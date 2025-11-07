@@ -128,10 +128,6 @@ https://localhost:5001/scalar/v1
 
 This project is currently in active development. Come talk to me about contributions.  It's mostly a one-person project at the moment, but I'm open to ideas and testing help!
 
-## 📜 License
-
-See [LICENSE.md](LICENSE.md) for details.
-
 ## 🙏 Acknowledgments
 
 - **Travis Smith / Sensorium** - Creator of the [TeensyROM Hardware](https://github.com/SensoriumEmbedded/TeensyROM)
@@ -143,3 +139,7 @@ See [LICENSE.md](LICENSE.md) for details.
 - [TeensyROM Hardware](https://github.com/SensoriumEmbedded/TeensyROM) - The hardware cartridge this application controls
 - [TeensyROM-UI](https://github.com/MetalHexx/TeensyROM-UI) - The original Windows desktop UI application
 - [TeensyROM-CLI](https://github.com/MetalHexx/TeensyROM-CLI) - Cross-platform command-line interface for TeensyROM device management
+
+## 📜 License
+
+See [LICENSE.md](LICENSE.md) for details.
