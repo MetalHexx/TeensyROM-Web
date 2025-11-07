@@ -4,48 +4,11 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 
 > **Note**: This project is the spiritual successor to the original [TeensyROM-UI WPF desktop application](https://github.com/MetalHexx/TeensyROM-UI). While the original application provided a Windows-only desktop experience, this new implementation offers cross-platform compatibility through a modern web architecture that can run on Windows, macOS, and Linux.
 
-## 🏗️ Architecture
-
-TeensyROM Web is built as a hybrid application combining:
-
-- **Backend**: .NET 9 Web API with Clean Architecture patterns
-  - RadEndpoints for minimal APIs
-  - MediatR for CQRS operations
-  - SignalR for real-time device communication
-  - Cross-platform serial port management
-
-- **Frontend**: Angular 19 with Nx monorepo architecture
-  - Standalone components with modern Angular patterns
-  - NgRx Signal Store for state management
-  - Angular Material UI with custom theming
-  - Clean Architecture with strict dependency boundaries
-
-## 🎯 Deployment Modes
-
-This application can be deployed in two ways:
-
-1. **Standalone Web Application** - Full-stack application with integrated API and web UI
-2. **API-Only Mode** - Headless API server for integration with custom clients or automation
-
 ## ✨ Features
-
-### Device Management
-- **Auto-Discovery**: Automatic detection of connected TeensyROM devices via serial ports
-- **Multi-Device Support**: Connect and manage multiple TeensyROM cartridges simultaneously
-- **Real-Time Device Logs**: Live device log debug monitoring of backend / serial operations
-- **Device Controls**: Ping and reset operations across all connected devices
-- **Storage Indexing**: Index SD and USB storage for fast file access, random launches and search
-
-### File Browser & Navigation
-- **Dual Storage**: Navigate both SD and USB storage with independent directory trees
-- **Directory Tree**: Collapsible tree view for hierarchical folder navigation
-- **File Listings**: Virtual scrolling file lists optimized for large directories (1000+ items)
-- **Breadcrumb Navigation**: Directory breadcrumb with quick navigation to parent folders
-- **Browser-like Directory Nav:**: Backtrack backward or forward through your directory navigation history
-- **Multi-Device Views**: Simultaneous file browsing across multiple connected devices
 
 ### Media Player & Playback
 - **File Launch**: Remote launching of games, SID music, and images
+- **Random Launch**: Random launching of all file types across storage devices.
 - **Playback Controls**: Play, pause, stop, next, and previous navigation
 - **Launch Modes**: 
   - **Sequential Mode**: Navigate through files in directory order
@@ -59,10 +22,6 @@ This application can be deployed in two ways:
 - **Full-Text Search**: Search across all indexed files on SD or USB storage (per storage type)
 - **Search Results View**: Dedicated view for browsing and launching search results
 - **File Type Filters**: Filter by All, Games, Music, Images, or Demos
-- **Scope Selection**: 
-  - **Directory Scope**: Search/shuffle within current directory
-  - **Storage Scope**: Search/shuffle across entire SD or USB storage (selected storage only)
-  - **All Scope**: Search/shuffle across all connected device storage (per device, per storage type)
 
 ### Play History & Favorites
 - **Play History Tracking**: Complete history of all launched files with timestamps
@@ -70,12 +29,20 @@ This application can be deployed in two ways:
 - **History View**: Dedicated panel for viewing and launching files from play history.
 - **Favorites System**: Mark files as favorites and toggle favorite status
 
-### User Interface
-- **Responsive Layout**: Adaptive UI that scales across desktop and tablet sizes
-- **Multi-Panel Views**: Split-screen device containers for managing multiple TeensyROMs
-- **Real-Time Indicators**: Visual feedback for currently playing files and loading states
-- **Error Handling**: Clear error messages and recovery options
-- **Material Design**: Modern Angular Material UI with consistent theming
+### File Browser & Navigation
+- **Dual Storage**: Navigate both SD and USB storage with independent directory trees
+- **Directory Tree**: Collapsible tree view for hierarchical folder navigation
+- **File Listings**: Virtual scrolling file lists optimized for large directories (2000+ items)
+- **Breadcrumb Navigation**: Directory breadcrumb with quick navigation to parent folders
+- **Browser-like Directory Nav:**: Backtrack backward or forward through your directory navigation history
+- **Multi-Device Views**: Simultaneous file browsing across multiple connected devices
+
+### Device Management
+- **Auto-Discovery**: Automatic detection of connected TeensyROM devices via serial ports
+- **Multi-Device Support**: Connect and manage multiple TeensyROM cartridges simultaneously
+- **Real-Time Device Logs**: Live device log debug monitoring of backend / serial operations
+- **Device Controls**: Ping and reset operations across all connected devices
+- **Storage Indexing**: Index SD and USB storage for fast file access, random launches and search
 
 ### API & Integration
 - **RESTful API**: Complete REST API with Scalar documentation (available at `/scalar/v1`)
@@ -87,13 +54,36 @@ This application can be deployed in two ways:
 
 Features planned for future releases:
 
+- **SID DJ Controls**: Advanced controls for live SID music mixing and performance
+- **MIDI Integration**: Full application control from MIDI devices.
+- **Cross-Storage Random Launch**:  Random selection across both SD and USB storage
 - **Cross-Storage Search**: Search across both SD and USB storage simultaneously
 - **Playlists**: Create, manage, and play custom playlists of games, music, and images
 - **File Transfer**: Drag-and-drop file uploads to device storage with progress tracking
 - **Settings Management**: User preferences, default behaviors, and application configuration
 - **Theme System**: Light/dark mode with custom color schemes and Material theme customization
 - **Keyboard Controls**: Keyboard shortcuts for playback, navigation, and common operations
-- **SID DJ Controls**: Advanced MIDI integration for live SID music mixing and performance
+- **Cross Storage Scope Selection**: Search/shuffle across all connected device storage (per device, per storage type)
+- **Scope Selection**: 
+  - **Storage Scope**: Search/shuffle across all storage devices SD or USB storage
+  - **Directory Pinning**: Search/shuffle scoped to a specific directory and children.
+
+## 🏗️ Architecture
+
+TeensyROM Web is built as a hybrid application combining:
+
+- **Backend**: .NET 9 Web API 
+  - Cross-platform serial port management
+
+- **Frontend**: Angular 19 with Nx monorepo architecture
+  - Frontend Web Application that communicates with API
+
+## 🎯 Deployment Modes
+
+This application can be deployed in two ways:
+
+1. **Standalone Web Application** - Full-stack application with integrated API and web UI
+2. **API-Only Mode** - Headless API server for integration with custom clients or automation
 
 ## 🚀 Quick Start
 
