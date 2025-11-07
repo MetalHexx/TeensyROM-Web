@@ -1,0 +1,31 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+
+  // Force overflow hidden when disabled
+  &.no-overflow {
+    .stretch-card,
+    .stretch-card * {
+      overflow: hidden !important;
+    }
+  }
+
+  mat-card-content {
+    margin-top: 16px;
+  }
+}
+
+.corner-content {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1;
+}
+
+.metadata-source {
+  margin: 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  text-align: right;
+}

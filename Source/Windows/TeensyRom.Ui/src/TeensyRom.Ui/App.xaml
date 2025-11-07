@@ -1,0 +1,121 @@
+﻿<Application 
+    x:Class="TeensyRom.Ui.App"
+    xmlns:ui="clr-namespace:TeensyRom.Ui"
+    xmlns:Paging="clr-namespace:TeensyRom.Ui.Controls.Paging"
+    xmlns:Help="clr-namespace:TeensyRom.Ui.Features.Help"
+    xmlns:FileInfo="clr-namespace:TeensyRom.Ui.Controls.FileInfo"
+    xmlns:DirectoryTree="clr-namespace:TeensyRom.Ui.Controls.DirectoryTree"
+    xmlns:PlayToolbar="clr-namespace:TeensyRom.Ui.Controls.PlayToolbar"
+    xmlns:DirectoryList="clr-namespace:TeensyRom.Ui.Controls.DirectoryList"
+    xmlns:Search="clr-namespace:TeensyRom.Ui.Controls.Search"
+    xmlns:DirectoryChips="clr-namespace:TeensyRom.Ui.Controls.DirectoryChips"
+    xmlns:Terminal="clr-namespace:TeensyRom.Ui.Features.Terminal"
+    xmlns:Settings="clr-namespace:TeensyRom.Ui.Features.Settings"
+    xmlns:CacheButton="clr-namespace:TeensyRom.Ui.Controls.CacheButton"
+    xmlns:FeatureTitle="clr-namespace:TeensyRom.Ui.Controls.FeatureTitle"
+    xmlns:SearchResultsToolbar="clr-namespace:TeensyRom.Ui.Controls.SearchResultsToolbar"
+    xmlns:Discover="clr-namespace:TeensyRom.Ui.Features.Discover"
+    xmlns:LibraryFilter="clr-namespace:TeensyRom.Ui.Controls.LibraryFilter"
+    xmlns:StorageSelector="clr-namespace:TeensyRom.Ui.Controls.StorageSelector"
+    xmlns:SerialCommand="clr-namespace:TeensyRom.Ui.Features.Terminal.SerialCommand"
+    
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"           
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"     
+    d1p1:Ignorable="d" xmlns:d1p1="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Startup="OnStartup">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Primary/MaterialDesignColor.DeepPurple.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Accent/MaterialDesignColor.Lime.xaml" />
+                <ResourceDictionary Source="AppResourceDictionary.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <DataTemplate DataType="{x:Type Paging:PagingViewModel}">
+                <Paging:PagingView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type Help:HelpViewModel}">
+                <Help:HelpView />
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type FileInfo:FileInfoViewModel}">
+                <FileInfo:FileInfoView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type DirectoryTree:DirectoryTreeViewModel}">
+                <DirectoryTree:DirectoryTreeView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type PlayToolbar:PlayToolbarViewModel}">
+                <PlayToolbar:PlayToolbarView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type DirectoryList:DirectoryListViewModel}">
+                <DirectoryList:DirectoryListView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type Search:SearchViewModel}">
+                <Search:SearchView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type Terminal:TerminalViewModel}">
+                <Terminal:TerminalView/>
+            </DataTemplate>
+            
+            <DataTemplate DataType="{x:Type Settings:SettingsViewModel}">
+                <Settings:SettingsView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type DirectoryChips:DirectoryChipsViewModel}">
+                <DirectoryChips:DirectoryChipsView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type CacheButton:CacheButtonViewModel}">
+                <CacheButton:CacheButtonView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type FeatureTitle:FeatureTitleViewModel}">
+                <FeatureTitle:FeatureTitleView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type SearchResultsToolbar:SearchResultsToolbarViewModel}">
+                <SearchResultsToolbar:SearchResultsToolbarView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type Discover:DiscoverViewModel}">
+                <Discover:DiscoverView/>
+            </DataTemplate>
+
+
+            <DataTemplate DataType="{x:Type LibraryFilter:LibraryFilterViewModel}">
+                <LibraryFilter:LibraryFilterView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type StorageSelector:StorageSelectorViewModel}">
+                <StorageSelector:StorageSelectorView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type SerialCommand:SerialCommandViewModel}">
+                <SerialCommand:SerialCommandView/>
+            </DataTemplate>
+            
+            <DataTemplate DataType="{x:Type Settings:NoteMappingViewModel}">
+                <Settings:NoteMappingView/>
+            </DataTemplate>
+            
+            <DataTemplate DataType="{x:Type Settings:DualNoteMappingViewModel}">
+                <Settings:DualNoteMappingView/>
+            </DataTemplate>
+
+            <DataTemplate DataType="{x:Type Settings:CCMappingViewModel}">
+                <Settings:CCMappingView/>
+            </DataTemplate>
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

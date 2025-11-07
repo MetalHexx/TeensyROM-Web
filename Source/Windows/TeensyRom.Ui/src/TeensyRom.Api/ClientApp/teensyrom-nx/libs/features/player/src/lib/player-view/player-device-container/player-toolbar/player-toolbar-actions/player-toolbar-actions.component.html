@@ -1,0 +1,26 @@
+<div class="toolbar-actions">
+  <lib-icon-button
+    icon="shuffle"
+    ariaLabel="Toggle Shuffle Mode"
+    size="large"
+    variant="rounded-transparent"
+    [color]="isShuffleMode() ? 'highlight' : 'normal'"
+    (buttonClick)="toggleShuffleMode()"
+  >
+  </lib-icon-button>
+  <lib-icon-button
+    data-testid="favorite-button"
+    [ariaLabel]="isFavorite() ? 'Remove from Favorites' : 'Add to Favorites'"
+    size="large"
+    variant="rounded-transparent"
+    [color]="'normal'"
+    [disabled]="!currentFile() || isFavoriteOperationInProgress()"
+    (buttonClick)="toggleFavorite()"
+  >
+    @if (isFavorite()) {
+    <mat-icon>favorite</mat-icon>
+    } @else {
+    <mat-icon>favorite_border</mat-icon>
+    }
+  </lib-icon-button>
+</div>

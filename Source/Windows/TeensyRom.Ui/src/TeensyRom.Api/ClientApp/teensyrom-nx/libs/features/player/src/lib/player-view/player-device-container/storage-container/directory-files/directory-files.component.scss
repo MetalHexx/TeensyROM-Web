@@ -1,0 +1,45 @@
+@use '../../../../../../../../ui/styles/src/lib/theme/styles.scss' as styles;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
+.directory-files {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+
+  lib-scaling-card {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+}
+
+.viewport-wrapper {
+  position: absolute;
+  top: 60px;
+  left: 16px;
+  right: 0;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.files-viewport {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+// Fix for active highlight extending beyond normal selected style on the right
+// The list-item-highlight class applies border-radius that extends beyond
+// the normal selected state due to this component's special padding requirements
+.file-list-item {
+  margin-right: 16px;
+}

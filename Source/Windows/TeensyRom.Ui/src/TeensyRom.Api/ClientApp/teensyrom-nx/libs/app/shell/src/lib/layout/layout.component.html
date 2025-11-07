@@ -1,0 +1,21 @@
+<lib-header></lib-header>
+
+<mat-sidenav-container class="sidenav-container">
+  <mat-sidenav
+    class="custom-sidenav glassy"
+    mode="over"
+    [opened]="navService.isNavOpen()"
+    (closedStart)="navService.closeNav()"
+  >
+    <lib-nav-menu></lib-nav-menu>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="router-container">
+    <div class="router-content">
+      <h2 class="view-title">{{ pageTitle() }}</h2>
+      <router-outlet />
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>
+
+<lib-alert-container></lib-alert-container>

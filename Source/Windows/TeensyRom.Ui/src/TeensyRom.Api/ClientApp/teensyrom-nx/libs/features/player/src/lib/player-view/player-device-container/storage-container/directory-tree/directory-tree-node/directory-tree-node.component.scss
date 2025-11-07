@@ -1,0 +1,16 @@
+@use '../../../../../../../../../ui/styles/src/lib/theme/styles.scss' as styles;
+
+:host {
+  display: inline-block;
+}
+
+.directory-tree-node {
+  @include styles.selectable-item;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  lib-icon-label {
+    flex-shrink: 0;
+  }
+}

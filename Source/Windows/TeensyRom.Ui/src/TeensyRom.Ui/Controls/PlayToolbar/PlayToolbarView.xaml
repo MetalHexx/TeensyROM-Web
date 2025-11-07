@@ -1,0 +1,533 @@
+﻿<UserControl x:Class="TeensyRom.Ui.Controls.PlayToolbar.PlayToolbarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:TeensyRom.Ui.Controls.PlayToolbar"
+             xmlns:behaviors="clr-namespace:TeensyRom.Ui.Helpers.Behaviors"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes" 
+             mc:Ignorable="d">
+    <UserControl.Resources>
+        <Style x:Key="ShuffleModeButtonStyle" TargetType="Button" BasedOn="{StaticResource StorageIconButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ShuffleModeEnabled}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource EnabledColor}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="RepeatModeButtonStyle" TargetType="Button" BasedOn="{StaticResource StorageIconButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding RepeatModeEnabled}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource EnabledColor}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Setter Property="Opacity" Value="1" />
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Trigger.EnterActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 To="0.80"
+                                                 Duration="0:0:0.5" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </Trigger.EnterActions>
+                        <Trigger.ExitActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 To="1"
+                                                 Duration="0:0:0.5" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </Trigger.ExitActions>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
+
+        <Grid Background="Transparent">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            
+        </Grid>
+
+        <Border Grid.Row="0" x:Name="PopupContent" HorizontalAlignment="Stretch" Margin="15 0 0 0" Height="0">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition></RowDefinition>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialDesign:PackIcon 
+                        Kind="Snail"                         
+                        Height="24" Width="24" 
+                        Foreground="LightGray"
+                        Opacity="0.3"
+                        ToolTip="Controls the speed of the playing song."
+                        Margin="0 6 10 0"/>
+
+                    <Slider Style="{StaticResource MaterialDesignSlider}"
+                        x:Name="SetSpeedSlider"
+                        IsEnabled="{Binding SetSpeedEnabled}"
+                        MouseDoubleClick="SetSpeedSlider_MouseDoubleClick"
+                        ValueChanged="SetSpeedSlider_ValueChanged"
+                        ToolTip="Controls the speed of the playing song.  &#x0a;• Keyboard arrows adjust the speed by 1.  &#x0a;• Page Up/Down buttons adjusts speed by 10. &#x0a;• Double-click to reverts to default speed."
+                        Maximum="{Binding MaxSpeed}"
+                        Minimum="{Binding MinSpeed}"
+                        IsSnapToTickEnabled="True"
+                        TickFrequency="0.01"           
+                        SmallChange="0.01"
+                        LargeChange="1" 
+                        Value="{Binding RawSpeedValue, Mode=OneWay}"
+                        Width="190"
+                        Margin="0 7 0 0"/>
+
+                    <materialDesign:PackIcon 
+                        Kind="Rabbit" 
+                        Opacity="0.3"                    
+                        Height="24" Width="24" 
+                        Foreground="LightGray"
+                        ToolTip="Controls the speed of the playing song."
+                        Margin="3 6 5 0"/>
+
+                    <TextBlock Text="{Binding ActualSpeedPercent, StringFormat=F2}"
+                        IsEnabled="{Binding SetSpeedEnabled}"
+                        VerticalAlignment="Center"                        
+                        FontSize="14"
+                        Foreground="White"
+                        ToolTip="Percentage increase or decrease of the playing song."/>
+                    
+                    <TextBlock VerticalAlignment="Center">%</TextBlock>
+                    
+                     <Rectangle Width="1"
+                        Fill="Gray"
+                        VerticalAlignment="Stretch"                        
+                        Opacity="0.5"
+                        Margin="15 0 15 0"/>
+
+                    
+                    <StackPanel IsEnabled="{Binding IsSong}" Orientation="Horizontal">
+                        <CheckBox IsChecked="{Binding Voice1Enabled}" Foreground="{StaticResource PrimaryHueLightBrush}">Voice 1</CheckBox>
+                        <CheckBox IsChecked="{Binding Voice2Enabled}" Margin="10 0 0 0" Foreground="{StaticResource PrimaryHueLightBrush}">Voice 2</CheckBox>
+                        <CheckBox IsChecked="{Binding Voice3Enabled}" Margin="10 0 0 0" Foreground="{StaticResource PrimaryHueLightBrush}">Voice 3</CheckBox>                        
+                    </StackPanel>
+                    
+                    <Rectangle Width="1"
+                        Fill="Gray"
+                        VerticalAlignment="Stretch"                        
+                        Opacity="0.5"
+                        Margin="15 0 15 0"/>
+                    
+                    <ComboBox
+                        x:Name="SpeedCurveList"
+                        ItemsSource="{Binding SpeedCurveOptions}"
+                        SelectedItem="{Binding SelectedSpeedCurve, Mode=TwoWay}"
+                        IsEnabled="{Binding SetSpeedEnabled}"                    
+                        FontFamily="Arial"
+                        Foreground="{StaticResource PrimaryHueLightBrush}"
+                        materialDesign:TextFieldAssist.UnderlineBrush="{StaticResource PrimaryHueLightBrush}"
+                        materialDesign:TextFieldAssist.PrefixText="Curve"
+                        ToolTip="The curve used for the speed control.&#x0a;• Linear Range: -68% to +127% &#x0a;• Logarithmic Range -56% to +10,000%."
+                        Margin="0 0 10 0"/>
+                    
+                    <ComboBox
+                        x:Name="SeekSpeedList"
+                        ItemsSource="{Binding SeekSpeedOptions}"
+                        SelectedItem="{Binding SelectedSeekSpeed, Mode=TwoWay}"
+                        IsEnabled="{Binding SetSpeedEnabled}"                    
+                        FontFamily="Arial"
+                        Foreground="{StaticResource PrimaryHueLightBrush}"
+                        materialDesign:TextFieldAssist.UnderlineBrush="{StaticResource PrimaryHueLightBrush}"
+                        materialDesign:TextFieldAssist.PrefixText="Seek"
+                        ToolTip="The curve used for the speed control.&#x0a;• Accurate Speed: 900%. Use if play timer accuracy is important.&#x0a;• Insane: Seeks at 10,000% speed.  Play timer becomes inaccurate."
+                        Margin="10 0 0 0"/>
+                    
+                    <Rectangle Width="1"
+                        Fill="Gray"
+                        VerticalAlignment="Stretch"                        
+                        Opacity="0.5"
+                        Margin="15 0 15 0"/>
+                    
+                    <Button
+                        Grid.Column="1"
+                        IsEnabled="{Binding IsSong}"
+                        Command="{Binding SendSongCommand}"                      
+                        ToolTip="Launch song on another TeensyROM UI instance."
+                        Style="{StaticResource StorageIconButton}"
+                        Margin="-5 2 0 0">
+                        <materialDesign:PackIcon Kind="SendCircleOutline"/>
+                    </Button>
+                    
+                    <Button
+                        Grid.Column="1"
+                        IsEnabled="{Binding IsSong}"
+                        Command="{Binding SaveSongSettingsCommand}"                      
+                        ToolTip="Save current song speed settings"
+                        Style="{StaticResource StorageIconButton}"
+                        Margin="10 2 0 0">
+                        <materialDesign:PackIcon Kind="FloppyDiscCogOutline"/>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="0 13 10 0">
+                    
+                    <ComboBox
+                        x:Name="TimerComboBox"
+                        ItemsSource="{Binding TimerOptions}"
+                        SelectedItem="{Binding TimerSeconds, Mode=TwoWay}"
+                        IsEnabled="{Binding TimedPlayComboBoxEnabled}"                    
+                        FontFamily="Arial"
+                        Foreground="{StaticResource EnabledColor}"
+                        materialDesign:TextFieldAssist.UnderlineBrush="{StaticResource EnabledColor}"
+                        materialDesign:TextFieldAssist.PrefixText="Timer:"
+                        ToolTip="The amount of time to play the current file before launching the next."
+                        Margin="20 0 0 0"/>
+
+                    <ComboBox
+                        x:Name="ScopeComboBox"
+                        ItemsSource="{Binding ScopeOptions}"
+                        SelectedItem="{Binding SelectedScope, Mode=TwoWay}"
+                        IsEnabled="{Binding ShuffleModeEnabled}"
+                        FontFamily="Arial"
+                        Foreground="{StaticResource EnabledColor}"
+                        materialDesign:TextFieldAssist.UnderlineBrush="{StaticResource EnabledColor}"
+                        materialDesign:TextFieldAssist.PrefixText="Shuffle Scope:"
+                        ToolTip="Shuffle mode will randomly select files at varying depths:&#x0a;• Selected Storage: Files across your entire selected storage device.&#x0a;• Directory (Shallow): Files in the pinned directory only.&#x0a;• Directory (Deep): Files in the pinned directory and deeply nested in directories below it."
+                        Margin="20 0 0 0"/>
+
+                </StackPanel>
+                
+                
+            </Grid>                        
+        </Border>
+
+        <Grid Grid.Row="1" VerticalAlignment="Top"            
+            x:Name="ProgressContainer"            
+            MouseEnter="ProgressContainer_MouseEnter"
+            MouseLeave="ProgressContainer_MouseLeave">
+
+            <ProgressBar x:Name="ProgressIndicator"
+                Value="{Binding ProgressSliderPercentage, Mode=OneWay}"
+                Visibility="{Binding ProgressEnabled, Converter={StaticResource BoolToVisibilityConvertor}}"
+                Maximum="1"
+                Minimum="0"
+                Height="4"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Center"
+                Opacity="1"/>
+
+            <Slider x:Name="ProgressSlider"
+                Value="{Binding ProgressSliderPercentage, Mode=TwoWay}"
+                Visibility="{Binding IsSong, Converter={StaticResource BoolToVisibilityConvertor}}"
+                Maximum="1"
+                Minimum="0"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Center"
+                Margin="0 -8 0 -8"
+                Style="{StaticResource MaterialDesignSlider}"
+                Opacity="0"/>
+            
+            <Separator 
+                x:Name="AdvancedSeparator"
+                Margin="0 -8 0 -8"
+                Style="{StaticResource MaterialDesignSeparator}" />
+        </Grid>
+
+
+
+        <Grid Grid.Row="2" Margin="10 10 0 10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Top" Margin="0 3 0 0">
+                <Button x:Name="PreviousButton"
+                    Command="{Binding PreviousCommand}"  
+                    ToolTip="Previous"
+                    Style="{StaticResource PlaybarPrevSkipButton}">
+                    <materialDesign:PackIcon Kind="SkipPrevious" />
+                </Button>
+
+                <Button x:Name="PlayButton"
+                    Command="{Binding TogglePlayCommand}" 
+                    Visibility="{Binding PlayButtonEnabled, Converter={StaticResource BoolToVisibilityConvertor}}"   
+                    ToolTip="Play"
+                    Style="{StaticResource PlaybarButton}">
+                    <materialDesign:PackIcon Kind="Play" />
+                </Button>
+
+                <Button x:Name="PauseButton"
+                    Command="{Binding TogglePlayCommand}" 
+                    Visibility="{Binding PauseButtonEnabled, Converter={StaticResource BoolToVisibilityConvertor}}"   
+                    ToolTip="Pause"
+                    Style="{StaticResource PlaybarButton}">
+                    <materialDesign:PackIcon Kind="Pause" />
+                </Button>
+
+                <Button x:Name="Stop"
+                    Command="{Binding TogglePlayCommand}" 
+                    Visibility="{Binding StopButtonEnabled, Converter={StaticResource BoolToVisibilityConvertor}}"   
+                    ToolTip="Stops the game or image by resetting the TR"
+                    Style="{StaticResource PlaybarButton}">
+                    <materialDesign:PackIcon Kind="Stop" />
+                </Button>
+
+                <Button x:Name="FastForwardButton"
+                    Visibility="{Binding IsSong, Converter={StaticResource BoolToVisibilityConvertor}}"
+                    Command="{Binding FastForwardCommand}"  
+                    ToolTip="Fast Forward Song."
+                    Style="{StaticResource FastForwardButtonStyle}"
+                    Margin="10 0 0 0">
+                    <materialDesign:PackIcon Kind="FastForwardOutline" />
+                </Button>
+
+                <Button x:Name="NextButton"
+                    Command="{Binding NextCommand}"  
+                    ToolTip="Play the next file. &#x0a;• In normal mode, it goes to the next file in the directory of the currently playing file.  &#x0a;• In shuffle mode, it will go to the next random file in your collection based on the shuffle scope.  &#x0a;• The filter above will determine the type of file that gets played."
+                    Style="{StaticResource PlaybarPrevSkipButton}">
+                    <materialDesign:PackIcon Kind="SkipNext" />
+                </Button>
+                
+                <TextBlock 
+                    Text="{Binding Progress.CurrentTime,  Mode=OneWay}" 
+                    Visibility="{Binding ProgressEnabled, Converter={StaticResource BoolToVisibilityConvertor}}"
+                    VerticalAlignment="Center" Margin="10 0 0 0"/>
+                
+                <TextBlock Text="/" 
+                    Visibility="{Binding ProgressEnabled, Converter={StaticResource BoolToVisibilityConvertor}}"
+                    VerticalAlignment="Center" Margin="5 0 5 0"/>
+                
+                <TextBlock 
+                    Text="{Binding Progress.TotalTime,  Mode=OneWay}" 
+                    Visibility="{Binding ProgressEnabled, Converter={StaticResource BoolToVisibilityConvertor}}"
+                    VerticalAlignment="Center" Margin="0 0 0 0"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="30 4 0 0">
+                <Button
+                    Content="{Binding File.Title, Mode=OneWay}"
+                    Command="{Binding NavigateToFileDirCommand}"
+                    Visibility="{Binding ShowTitleOnly, Converter={StaticResource BoolToVisibilityConvertor}}"
+                    HorizontalContentAlignment="Left"
+                    ToolTip="Navigate to the file directory"
+                    FontFamily="Arial" FontSize="18"
+                    Foreground="White"
+                    Style="{StaticResource MaterialDesignFlatButton}"
+                    Padding="5 0 5 0"
+                    Margin="0 10 0 0"
+                    Height="25"                    
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Left">
+                </Button>
+
+                <Button
+                    Content="{Binding File.Title, Mode=OneWay}"
+                    Command="{Binding NavigateToFileDirCommand}"
+                    Visibility="{Binding ShowTitleOnly, Converter={StaticResource InverseBoolToVisibilityConvertor}}"
+                    HorizontalContentAlignment="Left"
+                    ToolTip="Navigate to the file directory"
+                    FontFamily="Arial" FontSize="18"
+                    Foreground="White"
+                    Style="{StaticResource MaterialDesignFlatButton}"
+                    Padding="5 0 5 0"
+                    Height="25"
+                    Margin="0 0 0 -3"                    
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Left">
+                </Button>
+
+                <StackPanel Orientation="Horizontal" Margin="5 5 10 0">
+                    <TextBlock 
+                        Text="{Binding File.Creator, Mode=OneWay}" 
+                        Visibility="{Binding ShowCreator, Converter={StaticResource BoolToVisibilityConvertor}}" 
+                        FontFamily="Arial"  VerticalAlignment="Center"/>
+                    
+                    <TextBlock 
+                        Text="•" 
+                        Visibility="{Binding ShowReleaseCreatorSeperator, Converter={StaticResource BoolToVisibilityConvertor}}" 
+                        FontFamily="Arial" VerticalAlignment="Center" Margin="10 0 10 0"/>
+                    
+                    <TextBlock 
+                        Text="{Binding File.ReleaseInfo, Mode=OneWay}" 
+                        Visibility="{Binding ShowReleaseInfo, Converter={StaticResource BoolToVisibilityConvertor}}" 
+                        FontFamily="Arial" VerticalAlignment="Center"/>
+                    
+                </StackPanel>
+                
+            </StackPanel>            
+
+            <Grid Grid.Column="2"
+                HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel 
+                    Grid.Column="0"
+                    Visibility="{Binding SubtunesEnabled, Converter={StaticResource BoolToVisibilityConvertor}}"
+                    Orientation="Horizontal" 
+                    Margin="0 0 0 0">
+                    <Button 
+                        Command="{Binding PreviousSubtuneCommand}"
+                        IsEnabled="{Binding SubtunePreviousButtonEnabled}"
+                        Style="{StaticResource MaterialDesignIconForegroundButton}"
+                        Foreground="{DynamicResource PrimaryHueLightBrush }"
+                        Height="30" Width="30"
+                        ToolTip="Previous Subtune"
+                        VerticalAlignment="Center"
+                        Margin="0 0 2 0">
+                        <materialDesign:PackIcon Kind="SkipPrevious"/>
+                    </Button>
+
+                    <ComboBox
+                        x:Name="SubtuneComboBox"
+                        ItemsSource="{Binding SubtuneNumberList}"
+                        SelectedItem="{Binding CurrentSubtuneIndex, Mode=TwoWay}"  
+                        materialDesign:TextFieldAssist.UnderlineBrush="{DynamicResource PrimaryHueLightBrush }"
+                        FontFamily="Arial"
+                        Height="30"
+                        materialDesign:TextFieldAssist.PrefixText="Subtune:"
+                        ToolTip="Change to a different subtune."
+                        Margin="0 0 0 0"/>
+
+                    <Button 
+                        Command="{Binding NextSubtuneCommand}"
+                        IsEnabled="{Binding SubtuneNextButtonEnabled}"
+                        Style="{StaticResource MaterialDesignIconForegroundButton}"
+                        Foreground="{DynamicResource PrimaryHueLightBrush }"
+                        Height="30" Width="30"
+                        ToolTip="Next Subtune"
+                        VerticalAlignment="Center"
+                        Margin="2 0 10 0">
+                        <materialDesign:PackIcon Kind="SkipNext" />
+                    </Button>
+
+                </StackPanel>
+
+                <Button
+                    Grid.Column="1"
+                    x:Name="AdvancedControlButton"
+                    Click="AdvancedControlButton_Click"                      
+                    ToolTip="Opens the advanced control options."
+                    Style="{StaticResource StorageIconButton}"
+                    Padding="0"
+                    Margin="5 10 5 5">
+                    <materialDesign:PackIcon Kind="Gear"/>
+                </Button>
+
+                <Button Grid.Column="3"
+                    x:Name="TimerButton"
+                    Command="{Binding ToggleTimedPlay}"  
+                    IsEnabled ="{Binding TimedPlayButtonEnabled}"
+                    ToolTip="Enables continuous timed play.&#x0a;• When the timer ends, the next file will be launched."
+                    Style="{StaticResource TimerModeButtonStyle}"
+                    Padding="0"
+                    Margin="5 10 5 5">
+                    <materialDesign:PackIcon Kind="TimerOutline" Margin="0 0 0 0"/>
+                </Button>
+                
+                <Button Grid.Column="5"
+                    x:Name="ShuffleModeButton"
+                    Command="{Binding ToggleShuffleCommand}"  
+                    ToolTip="Shuffle Mode.  &#x0a;• Enabling this will cause the next button to play random file from your collection.  &#x0a;• Disabling will play the next file in the current directory. &#x0a;• The filter selected will determine the file type that gets picked."
+                    Style="{StaticResource ShuffleModeButtonStyle}"
+                    Margin="5 10 5 5">
+                    <materialDesign:PackIcon Kind="Shuffle"/>
+                </Button>
+                
+                <Button Grid.Column="6"
+                    x:Name="RepeatModeButton"
+                    Visibility="{Binding IsSong, Converter={StaticResource BoolToVisibilityConvertor}}"
+                    Command="{Binding ToggleRepeatCommand}"  
+                    ToolTip="Repeat Mode.  &#x0a;• Enabling this will repeat the song upon completion."
+                    Style="{StaticResource RepeatModeButtonStyle}"
+                    Margin="5 10 5 5">
+                    <materialDesign:PackIcon Kind="Repeat"/>
+                </Button>
+
+                <Button Grid.Column="7"
+                    x:Name="ShareButton"
+                    Command="{Binding ShareCommand}"    
+                    Visibility="{Binding ShareVisible, Converter={StaticResource BoolToVisibilityConvertor}, Mode=OneWay}"
+                    ToolTip="Copies a shareable web link to the clipboard"
+                    Style="{StaticResource StorageIconButton}"
+                    Padding="0"
+                    Margin="5 10 5 5">
+                    <materialDesign:PackIcon Kind="Share" Margin="0 0 0 3"/>
+                </Button>
+                
+                <Button
+                    Grid.Column="8"
+                    x:Name="PlaylistButton"
+                    Command="{Binding PlaylistCommand}"                      
+                    ToolTip="Adds the current file to one or more playlists."
+                    Style="{StaticResource StorageIconButton}"
+                    Padding="0"
+                    Margin="5 10 5 5">
+                    <materialDesign:PackIcon Kind="PlaylistAdd"/>
+                </Button>
+                
+                <ToggleButton
+                    Grid.Column="9"
+                    IsChecked="{Binding File.IsFavorite, Mode=OneWay}"
+                    Command="{Binding ToggleFavoriteCommand}"
+                    Style="{StaticResource StorageToggleIconButton}"
+                    Margin="5 10 10 5"
+                    ToolTip="Toggle favorite status.">
+                    <materialDesign:PackIcon Width="24" Height="24">
+                        <materialDesign:PackIcon.Style>
+                            <Style TargetType="materialDesign:PackIcon">
+                                <Setter Property="Kind" Value="HeartOutline"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding File.IsFavorite, Mode=OneWay}" Value="True">
+                                        <Setter Property="Kind" Value="Heart"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialDesign:PackIcon.Style>
+                    </materialDesign:PackIcon>
+                </ToggleButton>
+
+            </Grid>
+
+        </Grid>        
+    </Grid>
+</UserControl>

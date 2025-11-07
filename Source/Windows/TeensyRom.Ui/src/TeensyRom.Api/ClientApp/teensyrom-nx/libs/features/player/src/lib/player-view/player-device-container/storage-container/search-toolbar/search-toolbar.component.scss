@@ -1,0 +1,15 @@
+:host {
+  width: 100%;
+  display: flex;
+}
+
+.search-toolbar-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .search-field {
+    flex: 1;
+    min-width: 200px;
+  }
+}

@@ -1,0 +1,31 @@
+@use '@angular/material' as mat;
+
+.logs-content {
+  max-height: 300px;
+  background: var(--mat-sys-surface-container-low);
+}
+
+.log-line {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.95rem;
+  color: var(--mat-sys-on-surface);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.no-logs {
+  text-align: center;
+  font-size: 1rem;
+  color: var(--color-dimmed);
+  padding: 2rem 0;
+}
+
+@media (max-width: 500px) {
+  .device-logs-card {
+    min-width: 200px;
+    max-width: 500px;
+  }
+  .logs-content {
+    max-height: 200px;
+  }
+}
