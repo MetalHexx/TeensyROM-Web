@@ -115,13 +115,15 @@ pnpm install
 pnpm start
 ```
 
-The API documentation will be available at `http://localhost:5168/scalar/` and the web UI at `http://localhost:4200`.
-
+### Web UI
+```
+https://localhost:4200
+```
 ### API Documentation
 
 Once the API is running, view the interactive API documentation at:
 ```
-https://localhost:5001/scalar/v1
+http://localhost:5168/scalar
 ```
 
 ## 🤝 Contributing
