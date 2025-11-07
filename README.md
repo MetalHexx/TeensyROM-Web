@@ -145,3 +145,12 @@ This project is currently in active development. Come talk to me about contribut
 ## 📜 License
 
 See [LICENSE.md](LICENSE.md) for details.
+
+<p align="center">
+  <img
+    src="https://github.com/user-attachments/assets/d330fa67-5902-4765-ad32-b56cfd6bec0b"
+    alt="image"
+    width="25%"
+  />
+</p>
+
