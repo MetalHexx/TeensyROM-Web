@@ -55,8 +55,9 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 
 Features planned for future releases:
 
+- **Official Releases**: Installable binaries without need to compile source
 - **SID DJ Controls**: Advanced controls for live SID music mixing and performance
-- **MIDI Integration**: Full application control from MIDI devices.
+- **MIDI Integration**: Full application control from MIDI devices
 - **Cross-Storage Random Launch**:  Random selection across both SD and USB storage
 - **Cross-Storage Search**: Search across both SD and USB storage simultaneously
 - **Playlists**: Create, manage, and play custom playlists of games, music, and images
