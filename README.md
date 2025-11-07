@@ -20,6 +20,7 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 
 ### Search & Filter
 - **Full-Text Search**: Search across all indexed files on SD or USB storage (per storage type)
+- **Boolean / Phrase Search**: Group phrases in quotes or add a plus for required terms/phrases E.g., `Iron +Maiden +"Aces High"`
 - **Search Results View**: Dedicated view for browsing and launching search results
 - **File Type Filters**: Filter by All, Games, Music, Images, or Demos
 
