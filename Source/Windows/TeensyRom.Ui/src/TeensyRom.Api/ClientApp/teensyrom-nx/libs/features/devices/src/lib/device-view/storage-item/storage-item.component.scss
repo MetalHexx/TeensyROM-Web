@@ -1,0 +1,54 @@
+:host {
+  display: block;
+  width: 100%;
+}
+mat-card {
+  outline: 1px solid #cccccc6d;
+  min-height: 65px;
+}
+mat-card,
+mat-card-content,
+mat-card-title,
+mat-card-header {
+  padding: 0 !important;
+}
+
+.storage-container {
+  display: flex;
+  min-height: 60px;
+
+  .left-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-left: 1rem;
+    padding-top: 0rem;
+    flex: 1;
+  }
+
+  .icon-label {
+    padding-top: 0.4rem;
+  }
+  .right-container {
+    padding-top: 0.4rem; // Fine-tune alignment with the icon
+    margin-left: 1.2rem;
+    padding-right: -1rem;
+  }
+}
+
+.status-container {
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-left: 2rem; // Align with the start of "USB Stick" text
+  margin-top: -0.2rem;
+  padding-bottom: 0.5rem;
+
+  .status-label {
+    &.success {
+      color: var(--color-highlight);
+    }
+    &.error {
+      color: var(--color-dimmed);
+    }
+  }
+}

@@ -1,0 +1,14 @@
+<lib-scaling-card
+  [title]="creatorName()"
+  [metadataSource]="metadataSource()"
+  [enableOverflow]="false"
+>
+  <div class="image-wrapper">
+    <lib-cycle-image
+      [images]="imageUrls()"
+      [intervalMs]="8000"
+      animationEntry="from-bottom-left"
+      animationExit="none"
+    />
+  </div>
+</lib-scaling-card>

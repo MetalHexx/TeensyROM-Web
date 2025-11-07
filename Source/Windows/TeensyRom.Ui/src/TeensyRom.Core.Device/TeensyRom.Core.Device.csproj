@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	<NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TeensyRom.Core.Serial\TeensyRom.Core.Serial.csproj" />
+    <ProjectReference Include="..\TeensyRom.Core.Storage\TeensyRom.Core.Storage.csproj" />
+  </ItemGroup>
+
+</Project>

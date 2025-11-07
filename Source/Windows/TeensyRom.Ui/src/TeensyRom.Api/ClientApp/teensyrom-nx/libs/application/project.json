@@ -1,0 +1,22 @@
+{
+  "name": "application",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/application/src",
+  "prefix": "lib",
+  "projectType": "library",
+  "tags": ["scope:application", "type:use-cases"],
+  "implicitDependencies": [],
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true,
+        "reportsDirectory": "../../coverage/{projectRoot}"
+      },
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "executor": "@nx/vite:test"
+    }
+  }
+}

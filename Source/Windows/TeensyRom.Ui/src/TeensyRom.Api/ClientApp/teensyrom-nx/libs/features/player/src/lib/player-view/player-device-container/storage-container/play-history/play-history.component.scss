@@ -1,0 +1,21 @@
+@use '../../../../../../../../ui/styles/src/lib/theme/styles.scss' as styles;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.play-history {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}

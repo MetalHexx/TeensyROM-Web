@@ -1,0 +1,68 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	<NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Music\Hvsc\SIDlist_79_UTF8.csv" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Ardalis.SmartEnum" Version="7.0.0" />
+    <PackageReference Include="CsvHelper" Version="30.0.1" />
+    <PackageReference Include="MediatR" Version="12.2.0" />
+    <PackageReference Include="System.IO.Ports" Version="9.0.6" />
+    <PackageReference Include="System.Reactive" Version="6.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Assets\Firmware\TeensyROM.0.5.14.hex">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Game\Images\OneLoad64.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Music\DeepSidDB\deepsid_db.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Music\Deepsid_db\deepsid_db.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Music\Images\Composers\Composers.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Music\SidList\SIDlist_79_UTF8.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Music\SidList\SIDlist_82_UTF8.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Other\Sensorium.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Other\TeensyROM-Hardware-Purple.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Other\TeensyROM-Hardware.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\Tools\Vice\vice-bins.zip">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Assets\Game\Images\" />
+    <Folder Include="Assets\Music\Deepsid_db\" />
+    <Folder Include="Assets\Music\Images\Composers\" />
+    <Folder Include="Assets\Music\SidList\" />
+  </ItemGroup>
+
+</Project>

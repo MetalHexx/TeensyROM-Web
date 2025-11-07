@@ -1,0 +1,28 @@
+.breadcrumb-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.breadcrumb-chip {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--mat-chip-hover-state-layer-color, rgba(0, 0, 0, 0.04));
+  }
+
+  &:focus {
+    outline: 2px solid var(--mat-chip-focus-state-layer-color, rgba(0, 0, 0, 0.12));
+    outline-offset: 2px;
+  }
+}
+
+.breadcrumb-separator {
+  color: var(--color-dimmed, #666);
+  font-weight: 600;
+  font-size: 1.4em;
+  margin: 0;
+  user-select: none;
+}

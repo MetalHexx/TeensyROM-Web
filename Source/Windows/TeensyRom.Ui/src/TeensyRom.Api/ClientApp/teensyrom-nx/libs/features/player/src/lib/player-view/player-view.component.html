@@ -1,0 +1,21 @@
+@if (connectedDevices().length === 0) {
+
+<lib-empty-state-message
+  icon="devices"
+  title="No Connected Devices"
+  message="Connect a TeensyROM device to get started."
+  secondaryMessage="Visit the <strong>Device View</strong> to manage your connected devices."
+>
+</lib-empty-state-message>
+
+} @else {
+
+<div class="device-list">
+  @for (device of connectedDevices(); track device.deviceId) {
+  <div class="player-device-list-item">
+    <lib-player-device-container [device]="device"></lib-player-device-container>
+  </div>
+  }
+</div>
+
+}

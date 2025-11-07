@@ -1,0 +1,38 @@
+using Scalar.AspNetCore;
+using System.Text.Json.Serialization;
+
+namespace TeensyRom.Api.Startup
+{
+    public static class ApiDocStartupExtensions
+    {
+        /// <summary>
+        /// Adds and configures OpenAPI/Scalar with XML comments and custom UI options.
+        /// </summary>
+        public static IServiceCollection AddApiDocs(this IServiceCollection services)
+        {
+            //Needed to avoid adding patterns to nullable ints.
+            services.ConfigureHttpJsonOptions(options =>
+            {
+                options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+                options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            });
+            services.AddOpenApi();
+            return services;
+        }
+
+        /// <summary>
+        /// Maps OpenAPI and Scalar endpoints with custom UI options.
+        /// </summary>
+        public static WebApplication MapApiDocs(this WebApplication app)
+        {
+            app.MapOpenApi();
+            app.MapScalarApiReference(options =>
+            {
+                options
+                    .WithTitle("TeensyROM API")
+                    .WithTheme(ScalarTheme.Laserwave);
+            });
+            return app;
+        }
+    }
+}
