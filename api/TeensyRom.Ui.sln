@@ -14,8 +14,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TeensyRom.Tests.Unit", "src
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{7E3C6ECA-A1A8-446F-A8D0-A662F109F2B9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Sandbox", "src\TeensyRom.Sandbox\TeensyRom.Sandbox.csproj", "{92B66FA4-D2A5-4C32-875D-4F67C78213CC}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Serial", "src\TeensyRom.Core.Serial\TeensyRom.Core.Serial.csproj", "{CBBEC5BE-853A-4BD8-8F64-22B8ECE4F6F4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Storage", "src\TeensyRom.Core.Storage\TeensyRom.Core.Storage.csproj", "{DF947B64-0B87-4D44-A4B6-5E3D393470F1}"
@@ -66,18 +64,6 @@ Global
 		{5B6FE7D7-3EEF-4B6F-9EA3-4FD2268C7311}.Release|x64.Build.0 = Release|Any CPU
 		{5B6FE7D7-3EEF-4B6F-9EA3-4FD2268C7311}.Release|x86.ActiveCfg = Release|Any CPU
 		{5B6FE7D7-3EEF-4B6F-9EA3-4FD2268C7311}.Release|x86.Build.0 = Release|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Debug|x64.Build.0 = Debug|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Debug|x86.Build.0 = Debug|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Release|x64.ActiveCfg = Release|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Release|x64.Build.0 = Release|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Release|x86.ActiveCfg = Release|Any CPU
-		{92B66FA4-D2A5-4C32-875D-4F67C78213CC}.Release|x86.Build.0 = Release|Any CPU
 		{CBBEC5BE-853A-4BD8-8F64-22B8ECE4F6F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{CBBEC5BE-853A-4BD8-8F64-22B8ECE4F6F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CBBEC5BE-853A-4BD8-8F64-22B8ECE4F6F4}.Debug|x64.ActiveCfg = Debug|Any CPU

@@ -12,7 +12,7 @@ Simple steps to regenerate the TypeScript HTTP client from the .NET API.
 
 ### 1. Build the API Project
 
-From the Angular workspace (`ClientApp/teensyrom-nx`):
+From the Angular workspace (`ui/teensyrom-nx`):
 
 ```bash
 dotnet build ../../TeensyRom.Api.csproj

@@ -5,7 +5,7 @@
 **Hybrid .NET/Angular Application** for TeensyROM device management and media playback.
 
 - **Backend**: .NET 9 Web API (`TeensyRom.Api`) with RadEndpoints, MediatR CQRS, SignalR real-time communication
-- **Frontend**: Angular 19 Nx monorepo with Clean Architecture (`ClientApp/teensyrom-nx`)
+- **Frontend**: Angular 19 Nx monorepo with Clean Architecture (`ui/teensyrom-nx`)
 - **API Docs**: Available at `/scalar/v1` (not Swagger)
 
 ## Critical Architecture Patterns
