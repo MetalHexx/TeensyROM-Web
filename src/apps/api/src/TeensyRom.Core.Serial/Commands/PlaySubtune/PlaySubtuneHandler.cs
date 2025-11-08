@@ -10,7 +10,7 @@ namespace TeensyRom.Core.Commands.PlaySubtune
         {
             try
             {
-                playSubtune.Execute((uint)request.SubtuneIndex);
+                playSubtune.Execute(request.Serial, (uint)request.SubtuneIndex);
             }
             catch (TeensyException ex)
             {

@@ -25,13 +25,13 @@ namespace TeensyRom.Core.Serial.Commands.Composite.StartSeek
                 }
                 if (request.Direction is SeekDirection.Backward)
                 {
-                    playSubtune.Execute((uint)request.SubtuneIndex);
+                    playSubtune.Execute(request.Serial, (uint)request.SubtuneIndex);
                 }
                 if (request.ShouldMuteVoices)
                 {
-                    await muteVoices.Execute(VoiceState.Disabled, VoiceState.Disabled, VoiceState.Disabled);
+                    await muteVoices.Execute(request.Serial, VoiceState.Disabled, VoiceState.Disabled, VoiceState.Disabled);
                 }
-                await setMusicSpeed.Execute(request.SeekSpeed, MusicSpeedCurveTypes.Logarithmic);
+                await setMusicSpeed.Execute(request.Serial, request.SeekSpeed, MusicSpeedCurveTypes.Logarithmic);
             }
             catch (TeensyException ex)
             {

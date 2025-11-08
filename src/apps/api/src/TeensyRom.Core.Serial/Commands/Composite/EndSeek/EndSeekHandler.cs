@@ -15,11 +15,11 @@ namespace TeensyRom.Core.Serial.Commands.Composite.EndSeek
         {
             try
             {
-                await setMusicSpeed.Execute(request.SeekSpeed, request.SpeedCurve);
+                await setMusicSpeed.Execute(request.Serial, request.SeekSpeed, request.SpeedCurve);
 
                 if (request.ShouldEnableVoices)
                 {
-                    await muteVoices.Execute(VoiceState.Enabled, VoiceState.Enabled, VoiceState.Enabled);
+                    await muteVoices.Execute(request.Serial, VoiceState.Enabled, VoiceState.Enabled, VoiceState.Enabled);
                 }
             }
             catch (TeensyException ex)

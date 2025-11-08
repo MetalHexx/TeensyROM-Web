@@ -126,6 +126,7 @@ namespace TeensyRom.Core.Storage
             
             var filesToTransfer = new List<FileTransferItem>(transferItems);
             
+            // TODO: Set Serial property on ResetCommand
             await mediator.Send(new ResetCommand());
             
             for (int attempt = 0; attempt < _retryLimit + 1; attempt++)

@@ -68,7 +68,10 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
                 return;
             }
 
-            var launchCommand = new LaunchFileCommand(TeensyStorageType.SD, launchItem, r.DeviceId);
+            var launchCommand = new LaunchFileCommand(TeensyStorageType.SD, launchItem, r.DeviceId)
+            {
+                Serial = device.SerialState
+            };
             var result = await mediator.Send(launchCommand, ct);
 
             // Check if this was a successful launch or compatibility issue vs actual system error
