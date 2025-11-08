@@ -91,44 +91,100 @@ This application can be deployed in two ways:
 
 ## 🚀 Quick Start
 
+_For now, if you want to try it out, you'll have to compile and run from source. An installable binary release will be available later in Q4._
+
 ### Prerequisites
 - .NET 9 SDK
-- Node.js 18+ with PNPM package manager
-- TeensyROM hardware cartridge with firmware 0.5.12+
+- Node.js 18+ (includes npm)
+- PNPM package manager
+- Talk to Travis or I for a pre-release FW if you want to try this out.
 
-### Instructions to run
-_For now, if you want to try it out, you'll have to compile and run from source.  An installable binary release will be available later in Q4._
+### Install Node.js and npm
+
+Node.js includes npm (Node Package Manager) which is required to install PNPM.
+
+#### Windows
+
+Install Node.js LTS using Windows Package Manager (winget):
+
+```bash
+winget install OpenJS.NodeJS.LTS
+```
+
+After installation, restart your terminal to ensure npm is available in your PATH.
+
+#### macOS
+
+_Coming soon_
+
+#### Linux
+
+_Coming soon_
+
+### Install PNPM
+
+This project uses PNPM as the package manager. Install it globally using npm:
+
+```bash
+npm install -g pnpm
+```
+
+After installation, restart your terminal to ensure pnpm is available in your PATH.
+
+Or using other installation methods from [pnpm.io](https://pnpm.io/installation).
+
+### Setup Instructions
 
 ```bash
 # Clone the repository
 git clone https://github.com/MetalHexx/TeensyROM-Web.git
-cd TeensyROM-Web
+cd TeensyROM-Web/src
 
-# Backend setup
-cd api
-dotnet restore
-dotnet run --project src/TeensyRom.Api
-
-# Frontend setup (in a new terminal)
-cd ui
+# Install Node.js dependencies
 pnpm install
+```
+
+### Running the Application
+
+You'll need two terminal windows to run both the backend API and frontend simultaneously.
+
+**Terminal 1 - Start the API Backend:**
+```bash
+cd TeensyROM-Web/src/apps/api/src/TeensyRom.Api
+dotnet run
+```
+
+**Terminal 2 - Start the Frontend:**
+```bash
+cd TeensyROM-Web/src
 pnpm start
 ```
 
-### Web UI
-```
-https://localhost:4200
-```
-### API Documentation
+### Access the Application
 
-Once the API is running, view the interactive API documentation at:
+**Web UI:**
 ```
-http://localhost:5168/scalar
+http://localhost:4200
+```
+
+**API Documentation (Scalar):**
+```
+http://localhost:5168/scalar/v1
 ```
 
 ## 🤝 Contributing
 
 This project is currently in active development. Come talk to me about contributions.  It's mostly a one-person project at the moment, but I'm open to ideas and testing help!
+
+## 💬 Discord
+
+Join the TeensyROM community on Discord for support, discussions, and updates:
+
+<p align="left">
+  <a href="https://discord.com/invite/ubSAb74S5U">
+    <img src="https://img.shields.io/badge/Discord-Join%20Server-7289da?style=for-the-badge&logo=discord&logoColor=white" alt="Join TeensyROM Discord">
+  </a>
+</p>
 
 ## 🙏 Acknowledgments
 
