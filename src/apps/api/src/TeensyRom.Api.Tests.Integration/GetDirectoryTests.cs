@@ -128,7 +128,7 @@ public class GetDirectoryTests(EndpointFixture f) : IDisposable
         var expectedPath = "/music";
 
         // Act - TrClient automatically handles enum serialization
-        var r = await f.Client.GetAsync<GetDirectoryEndpoint, GetDirectoryRequest, ProblemDetails>(new GetDirectoryRequest
+        var r = await f.Client.GetAsync<GetDirectoryEndpoint, GetDirectoryRequest, string>(new GetDirectoryRequest
         {
             DeviceId = deviceId,
             Path = expectedPath,
@@ -136,9 +136,8 @@ public class GetDirectoryTests(EndpointFixture f) : IDisposable
         });
 
         // Assert
-        r.Should().BeProblem()
-            .WithStatusCode(HttpStatusCode.NotFound)
-            .WithMessage($"The storage {TeensyStorageType.USB} is not available.");
+        r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        r.Content.Should().Be($"The storage {TeensyStorageType.USB} is not available.");
     }
 
     //TODO: Fix a bug that causes directories that are not found to be added as an empty directory in the cache.
@@ -150,7 +149,7 @@ public class GetDirectoryTests(EndpointFixture f) : IDisposable
         var expectedPath = "/fake/path";
 
         // Act - TrClient automatically handles enum serialization
-        var r = await f.Client.GetAsync<GetDirectoryEndpoint, GetDirectoryRequest, ProblemDetails>(new GetDirectoryRequest
+        var r = await f.Client.GetAsync<GetDirectoryEndpoint, GetDirectoryRequest, string>(new GetDirectoryRequest
         {
             DeviceId = deviceId,
             Path = expectedPath,
@@ -158,9 +157,8 @@ public class GetDirectoryTests(EndpointFixture f) : IDisposable
         });
 
         // Assert
-        r.Should().BeProblem()
-            .WithStatusCode(HttpStatusCode.NotFound)
-            .WithMessage($"The directory {expectedPath} was not found.");
+        r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        r.Content.Should().Be($"The directory {expectedPath} was not found.");
     }
 
     [Fact]
@@ -171,7 +169,7 @@ public class GetDirectoryTests(EndpointFixture f) : IDisposable
         var expectedPath = "/music/MUSICIANS/L/LukHash/Alpha.sid";
 
         // Act - TrClient automatically handles enum serialization
-        var r = await f.Client.GetAsync<GetDirectoryEndpoint, GetDirectoryRequest, ProblemDetails>(new GetDirectoryRequest
+        var r = await f.Client.GetAsync<GetDirectoryEndpoint, GetDirectoryRequest, string>(new GetDirectoryRequest
         {
             DeviceId = deviceId,
             StorageType = TeensyStorageType.SD,
@@ -179,9 +177,8 @@ public class GetDirectoryTests(EndpointFixture f) : IDisposable
         });
 
         // Assert
-        r.Should().BeProblem()
-            .WithStatusCode(HttpStatusCode.NotFound)
-            .WithMessage($"The directory {expectedPath} was not found.");            
+        r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        r.Content.Should().Be($"The directory {expectedPath} was not found.");            
     }
 
     public void Dispose() => f.Reset();
