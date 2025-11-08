@@ -34,14 +34,20 @@
   <ItemGroup>
     <Folder Include="ClientApp\" />
     <Folder Include="Endpoints\Common\" />
-    <Folder Include="Endpoints\Serial\LogHub\" />
-    <Folder Include="Endpoints\Serial\StopLogs\" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="ClientApp\teensyrom-nx\dist\**" />
+    <Compile Remove="Endpoints\Serial\LogHub\**" />
+    <Compile Remove="Endpoints\Serial\StopLogs\**" />
     <Content Remove="ClientApp\teensyrom-nx\dist\**" />
+    <Content Remove="Endpoints\Serial\LogHub\**" />
+    <Content Remove="Endpoints\Serial\StopLogs\**" />
+    <EmbeddedResource Remove="Endpoints\Serial\LogHub\**" />
+    <EmbeddedResource Remove="Endpoints\Serial\StopLogs\**" />
     <None Remove="ClientApp\teensyrom-nx\dist\**" />
+    <None Remove="Endpoints\Serial\LogHub\**" />
+    <None Remove="Endpoints\Serial\StopLogs\**" />
   </ItemGroup>
 
 </Project>
