@@ -174,7 +174,7 @@ http://localhost:5168/scalar/v1
 
 ## 🤝 Contributing
 
-This project is currently in active development. Come talk to me about contributions.  It's mostly a one-person project at the moment, but I'm open to ideas and testing help!
+This project is currently in active development. Come talk to me about contributions.  It's mostly a one-person project at the moment, but I'm open to ideas and testing help!  Tag @hExx to reach me.
 
 ## 💬 Discord
 
