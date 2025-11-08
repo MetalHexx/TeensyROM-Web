@@ -8,7 +8,6 @@
   },
   "permissions": {
     "allow": [
-      "Read(//c/dev/src/TeensyROM-UI/Source/WIndows/TeensyRom.Ui/src/TeensyRom.Api/clientapp/teensyrom-nx/**)",
       "Bash(npx nx show project:*)",
       "Read(//c/dev/src/TeensyROM-UI/Source/WIndows/TeensyRom.Ui/src/TeensyRom.Api/**)",
       "Read(//c/dev/src/TeensyROM-UI/Source/Windows/TeensyRom.Ui/**)",
@@ -62,9 +61,7 @@
       "Bash(pnpm tsc:*)",
       "Bash(nx show:*)",
       "Bash(node ./.claude/hooks/angular-nx-quality/quality-check.cjs:*)",
-      "Bash(pnpm dlx tsc:*)",
-      "Bash(pnpm nx e2e:report:*)",
-      "Bash(/run-e2e-test:*)"
+      "Bash(pnpm dlx tsc:*)"
     ],
     "deny": [],
     "ask": []
