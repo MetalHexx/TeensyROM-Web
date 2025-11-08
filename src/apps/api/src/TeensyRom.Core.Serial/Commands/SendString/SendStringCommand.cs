@@ -8,6 +8,6 @@ namespace TeensyRom.Core.Commands.SendString
     {
         public required string StringToSend { get; init; }
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

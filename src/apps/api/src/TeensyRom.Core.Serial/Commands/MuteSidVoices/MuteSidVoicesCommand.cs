@@ -11,6 +11,6 @@ namespace TeensyRom.Core.Commands.MuteSidVoices
         public required VoiceState Voice2Enabled { get; init; }
         public required VoiceState Voice3Enabled { get; init; }
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

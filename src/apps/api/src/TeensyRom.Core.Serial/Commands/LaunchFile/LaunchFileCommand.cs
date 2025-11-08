@@ -12,6 +12,6 @@ namespace TeensyRom.Core.Commands.File.LaunchFile
         public FilePath Path => LaunchItem.Path;
         public long Size => LaunchItem.Size;
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

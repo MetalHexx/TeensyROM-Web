@@ -7,7 +7,7 @@ namespace TeensyRom.Core.Commands.PlaySubtune
     public class PlaySubtuneCommand : ITeensyCommand<PlaySubtuneResult>
     {
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
         public required int SubtuneIndex { get; init; }
     }
 }

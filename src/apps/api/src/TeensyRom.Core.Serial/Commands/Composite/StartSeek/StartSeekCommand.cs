@@ -12,6 +12,6 @@ namespace TeensyRom.Core.Serial.Commands.Composite.StartSeek
         public required double SeekSpeed { get; init; }
         public required SeekDirection Direction { get; init; }
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

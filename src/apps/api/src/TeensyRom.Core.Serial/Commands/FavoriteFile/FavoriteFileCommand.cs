@@ -12,6 +12,6 @@ namespace TeensyRom.Core.Commands
         public required FilePath SourcePath { get; init; }
         public required FilePath TargetPath { get; init; }
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }
