@@ -4,12 +4,12 @@ using TeensyRom.Core.Commands.MuteSidVoices;
 
 namespace TeensyRom.Core.Serial.Commands.Composite.FastForward
 {
-    public class FastForwardCommand(string? deviceId = null) : ITeensyCommand<FastForwardResult>
+    public class FastForwardCommand : ITeensyCommand<FastForwardResult>
     {
-        public bool ShouldTogglePlay { get; set; } = false;
-        public bool ShouldMuteVoices { get; set; } = false;
-        public double Speed { get; set; }
-        public string? DeviceId { get; set; } = deviceId;
+        public required bool ShouldTogglePlay { get; init; }
+        public required bool ShouldMuteVoices { get; init; }
+        public required double Speed { get; init; }
+        public string? DeviceId { get; set; }
         public ISerialStateContext Serial { get; set; } = null!;
     }
 }

@@ -4,10 +4,10 @@ using TeensyRom.Core.Serial.Commands;
 
 namespace TeensyRom.Core.Commands.SendString
 {
-    public class SendStringCommand(string stringToSend, string? deviceId = null) : ITeensyCommand<SendStringResult>
+    public class SendStringCommand : ITeensyCommand<SendStringResult>
     {
-        public string StringToSend { get; } = stringToSend;
-        public string? DeviceId { get; set; } = deviceId;
+        public required string StringToSend { get; init; }
+        public string? DeviceId { get; set; }
         public ISerialStateContext Serial { get; set; } = null!;
     }
 }

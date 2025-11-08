@@ -2,7 +2,6 @@ using Microsoft.Extensions.FileProviders;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using TeensyRom.Api.Endpoints.GetDeviceEvents;
-using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Api.Http;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Startup;
@@ -56,7 +55,8 @@ app.UseUiCors();
 app.UseRateLimiter();
 app.MapApiDocs();
 app.MapRadEndpoints();
-app.MapHub<LogsHub>("/logHub");
+// TODO: Re-enable when LogsHub implementation exists
+// app.MapHub<LogsHub>("/logHub");
 app.MapHub<DeviceEventHub>("/deviceEventHub");
 
 app.Run();

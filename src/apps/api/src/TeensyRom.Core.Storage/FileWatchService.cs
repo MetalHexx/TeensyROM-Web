@@ -1,4 +1,8 @@
-﻿using System.Reactive.Concurrency;
+﻿// NOTE: This file is not currently being used in the API and has been commented out.
+// It depends on IFileTransferService which is also commented out and will be refactored later.
+
+/*
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using TeensyRom.Core.Abstractions;
@@ -127,3 +131,4 @@ namespace TeensyRom.Core.Storage
         }
     }
 }
+*/

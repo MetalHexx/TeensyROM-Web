@@ -15,7 +15,6 @@ using TeensyRom.Api.Endpoints.GetDeviceEvents;
 using TeensyRom.Core.Music;
 using TeensyRom.Core.Music.Hvsc;
 using TeensyRom.Core.Music.DeepSid;
-using TeensyRom.Api.Endpoints.Serial.GetLogs;
 
 namespace TeensyRom.Api.Startup
 {

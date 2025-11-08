@@ -1,8 +1,4 @@
-﻿// NOTE: This file is not currently being used in the API and has been commented out.
-// It will be refactored later to properly handle serial context.
-
-/*
-using MediatR;
+﻿using MediatR;
 using MediatR.NotificationPublishers;
 using Microsoft.VisualBasic.FileIO;
 using System;
@@ -195,4 +191,3 @@ namespace TeensyRom.Core.Storage
         }
     }
 }
-*/

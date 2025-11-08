@@ -6,11 +6,11 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Commands.DeleteFile
 {
-    public class DeleteFileCommand(TeensyStorageType storageType, FilePath path, string? deviceId = null) : ITeensyCommand<DeleteFileResult>
+    public class DeleteFileCommand : ITeensyCommand<DeleteFileResult>
     {
-        public TeensyStorageType StorageType { get; } = storageType;
-        public FilePath Path { get; } = path;
-        public string? DeviceId { get; set; } = deviceId;
+        public required TeensyStorageType StorageType { get; init; }
+        public required FilePath Path { get; init; }
+        public string? DeviceId { get; set; }
         public ISerialStateContext Serial { get; set; } = null!;
     }
 }

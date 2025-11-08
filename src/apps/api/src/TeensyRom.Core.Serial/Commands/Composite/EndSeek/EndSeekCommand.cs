@@ -9,8 +9,8 @@ namespace TeensyRom.Core.Serial.Commands.Composite.EndSeek
     {
         public string? DeviceId { get; set; }
         public ISerialStateContext Serial { get; set; } = null!;
-        public bool ShouldEnableVoices { get; set; } = false;
-        public double SeekSpeed { get; set; }
-        public MusicSpeedCurveTypes SpeedCurve { get; set; }
+        public required bool ShouldEnableVoices { get; init; }
+        public required double SeekSpeed { get; init; }
+        public required MusicSpeedCurveTypes SpeedCurve { get; init; }
     }
 }

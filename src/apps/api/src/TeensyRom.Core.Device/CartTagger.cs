@@ -38,8 +38,10 @@ namespace TeensyRom.Core.Device
                     Serial = serial
                 });
             }
-            var getFileCommand = new GetFileCommand(storageType, new FilePath("/cart-tag.txt"))
+            var getFileCommand = new GetFileCommand
             {
+                StorageType = storageType,
+                FilePath = new FilePath("/cart-tag.txt"),
                 Serial = serial
             };
             var getFileResult = await mediator.Send(getFileCommand);
@@ -93,8 +95,9 @@ namespace TeensyRom.Core.Device
                 targetFilePath: new DirectoryPath(StorageHelper.Remote_Path_Root).Combine(new FilePath("cart-tag.txt")),
                 targetStorage: storageType
             );
-            var saveFileCommand = new SaveFilesCommand([fileTransferItem])
+            var saveFileCommand = new SaveFilesCommand
             {
+                Files = [fileTransferItem],
                 Serial = serial
             };
             var saveFileResult = await mediator.Send(saveFileCommand);
