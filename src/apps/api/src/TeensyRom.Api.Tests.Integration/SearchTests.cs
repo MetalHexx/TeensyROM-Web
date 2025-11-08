@@ -454,7 +454,7 @@ namespace TeensyRom.Api.Tests.Integration
             var deviceId = await GetCachedConnectedDevice();
 
             // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, ProblemDetails>(new SearchRequest
+            var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, string>(new SearchRequest
             {
                 DeviceId = deviceId,
                 SearchText = "test",
@@ -462,9 +462,8 @@ namespace TeensyRom.Api.Tests.Integration
             });
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound)
-                .WithMessage($"The storage {TeensyStorageType.USB} is not available.");
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The storage {TeensyStorageType.USB} is not available.");
         }
 
         [Fact]
@@ -474,7 +473,7 @@ namespace TeensyRom.Api.Tests.Integration
             var nonExistentDeviceId = Guid.NewGuid().ToString().GenerateFilenameSafeHash();
 
             // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, ProblemDetails>(new SearchRequest
+            var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, string>(new SearchRequest
             {
                 DeviceId = nonExistentDeviceId,
                 SearchText = "test",
@@ -482,9 +481,8 @@ namespace TeensyRom.Api.Tests.Integration
             });
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound)
-                .WithMessage($"The device {nonExistentDeviceId} was not found.");
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {nonExistentDeviceId} was not found.");
         }
 
         public void Dispose() => f.Reset();

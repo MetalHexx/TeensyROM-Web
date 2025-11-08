@@ -30,11 +30,11 @@ namespace TeensyRom.Api.Tests.Integration
         {
             // Act - TrClient automatically handles enum serialization
             var resetRequest = new ResetDeviceRequest { DeviceId = "invalid-device-id" };
-            var r = await f.Client.PutAsync<ResetDeviceEndpoint, ResetDeviceRequest, ProblemDetails>(resetRequest);
+            var r = await f.Client.PutAsync<ResetDeviceEndpoint, ResetDeviceRequest, string>(resetRequest);
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.BadRequest);
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be("The device invalid-device-id was not found.");
         }
 
         public void Dispose() => f.Reset();
