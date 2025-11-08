@@ -18,10 +18,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Serial", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Storage", "src\TeensyRom.Core.Storage\TeensyRom.Core.Storage.csproj", "{DF947B64-0B87-4D44-A4B6-5E3D393470F1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Midi", "TeensyRom.Core.Midi\TeensyRom.Core.Midi.csproj", "{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Assets", "src\TeensyRom.Assets\TeensyRom.Assets.csproj", "{ECFE6389-D41F-4573-A7B8-F94C99AF1419}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Api", "src\TeensyRom.Api\TeensyRom.Api.csproj", "{2676BA53-6477-48A6-8027-3CEC22E5DA2C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Api.Tests.Integration", "src\TeensyRom.Api.Tests.Integration\TeensyRom.Api.Tests.Integration.csproj", "{8BC14A39-60F0-4332-95B6-C456EC6C8763}"
@@ -88,30 +84,6 @@ Global
 		{DF947B64-0B87-4D44-A4B6-5E3D393470F1}.Release|x64.Build.0 = Release|Any CPU
 		{DF947B64-0B87-4D44-A4B6-5E3D393470F1}.Release|x86.ActiveCfg = Release|Any CPU
 		{DF947B64-0B87-4D44-A4B6-5E3D393470F1}.Release|x86.Build.0 = Release|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Debug|x64.Build.0 = Debug|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Debug|x86.Build.0 = Debug|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Release|x64.ActiveCfg = Release|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Release|x64.Build.0 = Release|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Release|x86.ActiveCfg = Release|Any CPU
-		{F26D9198-BB1A-4AFB-9CCE-0B79A8373905}.Release|x86.Build.0 = Release|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Debug|x64.Build.0 = Debug|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Debug|x86.Build.0 = Debug|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Release|Any CPU.Build.0 = Release|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Release|x64.ActiveCfg = Release|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Release|x64.Build.0 = Release|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Release|x86.ActiveCfg = Release|Any CPU
-		{ECFE6389-D41F-4573-A7B8-F94C99AF1419}.Release|x86.Build.0 = Release|Any CPU
 		{2676BA53-6477-48A6-8027-3CEC22E5DA2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{2676BA53-6477-48A6-8027-3CEC22E5DA2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2676BA53-6477-48A6-8027-3CEC22E5DA2C}.Debug|x64.ActiveCfg = Debug|Any CPU

@@ -107,10 +107,8 @@ namespace TeensyRom.Api.Services
 
             //settings = settings with
             //{
-            //    LastCart = device is null ? new KnownCart(deviceHash, pnpDeviceId, comPort, $"TeensyROM #{settings.KnownCarts.Count() + 1}", new(), null) : device
+            //    LastCart = device is null ? new KnownCart(deviceHash, pnpDeviceId, comPort, $"TeensyROM #{settings.KnownCarts.Count() + 1}", null) : device
             //};
-
-            //settings.LastCart.MidiSettings.InitMappings();
 
             //if (device is null)
             //{
