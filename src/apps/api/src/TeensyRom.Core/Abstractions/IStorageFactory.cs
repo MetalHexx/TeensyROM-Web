@@ -5,6 +5,6 @@ namespace TeensyRom.Core.Storage
 {
     public interface IStorageFactory
     {
-        IStorageService Create(CartStorage cartStorage);
+        IStorageService Create(CartStorage cartStorage, ISerialStateContext serial);
     }
 }

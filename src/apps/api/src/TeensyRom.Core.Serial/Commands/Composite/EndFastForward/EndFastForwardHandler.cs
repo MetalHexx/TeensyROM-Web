@@ -19,9 +19,9 @@ namespace TeensyRom.Core.Serial.Commands.Composite.EndFastForward
             {
                 if (request.ShouldEnableVoices)
                 {
-                    await muteVoices.Execute(VoiceState.Enabled, VoiceState.Enabled, VoiceState.Enabled);
+                    await muteVoices.Execute(request.Serial, VoiceState.Enabled, VoiceState.Enabled, VoiceState.Enabled);
                 }
-                await setMusicSpeed.Execute(request.OriginalSpeed, MusicSpeedCurveTypes.Logarithmic);
+                await setMusicSpeed.Execute(request.Serial, request.OriginalSpeed, MusicSpeedCurveTypes.Logarithmic);
             }
             catch (TeensyException ex)
             {

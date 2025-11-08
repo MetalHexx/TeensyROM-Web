@@ -30,7 +30,10 @@ namespace TeensyRom.Api.Endpoints.Player.ToggleMusic
                 return;
             }
 
-            var toggleCommand = new ToggleMusicCommand(r.DeviceId);
+            var toggleCommand = new ToggleMusicCommand(r.DeviceId)
+            {
+                Serial = device.SerialState
+            };
             var result = await mediator.Send(toggleCommand, ct);
 
             if (!result.IsSuccess)
