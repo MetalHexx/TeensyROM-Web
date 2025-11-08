@@ -8,7 +8,7 @@ namespace TeensyRom.Core.Serial.Commands.Composite.EndSeek
     public class EndSeekCommand : ITeensyCommand<EndSeekResult>
     {
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
         public required bool ShouldEnableVoices { get; init; }
         public required double SeekSpeed { get; init; }
         public required MusicSpeedCurveTypes SpeedCurve { get; init; }

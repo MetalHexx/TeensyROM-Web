@@ -11,6 +11,6 @@ namespace TeensyRom.Core.Commands.DeleteFile
         public required TeensyStorageType StorageType { get; init; }
         public required FilePath Path { get; init; }
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

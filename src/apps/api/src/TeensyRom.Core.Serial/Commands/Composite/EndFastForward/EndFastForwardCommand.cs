@@ -8,7 +8,7 @@ namespace TeensyRom.Core.Serial.Commands.Composite.EndFastForward
     public class EndFastForwardCommand : ITeensyCommand<EndFastForwardResult>
     {
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
         public required bool ShouldEnableVoices { get; init; }
         public required double OriginalSpeed { get; init; }
         public required MusicSpeedCurveTypes SpeedCurve { get; init; }

@@ -14,7 +14,7 @@ namespace TeensyRom.Core.Commands.SetMusicSpeed
     public class SetMusicSpeedCommand : ITeensyCommand<SetMusicSpeedResult>
     {
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
         public required double Speed { get; init; }
         public required MusicSpeedCurveTypes Type { get; init; }
     }

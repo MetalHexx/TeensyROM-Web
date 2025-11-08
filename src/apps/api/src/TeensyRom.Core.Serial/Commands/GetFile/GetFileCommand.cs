@@ -10,6 +10,6 @@ namespace TeensyRom.Core.Commands.GetFile
         public required TeensyStorageType StorageType { get; init; }
         public required FilePath FilePath { get; init; }
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }
