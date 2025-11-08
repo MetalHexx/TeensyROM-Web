@@ -12,6 +12,7 @@ using TeensyRom.Core.Commands.PlaySubtune;
 using TeensyRom.Core.Serial.Commands.ToggleMusic;
 using TeensyRom.Core.Serial;
 using TeensyRom.Api.Endpoints.GetDeviceEvents;
+using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Core.Music;
 using TeensyRom.Core.Music.Hvsc;
 using TeensyRom.Core.Music.DeepSid;

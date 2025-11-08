@@ -89,6 +89,48 @@
         }
       }
     },
+    "/logs": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Start Logging Hub",
+        "description": "Starts the logging service and returns a success message.",
+        "operationId": "StartLogs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartLogsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Stop Logging Channel",
+        "description": "Stops the logging service and returns a success message.",
+        "operationId": "StopLogs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopLogsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/devices": {
       "get": {
         "tags": [
@@ -1428,6 +1470,22 @@
           "hasMore": {
             "type": "boolean"
           },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "StartLogsResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "StopLogsResponse": {
+        "type": "object",
+        "properties": {
           "message": {
             "type": "string"
           }
