@@ -14,6 +14,6 @@ namespace TeensyRom.Core.Commands
     public class PingCommand : ITeensyCommand<PingResult>
     {
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

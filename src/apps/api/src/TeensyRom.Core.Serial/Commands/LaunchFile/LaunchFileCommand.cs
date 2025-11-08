@@ -7,17 +7,11 @@ namespace TeensyRom.Core.Commands.File.LaunchFile
 {
     public class LaunchFileCommand : ITeensyCommand<LaunchFileResult>
     {
-        public LaunchFileCommand(TeensyStorageType storageType, LaunchableItem item, string? deviceId = null)
-        {
-            StorageType = storageType;
-            LaunchItem = item;
-            DeviceId = deviceId;
-        }
+        public required TeensyStorageType StorageType { get; init; }
+        public required LaunchableItem LaunchItem { get; init; }
         public FilePath Path => LaunchItem.Path;
         public long Size => LaunchItem.Size;
-        public TeensyStorageType StorageType { get; }
-        public LaunchableItem LaunchItem { get; }
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

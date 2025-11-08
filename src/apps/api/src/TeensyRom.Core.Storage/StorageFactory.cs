@@ -9,14 +9,14 @@ namespace TeensyRom.Core.Storage
 {
     public class StorageFactory(IMediator mediator, IGameMetadataService gameMetadata, ISidMetadataService sidMetadata, ILoggingService log, IAlertService alert) : IStorageFactory
     {
-        public IStorageService Create(CartStorage cartStorage)
+        public IStorageService Create(CartStorage cartStorage, ISerialStateContext serial)
         {
             var settings = new StorageSettings
             {
                 CartStorage = cartStorage,
             };
             var storageCache = new SimpleStorageCache(cartStorage, settings);
-            var storageService = new StorageService(storageCache, settings, mediator, alert, log, sidMetadata, gameMetadata);
+            var storageService = new StorageService(storageCache, settings, mediator, alert, log, sidMetadata, gameMetadata, serial);
             return storageService;
         }
     }

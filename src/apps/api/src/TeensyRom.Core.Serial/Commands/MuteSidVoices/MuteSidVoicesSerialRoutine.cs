@@ -6,12 +6,12 @@ namespace TeensyRom.Core.Commands.MuteSidVoices
 {
     public interface IMuteSidVoicesSerialRoutine
     {
-        Task Execute(VoiceState voice1Enabled, VoiceState voice2Enabled, VoiceState voice3Enabled);
+        Task Execute(ISerialStateContext serial, VoiceState voice1Enabled, VoiceState voice2Enabled, VoiceState voice3Enabled);
     }
 
-    public class MuteSidVoicesSerialRoutine(ISerialStateContext serialState) : IMuteSidVoicesSerialRoutine
+    public class MuteSidVoicesSerialRoutine : IMuteSidVoicesSerialRoutine
     {
-        public async Task Execute(VoiceState voice1Enabled, VoiceState voice2Enabled, VoiceState voice3Enabled)
+        public async Task Execute(ISerialStateContext serial, VoiceState voice1Enabled, VoiceState voice2Enabled, VoiceState voice3Enabled)
         {
             var voiceMuteInfo = (byte)
             (
@@ -26,9 +26,9 @@ namespace TeensyRom.Core.Commands.MuteSidVoices
             {
                 try
                 {
-                    serialState.SendIntBytes(TeensyToken.SIDVoiceMuting, 2);
-                    serialState.SendSignedChar((sbyte)voiceMuteInfo);
-                    var ack = serialState.HandleAck();
+                    serial.SendIntBytes(TeensyToken.SIDVoiceMuting, 2);
+                    serial.SendSignedChar((sbyte)voiceMuteInfo);
+                    var ack = serial.HandleAck();
                     break;
                 }
                 catch (TeensyException)

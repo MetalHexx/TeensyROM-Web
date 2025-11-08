@@ -2,6 +2,7 @@
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reflection;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Commands.DeleteFile;
 using TeensyRom.Core.Commands.GetFile;
@@ -33,13 +34,14 @@ namespace TeensyRom.Core.Storage
         private readonly IGameMetadataService _gameMetadata;
         private readonly ISidMetadataService _sidMetadata;
         private readonly IMediator _mediator;
+        private readonly ISerialStateContext _serial;
         private TeensySettings _settings = null!;
         private IDisposable? _settingsSubscription;
 
 
         private IStorageCache _storageCache;
 
-        public CachedStorageService(ISettingsService settingsService, IGameMetadataService gameMetadata, ISidMetadataService sidMetadata, IMediator mediator, IAlertService alert, ILoggingService log, IStorageCache storageCache)
+        public CachedStorageService(ISettingsService settingsService, IGameMetadataService gameMetadata, ISidMetadataService sidMetadata, IMediator mediator, IAlertService alert, ILoggingService log, IStorageCache storageCache, ISerialStateContext serial)
         {
             _settingsService = settingsService;
             _gameMetadata = gameMetadata;
@@ -48,6 +50,7 @@ namespace TeensyRom.Core.Storage
             _alert = alert;
             _log = log;
             _storageCache = storageCache;
+            _serial = serial;
             _settings = settingsService.GetSettings();
             _settingsSubscription = _settingsService.Settings
                 .Where(s => s is not null && s.LastCart is not null)
@@ -60,11 +63,12 @@ namespace TeensyRom.Core.Storage
             var newFavPath = favPath.Combine(new FilePath(launchItem.Name));
 
             var favCommand = new FavoriteFileCommand
-            (
-                storageType: _settings.StorageType,
-                sourcePath: launchItem.Path,
-                targetPath: newFavPath
-            );
+            {
+                StorageType = _settings.StorageType,
+                SourcePath = launchItem.Path,
+                TargetPath = newFavPath,
+                Serial = _serial
+            };
 
             var result = await _mediator.Send(favCommand);
 
@@ -119,7 +123,12 @@ namespace TeensyRom.Core.Storage
                 _storageCache.WriteToDisk();
                 return;
             }
-            var result = await _mediator.Send(new DeleteFileCommand(_settings.StorageType, fav.Path));
+            var result = await _mediator.Send(new DeleteFileCommand
+            {
+                StorageType = _settings.StorageType,
+                Path = fav.Path,
+                Serial = _serial
+            });
 
             if (!result.IsSuccess)
             {
@@ -169,7 +178,13 @@ namespace TeensyRom.Core.Storage
                 return cacheItem;
             }
 
-            var response = await _mediator.Send(new GetDirectoryRecursiveCommand(_settings.StorageType, path, false));
+            var response = await _mediator.Send(new GetDirectoryRecursiveCommand
+            {
+                StorageType = _settings.StorageType,
+                Path = path,
+                Recursive = false,
+                Serial = _serial
+            });
 
             var directoryResult = response.DirectoryContent.FirstOrDefault();
 
@@ -200,7 +215,12 @@ namespace TeensyRom.Core.Storage
 
             if (playlistFile is not null)
             {
-                var customResult = await _mediator.Send(new GetFileCommand(_settings.StorageType, playlistFile.Path));
+                var customResult = await _mediator.Send(new GetFileCommand
+                {
+                    StorageType = _settings.StorageType,
+                    FilePath = playlistFile.Path,
+                    Serial = _serial
+                });
 
                 var playlist = LaunchableItemSerializer.Deserialize<Playlist>(customResult.FileData);
 
@@ -267,7 +287,12 @@ namespace TeensyRom.Core.Storage
 
         public async Task DeleteFile(FileItem file, TeensyStorageType storageType)
         {
-            var deleteResult = await _mediator.Send(new DeleteFileCommand(storageType, file.Path));
+            var deleteResult = await _mediator.Send(new DeleteFileCommand
+            {
+                StorageType = storageType,
+                Path = file.Path,
+                Serial = _serial
+            });
 
             if (!deleteResult.IsSuccess && deleteResult.IsBusy) 
             {
@@ -330,11 +355,12 @@ namespace TeensyRom.Core.Storage
             _alert.Publish($"Refreshing cache for {path} and all nested directories.");
 
             var getDirectoryCommand = new GetDirectoryRecursiveCommand
-            (
-                storageType: _settings.StorageType,
-                path: path,
-                recursive: true
-            );
+            {
+                StorageType = _settings.StorageType,
+                Path = path,
+                Recursive = true,
+                Serial = _serial
+            };
             var response = await _mediator.Send(getDirectoryCommand);
 
             if (!response.IsSuccess) return;
@@ -386,11 +412,12 @@ namespace TeensyRom.Core.Storage
                 var targetFullPath = item.TargetPath.Combine(new FilePath(item.SourceItem.Name));
 
                 var copyItem = new CopyFileCommand
-                (
-                    storageType: _settings.StorageType,
-                    sourcePath: item.SourceItem.Path,
-                    destPath: targetFullPath
-                );
+                {
+                    StorageType = _settings.StorageType,
+                    SourcePath = item.SourceItem.Path,
+                    DestPath = targetFullPath,
+                    Serial = _serial
+                };
                 var result = await _mediator.Send(copyItem);
                 results.Add(result);
 
@@ -521,7 +548,11 @@ namespace TeensyRom.Core.Storage
 
             var playlistTransferItem = new FileTransferItem(fileInfo, playlist.Path, _settings.StorageType);
 
-            var result = await _mediator.Send(new SaveFilesCommand([playlistTransferItem]));
+            var result = await _mediator.Send(new SaveFilesCommand
+            {
+                Files = [playlistTransferItem],
+                Serial = _serial
+            });
 
             if (!result.IsSuccess)
             {

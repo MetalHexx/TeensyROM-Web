@@ -6,7 +6,7 @@ namespace TeensyRom.Core.Commands.SetMusicSpeed
     {
         public async Task<SetMusicSpeedResult> Handle(SetMusicSpeedCommand request, CancellationToken cancellationToken)
         {
-            await setMusicSpeed.Execute(request.Speed, request.Type);
+            await setMusicSpeed.Execute(request.Serial, request.Speed, request.Type);
             return new SetMusicSpeedResult();
         }
     }

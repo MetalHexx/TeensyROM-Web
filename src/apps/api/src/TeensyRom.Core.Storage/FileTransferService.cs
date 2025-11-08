@@ -1,4 +1,8 @@
-﻿using MediatR;
+﻿// NOTE: This file is not currently being used in the API and has been commented out.
+// It will be refactored later to properly handle serial context.
+
+/*
+using MediatR;
 using MediatR.NotificationPublishers;
 using Microsoft.VisualBasic.FileIO;
 using System;
@@ -126,6 +130,7 @@ namespace TeensyRom.Core.Storage
             
             var filesToTransfer = new List<FileTransferItem>(transferItems);
             
+            // TODO: Set Serial property on ResetCommand
             await mediator.Send(new ResetCommand());
             
             for (int attempt = 0; attempt < _retryLimit + 1; attempt++)
@@ -190,3 +195,4 @@ namespace TeensyRom.Core.Storage
         }
     }
 }
+*/

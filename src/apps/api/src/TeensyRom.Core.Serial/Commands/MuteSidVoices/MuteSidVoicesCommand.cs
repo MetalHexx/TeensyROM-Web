@@ -5,12 +5,12 @@ using TeensyRom.Core.Serial.Commands;
 
 namespace TeensyRom.Core.Commands.MuteSidVoices
 {
-    public class MuteSidVoicesCommand(VoiceState muteVoice1, VoiceState muteVoice2, VoiceState muteVoice3, string? deviceId = null) : ITeensyCommand<MuteSidVoicesResult>
+    public class MuteSidVoicesCommand : ITeensyCommand<MuteSidVoicesResult>
     {
-        public VoiceState Voice1Enabled { get; } = muteVoice1;
-        public VoiceState Voice2Enabled { get; } = muteVoice2;
-        public VoiceState Voice3Enabled { get; } = muteVoice3;
-        public string? DeviceId { get; set; } = deviceId;
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required VoiceState Voice1Enabled { get; init; }
+        public required VoiceState Voice2Enabled { get; init; }
+        public required VoiceState Voice3Enabled { get; init; }
+        public string? DeviceId { get; set; }
+        public required ISerialStateContext Serial { get; init; }
     }
 }

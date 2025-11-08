@@ -4,15 +4,14 @@ using TeensyRom.Core.Commands.MuteSidVoices;
 
 namespace TeensyRom.Core.Serial.Commands.Composite.StartSeek
 {
-    public class StartSeekCommand(string? deviceId = null) : ITeensyCommand<StartSeekResult>
+    public class StartSeekCommand : ITeensyCommand<StartSeekResult>
     {
-        public int SubtuneIndex { get; set; }
-        public bool ShouldTogglePlay { get; set; } = false;
-        public bool ShouldMuteVoices { get; set; } = false;
-
-        public double SeekSpeed { get; set; }
-        public SeekDirection Direction { get; set; } = SeekDirection.Forward;
-        public string? DeviceId { get; set; } = deviceId;
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required int SubtuneIndex { get; init; }
+        public required bool ShouldTogglePlay { get; init; }
+        public required bool ShouldMuteVoices { get; init; }
+        public required double SeekSpeed { get; init; }
+        public required SeekDirection Direction { get; init; }
+        public string? DeviceId { get; set; }
+        public required ISerialStateContext Serial { get; init; }
     }
 }

@@ -8,12 +8,12 @@ namespace TeensyRom.Core.Commands.SetMusicSpeed
 {
     public interface ISetMusicSpeedSerialRoutine
     {
-        Task Execute(double speed, MusicSpeedCurveTypes type);
+        Task Execute(ISerialStateContext serial, double speed, MusicSpeedCurveTypes type);
     }
 
-    public class SetMusicSpeedSerialRoutine(ISerialStateContext serialState) : ISetMusicSpeedSerialRoutine
+    public class SetMusicSpeedSerialRoutine : ISetMusicSpeedSerialRoutine
     {
-        public async Task Execute(double requestSpeed, MusicSpeedCurveTypes speedCurve)
+        public async Task Execute(ISerialStateContext serial, double requestSpeed, MusicSpeedCurveTypes speedCurve)
         {
             var attemptNumber = 1;
 
@@ -28,17 +28,17 @@ namespace TeensyRom.Core.Commands.SetMusicSpeed
                         if (requestSpeed < MusicConstants.Linear_Speed_Min || requestSpeed > MusicConstants.Linear_Speed_Max)
                             throw new ArgumentOutOfRangeException(nameof(requestSpeed), $"Speed must be between {MusicConstants.Linear_Speed_Min} and {MusicConstants.Linear_Speed_Max}.");
 
-                        serialState.SendIntBytes(TeensyToken.SetMusicSpeedLinear, 2);
+                        serial.SendIntBytes(TeensyToken.SetMusicSpeedLinear, 2);
                     }
                     else
                     {
                         if (requestSpeed < MusicConstants.Log_Speed_Min || requestSpeed > MusicConstants.Log_Speed_Max)
                             throw new ArgumentOutOfRangeException(nameof(requestSpeed), $"Speed must be between {MusicConstants.Log_Speed_Min} and {MusicConstants.Log_Speed_Max}.");
 
-                        serialState.SendIntBytes(TeensyToken.SetMusicSpeedLog, 2);
+                        serial.SendIntBytes(TeensyToken.SetMusicSpeedLog, 2);
                     }
-                    serialState.SendSignedShort(computedSpeed);
-                    serialState.HandleAck();
+                    serial.SendSignedShort(computedSpeed);
+                    serial.HandleAck();
                     break;
                 }
                 catch (Exception)
@@ -51,7 +51,7 @@ namespace TeensyRom.Core.Commands.SetMusicSpeed
                         throw new TeensyDjException();
                     }
                     attemptNumber++;
-                    serialState.ClearBuffers();
+                    serial.ClearBuffers();
                     continue;
                 }
             }

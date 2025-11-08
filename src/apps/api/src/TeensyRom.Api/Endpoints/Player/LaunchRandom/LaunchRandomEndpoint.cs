@@ -83,7 +83,13 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchRandom
                 return;
             }
 
-            var result = await mediator.Send(new LaunchFileCommand(r.StorageType, file, r.DeviceId));
+            var result = await mediator.Send(new LaunchFileCommand
+            {
+                StorageType = r.StorageType,
+                LaunchItem = file,
+                DeviceId = r.DeviceId,
+                Serial = device.SerialState
+            });
 
             // Check if this was a successful launch or compatibility issue vs actual system error
             if (result.IsSuccess || result.IsCompatible == false)
