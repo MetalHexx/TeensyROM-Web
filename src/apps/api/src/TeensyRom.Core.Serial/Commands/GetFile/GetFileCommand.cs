@@ -5,11 +5,11 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Commands.GetFile
 {
-    public class GetFileCommand(TeensyStorageType storageType, FilePath filePath, string? deviceId = null) : ITeensyCommand<GetFileResult>
+    public class GetFileCommand : ITeensyCommand<GetFileResult>
     {
-        public TeensyStorageType StorageType { get; } = storageType;
-        public FilePath FilePath { get; } = filePath;
-        public string? DeviceId { get; set; } = deviceId;
+        public required TeensyStorageType StorageType { get; init; }
+        public required FilePath FilePath { get; init; }
+        public string? DeviceId { get; set; }
         public ISerialStateContext Serial { get; set; } = null!;
     }
 }

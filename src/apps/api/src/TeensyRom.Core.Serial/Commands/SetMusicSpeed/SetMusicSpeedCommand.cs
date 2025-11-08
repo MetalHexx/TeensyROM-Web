@@ -11,11 +11,11 @@ using TeensyRom.Core.Serial.Commands;
 
 namespace TeensyRom.Core.Commands.SetMusicSpeed
 {
-    public class SetMusicSpeedCommand(double speed, MusicSpeedCurveTypes type) : ITeensyCommand<SetMusicSpeedResult>
+    public class SetMusicSpeedCommand : ITeensyCommand<SetMusicSpeedResult>
     {
         public string? DeviceId { get; set; }
         public ISerialStateContext Serial { get; set; } = null!;
-        public double Speed { get; } = speed;
-        public MusicSpeedCurveTypes Type { get; } = type;
+        public required double Speed { get; init; }
+        public required MusicSpeedCurveTypes Type { get; init; }
     }
 }

@@ -6,12 +6,12 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Commands
 {
-    public class CopyFileCommand(TeensyStorageType storageType, FilePath sourcePath, FilePath destPath, string? deviceId = null) : ITeensyCommand<CopyFileResult>
+    public class CopyFileCommand : ITeensyCommand<CopyFileResult>
     {
-        public TeensyStorageType StorageType { get; } = storageType;
-        public FilePath SourcePath { get; } = sourcePath;
-        public FilePath DestPath { get; } = destPath;
-        public string? DeviceId { get; set; } = deviceId;
+        public required TeensyStorageType StorageType { get; init; }
+        public required FilePath SourcePath { get; init; }
+        public required FilePath DestPath { get; init; }
+        public string? DeviceId { get; set; }
         public ISerialStateContext Serial { get; set; } = null!;
     }
 }
