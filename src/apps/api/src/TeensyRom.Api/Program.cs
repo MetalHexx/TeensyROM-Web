@@ -1,33 +1,12 @@
-using MediatR;
-using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.FileProviders;
-using Scalar.AspNetCore;
 using System.Reflection;
 using System.Text.Json.Serialization;
-using System.Threading.RateLimiting;
 using TeensyRom.Api.Endpoints.GetDeviceEvents;
 using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Api.Http;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Startup;
-using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Assets;
-using TeensyRom.Core.Commands.MuteSidVoices;
-using TeensyRom.Core.Commands.PlaySubtune;
-using TeensyRom.Core.Commands.SetMusicSpeed;
 using TeensyRom.Core.Common;
-using TeensyRom.Core.Device;
-using TeensyRom.Core.Games;
-using TeensyRom.Core.Logging;
-using TeensyRom.Core.Music;
-using TeensyRom.Core.Music.Sid;
-using TeensyRom.Core.Serial;
-using TeensyRom.Core.Serial.Commands.Behaviors;
-using TeensyRom.Core.Serial.Commands.ToggleMusic;
-using TeensyRom.Core.Serial.State;
-using TeensyRom.Core.Settings;
-using TeensyRom.Core.Storage;
 
 AssetStartupHelper.UnpackAssets();
 

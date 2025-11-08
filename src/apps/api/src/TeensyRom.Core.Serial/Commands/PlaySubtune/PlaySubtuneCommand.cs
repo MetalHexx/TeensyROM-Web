@@ -1,9 +1,13 @@
 ﻿using MediatR;
+using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Serial.Commands;
 
 namespace TeensyRom.Core.Commands.PlaySubtune
 {
-    public class PlaySubtuneCommand (int subtuneIndex) : IRequest<PlaySubtuneResult>
+    public class PlaySubtuneCommand : ITeensyCommand<PlaySubtuneResult>
     {
-        public int SubtuneIndex { get; } = subtuneIndex;
+        public string? DeviceId { get; set; }
+        public required ISerialStateContext Serial { get; init; }
+        public required int SubtuneIndex { get; init; }
     }
 }

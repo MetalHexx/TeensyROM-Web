@@ -12,7 +12,7 @@ using TeensyRom.Core.Logging;
 namespace TeensyRom.Core.Serial.Commands.Behaviors
 {
     public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IRequest<TResponse>
+    where TRequest : ITeensyCommand<TResponse>
     where TResponse : TeensyCommandResult
     {
         private readonly ILoggingService _logService;
@@ -78,11 +78,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 
         public string? GetDeviceId(TRequest request)
         {
-            if (request is ITeensyCommand<TResponse> command)
-            {
-                return command.DeviceId;
-            }
-            return null;
+            return request.DeviceId;
         }
     }
 }

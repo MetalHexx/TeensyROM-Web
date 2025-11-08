@@ -31,7 +31,8 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
             }
             await mediator.Send(new PingCommand
             {
-                DeviceId = device.Cart.DeviceId
+                DeviceId = device.Cart.DeviceId,
+                Serial = device.SerialState
             });
             Response = new();
             Send();

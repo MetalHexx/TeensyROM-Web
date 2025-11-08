@@ -12,6 +12,6 @@ namespace TeensyRom.Core.Commands
     public class ResetCommand : ITeensyCommand<ResetResult>
     {
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

@@ -32,7 +32,8 @@ namespace TeensyRom.Api.Endpoints.ResetDevice
             }
             await mediator.Send(new ResetCommand
             {
-                DeviceId = device.Cart.DeviceId
+                DeviceId = device.Cart.DeviceId,
+                Serial = device.SerialState
             });
             Response = new();
 

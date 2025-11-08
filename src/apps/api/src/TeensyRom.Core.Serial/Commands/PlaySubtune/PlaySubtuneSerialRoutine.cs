@@ -5,21 +5,21 @@ namespace TeensyRom.Core.Commands.PlaySubtune
 {
     public interface IPlaySubtuneSerialRoutine
     {
-        void Execute(uint subtuneIndex);
+        void Execute(ISerialStateContext serial, uint subtuneIndex);
     }
 
-    public class PlaySubtuneSerialRoutine(ISerialStateContext serialState) : IPlaySubtuneSerialRoutine
+    public class PlaySubtuneSerialRoutine : IPlaySubtuneSerialRoutine
     {
-        public void Execute(uint subtuneIndex)
+        public void Execute(ISerialStateContext serial, uint subtuneIndex)
         {
             subtuneIndex = subtuneIndex > 0
                 ? subtuneIndex - 1
                 : 0;
 
-            serialState.ClearBuffers();
-            serialState.SendIntBytes(TeensyToken.PlaySubtune, 2);
-            serialState.SendIntBytes(subtuneIndex, 1);
-            serialState.HandleAck();
+            serial.ClearBuffers();
+            serial.SendIntBytes(TeensyToken.PlaySubtune, 2);
+            serial.SendIntBytes(subtuneIndex, 1);
+            serial.HandleAck();
         }
     }
 }

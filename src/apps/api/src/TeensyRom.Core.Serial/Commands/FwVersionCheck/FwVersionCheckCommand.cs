@@ -13,6 +13,6 @@ namespace TeensyRom.Core.Serial.Commands.FwVersionCheck
     public class FwVersionCheckCommand : ITeensyCommand<FwVersionCheckResult>
     {
         public string? DeviceId { get; set; }
-        public ISerialStateContext Serial { get; set; } = null!;
+        public required ISerialStateContext Serial { get; init; }
     }
 }

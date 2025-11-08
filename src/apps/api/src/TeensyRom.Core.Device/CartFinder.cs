@@ -98,8 +98,8 @@ namespace TeensyRom.Core.Device
                     (
                         cart,
                         serial,
-                        storageFactory.Create(sdStorage),
-                        storageFactory.Create(usbStorage)
+                        storageFactory.Create(sdStorage, serial),
+                        storageFactory.Create(usbStorage, serial)
                     );
                     foundDevices.Add(device);
                 }
