@@ -15,16 +15,6 @@ The TeensyROM backend is a **layered .NET 9 Web API** designed to manage physica
 
 ### Key Data/Control Flows
 
-```
-ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ
-Γöé Frontend (Angular) ΓåÆ HTTP/SignalR ΓåÆ API Endpoints ΓåÆ MediatR Pipeline    Γöé
-Γöé   Γåô Commands/Queries                                    Γåô                Γöé
-Γöé Device Manager ΓåÆ Serial State Machine ΓåÆ Physical TeensyROM Device       Γöé
-Γöé   Γåô Concurrent Requests                                 Γåô                Γöé
-Γöé Storage Services ΓåÆ Cache (JSON on disk) ΓåÉ Indexing Workflows            Γöé
-ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ
-```
-
 **Critical Pattern**: All device operations flow through MediatR with **pipeline behaviors** that handle locking, state transitions, logging, and exception handling before reaching handlers that execute serial/storage operations.
 
 ---
