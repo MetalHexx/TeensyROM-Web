@@ -12,7 +12,6 @@ using TeensyRom.Core.Commands.PlaySubtune;
 using TeensyRom.Core.Serial.Commands.ToggleMusic;
 using TeensyRom.Core.Serial;
 using Microsoft.AspNetCore.SignalR;
-using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Api.Endpoints.GetDeviceEvents;
 using TeensyRom.Core.Music;
 using TeensyRom.Core.Music.Hvsc;
