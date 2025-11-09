@@ -32,7 +32,13 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ILogStream, LogStream>();
             services.AddSingleton<IDeviceEventStream, DeviceEventStream>();
             services.AddSingleton<IAlertService, AlertService>();
-            services.AddSingleton<ISettingsService, SettingsService>();
+            services.AddSingleton<SettingsService>();
+            services.AddSingleton<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
+            services.AddSingleton<IConnectionSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
+            services.AddSingleton<IPlayerSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
+            services.AddSingleton<IFileTransferSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
+            services.AddSingleton<ISearchSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
+            services.AddSingleton<IAppSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IFwVersionChecker, FwVersionChecker>();
             services.AddSingleton<ICartFinder, CartFinder>();
             services.AddSingleton<ICartTagger, CartTagger>();
