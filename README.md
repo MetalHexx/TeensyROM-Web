@@ -68,7 +68,7 @@ Features planned for future releases:
 - **Theme System**: Light/dark mode with custom color schemes and Material theme customization
 - **Keyboard Controls**: Keyboard shortcuts for playback, navigation, and common operations
 - **Cross Storage Scope Selection**: Search/shuffle across all connected device storage (per device, per storage type)
-- **Ethernet Support**: Ethernet support (alternative to Serial/USB) for device communication
+- **Ethernet Support**: Ethernet support for device communication (alternative to Serial/USB)
 - **Scope Selection**: 
   - **Storage Scope**: Search/shuffle across all storage devices SD or USB storage
   - **Directory Pinning**: Search/shuffle scoped to a specific directory and children.
