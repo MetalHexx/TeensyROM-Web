@@ -93,11 +93,11 @@ namespace TeensyRom.Api.Tests.Integration
                 FilePath = _nonExistentPath,
                 StorageType = TeensyStorageType.SD
             };
-            var r = await f.Client.DeleteAsync<RemoveFavoriteEndpoint, RemoveFavoriteRequest, ProblemDetails>(request);
+            var r = await f.Client.DeleteAsync<RemoveFavoriteEndpoint, RemoveFavoriteRequest, string>(request);
 
             // Assert  
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound);
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {request.DeviceId} was not found.");
         }
 
         [Fact]
@@ -113,11 +113,11 @@ namespace TeensyRom.Api.Tests.Integration
                 FilePath = _nonExistentPath,
                 StorageType = TeensyStorageType.SD
             };
-            var r = await f.Client.DeleteAsync<RemoveFavoriteEndpoint, RemoveFavoriteRequest, ProblemDetails>(request);
+            var r = await f.Client.DeleteAsync<RemoveFavoriteEndpoint, RemoveFavoriteRequest, string>(request);
 
             // Assert  
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound);
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The file {_nonExistentPath} was not found.");
         }
 
         [Fact]

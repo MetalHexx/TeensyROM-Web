@@ -73,11 +73,11 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = Guid.NewGuid().ToString().GenerateFilenameSafeHash()
             };
-            var r = await f.Client.PostAsync<ToggleMusicEndpoint, ToggleMusicRequest, ProblemDetails>(request);
+            var r = await f.Client.PostAsync<ToggleMusicEndpoint, ToggleMusicRequest, string>(request);
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound);
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {request.DeviceId} was not found.");
         }
 
         [Fact]

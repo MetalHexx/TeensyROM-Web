@@ -89,12 +89,11 @@ namespace TeensyRom.Api.Tests.Integration
             };
 
             // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.PostAsync<LaunchRandomEndpoint, LaunchRandomRequest, ProblemDetails>(request);
+            var r = await f.Client.PostAsync<LaunchRandomEndpoint, LaunchRandomRequest, string>(request);
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound)
-                .WithMessage($"The device {deviceId} was not found.");
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {deviceId} was not found.");
         }
 
         [Fact]
@@ -109,12 +108,11 @@ namespace TeensyRom.Api.Tests.Integration
             };
 
             // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.PostAsync<LaunchRandomEndpoint, LaunchRandomRequest, ProblemDetails>(request);
+            var r = await f.Client.PostAsync<LaunchRandomEndpoint, LaunchRandomRequest, string>(request);
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound)
-                .WithMessage($"The device {deviceId} does not have USB storage.");
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {deviceId} does not have USB storage.");
         }
 
         [Fact]
@@ -130,12 +128,11 @@ namespace TeensyRom.Api.Tests.Integration
             };
 
             // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.PostAsync<LaunchRandomEndpoint, LaunchRandomRequest, ProblemDetails>(request);
+            var r = await f.Client.PostAsync<LaunchRandomEndpoint, LaunchRandomRequest, string>(request);
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound)
-                .WithMessage("No files were found.");
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be("No files were found.");
         }
 
         [Fact]

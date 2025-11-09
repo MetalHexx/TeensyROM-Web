@@ -2,6 +2,7 @@
 using TeensyRom.Api.Endpoints.FindCarts;
 using TeensyRom.Api.Endpoints.ConnectDevice;
 using TeensyRom.Api.Endpoints.ResetDevice;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 
 namespace TeensyRom.Api.Tests.Integration
@@ -29,12 +30,13 @@ namespace TeensyRom.Api.Tests.Integration
         public async Task When_Resetting_WithInvalidDeviceId_ReturnsBadRequest()
         {
             // Act - TrClient automatically handles enum serialization
-            var resetRequest = new ResetDeviceRequest { DeviceId = "invalid-device-id" };
-            var r = await f.Client.PutAsync<ResetDeviceEndpoint, ResetDeviceRequest, ProblemDetails>(resetRequest);
+            // Use a properly formatted but non-existent device ID
+            var resetRequest = new ResetDeviceRequest { DeviceId = Guid.NewGuid().ToString().GenerateFilenameSafeHash() };
+            var r = await f.Client.PutAsync<ResetDeviceEndpoint, ResetDeviceRequest, string>(resetRequest);
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.BadRequest);
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {resetRequest.DeviceId} was not found.");
         }
 
         public void Dispose() => f.Reset();
