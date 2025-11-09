@@ -61,13 +61,11 @@ namespace TeensyRom.Api.Tests.Integration
             // Act - TrClient automatically handles enum serialization
             var deviceId = Guid.NewGuid().ToString().GenerateFilenameSafeHash();
             var closeRequest = new DisconnectDeviceRequest { DeviceId = deviceId };
-            var r = await f.Client.DeleteAsync<DisconnectDeviceEndpoint, DisconnectDeviceRequest, ProblemDetails>(closeRequest);
+            var r = await f.Client.DeleteAsync<DisconnectDeviceEndpoint, DisconnectDeviceRequest, string>(closeRequest);
 
             // Assert
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound);
-
-            r.Content.Title.Should().Contain($"The device {deviceId} was not found.");
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {deviceId} was not found.");
         }
 
         public void Dispose() => f.Reset();

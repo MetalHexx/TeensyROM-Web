@@ -98,7 +98,7 @@ namespace TeensyRom.Api.Tests.Integration
             var fakeDeviceId = Guid.NewGuid().ToString().GenerateFilenameSafeHash();
 
             // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.PostAsync<LaunchFileEndpoint, LaunchFileRequest, ProblemDetails>(new LaunchFileRequest
+            var r = await f.Client.PostAsync<LaunchFileEndpoint, LaunchFileRequest, string>(new LaunchFileRequest
             {
                 DeviceId = fakeDeviceId,
                 FilePath = NonExistentPath,
@@ -106,8 +106,8 @@ namespace TeensyRom.Api.Tests.Integration
             });
 
             // Assert - This should return NotFound because the device doesn't exist (not because the file doesn't exist)
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound);
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {fakeDeviceId} was not found.");
         }
 
         [Fact]
@@ -136,11 +136,11 @@ namespace TeensyRom.Api.Tests.Integration
                 DeviceId = Guid.NewGuid().ToString().GenerateFilenameSafeHash(),
                 FilePath = NonExistentPath
             };
-            var r = await f.Client.PostAsync<LaunchFileEndpoint, LaunchFileRequest, ProblemDetails>(request);
+            var r = await f.Client.PostAsync<LaunchFileEndpoint, LaunchFileRequest, string>(request);
 
             // Assert  
-            r.Should().BeProblem()
-                .WithStatusCode(HttpStatusCode.NotFound);
+            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
+            r.Content.Should().Be($"The device {request.DeviceId} was not found.");
         }
 
         [Fact]
