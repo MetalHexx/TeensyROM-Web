@@ -1,4 +1,4 @@
-﻿using System.Reactive;
+using System.Reactive;
 
 namespace TeensyRom.Core.Settings
 {
@@ -7,6 +7,5 @@ namespace TeensyRom.Core.Settings
         IObservable<TeensySettings> Settings { get; }
         bool SaveSettings(TeensySettings settings);
         TeensySettings GetSettings();
-        void SetCart(string comPort);
     }
 }
