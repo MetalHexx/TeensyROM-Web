@@ -1,9 +1,8 @@
-﻿using MediatR;
+using MediatR;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Commands.DeleteFile;
 using TeensyRom.Core.Commands.GetFile;
-using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Games;
 using TeensyRom.Core.Logging;

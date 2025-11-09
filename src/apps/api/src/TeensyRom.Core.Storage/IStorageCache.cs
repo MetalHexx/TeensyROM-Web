@@ -1,4 +1,4 @@
-﻿
+
 using System.Reactive;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Settings;
@@ -9,7 +9,6 @@ namespace TeensyRom.Core.Storage
     public interface IStorageCache
     {
         IObservable<Unit> StorageReady { get; }
-
         void DeleteDirectory(DirectoryPath path);
         void DeleteDirectoryWithChildren(DirectoryPath path);
         void DeleteFile(FilePath path);

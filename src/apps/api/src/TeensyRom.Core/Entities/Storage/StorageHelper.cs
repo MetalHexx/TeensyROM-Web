@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.ValueObjects;
 
@@ -35,14 +35,6 @@ namespace TeensyRom.Core.Entities.Storage
             new(TeensyFileType.D64, TeensyFilterType.Images, "NFO", ".nfo"),
             new(TeensyFileType.D64, TeensyFilterType.Games, "D64", ".d64"),            
 
-        ];
-        public static readonly ImmutableList<TeensyFilter> Filters =
-        [
-            new(TeensyFilterType.All, "All", "AllInclusive"),
-            new(TeensyFilterType.Music, "Music", "MusicClefTreble"),
-            new(TeensyFilterType.Games, "Games", "Ghost"),
-            new(TeensyFilterType.Hex, "Hex", "ArrowUpBoldHexagonOutline"),
-            new(TeensyFilterType.Images, "Images", "FileImageOutline")
         ];
 
         public static ImmutableList<DirectoryPath> FavoritePaths => FileTargets

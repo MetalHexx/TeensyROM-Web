@@ -23,9 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Assets\Firmware\TeensyROM.0.5.14.hex">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="Assets\Game\Images\OneLoad64.zip">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
