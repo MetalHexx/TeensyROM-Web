@@ -3,6 +3,7 @@ using System.Reactive.Subjects;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
@@ -13,6 +14,16 @@ namespace TeensyRom.Api.Services
     public class SettingsService : ISettingsService
     {
         public IObservable<TeensySettings> Settings => _settings.AsObservable();
+        public IObservable<ConnectionSettings> ConnectionSettings => 
+            _settings.Select(s => s.ConnectionSettings).DistinctUntilChanged();
+        public IObservable<PlayerSettings> PlayerSettings => 
+            _settings.Select(s => s.PlayerSettings).DistinctUntilChanged();
+        public IObservable<FileTransferSettings> FileTransferSettings => 
+            _settings.Select(s => s.FileTransferSettings).DistinctUntilChanged();
+        public IObservable<SearchSettings> SearchSettings => 
+            _settings.Select(s => s.SearchSettings).DistinctUntilChanged();
+        public IObservable<AppSettings> AppSettings => 
+            _settings.Select(s => s.AppSettings).DistinctUntilChanged();
 
         private BehaviorSubject<TeensySettings> _settings;
         private TeensySettings? _currentSettings;
@@ -45,8 +56,14 @@ namespace TeensyRom.Api.Services
             }
             ValidateAndLogSettings(_currentSettings);
 
-                return _currentSettings with { };
+            return _currentSettings with { };
         }
+
+        public ConnectionSettings GetConnectionSettings() => GetSettings().ConnectionSettings;
+        public PlayerSettings GetPlayerSettings() => GetSettings().PlayerSettings;
+        public FileTransferSettings GetFileTransferSettings() => GetSettings().FileTransferSettings;
+        public SearchSettings GetSearchSettings() => GetSettings().SearchSettings;
+        public AppSettings GetAppSettings() => GetSettings().AppSettings;
 
         private TeensySettings InitDefaultSettings()
         {
@@ -60,7 +77,6 @@ namespace TeensyRom.Api.Services
                 Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
             }
             File.WriteAllText(_settingsFilePath, LaunchableItemSerializer.Serialize(settings));
-
         }
 
         public bool ValidateAndLogSettings(TeensySettings settings)
@@ -76,10 +92,12 @@ namespace TeensyRom.Api.Services
         public bool SaveSettings(TeensySettings settings)
         {
             _settings.OnNext(settings);
+            WriteSettings(settings);
+            _currentSettings = settings;
             return true;
         }
 
-    public static string GetFileNameSafeHash(string stringToHash)
+        public static string GetFileNameSafeHash(string stringToHash)
         {
             using (var md5 = MD5.Create())
             {
