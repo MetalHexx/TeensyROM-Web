@@ -7,9 +7,8 @@ using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Settings;
 
-namespace TeensyRom.Api.Services
+namespace TeensyRom.Core.Settings
 {
     public class SettingsService : ISettingsService
     {

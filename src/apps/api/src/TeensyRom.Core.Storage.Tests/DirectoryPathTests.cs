@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using TeensyRom.Core.ValueObjects;
 
-namespace TeensyRom.Tests.Unit
+namespace TeensyRom.Core.Storage.Tests
 {
     public class DirectoryPathTests
     {

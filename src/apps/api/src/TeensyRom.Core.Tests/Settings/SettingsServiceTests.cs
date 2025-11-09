@@ -2,12 +2,11 @@ using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
 using System.Reflection;
 using AutoFixture;
-using TeensyRom.Api.Services;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 
-namespace TeensyRom.Tests.Unit.Settings;
+namespace TeensyRom.Core.Tests.Settings;
 
 /// <summary>
 /// Comprehensive behavioral tests for SettingsService functionality.
