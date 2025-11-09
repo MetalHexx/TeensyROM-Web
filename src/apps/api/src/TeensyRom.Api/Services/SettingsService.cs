@@ -1,4 +1,4 @@
-﻿using System.Reactive.Linq;
+using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -28,7 +28,7 @@ namespace TeensyRom.Api.Services
 
         public TeensySettings GetSettings()
         {
-            if (_currentSettings is not null) return MapNewSettings(_currentSettings);
+            if (_currentSettings is not null) return _currentSettings with { };
 
             if (File.Exists(_settingsFilePath))
             {
@@ -45,7 +45,7 @@ namespace TeensyRom.Api.Services
             }
             ValidateAndLogSettings(_currentSettings);
 
-            return MapNewSettings(_currentSettings);
+                return _currentSettings with { };
         }
 
         private TeensySettings InitDefaultSettings()
@@ -75,57 +75,13 @@ namespace TeensyRom.Api.Services
             return true;
         }
 
-        private TeensySettings MapNewSettings(TeensySettings settings)
-        {
-            return settings with
-            {
-                LastCart = settings.LastCart is null ? null : settings.LastCart with { }
-            };
-        }
-
         public bool SaveSettings(TeensySettings settings)
         {
             _settings.OnNext(settings);
             return true;
         }
 
-        public void SetCart(string comPort)
-        {
-            //var serialProvider = SerialDeviceInfoProviderFactory.Create();
-            //var pnpDeviceId = serialProvider.GetPnpDeviceId(comPort);
-
-            //if (string.IsNullOrEmpty(pnpDeviceId))
-            //{
-            //    throw new Exception($"Unable to find PNPDeviceID for {comPort}");
-            //}
-            //var deviceHash = GetFileNameSafeHash(pnpDeviceId);
-
-            //var settings = _settings.Value with { };
-
-            //var device = settings.KnownCarts
-            //    .FirstOrDefault(RemoteMachineInfo => RemoteMachineInfo.DeviceHash == deviceHash);
-
-            //settings = settings with
-            //{
-            //    LastCart = device is null ? new KnownCart(deviceHash, pnpDeviceId, comPort, $"TeensyROM #{settings.KnownCarts.Count() + 1}", null) : device
-            //};
-
-            //if (device is null)
-            //{
-            //    settings.KnownCarts.Add(settings.LastCart with { });
-            //}
-            //else
-            //{
-            //    settings.KnownCarts.Remove(device);
-            //    settings.KnownCarts.Add(settings.LastCart with { });
-            //}
-            //var currentCart = settings.KnownCarts.FirstOrDefault(x => x.DeviceHash == deviceHash);
-            //settings.LastCart = currentCart;
-
-            //SaveSettings(settings);
-        }
-
-        public static string GetFileNameSafeHash(string stringToHash)
+    public static string GetFileNameSafeHash(string stringToHash)
         {
             using (var md5 = MD5.Create())
             {

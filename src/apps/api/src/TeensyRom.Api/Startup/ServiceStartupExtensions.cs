@@ -34,11 +34,9 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IAlertService, AlertService>();
             services.AddSingleton<ISettingsService, SettingsService>();
             services.AddSingleton<IFwVersionChecker, FwVersionChecker>();
-            services.AddSingleton<ISerialStateContext, SerialStateContext>();
             services.AddSingleton<ICartFinder, CartFinder>();
             services.AddSingleton<ICartTagger, CartTagger>();
             services.AddSingleton<IDeviceConnectionManager, DeviceConnectionManager>();
-            services.AddSingleton<IObservableSerialPort, ObservableSerialPort>();
             services.AddSingleton<ISerialFactory, SerialFactory>();
             services.AddSingleton<IStorageFactory, StorageFactory>();
             services.AddSingleton<IGameMetadataService, GameMetadataService>();
