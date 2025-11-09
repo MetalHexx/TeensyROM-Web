@@ -1,4 +1,4 @@
-﻿using TeensyRom.Api.Endpoints.ClosePort;
+using TeensyRom.Api.Endpoints.ClosePort;
 using TeensyRom.Api.Endpoints.FindCarts;
 using TeensyRom.Api.Endpoints.ConnectDevice;
 using TeensyRom.Core.Common;
