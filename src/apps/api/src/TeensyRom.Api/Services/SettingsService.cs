@@ -50,9 +50,7 @@ namespace TeensyRom.Api.Services
 
         private TeensySettings InitDefaultSettings()
         {
-            var settings = new TeensySettings();
-            settings.InitializeDefaults();
-            return settings;
+            return new TeensySettings();
         }
 
         private void WriteSettings(TeensySettings settings)
@@ -67,9 +65,9 @@ namespace TeensyRom.Api.Services
 
         public bool ValidateAndLogSettings(TeensySettings settings)
         {
-            if (!Directory.Exists(settings.WatchDirectoryLocation))
+            if (!Directory.Exists(settings.FileTransferSettings.WatchDirectoryLocation))
             {
-                _log.InternalError($"The watch directory '{settings.WatchDirectoryLocation}' was not found.  Please go create it.");
+                _log.InternalError($"The watch directory '{settings.FileTransferSettings.WatchDirectoryLocation}' was not found.  Please go create it.");
                 return false;
             }
             return true;
