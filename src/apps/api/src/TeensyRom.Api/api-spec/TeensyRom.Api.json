@@ -5,6 +5,88 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/settings": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Save User Settings",
+        "description": "Saves all user settings for the TeensyROM application to persistent storage.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n  - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)\n  - TCP: Host address, port (1-65535), and timeout values (milliseconds)\n- **Player Settings**: Playback behavior and startup preferences\n  - Repeat mode, play timer, mute settings, startup filter and launch options\n- **File Transfer Settings**: Auto-copy and directory watching configuration\n  - Watch directory location, auto-transfer path, and sync flags\n- **Search Settings**: Search weights, stop words, and content exclusions\n  - Search weights must be >= 0 with at least one > 0\n  - Stop words, banned directories, and banned files lists\n- **App Settings**: Application lifecycle state\n  - First-time setup flag\n\n**Validation:**\n- All nested settings objects are required\n- Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200)\n- TCP port must be between 1 and 65535\n- Timeout values must be positive integers (milliseconds)\n- Watch directory must be empty or a valid absolute path\n- Search weights must be non-negative with at least one > 0\n\nSettings are persisted to Settings.json and immediately available in memory.",
+        "operationId": "SaveSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveSettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Get User Settings",
+        "description": "Retrieves all current user settings for the TeensyROM application.\n\n**Settings Categories:**\n- **Connection Settings**: Device connectivity preferences (Serial/TCP)\n- **Player Settings**: Playback behavior and startup preferences\n- **File Transfer Settings**: Auto-copy and directory watching configuration\n- **Search Settings**: Search weights, stop words, and content exclusions\n- **App Settings**: Application lifecycle state\n\nSettings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.",
+        "operationId": "GetSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetSettingsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/devices/{deviceId}/reset": {
       "put": {
         "tags": [
@@ -930,6 +1012,17 @@
   },
   "components": {
     "schemas": {
+      "AppSettingsDto": {
+        "required": [
+          "firstTimeSetup"
+        ],
+        "type": "object",
+        "properties": {
+          "firstTimeSetup": {
+            "type": "boolean"
+          }
+        }
+      },
       "CartDto": {
         "required": [
           "deviceId",
@@ -1022,6 +1115,35 @@
             "type": "string"
           }
         }
+      },
+      "ConnectionSettingsDto": {
+        "required": [
+          "connectionType",
+          "autoConnectEnabled",
+          "serial",
+          "tcp"
+        ],
+        "type": "object",
+        "properties": {
+          "connectionType": {
+            "$ref": "#/components/schemas/ConnectionType"
+          },
+          "autoConnectEnabled": {
+            "type": "boolean"
+          },
+          "serial": {
+            "$ref": "#/components/schemas/SerialConnectionSettingsDto"
+          },
+          "tcp": {
+            "$ref": "#/components/schemas/TcpConnectionSettingsDto"
+          }
+        }
+      },
+      "ConnectionType": {
+        "enum": [
+          "Serial",
+          "Tcp"
+        ]
       },
       "DeviceStartResponse": {
         "type": "object",
@@ -1248,6 +1370,37 @@
           }
         }
       },
+      "FileTransferSettingsDto": {
+        "required": [
+          "watchDirectoryLocation",
+          "autoTransferPath",
+          "autoFileCopyEnabled",
+          "autoLaunchOnCopyEnabled",
+          "navToDirOnLaunch",
+          "syncFilesEnabled"
+        ],
+        "type": "object",
+        "properties": {
+          "watchDirectoryLocation": {
+            "type": "string"
+          },
+          "autoTransferPath": {
+            "type": "string"
+          },
+          "autoFileCopyEnabled": {
+            "type": "boolean"
+          },
+          "autoLaunchOnCopyEnabled": {
+            "type": "boolean"
+          },
+          "navToDirOnLaunch": {
+            "type": "boolean"
+          },
+          "syncFilesEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "FindDevicesResponse": {
         "required": [
           "devices",
@@ -1278,6 +1431,68 @@
           },
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "GetSettingsResponse": {
+        "required": [
+          "connectionSettings",
+          "playerSettings",
+          "fileTransferSettings",
+          "searchSettings",
+          "appSettings"
+        ],
+        "type": "object",
+        "properties": {
+          "connectionSettings": {
+            "$ref": "#/components/schemas/ConnectionSettingsDto"
+          },
+          "playerSettings": {
+            "$ref": "#/components/schemas/PlayerSettingsDto"
+          },
+          "fileTransferSettings": {
+            "$ref": "#/components/schemas/FileTransferSettingsDto"
+          },
+          "searchSettings": {
+            "$ref": "#/components/schemas/SearchSettingsDto"
+          },
+          "appSettings": {
+            "$ref": "#/components/schemas/AppSettingsDto"
+          }
+        }
+      },
+      "HttpValidationProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -1362,6 +1577,41 @@
           }
         }
       },
+      "PlayerSettingsDto": {
+        "required": [
+          "repeatModeOnStartup",
+          "playTimerEnabled",
+          "muteFastForward",
+          "muteRandomSeek",
+          "startupFilter",
+          "startupLaunchEnabled",
+          "startupLaunchRandom"
+        ],
+        "type": "object",
+        "properties": {
+          "repeatModeOnStartup": {
+            "type": "boolean"
+          },
+          "playTimerEnabled": {
+            "type": "boolean"
+          },
+          "muteFastForward": {
+            "type": "boolean"
+          },
+          "muteRandomSeek": {
+            "type": "boolean"
+          },
+          "startupFilter": {
+            "$ref": "#/components/schemas/TeensyFilterType"
+          },
+          "startupLaunchEnabled": {
+            "type": "boolean"
+          },
+          "startupLaunchRandom": {
+            "type": "boolean"
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -1429,6 +1679,48 @@
           }
         }
       },
+      "SaveSettingsRequest": {
+        "required": [
+          "connectionSettings",
+          "playerSettings",
+          "fileTransferSettings",
+          "searchSettings",
+          "appSettings"
+        ],
+        "type": "object",
+        "properties": {
+          "connectionSettings": {
+            "$ref": "#/components/schemas/ConnectionSettingsDto"
+          },
+          "playerSettings": {
+            "$ref": "#/components/schemas/PlayerSettingsDto"
+          },
+          "fileTransferSettings": {
+            "$ref": "#/components/schemas/FileTransferSettingsDto"
+          },
+          "searchSettings": {
+            "$ref": "#/components/schemas/SearchSettingsDto"
+          },
+          "appSettings": {
+            "$ref": "#/components/schemas/AppSettingsDto"
+          }
+        }
+      },
+      "SaveSettingsResponse": {
+        "required": [
+          "message",
+          "savedSettings"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "savedSettings": {
+            "$ref": "#/components/schemas/SaveSettingsRequest"
+          }
+        }
+      },
       "SearchResponse": {
         "required": [
           "files",
@@ -1475,6 +1767,86 @@
           }
         }
       },
+      "SearchSettingsDto": {
+        "required": [
+          "searchWeights",
+          "searchStopWords",
+          "bannedDirectories",
+          "bannedFiles"
+        ],
+        "type": "object",
+        "properties": {
+          "searchWeights": {
+            "$ref": "#/components/schemas/SearchWeightsDto"
+          },
+          "searchStopWords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bannedDirectories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bannedFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SearchWeightsDto": {
+        "required": [
+          "title",
+          "fileName",
+          "filePath",
+          "creator",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "number",
+            "format": "double"
+          },
+          "fileName": {
+            "type": "number",
+            "format": "double"
+          },
+          "filePath": {
+            "type": "number",
+            "format": "double"
+          },
+          "creator": {
+            "type": "number",
+            "format": "double"
+          },
+          "description": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "SerialConnectionSettingsDto": {
+        "required": [
+          "port",
+          "baudRate"
+        ],
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string"
+          },
+          "baudRate": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "StartLogsResponse": {
         "type": "object",
         "properties": {
@@ -1515,6 +1887,46 @@
             "type": "string"
           }
         }
+      },
+      "TcpConnectionSettingsDto": {
+        "required": [
+          "hostAddress",
+          "port",
+          "connectionTimeoutMs",
+          "readTimeoutMs",
+          "writeTimeoutMs"
+        ],
+        "type": "object",
+        "properties": {
+          "hostAddress": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "connectionTimeoutMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "readTimeoutMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "writeTimeoutMs": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TeensyFilterType": {
+        "enum": [
+          "All",
+          "Games",
+          "Music",
+          "Hex",
+          "Images"
+        ]
       },
       "TeensyStorageType": {
         "enum": [
@@ -1583,6 +1995,9 @@
     }
   },
   "tags": [
+    {
+      "name": "Settings"
+    },
     {
       "name": "Devices"
     },
