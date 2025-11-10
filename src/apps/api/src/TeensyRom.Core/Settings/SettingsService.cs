@@ -27,6 +27,7 @@ namespace TeensyRom.Core.Settings
         private BehaviorSubject<TeensySettings> _settings;
         private TeensySettings? _currentSettings;
         private string _settingsFilePath => Path.Combine(Assembly.GetExecutingAssembly().GetPath(), SettingsConstants.SettingsPath);
+        private readonly object _lock = new object();
 
         private readonly ILoggingService _log;
 
@@ -38,24 +39,27 @@ namespace TeensyRom.Core.Settings
 
         public TeensySettings GetSettings()
         {
-            if (_currentSettings is not null) return _currentSettings with { };
-
-            if (File.Exists(_settingsFilePath))
+            lock (_lock)
             {
-                using var stream = File.Open(_settingsFilePath, FileMode.Open, FileAccess.Read);
-                using var reader = new StreamReader(stream);
-                var content = reader.ReadToEnd();
+                if (_currentSettings is not null) return _currentSettings with { };
 
-                _currentSettings = LaunchableItemSerializer.Deserialize<TeensySettings>(content);
-            }
-            if (_currentSettings is null)
-            {
-                _currentSettings = InitDefaultSettings();
-                WriteSettings(_currentSettings);
-            }
-            ValidateAndLogSettings(_currentSettings);
+                if (File.Exists(_settingsFilePath))
+                {
+                    using var stream = File.Open(_settingsFilePath, FileMode.Open, FileAccess.Read);
+                    using var reader = new StreamReader(stream);
+                    var content = reader.ReadToEnd();
 
-            return _currentSettings with { };
+                    _currentSettings = LaunchableItemSerializer.Deserialize<TeensySettings>(content);
+                }
+                if (_currentSettings is null)
+                {
+                    _currentSettings = InitDefaultSettings();
+                    WriteSettings(_currentSettings);
+                }
+                ValidateAndLogSettings(_currentSettings);
+
+                return _currentSettings with { };
+            }
         }
 
         public ConnectionSettings GetConnectionSettings() => GetSettings().ConnectionSettings;
@@ -90,10 +94,13 @@ namespace TeensyRom.Core.Settings
 
         public bool SaveSettings(TeensySettings settings)
         {
-            _settings.OnNext(settings);
-            WriteSettings(settings);
-            _currentSettings = settings;
-            return true;
+            lock (_lock)
+            {
+                _settings.OnNext(settings);
+                WriteSettings(settings);
+                _currentSettings = settings;
+                return true;
+            }
         }
 
         public static string GetFileNameSafeHash(string stringToHash)
