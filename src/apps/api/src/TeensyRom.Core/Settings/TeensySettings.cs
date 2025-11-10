@@ -6,7 +6,6 @@ namespace TeensyRom.Core.Settings
   /// </summary>
   public record TeensySettings
   {
-    public string DeviceId { get; set; } = string.Empty;
     public ConnectionSettings ConnectionSettings { get; set; } = new();
     public PlayerSettings PlayerSettings { get; set; } = new();
     public FileTransferSettings FileTransferSettings { get; set; } = new();
