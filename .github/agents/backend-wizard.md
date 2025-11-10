@@ -110,6 +110,11 @@ Five states manage device lifecycle:
 3. Configure routes, tags, docs in `Configure()` method
 4. Delegate to services/MediatR in `Handle()` method
 
+### RadEndpoints
+- Endpoints are created using RadEndpoints
+- RadEndpoint Creation Docs: https://r.jina.ai/https://github.com/MetalHexx/RadEndpoints/blob/main/README.md
+- RadEndpoint Repository: https://r.jina.ai/https://github.com/MetalHexx/RadEndpoints/
+
 ### Adding Serial Commands
 1. Create command in `TeensyRom.Core.Serial/Commands/[Name]/`
 2. Implement `ITeensyCommand<TResult>` interface
