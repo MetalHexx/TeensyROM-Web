@@ -10,15 +10,7 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         {
             return new SaveSettingsResponse
             {
-                Message = "Settings saved successfully.",
-                SavedSettings = new SaveSettingsRequest
-                {
-                    //ConnectionSettings = MapConnectionSettingsDto(entity.ConnectionSettings),
-                    PlayerSettings = MapPlayerSettingsDto(entity.PlayerSettings),
-                    FileTransferSettings = MapFileTransferSettingsDto(entity.FileTransferSettings),
-                    SearchSettings = MapSearchSettingsDto(entity.SearchSettings),
-                    AppSettings = MapAppSettingsDto(entity.AppSettings)
-                }
+                Message = "Settings saved successfully."
             };
         }
 

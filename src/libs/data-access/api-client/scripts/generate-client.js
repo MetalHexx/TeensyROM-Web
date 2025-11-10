@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const config = {
-  openApiUrl: join(__dirname, '../../../../../../api-spec/TeensyRom.Api.json'),
+  openApiUrl: join(__dirname, '../../../../apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json'),
   outputDir: join(__dirname, '../src/lib'),
   generator: 'typescript-fetch',
   additionalProps: {

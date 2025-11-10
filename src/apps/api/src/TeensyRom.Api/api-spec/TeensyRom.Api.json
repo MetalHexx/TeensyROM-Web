@@ -709,38 +709,6 @@
         }
       }
     },
-    "/files/index/all": {
-      "post": {
-        "tags": [
-          "Files"
-        ],
-        "summary": "Index All",
-        "description": "Indexes all storage for all connected TeensyROM devices.\n\n- This will recursively index all storage devices.\n- Multiple devices will be indexed in parallel, one device type at a time.\n- This could take a few minutes if you have a lot of data.\n- Don't touch your commodores while indexing is in progress.",
-        "operationId": "IndexAll",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IndexAllResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/devices/{deviceId}/storage/{storageType}/index": {
       "post": {
         "tags": [
@@ -787,6 +755,38 @@
           },
           "400": {
             "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/index/all": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Index All",
+        "description": "Indexes all storage for all connected TeensyROM devices.\n\n- This will recursively index all storage devices.\n- Multiple devices will be indexed in parallel, one device type at a time.\n- This could take a few minutes if you have a lot of data.\n- Don't touch your commodores while indexing is in progress.",
+        "operationId": "IndexAll",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexAllResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1436,7 +1436,6 @@
       },
       "GetSettingsResponse": {
         "required": [
-          "connectionSettings",
           "playerSettings",
           "fileTransferSettings",
           "searchSettings",
@@ -1444,9 +1443,6 @@
         ],
         "type": "object",
         "properties": {
-          "connectionSettings": {
-            "$ref": "#/components/schemas/ConnectionSettingsDto"
-          },
           "playerSettings": {
             "$ref": "#/components/schemas/PlayerSettingsDto"
           },
@@ -1708,16 +1704,12 @@
       },
       "SaveSettingsResponse": {
         "required": [
-          "message",
-          "savedSettings"
+          "message"
         ],
         "type": "object",
         "properties": {
           "message": {
             "type": "string"
-          },
-          "savedSettings": {
-            "$ref": "#/components/schemas/SaveSettingsRequest"
           }
         }
       },

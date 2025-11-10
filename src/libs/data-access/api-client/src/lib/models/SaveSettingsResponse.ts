@@ -16,30 +16,30 @@ import { mapValues } from '../runtime';
 /**
  * 
  * @export
- * @interface IndexResponse
+ * @interface SaveSettingsResponse
  */
-export interface IndexResponse {
+export interface SaveSettingsResponse {
     /**
      * 
      * @type {string}
-     * @memberof IndexResponse
+     * @memberof SaveSettingsResponse
      */
     message: string;
 }
 
 /**
- * Check if a given object implements the IndexResponse interface.
+ * Check if a given object implements the SaveSettingsResponse interface.
  */
-export function instanceOfIndexResponse(value: object): value is IndexResponse {
+export function instanceOfSaveSettingsResponse(value: object): value is SaveSettingsResponse {
     if (!('message' in value) || value['message'] === undefined) return false;
     return true;
 }
 
-export function IndexResponseFromJSON(json: any): IndexResponse {
-    return IndexResponseFromJSONTyped(json, false);
+export function SaveSettingsResponseFromJSON(json: any): SaveSettingsResponse {
+    return SaveSettingsResponseFromJSONTyped(json, false);
 }
 
-export function IndexResponseFromJSONTyped(json: any, ignoreDiscriminator: boolean): IndexResponse {
+export function SaveSettingsResponseFromJSONTyped(json: any, ignoreDiscriminator: boolean): SaveSettingsResponse {
     if (json == null) {
         return json;
     }
@@ -49,11 +49,11 @@ export function IndexResponseFromJSONTyped(json: any, ignoreDiscriminator: boole
     };
 }
 
-export function IndexResponseToJSON(json: any): IndexResponse {
-    return IndexResponseToJSONTyped(json, false);
+export function SaveSettingsResponseToJSON(json: any): SaveSettingsResponse {
+    return SaveSettingsResponseToJSONTyped(json, false);
 }
 
-export function IndexResponseToJSONTyped(value?: IndexResponse | null, ignoreDiscriminator: boolean = false): any {
+export function SaveSettingsResponseToJSONTyped(value?: SaveSettingsResponse | null, ignoreDiscriminator: boolean = false): any {
     if (value == null) {
         return value;
     }
