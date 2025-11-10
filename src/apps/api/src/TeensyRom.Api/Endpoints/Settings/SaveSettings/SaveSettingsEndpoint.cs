@@ -53,8 +53,7 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 
             Response = new SaveSettingsResponse
             {
-                Message = "Settings saved successfully.",
-                SavedSettings = request
+                Message = "Settings saved successfully."
             };
 
             Send();

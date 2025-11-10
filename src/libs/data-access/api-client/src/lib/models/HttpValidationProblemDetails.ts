@@ -16,53 +16,59 @@ import { mapValues } from '../runtime';
 /**
  * 
  * @export
- * @interface ProblemDetails
+ * @interface HttpValidationProblemDetails
  */
-export interface ProblemDetails {
+export interface HttpValidationProblemDetails {
     /**
      * 
      * @type {string}
-     * @memberof ProblemDetails
+     * @memberof HttpValidationProblemDetails
      */
     type?: string | null;
     /**
      * 
      * @type {string}
-     * @memberof ProblemDetails
+     * @memberof HttpValidationProblemDetails
      */
     title?: string | null;
     /**
      * 
      * @type {number}
-     * @memberof ProblemDetails
+     * @memberof HttpValidationProblemDetails
      */
     status?: number | null;
     /**
      * 
      * @type {string}
-     * @memberof ProblemDetails
+     * @memberof HttpValidationProblemDetails
      */
     detail?: string | null;
     /**
      * 
      * @type {string}
-     * @memberof ProblemDetails
+     * @memberof HttpValidationProblemDetails
      */
     instance?: string | null;
+    /**
+     * 
+     * @type {{ [key: string]: Array<string>; }}
+     * @memberof HttpValidationProblemDetails
+     */
+    errors?: { [key: string]: Array<string>; };
 }
 
 /**
- * Check if a given object implements the ProblemDetails interface.
+ * Check if a given object implements the HttpValidationProblemDetails interface.
  */
-export function instanceOfProblemDetails(value: object): value is ProblemDetails {
+export function instanceOfHttpValidationProblemDetails(value: object): value is HttpValidationProblemDetails {
     return true;
 }
 
-export function ProblemDetailsFromJSON(json: any): ProblemDetails {
-    return ProblemDetailsFromJSONTyped(json, false);
+export function HttpValidationProblemDetailsFromJSON(json: any): HttpValidationProblemDetails {
+    return HttpValidationProblemDetailsFromJSONTyped(json, false);
 }
 
-export function ProblemDetailsFromJSONTyped(json: any, ignoreDiscriminator: boolean): ProblemDetails {
+export function HttpValidationProblemDetailsFromJSONTyped(json: any, ignoreDiscriminator: boolean): HttpValidationProblemDetails {
     if (json == null) {
         return json;
     }
@@ -73,14 +79,15 @@ export function ProblemDetailsFromJSONTyped(json: any, ignoreDiscriminator: bool
         'status': json['status'] == null ? undefined : json['status'],
         'detail': json['detail'] == null ? undefined : json['detail'],
         'instance': json['instance'] == null ? undefined : json['instance'],
+        'errors': json['errors'] == null ? undefined : json['errors'],
     };
 }
 
-export function ProblemDetailsToJSON(json: any): ProblemDetails {
-    return ProblemDetailsToJSONTyped(json, false);
+export function HttpValidationProblemDetailsToJSON(json: any): HttpValidationProblemDetails {
+    return HttpValidationProblemDetailsToJSONTyped(json, false);
 }
 
-export function ProblemDetailsToJSONTyped(value?: ProblemDetails | null, ignoreDiscriminator: boolean = false): any {
+export function HttpValidationProblemDetailsToJSONTyped(value?: HttpValidationProblemDetails | null, ignoreDiscriminator: boolean = false): any {
     if (value == null) {
         return value;
     }
@@ -92,6 +99,7 @@ export function ProblemDetailsToJSONTyped(value?: ProblemDetails | null, ignoreD
         'status': value['status'],
         'detail': value['detail'],
         'instance': value['instance'],
+        'errors': value['errors'],
     };
 }
 
