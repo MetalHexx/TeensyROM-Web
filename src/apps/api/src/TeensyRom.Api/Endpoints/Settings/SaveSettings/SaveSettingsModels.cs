@@ -1,6 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using FluentValidation;
-using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 {
