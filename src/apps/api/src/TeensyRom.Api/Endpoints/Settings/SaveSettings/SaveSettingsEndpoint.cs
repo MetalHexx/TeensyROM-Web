@@ -6,7 +6,7 @@ using TeensyRom.Core.ValueObjects;
 namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 {
     public class SaveSettingsEndpoint(ISettingsService settingsService) 
-        : RadEndpoint<SaveSettingsRequest, SaveSettingsResponse>
+        : RadEndpoint<SaveSettingsRequest, SaveSettingsResponse, SaveSettingsMapper>
     {
         public override void Configure()
         {
@@ -45,7 +45,7 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 
         public override Task Handle(SaveSettingsRequest request, CancellationToken ct)
         {
-            var settings = MapToEntity(request);
+            var settings = Map.ToEntity(request);
             var saveSuccess = settingsService.SaveSettings(settings);
 
             if (!saveSuccess)
@@ -62,93 +62,6 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 
             Send();
             return Task.CompletedTask;
-        }
-
-        private static TeensySettings MapToEntity(SaveSettingsRequest dto)
-        {
-            return new TeensySettings
-            {
-                ConnectionSettings = MapConnectionSettings(dto.ConnectionSettings),
-                PlayerSettings = MapPlayerSettings(dto.PlayerSettings),
-                FileTransferSettings = MapFileTransferSettings(dto.FileTransferSettings),
-                SearchSettings = MapSearchSettings(dto.SearchSettings),
-                AppSettings = MapAppSettings(dto.AppSettings)
-            };
-        }
-
-        private static ConnectionSettings MapConnectionSettings(ConnectionSettingsDto dto)
-        {
-            return new ConnectionSettings
-            {
-                ConnectionType = dto.ConnectionType,
-                AutoConnectEnabled = dto.AutoConnectEnabled,
-                Serial = new SerialConnectionSettings
-                {
-                    Port = dto.Serial.Port,
-                    BaudRate = dto.Serial.BaudRate
-                },
-                Tcp = new TcpConnectionSettings
-                {
-                    HostAddress = dto.Tcp.HostAddress,
-                    Port = dto.Tcp.Port,
-                    ConnectionTimeoutMs = dto.Tcp.ConnectionTimeoutMs,
-                    ReadTimeoutMs = dto.Tcp.ReadTimeoutMs,
-                    WriteTimeoutMs = dto.Tcp.WriteTimeoutMs
-                }
-            };
-        }
-
-        private static PlayerSettings MapPlayerSettings(PlayerSettingsDto dto)
-        {
-            return new PlayerSettings
-            {
-                RepeatModeOnStartup = dto.RepeatModeOnStartup,
-                PlayTimerEnabled = dto.PlayTimerEnabled,
-                MuteFastForward = dto.MuteFastForward,
-                MuteRandomSeek = dto.MuteRandomSeek,
-                StartupFilter = dto.StartupFilter,
-                StartupLaunchEnabled = dto.StartupLaunchEnabled,
-                StartupLaunchRandom = dto.StartupLaunchRandom
-            };
-        }
-
-        private static FileTransferSettings MapFileTransferSettings(FileTransferSettingsDto dto)
-        {
-            return new FileTransferSettings
-            {
-                WatchDirectoryLocation = dto.WatchDirectoryLocation,
-                AutoTransferPath = new DirectoryPath(dto.AutoTransferPath),
-                AutoFileCopyEnabled = dto.AutoFileCopyEnabled,
-                AutoLaunchOnCopyEnabled = dto.AutoLaunchOnCopyEnabled,
-                NavToDirOnLaunch = dto.NavToDirOnLaunch,
-                SyncFilesEnabled = dto.SyncFilesEnabled
-            };
-        }
-
-        private static SearchSettings MapSearchSettings(SearchSettingsDto dto)
-        {
-            return new SearchSettings
-            {
-                SearchWeights = new SearchWeights
-                {
-                    Title = dto.SearchWeights.Title,
-                    FileName = dto.SearchWeights.FileName,
-                    FilePath = dto.SearchWeights.FilePath,
-                    Creator = dto.SearchWeights.Creator,
-                    Description = dto.SearchWeights.Description
-                },
-                SearchStopWords = dto.SearchStopWords,
-                BannedDirectories = dto.BannedDirectories,
-                BannedFiles = dto.BannedFiles
-            };
-        }
-
-        private static AppSettings MapAppSettings(AppSettingsDto dto)
-        {
-            return new AppSettings
-            {
-                FirstTimeSetup = dto.FirstTimeSetup
-            };
         }
     }
 }
