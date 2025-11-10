@@ -8,7 +8,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         {
             return new GetSettingsResponse
             {
-                ConnectionSettings = MapConnectionSettings(entity.ConnectionSettings),
+                //ConnectionSettings = MapConnectionSettings(entity.ConnectionSettings),
                 PlayerSettings = MapPlayerSettings(entity.PlayerSettings),
                 FileTransferSettings = MapFileTransferSettings(entity.FileTransferSettings),
                 SearchSettings = MapSearchSettings(entity.SearchSettings),

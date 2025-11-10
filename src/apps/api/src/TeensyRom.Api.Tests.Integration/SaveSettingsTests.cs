@@ -280,7 +280,7 @@ namespace TeensyRom.Api.Tests.Integration
 
             // Assert - Verify persisted
             getResponse.Should().BeSuccessful<GetSettingsResponse>();
-            getResponse.Content.ConnectionSettings.Serial.Port.Should().Be("COM7");
+            //getResponse.Content.ConnectionSettings.Serial.Port.Should().Be("COM7");
         }
 
         [Fact]
@@ -291,12 +291,12 @@ namespace TeensyRom.Api.Tests.Integration
             initialSettings.Should().BeSuccessful<GetSettingsResponse>();
 
             var initialPlayerFilter = initialSettings.Content.PlayerSettings.StartupFilter;
-            var initialBaudRate = initialSettings.Content.ConnectionSettings.Serial.BaudRate;
+            //var initialBaudRate = initialSettings.Content.ConnectionSettings.Serial.BaudRate;
 
             // Arrange - Modify only player settings
             var saveRequest = CreateValidRequest();
             saveRequest.PlayerSettings.StartupFilter = TeensyFilterType.Music;
-            saveRequest.ConnectionSettings.Serial.BaudRate = initialBaudRate; // Keep same
+            //saveRequest.ConnectionSettings.Serial.BaudRate = initialBaudRate; // Keep same
 
             // Act - Save
             var saveResponse = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(saveRequest);
@@ -308,7 +308,7 @@ namespace TeensyRom.Api.Tests.Integration
             // Assert - Verify changes
             getResponse.Should().BeSuccessful<GetSettingsResponse>();
             getResponse.Content.PlayerSettings.StartupFilter.Should().Be(TeensyFilterType.Music);
-            getResponse.Content.ConnectionSettings.Serial.BaudRate.Should().Be(initialBaudRate);
+            //getResponse.Content.ConnectionSettings.Serial.BaudRate.Should().Be(initialBaudRate);
         }
 
         [Fact]

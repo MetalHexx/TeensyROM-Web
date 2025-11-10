@@ -10,7 +10,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         /// <summary>
         /// Device connectivity preferences - supports both Serial and TCP/Ethernet connections.
         /// </summary>
-        [Required] public ConnectionSettingsDto ConnectionSettings { get; set; } = null!;
+        //[Required] public ConnectionSettingsDto ConnectionSettings { get; set; } = null!;
 
         /// <summary>
         /// Playback behavior and player-related preferences.
