@@ -19,7 +19,7 @@ namespace TeensyRom.Api.Tests.Integration
                 .WithContentNotNull();
 
             r.Content.Should().NotBeNull();
-            r.Content.ConnectionSettings.Should().NotBeNull();
+            //r.Content.ConnectionSettings.Should().NotBeNull();
             r.Content.PlayerSettings.Should().NotBeNull();
             r.Content.FileTransferSettings.Should().NotBeNull();
             r.Content.SearchSettings.Should().NotBeNull();
@@ -38,10 +38,10 @@ namespace TeensyRom.Api.Tests.Integration
             var settings = r.Content;
             
             // Verify ConnectionSettings structure
-            settings.ConnectionSettings.Serial.Should().NotBeNull();
-            settings.ConnectionSettings.Tcp.Should().NotBeNull();
-            settings.ConnectionSettings.Serial.BaudRate.Should().BeGreaterThan(0);
-            settings.ConnectionSettings.Tcp.Port.Should().BeInRange(1, 65535);
+            //settings.ConnectionSettings.Serial.Should().NotBeNull();
+            //settings.ConnectionSettings.Tcp.Should().NotBeNull();
+            //settings.ConnectionSettings.Serial.BaudRate.Should().BeGreaterThan(0);
+            //settings.ConnectionSettings.Tcp.Port.Should().BeInRange(1, 65535);
 
             // Verify PlayerSettings structure
             settings.PlayerSettings.StartupFilter.Should().BeDefined();

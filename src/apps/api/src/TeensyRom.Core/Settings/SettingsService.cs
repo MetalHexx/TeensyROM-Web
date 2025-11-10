@@ -13,8 +13,8 @@ namespace TeensyRom.Core.Settings
     public class SettingsService : ISettingsService
     {
         public IObservable<TeensySettings> Settings => _settings.AsObservable();
-        public IObservable<ConnectionSettings> ConnectionSettings => 
-            _settings.Select(s => s.ConnectionSettings).DistinctUntilChanged();
+        //public IObservable<ConnectionSettings> ConnectionSettings => 
+        //    _settings.Select(s => s.ConnectionSettings).DistinctUntilChanged();
         public IObservable<PlayerSettings> PlayerSettings => 
             _settings.Select(s => s.PlayerSettings).DistinctUntilChanged();
         public IObservable<FileTransferSettings> FileTransferSettings => 
@@ -62,7 +62,7 @@ namespace TeensyRom.Core.Settings
             }
         }
 
-        public ConnectionSettings GetConnectionSettings() => GetSettings().ConnectionSettings;
+        //public ConnectionSettings GetConnectionSettings() => GetSettings().ConnectionSettings;
         public PlayerSettings GetPlayerSettings() => GetSettings().PlayerSettings;
         public FileTransferSettings GetFileTransferSettings() => GetSettings().FileTransferSettings;
         public SearchSettings GetSearchSettings() => GetSettings().SearchSettings;
