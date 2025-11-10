@@ -88,8 +88,6 @@ namespace TeensyRom.Api.Tests.Integration
                 .WithContentNotNull();
 
             r.Content.Message.Should().Be("Settings saved successfully.");
-            r.Content.SavedSettings.Should().NotBeNull();
-            r.Content.SavedSettings.ConnectionSettings.Serial.Port.Should().Be("COM3");
         }
 
         [Fact]
@@ -323,7 +321,6 @@ namespace TeensyRom.Api.Tests.Integration
 
             // Assert
             r.Should().BeSuccessful<SaveSettingsResponse>();
-            r.Content.SavedSettings.ConnectionSettings.Serial.Port.Should().BeEmpty();
         }
 
         [Fact]
@@ -338,7 +335,6 @@ namespace TeensyRom.Api.Tests.Integration
 
             // Assert
             r.Should().BeSuccessful<SaveSettingsResponse>();
-            r.Content.SavedSettings.ConnectionSettings.Tcp.HostAddress.Should().BeEmpty();
         }
 
         [Fact]
@@ -353,7 +349,6 @@ namespace TeensyRom.Api.Tests.Integration
 
             // Assert
             r.Should().BeSuccessful<SaveSettingsResponse>();
-            r.Content.SavedSettings.FileTransferSettings.WatchDirectoryLocation.Should().BeEmpty();
         }
 
         [Fact]
@@ -370,9 +365,6 @@ namespace TeensyRom.Api.Tests.Integration
 
             // Assert
             r.Should().BeSuccessful<SaveSettingsResponse>();
-            r.Content.SavedSettings.SearchSettings.SearchStopWords.Should().BeEmpty();
-            r.Content.SavedSettings.SearchSettings.BannedDirectories.Should().BeEmpty();
-            r.Content.SavedSettings.SearchSettings.BannedFiles.Should().BeEmpty();
         }
 
         public void Dispose()

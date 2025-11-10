@@ -42,11 +42,6 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         /// A message indicating the result of the save operation.
         /// </summary>
         [Required] public string Message { get; set; } = "Settings saved successfully.";
-
-        /// <summary>
-        /// The saved settings echoed back for confirmation.
-        /// </summary>
-        [Required] public SaveSettingsRequest SavedSettings { get; set; } = null!;
     }
 
     // Validators
