@@ -48,7 +48,7 @@ libs/infrastructure/src/lib/api-client/
 **Related Documentation:**
 
 - [API Client Generation Guide](../../API_CLIENT_GENERATION.md) - Step-by-step generation process
-- [Backend Endpoints](./BASIC_SETTINGS_ENDPOINT_PLAN.md#api-endpoints) - Endpoint specifications
+- [Backend Settings Endpoints](https://github.com/MetalHexx/TeensyROM-Web/tree/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings) - Backend endpoint implementation
 
 **Implementation Subtasks:**
 
@@ -92,90 +92,14 @@ libs/infrastructure/src/lib/api-client/
 </details>
 
 <details open>
-<summary><h3>Task 2: Verify Type Definitions</h3></summary>
-
-**Purpose**: Inspect generated TypeScript DTOs to ensure they accurately reflect the backend models and include all necessary properties with correct types. This validation prevents runtime type mismatches.
-
-**Related Documentation:**
-
-- [Backend Settings Models](./BASIC_SETTINGS_ENDPOINT_PLAN.md#data-models) - Backend C# model definitions
-- [Settings Feature Plan - Data Structures](./SETTINGS_FEATURE_PLAN.md#phase-2-domain-contracts--infrastructure-layer) - Expected domain structures
-
-**Implementation Subtasks:**
-
-- [ ] **Review SettingsDto**: Verify it contains properties for all four settings sections
-- [ ] **Review PlayerSettingsDto**: Confirm it includes `repeatMode`, `sidTimerSeconds`, `sidAutoAdvance`, `launchOnStartup`
-- [ ] **Review FileTransferSettingsDto**: Confirm it includes `watchFoldersEnabled`, `watchFolders`, `autoLaunchTransferred`
-- [ ] **Review SearchSettingsDto**: Confirm it includes `weights` object, `stopWords` array, `enableMetadataSearch`, `showHiddenFiles`
-- [ ] **Review AppSettingsDto**: Confirm it includes `setupCompleted` boolean
-- [ ] **Check Enum Generation**: Verify `RepeatMode` enum generated with `Off`, `Single`, `All` values
-- [ ] **Check Array Types**: Verify `watchFolders` and `stopWords` are typed as string arrays
-- [ ] **Check Nested Objects**: Verify `weights` object structure matches backend (name, composer, file path properties)
-
-**Testing Subtask:**
-
-- [ ] **Write Type Verification Tests**: Create type-checking tests that validate DTO structure (see Testing section)
-
-**Key Implementation Notes:**
-
-- DTOs should be interfaces (not classes) following TypeScript conventions
-- All properties should be required unless marked optional in backend
-- Enums should match backend enum names and values exactly
-- Date types should be strings (ISO 8601 format from JSON serialization)
-- The OpenAPI generator respects backend nullable annotations
-
-**Critical Type Structures** (reference only - do not manually create):
-
-```typescript
-// Example: SettingsDto structure (generated automatically)
-interface SettingsDto {
-  player: PlayerSettingsDto;
-  fileTransfer: FileTransferSettingsDto;
-  search: SearchSettingsDto;
-  app: AppSettingsDto;
-}
-```
-
-**Testing Focus for Task 2:**
-
-> Focus on **type safety** - ensure generated types match backend contracts.
-
-**Behaviors to Test:**
-
-- [ ] DTO properties match backend model properties exactly
-- [ ] Enum values match backend enum values
-- [ ] Array properties are correctly typed as arrays
-- [ ] Nested object structures are properly represented
-- [ ] Required vs optional properties match backend annotations
-- [ ] TypeScript compiler accepts valid DTO instances
-
-**Type Verification Test Example:**
-
-```typescript
-// Test that DTOs are structurally correct
-describe('Generated Settings DTOs', () => {
-  it('should have valid structure for SettingsDto', () => {
-    const settings: SettingsDto = {
-      player: {} as PlayerSettingsDto,
-      fileTransfer: {} as FileTransferSettingsDto,
-      search: {} as SearchSettingsDto,
-      app: {} as AppSettingsDto
-    };
-    expect(settings).toBeDefined();
-  });
-});
-```
-
-</details>
-
-<details open>
-<summary><h3>Task 3: Manual API Testing</h3></summary>
+<summary><h3>Task 2: Manual API Testing</h3></summary>
 
 **Purpose**: Use API testing tools to verify that the backend endpoints respond correctly and return data matching the generated DTOs. This validates the client-server contract before frontend integration.
 
 **Related Documentation:**
 
 - [Backend Endpoint Tests](./BASIC_SETTINGS_ENDPOINT_PLAN.md#testing) - Backend test specifications
+- [Backend Settings Endpoints](https://github.com/MetalHexx/TeensyROM-Web/tree/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings) - Endpoint implementation
 - [Scalar API Documentation](http://localhost:5000/scalar/v1) - Interactive API documentation (when backend is running)
 
 **Implementation Subtasks:**
@@ -208,7 +132,7 @@ describe('Generated Settings DTOs', () => {
 4. **POST Invalid Data**: Verify validation catches bad values (e.g., negative timer)
 5. **POST Partial Update**: Verify partial settings updates work correctly
 
-**Testing Focus for Task 3:**
+**Testing Focus for Task 2:**
 
 > Focus on **contract validation** - ensure API behavior matches expectations.
 
@@ -223,45 +147,6 @@ describe('Generated Settings DTOs', () => {
 - [ ] POST with missing optional fields succeeds with defaults
 - [ ] Partial updates preserve existing values for unspecified fields
 
-**Sample Manual Test (curl):**
-
-```bash
-# GET default settings
-curl -X GET http://localhost:5000/settings
-
-# POST updated settings
-curl -X POST http://localhost:5000/settings \
-  -H "Content-Type: application/json" \
-  -d '{
-    "player": {
-      "repeatMode": "All",
-      "sidTimerSeconds": 240,
-      "sidAutoAdvance": true,
-      "launchOnStartup": false
-    },
-    "fileTransfer": {
-      "watchFoldersEnabled": true,
-      "watchFolders": ["/path/to/watch"],
-      "autoLaunchTransferred": false
-    },
-    "search": {
-      "weights": {
-        "name": 2.0,
-        "composer": 1.5,
-        "author": 1.0,
-        "year": 0.5,
-        "filePath": 0.3
-      },
-      "stopWords": ["the", "a", "an"],
-      "enableMetadataSearch": true,
-      "showHiddenFiles": false
-    },
-    "app": {
-      "setupCompleted": true
-    }
-  }'
-```
-
 </details>
 
 ---
@@ -273,7 +158,6 @@ curl -X POST http://localhost:5000/settings \
 - [ ] **API Client Generated**: `SettingsApiService` exists in `libs/infrastructure/src/lib/api-client/api/`
 - [ ] **All DTOs Present**: `SettingsDto`, `PlayerSettingsDto`, `FileTransferSettingsDto`, `SearchSettingsDto`, `AppSettingsDto` exist in models directory
 - [ ] **No TypeScript Errors**: Generated files compile without errors
-- [ ] **Type Verification Passes**: DTO structures match backend models
 - [ ] **Manual API Tests Pass**: GET and POST endpoints respond correctly
 - [ ] **Validation Works**: Invalid data returns 400 Bad Request with problem details
 - [ ] **Settings Persist**: POST followed by GET returns saved settings
@@ -287,16 +171,14 @@ curl -X POST http://localhost:5000/settings \
 This phase focuses on **verification and contract validation** rather than automated tests:
 
 1. **Generation Verification**: Confirm code generation completes successfully
-2. **Type Verification**: Validate generated DTOs match backend contracts
-3. **Manual API Testing**: Verify endpoints behave as documented
+2. **Manual API Testing**: Verify endpoints behave as documented
 
 ### Test Types by Task
 
 | Task | Test Type | Focus |
 |------|-----------|-------|
 | Task 1 | Verification | Generation success |
-| Task 2 | Type Checking | DTO structure validation |
-| Task 3 | Manual Testing | API contract validation |
+| Task 2 | Manual Testing | API contract validation |
 
 ### No Automated Integration Tests Yet
 
