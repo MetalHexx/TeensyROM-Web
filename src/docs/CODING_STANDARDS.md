@@ -476,3 +476,100 @@ When creating new components, ensure:
 - **Style Guide**: [`STYLE_GUIDE.md`](./STYLE_GUIDE.md) - UI styling standards and patterns
 - **Component Examples**: Individual component files demonstrate these standards in practice
 - **Angular Documentation**: [Angular Coding Style Guide](https://angular.io/guide/styleguide)
+
+---
+
+## Reactive Forms
+
+### Form Component Hierarchy
+
+**Standard**: Use hierarchical form component pattern with parent form owner and presentational section components
+
+**Pattern**: Forms are decomposed into a tree structure:
+- **Smart Container**: Owns FormGroup, handles submission and store integration
+- **Section Components**: Receive FormGroup via input(), purely presentational
+- **Field Components** (optional): Custom form controls implementing ControlValueAccessor
+
+**Detailed Documentation**: See [FORM_COMPONENT_TREE.md](./FORM_COMPONENT_TREE.md) for complete pattern documentation
+
+### FormGroup Passing
+
+**Standard**: Pass FormGroup to child components via `input()` signals
+
+```typescript
+// Parent component
+form = this.fb.group({
+  section: this.fb.group({ /* controls */ })
+});
+
+// Child component
+export class SectionComponent {
+  formGroup = input.required<FormGroup>();
+}
+
+// Template
+<app-section [formGroup]="form.controls.section" />
+```
+
+**Type Safety**: Use generic `FormGroup` type for component inputs (not `FormGroup<T>`) to avoid type compatibility issues with FormBuilder inference.
+
+### Form Validation
+
+**Standard**: Apply validators at form building time, display errors in section components
+
+```typescript
+// In parent
+form = this.fb.group({
+  email: ['', [Validators.required, Validators.email]]
+});
+
+// In section component template
+@if (formGroup().get('email')?.hasError('required')) {
+  <mat-error>Email is required</mat-error>
+}
+@if (formGroup().get('email')?.hasError('email')) {
+  <mat-error>Invalid email format</mat-error>
+}
+```
+
+**Validation Best Practices**:
+- Match frontend validators to backend validation rules
+- Display errors inline below fields (Material Design pattern)
+- Show errors on blur or submit, not while typing
+- Provide clear, actionable error messages
+
+### Form State Management
+
+**Standard**: Use valueChanges observable with debouncing for auto-save patterns
+
+```typescript
+ngOnInit() {
+  this.form.valueChanges.pipe(
+    takeUntilDestroyed(this.destroyRef),
+    debounceTime(500),
+    filter(() => this.form.valid)
+  ).subscribe(values => {
+    this.store.saveData(values);
+  });
+}
+```
+
+**Cleanup**: Always use `takeUntilDestroyed()` to prevent memory leaks from form subscriptions.
+
+### Form Initialization
+
+**Standard**: Initialize form values from store using effect pattern
+
+```typescript
+ngOnInit() {
+  effect(() => {
+    const data = this.store.data();
+    this.form.patchValue(data, { emitEvent: false });
+  });
+}
+```
+
+**emitEvent: false**: Prevents valueChanges from triggering when initializing from external source (avoids circular updates).
+
+---
+
