@@ -2,7 +2,7 @@
 
 ## 🎯 Objective
 
-Define domain-layer contracts for settings services and implement the infrastructure-layer service that communicates with the backend API. This establishes Clean Architecture boundaries by creating domain interfaces (contracts) and infrastructure implementations that map API DTOs to domain models. The infrastructure service will be injected into the application layer (Phase 3) via dependency injection tokens.
+Define domain-layer contracts for settings services and implement the infrastructure-layer service that communicates with the backend API. This establishes Clean Architecture boundaries by creating domain interfaces (contracts) and infrastructure implementations that map API DTOs to domain models and dispatch error alerts following the player service pattern. The infrastructure service will be injected into the application layer (Phase 3) via dependency injection tokens.
 
 ---
 
@@ -18,10 +18,13 @@ Define domain-layer contracts for settings services and implement the infrastruc
 **Standards & Guidelines:**
 
 - [ ] [Coding Standards](../../CODING_STANDARDS.md) - General coding patterns and conventions
-- [ ] [Domain Standards](../../DOMAIN_STANDARDS.md) - Domain layer patterns and contracts
-- [ ] [Service Standards](../../SERVICE_STANDARDS.md) - Service implementation patterns
-- [ ] [NX Library Standards](../../NX_LIBRARY_STANDARDS.md) - Library organization
+- [ ] [Service Standards](../../SERVICE_STANDARDS.md) - Service implementation patterns and error handling
 - [ ] [Testing Standards](../../TESTING_STANDARDS.md) - Testing approaches by layer
+
+**Reference Implementations:**
+
+- [ ] [PlayerService](../../../libs/infrastructure/src/lib/player/player.service.ts) - Error handling with alert service pattern to follow
+- [ ] [Domain Mapper](../../../libs/infrastructure/src/lib/domain.mapper.ts) - DTO mapping patterns
 
 ---
 
@@ -34,13 +37,13 @@ libs/domain/src/lib/settings/
 ├── index.ts                                  ✨ New - Barrel export for settings domain
 ├── settings.contract.ts                      ✨ New - ISettingsService interface
 ├── settings.models.ts                        ✨ New - Domain models (Settings, PlayerSettings, etc.)
-├── settings.tokens.ts                        ✨ New - DI injection token for ISettingsService
-└── settings.mappers.ts                       ✨ New - Optional mapper interfaces (if needed)
+└── settings.tokens.ts                        ✨ New - DI injection token for ISettingsService
 
 libs/infrastructure/src/lib/settings/
 ├── index.ts                                  ✨ New - Barrel export for settings infrastructure
-├── settings.service.ts                       ✨ New - SettingsService implementation
-└── settings.mappers.ts                       ✨ New - DTO-to-domain mapping functions
+├── settings.service.ts                       ✨ New - SettingsService with alert-based error handling
+├── settings.mappers.ts                       ✨ New - DTO-to-domain mapping functions
+└── settings.service.spec.ts                  ✨ New - Service unit tests
 
 libs/infrastructure/src/index.ts              📝 Modified - Export settings infrastructure
 ```
@@ -50,634 +53,252 @@ libs/infrastructure/src/index.ts              📝 Modified - Export settings in
 <details open>
 <summary><h3>Task 1: Define Domain Models</h3></summary>
 
-**Purpose**: Create TypeScript interfaces representing settings in the domain layer. These models are framework-agnostic and represent the business concepts independent of API DTOs or Angular specifics.
+**Purpose**: Create TypeScript interfaces representing settings in the domain layer. These models are framework-agnostic and represent the business concepts independent of API DTOs.
 
 **Related Documentation:**
 
-- [Settings Feature Plan - Phase 2](./SETTINGS_FEATURE_PLAN.md#phase-2-domain-contracts--infrastructure-layer) - Domain model specifications
-- [Domain Standards](../../DOMAIN_STANDARDS.md) - Domain layer patterns
-- [Coding Standards - TypeScript Interfaces](../../CODING_STANDARDS.md#typescript-conventions) - Interface naming conventions
+- [Settings Feature Plan - Data Structures](./SETTINGS_FEATURE_PLAN.md#phase-2-domain-contracts--infrastructure-layer)
+- [Coding Standards - TypeScript](../../CODING_STANDARDS.md#typescript-conventions)
 
 **Implementation Subtasks:**
 
 - [ ] **Create settings.models.ts**: New file in `libs/domain/src/lib/settings/`
 - [ ] **Define Settings interface**: Root interface containing all settings sections
-- [ ] **Define PlayerSettings interface**: Includes `repeatMode`, `sidTimerSeconds`, `sidAutoAdvance`, `launchOnStartup`
-- [ ] **Define FileTransferSettings interface**: Includes `watchFoldersEnabled`, `watchFolders`, `autoLaunchTransferred`
-- [ ] **Define SearchSettings interface**: Includes `weights`, `stopWords`, `enableMetadataSearch`, `showHiddenFiles`
+- [ ] **Define PlayerSettings interface**: `repeatMode`, `sidTimerSeconds`, `sidAutoAdvance`, `launchOnStartup`
+- [ ] **Define FileTransferSettings interface**: `watchFoldersEnabled`, `watchFolders`, `autoLaunchTransferred`
+- [ ] **Define SearchSettings interface**: `weights`, `stopWords`, `enableMetadataSearch`, `showHiddenFiles`
 - [ ] **Define SearchWeights interface**: Nested object for search weight values
-- [ ] **Define AppSettings interface**: Includes `setupCompleted`
+- [ ] **Define AppSettings interface**: `setupCompleted`
 - [ ] **Define RepeatMode type**: Union type `'Off' | 'Single' | 'All'`
-- [ ] **Add JSDoc comments**: Document purpose of each interface and property
+- [ ] **Add JSDoc comments**: Document each interface and property
 
 **Testing Subtask:**
 
-- [ ] **Write Model Tests**: Create type-checking tests that validate model structure (see Testing section)
+- [ ] **Write Model Tests**: Type-checking tests validating model structure
 
 **Key Implementation Notes:**
 
-- Use TypeScript interfaces (not classes) following existing domain patterns
-- All properties should be required unless business logic demands optionality
-- Avoid any framework-specific types (no Angular, no RxJS in domain layer)
-- Use descriptive property names that match business terminology
-- Domain models may differ from DTOs if business needs require it (though they'll be similar here)
-
-**Critical Type Structure** (example only):
-
-```typescript
-// Example: Settings interface structure
-export interface Settings {
-  player: PlayerSettings;
-  fileTransfer: FileTransferSettings;
-  search: SearchSettings;
-  app: AppSettings;
-}
-
-export type RepeatMode = 'Off' | 'Single' | 'All';
-```
-
-**Testing Focus for Task 1:**
-
-> Focus on **type correctness** - ensure domain models are structurally sound.
-
-**Behaviors to Test:**
-
-- [ ] All interfaces are exportable and usable
-- [ ] RepeatMode type restricts to valid values
-- [ ] Nested interfaces (SearchWeights) are properly typed
-- [ ] Array properties (watchFolders, stopWords) are correctly typed
-- [ ] Models compile without TypeScript errors
-
-**Model Type Tests:**
-
-```typescript
-describe('Settings Domain Models', () => {
-  it('should create valid Settings object', () => {
-    const settings: Settings = {
-      player: {
-        repeatMode: 'Off',
-        sidTimerSeconds: 180,
-        sidAutoAdvance: false,
-        launchOnStartup: false
-      },
-      // ... other sections
-    };
-    expect(settings).toBeDefined();
-  });
-
-  it('should restrict RepeatMode to valid values', () => {
-    const validMode: RepeatMode = 'All';
-    // @ts-expect-error - Invalid value should fail type check
-    const invalidMode: RepeatMode = 'Invalid';
-  });
-});
-```
+- Use TypeScript interfaces (not classes) following domain patterns
+- All properties required unless business logic demands optionality
+- No framework-specific types (no Angular, no RxJS in domain layer)
+- Domain models may differ from DTOs if business logic requires it
 
 </details>
 
 <details open>
-<summary><h3>Task 2: Define Domain Service Contract</h3></summary>
+<summary><h3>Task 2: Define Service Contract Interface</h3></summary>
 
-**Purpose**: Create the `ISettingsService` interface that defines the contract for settings operations. This interface lives in the domain layer and will be implemented by infrastructure but consumed by application layer.
+**Purpose**: Create the `ISettingsService` contract interface defining the operations for settings management. This contract will be implemented by the infrastructure service and consumed by the application layer.
 
 **Related Documentation:**
 
-- [Domain Standards - Service Contracts](../../DOMAIN_STANDARDS.md#service-contracts) - Contract definition patterns
-- [Service Standards](../../SERVICE_STANDARDS.md) - Service interface conventions
-- [Settings Feature Plan - Phase 2](./SETTINGS_FEATURE_PLAN.md#phase-2-domain-contracts--infrastructure-layer) - Service operations
+- [Service Standards - Contract Definition](../../SERVICE_STANDARDS.md#service-contracts)
+- [Coding Standards - Interfaces](../../CODING_STANDARDS.md#typescript-conventions)
 
 **Implementation Subtasks:**
 
 - [ ] **Create settings.contract.ts**: New file in `libs/domain/src/lib/settings/`
-- [ ] **Define ISettingsService interface**: Service contract with method signatures
-- [ ] **Add getSettings method**: Returns `Observable<Settings>` for loading settings
-- [ ] **Add saveSettings method**: Accepts `Settings` parameter, returns `Observable<void>`
-- [ ] **Add JSDoc comments**: Document method purpose, parameters, and return values
-- [ ] **Document error handling**: Note expected error behaviors in JSDoc
+- [ ] **Define ISettingsService interface**: Contract with `getSettings()` and `saveSettings()` methods
+- [ ] **Use Observable return types**: `Observable<Settings>` for both methods
+- [ ] **Add JSDoc documentation**: Document each method's purpose and behavior
+- [ ] **Export from index.ts**: Add to domain barrel export
 
 **Testing Subtask:**
 
-- [ ] **Write Contract Tests**: Verify interface structure and type signatures (see Testing section)
+- [ ] **Verify Contract Compilation**: Ensure interface compiles without errors
 
 **Key Implementation Notes:**
 
-- Use RxJS `Observable` for asynchronous operations (standard for Angular services)
-- Methods should be simple and focused (single responsibility)
-- Avoid implementation details in contract (no HTTP, no caching logic)
-- Contract represents "what" the service does, not "how" it does it
-- Error handling is implementation detail (document expected behavior in JSDoc)
+- Contract defines "what" not "how" (implementation details in infrastructure)
+- Use RxJS Observable for async operations (infrastructure layer pattern)
+- Methods should be intuitive and match business terminology
+- Contract consumed by application layer stores via injection token
 
-**Critical Interface** (example only):
-
-```typescript
-export interface ISettingsService {
-  /**
-   * Loads current settings from persistence layer.
-   * @returns Observable emitting Settings on success, error on failure
-   */
-  getSettings(): Observable<Settings>;
-
-  /**
-   * Saves settings to persistence layer.
-   * @param settings - Settings to save
-   * @returns Observable completing on success, error on failure
-   */
-  saveSettings(settings: Settings): Observable<void>;
-}
-```
-
-**Testing Focus for Task 2:**
-
-> Focus on **contract correctness** - ensure interface is well-defined.
-
-**Behaviors to Test:**
-
-- [ ] Interface exports correctly from domain layer
-- [ ] Method signatures use correct types (Observable, Settings)
-- [ ] Interface is usable in application layer (no dependency issues)
-- [ ] TypeScript compiler accepts mock implementations
-
-**Contract Type Tests:**
-
-```typescript
-describe('ISettingsService Contract', () => {
-  it('should be implementable with correct signatures', () => {
-    const mockService: ISettingsService = {
-      getSettings: () => of({} as Settings),
-      saveSettings: (settings: Settings) => of(void 0)
-    };
-    expect(mockService).toBeDefined();
-  });
-});
-```
+**Interface Structure**: Define methods for getting and saving settings, returning Observables
 
 </details>
 
 <details open>
 <summary><h3>Task 3: Create Dependency Injection Token</h3></summary>
 
-**Purpose**: Create an Angular injection token that allows the infrastructure implementation to be injected into application layer services. This maintains Clean Architecture by preventing direct infrastructure dependencies.
+**Purpose**: Create an Angular injection token for the `ISettingsService` interface to enable dependency injection with proper typing.
 
 **Related Documentation:**
 
-- [Domain Standards - Injection Tokens](../../DOMAIN_STANDARDS.md#injection-tokens) - Token creation patterns
-- [Coding Standards - Dependency Injection](../../CODING_STANDARDS.md#dependency-injection) - DI conventions
+- [Service Standards - Injection Tokens](../../SERVICE_STANDARDS.md#injection-tokens)
+- [Coding Standards - Dependency Injection](../../CODING_STANDARDS.md#dependency-injection)
 
 **Implementation Subtasks:**
 
 - [ ] **Create settings.tokens.ts**: New file in `libs/domain/src/lib/settings/`
-- [ ] **Define SETTINGS_SERVICE_TOKEN**: `InjectionToken<ISettingsService>`
-- [ ] **Add token description**: Use descriptive string for debugging/error messages
-- [ ] **Export token**: Make available for infrastructure and application layers
+- [ ] **Define SETTINGS_SERVICE token**: `InjectionToken<ISettingsService>` with descriptive name
+- [ ] **Add token description**: Provide clear description string for debugging
+- [ ] **Export from index.ts**: Add to domain barrel export
 
 **Testing Subtask:**
 
-- [ ] **Write Token Tests**: Verify token is injectable (see Testing section)
+- [ ] **Verify Token Creation**: Ensure token is properly typed and exported
 
 **Key Implementation Notes:**
 
-- Use descriptive token name matching the interface (e.g., "ISettingsService")
-- Token must be exported from domain layer barrel export (index.ts)
-- Token is generic over the interface type (`InjectionToken<ISettingsService>`)
-- Token will be provided in infrastructure layer (Phase 2, Task 5)
+- Token enables type-safe dependency injection across layers
+- Token name should be descriptive for Angular DevTools
+- Token will be used in application layer to inject infrastructure service
+- Follow existing token patterns in domain layer
 
-**Critical Token Definition** (example only):
-
-```typescript
-export const SETTINGS_SERVICE_TOKEN = new InjectionToken<ISettingsService>(
-  'ISettingsService',
-  {
-    providedIn: 'root',
-    factory: () => {
-      throw new Error('SETTINGS_SERVICE_TOKEN must be provided');
-    }
-  }
-);
-```
-
-**Testing Focus for Task 3:**
-
-> Focus on **token usability** - ensure token is properly defined and injectable.
-
-**Behaviors to Test:**
-
-- [ ] Token is defined and exported correctly
-- [ ] Token type matches interface type
-- [ ] Token can be injected in test environment
-- [ ] Token provides clear error if not provided
-
-**Token Tests:**
-
-```typescript
-describe('SETTINGS_SERVICE_TOKEN', () => {
-  it('should be defined', () => {
-    expect(SETTINGS_SERVICE_TOKEN).toBeDefined();
-  });
-
-  it('should throw error if not provided', () => {
-    TestBed.configureTestingModule({});
-    expect(() => TestBed.inject(SETTINGS_SERVICE_TOKEN)).toThrow();
-  });
-});
-```
+**Token Pattern**: Create InjectionToken with interface type and descriptive string
 
 </details>
 
 <details open>
 <summary><h3>Task 4: Implement DTO-to-Domain Mappers</h3></summary>
 
-**Purpose**: Create mapping functions that convert API DTOs (from Phase 1) to domain models and vice versa. These mappers isolate the domain layer from API representation changes.
+**Purpose**: Create mapping functions that convert API DTOs to domain models and vice versa. These mappers isolate the infrastructure layer from domain layer changes.
 
 **Related Documentation:**
 
-- [Service Standards - Mapping Patterns](../../SERVICE_STANDARDS.md#mapping-patterns) - Mapper function conventions
-- [Coding Standards - Pure Functions](../../CODING_STANDARDS.md#pure-functions) - Function patterns
+- [Service Standards - Mapping Patterns](../../SERVICE_STANDARDS.md#dto-mapping)
+- [Domain Mapper Reference](../../../libs/infrastructure/src/lib/domain.mapper.ts) - Existing mapping patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Create infrastructure/settings.mappers.ts**: New file in `libs/infrastructure/src/lib/settings/`
-- [ ] **Implement mapSettingsDtoToDomain**: Converts `SettingsDto` to `Settings`
-- [ ] **Implement mapSettingsDomainToDto**: Converts `Settings` to `SettingsDto`
-- [ ] **Handle enum mapping**: Map `RepeatMode` between DTO and domain types
-- [ ] **Handle nested objects**: Properly map `SearchWeights` and collections
-- [ ] **Add null safety**: Handle potential null/undefined values from API
-- [ ] **Add mapper tests**: Test bidirectional mapping (see Testing section)
+- [ ] **Create settings.mappers.ts**: New file in `libs/infrastructure/src/lib/settings/`
+- [ ] **Implement mapSettingsDtoToDomain**: Convert DTO to domain Settings
+- [ ] **Implement mapSettingsDomainToDto**: Convert domain Settings to DTO  
+- [ ] **Handle enum mapping**: Map RepeatMode string values correctly
+- [ ] **Add null safety**: Handle potential undefined/null values from API
+- [ ] **Add type safety**: Ensure full type coverage with no `any` types
 
 **Testing Subtask:**
 
-- [ ] **Write Mapper Tests**: Test DTO-to-domain and domain-to-DTO conversions (see Testing section)
+- [ ] **Write Mapper Tests**: Test bidirectional conversion and round-trip
 
 **Key Implementation Notes:**
 
-- Mappers are pure functions (no side effects, no dependencies)
-- Handle type conversions if DTO and domain types differ
-- Validate that mappings are reversible (round-trip should work)
-- Consider defensive copying if domain objects should be immutable
-- Mapper functions should be simple and maintainable
+- Mappers are pure functions with no side effects
+- Handle all properties explicitly (no spread if structures diverge later)
+- Enum mapping should be explicit and type-safe
+- Test round-trip conversion (DTO → Domain → DTO produces identical result)
+- Follow patterns in existing DomainMapper utility
 
-**Mapper Function Example** (pattern only):
-
-```typescript
-export function mapSettingsDtoToDomain(dto: SettingsDto): Settings {
-  return {
-    player: {
-      repeatMode: dto.player.repeatMode as RepeatMode,
-      sidTimerSeconds: dto.player.sidTimerSeconds,
-      sidAutoAdvance: dto.player.sidAutoAdvance,
-      launchOnStartup: dto.player.launchOnStartup
-    },
-    // ... other sections
-  };
-}
-```
-
-**Testing Focus for Task 4:**
-
-> Focus on **mapping correctness** - ensure DTOs convert to domain models accurately.
-
-**Behaviors to Test:**
-
-- [ ] DTO maps to domain model with all properties preserved
-- [ ] Domain model maps back to DTO with all properties preserved
-- [ ] Round-trip conversion produces identical result
-- [ ] Enum values map correctly (RepeatMode)
-- [ ] Nested objects map correctly (SearchWeights)
-- [ ] Arrays map correctly (watchFolders, stopWords)
-- [ ] Null/undefined values handled gracefully
-
-**Mapper Tests:**
-
-```typescript
-describe('Settings Mappers', () => {
-  describe('mapSettingsDtoToDomain', () => {
-    it('should convert DTO to domain model', () => {
-      const dto: SettingsDto = createTestDto();
-      const domain = mapSettingsDtoToDomain(dto);
-      expect(domain.player.repeatMode).toBe('Off');
-      expect(domain.player.sidTimerSeconds).toBe(180);
-    });
-  });
-
-  describe('mapSettingsDomainToDto', () => {
-    it('should convert domain model to DTO', () => {
-      const domain: Settings = createTestSettings();
-      const dto = mapSettingsDomainToDto(domain);
-      expect(dto.player.repeatMode).toBe('Off');
-    });
-  });
-
-  describe('round-trip conversion', () => {
-    it('should preserve data through DTO->domain->DTO', () => {
-      const original: SettingsDto = createTestDto();
-      const domain = mapSettingsDtoToDomain(original);
-      const final = mapSettingsDomainToDto(domain);
-      expect(final).toEqual(original);
-    });
-  });
-});
-```
+**Mapping Pattern**: Create pure functions converting between DTO and domain types with explicit property mapping
 
 </details>
 
 <details open>
-<summary><h3>Task 5: Implement Infrastructure Settings Service</h3></summary>
+<summary><h3>Task 5: Implement Infrastructure Service with Alert-Based Error Handling</h3></summary>
 
-**Purpose**: Create the `SettingsService` class that implements `ISettingsService` by calling the generated API client and mapping DTOs to domain models. This service lives in the infrastructure layer and handles HTTP communication.
+**Purpose**: Implement `SettingsService` that calls the API client, maps responses to domain models, and dispatches error alerts via the alert service following the player service pattern.
 
 **Related Documentation:**
 
-- [Service Standards - Infrastructure Services](../../SERVICE_STANDARDS.md#infrastructure-layer) - Service implementation patterns
-- [Coding Standards - Services](../../CODING_STANDARDS.md#services) - Service class conventions
-- [Settings Feature Plan - Phase 2](./SETTINGS_FEATURE_PLAN.md#phase-2-domain-contracts--infrastructure-layer) - Service implementation details
+- [PlayerService Reference](../../../libs/infrastructure/src/lib/player/player.service.ts) - Error handling pattern to follow
+- [Service Standards - Error Handling](../../SERVICE_STANDARDS.md#error-handling)
+- [Alert Service Usage](../../SERVICE_STANDARDS.md#alert-service)
 
 **Implementation Subtasks:**
 
-- [ ] **Create infrastructure/settings.service.ts**: New file in `libs/infrastructure/src/lib/settings/`
-- [ ] **Define SettingsService class**: Implements `ISettingsService` interface
-- [ ] **Inject SettingsApiService**: Constructor injects generated API client
-- [ ] **Implement getSettings method**: Call API client, map DTO to domain, return Observable
-- [ ] **Implement saveSettings method**: Map domain to DTO, call API client, return Observable
-- [ ] **Add error handling**: Transform API errors to domain-friendly errors if needed
-- [ ] **Add providedIn root**: Make service tree-shakable and singleton
-- [ ] **Export from barrel**: Add to infrastructure layer index.ts
+- [ ] **Create settings.service.ts**: New file implementing ISettingsService
+- [ ] **Inject dependencies**: SettingsApiService and IAlertService via constructor
+- [ ] **Implement getSettings()**: Call API, map response, handle errors with alerts
+- [ ] **Implement saveSettings()**: Map domain to DTO, call API, handle errors with alerts
+- [ ] **Add error handler method**: Private method dispatching alerts and logging errors
+- [ ] **Use RxJS operators**: `map()` for success, `catchError()` for errors
+- [ ] **Inject ALERT_SERVICE**: Use @Inject decorator with ALERT_SERVICE token
+- [ ] **Follow player service pattern**: Match error handling structure exactly
 
 **Testing Subtask:**
 
-- [ ] **Write Service Tests**: Test service methods with mocked API client (see Testing section)
+- [ ] **Write Service Tests**: Test API calls, mapping, and error handling with alerts
 
 **Key Implementation Notes:**
 
-- Service uses constructor injection for dependencies
-- Use RxJS operators (`map`, `catchError`) for stream transformations
-- Don't catch errors unless transforming them (let errors propagate)
-- Service should be stateless (no instance variables except dependencies)
-- Use Angular's `inject()` function for modern DI patterns if preferred
+- Service implements ISettingsService contract from domain layer
+- Errors dispatched via `alertService.error()` (infrastructure responsibility)
+- Follow exact pattern from PlayerService (reference implementation)
+- Use `catchError` to handle errors and dispatch alerts
+- Log errors for debugging while showing user-friendly messages
+- Return throwError after alert dispatch to propagate error
+- Extract error messages using utility function
+- Test both success paths and error scenarios with alert spy
 
-**Service Class Pattern** (structure only):
+**Error Handling Pattern**: Use alert service in catchError operator like PlayerService
 
-```typescript
-@Injectable({ providedIn: 'root' })
-export class SettingsService implements ISettingsService {
-  private readonly apiClient = inject(SettingsApiService);
-
-  getSettings(): Observable<Settings> {
-    return this.apiClient.getSettings().pipe(
-      map(dto => mapSettingsDtoToDomain(dto))
-    );
-  }
-
-  saveSettings(settings: Settings): Observable<void> {
-    const dto = mapSettingsDomainToDto(settings);
-    return this.apiClient.saveSettings(dto);
-  }
-}
-```
-
-**Testing Focus for Task 5:**
-
-> Focus on **service behavior** - ensure service correctly orchestrates API calls and mapping.
-
-**Behaviors to Test:**
-
-- [ ] `getSettings()` calls API client's `getSettings()` method
-- [ ] `getSettings()` maps DTO to domain model using mapper
-- [ ] `getSettings()` returns Observable with domain model
-- [ ] `saveSettings()` maps domain model to DTO using mapper
-- [ ] `saveSettings()` calls API client's `saveSettings()` method
-- [ ] `saveSettings()` completes Observable on success
-- [ ] API errors propagate through service methods
-- [ ] Service is injectable and implements contract correctly
-
-**Service Tests:**
-
-```typescript
-describe('SettingsService', () => {
-  let service: SettingsService;
-  let apiClient: jasmine.SpyObj<SettingsApiService>;
-
-  beforeEach(() => {
-    const apiClientSpy = jasmine.createSpyObj('SettingsApiService', [
-      'getSettings',
-      'saveSettings'
-    ]);
-
-    TestBed.configureTestingModule({
-      providers: [
-        SettingsService,
-        { provide: SettingsApiService, useValue: apiClientSpy }
-      ]
-    });
-
-    service = TestBed.inject(SettingsService);
-    apiClient = TestBed.inject(SettingsApiService) as jasmine.SpyObj<SettingsApiService>;
-  });
-
-  describe('getSettings', () => {
-    it('should call API client and map result to domain', (done) => {
-      const dto: SettingsDto = createTestDto();
-      apiClient.getSettings.and.returnValue(of(dto));
-
-      service.getSettings().subscribe({
-        next: (settings) => {
-          expect(apiClient.getSettings).toHaveBeenCalled();
-          expect(settings.player.repeatMode).toBe('Off');
-          done();
-        }
-      });
-    });
-
-    it('should propagate API errors', (done) => {
-      const error = new Error('API Error');
-      apiClient.getSettings.and.returnValue(throwError(() => error));
-
-      service.getSettings().subscribe({
-        error: (err) => {
-          expect(err).toBe(error);
-          done();
-        }
-      });
-    });
-  });
-
-  describe('saveSettings', () => {
-    it('should map domain model and call API client', (done) => {
-      const settings: Settings = createTestSettings();
-      apiClient.saveSettings.and.returnValue(of(void 0));
-
-      service.saveSettings(settings).subscribe({
-        complete: () => {
-          expect(apiClient.saveSettings).toHaveBeenCalled();
-          done();
-        }
-      });
-    });
-  });
-});
-```
+**Reference**: See PlayerService.handleError() private method for exact pattern
 
 </details>
 
 <details open>
-<summary><h3>Task 6: Provide Infrastructure Service</h3></summary>
+<summary><h3>Task 6: Configure Dependency Injection Providers</h3></summary>
 
-**Purpose**: Configure Angular dependency injection to provide the infrastructure service implementation when the domain contract token is requested. This allows application layer to depend on domain contract while receiving infrastructure implementation.
+**Purpose**: Configure Angular providers to wire up the infrastructure service implementation to the domain contract token.
 
 **Related Documentation:**
 
-- [Coding Standards - Dependency Injection](../../CODING_STANDARDS.md#dependency-injection) - Provider configuration
-- [Service Standards - Token Providers](../../SERVICE_STANDARDS.md#token-providers) - Provider patterns
+- [Service Standards - Provider Configuration](../../SERVICE_STANDARDS.md#provider-configuration)
+- [Coding Standards - Dependency Injection](../../CODING_STANDARDS.md#dependency-injection)
 
 **Implementation Subtasks:**
 
-- [ ] **Update infrastructure index.ts**: Export `provideSettingsService` function
-- [ ] **Create provider function**: Define `provideSettingsService()` that returns provider config
-- [ ] **Configure token provider**: Map `SETTINGS_SERVICE_TOKEN` to `SettingsService` class
-- [ ] **Document provider usage**: Add JSDoc explaining how to use in app config
-- [ ] **Test provider**: Verify injection works correctly (see Testing section)
+- [ ] **Create providers.ts**: New file in `libs/infrastructure/src/lib/settings/`
+- [ ] **Define SETTINGS_PROVIDERS**: Export provider configuration array
+- [ ] **Map token to implementation**: Provide SettingsService for SETTINGS_SERVICE token
+- [ ] **Export from infrastructure index**: Add to infrastructure barrel export
+- [ ] **Verify providedIn**: Consider if service should use `providedIn: 'root'` or explicit providers
 
 **Testing Subtask:**
 
-- [ ] **Write Provider Tests**: Test that token resolves to service implementation (see Testing section)
+- [ ] **Verify Provider Configuration**: Test that service can be injected via token
 
 **Key Implementation Notes:**
 
-- Use functional provider pattern (`provideX` functions) following Angular modern practices
-- Provider should return `EnvironmentProviders` or `Provider` type
-- Document provider usage for application configuration
-- Provider will be used in app bootstrap configuration (Phase 4)
+- Providers typically configured in infrastructure library
+- Token from domain layer maps to service from infrastructure layer
+- Application layer injects via token (never imports infrastructure directly)
+- Follow existing provider patterns in infrastructure layer
+- Consider using class provider pattern or factory if needed
 
-**Provider Function Pattern** (example only):
-
-```typescript
-export function provideSettingsService(): EnvironmentProviders {
-  return makeEnvironmentProviders([
-    {
-      provide: SETTINGS_SERVICE_TOKEN,
-      useClass: SettingsService
-    }
-  ]);
-}
-```
-
-**Testing Focus for Task 6:**
-
-> Focus on **DI configuration** - ensure token resolves to implementation correctly.
-
-**Behaviors to Test:**
-
-- [ ] Provider function returns valid provider configuration
-- [ ] Token resolves to SettingsService instance
-- [ ] Injected service implements ISettingsService contract
-- [ ] Multiple injections return same instance (singleton)
-- [ ] Service is usable through token injection
-
-**Provider Tests:**
-
-```typescript
-describe('provideSettingsService', () => {
-  it('should provide SettingsService for SETTINGS_SERVICE_TOKEN', () => {
-    TestBed.configureTestingModule({
-      providers: [provideSettingsService()]
-    });
-
-    const service = TestBed.inject(SETTINGS_SERVICE_TOKEN);
-    expect(service).toBeInstanceOf(SettingsService);
-  });
-
-  it('should provide singleton instance', () => {
-    TestBed.configureTestingModule({
-      providers: [provideSettingsService()]
-    });
-
-    const service1 = TestBed.inject(SETTINGS_SERVICE_TOKEN);
-    const service2 = TestBed.inject(SETTINGS_SERVICE_TOKEN);
-    expect(service1).toBe(service2);
-  });
-});
-```
+**Provider Pattern**: Map domain token to infrastructure implementation class
 
 </details>
 
 <details open>
-<summary><h3>Task 7: Export Domain and Infrastructure Artifacts</h3></summary>
+<summary><h3>Task 7: Write Comprehensive Service Tests</h3></summary>
 
-**Purpose**: Update barrel exports to make domain contracts and infrastructure implementations available to other layers. This ensures proper module boundaries and clean imports.
+**Purpose**: Create Vitest unit tests for the SettingsService verifying API interactions, mapping, and alert-based error handling.
 
 **Related Documentation:**
 
-- [NX Library Standards - Exports](../../NX_LIBRARY_STANDARDS.md#exports) - Barrel export patterns
-- [Coding Standards - Module Organization](../../CODING_STANDARDS.md#module-organization) - Export conventions
+- [Testing Standards - Service Testing](../../TESTING_STANDARDS.md#service-layer-testing)
+- [Service Standards - Testing](../../SERVICE_STANDARDS.md#testing-services)
+- [PlayerService Tests](../../../libs/infrastructure/src/lib/player/player.service.spec.ts) - Test patterns to follow
 
 **Implementation Subtasks:**
 
-- [ ] **Update domain/settings/index.ts**: Export all domain artifacts (models, contract, token)
-- [ ] **Update domain/index.ts**: Re-export settings domain from root barrel
-- [ ] **Update infrastructure/settings/index.ts**: Export service and provider function
-- [ ] **Update infrastructure/index.ts**: Re-export settings infrastructure from root barrel
-- [ ] **Verify no circular dependencies**: Check import graph for cycles
-- [ ] **Test imports**: Verify other layers can import cleanly
+- [ ] **Create settings.service.spec.ts**: New test file using Vitest
+- [ ] **Setup test dependencies**: Mock SettingsApiService and IAlertService
+- [ ] **Test getSettings success**: Verify API call, mapping, and return value
+- [ ] **Test getSettings error**: Verify error handling and alert dispatch
+- [ ] **Test saveSettings success**: Verify mapping, API call, and return value
+- [ ] **Test saveSettings error**: Verify error handling and alert dispatch
+- [ ] **Test mapper integration**: Verify correct DTO-domain conversion
+- [ ] **Verify alert calls**: Use spy to verify alertService.error() called on errors
 
 **Testing Subtask:**
 
-- [ ] **Write Import Tests**: Test that exports are accessible from other layers (see Testing section)
+- [ ] **Run Tests**: Execute `pnpm nx test infrastructure --testFile=settings.service.spec.ts`
 
 **Key Implementation Notes:**
 
-- Use explicit named exports (avoid `export *` which can cause issues)
-- Domain layer should not export infrastructure implementations
-- Infrastructure layer exports both service and provider function
-- Maintain clear separation between domain and infrastructure exports
-- Consider what should be public API vs internal implementation
+- Use Vitest (NOT Jasmine) for testing
+- Mock API client methods using vi.fn()
+- Mock alert service to verify error dispatch
+- Test both happy path and error scenarios
+- Verify error messages are user-friendly
+- Follow behavioral testing approach (test observable outcomes)
+- Reference PlayerService tests for exact testing patterns
 
-**Barrel Export Pattern** (example only):
-
-```typescript
-// libs/domain/src/lib/settings/index.ts
-export * from './settings.models';
-export * from './settings.contract';
-export * from './settings.tokens';
-
-// libs/infrastructure/src/lib/settings/index.ts
-export * from './settings.service';
-export { provideSettingsService } from './settings.service';
-```
-
-**Testing Focus for Task 7:**
-
-> Focus on **module boundaries** - ensure exports follow Clean Architecture.
-
-**Behaviors to Test:**
-
-- [ ] Domain artifacts importable from domain layer
-- [ ] Infrastructure artifacts importable from infrastructure layer
-- [ ] No circular dependencies detected
-- [ ] Application layer can import domain contracts only
-- [ ] Infrastructure can import both domain and infrastructure
-
-**Export Tests:**
-
-```typescript
-describe('Settings Module Exports', () => {
-  it('should export domain models from domain layer', () => {
-    // This test verifies imports work
-    const settings: Settings = {} as Settings;
-    expect(settings).toBeDefined();
-  });
-
-  it('should export service contract from domain layer', () => {
-    const service: ISettingsService = {} as ISettingsService;
-    expect(service).toBeDefined();
-  });
-
-  it('should export service implementation from infrastructure layer', () => {
-    expect(SettingsService).toBeDefined();
-  });
-
-  it('should export provider function from infrastructure layer', () => {
-    expect(provideSettingsService).toBeDefined();
-  });
-});
-```
+**Test Structure**: Describe blocks for each method, test success and error cases, verify alert service called on errors
 
 </details>
 
@@ -687,16 +308,15 @@ describe('Settings Module Exports', () => {
 
 > Mark these checkboxes as you validate each criterion.
 
-- [ ] **Domain Models Defined**: All settings interfaces exist in domain layer
-- [ ] **Service Contract Defined**: `ISettingsService` interface complete with method signatures
-- [ ] **Injection Token Created**: `SETTINGS_SERVICE_TOKEN` defined and usable
-- [ ] **Mappers Implemented**: Bidirectional DTO-domain mapping works correctly
-- [ ] **Service Implemented**: `SettingsService` implements contract and calls API client
-- [ ] **Provider Configured**: Token resolves to service implementation
-- [ ] **Exports Complete**: All artifacts properly exported from barrel files
-- [ ] **All Tests Pass**: Unit tests for models, mappers, service pass
-- [ ] **No Circular Dependencies**: Import graph is clean
-- [ ] **TypeScript Compiles**: No compilation errors in domain or infrastructure layers
+- [ ] **Domain Models Defined**: All interfaces created in `libs/domain/src/lib/settings/`
+- [ ] **Service Contract Created**: ISettingsService interface defines operations
+- [ ] **Injection Token Created**: SETTINGS_SERVICE token enables DI
+- [ ] **Mappers Implemented**: Bidirectional DTO-domain conversion working
+- [ ] **Service Implemented**: SettingsService implements contract with alert-based errors
+- [ ] **Providers Configured**: DI providers map token to implementation
+- [ ] **All Tests Pass**: Service tests verify API calls, mapping, and alert dispatch
+- [ ] **No TypeScript Errors**: All code compiles without errors
+- [ ] **Error Alerts Work**: Errors trigger alert notifications like PlayerService
 
 ---
 
@@ -704,31 +324,37 @@ describe('Settings Module Exports', () => {
 
 ### Testing Approach
 
-This phase focuses on **unit testing domain contracts and infrastructure implementation**:
+This phase focuses on **service layer testing** with behavioral approach:
 
-1. **Type Tests**: Validate domain model structures
-2. **Mapper Tests**: Test bidirectional DTO-domain conversions
-3. **Service Tests**: Test service behavior with mocked API client
-4. **Provider Tests**: Test DI configuration
-5. **Export Tests**: Verify module boundaries
+1. **Model Tests**: Type-checking tests for domain interfaces
+2. **Mapper Tests**: Bidirectional conversion and round-trip tests
+3. **Service Tests**: API interaction, mapping, and alert-based error handling tests
 
 ### Test Types by Task
 
 | Task | Test Type | Focus |
 |------|-----------|-------|
-| Task 1 | Type Checking | Model structure validation |
-| Task 2 | Type Checking | Contract definition validation |
-| Task 3 | Unit | Token configuration |
-| Task 4 | Unit | Mapper correctness |
-| Task 5 | Unit | Service behavior with mocked dependencies |
-| Task 6 | Integration | DI provider configuration |
-| Task 7 | Integration | Module boundary validation |
+| Task 1 | Unit | Model type checking |
+| Task 2 | Verification | Contract compilation |
+| Task 3 | Verification | Token creation |
+| Task 4 | Unit | Mapper functions |
+| Task 5 | Unit | Service API calls and alert dispatch |
+| Task 6 | Integration | Provider configuration |
+| Task 7 | Unit | Comprehensive service testing |
 
-### Testing Standards Reference
+### Testing Framework
 
-- Follow [Testing Standards](../../TESTING_STANDARDS.md) for behavioral testing approach
-- Use [Service Standards](../../SERVICE_STANDARDS.md) for service testing patterns
-- Mock at infrastructure boundary (API client is mocked in service tests)
+- **Unit Tests**: Vitest (NOT Jasmine)
+- **Mocking**: vi.fn() for API client and alert service
+- **Assertions**: Vitest matchers (expect, toBe, toHaveBeenCalled, etc.)
+
+### Key Testing Principles
+
+- Mock at infrastructure boundary (API client)
+- Test observable outcomes (what consumers see)
+- Verify error alerts are dispatched correctly
+- Test both success and failure scenarios
+- Follow PlayerService test patterns exactly
 
 ---
 
@@ -755,9 +381,9 @@ This phase focuses on **unit testing domain contracts and infrastructure impleme
 - **Previous Phase**: [Phase 1 - Backend API & Type Generation](./SETTINGS_FEATURE_P1.md)
 - **Next Phase**: [Phase 3 - Settings Store (Application Layer)](./SETTINGS_FEATURE_P3.md)
 - **Feature Overview**: [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md)
-- **Architecture**: [Overview Context](../../OVERVIEW_CONTEXT.md)
-- **Domain Patterns**: [Domain Standards](../../DOMAIN_STANDARDS.md)
-- **Service Patterns**: [Service Standards](../../SERVICE_STANDARDS.md)
+- **PlayerService Reference**: [Player Service](../../../libs/infrastructure/src/lib/player/player.service.ts) - Error handling pattern
+- **Service Standards**: [Service Standards](../../SERVICE_STANDARDS.md) - Service patterns and error handling
+- **Testing Standards**: [Testing Standards](../../TESTING_STANDARDS.md) - Testing approaches
 
 ---
 
