@@ -17,10 +17,15 @@ Implement reactive forms architecture with decomposed section components. Each s
 
 **Standards & Guidelines:**
 
-- [ ] [Coding Standards](../../CODING_STANDARDS.md) - Component and form patterns
+- [ ] [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - Form patterns and FormGroup passing
+- [ ] [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Component hierarchy pattern for forms
 - [ ] [Smart Component Testing](../../SMART_COMPONENT_TESTING.md) - Component testing patterns
 - [ ] [Style Guide](../../STYLE_GUIDE.md) - Form styling conventions
 - [ ] [Testing Standards](../../TESTING_STANDARDS.md) - Testing approaches
+
+**Backend Validation Reference:**
+
+- [ ] [SaveSettings Validation Models](https://github.com/MetalHexx/TeensyROM-Web/blob/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings/SaveSettings/SaveSettingsModels.cs) - Backend validators to match
 
 **Angular Documentation:**
 
@@ -72,462 +77,333 @@ libs/features/settings/src/lib/
 <details open>
 <summary><h3>Task 1: Build Root FormGroup in Settings View</h3></summary>
 
-**Purpose**: Create the root reactive FormGroup with nested section groups in the settings view component. This establishes the form hierarchy that will be passed down to child components.
+**Purpose**: Create the root reactive FormGroup with nested section groups in the settings view component following the form component tree pattern.
 
 **Related Documentation:**
 
-- [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - Form patterns
-- Angular Reactive Forms - FormBuilder and FormGroup
+- [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - FormGroup creation and passing patterns
+- [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Smart container → section components pattern
+- [SaveSettings Backend Validators](https://github.com/MetalHexx/TeensyROM-Web/blob/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings/SaveSettings/SaveSettingsModels.cs) - Validation rules to match
 
 **Implementation Subtasks:**
 
-- [ ] **Import ReactiveFormsModule**: Add to component imports
-- [ ] **Inject FormBuilder**: Use `inject(FormBuilder)` for form creation
-- [ ] **Create root FormGroup**: Build form with nested groups for each section
-- [ ] **Create player FormGroup**: Add controls for repeatMode, sidTimerSeconds, sidAutoAdvance, launchOnStartup
-- [ ] **Create fileTransfer FormGroup**: Add controls for watchFoldersEnabled, watchFolders, autoLaunchTransferred
-- [ ] **Create search FormGroup**: Add controls for weights (nested group), stopWords, enableMetadataSearch, showHiddenFiles
-- [ ] **Create app FormGroup**: Add control for setupCompleted
-- [ ] **Initialize form values**: Populate controls with current settings from store
-- [ ] **Add form validation**: Apply validators matching backend rules
+- [ ] Import ReactiveFormsModule into settings-view component
+- [ ] Inject FormBuilder using `inject(FormBuilder)`
+- [ ] Create root FormGroup with nested section groups (player, fileTransfer, search, app)
+- [ ] Add form controls with validators matching backend SaveSettingsModels.cs
+- [ ] Initialize form values from `settingsStore.settings()` signal
+- [ ] Use effect() to rebuild form when settings load from store
+- [ ] Apply TypeScript typing for form structure (consider NonNullableFormBuilder)
 
 **Testing Subtask:**
 
-- [ ] **Write Form Building Tests**: Test FormGroup structure (see Testing section)
+- [ ] Write Form Structure Tests using Vitest (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Use `FormBuilder` for cleaner form creation syntax
-- Nested groups mirror domain model structure
-- Initialize controls with values from `settingsStore.settings()`
-- Validators should match backend validation (see Phase 1 backend plan)
-- Consider using `NonNullableFormBuilder` for type safety
-- Form should rebuild when settings load (effect pattern)
-
-**Form Building Pattern** (structure only):
-
-```typescript
-export class SettingsViewComponent implements OnInit {
-  private readonly fb = inject(FormBuilder);
-  private readonly store = inject(SettingsStore);
-  
-  form = this.fb.group({
-    player: this.fb.group({
-      repeatMode: ['Off', Validators.required],
-      sidTimerSeconds: [180, [Validators.required, Validators.min(1)]],
-      sidAutoAdvance: [false],
-      launchOnStartup: [false]
-    }),
-    fileTransfer: this.fb.group({
-      watchFoldersEnabled: [false],
-      watchFolders: this.fb.array([]),
-      autoLaunchTransferred: [false]
-    }),
-    // ... other sections
-  });
-  
-  ngOnInit() {
-    // Initialize form with store values
-    effect(() => {
-      const settings = this.store.settings();
-      this.form.patchValue(settings, { emitEvent: false });
-    });
-  }
-}
-```
+- Follow [Form Component Tree](../../FORM_COMPONENT_TREE.md) pattern for hierarchy
+- Nested FormGroups mirror domain model structure (Settings → sections)
+- Initialize with current store values, rebuild on settings load
+- Validators must match backend validation in SaveSettingsModels.cs
+- Use `patchValue()` with `{ emitEvent: false }` to prevent unnecessary updates
+- Consider using Angular's `NonNullableFormBuilder` for stricter typing
 
 **Testing Focus for Task 1:**
 
-> Focus on **form structure** - ensure FormGroup hierarchy is correct.
+> Test **form structure and initialization** - verify FormGroup hierarchy matches domain model.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Root FormGroup has four section groups
-- [ ] Each section has correct controls
-- [ ] Form initializes with store values
-- [ ] Form updates when store settings change
-- [ ] Validators are applied correctly
-- [ ] Form structure matches domain model
+- [ ] Root FormGroup contains four section FormGroups (player, fileTransfer, search, app)
+- [ ] Each section has correct controls with proper types
+- [ ] Form initializes with values from settingsStore.settings()
+- [ ] Form rebuilds when store settings change
+- [ ] Validators applied correctly per backend rules
+- [ ] Form structure matches Settings domain model
 
 </details>
 
 <details open>
-<summary><h3>Task 2: Create Player Settings Component</h3></summary>
+<summary><h3>Task 2: Create Player Settings Section Component</h3></summary>
 
-**Purpose**: Create a presentational component for the player settings section that receives a FormGroup input and renders Material form fields for player configuration.
+**Purpose**: Create a presentational component that receives the player FormGroup and renders Material form fields.
 
 **Related Documentation:**
 
-- [Coding Standards - Component Inputs](../../CODING_STANDARDS.md#component-inputs) - Input pattern
-- Angular Material Form Fields - Material form components
+- [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Section component pattern
+- [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - FormGroup input pattern
+- [SaveSettings Backend Validators](https://github.com/MetalHexx/TeensyROM-Web/blob/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings/SaveSettings/SaveSettingsModels.cs) - Validation constraints
 
 **Implementation Subtasks:**
 
-- [ ] **Generate component**: Create player-settings component
-- [ ] **Add FormGroup input**: Accept player FormGroup via `input<FormGroup>()`
-- [ ] **Add Material form fields**: MatSelect for repeat mode, MatSlider for timer, MatCheckbox for auto-advance and launch
-- [ ] **Bind form controls**: Use `formControlName` directives
-- [ ] **Add labels**: Descriptive labels for each field
-- [ ] **Add validation messages**: Error messages for invalid inputs
-- [ ] **Style form**: Apply consistent spacing and alignment
+- [ ] Generate player-settings component with Angular CLI
+- [ ] Add FormGroup input using `input<FormGroup>()` signal
+- [ ] Import ReactiveFormsModule and Angular Material form modules
+- [ ] Add mat-card wrapper for consistent card styling (see player-view pattern)
+- [ ] Create Material form fields: MatSelect (repeat mode), MatSlider (timer), MatCheckbox (auto-advance, launch)
+- [ ] Bind controls using `formControlName` directives
+- [ ] Add descriptive labels and help text for each field
+- [ ] Add inline validation error messages
+- [ ] Apply consistent form styling per Style Guide
 
 **Testing Subtask:**
 
-- [ ] **Write Component Tests**: Test form field rendering and binding (see Testing section)
+- [ ] Write Component Tests using Vitest (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Component is presentational (no store dependency)
-- Receives FormGroup via input signal
-- Uses Material form components for consistency
+- Component is **presentational** (no store dependency)
+- Receives FormGroup via input signal from parent
+- Uses Angular Material components for consistency
+- Mat-card wrapper provides section context (follow player-view pattern)
 - Validation messages should be user-friendly
-- Consider using MatSlider for timer (visual feedback)
-- Repeat mode uses MatSelect with options: Off, Single, All
-
-**Component Structure** (reference only):
-
-```typescript
-@Component({
-  selector: 'lib-player-settings',
-  standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    MatFormFieldModule,
-    MatSelectModule,
-    MatSliderModule,
-    MatCheckboxModule
-  ],
-  templateUrl: './player-settings.component.html'
-})
-export class PlayerSettingsComponent {
-  formGroup = input.required<FormGroup>();
-  
-  repeatModeOptions = ['Off', 'Single', 'All'];
-}
-```
+- Repeat mode options: "Off", "Single", "All" (match backend enum)
 
 **Testing Focus for Task 2:**
 
-> Focus on **form rendering** - ensure controls display and bind correctly.
+> Test **form field rendering and binding** - verify component correctly displays form controls.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Component renders all player form fields
-- [ ] Form controls bind to FormGroup correctly
-- [ ] Validation errors display for invalid inputs
-- [ ] Labels are descriptive and clear
-- [ ] Repeat mode select shows all options
-- [ ] Timer slider has appropriate min/max/step
+- [ ] Component renders when FormGroup provided
+- [ ] All form controls present (repeat mode select, timer slider, checkboxes)
+- [ ] Controls bound to correct FormGroup controls via formControlName
+- [ ] Validation errors display when controls invalid
+- [ ] Component updates when FormGroup values change
+- [ ] No direct store dependency (accepts FormGroup input only)
 
 </details>
 
 <details open>
-<summary><h3>Task 3: Create File Transfer Settings Component</h3></summary>
+<summary><h3>Task 3: Create File Transfer Settings Section Component</h3></summary>
 
-**Purpose**: Create a component for file transfer settings including watch folder management with add/remove functionality.
+**Purpose**: Create presentational component for file transfer settings with FormArray handling for watch folders.
 
 **Related Documentation:**
 
-- [Coding Standards - Form Arrays](../../CODING_STANDARDS.md#form-arrays) - FormArray patterns
-- Angular Reactive Forms - FormArray for dynamic lists
+- [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Section component with dynamic controls
+- [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - FormArray patterns
+- [SaveSettings Backend Validators](https://github.com/MetalHexx/TeensyROM-Web/blob/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings/SaveSettings/SaveSettingsModels.cs) - Watch folders validation
 
 **Implementation Subtasks:**
 
-- [ ] **Generate component**: Create file-transfer-settings component
-- [ ] **Add FormGroup input**: Accept fileTransfer FormGroup
-- [ ] **Add watch folders enabled checkbox**: MatCheckbox for toggle
-- [ ] **Add watch folders list**: Display FormArray items
-- [ ] **Add folder input field**: MatInput for new folder path
-- [ ] **Add "Add Folder" button**: Button to add folder to array
-- [ ] **Add remove buttons**: Button for each folder to remove it
-- [ ] **Add auto-launch checkbox**: MatCheckbox for auto-launch transferred
-- [ ] **Add validation**: Path format validation for folders
+- [ ] Generate file-transfer-settings component
+- [ ] Add FormGroup input for file transfer section
+- [ ] Add mat-card wrapper for section context
+- [ ] Create MatCheckbox for watchFoldersEnabled
+- [ ] Create MatCheckbox for autoLaunchTransferred
+- [ ] Add FormArray for watch folders (dynamic list)
+- [ ] Create add/remove buttons for watch folder entries
+- [ ] Add MatFormField with MatInput for each folder path
+- [ ] Handle FormArray additions/removals
+- [ ] Add path validation per backend rules
 
 **Testing Subtask:**
 
-- [ ] **Write Component Tests**: Test FormArray manipulation (see Testing section)
+- [ ] Write Component Tests with FormArray scenarios (see Testing section)
 
 **Key Implementation Notes:**
 
-- Use FormArray for watch folders list (dynamic)
-- Add/remove buttons manipulate the FormArray
-- Consider path validation (platform-specific)
+- FormArray allows dynamic watch folder list
+- Add/remove functionality modifies FormArray
+- Each folder path needs validation (non-empty, valid path format)
+- Consider max folder limit if backend has constraint
 - Disable folder list when watchFoldersEnabled is false
-- Show empty state when no folders configured
-- Consider file browser dialog (future enhancement)
 
 **Testing Focus for Task 3:**
 
-> Focus on **dynamic list management** - ensure FormArray works correctly.
+> Test **FormArray dynamic behavior** - adding/removing watch folders.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Adding folder appends to FormArray
-- [ ] Removing folder removes from FormArray
-- [ ] Watch folders disabled when toggle is off
-- [ ] Validation applies to folder paths
-- [ ] Empty state displays when no folders
-- [ ] All form controls bind correctly
+- [ ] Component renders with empty FormArray
+- [ ] Add button inserts new FormControl into FormArray
+- [ ] Remove button deletes FormControl from FormArray
+- [ ] Each folder path has validation
+- [ ] Folder list disabled when watchFoldersEnabled unchecked
+- [ ] FormArray changes reflected in parent FormGroup
 
 </details>
 
 <details open>
-<summary><h3>Task 4: Create Search Settings Component</h3></summary>
+<summary><h3>Task 4: Create Search Settings Section Component</h3></summary>
 
-**Purpose**: Create a component for search settings that includes a sub-component for search weights (nested form group).
+**Purpose**: Create search settings section with nested search weights sub-component.
 
 **Related Documentation:**
 
-- [Coding Standards - Component Composition](../../CODING_STANDARDS.md#component-composition) - Nested components
+- [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Nested section components
+- [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - Nested FormGroup patterns
+- [SaveSettings Backend Validators](https://github.com/MetalHexx/TeensyROM-Web/blob/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings/SaveSettings/SaveSettingsModels.cs) - Search validation rules
 
 **Implementation Subtasks:**
 
-- [ ] **Generate component**: Create search-settings component
-- [ ] **Add FormGroup input**: Accept search FormGroup
-- [ ] **Add metadata search checkbox**: MatCheckbox for enableMetadataSearch
-- [ ] **Add hidden files checkbox**: MatCheckbox for showHiddenFiles
-- [ ] **Add stop words textarea**: MatInput multiline for stop words array
-- [ ] **Add SearchWeights sub-component**: Pass weights FormGroup
-- [ ] **Parse stop words**: Convert textarea string to/from array
-- [ ] **Add validation**: Validate stop words format
+- [ ] Generate search-settings component
+- [ ] Add FormGroup input for search section
+- [ ] Add mat-card wrapper
+- [ ] Create MatCheckbox for enableMetadataSearch
+- [ ] Create MatCheckbox for showHiddenFiles
+- [ ] Create MatChips or MatFormField for stopWords array
+- [ ] Include search-weights sub-component (pass weights FormGroup)
+- [ ] Handle stopWords array input/validation
+- [ ] Add descriptive labels and help text
 
 **Testing Subtask:**
 
-- [ ] **Write Component Tests**: Test component with nested weights component (see Testing section)
+- [ ] Write Component Tests including nested weights component (see Testing section)
 
 **Key Implementation Notes:**
 
-- Stop words displayed as comma-separated text
-- Parse textarea to array on blur (split by comma/newline)
-- Consider chips component for stop words (future enhancement)
-- SearchWeights component handles nested form group
-- Provide help text explaining search options
+- Search weights becomes nested sub-component receiving weights FormGroup
+- Stop words array needs dynamic add/remove functionality
+- Consider MatChipList for stopWords management
+- Nested FormGroup for weights passed to search-weights component
 
 **Testing Focus for Task 4:**
 
-> Focus on **nested forms** - ensure parent-child form relationship works.
+> Test **nested component composition** - search settings with weights sub-component.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Checkboxes bind to form controls
-- [ ] Stop words textarea converts to/from array
-- [ ] SearchWeights component receives correct FormGroup
-- [ ] Changes in SearchWeights propagate to parent form
-- [ ] Validation works across nested forms
+- [ ] Component renders with search FormGroup
+- [ ] Checkboxes bind to enableMetadataSearch and showHiddenFiles
+- [ ] Stop words array can be modified
+- [ ] Nested search-weights component receives weights FormGroup
+- [ ] Changes in sub-component reflected in parent FormGroup
 
 </details>
 
 <details open>
 <summary><h3>Task 5: Create Search Weights Sub-Component</h3></summary>
 
-**Purpose**: Create a sub-component for managing search weight values with sliders for each weight property.
+**Purpose**: Create granular component for search weight sliders (titleWeight, composerWeight, authorWeight).
 
 **Related Documentation:**
 
-- [Coding Standards - Presentational Components](../../CODING_STANDARDS.md#presentational-components) - Presentational patterns
+- [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Leaf-level form components
+- [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - Sub-component patterns
+- [SaveSettings Backend Validators](https://github.com/MetalHexx/TeensyROM-Web/blob/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings/SaveSettings/SaveSettingsModels.cs) - Weight constraints
 
 **Implementation Subtasks:**
 
-- [ ] **Generate component**: Create search-weights component
-- [ ] **Add FormGroup input**: Accept weights FormGroup
-- [ ] **Add name weight slider**: MatSlider with min 0, max 5, step 0.1
-- [ ] **Add composer weight slider**: MatSlider configuration
-- [ ] **Add author weight slider**: MatSlider configuration
-- [ ] **Add year weight slider**: MatSlider configuration
-- [ ] **Add filePath weight slider**: MatSlider configuration
-- [ ] **Display current values**: Show numeric value next to each slider
-- [ ] **Add reset button**: Reset weights to defaults
+- [ ] Generate search-weights component
+- [ ] Add FormGroup input for weights (titleWeight, composerWeight, authorWeight)
+- [ ] Create three MatSlider controls (range 0-1, step 0.1)
+- [ ] Bind sliders to FormGroup controls
+- [ ] Add labels showing current values
+- [ ] Add descriptive help text for each weight
+- [ ] Apply validation per backend rules
 
 **Testing Subtask:**
 
-- [ ] **Write Component Tests**: Test sliders bind to weights FormGroup (see Testing section)
+- [ ] Write Component Tests for weight sliders (see Testing section)
 
 **Key Implementation Notes:**
 
-- Use MatSlider for intuitive weight adjustment
-- Display numeric value for precision
-- Consider preset weight configurations (future)
-- Weights typically range 0-5, step 0.1
-- Provide explanation of how weights affect search
+- Weights are decimal values 0.0 to 1.0
+- Sliders provide visual feedback for weight adjustment
+- Labels should display current decimal value
+- Consider adding "reset to defaults" button
+- Validation ensures 0 ≤ value ≤ 1
 
 **Testing Focus for Task 5:**
 
-> Focus on **slider controls** - ensure weight adjustments work.
+> Test **slider binding and value display** - verify weight controls work correctly.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] All sliders render with correct min/max/step
-- [ ] Sliders bind to weights FormGroup controls
-- [ ] Numeric values update when sliders change
-- [ ] Reset button restores default weights
-- [ ] Changes propagate to parent search FormGroup
+- [ ] Component renders with weights FormGroup
+- [ ] Three sliders present (title, composer, author)
+- [ ] Sliders bound to correct FormGroup controls
+- [ ] Value labels update when sliders change
+- [ ] Validation prevents out-of-range values
+- [ ] Changes reflected in parent FormGroup
 
 </details>
 
 <details open>
-<summary><h3>Task 6: Create App Settings Component</h3></summary>
+<summary><h3>Task 6: Create App Settings Section Component</h3></summary>
 
-**Purpose**: Create a simple component for application settings (currently just setup completed status).
+**Purpose**: Create simple app settings section component (currently just setupCompleted flag).
 
 **Related Documentation:**
 
-- [Coding Standards - Simple Components](../../CODING_STANDARDS.md#simple-components) - Minimal component patterns
+- [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Simple section component
+- [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - Basic form patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Generate component**: Create app-settings component
-- [ ] **Add FormGroup input**: Accept app FormGroup
-- [ ] **Add setupCompleted checkbox**: MatCheckbox for setup completion
-- [ ] **Add explanation text**: Describe what setup completion means
-- [ ] **Consider reset setup**: Button to reset setup wizard (future)
+- [ ] Generate app-settings component
+- [ ] Add FormGroup input for app section
+- [ ] Add mat-card wrapper
+- [ ] Create MatCheckbox for setupCompleted
+- [ ] Add descriptive label
+- [ ] Apply consistent styling
 
 **Testing Subtask:**
 
-- [ ] **Write Component Tests**: Test simple form rendering (see Testing section)
+- [ ] Write Component Tests (see Testing section)
 
 **Key Implementation Notes:**
 
-- This section may be minimal initially
-- Extensible for future app-level settings
-- Setup completed typically set programmatically
-- Consider hiding from UI if not user-configurable
-- May add more settings later (theme, language, etc.)
+- Currently only setupCompleted field
+- Future app settings would be added here
+- Simple presentational component pattern
 
 **Testing Focus for Task 6:**
 
-> Focus on **simple rendering** - ensure basic form works.
+> Test **basic form binding** - verify simple checkbox component.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Checkbox renders and binds correctly
-- [ ] Explanation text is clear
-- [ ] Form control updates parent form
-- [ ] Component is extensible for future settings
+- [ ] Component renders with app FormGroup
+- [ ] Setup completed checkbox present and bound
+- [ ] Checkbox reflects FormGroup value
+- [ ] Changes update FormGroup
 
 </details>
 
 <details open>
-<summary><h3>Task 7: Integrate Section Components into View</h3></summary>
+<summary><h3>Task 7: Integrate Section Components into Settings View</h3></summary>
 
-**Purpose**: Update the settings view component to pass section FormGroups to the new child components, completing the form hierarchy.
+**Purpose**: Update settings-view template to pass section FormGroups to new child components.
 
 **Related Documentation:**
 
-- [Coding Standards - Component Communication](../../CODING_STANDARDS.md#component-communication) - Input/output patterns
+- [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Parent-child form passing pattern
+- [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - FormGroup passing
 
 **Implementation Subtasks:**
 
-- [ ] **Import section components**: Add to settings view imports
-- [ ] **Replace static content**: Remove read-only displays from Phase 5
-- [ ] **Add section components**: Place components in scaling cards
-- [ ] **Pass FormGroups**: Bind section FormGroups to component inputs
-- [ ] **Wire form changes**: Subscribe to form valueChanges (Phase 7 will use this)
-- [ ] **Add dirty indicator**: Show visual indicator when form is dirty
+- [ ] Update settings-view.component.html
+- [ ] Add section component selectors
+- [ ] Pass section FormGroups via inputs: `[formGroup]="form.controls.player"`
+- [ ] Maintain card layout structure from Phase 5
+- [ ] Ensure responsive layout preserved
+- [ ] Remove placeholder read-only content
 
 **Testing Subtask:**
 
-- [ ] **Write Integration Tests**: Test complete form hierarchy (see Testing section)
+- [ ] Update Settings View Tests to verify form integration (see Testing section)
 
 **Key Implementation Notes:**
 
-- Each scaling card contains a section component
-- Pass FormGroup via component input signal
-- Form valueChanges will trigger auto-save in Phase 7
-- Dirty indicator uses form.dirty property
-- Consider disabling form during save operation
-
-**Template Integration** (structure only):
-
-```html
-<lib-scaling-card title="Player Settings">
-  <lib-player-settings [formGroup]="form.controls.player" />
-</lib-scaling-card>
-
-<lib-scaling-card title="File Transfer">
-  <lib-file-transfer-settings [formGroup]="form.controls.fileTransfer" />
-</lib-scaling-card>
-
-<!-- ... other sections -->
-```
+- Each section component receives its FormGroup slice
+- Parent retains root FormGroup ownership
+- Section components remain presentational
+- Layout structure from Phase 5 maintained
 
 **Testing Focus for Task 7:**
 
-> Focus on **form integration** - ensure parent-child form communication works.
+> Test **form composition** - parent passing FormGroups to children.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Section components render within scaling cards
-- [ ] FormGroups pass to child components correctly
-- [ ] Changes in child forms update parent form
-- [ ] Parent form dirty state reflects child changes
-- [ ] Form validation propagates from children
-- [ ] Complete form is functional end-to-end
-
-</details>
-
-<details open>
-<summary><h3>Task 8: Add Form Validation</h3></summary>
-
-**Purpose**: Implement comprehensive form validation matching backend validation rules, with user-friendly error messages displayed inline.
-
-**Related Documentation:**
-
-- [Coding Standards - Validation](../../CODING_STANDARDS.md#validation) - Validation patterns
-- Backend Settings Plan - Validation rules reference
-
-**Implementation Subtasks:**
-
-- [ ] **Add required validators**: Mark required fields
-- [ ] **Add range validators**: Min/max for numeric fields (e.g., timer > 0)
-- [ ] **Add pattern validators**: Path format validation for folders
-- [ ] **Add custom validators**: Complex validation logic (e.g., weight ranges)
-- [ ] **Add error messages**: User-friendly messages for each validator
-- [ ] **Style error states**: Red text, field highlighting
-- [ ] **Prevent invalid saves**: Disable save when form invalid (Phase 7)
-
-**Testing Subtask:**
-
-- [ ] **Write Validation Tests**: Test all validation rules (see Testing section)
-
-**Key Implementation Notes:**
-
-- Validation rules must match backend exactly
-- Display errors inline below fields (Material pattern)
-- Show errors on blur or submit, not while typing
-- Consider async validators for backend checks (future)
-- Validation messages should guide user to fix issues
-
-**Validation Example** (pattern only):
-
-```typescript
-// In form building
-sidTimerSeconds: [180, [
-  Validators.required,
-  Validators.min(1),
-  Validators.max(3600)
-]],
-
-// In template
-@if (form.controls.player.controls.sidTimerSeconds.hasError('min')) {
-  <mat-error>Timer must be at least 1 second</mat-error>
-}
-@if (form.controls.player.controls.sidTimerSeconds.hasError('max')) {
-  <mat-error>Timer cannot exceed 3600 seconds (1 hour)</mat-error>
-}
-```
-
-**Testing Focus for Task 8:**
-
-> Focus on **validation behavior** - ensure all rules work correctly.
-
-**Behaviors to Test:**
-
-- [ ] Required fields show error when empty
-- [ ] Min/max validators trigger appropriately
-- [ ] Pattern validators catch invalid formats
-- [ ] Error messages display correctly
-- [ ] Form invalid when any control invalid
-- [ ] Validation doesn't block valid values
+- [ ] Settings view creates root FormGroup
+- [ ] Each section component receives correct FormGroup slice
+- [ ] Changes in section components update root FormGroup
+- [ ] Form validity reflects all section validations
+- [ ] Parent can access all form values via root FormGroup
 
 </details>
 
@@ -535,80 +411,108 @@ sidTimerSeconds: [180, [
 
 ## ✅ Success Criteria
 
-> Mark these checkboxes as you validate each criterion.
+> All criteria must be met before proceeding to Phase 7.
 
-- [ ] **Root Form Created**: Settings view has complete FormGroup hierarchy
-- [ ] **Section Components Built**: All 4 section components implemented
-- [ ] **Sub-Component Built**: SearchWeights component functional
-- [ ] **Form Hierarchy Works**: FormGroups pass correctly parent→child
-- [ ] **All Fields Render**: Every settings field has Material form control
-- [ ] **Form Binding Works**: Changes in form update values correctly
-- [ ] **Validation Applied**: All backend validation rules implemented
-- [ ] **Error Messages Display**: Validation errors show inline with helpful text
-- [ ] **Dirty State Tracking**: Form knows when user has unsaved changes
-- [ ] **All Tests Pass**: Component and integration tests pass
-- [ ] **TypeScript Compiles**: No compilation errors
+**Form Architecture:**
+
+- [ ] Root FormGroup created in settings-view with nested section groups
+- [ ] Four section components created (player, file-transfer, search, app)
+- [ ] Search weights sub-component created and integrated
+- [ ] FormArray implemented for watch folders
+- [ ] All components receive FormGroups via input signals
+
+**Validation:**
+
+- [ ] Validators match backend SaveSettingsModels.cs rules
+- [ ] Inline validation error messages display
+- [ ] Form validity reflects all section validations
+- [ ] Invalid forms prevent submission (Phase 7)
+
+**Component Structure:**
+
+- [ ] Settings-view is smart container (owns FormGroup)
+- [ ] Section components are presentational (receive FormGroup)
+- [ ] No store dependencies in section components
+- [ ] Clean separation following Form Component Tree pattern
+
+**User Experience:**
+
+- [ ] Material form components consistent with app design
+- [ ] Cards provide section context (following player-view pattern)
+- [ ] Form fields have descriptive labels and help text
+- [ ] Responsive layout maintained from Phase 5
+
+**Testing:**
+
+- [ ] All components have Vitest unit tests
+- [ ] Form structure tests verify correct hierarchy
+- [ ] FormArray tests cover dynamic behavior
+- [ ] Component tests verify form binding
+- [ ] No test failures introduced
 
 ---
 
 ## 🧪 Testing Summary
 
-### Testing Approach
+> Comprehensive testing at form and component layers.
 
-This phase focuses on **form functionality and component integration**:
+**Test Distribution:**
 
-1. **Form Structure Tests**: Verify FormGroup hierarchy
-2. **Component Tests**: Test each section component renders correctly
-3. **Binding Tests**: Verify form controls bind to FormGroup
-4. **Validation Tests**: Test all validation rules
-5. **Integration Tests**: Test complete form hierarchy works
+- **Form Structure Tests**: 10 tests (settings-view FormGroup creation)
+- **Component Tests**: 48 tests (8 tests per section component)
+- **Integration Tests**: 12 tests (settings-view with section components)
+- **Total**: **70 tests**
 
-### Test Types by Task
+**Testing Tools:**
 
-| Task | Test Type | Focus |
-|------|-----------|-------|
-| Task 1 | Unit | Form structure |
-| Task 2-6 | Unit | Section component rendering |
-| Task 7 | Integration | Parent-child form communication |
-| Task 8 | Unit | Validation rules |
+- **Framework**: Vitest for all unit and component tests
+- **Component Testing**: Angular Testing Library patterns per [Smart Component Testing](../../SMART_COMPONENT_TESTING.md)
+- **Form Testing**: Test FormGroup structure, validation, and binding behaviors
 
-### Testing Standards Reference
+**Key Testing Patterns:**
 
-- Follow [Smart Component Testing](../../SMART_COMPONENT_TESTING.md) for component patterns
-- Use [Testing Standards](../../TESTING_STANDARDS.md) for behavioral testing
-- Test form behavior, not implementation details
-- Mock store for component tests
+1. **Form Structure Testing** (settings-view):
+   - Verify FormGroup hierarchy (root → sections)
+   - Test form initialization from store
+   - Verify validators applied correctly
 
----
+2. **Component Testing** (all section components):
+   - Test component renders with FormGroup input
+   - Verify form controls present and bound
+   - Test validation error display
+   - Verify changes update FormGroup
 
-## 📝 Implementation Notes
+3. **FormArray Testing** (file-transfer-settings):
+   - Test dynamic add/remove of FormControls
+   - Verify FormArray changes reflected in parent
+   - Test validation on array items
 
-> Track discoveries, decisions, and issues encountered during implementation.
+4. **Integration Testing** (settings-view + sections):
+   - Test parent-child FormGroup passing
+   - Verify form composition works correctly
+   - Test form validity aggregation
 
-### Discoveries During Implementation
+**Coverage Goals:**
 
-- [Add notes here as you implement]
-
-### Blockers & Questions
-
-- [Document any blockers or questions here]
-
-### Deviations from Plan
-
-- [Note any changes from the original plan and why]
-
----
-
-## 🔗 Related Documentation
-
-- **Previous Phase**: [Phase 5 - Settings View & Card Layout](./SETTINGS_FEATURE_P5.md)
-- **Next Phase**: [Phase 7 - Auto-Save & Change Detection](./SETTINGS_FEATURE_P7.md)
-- **Feature Overview**: [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md)
-- **Backend Validation**: [Basic Settings Endpoint Plan](./BASIC_SETTINGS_ENDPOINT_PLAN.md)
-- **Angular Forms**: Angular Reactive Forms Documentation
+- **Unit Tests**: 100% of form building logic
+- **Component Tests**: 100% of template bindings and interactions
+- **Behavioral Focus**: Test observable outcomes, not implementation
 
 ---
 
-_Phase Status: Ready for Implementation_
-_Last Updated: 2025-01-11_
-_Estimated Effort: 6-8 hours_
+## 🎯 Estimated Effort
+
+**Total Phase Time**: 4-5 hours
+
+**Task Breakdown:**
+
+- Task 1 (Root FormGroup): 45 minutes
+- Task 2 (Player Settings): 30 minutes  
+- Task 3 (File Transfer Settings): 45 minutes
+- Task 4 (Search Settings): 30 minutes
+- Task 5 (Search Weights): 30 minutes
+- Task 6 (App Settings): 20 minutes
+- Task 7 (Integration): 30 minutes
+- Testing: 60 minutes
+
+**Milestone**: Forms architecture complete, ready for auto-save (Phase 7).
