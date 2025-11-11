@@ -2,7 +2,7 @@
 
 ## 🎯 Objective
 
-Implement undo/redo capability that allows users to revert and reapply settings changes through buttons and keyboard shortcuts. Each undo/redo operation updates the form with historical settings snapshots, provides visual feedback about history position, and maintains the debounced auto-save workflow. This phase gives users confidence to experiment with settings knowing they can easily revert mistakes.
+Implement undo/redo capability that allows users to revert and reapply settings changes through buttons and keyboard shortcuts (Ctrl+Z/Ctrl+Y). Each operation updates the form with historical settings snapshots from the store's history array, provides visual feedback about history position, and maintains the debounced auto-save workflow from Phase 7.
 
 ---
 
@@ -14,14 +14,23 @@ Implement undo/redo capability that allows users to revert and reapply settings 
 
 - [ ] [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md) - High-level feature overview
 - [ ] [Phase 7 Completion](./SETTINGS_FEATURE_P7.md) - Auto-save functionality (prerequisite)
-- [ ] [Phase 3 - Undo/Redo Actions](./SETTINGS_FEATURE_P3.md#task-7-implement-undoredo-actions) - Store undo/redo implementation
+- [ ] [Phase 3 - History Management](./SETTINGS_FEATURE_P3.md) - Store undo/redo implementation
 
 **Standards & Guidelines:**
 
+- [ ] [State Standards](../../STATE_STANDARDS.md) - Store patterns with `updateState()` and `actionMessage`
 - [ ] [Coding Standards](../../CODING_STANDARDS.md) - Component patterns and keyboard handling
 - [ ] [Testing Standards](../../TESTING_STANDARDS.md) - Testing approaches
-- [ ] [Smart Component Testing](../../SMART_COMPONENT_TESTING.md) - Component testing patterns
 - [ ] [Style Guide](../../STYLE_GUIDE.md) - Button and toolbar styling
+
+**Reference Implementations:**
+
+- [ ] [PlayerStore](../../../libs/application/src/lib/player/player-store.ts) - History management pattern to follow exactly
+
+**Angular Documentation:**
+
+- Angular HostListener - Keyboard event handling
+- Angular Material Toolbar and Buttons
 
 ---
 
@@ -41,498 +50,236 @@ libs/features/settings/src/lib/
 ---
 
 <details open>
-<summary><h3>Task 1: Add Undo/Redo Toolbar</h3></summary>
+<summary><h3>Task 1: Add Undo/Redo Toolbar with Buttons</h3></summary>
 
-**Purpose**: Create a toolbar with Material icon buttons for undo and redo operations, positioned prominently in the settings view header.
+**Purpose**: Create toolbar with Material icon buttons for undo and redo operations.
 
 **Related Documentation:**
 
-- [Component Library](../../COMPONENT_LIBRARY.md) - Toolbar patterns
-- [Style Guide](../../STYLE_GUIDE.md) - Button styling
-- Angular Material Toolbar - MatToolbar and MatButton
+- [Style Guide](../../STYLE_GUIDE.md) - Toolbar and button styling conventions
+- [Coding Standards](../../CODING_STANDARDS.md) - Component structure patterns
+- Angular Material Toolbar - MatToolbar and MatIconButton components
 
 **Implementation Subtasks:**
 
-- [ ] **Add toolbar container**: Create toolbar in settings header
-- [ ] **Add undo button**: MatIconButton with `undo` icon
-- [ ] **Add redo button**: MatIconButton with `redo` icon
-- [ ] **Add tooltips**: Descriptive tooltips showing keyboard shortcuts
-- [ ] **Bind disabled state**: Connect to store's `canUndo` and `canRedo` signals
-- [ ] **Position toolbar**: Place prominently but not intrusively
+- [ ] Add toolbar container to settings header
+- [ ] Create MatIconButton for undo with `undo` icon
+- [ ] Create MatIconButton for redo with `redo` icon
+- [ ] Bind disabled state to store's `canUndo()` and `canRedo()` signals
+- [ ] Add tooltips showing keyboard shortcuts (e.g., "Undo (Ctrl+Z)")
+- [ ] Add aria-labels for accessibility
+- [ ] Position toolbar prominently but not intrusively
 
 **Testing Subtask:**
 
-- [ ] **Write Toolbar Tests**: Test buttons render and disable correctly (see Testing section)
+- [ ] Write Toolbar UI Tests using Vitest (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Use Material icon buttons for clean appearance
-- Tooltips should show keyboard shortcuts (e.g., "Undo (Ctrl+Z)")
-- Buttons disabled when undo/redo not available
-- Consider placing in header next to save status indicator
-- Use accessibility attributes for screen readers
-
-**Toolbar Template** (structure only):
-
-```html
-<div class="settings-header">
-  <div class="header-content">
-    <h1>Application Settings</h1>
-    <p>Configure TeensyROM behavior and preferences</p>
-  </div>
-  
-  <div class="header-actions">
-    <button mat-icon-button 
-            [disabled]="!store.canUndo()"
-            (click)="undo()"
-            matTooltip="Undo (Ctrl+Z)"
-            aria-label="Undo last change">
-      <mat-icon>undo</mat-icon>
-    </button>
-    
-    <button mat-icon-button 
-            [disabled]="!store.canRedo()"
-            (click)="redo()"
-            matTooltip="Redo (Ctrl+Y)"
-            aria-label="Redo last undone change">
-      <mat-icon>redo</mat-icon>
-    </button>
-    
-    <!-- Save status indicator from Phase 7 -->
-  </div>
-</div>
-```
+- Use Material icon buttons for consistency with app design
+- Tooltips must show keyboard shortcuts for discoverability
+- Buttons automatically disabled when no undo/redo available (via store signals)
+- Place toolbar in header area near save status indicator
+- Proper ARIA attributes for screen reader support
 
 **Testing Focus for Task 1:**
 
-> Focus on **toolbar rendering** - ensure buttons display and disable correctly.
+> Test **button rendering and state** - verify toolbar displays correctly.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Undo button renders with undo icon
-- [ ] Redo button renders with redo icon
-- [ ] Undo button disabled when `canUndo` is false
-- [ ] Redo button disabled when `canRedo` is false
-- [ ] Tooltips display with keyboard shortcuts
-- [ ] Buttons enabled when history available
+- [ ] Undo button renders with correct icon
+- [ ] Redo button renders with correct icon
+- [ ] Undo button disabled when canUndo() is false
+- [ ] Redo button disabled when canRedo() is false
+- [ ] Tooltips show correct keyboard shortcuts
+- [ ] ARIA labels present for accessibility
 
 </details>
 
 <details open>
-<summary><h3>Task 2: Wire Undo/Redo Button Actions</h3></summary>
+<summary><h3>Task 2: Implement Undo/Redo Click Handlers</h3></summary>
 
-**Purpose**: Connect button click events to store's undo and redo methods, triggering history navigation.
+**Purpose**: Connect toolbar buttons to store's undo/redo actions that navigate history.
 
 **Related Documentation:**
 
-- [Phase 3 - Undo/Redo Actions](./SETTINGS_FEATURE_P3.md#task-7-implement-undoredo-actions) - Store action details
-- [Store Testing Guide](../../STORE_TESTING.md) - Testing store interactions
+- [PlayerStore - History Actions](../../../libs/application/src/lib/player/player-store.ts) - Reference implementation for undo/redo
+- [Phase 3 - History Management](./SETTINGS_FEATURE_P3.md) - Store history implementation details
+- [State Standards](../../STATE_STANDARDS.md) - Action patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Implement undo method**: Call `store.undo()` on button click
-- [ ] **Implement redo method**: Call `store.redo()` on button click
-- [ ] **Verify store updates**: Confirm store state changes after undo/redo
-- [ ] **Add logging**: Log undo/redo operations for debugging
+- [ ] Create undo() method in component
+- [ ] Call settingsStore.undoSettings() in undo() method
+- [ ] Create redo() method in component
+- [ ] Call settingsStore.redoSettings() in redo() method
+- [ ] Connect methods to button click handlers
+- [ ] Ensure auto-save doesn't trigger on undo/redo form updates
 
 **Testing Subtask:**
 
-- [ ] **Write Button Action Tests**: Test button clicks trigger store methods (see Testing section)
+- [ ] Write Click Handler Tests using Vitest (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Button click handlers are simple method calls
-- Store handles all undo/redo logic internally
-- Form will update via effect (Task 3)
-- Consider haptic feedback on mobile (future enhancement)
-- Log operations for debugging and analytics
-
-**Action Methods** (structure only):
-
-```typescript
-export class SettingsViewComponent {
-  private readonly store = inject(SettingsStore);
-  
-  undo(): void {
-    console.log('Undo triggered');
-    this.store.undo();
-  }
-  
-  redo(): void {
-    console.log('Redo triggered');
-    this.store.redo();
-  }
-}
-```
+- Store actions handle history navigation (follow PlayerStore pattern exactly)
+- Store actions use `updateState()` with `actionMessage` per STATE_STANDARDS.md
+- Component simply calls store actions - no history logic in component
+- Must prevent auto-save from triggering when form updates from undo/redo
+- Use flag or similar mechanism to distinguish user edits from programmatic updates
 
 **Testing Focus for Task 2:**
 
-> Focus on **action invocation** - ensure store methods are called.
+> Test **action dispatch** - verify buttons call correct store actions.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Clicking undo button calls `store.undo()`
-- [ ] Clicking redo button calls `store.redo()`
-- [ ] Methods called exactly once per click
-- [ ] Logging occurs for each operation
-- [ ] No errors thrown during execution
+- [ ] Undo button click calls settingsStore.undoSettings()
+- [ ] Redo button click calls settingsStore.redoSettings()
+- [ ] Store actions update form with historical values
+- [ ] Auto-save does NOT trigger on undo/redo
+- [ ] Form updates reflect historical settings
 
 </details>
 
 <details open>
-<summary><h3>Task 3: Update Form on Undo/Redo</h3></summary>
+<summary><h3>Task 3: Synchronize Form with History State</h3></summary>
 
-**Purpose**: React to store state changes after undo/redo operations by updating the form with historical settings values.
+**Purpose**: Update form controls when undo/redo operations change current settings in store.
 
 **Related Documentation:**
 
-- [Coding Standards - Effects](../../CODING_STANDARDS.md#effects) - Angular effect patterns
-- [Phase 3 - Store State](./SETTINGS_FEATURE_P3.md#task-1-define-store-state-interface) - State properties
+- [State Standards](../../STATE_STANDARDS.md) - Reactive state patterns
+- [Coding Standards](../../CODING_STANDARDS.md) - Effect patterns
+- [Phase 3](./SETTINGS_FEATURE_P3.md) - Store history implementation
 
 **Implementation Subtasks:**
 
-- [ ] **Create effect**: Watch store settings signal
-- [ ] **Detect undo/redo**: Identify when settings change due to history navigation
-- [ ] **Patch form values**: Update form with historical settings
-- [ ] **Suppress valueChanges**: Prevent form update from triggering save
-- [ ] **Maintain focus**: Preserve user's form field focus after update
+- [ ] Create effect() to watch settingsStore.settings() signal
+- [ ] Update form with patchValue() when settings change
+- [ ] Set flag to prevent auto-save during programmatic updates
+- [ ] Use `{ emitEvent: false }` option to prevent valueChanges emission
+- [ ] Clear flag after form update completes
+- [ ] Test synchronization with undo/redo operations
 
 **Testing Subtask:**
 
-- [ ] **Write Form Update Tests**: Test form updates after undo/redo (see Testing section)
+- [ ] Write Form Sync Tests using Vitest (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Use Angular effect to watch store settings changes
-- Patch form with `{ emitEvent: false }` to suppress valueChanges
-- This prevents undo/redo from triggering auto-save
-- Form update should be seamless (no flicker)
-- Consider preserving cursor position in text fields
-- Effect should run after undo/redo but not during normal saves
-
-**Form Update Effect** (structure only):
-
-```typescript
-private readonly updateFormEffect = effect(() => {
-  const settings = this.store.settings();
-  const historyIndex = this.store.historyIndex();
-  
-  // Only update if undo/redo occurred (history index changed)
-  // Not during normal saves (history index stays same)
-  this.form.patchValue(settings, { emitEvent: false });
-});
-```
+- Effect watches settings signal for any changes (including undo/redo)
+- Use `patchValue({ emitEvent: false })` to prevent auto-save trigger
+- Consider using a "programmatic update" flag for clarity
+- Form must accurately reflect current settings after each undo/redo
+- No auto-save should occur during synchronization
 
 **Testing Focus for Task 3:**
 
-> Focus on **form synchronization** - ensure form updates match history.
+> Test **form synchronization** - verify form updates on history navigation.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Form updates when undo is triggered
-- [ ] Form updates when redo is triggered
-- [ ] Form values match historical settings
-- [ ] Form update doesn't trigger valueChanges
-- [ ] Form update doesn't trigger auto-save
-- [ ] All form fields update correctly
+- [ ] Form updates when settings change from undo
+- [ ] Form updates when settings change from redo
+- [ ] Auto-save does NOT trigger during sync
+- [ ] Form values match settings after undo/redo
+- [ ] Effect properly tracks settings changes
 
 </details>
 
 <details open>
-<summary><h3>Task 4: Implement Keyboard Shortcuts</h3></summary>
+<summary><h3>Task 4: Implement Keyboard Shortcuts (Ctrl+Z, Ctrl+Y)</h3></summary>
 
-**Purpose**: Add keyboard event handlers for Ctrl+Z (undo) and Ctrl+Y / Ctrl+Shift+Z (redo) to provide power-user efficiency.
+**Purpose**: Add keyboard event handlers for undo (Ctrl+Z) and redo (Ctrl+Y/Ctrl+Shift+Z).
 
 **Related Documentation:**
 
-- [Coding Standards - Keyboard Handlers](../../CODING_STANDARDS.md#keyboard-handling) - Event handler patterns
+- [Coding Standards](../../CODING_STANDARDS.md) - HostListener patterns
 - Angular HostListener - Keyboard event handling
 
 **Implementation Subtasks:**
 
-- [ ] **Add HostListener for Ctrl+Z**: Trigger undo on keyboard shortcut
-- [ ] **Add HostListener for Ctrl+Y**: Trigger redo on keyboard shortcut
-- [ ] **Add HostListener for Ctrl+Shift+Z**: Alternative redo shortcut
-- [ ] **Prevent default behavior**: Stop browser's native undo/redo
-- [ ] **Check if action available**: Only execute if undo/redo possible
-- [ ] **Add Mac support**: Handle Cmd key instead of Ctrl on Mac
+- [ ] Add @HostListener for keydown.control.z
+- [ ] Call undo() method on Ctrl+Z
+- [ ] Add @HostListener for keydown.control.y
+- [ ] Call redo() method on Ctrl+Y
+- [ ] Consider Ctrl+Shift+Z as alternative redo shortcut
+- [ ] Prevent default browser behavior for these shortcuts
+- [ ] Test shortcuts don't interfere with form inputs
 
 **Testing Subtask:**
 
-- [ ] **Write Keyboard Tests**: Test shortcuts trigger actions (see Testing section)
+- [ ] Write Keyboard Shortcut Tests using Vitest (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Use `@HostListener` decorator for keyboard events
-- Prevent default to stop browser native behavior
-- Check platform for Mac-specific shortcuts (Cmd vs Ctrl)
-- Only execute if undo/redo is available (check store signals)
-- Consider adding keyboard shortcut indicator in UI
-- Test keyboard shortcuts work when form fields focused
-
-**Keyboard Handler Pattern** (structure only):
-
-```typescript
-@HostListener('window:keydown.control.z', ['$event'])
-@HostListener('window:keydown.meta.z', ['$event']) // Mac
-handleUndo(event: KeyboardEvent): void {
-  if (this.store.canUndo()) {
-    event.preventDefault();
-    this.undo();
-  }
-}
-
-@HostListener('window:keydown.control.y', ['$event'])
-@HostListener('window:keydown.meta.y', ['$event']) // Mac
-@HostListener('window:keydown.control.shift.z', ['$event'])
-@HostListener('window:keydown.meta.shift.z', ['$event']) // Mac
-handleRedo(event: KeyboardEvent): void {
-  if (this.store.canRedo()) {
-    event.preventDefault();
-    this.redo();
-  }
-}
-```
+- Use Angular @HostListener decorator for keyboard events
+- Call preventDefault() to prevent browser default behavior
+- Shortcuts should work app-wide when settings view active
+- Consider supporting both Ctrl+Y and Ctrl+Shift+Z for redo (platform conventions)
+- Ensure shortcuts don't interfere with typing in form fields
 
 **Testing Focus for Task 4:**
 
-> Focus on **keyboard interaction** - ensure shortcuts work correctly.
+> Test **keyboard event handling** - verify shortcuts trigger correct actions.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Ctrl+Z triggers undo when available
-- [ ] Ctrl+Z does nothing when undo not available
-- [ ] Ctrl+Y triggers redo when available
-- [ ] Ctrl+Shift+Z triggers redo (alternative)
-- [ ] Shortcuts work when form fields focused
+- [ ] Ctrl+Z triggers undo() method
+- [ ] Ctrl+Y triggers redo() method
+- [ ] Shortcuts call store actions correctly
 - [ ] Default browser behavior prevented
-- [ ] Mac Command key works (if testable)
+- [ ] Shortcuts work when component active
+- [ ] Shortcuts don't interfere with form input
 
 </details>
 
 <details open>
 <summary><h3>Task 5: Add History Position Indicator</h3></summary>
 
-**Purpose**: Display a visual indicator showing the user's current position in the undo/redo history stack, providing context about available operations.
+**Purpose**: Display current position in history (e.g., "3 of 10 changes") for user awareness.
 
 **Related Documentation:**
 
-- [Style Guide](../../STYLE_GUIDE.md) - Status indicator patterns
-- [Component Library](../../COMPONENT_LIBRARY.md) - Indicator components
+- [Style Guide](../../STYLE_GUIDE.md) - Status indicator styling
+- [PlayerStore](../../../libs/application/src/lib/player/player-store.ts) - History state patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Add indicator component**: Display current position in history
-- [ ] **Show position text**: Format as "Change 3 of 10" or similar
-- [ ] **Bind to store signals**: Connect to history and historyIndex
-- [ ] **Position indicator**: Place near undo/redo buttons
-- [ ] **Handle empty history**: Show appropriate message when no history
-- [ ] **Style indicator**: Make readable but unobtrusive
+- [ ] Add computed signal for history position text
+- [ ] Calculate current position from store's `historyIndex()`
+- [ ] Calculate total history from store's `history()` array length
+- [ ] Add indicator element to template near undo/redo buttons
+- [ ] Style indicator subtly (secondary text color)
+- [ ] Handle edge cases (empty history, single item)
 
 **Testing Subtask:**
 
-- [ ] **Write Indicator Tests**: Test indicator displays correct position (see Testing section)
+- [ ] Write Position Indicator Tests using Vitest (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Calculate position from `historyIndex` and `history.length`
-- Consider showing "No changes" when history is empty
-- Update immediately when undo/redo occurs
-- Format should be clear and concise
-- Consider showing timestamp of current position (enhancement)
-- Indicator helps users understand undo/redo state
-
-**Indicator Template** (structure only):
-
-```html
-<div class="history-indicator">
-  @if (store.history().length > 0) {
-    <span class="history-position">
-      Change {{ store.historyIndex() + 1 }} of {{ store.history().length }}
-    </span>
-  } @else {
-    <span class="no-history">No changes</span>
-  }
-</div>
-```
+- Store exposes historyIndex and history array (from Phase 3)
+- Position = historyIndex + 1 (zero-based to one-based)
+- Total = history array length
+- Display format: "3 of 10" or "Change 3/10"
+- Hide or show placeholder when history empty
+- Update indicator reactively as history changes
 
 **Testing Focus for Task 5:**
 
-> Focus on **position display** - ensure indicator shows correct information.
+> Test **position display** - verify indicator shows correct history position.
 
-**Behaviors to Test:**
+**Behaviors to Test (Vitest):**
 
-- [ ] Indicator shows correct position after undo
-- [ ] Indicator shows correct position after redo
-- [ ] Indicator updates when new changes made
-- [ ] "No changes" displays when history empty
-- [ ] Position calculation is correct (1-indexed for users)
-- [ ] Indicator updates immediately on state changes
-
-</details>
-
-<details open>
-<summary><h3>Task 6: Style Undo/Redo Toolbar and Indicator</h3></summary>
-
-**Purpose**: Apply SCSS styling to make the undo/redo toolbar and history indicator visually integrated with the settings view.
-
-**Related Documentation:**
-
-- [Style Guide](../../STYLE_GUIDE.md) - Toolbar and button styling
-- [Coding Standards - SCSS](../../CODING_STANDARDS.md#scss-conventions) - SCSS patterns
-
-**Implementation Subtasks:**
-
-- [ ] **Style toolbar container**: Layout and spacing for header actions
-- [ ] **Style buttons**: Consistent button appearance
-- [ ] **Style disabled state**: Visual feedback for disabled buttons
-- [ ] **Style history indicator**: Readable text with appropriate sizing
-- [ ] **Add hover states**: Interactive feedback on buttons
-- [ ] **Ensure responsive**: Works on mobile viewports
-
-**Testing Subtask:**
-
-- [ ] **Manual Visual Testing**: Verify toolbar and indicator appearance
-
-**Key Implementation Notes:**
-
-- Toolbar should integrate with settings header seamlessly
-- Disabled buttons should be visually distinct
-- Hover states provide interactive feedback
-- Consider button size for touch targets on mobile
-- History indicator should not distract from main content
-- Use theme colors for consistency
-
-**Toolbar Styles** (pattern only):
-
-```scss
-.settings-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--spacing-lg);
-  
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    
-    button[mat-icon-button] {
-      &[disabled] {
-        opacity: 0.38;
-      }
-    }
-  }
-}
-
-.history-indicator {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  padding: 0 var(--spacing-sm);
-  
-  .no-history {
-    font-style: italic;
-  }
-}
-```
-
-**Testing Focus for Task 6:**
-
-> Focus on **visual integration** - ensure toolbar fits design system.
-
-**Visual Testing Checklist:**
-
-- [ ] Toolbar integrated with header layout
-- [ ] Buttons sized appropriately
-- [ ] Disabled state visually clear
-- [ ] Hover states work smoothly
-- [ ] History indicator readable
-- [ ] Works on mobile viewports
-- [ ] Colors match theme
-
-</details>
-
-<details open>
-<summary><h3>Task 7: Add Undo/Redo Integration Tests</h3></summary>
-
-**Purpose**: Create comprehensive tests that verify the complete undo/redo workflow including form updates, keyboard shortcuts, and history management.
-
-**Related Documentation:**
-
-- [Testing Standards - Integration Testing](../../TESTING_STANDARDS.md#integration-testing) - Integration patterns
-- [Store Testing Guide](../../STORE_TESTING.md) - Store integration testing
-
-**Implementation Subtasks:**
-
-- [ ] **Test button undo/redo**: Verify button clicks work end-to-end
-- [ ] **Test keyboard undo/redo**: Verify shortcuts work end-to-end
-- [ ] **Test form updates**: Verify form synchronizes with history
-- [ ] **Test history boundaries**: Verify behavior at stack limits
-- [ ] **Test undo after changes**: Verify new changes clear redo stack
-- [ ] **Test position indicator**: Verify indicator updates correctly
-
-**Testing Subtask:**
-
-- [ ] **Write Integration Tests**: Test complete undo/redo workflows (see Testing section)
-
-**Key Implementation Notes:**
-
-- Test both button and keyboard triggers
-- Verify form values match history at each step
-- Test boundary conditions (no undo/redo available)
-- Test that new changes after undo clear redo stack
-- Use fakeAsync for timing-dependent tests
-- Mock store or use real store with test data
-
-**Integration Test Pattern** (structure only):
-
-```typescript
-describe('Settings Undo/Redo', () => {
-  it('should undo and redo changes correctly', () => {
-    const component = fixture.componentInstance;
-    const store = TestBed.inject(SettingsStore);
-    
-    // Make change
-    component.form.patchValue({ player: { repeatMode: 'Single' } });
-    fixture.detectChanges();
-    
-    // Undo
-    component.undo();
-    fixture.detectChanges();
-    expect(component.form.value.player.repeatMode).toBe('Off');
-    
-    // Redo
-    component.redo();
-    fixture.detectChanges();
-    expect(component.form.value.player.repeatMode).toBe('Single');
-  });
-  
-  it('should handle keyboard shortcuts', () => {
-    // Simulate Ctrl+Z
-    const event = new KeyboardEvent('keydown', { 
-      key: 'z', 
-      ctrlKey: true 
-    });
-    component.handleUndo(event);
-    // Verify undo occurred
-  });
-});
-```
-
-**Testing Focus for Task 7:**
-
-> Focus on **complete workflows** - ensure undo/redo works end-to-end.
-
-**Behaviors to Test:**
-
-- [ ] Button clicks trigger undo/redo
-- [ ] Keyboard shortcuts trigger undo/redo
-- [ ] Form updates after undo/redo
-- [ ] History position indicator updates
-- [ ] Undo at beginning does nothing
-- [ ] Redo at end does nothing
-- [ ] New change after undo clears redo
-- [ ] Multiple undo/redo operations work correctly
+- [ ] Indicator displays current position correctly
+- [ ] Indicator updates on undo/redo
+- [ ] Position format user-friendly
+- [ ] Handles empty history gracefully
+- [ ] Handles single-item history
+- [ ] Reactively updates with store changes
 
 </details>
 
@@ -540,82 +287,112 @@ describe('Settings Undo/Redo', () => {
 
 ## ✅ Success Criteria
 
-> Mark these checkboxes as you validate each criterion.
+> All criteria must be met before proceeding to Phase 9.
 
-- [ ] **Toolbar Added**: Undo/redo buttons display in header
-- [ ] **Buttons Work**: Clicking buttons triggers undo/redo
-- [ ] **Form Updates**: Form synchronizes with history after undo/redo
-- [ ] **Keyboard Shortcuts**: Ctrl+Z and Ctrl+Y trigger operations
-- [ ] **Position Indicator**: History position displays correctly
-- [ ] **Styling Complete**: Toolbar and indicator visually integrated
-- [ ] **Disabled States**: Buttons disabled at history boundaries
-- [ ] **All Tests Pass**: Unit and integration tests pass
-- [ ] **User Experience Smooth**: Operations feel instant and responsive
+**Undo/Redo Functionality:**
+
+- [ ] Undo button navigates to previous settings
+- [ ] Redo button navigates to next settings
+- [ ] Buttons disabled when unavailable (canUndo/canRedo)
+- [ ] Form updates correctly on undo/redo
+- [ ] Auto-save does not trigger on undo/redo
+
+**Keyboard Shortcuts:**
+
+- [ ] Ctrl+Z triggers undo
+- [ ] Ctrl+Y triggers redo
+- [ ] Shortcuts work app-wide when settings active
+- [ ] Default browser behavior prevented
+- [ ] Shortcuts don't interfere with form inputs
+
+**User Feedback:**
+
+- [ ] Toolbar visible and accessible
+- [ ] Tooltips show keyboard shortcuts
+- [ ] History position indicator displays correctly
+- [ ] Visual feedback clear and intuitive
+- [ ] ARIA labels for accessibility
+
+**State Management:**
+
+- [ ] Store actions use `updateState()` with `actionMessage`
+- [ ] History management follows PlayerStore pattern
+- [ ] Form synchronization prevents auto-save loops
+- [ ] State updates comply with STATE_STANDARDS.md
+
+**Testing:**
+
+- [ ] All undo/redo logic has Vitest unit tests
+- [ ] Keyboard shortcuts tested
+- [ ] Form synchronization tested
+- [ ] Component integration tested
+- [ ] No test failures introduced
 
 ---
 
 ## 🧪 Testing Summary
 
-### Testing Approach
+> Comprehensive testing of undo/redo functionality.
 
-This phase focuses on **undo/redo functionality and keyboard interaction**:
+**Test Distribution:**
 
-1. **Toolbar Tests**: Verify buttons render and disable correctly
-2. **Action Tests**: Verify button clicks trigger store methods
-3. **Form Update Tests**: Verify form synchronizes with history
-4. **Keyboard Tests**: Verify shortcuts trigger operations
-5. **Indicator Tests**: Verify position display updates
-6. **Integration Tests**: Verify complete undo/redo workflows
+- **Unit Tests**: 30 tests (toolbar, handlers, sync, keyboard, indicator)
+- **Integration Tests**: 10 tests (full undo/redo flow with store)
+- **Total**: **40 tests**
 
-### Test Types by Task
+**Testing Tools:**
 
-| Task | Test Type | Focus |
-|------|-----------|-------|
-| Task 1 | Unit | Toolbar rendering |
-| Task 2 | Unit | Action invocation |
-| Task 3 | Unit | Form synchronization |
-| Task 4 | Unit | Keyboard shortcuts |
-| Task 5 | Unit | Position indicator |
-| Task 6 | Manual | Visual appearance |
-| Task 7 | Integration | Complete workflows |
+- **Framework**: Vitest for all unit and integration tests
+- **Component Testing**: Angular Testing Library patterns per [Smart Component Testing](../../SMART_COMPONENT_TESTING.md)
+- **Keyboard Testing**: Simulate keyboard events in tests
 
-### Testing Standards Reference
+**Key Testing Patterns:**
 
-- Follow [Testing Standards](../../TESTING_STANDARDS.md) for behavioral testing
-- Use [Smart Component Testing](../../SMART_COMPONENT_TESTING.md) for component patterns
-- Test keyboard events with KeyboardEvent mocks
-- Verify accessibility attributes
+1. **Toolbar Testing** (Vitest):
+   - Test button rendering and disabled states
+   - Verify tooltips and ARIA labels
+   - Test button click handlers
 
----
+2. **Store Action Testing** (Vitest):
+   - Test undo/redo actions called correctly
+   - Verify form updates after history navigation
+   - Test auto-save prevention during undo/redo
 
-## 📝 Implementation Notes
+3. **Keyboard Shortcut Testing** (Vitest):
+   - Simulate Ctrl+Z and Ctrl+Y events
+   - Verify correct actions triggered
+   - Test preventDefault() called
 
-> Track discoveries, decisions, and issues encountered during implementation.
+4. **Form Synchronization Testing** (Vitest):
+   - Test form updates on settings changes
+   - Verify no auto-save during sync
+   - Test effect behavior with history changes
 
-### Discoveries During Implementation
+5. **Integration Testing** (Vitest):
+   - Test complete undo/redo workflow
+   - Verify history position updates
+   - Test multiple undo/redo operations
 
-- [Add notes here as you implement]
+**Coverage Goals:**
 
-### Blockers & Questions
-
-- [Document any blockers or questions here]
-
-### Deviations from Plan
-
-- [Note any changes from the original plan and why]
-
----
-
-## 🔗 Related Documentation
-
-- **Previous Phase**: [Phase 7 - Auto-Save & Change Detection](./SETTINGS_FEATURE_P7.md)
-- **Next Phase**: [Phase 9 - E2E Testing & Polish](./SETTINGS_FEATURE_P9.md)
-- **Feature Overview**: [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md)
-- **Undo/Redo Store**: [Phase 3 - Undo/Redo Actions](./SETTINGS_FEATURE_P3.md#task-7-implement-undoredo-actions)
-- **Angular HostListener**: Angular keyboard event handling
+- **Unit Tests**: 100% of undo/redo logic
+- **Integration Tests**: All user-facing undo/redo workflows
+- **Behavioral Focus**: Test observable outcomes, not implementation
 
 ---
 
-_Phase Status: Ready for Implementation_
-_Last Updated: 2025-01-11_
-_Estimated Effort: 3-4 hours_
+## 🎯 Estimated Effort
+
+**Total Phase Time**: 3-4 hours
+
+**Task Breakdown:**
+
+- Task 1 (Toolbar): 30 minutes
+- Task 2 (Click Handlers): 30 minutes
+- Task 3 (Form Sync): 45 minutes
+- Task 4 (Keyboard Shortcuts): 45 minutes
+- Task 5 (Position Indicator): 30 minutes
+- Testing: 60 minutes
+
+**Milestone**: Undo/redo complete with keyboard shortcuts, ready for E2E testing and polish (Phase 9).
+

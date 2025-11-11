@@ -2,7 +2,7 @@
 
 ## 🎯 Objective
 
-Add comprehensive end-to-end test coverage using Cypress and implement final UI/UX polish based on user feedback and testing insights. This phase ensures production-readiness through thorough validation of all user workflows, accessibility compliance, responsive design verification, and addressing any quality issues discovered during testing. The goal is a polished, fully-tested settings feature ready for release.
+Create comprehensive Cypress E2E test suites covering all settings functionality with proper interceptor, fixture, and data generator infrastructure. Complete the feature with accessibility testing, responsive design validation, and final polish touchups. This phase ensures production-ready quality through rigorous end-to-end testing following established E2E patterns.
 
 ---
 
@@ -14,817 +14,464 @@ Add comprehensive end-to-end test coverage using Cypress and implement final UI/
 
 - [ ] [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md) - Complete feature overview
 - [ ] [Phase 8 Completion](./SETTINGS_FEATURE_P8.md) - Undo/redo functionality (prerequisite)
-- [ ] All previous phases (P1-P8) - Complete implementation context
+
+**E2E Testing Documentation (CRITICAL - Read Deeply):**
+
+- [ ] **CRITICAL**: [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - **Read deeply through this document and ALL linked documentation**
+- [ ] [E2E Test Patterns](../../../apps/teensyrom-ui-e2e/src/support/) - Study interceptor, fixture, and generator patterns
+- [ ] **Study Existing Tests**: Review all *.cy.ts files for established patterns
+
+**Backend Reference:**
+
+- [ ] [Settings Endpoints](https://github.com/MetalHexx/TeensyROM-Web/tree/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings) - API endpoints to mock
 
 **Standards & Guidelines:**
 
-- [ ] [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Cypress patterns and conventions
-- [ ] [Testing Standards](../../TESTING_STANDARDS.md) - Testing approaches
-- [ ] [Style Guide](../../STYLE_GUIDE.md) - Visual design standards
-- [ ] [Coding Standards](../../CODING_STANDARDS.md) - Accessibility and responsive design
+- [ ] [Testing Standards](../../TESTING_STANDARDS.md) - Testing philosophy
+- [ ] [Coding Standards](../../CODING_STANDARDS.md) - Accessibility requirements
+
+**Accessibility:**
+
+- WCAG 2.1 AA Guidelines - Accessibility compliance standards
 
 ---
 
 ## 📂 File Structure Overview
 
-> E2E tests and final polish touchups.
+> E2E test infrastructure and test suites.
 
 ```
-apps/teensyrom-ui-e2e/src/e2e/
-├── settings/
-│   ├── settings-navigation.cy.ts             ✨ New - Navigation and initial load tests
-│   ├── settings-form-interaction.cy.ts       ✨ New - Form input and validation tests
-│   ├── settings-auto-save.cy.ts              ✨ New - Auto-save functionality tests
-│   ├── settings-undo-redo.cy.ts              ✨ New - Undo/redo workflow tests
-│   ├── settings-validation.cy.ts             ✨ New - Form validation tests
-│   ├── settings-error-handling.cy.ts         ✨ New - Error scenario tests
-│   ├── settings-responsive.cy.ts             ✨ New - Mobile/tablet viewport tests
-│   └── settings-accessibility.cy.ts          ✨ New - Accessibility compliance tests
+apps/teensyrom-ui-e2e/src/
+├── e2e/
+│   └── settings.cy.ts                        ✨ New - Complete settings E2E test suite
+├── support/
+│   ├── interceptors/
+│   │   └── settings.interceptors.ts          ✨ New - API mocking for settings endpoints
+│   ├── generators/
+│   │   └── settings.generators.ts            ✨ New - Test data generation functions
+│   └── constants/
+│       └── settings.constants.ts             ✨ New - Selectors, routes, test constants
 └── fixtures/
-    └── settings.json                         ✨ New - Test data fixtures
-
-libs/features/settings/src/lib/
-└── (various components)                      📝 Modified - Polish improvements based on testing
-
-apps/teensyrom-ui/src/styles/
-└── _settings-overrides.scss                  ✨ New - Settings-specific style overrides (if needed)
+    └── settings.json                         ✨ New - Static test fixture data
 ```
 
 ---
 
 <details open>
-<summary><h3>Task 1: Create E2E Navigation and Load Tests</h3></summary>
+<summary><h3>Task 1: Create E2E Testing Infrastructure</h3></summary>
 
-**Purpose**: Verify users can navigate to settings and the page loads correctly with all sections displayed.
+**Purpose**: Build foundational E2E testing infrastructure following established patterns from E2E_TESTS.md.
 
 **Related Documentation:**
 
-- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Cypress patterns
-- [Phase 5 - Settings View](./SETTINGS_FEATURE_P5.md) - View component details
+- **CRITICAL**: [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Read ALL sections and linked docs
+- [Settings Backend Endpoints](https://github.com/MetalHexx/TeensyROM-Web/tree/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings) - Endpoints to mock
+- **Study**: Existing interceptor files in `apps/teensyrom-ui-e2e/src/support/interceptors/` for patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Create navigation spec**: New Cypress test file
-- [ ] **Test menu navigation**: Verify clicking settings menu item
-- [ ] **Test URL routing**: Verify `/settings` route loads
-- [ ] **Test initial load**: Verify all sections display
-- [ ] **Test loading state**: Verify loading indicator appears and disappears
-- [ ] **Test error state**: Verify error display on load failure
-- [ ] **Add test fixtures**: Mock settings data for consistent tests
+- [ ] Create `settings.interceptors.ts` following interceptor patterns
+- [ ] Mock GET /api/v1/settings endpoint (load settings)
+- [ ] Mock PUT /api/v1/settings endpoint (save settings)
+- [ ] Create `settings.generators.ts` for dynamic test data
+- [ ] Implement generateSettings() function with configurable options
+- [ ] Implement generateInvalidSettings() for validation testing
+- [ ] Create `settings.constants.ts` for selectors and routes
+- [ ] Define data-testid selectors for all interactive elements
+- [ ] Create `settings.json` fixture with sample settings data
 
 **Testing Subtask:**
 
-- [ ] **Write Navigation E2E Tests**: Complete navigation test scenarios (see Testing section)
+- [ ] Verify infrastructure works with basic E2E tests (see Task 2)
 
 **Key Implementation Notes:**
 
-- Use Cypress best practices (data-testid attributes)
-- Mock backend responses for consistent tests
-- Test both successful load and error scenarios
-- Verify all 4 section cards display
-- Test direct navigation to `/settings` (deep linking)
-- Use fixtures for test data consistency
+- **CRITICAL**: Study existing interceptor files to match established patterns exactly
+- Interceptors must handle both success and error scenarios
+- Generators should create realistic, varied test data
+- Constants file centralizes selectors (prevents brittle tests)
+- Fixtures provide consistent baseline data
+- Follow naming conventions from existing E2E infrastructure
+- Mock all Settings endpoints per backend API structure
 
-**E2E Test Pattern** (structure only):
+**Infrastructure Pattern** (reference existing files for exact implementation):
 
 ```typescript
-describe('Settings Navigation', () => {
-  beforeEach(() => {
-    cy.visit('/');
-    cy.intercept('GET', '**/api/settings', {
-      fixture: 'settings.json'
-    }).as('getSettings');
-  });
+// settings.interceptors.ts pattern (simplified - see actual interceptor files)
+export const interceptGetSettings = (settings?: Settings) => {
+  cy.intercept('GET', '/api/v1/settings', {
+    statusCode: 200,
+    body: settings || generateSettings()
+  }).as('getSettings');
+};
 
-  it('should navigate to settings from menu', () => {
-    cy.get('[data-testid="nav-settings"]').click();
-    cy.url().should('include', '/settings');
-    cy.wait('@getSettings');
-    cy.get('[data-testid="settings-view"]').should('be.visible');
-  });
-
-  it('should display all settings sections', () => {
-    cy.visit('/settings');
-    cy.wait('@getSettings');
-    
-    cy.get('[data-testid="player-settings-card"]').should('be.visible');
-    cy.get('[data-testid="file-transfer-card"]').should('be.visible');
-    cy.get('[data-testid="search-settings-card"]').should('be.visible');
-    cy.get('[data-testid="app-settings-card"]').should('be.visible');
-  });
-});
+export const interceptSaveSettings = (shouldFail = false) => {
+  cy.intercept('PUT', '/api/v1/settings', {
+    statusCode: shouldFail ? 500 : 200,
+    body: shouldFail ? { error: 'Save failed' } : { success: true }
+  }).as('saveSettings');
+};
 ```
 
 **Testing Focus for Task 1:**
 
-> Focus on **navigation and initial load** - ensure users can access settings.
+> **Infrastructure setup** - verify mocking works correctly.
 
-**E2E Scenarios to Test:**
+**Behaviors to Verify:**
 
-- [ ] User clicks settings menu item and navigates to settings page
-- [ ] Settings page URL is `/settings`
-- [ ] All four section cards display after load
-- [ ] Loading indicator shows during fetch
-- [ ] Error message displays if backend fails
-- [ ] Direct navigation to `/settings` works (deep link)
-- [ ] Browser back/forward buttons work correctly
+- [ ] Interceptors successfully mock settings endpoints
+- [ ] Generators produce valid test data
+- [ ] Constants provide correct selectors
+- [ ] Fixtures load correctly in tests
 
 </details>
 
 <details open>
-<summary><h3>Task 2: Create E2E Form Interaction Tests</h3></summary>
+<summary><h3>Task 2: Create Navigation and Load E2E Tests</h3></summary>
 
-**Purpose**: Verify users can interact with all form fields and inputs behave correctly.
+**Purpose**: Test settings view navigation, initial load, and data display.
 
 **Related Documentation:**
 
-- [Phase 6 - Reactive Forms](./SETTINGS_FEATURE_P6.md) - Form implementation details
-- [E2E Testing Guide - Form Testing](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md#form-testing) - Form test patterns
+- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Navigation testing patterns
+- [Settings Constants](./SETTINGS_FEATURE_P5.md) - Route configuration
 
 **Implementation Subtasks:**
 
-- [ ] **Create form interaction spec**: New Cypress test file
-- [ ] **Test text inputs**: Verify typing in text fields
-- [ ] **Test select dropdowns**: Verify selecting options
-- [ ] **Test checkboxes**: Verify checking/unchecking
-- [ ] **Test sliders**: Verify adjusting slider values
-- [ ] **Test array inputs**: Verify adding/removing watch folders
-- [ ] **Test form changes**: Verify form tracks dirty state
+- [ ] Create settings.cy.ts file
+- [ ] Write test: "navigates to settings view via menu"
+- [ ] Write test: "loads settings on view mount"
+- [ ] Write test: "displays all settings sections"
+- [ ] Write test: "shows loading indicator while fetching"
+- [ ] Write test: "handles settings load errors with alerts"
+- [ ] Use interceptors for API mocking
+- [ ] Use data-testid selectors from constants
 
 **Testing Subtask:**
 
-- [ ] **Write Form Interaction E2E Tests**: Complete form test scenarios (see Testing section)
+- [ ] Complete Navigation Test Suite (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Test all form control types
-- Verify form state updates after interaction
-- Test form dirty state indicator
-- Use Cypress commands for form interaction
-- Test keyboard and mouse interaction
-- Verify form values persist in UI
-
-**E2E Test Pattern** (structure only):
-
-```typescript
-describe('Settings Form Interaction', () => {
-  beforeEach(() => {
-    cy.visit('/settings');
-    cy.wait('@getSettings');
-  });
-
-  it('should update player repeat mode', () => {
-    cy.get('[data-testid="player-repeat-mode"]').click();
-    cy.get('mat-option').contains('All').click();
-    cy.get('[data-testid="player-repeat-mode"]').should('contain', 'All');
-  });
-
-  it('should adjust SID timer with slider', () => {
-    cy.get('[data-testid="sid-timer-slider"]')
-      .invoke('val', 240)
-      .trigger('change');
-    cy.get('[data-testid="sid-timer-value"]').should('contain', '240');
-  });
-
-  it('should toggle checkbox', () => {
-    cy.get('[data-testid="sid-auto-advance"]').click();
-    cy.get('[data-testid="sid-auto-advance"]').should('be.checked');
-  });
-});
-```
+- Use interceptGetSettings() to mock API responses
+- Verify all four sections render (player, file-transfer, search, app)
+- Test loading states with interceptor delays
+- Test error scenarios with failed interceptors
+- Verify infrastructure layer alerts appear on errors
 
 **Testing Focus for Task 2:**
 
-> Focus on **form interaction** - ensure all inputs work correctly.
+> Test **navigation and initial load** - verify view loads correctly.
 
-**E2E Scenarios to Test:**
+**Behaviors to Test (Cypress):**
 
-- [ ] User can select repeat mode from dropdown
-- [ ] User can adjust SID timer slider
-- [ ] User can toggle auto-advance checkbox
-- [ ] User can toggle launch on startup checkbox
-- [ ] User can enable/disable watch folders
-- [ ] User can add folder to watch list
-- [ ] User can remove folder from watch list
-- [ ] User can adjust search weights
-- [ ] User can edit stop words
-- [ ] Form shows dirty state when modified
+- [ ] Settings menu item navigates to /settings route
+- [ ] Settings view renders on navigation
+- [ ] API call made to GET /api/v1/settings
+- [ ] Loading indicator shown during fetch
+- [ ] All four sections displayed after load
+- [ ] Alert shown if settings load fails
 
 </details>
 
 <details open>
-<summary><h3>Task 3: Create E2E Auto-Save Tests</h3></summary>
+<summary><h3>Task 3: Create Form Interaction E2E Tests</h3></summary>
 
-**Purpose**: Verify auto-save functionality works correctly including debouncing, save status indicators, and error handling.
+**Purpose**: Test form field interactions, validation, and user input handling.
 
 **Related Documentation:**
 
-- [Phase 7 - Auto-Save](./SETTINGS_FEATURE_P7.md) - Auto-save implementation details
-- [E2E Testing Guide - Async Testing](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md#async-testing) - Async patterns
+- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Form testing patterns
+- [SaveSettings Validators](https://github.com/MetalHexx/TeensyROM-Web/blob/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings/SaveSettings/SaveSettingsModels.cs) - Validation rules
 
 **Implementation Subtasks:**
 
-- [ ] **Create auto-save spec**: New Cypress test file
-- [ ] **Test save trigger**: Verify changes trigger save after debounce
-- [ ] **Test debouncing**: Verify rapid changes batch into single save
-- [ ] **Test save status**: Verify "Saving..." and "Saved" indicators
-- [ ] **Test save persistence**: Verify values persist after page reload
-- [ ] **Test save errors**: Verify error handling and retry
+- [ ] Write test: "updates player settings fields"
+- [ ] Write test: "updates file transfer settings"
+- [ ] Write test: "adds and removes watch folders"
+- [ ] Write test: "updates search settings and weights"
+- [ ] Write test: "updates app settings"
+- [ ] Write test: "shows validation errors for invalid inputs"
+- [ ] Write test: "prevents save when form invalid"
+- [ ] Use Cypress commands for form interaction
 
 **Testing Subtask:**
 
-- [ ] **Write Auto-Save E2E Tests**: Complete auto-save test scenarios (see Testing section)
+- [ ] Complete Form Interaction Test Suite (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Mock backend save endpoint
-- Use Cypress wait() for timing-dependent tests
-- Verify save indicators display correctly
-- Test successful save and error scenarios
-- Verify persistence across page reloads
-- Test network error recovery
-
-**E2E Test Pattern** (structure only):
-
-```typescript
-describe('Settings Auto-Save', () => {
-  beforeEach(() => {
-    cy.visit('/settings');
-    cy.wait('@getSettings');
-    cy.intercept('POST', '**/api/settings', {
-      statusCode: 200
-    }).as('saveSettings');
-  });
-
-  it('should auto-save after changes', () => {
-    cy.get('[data-testid="player-repeat-mode"]').click();
-    cy.get('mat-option').contains('Single').click();
-    
-    // Wait for debounce
-    cy.wait(600);
-    
-    // Verify save was called
-    cy.wait('@saveSettings');
-    cy.get('[data-testid="save-status"]').should('contain', 'Saved');
-  });
-
-  it('should batch rapid changes into single save', () => {
-    cy.get('[data-testid="sid-timer-slider"]').invoke('val', 200).trigger('change');
-    cy.wait(100);
-    cy.get('[data-testid="sid-timer-slider"]').invoke('val', 240).trigger('change');
-    
-    cy.wait(600);
-    cy.get('@saveSettings.all').should('have.length', 1);
-  });
-});
-```
+- Test all form field types (selects, sliders, checkboxes, text inputs)
+- Verify FormArray behavior (watch folders add/remove)
+- Test inline validation error messages
+- Test validation prevents invalid form submission
+- Use cy.get() with data-testid selectors for reliability
 
 **Testing Focus for Task 3:**
 
-> Focus on **auto-save behavior** - ensure changes persist automatically.
+> Test **form interactions** - verify all form fields work correctly.
 
-**E2E Scenarios to Test:**
+**Behaviors to Test (Cypress):**
 
-- [ ] Form changes trigger save after 500ms debounce
-- [ ] Rapid changes batch into single save
-- [ ] Save status shows "Saving..." during save
-- [ ] Save status shows "Saved" on success
-- [ ] Settings persist across page reload
-- [ ] Save error displays error message
-- [ ] User can retry failed save
-- [ ] Invalid form doesn't trigger save
+- [ ] All form fields accept user input
+- [ ] Form values update correctly
+- [ ] Watch folders can be added dynamically
+- [ ] Watch folders can be removed
+- [ ] Invalid inputs show validation errors
+- [ ] Invalid form cannot be submitted
+- [ ] Form validity updates reactively
 
 </details>
 
 <details open>
-<summary><h3>Task 4: Create E2E Undo/Redo Tests</h3></summary>
+<summary><h3>Task 4: Create Auto-Save E2E Tests</h3></summary>
 
-**Purpose**: Verify undo/redo functionality works end-to-end including button clicks, keyboard shortcuts, and form updates.
+**Purpose**: Test debounced auto-save functionality with loading indicators and success feedback.
 
 **Related Documentation:**
 
-- [Phase 8 - Undo/Redo](./SETTINGS_FEATURE_P8.md) - Undo/redo implementation details
-- [E2E Testing Guide - Keyboard Testing](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md#keyboard-testing) - Keyboard patterns
+- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Async behavior testing
+- [Phase 7](./SETTINGS_FEATURE_P7.md) - Auto-save implementation
 
 **Implementation Subtasks:**
 
-- [ ] **Create undo/redo spec**: New Cypress test file
-- [ ] **Test undo button**: Verify button click reverts changes
-- [ ] **Test redo button**: Verify button click reapplies changes
-- [ ] **Test keyboard shortcuts**: Verify Ctrl+Z and Ctrl+Y work
-- [ ] **Test history position**: Verify position indicator updates
-- [ ] **Test disabled states**: Verify buttons disable at boundaries
-- [ ] **Test multiple operations**: Verify chained undo/redo
+- [ ] Write test: "triggers auto-save after debounce period"
+- [ ] Write test: "shows loading indicator during save"
+- [ ] Write test: "updates last saved timestamp on success"
+- [ ] Write test: "debounces multiple rapid changes"
+- [ ] Write test: "does not save invalid forms"
+- [ ] Write test: "shows alert on save error"
+- [ ] Use cy.clock() and cy.tick() for debounce testing
+- [ ] Use interceptSaveSettings() for API mocking
 
 **Testing Subtask:**
 
-- [ ] **Write Undo/Redo E2E Tests**: Complete undo/redo test scenarios (see Testing section)
+- [ ] Complete Auto-Save Test Suite (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Test button and keyboard triggers
-- Verify form values revert correctly
-- Test history position indicator
-- Test boundary conditions
-- Verify undo clears redo on new change
-- Test multiple undo/redo operations
-
-**E2E Test Pattern** (structure only):
-
-```typescript
-describe('Settings Undo/Redo', () => {
-  beforeEach(() => {
-    cy.visit('/settings');
-    cy.wait('@getSettings');
-  });
-
-  it('should undo and redo changes', () => {
-    // Make change
-    cy.get('[data-testid="player-repeat-mode"]').click();
-    cy.get('mat-option').contains('All').click();
-    cy.wait(600); // Wait for auto-save
-    
-    // Undo
-    cy.get('[data-testid="undo-button"]').click();
-    cy.get('[data-testid="player-repeat-mode"]').should('contain', 'Off');
-    
-    // Redo
-    cy.get('[data-testid="redo-button"]').click();
-    cy.get('[data-testid="player-repeat-mode"]').should('contain', 'All');
-  });
-
-  it('should undo with keyboard shortcut', () => {
-    cy.get('[data-testid="player-repeat-mode"]').click();
-    cy.get('mat-option').contains('Single').click();
-    cy.wait(600);
-    
-    cy.get('body').type('{ctrl}z');
-    cy.get('[data-testid="player-repeat-mode"]').should('contain', 'Off');
-  });
-});
-```
+- Use cy.clock() to control time and test debounce accurately
+- Use cy.tick(500) to advance past debounce period
+- Intercept PUT /api/v1/settings to verify save called
+- Test both successful and failed save scenarios
+- Verify infrastructure layer alerts on errors
+- Verify loading-text component visibility during saves
 
 **Testing Focus for Task 4:**
 
-> Focus on **undo/redo workflows** - ensure history navigation works.
+> Test **auto-save behavior** - verify debounced saves work correctly.
 
-**E2E Scenarios to Test:**
+**Behaviors to Test (Cypress):**
 
-- [ ] User can undo changes with button
-- [ ] User can redo changes with button
-- [ ] Ctrl+Z triggers undo
-- [ ] Ctrl+Y triggers redo
-- [ ] History position indicator updates
-- [ ] Undo button disabled at history start
-- [ ] Redo button disabled at history end
-- [ ] New change after undo clears redo
-- [ ] Multiple undo operations work correctly
+- [ ] Form changes trigger save after 500ms
+- [ ] Multiple rapid changes debounced to single save
+- [ ] Loading indicator shown during save
+- [ ] Timestamp updated after successful save
+- [ ] Invalid forms do not trigger save
+- [ ] Save errors show alert notifications
+- [ ] User can continue editing after save
 
 </details>
 
 <details open>
-<summary><h3>Task 5: Create E2E Validation Tests</h3></summary>
+<summary><h3>Task 5: Create Undo/Redo E2E Tests</h3></summary>
 
-**Purpose**: Verify form validation works correctly and prevents invalid data submission.
+**Purpose**: Test undo/redo functionality via buttons and keyboard shortcuts.
 
 **Related Documentation:**
 
-- [Phase 6 - Validation](./SETTINGS_FEATURE_P6.md#task-8-add-form-validation) - Validation implementation
-- [Backend Plan - Validation Rules](./BASIC_SETTINGS_ENDPOINT_PLAN.md#validation) - Backend validation
+- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Keyboard interaction testing
+- [Phase 8](./SETTINGS_FEATURE_P8.md) - Undo/redo implementation
 
 **Implementation Subtasks:**
 
-- [ ] **Create validation spec**: New Cypress test file
-- [ ] **Test required fields**: Verify required validation
-- [ ] **Test min/max values**: Verify range validation
-- [ ] **Test pattern matching**: Verify format validation
-- [ ] **Test error messages**: Verify error text displays
-- [ ] **Test save prevention**: Verify invalid forms don't save
+- [ ] Write test: "undo button reverts changes"
+- [ ] Write test: "redo button reapplies changes"
+- [ ] Write test: "Ctrl+Z keyboard shortcut triggers undo"
+- [ ] Write test: "Ctrl+Y keyboard shortcut triggers redo"
+- [ ] Write test: "buttons disabled when unavailable"
+- [ ] Write test: "history position indicator updates"
+- [ ] Write test: "auto-save does not trigger on undo/redo"
+- [ ] Use cy.type() with special keys for keyboard shortcuts
 
 **Testing Subtask:**
 
-- [ ] **Write Validation E2E Tests**: Complete validation test scenarios (see Testing section)
+- [ ] Complete Undo/Redo Test Suite (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Test all validation rules
-- Verify error messages display
-- Test that invalid forms don't save
-- Verify error styling (red text, field highlighting)
-- Test validation triggers (blur, submit)
-- Test validation clearing on valid input
-
-**E2E Test Pattern** (structure only):
-
-```typescript
-describe('Settings Validation', () => {
-  beforeEach(() => {
-    cy.visit('/settings');
-    cy.wait('@getSettings');
-  });
-
-  it('should show error for invalid SID timer', () => {
-    cy.get('[data-testid="sid-timer-input"]').clear().type('0').blur();
-    cy.get('[data-testid="sid-timer-error"]')
-      .should('be.visible')
-      .and('contain', 'must be at least 1');
-  });
-
-  it('should prevent save when form invalid', () => {
-    cy.intercept('POST', '**/api/settings').as('saveSettings');
-    
-    cy.get('[data-testid="sid-timer-input"]').clear().type('-1').blur();
-    cy.wait(600);
-    
-    cy.get('@saveSettings.all').should('have.length', 0);
-  });
-});
-```
+- Test both button clicks and keyboard shortcuts
+- Verify form updates correctly on undo/redo
+- Verify auto-save does NOT trigger during undo/redo operations
+- Test button disabled states via canUndo/canRedo
+- Test history position indicator accuracy
+- Use cy.type('{ctrl}z') for keyboard shortcuts
 
 **Testing Focus for Task 5:**
 
-> Focus on **validation behavior** - ensure invalid data is caught.
+> Test **undo/redo functionality** - verify history navigation works.
 
-**E2E Scenarios to Test:**
+**Behaviors to Test (Cypress):**
 
-- [ ] Required field error shows when empty
-- [ ] Min value error shows for too-small number
-- [ ] Max value error shows for too-large number
-- [ ] Pattern error shows for invalid format
-- [ ] Error messages are user-friendly
-- [ ] Invalid form prevents auto-save
-- [ ] Valid input clears error message
-- [ ] Multiple errors display correctly
+- [ ] Undo button reverts form to previous state
+- [ ] Redo button reapplies undone changes
+- [ ] Ctrl+Z triggers undo
+- [ ] Ctrl+Y triggers redo
+- [ ] Buttons disabled appropriately
+- [ ] History indicator shows correct position
+- [ ] No auto-save during undo/redo
+- [ ] Multiple undo/redo operations work correctly
 
 </details>
 
 <details open>
-<summary><h3>Task 6: Create E2E Error Handling Tests</h3></summary>
+<summary><h3>Task 6: Create Error Handling E2E Tests</h3></summary>
 
-**Purpose**: Verify error scenarios are handled gracefully including network errors, validation errors, and backend failures.
+**Purpose**: Test error scenarios and infrastructure layer alert notifications.
 
 **Related Documentation:**
 
-- [Phase 7 - Error Handling](./SETTINGS_FEATURE_P7.md#task-6-handle-save-errors-gracefully) - Error handling details
-- [Phase 4 - Bootstrap Errors](./SETTINGS_FEATURE_P4.md#task-4-handle-settings-load-errors-gracefully) - Bootstrap error handling
+- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Error scenario testing
+- [PlayerService](../../../libs/infrastructure/src/lib/player/player.service.ts) - Alert pattern reference
 
 **Implementation Subtasks:**
 
-- [ ] **Create error handling spec**: New Cypress test file
-- [ ] **Test network errors**: Verify offline/timeout scenarios
-- [ ] **Test backend errors**: Verify 500 error handling
-- [ ] **Test validation errors**: Verify 400 error handling
-- [ ] **Test error recovery**: Verify retry functionality
-- [ ] **Test error preservation**: Verify form state preserved on error
+- [ ] Write test: "shows alert on settings load error"
+- [ ] Write test: "shows alert on settings save error"
+- [ ] Write test: "form remains editable after save error"
+- [ ] Write test: "user can retry save after error"
+- [ ] Write test: "loading indicator disappears on error"
+- [ ] Use failed interceptors to trigger errors
+- [ ] Verify alert component appears with error messages
 
 **Testing Subtask:**
 
-- [ ] **Write Error Handling E2E Tests**: Complete error test scenarios (see Testing section)
+- [ ] Complete Error Handling Test Suite (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Mock various error responses
-- Verify error messages display
-- Test form state preserved on error
-- Test retry mechanisms
-- Verify graceful degradation
-- Test error recovery workflows
-
-**E2E Test Pattern** (structure only):
-
-```typescript
-describe('Settings Error Handling', () => {
-  it('should handle network error gracefully', () => {
-    cy.visit('/settings');
-    cy.intercept('GET', '**/api/settings', { forceNetworkError: true }).as('getError');
-    
-    cy.wait('@getError');
-    cy.get('[data-testid="error-message"]')
-      .should('be.visible')
-      .and('contain', 'Unable to connect');
-  });
-
-  it('should preserve form on save error', () => {
-    cy.visit('/settings');
-    cy.wait('@getSettings');
-    
-    cy.intercept('POST', '**/api/settings', {
-      statusCode: 500,
-      body: { message: 'Internal server error' }
-    }).as('saveError');
-    
-    cy.get('[data-testid="player-repeat-mode"]').click();
-    cy.get('mat-option').contains('All').click();
-    cy.wait(600);
-    
-    cy.wait('@saveError');
-    cy.get('[data-testid="player-repeat-mode"]').should('contain', 'All');
-  });
-});
-```
+- **CRITICAL**: Verify infrastructure layer alerts appear (not component errors)
+- Use interceptors with error responses (status 500, 400, etc.)
+- Test that isSaving flag resets on error
+- Verify form remains editable and functional after errors
+- Test user can make changes and retry save
+- Alert messages should be user-friendly
 
 **Testing Focus for Task 6:**
 
-> Focus on **error resilience** - ensure errors don't break functionality.
+> Test **error handling** - verify errors handled gracefully via alerts.
 
-**E2E Scenarios to Test:**
+**Behaviors to Test (Cypress):**
 
-- [ ] Network error shows appropriate message
-- [ ] Backend 500 error shows server error message
-- [ ] Backend 400 error shows validation message
-- [ ] Form state preserved on error
-- [ ] User can retry after error
-- [ ] Error message dismissable
-- [ ] App remains functional after error
-- [ ] Bootstrap error uses defaults and shows warning
+- [ ] Load errors show alert notification
+- [ ] Save errors show alert notification
+- [ ] Loading indicator hidden on error
+- [ ] Form remains editable after error
+- [ ] isSaving flag reset on error
+- [ ] User can retry operations after error
+- [ ] Error messages clear and actionable
 
 </details>
 
 <details open>
-<summary><h3>Task 7: Create E2E Responsive Design Tests</h3></summary>
+<summary><h3>Task 7: Create Responsive Design E2E Tests</h3></summary>
 
-**Purpose**: Verify settings interface works correctly on mobile and tablet viewports with touch-friendly controls.
+**Purpose**: Test settings view on different viewport sizes (desktop, tablet, mobile).
 
 **Related Documentation:**
 
-- [Style Guide - Responsive Design](../../STYLE_GUIDE.md#responsive-design) - Responsive patterns
-- [E2E Testing Guide - Viewport Testing](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md#viewport-testing) - Viewport patterns
+- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Responsive testing patterns
+- [Style Guide](../../STYLE_GUIDE.md) - Responsive breakpoints
 
 **Implementation Subtasks:**
 
-- [ ] **Create responsive spec**: New Cypress test file
-- [ ] **Test mobile viewport**: Verify layout on small screens
-- [ ] **Test tablet viewport**: Verify layout on medium screens
-- [ ] **Test desktop viewport**: Verify layout on large screens
-- [ ] **Test touch interactions**: Verify touch-friendly controls
-- [ ] **Test card stacking**: Verify cards stack on mobile
+- [ ] Write test: "renders correctly on desktop (1920x1080)"
+- [ ] Write test: "renders correctly on tablet (768x1024)"
+- [ ] Write test: "renders correctly on mobile (375x667)"
+- [ ] Write test: "sections stack vertically on mobile"
+- [ ] Write test: "toolbar remains accessible on mobile"
+- [ ] Write test: "forms usable on touch devices"
+- [ ] Use cy.viewport() to test different sizes
 
 **Testing Subtask:**
 
-- [ ] **Write Responsive E2E Tests**: Complete responsive test scenarios (see Testing section)
+- [ ] Complete Responsive Design Test Suite (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Test multiple viewport sizes
-- Verify layout adapts appropriately
-- Test touch interactions (if supported)
-- Verify scrolling works on all viewports
-- Test button/input sizing for touch
-- Verify text remains readable
-
-**E2E Test Pattern** (structure only):
-
-```typescript
-describe('Settings Responsive Design', () => {
-  const viewports = [
-    { name: 'mobile', width: 375, height: 667 },
-    { name: 'tablet', width: 768, height: 1024 },
-    { name: 'desktop', width: 1920, height: 1080 }
-  ];
-
-  viewports.forEach(viewport => {
-    it(`should display correctly on ${viewport.name}`, () => {
-      cy.viewport(viewport.width, viewport.height);
-      cy.visit('/settings');
-      cy.wait('@getSettings');
-      
-      cy.get('[data-testid="settings-view"]').should('be.visible');
-      cy.get('[data-testid="player-settings-card"]').should('be.visible');
-      
-      // Verify layout specific to viewport
-      if (viewport.name === 'mobile') {
-        // Verify cards stack vertically
-        cy.get('[data-testid="settings-grid"]')
-          .should('have.css', 'grid-template-columns', '1fr');
-      }
-    });
-  });
-});
-```
+- Test at standard breakpoints (desktop, tablet, mobile)
+- Verify card layout adapts to screen size
+- Ensure toolbar buttons accessible on small screens
+- Test form fields usable on touch devices
+- Verify no horizontal scrolling on mobile
+- Test menu and navigation work on all sizes
 
 **Testing Focus for Task 7:**
 
-> Focus on **responsive behavior** - ensure UI works on all devices.
+> Test **responsive design** - verify layout adapts to screen sizes.
 
-**E2E Scenarios to Test:**
+**Behaviors to Test (Cypress):**
 
-- [ ] Settings page displays on mobile viewport
-- [ ] Cards stack vertically on mobile
-- [ ] Settings page displays on tablet viewport
-- [ ] Cards display 2-column on desktop
-- [ ] Form inputs are touch-friendly
-- [ ] Buttons large enough for touch
-- [ ] Text remains readable on mobile
-- [ ] Scrolling works smoothly on all viewports
+- [ ] Desktop layout uses multi-column grid
+- [ ] Tablet layout uses appropriate columns
+- [ ] Mobile layout stacks sections vertically
+- [ ] All controls accessible on mobile
+- [ ] No horizontal overflow on any size
+- [ ] Touch interactions work on mobile
+- [ ] Toolbar buttons accessible on all sizes
 
 </details>
 
 <details open>
-<summary><h3>Task 8: Create E2E Accessibility Tests</h3></summary>
+<summary><h3>Task 8: Create Accessibility (a11y) E2E Tests</h3></summary>
 
-**Purpose**: Verify settings interface meets WCAG 2.1 AA accessibility standards including keyboard navigation, screen reader support, and proper ARIA attributes.
+**Purpose**: Verify WCAG 2.1 AA compliance and keyboard navigation support.
 
 **Related Documentation:**
 
-- [Coding Standards - Accessibility](../../CODING_STANDARDS.md#accessibility) - Accessibility patterns
-- [E2E Testing Guide - Accessibility Testing](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md#accessibility-testing) - A11y patterns
+- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Accessibility testing patterns
+- WCAG 2.1 AA Guidelines - Accessibility standards
+- **Study**: Existing a11y tests in other *.cy.ts files
 
 **Implementation Subtasks:**
 
-- [ ] **Create accessibility spec**: New Cypress test file
-- [ ] **Test keyboard navigation**: Verify Tab key navigation
-- [ ] **Test focus management**: Verify focus indicators
-- [ ] **Test ARIA labels**: Verify descriptive labels
-- [ ] **Test screen reader**: Verify announcements (if tooling supports)
-- [ ] **Test color contrast**: Verify readable text
-- [ ] **Run axe-core**: Automated accessibility checks
+- [ ] Install and configure cypress-axe plugin
+- [ ] Write test: "passes axe accessibility audit"
+- [ ] Write test: "all form fields have labels"
+- [ ] Write test: "keyboard navigation works throughout"
+- [ ] Write test: "focus indicators visible"
+- [ ] Write test: "ARIA attributes present"
+- [ ] Write test: "screen reader compatible"
+- [ ] Use cy.checkA11y() for automated audits
 
 **Testing Subtask:**
 
-- [ ] **Write Accessibility E2E Tests**: Complete accessibility test scenarios (see Testing section)
+- [ ] Complete Accessibility Test Suite (see Testing section below)
 
 **Key Implementation Notes:**
 
-- Use cypress-axe for automated checks
-- Test keyboard-only navigation
-- Verify focus indicators visible
-- Test ARIA attributes present
-- Verify error announcements
-- Test form labels associated
-
-**E2E Test Pattern** (structure only):
-
-```typescript
-describe('Settings Accessibility', () => {
-  beforeEach(() => {
-    cy.visit('/settings');
-    cy.wait('@getSettings');
-    cy.injectAxe(); // Requires cypress-axe
-  });
-
-  it('should have no accessibility violations', () => {
-    cy.checkA11y('[data-testid="settings-view"]');
-  });
-
-  it('should support keyboard navigation', () => {
-    cy.get('body').tab();
-    cy.focused().should('have.attr', 'data-testid', 'player-repeat-mode');
-    
-    cy.focused().tab();
-    // Verify next element focused
-  });
-
-  it('should have proper ARIA labels', () => {
-    cy.get('[data-testid="sid-timer-slider"]')
-      .should('have.attr', 'aria-label')
-      .and('not.be.empty');
-  });
-});
-```
+- Use cypress-axe for automated WCAG 2.1 AA testing
+- Test keyboard-only navigation (tab, enter, space, arrows)
+- Verify focus management and visible focus indicators
+- Test ARIA labels on interactive elements
+- Verify form field label associations
+- Test screen reader support (role attributes)
+- Address any axe violations found
 
 **Testing Focus for Task 8:**
 
-> Focus on **accessibility compliance** - ensure usable by all users.
+> Test **accessibility** - verify WCAG 2.1 AA compliance.
 
-**E2E Scenarios to Test:**
+**Behaviors to Test (Cypress):**
 
-- [ ] No automated accessibility violations (axe-core)
-- [ ] Keyboard navigation works through all fields
-- [ ] Focus indicators are visible
-- [ ] All interactive elements keyboard accessible
-- [ ] Form fields have descriptive labels
-- [ ] Validation errors have ARIA attributes
-- [ ] Buttons have accessible names
-- [ ] Color contrast meets WCAG AA standards
-
-</details>
-
-<details open>
-<summary><h3>Task 9: Implement UI/UX Polish Improvements</h3></summary>
-
-**Purpose**: Address any UX issues discovered during testing and implement final polish touches for production readiness.
-
-**Related Documentation:**
-
-- [Style Guide](../../STYLE_GUIDE.md) - Visual design standards
-- [Component Library](../../COMPONENT_LIBRARY.md) - Component patterns
-
-**Implementation Subtasks:**
-
-- [ ] **Review test findings**: Collect UX issues from E2E testing
-- [ ] **Improve transitions**: Add smooth animations where appropriate
-- [ ] **Enhance feedback**: Improve visual feedback for interactions
-- [ ] **Refine spacing**: Adjust margins/padding for visual balance
-- [ ] **Optimize loading**: Improve perceived performance
-- [ ] **Add help text**: Tooltips or explanations for complex settings
-- [ ] **Polish error messages**: Make errors more actionable
-- [ ] **Add empty states**: Handle edge cases gracefully
-
-**Testing Subtask:**
-
-- [ ] **Manual Testing**: Verify polish improvements enhance UX
-
-**Key Implementation Notes:**
-
-- Focus on issues discovered during E2E testing
-- Small improvements compound to better UX
-- Consider user feedback if available
-- Don't over-animate (keep subtle)
-- Ensure consistency with app design language
-- Test polish changes don't introduce bugs
-
-**Polish Areas** (examples):
-
-- Smooth transitions on card hover
-- Loading skeletons instead of spinners
-- Tooltips explaining search weights
-- Help icon with setting explanations
-- Improved error message wording
-- Empty state for watch folders list
-- Confirmation dialog for reset to defaults
-- Keyboard shortcut legend
-
-**Testing Focus for Task 9:**
-
-> Focus on **user experience** - ensure interface is polished and intuitive.
-
-**Polish Checklist:**
-
-- [ ] Transitions are smooth and purposeful
-- [ ] Visual feedback clear for all interactions
-- [ ] Help text available for complex settings
-- [ ] Error messages actionable and clear
-- [ ] Empty states handle edge cases
-- [ ] Loading states feel fast
-- [ ] Design consistent with app
-- [ ] All interactions feel responsive
-
-</details>
-
-<details open>
-<summary><h3>Task 10: Final Integration and Smoke Testing</h3></summary>
-
-**Purpose**: Perform final integration testing and smoke tests to verify all features work together correctly and the feature is production-ready.
-
-**Related Documentation:**
-
-- [Testing Standards - Integration Testing](../../TESTING_STANDARDS.md#integration-testing) - Integration patterns
-- All previous phase documents - Complete implementation context
-
-**Implementation Subtasks:**
-
-- [ ] **Run all E2E tests**: Verify complete E2E test suite passes
-- [ ] **Run all unit tests**: Verify all layer tests pass
-- [ ] **Run linters**: Verify code quality standards met
-- [ ] **Test complete workflows**: Manual testing of user journeys
-- [ ] **Verify performance**: Check load times and responsiveness
-- [ ] **Test browser compatibility**: Verify works in target browsers
-- [ ] **Review code coverage**: Ensure >90% coverage
-- [ ] **Document known issues**: List any remaining minor issues
-
-**Testing Subtask:**
-
-- [ ] **Execute Final Test Plan**: Complete testing checklist (see Testing section)
-
-**Key Implementation Notes:**
-
-- Run complete test suite (unit + integration + E2E)
-- Manual testing supplements automated tests
-- Test in multiple browsers if possible
-- Check performance metrics
-- Review code coverage reports
-- Document any limitations or known issues
-- Ensure documentation is current
-
-**Final Testing Checklist:**
-
-- [ ] All unit tests pass
-- [ ] All integration tests pass
-- [ ] All E2E tests pass
-- [ ] Linters pass with no errors
-- [ ] Code coverage >90%
-- [ ] Performance acceptable
-- [ ] Works in Chrome, Firefox, Safari, Edge
-- [ ] No console errors or warnings
-- [ ] Documentation complete
-- [ ] Known issues documented
-
-**Testing Focus for Task 10:**
-
-> Focus on **production readiness** - ensure feature is complete and robust.
-
-**Final Verification:**
-
-- [ ] Complete user workflows tested
-- [ ] All features functional
-- [ ] No critical bugs
-- [ ] Performance acceptable
-- [ ] Accessibility compliant
-- [ ] Responsive design works
-- [ ] Error handling robust
-- [ ] Code quality high
-- [ ] Tests comprehensive
-- [ ] Documentation complete
+- [ ] No axe accessibility violations
+- [ ] All form fields have associated labels
+- [ ] Keyboard navigation reaches all controls
+- [ ] Focus indicators clearly visible
+- [ ] ARIA labels present on icon buttons
+- [ ] Semantic HTML structure maintained
+- [ ] Color contrast meets WCAG standards
+- [ ] Form validation errors announced properly
 
 </details>
 
@@ -832,96 +479,139 @@ describe('Settings Accessibility', () => {
 
 ## ✅ Success Criteria
 
-> Mark these checkboxes as you validate each criterion.
+> All criteria must be met for feature completion.
 
-- [ ] **E2E Tests Complete**: All E2E test scenarios implemented
-- [ ] **All Tests Pass**: Unit, integration, and E2E tests pass
-- [ ] **Accessibility Compliant**: Meets WCAG 2.1 AA standards
-- [ ] **Responsive Design**: Works on mobile, tablet, desktop
-- [ ] **Error Handling**: All error scenarios handled gracefully
-- [ ] **UI Polish**: Interface is polished and intuitive
-- [ ] **Performance**: Load times and interactions feel responsive
-- [ ] **Browser Compatibility**: Works in all target browsers
-- [ ] **Code Quality**: Linters pass, coverage >90%
-- [ ] **Documentation**: All documentation complete and current
-- [ ] **Production Ready**: Feature ready for release
+**E2E Testing Infrastructure:**
+
+- [ ] Interceptors created for all Settings endpoints
+- [ ] Data generators produce realistic test data
+- [ ] Constants file defines all selectors
+- [ ] Fixtures provide baseline test data
+- [ ] Infrastructure follows E2E_TESTS.md patterns exactly
+
+**Test Coverage:**
+
+- [ ] Navigation and load tests (6 tests)
+- [ ] Form interaction tests (7 tests)
+- [ ] Auto-save tests (7 tests)
+- [ ] Undo/redo tests (8 tests)
+- [ ] Error handling tests (7 tests)
+- [ ] Responsive design tests (7 tests)
+- [ ] Accessibility tests (8 tests)
+- [ ] **Total: 50 E2E tests minimum**
+
+**Quality Assurance:**
+
+- [ ] All E2E tests passing consistently
+- [ ] No flaky tests (intermittent failures)
+- [ ] Tests run in reasonable time (<5 minutes)
+- [ ] WCAG 2.1 AA compliance verified
+- [ ] Responsive design validated
+- [ ] Error scenarios thoroughly tested
+
+**User Experience:**
+
+- [ ] All interactions smooth and intuitive
+- [ ] Visual feedback clear and timely
+- [ ] Error messages helpful and actionable
+- [ ] Loading states prevent confusion
+- [ ] Keyboard shortcuts discoverable
+
+**Production Ready:**
+
+- [ ] All unit tests passing (Phases 1-8)
+- [ ] All E2E tests passing (Phase 9)
+- [ ] No console errors or warnings
+- [ ] Performance acceptable
+- [ ] Documentation complete
 
 ---
 
 ## 🧪 Testing Summary
 
-### Testing Approach
+> Comprehensive E2E test coverage for production readiness.
 
-This phase focuses on **comprehensive E2E testing and production readiness**:
+**Test Distribution:**
 
-1. **Navigation E2E**: Verify settings access
-2. **Form Interaction E2E**: Verify all inputs work
-3. **Auto-Save E2E**: Verify save functionality
-4. **Undo/Redo E2E**: Verify history navigation
-5. **Validation E2E**: Verify data validation
-6. **Error Handling E2E**: Verify error scenarios
-7. **Responsive E2E**: Verify viewport adaptation
-8. **Accessibility E2E**: Verify WCAG compliance
-9. **Polish**: Verify UX improvements
-10. **Integration**: Verify complete feature
+- **E2E Tests**: 50+ tests across 8 test suites (navigation, forms, auto-save, undo/redo, errors, responsive, a11y)
+- **Infrastructure**: Interceptors, generators, constants, fixtures
+- **Total Feature Tests**: ~460 tests (300 unit, 50 integration, 110 E2E)
 
-### Test Types Summary
+**Testing Tools:**
 
-| Phase | Unit | Integration | E2E | Total |
-|-------|------|-------------|-----|-------|
-| P1 | Manual | - | - | Manual |
-| P2 | ✓ | ✓ | - | ~50 tests |
-| P3 | ✓ | ✓ | - | ~80 tests |
-| P4 | ✓ | ✓ | - | ~20 tests |
-| P5 | ✓ | - | ✓ | ~30 tests |
-| P6 | ✓ | ✓ | - | ~60 tests |
-| P7 | ✓ | ✓ | - | ~40 tests |
-| P8 | ✓ | ✓ | - | ~40 tests |
-| P9 | - | - | ✓ | ~80 tests |
-| **Total** | **~300+** | **~50+** | **~110+** | **~460+ tests** |
+- **Framework**: Cypress for all E2E tests
+- **Patterns**: Follow [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) exactly
+- **Accessibility**: cypress-axe for WCAG 2.1 AA testing
+- **Mocking**: Interceptors for API responses, generators for test data
 
-### Testing Standards Reference
+**Key Testing Patterns:**
 
-- Follow [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) for Cypress patterns
-- Use [Testing Standards](../../TESTING_STANDARDS.md) for behavioral approach
-- Achieve >90% code coverage
-- Test all user workflows end-to-end
+1. **Infrastructure Setup** (Task 1):
+   - Interceptors for API mocking (following existing patterns)
+   - Generators for dynamic test data
+   - Constants for selector centralization
+   - Fixtures for baseline data
 
----
+2. **Navigation Testing** (Task 2):
+   - Route navigation and view rendering
+   - Initial data load with loading states
+   - Error scenario handling with alerts
 
-## 📝 Implementation Notes
+3. **Form Testing** (Task 3):
+   - All form field types and interactions
+   - FormArray dynamic behavior
+   - Validation and error display
 
-> Track discoveries, decisions, and issues encountered during implementation.
+4. **Auto-Save Testing** (Task 4):
+   - Debounced save behavior with cy.clock()
+   - Loading indicators during saves
+   - Success and error scenarios with alerts
 
-### Discoveries During Implementation
+5. **Undo/Redo Testing** (Task 5):
+   - Button and keyboard shortcut interactions
+   - History navigation accuracy
+   - Auto-save prevention during undo/redo
 
-- [Add notes here as you implement]
+6. **Error Handling Testing** (Task 6):
+   - Infrastructure layer alert notifications
+   - Error recovery and retry capability
+   - State management during errors
 
-### Blockers & Questions
+7. **Responsive Testing** (Task 7):
+   - Multiple viewport sizes
+   - Layout adaptation
+   - Touch device compatibility
 
-- [Document any blockers or questions here]
+8. **Accessibility Testing** (Task 8):
+   - WCAG 2.1 AA compliance via axe
+   - Keyboard navigation
+   - Screen reader support
 
-### Deviations from Plan
+**Coverage Goals:**
 
-- [Note any changes from the original plan and why]
-
-### Known Issues
-
-- [Document any minor issues that don't block release]
-
----
-
-## 🔗 Related Documentation
-
-- **Previous Phase**: [Phase 8 - Undo/Redo with Keyboard Shortcuts](./SETTINGS_FEATURE_P8.md)
-- **Feature Overview**: [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md)
-- **E2E Testing**: [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md)
-- **All Previous Phases**: P1-P8 implementation documents
-- **Production Checklist**: Verify all success criteria met
+- **E2E Tests**: 100% of user-facing workflows
+- **Error Scenarios**: All failure paths tested with infrastructure alerts
+- **Accessibility**: WCAG 2.1 AA compliance verified
+- **Responsive**: All major viewport sizes validated
 
 ---
 
-_Phase Status: Ready for Implementation_
-_Last Updated: 2025-01-11_
-_Estimated Effort: 6-8 hours_
-_Completion: Final Phase - Feature Production Ready After This Phase_
+## 🎯 Estimated Effort
+
+**Total Phase Time**: 6-8 hours
+
+**Task Breakdown:**
+
+- Task 1 (E2E Infrastructure): 90 minutes
+- Task 2 (Navigation Tests): 45 minutes
+- Task 3 (Form Tests): 60 minutes
+- Task 4 (Auto-Save Tests): 60 minutes
+- Task 5 (Undo/Redo Tests): 60 minutes
+- Task 6 (Error Handling Tests): 45 minutes
+- Task 7 (Responsive Tests): 45 minutes
+- Task 8 (Accessibility Tests): 60 minutes
+- Test Debugging and Polish: 60 minutes
+
+**Total Feature Effort**: ~35-45 hours across all 9 phases
+
+**Milestone**: Settings feature 100% complete and production-ready with comprehensive test coverage.
