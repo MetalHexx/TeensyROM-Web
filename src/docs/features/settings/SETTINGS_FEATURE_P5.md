@@ -2,7 +2,7 @@
 
 ## 🎯 Objective
 
-Create the settings feature library with the main view component that displays settings in a card-based layout. This phase establishes the visual structure, navigation integration, and store connection without form interactivity yet. The view displays current settings values in a read-only card layout, providing the foundation for Phase 6's reactive forms implementation.
+Generate the settings feature library and create the settings view component with card-based layout structure following the player-view pattern. This establishes the feature shell that will house section components in Phase 6, integrates with navigation, and provides the visual structure for the settings interface.
 
 ---
 
@@ -17,41 +17,35 @@ Create the settings feature library with the main view component that displays s
 
 **Standards & Guidelines:**
 
-- [ ] [Coding Standards](../../CODING_STANDARDS.md) - Component patterns and conventions
-- [ ] [Smart Component Testing](../../SMART_COMPONENT_TESTING.md) - Component testing patterns
-- [ ] [Style Guide](../../STYLE_GUIDE.md) - Visual design system
-- [ ] [Component Library](../../COMPONENT_LIBRARY.md) - Reusable components (lib-scaling-card)
+- [ ] [Coding Standards](../../CODING_STANDARDS.md) - Component structure and Angular patterns
+- [ ] [Navigation Standards](../../NAVIGATION_STANDARDS.md) - Navigation and routing patterns
+- [ ] [Style Guide](../../STYLE_GUIDE.md) - UI styling standards
 - [ ] [NX Library Standards](../../NX_LIBRARY_STANDARDS.md) - Feature library organization
-- [ ] [Testing Standards](../../TESTING_STANDARDS.md) - Testing approaches
 
 **Reference Implementations:**
 
-- [ ] [Player View Component](../../../libs/features/player/src/lib/player-view/player-view.component.ts) - Similar card-based layout pattern
-- [ ] [Device View Component](../../../libs/features/device/src/lib/device-view/device-view.component.ts) - Card layout reference
+- [ ] [PlayerViewComponent](../../../libs/features/player/src/lib/player-view/) - Reference view structure with child components
+- [ ] [Player Device Container](../../../libs/features/player/src/lib/player-view/player-device-container/) - Card-based component pattern
+- [ ] [DeviceViewComponent](../../../libs/features/device/src/lib/device-view/) - Alternative view pattern
 
 ---
 
 ## 📂 File Structure Overview
 
-> New feature library and view component.
+> New feature library with view component.
 
 ```
 libs/features/settings/
-├── project.json                              ✨ New - Nx project configuration
 ├── src/
-│   ├── index.ts                              ✨ New - Barrel export
+│   ├── index.ts                              ✨ New - Feature barrel export
 │   └── lib/
-│       ├── settings.routes.ts                ✨ New - Feature routing
 │       └── settings-view/
-│           ├── settings-view.component.ts    ✨ New - Main view component
-│           ├── settings-view.component.html  ✨ New - Component template
-│           ├── settings-view.component.scss  ✨ New - Component styles
-│           └── settings-view.component.spec.ts ✨ New - Component tests
-
-apps/teensyrom-ui/src/app/
-├── app.routes.ts                             📝 Modified - Add settings route
-└── navigation/
-    └── navigation.service.ts                 📝 Modified - Add settings menu item
+│           ├── settings-view.component.ts    ✨ New - Smart container component
+│           ├── settings-view.component.html  ✨ New - View template
+│           ├── settings-view.component.scss  ✨ New - View styles
+│           └── settings-view.component.spec.ts ✨ New - View tests
+├── project.json                              ✨ New - NX project configuration
+└── tsconfig.json                             ✨ New - TypeScript configuration
 ```
 
 ---
@@ -59,505 +53,209 @@ apps/teensyrom-ui/src/app/
 <details open>
 <summary><h3>Task 1: Generate Settings Feature Library</h3></summary>
 
-**Purpose**: Create the settings feature library following Nx workspace conventions. This establishes proper module boundaries and dependency constraints.
+**Purpose**: Create the NX feature library using the Angular component generator to establish proper project structure.
 
 **Related Documentation:**
 
-- [NX Library Standards](../../NX_LIBRARY_STANDARDS.md) - Feature library patterns
-- [Dependency Constraints](../../DEPENDENCY_CONSTRAINTS_PLAN.md) - Layer boundaries
+- [NX Library Standards](../../NX_LIBRARY_STANDARDS.md) - Library organization patterns
+- [Coding Standards](../../CODING_STANDARDS.md) - Angular component patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Generate library**: Run `nx generate @nx/angular:library settings --directory=libs/features/settings --tags=scope:features,feature:settings`
-- [ ] **Configure project**: Verify project.json has correct tags and configuration
-- [ ] **Update tsconfig**: Ensure library path mapping in root tsconfig
-- [ ] **Verify boundaries**: Check ESLint dependency constraints enforce boundaries
-- [ ] **Export barrel**: Create index.ts with public API exports
+- [ ] **Generate library**: Run `pnpm nx g @nx/angular:library` with settings feature options
+- [ ] **Configure library**: Set up feature library with proper tags and dependencies
+- [ ] **Generate component**: Create settings-view component with `--standalone` flag
+- [ ] **Update barrel exports**: Export SettingsViewComponent from feature index.ts
+- [ ] **Verify structure**: Check project.json and tsconfig.json generated correctly
 
 **Testing Subtask:**
 
-- [ ] **Verify Library Generation**: Check library builds and lints successfully
+- [ ] **Verify Generation**: Build library to ensure no errors
 
 **Key Implementation Notes:**
 
-- Use Nx CLI generator to ensure proper configuration
-- Feature libraries are tagged with `scope:features` and `feature:settings`
-- Library can depend on: application, domain, shared, infrastructure
-- Library cannot depend on: other features, app layer
-- Follow existing feature library structure (player, device) as reference
-
-**Library Generation Command**:
-
-```bash
-nx generate @nx/angular:library settings \
-  --directory=libs/features/settings \
-  --tags=scope:features,feature:settings \
-  --standalone
-```
-
-**Testing Focus for Task 1:**
-
-> Focus on **library setup** - ensure proper Nx configuration.
-
-**Behaviors to Verify:**
-
-- [ ] Library generates without errors
-- [ ] Project.json has correct tags
-- [ ] Library builds successfully: `nx build settings`
-- [ ] Library lints successfully: `nx lint settings`
-- [ ] ESLint enforces dependency constraints
+- Use NX generators for consistency
+- Feature library tags: `scope:features`, `feature:settings`
+- Component should be standalone (Angular 19 pattern)
+- Follow existing feature library structure (player, device)
+- Library dependencies: application (store), domain (contracts), shared UI components
 
 </details>
 
 <details open>
-<summary><h3>Task 2: Create Settings View Component</h3></summary>
+<summary><h3>Task 2: Create Settings View Component Structure</h3></summary>
 
-**Purpose**: Create the main settings view component with card-based layout structure. This component will display all settings sections using scaling card components.
+**Purpose**: Implement the smart container component that will coordinate settings state, forms, and child section components.
 
 **Related Documentation:**
 
-- [Coding Standards - Component Structure](../../CODING_STANDARDS.md#component-structure) - Component patterns
-- [Component Library - lib-scaling-card](../../COMPONENT_LIBRARY.md#lib-scaling-card) - Card component usage
-- [Player View Component](../../../libs/features/player/src/lib/player-view/player-view.component.ts) - Reference pattern
+- [Coding Standards - Component Structure](../../CODING_STANDARDS.md#component-structure)
+- [PlayerViewComponent](../../../libs/features/player/src/lib/player-view/player-view.component.ts) - Reference smart container pattern
 
 **Implementation Subtasks:**
 
-- [ ] **Generate component**: Create `settings-view` component in feature library
-- [ ] **Add component decorator**: Configure standalone component with imports
-- [ ] **Inject SettingsStore**: Use `inject()` to get store instance
-- [ ] **Create card layout**: Add 4 `lib-scaling-card` instances for sections
-- [ ] **Add page header**: Include "Application Settings" title with subtitle
-- [ ] **Add loading state**: Show skeleton or spinner during initial load
-- [ ] **Add error state**: Display error message if settings fail to load
-- [ ] **Add empty state**: Handle case where settings haven't loaded yet
+- [ ] **Inject SettingsStore**: Add store injection for state management
+- [ ] **Create component class**: Smart container with signal-based state
+- [ ] **Add metadata**: Component decorator with selector, template, styles
+- [ ] **Import dependencies**: Import necessary modules (ReactiveFormsModule, Material, etc.)
+- [ ] **Add computed signals**: Derive needed state from store signals
+- [ ] **Structure for sections**: Prepare for section components to be added in Phase 6
 
 **Testing Subtask:**
 
-- [ ] **Write Component Tests**: Test rendering and state display (see Testing section)
+- [ ] **Write Component Tests**: Basic component instantiation tests using Vitest
 
 **Key Implementation Notes:**
 
-- Use standalone component pattern (imports array, no module)
-- Inject store using `inject()` function (modern DI pattern)
-- Use Material components for layout (MatCard if not using lib-scaling-card)
-- Follow player view pattern for header and layout structure
-- Use `@if` control flow for conditional rendering
-- Display read-only values initially (forms in Phase 6)
-
-**Component Structure Pattern** (reference only):
-
-```typescript
-@Component({
-  selector: 'lib-settings-view',
-  standalone: true,
-  imports: [
-    CommonModule,
-    ScalingCardComponent,
-    MatIconModule,
-    // ... other imports
-  ],
-  templateUrl: './settings-view.component.html',
-  styleUrls: ['./settings-view.component.scss']
-})
-export class SettingsViewComponent {
-  private readonly store = inject(SettingsStore);
-  
-  // Expose signals for template
-  settings = this.store.settings;
-  isLoading = this.store.isLoading;
-  error = this.store.error;
-}
-```
-
-**Template Pattern** (structure only):
-
-```html
-<div class="settings-view">
-  <header class="settings-header">
-    <h1>Application Settings</h1>
-    <p>Configure TeensyROM behavior and preferences</p>
-  </header>
-
-  @if (isLoading()) {
-    <div class="loading-state">Loading settings...</div>
-  } @else if (error()) {
-    <div class="error-state">{{ error() }}</div>
-  } @else {
-    <div class="settings-grid">
-      <lib-scaling-card title="Player Settings">
-        <!-- Player section content - Phase 6 -->
-      </lib-scaling-card>
-      
-      <lib-scaling-card title="File Transfer">
-        <!-- File Transfer section content - Phase 6 -->
-      </lib-scaling-card>
-      
-      <lib-scaling-card title="Search">
-        <!-- Search section content - Phase 6 -->
-      </lib-scaling-card>
-      
-      <lib-scaling-card title="Application">
-        <!-- App section content - Phase 6 -->
-      </lib-scaling-card>
-    </div>
-  }
-</div>
-```
-
-**Testing Focus for Task 2:**
-
-> Focus on **component rendering** - ensure component displays correctly.
-
-**Behaviors to Test:**
-
-- [ ] Component renders without errors
-- [ ] Header displays "Application Settings" title
-- [ ] Four scaling cards render when settings loaded
-- [ ] Loading state displays when `isLoading` is true
-- [ ] Error state displays when `error` is present
-- [ ] Store is injected correctly
-- [ ] Signals are exposed to template
+- Smart container owns reactive form (Phase 6)
+- Injects store for state management
+- Coordinates auto-save, undo/redo (Phases 7-8)
+- Use signal inputs and outputs following Angular 19 patterns
+- Reference PlayerViewComponent for smart container patterns
+- Keep component focused on coordination, not presentation
 
 </details>
 
 <details open>
-<summary><h3>Task 3: Style Settings View Component</h3></summary>
+<summary><h3>Task 3: Implement Card-Based Layout</h3></summary>
 
-**Purpose**: Apply SCSS styling to create an attractive, responsive card grid layout following the application's design system.
+**Purpose**: Create the visual layout structure using Material cards for section grouping following the player-view component hierarchy pattern.
 
 **Related Documentation:**
 
-- [Style Guide](../../STYLE_GUIDE.md) - Design system and utility classes
-- [Coding Standards - SCSS](../../CODING_STANDARDS.md#scss-conventions) - SCSS patterns
-- [Player View Styles](../../../libs/features/player/src/lib/player-view/player-view.component.scss) - Reference styles
+- [Style Guide](../../STYLE_GUIDE.md) - UI styling patterns and utility classes
+- [Player Device Container](../../../libs/features/player/src/lib/player-view/player-device-container/) - Reference card layout with child components
 
 **Implementation Subtasks:**
 
-- [ ] **Create card grid**: Use CSS Grid for responsive 2-column layout
-- [ ] **Style header**: Typography and spacing for title/subtitle
-- [ ] **Style loading state**: Center spinner or skeleton
-- [ ] **Style error state**: Error message display with appropriate color
-- [ ] **Add responsive breakpoints**: Single column on mobile, two columns on desktop
-- [ ] **Apply theme colors**: Use Material theme variables for consistency
-- [ ] **Add spacing utilities**: Use margin/padding from style guide
+- [ ] **Add container div**: Main settings container element
+- [ ] **Use Material cards**: Mat-card components for visual grouping (to be added to child section components in Phase 6)
+- [ ] **Add flex layout**: Use CSS flexbox for responsive layout
+- [ ] **Style container**: Add SCSS styles for spacing and layout
+- [ ] **Prepare for sections**: Structure ready for section component insertion
+- [ ] **Reference player styles**: Follow similar patterns from player view components
 
 **Testing Subtask:**
 
-- [ ] **Manual Visual Testing**: Verify layout at different screen sizes
+- [ ] **Visual Verification**: Run app to verify layout structure
 
 **Key Implementation Notes:**
 
-- Use CSS Grid for card layout (more flexible than flexbox for this use case)
-- Follow existing player/device view styling patterns
-- Use Material Design spacing scale (8px base unit)
-- Apply theme colors via CSS custom properties
-- Ensure cards scale properly on different viewports
-- Use utility classes from style guide when appropriate
-
-**Grid Layout Pattern** (reference only):
-
-```scss
-.settings-view {
-  padding: var(--spacing-md);
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.settings-header {
-  margin-bottom: var(--spacing-lg);
-  
-  h1 {
-    font-size: 2rem;
-    margin-bottom: var(--spacing-xs);
-  }
-  
-  p {
-    color: var(--text-secondary);
-  }
-}
-
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-  gap: var(--spacing-md);
-  
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-}
-```
-
-**Testing Focus for Task 3:**
-
-> Focus on **visual presentation** - ensure layout is attractive and responsive.
-
-**Visual Testing Checklist:**
-
-- [ ] Cards arrange in 2-column grid on desktop
-- [ ] Cards stack in single column on mobile
-- [ ] Header typography is clear and readable
-- [ ] Spacing is consistent with design system
-- [ ] Colors match application theme
-- [ ] Loading/error states are visually distinct
-- [ ] Layout works at various viewport sizes
+- Cards will be on individual section components (Phase 6), not view wrapper
+- View component provides container structure
+- Use Material Design spacing (8px grid)
+- Responsive layout (stack on mobile, grid on desktop)
+- Reference PlayerViewComponent and child components for layout patterns
+- Section components (Phase 6) will each have their own cards
+- Follow player-view component tree structure
 
 </details>
 
 <details open>
-<summary><h3>Task 4: Add Settings Navigation Menu Item</h3></summary>
+<summary><h3>Task 4: Add Navigation Integration</h3></summary>
 
-**Purpose**: Add a settings menu item to the application navigation, allowing users to access the settings view.
+**Purpose**: Integrate settings route into application navigation system using established navigation patterns.
 
 **Related Documentation:**
 
-- [Navigation Service](../../../apps/teensyrom-ui/src/app/navigation/navigation.service.ts) - Navigation configuration
-- [Coding Standards - Navigation](../../CODING_STANDARDS.md#navigation-patterns) - Navigation patterns
+- [Navigation Standards](../../NAVIGATION_STANDARDS.md) - Navigation and routing patterns
+- [Navigation Constants](../../../libs/app/navigation/src/lib/navigation.constants.ts) - Centralized navigation configuration
+- [App Routes](../../../apps/teensyrom-ui/src/app/app.routes.ts) - Route configuration
 
 **Implementation Subtasks:**
 
-- [ ] **Update navigation service**: Add settings menu item to nav configuration
-- [ ] **Add settings icon**: Use Material icon `settings`
-- [ ] **Set route path**: Point to `/settings` route
-- [ ] **Position in menu**: Place appropriately in menu order
-- [ ] **Add accessibility**: Include aria-label for screen readers
+- [ ] **Verify ROUTES constant**: Check that 'settings' route already exists in navigation.constants.ts
+- [ ] **Verify NAV_ITEMS**: Check that settings nav item already exists with icon and title
+- [ ] **Add route to app.routes.ts**: Add lazy-loaded settings route with data.title
+- [ ] **Test navigation**: Verify clicking settings nav item navigates to settings view
+- [ ] **Verify route resolver**: Determine if settings needs route resolver (likely not)
 
 **Testing Subtask:**
 
-- [ ] **Write Navigation Tests**: Test menu item renders and routes correctly (see Testing section)
+- [ ] **Navigation Tests**: Manual testing of navigation flow
 
 **Key Implementation Notes:**
 
-- Follow existing navigation item pattern
-- Use Material Icons icon set
-- Consider menu item placement (likely after player/device items)
-- Ensure keyboard navigation works
-- Test navigation item displays in menu
-
-**Navigation Item Pattern** (reference only):
-
-```typescript
-{
-  label: 'Settings',
-  icon: 'settings',
-  route: '/settings',
-  ariaLabel: 'Application settings'
-}
-```
-
-**Testing Focus for Task 4:**
-
-> Focus on **navigation integration** - ensure menu item works correctly.
-
-**Behaviors to Test:**
-
-- [ ] Settings menu item appears in navigation
-- [ ] Clicking item navigates to `/settings`
-- [ ] Icon displays correctly
-- [ ] Active state shows when on settings route
-- [ ] Keyboard navigation works
-- [ ] Screen reader announces item correctly
+- Settings route and nav item may already exist in navigation constants
+- Use lazy loading pattern: `loadComponent: () => import(...)`
+- Set `data: { title: 'Settings' }` for page title
+- No route resolver needed (bootstrap handles initialization)
+- Follow exact pattern from player and device routes
+- Reference NAVIGATION_STANDARDS.md for complete patterns
 
 </details>
 
 <details open>
-<summary><h3>Task 5: Configure Settings Route</h3></summary>
+<summary><h3>Task 5: Write Component Tests</h3></summary>
 
-**Purpose**: Add the `/settings` route to the application routing configuration with lazy loading for optimal performance.
+**Purpose**: Create Vitest tests for the settings view component verifying rendering, store integration, and component behavior.
 
 **Related Documentation:**
 
-- [App Routes](../../../apps/teensyrom-ui/src/app/app.routes.ts) - Application routing
-- [Coding Standards - Routing](../../CODING_STANDARDS.md#routing-patterns) - Routing patterns
+- [Smart Component Testing](../../SMART_COMPONENT_TESTING.md) - Component testing patterns
+- [Testing Standards](../../TESTING_STANDARDS.md) - Testing approaches
 
 **Implementation Subtasks:**
 
-- [ ] **Create settings.routes.ts**: Define feature routes in library
-- [ ] **Add default route**: Map empty path to settings view component
-- [ ] **Update app.routes.ts**: Add lazy-loaded settings route
-- [ ] **Test route navigation**: Verify `/settings` loads component
-- [ ] **Test route guards**: Ensure no guards block access (settings should be public)
+- [ ] **Create settings-view.component.spec.ts**: Component test file using Vitest
+- [ ] **Setup TestBed**: Configure testing module with mock store
+- [ ] **Test component creation**: Verify component instantiates
+- [ ] **Test store injection**: Verify store properly injected
+- [ ] **Test rendering**: Verify template renders correctly
+- [ ] **Mock SettingsStore**: Use TestBed providers for mock store
+- [ ] **Test signal subscriptions**: Verify component reacts to store changes
 
 **Testing Subtask:**
 
-- [ ] **Write Routing Tests**: Test route configuration (see Testing section)
+- [ ] **Run Tests**: Execute `pnpm nx test settings --testFile=settings-view.component.spec.ts`
 
 **Key Implementation Notes:**
 
-- Use lazy loading for better initial load performance
-- Feature routes defined in library, imported by app
-- Settings should be accessible without authentication (if app has auth)
-- Follow existing player/device route patterns
-- Ensure route works with or without trailing slash
-
-**Route Configuration Pattern** (reference only):
-
-```typescript
-// libs/features/settings/src/lib/settings.routes.ts
-export const SETTINGS_ROUTES: Routes = [
-  {
-    path: '',
-    component: SettingsViewComponent
-  }
-];
-
-// apps/teensyrom-ui/src/app/app.routes.ts
-{
-  path: 'settings',
-  loadChildren: () => import('@teensyrom/features/settings').then(m => m.SETTINGS_ROUTES)
-}
-```
-
-**Testing Focus for Task 5:**
-
-> Focus on **routing functionality** - ensure route loads component correctly.
-
-**Behaviors to Test:**
-
-- [ ] Navigating to `/settings` loads SettingsViewComponent
-- [ ] Route lazy loads (not in initial bundle)
-- [ ] Route works with browser back/forward
-- [ ] Route updates browser URL correctly
-- [ ] Direct navigation to `/settings` works (deep linking)
+- Use Vitest (NOT Jasmine) for testing
+- Mock SettingsStore with signal-based API
+- Test component behavior, not implementation
+- Shallow rendering (mock child components when added in Phase 6)
+- Focus on store integration and state management
+- Reference PlayerViewComponent tests for patterns
 
 </details>
 
 <details open>
-<summary><h3>Task 6: Connect Component to Settings Store</h3></summary>
+<summary><h3>Task 6: Setup E2E Test Infrastructure</h3></summary>
 
-**Purpose**: Wire up the settings view component to display actual settings values from the store. This creates a live, reactive connection between store state and UI.
-
-**Related Documentation:**
-
-- [Settings Store - Selectors](./SETTINGS_FEATURE_P3.md#task-9-implement-computed-selectors) - Available store selectors
-- [Coding Standards - Signals](../../CODING_STANDARDS.md#signals) - Signal usage patterns
-
-**Implementation Subtasks:**
-
-- [ ] **Expose store signals**: Make store signals available in component template
-- [ ] **Display player settings**: Show repeat mode, timer, auto-advance, launch on startup
-- [ ] **Display file transfer settings**: Show watch folders enabled, folders list, auto-launch
-- [ ] **Display search settings**: Show weights, stop words, metadata search, hidden files
-- [ ] **Display app settings**: Show setup completed status
-- [ ] **Format values**: Use pipes for formatting (e.g., time display, boolean labels)
-
-**Testing Subtask:**
-
-- [ ] **Write Store Integration Tests**: Test component displays store values (see Testing section)
-
-**Key Implementation Notes:**
-
-- Use store signals directly in template (reactive)
-- No need to subscribe - signals handle reactivity
-- Format values for user-friendly display
-- Consider using pipes for formatting (e.g., seconds to minutes)
-- Display arrays as lists (watch folders, stop words)
-- Show boolean values as Yes/No or checkmarks
-
-**Template Integration Pattern** (reference only):
-
-```html
-<lib-scaling-card title="Player Settings">
-  <div class="setting-row">
-    <span class="setting-label">Repeat Mode:</span>
-    <span class="setting-value">{{ settings().player.repeatMode }}</span>
-  </div>
-  <div class="setting-row">
-    <span class="setting-label">SID Timer:</span>
-    <span class="setting-value">{{ settings().player.sidTimerSeconds }} seconds</span>
-  </div>
-  <!-- ... other player settings -->
-</lib-scaling-card>
-```
-
-**Testing Focus for Task 6:**
-
-> Focus on **data binding** - ensure store values display correctly.
-
-**Behaviors to Test:**
-
-- [ ] Component displays player settings from store
-- [ ] Component displays file transfer settings from store
-- [ ] Component displays search settings from store
-- [ ] Component displays app settings from store
-- [ ] Values update when store signals change
-- [ ] Arrays display as readable lists
-- [ ] Boolean values display as Yes/No
-- [ ] Formatting is user-friendly
-
-</details>
-
-<details open>
-<summary><h3>Task 7: Add E2E Navigation Tests</h3></summary>
-
-**Purpose**: Create end-to-end tests that verify users can navigate to settings and see the settings view with all sections displayed.
+**Purpose**: Prepare E2E testing infrastructure for settings feature following the established interceptor/fixture/generator patterns.
 
 **Related Documentation:**
 
-- [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - Cypress patterns
-- [Testing Standards - E2E](../../TESTING_STANDARDS.md#e2e-testing) - E2E approach
+- **IMPORTANT**: [E2E Testing Standards](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - **READ THIS ENTIRE DOCUMENT AND ALL LINKED DOCUMENTATION**
+- [E2E Fixtures](../../../apps/teensyrom-ui-e2e/src/support/test-data/fixtures/E2E_FIXTURES.md) - Fixture patterns
+- [E2E Interceptors](../../../apps/teensyrom-ui-e2e/src/support/interceptors/E2E_INTERCEPTORS.md) - Interceptor patterns
+- [E2E Generators](../../../apps/teensyrom-ui-e2e/src/support/test-data/generators/E2E_TEST_GENERATORS.md) - Generator patterns
+- [Backend Settings Endpoints](https://github.com/MetalHexx/TeensyROM-Web/tree/main/src/apps/api/src/TeensyRom.Api/Endpoints/Settings) - Endpoints to mock
 
 **Implementation Subtasks:**
 
-- [ ] **Create settings E2E spec**: New Cypress test file
-- [ ] **Test navigation click**: Verify clicking settings menu item navigates
-- [ ] **Test route URL**: Verify URL changes to `/settings`
-- [ ] **Test view renders**: Verify settings view component displays
-- [ ] **Test cards display**: Verify all 4 section cards are visible
-- [ ] **Test loading state**: Verify loading indicator appears briefly
-- [ ] **Test error state**: Verify error displays if backend fails
+- [ ] **Create settings fixtures**: Define pre-built settings data in fixtures/settings.fixture.ts
+- [ ] **Create settings generators**: Factory functions for dynamic settings data in generators/settings.generators.ts
+- [ ] **Create settings interceptors**: Wrapper functions for cy.intercept in interceptors/settings.interceptors.ts
+- [ ] **Add route constants**: Settings routes in constants/routes.ts
+- [ ] **Create test helpers**: Selectors and navigation helpers in e2e/settings/test-helpers.ts
+- [ ] **Reference backend endpoints**: Study GET/POST settings endpoints for accurate mocking
 
 **Testing Subtask:**
 
-- [ ] **Write E2E Tests**: Create Cypress tests for settings navigation (see Testing section)
+- [ ] **Verify Infrastructure**: Test that interceptors work with fixtures/generators
 
 **Key Implementation Notes:**
 
-- Follow existing E2E patterns in player/device specs
-- Use Cypress best practices (data-testid attributes)
-- Test user journey, not implementation details
-- Mock backend responses for consistent tests
-- Test both success and error scenarios
-
-**E2E Test Pattern** (reference only):
-
-```typescript
-describe('Settings Navigation', () => {
-  beforeEach(() => {
-    cy.visit('/');
-    cy.intercept('GET', '/api/settings', { fixture: 'settings.json' }).as('getSettings');
-  });
-
-  it('should navigate to settings page', () => {
-    cy.get('[data-testid="nav-settings"]').click();
-    cy.url().should('include', '/settings');
-    cy.get('[data-testid="settings-view"]').should('be.visible');
-  });
-
-  it('should display all settings sections', () => {
-    cy.visit('/settings');
-    cy.wait('@getSettings');
-    
-    cy.get('[data-testid="player-settings-card"]').should('be.visible');
-    cy.get('[data-testid="file-transfer-card"]').should('be.visible');
-    cy.get('[data-testid="search-settings-card"]').should('be.visible');
-    cy.get('[data-testid="app-settings-card"]').should('be.visible');
-  });
-});
-```
-
-**Testing Focus for Task 7:**
-
-> Focus on **user experience** - ensure users can access and view settings.
-
-**E2E Test Scenarios:**
-
-- [ ] User clicks settings menu item and navigates to settings page
-- [ ] Settings page URL is `/settings`
-- [ ] Settings view displays with header
-- [ ] All four section cards display
-- [ ] Loading state appears during data fetch
-- [ ] Error state displays if backend fails
-- [ ] Direct navigation to `/settings` works
+- **CRITICAL**: Follow E2E_TESTS.md three-layer architecture (fixtures → interceptors → tests)
+- Create multiple fixture scenarios (default, custom, invalid)
+- Generators use @faker-js/faker for dynamic data
+- Interceptors handle both success and error modes
+- Include waitForSettingsLoad() function co-located with interceptor
+- Reference backend Settings endpoints for accurate request/response structure
+- Follow existing device and player E2E patterns exactly
+- All E2E files use TypeScript with proper typing
 
 </details>
 
@@ -567,16 +265,14 @@ describe('Settings Navigation', () => {
 
 > Mark these checkboxes as you validate each criterion.
 
-- [ ] **Feature Library Created**: Settings library exists and builds successfully
-- [ ] **Component Implemented**: Settings view component displays card layout
-- [ ] **Styling Complete**: Layout is responsive and follows design system
-- [ ] **Navigation Added**: Settings menu item appears in navigation
-- [ ] **Routing Configured**: `/settings` route loads component
-- [ ] **Store Connected**: Component displays settings from store
-- [ ] **Loading State Works**: Loading indicator displays during fetch
-- [ ] **Error State Works**: Error message displays on failure
-- [ ] **All Tests Pass**: Component, navigation, and E2E tests pass
-- [ ] **E2E Tests Added**: Cypress tests verify user can access settings
+- [ ] **Feature Library Generated**: Settings feature library exists with proper structure
+- [ ] **View Component Created**: SettingsViewComponent renders successfully
+- [ ] **Layout Structure**: Card-based layout prepared for section components
+- [ ] **Navigation Works**: Settings accessible via navigation menu
+- [ ] **Route Configured**: Lazy-loaded settings route in app.routes.ts
+- [ ] **Component Tests Pass**: Vitest tests verify component behavior
+- [ ] **E2E Infrastructure Ready**: Fixtures, interceptors, and helpers created
+- [ ] **Store Integration**: Component properly injects and uses SettingsStore
 
 ---
 
@@ -584,33 +280,36 @@ describe('Settings Navigation', () => {
 
 ### Testing Approach
 
-This phase focuses on **component rendering and navigation integration**:
+This phase focuses on **component and E2E infrastructure testing**:
 
-1. **Component Tests**: Verify component renders correctly with mocked store
-2. **Navigation Tests**: Verify menu item displays and routes correctly
-3. **Routing Tests**: Verify route configuration works
-4. **Store Integration Tests**: Verify component displays store values
-5. **E2E Tests**: Verify user can navigate to and view settings
+1. **Component Tests**: Verify view component with mock store
+2. **Navigation Tests**: Manual verification of routing
+3. **E2E Infrastructure**: Prepare fixtures, interceptors, generators
 
 ### Test Types by Task
 
 | Task | Test Type | Focus |
 |------|-----------|-------|
 | Task 1 | Verification | Library generation |
-| Task 2 | Unit | Component rendering |
-| Task 3 | Manual | Visual layout |
-| Task 4 | Unit | Navigation integration |
-| Task 5 | Unit | Route configuration |
-| Task 6 | Integration | Store connection |
-| Task 7 | E2E | User navigation |
+| Task 2 | Unit | Component creation and store injection |
+| Task 3 | Visual | Layout rendering |
+| Task 4 | Manual | Navigation flow |
+| Task 5 | Unit | Component behavior |
+| Task 6 | Infrastructure | E2E test setup |
 
-### Testing Standards Reference
+### Testing Framework
 
-- Follow [Smart Component Testing](../../SMART_COMPONENT_TESTING.md) for component patterns
-- Use [Testing Standards](../../TESTING_STANDARDS.md) for behavioral testing approach
-- Follow [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) for Cypress patterns
-- Mock store at component boundary for unit tests
-- Use real store for E2E tests with mocked backend
+- **Unit Tests**: Vitest (NOT Jasmine)
+- **E2E Tests**: Cypress with fixture/interceptor pattern
+- **Mocking**: TestBed for component tests, interceptors for E2E
+
+### Key Testing Principles
+
+- Mock SettingsStore for unit tests
+- Use shallow rendering for component tests
+- Follow E2E_TESTS.md patterns exactly
+- Test observable component behavior
+- Reference player and device test patterns
 
 ---
 
@@ -635,14 +334,15 @@ This phase focuses on **component rendering and navigation integration**:
 ## 🔗 Related Documentation
 
 - **Previous Phase**: [Phase 4 - Bootstrap Integration](./SETTINGS_FEATURE_P4.md)
-- **Next Phase**: [Phase 6 - Settings Section Components](./SETTINGS_FEATURE_P6.md)
+- **Next Phase**: [Phase 6 - Reactive Forms & Section Components](./SETTINGS_FEATURE_P6.md)
 - **Feature Overview**: [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md)
-- **Component Library**: [lib-scaling-card](../../COMPONENT_LIBRARY.md#lib-scaling-card)
-- **Player View Reference**: [Player View Component](../../../libs/features/player/src/lib/player-view/player-view.component.ts)
-- **E2E Testing**: [E2E Testing Guide](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md)
+- **Navigation Standards**: [NAVIGATION_STANDARDS.md](../../NAVIGATION_STANDARDS.md)
+- **E2E Testing**: [E2E_TESTS.md](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - **CRITICAL**
+- **PlayerView Reference**: [Player View Components](../../../libs/features/player/src/lib/player-view/)
+- **Smart Component Testing**: [SMART_COMPONENT_TESTING.md](../../SMART_COMPONENT_TESTING.md)
 
 ---
 
 _Phase Status: Ready for Implementation_
 _Last Updated: 2025-01-11_
-_Estimated Effort: 4-5 hours_
+_Estimated Effort: 3-4 hours_

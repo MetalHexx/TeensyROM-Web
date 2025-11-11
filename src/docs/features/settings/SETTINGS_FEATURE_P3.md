@@ -2,7 +2,7 @@
 
 ## 🎯 Objective
 
-Implement the NgRx Signal Store for settings management in the application layer. This store provides reactive state management for settings with actions for loading, saving, updating, and managing undo/redo history. The store depends on the domain service contract (via injection token) and exposes computed signals for UI consumption. This phase establishes the core state management foundation that will be used by UI components (Phase 5-8) and bootstrap services (Phase 4).
+Implement the NgRx Signal Store for settings state management in the application layer. The store will manage settings state, coordinate with the infrastructure service, track undo/redo history following the PlayerStore pattern, and provide computed selectors for components. This establishes the reactive state management layer that components will consume in later phases.
 
 ---
 
@@ -17,770 +17,320 @@ Implement the NgRx Signal Store for settings management in the application layer
 
 **Standards & Guidelines:**
 
-- [ ] [State Standards](../../STATE_STANDARDS.md) - NgRx Signal Store patterns and architecture
-- [ ] [Coding Standards](../../CODING_STANDARDS.md) - General coding patterns
-- [ ] [Store Testing Guide](../../STORE_TESTING.md) - Store testing patterns
-- [ ] [Testing Standards](../../TESTING_STANDARDS.md) - Behavioral testing approach
+- [ ] [State Standards](../../STATE_STANDARDS.md) - **CRITICAL**: NgRx Signal Store patterns, updateState with actionMessage
+- [ ] [Store Testing](../../STORE_TESTING.md) - Store testing patterns and best practices
+- [ ] [Coding Standards](../../CODING_STANDARDS.md) - General coding conventions
+
+**Reference Implementations:**
+
+- [ ] [PlayerStore](../../../libs/application/src/lib/player/player-store.ts) - Store structure and history management pattern to follow
+- [ ] [Player History Actions](../../../libs/application/src/lib/player/actions/navigate-backward-in-history.ts) - Undo/redo pattern with updateState
+- [ ] [Player Store Actions](../../../libs/application/src/lib/player/actions/) - Action implementation patterns
 
 ---
 
 ## 📂 File Structure Overview
 
-> New store files in application layer.
+> New store implementation with actions and selectors.
 
 ```
 libs/application/src/lib/settings/
 ├── index.ts                                  ✨ New - Barrel export for settings store
-├── settings.store.ts                         ✨ New - Settings store definition
-├── settings.state.ts                         ✨ New - State interface definition
+├── settings-store.ts                         ✨ New - NgRx Signal Store configuration
+├── settings-state.interface.ts               ✨ New - State interface definition
+├── settings-store.spec.ts                    ✨ New - Store unit tests
 ├── actions/
-│   ├── index.ts                              ✨ New - Barrel export for actions
-│   ├── load-settings.action.ts               ✨ New - Load settings from backend
-│   ├── save-settings.action.ts               ✨ New - Save settings to backend
-│   ├── update-player-settings.action.ts      ✨ New - Update player section
-│   ├── update-file-transfer-settings.action.ts ✨ New - Update file transfer section
-│   ├── update-search-settings.action.ts      ✨ New - Update search section
-│   ├── update-app-settings.action.ts         ✨ New - Update app section
-│   ├── undo.action.ts                        ✨ New - Undo to previous snapshot
-│   ├── redo.action.ts                        ✨ New - Redo to next snapshot
-│   ├── reset-to-defaults.action.ts           ✨ New - Reset all settings
-│   └── clear-history.action.ts               ✨ New - Clear undo/redo history
-├── selectors/
-│   ├── index.ts                              ✨ New - Barrel export for selectors
-│   ├── get-settings.selector.ts              ✨ New - Get current settings
-│   ├── get-player-settings.selector.ts       ✨ New - Get player section
-│   ├── get-file-transfer-settings.selector.ts ✨ New - Get file transfer section
-│   ├── get-search-settings.selector.ts       ✨ New - Get search section
-│   ├── get-app-settings.selector.ts          ✨ New - Get app section
-│   ├── get-has-unsaved-changes.selector.ts   ✨ New - Check for unsaved changes
-│   ├── get-can-undo.selector.ts              ✨ New - Check if undo available
-│   ├── get-can-redo.selector.ts              ✨ New - Check if redo available
-│   └── get-loading-state.selector.ts         ✨ New - Get loading/error state
-└── helpers/
-    ├── settings-defaults.ts                  ✨ New - Default settings values
-    └── history-manager.ts                    ✨ New - Undo/redo history logic
+│   ├── index.ts                              ✨ New - Actions barrel export
+│   ├── load-settings.ts                      ✨ New - Load settings action
+│   ├── save-settings.ts                      ✨ New - Save settings action
+│   ├── update-settings.ts                    ✨ New - Update settings action
+│   ├── undo.ts                               ✨ New - Undo action
+│   ├── redo.ts                               ✨ New - Redo action
+│   └── clear-history.ts                      ✨ New - Clear history action
+└── selectors/
+    ├── index.ts                              ✨ New - Selectors barrel export
+    ├── get-settings.ts                       ✨ New - Settings selector
+    ├── can-undo.ts                           ✨ New - Can undo selector
+    ├── can-redo.ts                           ✨ New - Can redo selector
+    └── get-history-position.ts               ✨ New - History position selector
 ```
 
 ---
 
 <details open>
-<summary><h3>Task 1: Define Store State Interface</h3></summary>
+<summary><h3>Task 1: Define Settings State Interface</h3></summary>
 
-**Purpose**: Create the TypeScript interface that defines the shape of the settings store state. This includes current settings, loading/error states, and undo/redo history tracking.
+**Purpose**: Create the TypeScript interface defining the settings store state structure, including current settings, undo/redo history, and loading/error states.
 
 **Related Documentation:**
 
-- [State Standards - State Interface Patterns](../../STATE_STANDARDS.md#state-interface-patterns) - State structure conventions
-- [Settings Feature Plan - Phase 3](./SETTINGS_FEATURE_PLAN.md#phase-3-settings-store-application-layer) - State requirements
+- [State Standards - State Interface](../../STATE_STANDARDS.md#state-structure)
+- [PlayerStore State](../../../libs/application/src/lib/player/player-store.ts) - Reference state structure with history
 
 **Implementation Subtasks:**
 
-- [ ] **Create settings.state.ts**: New file in `libs/application/src/lib/settings/`
-- [ ] **Define SettingsState interface**: Root state interface for the store
-- [ ] **Add settings property**: Current `Settings` object
-- [ ] **Add originalSettings property**: Last saved settings for dirty checking
-- [ ] **Add isLoading property**: Boolean for loading state
-- [ ] **Add error property**: Optional error message string
-- [ ] **Add history property**: Array of `Settings` snapshots for undo
-- [ ] **Add historyIndex property**: Current position in history array
-- [ ] **Add JSDoc comments**: Document state properties and their purpose
+- [ ] **Create settings-state.interface.ts**: Define SettingsState interface
+- [ ] **Define current settings**: Current Settings object
+- [ ] **Define history structure**: Array of Settings snapshots (max 50 entries)
+- [ ] **Define history position**: Current position in history (-1 = at end, 0+ = specific position)
+- [ ] **Add loading state**: `isLoading`, `isSaving` boolean flags
+- [ ] **Add error state**: `error` nullable string
+- [ ] **Add timestamp**: `lastUpdated` nullable number
 
 **Testing Subtask:**
 
-- [ ] **Write State Type Tests**: Verify state interface structure (see Testing section)
+- [ ] **Verify Interface Compilation**: Ensure interface compiles without errors
 
 **Key Implementation Notes:**
 
-- State should be serializable (no functions, no complex objects)
-- History array stores snapshots, not individual changes (simpler than command pattern)
-- `historyIndex` points to current position in history (-1 if no history)
-- `originalSettings` tracks last-saved state to detect unsaved changes
-- Error property stores user-friendly error messages (not exception objects)
-
-**State Interface Pattern** (structure only):
-
-```typescript
-export interface SettingsState {
-  settings: Settings;
-  originalSettings: Settings;
-  isLoading: boolean;
-  error: string | null;
-  history: Settings[];
-  historyIndex: number;
-}
-```
-
-**Testing Focus for Task 1:**
-
-> Focus on **state structure** - ensure state interface is well-defined.
-
-**Behaviors to Test:**
-
-- [ ] State interface is exportable and usable
-- [ ] All properties have correct types
-- [ ] State can be instantiated with valid values
-- [ ] State compiles without TypeScript errors
+- Follow PlayerStore history pattern exactly (playHistory structure)
+- History limited to 50 snapshots to prevent memory issues
+- Position -1 indicates at current (end of history), 0+ indicates historical position
+- Separate loading flags for initial load vs save operations
+- State should be serializable (no functions, classes, or complex objects)
 
 </details>
 
 <details open>
-<summary><h3>Task 2: Create Default Settings and Initial State</h3></summary>
+<summary><h3>Task 2: Create NgRx Signal Store Configuration</h3></summary>
 
-**Purpose**: Define default settings values and initial state factory function. Defaults ensure the application has sensible configuration before any user customization.
+**Purpose**: Configure the NgRx Signal Store with initial state, DevTools integration, and wire up actions and selectors.
 
 **Related Documentation:**
 
-- [State Standards - Initial State](../../STATE_STANDARDS.md#initial-state) - Initial state patterns
-- [Settings Feature Plan - Default Values](./SETTINGS_FEATURE_PLAN.md#phase-3-settings-store-application-layer) - Default value specifications
+- [State Standards - Store Configuration](../../STATE_STANDARDS.md#store-configuration)
+- [PlayerStore Configuration](../../../libs/application/src/lib/player/player-store.ts) - Reference implementation
 
 **Implementation Subtasks:**
 
-- [ ] **Create helpers/settings-defaults.ts**: New file for default values
-- [ ] **Define DEFAULT_SETTINGS constant**: Complete `Settings` object with defaults
-- [ ] **Define DEFAULT_STATE constant**: Initial `SettingsState` with defaults
-- [ ] **Document default values**: Add JSDoc explaining default choices
-- [ ] **Export constants**: Make available to store and tests
+- [ ] **Create settings-store.ts**: Define SettingsStore using signalStore
+- [ ] **Configure initial state**: Empty settings with loading/error states
+- [ ] **Add DevTools integration**: Use `withDevtools('settings')` for debugging
+- [ ] **Set providedIn root**: Use `providedIn: 'root'` for singleton store
+- [ ] **Wire up actions**: Use `withActions()` pattern for all store actions
+- [ ] **Wire up selectors**: Use `withSelectors()` pattern for computed state
 
 **Testing Subtask:**
 
-- [ ] **Write Default Value Tests**: Verify defaults are valid and reasonable (see Testing section)
+- [ ] **Verify Store Creation**: Test store instantiation and initial state
 
 **Key Implementation Notes:**
 
-- Default values should match backend defaults for consistency
-- Player defaults: `repeatMode: 'Off'`, `sidTimerSeconds: 180`, `sidAutoAdvance: false`, `launchOnStartup: false`
-- File transfer defaults: `watchFoldersEnabled: false`, `watchFolders: []`, `autoLaunchTransferred: false`
-- Search defaults: Balanced weights, common stop words, metadata enabled, hidden files disabled
-- App defaults: `setupCompleted: false`
-- Initial state has no history, not loading, no error
-
-**Default Settings Pattern** (reference only):
-
-```typescript
-export const DEFAULT_SETTINGS: Settings = {
-  player: {
-    repeatMode: 'Off',
-    sidTimerSeconds: 180,
-    sidAutoAdvance: false,
-    launchOnStartup: false
-  },
-  // ... other sections with defaults
-};
-
-export const DEFAULT_STATE: SettingsState = {
-  settings: DEFAULT_SETTINGS,
-  originalSettings: DEFAULT_SETTINGS,
-  isLoading: false,
-  error: null,
-  history: [],
-  historyIndex: -1
-};
-```
-
-**Testing Focus for Task 2:**
-
-> Focus on **default values** - ensure defaults are valid and sensible.
-
-**Behaviors to Test:**
-
-- [ ] DEFAULT_SETTINGS is a valid Settings object
-- [ ] All required properties have default values
-- [ ] Default values match expected types
-- [ ] DEFAULT_STATE is a valid SettingsState
-- [ ] Initial state has empty history and no loading/error
+- Use `signalStore` from @ngrx/signals
+- DevTools name should match store purpose ('settings')
+- Store provided at root level (singleton across app)
+- Actions and selectors added via separate feature functions
+- Follow exact PlayerStore configuration pattern
 
 </details>
 
 <details open>
-<summary><h3>Task 3: Implement History Management Helpers</h3></summary>
+<summary><h3>Task 3: Implement Load Settings Action</h3></summary>
 
-**Purpose**: Create pure functions for managing undo/redo history snapshots. These helpers encapsulate the logic for adding snapshots, navigating history, and managing history size limits.
+**Purpose**: Create async action that calls the infrastructure service to load settings from the backend and updates store state.
 
 **Related Documentation:**
 
-- [State Standards - Helper Functions](../../STATE_STANDARDS.md#helper-functions) - Helper function patterns
-- [Coding Standards - Pure Functions](../../CODING_STANDARDS.md#pure-functions) - Pure function conventions
+- [State Standards - Async Actions](../../STATE_STANDARDS.md#async-actions)
+- [State Standards - updateState Pattern](../../STATE_STANDARDS.md#use-updatestate-with-actionmessage-for-all-state-mutations)
+- [Player Actions](../../../libs/application/src/lib/player/actions/) - Reference async action patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Create helpers/history-manager.ts**: New file for history logic
-- [ ] **Define MAX_HISTORY_SIZE constant**: Limit history to 50 snapshots
-- [ ] **Implement addToHistory function**: Adds new snapshot, manages size limit
-- [ ] **Implement canUndo function**: Checks if undo is available
-- [ ] **Implement canRedo function**: Checks if redo is available
-- [ ] **Implement getUndoSettings function**: Gets settings at previous history index
-- [ ] **Implement getRedoSettings function**: Gets settings at next history index
-- [ ] **Add helper tests**: Test all history functions (see Testing section)
+- [ ] **Create load-settings.ts**: Implement loadSettings action
+- [ ] **Inject SETTINGS_SERVICE**: Use token to inject infrastructure service
+- [ ] **Set loading state**: Use updateState with actionMessage before API call
+- [ ] **Call service**: Use firstValueFrom with getSettings()
+- [ ] **Update state on success**: Use updateState with actionMessage, set settings and initialize history
+- [ ] **Handle errors**: Catch errors, use updateState with actionMessage to set error state
+- [ ] **Use createAction utility**: Generate actionMessage for Redux DevTools tracking
 
 **Testing Subtask:**
 
-- [ ] **Write History Helper Tests**: Test history navigation and limits (see Testing section)
+- [ ] **Write Load Action Tests**: Test success, error, and loading states using Vitest
 
 **Key Implementation Notes:**
 
-- History functions are pure (no state mutation, return new values)
-- Adding to history when in middle of history discards future snapshots (standard undo/redo behavior)
-- History size limit prevents unbounded memory growth
-- History array stores deep copies to prevent accidental mutations
-- Index -1 means no history, 0 means at oldest entry
+- **CRITICAL**: Use `updateState()` with `actionMessage`, NOT `patchState()`
+- Use `createAction('load-settings')` from utils for Redux DevTools correlation
+- Initialize history with first loaded settings as initial snapshot
+- Clear error state on successful load
+- Follow exact pattern from PlayerStore actions
 
-**History Helper Pattern** (reference only):
-
-```typescript
-export const MAX_HISTORY_SIZE = 50;
-
-export function addToHistory(
-  history: Settings[],
-  currentIndex: number,
-  newSnapshot: Settings
-): { history: Settings[]; index: number } {
-  // Truncate future if in middle of history
-  const truncated = history.slice(0, currentIndex + 1);
-  // Add new snapshot
-  const updated = [...truncated, newSnapshot];
-  // Enforce size limit (keep newest)
-  const limited = updated.slice(-MAX_HISTORY_SIZE);
-  return {
-    history: limited,
-    index: limited.length - 1
-  };
-}
-```
-
-**Testing Focus for Task 3:**
-
-> Focus on **history logic** - ensure undo/redo works correctly.
-
-**Behaviors to Test:**
-
-- [ ] `addToHistory` adds snapshot to end of history
-- [ ] `addToHistory` truncates future snapshots when in middle
-- [ ] `addToHistory` enforces max history size
-- [ ] `canUndo` returns true when history index > 0
-- [ ] `canUndo` returns false when history is empty or at start
-- [ ] `canRedo` returns true when history index < history length - 1
-- [ ] `canRedo` returns false when at end of history
-- [ ] `getUndoSettings` returns previous snapshot
-- [ ] `getRedoSettings` returns next snapshot
-- [ ] History functions don't mutate input arrays
+**Action Pattern**: Reference navigate-backward-in-history.ts for updateState with actionMessage usage
 
 </details>
 
 <details open>
-<summary><h3>Task 4: Implement Load Settings Action</h3></summary>
+<summary><h3>Task 4: Implement Save Settings Action</h3></summary>
 
-**Purpose**: Create the action that loads settings from the backend via the domain service. This action handles loading state, success, and error scenarios.
+**Purpose**: Create async action that saves settings to the backend via infrastructure service and updates store state.
 
 **Related Documentation:**
 
-- [State Standards - Action Patterns](../../STATE_STANDARDS.md#action-patterns) - Action implementation patterns
-- [Store Testing Guide](../../STORE_TESTING.md) - Action testing patterns
+- [State Standards - updateState Pattern](../../STATE_STANDARDS.md#use-updatestate-with-actionmessage-for-all-state-mutations)
+- [Player Actions](../../../libs/application/src/lib/player/actions/) - Reference async action patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Create actions/load-settings.action.ts**: New action file
-- [ ] **Define withLoadSettings feature**: Use `signalStoreFeature` pattern
-- [ ] **Inject SETTINGS_SERVICE_TOKEN**: Use domain service contract
-- [ ] **Implement loadSettings method**: Async action that calls service
-- [ ] **Set loading state**: Set `isLoading: true` when starting
-- [ ] **Update state on success**: Set settings, originalSettings, clear error, clear history
-- [ ] **Update state on error**: Set error message, clear loading
-- [ ] **Add action tests**: Test loading behavior (see Testing section)
+- [ ] **Create save-settings.ts**: Implement saveSettings action
+- [ ] **Inject SETTINGS_SERVICE**: Use token for service injection
+- [ ] **Set saving state**: Use updateState with actionMessage before API call
+- [ ] **Call service**: Use firstValueFrom with saveSettings()
+- [ ] **Update state on success**: Use updateState with actionMessage, clear saving flag
+- [ ] **Handle errors**: Use updateState with actionMessage to set error state
+- [ ] **Use createAction utility**: Generate actionMessage for tracking
 
 **Testing Subtask:**
 
-- [ ] **Write Load Action Tests**: Test loading, success, and error scenarios (see Testing section)
+- [ ] **Write Save Action Tests**: Test success, error, and saving states using Vitest
 
 **Key Implementation Notes:**
 
-- Use `rxMethod` for async actions (Signal Store pattern)
-- Loading clears any existing error state
-- Success updates both `settings` and `originalSettings` (no unsaved changes after load)
-- Success clears history (fresh start after load)
-- Error preserves existing settings (don't lose state on load failure)
-- Use `tapResponse` for handling success/error
-
-**Action Pattern** (structure only):
-
-```typescript
-export function withLoadSettings() {
-  return signalStoreFeature(
-    withMethods((store, settingsService = inject(SETTINGS_SERVICE_TOKEN)) => ({
-      loadSettings: rxMethod<void>(
-        pipe(
-          tap(() => patchState(store, { isLoading: true, error: null })),
-          switchMap(() => settingsService.getSettings().pipe(
-            tapResponse({
-              next: (settings) => patchState(store, {
-                settings,
-                originalSettings: settings,
-                isLoading: false,
-                history: [],
-                historyIndex: -1
-              }),
-              error: (error: Error) => patchState(store, {
-                isLoading: false,
-                error: error.message
-              })
-            })
-          ))
-        )
-      )
-    }))
-  );
-}
-```
-
-**Testing Focus for Task 4:**
-
-> Focus on **loading behavior** - ensure action handles all scenarios correctly.
-
-**Behaviors to Test:**
-
-- [ ] Loading sets `isLoading: true` immediately
-- [ ] Loading clears existing error state
-- [ ] Success updates settings and originalSettings
-- [ ] Success clears loading state
-- [ ] Success clears history
-- [ ] Error sets error message
-- [ ] Error clears loading state
-- [ ] Error preserves existing settings
-- [ ] Service method called exactly once per invocation
+- **CRITICAL**: Use `updateState()` with `actionMessage`, NOT `patchState()`
+- Use `createAction('save-settings')` for Redux DevTools
+- Don't modify history on save (only on user changes)
+- Preserve current state on save failure
+- Infrastructure layer handles error alerts (don't duplicate here)
 
 </details>
 
 <details open>
-<summary><h3>Task 5: Implement Save Settings Action</h3></summary>
+<summary><h3>Task 5: Implement Update Settings with History Tracking</h3></summary>
 
-**Purpose**: Create the action that saves current settings to the backend via the domain service. This action handles save state, success, and error scenarios, and updates originalSettings on success.
+**Purpose**: Create action for local settings updates that adds snapshot to history, enabling undo/redo functionality following PlayerStore pattern.
 
 **Related Documentation:**
 
-- [State Standards - Action Patterns](../../STATE_STANDARDS.md#action-patterns) - Action implementation patterns
-- [Store Testing Guide](../../STORE_TESTING.md) - Action testing patterns
+- [State Standards - updateState Pattern](../../STATE_STANDARDS.md#use-updatestate-with-actionmessage-for-all-state-mutations)
+- [PlayerStore History](../../../libs/application/src/lib/player/player-store.ts) - History management pattern
 
 **Implementation Subtasks:**
 
-- [ ] **Create actions/save-settings.action.ts**: New action file
-- [ ] **Define withSaveSettings feature**: Use `signalStoreFeature` pattern
-- [ ] **Inject SETTINGS_SERVICE_TOKEN**: Use domain service contract
-- [ ] **Implement saveSettings method**: Async action that calls service
-- [ ] **Set loading state**: Set `isLoading: true` when starting
-- [ ] **Update state on success**: Update originalSettings, clear error, clear loading
-- [ ] **Update state on error**: Set error message, clear loading
-- [ ] **Add action tests**: Test saving behavior (see Testing section)
+- [ ] **Create update-settings.ts**: Implement updateSettings action
+- [ ] **Accept partial updates**: Support Partial<Settings> parameter
+- [ ] **Add to history**: Push current state to history before update (max 50 entries)
+- [ ] **Update settings**: Merge partial updates with current settings
+- [ ] **Update position**: Set history position to -1 (at current/end)
+- [ ] **Use updateState with actionMessage**: Use createAction for tracking
+- [ ] **Trim history**: Remove oldest entries if exceeding 50 snapshot limit
 
 **Testing Subtask:**
 
-- [ ] **Write Save Action Tests**: Test saving, success, and error scenarios (see Testing section)
+- [ ] **Write Update Action Tests**: Test updates, history tracking, and limits using Vitest
 
 **Key Implementation Notes:**
 
-- Saving does not modify current settings (only originalSettings on success)
-- Success clears the "unsaved changes" state by syncing originalSettings
-- Success does not clear history (user may want to undo after save)
-- Error preserves all state (retry is possible)
-- Consider debouncing if auto-save is enabled (Phase 7)
-
-**Testing Focus for Task 5:**
-
-> Focus on **saving behavior** - ensure action persists settings correctly.
-
-**Behaviors to Test:**
-
-- [ ] Saving sets `isLoading: true` immediately
-- [ ] Saving clears existing error state
-- [ ] Success updates originalSettings to match current settings
-- [ ] Success clears loading state
-- [ ] Success preserves history
-- [ ] Error sets error message
-- [ ] Error clears loading state
-- [ ] Error preserves all settings (current and original)
-- [ ] Service method called with current settings
+- **CRITICAL**: Use `updateState()` with `actionMessage`, NOT `patchState()`
+- History position -1 means "at current state" (not in history)
+- Limit history to 50 entries to prevent memory issues
+- Trim from beginning (FIFO) when exceeding limit
+- Each update creates new history snapshot
+- Follow exact PlayerStore history tracking pattern
 
 </details>
 
 <details open>
-<summary><h3>Task 6: Implement Update Section Actions</h3></summary>
+<summary><h3>Task 6: Implement Undo/Redo Actions</h3></summary>
 
-**Purpose**: Create actions for updating individual settings sections (Player, FileTransfer, Search, App). These actions record history snapshots and update the corresponding section of settings.
+**Purpose**: Create undo and redo actions that navigate through settings history following PlayerStore navigation pattern.
 
 **Related Documentation:**
 
-- [State Standards - Action Patterns](../../STATE_STANDARDS.md#action-patterns) - Action implementation patterns
-- [Settings Feature Plan - Phase 3](./SETTINGS_FEATURE_PLAN.md#phase-3-settings-store-application-layer) - Update action requirements
+- [State Standards - updateState Pattern](../../STATE_STANDARDS.md#use-updatestate-with-actionmessage-for-all-state-mutations)
+- [Player History Navigation](../../../libs/application/src/lib/player/actions/navigate-backward-in-history.ts) - Undo/redo pattern
 
 **Implementation Subtasks:**
 
-- [ ] **Create actions/update-player-settings.action.ts**: Update player section
-- [ ] **Create actions/update-file-transfer-settings.action.ts**: Update file transfer section
-- [ ] **Create actions/update-search-settings.action.ts**: Update search section
-- [ ] **Create actions/update-app-settings.action.ts**: Update app section
-- [ ] **Record history snapshot**: Before updating, add current settings to history
-- [ ] **Update section**: Patch the corresponding section with new values
-- [ ] **Implement partial updates**: Support updating subset of section properties
-- [ ] **Add action tests**: Test update behavior for each section (see Testing section)
+- [ ] **Create undo.ts**: Implement undo action moving backward in history
+- [ ] **Create redo.ts**: Implement redo action moving forward in history
+- [ ] **Handle position -1**: When at current (-1), undo moves to most recent history entry
+- [ ] **Handle wraparound**: Support cycling through history (optional)
+- [ ] **Update position**: Modify historyPosition appropriately
+- [ ] **Apply historical settings**: Replace current settings with historical snapshot
+- [ ] **Use updateState with actionMessage**: Use createAction for each action
 
 **Testing Subtask:**
 
-- [ ] **Write Update Action Tests**: Test section updates and history recording (see Testing section)
+- [ ] **Write Undo/Redo Tests**: Test navigation, position updates, and edge cases using Vitest
 
 **Key Implementation Notes:**
 
-- Each update records current settings in history before modification
-- Use `addToHistory` helper to manage history array
-- Support partial updates (only specified properties change)
-- Updates are synchronous (no backend call until save action)
-- All update actions follow same pattern (consider DRY with generic function)
-
-**Update Action Pattern** (structure only):
-
-```typescript
-export function withUpdatePlayerSettings() {
-  return signalStoreFeature(
-    withMethods((store) => ({
-      updatePlayerSettings: (updates: Partial<PlayerSettings>) => {
-        const currentSettings = store.settings();
-        const { history, index } = addToHistory(
-          store.history(),
-          store.historyIndex(),
-          currentSettings
-        );
-        
-        patchState(store, {
-          settings: {
-            ...currentSettings,
-            player: { ...currentSettings.player, ...updates }
-          },
-          history,
-          historyIndex: index
-        });
-      }
-    }))
-  );
-}
-```
-
-**Testing Focus for Task 6:**
-
-> Focus on **update behavior** - ensure section updates record history correctly.
-
-**Behaviors to Test:**
-
-- [ ] Update action modifies only the specified section
-- [ ] Update action records current settings in history before change
-- [ ] Update action supports partial updates
-- [ ] Update action preserves other sections unchanged
-- [ ] History index increments after update
-- [ ] Multiple updates create multiple history entries
-- [ ] Updates don't modify originalSettings (only current settings)
+- **CRITICAL**: Use `updateState()` with `actionMessage`, NOT `patchState()`
+- Position -1 = at current, 0+ = at historical position
+- Undo from -1 moves to history.length - 1 (most recent snapshot)
+- Redo from last position stays at last position
+- Don't modify history array during navigation
+- Follow exact PlayerStore navigation pattern
 
 </details>
 
 <details open>
-<summary><h3>Task 7: Implement Undo/Redo Actions</h3></summary>
+<summary><h3>Task 7: Implement Computed Selectors</h3></summary>
 
-**Purpose**: Create actions for navigating through settings history using undo and redo operations. These actions restore previous or future settings snapshots.
+**Purpose**: Create computed signal selectors that derive state for component consumption.
 
 **Related Documentation:**
 
-- [State Standards - Action Patterns](../../STATE_STANDARDS.md#action-patterns) - Action implementation patterns
-- [Settings Feature Plan - Phase 8](./SETTINGS_FEATURE_PLAN.md#phase-8-undoredo-with-keyboard-shortcuts) - Undo/redo requirements
+- [State Standards - Selectors](../../STATE_STANDARDS.md#selectors)
+- [Player Selectors](../../../libs/application/src/lib/player/selectors/) - Reference selector patterns
 
 **Implementation Subtasks:**
 
-- [ ] **Create actions/undo.action.ts**: Undo to previous snapshot
-- [ ] **Create actions/redo.action.ts**: Redo to next snapshot
-- [ ] **Implement undo method**: Use `getUndoSettings` and `canUndo` helpers
-- [ ] **Implement redo method**: Use `getRedoSettings` and `canRedo` helpers
-- [ ] **Guard against invalid operations**: No-op if undo/redo not available
-- [ ] **Update history index**: Decrement for undo, increment for redo
-- [ ] **Add action tests**: Test undo/redo navigation (see Testing section)
+- [ ] **Create get-settings.ts**: Select current settings
+- [ ] **Create can-undo.ts**: Compute if undo is available
+- [ ] **Create can-redo.ts**: Compute if redo is available
+- [ ] **Create get-history-position.ts**: Select current history position
+- [ ] **Add to withSelectors**: Wire all selectors into store configuration
+- [ ] **Use computed signals**: Selectors auto-update when state changes
 
 **Testing Subtask:**
 
-- [ ] **Write Undo/Redo Action Tests**: Test history navigation (see Testing section)
+- [ ] **Write Selector Tests**: Test selector computations using Vitest
 
 **Key Implementation Notes:**
 
-- Undo/redo only changes history index and current settings
-- Does not modify history array (navigation only)
-- Guard checks prevent index out of bounds
-- Undo/redo don't affect originalSettings (unsaved changes remain)
-- Undo/redo don't affect loading or error state
-
-**Undo/Redo Pattern** (structure only):
-
-```typescript
-export function withUndoRedo() {
-  return signalStoreFeature(
-    withMethods((store) => ({
-      undo: () => {
-        if (!canUndo(store.historyIndex())) return;
-        
-        const newIndex = store.historyIndex() - 1;
-        const settings = getUndoSettings(store.history(), newIndex);
-        
-        patchState(store, {
-          settings,
-          historyIndex: newIndex
-        });
-      },
-      
-      redo: () => {
-        if (!canRedo(store.historyIndex(), store.history().length)) return;
-        
-        const newIndex = store.historyIndex() + 1;
-        const settings = getRedoSettings(store.history(), newIndex);
-        
-        patchState(store, {
-          settings,
-          historyIndex: newIndex
-        });
-      }
-    }))
-  );
-}
-```
-
-**Testing Focus for Task 7:**
-
-> Focus on **navigation behavior** - ensure undo/redo moves through history correctly.
-
-**Behaviors to Test:**
-
-- [ ] Undo decrements history index
-- [ ] Undo restores previous settings snapshot
-- [ ] Undo does nothing when at start of history
-- [ ] Redo increments history index
-- [ ] Redo restores next settings snapshot
-- [ ] Redo does nothing when at end of history
-- [ ] Undo followed by redo returns to same state
-- [ ] Multiple undo operations navigate backward correctly
-- [ ] Undo/redo don't modify originalSettings
+- Selectors are pure computed functions
+- canUndo: true when history not empty and position != 0
+- canRedo: true when position != -1 (not at current)
+- Selectors automatically update when state changes (reactive)
+- Follow PlayerStore selector patterns
 
 </details>
 
 <details open>
-<summary><h3>Task 8: Implement Reset and Clear History Actions</h3></summary>
+<summary><h3>Task 8: Write Comprehensive Store Tests</h3></summary>
 
-**Purpose**: Create actions for resetting settings to defaults and clearing undo/redo history. These utility actions support user workflows and history management.
-
-**Related Documentation:**
-
-- [State Standards - Action Patterns](../../STATE_STANDARDS.md#action-patterns) - Action implementation patterns
-- [Settings Feature Plan - Phase 9](./SETTINGS_FEATURE_PLAN.md#phase-9-e2e-testing--polish) - Reset to defaults requirement
-
-**Implementation Subtasks:**
-
-- [ ] **Create actions/reset-to-defaults.action.ts**: Reset all settings to defaults
-- [ ] **Create actions/clear-history.action.ts**: Clear undo/redo history
-- [ ] **Implement resetToDefaults method**: Restore DEFAULT_SETTINGS, record in history
-- [ ] **Implement clearHistory method**: Empty history array, reset index
-- [ ] **Add confirmation guard**: Consider requiring confirmation for reset (UI decision)
-- [ ] **Add action tests**: Test reset and clear behavior (see Testing section)
-
-**Testing Subtask:**
-
-- [ ] **Write Reset/Clear Action Tests**: Test reset and history clearing (see Testing section)
-
-**Key Implementation Notes:**
-
-- Reset records current settings in history before resetting (allows undo)
-- Reset sets both settings and originalSettings to defaults (clears unsaved changes)
-- Clear history is typically used after save (not user-facing action)
-- Reset to defaults is a potentially destructive action (UI should confirm)
-
-**Reset/Clear Pattern** (structure only):
-
-```typescript
-export function withResetAndClear() {
-  return signalStoreFeature(
-    withMethods((store) => ({
-      resetToDefaults: () => {
-        const currentSettings = store.settings();
-        const { history, index } = addToHistory(
-          store.history(),
-          store.historyIndex(),
-          currentSettings
-        );
-        
-        patchState(store, {
-          settings: DEFAULT_SETTINGS,
-          history,
-          historyIndex: index
-        });
-      },
-      
-      clearHistory: () => {
-        patchState(store, {
-          history: [],
-          historyIndex: -1
-        });
-      }
-    }))
-  );
-}
-```
-
-**Testing Focus for Task 8:**
-
-> Focus on **reset behavior** - ensure defaults restore and history clears correctly.
-
-**Behaviors to Test:**
-
-- [ ] Reset restores DEFAULT_SETTINGS
-- [ ] Reset records current settings in history before resetting
-- [ ] Reset allows undo to previous settings
-- [ ] Clear history empties history array
-- [ ] Clear history sets index to -1
-- [ ] Clear history disables undo/redo
-
-</details>
-
-<details open>
-<summary><h3>Task 9: Implement Computed Selectors</h3></summary>
-
-**Purpose**: Create computed signals that derive useful values from store state, such as individual sections, dirty state, and undo/redo availability. Selectors provide reactive access to state for UI components.
+**Purpose**: Create Vitest tests for the entire store verifying state management, actions, history, and selectors.
 
 **Related Documentation:**
 
-- [State Standards - Selector Patterns](../../STATE_STANDARDS.md#selector-patterns) - Selector implementation patterns
-- [Store Testing Guide](../../STORE_TESTING.md) - Selector testing patterns
+- [Store Testing Standards](../../STORE_TESTING.md) - Store testing patterns
+- [PlayerStore Tests](../../../libs/application/src/lib/player/) - Reference test implementations
 
 **Implementation Subtasks:**
 
-- [ ] **Create selectors/get-settings.selector.ts**: Get complete current settings
-- [ ] **Create selectors/get-player-settings.selector.ts**: Get player section
-- [ ] **Create selectors/get-file-transfer-settings.selector.ts**: Get file transfer section
-- [ ] **Create selectors/get-search-settings.selector.ts**: Get search section
-- [ ] **Create selectors/get-app-settings.selector.ts**: Get app section
-- [ ] **Create selectors/get-has-unsaved-changes.selector.ts**: Compare settings with originalSettings
-- [ ] **Create selectors/get-can-undo.selector.ts**: Use canUndo helper
-- [ ] **Create selectors/get-can-redo.selector.ts**: Use canRedo helper
-- [ ] **Create selectors/get-loading-state.selector.ts**: Get loading and error state
-- [ ] **Add selector tests**: Test computed values (see Testing section)
+- [ ] **Create settings-store.spec.ts**: Comprehensive store test suite using Vitest
+- [ ] **Test initial state**: Verify default state values
+- [ ] **Test load action**: Mock service, verify state updates on success/error
+- [ ] **Test save action**: Mock service, verify saving states
+- [ ] **Test update action**: Verify history tracking and limits
+- [ ] **Test undo/redo**: Verify navigation through history
+- [ ] **Test selectors**: Verify computed values
+- [ ] **Mock SETTINGS_SERVICE**: Use TestBed providers to mock service
 
 **Testing Subtask:**
 
-- [ ] **Write Selector Tests**: Test selector computations (see Testing section)
+- [ ] **Run Tests**: Execute `pnpm nx test application --testFile=settings-store.spec.ts`
 
 **Key Implementation Notes:**
 
-- Selectors use `computed` for reactive derived values
-- Section selectors extract specific settings sections
-- Dirty check uses deep equality comparison (settings !== originalSettings)
-- Undo/redo availability selectors use history helper functions
-- Loading state selector combines isLoading and error properties
-
-**Selector Pattern** (structure only):
-
-```typescript
-export function withSettingsSelectors() {
-  return signalStoreFeature(
-    withComputed((store) => ({
-      playerSettings: computed(() => store.settings().player),
-      fileTransferSettings: computed(() => store.settings().fileTransfer),
-      searchSettings: computed(() => store.settings().search),
-      appSettings: computed(() => store.settings().app),
-      
-      hasUnsavedChanges: computed(() => {
-        const current = store.settings();
-        const original = store.originalSettings();
-        return JSON.stringify(current) !== JSON.stringify(original);
-      }),
-      
-      canUndo: computed(() => canUndo(store.historyIndex())),
-      canRedo: computed(() => canRedo(store.historyIndex(), store.history().length))
-    }))
-  );
-}
-```
-
-**Testing Focus for Task 9:**
-
-> Focus on **selector computations** - ensure derived values are correct.
-
-**Behaviors to Test:**
-
-- [ ] Section selectors return correct sections
-- [ ] `hasUnsavedChanges` returns false when settings match originalSettings
-- [ ] `hasUnsavedChanges` returns true when settings differ from originalSettings
-- [ ] `canUndo` returns correct value based on history state
-- [ ] `canRedo` returns correct value based on history state
-- [ ] Selectors recompute when dependencies change
-- [ ] Selectors don't recompute when unrelated state changes
-
-</details>
-
-<details open>
-<summary><h3>Task 10: Assemble Complete Settings Store</h3></summary>
-
-**Purpose**: Combine all store features (state, actions, selectors) into the final settings store definition. This creates the complete store that will be provided to the application.
-
-**Related Documentation:**
-
-- [State Standards - Store Composition](../../STATE_STANDARDS.md#store-composition) - Store assembly patterns
-- [Settings Feature Plan - Phase 3](./SETTINGS_FEATURE_PLAN.md#phase-3-settings-store-application-layer) - Complete store requirements
-
-**Implementation Subtasks:**
-
-- [ ] **Create settings.store.ts**: Main store file
-- [ ] **Define SettingsStore type**: Type for the complete store instance
-- [ ] **Use signalStore builder**: Compose all features
-- [ ] **Include withState**: Add initial state
-- [ ] **Include all action features**: Load, save, update sections, undo/redo, reset/clear
-- [ ] **Include selector feature**: Add computed selectors
-- [ ] **Export store**: Make available for bootstrap and components
-- [ ] **Add store integration tests**: Test complete store behavior (see Testing section)
-
-**Testing Subtask:**
-
-- [ ] **Write Store Integration Tests**: Test complete store workflows (see Testing section)
-
-**Key Implementation Notes:**
-
-- Store is composed using `signalStore()` builder function
-- Features are applied in order (order matters for dependencies)
-- Store should be provided at application root (via bootstrap config)
-- Store type can be inferred or explicitly defined for type safety
-- Store instance is singleton (providedIn: 'root')
-
-**Store Assembly Pattern** (structure only):
-
-```typescript
-export const SettingsStore = signalStore(
-  { providedIn: 'root' },
-  withState(DEFAULT_STATE),
-  withLoadSettings(),
-  withSaveSettings(),
-  withUpdatePlayerSettings(),
-  withUpdateFileTransferSettings(),
-  withUpdateSearchSettings(),
-  withUpdateAppSettings(),
-  withUndoRedo(),
-  withResetAndClear(),
-  withSettingsSelectors()
-);
-
-export type SettingsStore = InstanceType<typeof SettingsStore>;
-```
-
-**Testing Focus for Task 10:**
-
-> Focus on **store integration** - ensure all features work together correctly.
-
-**Behaviors to Test:**
-
-- [ ] Store instantiates with default state
-- [ ] All actions are available on store instance
-- [ ] All selectors are available on store instance
-- [ ] Load action populates store state
-- [ ] Update actions record history
-- [ ] Undo/redo navigate history correctly
-- [ ] Save action syncs originalSettings
-- [ ] Dirty check works across load/update/save workflow
-- [ ] Complete user workflow (load → update → save → undo) works end-to-end
+- Use Vitest (NOT Jasmine) for all tests
+- Mock infrastructure service via TestBed providers
+- Test behavioral outcomes (what components see)
+- Verify updateState called with actionMessage
+- Test history limits (max 50 entries)
+- Follow PlayerStore test patterns
 
 </details>
 
@@ -790,18 +340,16 @@ export type SettingsStore = InstanceType<typeof SettingsStore>;
 
 > Mark these checkboxes as you validate each criterion.
 
-- [ ] **State Interface Defined**: SettingsState interface complete with all properties
-- [ ] **Defaults Created**: DEFAULT_SETTINGS and DEFAULT_STATE constants defined
-- [ ] **History Helpers Implemented**: All history management functions working
-- [ ] **Load Action Complete**: Loading settings from backend works
-- [ ] **Save Action Complete**: Saving settings to backend works
-- [ ] **Update Actions Complete**: All four section update actions working
-- [ ] **Undo/Redo Implemented**: History navigation working correctly
-- [ ] **Reset/Clear Implemented**: Reset to defaults and clear history working
-- [ ] **Selectors Implemented**: All computed selectors providing correct values
-- [ ] **Store Assembled**: Complete store with all features integrated
-- [ ] **All Tests Pass**: Unit and integration tests pass
-- [ ] **TypeScript Compiles**: No compilation errors in application layer
+- [ ] **State Interface Defined**: SettingsState with settings, history, and metadata
+- [ ] **Store Configured**: NgRx Signal Store with DevTools integration
+- [ ] **Load Action Works**: Settings load from backend and initialize history
+- [ ] **Save Action Works**: Settings save to backend successfully
+- [ ] **Update Tracks History**: Local updates add to history (max 50)
+- [ ] **Undo/Redo Works**: Navigate through settings history correctly
+- [ ] **Selectors Compute**: canUndo, canRedo compute correctly
+- [ ] **All Tests Pass**: Vitest tests verify all functionality
+- [ ] **updateState Used**: All actions use updateState with actionMessage (no patchState)
+- [ ] **DevTools Integration**: Redux DevTools track all state mutations
 
 ---
 
@@ -809,31 +357,39 @@ export type SettingsStore = InstanceType<typeof SettingsStore>;
 
 ### Testing Approach
 
-This phase focuses on **behavioral testing of store state management**:
+This phase focuses on **store testing** with behavioral approach:
 
-1. **State Tests**: Validate state interface structure
-2. **Helper Tests**: Test history management pure functions
-3. **Action Tests**: Test each action's behavior with mocked service
-4. **Selector Tests**: Test computed value derivations
-5. **Integration Tests**: Test complete store workflows
+1. **State Tests**: Verify interface and initial state
+2. **Action Tests**: Test all actions with success/error paths
+3. **History Tests**: Verify undo/redo and history limits
+4. **Selector Tests**: Test computed selectors
 
 ### Test Types by Task
 
 | Task | Test Type | Focus |
 |------|-----------|-------|
-| Task 1 | Type Checking | State structure validation |
-| Task 2 | Unit | Default value validation |
-| Task 3 | Unit | History helper logic |
-| Task 4-8 | Unit | Action behavior with mocked service |
-| Task 9 | Unit | Selector computations |
-| Task 10 | Integration | Complete store workflows |
+| Task 1 | Unit | State interface |
+| Task 2 | Unit | Store configuration |
+| Task 3 | Unit | Load action with mock service |
+| Task 4 | Unit | Save action with mock service |
+| Task 5 | Unit | Update action and history tracking |
+| Task 6 | Unit | Undo/redo navigation |
+| Task 7 | Unit | Selector computations |
+| Task 8 | Integration | Full store behavior |
 
-### Testing Standards Reference
+### Testing Framework
 
-- Follow [Store Testing Guide](../../STORE_TESTING.md) for store-specific patterns
-- Use [Testing Standards](../../TESTING_STANDARDS.md) for behavioral testing approach
-- Mock domain service at injection token boundary
-- Test observable behaviors, not implementation details
+- **Unit Tests**: Vitest (NOT Jasmine)
+- **Mocking**: TestBed providers for SETTINGS_SERVICE
+- **Assertions**: Vitest matchers
+
+### Key Testing Principles
+
+- Mock at application-infrastructure boundary (service)
+- Test observable state changes (signals)
+- Verify updateState called with actionMessage
+- Test edge cases (empty history, limits, errors)
+- Follow PlayerStore test patterns
 
 ---
 
@@ -860,12 +416,13 @@ This phase focuses on **behavioral testing of store state management**:
 - **Previous Phase**: [Phase 2 - Domain Contracts & Infrastructure Layer](./SETTINGS_FEATURE_P2.md)
 - **Next Phase**: [Phase 4 - Bootstrap Integration](./SETTINGS_FEATURE_P4.md)
 - **Feature Overview**: [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md)
-- **State Patterns**: [State Standards](../../STATE_STANDARDS.md)
-- **Store Testing**: [Store Testing Guide](../../STORE_TESTING.md)
-- **Testing Approach**: [Testing Standards](../../TESTING_STANDARDS.md)
+- **State Standards**: [STATE_STANDARDS.md](../../STATE_STANDARDS.md) - **CRITICAL REFERENCE**
+- **PlayerStore Reference**: [Player Store](../../../libs/application/src/lib/player/player-store.ts)
+- **Player Actions**: [Player Actions](../../../libs/application/src/lib/player/actions/)
+- **Store Testing**: [Store Testing](../../STORE_TESTING.md)
 
 ---
 
 _Phase Status: Ready for Implementation_
 _Last Updated: 2025-01-11_
-_Estimated Effort: 6-8 hours_
+_Estimated Effort: 4-6 hours_
