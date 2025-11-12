@@ -228,6 +228,7 @@ libs/features/settings/
 **Related Documentation:**
 
 - **IMPORTANT**: [E2E Testing Standards](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md) - **READ THIS ENTIRE DOCUMENT AND ALL LINKED DOCUMENTATION**
+- [E2E Constants](../../../apps/teensyrom-ui-e2e/src/support/constants/E2E_CONSTANTS.md) - Constant patterns
 - [E2E Fixtures](../../../apps/teensyrom-ui-e2e/src/support/test-data/fixtures/E2E_FIXTURES.md) - Fixture patterns
 - [E2E Interceptors](../../../apps/teensyrom-ui-e2e/src/support/interceptors/E2E_INTERCEPTORS.md) - Interceptor patterns
 - [E2E Generators](../../../apps/teensyrom-ui-e2e/src/support/test-data/generators/E2E_TEST_GENERATORS.md) - Generator patterns
@@ -235,6 +236,7 @@ libs/features/settings/
 
 **Implementation Subtasks:**
 
+- [ ] **Create settings constants**: Define pre-built constants data in appropriate constants files
 - [ ] **Create settings fixtures**: Define pre-built settings data in fixtures/settings.fixture.ts
 - [ ] **Create settings generators**: Factory functions for dynamic settings data in generators/settings.generators.ts
 - [ ] **Create settings interceptors**: Wrapper functions for cy.intercept in interceptors/settings.interceptors.ts
@@ -252,6 +254,7 @@ libs/features/settings/
 - Create multiple fixture scenarios (default, custom, invalid)
 - Generators use @faker-js/faker for dynamic data
 - Interceptors handle both success and error modes
+- Constants should be used across fixtures, interceptors, and tests
 - Include waitForSettingsLoad() function co-located with interceptor
 - Reference backend Settings endpoints for accurate request/response structure
 - Follow existing device and player E2E patterns exactly
