@@ -26,3 +26,6 @@ export * from './player-scope.enum';
 export * from './alert-severity.enum';
 export * from './alert-position.enum';
 export * from './alert-message.model';
+
+// Settings models
+export * from './settings.model';
