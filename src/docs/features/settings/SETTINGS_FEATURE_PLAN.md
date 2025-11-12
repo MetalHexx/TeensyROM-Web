@@ -9,7 +9,6 @@
 - **State Standards**: [STATE_STANDARDS.md](../../STATE_STANDARDS.md)
 - **Store Testing**: [STORE_TESTING.md](../../STORE_TESTING.md)
 - **Smart Component Testing**: [SMART_COMPONENT_TESTING.md](../../SMART_COMPONENT_TESTING.md)
-- **Domain Standards**: [DOMAIN_STANDARDS.md](../../DOMAIN_STANDARDS.md)
 - **Style Guide**: [STYLE_GUIDE.md](../../STYLE_GUIDE.md)
 - **Component Library**: [COMPONENT_LIBRARY.md](../../COMPONENT_LIBRARY.md)
 - **Service Standards**: [SERVICE_STANDARDS.md](../../SERVICE_STANDARDS.md)
