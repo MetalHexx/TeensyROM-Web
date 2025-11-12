@@ -17,8 +17,8 @@ Implement reactive forms architecture with decomposed section components. Each s
 
 **Standards & Guidelines:**
 
-- [ ] [Coding Standards - Reactive Forms](../../CODING_STANDARDS.md#reactive-forms) - Form patterns and FormGroup passing
-- [ ] [Form Component Tree](../../FORM_COMPONENT_TREE.md) - Component hierarchy pattern for forms
+- [ ] [Coding Standards](../../CODING_STANDARDS.md) - General Coding standards
+- [ ] [Form Standards](../../FORM_STANDARDS.md) -  Form building and validation patterns
 - [ ] [Smart Component Testing](../../SMART_COMPONENT_TESTING.md) - Component testing patterns
 - [ ] [Style Guide](../../STYLE_GUIDE.md) - Form styling conventions
 - [ ] [Testing Standards](../../TESTING_STANDARDS.md) - Testing approaches
