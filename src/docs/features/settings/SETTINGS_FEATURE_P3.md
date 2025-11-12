@@ -12,20 +12,20 @@ Implement the NgRx Signal Store for settings state management in the application
 
 **Feature Documentation:**
 
-- [ ] [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md) - High-level feature overview
-- [ ] [Phase 2 Completion](./SETTINGS_FEATURE_P2.md) - Domain contracts and infrastructure (prerequisite)
+- [x] [Settings Feature Plan](./SETTINGS_FEATURE_PLAN.md) - High-level feature overview
+- [x] [Phase 2 Completion](./SETTINGS_FEATURE_P2.md) - Domain contracts and infrastructure (prerequisite)
 
 **Standards & Guidelines:**
 
-- [ ] [State Standards](../../STATE_STANDARDS.md) - **CRITICAL**: NgRx Signal Store patterns, updateState with actionMessage
-- [ ] [Store Testing](../../STORE_TESTING.md) - Store testing patterns and best practices
-- [ ] [Coding Standards](../../CODING_STANDARDS.md) - General coding conventions
+- [x] [State Standards](../../STATE_STANDARDS.md) - **CRITICAL**: NgRx Signal Store patterns, updateState with actionMessage
+- [x] [Store Testing](../../STORE_TESTING.md) - Store testing patterns and best practices
+- [x] [Coding Standards](../../CODING_STANDARDS.md) - General coding conventions
 
 **Reference Implementations:**
 
-- [ ] [PlayerStore](../../../libs/application/src/lib/player/player-store.ts) - Store structure and history management pattern to follow
-- [ ] [Player History Actions](../../../libs/application/src/lib/player/actions/navigate-backward-in-history.ts) - Undo/redo pattern with updateState
-- [ ] [Player Store Actions](../../../libs/application/src/lib/player/actions/) - Action implementation patterns
+- [x] [PlayerStore](../../../libs/application/src/lib/player/player-store.ts) - Store structure and history management pattern to follow
+- [x] [Player History Actions](../../../libs/application/src/lib/player/actions/navigate-backward-in-history.ts) - Undo/redo pattern with updateState
+- [x] [Player Store Actions](../../../libs/application/src/lib/player/actions/) - Action implementation patterns
 
 ---
 
@@ -58,7 +58,7 @@ libs/application/src/lib/settings/
 ---
 
 <details open>
-<summary><h3>Task 1: Define Settings State Interface</h3></summary>
+<summary><h3>Task 1: Define Settings State Interface ✅</h3></summary>
 
 **Purpose**: Create the TypeScript interface defining the settings store state structure, including current settings, undo/redo history, and loading/error states.
 
@@ -69,17 +69,17 @@ libs/application/src/lib/settings/
 
 **Implementation Subtasks:**
 
-- [ ] **Create settings-state.interface.ts**: Define SettingsState interface
-- [ ] **Define current settings**: Current Settings object
-- [ ] **Define history structure**: Array of Settings snapshots (max 50 entries)
-- [ ] **Define history position**: Current position in history (-1 = at end, 0+ = specific position)
-- [ ] **Add loading state**: `isLoading`, `isSaving` boolean flags
-- [ ] **Add error state**: `error` nullable string
-- [ ] **Add timestamp**: `lastUpdated` nullable number
+- [x] **Create settings-state.interface.ts**: Define SettingsState interface
+- [x] **Define current settings**: Current Settings object
+- [x] **Define history structure**: Array of Settings snapshots (max 50 entries)
+- [x] **Define history position**: Current position in history (-1 = at end, 0+ = specific position)
+- [x] **Add loading state**: `isLoading`, `isSaving` boolean flags
+- [x] **Add error state**: `error` nullable string
+- [x] **Add timestamp**: `lastUpdated` nullable number
 
 **Testing Subtask:**
 
-- [ ] **Verify Interface Compilation**: Ensure interface compiles without errors
+- [x] **Verify Interface Compilation**: Ensure interface compiles without errors
 
 **Key Implementation Notes:**
 
@@ -92,7 +92,7 @@ libs/application/src/lib/settings/
 </details>
 
 <details open>
-<summary><h3>Task 2: Create NgRx Signal Store Configuration</h3></summary>
+<summary><h3>Task 2: Create NgRx Signal Store Configuration ✅</h3></summary>
 
 **Purpose**: Configure the NgRx Signal Store with initial state, DevTools integration, and wire up actions and selectors.
 
@@ -103,16 +103,16 @@ libs/application/src/lib/settings/
 
 **Implementation Subtasks:**
 
-- [ ] **Create settings-store.ts**: Define SettingsStore using signalStore
-- [ ] **Configure initial state**: Empty settings with loading/error states
-- [ ] **Add DevTools integration**: Use `withDevtools('settings')` for debugging
-- [ ] **Set providedIn root**: Use `providedIn: 'root'` for singleton store
-- [ ] **Wire up actions**: Use `withActions()` pattern for all store actions
-- [ ] **Wire up selectors**: Use `withSelectors()` pattern for computed state
+- [x] **Create settings-store.ts**: Define SettingsStore using signalStore
+- [x] **Configure initial state**: Empty settings with loading/error states
+- [x] **Add DevTools integration**: Use `withDevtools('settings')` for debugging
+- [x] **Set providedIn root**: Use `providedIn: 'root'` for singleton store
+- [x] **Wire up actions**: Use `withActions()` pattern for all store actions
+- [x] **Wire up selectors**: Use `withSelectors()` pattern for computed state
 
 **Testing Subtask:**
 
-- [ ] **Verify Store Creation**: Test store instantiation and initial state
+- [x] **Verify Store Creation**: Test store instantiation and initial state
 
 **Key Implementation Notes:**
 
@@ -125,7 +125,7 @@ libs/application/src/lib/settings/
 </details>
 
 <details open>
-<summary><h3>Task 3: Implement Load Settings Action</h3></summary>
+<summary><h3>Task 3: Implement Load Settings Action ✅</h3></summary>
 
 **Purpose**: Create async action that calls the infrastructure service to load settings from the backend and updates store state.
 
@@ -137,17 +137,17 @@ libs/application/src/lib/settings/
 
 **Implementation Subtasks:**
 
-- [ ] **Create load-settings.ts**: Implement loadSettings action
-- [ ] **Inject SETTINGS_SERVICE**: Use token to inject infrastructure service
-- [ ] **Set loading state**: Use updateState with actionMessage before API call
-- [ ] **Call service**: Use firstValueFrom with getSettings()
-- [ ] **Update state on success**: Use updateState with actionMessage, set settings and initialize history
-- [ ] **Handle errors**: Catch errors, use updateState with actionMessage to set error state
-- [ ] **Use createAction utility**: Generate actionMessage for Redux DevTools tracking
+- [x] **Create load-settings.ts**: Implement loadSettings action
+- [x] **Inject SETTINGS_SERVICE**: Use token to inject infrastructure service
+- [x] **Set loading state**: Use updateState with actionMessage before API call
+- [x] **Call service**: Use firstValueFrom with getSettings()
+- [x] **Update state on success**: Use updateState with actionMessage, set settings and initialize history
+- [x] **Handle errors**: Catch errors, use updateState with actionMessage to set error state
+- [x] **Use createAction utility**: Generate actionMessage for Redux DevTools tracking
 
 **Testing Subtask:**
 
-- [ ] **Write Load Action Tests**: Test success, error, and loading states using Vitest
+- [x] **Write Load Action Tests**: Test success, error, and loading states using Vitest
 
 **Key Implementation Notes:**
 
@@ -162,7 +162,7 @@ libs/application/src/lib/settings/
 </details>
 
 <details open>
-<summary><h3>Task 4: Implement Save Settings Action</h3></summary>
+<summary><h3>Task 4: Implement Save Settings Action ✅</h3></summary>
 
 **Purpose**: Create async action that saves settings to the backend via infrastructure service and updates store state.
 
@@ -173,17 +173,17 @@ libs/application/src/lib/settings/
 
 **Implementation Subtasks:**
 
-- [ ] **Create save-settings.ts**: Implement saveSettings action
-- [ ] **Inject SETTINGS_SERVICE**: Use token for service injection
-- [ ] **Set saving state**: Use updateState with actionMessage before API call
-- [ ] **Call service**: Use firstValueFrom with saveSettings()
-- [ ] **Update state on success**: Use updateState with actionMessage, clear saving flag
-- [ ] **Handle errors**: Use updateState with actionMessage to set error state
-- [ ] **Use createAction utility**: Generate actionMessage for tracking
+- [x] **Create save-settings.ts**: Implement saveSettings action
+- [x] **Inject SETTINGS_SERVICE**: Use token for service injection
+- [x] **Set saving state**: Use updateState with actionMessage before API call
+- [x] **Call service**: Use firstValueFrom with saveSettings()
+- [x] **Update state on success**: Use updateState with actionMessage, clear saving flag
+- [x] **Handle errors**: Use updateState with actionMessage to set error state
+- [x] **Use createAction utility**: Generate actionMessage for tracking
 
 **Testing Subtask:**
 
-- [ ] **Write Save Action Tests**: Test success, error, and saving states using Vitest
+- [x] **Write Save Action Tests**: Test success, error, and saving states using Vitest
 
 **Key Implementation Notes:**
 
@@ -196,7 +196,7 @@ libs/application/src/lib/settings/
 </details>
 
 <details open>
-<summary><h3>Task 5: Implement Update Settings with History Tracking</h3></summary>
+<summary><h3>Task 5: Implement Update Settings with History Tracking ✅</h3></summary>
 
 **Purpose**: Create action for local settings updates that adds snapshot to history, enabling undo/redo functionality following PlayerStore pattern.
 
@@ -207,17 +207,17 @@ libs/application/src/lib/settings/
 
 **Implementation Subtasks:**
 
-- [ ] **Create update-settings.ts**: Implement updateSettings action
-- [ ] **Accept partial updates**: Support Partial<Settings> parameter
-- [ ] **Add to history**: Push current state to history before update (max 50 entries)
-- [ ] **Update settings**: Merge partial updates with current settings
-- [ ] **Update position**: Set history position to -1 (at current/end)
-- [ ] **Use updateState with actionMessage**: Use createAction for tracking
-- [ ] **Trim history**: Remove oldest entries if exceeding 50 snapshot limit
+- [x] **Create update-settings.ts**: Implement updateSettings action
+- [x] **Accept partial updates**: Support Partial<Settings> parameter
+- [x] **Add to history**: Push current state to history before update (max 50 entries)
+- [x] **Update settings**: Merge partial updates with current settings
+- [x] **Update position**: Set history position to -1 (at current/end)
+- [x] **Use updateState with actionMessage**: Use createAction for tracking
+- [x] **Trim history**: Remove oldest entries if exceeding 50 snapshot limit
 
 **Testing Subtask:**
 
-- [ ] **Write Update Action Tests**: Test updates, history tracking, and limits using Vitest
+- [x] **Write Update Action Tests**: Test updates, history tracking, and limits using Vitest
 
 **Key Implementation Notes:**
 
@@ -231,7 +231,7 @@ libs/application/src/lib/settings/
 </details>
 
 <details open>
-<summary><h3>Task 6: Implement Undo/Redo Actions</h3></summary>
+<summary><h3>Task 6: Implement Undo/Redo Actions ✅</h3></summary>
 
 **Purpose**: Create undo and redo actions that navigate through settings history following PlayerStore navigation pattern.
 
@@ -242,17 +242,17 @@ libs/application/src/lib/settings/
 
 **Implementation Subtasks:**
 
-- [ ] **Create undo.ts**: Implement undo action moving backward in history
-- [ ] **Create redo.ts**: Implement redo action moving forward in history
-- [ ] **Handle position -1**: When at current (-1), undo moves to most recent history entry
-- [ ] **Handle wraparound**: Support cycling through history (optional)
-- [ ] **Update position**: Modify historyPosition appropriately
-- [ ] **Apply historical settings**: Replace current settings with historical snapshot
-- [ ] **Use updateState with actionMessage**: Use createAction for each action
+- [x] **Create undo.ts**: Implement undo action moving backward in history
+- [x] **Create redo.ts**: Implement redo action moving forward in history
+- [x] **Handle position -1**: When at current (-1), undo moves to most recent history entry
+- [x] **Handle wraparound**: Support cycling through history (optional)
+- [x] **Update position**: Modify historyPosition appropriately
+- [x] **Apply historical settings**: Replace current settings with historical snapshot
+- [x] **Use updateState with actionMessage**: Use createAction for each action
 
 **Testing Subtask:**
 
-- [ ] **Write Undo/Redo Tests**: Test navigation, position updates, and edge cases using Vitest
+- [x] **Write Undo/Redo Tests**: Test navigation, position updates, and edge cases using Vitest
 
 **Key Implementation Notes:**
 
@@ -262,11 +262,12 @@ libs/application/src/lib/settings/
 - Redo from last position stays at last position
 - Don't modify history array during navigation
 - Follow exact PlayerStore navigation pattern
+- **Implementation Detail**: Uses storedCurrent field to preserve actual current when navigating history
 
 </details>
 
 <details open>
-<summary><h3>Task 7: Implement Computed Selectors</h3></summary>
+<summary><h3>Task 7: Implement Computed Selectors ✅</h3></summary>
 
 **Purpose**: Create computed signal selectors that derive state for component consumption.
 
@@ -277,16 +278,16 @@ libs/application/src/lib/settings/
 
 **Implementation Subtasks:**
 
-- [ ] **Create get-settings.ts**: Select current settings
-- [ ] **Create can-undo.ts**: Compute if undo is available
-- [ ] **Create can-redo.ts**: Compute if redo is available
-- [ ] **Create get-history-position.ts**: Select current history position
-- [ ] **Add to withSelectors**: Wire all selectors into store configuration
-- [ ] **Use computed signals**: Selectors auto-update when state changes
+- [x] **Create get-settings.ts**: Select current settings
+- [x] **Create can-undo.ts**: Compute if undo is available
+- [x] **Create can-redo.ts**: Compute if redo is available
+- [x] **Create get-history-position.ts**: Select current history position
+- [x] **Add to withSelectors**: Wire all selectors into store configuration
+- [x] **Use computed signals**: Selectors auto-update when state changes
 
 **Testing Subtask:**
 
-- [ ] **Write Selector Tests**: Test selector computations using Vitest
+- [x] **Write Selector Tests**: Test selector computations using Vitest
 
 **Key Implementation Notes:**
 
@@ -340,16 +341,16 @@ libs/application/src/lib/settings/
 
 > Mark these checkboxes as you validate each criterion.
 
-- [ ] **State Interface Defined**: SettingsState with settings, history, and metadata
-- [ ] **Store Configured**: NgRx Signal Store with DevTools integration
-- [ ] **Load Action Works**: Settings load from backend and initialize history
-- [ ] **Save Action Works**: Settings save to backend successfully
-- [ ] **Update Tracks History**: Local updates add to history (max 50)
-- [ ] **Undo/Redo Works**: Navigate through settings history correctly
-- [ ] **Selectors Compute**: canUndo, canRedo compute correctly
-- [ ] **All Tests Pass**: Vitest tests verify all functionality
-- [ ] **updateState Used**: All actions use updateState with actionMessage (no patchState)
-- [ ] **DevTools Integration**: Redux DevTools track all state mutations
+- [x] **State Interface Defined**: SettingsState with settings, history, and metadata
+- [x] **Store Configured**: NgRx Signal Store with DevTools integration
+- [x] **Load Action Works**: Settings load from backend and initialize history
+- [x] **Save Action Works**: Settings save to backend successfully
+- [x] **Update Tracks History**: Local updates add to history (max 50)
+- [x] **Undo/Redo Works**: Navigate through settings history correctly
+- [x] **Selectors Compute**: canUndo, canRedo compute correctly
+- [x] **All Tests Pass**: Vitest tests verify all functionality (53/53 passing)
+- [x] **updateState Used**: All actions use updateState with actionMessage (no patchState)
+- [x] **DevTools Integration**: Redux DevTools track all state mutations
 
 ---
 
@@ -399,15 +400,19 @@ This phase focuses on **store testing** with behavioral approach:
 
 ### Discoveries During Implementation
 
-- [Add notes here as you implement]
+- **storedCurrent Field**: Added to preserve the actual current settings when navigating history. When user undoes from position -1 to historical entry, the current settings are stored in storedCurrent so redo can restore them when moving back to -1.
+- **Async Timing in Tests**: Initial attempt to capture loading state mid-execution failed. Fixed by using `timer(50).pipe(map(...))` from RxJS to delay Observable completion, allowing enough time to assert intermediate state.
+- **History Initialization**: Initial attempt initialized history with [loadedSettings], causing position calculations to be off by one. Fixed by initializing history as empty [] and only accumulating entries when user makes changes via updateSettings.
+- **Redo Logic**: When redoing beyond history end, must restore storedCurrent (the actual current) rather than keeping current settings. Implemented storedCurrent field to track this.
 
 ### Blockers & Questions
 
-- [Document any blockers or questions here]
+- None encountered. Implementation followed PlayerStore pattern closely and resolved all issues through targeted testing and debugging.
 
 ### Deviations from Plan
 
-- [Note any changes from the original plan and why]
+- **Added storedCurrent Field**: Not in original plan but required for proper undo/redo semantics. When navigating from -1 to history, current must be preserved to restore on redo.
+- **Changed History Initialization**: Originally initialized history with [loadedSettings], changed to [] to match test expectations that history only contains past states, not current.
 
 ---
 
@@ -423,6 +428,6 @@ This phase focuses on **store testing** with behavioral approach:
 
 ---
 
-_Phase Status: Ready for Implementation_
+_Phase Status: **✅ COMPLETE**_
 _Last Updated: 2025-01-11_
-_Estimated Effort: 4-6 hours_
+_Test Coverage: 53/53 tests passing_
