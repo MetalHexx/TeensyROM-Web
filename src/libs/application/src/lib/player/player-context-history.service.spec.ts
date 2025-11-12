@@ -8,8 +8,10 @@ import {
   LaunchMode,
   PLAYER_SERVICE,
   DEVICE_SERVICE,
+  ALERT_SERVICE,
   IPlayerService,
   IDeviceService,
+  IAlertService,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -74,6 +76,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
     resetDevice: MockedFunction<IDeviceService['resetDevice']>;
     pingDevice: MockedFunction<IDeviceService['pingDevice']>;
   };
+  let mockAlertService: Partial<IAlertService>;
 
   // Helper to wait for async operations
   const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -112,12 +115,23 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       getSelectedDirectoryState: vi.fn(),
     };
 
+    mockAlertService = {
+      alerts$: vi.fn(),
+      show: vi.fn(),
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+      info: vi.fn(),
+      dismiss: vi.fn(),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         PlayerContextService,
         PlayerStore, // Real store - we want to test integration
         { provide: PLAYER_SERVICE, useValue: mockPlayerService },
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
+        { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
       ],
     });

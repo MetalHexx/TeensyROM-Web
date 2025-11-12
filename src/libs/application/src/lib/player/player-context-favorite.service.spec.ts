@@ -3,10 +3,12 @@ import { TestBed } from '@angular/core/testing';
 import { of, Subject } from 'rxjs';
 import {
   DEVICE_SERVICE,
+  ALERT_SERVICE,
   FileItem,
   FileItemType,
   IDeviceService,
   IPlayerService,
+  IAlertService,
   LaunchMode,
   PLAYER_SERVICE,
   StorageType,
@@ -51,6 +53,7 @@ describe('PlayerContextService - Favorite Synchronization', () => {
   let service: PlayerContextService;
   let mockPlayerService: Partial<IPlayerService>;
   let mockDeviceService: Partial<IDeviceService>;
+  let mockAlertService: Partial<IAlertService>;
   let mockStorageStore: Partial<StorageStoreContract>;
   let mockTimerManager: Partial<PlayerTimerManager>;
   let timerUpdateSubject: Subject<unknown>;
@@ -75,6 +78,16 @@ describe('PlayerContextService - Favorite Synchronization', () => {
       disconnectDevice: vi.fn<IDeviceService['disconnectDevice']>(),
       resetDevice: vi.fn<IDeviceService['resetDevice']>(),
       pingDevice: vi.fn<IDeviceService['pingDevice']>(),
+    };
+
+    mockAlertService = {
+      alerts$: vi.fn(),
+      show: vi.fn(),
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+      info: vi.fn(),
+      dismiss: vi.fn(),
     };
 
     mockStorageStore = {
@@ -106,6 +119,7 @@ describe('PlayerContextService - Favorite Synchronization', () => {
         PlayerStore,
         { provide: PLAYER_SERVICE, useValue: mockPlayerService },
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
+        { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: PlayerTimerManager, useValue: mockTimerManager },
       ],
