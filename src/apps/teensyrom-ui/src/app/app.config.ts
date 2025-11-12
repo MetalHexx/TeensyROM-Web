@@ -16,6 +16,7 @@ import {
   FILES_API_CLIENT_PROVIDER,
   PLAYER_SERVICE_PROVIDER,
   PLAYER_API_CLIENT_PROVIDER,
+  SETTINGS_PROVIDERS,
 } from '@teensyrom-nx/infrastructure';
 
 export const appConfig: ApplicationConfig = {
@@ -38,5 +39,6 @@ export const appConfig: ApplicationConfig = {
     FILES_API_CLIENT_PROVIDER,
     PLAYER_SERVICE_PROVIDER,
     PLAYER_API_CLIENT_PROVIDER,
+    SETTINGS_PROVIDERS,
   ],
 };
