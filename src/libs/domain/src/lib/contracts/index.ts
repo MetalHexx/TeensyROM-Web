@@ -12,3 +12,6 @@ export * from './player.contract';
 
 // Alert contracts
 export * from './alert.contract';
+
+// Settings contracts
+export * from './settings.contract';
