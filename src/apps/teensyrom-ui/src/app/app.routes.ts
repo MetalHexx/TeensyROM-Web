@@ -25,6 +25,12 @@ export const appRoutes: Route[] = [
         loadComponent: () =>
           import('@teensyrom-nx/features/player').then((m) => m.PlayerViewComponent),
       },
+      {
+        path: 'settings',
+        data: { title: 'Settings' },
+        loadComponent: () =>
+          import('@teensyrom-nx/features/settings').then((m) => m.SettingsViewComponent),
+      },
     ],
   },
 ];

@@ -1,0 +1,35 @@
+@if (isLoading()) {
+  <div class="loading-state">
+    <div class="loading-content">
+      <span class="material-icons loading-icon">settings</span>
+      <p>Loading settings...</p>
+    </div>
+  </div>
+} @else if (error()) {
+  <div class="error-state">
+    <div class="error-content">
+      <span class="material-icons error-icon">error</span>
+      <h3>Error Loading Settings</h3>
+      <p>{{ error() }}</p>
+    </div>
+  </div>
+} @else if (formattedJson()) {
+  <div class="settings-container">
+    <div class="settings-header">
+      <h2>Current Settings</h2>
+      <p class="settings-description">
+        Current application settings loaded from backend
+      </p>
+    </div>
+    <div class="settings-content">
+      <pre class="settings-json">{{ formattedJson() }}</pre>
+    </div>
+  </div>
+} @else {
+  <div class="empty-state">
+    <div class="empty-content">
+      <span class="material-icons empty-icon">settings</span>
+      <p>No settings available</p>
+    </div>
+  </div>
+}
