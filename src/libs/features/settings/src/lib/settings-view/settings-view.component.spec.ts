@@ -1,24 +1,49 @@
 import '@analogjs/vitest-angular/setup-zone';
-import { ComponentFixture, TestBed, fakeAsync, tick, flush } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal, WritableSignal } from '@angular/core';
-import { FormGroup } from '@angular/forms';
+import { FormGroup, FormBuilder, Validators } from '@angular/forms';
 import { SettingsViewComponent } from './settings-view.component';
-import { Settings } from '@teensyrom-nx/domain';
-import { SettingsStore } from '@teensyrom-nx/application';
+import { Settings, SETTINGS_SERVICE, ISettingsService } from '@teensyrom-nx/domain';
+import { SettingsFormService } from './settings-form.service';
+
+/**
+ * Custom validator to ensure at least one weight is greater than 0
+ * (Copied from SettingsFormService for test mock)
+ */
+function atLeastOneWeightValidator(group: FormGroup): { [key: string]: boolean } | null {
+  const nameWeight = group.get('nameWeight')?.value || 0;
+  const titleWeight = group.get('titleWeight')?.value || 0;
+  const creatorWeight = group.get('creatorWeight')?.value || 0;
+  const releaseInfoWeight = group.get('releaseInfoWeight')?.value || 0;
+  const descriptionWeight = group.get('descriptionWeight')?.value || 0;
+
+  const hasAtLeastOne =
+    nameWeight > 0 ||
+    titleWeight > 0 ||
+    creatorWeight > 0 ||
+    releaseInfoWeight > 0 ||
+    descriptionWeight > 0;
+
+  return hasAtLeastOne ? null : { atLeastOneWeight: true };
+}
 
 describe('SettingsViewComponent', () => {
   let component: SettingsViewComponent;
   let fixture: ComponentFixture<SettingsViewComponent>;
-  let mockSettingsStore: Partial<SettingsStore>;
-  
+  let mockFormService: Partial<SettingsFormService>;
+  let mockSettingsService: ISettingsService;
+
   // Mock signals
   let settingsSignal: WritableSignal<Settings | null>;
   let isLoadingSignal: WritableSignal<boolean>;
   let isSavingSignal: WritableSignal<boolean>;
   let errorSignal: WritableSignal<string | null>;
-  let historySignal: WritableSignal<Settings[]>;
-  let historyPositionSignal: WritableSignal<number>;
+  let settingsFormSignal: WritableSignal<FormGroup | null>;
+  let autoSaveEnabledSignal: WritableSignal<boolean>;
+  let canSaveSignal: WritableSignal<boolean>;
+  let canUndoSignal: WritableSignal<boolean>;
+  let canRedoSignal: WritableSignal<boolean>;
 
   const mockSettings: Settings = {
     connectionSettings: {
@@ -60,43 +85,119 @@ describe('SettingsViewComponent', () => {
   };
 
   beforeEach(async () => {
+    // Create mock settings service
+    mockSettingsService = {
+      getSettings: vi.fn().mockResolvedValue(mockSettings),
+      saveSettings: vi.fn().mockResolvedValue(undefined),
+    } as ISettingsService;
+
     // Initialize mock signals
     settingsSignal = signal(mockSettings);
     isLoadingSignal = signal(false);
     isSavingSignal = signal(false);
     errorSignal = signal(null);
-    historySignal = signal([mockSettings]);
-    historyPositionSignal = signal(-1);
+    autoSaveEnabledSignal = signal(true);
+    canSaveSignal = signal(true);
+    canUndoSignal = signal(true);
+    canRedoSignal = signal(false);
 
-    // Create mock store
-    mockSettingsStore = {
+    // Build a real form for testing
+    const fb = new FormBuilder();
+    const mockForm = fb.group({
+      connectionSettings: fb.group({
+        connectionType: [mockSettings.connectionSettings.connectionType, Validators.required],
+        autoConnectEnabled: [mockSettings.connectionSettings.autoConnectEnabled],
+      }),
+      playerSettings: fb.group({
+        repeatModeOnStartup: [mockSettings.playerSettings.repeatModeOnStartup],
+        playTimerEnabled: [mockSettings.playerSettings.playTimerEnabled],
+        muteFastForward: [mockSettings.playerSettings.muteFastForward],
+        muteRandomSeek: [mockSettings.playerSettings.muteRandomSeek],
+        startupFilter: [mockSettings.playerSettings.startupFilter, Validators.required],
+        startupLaunchEnabled: [mockSettings.playerSettings.startupLaunchEnabled],
+        startupLaunchRandom: [mockSettings.playerSettings.startupLaunchRandom],
+      }),
+      fileTransferSettings: fb.group({
+        watchDirectoryLocation: [mockSettings.fileTransferSettings.watchDirectoryLocation],
+        autoTransferPath: [
+          mockSettings.fileTransferSettings.autoTransferPath,
+          Validators.required,
+        ],
+        autoFileCopyEnabled: [mockSettings.fileTransferSettings.autoFileCopyEnabled],
+        autoLaunchOnCopyEnabled: [mockSettings.fileTransferSettings.autoLaunchOnCopyEnabled],
+        navToDirOnLaunch: [mockSettings.fileTransferSettings.navToDirOnLaunch],
+        syncFilesEnabled: [mockSettings.fileTransferSettings.syncFilesEnabled],
+      }),
+      searchSettings: fb.group({
+        weights: fb.group(
+          {
+            nameWeight: [mockSettings.searchSettings.weights.nameWeight, [Validators.min(0)]],
+            titleWeight: [mockSettings.searchSettings.weights.titleWeight, [Validators.min(0)]],
+            creatorWeight: [mockSettings.searchSettings.weights.creatorWeight, [Validators.min(0)]],
+            releaseInfoWeight: [
+              mockSettings.searchSettings.weights.releaseInfoWeight,
+              [Validators.min(0)],
+            ],
+            descriptionWeight: [
+              mockSettings.searchSettings.weights.descriptionWeight,
+              [Validators.min(0)],
+            ],
+          },
+          {
+            validators: atLeastOneWeightValidator,
+          }
+        ),
+        stopWords: ['the,and,or', Validators.required],
+        bannedDirectories: ['/system,/temp', Validators.required],
+        bannedFiles: ['.DS_Store,thumbs.db', Validators.required],
+      }),
+      appSettings: fb.group({
+        setupCompleted: [mockSettings.appSettings.setupCompleted],
+      }),
+    });
+    settingsFormSignal = signal(mockForm);
+
+    // Create mock form service
+    mockFormService = {
       settings: settingsSignal.asReadonly(),
       isLoading: isLoadingSignal.asReadonly(),
       isSaving: isSavingSignal.asReadonly(),
       error: errorSignal.asReadonly(),
-      history: historySignal.asReadonly(),
-      historyPosition: historyPositionSignal.asReadonly(),
-      getSettings: () => settingsSignal.asReadonly(),
+      settingsForm: settingsFormSignal.asReadonly(),
+      autoSaveEnabled: autoSaveEnabledSignal,
+      canSave: canSaveSignal.asReadonly(),
+      canUndo: canUndoSignal.asReadonly(),
+      canRedo: canRedoSignal.asReadonly(),
       saveSettings: vi.fn(),
-      updateSettings: vi.fn(),
       undo: vi.fn(),
       redo: vi.fn(),
+      getConnectionSettings: vi.fn(() => mockForm.get('connectionSettings') as FormGroup),
+      getPlayerSettings: vi.fn(() => mockForm.get('playerSettings') as FormGroup),
+      getFileTransferSettings: vi.fn(() => mockForm.get('fileTransferSettings') as FormGroup),
+      getSearchSettings: vi.fn(() => mockForm.get('searchSettings') as FormGroup),
+      getAppSettings: vi.fn(() => mockForm.get('appSettings') as FormGroup),
     };
 
     await TestBed.configureTestingModule({
       imports: [SettingsViewComponent],
       providers: [
         provideNoopAnimations(),
-        { provide: SettingsStore, useValue: mockSettingsStore },
+        { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(SettingsViewComponent, {
+        set: {
+          providers: [{ provide: SettingsFormService, useValue: mockFormService }],
+        },
+      })
+      .compileComponents();
 
     // Create component within injection context to support takeUntilDestroyed()
     TestBed.runInInjectionContext(() => {
       fixture = TestBed.createComponent(SettingsViewComponent);
       component = fixture.componentInstance;
     });
-    
+
     fixture.detectChanges();
   });
 
@@ -105,8 +206,8 @@ describe('SettingsViewComponent', () => {
       expect(component).toBeTruthy();
     });
 
-    it('should inject settings store', () => {
-      expect(component['settingsStore']).toBeTruthy();
+    it('should inject form service', () => {
+      expect(component['formService']).toBeTruthy();
     });
 
     it('should build form when settings load', () => {
@@ -170,108 +271,6 @@ describe('SettingsViewComponent', () => {
     });
   });
 
-  describe('Auto-save Behavior', () => {
-    it('should trigger save after 1000ms debounce when auto-save enabled', fakeAsync(() => {
-      const form = component.settingsForm();
-      expect(form).toBeTruthy();
-      if (!form) return;
-      const saveSpy = vi.spyOn(component, 'saveSettings');
-      
-      // Change a value
-      form.get('connectionSettings.autoConnectEnabled')?.setValue(false);
-      tick(500); // Not enough time
-      
-      expect(saveSpy).not.toHaveBeenCalled();
-      
-      tick(500); // Total 1000ms
-      
-      expect(saveSpy).toHaveBeenCalled();
-      flush();
-    }));
-
-    it('should not trigger auto-save when disabled', fakeAsync(() => {
-      component.autoSaveEnabled.set(false);
-      fixture.detectChanges();
-      
-      const form = component.settingsForm();
-      expect(form).toBeTruthy();
-      if (!form) return;
-      const saveSpy = vi.spyOn(component, 'saveSettings');
-      
-      form.get('connectionSettings.autoConnectEnabled')?.setValue(false);
-      tick(1000);
-      
-      expect(saveSpy).not.toHaveBeenCalled();
-      flush();
-    }));
-
-    it('should not trigger auto-save when form invalid', fakeAsync(() => {
-      const form = component.settingsForm();
-      expect(form).toBeTruthy();
-      if (!form) return;
-      const saveSpy = vi.spyOn(component, 'saveSettings');
-      
-      // Make form invalid by clearing required field
-      form.get('fileTransferSettings.autoTransferPath')?.setValue('');
-      tick(1000);
-      
-      expect(saveSpy).not.toHaveBeenCalled();
-      flush();
-    }));
-
-    it('should not trigger auto-save during store sync', fakeAsync(() => {
-      const saveSpy = vi.spyOn(component, 'saveSettings');
-      
-      // Simulate store change (undo/redo)
-      const newSettings = { ...mockSettings };
-      newSettings.connectionSettings.autoConnectEnabled = false;
-      historyPositionSignal.set(0); // Indicate history navigation
-      settingsSignal.set(newSettings);
-      
-      fixture.detectChanges();
-      tick(1000);
-      
-      expect(saveSpy).not.toHaveBeenCalled();
-      flush();
-    }));
-  });
-
-  describe('Manual Save', () => {
-    beforeEach(() => {
-      component.autoSaveEnabled.set(false);
-      fixture.detectChanges();
-    });
-
-    it('should call store saveSettings when button clicked', () => {
-      component.saveSettings();
-      
-      expect(mockSettingsStore.saveSettings).toHaveBeenCalled();
-    });
-
-    it('should convert form values to Settings model', () => {
-      const form = component.settingsForm();
-      expect(form).toBeTruthy();
-      if (!form) return;
-      form.get('connectionSettings.autoConnectEnabled')?.setValue(false);
-      
-      component.saveSettings();
-      
-      const callArg = vi.mocked(mockSettingsStore.updateSettings).mock.calls[0][0];
-      expect(callArg.settings.connectionSettings.autoConnectEnabled).toBe(false);
-    });
-
-    it('should convert comma-separated strings to arrays', () => {
-      const form = component.settingsForm();
-      expect(form).toBeTruthy();
-      form.get('searchSettings.stopWords')?.setValue('foo, bar, baz');
-      
-      component.saveSettings();
-      
-      const callArg = vi.mocked(mockSettingsStore.updateSettings).mock.calls[0][0];
-      expect(callArg.settings.searchSettings.stopWords).toEqual(['foo', 'bar', 'baz']);
-    });
-  });
-
   describe('Save Button State', () => {
     beforeEach(() => {
       component.autoSaveEnabled.set(false);
@@ -307,103 +306,72 @@ describe('SettingsViewComponent', () => {
     });
 
     it('should be disabled when saving', () => {
+      // Update mock canSave to reflect saving state (computed in real service)
+      canSaveSignal.set(false);
       isSavingSignal.set(true);
       fixture.detectChanges();
-      
+
       expect(component.canSave()).toBe(false);
     });
   });
 
   describe('Undo/Redo Actions', () => {
-    it('should call store undo when undo clicked', () => {
-      historyPositionSignal.set(1); // Enable undo
+    it('should delegate undo to form service', () => {
+      canUndoSignal.set(true);
       fixture.detectChanges();
-      
+
       component.undo();
-      
-      expect(mockSettingsStore.undo).toHaveBeenCalled();
+
+      expect(mockFormService.undo).toHaveBeenCalled();
     });
 
-    it('should call store redo when redo clicked', () => {
-      historyPositionSignal.set(0); // Enable redo (not at end)
-      historySignal.set([mockSettings, mockSettings]); // Multiple entries
+    it('should delegate redo to form service', () => {
+      canRedoSignal.set(true);
       fixture.detectChanges();
-      
+
       component.redo();
-      
-      expect(mockSettingsStore.redo).toHaveBeenCalled();
+
+      expect(mockFormService.redo).toHaveBeenCalled();
     });
 
     it('should disable undo when history is empty', () => {
-      historySignal.set([]);
-      historyPositionSignal.set(-1);
+      canUndoSignal.set(false);
       fixture.detectChanges();
-      
+
       expect(component.canUndo()).toBe(false);
     });
 
     it('should disable redo when at end of history', () => {
-      historySignal.set([mockSettings]);
-      historyPositionSignal.set(-1);
+      canRedoSignal.set(false);
       fixture.detectChanges();
-      
+
       expect(component.canRedo()).toBe(false);
     });
   });
 
   describe('Keyboard Shortcuts', () => {
     it('should call undo on Ctrl+Z', () => {
-      historyPositionSignal.set(1);
+      canUndoSignal.set(true);
       fixture.detectChanges();
-      
+
       const undoSpy = vi.spyOn(component, 'undo');
       const event = new KeyboardEvent('keydown', { ctrlKey: true, key: 'z' });
-      
+
       component.onUndoShortcut(event);
-      
+
       expect(undoSpy).toHaveBeenCalled();
     });
 
     it('should call redo on Ctrl+Y', () => {
-      historyPositionSignal.set(0);
-      historySignal.set([mockSettings, mockSettings]);
+      canRedoSignal.set(true);
       fixture.detectChanges();
-      
+
       const redoSpy = vi.spyOn(component, 'redo');
       const event = new KeyboardEvent('keydown', { ctrlKey: true, key: 'y' });
-      
+
       component.onRedoShortcut(event);
-      
+
       expect(redoSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe('Form Sync from Store', () => {
-    it('should patch form when settings change in store', () => {
-      const newSettings = { ...mockSettings };
-      newSettings.connectionSettings.autoConnectEnabled = false;
-      historyPositionSignal.set(0); // Simulate undo/redo
-      settingsSignal.set(newSettings);
-      
-      fixture.detectChanges();
-      
-      const form = component.settingsForm();
-      expect(form).toBeTruthy();
-      if (!form) return;
-      expect(form.get('connectionSettings.autoConnectEnabled')?.value).toBe(false);
-    });
-
-    it('should set sync flag during form patch', () => {
-      const newSettings = { ...mockSettings };
-      historyPositionSignal.set(0);
-      settingsSignal.set(newSettings);
-      
-      // Sync flag is private, but we can verify auto-save doesn't trigger
-      const saveSpy = vi.spyOn(component, 'saveSettings');
-      
-      fixture.detectChanges();
-      
-      expect(saveSpy).not.toHaveBeenCalled();
     });
   });
 
