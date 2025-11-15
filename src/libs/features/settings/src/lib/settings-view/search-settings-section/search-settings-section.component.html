@@ -1,0 +1,128 @@
+<lib-scaling-card title="Search Settings">
+  <form [formGroup]="formGroup()">
+    <!-- Responsive Grid for Groups -->
+    <div class="settings-grid">
+      <!-- Search Weights Group -->
+      <div class="settings-group" [formGroup]="weightsGroup()">
+        <h3 class="group-title">Search Weights</h3>
+        <p class="group-description">
+          Adjust the importance of different fields when searching content. At least one weight must be greater than 0.
+        </p>
+
+        <!-- Name Weight Slider -->
+        <div class="slider-row">
+          <span class="slider-label">File Name Weight</span>
+          <div class="slider-container">
+            <mat-slider min="0" max="10" step="0.1" discrete>
+              <input matSliderThumb formControlName="nameWeight" />
+            </mat-slider>
+            <span class="slider-value">{{ weightsGroup().get('nameWeight')?.value }}</span>
+          </div>
+        </div>
+
+        <!-- Title Weight Slider -->
+        <div class="slider-row">
+          <span class="slider-label">Title Weight</span>
+          <div class="slider-container">
+            <mat-slider min="0" max="10" step="0.1" discrete>
+              <input matSliderThumb formControlName="titleWeight" />
+            </mat-slider>
+            <span class="slider-value">{{ weightsGroup().get('titleWeight')?.value }}</span>
+          </div>
+        </div>
+
+        <!-- Creator Weight Slider -->
+        <div class="slider-row">
+          <span class="slider-label">Creator Weight</span>
+          <div class="slider-container">
+            <mat-slider min="0" max="10" step="0.1" discrete>
+              <input matSliderThumb formControlName="creatorWeight" />
+            </mat-slider>
+            <span class="slider-value">{{ weightsGroup().get('creatorWeight')?.value }}</span>
+          </div>
+        </div>
+
+        <!-- Release Info Weight Slider -->
+        <div class="slider-row">
+          <span class="slider-label">Release Info Weight</span>
+          <div class="slider-container">
+            <mat-slider min="0" max="10" step="0.1" discrete>
+              <input matSliderThumb formControlName="releaseInfoWeight" />
+            </mat-slider>
+            <span class="slider-value">{{ weightsGroup().get('releaseInfoWeight')?.value }}</span>
+          </div>
+        </div>
+
+        <!-- Description Weight Slider -->
+        <div class="slider-row">
+          <span class="slider-label">Description Weight</span>
+          <div class="slider-container">
+            <mat-slider min="0" max="10" step="0.1" discrete>
+              <input matSliderThumb formControlName="descriptionWeight" />
+            </mat-slider>
+            <span class="slider-value">{{ weightsGroup().get('descriptionWeight')?.value }}</span>
+          </div>
+        </div>
+
+        @if (weightsGroup().hasError('atLeastOneWeight') && weightsGroup().touched) {
+          <mat-error class="group-error">At least one search weight must be greater than 0</mat-error>
+        }
+      </div>
+
+      <!-- Right Column Container -->
+      <div class="settings-column">
+        <!-- Stop Words Group -->
+        <div class="settings-group">
+          <h3 class="group-title">Stop Words</h3>
+
+          <mat-form-field appearance="fill" class="full-width">
+            <mat-label>Stop Words (comma-separated)</mat-label>
+            <textarea
+              matInput
+              formControlName="stopWords"
+              rows="3"
+              placeholder="the, and, or, a, an"
+            ></textarea>
+            <mat-hint>Words to exclude from search processing</mat-hint>
+            @if (formGroup().get('stopWords')?.hasError('required') && formGroup().get('stopWords')?.touched) {
+              <mat-error>Stop words list is required</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <!-- Banned Content Group -->
+        <div class="settings-group">
+          <h3 class="group-title">Banned Content</h3>
+
+          <mat-form-field appearance="fill" class="full-width">
+            <mat-label>Banned Directories (comma-separated)</mat-label>
+            <textarea
+              matInput
+              formControlName="bannedDirectories"
+              rows="3"
+              placeholder="/system, /temp, /cache"
+            ></textarea>
+            <mat-hint>Directories to exclude from search and indexing</mat-hint>
+            @if (formGroup().get('bannedDirectories')?.hasError('required') && formGroup().get('bannedDirectories')?.touched) {
+              <mat-error>Banned directories list is required</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="fill" class="full-width">
+            <mat-label>Banned Files (comma-separated)</mat-label>
+            <textarea
+              matInput
+              formControlName="bannedFiles"
+              rows="3"
+              placeholder=".DS_Store, thumbs.db, desktop.ini"
+            ></textarea>
+            <mat-hint>Files to exclude from search and indexing</mat-hint>
+            @if (formGroup().get('bannedFiles')?.hasError('required') && formGroup().get('bannedFiles')?.touched) {
+              <mat-error>Banned files list is required</mat-error>
+            }
+          </mat-form-field>
+        </div>
+      </div>
+    </div>
+  </form>
+</lib-scaling-card>

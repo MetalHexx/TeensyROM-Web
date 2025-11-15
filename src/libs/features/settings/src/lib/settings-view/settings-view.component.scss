@@ -2,8 +2,10 @@
   display: block;
   height: 100%;
   width: 100%;
+  overflow: hidden;
 }
 
+// Loading, Error, and Empty States
 .loading-state,
 .error-state,
 .empty-state {
@@ -58,47 +60,128 @@
   }
 }
 
+// Settings Container (Main Layout)
 .settings-container {
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
-  padding: 1.5rem;
-  gap: 1rem;
   overflow: hidden;
 }
 
-.settings-header {
+// Toolbar
+.settings-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
 
-  h2 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.75rem;
-    font-weight: 500;
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+
+    h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 500;
+    }
   }
 
-  .settings-description {
-    margin: 0;
-    opacity: 0.7;
-    font-size: 0.875rem;
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+
+    mat-slide-toggle {
+      display: flex;
+      align-items: center;
+    }
+
+    button {
+      white-space: nowrap;
+    }
+
+    mat-icon-button {
+      display: inline-flex;
+    }
   }
 }
 
-.settings-content {
+// History Controls (Undo/Redo buttons)
+.history-controls {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+// Loading Indicator Container (prevent layout shift)
+.loading-indicator-container {
+  min-width: 80px; // Reserve space for "Saving..." text
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .invisible {
+    visibility: hidden; // Use visibility instead of display to maintain space
+  }
+}
+
+// Form Layout
+.settings-form {
   flex: 1;
-  overflow: auto;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.settings-json {
-  margin: 0;
-  font-family: 'Courier New', monospace;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  color: var(--text-color, #ffffff);
-  overflow-wrap: break-word;
+// Material Tabs
+.settings-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  ::ng-deep {
+    .mat-mdc-tab-body-wrapper {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .mat-mdc-tab-body-content {
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    // Tab label with icon
+    .mat-mdc-tab .mdc-tab__text-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+}
+
+// Tab Icons
+.tab-icon {
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+// Tab Content
+.tab-content {
+  padding: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+
+  @media (max-width: 767px) {
+    padding: 1rem;
+  }
 }

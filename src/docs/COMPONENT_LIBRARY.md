@@ -413,17 +413,16 @@ Because FadingContainer uses **no CSS transforms**, it's the best choice for con
 
 ### `LoadingTextComponent`
 
-**Purpose**: Elegant loading text indicator with fade animation and leet-speak cycling effect. Wraps [LeetTextContainerComponent](#leettextcontainercomponent) with smooth fade-in/fade-out transitions. Perfect for corner slots, loading indicators, and status messages. Displays "Loading..." by default, but supports custom text via ng-content.
+**Purpose**: Elegant loading text indicator with fade animation and leet-speak cycling effect. Wraps [LeetTextContainerComponent](#leettextcontainercomponent) with smooth fade-in/fade-out transitions. Perfect for corner slots, loading indicators, and status messages. Displays "Loading..." by default, but supports custom text via input signal for context-specific messages.
 
 **Selector**: `lib-loading-text`
 
 **Properties**:
 
 - `visible`: `boolean` - Controls visibility with fade animation (default: `false`)
+- `text`: `string` - Custom text to display (default: `"Loading..."`) - Use for context-specific messages like "Autosaving...", "Processing...", etc.
 - `showSpinner`: `boolean` - Show animated spinner before text (default: `true`)
 - `animationDuration`: `number` - Duration of leet cycling in ms (default: `1000`)
-
-**Content**: Optional custom text via ng-content (default: "Loading...")
 
 **Usage**:
 
@@ -434,16 +433,17 @@ Because FadingContainer uses **no CSS transforms**, it's the best choice for con
   <p>Content...</p>
 </lib-scaling-card>
 
-<!-- Custom text -->
-<lib-loading-text [visible]="isProcessing()"> Processing... </lib-loading-text>
+<!-- Custom text via input signal -->
+<lib-loading-text [visible]="isProcessing()" [text]="'Processing...'"></lib-loading-text>
+
+<!-- Autosaving indicator -->
+<lib-loading-text [visible]="isSaving()" [text]="'Autosaving...'"></lib-loading-text>
 
 <!-- Without spinner -->
-<lib-loading-text [visible]="isSaving()" [showSpinner]="false"> Saving... </lib-loading-text>
+<lib-loading-text [visible]="isSaving()" [text]="'Saving...'" [showSpinner]="false"></lib-loading-text>
 
 <!-- Custom animation speed -->
-<lib-loading-text [visible]="isLoading()" [animationDuration]="500">
-  Fast Loading...
-</lib-loading-text>
+<lib-loading-text [visible]="isLoading()" [text]="'Fast Loading...'" [animationDuration]="500"></lib-loading-text>
 ```
 
 **Animation Behavior**:
@@ -456,9 +456,12 @@ Because FadingContainer uses **no CSS transforms**, it's the best choice for con
 **Use Cases**:
 
 - Loading indicators in card corner slots
-- Status messages in toolbars and headers
-- Retro-styled loading states
-- Processing/saving feedback with personality
+- Status messages in toolbars and headers  
+- Autosaving/processing feedback ("Autosaving...", "Processing...")
+- Retro-styled loading states with personality
+
+**Used In**:
+- `libs/features/settings/src/lib/settings-view/settings-view.component.html` - Autosaving indicator
 
 **Comparison**:
 

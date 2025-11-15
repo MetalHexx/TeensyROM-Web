@@ -13,17 +13,127 @@
       <p>{{ error() }}</p>
     </div>
   </div>
-} @else if (formattedJson()) {
+} @else if (settingsForm()) {
   <div class="settings-container">
-    <div class="settings-header">
-      <h2>Current Settings</h2>
-      <p class="settings-description">
-        Current application settings loaded from backend
-      </p>
+    <!-- Toolbar -->
+    <div class="settings-toolbar">
+      <div class="toolbar-left">
+        <h2>Settings</h2>
+      </div>
+      
+      <div class="toolbar-actions">
+        <!-- Auto-save toggle -->
+        <mat-slide-toggle
+          [checked]="autoSaveEnabled()"
+          (change)="autoSaveEnabled.set($event.checked)"
+          color="primary">
+          Auto-save
+        </mat-slide-toggle>
+
+        <!-- Manual save button (hidden when auto-save is on) -->
+        @if (!autoSaveEnabled()) {
+          <button
+            mat-raised-button
+            color="primary"
+            [disabled]="!canSave()"
+            (click)="saveSettings()">
+            <mat-icon>save</mat-icon>
+            Save
+          </button>
+        }
+
+        <!-- History controls -->
+        <div class="history-controls">
+          <button
+            mat-icon-button
+            [disabled]="!canUndo()"
+            (click)="undo()"
+            matTooltip="Undo (Ctrl+Z)">
+            <mat-icon>undo</mat-icon>
+          </button>
+          
+          <button
+            mat-icon-button
+            [disabled]="!canRedo()"
+            (click)="redo()"
+            matTooltip="Redo (Ctrl+Y)">
+            <mat-icon>redo</mat-icon>
+          </button>
+        </div>
+
+        <!-- Loading indicator (always rendered to prevent layout shift) -->
+        <div class="loading-indicator-container">
+          <lib-loading-text 
+            [text]="'Saving...'" 
+            [class.invisible]="!isSaving()" />
+        </div>
+      </div>
     </div>
-    <div class="settings-content">
-      <pre class="settings-json">{{ formattedJson() }}</pre>
-    </div>
+
+    <!-- Settings Form -->
+    <form [formGroup]="settingsForm()!" class="settings-form">
+      <mat-tab-group class="settings-tabs" animationDuration="200ms">
+        <!-- Connection Tab -->
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon class="tab-icon">settings_ethernet</mat-icon>
+            Connection
+          </ng-template>
+          <div class="tab-content">
+            <lib-connection-settings-section
+              [formGroup]="getConnectionSettings()" />
+          </div>
+        </mat-tab>
+
+        <!-- Player Tab -->
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon class="tab-icon">play_circle</mat-icon>
+            Player
+          </ng-template>
+          <div class="tab-content">
+            <lib-player-settings-section
+              [formGroup]="getPlayerSettings()" />
+          </div>
+        </mat-tab>
+
+        <!-- File Transfer Tab -->
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon class="tab-icon">folder</mat-icon>
+            File Transfer
+          </ng-template>
+          <div class="tab-content">
+            <lib-file-transfer-settings-section
+              [formGroup]="getFileTransferSettings()" />
+          </div>
+        </mat-tab>
+
+        <!-- Search Tab -->
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon class="tab-icon">search</mat-icon>
+            Search
+          </ng-template>
+          <div class="tab-content">
+            <lib-search-settings-section
+              [formGroup]="getSearchSettings()" />
+          </div>
+        </mat-tab>
+
+        <!-- App Tab -->
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <mat-icon class="tab-icon">apps</mat-icon>
+            App
+          </ng-template>
+          <div class="tab-content">
+            <lib-app-settings-section
+              [formGroup]="getAppSettings()" />
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+    </form>
   </div>
 } @else {
   <div class="empty-state">

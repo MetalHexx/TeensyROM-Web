@@ -6,7 +6,7 @@ import { LeetTextContainerComponent } from '../leet-text-container/leet-text-con
  * Loading text component with fade-in/fade-out animation and leet-speak cycling effect.
  * Wraps the leet-text-container with elegant fade animations suitable for corner slots and loading indicators.
  *
- * Displays "Loading..." by default, but custom text can be provided via ng-content.
+ * Displays "Loading..." by default, but custom text can be provided via the text input.
  *
  * @example
  * ```html
@@ -18,13 +18,11 @@ import { LeetTextContainerComponent } from '../leet-text-container/leet-text-con
  *   <lib-loading-text slot="corner" [visible]="isLoading()"></lib-loading-text>
  * </lib-scaling-card>
  *
- * <!-- Custom text -->
- * <lib-loading-text [visible]="isLoading()">Processing...</lib-loading-text>
+ * <!-- Custom text via input -->
+ * <lib-loading-text [visible]="isLoading()" [text]="'Processing...'"></lib-loading-text>
  *
  * <!-- With custom animation speed -->
- * <lib-loading-text [visible]="isLoading()" [showSpinner]="true" [animationDuration]="500">
- *   Saving...
- * </lib-loading-text>
+ * <lib-loading-text [visible]="isLoading()" [text]="'Saving...'" [showSpinner]="true" [animationDuration]="500"></lib-loading-text>
  * ```
  */
 @Component({
@@ -43,6 +41,12 @@ export class LoadingTextComponent {
    * - false: Fade out and hide
    */
   visible = input<boolean>(false);
+
+  /**
+   * Custom text to display (default: "Loading...")
+   * Use this for context-specific loading messages like "Autosaving...", "Processing...", etc.
+   */
+  text = input<string>('Loading...');
 
   /**
    * Show animated spinner before the text (default: true)

@@ -66,13 +66,33 @@ describe('LoadingTextComponent', () => {
     expect(loadingTextWrapper?.textContent?.trim()).toBe('Loading...');
   });
 
-  it('should allow custom text via ng-content', () => {
-    // Create a new fixture with custom content
-    const customFixture = TestBed.createComponent(LoadingTextComponent);
-    const customElement = customFixture.nativeElement as HTMLElement;
-    customElement.textContent = 'Processing...';
-    customFixture.detectChanges();
+  it('should display custom text via text input', () => {
+    componentRef.setInput('text', 'Autosaving...');
+    fixture.detectChanges();
 
-    expect(customElement.textContent?.trim()).toContain('Processing...');
+    const loadingTextWrapper = fixture.nativeElement.querySelector('.loading-text-wrapper');
+    expect(loadingTextWrapper?.textContent?.trim()).toBe('Autosaving...');
+  });
+
+  it('should allow different custom text values', () => {
+    componentRef.setInput('text', 'Processing...');
+    fixture.detectChanges();
+
+    const loadingTextWrapper = fixture.nativeElement.querySelector('.loading-text-wrapper');
+    expect(loadingTextWrapper?.textContent?.trim()).toBe('Processing...');
+  });
+
+  it('should update text when input changes', () => {
+    componentRef.setInput('text', 'Saving...');
+    fixture.detectChanges();
+
+    let loadingTextWrapper = fixture.nativeElement.querySelector('.loading-text-wrapper');
+    expect(loadingTextWrapper?.textContent?.trim()).toBe('Saving...');
+
+    componentRef.setInput('text', 'Loading...');
+    fixture.detectChanges();
+
+    loadingTextWrapper = fixture.nativeElement.querySelector('.loading-text-wrapper');
+    expect(loadingTextWrapper?.textContent?.trim()).toBe('Loading...');
   });
 });
