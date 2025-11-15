@@ -1,6 +1,7 @@
 import {
   GetSettingsResponse,
   SaveSettingsRequest,
+  ConnectionSettingsDto,
   PlayerSettingsDto,
   FileTransferSettingsDto,
   SearchSettingsDto,
@@ -9,12 +10,14 @@ import {
 } from '@teensyrom-nx/data-access/api-client';
 import {
   Settings,
+  ConnectionSettings,
   PlayerSettings,
   FileTransferSettings,
   SearchSettings,
   SearchWeights,
   AppSettings,
   StartupFilterType,
+  ConnectionType,
 } from '@teensyrom-nx/domain';
 
 /**
@@ -24,6 +27,7 @@ import {
  */
 export function mapSettingsDtoToDomain(dto: GetSettingsResponse): Settings {
   return {
+    connectionSettings: mapConnectionSettingsDtoToDomain(dto.connectionSettings),
     playerSettings: mapPlayerSettingsDtoToDomain(dto.playerSettings),
     fileTransferSettings: mapFileTransferSettingsDtoToDomain(dto.fileTransferSettings),
     searchSettings: mapSearchSettingsDtoToDomain(dto.searchSettings),
@@ -33,19 +37,36 @@ export function mapSettingsDtoToDomain(dto: GetSettingsResponse): Settings {
 
 /**
  * Maps domain Settings to API DTO (SaveSettingsRequest)
- * Note: SaveSettingsRequest includes connectionSettings which GetSettingsResponse doesn't have.
- * This mapper focuses on the fields we have in domain Settings.
  * @param settings - Domain Settings object
  * @returns SaveSettingsRequest DTO for API
  */
-export function mapSettingsDomainToDto(
-  settings: Settings
-): Omit<SaveSettingsRequest, 'connectionSettings'> {
+export function mapSettingsDomainToDto(settings: Settings): SaveSettingsRequest {
   return {
+    connectionSettings: mapConnectionSettingsDomainToDto(settings.connectionSettings),
     playerSettings: mapPlayerSettingsDomainToDto(settings.playerSettings),
     fileTransferSettings: mapFileTransferSettingsDomainToDto(settings.fileTransferSettings),
     searchSettings: mapSearchSettingsDomainToDto(settings.searchSettings),
     appSettings: mapAppSettingsDomainToDto(settings.appSettings),
+  };
+}
+
+/**
+ * Maps ConnectionSettings DTO to domain model (1:1 field mapping)
+ */
+function mapConnectionSettingsDtoToDomain(dto: ConnectionSettingsDto): ConnectionSettings {
+  return {
+    connectionType: dto.connectionType as ConnectionType,
+    autoConnectEnabled: dto.autoConnectEnabled,
+  };
+}
+
+/**
+ * Maps domain ConnectionSettings to DTO (1:1 field mapping)
+ */
+function mapConnectionSettingsDomainToDto(settings: ConnectionSettings): ConnectionSettingsDto {
+  return {
+    connectionType: settings.connectionType,
+    autoConnectEnabled: settings.autoConnectEnabled,
   };
 }
 

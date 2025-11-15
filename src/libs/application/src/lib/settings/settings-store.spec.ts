@@ -42,6 +42,10 @@ describe('SettingsStore (NgRx Signal Store)', () => {
   let mockSettingsService: ISettingsService;
 
   const createMockSettings = (overrides: Partial<Settings> = {}): Settings => ({
+    connectionSettings: {
+      connectionType: 'Serial',
+      autoConnectEnabled: false,
+    },
     playerSettings: {
       repeatModeOnStartup: false,
       playTimerEnabled: false,

@@ -24,19 +24,19 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
             {
                 ConnectionType = entity.ConnectionType,
                 AutoConnectEnabled = entity.AutoConnectEnabled,
-                Serial = new SerialConnectionSettingsDto
-                {
-                    Port = entity.Serial.Port,
-                    BaudRate = entity.Serial.BaudRate
-                },
-                Tcp = new TcpConnectionSettingsDto
-                {
-                    HostAddress = entity.Tcp.HostAddress,
-                    Port = entity.Tcp.Port,
-                    ConnectionTimeoutMs = entity.Tcp.ConnectionTimeoutMs,
-                    ReadTimeoutMs = entity.Tcp.ReadTimeoutMs,
-                    WriteTimeoutMs = entity.Tcp.WriteTimeoutMs
-                }
+                //Serial = new SerialConnectionSettingsDto
+                //{
+                //    Port = entity.Serial.Port,
+                //    BaudRate = entity.Serial.BaudRate
+                //},
+                //Tcp = new TcpConnectionSettingsDto
+                //{
+                //    HostAddress = entity.Tcp.HostAddress,
+                //    Port = entity.Tcp.Port,
+                //    ConnectionTimeoutMs = entity.Tcp.ConnectionTimeoutMs,
+                //    ReadTimeoutMs = entity.Tcp.ReadTimeoutMs,
+                //    WriteTimeoutMs = entity.Tcp.WriteTimeoutMs
+                //}
             };
         }
 

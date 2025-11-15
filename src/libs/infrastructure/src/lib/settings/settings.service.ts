@@ -38,37 +38,12 @@ export class SettingsService implements ISettingsService {
   /**
    * Saves all user settings to the backend API.
    *
-   * Note: The API requires connectionSettings which is not part of the current domain model.
-   * This implementation provides stub connection settings. In a future phase, connection settings
-   * should be added to the domain model or retrieved from the backend before saving.
-   *
    * @param settings - Complete settings object to persist
    * @returns Observable emitting the saved settings object (echoes back input)
    */
   saveSettings(settings: Settings): Observable<Settings> {
-    // Map domain settings to DTO
-    const settingsDto = mapSettingsDomainToDto(settings);
-
-    // TODO: connectionSettings needs to be included in the request
-    // For now, provide stub connection settings to satisfy API requirements
-    const saveRequest = {
-      ...settingsDto,
-      connectionSettings: {
-        connectionType: 'Serial' as const,
-        autoConnectEnabled: false,
-        serial: {
-          port: '',
-          baudRate: 115200,
-        },
-        tcp: {
-          hostAddress: 'localhost',
-          port: 5000,
-          connectionTimeoutMs: 5000,
-          readTimeoutMs: 5000,
-          writeTimeoutMs: 5000,
-        },
-      },
-    };
+    // Map domain settings to DTO (now includes connectionSettings)
+    const saveRequest = mapSettingsDomainToDto(settings);
 
     return from(this.apiService.saveSettings({ saveSettingsRequest: saveRequest })).pipe(
       map(() => settings), // Echo back the input settings since API only returns a message

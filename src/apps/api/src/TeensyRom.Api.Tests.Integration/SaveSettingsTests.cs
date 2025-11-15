@@ -19,19 +19,19 @@ namespace TeensyRom.Api.Tests.Integration
                 {
                     ConnectionType = ConnectionType.Serial,
                     AutoConnectEnabled = true,
-                    Serial = new SerialConnectionSettingsDto
-                    {
-                        Port = "COM3",
-                        BaudRate = 115200
-                    },
-                    Tcp = new TcpConnectionSettingsDto
-                    {
-                        HostAddress = "192.168.1.100",
-                        Port = 5001,
-                        ConnectionTimeoutMs = 5000,
-                        ReadTimeoutMs = 1000,
-                        WriteTimeoutMs = 1000
-                    }
+                    //Serial = new SerialConnectionSettingsDto
+                    //{
+                    //    Port = "COM3",
+                    //    BaudRate = 115200
+                    //},
+                    //Tcp = new TcpConnectionSettingsDto
+                    //{
+                    //    HostAddress = "192.168.1.100",
+                    //    Port = 5001,
+                    //    ConnectionTimeoutMs = 5000,
+                    //    ReadTimeoutMs = 1000,
+                    //    WriteTimeoutMs = 1000
+                    //}
                 },
                 PlayerSettings = new PlayerSettingsDto
                 {
@@ -90,110 +90,110 @@ namespace TeensyRom.Api.Tests.Integration
             r.Content.Message.Should().Be("Settings saved successfully.");
         }
 
-        [Fact]
-        public async Task SaveSettings_WithInvalidBaudRate_ReturnsBadRequest()
-        {
-            // Arrange
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Serial.BaudRate = -1;
+        //[Fact]
+        //public async Task SaveSettings_WithInvalidBaudRate_ReturnsBadRequest()
+        //{
+        //    // Arrange
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Serial.BaudRate = -1;
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
 
-            // Assert
-            r.Should().BeValidationProblem()
-                .WithKey("ConnectionSettings.Serial.BaudRate");
-        }
+        //    // Assert
+        //    r.Should().BeValidationProblem()
+        //        .WithKey("ConnectionSettings.Serial.BaudRate");
+        //}
 
-        [Fact]
-        public async Task SaveSettings_WithInvalidBaudRateValue_ReturnsBadRequest()
-        {
-            // Arrange
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Serial.BaudRate = 12345; // Not a standard baud rate
+        //[Fact]
+        //public async Task SaveSettings_WithInvalidBaudRateValue_ReturnsBadRequest()
+        //{
+        //    // Arrange
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Serial.BaudRate = 12345; // Not a standard baud rate
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
 
-            // Assert
-            r.Should().BeValidationProblem()
-                .WithKeyAndValue("ConnectionSettings.Serial.BaudRate", "Baud rate should be one of: 9600, 19200, 38400, 57600, or 115200.");
-        }
+        //    // Assert
+        //    r.Should().BeValidationProblem()
+        //        .WithKeyAndValue("ConnectionSettings.Serial.BaudRate", "Baud rate should be one of: 9600, 19200, 38400, 57600, or 115200.");
+        //}
 
-        [Fact]
-        public async Task SaveSettings_WithInvalidTcpPort_ReturnsBadRequest()
-        {
-            // Arrange
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Tcp.Port = 70000; // Out of valid range
+        //[Fact]
+        //public async Task SaveSettings_WithInvalidTcpPort_ReturnsBadRequest()
+        //{
+        //    // Arrange
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Tcp.Port = 70000; // Out of valid range
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
 
-            // Assert
-            r.Should().BeValidationProblem()
-                .WithKeyAndValue("ConnectionSettings.Tcp.Port", "TCP port must be between 1 and 65535.");
-        }
+        //    // Assert
+        //    r.Should().BeValidationProblem()
+        //        .WithKeyAndValue("ConnectionSettings.Tcp.Port", "TCP port must be between 1 and 65535.");
+        //}
 
-        [Fact]
-        public async Task SaveSettings_WithInvalidTcpPortZero_ReturnsBadRequest()
-        {
-            // Arrange
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Tcp.Port = 0;
+        //[Fact]
+        //public async Task SaveSettings_WithInvalidTcpPortZero_ReturnsBadRequest()
+        //{
+        //    // Arrange
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Tcp.Port = 0;
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
 
-            // Assert
-            r.Should().BeValidationProblem()
-                .WithKey("ConnectionSettings.Tcp.Port");
-        }
+        //    // Assert
+        //    r.Should().BeValidationProblem()
+        //        .WithKey("ConnectionSettings.Tcp.Port");
+        //}
 
-        [Fact]
-        public async Task SaveSettings_WithInvalidTimeouts_ReturnsBadRequest()
-        {
-            // Arrange
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Tcp.ConnectionTimeoutMs = -100;
+        //[Fact]
+        //public async Task SaveSettings_WithInvalidTimeouts_ReturnsBadRequest()
+        //{
+        //    // Arrange
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Tcp.ConnectionTimeoutMs = -100;
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
 
-            // Assert
-            r.Should().BeValidationProblem()
-                .WithKey("ConnectionSettings.Tcp.ConnectionTimeoutMs");
-        }
+        //    // Assert
+        //    r.Should().BeValidationProblem()
+        //        .WithKey("ConnectionSettings.Tcp.ConnectionTimeoutMs");
+        //}
 
-        [Fact]
-        public async Task SaveSettings_WithNegativeReadTimeout_ReturnsBadRequest()
-        {
-            // Arrange
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Tcp.ReadTimeoutMs = -50;
+        //[Fact]
+        //public async Task SaveSettings_WithNegativeReadTimeout_ReturnsBadRequest()
+        //{
+        //    // Arrange
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Tcp.ReadTimeoutMs = -50;
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
 
-            // Assert
-            r.Should().BeValidationProblem()
-                .WithKey("ConnectionSettings.Tcp.ReadTimeoutMs");
-        }
+        //    // Assert
+        //    r.Should().BeValidationProblem()
+        //        .WithKey("ConnectionSettings.Tcp.ReadTimeoutMs");
+        //}
 
-        [Fact]
-        public async Task SaveSettings_WithNegativeWriteTimeout_ReturnsBadRequest()
-        {
-            // Arrange
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Tcp.WriteTimeoutMs = 0;
+        //[Fact]
+        //public async Task SaveSettings_WithNegativeWriteTimeout_ReturnsBadRequest()
+        //{
+        //    // Arrange
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Tcp.WriteTimeoutMs = 0;
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
 
-            // Assert
-            r.Should().BeValidationProblem()
-                .WithKey("ConnectionSettings.Tcp.WriteTimeoutMs");
-        }
+        //    // Assert
+        //    r.Should().BeValidationProblem()
+        //        .WithKey("ConnectionSettings.Tcp.WriteTimeoutMs");
+        //}
 
         [Fact]
         public async Task SaveSettings_WithInvalidConnectionType_ReturnsBadRequest()
@@ -262,24 +262,24 @@ namespace TeensyRom.Api.Tests.Integration
                 .WithKeyAndValue("SearchSettings.SearchWeights", "At least one search weight must be greater than 0 for meaningful search.");
         }
 
-        [Fact]
-        public async Task SaveSettings_SettingsPersist_BetweenRequests()
-        {
-            // Arrange - Save settings with unique value
-            var saveRequest = CreateValidRequest();
-            saveRequest.ConnectionSettings.Serial.Port = "COM7";
+        //[Fact]
+        //public async Task SaveSettings_SettingsPersist_BetweenRequests()
+        //{
+        //    // Arrange - Save settings with unique value
+        //    var saveRequest = CreateValidRequest();
+        //    saveRequest.ConnectionSettings.Serial.Port = "COM7";
 
-            // Act - Save
-            var saveResponse = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(saveRequest);
-            saveResponse.Should().BeSuccessful<SaveSettingsResponse>();
+        //    // Act - Save
+        //    var saveResponse = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(saveRequest);
+        //    saveResponse.Should().BeSuccessful<SaveSettingsResponse>();
 
-            // Act - Retrieve
-            var getResponse = await f.Client.GetAsync<GetSettingsEndpoint, GetSettingsResponse>();
+        //    // Act - Retrieve
+        //    var getResponse = await f.Client.GetAsync<GetSettingsEndpoint, GetSettingsResponse>();
 
-            // Assert - Verify persisted
-            getResponse.Should().BeSuccessful<GetSettingsResponse>();
-            //getResponse.Content.ConnectionSettings.Serial.Port.Should().Be("COM7");
-        }
+        //    // Assert - Verify persisted
+        //    getResponse.Should().BeSuccessful<GetSettingsResponse>();
+        //    //getResponse.Content.ConnectionSettings.Serial.Port.Should().Be("COM7");
+        //}
 
         [Fact]
         public async Task SaveSettings_UpdatesOnlyChangedSection_OtherSectionsUnchanged()
@@ -309,33 +309,33 @@ namespace TeensyRom.Api.Tests.Integration
             //getResponse.Content.ConnectionSettings.Serial.BaudRate.Should().Be(initialBaudRate);
         }
 
-        [Fact]
-        public async Task SaveSettings_WithEmptyPort_IsValid()
-        {
-            // Arrange - Empty port means auto-detect
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Serial.Port = string.Empty;
+        //[Fact]
+        //public async Task SaveSettings_WithEmptyPort_IsValid()
+        //{
+        //    // Arrange - Empty port means auto-detect
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Serial.Port = string.Empty;
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(request);
 
-            // Assert
-            r.Should().BeSuccessful<SaveSettingsResponse>();
-        }
+        //    // Assert
+        //    r.Should().BeSuccessful<SaveSettingsResponse>();
+        //}
 
-        [Fact]
-        public async Task SaveSettings_WithEmptyHostAddress_IsValid()
-        {
-            // Arrange - Empty host means not configured
-            var request = CreateValidRequest();
-            request.ConnectionSettings.Tcp.HostAddress = string.Empty;
+        //[Fact]
+        //public async Task SaveSettings_WithEmptyHostAddress_IsValid()
+        //{
+        //    // Arrange - Empty host means not configured
+        //    var request = CreateValidRequest();
+        //    request.ConnectionSettings.Tcp.HostAddress = string.Empty;
 
-            // Act
-            var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(request);
+        //    // Act
+        //    var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(request);
 
-            // Assert
-            r.Should().BeSuccessful<SaveSettingsResponse>();
-        }
+        //    // Assert
+        //    r.Should().BeSuccessful<SaveSettingsResponse>();
+        //}
 
         [Fact]
         public async Task SaveSettings_WithEmptyWatchDirectory_IsValid()

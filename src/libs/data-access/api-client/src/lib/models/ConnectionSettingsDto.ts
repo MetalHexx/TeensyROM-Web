@@ -20,20 +20,6 @@ import {
     ConnectionTypeToJSON,
     ConnectionTypeToJSONTyped,
 } from './ConnectionType';
-import type { SerialConnectionSettingsDto } from './SerialConnectionSettingsDto';
-import {
-    SerialConnectionSettingsDtoFromJSON,
-    SerialConnectionSettingsDtoFromJSONTyped,
-    SerialConnectionSettingsDtoToJSON,
-    SerialConnectionSettingsDtoToJSONTyped,
-} from './SerialConnectionSettingsDto';
-import type { TcpConnectionSettingsDto } from './TcpConnectionSettingsDto';
-import {
-    TcpConnectionSettingsDtoFromJSON,
-    TcpConnectionSettingsDtoFromJSONTyped,
-    TcpConnectionSettingsDtoToJSON,
-    TcpConnectionSettingsDtoToJSONTyped,
-} from './TcpConnectionSettingsDto';
 
 /**
  * 
@@ -53,18 +39,6 @@ export interface ConnectionSettingsDto {
      * @memberof ConnectionSettingsDto
      */
     autoConnectEnabled: boolean;
-    /**
-     * 
-     * @type {SerialConnectionSettingsDto}
-     * @memberof ConnectionSettingsDto
-     */
-    serial: SerialConnectionSettingsDto;
-    /**
-     * 
-     * @type {TcpConnectionSettingsDto}
-     * @memberof ConnectionSettingsDto
-     */
-    tcp: TcpConnectionSettingsDto;
 }
 
 
@@ -75,8 +49,6 @@ export interface ConnectionSettingsDto {
 export function instanceOfConnectionSettingsDto(value: object): value is ConnectionSettingsDto {
     if (!('connectionType' in value) || value['connectionType'] === undefined) return false;
     if (!('autoConnectEnabled' in value) || value['autoConnectEnabled'] === undefined) return false;
-    if (!('serial' in value) || value['serial'] === undefined) return false;
-    if (!('tcp' in value) || value['tcp'] === undefined) return false;
     return true;
 }
 
@@ -92,8 +64,6 @@ export function ConnectionSettingsDtoFromJSONTyped(json: any, ignoreDiscriminato
         
         'connectionType': ConnectionTypeFromJSON(json['connectionType']),
         'autoConnectEnabled': json['autoConnectEnabled'],
-        'serial': SerialConnectionSettingsDtoFromJSON(json['serial']),
-        'tcp': TcpConnectionSettingsDtoFromJSON(json['tcp']),
     };
 }
 
@@ -110,8 +80,6 @@ export function ConnectionSettingsDtoToJSONTyped(value?: ConnectionSettingsDto |
         
         'connectionType': ConnectionTypeToJSON(value['connectionType']),
         'autoConnectEnabled': value['autoConnectEnabled'],
-        'serial': SerialConnectionSettingsDtoToJSON(value['serial']),
-        'tcp': TcpConnectionSettingsDtoToJSON(value['tcp']),
     };
 }
 

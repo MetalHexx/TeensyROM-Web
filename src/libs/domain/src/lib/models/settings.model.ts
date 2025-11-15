@@ -9,6 +9,21 @@ export type RepeatMode = 'Off' | 'Single' | 'All';
 export type StartupFilterType = 'All' | 'Games' | 'Music' | 'Hex' | 'Images';
 
 /**
+ * Connection type for device communication
+ */
+export type ConnectionType = 'Serial' | 'Tcp';
+
+/**
+ * Connection settings for device communication
+ */
+export interface ConnectionSettings {
+  /** Type of connection (Serial or TCP) */
+  connectionType: ConnectionType;
+  /** Whether to automatically connect on startup */
+  autoConnectEnabled: boolean;
+}
+
+/**
  * Search weight configuration for content search
  */
 export interface SearchWeights {
@@ -88,6 +103,8 @@ export interface AppSettings {
  * Root settings object containing all configuration categories
  */
 export interface Settings {
+  /** Device connection settings */
+  connectionSettings: ConnectionSettings;
   /** Player-related settings */
   playerSettings: PlayerSettings;
   /** File transfer and watch folder settings */

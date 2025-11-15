@@ -20,6 +20,13 @@ import {
     AppSettingsDtoToJSON,
     AppSettingsDtoToJSONTyped,
 } from './AppSettingsDto';
+import type { ConnectionSettingsDto } from './ConnectionSettingsDto';
+import {
+    ConnectionSettingsDtoFromJSON,
+    ConnectionSettingsDtoFromJSONTyped,
+    ConnectionSettingsDtoToJSON,
+    ConnectionSettingsDtoToJSONTyped,
+} from './ConnectionSettingsDto';
 import type { PlayerSettingsDto } from './PlayerSettingsDto';
 import {
     PlayerSettingsDtoFromJSON,
@@ -50,6 +57,12 @@ import {
 export interface GetSettingsResponse {
     /**
      * 
+     * @type {ConnectionSettingsDto}
+     * @memberof GetSettingsResponse
+     */
+    connectionSettings: ConnectionSettingsDto;
+    /**
+     * 
      * @type {PlayerSettingsDto}
      * @memberof GetSettingsResponse
      */
@@ -78,6 +91,7 @@ export interface GetSettingsResponse {
  * Check if a given object implements the GetSettingsResponse interface.
  */
 export function instanceOfGetSettingsResponse(value: object): value is GetSettingsResponse {
+    if (!('connectionSettings' in value) || value['connectionSettings'] === undefined) return false;
     if (!('playerSettings' in value) || value['playerSettings'] === undefined) return false;
     if (!('fileTransferSettings' in value) || value['fileTransferSettings'] === undefined) return false;
     if (!('searchSettings' in value) || value['searchSettings'] === undefined) return false;
@@ -95,6 +109,7 @@ export function GetSettingsResponseFromJSONTyped(json: any, ignoreDiscriminator:
     }
     return {
         
+        'connectionSettings': ConnectionSettingsDtoFromJSON(json['connectionSettings']),
         'playerSettings': PlayerSettingsDtoFromJSON(json['playerSettings']),
         'fileTransferSettings': FileTransferSettingsDtoFromJSON(json['fileTransferSettings']),
         'searchSettings': SearchSettingsDtoFromJSON(json['searchSettings']),
@@ -113,6 +128,7 @@ export function GetSettingsResponseToJSONTyped(value?: GetSettingsResponse | nul
 
     return {
         
+        'connectionSettings': ConnectionSettingsDtoToJSON(value['connectionSettings']),
         'playerSettings': PlayerSettingsDtoToJSON(value['playerSettings']),
         'fileTransferSettings': FileTransferSettingsDtoToJSON(value['fileTransferSettings']),
         'searchSettings': SearchSettingsDtoToJSON(value['searchSettings']),

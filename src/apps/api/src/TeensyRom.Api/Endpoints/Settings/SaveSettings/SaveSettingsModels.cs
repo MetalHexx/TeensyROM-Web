@@ -78,13 +78,13 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             RuleFor(x => x.ConnectionType)
                 .IsInEnum().WithMessage("Connection type must be a valid enum value (Serial or Tcp).");
 
-            RuleFor(x => x.Serial)
-                .NotNull().WithMessage("Serial connection settings are required.")
-                .SetValidator(new SerialConnectionSettingsValidator());
+            //RuleFor(x => x.Serial)
+            //    .NotNull().WithMessage("Serial connection settings are required.")
+            //    .SetValidator(new SerialConnectionSettingsValidator());
 
-            RuleFor(x => x.Tcp)
-                .NotNull().WithMessage("TCP connection settings are required.")
-                .SetValidator(new TcpConnectionSettingsValidator());
+            //RuleFor(x => x.Tcp)
+            //    .NotNull().WithMessage("TCP connection settings are required.")
+            //    .SetValidator(new TcpConnectionSettingsValidator());
         }
     }
 

@@ -33,19 +33,19 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             {
                 ConnectionType = entity.ConnectionType,
                 AutoConnectEnabled = entity.AutoConnectEnabled,
-                Serial = new SerialConnectionSettingsDto
-                {
-                    Port = entity.Serial.Port,
-                    BaudRate = entity.Serial.BaudRate
-                },
-                Tcp = new TcpConnectionSettingsDto
-                {
-                    HostAddress = entity.Tcp.HostAddress,
-                    Port = entity.Tcp.Port,
-                    ConnectionTimeoutMs = entity.Tcp.ConnectionTimeoutMs,
-                    ReadTimeoutMs = entity.Tcp.ReadTimeoutMs,
-                    WriteTimeoutMs = entity.Tcp.WriteTimeoutMs
-                }
+                //Serial = new SerialConnectionSettingsDto
+                //{
+                //    Port = entity.Serial.Port,
+                //    BaudRate = entity.Serial.BaudRate
+                //},
+                //Tcp = new TcpConnectionSettingsDto
+                //{
+                //    HostAddress = entity.Tcp.HostAddress,
+                //    Port = entity.Tcp.Port,
+                //    ConnectionTimeoutMs = entity.Tcp.ConnectionTimeoutMs,
+                //    ReadTimeoutMs = entity.Tcp.ReadTimeoutMs,
+                //    WriteTimeoutMs = entity.Tcp.WriteTimeoutMs
+                //}
             };
         }
 
@@ -109,19 +109,19 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             {
                 ConnectionType = dto.ConnectionType,
                 AutoConnectEnabled = dto.AutoConnectEnabled,
-                Serial = new SerialConnectionSettings
-                {
-                    Port = dto.Serial.Port,
-                    BaudRate = dto.Serial.BaudRate
-                },
-                Tcp = new TcpConnectionSettings
-                {
-                    HostAddress = dto.Tcp.HostAddress,
-                    Port = dto.Tcp.Port,
-                    ConnectionTimeoutMs = dto.Tcp.ConnectionTimeoutMs,
-                    ReadTimeoutMs = dto.Tcp.ReadTimeoutMs,
-                    WriteTimeoutMs = dto.Tcp.WriteTimeoutMs
-                }
+                //Serial = new SerialConnectionSettings
+                //{
+                //    Port = dto.Serial.Port,
+                //    BaudRate = dto.Serial.BaudRate
+                //},
+                //Tcp = new TcpConnectionSettings
+                //{
+                //    HostAddress = dto.Tcp.HostAddress,
+                //    Port = dto.Tcp.Port,
+                //    ConnectionTimeoutMs = dto.Tcp.ConnectionTimeoutMs,
+                //    ReadTimeoutMs = dto.Tcp.ReadTimeoutMs,
+                //    WriteTimeoutMs = dto.Tcp.WriteTimeoutMs
+                //}
             };
         }
 

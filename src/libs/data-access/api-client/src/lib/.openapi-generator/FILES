@@ -42,11 +42,9 @@ models/SaveSettingsResponse.ts
 models/SearchResponse.ts
 models/SearchSettingsDto.ts
 models/SearchWeightsDto.ts
-models/SerialConnectionSettingsDto.ts
 models/StartLogsResponse.ts
 models/StopLogsResponse.ts
 models/StorageCacheDto.ts
-models/TcpConnectionSettingsDto.ts
 models/TeensyFilterType.ts
 models/TeensyStorageType.ts
 models/ToggleMusicResponse.ts
