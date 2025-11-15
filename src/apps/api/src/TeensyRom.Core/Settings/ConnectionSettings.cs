@@ -7,8 +7,8 @@ namespace TeensyRom.Core.Settings
   {
     public ConnectionType ConnectionType { get; set; } = ConnectionType.Serial;    
     public bool AutoConnectEnabled { get; set; } = true;
-    public SerialConnectionSettings Serial { get; set; } = new();
-    public TcpConnectionSettings Tcp { get; set; } = new();
+    //public SerialConnectionSettings Serial { get; set; } = new();
+    //public TcpConnectionSettings Tcp { get; set; } = new();
   }
 
   /// <summary>

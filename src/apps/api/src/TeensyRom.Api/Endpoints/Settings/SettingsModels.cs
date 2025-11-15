@@ -11,7 +11,7 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// <summary>
         /// Connection type preference for device communication.
         /// </summary>
-        [Required] public ConnectionType ConnectionType { get; set; }
+        [Required] public ConnectionType ConnectionType { get; set; } = ConnectionType.Serial;
 
         /// <summary>
         /// Automatically attempt to connect to devices on startup.
