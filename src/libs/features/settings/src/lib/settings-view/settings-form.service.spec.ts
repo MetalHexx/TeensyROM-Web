@@ -1,6 +1,6 @@
 import '@analogjs/vitest-angular/setup-zone';
 import { TestBed, fakeAsync, tick, flush } from '@angular/core/testing';
-import { signal, WritableSignal } from '@angular/core';
+import { signal, WritableSignal, computed } from '@angular/core';
 import { SettingsFormService } from './settings-form.service';
 import { Settings, SETTINGS_SERVICE, ISettingsService } from '@teensyrom-nx/domain';
 import { SettingsStore } from '@teensyrom-nx/application';
@@ -85,6 +85,20 @@ describe('SettingsFormService', () => {
       updateSettings: vi.fn(),
       undo: vi.fn(),
       redo: vi.fn(),
+      // Selectors return a function that returns a computed signal (matching store pattern)
+      canUndo: vi.fn(() => computed(() => {
+        const position = historyPositionSignal();
+        const historyLength = historySignal().length;
+        return historyLength > 0 && (position === -1 || position > 0);
+      })),
+      canRedo: vi.fn(() => computed(() => historyPositionSignal() !== -1 && historyPositionSignal() < historySignal().length - 1)),
+      isNavigatingHistory: vi.fn(() => computed(() => historyPositionSignal() !== -1)),
+      historyPositionDisplay: vi.fn(() => computed(() => {
+        const position = historyPositionSignal();
+        const totalCount = historySignal().length;
+        if (position === -1 || totalCount === 0) return null;
+        return `${position + 1}/${totalCount}`;
+      })),
     };
 
     TestBed.configureTestingModule({
@@ -354,6 +368,62 @@ describe('SettingsFormService', () => {
 
       expect(form.get('connectionSettings.autoConnectEnabled')?.value).toBe(false);
     });
+  });
+
+  describe('Saving Indicator', () => {
+    it('should show saving indicator immediately when saving starts', fakeAsync(() => {
+      expect(service.showSaving()).toBe(false);
+
+      isSavingSignal.set(true);
+      TestBed.flushEffects();
+
+      expect(service.showSaving()).toBe(true);
+    }));
+
+    it('should keep showing for 1.5s after save completes', fakeAsync(() => {
+      // Start saving
+      isSavingSignal.set(true);
+      TestBed.flushEffects();
+      expect(service.showSaving()).toBe(true);
+
+      // Complete save
+      isSavingSignal.set(false);
+      TestBed.flushEffects();
+      expect(service.showSaving()).toBe(true); // Still showing
+
+      // After 1s, still showing
+      tick(1000);
+      expect(service.showSaving()).toBe(true);
+
+      // After 1.5s, should hide
+      tick(500);
+      expect(service.showSaving()).toBe(false);
+    }));
+
+    it('should reset timer if saving starts again before delay expires', fakeAsync(() => {
+      // First save
+      isSavingSignal.set(true);
+      TestBed.flushEffects();
+      isSavingSignal.set(false);
+      TestBed.flushEffects();
+
+      // Wait 1s
+      tick(1000);
+      expect(service.showSaving()).toBe(true);
+
+      // Start second save before first delay expires
+      isSavingSignal.set(true);
+      TestBed.flushEffects();
+      isSavingSignal.set(false);
+      TestBed.flushEffects();
+
+      // Original delay should be cancelled, new one starts
+      tick(1000);
+      expect(service.showSaving()).toBe(true);
+
+      tick(500);
+      expect(service.showSaving()).toBe(false);
+    }));
   });
 
   describe('Validation', () => {

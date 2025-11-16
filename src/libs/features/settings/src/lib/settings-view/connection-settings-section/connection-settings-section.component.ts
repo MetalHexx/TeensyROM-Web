@@ -2,9 +2,9 @@ import { Component, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatRadioModule } from '@angular/material/radio';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
+import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
 
 /**
  * Presentational component for connection settings section.
@@ -23,9 +23,9 @@ import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
     CommonModule,
     ReactiveFormsModule,
     MatRadioModule,
-    MatSlideToggleModule,
     MatFormFieldModule,
     ScalingCardComponent,
+    SettingsToggleItemComponent,
   ],
   templateUrl: './connection-settings-section.component.html',
   styleUrl: './connection-settings-section.component.scss',

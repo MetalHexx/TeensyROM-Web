@@ -11,7 +11,7 @@
 
         <!-- Name Weight Slider -->
         <div class="slider-row">
-          <span class="slider-label">File Name Weight</span>
+          <span class="slider-label">File Name</span>
           <div class="slider-container">
             <mat-slider min="0" max="10" step="0.1" discrete>
               <input matSliderThumb formControlName="nameWeight" />
@@ -22,7 +22,7 @@
 
         <!-- Title Weight Slider -->
         <div class="slider-row">
-          <span class="slider-label">Title Weight</span>
+          <span class="slider-label">Title</span>
           <div class="slider-container">
             <mat-slider min="0" max="10" step="0.1" discrete>
               <input matSliderThumb formControlName="titleWeight" />
@@ -33,7 +33,7 @@
 
         <!-- Creator Weight Slider -->
         <div class="slider-row">
-          <span class="slider-label">Creator Weight</span>
+          <span class="slider-label">Creator</span>
           <div class="slider-container">
             <mat-slider min="0" max="10" step="0.1" discrete>
               <input matSliderThumb formControlName="creatorWeight" />
@@ -44,7 +44,7 @@
 
         <!-- Release Info Weight Slider -->
         <div class="slider-row">
-          <span class="slider-label">Release Info Weight</span>
+          <span class="slider-label">Release Info</span>
           <div class="slider-container">
             <mat-slider min="0" max="10" step="0.1" discrete>
               <input matSliderThumb formControlName="releaseInfoWeight" />
@@ -55,7 +55,7 @@
 
         <!-- Description Weight Slider -->
         <div class="slider-row">
-          <span class="slider-label">Description Weight</span>
+          <span class="slider-label">Description</span>
           <div class="slider-container">
             <mat-slider min="0" max="10" step="0.1" discrete>
               <input matSliderThumb formControlName="descriptionWeight" />
@@ -93,6 +93,9 @@
         <!-- Banned Content Group -->
         <div class="settings-group">
           <h3 class="group-title">Banned Content</h3>
+          <p class="group-description">
+            Banned files or directories will be omitted from indexing.  Some of the defaults are files or directories with known critcal issues on TeensyROM.
+          </p>
 
           <mat-form-field appearance="fill" class="full-width">
             <mat-label>Banned Directories (comma-separated)</mat-label>
@@ -102,7 +105,7 @@
               rows="3"
               placeholder="/system, /temp, /cache"
             ></textarea>
-            <mat-hint>Directories to exclude from search and indexing</mat-hint>
+            <mat-hint>Directories to exclude from search and indexing.</mat-hint>
             @if (formGroup().get('bannedDirectories')?.hasError('required') && formGroup().get('bannedDirectories')?.touched) {
               <mat-error>Banned directories list is required</mat-error>
             }

@@ -5,6 +5,8 @@ import { getSettings } from './get-settings';
 import { canUndo } from './can-undo';
 import { canRedo } from './can-redo';
 import { getHistoryPosition } from './get-history-position';
+import { isNavigatingHistory } from './is-navigating-history';
+import { historyPositionDisplay } from './history-position-display';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -16,6 +18,8 @@ export function withSettingsSelectors() {
       ...canUndo(writableStore),
       ...canRedo(writableStore),
       ...getHistoryPosition(writableStore),
+      ...isNavigatingHistory(writableStore),
+      ...historyPositionDisplay(writableStore),
     };
   });
 }

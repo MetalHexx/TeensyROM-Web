@@ -1,8 +1,8 @@
 import { Component, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
+import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
 
 /**
  * Presentational component for application settings section.
@@ -17,7 +17,7 @@ import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
  */
 @Component({
   selector: 'lib-app-settings-section',
-  imports: [CommonModule, ReactiveFormsModule, MatSlideToggleModule, ScalingCardComponent],
+  imports: [CommonModule, ReactiveFormsModule, ScalingCardComponent, SettingsToggleItemComponent],
   templateUrl: './app-settings-section.component.html',
   styleUrl: './app-settings-section.component.scss',
 })

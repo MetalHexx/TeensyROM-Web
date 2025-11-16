@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
-import { LoadingTextComponent } from '@teensyrom-nx/ui/components';
+import { LoadingTextComponent, ScalingCompactCardComponent, ActionButtonComponent, IconLabelComponent } from '@teensyrom-nx/ui/components';
 import { ConnectionSettingsSectionComponent } from './connection-settings-section/connection-settings-section.component';
 import { PlayerSettingsSectionComponent } from './player-settings-section/player-settings-section.component';
 import { FileTransferSettingsSectionComponent } from './file-transfer-settings-section/file-transfer-settings-section.component';
@@ -26,6 +26,9 @@ import { SettingsFormService } from './settings-form.service';
     MatTooltipModule,
     MatTabsModule,
     LoadingTextComponent,
+    ScalingCompactCardComponent,
+    ActionButtonComponent,
+    IconLabelComponent,
     ConnectionSettingsSectionComponent,
     PlayerSettingsSectionComponent,
     FileTransferSettingsSectionComponent,
@@ -45,11 +48,14 @@ export class SettingsViewComponent {
   readonly isLoading = this.formService.isLoading;
   readonly error = this.formService.error;
   readonly isSaving = this.formService.isSaving;
+  readonly showSaving = this.formService.showSaving;
   readonly settingsForm = this.formService.settingsForm;
   readonly autoSaveEnabled = this.formService.autoSaveEnabled;
   readonly canSave = this.formService.canSave;
   readonly canUndo = this.formService.canUndo;
   readonly canRedo = this.formService.canRedo;
+  readonly isNavigatingHistory = this.formService.isNavigatingHistory;
+  readonly historyPositionDisplay = this.formService.historyPositionDisplay;
 
   readonly formattedJson = computed(() => {
     const settings = this.settings();

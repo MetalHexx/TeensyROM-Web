@@ -16,6 +16,7 @@ form {
 // Responsive grid for settings groups
 .settings-grid {
   display: grid;
+  margin-top: -1rem;
   gap: 1.5rem;
   grid-template-columns: 1fr;
 
@@ -42,7 +43,7 @@ form {
   }
 
   .group-title {
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 -0.5rem 0;
     font-size: 1rem;
     font-weight: 600;
     opacity: 0.9;
@@ -99,15 +100,6 @@ mat-form-field {
   textarea {
     font-family: monospace;
     font-size: 0.9rem;
+    height: 6rem;
   }
-
-  mat-hint {
-    font-size: 0.8rem;
-    opacity: 0.7;
-  }
-}
-
-mat-error {
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
 }

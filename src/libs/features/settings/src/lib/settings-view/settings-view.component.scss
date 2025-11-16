@@ -5,62 +5,6 @@
   overflow: hidden;
 }
 
-// Loading, Error, and Empty States
-.loading-state,
-.error-state,
-.empty-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  width: 100%;
-}
-
-.loading-content,
-.error-content,
-.empty-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  text-align: center;
-}
-
-.loading-icon,
-.error-icon,
-.empty-icon {
-  font-size: 3rem;
-  opacity: 0.6;
-}
-
-.loading-icon {
-  animation: spin 2s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.error-content {
-  color: var(--error-color, #f44336);
-
-  h3 {
-    margin: 0;
-    font-size: 1.5rem;
-  }
-
-  p {
-    margin: 0;
-    opacity: 0.8;
-  }
-}
-
-// Settings Container (Main Layout)
 .settings-container {
   display: flex;
   flex-direction: column;
@@ -69,119 +13,61 @@
   overflow: hidden;
 }
 
-// Toolbar
 .settings-toolbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 1.5rem;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
-
-  .toolbar-left {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-
-    h2 {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 500;
-    }
-  }
+  order: 2;
+  width: 100%;
 
   .toolbar-actions {
     display: flex;
     align-items: center;
-    gap: 1rem;
     flex-shrink: 0;
     flex-wrap: wrap;
-
-    mat-slide-toggle {
-      display: flex;
-      align-items: center;
-    }
-
-    button {
-      white-space: nowrap;
-    }
-
-    mat-icon-button {
-      display: inline-flex;
-    }
+    max-width: 800px;
+    width: 100%;
   }
 }
-
-// History Controls (Undo/Redo buttons)
-.history-controls {
-  display: flex;
-  gap: 0.25rem;
-  align-items: center;
+.toolbar-card {
+  display: flex !important;
+  max-width: 100%;
+  width: 100%;
 }
 
-// Loading Indicator Container (prevent layout shift)
-.loading-indicator-container {
-  min-width: 80px; // Reserve space for "Saving..." text
+.toolbar-button-container {
   display: flex;
-  align-items: center;
   justify-content: center;
-
-  .invisible {
-    visibility: hidden; // Use visibility instead of display to maintain space
-  }
+  flex-direction: row;
+  gap: 1rem;
+  width: 100%;
+  align-items: center;
 }
 
-// Form Layout
+.toolbar-button-container mat-slide-toggle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .settings-form {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  order: 1;
 }
 
-// Material Tabs
-.settings-tabs {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-
-  ::ng-deep {
-    .mat-mdc-tab-body-wrapper {
-      flex: 1;
-      overflow: hidden;
-    }
-
-    .mat-mdc-tab-body-content {
-      height: 100%;
-      overflow-y: auto;
-    }
-
-    // Tab label with icon
-    .mat-mdc-tab .mdc-tab__text-label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-  }
-}
-
-// Tab Icons
 .tab-icon {
   font-size: 1.25rem;
   width: 1.25rem;
   height: 1.25rem;
 }
 
-// Tab Content
 .tab-content {
   padding: 1.5rem;
   max-width: 800px;
-  margin: 0 auto;
   width: 100%;
-
-  @media (max-width: 767px) {
-    padding: 1rem;
-  }
 }

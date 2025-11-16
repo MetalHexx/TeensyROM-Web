@@ -31,12 +31,9 @@ export function undo(writableStore: WritableStore<SettingsState>) {
           `Undo: At current (-1), moving to most recent history entry at position ${targetPosition}`
         );
       } else if (currentPosition === 0) {
-        // At oldest, wrap to most recent (end of history)
-        targetPosition = history.length - 1;
-        logInfo(
-          LogType.Info,
-          `Undo: At oldest (0), wrapping to most recent at position ${targetPosition}`
-        );
+        // At oldest, cannot go back further - stop here
+        logInfo(LogType.Info, 'Undo: Already at oldest history position (0), cannot undo further');
+        return;
       } else {
         // Normal backward movement (toward older entries)
         targetPosition = currentPosition - 1;

@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
+import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
 
 /**
  * Presentational component for player settings section.
@@ -24,8 +24,8 @@ import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
     ReactiveFormsModule,
     MatFormFieldModule,
     MatSelectModule,
-    MatSlideToggleModule,
     ScalingCardComponent,
+    SettingsToggleItemComponent,
   ],
   templateUrl: './player-settings-section.component.html',
   styleUrl: './player-settings-section.component.scss',

@@ -25,6 +25,9 @@ html {
   --color-directory: #f5d76e;
   --glassy-color: 255, 255, 255;
 
+  // Design Tokens - Spacing
+  --spacing-form-control-gap: 0.75rem; // 12px - spacing between form controls and their labels
+
   @include mat.theme(
     (
       color: mat.$azure-palette,
@@ -251,6 +254,26 @@ body {
 // ─────────────────────────────────────────────
 //  MATERIAL COMPONENT SPECIFIC STYLES
 // ─────────────────────────────────────────────
+
+// Apply consistent spacing between toggles and their labels
+mat-slide-toggle {
+  .mdc-form-field {
+    gap: var(--spacing-form-control-gap);
+  }
+}
+
+// Global form field hint and error styling
+mat-hint {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin-left: -0.9rem
+}
+
+mat-error {
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  margin-left: -0.9rem
+}
 
 // Style all Material input placeholders with dimmed color
 // Only show placeholder when input is focused

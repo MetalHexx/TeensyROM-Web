@@ -13,13 +13,9 @@
     </div>
 
     <!-- Auto-Connect Toggle -->
-    <div class="toggle-row">
-      <mat-slide-toggle formControlName="autoConnectEnabled">
-        <span class="toggle-label">Auto-connect on startup</span>
-      </mat-slide-toggle>
-      <p class="toggle-description">
-        Automatically connect to the last known device when the application starts
-      </p>
-    </div>
+    <lib-settings-toggle-item
+      label="Auto-connect on startup"
+      description="Automatically connect to available TeensyROM devices when the application starts."
+      [control]="formGroup().controls['autoConnectEnabled']" />
   </form>
 </lib-scaling-card>

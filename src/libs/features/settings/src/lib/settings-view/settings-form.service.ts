@@ -41,12 +41,23 @@ export class SettingsFormService {
   private readonly isSyncingFromStore = signal<boolean>(false);
 
   /**
+   * Timer for delayed saving indicator
+   */
+  private savingTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
    * Store state signals (pass-through for component consumption)
    */
   readonly settings = this.settingsStore.getSettings();
   readonly isLoading = this.settingsStore.isLoading;
   readonly error = this.settingsStore.error;
   readonly isSaving = computed(() => this.settingsStore.isSaving());
+
+  /**
+   * Delayed saving indicator - stays visible for minimum 1.5s even if save completes faster
+   * Provides better UX feedback for quick auto-saves
+   */
+  readonly showSaving = signal<boolean>(false);
 
   /**
    * Computed: whether manual save is allowed
@@ -57,23 +68,30 @@ export class SettingsFormService {
   });
 
   /**
-   * Computed: whether undo is available
+   * Computed: whether undo is available (from store computed signal)
    */
-  readonly canUndo = computed(() => this.settingsStore.history().length > 0);
+  readonly canUndo = computed(() => this.settingsStore.canUndo()());
 
   /**
-   * Computed: whether redo is available
+   * Computed: whether redo is available (from store computed signal)
    */
-  readonly canRedo = computed(() => {
-    const position = this.settingsStore.historyPosition();
-    const historyLength = this.settingsStore.history().length;
-    return position !== -1 && position < historyLength - 1;
-  });
+  readonly canRedo = computed(() => this.settingsStore.canRedo()());
+
+  /**
+   * Computed: whether user is navigating history (from store computed signal)
+   */
+  readonly isNavigatingHistory = computed(() => this.settingsStore.isNavigatingHistory()());
+
+  /**
+   * Computed: formatted history position display (from store computed signal)
+   */
+  readonly historyPositionDisplay = computed(() => this.settingsStore.historyPositionDisplay()());
 
   constructor() {
     this.initializeForm();
     this.setupAutoSave();
     this.setupStoreSync();
+    this.setupSavingIndicator();
   }
 
   /**
@@ -112,7 +130,7 @@ export class SettingsFormService {
   }
 
   /**
-   * Sync form when settings change (from undo/redo or external updates)
+   * Setup form sync from store (for undo/redo)
    */
   private setupStoreSync(): void {
     effect(() => {
@@ -125,6 +143,33 @@ export class SettingsFormService {
         this.isSyncingFromStore.set(true);
         form.patchValue(this.settingsToFormValue(settings), { emitEvent: false });
         this.isSyncingFromStore.set(false);
+      }
+    });
+  }
+
+  /**
+   * Setup saving indicator with minimum display duration
+   * Shows indicator for at least 1.5s even if save completes faster
+   */
+  private setupSavingIndicator(): void {
+    effect(() => {
+      const saving = this.isSaving();
+
+      if (saving) {
+        // Show immediately when saving starts
+        this.showSaving.set(true);
+        
+        // Clear any existing timer
+        if (this.savingTimer) {
+          clearTimeout(this.savingTimer);
+          this.savingTimer = null;
+        }
+      } else if (this.showSaving()) {
+        // When saving completes, keep showing for minimum duration
+        this.savingTimer = setTimeout(() => {
+          this.showSaving.set(false);
+          this.savingTimer = null;
+        }, 1500);
       }
     });
   }

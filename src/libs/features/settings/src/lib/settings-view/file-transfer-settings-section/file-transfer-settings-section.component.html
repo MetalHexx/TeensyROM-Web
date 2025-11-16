@@ -29,46 +29,30 @@
       <div class="settings-group">
         <h3 class="group-title">Auto-Copy Behavior</h3>
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="autoFileCopyEnabled">
-            <span class="toggle-label">Enable automatic file copying</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Automatically copy detected files from watch directory to transfer path
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Enable automatic file copying"
+          description="Automatically copy detected files from watch directory to transfer path"
+          [control]="formGroup().controls['autoFileCopyEnabled']" />
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="autoLaunchOnCopyEnabled">
-            <span class="toggle-label">Auto-launch after copy</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Automatically launch files after they are copied to the device
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Auto-launch after copy"
+          description="Automatically launch files after they are copied to the device"
+          [control]="formGroup().controls['autoLaunchOnCopyEnabled']" />
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="navToDirOnLaunch">
-            <span class="toggle-label">Navigate to directory on launch</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Automatically navigate to the file's directory when launched
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Navigate to directory on launch"
+          description="Automatically navigate to the file's directory when launched"
+          [control]="formGroup().controls['navToDirOnLaunch']" />
       </div>
 
       <!-- Synchronization Settings Group -->
       <div class="settings-group">
         <h3 class="group-title">Synchronization</h3>
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="syncFilesEnabled">
-            <span class="toggle-label">Enable file synchronization</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Keep files synchronized between watch directory and device
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Enable file synchronization"
+          description="Keep files synchronized between watch directory and device"
+          [control]="formGroup().controls['syncFilesEnabled']" />
       </div>
     </div>
   </form>

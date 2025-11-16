@@ -1,13 +1,8 @@
 <lib-scaling-card title="Application Settings">
   <form [formGroup]="formGroup()">
-    <div class="toggle-row">
-      <mat-slide-toggle formControlName="setupCompleted">
-        <span class="toggle-label">Initial setup completed</span>
-      </mat-slide-toggle>
-      <p class="toggle-description">
-        Indicates whether the first-time setup wizard has been completed. Disabling this will show
-        the setup wizard again on next application start.
-      </p>
-    </div>
+    <lib-settings-toggle-item
+      label="Initial setup completed"
+      description="Indicates whether the first-time setup wizard has been completed. Disabling this will show the setup wizard again on next application start."
+      [control]="formGroup().controls['setupCompleted']" />
   </form>
 </lib-scaling-card>

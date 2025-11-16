@@ -1,6 +1,7 @@
 <lib-scaling-card title="Player Settings">
   <form [formGroup]="formGroup()">
     <!-- Startup Filter Dropdown -->
+    <h3 class="filter-title">Default Filter</h3>
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Startup Filter</mat-label>
       <mat-select formControlName="startupFilter">
@@ -19,64 +20,40 @@
       <div class="settings-group">
         <h3 class="group-title">Playback Behavior</h3>
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="repeatModeOnStartup">
-            <span class="toggle-label">Enable repeat mode on startup</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Automatically enable music repeat mode when the application starts
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Enable repeat mode on startup"
+          description="Automatically enable music repeat mode on startup.  Useful for DJ mixing."
+          [control]="formGroup().controls['repeatModeOnStartup']" />
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="playTimerEnabled">
-            <span class="toggle-label">Show play timer</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Display elapsed playback time in the player interface
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Enable play timer on startup"
+          description="Display elapsed playback time in the player interface"
+          [control]="formGroup().controls['playTimerEnabled']" />
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="muteFastForward">
-            <span class="toggle-label">Mute during fast forward</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Silence audio when fast-forwarding through content
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Mute on fast forward"
+          description="Mute voices when fast-forwarding through SIDs."
+          [control]="formGroup().controls['muteFastForward']" />
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="muteRandomSeek">
-            <span class="toggle-label">Mute during random seek</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Silence audio when randomly seeking to new positions
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Mute on random seek"
+          description="Mute voices when random seeking."
+          [control]="formGroup().controls['muteRandomSeek']" />
       </div>
 
       <!-- Startup Launch Settings Group -->
       <div class="settings-group">
         <h3 class="group-title">Startup Launch</h3>
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="startupLaunchEnabled">
-            <span class="toggle-label">Launch file on startup</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Automatically launch a file when the application starts
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Launch file on startup"
+          description="Automatically launch a file when the application startup.  Defaults to last played file."
+          [control]="formGroup().controls['startupLaunchEnabled']" />
 
-        <div class="toggle-row">
-          <mat-slide-toggle formControlName="startupLaunchRandom">
-            <span class="toggle-label">Launch random file</span>
-          </mat-slide-toggle>
-          <p class="toggle-description">
-            Choose a random file to launch instead of the last used file
-          </p>
-        </div>
+        <lib-settings-toggle-item
+          label="Launch random file"
+          description="Choose a random file to launch.  Overrides the last played file default."
+          [control]="formGroup().controls['startupLaunchRandom']" />
       </div>
     </div>
   </form>

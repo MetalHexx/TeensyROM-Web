@@ -44,6 +44,9 @@ describe('SettingsViewComponent', () => {
   let canSaveSignal: WritableSignal<boolean>;
   let canUndoSignal: WritableSignal<boolean>;
   let canRedoSignal: WritableSignal<boolean>;
+  let showSavingSignal: WritableSignal<boolean>;
+  let isNavigatingHistorySignal: WritableSignal<boolean>;
+  let historyPositionDisplaySignal: WritableSignal<string | null>;
 
   const mockSettings: Settings = {
     connectionSettings: {
@@ -100,6 +103,9 @@ describe('SettingsViewComponent', () => {
     canSaveSignal = signal(true);
     canUndoSignal = signal(true);
     canRedoSignal = signal(false);
+    showSavingSignal = signal(false);
+    isNavigatingHistorySignal = signal(false);
+    historyPositionDisplaySignal = signal(null);
 
     // Build a real form for testing
     const fb = new FormBuilder();
@@ -165,9 +171,12 @@ describe('SettingsViewComponent', () => {
       error: errorSignal.asReadonly(),
       settingsForm: settingsFormSignal.asReadonly(),
       autoSaveEnabled: autoSaveEnabledSignal,
+      showSaving: showSavingSignal.asReadonly(),
       canSave: canSaveSignal.asReadonly(),
       canUndo: canUndoSignal.asReadonly(),
       canRedo: canRedoSignal.asReadonly(),
+      isNavigatingHistory: isNavigatingHistorySignal.asReadonly(),
+      historyPositionDisplay: historyPositionDisplaySignal.asReadonly(),
       saveSettings: vi.fn(),
       undo: vi.fn(),
       redo: vi.fn(),

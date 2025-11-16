@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
+import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
 
 /**
  * Presentational component for file transfer settings section.
@@ -24,8 +24,8 @@ import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
-    MatSlideToggleModule,
     ScalingCardComponent,
+    SettingsToggleItemComponent,
   ],
   templateUrl: './file-transfer-settings-section.component.html',
   styleUrl: './file-transfer-settings-section.component.scss',

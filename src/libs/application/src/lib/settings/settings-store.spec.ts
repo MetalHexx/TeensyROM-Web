@@ -35,6 +35,8 @@ type SettingsStoreInstance = {
   canUndo: () => () => boolean;
   canRedo: () => () => boolean;
   getHistoryPosition: () => () => number;
+  isNavigatingHistory: () => () => boolean;
+  historyPositionDisplay: () => () => string | null;
 };
 
 describe('SettingsStore (NgRx Signal Store)', () => {
@@ -500,7 +502,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
       expect(store.historyPosition()).toBe(0);
     });
 
-    it('should wrap around from position 0 to end', async () => {
+    it('should stop at position 0 without wrapping', async () => {
       const mockSettings = createMockSettings();
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
       await store.loadSettings();
@@ -512,8 +514,9 @@ describe('SettingsStore (NgRx Signal Store)', () => {
       store.undo();
       expect(store.historyPosition()).toBe(0);
 
+      // Try to undo again - should stay at 0, not wrap
       store.undo();
-      expect(store.historyPosition()).toBe(store.history().length - 1);
+      expect(store.historyPosition()).toBe(0);
     });
 
     it('should restore historical settings', async () => {
@@ -677,7 +680,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         expect(canUndo()).toBe(true);
       });
 
-      it('should return true at any position (supports wraparound)', async () => {
+      it('should return false when at position 0 (boundary stop)', async () => {
         const mockSettings = createMockSettings();
         vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
         await store.loadSettings();
@@ -686,11 +689,10 @@ describe('SettingsStore (NgRx Signal Store)', () => {
 
         const canUndo = store.canUndo();
 
-        expect(canUndo()).toBe(true);
+        expect(canUndo()).toBe(true); // At position -1, can undo to position 0
 
-        store.undo();
-        store.undo();
-        expect(canUndo()).toBe(true);
+        store.undo(); // Now at position 0
+        expect(canUndo()).toBe(false); // At position 0, cannot undo further
       });
     });
 
@@ -754,6 +756,91 @@ describe('SettingsStore (NgRx Signal Store)', () => {
 
         store.redo();
         expect(getPosition()).toBe(-1);
+      });
+    });
+
+    describe('isNavigatingHistory', () => {
+      it('should return false at current state (position -1)', () => {
+        const isNavigating = store.isNavigatingHistory();
+        expect(isNavigating()).toBe(false);
+      });
+
+      it('should return true when navigating history', async () => {
+        const mockSettings = createMockSettings();
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        store.updateSettings({ settings: { appSettings: { setupCompleted: true } } });
+        store.undo();
+
+        const isNavigating = store.isNavigatingHistory();
+        expect(isNavigating()).toBe(true);
+      });
+
+      it('should return false after returning to current', async () => {
+        const mockSettings = createMockSettings();
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        store.updateSettings({ settings: { appSettings: { setupCompleted: true } } });
+        store.undo();
+        store.redo();
+
+        const isNavigating = store.isNavigatingHistory();
+        expect(isNavigating()).toBe(false);
+      });
+    });
+
+    describe('historyPositionDisplay', () => {
+      it('should return null at current state', () => {
+        const display = store.historyPositionDisplay();
+        expect(display()).toBeNull();
+      });
+
+      it('should return null with empty history', () => {
+        const display = store.historyPositionDisplay();
+        expect(display()).toBeNull();
+      });
+
+      it('should return formatted position string when navigating', async () => {
+        const mockSettings = createMockSettings();
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        store.updateSettings({ settings: { appSettings: { setupCompleted: true } } });
+        store.updateSettings({ settings: { appSettings: { setupCompleted: false } } });
+        
+        // history.length should be 2, position will be 1 after first undo
+        store.undo();
+
+        const display = store.historyPositionDisplay();
+        expect(display()).toBe('2/2');
+      });
+
+      it('should show 1-indexed position (position 0 displays as 1)', async () => {
+        const mockSettings = createMockSettings();
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        store.updateSettings({ settings: { appSettings: { setupCompleted: true } } });
+        store.undo();
+        store.undo();
+
+        const display = store.historyPositionDisplay();
+        expect(display()).toBe('1/1');
+      });
+
+      it('should return null after returning to current', async () => {
+        const mockSettings = createMockSettings();
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        store.updateSettings({ settings: { appSettings: { setupCompleted: true } } });
+        store.undo();
+        store.redo();
+
+        const display = store.historyPositionDisplay();
+        expect(display()).toBeNull();
       });
     });
   });

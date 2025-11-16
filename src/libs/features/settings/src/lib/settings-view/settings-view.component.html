@@ -15,81 +15,14 @@
   </div>
 } @else if (settingsForm()) {
   <div class="settings-container">
-    <!-- Toolbar -->
-    <div class="settings-toolbar">
-      <div class="toolbar-left">
-        <h2>Settings</h2>
-      </div>
-      
-      <div class="toolbar-actions">
-        <!-- Auto-save toggle -->
-        <mat-slide-toggle
-          [checked]="autoSaveEnabled()"
-          (change)="autoSaveEnabled.set($event.checked)"
-          color="primary">
-          Auto-save
-        </mat-slide-toggle>
-
-        <!-- Manual save button (hidden when auto-save is on) -->
-        @if (!autoSaveEnabled()) {
-          <button
-            mat-raised-button
-            color="primary"
-            [disabled]="!canSave()"
-            (click)="saveSettings()">
-            <mat-icon>save</mat-icon>
-            Save
-          </button>
-        }
-
-        <!-- History controls -->
-        <div class="history-controls">
-          <button
-            mat-icon-button
-            [disabled]="!canUndo()"
-            (click)="undo()"
-            matTooltip="Undo (Ctrl+Z)">
-            <mat-icon>undo</mat-icon>
-          </button>
-          
-          <button
-            mat-icon-button
-            [disabled]="!canRedo()"
-            (click)="redo()"
-            matTooltip="Redo (Ctrl+Y)">
-            <mat-icon>redo</mat-icon>
-          </button>
-        </div>
-
-        <!-- Loading indicator (always rendered to prevent layout shift) -->
-        <div class="loading-indicator-container">
-          <lib-loading-text 
-            [text]="'Saving...'" 
-            [class.invisible]="!isSaving()" />
-        </div>
-      </div>
-    </div>
-
     <!-- Settings Form -->
     <form [formGroup]="settingsForm()!" class="settings-form">
       <mat-tab-group class="settings-tabs" animationDuration="200ms">
-        <!-- Connection Tab -->
-        <mat-tab>
-          <ng-template mat-tab-label>
-            <mat-icon class="tab-icon">settings_ethernet</mat-icon>
-            Connection
-          </ng-template>
-          <div class="tab-content">
-            <lib-connection-settings-section
-              [formGroup]="getConnectionSettings()" />
-          </div>
-        </mat-tab>
 
         <!-- Player Tab -->
         <mat-tab>
           <ng-template mat-tab-label>
-            <mat-icon class="tab-icon">play_circle</mat-icon>
-            Player
+            <lib-icon-label icon="play_circle" label="Player" />
           </ng-template>
           <div class="tab-content">
             <lib-player-settings-section
@@ -100,8 +33,7 @@
         <!-- File Transfer Tab -->
         <mat-tab>
           <ng-template mat-tab-label>
-            <mat-icon class="tab-icon">folder</mat-icon>
-            File Transfer
+            <lib-icon-label icon="folder" label="File Transfer" />
           </ng-template>
           <div class="tab-content">
             <lib-file-transfer-settings-section
@@ -112,8 +44,7 @@
         <!-- Search Tab -->
         <mat-tab>
           <ng-template mat-tab-label>
-            <mat-icon class="tab-icon">search</mat-icon>
-            Search
+            <lib-icon-label icon="search" label="Search / Indexing" />
           </ng-template>
           <div class="tab-content">
             <lib-search-settings-section
@@ -122,18 +53,83 @@
         </mat-tab>
 
         <!-- App Tab -->
-        <mat-tab>
+        <!-- <mat-tab>
           <ng-template mat-tab-label>
-            <mat-icon class="tab-icon">apps</mat-icon>
-            App
+            <lib-icon-label icon="apps" label="App" />
           </ng-template>
           <div class="tab-content">
             <lib-app-settings-section
               [formGroup]="getAppSettings()" />
           </div>
+        </mat-tab> -->
+
+         <!-- Connection Tab -->
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <lib-icon-label icon="settings_ethernet" label="Connection" />
+          </ng-template>
+          <div class="tab-content">
+            <lib-connection-settings-section
+              [formGroup]="getConnectionSettings()" />
+          </div>
         </mat-tab>
       </mat-tab-group>
     </form>
+
+    <!-- Toolbar -->
+    <div class="settings-toolbar">
+      <div class="toolbar-left">
+        <!-- <h2>Settings</h2> -->
+      </div>
+      
+      <div class="toolbar-actions">
+        <!-- Saving indicator -->
+        <lib-loading-text
+          [visible]="showSaving()"
+          [text]="'Saving...'"
+        />
+
+        <!-- Action buttons -->
+        <lib-scaling-compact-card class="toolbar-card">
+          <div class="toolbar-button-container">
+            <!-- Auto-save toggle -->
+            <mat-slide-toggle
+              [checked]="autoSaveEnabled()"
+              (change)="autoSaveEnabled.set($event.checked)"
+              color="primary">
+              Auto-save
+            </mat-slide-toggle>
+
+            <!-- Save button -->
+            <lib-action-button
+              icon="save"
+              label="Save"
+              [disabled]="!canSave()"
+              (buttonClick)="saveSettings()"
+            >
+            </lib-action-button>
+
+            <!-- Undo button -->
+            <lib-action-button
+              icon="undo"
+              label="Undo"
+              [disabled]="!canUndo()"
+              (buttonClick)="undo()"
+            >
+            </lib-action-button>
+
+            <!-- Redo button -->
+            <lib-action-button
+              icon="redo"
+              label="Redo"
+              [disabled]="!canRedo()"
+              (buttonClick)="redo()"
+            >
+            </lib-action-button>
+          </div>
+        </lib-scaling-compact-card>
+      </div>
+    </div>
   </div>
 } @else {
   <div class="empty-state">

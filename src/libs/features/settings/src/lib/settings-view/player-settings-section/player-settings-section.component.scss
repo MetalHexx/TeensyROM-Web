@@ -16,6 +16,7 @@ form {
 // Responsive grid for settings groups
 .settings-grid {
   display: grid;
+  margin: -1.5rem 0 0 0;
   gap: 1.5rem;
   grid-template-columns: 1fr;
 
@@ -24,6 +25,23 @@ form {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.filter-title {
+    margin: 0 0 -0.5rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+.filter-description {
+    margin: -0.7rem 0 0 0;
+    padding-left: 4.25rem;
+    font-size: 0.875rem;
+    opacity: 0.7;
+    line-height: 1.4;
+  }
 
 .settings-group {
   display: flex;
@@ -43,35 +61,4 @@ form {
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
-}
-
-.toggle-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  mat-slide-toggle {
-    ::ng-deep .mdc-form-field {
-      display: flex;
-      align-items: center;
-    }
-  }
-
-  .toggle-label {
-    font-size: 0.95rem;
-    font-weight: 500;
-  }
-
-  .toggle-description {
-    margin: 0;
-    padding-left: 3.25rem; // Align with toggle label
-    font-size: 0.875rem;
-    opacity: 0.7;
-    line-height: 1.4;
-  }
-}
-
-mat-error {
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
 }
