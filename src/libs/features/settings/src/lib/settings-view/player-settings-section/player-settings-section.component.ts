@@ -44,6 +44,11 @@ export class PlayerSettingsSectionComponent {
   formGroup = input.required<FormGroup>();
 
   /**
+   * Controls whether this section's card is visible via animation
+   */
+  animationTrigger = input<boolean>(true);
+
+  /**
    * Available startup filter options matching StartupFilterType
    */
   readonly startupFilterOptions = [

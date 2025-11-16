@@ -1,12 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, computed, HostListener } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, computed, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatTabsModule } from '@angular/material/tabs';
-import { LoadingTextComponent, ScalingCompactCardComponent, ActionButtonComponent, IconLabelComponent } from '@teensyrom-nx/ui/components';
+import { LoadingTextComponent, ScalingCompactCardComponent, ActionButtonComponent } from '@teensyrom-nx/ui/components';
 import { ConnectionSettingsSectionComponent } from './connection-settings-section/connection-settings-section.component';
 import { PlayerSettingsSectionComponent } from './player-settings-section/player-settings-section.component';
 import { FileTransferSettingsSectionComponent } from './file-transfer-settings-section/file-transfer-settings-section.component';
@@ -24,16 +24,14 @@ import { SettingsFormService } from './settings-form.service';
     MatIconModule,
     MatSlideToggleModule,
     MatTooltipModule,
-    MatTabsModule,
     LoadingTextComponent,
+    EmptyStateMessageComponent,
     ScalingCompactCardComponent,
     ActionButtonComponent,
-    IconLabelComponent,
     ConnectionSettingsSectionComponent,
     PlayerSettingsSectionComponent,
     FileTransferSettingsSectionComponent,
     SearchSettingsSectionComponent,
-    AppSettingsSectionComponent,
   ],
   providers: [SettingsFormService],
   templateUrl: './settings-view.component.html',
@@ -42,6 +40,9 @@ import { SettingsFormService } from './settings-form.service';
 })
 export class SettingsViewComponent {
   private readonly formService = inject(SettingsFormService);
+
+  // Active section state
+  readonly activeSection = signal<'player' | 'fileTransfer' | 'search' | 'connection'>('player');
 
   // Expose service state to template
   readonly settings = this.formService.settings;
@@ -82,6 +83,13 @@ export class SettingsViewComponent {
       event.preventDefault();
       this.redo();
     }
+  }
+
+  /**
+   * Sets the active settings section
+   */
+  setActiveSection(section: 'player' | 'fileTransfer' | 'search' | 'connection'): void {
+    this.activeSection.set(section);
   }
 
   /**

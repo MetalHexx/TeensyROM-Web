@@ -1,79 +1,65 @@
-@if (isLoading()) {
-  <div class="loading-state">
-    <div class="loading-content">
-      <span class="material-icons loading-icon">settings</span>
-      <p>Loading settings...</p>
-    </div>
-  </div>
-} @else if (error()) {
-  <div class="error-state">
-    <div class="error-content">
-      <span class="material-icons error-icon">error</span>
-      <h3>Error Loading Settings</h3>
-      <p>{{ error() }}</p>
-    </div>
-  </div>
+@if (error()) {
+
+<lib-empty-state-message
+  icon="error"
+  title="Error Loading Settings"
+  [message]="error()!">
+</lib-empty-state-message>
+
 } @else if (settingsForm()) {
-  <div class="settings-container">
+  <div class="settings-wrapper">
+    <div class="settings-container">
+    <!-- Navigation Card -->
+    <lib-scaling-compact-card class="navigation-card">
+      <div class="navigation-buttons">
+        <lib-action-button
+          icon="play_circle"
+          label="Player"
+          [variant]="activeSection() === 'player' ? 'raised' : 'stroked'"
+          [color]="activeSection() === 'player' ? 'primary' : 'normal'"
+          (buttonClick)="setActiveSection('player')" />
+        <lib-action-button
+          icon="folder"
+          label="File Transfer"
+          [variant]="activeSection() === 'fileTransfer' ? 'raised' : 'stroked'"
+          [color]="activeSection() === 'fileTransfer' ? 'primary' : 'normal'"
+          (buttonClick)="setActiveSection('fileTransfer')" />
+        <lib-action-button
+          icon="search"
+          label="Search"
+          [variant]="activeSection() === 'search' ? 'raised' : 'stroked'"
+          [color]="activeSection() === 'search' ? 'primary' : 'normal'"
+          (buttonClick)="setActiveSection('search')" />
+        <lib-action-button
+          icon="settings_ethernet"
+          label="Connection"
+          [variant]="activeSection() === 'connection' ? 'raised' : 'stroked'"
+          [color]="activeSection() === 'connection' ? 'primary' : 'normal'"
+          (buttonClick)="setActiveSection('connection')" />
+      </div>
+    </lib-scaling-compact-card>
+
     <!-- Settings Form -->
     <form [formGroup]="settingsForm()!" class="settings-form">
-      <mat-tab-group class="settings-tabs" animationDuration="200ms">
+      <div class="section-content">
+        <!-- @if (activeSection() === 'player') { -->
+          <lib-player-settings-section
+            [formGroup]="getPlayerSettings()"
+            [animationTrigger]="activeSection() === 'player'" />
+        <!-- } -->
 
-        <!-- Player Tab -->
-        <mat-tab>
-          <ng-template mat-tab-label>
-            <lib-icon-label icon="play_circle" label="Player" />
-          </ng-template>
-          <div class="tab-content">
-            <lib-player-settings-section
-              [formGroup]="getPlayerSettings()" />
-          </div>
-        </mat-tab>
+        <lib-file-transfer-settings-section
+          [formGroup]="getFileTransferSettings()"
+          [animationTrigger]="activeSection() === 'fileTransfer'" />
 
-        <!-- File Transfer Tab -->
-        <mat-tab>
-          <ng-template mat-tab-label>
-            <lib-icon-label icon="folder" label="File Transfer" />
-          </ng-template>
-          <div class="tab-content">
-            <lib-file-transfer-settings-section
-              [formGroup]="getFileTransferSettings()" />
-          </div>
-        </mat-tab>
+        <lib-search-settings-section
+          [formGroup]="getSearchSettings()"
+          [animationTrigger]="activeSection() === 'search'" />
 
-        <!-- Search Tab -->
-        <mat-tab>
-          <ng-template mat-tab-label>
-            <lib-icon-label icon="search" label="Search / Indexing" />
-          </ng-template>
-          <div class="tab-content">
-            <lib-search-settings-section
-              [formGroup]="getSearchSettings()" />
-          </div>
-        </mat-tab>
-
-        <!-- App Tab -->
-        <!-- <mat-tab>
-          <ng-template mat-tab-label>
-            <lib-icon-label icon="apps" label="App" />
-          </ng-template>
-          <div class="tab-content">
-            <lib-app-settings-section
-              [formGroup]="getAppSettings()" />
-          </div>
-        </mat-tab> -->
-
-         <!-- Connection Tab -->
-        <mat-tab>
-          <ng-template mat-tab-label>
-            <lib-icon-label icon="settings_ethernet" label="Connection" />
-          </ng-template>
-          <div class="tab-content">
-            <lib-connection-settings-section
-              [formGroup]="getConnectionSettings()" />
-          </div>
-        </mat-tab>
-      </mat-tab-group>
+        <lib-connection-settings-section
+          [formGroup]="getConnectionSettings()"
+          [animationTrigger]="activeSection() === 'connection'" />
+      </div>
     </form>
 
     <!-- Toolbar -->
@@ -130,12 +116,6 @@
         </lib-scaling-compact-card>
       </div>
     </div>
-  </div>
-} @else {
-  <div class="empty-state">
-    <div class="empty-content">
-      <span class="material-icons empty-icon">settings</span>
-      <p>No settings available</p>
     </div>
   </div>
 }

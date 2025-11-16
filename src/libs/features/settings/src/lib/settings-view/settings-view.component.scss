@@ -5,20 +5,29 @@
   overflow: hidden;
 }
 
-.settings-container {
+.settings-wrapper {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   height: 100%;
   width: 100%;
   overflow: hidden;
 }
 
+.settings-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  max-width: 1200px;
+  overflow: hidden;
+}
+
 .settings-toolbar {
   display: flex;
-  gap: 1.5rem;
-  padding: 0 0;
+  gap: 0;
+  padding: 0;
   flex-shrink: 0;
-  order: 2;
+  order: 3;
   width: 100%;
 
   .toolbar-actions {
@@ -26,13 +35,11 @@
     align-items: center;
     flex-shrink: 0;
     flex-wrap: wrap;
-    max-width: 800px;
     width: 100%;
   }
 }
 .toolbar-card {
   display: flex !important;
-  max-width: 100%;
   width: 100%;
 }
 
@@ -56,35 +63,45 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  order: 2;
+  min-height: 0;
+}
+
+.navigation-card {
+  flex-shrink: 0;
   order: 1;
-
-  .settings-tabs {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-
-    ::ng-deep {
-      .mat-mdc-tab-body-wrapper {
-        flex: 1;
-        overflow: auto;
-      }
-
-      .mat-mdc-tab-body-content {
-        height: 100%;
-        overflow: auto;
-      }
-    }
+  width: 100%;
+  margin-bottom: 1rem;
+  max-height: 100px;
+  
+  lib-scaling-container {
+    max-height: 100px;
   }
 }
 
-.tab-icon {
-  font-size: 1.25rem;
-  width: 1.25rem;
-  height: 1.25rem;
+.navigation-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem;
 }
 
-.tab-content {
-  padding: 1.5rem;
-  max-width: 800px;
+.section-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
   width: 100%;
+  min-height: 0;
+}
+
+// Absolutely position all sections to prevent stacking during animations
+.section-content > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0;
+  overflow: hidden;
 }

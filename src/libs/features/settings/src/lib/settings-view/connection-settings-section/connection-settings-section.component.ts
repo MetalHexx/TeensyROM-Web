@@ -37,4 +37,9 @@ export class ConnectionSettingsSectionComponent {
    * - autoConnectEnabled: FormControl<boolean>
    */
   formGroup = input.required<FormGroup>();
+
+  /**
+   * Controls whether this section's card is visible via animation
+   */
+  animationTrigger = input<boolean>(true);
 }

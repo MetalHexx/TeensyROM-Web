@@ -46,6 +46,11 @@ export class SearchSettingsSectionComponent {
   formGroup = input.required<FormGroup>();
 
   /**
+   * Controls whether this section's card is visible via animation
+   */
+  animationTrigger = input<boolean>(true);
+
+  /**
    * Computed signal to access nested weights FormGroup
    */
   weightsGroup = computed(() => this.formGroup().get('weights') as FormGroup);
