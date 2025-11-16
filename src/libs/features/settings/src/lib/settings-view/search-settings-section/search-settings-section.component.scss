@@ -1,5 +1,10 @@
 :host {
   display: block;
+  height: 100%;
+
+  lib-scaling-card {
+    height: 100%;
+  }
 }
 
 form {
@@ -37,10 +42,6 @@ form {
   flex-direction: column;
   gap: 1rem;
   padding: 1rem 0;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  }
 
   .group-title {
     margin: 0 0 -0.5rem 0;
