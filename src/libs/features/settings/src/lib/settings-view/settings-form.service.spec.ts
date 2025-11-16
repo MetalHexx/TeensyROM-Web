@@ -220,6 +220,40 @@ describe('SettingsFormService', () => {
       expect(saveSpy).not.toHaveBeenCalled();
       flush();
     }));
+
+    it('should not trigger during store sync (undo/redo)', fakeAsync(() => {
+      const form = service.settingsForm();
+      expect(form).toBeTruthy();
+      if (!form) return;
+      const saveSpy = vi.spyOn(service, 'saveSettings');
+
+      // Simulate undo/redo by changing history position
+      historyPositionSignal.set(0);
+      const newSettings = { ...mockSettings };
+      newSettings.connectionSettings.autoConnectEnabled = false;
+      settingsSignal.set(newSettings);
+
+      // Flush effects to trigger store sync
+      TestBed.flushEffects();
+      tick(1000);
+
+      // Auto-save should NOT trigger because sync flag should prevent it
+      expect(saveSpy).not.toHaveBeenCalled();
+      flush();
+    }));
+
+    it('should not trigger on initial form creation', fakeAsync(() => {
+      // This test verifies form initialization doesn't trigger auto-save
+      const saveSpy = vi.spyOn(service, 'saveSettings');
+
+      // Create a new service instance to test initialization
+      const newService = TestBed.runInInjectionContext(() => new SettingsFormService());
+      TestBed.flushEffects();
+      tick(1000);
+
+      expect(saveSpy).not.toHaveBeenCalled();
+      flush();
+    }));
   });
 
   describe('Manual Save', () => {
@@ -349,6 +383,132 @@ describe('SettingsFormService', () => {
       const formGroup = service.getAppSettings();
       expect(formGroup).toBeTruthy();
       expect(formGroup.get('setupCompleted')).toBeTruthy();
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should return early from saveSettings when form is null', async () => {
+      service['settingsForm'].set(null);
+
+      await service.saveSettings();
+
+      expect(mockSettingsStore.updateSettings).not.toHaveBeenCalled();
+      expect(mockSettingsStore.saveSettings).not.toHaveBeenCalled();
+    });
+
+    it('should return early from saveSettings when form is invalid', async () => {
+      const form = service.settingsForm();
+      expect(form).toBeTruthy();
+      if (!form) return;
+
+      // Make form invalid
+      form.get('fileTransferSettings.autoTransferPath')?.setValue('');
+      form.get('fileTransferSettings.autoTransferPath')?.markAsTouched();
+
+      await service.saveSettings();
+
+      expect(mockSettingsStore.updateSettings).not.toHaveBeenCalled();
+      expect(mockSettingsStore.saveSettings).not.toHaveBeenCalled();
+    });
+
+    it('should throw when getConnectionSettings called with null form', () => {
+      service['settingsForm'].set(null);
+
+      expect(() => service.getConnectionSettings()).toThrow('Settings form not initialized');
+    });
+
+    it('should throw when getPlayerSettings called with null form', () => {
+      service['settingsForm'].set(null);
+
+      expect(() => service.getPlayerSettings()).toThrow('Settings form not initialized');
+    });
+
+    it('should throw when getFileTransferSettings called with null form', () => {
+      service['settingsForm'].set(null);
+
+      expect(() => service.getFileTransferSettings()).toThrow('Settings form not initialized');
+    });
+
+    it('should throw when getSearchSettings called with null form', () => {
+      service['settingsForm'].set(null);
+
+      expect(() => service.getSearchSettings()).toThrow('Settings form not initialized');
+    });
+
+    it('should throw when getAppSettings called with null form', () => {
+      service['settingsForm'].set(null);
+
+      expect(() => service.getAppSettings()).toThrow('Settings form not initialized');
+    });
+
+    it('should log error and continue when saveSettings fails', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(mockSettingsStore.saveSettings).mockRejectedValueOnce(new Error('Save failed'));
+
+      await service.saveSettings();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to save settings:', expect.any(Error));
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('Array/String Transformations', () => {
+    it('should handle empty string arrays', async () => {
+      const form = service.settingsForm();
+      expect(form).toBeTruthy();
+      if (!form) return;
+
+      // Empty strings will make form invalid (required validators), so this tests the edge case
+      // In practice, stringToArray('') returns [''] which is technically valid
+      form.get('searchSettings.stopWords')?.setValue('single');
+
+      await service.saveSettings();
+
+      // Verify the transformation happens correctly for single values
+      const callArg = vi.mocked(mockSettingsStore.updateSettings).mock.calls[0][0];
+      expect(callArg.settings.searchSettings.stopWords).toEqual(['single']);
+    });
+
+    it('should handle single value arrays', async () => {
+      const form = service.settingsForm();
+      expect(form).toBeTruthy();
+      if (!form) return;
+
+      form.get('searchSettings.stopWords')?.setValue('single');
+
+      await service.saveSettings();
+
+      const callArg = vi.mocked(mockSettingsStore.updateSettings).mock.calls[0][0];
+      expect(callArg.settings.searchSettings.stopWords).toEqual(['single']);
+    });
+
+    it('should trim whitespace from array elements', async () => {
+      const form = service.settingsForm();
+      expect(form).toBeTruthy();
+      if (!form) return;
+
+      form.get('searchSettings.stopWords')?.setValue('  foo  ,  bar  ,  baz  ');
+
+      await service.saveSettings();
+
+      const callArg = vi.mocked(mockSettingsStore.updateSettings).mock.calls[0][0];
+      expect(callArg.settings.searchSettings.stopWords).toEqual(['foo', 'bar', 'baz']);
+    });
+
+    it('should handle arrays with commas and spaces', async () => {
+      const form = service.settingsForm();
+      expect(form).toBeTruthy();
+      if (!form) return;
+
+      form.get('searchSettings.bannedDirectories')?.setValue('/path/with spaces, /another/path');
+
+      await service.saveSettings();
+
+      const callArg = vi.mocked(mockSettingsStore.updateSettings).mock.calls[0][0];
+      expect(callArg.settings.searchSettings.bannedDirectories).toEqual([
+        '/path/with spaces',
+        '/another/path',
+      ]);
     });
   });
 

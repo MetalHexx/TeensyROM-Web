@@ -151,4 +151,21 @@ describe('FileTransferSettingsSectionComponent', () => {
     testFormGroup.get('autoTransferPath')?.setValue('/valid/path');
     expect(testFormGroup.valid).toBe(true);
   });
+
+  it('should accept animationTrigger input', () => {
+    componentRef.setInput('animationTrigger', true);
+    fixture.detectChanges();
+
+    expect(component.animationTrigger()).toBe(true);
+
+    componentRef.setInput('animationTrigger', false);
+    fixture.detectChanges();
+
+    expect(component.animationTrigger()).toBe(false);
+  });
+
+  it('should default animationTrigger to true', () => {
+    fixture.detectChanges();
+    expect(component.animationTrigger()).toBe(true);
+  });
 });

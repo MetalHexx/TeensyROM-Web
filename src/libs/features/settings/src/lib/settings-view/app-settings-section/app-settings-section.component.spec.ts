@@ -78,4 +78,16 @@ describe('AppSettingsSectionComponent', () => {
     // Boolean controls typically don't have validation, but we verify the control works
     expect(testFormGroup.get('setupCompleted')?.value).toBeNull();
   });
+
+  it('should accept animationTrigger input', () => {
+    componentRef.setInput('animationTrigger', true);
+    fixture.detectChanges();
+
+    expect(component.animationTrigger()).toBe(true);
+
+    componentRef.setInput('animationTrigger', false);
+    fixture.detectChanges();
+
+    expect(component.animationTrigger()).toBe(false);
+  });
 });
