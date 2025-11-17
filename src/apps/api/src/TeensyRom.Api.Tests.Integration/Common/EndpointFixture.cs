@@ -1,4 +1,4 @@
-﻿using RadEndpoints.Testing;
+using RadEndpoints.Testing;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.Json;
@@ -11,6 +11,10 @@ using TeensyRom.Api.Endpoints.ResetDevice;
 using TeensyRom.Api.Models;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Settings;
+using TeensyRom.Core.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using TeensyRom.Core.Logging;
 
 namespace TeensyRom.Api.Tests.Integration.Common
 {
@@ -43,14 +47,37 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public EndpointFixture()
         {
-            _factory = new WebApplicationFactory<Program>();
+            _factory = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(builder =>
+                {
+                    builder.ConfigureServices(services =>
+                    {
+                        // Override settings to disable auto-connect for integration tests
+                        // This prevents the ApplicationBootstrapService from auto-connecting devices
+                        // on startup, allowing tests to control device connection state explicitly
+                        var settingsServiceDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(SettingsService));
+                        if (settingsServiceDescriptor != null)
+                        {
+                            services.Remove(settingsServiceDescriptor);
+                        }
+                        var iSettingsServiceDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ISettingsService));
+                        if (iSettingsServiceDescriptor != null)
+                        {
+                            services.Remove(iSettingsServiceDescriptor);
+                        }
+
+                        // Register a test-specific SettingsService that returns settings with AutoConnectEnabled = false
+                        services.AddSingleton<SettingsService, TestSettingsService>();
+                        services.AddSingleton<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
+                    });
+                });
         }
 
         public async Task<string> GetConnectedDevice() 
         {
             var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest()
             {
-                AutoConnectNew = true
+                AutoConnect = true
             });
             var deviceId = findResponse.Content.Devices.First().DeviceId!;
 
@@ -61,7 +88,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
         {
             var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest()
             {
-                AutoConnectNew = true
+                AutoConnect = true
             });
             return findResponse.Content.Devices;
         }
@@ -91,7 +118,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
         {
             var initialCarts = Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest()
             {
-                AutoConnectNew = true
+                AutoConnect = true
             }).Result;
 
             var connectDevices = initialCarts.Content.Devices
@@ -177,5 +204,35 @@ namespace TeensyRom.Api.Tests.Integration.Common
         }
 
         public void Dispose() => _factory.Dispose();
+    }
+
+    /// <summary>
+    /// Test-specific SettingsService that forces AutoConnectEnabled to false.
+    /// Prevents ApplicationBootstrapService from auto-connecting devices during integration tests,
+    /// allowing tests to explicitly control device connection state.
+    /// 
+    /// Overrides InitDefaultSettings to ensure AutoConnectEnabled = false is baked into
+    /// the default settings loaded during construction.
+    /// </summary>
+    public class TestSettingsService : SettingsService
+    {
+        private readonly TeensySettings _testSettings;
+
+        public TestSettingsService(ILoggingService log) : base(log)
+        {
+            // After base constructor runs (which calls GetSettings and loads/creates settings),
+            // we need to force the settings to have AutoConnectEnabled = false
+            var currentSettings = base.GetSettings();
+            _testSettings = currentSettings with
+            {
+                ConnectionSettings = currentSettings.ConnectionSettings with
+                {
+                    AutoConnectEnabled = false
+                }
+            };
+            
+            // Force save the modified settings so they persist in the singleton
+            SaveSettings(_testSettings);
+        }
     }    
 }

@@ -107,7 +107,7 @@ namespace TeensyRom.Core.Device
             return false;
         }
 
-        public async Task<List<TeensyRomDevice>> FindDevices(bool autoConnectNew, CancellationToken ct)
+        public async Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct)
         {
             _healthCheckEnabled = false;
 
@@ -137,7 +137,7 @@ namespace TeensyRom.Core.Device
             _connectedDevices.Clear();
             _disconnectedDevices.Clear();
 
-            if (!autoConnectNew)
+            if (!autoConnect)
             {
                 var devicesToKeep = devices.Where(d => devicesToReconnect.Contains(d.DeviceId)).ToList();
                 var devicesToDisconnect = devices.Where(d => !devicesToReconnect.Contains(d.DeviceId)).ToList();

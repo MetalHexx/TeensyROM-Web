@@ -23,7 +23,7 @@ namespace TeensyRom.Api.Tests.Integration
 
             var findResponse = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest() 
             {
-                AutoConnectNew = false
+                AutoConnect = false
             });
 
             // Assert

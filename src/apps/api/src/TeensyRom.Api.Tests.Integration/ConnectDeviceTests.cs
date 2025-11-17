@@ -15,7 +15,7 @@ namespace TeensyRom.Api.Tests.Integration
             // Arrange - TrClient automatically handles enum serialization
             var devices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest 
             {
-                AutoConnectNew = false
+                AutoConnect = false
             });
             var expectedDeviceId = devices.Content.Devices.First().DeviceId;
 
@@ -27,7 +27,7 @@ namespace TeensyRom.Api.Tests.Integration
 
             var finalDevices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest 
             {
-                AutoConnectNew = false
+                AutoConnect = false
             });
 
             // Assert

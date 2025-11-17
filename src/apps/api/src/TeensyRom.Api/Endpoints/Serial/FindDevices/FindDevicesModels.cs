@@ -7,7 +7,7 @@ namespace TeensyRom.Api.Endpoints.FindCarts
 {
     public class FindDevicesRequest
     {
-        [FromQuery] public bool? AutoConnectNew { get; set; }
+        [FromQuery] public bool? AutoConnect { get; set; }
     }
     /// <summary>
     /// Response model for finding available and connected TeensyROM devices.

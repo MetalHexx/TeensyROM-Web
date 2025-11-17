@@ -58,7 +58,7 @@ export interface DisconnectDeviceRequest {
 }
 
 export interface FindDevicesRequest {
-    autoConnectNew?: boolean;
+    autoConnect?: boolean;
 }
 
 export interface PingDeviceRequest {
@@ -151,8 +151,8 @@ export class DevicesApiService extends runtime.BaseAPI {
     async findDevicesRaw(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
         const queryParameters: any = {};
 
-        if (requestParameters['autoConnectNew'] != null) {
-            queryParameters['AutoConnectNew'] = requestParameters['autoConnectNew'];
+        if (requestParameters['autoConnect'] != null) {
+            queryParameters['AutoConnect'] = requestParameters['autoConnect'];
         }
 
         const headerParameters: runtime.HTTPHeaders = {};

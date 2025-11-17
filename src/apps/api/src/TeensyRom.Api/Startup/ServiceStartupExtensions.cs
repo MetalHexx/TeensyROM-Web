@@ -53,6 +53,10 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IToggleMusicSerialRoutine, ToggleMusicSerialRoutine>();
             services.AddSingleton<ISetMusicSpeedSerialRoutine, SetMusicSpeedSerialRoutine>();
             services.AddSingleton<IPlaySubtuneSerialRoutine, PlaySubtuneSerialRoutine>();
+
+            // Register application bootstrap hosted service
+            services.AddHostedService<ApplicationBootstrapService>();
+
             return services;
         }
     }

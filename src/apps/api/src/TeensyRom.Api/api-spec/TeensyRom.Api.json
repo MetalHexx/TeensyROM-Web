@@ -223,7 +223,7 @@
         "operationId": "FindDevices",
         "parameters": [
           {
-            "name": "AutoConnectNew",
+            "name": "AutoConnect",
             "in": "query",
             "schema": {
               "type": "boolean"

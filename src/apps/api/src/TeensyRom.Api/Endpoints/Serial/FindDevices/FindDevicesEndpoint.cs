@@ -26,7 +26,7 @@ namespace TeensyRom.Api.Endpoints.FindCarts
 
         public override async Task Handle(FindDevicesRequest r, CancellationToken ct)
         {
-            var devices = await deviceManager.FindDevices(r.AutoConnectNew ?? false, ct);
+            var devices = await deviceManager.FindDevices(r.AutoConnect ?? false, ct);
 
             if (devices.Count == 0)
             {
