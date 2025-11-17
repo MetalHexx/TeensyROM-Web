@@ -7,7 +7,7 @@ import {
   Settings,
   ISettingsService,
   SETTINGS_SERVICE,
-  StartupFilterType,
+  PlayerFilterType,
 } from '@teensyrom-nx/domain';
 import { SettingsStore } from './settings-store';
 
@@ -53,7 +53,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
       playTimerEnabled: false,
       muteFastForward: false,
       muteRandomSeek: false,
-      startupFilter: 'All' as StartupFilterType,
+      startupFilter: PlayerFilterType.All,
       startupLaunchEnabled: false,
       startupLaunchRandom: false,
     },

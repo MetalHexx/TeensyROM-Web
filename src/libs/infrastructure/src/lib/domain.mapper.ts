@@ -13,6 +13,14 @@ import {
   CompetitionDto,
   FileLinkDto,
   FileTagDto,
+  GetSettingsResponse,
+  SaveSettingsRequest,
+  ConnectionSettingsDto,
+  PlayerSettingsDto,
+  FileTransferSettingsDto,
+  SearchSettingsDto,
+  SearchWeightsDto,
+  AppSettingsDto,
 } from '@teensyrom-nx/data-access/api-client';
 import { DeviceState as ApiDeviceState } from '@teensyrom-nx/data-access/api-client';
 import {
@@ -31,6 +39,14 @@ import {
   FileTag,
   YouTubeVideo,
   Competition,
+  Settings,
+  ConnectionSettings,
+  PlayerSettings,
+  FileTransferSettings,
+  SearchSettings,
+  SearchWeights,
+  AppSettings,
+  ConnectionType,
 } from '@teensyrom-nx/domain';
 
 /**
@@ -292,6 +308,178 @@ export class DomainMapper {
     return {
       name: dto.name ?? '',
       place: dto.place ?? undefined,
+    };
+  }
+
+  // ===== SETTINGS MAPPING =====
+
+  /**
+   * Maps API filter string to domain PlayerFilterType enum
+   * Case-insensitive with fallback to 'All' for unrecognized values
+   */
+  private static toPlayerFilterType(apiFilter: string): PlayerFilterType {
+    const normalized = apiFilter?.toUpperCase() ?? '';
+
+    switch (normalized) {
+      case 'ALL':
+        return PlayerFilterType.All;
+      case 'GAMES':
+        return PlayerFilterType.Games;
+      case 'MUSIC':
+        return PlayerFilterType.Music;
+      case 'HEX':
+        return PlayerFilterType.Hex;
+      case 'IMAGES':
+        return PlayerFilterType.Images;
+      default:
+        return PlayerFilterType.All;
+    }
+  }
+
+  /**
+   * Maps API DTO to domain Settings model
+   */
+  static toSettings(dto: GetSettingsResponse): Settings {
+    return {
+      connectionSettings: this.toConnectionSettings(dto.connectionSettings),
+      playerSettings: this.toPlayerSettings(dto.playerSettings),
+      fileTransferSettings: this.toFileTransferSettings(dto.fileTransferSettings),
+      searchSettings: this.toSearchSettings(dto.searchSettings),
+      appSettings: this.toAppSettings(dto.appSettings),
+    };
+  }
+
+  /**
+   * Maps domain Settings to API DTO (SaveSettingsRequest)
+   */
+  static toSettingsDto(settings: Settings): SaveSettingsRequest {
+    return {
+      connectionSettings: this.toConnectionSettingsDto(settings.connectionSettings),
+      playerSettings: this.toPlayerSettingsDto(settings.playerSettings),
+      fileTransferSettings: this.toFileTransferSettingsDto(settings.fileTransferSettings),
+      searchSettings: this.toSearchSettingsDto(settings.searchSettings),
+      appSettings: this.toAppSettingsDto(settings.appSettings),
+    };
+  }
+
+  private static toConnectionSettings(dto: ConnectionSettingsDto): ConnectionSettings {
+    return {
+      connectionType: dto.connectionType as ConnectionType,
+      autoConnectEnabled: dto.autoConnectEnabled,
+    };
+  }
+
+  private static toConnectionSettingsDto(settings: ConnectionSettings): ConnectionSettingsDto {
+    return {
+      connectionType: settings.connectionType,
+      autoConnectEnabled: settings.autoConnectEnabled,
+    };
+  }
+
+  private static toPlayerSettings(dto: PlayerSettingsDto): PlayerSettings {
+    return {
+      repeatModeOnStartup: dto.repeatModeOnStartup,
+      playTimerEnabled: dto.playTimerEnabled,
+      muteFastForward: dto.muteFastForward,
+      muteRandomSeek: dto.muteRandomSeek,
+      startupFilter: this.toPlayerFilterType(dto.startupFilter as string),
+      startupLaunchEnabled: dto.startupLaunchEnabled,
+      startupLaunchRandom: dto.startupLaunchRandom,
+    };
+  }
+
+  private static toPlayerSettingsDto(settings: PlayerSettings): PlayerSettingsDto {
+    // Convert PlayerFilterType enum back to TeensyFilterType string
+    const filterMap: Record<PlayerFilterType, string> = {
+      [PlayerFilterType.All]: 'All',
+      [PlayerFilterType.Games]: 'Games',
+      [PlayerFilterType.Music]: 'Music',
+      [PlayerFilterType.Hex]: 'Hex',
+      [PlayerFilterType.Images]: 'Images',
+    };
+
+    return {
+      repeatModeOnStartup: settings.repeatModeOnStartup,
+      playTimerEnabled: settings.playTimerEnabled,
+      muteFastForward: settings.muteFastForward,
+      muteRandomSeek: settings.muteRandomSeek,
+      startupFilter: filterMap[settings.startupFilter] as any,
+      startupLaunchEnabled: settings.startupLaunchEnabled,
+      startupLaunchRandom: settings.startupLaunchRandom,
+    };
+  }
+
+  private static toFileTransferSettings(dto: FileTransferSettingsDto): FileTransferSettings {
+    return {
+      watchDirectoryLocation: dto.watchDirectoryLocation,
+      autoTransferPath: dto.autoTransferPath,
+      autoFileCopyEnabled: dto.autoFileCopyEnabled,
+      autoLaunchOnCopyEnabled: dto.autoLaunchOnCopyEnabled,
+      navToDirOnLaunch: dto.navToDirOnLaunch,
+      syncFilesEnabled: dto.syncFilesEnabled,
+    };
+  }
+
+  private static toFileTransferSettingsDto(
+    settings: FileTransferSettings
+  ): FileTransferSettingsDto {
+    return {
+      watchDirectoryLocation: settings.watchDirectoryLocation,
+      autoTransferPath: settings.autoTransferPath,
+      autoFileCopyEnabled: settings.autoFileCopyEnabled,
+      autoLaunchOnCopyEnabled: settings.autoLaunchOnCopyEnabled,
+      navToDirOnLaunch: settings.navToDirOnLaunch,
+      syncFilesEnabled: settings.syncFilesEnabled,
+    };
+  }
+
+  private static toSearchSettings(dto: SearchSettingsDto): SearchSettings {
+    return {
+      weights: this.toSearchWeights(dto.searchWeights),
+      stopWords: dto.searchStopWords,
+      bannedDirectories: dto.bannedDirectories,
+      bannedFiles: dto.bannedFiles,
+    };
+  }
+
+  private static toSearchSettingsDto(settings: SearchSettings): SearchSettingsDto {
+    return {
+      searchWeights: this.toSearchWeightsDto(settings.weights),
+      searchStopWords: settings.stopWords,
+      bannedDirectories: settings.bannedDirectories,
+      bannedFiles: settings.bannedFiles,
+    };
+  }
+
+  private static toSearchWeights(dto: SearchWeightsDto): SearchWeights {
+    return {
+      nameWeight: dto.fileName,
+      titleWeight: dto.title,
+      creatorWeight: dto.creator,
+      releaseInfoWeight: dto.filePath,
+      descriptionWeight: dto.description,
+    };
+  }
+
+  private static toSearchWeightsDto(weights: SearchWeights): SearchWeightsDto {
+    return {
+      title: weights.titleWeight,
+      fileName: weights.nameWeight,
+      filePath: weights.releaseInfoWeight,
+      creator: weights.creatorWeight,
+      description: weights.descriptionWeight,
+    };
+  }
+
+  private static toAppSettings(dto: AppSettingsDto): AppSettings {
+    return {
+      setupCompleted: !dto.firstTimeSetup,
+    };
+  }
+
+  private static toAppSettingsDto(settings: AppSettings): AppSettingsDto {
+    return {
+      firstTimeSetup: !settings.setupCompleted,
     };
   }
 }

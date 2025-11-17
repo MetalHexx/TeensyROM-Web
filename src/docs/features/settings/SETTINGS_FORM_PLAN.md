@@ -460,7 +460,7 @@ SettingsForm (FormGroup)
 │   ├── playTimerEnabled (FormControl<boolean>)
 │   ├── muteFastForward (FormControl<boolean>)
 │   ├── muteRandomSeek (FormControl<boolean>)
-│   ├── startupFilter (FormControl<StartupFilterType>) [required, enum]
+│   ├── startupFilter (FormControl<PlayerFilterType>) [required, enum]
 │   ├── startupLaunchEnabled (FormControl<boolean>)
 │   └── startupLaunchRandom (FormControl<boolean>)
 ├── fileTransferSettings (FormGroup)

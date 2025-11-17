@@ -14,7 +14,7 @@ import { logInfo, logError, LogType } from '@teensyrom-nx/utils';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
-export function createDefaultDeviceState(deviceId: string): DevicePlayerState {
+export function createDefaultDeviceState(deviceId: string, defaultFilter?: PlayerFilterType): DevicePlayerState {
   return {
     deviceId,
     currentFile: null,
@@ -23,7 +23,7 @@ export function createDefaultDeviceState(deviceId: string): DevicePlayerState {
     launchMode: LaunchMode.Directory,
     shuffleSettings: {
       scope: PlayerScope.Storage,
-      filter: PlayerFilterType.All,
+      filter: defaultFilter ?? PlayerFilterType.All,
       startingDirectory: undefined,
     },
     playHistory: null,
@@ -38,7 +38,8 @@ export function createDefaultDeviceState(deviceId: string): DevicePlayerState {
 export function ensurePlayerState(
   store: WritableStore<PlayerState>,
   deviceId: string,
-  actionMessage: string
+  actionMessage: string,
+  defaultFilter?: PlayerFilterType
 ): DevicePlayerState {
   const existing = store.players()[deviceId];
   if (existing) {
@@ -48,7 +49,7 @@ export function ensurePlayerState(
 
   logInfo(LogType.Start, `PlayerHelper: Creating new player state for device ${deviceId}`);
 
-  const defaultState = createDefaultDeviceState(deviceId);
+  const defaultState = createDefaultDeviceState(deviceId, defaultFilter);
   updateState(store, actionMessage, (state) => ({
     players: {
       ...state.players,

@@ -17,6 +17,7 @@ import {
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore, StorageDirectoryState } from '../storage/storage-store';
+import { SettingsStore } from '../settings/settings-store';
 
 interface TimerState {
   remainingMs: number;
@@ -58,6 +59,9 @@ describe('PlayerContextService', () => {
   let mockStorageStore: {
     navigateToDirectory: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+  };
+  let mockSettingsStore: {
+    settings: ReturnType<typeof vi.fn>;
   };
   let mockPlayerService: {
     launchFile: ReturnType<typeof vi.fn>;
@@ -111,6 +115,10 @@ describe('PlayerContextService', () => {
       getSelectedDirectoryState: vi.fn(),
     };
 
+    mockSettingsStore = {
+      settings: vi.fn(() => null),
+    };
+
     mockAlertService = {
       alerts$: vi.fn(),
       show: vi.fn(),
@@ -129,6 +137,7 @@ describe('PlayerContextService', () => {
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
+        { provide: SettingsStore, useValue: mockSettingsStore },
       ],
     });
 

@@ -1,12 +1,9 @@
+import { PlayerFilterType } from './player-filter-type.enum';
+
 /**
  * RepeatMode type representing music playback repeat options
  */
 export type RepeatMode = 'Off' | 'Single' | 'All';
-
-/**
- * Startup filter type for file filtering on application launch
- */
-export type StartupFilterType = 'All' | 'Games' | 'Music' | 'Hex' | 'Images';
 
 /**
  * Connection type for device communication
@@ -84,7 +81,7 @@ export interface PlayerSettings {
   /** Whether to mute audio during random seek */
   muteRandomSeek: boolean;
   /** Filter type to apply on startup */
-  startupFilter: StartupFilterType;
+  startupFilter: PlayerFilterType;
   /** Whether to launch a file on startup */
   startupLaunchEnabled: boolean;
   /** Whether to launch a random file on startup */

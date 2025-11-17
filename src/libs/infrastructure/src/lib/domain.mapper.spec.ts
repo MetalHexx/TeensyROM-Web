@@ -11,6 +11,13 @@ import {
   DeviceState as ApiDeviceState,
   NullableOfTeensyFilterType,
   LaunchRandomScopeEnum,
+  GetSettingsResponse,
+  PlayerSettingsDto,
+  ConnectionSettingsDto,
+  FileTransferSettingsDto,
+  SearchSettingsDto,
+  SearchWeightsDto,
+  AppSettingsDto,
 } from '@teensyrom-nx/data-access/api-client';
 import { DomainMapper } from './domain.mapper';
 import {
@@ -19,6 +26,8 @@ import {
   DeviceState,
   PlayerFilterType,
   PlayerScope,
+  Settings,
+  ConnectionType,
 } from '@teensyrom-nx/domain';
 
 describe('DomainMapper (Storage)', () => {
@@ -738,3 +747,259 @@ describe('DomainMapper (Player)', () => {
     });
   });
 });
+
+describe('DomainMapper (Settings)', () => {
+  describe('toSettings - API Filter String → PlayerFilterType Enum Mapping', () => {
+    it('should map "All" to PlayerFilterType.All', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: 'All' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.All);
+    });
+
+    it('should map "Games" to PlayerFilterType.Games', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: 'Games' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.Games);
+    });
+
+    it('should map "Music" to PlayerFilterType.Music', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: 'Music' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.Music);
+    });
+
+    it('should map "Hex" to PlayerFilterType.Hex', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: 'Hex' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.Hex);
+    });
+
+    it('should map "Images" to PlayerFilterType.Images', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: 'Images' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.Images);
+    });
+
+    it('should be case-insensitive - lowercase', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: 'games' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.Games);
+    });
+
+    it('should be case-insensitive - mixed case', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: 'MuSiC' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.Music);
+    });
+
+    it('should default to PlayerFilterType.All for unrecognized values', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: 'InvalidFilter' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.All);
+    });
+
+    it('should default to PlayerFilterType.All for empty string', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: '' });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.All);
+    });
+
+    it('should default to PlayerFilterType.All for null/undefined', () => {
+      const dto = createMockGetSettingsResponse({ startupFilter: null as any });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.All);
+    });
+  });
+
+  describe('toSettings - Full Settings Mapping', () => {
+    it('should map all connection settings correctly', () => {
+      const dto = createMockGetSettingsResponse({
+        connectionType: 'Serial',
+        autoConnectEnabled: true,
+      });
+      const result = DomainMapper.toSettings(dto);
+
+      expect(result.connectionSettings.connectionType).toBe('Serial');
+      expect(result.connectionSettings.autoConnectEnabled).toBe(true);
+    });
+
+    it('should map all player settings correctly', () => {
+      const dto = createMockGetSettingsResponse({
+        repeatModeOnStartup: true,
+        playTimerEnabled: false,
+        muteFastForward: true,
+        muteRandomSeek: false,
+        startupFilter: 'Music',
+        startupLaunchEnabled: true,
+        startupLaunchRandom: false,
+      });
+      const result = DomainMapper.toSettings(dto);
+
+      expect(result.playerSettings.repeatModeOnStartup).toBe(true);
+      expect(result.playerSettings.playTimerEnabled).toBe(false);
+      expect(result.playerSettings.muteFastForward).toBe(true);
+      expect(result.playerSettings.muteRandomSeek).toBe(false);
+      expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.Music);
+      expect(result.playerSettings.startupLaunchEnabled).toBe(true);
+      expect(result.playerSettings.startupLaunchRandom).toBe(false);
+    });
+
+    it('should map file transfer settings correctly', () => {
+      const dto = createMockGetSettingsResponse({
+        watchDirectoryLocation: '/watch',
+        autoTransferPath: '/transfer',
+        autoFileCopyEnabled: true,
+        autoLaunchOnCopyEnabled: false,
+        navToDirOnLaunch: true,
+        syncFilesEnabled: false,
+      });
+      const result = DomainMapper.toSettings(dto);
+
+      expect(result.fileTransferSettings.watchDirectoryLocation).toBe('/watch');
+      expect(result.fileTransferSettings.autoTransferPath).toBe('/transfer');
+      expect(result.fileTransferSettings.autoFileCopyEnabled).toBe(true);
+      expect(result.fileTransferSettings.autoLaunchOnCopyEnabled).toBe(false);
+      expect(result.fileTransferSettings.navToDirOnLaunch).toBe(true);
+      expect(result.fileTransferSettings.syncFilesEnabled).toBe(false);
+    });
+
+    it('should map app settings correctly (inverse firstTimeSetup)', () => {
+      const dto = createMockGetSettingsResponse({ firstTimeSetup: false });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.appSettings.setupCompleted).toBe(true);
+    });
+  });
+
+  describe('toSettingsDto', () => {
+    it('should map PlayerFilterType enum back to API string', () => {
+      const domainSettings = createMockDomainSettings({
+        startupFilter: PlayerFilterType.Games,
+      });
+      const result = DomainMapper.toSettingsDto(domainSettings);
+
+      expect(result.playerSettings.startupFilter).toBe('Games');
+    });
+
+    it('should preserve all player settings when mapping to DTO', () => {
+      const domainSettings = createMockDomainSettings({
+        repeatModeOnStartup: true,
+        playTimerEnabled: false,
+        muteFastForward: true,
+        muteRandomSeek: false,
+        startupFilter: PlayerFilterType.Music,
+        startupLaunchEnabled: true,
+        startupLaunchRandom: false,
+      });
+      const result = DomainMapper.toSettingsDto(domainSettings);
+
+      expect(result.playerSettings.repeatModeOnStartup).toBe(true);
+      expect(result.playerSettings.playTimerEnabled).toBe(false);
+      expect(result.playerSettings.muteFastForward).toBe(true);
+      expect(result.playerSettings.muteRandomSeek).toBe(false);
+      expect(result.playerSettings.startupFilter).toBe('Music');
+      expect(result.playerSettings.startupLaunchEnabled).toBe(true);
+      expect(result.playerSettings.startupLaunchRandom).toBe(false);
+    });
+
+    it('should map app settings correctly (inverse setupCompleted)', () => {
+      const domainSettings = createMockDomainSettings({ setupCompleted: true });
+      const result = DomainMapper.toSettingsDto(domainSettings);
+      expect(result.appSettings.firstTimeSetup).toBe(false);
+    });
+  });
+});
+
+// Helper functions for settings tests
+function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSettingsResponse {
+  const connectionSettings: ConnectionSettingsDto = {
+    connectionType: overrides.connectionType ?? 'Serial',
+    autoConnectEnabled: overrides.autoConnectEnabled ?? false,
+  };
+
+  const playerSettings: PlayerSettingsDto = {
+    repeatModeOnStartup: overrides.repeatModeOnStartup ?? false,
+    playTimerEnabled: overrides.playTimerEnabled ?? true,
+    muteFastForward: overrides.muteFastForward ?? false,
+    muteRandomSeek: overrides.muteRandomSeek ?? false,
+    startupFilter: overrides.startupFilter ?? 'All',
+    startupLaunchEnabled: overrides.startupLaunchEnabled ?? false,
+    startupLaunchRandom: overrides.startupLaunchRandom ?? false,
+  };
+
+  const fileTransferSettings: FileTransferSettingsDto = {
+    watchDirectoryLocation: overrides.watchDirectoryLocation ?? '',
+    autoTransferPath: overrides.autoTransferPath ?? '',
+    autoFileCopyEnabled: overrides.autoFileCopyEnabled ?? false,
+    autoLaunchOnCopyEnabled: overrides.autoLaunchOnCopyEnabled ?? false,
+    navToDirOnLaunch: overrides.navToDirOnLaunch ?? false,
+    syncFilesEnabled: overrides.syncFilesEnabled ?? false,
+  };
+
+  const searchWeights: SearchWeightsDto = {
+    title: 1.0,
+    fileName: 1.0,
+    filePath: 1.0,
+    creator: 1.0,
+    description: 1.0,
+  };
+
+  const searchSettings: SearchSettingsDto = {
+    searchWeights: searchWeights,
+    searchStopWords: [],
+    bannedDirectories: [],
+    bannedFiles: [],
+  };
+
+  const appSettings: AppSettingsDto = {
+    firstTimeSetup: overrides.firstTimeSetup ?? true,
+  };
+
+  return {
+    connectionSettings,
+    playerSettings,
+    fileTransferSettings,
+    searchSettings,
+    appSettings,
+  };
+}
+
+function createMockDomainSettings(overrides: Partial<any> = {}): Settings {
+  return {
+    connectionSettings: {
+      connectionType: overrides.connectionType ?? ('Serial' as ConnectionType),
+      autoConnectEnabled: overrides.autoConnectEnabled ?? false,
+    },
+    playerSettings: {
+      repeatModeOnStartup: overrides.repeatModeOnStartup ?? false,
+      playTimerEnabled: overrides.playTimerEnabled ?? true,
+      muteFastForward: overrides.muteFastForward ?? false,
+      muteRandomSeek: overrides.muteRandomSeek ?? false,
+      startupFilter: overrides.startupFilter ?? PlayerFilterType.All,
+      startupLaunchEnabled: overrides.startupLaunchEnabled ?? false,
+      startupLaunchRandom: overrides.startupLaunchRandom ?? false,
+    },
+    fileTransferSettings: {
+      watchDirectoryLocation: overrides.watchDirectoryLocation ?? '',
+      autoTransferPath: overrides.autoTransferPath ?? '',
+      autoFileCopyEnabled: overrides.autoFileCopyEnabled ?? false,
+      autoLaunchOnCopyEnabled: overrides.autoLaunchOnCopyEnabled ?? false,
+      navToDirOnLaunch: overrides.navToDirOnLaunch ?? false,
+      syncFilesEnabled: overrides.syncFilesEnabled ?? false,
+    },
+    searchSettings: {
+      weights: {
+        nameWeight: 1.0,
+        titleWeight: 1.0,
+        creatorWeight: 1.0,
+        releaseInfoWeight: 1.0,
+        descriptionWeight: 1.0,
+      },
+      stopWords: [],
+      bannedDirectories: [],
+      bannedFiles: [],
+    },
+    appSettings: {
+      setupCompleted: overrides.setupCompleted ?? false,
+    },
+  };
+}

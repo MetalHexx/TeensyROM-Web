@@ -13,6 +13,7 @@ import {
 } from '@teensyrom-nx/domain';
 import { PlayerStore, LaunchedFile, HistoryEntry } from './player-store';
 import { StorageStore } from '../storage/storage-store';
+import { SettingsStore } from '../settings/settings-store';
 import { StorageKeyUtil } from '../storage/storage-key.util';
 import { IPlayerContext, LaunchFileContextRequest } from './player-context.interface';
 import { PlayerTimerManager } from './player-timer-manager';
@@ -24,6 +25,7 @@ import { Subscription } from 'rxjs';
 export class PlayerContextService implements IPlayerContext {
   private readonly store = inject(PlayerStore);
   private readonly storageStore = inject(StorageStore);
+  private readonly settingsStore = inject(SettingsStore);
   private readonly timerManager = inject(PlayerTimerManager);
   private readonly location = inject(Location);
   private readonly alertService = inject(ALERT_SERVICE);
@@ -34,7 +36,17 @@ export class PlayerContextService implements IPlayerContext {
   private isHandlingPopState = false;
 
   initializePlayer(deviceId: string): void {
-    this.store.initializePlayer({ deviceId });
+    // Get default filter from settings before initializing player
+    const settings = this.settingsStore.settings();
+    const defaultFilter = settings?.playerSettings?.startupFilter ?? PlayerFilterType.All;
+    
+    // Initialize player with default filter to avoid race condition
+    this.store.initializePlayer({ deviceId, defaultFilter });
+    
+    logInfo(
+      LogType.Info,
+      `PlayerContext: Initialized player with default filter ${defaultFilter} for device ${deviceId}`
+    );
   }
 
   removePlayer(deviceId: string): void {
@@ -80,8 +92,6 @@ export class PlayerContextService implements IPlayerContext {
     const launchMode = request.launchMode ?? LaunchMode.Directory;
     const directoryPath = request.directoryPath ?? '/';
     const files = [...request.files];
-
-    this.store.initializePlayer({ deviceId: request.deviceId });
 
     // Hide history view when launching new files (directory clicks, search clicks)
     this.store.updateHistoryViewVisibility({ deviceId: request.deviceId, visible: false });
@@ -130,8 +140,6 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   async launchRandomFile(deviceId: string): Promise<void> {
-    this.store.initializePlayer({ deviceId });
-
     await this.store.launchRandomFile({ deviceId });
 
     const currentFile = this.store.getCurrentFile(deviceId)();
@@ -636,7 +644,7 @@ export class PlayerContextService implements IPlayerContext {
         storageType,
         path: directoryPath,
       });
-    } catch (error) {
+    } catch {
       logWarn(`Failed to navigate to directory "${directoryPath}" during browser navigation`);
       this.alertService.warning(`Directory "${directoryPath}" could not be loaded or has no files`);
       return;

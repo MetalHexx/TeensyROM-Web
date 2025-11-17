@@ -16,6 +16,7 @@ import {
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore } from '../storage/storage-store';
+import { SettingsStore } from '../settings/settings-store';
 import { PlayerTimerManager } from './player-timer-manager';
 
 type StorageStoreContract = Partial<typeof StorageStore>;
@@ -55,6 +56,7 @@ describe('PlayerContextService - Favorite Synchronization', () => {
   let mockDeviceService: Partial<IDeviceService>;
   let mockAlertService: Partial<IAlertService>;
   let mockStorageStore: Partial<StorageStoreContract>;
+  let mockSettingsStore: Partial<typeof SettingsStore>;
   let mockTimerManager: Partial<PlayerTimerManager>;
   let timerUpdateSubject: Subject<unknown>;
   let timerCompleteSubject: Subject<void>;
@@ -97,6 +99,10 @@ describe('PlayerContextService - Favorite Synchronization', () => {
       getSelectedDirectoryState: vi.fn<StorageStoreContract['getSelectedDirectoryState']>(),
     };
 
+    mockSettingsStore = {
+      settings: vi.fn(() => null),
+    };
+
     mockTimerManager = {
       createTimer: vi.fn<PlayerTimerManager['createTimer']>(),
       destroyTimer: vi.fn<PlayerTimerManager['destroyTimer']>(),
@@ -122,6 +128,7 @@ describe('PlayerContextService - Favorite Synchronization', () => {
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: PlayerTimerManager, useValue: mockTimerManager },
+        { provide: SettingsStore, useValue: mockSettingsStore },
       ],
     });
 

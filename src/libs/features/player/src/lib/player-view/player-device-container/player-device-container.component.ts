@@ -1,4 +1,4 @@
-import { Component, input, computed, inject } from '@angular/core';
+import { Component, input, computed, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Device } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
@@ -27,6 +27,20 @@ export class PlayerDeviceContainerComponent {
   device = input<Device>();
 
   readonly deviceId = computed(() => this.device()?.deviceId ?? '');
+
+  constructor() {
+    // Initialize player state when device container mounts
+    // This ensures default filter from settings is applied for:
+    // 1. Devices already connected at startup
+    // 2. Devices that connect after app startup
+    // Uses ensurePlayerState guard internally - won't overwrite existing state
+    effect(() => {
+      const deviceId = this.deviceId();
+      if (deviceId) {
+        this.playerContext.initializePlayer(deviceId);
+      }
+    });
+  }
 
   readonly currentFile = computed(() => {
     const deviceId = this.deviceId();

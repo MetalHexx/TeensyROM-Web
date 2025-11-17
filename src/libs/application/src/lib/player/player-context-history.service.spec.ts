@@ -16,6 +16,7 @@ import {
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore, StorageDirectoryState } from '../storage/storage-store';
+import { SettingsStore } from '../settings/settings-store';
 
 // Test data factory functions
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
@@ -133,6 +134,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
+        { provide: SettingsStore, useValue: { settings: vi.fn(() => null) } },
       ],
     });
 

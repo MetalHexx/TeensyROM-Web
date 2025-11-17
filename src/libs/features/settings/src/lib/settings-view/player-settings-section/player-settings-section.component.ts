@@ -37,7 +37,7 @@ export class PlayerSettingsSectionComponent {
    * - playTimerEnabled: FormControl<boolean>
    * - muteFastForward: FormControl<boolean>
    * - muteRandomSeek: FormControl<boolean>
-   * - startupFilter: FormControl<StartupFilterType>
+   * - startupFilter: FormControl<PlayerFilterType>
    * - startupLaunchEnabled: FormControl<boolean>
    * - startupLaunchRandom: FormControl<boolean>
    */
@@ -49,13 +49,13 @@ export class PlayerSettingsSectionComponent {
   animationTrigger = input<boolean>(true);
 
   /**
-   * Available startup filter options matching StartupFilterType
+   * Available startup filter options matching PlayerFilterType
    */
   readonly startupFilterOptions = [
-    { value: 'All', label: 'All Files' },
-    { value: 'Games', label: 'Games Only' },
-    { value: 'Music', label: 'Music Only' },
-    { value: 'Hex', label: 'Hex Files Only' },
-    { value: 'Images', label: 'Images Only' },
+    { value: 'ALL', label: 'All Files' },
+    { value: 'GAMES', label: 'Games Only' },
+    { value: 'MUSIC', label: 'Music Only' },
+    { value: 'HEX', label: 'Hex Files Only' },
+    { value: 'IMAGES', label: 'Images Only' },
   ];
 }

@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@angular/core';
 import { from, Observable, catchError, map, mergeMap, throwError } from 'rxjs';
 import { SettingsApiService } from '@teensyrom-nx/data-access/api-client';
 import { ISettingsService, Settings, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
-import { mapSettingsDtoToDomain, mapSettingsDomainToDto } from './settings.mappers';
+import { DomainMapper } from '../domain.mapper';
 import { extractErrorMessage } from '../error/api-error.utils';
 import { logError } from '@teensyrom-nx/utils';
 
@@ -30,7 +30,7 @@ export class SettingsService implements ISettingsService {
    */
   getSettings(): Observable<Settings> {
     return from(this.apiService.getSettings()).pipe(
-      map((response) => mapSettingsDtoToDomain(response)),
+      map((response) => DomainMapper.toSettings(response)),
       catchError((error) => this.handleError(error, 'getSettings', 'Failed to load settings'))
     );
   }
@@ -43,7 +43,7 @@ export class SettingsService implements ISettingsService {
    */
   saveSettings(settings: Settings): Observable<Settings> {
     // Map domain settings to DTO (now includes connectionSettings)
-    const saveRequest = mapSettingsDomainToDto(settings);
+    const saveRequest = DomainMapper.toSettingsDto(settings);
 
     return from(this.apiService.saveSettings({ saveSettingsRequest: saveRequest })).pipe(
       map(() => settings), // Echo back the input settings since API only returns a message
