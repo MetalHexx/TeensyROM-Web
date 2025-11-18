@@ -104,7 +104,7 @@ async function initializeAllDeviceStorage(
     for (const device of devices) {
       const deviceId = device.deviceId;
 
-      if (device.usbStorage?.available) {
+      if (device.usbStorage?.available && device.isConnected) {
         await storageStore.initializeStorage({
           deviceId,
           storageType: StorageType.Usb,
@@ -112,7 +112,7 @@ async function initializeAllDeviceStorage(
         logInfo(LogType.Info, `Initialized USB storage for ${deviceId}`);
       }
 
-      if (device.sdStorage?.available) {
+      if (device.sdStorage?.available && device.isConnected) {
         await storageStore.initializeStorage({
           deviceId,
           storageType: StorageType.Sd,
