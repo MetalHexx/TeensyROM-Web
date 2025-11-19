@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -100,7 +100,7 @@ namespace TeensyRom.Api.Tests.Integration
         public async Task When_Indexing_WithBadPath_BadRequestReturned()
         {
             // Arrange - TrClient automatically handles enum serialization and proper request signature
-            var availableDevices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest());
+            var availableDevices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
             var deviceId = availableDevices.Content.Devices.First().DeviceId;
 
             // Act - TrClient automatically handles enum serialization

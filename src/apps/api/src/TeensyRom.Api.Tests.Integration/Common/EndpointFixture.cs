@@ -75,10 +75,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public async Task<string> GetConnectedDevice() 
         {
-            var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest()
-            {
-                AutoConnect = true
-            });
+            var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
             var deviceId = findResponse.Content.Devices.First().DeviceId!;
 
             return deviceId;
@@ -86,10 +83,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public async Task<List<CartDto>> ConnectToDevices()
         {
-            var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest()
-            {
-                AutoConnect = true
-            });
+            var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
             return findResponse.Content.Devices;
         }
 
@@ -116,10 +110,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public void Reset() 
         {
-            var initialCarts = Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest()
-            {
-                AutoConnect = true
-            }).Result;
+            var initialCarts = Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>().Result;
 
             var connectDevices = initialCarts.Content.Devices
                 .Where(d => d.IsConnected)

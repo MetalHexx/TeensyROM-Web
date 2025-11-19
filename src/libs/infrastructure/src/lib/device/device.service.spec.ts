@@ -50,7 +50,7 @@ describe('DeviceService - Alert Integration', () => {
 
       await expect(
         new Promise((resolve, reject) => {
-          service.findDevices(true).subscribe({
+          service.findDevices().subscribe({
             next: resolve,
             error: reject,
           });
@@ -68,7 +68,7 @@ describe('DeviceService - Alert Integration', () => {
 
       await expect(
         new Promise((resolve, reject) => {
-          service.findDevices(true).subscribe({
+          service.findDevices().subscribe({
             next: resolve,
             error: reject,
           });
@@ -87,7 +87,7 @@ describe('DeviceService - Alert Integration', () => {
 
       await expect(
         new Promise((resolve, reject) => {
-          service.findDevices(true).subscribe({
+          service.findDevices().subscribe({
             next: resolve,
             error: reject,
           });
@@ -106,7 +106,7 @@ describe('DeviceService - Alert Integration', () => {
 
       let caughtError: Error | null = null;
       await new Promise<void>((resolve) => {
-        service.findDevices(true).subscribe({
+        service.findDevices().subscribe({
           error: (err: Error) => {
             caughtError = err;
             resolve();
@@ -317,7 +317,7 @@ describe('DeviceService - Alert Integration', () => {
 
       await expect(
         new Promise((resolve, reject) => {
-          service.findDevices(true).subscribe({
+          service.findDevices().subscribe({
             next: resolve,
             error: reject,
           });

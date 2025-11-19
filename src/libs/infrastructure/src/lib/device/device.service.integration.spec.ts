@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { DeviceService } from './device.service';
 import { DevicesApiService, Configuration } from '@teensyrom-nx/data-access/api-client';
 import { firstValueFrom } from 'rxjs';
 
 // Gate integration tests behind env variable to avoid external dependency by default
-const run = process.env.RUN_INTEGRATION === 'true' ? describe : describe.skip;
+const run = process.env['RUN_INTEGRATION'] === 'true' ? describe : describe.skip;
 
 run('DeviceService Integration Tests', () => {
   let deviceService: DeviceService;
@@ -16,7 +16,11 @@ run('DeviceService Integration Tests', () => {
     });
 
     const devicesService = new DevicesApiService(config);
-    deviceService = new DeviceService(devicesService);
+    // Mock alert service for integration tests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockAlertService: Record<string, unknown> = { error: vi.fn() };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    deviceService = new DeviceService(devicesService, mockAlertService as any);
   });
 
   afterEach(async () => {
@@ -37,17 +41,17 @@ run('DeviceService Integration Tests', () => {
   }
 
   async function getConnectedDevice() {
-    const result = await firstValueFrom(deviceService.findDevices(true));
+    const result = await firstValueFrom(deviceService.findDevices());
     return result?.[0];
   }
 
   async function getDisconnectedDevice() {
-    const result = await firstValueFrom(deviceService.findDevices(false));
+    const result = await firstValueFrom(deviceService.findDevices());
     return result?.[0];
   }
 
   it('should find available and connected devices', async () => {
-    const devices = await firstValueFrom(deviceService.findDevices(true));
+    const devices = await firstValueFrom(deviceService.findDevices());
     expect(devices).toBeDefined();
     expect(Array.isArray(devices)).toBe(true);
   }, 40000);
@@ -64,6 +68,5 @@ run('DeviceService Integration Tests', () => {
     await deviceService.connectDevice(expectedDevice.deviceId).toPromise();
     const result = await deviceService.disconnectDevice(expectedDevice.deviceId).toPromise();
     expect(result).toBeDefined();
-    expect(result?.message).toBeDefined();
   }, 40000);
 });

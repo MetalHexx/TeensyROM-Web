@@ -8,7 +8,7 @@ namespace TeensyRom.Core.Settings
   /// For domain-specific access, use the individual provider interfaces.
   /// </summary>
   public interface ISettingsService : 
-    //IConnectionSettingsProvider,
+    IConnectionSettingsProvider,
     IPlayerSettingsProvider,
     IFileTransferSettingsProvider,
     ISearchSettingsProvider,

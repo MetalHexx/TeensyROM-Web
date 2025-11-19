@@ -20,8 +20,8 @@ export class DeviceService implements IDeviceService {
     this.alertService = alertService;
   }
 
-  findDevices(autoConnect: boolean): Observable<Device[]> {
-    return from(this.apiService.findDevices({ autoConnect })).pipe(
+  findDevices(): Observable<Device[]> {
+    return from(this.apiService.findDevices()).pipe(
       map((response: FindDevicesResponse) => DomainMapper.toDeviceList(response.devices)),
       catchError((error) => this.handleError(error, 'findDevices', 'Failed to find devices'))
     );

@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using TeensyRom.Api.Endpoints.FindCarts;
 using TeensyRom.Api.Endpoints.ConnectDevice;
 using TeensyRom.Api.Endpoints.ClosePort;
@@ -13,10 +13,7 @@ namespace TeensyRom.Api.Tests.Integration
         public async void When_Called_ResponseSuccessful()
         {
             // Arrange - TrClient automatically handles enum serialization
-            var devices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest 
-            {
-                AutoConnect = false
-            });
+            var devices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
             var expectedDeviceId = devices.Content.Devices.First().DeviceId;
 
             // Act - TrClient automatically handles enum serialization
@@ -25,10 +22,7 @@ namespace TeensyRom.Api.Tests.Integration
                 DeviceId = expectedDeviceId
             });
 
-            var finalDevices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest 
-            {
-                AutoConnect = false
-            });
+            var finalDevices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
 
             // Assert
             r.Should().BeSuccessful<ConnectDeviceResponse>()

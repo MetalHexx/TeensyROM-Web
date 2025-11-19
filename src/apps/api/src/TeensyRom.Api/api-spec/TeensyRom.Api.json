@@ -221,15 +221,6 @@
         "summary": "Find Devices",
         "description": "Returns all available and connected TeensyROM devices.\n\n- This will momentarily disconnect all devices.\n- All available COM ports will be scanned for TeensyROM devices.\n- All previously connected devices will reconnect.",
         "operationId": "FindDevices",
-        "parameters": [
-          {
-            "name": "AutoConnect",
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "OK",

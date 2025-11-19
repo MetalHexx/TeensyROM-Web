@@ -17,7 +17,7 @@ export function findDevices(
       patchState(store, { isLoading: true });
 
       try {
-        const devices = await firstValueFrom(deviceService.findDevices(false));
+        const devices = await firstValueFrom(deviceService.findDevices());
         patchState(store, {
           devices,
           error: devices.length === 0 ? 'No devices found' : null,

@@ -1,14 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using TeensyRom.Api.Endpoints.ConnectDevice;
-using TeensyRom.Api.Models;
-using TeensyRom.Core.Entities.Device;
 
 namespace TeensyRom.Api.Endpoints.FindCarts
 {
-    public class FindDevicesRequest
-    {
-        [FromQuery] public bool? AutoConnect { get; set; }
-    }
     /// <summary>
     /// Response model for finding available and connected TeensyROM devices.
     /// </summary>

@@ -57,10 +57,6 @@ export interface DisconnectDeviceRequest {
     deviceId: string;
 }
 
-export interface FindDevicesRequest {
-    autoConnect?: boolean;
-}
-
 export interface PingDeviceRequest {
     deviceId: string;
 }
@@ -148,12 +144,8 @@ export class DevicesApiService extends runtime.BaseAPI {
      * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - All previously connected devices will reconnect.
      * Find Devices
      */
-    async findDevicesRaw(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
+    async findDevicesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
         const queryParameters: any = {};
-
-        if (requestParameters['autoConnect'] != null) {
-            queryParameters['AutoConnect'] = requestParameters['autoConnect'];
-        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -171,8 +163,8 @@ export class DevicesApiService extends runtime.BaseAPI {
      * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - All previously connected devices will reconnect.
      * Find Devices
      */
-    async findDevices(requestParameters: FindDevicesRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindDevicesResponse> {
-        const response = await this.findDevicesRaw(requestParameters, initOverrides);
+    async findDevices(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindDevicesResponse> {
+        const response = await this.findDevicesRaw(initOverrides);
         return await response.value();
     }
 

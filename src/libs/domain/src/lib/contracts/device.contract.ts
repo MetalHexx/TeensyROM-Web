@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 import { Device } from '../models';
 
 export interface IDeviceService {
-  findDevices(autoConnect: boolean): Observable<Device[]>;
+  findDevices(): Observable<Device[]>;
   getConnectedDevices(): Observable<Device[]>;
   connectDevice(deviceId: string): Observable<Device>;
   disconnectDevice(deviceId: string): Observable<void>;

@@ -4,7 +4,7 @@ using TeensyRom.Core.Abstractions;
 
 namespace TeensyRom.Api.Endpoints.FindCarts
 {
-    public class FindDevicesEndpoint(IDeviceConnectionManager deviceManager) : RadEndpoint<FindDevicesRequest, FindDevicesResponse>
+    public class FindDevicesEndpoint(IDeviceConnectionManager deviceManager, IConnectionSettingsProvider connectionSettings) : RadEndpointWithoutRequest<FindDevicesResponse>
     {
         public override void Configure()
         {
@@ -24,9 +24,11 @@ namespace TeensyRom.Api.Endpoints.FindCarts
                 );
         }
 
-        public override async Task Handle(FindDevicesRequest r, CancellationToken ct)
+        public override async Task Handle(CancellationToken ct)
         {
-            var devices = await deviceManager.FindDevices(r.AutoConnect ?? false, ct);
+            var autoConnect = connectionSettings.GetConnectionSettings().AutoConnectEnabled;
+
+            var devices = await deviceManager.FindDevices(autoConnect, ct);
 
             if (devices.Count == 0)
             {
@@ -34,13 +36,6 @@ namespace TeensyRom.Api.Endpoints.FindCarts
                 return;
             }
             List<CartDto> deviceDtos = [.. await Task.WhenAll(devices.Select(CartDto.FromDevice))];
-
-            Response = new()
-            {
-                Devices = deviceDtos.ToList(),
-                Message = "Success!"
-            };
-
 
             Response = new()
             {

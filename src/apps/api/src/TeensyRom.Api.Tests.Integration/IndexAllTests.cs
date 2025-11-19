@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using TeensyRom.Api.Endpoints.Files.Index;
 using TeensyRom.Api.Endpoints.Files.IndexAll;
 using TeensyRom.Api.Endpoints.FindCarts;
@@ -15,7 +15,7 @@ namespace TeensyRom.Api.Tests.Integration
         public async Task When_IndexingAll_SuccessReturned()
         {
             // Arrange - TrClient automatically handles enum serialization
-            var deviceResult = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest());
+            var deviceResult = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
 
             foreach (var item in deviceResult.Content.Devices)
             {
