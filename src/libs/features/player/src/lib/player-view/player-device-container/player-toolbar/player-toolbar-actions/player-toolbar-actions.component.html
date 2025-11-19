@@ -1,34 +1,40 @@
 <div class="toolbar-actions">
-  <!-- Custom Timer Controls -->
-  <div class="timer-controls-container">
-    <lib-icon-button
-      icon="timer"
-      ariaLabel="Toggle Custom Play Timer"
-      size="large"
-      variant="rounded-transparent"
-      [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"
-      [matTooltip]="'Toggle Custom Play Timer'"
-      (buttonClick)="onTimerToggle()"
-      data-testid="timer-button"
-    >
-    </lib-icon-button>
+  <!-- Custom Timer Button with Menu -->
+  <lib-icon-button
+    icon="timer"
+    ariaLabel="Custom Play Timer"
+    size="large"
+    variant="rounded-transparent"
+    [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"
+    [matTooltip]="'Custom Play Timer'"
+    [matMenuTriggerFor]="timerMenu"
+    [matBadge]="timerBadgeText()"
+    matBadgePosition="above after"
+    matBadgeColor="primary"
+    [matBadgeHidden]="!isCustomTimerEnabled()"
+    data-testid="timer-button"
+  >
+  </lib-icon-button>
 
-    @if (isCustomTimerEnabled()) {
-    <mat-form-field class="duration-dropdown" appearance="outline">
-      <mat-select
-        [value]="selectedDurationMs()"
-        (selectionChange)="onDurationChange($event.value)"
-        data-testid="duration-dropdown"
-      >
-        @for (option of durationOptions; track option.valueMs) {
-        <mat-option [value]="option.valueMs">
-          {{ option.label }}
-        </mat-option>
+  <mat-menu #timerMenu="matMenu">
+    <!-- Off option -->
+    <button mat-menu-item (click)="onTimerMenuItemClick(null)" data-testid="timer-menu-off">
+      @if (!isCustomTimerEnabled()) {
+        <mat-icon>check</mat-icon>
+      }
+      <span>Off</span>
+    </button>
+
+    <!-- Duration options -->
+    @for (option of durationOptions; track option.valueMs) {
+      <button mat-menu-item (click)="onTimerMenuItemClick(option.valueMs)" [attr.data-testid]="'timer-menu-' + option.label">
+        @if (isCustomTimerEnabled() && selectedDurationMs() === option.valueMs) {
+          <mat-icon>check</mat-icon>
         }
-      </mat-select>
-    </mat-form-field>
+        <span>{{ option.label }}</span>
+      </button>
     }
-  </div>
+  </mat-menu>
 
   <lib-icon-button
     icon="shuffle"

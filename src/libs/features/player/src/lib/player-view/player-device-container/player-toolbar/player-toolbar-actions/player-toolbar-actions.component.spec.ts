@@ -537,42 +537,34 @@ describe('PlayerToolbarActionsComponent', () => {
     });
   });
 
-  describe('Task 3: Timer Toggle Button', () => {
-    it('should have onTimerToggle method', () => {
-      expect(component.onTimerToggle).toBeDefined();
+  describe('Task 3: Timer Menu Button', () => {
+    it('should have onTimerMenuItemClick method', () => {
+      expect(component.onTimerMenuItemClick).toBeDefined();
     });
 
-    it('should enable timer when button clicked and timer is disabled', () => {
-      customTimerConfigSignal.set({ enabled: false, durationMs: 180000 });
-      
-      component.onTimerToggle();
-      
-      expect(mockPlayerContext.setCustomTimer).toHaveBeenCalledWith('test-device', true, 180000);
-    });
-
-    it('should disable timer when button clicked and timer is enabled', () => {
+    it('should disable timer when "Off" menu item is clicked', () => {
       customTimerConfigSignal.set({ enabled: true, durationMs: 180000 });
       
-      component.onTimerToggle();
+      component.onTimerMenuItemClick(null);
       
       expect(mockPlayerContext.setCustomTimer).toHaveBeenCalledWith('test-device', false, 180000);
     });
 
-    it('should preserve duration when toggling timer on/off', () => {
+    it('should enable timer with selected duration when duration menu item is clicked', () => {
+      customTimerConfigSignal.set({ enabled: false, durationMs: 180000 });
+      
+      component.onTimerMenuItemClick(30000);
+      
+      expect(mockPlayerContext.setCustomTimer).toHaveBeenCalledWith('test-device', true, 30000);
+    });
+
+    it('should preserve duration when selecting "Off" menu item', () => {
       // Set custom duration
       customTimerConfigSignal.set({ enabled: true, durationMs: 30000 });
       
-      // Toggle off
-      component.onTimerToggle();
+      // Select "Off"
+      component.onTimerMenuItemClick(null);
       expect(mockPlayerContext.setCustomTimer).toHaveBeenCalledWith('test-device', false, 30000);
-      
-      // Update signal to reflect disabled state
-      customTimerConfigSignal.set({ enabled: false, durationMs: 30000 });
-      
-      // Toggle on again
-      mockPlayerContext.setCustomTimer.mockClear();
-      component.onTimerToggle();
-      expect(mockPlayerContext.setCustomTimer).toHaveBeenCalledWith('test-device', true, 30000);
     });
 
     it('should render timer button in template', () => {
@@ -599,124 +591,96 @@ describe('PlayerToolbarActionsComponent', () => {
       fixture.componentRef.setInput('deviceId', '');
       fixture.detectChanges();
       
-      expect(() => component.onTimerToggle()).not.toThrow();
+      expect(() => component.onTimerMenuItemClick(null)).not.toThrow();
       expect(mockPlayerContext.setCustomTimer).not.toHaveBeenCalled();
+    });
+
+    it('should have timerBadgeText computed signal', () => {
+      expect(component.timerBadgeText).toBeDefined();
+    });
+
+    it('should return correct badge text for selected duration', () => {
+      customTimerConfigSignal.set({ enabled: true, durationMs: 30000 });
+      expect(component.timerBadgeText()).toBe('30s');
+
+      customTimerConfigSignal.set({ enabled: true, durationMs: 180000 });
+      expect(component.timerBadgeText()).toBe('3m');
+
+      customTimerConfigSignal.set({ enabled: true, durationMs: 3600000 });
+      expect(component.timerBadgeText()).toBe('1h');
+    });
+
+    it('should default to "3m" badge text when config is null', () => {
+      customTimerConfigSignal.set(null);
+      expect(component.timerBadgeText()).toBe('3m');
     });
   });
 
-  describe('Task 4: Duration Dropdown', () => {
-    it('should have onDurationChange method', () => {
-      expect(component.onDurationChange).toBeDefined();
+  describe('Task 4: Timer Menu', () => {
+    it('should render mat-menu in template', () => {
+      const compiled = fixture.nativeElement as HTMLElement;
+      const menu = compiled.querySelector('mat-menu');
+      expect(menu).toBeTruthy();
     });
 
-    it('should update duration when dropdown selection changes', () => {
-      customTimerConfigSignal.set({ enabled: true, durationMs: 180000 });
+    it('should call onTimerMenuItemClick with null when "Off" menu item method is invoked', () => {
+      const spy = vi.spyOn(mockPlayerContext, 'setCustomTimer');
       
-      component.onDurationChange(30000);
+      component.onTimerMenuItemClick(null);
       
-      expect(mockPlayerContext.setCustomTimer).toHaveBeenCalledWith('test-device', true, 30000);
+      expect(spy).toHaveBeenCalledWith('test-device', false, 180000);
     });
 
-    it('should keep timer enabled when changing duration', () => {
+    it('should call onTimerMenuItemClick with duration when duration method is invoked', () => {
+      const spy = vi.spyOn(mockPlayerContext, 'setCustomTimer');
+      
+      component.onTimerMenuItemClick(30000);
+      
+      expect(spy).toHaveBeenCalledWith('test-device', true, 30000);
+    });
+
+    it('should change duration and keep timer enabled when duration menu item selected', () => {
       customTimerConfigSignal.set({ enabled: true, durationMs: 180000 });
       
-      component.onDurationChange(60000);
+      component.onTimerMenuItemClick(60000);
       
-      // First parameter should be true (keep enabled)
+      // Timer should remain enabled with new duration
       expect(mockPlayerContext.setCustomTimer).toHaveBeenCalledWith('test-device', true, 60000);
     });
 
-    it('should hide dropdown when timer is disabled', () => {
+    it('should enable timer when selecting duration while timer is off', () => {
       customTimerConfigSignal.set({ enabled: false, durationMs: 180000 });
-      fixture.detectChanges();
       
-      const compiled = fixture.nativeElement as HTMLElement;
-      const dropdown = compiled.querySelector('[data-testid="duration-dropdown"]');
-      expect(dropdown).toBeFalsy();
-    });
-
-    it('should show dropdown when timer is enabled', () => {
-      customTimerConfigSignal.set({ enabled: true, durationMs: 180000 });
-      fixture.detectChanges();
+      component.onTimerMenuItemClick(30000);
       
-      const compiled = fixture.nativeElement as HTMLElement;
-      const dropdown = compiled.querySelector('[data-testid="duration-dropdown"]');
-      expect(dropdown).toBeTruthy();
-    });
-
-    it('should show current duration as selected value', () => {
-      customTimerConfigSignal.set({ enabled: true, durationMs: 30000 });
-      fixture.detectChanges();
-      
-      expect(component.selectedDurationMs()).toBe(30000);
-    });
-
-    it('should show default 3m (180000ms) when first enabling timer', () => {
-      customTimerConfigSignal.set({ enabled: true, durationMs: 180000 });
-      fixture.detectChanges();
-      
-      expect(component.selectedDurationMs()).toBe(180000);
-    });
-
-    it.skip('should render all 10 duration options', () => {
-      // Note: mat-select doesn't render mat-options until the dropdown is opened
-      // This test is skipped because Material Select lazy-renders options
-      customTimerConfigSignal.set({ enabled: true, durationMs: 180000 });
-      fixture.detectChanges();
-      
-      const compiled = fixture.nativeElement as HTMLElement;
-      const options = compiled.querySelectorAll('mat-option');
-      expect(options.length).toBe(10);
-    });
-
-    it('should not error when deviceId is empty', () => {
-      fixture.componentRef.setInput('deviceId', '');
-      fixture.detectChanges();
-      
-      expect(() => component.onDurationChange(30000)).not.toThrow();
-      expect(mockPlayerContext.setCustomTimer).not.toHaveBeenCalled();
-    });
-
-    it('should maintain dropdown visibility when changing duration', () => {
-      customTimerConfigSignal.set({ enabled: true, durationMs: 180000 });
-      fixture.detectChanges();
-      
-      // Change duration
-      component.onDurationChange(60000);
-      customTimerConfigSignal.set({ enabled: true, durationMs: 60000 });
-      fixture.detectChanges();
-      
-      // Dropdown should still be visible
-      const compiled = fixture.nativeElement as HTMLElement;
-      const dropdown = compiled.querySelector('[data-testid="duration-dropdown"]');
-      expect(dropdown).toBeTruthy();
+      expect(mockPlayerContext.setCustomTimer).toHaveBeenCalledWith('test-device', true, 30000);
     });
   });
 
   describe('Task 6: Edge Cases and State Initialization', () => {
-    it('should handle null config gracefully in timer button', () => {
+    it('should handle null config gracefully in timer menu', () => {
       customTimerConfigSignal.set(null);
       fixture.detectChanges();
       
-      // Should not error when clicking button with null config
-      expect(() => component.onTimerToggle()).not.toThrow();
+      // Should not error when clicking menu item with null config
+      expect(() => component.onTimerMenuItemClick(null)).not.toThrow();
       expect(component.isCustomTimerEnabled()).toBe(false);
     });
 
-    it('should handle empty deviceId in timer toggle', () => {
+    it('should handle empty deviceId in timer menu item click', () => {
       fixture.componentRef.setInput('deviceId', '');
       fixture.detectChanges();
       
-      component.onTimerToggle();
+      component.onTimerMenuItemClick(30000);
       
       expect(mockPlayerContext.setCustomTimer).not.toHaveBeenCalled();
     });
 
-    it('should handle empty deviceId in duration change', () => {
+    it('should handle empty deviceId when clicking "Off" menu item', () => {
       fixture.componentRef.setInput('deviceId', '');
       fixture.detectChanges();
       
-      component.onDurationChange(30000);
+      component.onTimerMenuItemClick(null);
       
       expect(mockPlayerContext.setCustomTimer).not.toHaveBeenCalled();
     });
@@ -747,6 +711,7 @@ describe('PlayerToolbarActionsComponent', () => {
       
       expect(component.isCustomTimerEnabled()).toBe(true);
       expect(component.selectedDurationMs()).toBe(30000);
+      expect(component.timerBadgeText()).toBe('30s');
       
       // Test device 2
       fixture.componentRef.setInput('deviceId', 'device-2');
@@ -754,6 +719,7 @@ describe('PlayerToolbarActionsComponent', () => {
       
       expect(component.isCustomTimerEnabled()).toBe(false);
       expect(component.selectedDurationMs()).toBe(180000);
+      expect(component.timerBadgeText()).toBe('3m');
     });
 
     it('should not cause errors when component is destroyed', () => {
@@ -765,7 +731,7 @@ describe('PlayerToolbarActionsComponent', () => {
     });
 
     it('should prevent invalid duration values via predefined options', () => {
-      // Dropdown only allows selection from DURATION_OPTIONS
+      // Menu only allows selection from DURATION_OPTIONS
       const validValues = component['durationOptions'].map(opt => opt.valueMs);
       
       // Verify all values are positive

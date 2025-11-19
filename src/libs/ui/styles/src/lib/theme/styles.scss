@@ -14,6 +14,18 @@ body {
   @include mat.form-field-density(-2);
 }
 
+// Configure Material Symbols font
+.mat-icon {
+  font-family: 'Material Symbols Outlined';
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+// Override to filled variant for specific components
+.dice-icon-filled .mat-icon,
+.playback-icon-filled .mat-icon {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
 html {
   color-scheme: light;
   --color-primary: #890089;
@@ -254,6 +266,14 @@ body {
 // ─────────────────────────────────────────────
 //  MATERIAL COMPONENT SPECIFIC STYLES
 // ─────────────────────────────────────────────
+
+// Material badge styling - use custom primary color with white text
+:root {
+  --mat-badge-background-color: var(--color-primary);
+  --mat-badge-text-color: white;
+  --mat-badge-disabled-state-background-color: var(--color-dimmed);
+  --mat-badge-disabled-state-text-color: white;
+}
 
 // Apply consistent spacing between toggles and their labels
 mat-slide-toggle {

@@ -1,8 +1,8 @@
 import { Component, inject, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { IconButtonComponent } from '@teensyrom-nx/ui/components';
 import { PLAYER_CONTEXT, StorageStore } from '@teensyrom-nx/application';
@@ -32,8 +32,8 @@ const DURATION_OPTIONS = [
   imports: [
     CommonModule,
     MatIconModule,
-    MatSelectModule,
-    MatFormFieldModule,
+    MatMenuModule,
+    MatBadgeModule,
     MatTooltipModule,
     IconButtonComponent,
   ],
@@ -79,6 +79,16 @@ export class PlayerToolbarActionsComponent {
     return config?.durationMs ?? 180000;
   });
 
+  /**
+   * Badge text showing the selected timer duration.
+   * Returns the label from DURATION_OPTIONS matching selectedDurationMs.
+   */
+  timerBadgeText = computed(() => {
+    const durationMs = this.selectedDurationMs();
+    const option = DURATION_OPTIONS.find(opt => opt.valueMs === durationMs);
+    return option?.label ?? '3m';
+  });
+
   currentFile = computed(() => {
     const deviceId = this.deviceId();
     if (!deviceId) return null;
@@ -87,28 +97,22 @@ export class PlayerToolbarActionsComponent {
   });
 
   /**
-   * Toggles the custom timer enabled state.
-   * Preserves the current duration when toggling.
+   * Handles timer menu item selection.
+   * Selecting "Off" disables the timer while preserving duration.
+   * Selecting a duration enables the timer with that duration.
    */
-  onTimerToggle(): void {
+  onTimerMenuItemClick(durationMs: number | null): void {
     const deviceId = this.deviceId();
     if (!deviceId) return;
 
-    const currentEnabled = this.isCustomTimerEnabled();
-    const currentDuration = this.selectedDurationMs();
-
-    this.playerContext.setCustomTimer(deviceId, !currentEnabled, currentDuration);
-  }
-
-  /**
-   * Updates the timer duration.
-   * Keeps the timer enabled when changing duration.
-   */
-  onDurationChange(newDurationMs: number): void {
-    const deviceId = this.deviceId();
-    if (!deviceId) return;
-
-    this.playerContext.setCustomTimer(deviceId, true, newDurationMs);
+    if (durationMs === null) {
+      // "Off" selected - disable timer, preserve current duration
+      const currentDuration = this.selectedDurationMs();
+      this.playerContext.setCustomTimer(deviceId, false, currentDuration);
+    } else {
+      // Duration selected - enable timer with selected duration
+      this.playerContext.setCustomTimer(deviceId, true, durationMs);
+    }
   }
 
   toggleShuffleMode(): void {

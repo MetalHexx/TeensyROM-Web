@@ -1,4 +1,5 @@
 // Dice roll animation for random launch button
+// Note: Animation is applied to mat-icon via JavaScript in component
 :host ::ng-deep mat-icon.dice-roll {
   animation: diceRoll 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   display: inline-block; // Needed for transform to work properly
