@@ -3,7 +3,7 @@ import { LogType, createAction, logInfo, logWarn } from '@teensyrom-nx/utils';
 import { PlayerState } from '../player-store';
 import { WritableStore } from '../player-helpers';
 
-interface UpdateFavoriteStatusParams {
+export interface UpdateFavoriteStatusParams {
   deviceId: string;
   filePath: string;
   isFavorite: boolean;

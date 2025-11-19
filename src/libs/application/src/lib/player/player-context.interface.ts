@@ -7,7 +7,7 @@ import {
   PlayerFilterType,
   PlayerScope,
 } from '@teensyrom-nx/domain';
-import { LaunchedFile, PlayerFileContext, ShuffleSettings, PlayHistory } from './player-store';
+import { LaunchedFile, PlayerFileContext, ShuffleSettings, PlayHistory, PlayTimerConfig } from './player-store';
 import { TimerState } from './timer-state.interface';
 
 export interface LaunchFileContextRequest {
@@ -50,6 +50,26 @@ export interface IPlayerContext {
 
   // Phase 5: Timer system
   getTimerState(deviceId: string): Signal<TimerState | null>;
+
+  // Custom Play Timer
+  /**
+   * Get custom play timer configuration for a device.
+   * Returns a signal that emits the current timer config (enabled state and duration).
+   * @param deviceId - The device identifier
+   * @returns Signal emitting PlayTimerConfig or null if device doesn't exist
+   */
+  getPlayTimerConfig(deviceId: string): Signal<PlayTimerConfig | null>;
+
+  /**
+   * Update custom play timer configuration for a device.
+   * Sets the enabled state and duration. When enabled, custom timer overrides
+   * music metadata for non-song files only. Changes take effect on next file launch,
+   * or immediately for currently playing files if mid-playback updates are enabled.
+   * @param deviceId - The device identifier
+   * @param enabled - Whether custom timer is active
+   * @param durationMs - Custom duration in milliseconds
+   */
+  setCustomTimer(deviceId: string, enabled: boolean, durationMs: number): void;
 
   // File compatibility
   isCurrentFileCompatible(deviceId: string): Signal<boolean>;

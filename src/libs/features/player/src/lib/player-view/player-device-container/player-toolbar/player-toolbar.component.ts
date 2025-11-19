@@ -145,13 +145,59 @@ export class PlayerToolbarComponent {
   // Phase 5: Timer state for progress bar
   timerState = computed(() => this.playerContext.getTimerState(this.deviceId())());
 
-  showProgressBar = computed(() => {
-    const state = this.timerState();
-    return state !== null && state.showProgress;
+  // Phase 3: Custom timer config for demo purposes
+  customTimerConfig = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return null;
+    return this.playerContext.getPlayTimerConfig(deviceId)();
   });
 
-  currentTime = computed(() => this.timerState()?.currentTime ?? 0);
-  totalTime = computed(() => this.timerState()?.totalTime ?? 0);
+  showProgressBar = computed(() => {
+    const state = this.timerState();
+    const customTimer = this.customTimerConfig();
+    
+    // Show progress bar if Phase 5 timer is active OR custom timer is enabled (Phase 3 demo)
+    if (state !== null && state.showProgress) {
+      return true;
+    }
+    
+    // Phase 3: Show progress bar when custom timer is enabled (for demo/testing)
+    return customTimer !== null && customTimer.enabled;
+  });
+
+  currentTime = computed(() => {
+    const state = this.timerState();
+    const customTimer = this.customTimerConfig();
+    
+    // Use Phase 5 timer if available
+    if (state !== null) {
+      return state.currentTime;
+    }
+    
+    // Phase 3 demo: Show half of custom timer duration
+    if (customTimer !== null && customTimer.enabled) {
+      return Math.floor(customTimer.durationMs / 2);
+    }
+    
+    return 0;
+  });
+  
+  totalTime = computed(() => {
+    const state = this.timerState();
+    const customTimer = this.customTimerConfig();
+    
+    // Use Phase 5 timer if available
+    if (state !== null) {
+      return state.totalTime;
+    }
+    
+    // Phase 3 demo: Show custom timer duration
+    if (customTimer !== null && customTimer.enabled) {
+      return customTimer.durationMs;
+    }
+    
+    return 0;
+  });
 
   // Current file for file-info component
   currentFile = computed(() => {

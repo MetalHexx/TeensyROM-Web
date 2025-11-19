@@ -1,4 +1,35 @@
 <div class="toolbar-actions">
+  <!-- Custom Timer Controls -->
+  <div class="timer-controls-container">
+    <lib-icon-button
+      icon="timer"
+      ariaLabel="Toggle Custom Play Timer"
+      size="large"
+      variant="rounded-transparent"
+      [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"
+      [matTooltip]="'Toggle Custom Play Timer'"
+      (buttonClick)="onTimerToggle()"
+      data-testid="timer-button"
+    >
+    </lib-icon-button>
+
+    @if (isCustomTimerEnabled()) {
+    <mat-form-field class="duration-dropdown" appearance="outline">
+      <mat-select
+        [value]="selectedDurationMs()"
+        (selectionChange)="onDurationChange($event.value)"
+        data-testid="duration-dropdown"
+      >
+        @for (option of durationOptions; track option.valueMs) {
+        <mat-option [value]="option.valueMs">
+          {{ option.label }}
+        </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    }
+  </div>
+
   <lib-icon-button
     icon="shuffle"
     ariaLabel="Toggle Shuffle Mode"

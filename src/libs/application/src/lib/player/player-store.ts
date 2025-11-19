@@ -34,6 +34,11 @@ export interface ShuffleSettings {
   startingDirectory?: string;
 }
 
+export interface PlayTimerConfig {
+  enabled: boolean;
+  durationMs: number;
+}
+
 export interface HistoryEntry {
   file: FileItem;
   storageKey: StorageKey;
@@ -56,6 +61,7 @@ export interface DevicePlayerState {
   shuffleSettings: ShuffleSettings;
   playHistory: PlayHistory | null;
   historyViewVisible: boolean;
+  playTimerConfig: PlayTimerConfig;
   timerState: TimerState | null;
   isLoading: boolean;
   error: string | null;

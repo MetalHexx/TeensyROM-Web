@@ -16,6 +16,7 @@ import { getCurrentHistoryPosition } from './get-current-history-position';
 import { canNavigateBackwardInHistory } from './can-navigate-backward-in-history';
 import { canNavigateForwardInHistory } from './can-navigate-forward-in-history';
 import { isHistoryViewVisible } from './is-history-view-visible';
+import { getPlayTimerConfig } from './get-play-timer-config';
 
 export function withPlayerSelectors() {
   return withMethods((store) => {
@@ -30,6 +31,7 @@ export function withPlayerSelectors() {
       ...getShuffleSettings(writableStore),
       ...getLaunchMode(writableStore),
       ...getTimerState(writableStore),
+      ...getPlayTimerConfig(writableStore),
       ...isCurrentFileCompatible(writableStore),
       ...getPlayHistory(writableStore),
       ...getCurrentHistoryPosition(writableStore),

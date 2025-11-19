@@ -29,6 +29,7 @@ import { navigateBackwardInHistory } from './navigate-backward-in-history';
 import { navigateForwardInHistory } from './navigate-forward-in-history';
 import { updateHistoryViewVisibility } from './update-history-view-visibility';
 import { navigateToHistoryPosition } from './navigate-to-history-position';
+import { updatePlayerTimer } from './update-player-timer';
 
 export function withPlayerActions() {
   return withMethods(
@@ -47,6 +48,7 @@ export function withPlayerActions() {
         ...updateLaunchMode(writableStore),
         ...updatePlayerStatus(writableStore),
         ...updateTimerState(writableStore),
+        ...updatePlayerTimer(writableStore),
         ...play(writableStore, playerService),
         ...pauseMusic(writableStore, playerService),
         ...stopPlayback(writableStore, deviceService),

@@ -9,7 +9,6 @@ import {
   StorageType,
   StorageTypeUtil,
   ALERT_SERVICE,
-  IAlertService,
 } from '@teensyrom-nx/domain';
 import { PlayerStore, LaunchedFile, HistoryEntry } from './player-store';
 import { StorageStore } from '../storage/storage-store';
@@ -18,6 +17,7 @@ import { StorageKeyUtil } from '../storage/storage-key.util';
 import { IPlayerContext, LaunchFileContextRequest } from './player-context.interface';
 import { PlayerTimerManager } from './player-timer-manager';
 import { parsePlayLength } from './timer-utils';
+import { DEFAULT_TIMER_MS } from './player.constants';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import { Subscription } from 'rxjs';
 
@@ -390,25 +390,68 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   /**
-   * Phase 5: Setup timer for music file
+   * Phase 5 + Custom Timer: Setup timer for file based on custom timer configuration
    * Creates timer, subscribes to updates and completion events
+   *
+   * Timer Priority Logic:
+   * 1. Hex files: Never create timer (incompatible)
+   * 2. Song files: Always use metadata duration (ignore custom timer)
+   * 3. Custom timer enabled: Use custom duration for non-song files only
+   * 4. Other files (games, images, etc.): No timer when custom timer disabled
    */
   private setupTimerForFile(deviceId: string, file: FileItem): void {
-    // Only setup timer for music files
-    if (file.type !== FileItemType.Song) {
-      logInfo(LogType.Info, `Skipping timer setup for non-music file: ${file.name}`);
-      // Cleanup any existing timer when switching to non-music file
+    const timerDuration = this.determineTimerDuration(deviceId, file);
+
+    // No timer needed - cleanup and exit
+    if (timerDuration === null) {
       this.cleanupTimerSubscriptions(deviceId);
       this.timerManager.destroyTimer(deviceId);
       return;
     }
 
-    // Parse play length
+    // Create timer with determined duration
+    this.createAndSubscribeToTimer(deviceId, timerDuration);
+  }
+
+  /**
+   * Determine appropriate timer duration based on file type and custom timer settings
+   * Returns duration in milliseconds, or null if no timer should be created
+   */
+  private determineTimerDuration(deviceId: string, file: FileItem): number | null {
+    // Hex files never get timers
+    if (file.type === FileItemType.Hex) {
+      logInfo(LogType.Info, `Hex file excluded from timer: ${file.name}`);
+      return null;
+    }
+
+    // Song files always use metadata duration
+    if (file.type === FileItemType.Song) {
+      return this.parseSongDuration(file);
+    }
+
+    // Non-song files use custom timer if enabled
+    const playTimerConfig = this.store.getPlayTimerConfig(deviceId)();
+    if (playTimerConfig?.enabled) {
+      logInfo(
+        LogType.Start,
+        `Setting up custom timer for ${file.name} (${playTimerConfig.durationMs}ms) on device ${deviceId}`
+      );
+      return playTimerConfig.durationMs;
+    }
+
+    // No timer for non-song files when custom timer disabled
+    logInfo(LogType.Info, `Skipping timer setup for non-music file: ${file.name}`);
+    return null;
+  }
+
+  /**
+   * Parse song duration from metadata, with fallback to default 3-minute timer
+   */
+  private parseSongDuration(file: FileItem): number {
     let totalTime = parsePlayLength(file.playLength ?? '');
 
-    // If parsing failed or returned 0, use default 3-minute timer and log warning
+    // Handle missing or invalid metadata
     if (totalTime === 0) {
-      const DEFAULT_TIMER_MS = 180000; // 3 minutes
       totalTime = DEFAULT_TIMER_MS;
 
       if (!file.playLength || file.playLength.trim() === '') {
@@ -424,14 +467,18 @@ export class PlayerContextService implements IPlayerContext {
 
     logInfo(
       LogType.Start,
-      `Setting up timer for ${file.name} (${totalTime}ms) on device ${deviceId}`
+      `Setting up metadata timer for song ${file.name} (${totalTime}ms)`
     );
 
-    // Cleanup existing timer subscriptions
-    this.cleanupTimerSubscriptions(deviceId);
+    return totalTime;
+  }
 
-    // Create timer
-    this.timerManager.createTimer(deviceId, totalTime);
+  /**
+   * Create timer and subscribe to update and completion events
+   */
+  private createAndSubscribeToTimer(deviceId: string, durationMs: number): void {
+    this.cleanupTimerSubscriptions(deviceId);
+    this.timerManager.createTimer(deviceId, durationMs);
 
     // Subscribe to timer updates
     const updateSub = this.timerManager.onTimerUpdate$(deviceId).subscribe((timerState) => {
@@ -448,7 +495,13 @@ export class PlayerContextService implements IPlayerContext {
     });
 
     // Store subscriptions for cleanup
-    this.timerSubscriptions.set(deviceId, [updateSub, completeSub]);
+    if (!this.timerSubscriptions.has(deviceId)) {
+      this.timerSubscriptions.set(deviceId, []);
+    }
+    const subs = this.timerSubscriptions.get(deviceId);
+    if (subs) {
+      subs.push(updateSub, completeSub);
+    }
 
     logInfo(LogType.Success, `Timer setup complete for device ${deviceId}`);
   }
@@ -467,10 +520,52 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   /**
-   * Get timer state for a device
+   * Get current timer state for a device
    */
   getTimerState(deviceId: string) {
     return this.store.getTimerState(deviceId);
+  }
+
+  /**
+   * Get custom play timer configuration for a device
+   */
+  getPlayTimerConfig(deviceId: string) {
+    return this.store.getPlayTimerConfig(deviceId);
+  }
+
+  /**
+   * Set custom play timer configuration for a device.
+   * Updates the custom timer enabled state and duration.
+   *
+   * If a file is currently playing with a timer, the timer will be recreated immediately
+   * with the new configuration. This provides instant feedback when users change settings
+   * mid-playback. Timer recreation resets currentTime to 0 with the new totalTime.
+   *
+   * @param deviceId - The device identifier
+   * @param enabled - Whether custom timer is active
+   * @param durationMs - Custom duration in milliseconds
+   */
+  setCustomTimer(deviceId: string, enabled: boolean, durationMs: number): void {
+    // Update store state
+    this.store.updatePlayerTimer({ deviceId, enabled, durationMs });
+
+    logInfo(
+      LogType.Info,
+      `Custom timer config updated for device ${deviceId}: enabled=${enabled}, duration=${durationMs}ms`
+    );
+
+    // Get current file and timer state
+    const currentFile = this.store.getCurrentFile(deviceId)();
+    const timerState = this.store.getTimerState(deviceId)();
+
+    // Recreate timer if file is playing with a timer
+    if (currentFile?.file && timerState) {
+      logInfo(
+        LogType.Info,
+        `Recreating timer mid-playback for device ${deviceId} with new config`
+      );
+      this.setupTimerForFile(deviceId, currentFile.file);
+    }
   }
 
   /**

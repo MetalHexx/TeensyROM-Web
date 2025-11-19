@@ -101,6 +101,10 @@ describe('PlayerToolbarComponent', () => {
       // File compatibility
       isCurrentFileCompatible: vi.fn().mockReturnValue(fileCompatibleSignal.asReadonly()),
 
+      // Custom timer (Phase 3 UI)
+      getPlayTimerConfig: vi.fn().mockReturnValue(signal(null).asReadonly()),
+      setCustomTimer: vi.fn(),
+
       // Play history
       getPlayHistory: vi.fn().mockReturnValue(signal(null).asReadonly()),
       getCurrentHistoryPosition: vi.fn().mockReturnValue(signal(0).asReadonly()),

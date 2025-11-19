@@ -11,6 +11,7 @@ import {
 } from '@teensyrom-nx/domain';
 import { StorageKeyUtil, StorageKey } from '../storage/storage-key.util';
 import { logInfo, logError, LogType } from '@teensyrom-nx/utils';
+import { DEFAULT_TIMER_MS } from './player.constants';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -28,6 +29,10 @@ export function createDefaultDeviceState(deviceId: string, defaultFilter?: Playe
     },
     playHistory: null,
     historyViewVisible: false,
+    playTimerConfig: {
+      enabled: false,
+      durationMs: DEFAULT_TIMER_MS,
+    },
     timerState: null,
     isLoading: false,
     error: null,
