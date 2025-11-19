@@ -18,6 +18,7 @@ describe('PlayerContextService - Settings Integration', () => {
   let mockPlayerStore: {
     initializePlayer: ReturnType<typeof vi.fn>;
     updateShuffleSettings: ReturnType<typeof vi.fn>;
+    updatePlayerTimer: ReturnType<typeof vi.fn>;
   };
   let mockStorageStore: {
     navigateToDirectory: ReturnType<typeof vi.fn>;
@@ -40,6 +41,7 @@ describe('PlayerContextService - Settings Integration', () => {
     mockPlayerStore = {
       initializePlayer: vi.fn(),
       updateShuffleSettings: vi.fn(),
+      updatePlayerTimer: vi.fn(),
     };
 
     mockStorageStore = {
@@ -126,7 +128,7 @@ describe('PlayerContextService - Settings Integration', () => {
     service = TestBed.inject(PlayerContextService);
   });
 
-  describe('initializePlayer with Default Filter', () => {
+  describe('initializePlayer with Settings Integration', () => {
     it('should apply default filter from settings when initializing player', () => {
       // Arrange
       const settingsStoreMock = mockSettingsStore as {
@@ -172,7 +174,8 @@ describe('PlayerContextService - Settings Integration', () => {
       // Assert
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({ 
         deviceId,
-        defaultFilter: PlayerFilterType.Games 
+        defaultFilter: PlayerFilterType.Games,
+        playTimerEnabled: true
       });
     });
 
@@ -189,7 +192,8 @@ describe('PlayerContextService - Settings Integration', () => {
       // Assert
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
-        defaultFilter: PlayerFilterType.All
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: false
       });
     });
 
@@ -230,7 +234,8 @@ describe('PlayerContextService - Settings Integration', () => {
       // Assert
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
-        defaultFilter: PlayerFilterType.All
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: false
       });
     });
 
@@ -279,7 +284,8 @@ describe('PlayerContextService - Settings Integration', () => {
       // Assert
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
-        defaultFilter: PlayerFilterType.Music
+        defaultFilter: PlayerFilterType.Music,
+        playTimerEnabled: true
       });
     });
 
@@ -328,7 +334,8 @@ describe('PlayerContextService - Settings Integration', () => {
       // Assert
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
-        defaultFilter: PlayerFilterType.Hex
+        defaultFilter: PlayerFilterType.Hex,
+        playTimerEnabled: true
       });
     });
 
@@ -377,7 +384,8 @@ describe('PlayerContextService - Settings Integration', () => {
       // Assert
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
-        defaultFilter: PlayerFilterType.Images
+        defaultFilter: PlayerFilterType.Images,
+        playTimerEnabled: true
       });
     });
 
@@ -389,7 +397,8 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledTimes(1);
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
-        defaultFilter: PlayerFilterType.All
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: true
       });
     });
 
@@ -443,11 +452,13 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledTimes(2);
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId: device1,
-        defaultFilter: PlayerFilterType.Games
+        defaultFilter: PlayerFilterType.Games,
+        playTimerEnabled: true
       });
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId: device2,
-        defaultFilter: PlayerFilterType.Games
+        defaultFilter: PlayerFilterType.Games,
+        playTimerEnabled: true
       });
     });
 
@@ -510,12 +521,239 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledTimes(1);
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
-        defaultFilter: PlayerFilterType.Games // Called with Games from settings
+        defaultFilter: PlayerFilterType.Games,
+        playTimerEnabled: true
       });
       
       // The key assertion: updateShuffleSettings should NOT have been called
       // because ensurePlayerState should have returned existing state without modifying it
       expect(mockPlayerStore.updateShuffleSettings).toHaveBeenCalledTimes(1); // Only the user's manual change
+    });
+  });
+
+  describe('initializePlayer with Play Timer Settings', () => {
+    beforeEach(() => {
+      mockPlayerStore.updatePlayerTimer = vi.fn();
+    });
+
+    it('should enable play timer when playTimerEnabled is true in settings', () => {
+      // Arrange
+      const settingsStoreMock = mockSettingsStore as {
+        settings: ReturnType<typeof vi.fn>;
+      };
+      settingsStoreMock.settings.mockReturnValue({
+        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        playerSettings: {
+          repeatModeOnStartup: false,
+          playTimerEnabled: true, // Timer enabled in settings
+          muteFastForward: false,
+          muteRandomSeek: false,
+          startupFilter: PlayerFilterType.All,
+          startupLaunchEnabled: false,
+          startupLaunchRandom: false,
+        },
+        fileTransferSettings: {
+          watchDirectoryLocation: '',
+          autoTransferPath: '',
+          autoFileCopyEnabled: false,
+          autoLaunchOnCopyEnabled: false,
+          navToDirOnLaunch: false,
+          syncFilesEnabled: false,
+        },
+        searchSettings: {
+          weights: {
+            nameWeight: 1.0,
+            titleWeight: 1.0,
+            creatorWeight: 1.0,
+            releaseInfoWeight: 1.0,
+            descriptionWeight: 1.0,
+          },
+          stopWords: [],
+          bannedDirectories: [],
+          bannedFiles: [],
+        },
+        appSettings: { setupCompleted: false },
+      });
+
+      // Act
+      service.initializePlayer(deviceId);
+
+      // Assert
+      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
+        deviceId,
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: true,
+      });
+    });
+
+    it('should NOT enable play timer when playTimerEnabled is false in settings', () => {
+      // Arrange
+      const settingsStoreMock = mockSettingsStore as {
+        settings: ReturnType<typeof vi.fn>;
+      };
+      settingsStoreMock.settings.mockReturnValue({
+        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        playerSettings: {
+          repeatModeOnStartup: false,
+          playTimerEnabled: false, // Timer disabled in settings
+          muteFastForward: false,
+          muteRandomSeek: false,
+          startupFilter: PlayerFilterType.All,
+          startupLaunchEnabled: false,
+          startupLaunchRandom: false,
+        },
+        fileTransferSettings: {
+          watchDirectoryLocation: '',
+          autoTransferPath: '',
+          autoFileCopyEnabled: false,
+          autoLaunchOnCopyEnabled: false,
+          navToDirOnLaunch: false,
+          syncFilesEnabled: false,
+        },
+        searchSettings: {
+          weights: {
+            nameWeight: 1.0,
+            titleWeight: 1.0,
+            creatorWeight: 1.0,
+            releaseInfoWeight: 1.0,
+            descriptionWeight: 1.0,
+          },
+          stopWords: [],
+          bannedDirectories: [],
+          bannedFiles: [],
+        },
+        appSettings: { setupCompleted: false },
+      });
+
+      // Act
+      service.initializePlayer(deviceId);
+
+      // Assert
+      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
+        deviceId,
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: false,
+      });
+    });
+
+    it('should default to disabled when settings are null', () => {
+      // Arrange
+      const settingsStoreMock = mockSettingsStore as {
+        settings: ReturnType<typeof vi.fn>;
+      };
+      settingsStoreMock.settings.mockReturnValue(null);
+
+      // Act
+      service.initializePlayer(deviceId);
+
+      // Assert
+      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
+        deviceId,
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: false,
+      });
+    });
+
+    it('should default to disabled when playerSettings are undefined', () => {
+      // Arrange
+      const settingsStoreMock = mockSettingsStore as {
+        settings: ReturnType<typeof vi.fn>;
+      };
+      settingsStoreMock.settings.mockReturnValue({
+        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        playerSettings: undefined,
+        fileTransferSettings: {
+          watchDirectoryLocation: '',
+          autoTransferPath: '',
+          autoFileCopyEnabled: false,
+          autoLaunchOnCopyEnabled: false,
+          navToDirOnLaunch: false,
+          syncFilesEnabled: false,
+        },
+        searchSettings: {
+          weights: {
+            nameWeight: 1.0,
+            titleWeight: 1.0,
+            creatorWeight: 1.0,
+            releaseInfoWeight: 1.0,
+            descriptionWeight: 1.0,
+          },
+          stopWords: [],
+          bannedDirectories: [],
+          bannedFiles: [],
+        },
+        appSettings: { setupCompleted: false },
+      });
+
+      // Act
+      service.initializePlayer(deviceId);
+
+      // Assert
+      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
+        deviceId,
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: false,
+      });
+    });
+
+    it('should apply timer setting independently per device', () => {
+      // Arrange
+      const device1 = 'device-1';
+      const device2 = 'device-2';
+
+      const settingsStoreMock = mockSettingsStore as {
+        settings: ReturnType<typeof vi.fn>;
+      };
+      settingsStoreMock.settings.mockReturnValue({
+        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        playerSettings: {
+          repeatModeOnStartup: false,
+          playTimerEnabled: true,
+          muteFastForward: false,
+          muteRandomSeek: false,
+          startupFilter: PlayerFilterType.All,
+          startupLaunchEnabled: false,
+          startupLaunchRandom: false,
+        },
+        fileTransferSettings: {
+          watchDirectoryLocation: '',
+          autoTransferPath: '',
+          autoFileCopyEnabled: false,
+          autoLaunchOnCopyEnabled: false,
+          navToDirOnLaunch: false,
+          syncFilesEnabled: false,
+        },
+        searchSettings: {
+          weights: {
+            nameWeight: 1.0,
+            titleWeight: 1.0,
+            creatorWeight: 1.0,
+            releaseInfoWeight: 1.0,
+            descriptionWeight: 1.0,
+          },
+          stopWords: [],
+          bannedDirectories: [],
+          bannedFiles: [],
+        },
+        appSettings: { setupCompleted: false },
+      });
+
+      // Act
+      service.initializePlayer(device1);
+      service.initializePlayer(device2);
+
+      // Assert
+      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledTimes(2);
+      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
+        deviceId: device1,
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: true,
+      });
+      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
+        deviceId: device2,
+        defaultFilter: PlayerFilterType.All,
+        playTimerEnabled: true,
+      });
     });
   });
 });

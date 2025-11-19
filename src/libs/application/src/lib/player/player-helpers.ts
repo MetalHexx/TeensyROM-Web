@@ -15,7 +15,11 @@ import { DEFAULT_TIMER_MS } from './player.constants';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
-export function createDefaultDeviceState(deviceId: string, defaultFilter?: PlayerFilterType): DevicePlayerState {
+export function createDefaultDeviceState(
+  deviceId: string,
+  defaultFilter?: PlayerFilterType,
+  playTimerEnabled?: boolean
+): DevicePlayerState {
   return {
     deviceId,
     currentFile: null,
@@ -30,7 +34,7 @@ export function createDefaultDeviceState(deviceId: string, defaultFilter?: Playe
     playHistory: null,
     historyViewVisible: false,
     playTimerConfig: {
-      enabled: false,
+      enabled: playTimerEnabled ?? false,
       durationMs: DEFAULT_TIMER_MS,
     },
     timerState: null,
@@ -44,7 +48,8 @@ export function ensurePlayerState(
   store: WritableStore<PlayerState>,
   deviceId: string,
   actionMessage: string,
-  defaultFilter?: PlayerFilterType
+  defaultFilter?: PlayerFilterType,
+  playTimerEnabled?: boolean
 ): DevicePlayerState {
   const existing = store.players()[deviceId];
   if (existing) {
@@ -54,7 +59,7 @@ export function ensurePlayerState(
 
   logInfo(LogType.Start, `PlayerHelper: Creating new player state for device ${deviceId}`);
 
-  const defaultState = createDefaultDeviceState(deviceId, defaultFilter);
+  const defaultState = createDefaultDeviceState(deviceId, defaultFilter, playTimerEnabled);
   updateState(store, actionMessage, (state) => ({
     players: {
       ...state.players,

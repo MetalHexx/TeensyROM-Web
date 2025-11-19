@@ -36,16 +36,17 @@ export class PlayerContextService implements IPlayerContext {
   private isHandlingPopState = false;
 
   initializePlayer(deviceId: string): void {
-    // Get default filter from settings before initializing player
+    // Get default filter and timer settings from settings before initializing player
     const settings = this.settingsStore.settings();
     const defaultFilter = settings?.playerSettings?.startupFilter ?? PlayerFilterType.All;
+    const playTimerEnabled = settings?.playerSettings?.playTimerEnabled ?? false;
     
-    // Initialize player with default filter to avoid race condition
-    this.store.initializePlayer({ deviceId, defaultFilter });
+    // Initialize player with default filter and timer setting
+    this.store.initializePlayer({ deviceId, defaultFilter, playTimerEnabled });
     
     logInfo(
       LogType.Info,
-      `PlayerContext: Initialized player with default filter ${defaultFilter} for device ${deviceId}`
+      `PlayerContext: Initialized player for device ${deviceId} (filter: ${defaultFilter}, timer: ${playTimerEnabled})`
     );
   }
 
