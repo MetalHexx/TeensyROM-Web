@@ -26,10 +26,10 @@ export default [
               sourceTag: 'scope:application',
               onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared'],
             },
-            // Infrastructure Layer - Can depend on domain, shared utilities, and api-client
+            // Infrastructure Layer - Can depend on application, domain, shared utilities, and api-client
             {
               sourceTag: 'scope:infrastructure',
-              onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared', 'scope:data-access'],
+              onlyDependOnLibsWithTags: ['scope:application', 'scope:domain', 'scope:shared', 'scope:data-access'],
             },
             // Features Layer - Can depend on application, domain, and shared UI
             {

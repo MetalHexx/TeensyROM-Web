@@ -36,7 +36,7 @@ This application follows **Clean Architecture** principles with clear separation
 
 - **Domain** has no dependencies (pure TypeScript)
 - **Application** depends only on Domain
-- **Infrastructure** depends on Domain (implements contracts)
+- **Infrastructure** depends on Application and Domain (implements contracts, uses application utilities)
 - **Presentation** depends on Application and Domain (not Infrastructure directly)
 
 ### Dependency Constraint Enforcement
@@ -45,7 +45,7 @@ This application follows **Clean Architecture** principles with clear separation
 
 - **Domain Layer**: `["scope:domain"]` - Cannot depend on any other layers
 - **Application Layer**: `["scope:application"]` - Can only depend on domain and shared utilities
-- **Infrastructure Layer**: `["scope:infrastructure"]` - Can only depend on domain, shared, and api-client
+- **Infrastructure Layer**: `["scope:infrastructure"]` - Can depend on application, domain, shared, and api-client
 - **Features Layer**: `["scope:features", "feature:device|player"]` - Can depend on application, domain, and shared UI (features isolated from each other)
 - **App Layer**: `["scope:app"]` - Can import from infrastructure (composition root), features, application, and shared
 
@@ -133,6 +133,7 @@ All domain contracts are located in the shared `contracts/` folder for universal
 - **HTTP Clients**: API communication using generated OpenAPI clients
 - **SignalR Integration**: Real-time communication implementations
 - **Framework Dependencies**: Angular-specific and external library integrations
+- **Application Utilities**: Can leverage application layer utilities and patterns when needed
 
 **Examples**:
 
@@ -140,6 +141,7 @@ All domain contracts are located in the shared `contracts/` folder for universal
 - `StorageService` implementing `IStorageService` using HTTP API
 - Data mapping between API DTOs and domain models
 - External service integrations and I/O operations
+- Using application-level utilities for common infrastructure patterns
 
 ### 4. Presentation Layer (`libs/features`, `libs/ui`) - User Interface
 
@@ -369,6 +371,7 @@ libs/
 - **External Integration**: HTTP clients, SignalR, file system, database access
 - **Data Mapping**: Transform external data (API DTOs) to/from domain models
 - **Framework Specific**: Angular services, RxJS, HTTP client integrations
+- **Application Utilities**: Can depend on and use application layer utilities and patterns
 
 ### UI Layer Principles
 
