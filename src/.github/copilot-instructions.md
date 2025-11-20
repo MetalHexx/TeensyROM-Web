@@ -14,17 +14,44 @@
 
 The frontend follows **strict Clean Architecture** with automated dependency constraint enforcement:
 
-```
-Domain (libs/domain) → Application (libs/application) → Infrastructure (libs/infrastructure)
-                    ↓                                 ↓
-                Features (libs/features) → UI Components (libs/ui)
+```mermaid
+graph TB
+    subgraph Presentation["Presentation Layer"]
+        UI[UI Components<br/>libs/ui]
+        Features[Features<br/>libs/features]
+    end
+    
+    subgraph Core["Core Layers"]
+        Application[Application<br/>libs/application<br/>Use Cases & State]
+        Domain[Domain<br/>libs/domain<br/>Contracts & Models]
+    end
+    
+    subgraph External["External Layer"]
+        Infrastructure[Infrastructure<br/>libs/infrastructure<br/>Implementations]
+    end
+    
+    Features --> Application
+    Features --> Domain
+    Features --> UI
+    UI -.->|pure presentational| UI
+    
+    Application --> Domain
+    
+    Infrastructure --> Application
+    Infrastructure --> Domain
+    
+    style Domain fill:#e1f5ff,stroke:#333,stroke-width:3px
+    style Application fill:#fff4e1,stroke:#333,stroke-width:2px
+    style Infrastructure fill:#ffe1f5,stroke:#333,stroke-width:2px
+    style Features fill:#e1ffe1,stroke:#333,stroke-width:2px
+    style UI fill:#f5e1ff,stroke:#333,stroke-width:2px
 ```
 
 **Layer Rules** (ESLint will fail builds on violations):
 
 - **Domain**: Pure TypeScript contracts/models in shared `models/` and `contracts/` folders - ZERO dependencies
 - **Application**: NgRx Signal Stores, use cases - depends ONLY on domain + shared utilities
-- **Infrastructure**: Service implementations, HTTP clients - depends on domain + api-client
+- **Infrastructure**: Service implementations, HTTP clients - **CAN depend on application layer + domain + shared + api-client** 
 - **Features**: Smart components - depends on application + domain + shared UI (features CANNOT import each other)
 - **UI**: Dumb components - depends ONLY on other UI components
 
