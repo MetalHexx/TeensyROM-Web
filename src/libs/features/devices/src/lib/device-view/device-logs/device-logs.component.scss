@@ -2,6 +2,7 @@
 
 .logs-content {
   max-height: 300px;
+  overflow-y: auto;
   background: var(--mat-sys-surface-container-low);
 }
 
