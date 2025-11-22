@@ -18,6 +18,7 @@ import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore, StorageDirectoryState } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
+import { PLAYER_STORAGE } from './player-storage.interface';
 
 interface TimerState {
   remainingMs: number;
@@ -77,6 +78,12 @@ describe('PlayerContextService', () => {
     pingDevice: ReturnType<typeof vi.fn>;
   };
   let mockAlertService: Partial<IAlertService>;
+  let mockPlayerStorage: {
+    save: ReturnType<typeof vi.fn>;
+    load: ReturnType<typeof vi.fn>;
+    hasSavedState: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+  };
 
   const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -129,6 +136,13 @@ describe('PlayerContextService', () => {
       dismiss: vi.fn(),
     };
 
+    mockPlayerStorage = {
+      save: vi.fn(),
+      load: vi.fn().mockReturnValue({}),
+      hasSavedState: vi.fn().mockReturnValue(false),
+      clear: vi.fn(),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         PlayerContextService,
@@ -138,6 +152,7 @@ describe('PlayerContextService', () => {
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: SettingsStore, useValue: mockSettingsStore },
+        { provide: PLAYER_STORAGE, useValue: mockPlayerStorage },
       ],
     });
 
@@ -383,6 +398,7 @@ describe('PlayerContextService', () => {
         service.toggleShuffleMode(deviceId);
 
         expect(service.getLaunchMode(deviceId)()).toBe(LaunchMode.Shuffle);
+        expect(mockPlayerStorage.save).toHaveBeenCalledWith(deviceId, expect.any(Object));
       });
 
       it('should toggle from Shuffle to Directory mode', () => {
@@ -401,6 +417,7 @@ describe('PlayerContextService', () => {
 
         const settings = service.getShuffleSettings(deviceId)();
         expect(settings?.scope).toBe(PlayerScope.DirectoryDeep);
+        expect(mockPlayerStorage.save).toHaveBeenCalledWith(deviceId, expect.any(Object));
       });
 
       it('should update filter mode', () => {

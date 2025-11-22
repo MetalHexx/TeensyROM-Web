@@ -2,6 +2,7 @@ import { firstValueFrom } from 'rxjs';
 import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { IPlayerService, LaunchMode, StorageType, FileItem } from '@teensyrom-nx/domain';
 import { PlayerState } from '../player-store';
+import { IPlayerStorage } from '../player-storage.interface';
 import {
   WritableStore,
   ensurePlayerState,
@@ -23,7 +24,8 @@ export interface LaunchFileWithContextParams {
 
 export function launchFileWithContext(
   store: WritableStore<PlayerState>,
-  playerService: IPlayerService
+  playerService: IPlayerService,
+  playerStorage: IPlayerStorage
 ) {
   return {
     launchFileWithContext: async ({
@@ -95,6 +97,16 @@ export function launchFileWithContext(
           launchMode,
           actionMessage
         );
+
+        // Persist state after successful launch
+        try {
+          playerStorage.save(deviceId, store.players()[deviceId]);
+        } catch (error) {
+          logError(
+            `PlayerAction: Failed to persist player state to localStorage for device ${deviceId}`,
+            { error }
+          );
+        }
 
         logInfo(
           LogType.Success,

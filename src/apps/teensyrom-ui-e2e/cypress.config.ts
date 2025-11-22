@@ -1,5 +1,10 @@
-import { nxE2EPreset } from '@nx/cypress/plugins/cypress-preset';
+import { nxE2EPreset } from '@nx/cypress/plugins/cypress-preset.js';
 import { defineConfig } from 'cypress';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const __filename = fileURLToPath(import.meta.url);
+const __require = createRequire(import.meta.url);
 
 export default defineConfig({
   e2e: {
@@ -23,7 +28,7 @@ export default defineConfig({
 
     // Reporter configuration - for JSON test reports (agent consumption)
     // Use require.resolve to handle pnpm workspace module resolution
-    reporter: require.resolve('cypress-mochawesome-reporter'),
+    reporter: __require.resolve('cypress-mochawesome-reporter'),
     reporterOptions: {
       reportDir: 'dist/cypress/apps/teensyrom-ui-e2e/reports',
       charts: false,
@@ -39,7 +44,7 @@ export default defineConfig({
 
     setupNodeEvents(on, config) {
       // Register mochawesome reporter plugin with resolved path
-      const mochawesomeReporter = require('cypress-mochawesome-reporter/plugin');
+      const mochawesomeReporter = __require('cypress-mochawesome-reporter/plugin');
       mochawesomeReporter(on);
       return config;
     },

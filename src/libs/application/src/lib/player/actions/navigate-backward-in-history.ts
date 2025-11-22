@@ -5,6 +5,7 @@ import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { PlayerState } from '../player-store';
 import { WritableStore, getPlayerState, setPlayerLoading, setPlayerError } from '../player-helpers';
 import { StorageKeyUtil } from '../../storage/storage-key.util';
+import { IPlayerStorage } from '../player-storage.interface';
 
 export interface NavigateBackwardInHistoryParams {
   deviceId: string;
@@ -12,7 +13,8 @@ export interface NavigateBackwardInHistoryParams {
 
 export function navigateBackwardInHistory(
   store: WritableStore<PlayerState>,
-  playerService: IPlayerService
+  playerService: IPlayerService,
+  playerStorage: IPlayerStorage
 ) {
   return {
     navigateBackwardInHistory: async ({
@@ -133,6 +135,16 @@ export function navigateBackwardInHistory(
             },
           };
         });
+
+        // Persist state after successful history navigation
+        try {
+          playerStorage.save(deviceId, store.players()[deviceId]);
+        } catch (error) {
+          logError(
+            `NavigateBackwardInHistory: Failed to persist player state to localStorage for device ${deviceId}`,
+            { error }
+          );
+        }
 
         logInfo(
           LogType.Finish,

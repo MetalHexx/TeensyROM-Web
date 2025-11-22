@@ -1,0 +1,13 @@
+ignoredBuiltDependencies:
+  - '@nestjs/core'
+  - '@openapitools/openapi-generator-cli'
+  - '@parcel/watcher'
+  - '@swc/core'
+  - esbuild
+  - lmdb
+  - msgpackr-extract
+  - msw
+  - nx
+  - unrs-resolver
+onlyBuiltDependencies:
+  - cypress

@@ -17,6 +17,7 @@ import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore, StorageDirectoryState } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
+import { PLAYER_STORAGE } from './player-storage.interface';
 
 // Test data factory functions
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
@@ -78,6 +79,12 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
     pingDevice: MockedFunction<IDeviceService['pingDevice']>;
   };
   let mockAlertService: Partial<IAlertService>;
+  let mockPlayerStorage: {
+    save: ReturnType<typeof vi.fn>;
+    load: ReturnType<typeof vi.fn>;
+    hasSavedState: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+  };
 
   // Helper to wait for async operations
   const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -126,6 +133,13 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       dismiss: vi.fn(),
     };
 
+    mockPlayerStorage = {
+      save: vi.fn(),
+      load: vi.fn().mockReturnValue({}),
+      hasSavedState: vi.fn().mockReturnValue(false),
+      clear: vi.fn(),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         PlayerContextService,
@@ -135,6 +149,15 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: SettingsStore, useValue: { settings: vi.fn(() => null) } },
+        {
+          provide: PLAYER_STORAGE,
+          useValue: {
+            save: vi.fn(),
+            load: vi.fn(),
+            hasSavedState: vi.fn(() => false),
+            clear: vi.fn(),
+          },
+        },
       ],
     });
 

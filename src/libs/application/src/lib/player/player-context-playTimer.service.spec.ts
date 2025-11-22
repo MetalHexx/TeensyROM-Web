@@ -17,6 +17,7 @@ import { StorageStore, StorageDirectoryState } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { TimerState } from './timer-state.interface';
 import { DEFAULT_TIMER_MS } from './player.constants';
+import { PLAYER_STORAGE } from './player-storage.interface';
 
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   name: 'test-file.sid',
@@ -76,6 +77,12 @@ describe('PlayerContextService - Custom Play Timer', () => {
     pingDevice: ReturnType<typeof vi.fn>;
   };
   let mockAlertService: IAlertService;
+  let mockPlayerStorage: {
+    save: ReturnType<typeof vi.fn>;
+    load: ReturnType<typeof vi.fn>;
+    hasSavedState: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+  };
 
   const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -128,6 +135,13 @@ describe('PlayerContextService - Custom Play Timer', () => {
       alerts$: of([]),
     } as IAlertService;
 
+    mockPlayerStorage = {
+      save: vi.fn(),
+      load: vi.fn().mockReturnValue({}),
+      hasSavedState: vi.fn().mockReturnValue(false),
+      clear: vi.fn(),
+    };
+
     mockSettingsStore.settings.mockReturnValue({
       playerSettings: {
         startupFilter: 'ALL',
@@ -143,6 +157,7 @@ describe('PlayerContextService - Custom Play Timer', () => {
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: SettingsStore, useValue: mockSettingsStore },
+        { provide: PLAYER_STORAGE, useValue: { load: vi.fn(), save: vi.fn(), hasSavedState: vi.fn(), clear: vi.fn() } },
       ],
     });
 

@@ -12,6 +12,7 @@ import { PlayerStore } from './player-store';
 import { StorageStore } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { PlayerTimerManager } from './player-timer-manager';
+import { PLAYER_STORAGE } from './player-storage.interface';
 
 describe('PlayerContextService - Settings Integration', () => {
   let service: PlayerContextService;
@@ -29,6 +30,12 @@ describe('PlayerContextService - Settings Integration', () => {
   };
   let mockAlertService: Partial<IAlertService>;
   let mockTimerManager: Partial<PlayerTimerManager>;
+  let mockPlayerStorage: {
+    save: ReturnType<typeof vi.fn>;
+    load: ReturnType<typeof vi.fn>;
+    hasSavedState: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+  };
   let timerUpdateSubject: Subject<{ deviceId: string; currentMs: number; totalMs: number }>;
   let timerCompleteSubject: Subject<void>;
 
@@ -100,6 +107,13 @@ describe('PlayerContextService - Settings Integration', () => {
       dismiss: vi.fn(),
     };
 
+    mockPlayerStorage = {
+      save: vi.fn(),
+      load: vi.fn().mockReturnValue({}),
+      hasSavedState: vi.fn().mockReturnValue(false),
+      clear: vi.fn(),
+    };
+
     mockTimerManager = {
       createTimer: vi.fn<PlayerTimerManager['createTimer']>(),
       destroyTimer: vi.fn<PlayerTimerManager['destroyTimer']>(),
@@ -122,6 +136,7 @@ describe('PlayerContextService - Settings Integration', () => {
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: SettingsStore, useValue: mockSettingsStore },
         { provide: PlayerTimerManager, useValue: mockTimerManager },
+        { provide: PLAYER_STORAGE, useValue: mockPlayerStorage },
       ],
     });
 

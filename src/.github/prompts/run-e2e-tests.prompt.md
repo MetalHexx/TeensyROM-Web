@@ -1,6 +1,5 @@
 ---
 description: Execute Cypress E2E tests with detailed JSON reporting and analysis
-mode: agent
 tools: ['runCommands', 'runTests']
 ---
 

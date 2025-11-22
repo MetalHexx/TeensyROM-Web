@@ -15,6 +15,7 @@ import { StorageStore } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { StorageKeyUtil } from '../storage/storage-key.util';
 import { IPlayerContext, LaunchFileContextRequest } from './player-context.interface';
+import { PLAYER_STORAGE } from './player-storage.interface';
 import { PlayerTimerManager } from './player-timer-manager';
 import { parsePlayLength } from './timer-utils';
 import { DEFAULT_TIMER_MS } from './player.constants';
@@ -29,6 +30,7 @@ export class PlayerContextService implements IPlayerContext {
   private readonly timerManager = inject(PlayerTimerManager);
   private readonly location = inject(Location);
   private readonly alertService = inject(ALERT_SERVICE);
+  private readonly playerStorage = inject(PLAYER_STORAGE);
 
   // Track timer subscriptions per device for cleanup
   private readonly timerSubscriptions = new Map<string, Subscription[]>();
@@ -40,14 +42,9 @@ export class PlayerContextService implements IPlayerContext {
     const settings = this.settingsStore.settings();
     const defaultFilter = settings?.playerSettings?.startupFilter ?? PlayerFilterType.All;
     const playTimerEnabled = settings?.playerSettings?.playTimerEnabled ?? false;
-    
-    // Initialize player with default filter and timer setting
+
+    // Initialize player (action handles localStorage loading internally)
     this.store.initializePlayer({ deviceId, defaultFilter, playTimerEnabled });
-    
-    logInfo(
-      LogType.Info,
-      `PlayerContext: Initialized player for device ${deviceId} (filter: ${defaultFilter}, timer: ${playTimerEnabled})`
-    );
   }
 
   removePlayer(deviceId: string): void {

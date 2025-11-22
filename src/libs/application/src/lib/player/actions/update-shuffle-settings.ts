@@ -1,9 +1,10 @@
 import { updateState } from '@angular-architects/ngrx-toolkit';
-import { createAction, LogType, logInfo } from '@teensyrom-nx/utils';
+import { createAction, LogType, logInfo, logError } from '@teensyrom-nx/utils';
 import { WritableStore, ensurePlayerState } from '../player-helpers';
 import { PlayerState, ShuffleSettings } from '../player-store';
+import { IPlayerStorage } from '../player-storage.interface';
 
-export function updateShuffleSettings(store: WritableStore<PlayerState>) {
+export function updateShuffleSettings(store: WritableStore<PlayerState>, playerStorage: IPlayerStorage) {
   return {
     updateShuffleSettings: ({
       deviceId,
@@ -44,6 +45,16 @@ export function updateShuffleSettings(store: WritableStore<PlayerState>) {
           },
         };
       });
+
+      // Persist state after shuffle settings change
+      try {
+        playerStorage.save(deviceId, store.players()[deviceId]);
+      } catch (error) {
+        logError(
+          `PlayerAction: Failed to persist player state to localStorage for device ${deviceId}`,
+          { error }
+        );
+      }
 
       logInfo(LogType.Success, `PlayerAction: Shuffle settings updated for device ${deviceId}`);
     },

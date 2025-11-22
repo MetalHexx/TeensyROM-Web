@@ -1,13 +1,14 @@
 import { updateState } from '@angular-architects/ngrx-toolkit';
-import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
+import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { PlayerState } from '../player-store';
 import { WritableStore, getPlayerState } from '../player-helpers';
+import { IPlayerStorage } from '../player-storage.interface';
 
 export interface ClearHistoryParams {
   deviceId: string;
 }
 
-export function clearHistory(store: WritableStore<PlayerState>) {
+export function clearHistory(store: WritableStore<PlayerState>, playerStorage: IPlayerStorage) {
   return {
     clearHistory: ({ deviceId }: ClearHistoryParams): void => {
       const actionMessage = createAction('clear-history');
@@ -50,6 +51,13 @@ export function clearHistory(store: WritableStore<PlayerState>) {
           },
         };
       });
+
+      // Persist state after clearing history
+      try {
+        playerStorage.save(deviceId, store.players()[deviceId]);
+      } catch (error) {
+        logError('Failed to persist player state to localStorage', { deviceId, error });
+      }
     },
   };
 }

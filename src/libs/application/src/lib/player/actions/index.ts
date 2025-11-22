@@ -8,6 +8,7 @@ import {
 } from '@teensyrom-nx/domain';
 import { PlayerState } from '../player-store';
 import { WritableStore } from '../player-helpers';
+import { PLAYER_STORAGE, IPlayerStorage } from '../player-storage.interface';
 import { initializePlayer } from './initialize-player';
 import { launchFileWithContext } from './launch-file-with-context';
 import { launchRandomFile } from './launch-random-file';
@@ -36,33 +37,34 @@ export function withPlayerActions() {
     (
       store,
       playerService: IPlayerService = inject(PLAYER_SERVICE),
-      deviceService: IDeviceService = inject(DEVICE_SERVICE)
+      deviceService: IDeviceService = inject(DEVICE_SERVICE),
+      playerStorage: IPlayerStorage = inject(PLAYER_STORAGE)
     ) => {
       const writableStore = store as WritableStore<PlayerState>;
       return {
         ...initializePlayer(writableStore),
-        ...launchFileWithContext(writableStore, playerService),
+        ...launchFileWithContext(writableStore, playerService, playerStorage),
         ...launchRandomFile(writableStore, playerService),
         ...loadFileContext(writableStore),
-        ...updateShuffleSettings(writableStore),
-        ...updateLaunchMode(writableStore),
+        ...updateShuffleSettings(writableStore, playerStorage),
+        ...updateLaunchMode(writableStore, playerStorage),
         ...updatePlayerStatus(writableStore),
         ...updateTimerState(writableStore),
-        ...updatePlayerTimer(writableStore),
+        ...updatePlayerTimer(writableStore, playerStorage),
         ...play(writableStore, playerService),
         ...pauseMusic(writableStore, playerService),
         ...stopPlayback(writableStore, deviceService),
         ...updateFavoriteStatus(writableStore),
-        ...navigateNext(writableStore, playerService),
-        ...navigatePrevious(writableStore, playerService),
+        ...navigateNext(writableStore, playerService, playerStorage),
+        ...navigatePrevious(writableStore, playerService, playerStorage),
         ...removePlayer(writableStore),
-        ...recordHistory(writableStore),
-        ...clearHistory(writableStore),
-        ...navigateBackwardInHistory(writableStore, playerService),
-        ...navigateForwardInHistory(writableStore, playerService),
+        ...recordHistory(writableStore, playerStorage),
+        ...clearHistory(writableStore, playerStorage),
+        ...navigateBackwardInHistory(writableStore, playerService, playerStorage),
+        ...navigateForwardInHistory(writableStore, playerService, playerStorage),
         updateHistoryViewVisibility: (params: { deviceId: string; visible: boolean }) =>
-          updateHistoryViewVisibility(writableStore, params),
-        ...navigateToHistoryPosition(writableStore, playerService),
+          updateHistoryViewVisibility(writableStore, playerStorage, params),
+        ...navigateToHistoryPosition(writableStore, playerService, playerStorage),
       };
     }
   );

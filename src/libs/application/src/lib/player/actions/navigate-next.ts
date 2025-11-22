@@ -4,6 +4,7 @@ import { LaunchMode, PlayerStatus } from '@teensyrom-nx/domain';
 import { IPlayerService } from '@teensyrom-nx/domain';
 import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { PlayerState } from '../player-store';
+import { IPlayerStorage } from '../player-storage.interface';
 import {
   WritableStore,
   setShuffleNavigationSuccess,
@@ -13,7 +14,7 @@ import {
 } from '../player-helpers';
 import { StorageKeyUtil } from '../../storage/storage-key.util';
 
-export function navigateNext(store: WritableStore<PlayerState>, playerService: IPlayerService) {
+export function navigateNext(store: WritableStore<PlayerState>, playerService: IPlayerService, playerStorage: IPlayerStorage) {
   return {
     navigateNext: async ({ deviceId }: { deviceId: string }): Promise<void> => {
       const actionMessage = createAction('navigate-next');
@@ -73,6 +74,16 @@ export function navigateNext(store: WritableStore<PlayerState>, playerService: I
             existingStorageKey,
             actionMessage
           );
+
+          // Persist state after successful navigation
+          try {
+            playerStorage.save(deviceId, store.players()[deviceId]);
+          } catch (error) {
+            logError(
+              `Navigate next: Failed to persist player state to localStorage for device ${deviceId}`,
+              { error }
+            );
+          }
         } else if (
           (launchMode === LaunchMode.Directory || launchMode === LaunchMode.Search) &&
           fileContext
@@ -124,6 +135,16 @@ export function navigateNext(store: WritableStore<PlayerState>, playerService: I
             nextIndex,
             actionMessage
           );
+
+          // Persist state after successful navigation
+          try {
+            playerStorage.save(deviceId, store.players()[deviceId]);
+          } catch (error) {
+            logError(
+              `Navigate next: Failed to persist player state to localStorage for device ${deviceId}`,
+              { error }
+            );
+          }
         } else {
           logInfo(LogType.Info, `No file context available for navigation on ${deviceId}`);
         }

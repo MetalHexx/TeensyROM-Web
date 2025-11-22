@@ -1,4 +1,4 @@
-import { Component, input, computed, inject, effect } from '@angular/core';
+import { Component, input, computed, inject, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Device } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
@@ -34,10 +34,14 @@ export class PlayerDeviceContainerComponent {
     // 1. Devices already connected at startup
     // 2. Devices that connect after app startup
     // Uses ensurePlayerState guard internally - won't overwrite existing state
+    // Note: untracked() prevents initialization from triggering reactive loops
+    // when handleDeepLinking updates store signals
     effect(() => {
       const deviceId = this.deviceId();
       if (deviceId) {
-        this.playerContext.initializePlayer(deviceId);
+        untracked(() => {
+          this.playerContext.initializePlayer(deviceId);
+        });
       }
     });
   }

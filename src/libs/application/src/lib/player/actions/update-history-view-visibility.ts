@@ -1,7 +1,8 @@
 import { updateState } from '@angular-architects/ngrx-toolkit';
-import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
+import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { WritableStore } from '../player-helpers';
 import { PlayerState } from '../player-store';
+import { IPlayerStorage } from '../player-storage.interface';
 
 export interface UpdateHistoryViewVisibilityParams {
   deviceId: string;
@@ -10,6 +11,7 @@ export interface UpdateHistoryViewVisibilityParams {
 
 export function updateHistoryViewVisibility(
   store: WritableStore<PlayerState>,
+  playerStorage: IPlayerStorage,
   params: UpdateHistoryViewVisibilityParams
 ): void {
   const { deviceId, visible } = params;
@@ -35,6 +37,16 @@ export function updateHistoryViewVisibility(
       },
     },
   }));
+
+  // Persist state after visibility change
+  try {
+    playerStorage.save(deviceId, store.players()[deviceId]);
+  } catch (error) {
+    logError(
+      `${actionMessage}: Failed to persist player state to localStorage for device ${deviceId}`,
+      { error }
+    );
+  }
 
   logInfo(
     LogType.Success,

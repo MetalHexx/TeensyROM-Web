@@ -1,7 +1,8 @@
 import { updateState } from '@angular-architects/ngrx-toolkit';
-import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
+import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { PlayerState, HistoryEntry } from '../player-store';
 import { WritableStore, getPlayerState } from '../player-helpers';
+import { IPlayerStorage } from '../player-storage.interface';
 
 const MAX_HISTORY_ENTRIES = 1000;
 
@@ -10,7 +11,7 @@ export interface RecordHistoryParams {
   entry: HistoryEntry;
 }
 
-export function recordHistory(store: WritableStore<PlayerState>) {
+export function recordHistory(store: WritableStore<PlayerState>, playerStorage: IPlayerStorage) {
   return {
     recordHistory: ({ deviceId, entry }: RecordHistoryParams): void => {
       const actionMessage = createAction('record-history');
@@ -103,6 +104,13 @@ export function recordHistory(store: WritableStore<PlayerState>) {
           },
         };
       });
+
+      // Persist state after recording history
+      try {
+        playerStorage.save(deviceId, store.players()[deviceId]);
+      } catch (error) {
+        logError('Failed to persist player state to localStorage', { deviceId, error });
+      }
     },
   };
 }

@@ -1,79 +1,86 @@
 import { inject } from '@angular/core';
 import { ResolveFn, ActivatedRouteSnapshot } from '@angular/router';
-import { StorageStore, PlayerContextService, DeviceStore } from '@teensyrom-nx/application';
-import {
-  StorageType,
-  LaunchMode,
-  AlertPosition,
-  ALERT_SERVICE,
-  IAlertService,
-} from '@teensyrom-nx/domain';
-import { logInfo, logError, logWarn, LogType } from '@teensyrom-nx/utils';
+import { StorageStore, PlayerContextService, DeviceStore, PLAYER_STORAGE, SettingsStore, StorageKeyUtil, IPlayerStorage, PlayerStore } from '@teensyrom-nx/application';
+import { StorageType, LaunchMode, Settings } from '@teensyrom-nx/domain';
+import { logInfo, logError, LogType } from '@teensyrom-nx/utils';
+import { effect, runInInjectionContext, Injector, untracked } from '@angular/core';
 
 /**
- * Route resolver for player route that kicks off storage initialization
- * without blocking navigation.
+ * Route resolver for player route that kicks off initialization without blocking.
  *
  * Execution flow:
- * 1. Start background initialization of all device storage
- * 2. Check for deep linking query parameters
- * 3. Return immediately - component renders while storage loads
+ * 1. Return immediately - component renders instantly
+ * 2. Background: initializePlayer() waits for DeviceStore, then settings, then executes startup
  *
- * The component will show loading states as storage data arrives.
+ * The component shows loading states as everything initializes in the background.
  *
  * Query Parameters (optional, for deep linking):
- * - `device`: Device ID to navigate to (required for deep linking)
- * - `storage`: Storage type 'SD' or 'USB' (required for deep linking)
- * - `path`: Directory path to open (required for deep linking)
- * - `file`: File name to launch (optional, auto-launch if provided)
+ * - `device`: Device ID to navigate to
+ * - `storage`: Storage type 'SD' or 'USB'
+ * - `path`: Directory path to open
+ * - `file`: File name to launch
  *
- * @returns Promise<void> - resolves immediately, initialization continues in background
+ * @returns Promise<void> - resolves immediately
  */
 export const playerRouteResolver: ResolveFn<void> = async (
   route: ActivatedRouteSnapshot
 ): Promise<void> => {
+  const settingStore = inject(SettingsStore);
   const storageStore = inject(StorageStore);
   const deviceStore = inject(DeviceStore);
   const playerContextService = inject(PlayerContextService);
-  const alertService = inject(ALERT_SERVICE);
+  const playerStorage = inject(PLAYER_STORAGE);
+  const playerStore = inject(PlayerStore);
+  const injector = inject(Injector);
 
-  // Kick off initialization in background (fire-and-forget)
-  initPlayer(storageStore, deviceStore, playerContextService, alertService, route);
+  const deviceParam = route.queryParamMap.get('device');
+  const storageParam = route.queryParamMap.get('storage');
+  const pathParam = route.queryParamMap.get('path');
+  const fileParam = route.queryParamMap.get('file');
 
-  logInfo(LogType.Info, 'Player route resolver: initialization started (non-blocking)');
+  logInfo(LogType.Success, 'PlayerResolver: Starting async player initialization');
 
-  // Return immediately - component renders while storage loads
+  // Kick off ALL initialization in background (don't await anything)
+  setTimeout(() => {
+    initializePlayer(
+      injector,
+      settingStore,
+      storageStore,
+      deviceStore,
+      playerContextService,
+      playerStorage,
+      playerStore,
+      deviceParam,
+      storageParam,
+      pathParam,
+      fileParam
+    ).catch((error) => {
+      logError('PlayerResolver: Player initialization failed:', error);
+    });
+  }, 0);
+
+  // Return immediately - component renders now
+  logInfo(LogType.Success, 'PlayerResolver: Returning immediately to render component');
 };
 
-/**
- * Orchestrator function that coordinates player initialization.
- * Calls sub-initialization functions in sequence:
- * 1. Wait for DeviceStore to be initialized
- * 2. Initialize all device storage
- * 3. Handle deep linking if query parameters provided
+/** 
+ * Complete player initialization - runs entirely in background after component renders
  */
-async function initPlayer(
+async function initializePlayer(
+  injector: Injector,
+  settingStore: InstanceType<typeof SettingsStore>,
   storageStore: InstanceType<typeof StorageStore>,
   deviceStore: InstanceType<typeof DeviceStore>,
   playerContextService: PlayerContextService,
-  alertService: IAlertService,
-  route: ActivatedRouteSnapshot
+  playerStorage: IPlayerStorage,
+  playerStore: InstanceType<typeof PlayerStore>,
+  deviceParam: string | null,
+  storageParam: string | null,
+  pathParam: string | null,
+  fileParam: string | null
 ): Promise<void> {
-  await waitForDeviceStoreInitialization(deviceStore);
-  await initializeAllDeviceStorage(storageStore, deviceStore);
-  playerContextService.startListeningToPopState();
-  logInfo(LogType.Info, 'PlayerContextService popstate listener started');
-  await initDeeplinking(storageStore, playerContextService, alertService, route);
-}
-
-/**
- * Wait for DeviceStore to finish initializing.
- * Polls hasInitialised until it becomes true.
- */
-async function waitForDeviceStoreInitialization(
-  deviceStore: InstanceType<typeof DeviceStore>
-): Promise<void> {
-  logInfo(LogType.Start, 'Waiting for DeviceStore to initialize');
+  // Step 1: Wait for DeviceStore
+  logInfo(LogType.Start, 'PlayerInit: Waiting for DeviceStore to initialize');
 
   while (!deviceStore.hasInitialised()) {
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -81,141 +88,143 @@ async function waitForDeviceStoreInitialization(
 
   logInfo(
     LogType.Success,
-    `DeviceStore initialized: ${deviceStore.devices().length} device(s) found`
+    `PlayerInit: DeviceStore initialized: ${deviceStore.devices().length} device(s) found`
   );
-}
 
-/**
- * Async function that initializes all storage for all connected devices.
- * This runs in the background without blocking navigation.
- */
-async function initializeAllDeviceStorage(
-  storageStore: InstanceType<typeof StorageStore>,
-  deviceStore: InstanceType<typeof DeviceStore>
-): Promise<void> {
-  try {
-    logInfo(LogType.Start, 'Initializing all device storage');
+  // Step 2: Initialize storage for all devices
+  const devices = deviceStore.devices();
+  logInfo(LogType.Start, `PlayerInit: Initializing storage for ${devices.length} device(s)`);
 
-    // Get devices from the DeviceStore
-    const devices = deviceStore.devices();
-    logInfo(LogType.Info, `Found ${devices.length} connected devices`, devices.length);
+  for (const currentDevice of devices) {
+    if (!currentDevice.isConnected) continue;
 
-    // Initialize all storage types for all devices
-    for (const device of devices) {
-      const deviceId = device.deviceId;
-
-      if (device.usbStorage?.available && device.isConnected) {
+    try {
+      if (currentDevice.usbStorage?.available) {
         await storageStore.initializeStorage({
-          deviceId,
+          deviceId: currentDevice.deviceId,
           storageType: StorageType.Usb,
         });
-        logInfo(LogType.Info, `Initialized USB storage for ${deviceId}`);
       }
 
-      if (device.sdStorage?.available && device.isConnected) {
+      if (currentDevice.sdStorage?.available) {
         await storageStore.initializeStorage({
-          deviceId,
+          deviceId: currentDevice.deviceId,
           storageType: StorageType.Sd,
         });
-        logInfo(LogType.Info, `Initialized SD storage for ${deviceId}`);
       }
+    } catch (error) {
+      logError(
+        `PlayerInit: Error initializing storage for device ${currentDevice.deviceId}:`,
+        error instanceof Error ? error.message : error
+      );
     }
-
-    logInfo(LogType.Success, 'All device storage initialized');
-  } catch (error) {
-    logError('Error initializing device storage:', error instanceof Error ? error.message : error);
   }
-}
 
-/**
- * Handle deep linking based on query parameters.
- * Gathers route parameters (device, storage, path, file) and:
- * 1. Navigates to the specified directory
- * 2. If file provided, waits for directory load and launches the file
- *
- * Query Parameters:
- * - `device`: Device ID (required for deep linking)
- * - `storage`: Storage type 'SD' or 'USB' (required for deep linking)
- * - `path`: Directory path to open (required for deep linking)
- * - `file`: File name to launch (optional)
- */
-async function initDeeplinking(
-  storageStore: InstanceType<typeof StorageStore>,
-  playerContextService: PlayerContextService,
-  alertService: IAlertService,
-  route: ActivatedRouteSnapshot
-): Promise<void> {
-  try {
-    // Gather route parameters
-    const device = route.queryParamMap.get('device');
-    const storage = route.queryParamMap.get('storage');
-    const path = route.queryParamMap.get('path');
-    const file = route.queryParamMap.get('file');
+  logInfo(LogType.Success, 'PlayerInit: Storage initialization complete');
 
-    // Return early if required parameters are missing
-    if (!device || !storage || !path) {
-      logInfo(LogType.Info, 'No deep linking parameters provided');
-      return;
-    }
+  // Step 3: Start listening to popstate
+  playerContextService.startListeningToPopState();
+  logInfo(LogType.Info, 'PlayerInit: Popstate listener started');
 
-    logInfo(LogType.Start, 'Deep linking initialization', {
-      device,
-      storage,
-      path,
-      file: file ?? 'none',
-    });
+  // Step 4: Wait for settings
+  logInfo(LogType.Start, 'PlayerInit: Waiting for settings to load');
 
-    // Convert storage string to StorageType enum
-    const storageType = storage.toUpperCase() === 'USB' ? StorageType.Usb : StorageType.Sd;
-
-    // Navigate to the specified directory
-    await storageStore.navigateToDirectory({
-      deviceId: device,
-      storageType,
-      path,
-    });
-
-    logInfo(LogType.Info, `Navigated to directory: ${path}`);
-
-    // If file name provided, find and launch it
-    if (file) {
-      logInfo(LogType.Info, `File launch requested: ${file}`);
-
-      // Get the loaded directory
-      const directoryState = storageStore.getSelectedDirectoryState(device)();
-
-      if (directoryState?.directory?.files) {
-        // Find the file in the directory
-        const targetFile = directoryState.directory.files.find((f) => f.name === file);
-
-        if (targetFile) {
-          logInfo(LogType.Info, `Found file: ${file}, launching...`);
-
-          // Launch the file with directory context
-          await playerContextService.launchFileWithContext({
-            deviceId: device,
-            storageType,
-            file: targetFile,
-            directoryPath: path,
-            files: directoryState.directory.files,
-            launchMode: LaunchMode.Directory,
+  const settings = await new Promise<Settings>((resolve) => {
+    runInInjectionContext(injector, () => {
+      const effectRef = effect(() => {
+        const loadedSettings = settingStore.getSettings()();
+        if (loadedSettings !== null) {
+          untracked(() => {
+            logInfo(LogType.Success, 'PlayerInit: Settings loaded');
+            resolve(loadedSettings);
           });
-
-          logInfo(LogType.Success, `File launched: ${file}`);
-        } else {
-          logWarn(`File not found in directory: ${file}`);
-          alertService.warning(`File "${file}" not found in directory "${path}"`);
+          effectRef.destroy();
         }
-      } else {
-        logWarn(`Directory not loaded or has no files: ${path}`);
-        alertService.warning(`Directory "${path}" could not be loaded or has no files`);
+      });
+    });
+  });
+
+  if (!settings) {
+    logError('PlayerInit: Settings failed to load, skipping startup behaviors');
+    return;
+  }
+
+  // Step 5: Execute startup behaviors
+  logInfo(LogType.Start, 'PlayerInit: Executing startup behaviors');
+
+  try {
+    for (const currentDevice of devices) {
+      // Check if device already has a file playing - skip if so
+      const currentFile = playerStore.getCurrentFile(currentDevice.deviceId)();
+      if (currentFile !== null) {
+        logInfo(
+          LogType.Info,
+          `PlayerInit: Device ${currentDevice.deviceId} already has file playing, skipping startup behaviors`
+        );
+        continue;
+      }
+
+      const savedState = playerStorage.load(currentDevice.deviceId);
+
+      if (!currentDevice.isConnected) continue;
+
+      let pathToNavigate = '/';
+      let filenameToLaunch: string | null = null;
+      let storageToNavigate = StorageType.Sd;
+      let shouldLaunch = settings.playerSettings.startupLaunchEnabled;
+
+      // Check for deep linking parameters
+      if (deviceParam === currentDevice.deviceId && pathParam && storageParam) {
+        pathToNavigate = pathParam;
+        storageToNavigate = storageParam.toUpperCase() === 'USB' ? StorageType.Usb : StorageType.Sd;
+        filenameToLaunch = fileParam;
+        shouldLaunch = shouldLaunch && true;
+      } else if (savedState?.currentFile?.file) {
+        // Use saved state if available
+        pathToNavigate = savedState.currentFile.file.parentPath;
+        storageToNavigate = StorageKeyUtil.parse(savedState.currentFile.storageKey).storageType;
+        filenameToLaunch = savedState.currentFile.file.name;
+        shouldLaunch = shouldLaunch && true;
+      }
+
+      // Navigate to initial directory
+      if (!settings.playerSettings.startupLaunchRandom) {
+        await storageStore.navigateToDirectory({
+          deviceId: currentDevice.deviceId,
+          storageType: storageToNavigate,
+          path: pathToNavigate,
+        });
+      }
+
+      // Handle auto-launch or random launch
+      if (settings.playerSettings.startupLaunchRandom && shouldLaunch) {
+        playerContextService.launchRandomFile(currentDevice.deviceId);
+        playerContextService.setFilterMode(currentDevice.deviceId, settings.playerSettings.startupFilter);
+      } else if (filenameToLaunch && shouldLaunch) {
+        const directoryState = storageStore.getSelectedDirectoryState(currentDevice.deviceId)();
+        if (directoryState?.directory?.files) {
+          const fileToLaunch = directoryState.directory.files.find((f: { name: string }) => f.name === filenameToLaunch);
+
+          if (fileToLaunch) {
+            logInfo(LogType.Info, `PlayerInit: Found file: ${filenameToLaunch}, launching...`);
+
+            await playerContextService.launchFileWithContext({
+              deviceId: currentDevice.deviceId,
+              storageType: storageToNavigate,
+              file: fileToLaunch,
+              directoryPath: pathToNavigate,
+              files: directoryState.directory.files,              
+              launchMode: savedState?.launchMode || LaunchMode.Directory,
+            });
+          }
+        }
       }
     }
 
-    logInfo(LogType.Success, 'Deep linking initialization completed');
+    logInfo(LogType.Success, 'PlayerInit: All initialization complete');
   } catch (error) {
     logError(
-      'Error during deep linking initialization:',
+      'PlayerInit: Error during startup behaviors:',
       error instanceof Error ? error.message : error
     );
   }

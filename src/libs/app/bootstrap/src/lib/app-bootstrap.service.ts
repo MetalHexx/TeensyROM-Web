@@ -55,7 +55,7 @@ export class AppBootstrapService {
 
   /**
    * Initialize settings by loading from backend
-   * Settings load failure is non-critical - app continues with defaults
+   * Bootstrap will block until settings are loaded or loading fails
    */
   private async initializeSettings(): Promise<void> {
     logInfo(LogType.Start, 'AppBootstrap: Initializing settings...');
@@ -63,34 +63,44 @@ export class AppBootstrapService {
     // Trigger settings load
     this.settingsStore.loadSettings();
 
-    // Wait for settings to finish loading
+    // Wait for settings to finish loading and be available
     await this.waitForSettingsInit();
 
-    // Check if settings load failed
+    // Check if settings load failed after waiting
     const error = this.settingsStore.error();
     if (error) {
       logWarn(`AppBootstrap: Settings failed to load, using defaults: ${error}`);
       // App continues with defaults - non-blocking error
-    } else {
-      logInfo(LogType.Success, 'AppBootstrap: Settings loaded successfully');
     }
   }
 
   /**
    * Wait for settings initialization to complete
-   * Uses effect pattern to watch isLoading signal
+   * Uses effect pattern to watch isLoading signal and settings availability
+   * Blocks until settings are actually loaded, not just done loading
    */
   private async waitForSettingsInit(): Promise<void> {
     return new Promise((resolve) => {
       runInInjectionContext(this.injector, () => {
         const effectRef = effect(() => {
           const isLoading = this.settingsStore.isLoading();
-          if (!isLoading) {
+          const settings = this.settingsStore.settings();
+          
+          // Wait until not loading AND settings exist
+          if (!isLoading && settings !== null) {
+            logInfo(LogType.Success, 'AppBootstrap: Settings loaded and available');
             // Use untracked to prevent the effect from re-running when we resolve
             untracked(() => {
               resolve();
             });
             // Clean up effect to prevent memory leaks
+            effectRef.destroy();
+          } else if (!isLoading && settings === null) {
+            // Loading finished but no settings - still resolve to unblock
+            logWarn('AppBootstrap: Settings load completed but settings are null, continuing with defaults');
+            untracked(() => {
+              resolve();
+            });
             effectRef.destroy();
           }
         });

@@ -18,6 +18,7 @@ import { PlayerStore } from './player-store';
 import { StorageStore } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { PlayerTimerManager } from './player-timer-manager';
+import { PLAYER_STORAGE } from './player-storage.interface';
 
 type StorageStoreContract = Partial<typeof StorageStore>;
 
@@ -58,6 +59,12 @@ describe('PlayerContextService - Favorite Synchronization', () => {
   let mockStorageStore: Partial<StorageStoreContract>;
   let mockSettingsStore: Partial<typeof SettingsStore>;
   let mockTimerManager: Partial<PlayerTimerManager>;
+  let mockPlayerStorage: {
+    save: ReturnType<typeof vi.fn>;
+    load: ReturnType<typeof vi.fn>;
+    hasSavedState: ReturnType<typeof vi.fn>;
+    clear: ReturnType<typeof vi.fn>;
+  };
   let timerUpdateSubject: Subject<unknown>;
   let timerCompleteSubject: Subject<void>;
 
@@ -90,6 +97,13 @@ describe('PlayerContextService - Favorite Synchronization', () => {
       warning: vi.fn(),
       info: vi.fn(),
       dismiss: vi.fn(),
+    };
+
+    mockPlayerStorage = {
+      save: vi.fn(),
+      load: vi.fn().mockReturnValue({}),
+      hasSavedState: vi.fn().mockReturnValue(false),
+      clear: vi.fn(),
     };
 
     mockStorageStore = {
@@ -129,6 +143,7 @@ describe('PlayerContextService - Favorite Synchronization', () => {
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: PlayerTimerManager, useValue: mockTimerManager },
         { provide: SettingsStore, useValue: mockSettingsStore },
+        { provide: PLAYER_STORAGE, useValue: { load: vi.fn(), save: vi.fn(), hasSavedState: vi.fn(), clear: vi.fn() } },
       ],
     });
 

@@ -1,7 +1,8 @@
 import { updateState } from '@angular-architects/ngrx-toolkit';
-import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
+import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { PlayerState } from '../player-store';
 import { WritableStore } from '../player-helpers';
+import { IPlayerStorage } from '../player-storage.interface';
 
 /**
  * Update custom play timer configuration for a device.
@@ -16,7 +17,7 @@ import { WritableStore } from '../player-helpers';
  * @param store - Player store instance
  * @returns Action method object
  */
-export function updatePlayerTimer(store: WritableStore<PlayerState>) {
+export function updatePlayerTimer(store: WritableStore<PlayerState>, playerStorage: IPlayerStorage) {
   return {
     updatePlayerTimer: ({
       deviceId,
@@ -58,6 +59,13 @@ export function updatePlayerTimer(store: WritableStore<PlayerState>) {
           },
         };
       });
+
+      // Persist state after timer config change
+      try {
+        playerStorage.save(deviceId, store.players()[deviceId]);
+      } catch (error) {
+        logError('Failed to persist player state to localStorage', { deviceId, error });
+      }
 
       logInfo(
         LogType.Success,
