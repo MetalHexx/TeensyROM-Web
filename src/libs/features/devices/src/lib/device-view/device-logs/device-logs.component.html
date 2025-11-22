@@ -31,7 +31,7 @@
   </div>
 
   <!-- Main logs content -->
-  <div class="logs-content" #logsContent>
+  <div class="logs-content" #logsContent (scroll)="onScroll()">
     @if (logs().length) {
     <div class="logs-list">
       @for (line of logs(); track $index) {

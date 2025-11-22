@@ -6,6 +6,7 @@ import {
   effect,
   EffectRef,
   ChangeDetectionStrategy,
+  signal,
 } from '@angular/core';
 import { DEVICE_LOGS_SERVICE, IDeviceLogsService } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
@@ -30,10 +31,11 @@ export class DeviceLogsComponent {
   private readonly logsService: IDeviceLogsService = inject(DEVICE_LOGS_SERVICE);
   readonly logs = this.logsService.logs;
   readonly isConnected = this.logsService.isConnected;
+  private readonly autoScroll = signal(true);
 
   logEffectRef: EffectRef | undefined = effect(() => {
     const logs = this.logs();
-    if (logs.length) {
+    if (logs.length && this.autoScroll()) {
       queueMicrotask(() => this.scrollToElement());
     }
   });
@@ -55,10 +57,19 @@ export class DeviceLogsComponent {
   }
 
   scrollToElement(): void {
-    this.logsContentRef.nativeElement.scroll({
-      top: this.logsContentRef.nativeElement.scrollHeight,
-      left: 0,
-      behavior: 'smooth',
-    });
+    const element = this.logsContentRef.nativeElement;
+    if (element && typeof element.scroll === 'function') {
+      element.scroll({
+        top: element.scrollHeight,
+        left: 0,
+        behavior: 'smooth',
+      });
+    }
+  }
+
+  onScroll(): void {
+    const element = this.logsContentRef.nativeElement;
+    const isAtBottom = Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 5;
+    this.autoScroll.set(isAtBottom);
   }
 }
