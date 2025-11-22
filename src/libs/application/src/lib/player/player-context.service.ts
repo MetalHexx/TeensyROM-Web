@@ -1,4 +1,5 @@
-import { Injectable, inject, Signal } from '@angular/core';
+import { Injectable, inject, Signal, Injector } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Location } from '@angular/common';
 import {
   LaunchMode,
@@ -17,6 +18,7 @@ import { StorageKeyUtil } from '../storage/storage-key.util';
 import { IPlayerContext, LaunchFileContextRequest } from './player-context.interface';
 import { PLAYER_STORAGE } from './player-storage.interface';
 import { PlayerTimerManager } from './player-timer-manager';
+import { TimerState } from './timer-state.interface';
 import { parsePlayLength } from './timer-utils';
 import { DEFAULT_TIMER_MS } from './player.constants';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
@@ -31,9 +33,12 @@ export class PlayerContextService implements IPlayerContext {
   private readonly location = inject(Location);
   private readonly alertService = inject(ALERT_SERVICE);
   private readonly playerStorage = inject(PLAYER_STORAGE);
+  private readonly injector = inject(Injector);
 
-  // Track timer subscriptions per device for cleanup
-  private readonly timerSubscriptions = new Map<string, Subscription[]>();
+  // Cache signals per device for reuse (lazy creation)
+  private readonly timerSignals = new Map<string, Signal<TimerState | null>>();
+  // Track only completion subscriptions for auto-progression
+  private readonly completionSubscriptions = new Map<string, Subscription>();
   private popstateListener: ((event: PopStateEvent) => void) | null = null;
   private isHandlingPopState = false;
 
@@ -48,8 +53,8 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   removePlayer(deviceId: string): void {
-    // Phase 5: Cleanup timer subscriptions before removing player
-    this.cleanupTimerSubscriptions(deviceId);
+    // Phase 5: Cleanup timer before removing player
+    this.cleanupTimer(deviceId);
 
     this.store.removePlayer({ deviceId });
   }
@@ -381,7 +386,7 @@ export class PlayerContextService implements IPlayerContext {
     const error = this.store.getPlayerError(deviceId)();
     if (error) {
       // Operation failed - cleanup any existing timer
-      this.cleanupTimerSubscriptions(deviceId);
+      this.cleanupTimer(deviceId);
       return true;
     }
     return false;
@@ -402,13 +407,12 @@ export class PlayerContextService implements IPlayerContext {
 
     // No timer needed - cleanup and exit
     if (timerDuration === null) {
-      this.cleanupTimerSubscriptions(deviceId);
-      this.timerManager.destroyTimer(deviceId);
+      this.cleanupTimer(deviceId);
       return;
     }
 
     // Create timer with determined duration
-    this.createAndSubscribeToTimer(deviceId, timerDuration);
+    this.createTimerWithCompletion(deviceId, timerDuration);
   }
 
   /**
@@ -472,18 +476,32 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   /**
-   * Create timer and subscribe to update and completion events
+   * Create timer and subscribe to completion events only.
+   * Timer updates flow through observable-to-signal conversion (no store pollution).
    */
-  private createAndSubscribeToTimer(deviceId: string, durationMs: number): void {
-    this.cleanupTimerSubscriptions(deviceId);
+  private createTimerWithCompletion(deviceId: string, durationMs: number): void {
+    this.cleanupTimer(deviceId);
     this.timerManager.createTimer(deviceId, durationMs);
 
-    // Subscribe to timer updates
-    const updateSub = this.timerManager.onTimerUpdate$(deviceId).subscribe((timerState) => {
-      this.store.updateTimerState({ deviceId, timerState });
-    });
+    // Clear cached signal so we create a fresh one for the new timer
+    this.timerSignals.delete(deviceId);
 
-    // Subscribe to timer completion for auto-progression
+    // Immediately initialize the new signal (outside reactive context)
+    // This prevents components from calling getTimerState() from within computeds
+    // and triggering NG0602 errors
+    const currentState = this.timerManager.getTimerState(deviceId);
+    const signal: Signal<TimerState | null> = currentState
+      ? (toSignal(this.timerManager.onTimerUpdate$(deviceId), {
+          initialValue: currentState,
+          injector: this.injector,
+        }) as Signal<TimerState | null>)
+      : toSignal(this.timerManager.onTimerUpdate$(deviceId), {
+          initialValue: null,
+          injector: this.injector,
+        });
+    this.timerSignals.set(deviceId, signal);
+
+    // Subscribe only to completion for auto-progression
     const completeSub = this.timerManager.onTimerComplete$(deviceId).subscribe(() => {
       logInfo(
         LogType.Success,
@@ -492,36 +510,64 @@ export class PlayerContextService implements IPlayerContext {
       void this.next(deviceId);
     });
 
-    // Store subscriptions for cleanup
-    if (!this.timerSubscriptions.has(deviceId)) {
-      this.timerSubscriptions.set(deviceId, []);
-    }
-    const subs = this.timerSubscriptions.get(deviceId);
-    if (subs) {
-      subs.push(updateSub, completeSub);
-    }
+    // Store completion subscription for cleanup
+    this.completionSubscriptions.set(deviceId, completeSub);
 
     logInfo(LogType.Success, `Timer setup complete for device ${deviceId}`);
   }
 
   /**
-   * Phase 5: Cleanup timer subscriptions and destroy timer
+   * Phase 5: Cleanup timer, signal cache, and completion subscription
    */
-  private cleanupTimerSubscriptions(deviceId: string): void {
-    const subs = this.timerSubscriptions.get(deviceId);
-    if (subs) {
-      subs.forEach((sub) => sub.unsubscribe());
-      this.timerSubscriptions.delete(deviceId);
-    }
+  private cleanupTimer(deviceId: string): void {
+    // Destroy timer in manager
     this.timerManager.destroyTimer(deviceId);
-    this.store.updateTimerState({ deviceId, timerState: null });
+
+    // Remove cached signal
+    this.timerSignals.delete(deviceId);
+
+    // Unsubscribe and remove completion subscription
+    const completeSub = this.completionSubscriptions.get(deviceId);
+    if (completeSub) {
+      completeSub.unsubscribe();
+      this.completionSubscriptions.delete(deviceId);
+    }
   }
 
   /**
-   * Get current timer state for a device
+   * Get current timer state for a device.
+   * Returns a signal that emits timer updates from the observable stream.
+   * Signals are cached per device for referential equality and performance.
    */
-  getTimerState(deviceId: string) {
-    return this.store.getTimerState(deviceId);
+  getTimerState(deviceId: string): Signal<TimerState | null> {
+    // Return cached signal if it exists
+    const cachedSignal = this.timerSignals.get(deviceId);
+    if (cachedSignal) {
+      return cachedSignal;
+    }
+
+    // Get current timer state synchronously as initial value
+    // This ensures the signal has the correct value immediately,
+    // even if created after timer starts emitting
+    const currentState = this.timerManager.getTimerState(deviceId);
+
+    // Create new signal from observable stream with explicit injector
+    // If timer exists, use its current state as initial value
+    // Otherwise use null as initial value
+    const signal: Signal<TimerState | null> = currentState
+      ? (toSignal(this.timerManager.onTimerUpdate$(deviceId), {
+          initialValue: currentState,
+          injector: this.injector,
+        }) as Signal<TimerState | null>)
+      : toSignal(this.timerManager.onTimerUpdate$(deviceId), {
+          initialValue: null,
+          injector: this.injector,
+        });
+
+    // Cache signal for reuse
+    this.timerSignals.set(deviceId, signal);
+
+    return signal;
   }
 
   /**
@@ -554,7 +600,7 @@ export class PlayerContextService implements IPlayerContext {
 
     // Get current file and timer state
     const currentFile = this.store.getCurrentFile(deviceId)();
-    const timerState = this.store.getTimerState(deviceId)();
+    const timerState = this.timerManager.getTimerState(deviceId);
 
     // Recreate timer if file is playing with a timer
     if (currentFile?.file && timerState) {

@@ -11,6 +11,7 @@ export * from './lib/player/player-key.util';
 export * from './lib/player/player-storage.interface';
 export * from './lib/player/player-context.interface';
 export * from './lib/player/player-context.service';
+export * from './lib/player/timer-state.interface';
 export * from './lib/player/providers';
 
 // Settings state management

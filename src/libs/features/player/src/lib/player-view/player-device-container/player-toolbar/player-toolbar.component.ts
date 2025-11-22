@@ -1,4 +1,4 @@
-import { Component, inject, input, computed } from '@angular/core';
+import { Component, inject, input, computed, effect, Signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   ScalingCompactCardComponent,
@@ -6,7 +6,7 @@ import {
   IconButtonColor,
   SlidingContainerComponent,
 } from '@teensyrom-nx/ui/components';
-import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT, TimerState } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
 import { ProgressBarComponent } from './progress-bar/progress-bar.component';
 import { FileInfoComponent } from './file-info/file-info.component';
@@ -32,6 +32,19 @@ export class PlayerToolbarComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
 
   deviceId = input.required<string>();
+
+  // Phase 5: Timer state - computed to react to device ID changes
+  // getTimerState() returns a Signal, and we need to switch between device signals
+  // We call getTimerState() in a computed but immediately read its value
+  // This is safe because getTimerState internally caches the toSignal call per device
+  timerState = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return null;
+    
+    // getTimerState returns Signal<TimerState | null>, call it to get current value
+    const timerSignal = this.playerContext.getTimerState(deviceId);
+    return timerSignal();
+  });
 
   isLoading(): boolean {
     const deviceId = this.deviceId();
@@ -142,8 +155,9 @@ export class PlayerToolbarComponent {
     return !this.isFileCompatible() ? 'error' : 'normal';
   }
 
-  // Phase 5: Timer state for progress bar
-  timerState = computed(() => this.playerContext.getTimerState(this.deviceId())());
+  // Phase 5: Timer state for progress bar  
+  // Read from the cached signal (initialized in constructor effect)
+  timerState = computed(() => this._cachedTimerSignal ? this._cachedTimerSignal() : null);
 
   // Phase 3: Custom timer config for demo purposes
   customTimerConfig = computed(() => {

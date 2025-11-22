@@ -11,7 +11,6 @@ import { StorageKey } from '../storage/storage-key.util';
 import { withPlayerSelectors } from './selectors';
 import { withPlayerActions } from './actions';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
-import { TimerState } from './timer-state.interface';
 
 export interface LaunchedFile {
   storageKey: StorageKey;
@@ -62,7 +61,6 @@ export interface DevicePlayerState {
   playHistory: PlayHistory | null;
   historyViewVisible: boolean;
   playTimerConfig: PlayTimerConfig;
-  timerState: TimerState | null;
   isLoading: boolean;
   error: string | null;
   lastUpdated: number | null;

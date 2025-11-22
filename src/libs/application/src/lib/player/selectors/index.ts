@@ -9,7 +9,6 @@ import { getPlayerError } from './get-player-error';
 import { getPlayerStatus } from './get-player-status';
 import { getShuffleSettings } from './get-shuffle-settings';
 import { getLaunchMode } from './get-launch-mode';
-import { getTimerState } from './get-timer-state';
 import { isCurrentFileCompatible } from './is-current-file-compatible';
 import { getPlayHistory } from './get-play-history';
 import { getCurrentHistoryPosition } from './get-current-history-position';
@@ -30,7 +29,6 @@ export function withPlayerSelectors() {
       ...getPlayerStatus(writableStore),
       ...getShuffleSettings(writableStore),
       ...getLaunchMode(writableStore),
-      ...getTimerState(writableStore),
       ...getPlayTimerConfig(writableStore),
       ...isCurrentFileCompatible(writableStore),
       ...getPlayHistory(writableStore),

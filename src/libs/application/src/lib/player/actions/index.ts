@@ -16,7 +16,6 @@ import { loadFileContext } from './load-file-context';
 import { updateShuffleSettings } from './update-shuffle-settings';
 import { updateLaunchMode } from './update-launch-mode';
 import { updatePlayerStatus } from './update-player-status';
-import { updateTimerState } from './update-timer-state';
 import { play } from './play';
 import { pauseMusic } from './pause-music';
 import { stopPlayback } from './stop-playback';
@@ -49,7 +48,6 @@ export function withPlayerActions() {
         ...updateShuffleSettings(writableStore, playerStorage),
         ...updateLaunchMode(writableStore, playerStorage),
         ...updatePlayerStatus(writableStore),
-        ...updateTimerState(writableStore),
         ...updatePlayerTimer(writableStore, playerStorage),
         ...play(writableStore, playerService),
         ...pauseMusic(writableStore, playerService),

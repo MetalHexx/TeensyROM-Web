@@ -37,7 +37,6 @@ export function createDefaultDeviceState(
       enabled: playTimerEnabled ?? false,
       durationMs: DEFAULT_TIMER_MS,
     },
-    timerState: null,
     isLoading: false,
     error: null,
     lastUpdated: null,
