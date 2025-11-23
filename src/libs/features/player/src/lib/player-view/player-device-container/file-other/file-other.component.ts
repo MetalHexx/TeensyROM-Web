@@ -76,7 +76,7 @@ export class FileOtherComponent {
       width: '800px',
       maxWidth: '90vw',
       panelClass: 'youtube-dialog',
-      backdropClass: 'youtube-dialog-backdrop',
+      backdropClass: 'youtube-dialog-backdrop', // Slow animation timing
     });
   }
 }

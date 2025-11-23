@@ -50,10 +50,7 @@ html {
 
   & {
     --mat-sys-surface-container-low: #cdcdcd;
-    --dialog-backdrop-color: var(
-      --mat-sidenav-scrim-color,
-      color-mix(in srgb, var(--mat-sys-neutral-variant20) 40%, transparent)
-    );
+    --dialog-backdrop-color: rgba(0, 0, 0, 0.85);
   }
 }
 
@@ -78,10 +75,7 @@ html.dark-mode {
 
   & {
     --mat-sys-surface-container-low: #231e22;
-    --dialog-backdrop-color: var(
-      --mat-sidenav-scrim-color,
-      color-mix(in srgb, var(--mat-sys-neutral-variant20) 40%, transparent)
-    );
+    --dialog-backdrop-color: rgba(0, 0, 0, 0.85);
   }
 }
 
@@ -571,9 +565,17 @@ mat-card-title {
   }
 }
 
+// Lighter backdrop for busy/loading dialogs - uses Material's default semi-transparent color
+.cdk-overlay-backdrop.busy-dialog-backdrop {
+  background-color: var(
+    --mat-sidenav-scrim-color,
+    color-mix(in srgb, var(--mat-sys-neutral-variant20) 40%, transparent)
+  ) !important;
+}
+
 // Slow backdrop animation for YouTube dialog
 .cdk-overlay-backdrop.cdk-overlay-backdrop-showing.youtube-dialog-backdrop {
-  transition: opacity 200ms cubic-bezier(0.35, 0, 0.25, 1) !important;
+  transition: opacity 1200ms cubic-bezier(0.35, 0, 0.25, 1) !important;
 }
 
 .youtube-dialog {

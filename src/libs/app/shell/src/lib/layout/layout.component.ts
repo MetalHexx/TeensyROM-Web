@@ -81,6 +81,7 @@ export class LayoutComponent {
           },
           disableClose: true,
           panelClass: 'glassy-dialog',
+          backdropClass: 'busy-dialog-backdrop', // Lighter backdrop for busy states
         });
       } else if (dialogRef) {
         dialogRef.close();

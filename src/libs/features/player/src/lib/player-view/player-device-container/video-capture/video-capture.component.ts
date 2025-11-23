@@ -180,7 +180,6 @@ export class VideoCaptureComponent implements OnDestroy {
       maxWidth: '1200px',
       maxHeight: '900px',
       panelClass: 'video-dialog-fullscreen',
-      backdropClass: 'video-dialog-backdrop',
     });
 
     // Reattach stream to main video element when dialog closes

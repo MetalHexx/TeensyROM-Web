@@ -886,16 +886,149 @@ The dialog container is static (not animated), so applying `backdrop-filter: blu
 
 **Usage**: Automatically applied via `backdropClass: 'youtube-dialog-backdrop'` in dialog configuration. Synchronizes backdrop fade (1200ms) with card animation duration for cohesive visual effect.
 
-### Overlays
+### Overlays & Backdrop System
 
-#### `.cdk-overlay-backdrop`
+#### Global Dialog Backdrop (Default)
 
-**Purpose**: Custom backdrop color for overlays
+**Purpose**: Provides a strong black overlay backdrop for content-focused dialogs (video, YouTube) to create maximum visual contrast between dialog content and the underlying UI.
+
+**Implementation**: Global CSS custom property `--dialog-backdrop-color` set to `rgba(0, 0, 0, 0.85)` (85% opacity black) in both light and dark themes.
+
+**Technical Details:**
+
+```scss
+// Applied globally to all Material dialog backdrops by default
+.cdk-overlay-backdrop {
+  background-color: var(--dialog-backdrop-color) !important;
+}
+
+// Theme definitions
+html {
+  --dialog-backdrop-color: rgba(0, 0, 0, 0.85);
+}
+
+html.dark-mode {
+  --dialog-backdrop-color: rgba(0, 0, 0, 0.85);
+}
+```
+
+**Key Features:**
+
+- **Strong contrast**: 85% opacity black provides maximum separation for video/media content
+- **Theme-independent**: Same backdrop color in both light and dark modes for predictable UX
+- **Automatic application**: All Material dialogs inherit this backdrop automatically
+- **No per-dialog configuration**: No need to specify `backdropClass` for standard black backdrop
+
+**Usage Example:**
+
+```typescript
+// Video dialog - black backdrop applied automatically
+this.dialog.open(VideoDialogComponent, {
+  data: { stream, deviceLabel, deviceId },
+  width: '85vw',
+  height: '85vh',
+  panelClass: 'video-dialog-fullscreen',
+  // No backdropClass needed - global black backdrop applies
+});
+```
 
 **Used In:**
 
-- Dialog backdrops created by Angular Material
-- Sidenav overlays in [`layout.component.html`](../libs/app/shell/src/lib/layout/layout.component.html)
+- [`video-capture.component.ts`](../libs/features/player/src/lib/player-view/player-device-container/video-capture/video-capture.component.ts) - Video capture dialog
+- [`file-other.component.ts`](../libs/features/player/src/lib/player-view/player-device-container/file-other/file-other.component.ts) - YouTube video dialog
+- All content-focused dialogs (default behavior)
+
+#### Busy/Loading Dialog Backdrop
+
+**Purpose**: Provides a lighter, semi-transparent backdrop for busy/loading dialogs that need to communicate status without dominating the user's attention.
+
+**Class**: `.busy-dialog-backdrop`
+
+**Implementation**: Uses Material Design's default semi-transparent color-mix formula for a softer, less imposing overlay.
+
+```scss
+.cdk-overlay-backdrop.busy-dialog-backdrop {
+  background-color: var(
+    --mat-sidenav-scrim-color,
+    color-mix(in srgb, var(--mat-sys-neutral-variant20) 40%, transparent)
+  ) !important;
+}
+```
+
+**Key Features:**
+
+- **Lighter overlay**: ~40% opacity provides subtle background dimming
+- **Theme-adaptive**: Uses Material's neutral-variant colors that adjust per theme
+- **Non-intrusive**: Maintains visibility of background context during loading states
+- **Fast visibility**: Lighter backdrop appears quickly, communicating status immediately
+
+**Usage Example:**
+
+```typescript
+// Busy dialog with lighter backdrop
+this.dialog.open(BusyDialogComponent, {
+  data: { title: 'Loading', message: 'Please wait...' },
+  disableClose: true,
+  panelClass: 'glassy-dialog',
+  backdropClass: 'busy-dialog-backdrop', // Lighter backdrop for busy states
+});
+```
+
+**Used In:**
+
+- [`layout.component.ts`](../libs/app/shell/src/lib/layout/layout.component.ts) - Busy dialogs (device indexing, finding devices)
+
+**Design Rationale:**
+
+- **Content dialogs** (video, YouTube) use **dark backdrop** (85% black) for maximum focus and contrast
+- **Status dialogs** (busy, loading) use **lighter backdrop** (~40% neutral) for non-intrusive communication
+- Different UX contexts justify different backdrop weights
+
+#### Custom Backdrop Animation
+
+**Purpose**: Provides slower backdrop fade-in animation for video-focused dialogs to create a more dramatic, cinematic entrance effect.
+
+**Class**: `.youtube-dialog-backdrop`
+
+**Implementation:**
+
+```scss
+.cdk-overlay-backdrop.cdk-overlay-backdrop-showing.youtube-dialog-backdrop {
+  transition: opacity 1200ms cubic-bezier(0.35, 0, 0.25, 1) !important;
+}
+```
+
+**Usage Example:**
+
+```typescript
+// YouTube dialog with slow backdrop animation
+this.dialog.open(YouTubeDialogComponent, {
+  data: { video },
+  width: '800px',
+  maxWidth: '90vw',
+  panelClass: 'youtube-dialog',
+  backdropClass: 'youtube-dialog-backdrop', // Slow animation timing
+});
+```
+
+**Timing Comparison:**
+
+- **Default backdrop**: ~200ms (fast, immediate feedback for busy dialogs)
+- **YouTube backdrop**: 1200ms (slow, dramatic for video content)
+
+**Used In:**
+
+- [`file-other.component.ts`](../libs/features/player/src/lib/player-view/player-device-container/file-other/file-other.component.ts) - YouTube video dialog
+
+**Best Practice:** Use custom `backdropClass` only when you need to override the default animation timing. The backdrop color is always black (from global system) - custom classes only affect animation behavior.
+
+#### Sidenav Overlays
+
+**Purpose**: Dialog backdrop styling also applies to Material sidenav overlays for navigation consistency.
+
+**Used In:**
+
+- [`layout.component.html`](../libs/app/shell/src/lib/layout/layout.component.html) - Navigation sidenav overlay
 
 ---
 
