@@ -36,6 +36,12 @@ mat-progress-bar {
     will-change: transform; // The bar slides horizontally
   }
 
+  // Speed up the progress bar animation to prevent slow reset on song changes
+  // Material's default 250ms transition looks awkward when timer already shows 1+ seconds
+  ::ng-deep .mdc-linear-progress__primary-bar {
+    transition-duration: 100ms !important; // Fast reset animation
+  }
+
   // Clip the progress bar background to the curves
   ::ng-deep .mdc-linear-progress__buffer {
     border-top-left-radius: 4px;
