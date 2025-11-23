@@ -1,7 +1,9 @@
 import { Component, Inject, ChangeDetectionStrategy, signal, viewChild, ElementRef, afterNextRender } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { IconButtonComponent } from '@teensyrom-nx/ui/components';
+import { MatSliderModule } from '@angular/material/slider';
+import { FormsModule } from '@angular/forms';
+import { IconButtonComponent, ScalingCompactCardComponent } from '@teensyrom-nx/ui/components';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
 
@@ -14,7 +16,7 @@ export interface VideoDialogData {
 @Component({
   selector: 'lib-video-dialog',
   standalone: true,
-  imports: [CommonModule, IconButtonComponent, PlayerToolbarComponent, FilterToolbarComponent],
+  imports: [CommonModule, IconButtonComponent, PlayerToolbarComponent, FilterToolbarComponent, MatSliderModule, FormsModule, ScalingCompactCardComponent],
   templateUrl: './video-dialog.component.html',
   styleUrl: './video-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -23,6 +25,18 @@ export class VideoDialogComponent {
   private videoElement = viewChild<ElementRef<HTMLVideoElement>>('dialogVideoElement');
   private containerElement = viewChild<ElementRef<HTMLDivElement>>('videoContainer');
   isFullscreen = signal<boolean>(false);
+  isCrtEnabled = signal<boolean>(false);
+  showCrtControls = signal<boolean>(false);
+  
+  // CRT effect parameters
+  scanlineIntensity = signal<number>(0.15);
+  scanlineThickness = signal<number>(1);
+  scanlineSpacing = signal<number>(3);
+  vignetteStrength = signal<number>(0.5);
+  screenCurvature = signal<number>(0);
+  contrast = signal<number>(1.15);
+  brightness = signal<number>(1.1);
+  saturation = signal<number>(1.2);
 
   constructor(
     public dialogRef: MatDialogRef<VideoDialogComponent>,
@@ -59,5 +73,13 @@ export class VideoDialogComponent {
       }
       this.isFullscreen.set(false);
     }
+  }
+
+  toggleCrtEffect(): void {
+    this.isCrtEnabled.update(enabled => !enabled);
+  }
+
+  toggleCrtControls(): void {
+    this.showCrtControls.update(show => !show);
   }
 }

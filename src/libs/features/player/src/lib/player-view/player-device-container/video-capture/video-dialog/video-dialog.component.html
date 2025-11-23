@@ -1,12 +1,95 @@
 <!-- Video container with hover controls -->
 <div class="video-container" #videoContainer>
-  <video 
-    #dialogVideoElement 
-    autoplay 
-    playsinline 
-    muted
-    class="video-stream"
-  ></video>
+  <div 
+    class="video-wrapper" 
+    [class.crt-effect]="isCrtEnabled()"
+    [style.--scanline-intensity]="scanlineIntensity()"
+    [style.--scanline-thickness.px]="scanlineThickness()"
+    [style.--scanline-spacing.px]="scanlineSpacing()"
+    [style.--vignette-strength]="vignetteStrength()"
+    [style.--screen-curvature.px]="screenCurvature()"
+    [style.--crt-contrast]="contrast()"
+    [style.--crt-brightness]="brightness()"
+    [style.--crt-saturation]="saturation()">
+    <video 
+      #dialogVideoElement 
+      autoplay 
+      playsinline 
+      muted
+      class="video-stream"
+    ></video>
+  </div>
+
+  <!-- CRT Controls overlay (top left) -->
+  @if (isCrtEnabled() && showCrtControls()) {
+    <div class="crt-controls-overlay">
+      <lib-scaling-compact-card title="CRT Effect" cardClass="glassy-card">
+        <div class="crt-control-group">
+          <label class="control-label">Scanline Intensity</label>
+          <mat-slider min="0" max="0.5" step="0.01" discrete>
+            <input matSliderThumb [(ngModel)]="scanlineIntensity" />
+          </mat-slider>
+          <span class="control-value">{{ scanlineIntensity() | number: '1.2-2' }}</span>
+        </div>
+
+        <div class="crt-control-group">
+          <label class="control-label">Scanline Thickness</label>
+          <mat-slider min="1" max="4" step="1" discrete>
+            <input matSliderThumb [(ngModel)]="scanlineThickness" />
+          </mat-slider>
+          <span class="control-value">{{ scanlineThickness() }}px</span>
+        </div>
+
+        <div class="crt-control-group">
+          <label class="control-label">Scanline Gap</label>
+          <mat-slider min="1" max="8" step="1" discrete>
+            <input matSliderThumb [(ngModel)]="scanlineSpacing" />
+          </mat-slider>
+          <span class="control-value">{{ scanlineSpacing() }}px</span>
+        </div>
+
+        <div class="crt-control-group">
+          <label class="control-label">Vignette</label>
+          <mat-slider min="0" max="2" step="0.05" discrete>
+            <input matSliderThumb [(ngModel)]="vignetteStrength" />
+          </mat-slider>
+          <span class="control-value">{{ vignetteStrength() | number: '1.2-2' }}</span>
+        </div>
+
+        <div class="crt-control-group">
+          <label class="control-label">Screen Curvature</label>
+          <mat-slider min="0" max="50" step="2" discrete>
+            <input matSliderThumb [(ngModel)]="screenCurvature" />
+          </mat-slider>
+          <span class="control-value">{{ screenCurvature() }}px</span>
+        </div>
+
+        <div class="crt-control-group">
+          <label class="control-label">Contrast</label>
+          <mat-slider min="0.8" max="1.5" step="0.05" discrete>
+            <input matSliderThumb [(ngModel)]="contrast" />
+          </mat-slider>
+          <span class="control-value">{{ contrast() | number: '1.2-2' }}</span>
+        </div>
+
+        <div class="crt-control-group">
+          <label class="control-label">Brightness</label>
+          <mat-slider min="0.8" max="1.5" step="0.05" discrete>
+            <input matSliderThumb [(ngModel)]="brightness" />
+          </mat-slider>
+          <span class="control-value">{{ brightness() | number: '1.2-2' }}</span>
+        </div>
+
+        <div class="crt-control-group">
+          <label class="control-label">Saturation</label>
+          <mat-slider min="0.8" max="1.5" step="0.05" discrete>
+            <input matSliderThumb [(ngModel)]="saturation" />
+          </mat-slider>
+          <span class="control-value">{{ saturation() | number: '1.2-2' }}</span>
+        </div>
+      </lib-scaling-compact-card>
+    </div>
+  }
 
   <!-- Filter toolbar overlay (above player toolbar) -->
   <div class="filter-toolbar-overlay">
@@ -51,5 +134,31 @@
         </lib-icon-button>
       }
     </div>
+
+    <!-- CRT effect toggle button -->
+    <div class="crt-button">
+      <lib-icon-button
+        icon="tv"
+        ariaLabel="Toggle CRT effect"
+        variant="rounded-transparent"
+        [class.active]="isCrtEnabled()"
+        (buttonClick)="toggleCrtEffect()"
+      >
+      </lib-icon-button>
+    </div>
+
+    <!-- CRT settings button -->
+    @if (isCrtEnabled()) {
+      <div class="crt-settings-button">
+        <lib-icon-button
+          icon="tune"
+          ariaLabel="CRT settings"
+          variant="rounded-transparent"
+          [class.active]="showCrtControls()"
+          (buttonClick)="toggleCrtControls()"
+        >
+        </lib-icon-button>
+      </div>
+    }
   </div>
 </div>

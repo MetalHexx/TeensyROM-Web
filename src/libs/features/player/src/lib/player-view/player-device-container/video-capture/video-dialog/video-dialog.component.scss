@@ -23,6 +23,20 @@
   padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
+
+  // Keep toolbars visible when hovering anywhere in the dialog
+  &:hover .player-toolbar-overlay,
+  &:hover .filter-toolbar-overlay {
+    opacity: 1 !important;
+  }
+
+  &:hover .player-toolbar-overlay {
+    transform: translateY(0) !important;
+  }
+
+  &:hover .filter-toolbar-overlay {
+    transform: translate(-50%, 0) !important;
+  }
 }
 
 .video-container {
@@ -36,7 +50,12 @@
   justify-content: center;
   border-radius: 12px;
 
-  &:hover .video-controls,
+  // Show controls on container hover
+  &:hover .video-controls {
+    opacity: 1;
+  }
+
+  // Show toolbars on container hover
   &:hover .player-toolbar-overlay,
   &:hover .filter-toolbar-overlay {
     opacity: 1;
@@ -50,6 +69,74 @@
     transform: translate(-50%, 0);
   }
 
+  .video-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    
+    // CSS variables with defaults
+    --scanline-intensity: 0.15;
+    --scanline-thickness: 1px;
+    --scanline-spacing: 3px;
+    --vignette-strength: 0.5;
+    --screen-curvature: 0px;
+    --crt-contrast: 1.15;
+    --crt-brightness: 1.1;
+    --crt-saturation: 1.2;
+
+    // CRT effect styling
+    &.crt-effect {
+      // Apply border radius for screen curvature
+      border-radius: var(--screen-curvature);
+      overflow: hidden;
+
+      // Scanlines overlay using pseudo-element
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, var(--scanline-intensity)) 0px,
+          rgba(0, 0, 0, var(--scanline-intensity)) var(--scanline-thickness),
+          transparent var(--scanline-thickness),
+          transparent calc(var(--scanline-thickness) + var(--scanline-spacing))
+        );
+        background-size: 100% calc(var(--scanline-thickness) + var(--scanline-spacing));
+        pointer-events: none;
+        z-index: 2;
+        border-radius: var(--screen-curvature);
+      }
+
+      // Vignette effect using pseudo-element
+      &::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 0%,
+          transparent 60%,
+          rgba(0, 0, 0, var(--vignette-strength)) 100%
+        );
+        pointer-events: none;
+        z-index: 2;
+        border-radius: var(--screen-curvature);
+      }
+
+      .video-stream {
+        filter: contrast(var(--crt-contrast)) brightness(var(--crt-brightness)) saturate(var(--crt-saturation));
+        border-radius: var(--screen-curvature);
+      }
+    }
+  }
+
   .video-stream {
     width: 100%;
     height: 100%;
@@ -57,12 +144,15 @@
     background-color: #000;
     opacity: 0;
     animation: fadeIn 1200ms cubic-bezier(0.35, 0, 0.25, 1) 400ms forwards;
+    transition: filter 0.3s ease-in-out;
   }
 
   // When container is in fullscreen
   &:fullscreen {
-    .video-stream {
-      object-fit: contain;
+    .video-wrapper {
+      .video-stream {
+        object-fit: contain;
+      }
     }
 
     .player-toolbar-overlay,
@@ -84,14 +174,23 @@
       left: 50%;
       right: auto;
       transform: translate(-50%, -100%);
+
+      // Stay visible when hovering in fullscreen
+      &:hover {
+        opacity: 1 !important;
+        transform: translate(-50%, 0) !important;
+      }
     }
 
+    // Show toolbars on container hover in fullscreen
     &:hover .player-toolbar-overlay {
       transform: translateY(0);
+      opacity: 1;
     }
 
     &:hover .filter-toolbar-overlay {
       transform: translate(-50%, 0);
+      opacity: 1;
     }
   }
 
@@ -106,6 +205,12 @@
     z-index: 16;
     width: auto;
     max-width: 90%;
+
+    // Stay visible when hovering over the toolbar itself
+    &:hover {
+      opacity: 1 !important;
+      transform: translate(-50%, 0) !important;
+    }
 
     // Only remove outer margins
     ::ng-deep lib-scaling-compact-card {
@@ -123,6 +228,12 @@
     opacity: 0;
     transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
     z-index: 15;
+
+    // Stay visible when hovering over the toolbar itself
+    &:hover {
+      opacity: 1 !important;
+      transform: translateY(0) !important;
+    }
 
     // Only remove outer margins, leave everything else alone
     ::ng-deep lib-sliding-container {
@@ -156,6 +267,90 @@
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .crt-button {
+      position: absolute;
+      bottom: 144px;
+      right: 16px;
+      pointer-events: all;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      // Highlight when CRT effect is active
+      ::ng-deep lib-icon-button.active {
+        .icon-button {
+          background-color: rgba(var(--glassy-color), 0.2) !important;
+          border: 1px solid var(--color-highlight);
+        }
+
+        mat-icon {
+          color: var(--color-highlight);
+        }
+      }
+    }
+
+    .crt-settings-button {
+      position: absolute;
+      bottom: 200px;
+      right: 16px;
+      pointer-events: all;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      // Highlight when settings panel is active
+      ::ng-deep lib-icon-button.active {
+        .icon-button {
+          background-color: rgba(var(--glassy-color), 0.2) !important;
+          border: 1px solid var(--color-highlight);
+        }
+
+        mat-icon {
+          color: var(--color-highlight);
+        }
+      }
+    }
+  }
+
+  .crt-controls-overlay {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    pointer-events: all;
+    z-index: 20;
+    max-width: 300px;
+
+    ::ng-deep lib-scaling-compact-card {
+      margin: 0;
+    }
+
+    .crt-control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .control-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        opacity: 0.9;
+      }
+
+      mat-slider {
+        width: 100%;
+      }
+
+      .control-value {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        text-align: right;
+      }
     }
   }
 }
