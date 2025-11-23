@@ -1,4 +1,4 @@
-import { Component, input, computed } from '@angular/core';
+import { Component, input, computed, ChangeDetectionStrategy } from '@angular/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 
 /**
@@ -10,6 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
  * - 4px height for subtle visual presence
  * - Uses --color-primary-bright theme variable
  * - Border-radius matches card corners (4px)
+ * - OnPush change detection for optimal performance
  *
  * @example
  * ```html
@@ -25,6 +26,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
   imports: [MatProgressBarModule],
   templateUrl: './progress-bar.component.html',
   styleUrl: './progress-bar.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProgressBarComponent {
   /** Current progress value (e.g., elapsed time in seconds) */

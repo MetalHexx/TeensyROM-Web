@@ -196,10 +196,20 @@ export class DirectoryFilesComponent implements OnDestroy {
     });
 
     // Effect to automatically select and scroll to the currently playing file
+    // CRITICAL: Only run when batch processing is complete to avoid triggering
+    // change detection during progressive rendering (which causes progress bar jank)
     effect(() => {
       const playingFile = this.currentPlayingFile();
       const fileContext = this.playerFileContext();
       const directoriesAndFiles = this.directoriesAndFiles();
+      const isProcessingBatches = this._isProcessingBatches();
+
+      // Wait until batch processing completes before scrolling
+      // This prevents running on every batch update (20+ times for 1000 files)
+      // which was causing change detection cycles that made the progress bar stutter
+      if (isProcessingBatches) {
+        return;
+      }
 
       // Only proceed if we have a playing file and directory content is loaded
       if (!playingFile || directoriesAndFiles.length === 0) {

@@ -2,7 +2,7 @@
 <lib-sliding-container
   containerHeight="80px"
   animationDirection="from-top"
-  [animationTrigger]="isPlayerLoaded()"
+  [animationTrigger]="isPlayerLoadedComputed()"
 >
   <lib-scaling-compact-card animationEntry="from-top" animationParent="auto">
     <!-- Progress Bar (flush to top inside card) -->
@@ -23,19 +23,19 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigatePrevious()"
+          [disabled]="!canNavigatePreviousComputed()"
           (buttonClick)="previous()"
         >
         </lib-icon-button>
 
-        @if (isCurrentFileMusicType()) {
+        @if (isCurrentFileMusicTypeComputed()) {
         <lib-icon-button
-          [icon]="getPlayPauseIcon()"
-          [ariaLabel]="getPlayPauseLabel()"
+          [icon]="getPlayPauseIconComputed()"
+          [ariaLabel]="getPlayPauseLabelComputed()"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
-          [color]="getPlayButtonColor()"
+          [color]="getPlayButtonColorComputed()"
           (buttonClick)="playPause()"
         >
         </lib-icon-button>
@@ -46,7 +46,7 @@
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
-          [color]="getPlayButtonColor()"
+          [color]="getPlayButtonColorComputed()"
           (buttonClick)="stop()"
         >
         </lib-icon-button>
@@ -59,7 +59,7 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigate()"
+          [disabled]="!canNavigateComputed()"
           (buttonClick)="next()"
         >
         </lib-icon-button>
@@ -92,19 +92,19 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigatePrevious()"
+          [disabled]="!canNavigatePreviousComputed()"
           (buttonClick)="previous()"
         >
         </lib-icon-button>
 
-        @if (isCurrentFileMusicType()) {
+        @if (isCurrentFileMusicTypeComputed()) {
         <lib-icon-button
-          [icon]="getPlayPauseIcon()"
-          [ariaLabel]="getPlayPauseLabel()"
+          [icon]="getPlayPauseIconComputed()"
+          [ariaLabel]="getPlayPauseLabelComputed()"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
-          [color]="getPlayButtonColor()"
+          [color]="getPlayButtonColorComputed()"
           (buttonClick)="playPause()"
         >
         </lib-icon-button>
@@ -115,7 +115,7 @@
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
-          [color]="getPlayButtonColor()"
+          [color]="getPlayButtonColorComputed()"
           (buttonClick)="stop()"
         >
         </lib-icon-button>
@@ -128,7 +128,7 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigate()"
+          [disabled]="!canNavigateComputed()"
           (buttonClick)="next()"
         >
         </lib-icon-button>
@@ -161,19 +161,19 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigatePrevious()"
+          [disabled]="!canNavigatePreviousComputed()"
           (buttonClick)="previous()"
         >
         </lib-icon-button>
 
-        @if (isCurrentFileMusicType()) {
+        @if (isCurrentFileMusicTypeComputed()) {
         <lib-icon-button
-          [icon]="getPlayPauseIcon()"
-          [ariaLabel]="getPlayPauseLabel()"
+          [icon]="getPlayPauseIconComputed()"
+          [ariaLabel]="getPlayPauseLabelComputed()"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
-          [color]="getPlayButtonColor()"
+          [color]="getPlayButtonColorComputed()"
           (buttonClick)="playPause()"
         >
         </lib-icon-button>
@@ -184,7 +184,7 @@
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
-          [color]="getPlayButtonColor()"
+          [color]="getPlayButtonColorComputed()"
           (buttonClick)="stop()"
         >
         </lib-icon-button>
@@ -197,7 +197,7 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigate()"
+          [disabled]="!canNavigateComputed()"
           (buttonClick)="next()"
         >
         </lib-icon-button>

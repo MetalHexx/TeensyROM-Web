@@ -9,6 +9,12 @@
   display: block;
   // Ensure it spans full width and clips properly
   pointer-events: none; // Don't interfere with clicks
+  
+  // Performance: Isolate from layout recalculation
+  // The progress bar updates every 100ms, so we need to prevent it from
+  // triggering reflows in parent elements during directory loading operations
+  contain: layout style paint; // Isolate rendering to this element
+  will-change: contents; // Hint that inner content changes frequently
 }
 
 mat-progress-bar {
@@ -17,10 +23,17 @@ mat-progress-bar {
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
   overflow: hidden;
+  
+  // Performance: GPU acceleration for smooth updates
+  transform: translateZ(0); // Force GPU layer
+  backface-visibility: hidden; // Optimize for animation
 
   // Override Material progress bar color with theme variable
   ::ng-deep .mdc-linear-progress__bar-inner {
     border-color: var(--color-primary-bright);
+    // GPU accelerate the animated bar itself
+    transform: translateZ(0);
+    will-change: transform; // The bar slides horizontally
   }
 
   // Clip the progress bar background to the curves

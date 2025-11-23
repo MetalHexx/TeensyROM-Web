@@ -198,7 +198,7 @@ async function initializePlayer(
 
       // Handle auto-launch or random launch
       if (settings.playerSettings.startupLaunchRandom && shouldLaunch) {
-        playerContextService.launchRandomFile(currentDevice.deviceId);
+        await playerContextService.launchRandomFile(currentDevice.deviceId);
         playerContextService.setFilterMode(currentDevice.deviceId, settings.playerSettings.startupFilter);
       } else if (filenameToLaunch && shouldLaunch) {
         const directoryState = storageStore.getSelectedDirectoryState(currentDevice.deviceId)();

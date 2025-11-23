@@ -1,4 +1,4 @@
-import { Injectable, inject, Signal, Injector } from '@angular/core';
+import { Injectable, inject, Signal, Injector, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Location } from '@angular/common';
 import {
@@ -35,7 +35,10 @@ export class PlayerContextService implements IPlayerContext {
   private readonly playerStorage = inject(PLAYER_STORAGE);
   private readonly injector = inject(Injector);
 
-  // Cache signals per device for reuse (lazy creation)
+  // Constant null signal to return when no timer exists (avoids NG0602 in reactive contexts)
+  private readonly nullTimerSignal: Signal<TimerState | null> = signal<TimerState | null>(null).asReadonly();
+  
+  // Cache signals per device for reuse (eager creation in createTimerWithCompletion)
   private readonly timerSignals = new Map<string, Signal<TimerState | null>>();
   // Track only completion subscriptions for auto-progression
   private readonly completionSubscriptions = new Map<string, Subscription>();
@@ -146,14 +149,13 @@ export class PlayerContextService implements IPlayerContext {
     await this.store.launchRandomFile({ deviceId });
 
     const currentFile = this.store.getCurrentFile(deviceId)();
-    if (currentFile) {
+    if (currentFile) {      
+      if (!this.hasErrorAndCleanup(deviceId)) {
+        this.setupTimerForFile(deviceId, currentFile.file);
+      }
       await this.loadDirectoryContextForRandomFile(currentFile);
-
-      // Only setup timer for music files if launch was successful
-      // Note: We still load directory context even on error so UI can show failed file
       if (!this.hasErrorAndCleanup(deviceId)) {
         this.recordHistoryIfSuccessful(deviceId);
-        this.setupTimerForFile(deviceId, currentFile.file);
         this.updateUrlForLaunchedFile(deviceId);
       }
     }
@@ -480,25 +482,30 @@ export class PlayerContextService implements IPlayerContext {
    * Timer updates flow through observable-to-signal conversion (no store pollution).
    */
   private createTimerWithCompletion(deviceId: string, durationMs: number): void {
+    // Cleanup old timer/signal/subscriptions FIRST
     this.cleanupTimer(deviceId);
+    
+    // Create NEW timer in manager (must happen before toSignal)
     this.timerManager.createTimer(deviceId, durationMs);
 
-    // Clear cached signal so we create a fresh one for the new timer
-    this.timerSignals.delete(deviceId);
-
     // Immediately initialize the new signal (outside reactive context)
-    // This prevents components from calling getTimerState() from within computeds
-    // and triggering NG0602 errors
+    // Get current state AFTER creating timer so we have valid initial value
     const currentState = this.timerManager.getTimerState(deviceId);
-    const signal: Signal<TimerState | null> = currentState
-      ? (toSignal(this.timerManager.onTimerUpdate$(deviceId), {
+    
+    logInfo(LogType.Info, `Timer signal initialized for device ${deviceId}:`, currentState);
+    
+    // Create signal with proper initialValue (currentState should always exist after createTimer)
+    // Use type assertion since we know the observable will emit TimerState | null
+    const signal = currentState
+      ? toSignal(this.timerManager.onTimerUpdate$(deviceId), {
           initialValue: currentState,
           injector: this.injector,
-        }) as Signal<TimerState | null>)
-      : toSignal(this.timerManager.onTimerUpdate$(deviceId), {
-          initialValue: null,
+        })
+      : (toSignal(this.timerManager.onTimerUpdate$(deviceId), {
           injector: this.injector,
-        });
+        }) as Signal<TimerState | null>);
+    
+    // Cache the new signal
     this.timerSignals.set(deviceId, signal);
 
     // Subscribe only to completion for auto-progression
@@ -538,36 +545,21 @@ export class PlayerContextService implements IPlayerContext {
    * Get current timer state for a device.
    * Returns a signal that emits timer updates from the observable stream.
    * Signals are cached per device for referential equality and performance.
+   * 
+   * IMPORTANT: This method is safe to call from reactive contexts (computed, effect)
+   * because it NEVER calls toSignal() - signals are pre-created in createTimerWithCompletion().
+   * If no cached signal exists, returns a constant null signal.
    */
   getTimerState(deviceId: string): Signal<TimerState | null> {
-    // Return cached signal if it exists
+    // Return cached signal if it exists (created in createTimerWithCompletion)
     const cachedSignal = this.timerSignals.get(deviceId);
     if (cachedSignal) {
       return cachedSignal;
     }
 
-    // Get current timer state synchronously as initial value
-    // This ensures the signal has the correct value immediately,
-    // even if created after timer starts emitting
-    const currentState = this.timerManager.getTimerState(deviceId);
-
-    // Create new signal from observable stream with explicit injector
-    // If timer exists, use its current state as initial value
-    // Otherwise use null as initial value
-    const signal: Signal<TimerState | null> = currentState
-      ? (toSignal(this.timerManager.onTimerUpdate$(deviceId), {
-          initialValue: currentState,
-          injector: this.injector,
-        }) as Signal<TimerState | null>)
-      : toSignal(this.timerManager.onTimerUpdate$(deviceId), {
-          initialValue: null,
-          injector: this.injector,
-        });
-
-    // Cache signal for reuse
-    this.timerSignals.set(deviceId, signal);
-
-    return signal;
+    // No timer exists for this device - return constant null signal
+    // This is safe to call from reactive contexts since we're not calling toSignal()
+    return this.nullTimerSignal;
   }
 
   /**

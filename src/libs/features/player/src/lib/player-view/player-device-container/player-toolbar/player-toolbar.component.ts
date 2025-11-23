@@ -1,4 +1,4 @@
-import { Component, inject, input, computed, effect, Signal, untracked } from '@angular/core';
+import { Component, inject, input, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   ScalingCompactCardComponent,
@@ -6,7 +6,7 @@ import {
   IconButtonColor,
   SlidingContainerComponent,
 } from '@teensyrom-nx/ui/components';
-import { PLAYER_CONTEXT, TimerState } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
 import { ProgressBarComponent } from './progress-bar/progress-bar.component';
 import { FileInfoComponent } from './file-info/file-info.component';
@@ -27,23 +27,86 @@ import { PlayerToolbarActionsComponent } from './player-toolbar-actions/player-t
   ],
   templateUrl: './player-toolbar.component.html',
   styleUrl: './player-toolbar.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PlayerToolbarComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
 
   deviceId = input.required<string>();
 
-  // Phase 5: Timer state - computed to react to device ID changes
-  // getTimerState() returns a Signal, and we need to switch between device signals
-  // We call getTimerState() in a computed but immediately read its value
-  // This is safe because getTimerState internally caches the toSignal call per device
+  // Phase 5: Timer state - computed to react to device ID changes AND file launches
+  // IMPORTANT: We call getTimerState() fresh each time to pick up newly cached signals
+  // When a file launches, setupTimerForFile() caches a new signal, and this computed
+  // will pick it up on the next change detection cycle
+  //
+  // Performance Fix: Track ONLY file path (file identity), not full currentFile object
+  // This prevents jank during directory loading - when large directories (1000+ files) load,
+  // the directory-files component's animation and auto-scroll trigger many change detection
+  // cycles. By tracking only the file path, timerState only re-evaluates when a NEW file
+  // launches, not on every unrelated state update during directory operations.
   timerState = computed(() => {
     const deviceId = this.deviceId();
     if (!deviceId) return null;
     
+    // Track only file PATH to trigger re-evaluation when file IDENTITY changes
+    // Reading just the path (string primitive) instead of full object prevents
+    // unnecessary re-evaluation during directory loading animations
+    const currentFilePath = this.currentFile()?.file?.path;
+    
     // getTimerState returns Signal<TimerState | null>, call it to get current value
     const timerSignal = this.playerContext.getTimerState(deviceId);
     return timerSignal();
+  });
+
+  // Convert to computed for OnPush optimization
+  isCurrentFileMusicTypeComputed = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+
+    const currentFile = this.playerContext.getCurrentFile(deviceId)();
+    return currentFile?.file?.type === FileItemType.Song;
+  });
+
+  canNavigateComputed = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+
+    const fileContext = this.playerContext.getFileContext(deviceId)();
+    const launchMode = this.playerContext.getLaunchMode(deviceId)();
+
+    return (
+      (fileContext !== null && fileContext.files.length > 1) || launchMode === LaunchMode.Shuffle
+    );
+  });
+
+  canNavigatePreviousComputed = computed(() => this.canNavigateComputed());
+
+  getPlayPauseIconComputed = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return 'play_arrow';
+
+    const status = this.playerContext.getPlayerStatus(deviceId)();
+    return status === PlayerStatus.Playing ? 'pause' : 'play_arrow';
+  });
+
+  getPlayPauseLabelComputed = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return 'Play';
+
+    const status = this.playerContext.getPlayerStatus(deviceId)();
+    return status === PlayerStatus.Playing ? 'Pause' : 'Play';
+  });
+
+  getPlayButtonColorComputed = computed<IconButtonColor>(() => {
+    return !this.isFileCompatible() ? 'error' : 'normal';
+  });
+
+  isPlayerLoadedComputed = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+
+    const currentFile = this.playerContext.getCurrentFile(deviceId)();
+    return currentFile !== null;
   });
 
   isLoading(): boolean {
@@ -88,49 +151,8 @@ export class PlayerToolbarComponent {
     }
   }
 
-  // UI helper methods for button display logic
-  getPlayPauseIcon(): string {
-    const deviceId = this.deviceId();
-    if (!deviceId) return 'play_arrow';
-
-    const status = this.playerContext.getPlayerStatus(deviceId)();
-    return status === PlayerStatus.Playing ? 'pause' : 'play_arrow';
-  }
-
-  getPlayPauseLabel(): string {
-    const deviceId = this.deviceId();
-    if (!deviceId) return 'Play';
-
-    const status = this.playerContext.getPlayerStatus(deviceId)();
-    return status === PlayerStatus.Playing ? 'Pause' : 'Play';
-  }
-
-  isCurrentFileMusicType(): boolean {
-    const deviceId = this.deviceId();
-    if (!deviceId) return false;
-
-    const currentFile = this.playerContext.getCurrentFile(deviceId)();
-    return currentFile?.file?.type === FileItemType.Song;
-  }
-
-  canNavigate(): boolean {
-    const deviceId = this.deviceId();
-    if (!deviceId) return false;
-
-    const fileContext = this.playerContext.getFileContext(deviceId)();
-    const launchMode = this.playerContext.getLaunchMode(deviceId)();
-
-    // Can navigate if we have file context (directory mode) or are in shuffle mode
-    return (
-      (fileContext !== null && fileContext.files.length > 1) || launchMode === LaunchMode.Shuffle
-    );
-  }
-
-  canNavigatePrevious(): boolean {
-    // Same logic as canNavigate for now - in shuffle mode, previous launches another random file
-    return this.canNavigate();
-  }
-
+  // UI helper methods - keep as methods for async operations
+  // Template should use computed versions (with "Computed" suffix)
   getPlayerStatus(): PlayerStatus {
     const deviceId = this.deviceId();
     if (!deviceId) return PlayerStatus.Stopped;
@@ -138,26 +160,9 @@ export class PlayerToolbarComponent {
     return this.playerContext.getPlayerStatus(deviceId)();
   }
 
-  isPlayerLoaded(): boolean {
-    const deviceId = this.deviceId();
-    if (!deviceId) return false;
-
-    const currentFile = this.playerContext.getCurrentFile(deviceId)();
-    return currentFile !== null;
-  }
-
   hasError = computed(() => this.playerContext.getError(this.deviceId())() !== null);
 
   isFileCompatible = computed(() => this.playerContext.isCurrentFileCompatible(this.deviceId())());
-
-  getPlayButtonColor(): IconButtonColor {
-    // Only show error (red) on play button when file is incompatible
-    return !this.isFileCompatible() ? 'error' : 'normal';
-  }
-
-  // Phase 5: Timer state for progress bar  
-  // Read from the cached signal (initialized in constructor effect)
-  timerState = computed(() => this._cachedTimerSignal ? this._cachedTimerSignal() : null);
 
   // Phase 3: Custom timer config for demo purposes
   customTimerConfig = computed(() => {
@@ -169,23 +174,31 @@ export class PlayerToolbarComponent {
   showProgressBar = computed(() => {
     const state = this.timerState();
     const customTimer = this.customTimerConfig();
+    const currentFile = this.currentFile();
     
     // Show progress bar if Phase 5 timer is active OR custom timer is enabled (Phase 3 demo)
     if (state !== null && state.showProgress) {
       return true;
     }
     
-    // Phase 3: Show progress bar when custom timer is enabled (for demo/testing)
-    return customTimer !== null && customTimer.enabled;
+    // Phase 3: Show progress bar when custom timer is enabled AND file is loaded
+    // Don't show demo progress bar until a file is actually playing
+    return customTimer !== null && customTimer.enabled && currentFile !== null;
   });
 
   currentTime = computed(() => {
     const state = this.timerState();
     const customTimer = this.customTimerConfig();
+    const hasError = this.hasError();
     
     // Use Phase 5 timer if available
     if (state !== null) {
       return state.currentTime;
+    }
+    
+    // Don't show progress if there's an error (failed launch)
+    if (hasError) {
+      return 0;
     }
     
     // Phase 3 demo: Show half of custom timer duration
@@ -199,10 +212,16 @@ export class PlayerToolbarComponent {
   totalTime = computed(() => {
     const state = this.timerState();
     const customTimer = this.customTimerConfig();
+    const hasError = this.hasError();
     
     // Use Phase 5 timer if available
     if (state !== null) {
       return state.totalTime;
+    }
+    
+    // Don't show progress if there's an error (failed launch)
+    if (hasError) {
+      return 0;
     }
     
     // Phase 3 demo: Show custom timer duration
