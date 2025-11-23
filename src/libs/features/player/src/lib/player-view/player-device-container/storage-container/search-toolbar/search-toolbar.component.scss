@@ -1,6 +1,9 @@
 :host {
-  width: 100%;
   display: flex;
+}
+
+:host-context(.compact-section-width) {
+  width: 100%;
 }
 
 .search-toolbar-content {

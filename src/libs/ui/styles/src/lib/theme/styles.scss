@@ -322,6 +322,18 @@ mat-card-title {
   }
 }
 
+.compact-section-width {
+  width: 327px;
+  min-width: 327px;
+  max-width: 327px;
+  
+  @media (max-width: 500px) {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
 .stretch-card {
   height: 100%;
   display: flex;

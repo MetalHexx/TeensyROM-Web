@@ -1,6 +1,9 @@
 :host {
-  width: 100%;
   display: block;
+}
+
+:host-context(.compact-section-width) {
+  width: 100%;
 }
 
 .filter-buttons {

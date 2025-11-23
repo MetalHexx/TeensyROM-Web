@@ -11,6 +11,10 @@
   }
 }
 
+:host-context(.compact-section-width) {
+  width: 100%;
+}
+
 mat-card {
   width: 327px;
   height: 390px; // Match host height
