@@ -15,13 +15,13 @@
     <div class="viewport-wrapper">
       <cdk-virtual-scroll-viewport
         #viewport
-        itemSize="52"
+        itemSize="42"
         class="files-viewport"
         minBufferPx="200"
         maxBufferPx="400"
       >
-        @for (item of directoriesAndFiles(); track item.path) {
         <div
+          *cdkVirtualFor="let item of directoriesAndFiles(); trackBy: trackByPath"
           class="file-list-item list-item-highlight"
           [attr.data-item-path]="item.path"
           [attr.data-is-playing]="isCurrentlyPlaying(item)"
@@ -45,7 +45,6 @@
           </lib-file-item>
           }
         </div>
-        }
       </cdk-virtual-scroll-viewport>
     </div>
     } @else {

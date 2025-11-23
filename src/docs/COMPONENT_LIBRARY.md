@@ -2680,81 +2680,6 @@ export class NavigationComponent {
 
 Angular-specific utilities for common UI patterns. Located in `libs/ui/components/src/lib/utils/`.
 
-### `VirtualScrollAnimator<T>`
-
-**Purpose**: Reusable utility class for animating scroll-to-item in CDK Virtual Scroll viewports. Handles smooth scrolling, dynamic height measurement, centering calculations, and loading state management.
-
-**Location**: `libs/ui/components/src/lib/utils/virtual-scroll-animator/`
-
-**Type Parameter**:
-
-- `T` - Type of items in the scrollable list
-
-**Key Features**:
-
-- Smooth scrolling to specific items with viewport centering
-- Dynamic height measurement for theme/font changes
-- Fallback handling for various edge cases
-- Loading state management during scroll animation
-- Automatic cleanup and cancellation support
-
-**Usage**:
-
-```typescript
-import { VirtualScrollAnimator } from '@teensyrom-nx/ui/components';
-
-export class FileListComponent {
-  private readonly scrollAnimator = new VirtualScrollAnimator<FileItem>();
-  private readonly _isScrolling = signal(false);
-
-  viewport = viewChild<CdkVirtualScrollViewport>('virtualScroll');
-  files = signal<FileItem[]>([]);
-
-  scrollToFile(fileId: string) {
-    this.scrollAnimator.scrollToItem({
-      viewport: this.viewport,
-      items: this.files(),
-      findIndex: (items) => items.findIndex((f) => f.id === fileId),
-      itemHeight: 52,
-      isScrollingSignal: this._isScrolling,
-      scrollDuration: 600,
-      renderDelay: 100,
-      onComplete: () => console.log('Scroll complete'),
-    });
-  }
-
-  ngOnDestroy() {
-    this.scrollAnimator.destroy();
-  }
-}
-```
-
-**Configuration Options**:
-
-- `viewport` - Signal containing the CdkVirtualScrollViewport reference
-- `items` - Array of items to search through
-- `findIndex` - Function returning target item index
-- `itemHeight` - Configured item height in pixels
-- `isScrollingSignal` - Signal to track scrolling state
-- `scrollDuration` - Animation duration in ms (default: 600)
-- `renderDelay` - Delay before scroll starts (default: 100)
-- `onComplete` - Optional callback when scroll finishes
-
-**Methods**:
-
-- `scrollToItem(config)` - Initiates smooth scroll animation
-- `cancelPendingScroll()` - Cancels any in-progress scroll
-- `destroy()` - Cleanup method for ngOnDestroy
-
-**Use Cases**:
-
-- Auto-scroll to currently playing item in media lists
-- Scroll to selected item in product catalogs
-- Jump to search result in large lists
-- Navigate to specific message in chat history
-
-**Dependencies**: Angular CDK Virtual Scrolling (`CdkVirtualScrollViewport`)
-
 ---
 
 ## Component Architecture
@@ -2783,9 +2708,6 @@ import { IconLabelComponent } from '@teensyrom-nx/ui/components';
 import { StatusIconLabelComponent } from '@teensyrom-nx/ui/components';
 import { MenuItemComponent } from '@teensyrom-nx/ui/components';
 import { FadingContainerComponent } from '@teensyrom-nx/ui/components';
-
-// Utilities
-import { VirtualScrollAnimator } from '@teensyrom-nx/ui/components';
 
 @Component({
   // ...
