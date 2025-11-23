@@ -1,0 +1,51 @@
+<lib-scaling-compact-card [enableOverflow]="true">
+  <div class="video-wrapper">
+    @if (hasDevices() && !isPermissionDenied()) {
+      <!-- Device Selection Dropdown -->
+      <div class="device-selector">
+        <mat-form-field appearance="outline">
+          <mat-label>Video Device</mat-label>
+          <mat-select 
+            [value]="selectedDevice()"
+            (selectionChange)="onDeviceSelected($event.value)"
+          >
+            @for (device of devices(); track device.deviceId) {
+              <mat-option [value]="device.deviceId">
+                {{ device.label }}
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <!-- Maximize button -->
+      <div class="maximize-button">
+        <lib-icon-button
+          icon="fullscreen"
+          ariaLabel="Open in dialog"
+          variant="rounded-transparent"
+          (buttonClick)="openVideoDialog()"
+        >
+        </lib-icon-button>
+      </div>
+
+      <!-- Video Stream -->
+      <video 
+        #videoElement 
+        autoplay 
+        playsinline 
+        muted
+        class="video-stream"
+      ></video>
+    } @else if (isPermissionDenied()) {
+      <div class="error-message">
+        <p>Camera permission denied</p>
+        <p class="error-hint">Please allow camera access in your browser settings</p>
+      </div>
+    } @else {
+      <div class="no-devices-message">
+        <p>No video capture devices detected</p>
+      </div>
+    }
+  </div>
+</lib-scaling-compact-card>
