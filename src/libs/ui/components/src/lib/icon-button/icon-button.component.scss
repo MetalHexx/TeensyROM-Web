@@ -2,6 +2,12 @@
   display: inline-block;
 }
 
+button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 // Color classes for both mat-icon and custom icons
 .normal {
   color: var(--mdc-icon-button-icon-color, currentColor);

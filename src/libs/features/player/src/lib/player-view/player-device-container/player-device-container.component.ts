@@ -4,6 +4,7 @@ import { Device } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
 import { FileOtherComponent } from './file-other/file-other.component';
 import { FileImageComponent } from './file-image/file-image.component';
+import { VideoCaptureComponent } from './video-capture/video-capture.component';
 import { PlayerToolbarComponent } from './player-toolbar/player-toolbar.component';
 import { StorageContainerComponent } from './storage-container/storage-container.component';
 import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
@@ -14,6 +15,7 @@ import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
     CommonModule,
     MatCardModule,
     FileImageComponent,
+    VideoCaptureComponent,
     FileOtherComponent,
     PlayerToolbarComponent,
     StorageContainerComponent,

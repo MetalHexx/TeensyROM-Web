@@ -1,0 +1,50 @@
+<!-- Video container with hover controls -->
+<div class="video-container" #videoContainer>
+  <video 
+    #dialogVideoElement 
+    autoplay 
+    playsinline 
+    muted
+    class="video-stream"
+  ></video>
+
+  <!-- Player toolbar overlay (bottom) -->
+  <div class="player-toolbar-overlay">
+    <lib-player-toolbar [deviceId]="data.deviceId"></lib-player-toolbar>
+  </div>
+
+  <!-- Control buttons (fade on hover) -->
+  <div class="video-controls">
+    <!-- Close button -->
+    <div class="close-button">
+      <lib-icon-button
+        icon="close"
+        ariaLabel="Close dialog"
+        variant="rounded-transparent"
+        (buttonClick)="onClose()"
+      >
+      </lib-icon-button>
+    </div>
+
+    <!-- Fullscreen toggle button -->
+    <div class="fullscreen-button">
+      @if (!isFullscreen()) {
+        <lib-icon-button
+          icon="fullscreen"
+          ariaLabel="Enter fullscreen"
+          variant="rounded-transparent"
+          (buttonClick)="toggleFullscreen()"
+        >
+        </lib-icon-button>
+      } @else {
+        <lib-icon-button
+          icon="fullscreen_exit"
+          ariaLabel="Exit fullscreen"
+          variant="rounded-transparent"
+          (buttonClick)="toggleFullscreen()"
+        >
+        </lib-icon-button>
+      }
+    </div>
+  </div>
+</div>
