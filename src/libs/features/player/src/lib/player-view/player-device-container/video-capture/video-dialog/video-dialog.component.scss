@@ -37,7 +37,8 @@
   border-radius: 12px;
 
   &:hover .video-controls,
-  &:hover .player-toolbar-overlay {
+  &:hover .player-toolbar-overlay,
+  &:hover .filter-toolbar-overlay {
     opacity: 1;
   }
 
@@ -56,12 +57,42 @@
       object-fit: contain;
     }
 
-    .player-toolbar-overlay {
+    .player-toolbar-overlay,
+    .filter-toolbar-overlay {
       position: fixed;
-      bottom: 0;
       left: 0;
       right: 0;
       z-index: 9999;
+    }
+
+    .player-toolbar-overlay {
+      bottom: 0;
+    }
+
+    .filter-toolbar-overlay {
+      top: 0;
+      bottom: auto;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+    }
+  }
+
+  .filter-toolbar-overlay {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: all;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    z-index: 16;
+    width: auto;
+    max-width: 90%;
+
+    // Only remove outer margins
+    ::ng-deep lib-scaling-compact-card {
+      margin: 0 !important;
     }
   }
 

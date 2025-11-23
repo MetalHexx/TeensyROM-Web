@@ -8,6 +8,11 @@
     class="video-stream"
   ></video>
 
+  <!-- Filter toolbar overlay (above player toolbar) -->
+  <div class="filter-toolbar-overlay">
+    <lib-filter-toolbar [deviceId]="data.deviceId"></lib-filter-toolbar>
+  </div>
+
   <!-- Player toolbar overlay (bottom) -->
   <div class="player-toolbar-overlay">
     <lib-player-toolbar [deviceId]="data.deviceId"></lib-player-toolbar>

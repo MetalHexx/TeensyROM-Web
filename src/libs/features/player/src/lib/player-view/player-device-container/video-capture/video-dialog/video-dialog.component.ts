@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { IconButtonComponent } from '@teensyrom-nx/ui/components';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
+import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
 
 export interface VideoDialogData {
   stream: MediaStream;
@@ -13,7 +14,7 @@ export interface VideoDialogData {
 @Component({
   selector: 'lib-video-dialog',
   standalone: true,
-  imports: [CommonModule, IconButtonComponent, PlayerToolbarComponent],
+  imports: [CommonModule, IconButtonComponent, PlayerToolbarComponent, FilterToolbarComponent],
   templateUrl: './video-dialog.component.html',
   styleUrl: './video-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
