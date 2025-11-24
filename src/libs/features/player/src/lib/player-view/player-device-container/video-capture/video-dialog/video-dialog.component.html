@@ -22,10 +22,11 @@
 
   <!-- CRT Controls overlay (top left) -->
   @if (isCrtEnabled() && showCrtControls()) {
-    <div class="crt-controls-overlay">
-      <lib-scaling-compact-card title="CRT Effect" cardClass="glassy-card">
+    <div class="crt-controls-overlay" [class.slide-in]="showCrtControls()">
+      <lib-compact-card-layout cardClass="glassy-card crt-controls-card">
+        <div class="crt-card-header">CRT Effect</div>
         <div class="crt-control-group">
-          <label class="control-label">Scanline Intensity</label>
+          <span class="control-label">Scanline Intensity</span>
           <mat-slider min="0" max="0.5" step="0.01" discrete>
             <input matSliderThumb [(ngModel)]="scanlineIntensity" />
           </mat-slider>
@@ -33,7 +34,7 @@
         </div>
 
         <div class="crt-control-group">
-          <label class="control-label">Scanline Thickness</label>
+          <span class="control-label">Scanline Thickness</span>
           <mat-slider min="1" max="4" step="1" discrete>
             <input matSliderThumb [(ngModel)]="scanlineThickness" />
           </mat-slider>
@@ -41,7 +42,7 @@
         </div>
 
         <div class="crt-control-group">
-          <label class="control-label">Scanline Gap</label>
+          <span class="control-label">Scanline Gap</span>
           <mat-slider min="1" max="8" step="1" discrete>
             <input matSliderThumb [(ngModel)]="scanlineSpacing" />
           </mat-slider>
@@ -49,7 +50,7 @@
         </div>
 
         <div class="crt-control-group">
-          <label class="control-label">Vignette</label>
+          <span class="control-label">Vignette</span>
           <mat-slider min="0" max="2" step="0.05" discrete>
             <input matSliderThumb [(ngModel)]="vignetteStrength" />
           </mat-slider>
@@ -57,7 +58,7 @@
         </div>
 
         <div class="crt-control-group">
-          <label class="control-label">Screen Curvature</label>
+          <span class="control-label">Screen Curvature</span>
           <mat-slider min="0" max="50" step="2" discrete>
             <input matSliderThumb [(ngModel)]="screenCurvature" />
           </mat-slider>
@@ -65,7 +66,7 @@
         </div>
 
         <div class="crt-control-group">
-          <label class="control-label">Contrast</label>
+          <span class="control-label">Contrast</span>
           <mat-slider min="0.8" max="1.5" step="0.05" discrete>
             <input matSliderThumb [(ngModel)]="contrast" />
           </mat-slider>
@@ -73,7 +74,7 @@
         </div>
 
         <div class="crt-control-group">
-          <label class="control-label">Brightness</label>
+          <span class="control-label">Brightness</span>
           <mat-slider min="0.8" max="1.5" step="0.05" discrete>
             <input matSliderThumb [(ngModel)]="brightness" />
           </mat-slider>
@@ -81,13 +82,13 @@
         </div>
 
         <div class="crt-control-group">
-          <label class="control-label">Saturation</label>
+          <span class="control-label">Saturation</span>
           <mat-slider min="0.8" max="1.5" step="0.05" discrete>
             <input matSliderThumb [(ngModel)]="saturation" />
           </mat-slider>
           <span class="control-value">{{ saturation() | number: '1.2-2' }}</span>
         </div>
-      </lib-scaling-compact-card>
+      </lib-compact-card-layout>
     </div>
   }
 

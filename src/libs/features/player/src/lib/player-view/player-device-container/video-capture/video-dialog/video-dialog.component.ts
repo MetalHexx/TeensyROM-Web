@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSliderModule } from '@angular/material/slider';
 import { FormsModule } from '@angular/forms';
-import { IconButtonComponent, ScalingCompactCardComponent } from '@teensyrom-nx/ui/components';
+import { IconButtonComponent, CompactCardLayoutComponent } from '@teensyrom-nx/ui/components';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
 
@@ -16,7 +16,7 @@ export interface VideoDialogData {
 @Component({
   selector: 'lib-video-dialog',
   standalone: true,
-  imports: [CommonModule, IconButtonComponent, PlayerToolbarComponent, FilterToolbarComponent, MatSliderModule, FormsModule, ScalingCompactCardComponent],
+  imports: [CommonModule, IconButtonComponent, PlayerToolbarComponent, FilterToolbarComponent, MatSliderModule, FormsModule, CompactCardLayoutComponent],
   templateUrl: './video-dialog.component.html',
   styleUrl: './video-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -25,18 +25,18 @@ export class VideoDialogComponent {
   private videoElement = viewChild<ElementRef<HTMLVideoElement>>('dialogVideoElement');
   private containerElement = viewChild<ElementRef<HTMLDivElement>>('videoContainer');
   isFullscreen = signal<boolean>(false);
-  isCrtEnabled = signal<boolean>(false);
+  isCrtEnabled = signal<boolean>(true);
   showCrtControls = signal<boolean>(false);
   
   // CRT effect parameters
-  scanlineIntensity = signal<number>(0.15);
-  scanlineThickness = signal<number>(1);
-  scanlineSpacing = signal<number>(3);
-  vignetteStrength = signal<number>(0.5);
+  scanlineIntensity = signal<number>(0.50);
+  scanlineThickness = signal<number>(3);
+  scanlineSpacing = signal<number>(2);
+  vignetteStrength = signal<number>(0.80);
   screenCurvature = signal<number>(0);
-  contrast = signal<number>(1.15);
-  brightness = signal<number>(1.1);
-  saturation = signal<number>(1.2);
+  contrast = signal<number>(1.10);
+  brightness = signal<number>(1.50);
+  saturation = signal<number>(1.30);
 
   constructor(
     public dialogRef: MatDialogRef<VideoDialogComponent>,
