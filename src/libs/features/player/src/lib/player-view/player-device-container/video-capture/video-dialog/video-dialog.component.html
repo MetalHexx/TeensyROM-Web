@@ -21,7 +21,7 @@
   </div>
 
   <!-- CRT Controls overlay (top left) -->
-  @if (isCrtEnabled() && showCrtControls()) {
+  @if (isCrtEnabled()) {
     <div class="crt-controls-overlay" [class.slide-in]="showCrtControls()">
       <lib-compact-card-layout cardClass="glassy-card crt-controls-card">
         <div class="crt-card-header">CRT Effect</div>
@@ -115,51 +115,50 @@
       </lib-icon-button>
     </div>
 
-    <!-- Fullscreen toggle button -->
-    <div class="fullscreen-button">
-      @if (!isFullscreen()) {
-        <lib-icon-button
-          icon="fullscreen"
-          ariaLabel="Enter fullscreen"
-          variant="rounded-transparent"
-          (buttonClick)="toggleFullscreen()"
-        >
-        </lib-icon-button>
-      } @else {
-        <lib-icon-button
-          icon="fullscreen_exit"
-          ariaLabel="Exit fullscreen"
-          variant="rounded-transparent"
-          (buttonClick)="toggleFullscreen()"
-        >
-        </lib-icon-button>
-      }
-    </div>
+    <!-- Right side controls card -->
+    <div class="right-controls-card">
+      <lib-compact-card-layout cardClass="glassy-card">
+        <!-- Fullscreen toggle button -->
+        @if (!isFullscreen()) {
+          <lib-icon-button
+            icon="fullscreen"
+            ariaLabel="Enter fullscreen"
+            variant="rounded-transparent"
+            (buttonClick)="toggleFullscreen()"
+          >
+          </lib-icon-button>
+        } @else {
+          <lib-icon-button
+            icon="fullscreen_exit"
+            ariaLabel="Exit fullscreen"
+            variant="rounded-transparent"
+            (buttonClick)="toggleFullscreen()"
+          >
+          </lib-icon-button>
+        }
 
-    <!-- CRT effect toggle button -->
-    <div class="crt-button">
-      <lib-icon-button
-        icon="tv"
-        ariaLabel="Toggle CRT effect"
-        variant="rounded-transparent"
-        [class.active]="isCrtEnabled()"
-        (buttonClick)="toggleCrtEffect()"
-      >
-      </lib-icon-button>
-    </div>
-
-    <!-- CRT settings button -->
-    @if (isCrtEnabled()) {
-      <div class="crt-settings-button">
+        <!-- CRT effect toggle button -->
         <lib-icon-button
-          icon="tune"
-          ariaLabel="CRT settings"
+          icon="tv"
+          ariaLabel="Toggle CRT effect"
           variant="rounded-transparent"
-          [class.active]="showCrtControls()"
-          (buttonClick)="toggleCrtControls()"
+          [class.active]="isCrtEnabled()"
+          (buttonClick)="toggleCrtEffect()"
         >
         </lib-icon-button>
-      </div>
-    }
+
+        <!-- CRT settings button -->
+        @if (isCrtEnabled()) {
+          <lib-icon-button
+            icon="tune"
+            ariaLabel="CRT settings"
+            variant="rounded-transparent"
+            [class.active]="showCrtControls()"
+            (buttonClick)="toggleCrtControls()"
+          >
+          </lib-icon-button>
+        }
+      </lib-compact-card-layout>
+    </div>
   </div>
 </div>
