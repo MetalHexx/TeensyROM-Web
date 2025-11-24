@@ -32,8 +32,8 @@ export class VideoDialogComponent {
   scanlineIntensity = signal<number>(0.50);
   scanlineThickness = signal<number>(3);
   scanlineSpacing = signal<number>(2);
-  vignetteStrength = signal<number>(0.80);
-  screenCurvature = signal<number>(0);
+  vignetteStrength = signal<number>(1.30);
+  screenCurvature = signal<number>(40);
   contrast = signal<number>(1.10);
   brightness = signal<number>(1.50);
   saturation = signal<number>(1.30);
