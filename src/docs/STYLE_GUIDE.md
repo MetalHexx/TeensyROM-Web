@@ -205,6 +205,30 @@ Available color variables for semantic styling:
 
 **Best Practice**: Use for high-emphasis glassmorphism where the overlay needs maximum visibility while maintaining the blur effect.
 
+#### `.glassy-dark`
+
+**Usage Example:**
+
+```html
+<div class="glassy-dark">Dark overlay content</div>
+```
+
+**Implementation**: Uses [`@mixin glassy-dark-effect`](#mixin-glassy-dark-effect) (40% black opacity)
+
+**Best Practice**: Use as the default for cards and prominent UI elements. The dark semi-transparent effect is sophisticated and modern, allowing background patterns to enhance visual depth while maintaining excellent readability. Recommended for all primary card components.
+
+#### `.glassy-dark`
+
+**Usage Example:**
+
+```html
+<div class="glassy-dark">Dark overlay content</div>
+```
+
+**Implementation**: Uses [`@mixin glassy-dark-effect`](#mixin-glassy-dark-effect) (40% black opacity)
+
+**Best Practice**: Use as the default for cards and prominent UI elements. The dark semi-transparent effect is sophisticated and modern, allowing background patterns to enhance the visual depth while maintaining excellent readability. Recommended for all primary card components.
+
 #### `.glassy-card`
 
 **Usage Example:**
@@ -216,12 +240,12 @@ Available color variables for semantic styling:
 <lib-scaling-card cardClass="glassy-card" title="Glassy Card"> Content </lib-scaling-card>
 ```
 
-**Implementation**: Uses [`@mixin glassy-medium-effect`](#mixin-glassy-medium-effect) (15% opacity) with Material Design styling
+**Implementation**: Uses [`@mixin glassy-dark-effect`](#mixin-glassy-dark-effect) (40% black opacity) with Material Design styling
 
 **Visual Effects:**
 
-- Medium glassy background (15% white overlay)
-- 10px backdrop blur
+- Dark glassy background (40% black overlay) - lets synthwave pattern shine through
+- 12px backdrop blur
 - Large rounded corners (`var(--mat-sys-corner-large)`)
 - Material elevation shadow (`var(--mat-sys-level4)`)
 - Overflow hidden for clean edges
@@ -229,8 +253,10 @@ Available color variables for semantic styling:
 **Used In:**
 
 - [`youtube-dialog.component.html`](../libs/features/player/src/lib/player-view/player-device-container/file-other/youtube-dialog/youtube-dialog.component.html) - YouTube video dialog card
+- Video player CRT controls overlay
+- Player toolbar and filter toolbar cards
 
-**Best Practice**: Use for cards that need a prominent glassmorphism effect, such as modal dialog content, overlay cards, or featured content cards. Provides a polished, modern appearance with proper Material Design integration. Apply via the `cardClass` input on card components to avoid wrapper elements.
+**Best Practice**: Use for cards that need a prominent glassmorphism effect, such as modal dialog content, overlay cards, or featured content cards. The dark semi-transparent effect provides a polished, modern appearance with proper Material Design integration while allowing the synthwave background to shine through. Apply via the `cardClass` input on card components to avoid wrapper elements.
 
 ---
 
@@ -321,12 +347,46 @@ Available color variables for semantic styling:
 }
 ```
 
+#### `@mixin glassy-dark-effect`
+
+**Opacity**: 40% black overlay (sophisticated dark glassy effect)
+**Blur**: 12px backdrop blur (enhanced blur for dark variant)
+**Theme Support**: Pure black in both light and dark modes - designed to showcase background patterns
+
+**Usage:**
+
+```scss
+.my-dark-overlay {
+  @include glassy-dark-effect;
+}
+```
+
+**Key Characteristics:**
+
+- Uses **black** instead of white for a premium, modern aesthetic
+- 40% opacity provides excellent contrast while remaining transparent enough for backgrounds to show through
+- 12px blur (vs 10px for other variants) enhances the frosted glass effect
+- Perfect for dark-themed applications and showcasing animated backgrounds (e.g., synthwave pattern)
+- Recommended as the **default** for card components and primary UI elements
+
+**Color Theory:**
+
+- **White mixins** (subtle→strong): Ideal for light backgrounds; create airy, translucent effects
+- **Black mixin** (dark): Ideal for layered backgrounds; creates depth and sophistication while maintaining readability
+
+**Used In:**
+
+- `.glassy-dark` CSS class - Primary card styling across the application
+- `.glassy-card` CSS class - Material card components with enhanced dark styling
+- `card-layout.component.ts` - Default glassy intensity for CardLayout components
+- `compact-card-layout.component.ts` - Default glassy intensity for CompactCardLayout components
+
 **Implementation Details:**
 
 - All glassy mixins use CSS custom property `--glassy-color` for consistent glassmorphism effect (except `glassy-default-effect` which is hardcoded for legacy compatibility)
-- Both light and dark modes: `--glassy-color: 255, 255, 255` (white)
-- Using white tint in both themes creates proper glassmorphism effect that lets the blurred background show through
-- All variations use the same 10px backdrop blur for consistent visual effect
+- White mixins (subtle→strong): `--glassy-color: 255, 255, 255` (white) in both themes
+- Dark mixin: `rgba(0, 0, 0, 0.4)` hardcoded for maximum compatibility and consistency
+- Using different color approaches (white vs black) allows developers to choose the aesthetic that best suits their layout
 
 **Selection Guide:**
 
@@ -334,7 +394,8 @@ Available color variables for semantic styling:
 - **Light (7.5%)**: Subtle effect, low emphasis
 - **Default (10%)**: Standard glassmorphism, balanced visibility
 - **Medium (15%)**: Pronounced effect, higher emphasis
-- **Strong (20%)**: Bold effect, maximum visibility
+- **Strong (20%)**: Bold effect, maximum visibility (white)
+- **Dark (40% black)**: Premium dark glassmorphism, perfect for showcasing backgrounds - **recommended as default for modern applications**
 
 **Used In:**
 
@@ -1130,6 +1191,44 @@ this.dialog.open(YouTubeDialogComponent, {
    - Test styling in both light and dark modes
    - Use Material's built-in theming mixins when extending components
    - Leverage Material's density and typography configuration
+
+---
+
+## Background Patterns
+
+### Synthwave Neo-Retro Grid
+
+The application layout features a subtle animated synthwave-inspired background pattern that shines through glassy cards for a neo-retro aesthetic.
+
+**Implementation**: `libs/app/shell/src/lib/layout/layout.component.scss`
+
+**Features**:
+- Animated radial gradients in primary purple and highlight cyan colors
+- Subtle grid pattern (50px spacing) with minimal opacity
+- Animated scanlines that drift slowly (20s cycle)
+- Gentle pulsing effect (8s cycle) for ambient depth
+- Fixed positioning with `z-index: -1` - never interferes with UI
+
+**Design Philosophy**:
+- Opacity kept very low (0.015-0.15) to avoid distraction
+- Works with both light and dark themes using CSS custom properties
+- Enhances glassy card effects by providing visual interest through transparency
+- Performance-optimized using CSS animations only (no JavaScript)
+
+**Visual Elements**:
+1. **Grid Pattern**: Horizontal/vertical lines create retro grid aesthetic
+2. **Radial Gradients**: Purple (primary) and cyan (highlight) ellipses for depth
+3. **Scanlines**: Horizontal accent lines with subtle drift animation
+4. **Pulsing**: Gentle opacity animation for ambient movement
+
+**SVG Asset**: `apps/teensyrom-ui/public/synthwave-grid.svg`
+- Optional detailed synthwave grid with perspective
+- Animated scan line effect
+- Can be used as alternative background via CSS `background-image`
+
+**Accessibility**: Background opacity ensures WCAG contrast ratios are maintained for all text and interactive elements.
+
+**Used In**: Main application layout (all views)
 
 ### Styling Hierarchy
 

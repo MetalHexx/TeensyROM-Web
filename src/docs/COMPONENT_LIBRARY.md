@@ -12,7 +12,7 @@ Pure layout components without animations. Use these when you need static cards.
 
 ### `CardLayoutComponent`
 
-**Purpose**: Card layout with headers, titles, metadata, and corner slots. No animations.
+**Purpose**: Card layout with headers, titles, metadata, and corner slots. No animations. **Glassy backdrop effect enabled by default.**
 
 **Selector**: `lib-card-layout`
 
@@ -22,13 +22,51 @@ Pure layout components without animations. Use these when you need static cards.
 - `subtitle`: Text below title (optional)
 - `metadataSource`: Footer attribution (optional)
 - `enableOverflow`: Allow scrollbars (default: `true`)
+- `cardClass`: Additional CSS classes (optional)
+- `glassy`: Enable glassy backdrop effect (default: `true`)
+- `glassyIntensity`: Glassy effect intensity - `'subtle'`, `'light'`, `'medium'`, `'strong'`, `'dark'`, or `'default'` (default: `'dark'`)
+
+**Glassy Styling**:
+
+All cards include glassy backdrop effect by default with a dark semi-transparent glass appearance. The system automatically applies the appropriate CSS classes based on your configuration:
+
+- **Default behavior**: Dark intensity glassy effect (40% black overlay) with rounded corners - shows synthwave background beautifully
+- **Opt-out**: Set `[glassy]="false"` to disable glassy styling entirely
+- **Intensity variations**: Control opacity and blur strength via `glassyIntensity`
+  - `'subtle'`: 5% white opacity - barely visible tint
+  - `'light'`: 7.5% white opacity - gentle glassy effect
+  - `'medium'`: 15% white opacity - balanced glassy effect
+  - `'strong'`: 20% white opacity - prominent glassy effect
+  - `'dark'`: 40% black opacity - dark semi-transparent glass (default - recommended)
+  - `'default'`: Uses `.glassy-card` class (40% black opacity + Material Design tokens)
 
 **Usage**:
 
 ```html
+<!-- Default: dark glassy effect (shows synthwave beautifully) -->
 <lib-card-layout title="File Info" subtitle="v1.2.3">
-  <mat-chip slot="corner"><mat-chip>C64</mat-chip>
+  <mat-chip slot="corner">C64</mat-chip>
   <p>Content...</p>
+</lib-card-layout>
+
+<!-- Light glassy effect (more transparent) -->
+<lib-card-layout title="Settings" [glassyIntensity]="'light'">
+  <form>...</form>
+</lib-card-layout>
+
+<!-- Strong glassy effect -->
+<lib-card-layout title="YouTube Video" [glassyIntensity]="'strong'">
+  <iframe src="..."></iframe>
+</lib-card-layout>
+
+<!-- Disable glassy effect -->
+<lib-card-layout title="Plain Card" [glassy]="false">
+  <p>No backdrop blur</p>
+</lib-card-layout>
+
+<!-- Custom classes still work -->
+<lib-card-layout title="Custom" cardClass="my-custom-class">
+  <p>Combined with glassy effect</p>
 </lib-card-layout>
 ```
 
@@ -38,21 +76,59 @@ Pure layout components without animations. Use these when you need static cards.
 
 ### `CompactCardLayoutComponent`
 
-**Purpose**: Minimal card layout for forms and toolbars. No headers, no animations.
+**Purpose**: Minimal card layout for forms and toolbars. No headers, no animations. **Glassy backdrop effect enabled by default.**
 
 **Selector**: `lib-compact-card-layout`
 
 **Properties**:
 
 - `enableOverflow`: Allow scrollbars (default: `true`)
+- `cardClass`: Additional CSS classes (optional)
+- `glassy`: Enable glassy backdrop effect (default: `true`)
+- `glassyIntensity`: Glassy effect intensity - `'subtle'`, `'light'`, `'medium'`, `'strong'`, `'dark'`, or `'default'` (default: `'dark'`)
+
+**Glassy Styling**:
+
+All compact cards include glassy backdrop effect by default with a dark semi-transparent glass appearance. The system automatically applies the appropriate CSS classes:
+
+- **Default behavior**: Dark intensity glassy effect (40% black overlay) with rounded corners - shows synthwave background beautifully
+- **Opt-out**: Set `[glassy]="false"` to disable glassy styling entirely
+- **Intensity variations**: Control opacity and blur strength via `glassyIntensity`
+  - `'subtle'`: 5% white opacity - barely visible tint
+  - `'light'`: 7.5% white opacity - gentle glassy effect
+  - `'medium'`: 15% white opacity - balanced glassy effect
+  - `'strong'`: 20% white opacity - prominent glassy effect
+  - `'dark'`: 40% black opacity - dark semi-transparent glass (default - recommended)
+  - `'default'`: Uses `.glassy-card` class (40% black opacity + Material Design tokens)
 
 **Usage**:
 
 ```html
+<!-- Default: dark glassy effect (shows synthwave beautifully) -->
 <lib-compact-card-layout>
   <mat-form-field>
     <input matInput />
   </mat-form-field>
+</lib-compact-card-layout>
+
+<!-- Light glassy effect for more transparency -->
+<lib-compact-card-layout [glassyIntensity]="'light'">
+  <div class="toolbar-buttons">...</div>
+</lib-compact-card-layout>
+
+<!-- Strong glassy effect for prominent overlays -->
+<lib-compact-card-layout [glassyIntensity]="'strong'">
+  <div class="overlay-content">...</div>
+</lib-compact-card-layout>
+
+<!-- Disable glassy effect -->
+<lib-compact-card-layout [glassy]="false">
+  <form>Plain card without blur</form>
+</lib-compact-card-layout>
+
+<!-- Custom classes still work -->
+<lib-compact-card-layout cardClass="custom-toolbar-class">
+  <div>Combined with glassy effect</div>
 </lib-compact-card-layout>
 ```
 
@@ -66,31 +142,46 @@ Animated cards that combine layout + animation. See [Animation System](#animatio
 
 ### `ScalingCardComponent`
 
-**Purpose**: Animated card with scale+fade+slide effects. Composes [CardLayoutComponent](#cardlayoutcomponent) + [ScalingContainerComponent](#scalingcontainercomponent).
+**Purpose**: Animated card with scale+fade+slide effects. Composes [CardLayoutComponent](#cardlayoutcomponent) + [ScalingContainerComponent](#scalingcontainercomponent). **Inherits glassy backdrop effect from CardLayoutComponent.**
 
 **Selector**: `lib-scaling-card`
 
 **Properties**:
 
-- Layout props: `title`, `subtitle`, `metadataSource`, `enableOverflow`, `cardClass`
+- Layout props: `title`, `subtitle`, `metadataSource`, `enableOverflow`, `cardClass`, `glassy`, `glassyIntensity`
 - Animation props: `animationEntry`, `animationExit`, `animationTrigger`, `animationParent`, `animationDuration`
+
+**Glassy Styling**: 
+
+Inherits all glassy styling options from [CardLayoutComponent](#cardlayoutcomponent). Glassy effect is enabled by default with `'medium'` intensity.
 
 **Usage**:
 
 ```html
+<!-- Default: medium glassy effect with animation -->
 <lib-scaling-card title="Device" animationEntry="from-left">
   <button mat-icon-button slot="corner"><mat-icon>more_vert</mat-icon></button>
   <p>Content...</p>
 </lib-scaling-card>
 
-<!-- With custom animation speed and glassy effect -->
+<!-- Custom animation speed with strong glassy effect -->
 <lib-scaling-card
-  cardClass="glassy-card"
   title="YouTube Video"
   [animationDuration]="1200"
+  [glassyIntensity]="'strong'"
   animationEntry="from-top"
 >
   <iframe src="..."></iframe>
+</lib-scaling-card>
+
+<!-- Disable glassy effect -->
+<lib-scaling-card title="Plain" [glassy]="false" animationEntry="from-bottom">
+  <p>No backdrop blur</p>
+</lib-scaling-card>
+
+<!-- Legacy approach still works (but not needed) -->
+<lib-scaling-card cardClass="glassy-card" title="Legacy">
+  <p>Explicitly passing glassy-card class</p>
 </lib-scaling-card>
 ```
 
@@ -98,25 +189,49 @@ Animated cards that combine layout + animation. See [Animation System](#animatio
 
 ### `ScalingCompactCardComponent`
 
-**Purpose**: Animated compact card for forms/toolbars. Composes [CompactCardLayoutComponent](#compactcardlayoutcomponent) + [ScalingContainerComponent](#scalingcontainercomponent).
+**Purpose**: Animated compact card for forms/toolbars. Composes [CompactCardLayoutComponent](#compactcardlayoutcomponent) + [ScalingContainerComponent](#scalingcontainercomponent). **Inherits glassy backdrop effect from CompactCardLayoutComponent.**
 
 **Selector**: `lib-scaling-compact-card`
 
 **Properties**:
 
-- Layout props: `enableOverflow`, `cardClass`
+- Layout props: `enableOverflow`, `cardClass`, `glassy`, `glassyIntensity`
 - Animation props: `animationEntry`, `animationExit`, `animationTrigger`, `animationParent`, `animationDuration`
+
+**Glassy Styling**: 
+
+Inherits all glassy styling options from [CompactCardLayoutComponent](#compactcardlayoutcomponent). Glassy effect is enabled by default with `'medium'` intensity.
 
 **Usage**:
 
 ```html
+<!-- Default: medium glassy effect with animation -->
 <lib-scaling-compact-card animationEntry="from-top">
   <mat-form-field><input matInput /></mat-form-field>
 </lib-scaling-compact-card>
 
-<!-- With custom animation speed -->
-<lib-scaling-compact-card [animationDuration]="800" animationEntry="from-left">
+<!-- Custom animation speed with subtle glassy effect -->
+<lib-scaling-compact-card 
+  [animationDuration]="800" 
+  [glassyIntensity]="'subtle'"
+  animationEntry="from-left"
+>
   <form>...</form>
+</lib-scaling-compact-card>
+
+<!-- Strong glassy effect for prominent overlays -->
+<lib-scaling-compact-card [glassyIntensity]="'strong'" animationEntry="from-top">
+  <div class="overlay-controls">...</div>
+</lib-scaling-compact-card>
+
+<!-- Disable glassy effect -->
+<lib-scaling-compact-card [glassy]="false" animationEntry="from-right">
+  <div>Plain card without blur</div>
+</lib-scaling-compact-card>
+
+<!-- Legacy approach still works (but not needed) -->
+<lib-scaling-compact-card cardClass="glassy-card" animationEntry="from-top">
+  <div>Explicitly passing glassy-card class</div>
 </lib-scaling-compact-card>
 ```
 

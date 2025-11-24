@@ -80,7 +80,7 @@ html.dark-mode {
 }
 
 body {
-  background: var(--mat-sys-surface-container-low);
+  background: transparent; // Let the synthwave pattern show through from layout component
   color: var(--mat-sys-on-surface);
 }
 
@@ -128,6 +128,12 @@ body {
   background-color: rgba(var(--glassy-color), 0.2) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+@mixin glassy-dark-effect {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 // ─────────────────────────────────────────────
@@ -249,8 +255,12 @@ body {
   @include glassy-strong-effect;
 }
 
+.glassy-dark {
+  @include glassy-dark-effect;
+}
+
 .glassy-card {
-  @include glassy-medium-effect;
+  @include glassy-dark-effect;
   border-radius: var(--mat-sys-corner-large) !important;
   box-shadow: var(--mat-sys-level4) !important;
   will-change: transform, backdrop-filter;
