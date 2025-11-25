@@ -10,7 +10,9 @@
     [style.--screen-curvature.px]="screenCurvature()"
     [style.--crt-contrast]="contrast()"
     [style.--crt-brightness]="brightness()"
-    [style.--crt-saturation]="saturation()">
+    [style.--crt-saturation]="saturation()"
+    [style.--video-visible-left.px]="videoVisibleLeft()"
+    [style.--video-visible-width.px]="videoVisibleWidth()">
     <video 
       #dialogVideoElement 
       autoplay 
@@ -59,7 +61,7 @@
 
         <div class="crt-control-group">
           <span class="control-label">Screen Curvature</span>
-          <mat-slider min="0" max="50" step="2" discrete>
+          <mat-slider min="0" max="150" step="5" discrete>
             <input matSliderThumb [(ngModel)]="screenCurvature" />
           </mat-slider>
           <span class="control-value">{{ screenCurvature() }}px</span>

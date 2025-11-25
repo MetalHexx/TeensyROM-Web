@@ -104,16 +104,6 @@
     position: relative;
     width: 100%;
     height: 100%;
-    
-    // CSS variables with defaults
-    --scanline-intensity: 0.5;
-    --scanline-thickness: 3px;
-    --scanline-spacing: 2px;
-    --vignette-strength: 1.3;
-    --screen-curvature: 40px;
-    --crt-contrast: 1.1;
-    --crt-brightness: 1.5;
-    --crt-saturation: 1.3;
 
     // CRT effect styling
     &.crt-effect {
@@ -194,6 +184,37 @@
     .video-wrapper {
       .video-stream {
         object-fit: contain;
+      }
+
+      // Apply dynamic positioning for pseudo-elements in fullscreen only
+      &.crt-effect {
+        // Use clip-path for proper curved masking in fullscreen
+        clip-path: inset(
+          0 
+          calc((100% - var(--video-visible-width)) / 2)
+          0 
+          calc((100% - var(--video-visible-width)) / 2)
+          round var(--screen-curvature)
+        );
+
+        &::before {
+          left: var(--video-visible-left);
+          width: var(--video-visible-width);
+          // Remove border-radius in fullscreen (clip-path handles it)
+          border-radius: 0;
+        }
+
+        &::after {
+          left: calc(var(--video-visible-left) - 20px);
+          width: calc(var(--video-visible-width) + 40px);
+          // Remove border-radius in fullscreen (clip-path handles it)
+          border-radius: 0;
+        }
+
+        .video-stream {
+          // Remove border-radius in fullscreen (clip-path handles it)
+          border-radius: 0;
+        }
       }
     }
 
