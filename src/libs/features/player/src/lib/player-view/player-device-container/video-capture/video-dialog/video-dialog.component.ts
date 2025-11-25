@@ -33,7 +33,7 @@ export class VideoDialogComponent implements OnDestroy {
   scanlineThickness = signal<number>(3);
   scanlineSpacing = signal<number>(2);
   vignetteStrength = signal<number>(1.30);
-  screenCurvature = signal<number>(100);
+  screenCurvature = signal<number>(115);
   contrast = signal<number>(1.10);
   brightness = signal<number>(1.50);
   saturation = signal<number>(1.30);
