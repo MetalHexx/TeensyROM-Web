@@ -16,6 +16,87 @@
       background-color: transparent !important;
       box-sizing: border-box !important;
     }
+
+    // Ensure hover events work on video dialog without requiring focus
+    &:hover {
+      lib-video-dialog {
+        .video-container {
+          .player-toolbar-overlay,
+          .filter-toolbar-overlay {
+            opacity: 1 !important;
+          }
+
+          .player-toolbar-overlay {
+            transform: translateY(0) !important;
+          }
+
+          .filter-toolbar-overlay {
+            transform: translate(-50%, 0) !important;
+          }
+
+          .video-controls {
+            opacity: 1 !important;
+
+            .close-button {
+              opacity: 1 !important;
+            }
+
+            .right-controls-card {
+              opacity: 1 !important;
+              transform: translateX(0) !important;
+            }
+          }
+
+          .crt-controls-overlay.slide-in {
+            opacity: 1 !important;
+            transform: translateX(0) !important;
+          }
+        }
+      }
+    }
+  }
+
+  // Keep video dialog toolbars visible when dropdown menu is open
+  body:has(.dropdown-menu-wrapper) {
+    .video-container {
+      .player-toolbar-overlay,
+      .filter-toolbar-overlay {
+        opacity: 1 !important;
+        pointer-events: all !important;
+      }
+
+      .player-toolbar-overlay {
+        transform: translateY(0) !important;
+      }
+
+      .filter-toolbar-overlay {
+        transform: translate(-50%, 0) !important;
+      }
+
+      .crt-controls-overlay.slide-in {
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+      }
+
+      .video-controls {
+        opacity: 1 !important;
+
+        .right-controls-card {
+          opacity: 1 !important;
+          transform: translateX(0) !important;
+          pointer-events: all !important;
+
+          lib-compact-card-layout,
+          ::ng-deep lib-compact-card-layout {
+            opacity: 1 !important;
+          }
+        }
+
+        .close-button {
+          opacity: 1 !important;
+        }
+      }
+    }
   }
 }
 
@@ -26,20 +107,7 @@
   padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
-
-  // Keep toolbars visible when hovering anywhere in the dialog
-  &:hover .player-toolbar-overlay,
-  &:hover .filter-toolbar-overlay {
-    opacity: 1 !important;
-  }
-
-  &:hover .player-toolbar-overlay {
-    transform: translateY(0) !important;
-  }
-
-  &:hover .filter-toolbar-overlay {
-    transform: translate(-50%, 0) !important;
-  }
+  pointer-events: auto !important;
 }
 
 .video-container {
@@ -52,14 +120,15 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--screen-curvature, 12px);
+  pointer-events: auto !important;
 
-  // Show controls on container hover
+  // Show controls on container hover only (not focus-within for initial state)
   &:hover .video-controls {
-    opacity: 1;
+    opacity: 1 !important;
   }
 
   &:hover .video-controls .close-button {
-    opacity: 1;
+    opacity: 1 !important;
   }
 
   // Show and slide in CRT controls on container hover (when slide-in is active)
@@ -68,36 +137,25 @@
     transform: translateX(0) !important;
   }
 
-  // Hide and slide out CRT controls when not hovering
-  &:not(:hover) .crt-controls-overlay {
-    opacity: 0 !important;
-    transform: translateX(-100%) !important;
-  }
-
   // Show and slide in right controls on container hover
   &:hover .video-controls .right-controls-card {
     opacity: 1 !important;
     transform: translateX(0) !important;
   }
 
-  // Hide and slide out right controls when not hovering
-  &:not(:hover) .video-controls .right-controls-card {
-    opacity: 0 !important;
-    transform: translateX(100%) !important;
-  }
-
   // Show toolbars on container hover
   &:hover .player-toolbar-overlay,
   &:hover .filter-toolbar-overlay {
-    opacity: 1;
+    opacity: 1 !important;
+    pointer-events: all !important;
   }
 
   &:hover .player-toolbar-overlay {
-    transform: translateY(0);
+    transform: translateY(0) !important;
   }
 
   &:hover .filter-toolbar-overlay {
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 0) !important;
   }
 
   .video-wrapper {
@@ -247,13 +305,33 @@
 
     // Show toolbars on container hover in fullscreen
     &:hover .player-toolbar-overlay {
-      transform: translateY(0);
-      opacity: 1;
+      transform: translateY(0) !important;
+      opacity: 1 !important;
+      pointer-events: all !important;
     }
 
     &:hover .filter-toolbar-overlay {
-      transform: translate(-50%, 0);
-      opacity: 1;
+      transform: translate(-50%, 0) !important;
+      opacity: 1 !important;
+      pointer-events: all !important;
+    }
+
+    &:hover .video-controls {
+      opacity: 1 !important;
+    }
+
+    &:hover .video-controls .close-button {
+      opacity: 1 !important;
+    }
+
+    &:hover .video-controls .right-controls-card {
+      opacity: 1 !important;
+      transform: translateX(0) !important;
+    }
+
+    &:hover .crt-controls-overlay.slide-in {
+      opacity: 1 !important;
+      transform: translateX(0) !important;
     }
 
     // Fix card positioning in fullscreen
@@ -301,6 +379,12 @@
       transform: translate(-50%, 0) !important;
     }
 
+    // Stay visible when menu has focus
+    &:focus-within {
+      opacity: 1 !important;
+      transform: translate(-50%, 0) !important;
+    }
+
     // Only remove outer margins
     ::ng-deep lib-scaling-compact-card {
       margin: 0 !important;
@@ -320,6 +404,12 @@
 
     // Stay visible when hovering over the toolbar itself
     &:hover {
+      opacity: 1 !important;
+      transform: translateY(0) !important;
+    }
+
+    // Stay visible when menu has focus
+    &:focus-within {
       opacity: 1 !important;
       transform: translateY(0) !important;
     }

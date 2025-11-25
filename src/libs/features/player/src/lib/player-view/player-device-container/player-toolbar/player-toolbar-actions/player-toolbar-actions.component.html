@@ -1,40 +1,44 @@
 <div class="toolbar-actions">
-  <!-- Custom Timer Button with Menu -->
-  <lib-icon-button
-    icon="timer"
-    ariaLabel="Custom Play Timer"
-    size="large"
-    variant="rounded-transparent"
-    [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"
-    [matTooltip]="'Custom Play Timer'"
-    [matMenuTriggerFor]="timerMenu"
-    [matBadge]="timerBadgeText()"
-    matBadgePosition="above after"
-    matBadgeColor="primary"
-    [matBadgeHidden]="!isCustomTimerEnabled()"
-    data-testid="timer-button"
-  >
-  </lib-icon-button>
+  <!-- Custom Timer Button with Dropdown Menu -->
+  <lib-dropdown-menu #timerDropdown>
+    <lib-icon-button
+      icon="timer"
+      ariaLabel="Custom Play Timer"
+      size="large"
+      variant="rounded-transparent"
+      [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"
+      [matTooltip]="'Custom Play Timer'"
+      [matBadge]="timerBadgeText()"
+      matBadgePosition="above after"
+      matBadgeColor="primary"
+      [matBadgeHidden]="!isCustomTimerEnabled()"
+      data-testid="timer-button"
+      (buttonClick)="timerDropdown.toggle()"
+    >
+    </lib-icon-button>
 
-  <mat-menu #timerMenu="matMenu">
-    <!-- Off option -->
-    <button mat-menu-item (click)="onTimerMenuItemClick(null)" data-testid="timer-menu-off">
-      @if (!isCustomTimerEnabled()) {
-        <mat-icon>check</mat-icon>
+    <div dropdown-content>
+      <!-- Off option -->
+      <lib-dropdown-menu-item 
+        [selected]="!isCustomTimerEnabled()"
+        [testId]="'timer-menu-off'"
+        (itemClick)="onTimerMenuItemClick(null)"
+      >
+        Off
+      </lib-dropdown-menu-item>
+
+      <!-- Duration options -->
+      @for (option of durationOptions; track option.valueMs) {
+        <lib-dropdown-menu-item
+          [selected]="isCustomTimerEnabled() && selectedDurationMs() === option.valueMs"
+          [testId]="'timer-menu-' + option.label"
+          (itemClick)="onTimerMenuItemClick(option.valueMs)"
+        >
+          {{ option.label }}
+        </lib-dropdown-menu-item>
       }
-      <span>Off</span>
-    </button>
-
-    <!-- Duration options -->
-    @for (option of durationOptions; track option.valueMs) {
-      <button mat-menu-item (click)="onTimerMenuItemClick(option.valueMs)" [attr.data-testid]="'timer-menu-' + option.label">
-        @if (isCustomTimerEnabled() && selectedDurationMs() === option.valueMs) {
-          <mat-icon>check</mat-icon>
-        }
-        <span>{{ option.label }}</span>
-      </button>
-    }
-  </mat-menu>
+    </div>
+  </lib-dropdown-menu>
 
   <lib-icon-button
     icon="shuffle"

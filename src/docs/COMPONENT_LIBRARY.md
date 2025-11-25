@@ -1530,6 +1530,292 @@ The component uses a `ScalingCardComponent` with:
 
 ---
 
+## Menu Components
+
+### `DropdownMenuComponent`
+
+**Purpose**: A custom dropdown menu component using Angular CDK Overlay for better control over rendering lifecycle. Provides smooth fade-in/out animations with glassy backdrop styling. Designed to avoid the flicker issues present in Material's mat-menu by managing overlay lifecycle explicitly without automatic focus restoration or aggressive animations.
+
+**Selector**: `lib-dropdown-menu`
+
+**Properties**:
+
+- `isOpen`: `Signal<boolean>` - Read-only signal indicating current open/closed state
+
+**Methods**:
+
+- `toggle()`: Toggle dropdown open/closed state
+- `open()`: Explicitly open the dropdown
+- `close()`: Explicitly close the dropdown
+
+**Events**:
+
+- `opened`: Emitted when dropdown opens
+- `closed`: Emitted when dropdown closes
+
+**Usage Examples**:
+
+```html
+<!-- Basic dropdown with toggle -->
+<lib-dropdown-menu #dropdown>
+  <lib-icon-button
+    icon="more_vert"
+    ariaLabel="Options"
+    (buttonClick)="dropdown.toggle()"
+  >
+  </lib-icon-button>
+
+  <div dropdown-content>
+    <lib-dropdown-menu-item [selected]="false" (itemClick)="onOption1()">
+      Option 1
+    </lib-dropdown-menu-item>
+    <lib-dropdown-menu-item [selected]="true" (itemClick)="onOption2()">
+      Option 2
+    </lib-dropdown-menu-item>
+  </div>
+</lib-dropdown-menu>
+
+<!-- With timer menu example -->
+<lib-dropdown-menu #timerDropdown>
+  <lib-icon-button
+    icon="timer"
+    ariaLabel="Custom Play Timer"
+    [matBadge]="timerBadgeText()"
+    (buttonClick)="timerDropdown.toggle()"
+  >
+  </lib-icon-button>
+
+  <div dropdown-content>
+    <lib-dropdown-menu-item 
+      [selected]="!isTimerEnabled()"
+      (itemClick)="disableTimer()"
+    >
+      Off
+    </lib-dropdown-menu-item>
+
+    @for (option of durationOptions; track option.value) {
+      <lib-dropdown-menu-item
+        [selected]="isTimerEnabled() && selectedDuration() === option.value"
+        (itemClick)="setDuration(option.value)"
+      >
+        {{ option.label }}
+      </lib-dropdown-menu-item>
+    }
+  </div>
+</lib-dropdown-menu>
+```
+
+**Advanced Usage with Programmatic Control**:
+
+```typescript
+export class ToolbarComponent {
+  dropdown = viewChild<DropdownMenuComponent>('dropdown');
+
+  openMenu() {
+    this.dropdown()?.open();
+  }
+
+  closeMenu() {
+    this.dropdown()?.close();
+  }
+
+  onMenuItemClick(action: string) {
+    // Perform action
+    console.log('Action:', action);
+    
+    // Explicitly close dropdown after action
+    this.dropdown()?.close();
+  }
+}
+```
+
+**Animation Behavior**:
+
+- **Entry**: 150ms fade-in with scale (0.95 → 1.0) and opacity (0 → 1)
+- **Exit**: 100ms fade-out with scale (1.0 → 0.95) and opacity (1 → 0)
+- **Easing**: Smooth cubic-bezier transitions
+- **No Flicker**: Explicitly managed lifecycle prevents browser repaint issues
+
+**Positioning**:
+
+Uses Angular CDK's flexible positioning with fallback options:
+
+1. **Primary**: Below trigger element, aligned to start (left edge)
+   - `originY: 'bottom'`, `overlayY: 'top'`, `offsetY: 8px`
+2. **Fallback**: Above trigger element if insufficient space below
+   - `originY: 'top'`, `overlayY: 'bottom'`, `offsetY: -8px`
+
+**Backdrop Behavior**:
+
+- **Transparent Backdrop**: Invisible backdrop that closes menu on outside click
+- **Click-to-Close**: Clicking outside menu automatically closes it
+- **No Visual Overlay**: Unlike dialogs, dropdown doesn't dim background
+
+**Styling Integration**:
+
+- **Glassy Effect**: Uses `CompactCardLayoutComponent` with `glassy-card` class
+- **Theme Integration**: Automatically adapts to light/dark theme
+- **Shadow**: Material Design elevation shadow (0 8px 24px rgba(0, 0, 0, 0.3))
+- **Sizing**: Min-width 120px, max-width 280px with automatic content sizing
+
+**Content Projection**:
+
+Uses two content projection slots:
+
+1. **Default slot**: Trigger element (button, icon, etc.)
+2. **`[dropdown-content]` slot**: Menu items wrapped in a div with this attribute
+
+**Best Practice**:
+
+- Always use `#templateRef` to get component reference for toggle/open/close methods
+- Wrap menu items in a `<div dropdown-content>` element
+- Call `dropdown.close()` explicitly after handling menu item clicks
+- Use `lib-dropdown-menu-item` for consistent menu item styling
+- Prefer this over `mat-menu` when experiencing flicker issues
+
+**Advantages over mat-menu**:
+
+- **No Flicker**: Explicit lifecycle management prevents browser repaint issues
+- **Smooth Animations**: Controlled fade-in/out without aggressive Material animations
+- **Simpler Lifecycle**: No automatic focus restoration causing visual glitches
+- **Full Control**: Direct access to open/close methods via template reference
+
+**Used In**:
+
+- `player-toolbar-actions.component.html` - Custom play timer menu
+
+**See Also**: [DropdownMenuItemComponent](#dropdownmenuitemcomponent), [CompactCardLayoutComponent](#compactcardlayoutcomponent)
+
+---
+
+### `DropdownMenuItemComponent`
+
+**Purpose**: Menu item component for use with `lib-dropdown-menu`. Provides consistent styling, selection state indicators, and click handling for dropdown menu items. Displays a check icon when selected and emits events on click.
+
+**Selector**: `lib-dropdown-menu-item`
+
+**Properties**:
+
+- `selected`: `boolean` - Whether this item is currently selected (shows check icon) - defaults to `false`
+- `testId`: `string` - Data-testid attribute for testing - defaults to empty string
+
+**Events**:
+
+- `itemClick`: Emitted when menu item is clicked
+
+**Usage Examples**:
+
+```html
+<!-- Basic menu item -->
+<lib-dropdown-menu-item (itemClick)="handleClick()">
+  Action
+</lib-dropdown-menu-item>
+
+<!-- Selected item with check icon -->
+<lib-dropdown-menu-item [selected]="true" (itemClick)="handleClick()">
+  Current Selection
+</lib-dropdown-menu-item>
+
+<!-- With test ID for e2e testing -->
+<lib-dropdown-menu-item 
+  [testId]="'menu-delete'"
+  (itemClick)="deleteItem()"
+>
+  Delete
+</lib-dropdown-menu-item>
+
+<!-- Dynamic selection state -->
+<lib-dropdown-menu-item
+  [selected]="currentValue() === option.value"
+  (itemClick)="selectOption(option)"
+>
+  {{ option.label }}
+</lib-dropdown-menu-item>
+```
+
+**Advanced Usage in Loop**:
+
+```typescript
+export class MenuComponent {
+  options = [
+    { value: 'small', label: 'Small' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'large', label: 'Large' }
+  ];
+
+  selectedSize = signal<string>('medium');
+
+  selectSize(size: string) {
+    this.selectedSize.set(size);
+    // Dropdown will close automatically after click
+  }
+}
+```
+
+```html
+<lib-dropdown-menu #sizeMenu>
+  <lib-icon-button icon="format_size" (buttonClick)="sizeMenu.toggle()">
+  </lib-icon-button>
+
+  <div dropdown-content>
+    @for (option of options; track option.value) {
+      <lib-dropdown-menu-item
+        [selected]="selectedSize() === option.value"
+        [testId]="'size-' + option.value"
+        (itemClick)="selectSize(option.value)"
+      >
+        {{ option.label }}
+      </lib-dropdown-menu-item>
+    }
+  </div>
+</lib-dropdown-menu>
+```
+
+**Visual States**:
+
+- **Normal**: Default appearance with hover effect (10% white overlay)
+- **Hover**: Light background (10% white overlay) on mouse over
+- **Active**: Slightly darker background (15% white overlay) on click
+- **Selected**: Subtle background (8% white overlay) with check icon
+
+**Check Icon**:
+
+- **Color**: Uses `--color-highlight` (cyan/magenta based on theme)
+- **Size**: 18px × 18px Material icon
+- **Position**: Left side of menu item before label text
+- **Visibility**: Only shown when `[selected]="true"`
+
+**Styling Integration**:
+
+- **Font**: Roboto sans-serif, 0.875rem (14px)
+- **Spacing**: 12px vertical padding, 16px horizontal padding, 12px gap between icon and text
+- **Colors**: Uses `--mat-sys-on-surface` for text, theme-aware colors
+- **Transitions**: Smooth 0.2s ease background color transitions
+- **Layout**: Flexbox with full-width button, left-aligned text
+
+**Accessibility Features**:
+
+- **Semantic Button**: Uses native `<button>` element for proper semantics
+- **Keyboard Support**: Full keyboard navigation (Enter/Space to activate)
+- **Type Safety**: `type="button"` prevents form submission
+- **Test Integration**: `data-testid` attribute for e2e testing
+
+**Best Practice**:
+
+- Always use inside `lib-dropdown-menu` with `dropdown-content` wrapper
+- Set `[selected]="true"` for currently active option to show check icon
+- Provide `testId` for menu items used in e2e tests
+- Keep menu item labels concise (1-3 words) for optimal layout
+- Emit events and let parent component handle logic + dropdown closing
+
+**Used In**:
+
+- `player-toolbar-actions.component.html` - Timer duration options menu
+
+**See Also**: [DropdownMenuComponent](#dropdownmenucomponent), [IconButtonComponent](#iconbuttoncomponent)
+
+---
+
 ## List Components
 
 ### `StorageItemComponent`

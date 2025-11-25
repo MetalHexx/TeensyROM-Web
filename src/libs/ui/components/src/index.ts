@@ -1,5 +1,7 @@
 export * from './lib/menu-item/menu-item.component';
 export * from './lib/menu-item/menu-item.model';
+export * from './lib/dropdown-menu/dropdown-menu.component';
+export * from './lib/dropdown-menu/dropdown-menu-item.component';
 export * from './lib/icon-label/icon-label.component';
 export * from './lib/link/link.component';
 export * from './lib/external-link/external-link.component';

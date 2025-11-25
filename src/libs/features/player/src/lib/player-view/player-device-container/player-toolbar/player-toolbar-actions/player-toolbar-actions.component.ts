@@ -1,10 +1,9 @@
-import { Component, inject, input, computed } from '@angular/core';
+import { Component, inject, input, computed, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { IconButtonComponent } from '@teensyrom-nx/ui/components';
+import { IconButtonComponent, DropdownMenuComponent, DropdownMenuItemComponent } from '@teensyrom-nx/ui/components';
 import { PLAYER_CONTEXT, StorageStore } from '@teensyrom-nx/application';
 import { LaunchMode } from '@teensyrom-nx/domain';
 import { StorageKeyUtil } from '@teensyrom-nx/application';
@@ -32,10 +31,11 @@ const DURATION_OPTIONS = [
   imports: [
     CommonModule,
     MatIconModule,
-    MatMenuModule,
     MatBadgeModule,
     MatTooltipModule,
     IconButtonComponent,
+    DropdownMenuComponent,
+    DropdownMenuItemComponent,
   ],
   templateUrl: './player-toolbar-actions.component.html',
   styleUrl: './player-toolbar-actions.component.scss',
@@ -45,6 +45,8 @@ export class PlayerToolbarActionsComponent {
   private readonly storageStore = inject(StorageStore);
 
   deviceId = input.required<string>();
+  
+  timerDropdown = viewChild<DropdownMenuComponent>('timerDropdown');
 
   /**
    * Expose duration options for template usage
@@ -113,6 +115,9 @@ export class PlayerToolbarActionsComponent {
       // Duration selected - enable timer with selected duration
       this.playerContext.setCustomTimer(deviceId, true, durationMs);
     }
+    
+    // Close the dropdown
+    this.timerDropdown()?.close();
   }
 
   toggleShuffleMode(): void {

@@ -622,6 +622,20 @@ mat-card-title {
   background-color: var(--dialog-backdrop-color) !important;
 }
 
+// Ensure CDK overlays appear in fullscreen with extremely high z-index
+.cdk-overlay-container {
+  z-index: 2147483647 !important; // Maximum safe z-index
+}
+
+.cdk-overlay-pane {
+  z-index: 2147483647 !important;
+}
+
+// Dropdown menu wrapper
+.dropdown-menu-wrapper {
+  z-index: 2147483647 !important;
+}
+
 // ─────────────────────────────────────────────
 //  LAYOUT / FONT STYLES
 // ─────────────────────────────────────────────

@@ -1,0 +1,18 @@
+:host {
+  display: inline-block;
+}
+
+.dropdown-container {
+  display: inline-block;
+  cursor: pointer;
+}
+
+.dropdown-menu-wrapper {
+  min-width: 120px;
+  max-width: 280px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown-menu-content {
+  padding: 4px 0;
+}

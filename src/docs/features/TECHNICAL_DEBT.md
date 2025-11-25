@@ -217,6 +217,47 @@ getButtonColor = input<IconButtonColor>(IconButtonColors.NORMAL);
 
 ## UI/UX
 
+### Material Menu Flicker on Close
+
+**Priority**: Medium  
+**Effort**: 2-3 days  
+**Created**: 2025-11-25
+
+**Issue**: When Material menus close (specifically the play timer menu in player toolbar), the entire browser content flickers briefly. This affects both the video dialog and the main player view where the toolbar is used.
+
+**Affected Components**:
+- `libs/features/player/src/lib/player-view/player-device-container/player-toolbar/player-toolbar-actions/player-toolbar-actions.component.html` - Timer menu trigger
+- `libs/features/player/src/lib/player-view/player-device-container/video-capture/video-dialog/video-dialog.component.scss` - Toolbar visibility during menu interaction
+- Global Material menu behavior
+
+**Current Problems**:
+- Entire page content flickers when menu closes (not just toolbars)
+- Affects user experience across all views using the player toolbar
+- Not isolated to dialog backdrop or overlay - occurs on regular page content
+- Appears to be a browser repaint/rendering issue triggered by Material's menu close behavior
+
+**Attempted Solutions**:
+- Added `body:has(.mat-mdc-menu-panel)` selector to force toolbar visibility during menu interaction
+- Disabled transitions with `transition: none !important` while menu is open
+- Tried `matMenuTriggerRestoreFocus="false"` to prevent focus restoration
+- Added pointer-events disabling via MutationObserver
+- Attempted to disable backdrop/overlay transitions
+- Added `will-change: auto` reset on menu close
+
+**Recommended Solution**:
+- Investigate Material menu lifecycle hooks and overlay rendering
+- Consider using custom menu implementation or dropdown component
+- Research browser-specific rendering optimizations
+- Look into Material CDK overlay configuration options
+- Test with different Angular Material versions to identify regression
+
+**Benefits**:
+- Smoother user experience when interacting with menus
+- Professional appearance without visual glitches
+- Better overall UI polish
+
+**Breaking Changes**: May require replacing Material menu with custom implementation
+
 ### Player View Responsiveness Issues
 
 **Priority**: Medium
