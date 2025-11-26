@@ -9,29 +9,29 @@ Opens the TeensyROM Settings view at http://localhost:4200/settings. If the fron
 
 ## Process
 
-### Step 1: Check if Frontend is Running
+### Step 1: Open Settings View
 
-Check if the "Serve Frontend" task is already running:
-- If running, proceed to Step 3
-- If not running, proceed to Step 2
-
-### Step 2: Start Frontend (if needed)
-
-If the frontend is not running, start it:
-
-```bash
-pnpm start
-```
-
-Wait for the dev server to be ready (typically shows "Application bundle generation complete" or similar message indicating the server is listening on port 4200).
-
-### Step 3: Open Settings View
-
-Open the Settings view in the browser:
+Eagerly attempt to open the Settings view in the browser:
 
 **URL**: http://localhost:4200/settings
 
 Use the Simple Browser to open the URL within VS Code for quick access.
+
+### Step 2: Start Frontend (if Step 1 fails)
+
+If the page fails to load (connection refused or page not found), start the frontend:
+
+```bash
+pnpm nx serve teensyrom-ui
+```
+
+Wait for the dev server to be ready (typically shows "Application bundle generation complete" or similar message indicating the server is listening on port 4200).
+
+### Step 3: Retry Opening Settings View
+
+After the dev server starts, open the Settings view again:
+
+**URL**: http://localhost:4200/settings
 
 ## Expected Outcome
 
