@@ -3,7 +3,7 @@
 <lib-empty-state-message
   icon="error"
   title="Error Loading Settings"
-  [message]="error()!">
+  [message]="error() || ''">
 </lib-empty-state-message>
 
 } @else if (settingsForm()) {
@@ -18,6 +18,12 @@
           [variant]="activeSection() === 'player' ? 'raised' : 'stroked'"
           [color]="activeSection() === 'player' ? 'primary' : 'normal'"
           (buttonClick)="setActiveSection('player')" />
+        <lib-action-button
+          icon="videocam"
+          label="Video"
+          [variant]="activeSection() === 'video' ? 'raised' : 'stroked'"
+          [color]="activeSection() === 'video' ? 'primary' : 'normal'"
+          (buttonClick)="setActiveSection('video')" />
         <lib-action-button
           icon="folder"
           label="File Transfer"
@@ -47,6 +53,10 @@
             [formGroup]="getPlayerSettings()"
             [animationTrigger]="activeSection() === 'player'" />
         <!-- } -->
+
+        <lib-video-settings-section
+          [formGroup]="getVideoSettings()"
+          [animationTrigger]="activeSection() === 'video'" />
 
         <lib-file-transfer-settings-section
           [formGroup]="getFileTransferSettings()"

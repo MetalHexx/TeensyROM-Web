@@ -57,6 +57,9 @@ describe('SettingsStore (NgRx Signal Store)', () => {
       startupLaunchEnabled: false,
       startupLaunchRandom: false,
     },
+    videoSettings: {
+      enableVideo: false,
+    },
     fileTransferSettings: {
       watchDirectoryLocation: '',
       autoTransferPath: '',
@@ -842,6 +845,176 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         const display = store.historyPositionDisplay();
         expect(display()).toBeNull();
       });
+    });
+
+    describe('selectVideoSettings', () => {
+      it('should return null when settings not loaded', () => {
+        const videoSettings = (store as any).videoSettings;
+        expect(videoSettings()).toBeNull();
+      });
+
+      it('should return VideoSettings when settings loaded', async () => {
+        const mockSettings = createMockSettings({
+          videoSettings: { enableVideo: true },
+        });
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        const videoSettings = (store as any).videoSettings;
+        expect(videoSettings()).toEqual({ enableVideo: true });
+      });
+
+      it('should reactively update when video settings change', async () => {
+        const mockSettings = createMockSettings({
+          videoSettings: { enableVideo: false },
+        });
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        const videoSettings = (store as any).videoSettings;
+        expect(videoSettings()?.enableVideo).toBe(false);
+
+        store.updateSettings({
+          settings: { videoSettings: { enableVideo: true } },
+        });
+
+        expect(videoSettings()?.enableVideo).toBe(true);
+      });
+    });
+
+    describe('selectEnableVideo', () => {
+      it('should return false when settings not loaded', () => {
+        const enableVideo = (store as any).enableVideo;
+        expect(enableVideo()).toBe(false);
+      });
+
+      it('should return enableVideo boolean from loaded settings', async () => {
+        const mockSettings = createMockSettings({
+          videoSettings: { enableVideo: true },
+        });
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        const enableVideo = (store as any).enableVideo;
+        expect(enableVideo()).toBe(true);
+      });
+
+      it('should default to false when video settings missing', async () => {
+        const mockSettings = createMockSettings();
+        // Explicitly remove videoSettings to test null handling
+        (mockSettings as any).videoSettings = undefined;
+
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        const enableVideo = (store as any).enableVideo;
+        expect(enableVideo()).toBe(false);
+      });
+
+      it('should reactively update when enableVideo changes', async () => {
+        const mockSettings = createMockSettings({
+          videoSettings: { enableVideo: false },
+        });
+        vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+        await store.loadSettings();
+
+        const enableVideo = (store as any).enableVideo;
+        expect(enableVideo()).toBe(false);
+
+        store.updateSettings({
+          settings: { videoSettings: { enableVideo: true } },
+        });
+
+        expect(enableVideo()).toBe(true);
+      });
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // VIDEO SETTINGS INTEGRATION TESTS
+  // --------------------------------------------------------------------------
+
+  describe('Video Settings Integration', () => {
+    it('should load video settings from API', async () => {
+      const mockSettings = createMockSettings({
+        videoSettings: { enableVideo: true },
+      });
+      vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+
+      await store.loadSettings();
+
+      expect(store.settings()?.videoSettings).toEqual({ enableVideo: true });
+    });
+
+    it('should save video settings to backend', async () => {
+      const mockSettings = createMockSettings({
+        videoSettings: { enableVideo: false },
+      });
+      vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+      await store.loadSettings();
+
+      store.updateSettings({
+        settings: { videoSettings: { enableVideo: true } },
+      });
+
+      vi.mocked(mockSettingsService.saveSettings).mockReturnValue(
+        of(store.settings()!)
+      );
+      await store.saveSettings();
+
+      expect(mockSettingsService.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          videoSettings: { enableVideo: true },
+        })
+      );
+    });
+
+    it('should include video settings in history tracking', async () => {
+      const mockSettings = createMockSettings({
+        videoSettings: { enableVideo: false },
+      });
+      vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+      await store.loadSettings();
+
+      store.updateSettings({
+        settings: { videoSettings: { enableVideo: true } },
+      });
+
+      const history = store.history();
+      expect(history.length).toBe(1);
+      expect(history[0].videoSettings).toEqual({ enableVideo: false });
+    });
+
+    it('should restore video settings on undo', async () => {
+      const mockSettings = createMockSettings({
+        videoSettings: { enableVideo: false },
+      });
+      vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+      await store.loadSettings();
+
+      store.updateSettings({
+        settings: { videoSettings: { enableVideo: true } },
+      });
+      expect(store.settings()?.videoSettings.enableVideo).toBe(true);
+
+      store.undo();
+      expect(store.settings()?.videoSettings.enableVideo).toBe(false);
+    });
+
+    it('should restore video settings on redo', async () => {
+      const mockSettings = createMockSettings({
+        videoSettings: { enableVideo: false },
+      });
+      vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
+      await store.loadSettings();
+
+      store.updateSettings({
+        settings: { videoSettings: { enableVideo: true } },
+      });
+      store.undo();
+
+      store.redo();
+      expect(store.settings()?.videoSettings.enableVideo).toBe(true);
     });
   });
 });

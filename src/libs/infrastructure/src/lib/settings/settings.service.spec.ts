@@ -6,13 +6,14 @@ import {
   SaveSettingsResponse,
   ConnectionSettingsDto,
   PlayerSettingsDto,
+  VideoSettingsDto,
   FileTransferSettingsDto,
   SearchSettingsDto,
   SearchWeightsDto,
   AppSettingsDto,
 } from '@teensyrom-nx/data-access/api-client';
 import { SettingsService } from './settings.service';
-import { Settings, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
+import { Settings, ALERT_SERVICE, IAlertService, PlayerFilterType } from '@teensyrom-nx/domain';
 
 /**
  * Creates a complete test GetSettingsResponse DTO
@@ -31,6 +32,9 @@ const createGetSettingsResponseDto = (): GetSettingsResponse => ({
     startupLaunchEnabled: true,
     startupLaunchRandom: false,
   } as PlayerSettingsDto,
+  videoSettings: {
+    enableVideo: false,
+  } as VideoSettingsDto,
   fileTransferSettings: {
     watchDirectoryLocation: '/test/watch',
     autoTransferPath: '/test/transfer',
@@ -69,9 +73,12 @@ const createDomainSettings = (): Settings => ({
     playTimerEnabled: true,
     muteFastForward: false,
     muteRandomSeek: false,
-    startupFilter: 'All',
+    startupFilter: PlayerFilterType.All,
     startupLaunchEnabled: true,
     startupLaunchRandom: false,
+  },
+  videoSettings: {
+    enableVideo: false,
   },
   fileTransferSettings: {
     watchDirectoryLocation: '/test/watch',

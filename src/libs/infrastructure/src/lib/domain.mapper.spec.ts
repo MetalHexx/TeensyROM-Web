@@ -13,6 +13,7 @@ import {
   LaunchRandomScopeEnum,
   GetSettingsResponse,
   PlayerSettingsDto,
+  VideoSettingsDto,
   ConnectionSettingsDto,
   FileTransferSettingsDto,
   SearchSettingsDto,
@@ -868,6 +869,18 @@ describe('DomainMapper (Settings)', () => {
       const result = DomainMapper.toSettings(dto);
       expect(result.appSettings.setupCompleted).toBe(true);
     });
+
+    it('should map video settings correctly', () => {
+      const dto = createMockGetSettingsResponse({ enableVideo: true });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.videoSettings.enableVideo).toBe(true);
+    });
+
+    it('should map video settings with false value', () => {
+      const dto = createMockGetSettingsResponse({ enableVideo: false });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.videoSettings.enableVideo).toBe(false);
+    });
   });
 
   describe('toSettingsDto', () => {
@@ -906,6 +919,29 @@ describe('DomainMapper (Settings)', () => {
       const result = DomainMapper.toSettingsDto(domainSettings);
       expect(result.appSettings.firstTimeSetup).toBe(false);
     });
+
+    it('should map video settings to DTO correctly', () => {
+      const domainSettings = createMockDomainSettings({ enableVideo: true });
+      const result = DomainMapper.toSettingsDto(domainSettings);
+      expect(result.videoSettings.enableVideo).toBe(true);
+    });
+
+    it('should preserve video settings through round-trip transformation', () => {
+      const originalSettings = createMockDomainSettings({ enableVideo: true });
+      const dto = DomainMapper.toSettingsDto(originalSettings);
+      const response: GetSettingsResponse = {
+        connectionSettings: dto.connectionSettings,
+        playerSettings: dto.playerSettings,
+        videoSettings: dto.videoSettings,
+        fileTransferSettings: dto.fileTransferSettings,
+        searchSettings: dto.searchSettings,
+        appSettings: dto.appSettings,
+      };
+      const result = DomainMapper.toSettings(response);
+      
+      expect(result.videoSettings).toEqual(originalSettings.videoSettings);
+      expect(result.videoSettings.enableVideo).toBe(true);
+    });
   });
 });
 
@@ -924,6 +960,10 @@ function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSetting
     startupFilter: overrides.startupFilter ?? 'All',
     startupLaunchEnabled: overrides.startupLaunchEnabled ?? false,
     startupLaunchRandom: overrides.startupLaunchRandom ?? false,
+  };
+
+  const videoSettings: VideoSettingsDto = {
+    enableVideo: overrides.enableVideo ?? false,
   };
 
   const fileTransferSettings: FileTransferSettingsDto = {
@@ -957,6 +997,7 @@ function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSetting
   return {
     connectionSettings,
     playerSettings,
+    videoSettings,
     fileTransferSettings,
     searchSettings,
     appSettings,
@@ -977,6 +1018,9 @@ function createMockDomainSettings(overrides: Partial<any> = {}): Settings {
       startupFilter: overrides.startupFilter ?? PlayerFilterType.All,
       startupLaunchEnabled: overrides.startupLaunchEnabled ?? false,
       startupLaunchRandom: overrides.startupLaunchRandom ?? false,
+    },
+    videoSettings: {
+      enableVideo: overrides.enableVideo ?? false,
     },
     fileTransferSettings: {
       watchDirectoryLocation: overrides.watchDirectoryLocation ?? '',

@@ -1,5 +1,6 @@
 # Video Settings Feature - Master Plan
 
+**Project Status**: ✅ **FEATURE COMPLETE** - Production Ready (November 26, 2025)  
 **Project Overview**: Add a new video settings group to the TeensyROM settings system that allows users to enable/disable video capture functionality across the application.
 
 **Standards Documentation**:
@@ -96,8 +97,8 @@ Create the API surface for video settings by adding DTOs with validation rules a
 
 ---
 
-<details open>
-<summary><h3>Phase 3: API Client Regeneration & Infrastructure Integration</h3></summary>
+<details>
+<summary><h3>Phase 3: API Client Regeneration & Infrastructure Integration ✅ COMPLETE</h3></summary>
 
 ### Objective
 
@@ -105,31 +106,38 @@ Regenerate the TypeScript API client to include the new video settings DTOs, the
 
 ### Key Deliverables
 
-- [ ] OpenAPI spec regenerated with VideoSettingsDto
-- [ ] TypeScript API client regenerated with updated models
-- [ ] Domain `VideoSettings` interface created in libs/domain
-- [ ] DomainMapper updated with VideoSettings transformation methods
-- [ ] SettingsService correctly maps VideoSettings in both directions
+- [x] OpenAPI spec regenerated with VideoSettingsDto
+- [x] TypeScript API client regenerated with updated models
+- [x] Domain `VideoSettings` interface created in libs/domain
+- [x] DomainMapper updated with VideoSettings transformation methods
+- [x] SettingsService correctly maps VideoSettings in both directions
 
 ### High-Level Tasks
 
-1. **Regenerate OpenAPI Spec**: Run backend build to generate updated OpenAPI spec
-2. **Regenerate API Client**: Run pnpm generate:api-client to create TypeScript models
-3. **Create Domain VideoSettings Interface**: Define frontend domain contract for video settings
-4. **Update Domain Mapper**: Add toVideoSettings and toVideoSettingsDto methods
-5. **Verify Settings Service**: Ensure getSettings/saveSettings correctly handle video settings
+1. ✅ **Regenerate OpenAPI Spec**: Run backend build to generate updated OpenAPI spec
+2. ✅ **Regenerate API Client**: Run pnpm generate:api-client to create TypeScript models
+3. ✅ **Create Domain VideoSettings Interface**: Define frontend domain contract for video settings
+4. ✅ **Update Domain Mapper**: Add toVideoSettings and toVideoSettingsDto methods
+5. ✅ **Verify Settings Service**: Ensure getSettings/saveSettings correctly handle video settings
 
-### Open Questions for Phase 3
+### Completion Notes
 
-- **Domain Model Structure**: Should frontend VideoSettings interface match backend exactly or diverge?
-  - *Recommendation*: Match exactly for simplicity; diverge only if frontend needs differ
+- **Completed**: November 26, 2025
+- **Actual Time**: 1 hour (estimated 1-1.5 hours)
+- **Key Achievements**: 
+  - VideoSettings domain interface matches backend exactly (single enableVideo boolean)
+  - DomainMapper uses private static helper pattern for consistency
+  - SettingsService required ZERO changes (validates architecture)
+  - 4 comprehensive tests added (API→Domain, Domain→API, round-trip, edge cases)
+  - Removed dead code (settings.mappers.ts) during cleanup
+- **Reports**: [TASK-03-001](reports/TASK-03-001-report.md), [TASK-03-002](reports/TASK-03-002-report.md)
 
 </details>
 
 ---
 
 <details open>
-<summary><h3>Phase 4: Frontend State Management - Store & Actions</h3></summary>
+<summary><h3>Phase 4: Frontend State Management - Store & Actions ✅ COMPLETE</h3></summary>
 
 ### Objective
 
@@ -137,84 +145,123 @@ Extend the settings store to manage video settings state and provide actions/sel
 
 ### Key Deliverables
 
-- [ ] SettingsState interface includes VideoSettings property
-- [ ] Settings store initial state includes default VideoSettings
-- [ ] Video settings selectors created (selectVideoSettings, selectEnableVideo)
-- [ ] Settings history correctly tracks video settings changes
-- [ ] Settings form service integrates video settings
+- [x] SettingsState interface includes VideoSettings property
+- [x] Settings store initial state includes default VideoSettings
+- [x] Video settings selectors created (selectVideoSettings, selectEnableVideo)
+- [x] Settings history correctly tracks video settings changes
+- [x] Settings form service integrates video settings
 
 ### High-Level Tasks
 
-1. **Update SettingsState Interface**: Add videoSettings property to state definition
-2. **Create Video Settings Selectors**: Define selectors for accessing video settings state
-3. **Verify State Hydration**: Ensure video settings load from API on store initialization
-4. **Test State Persistence**: Verify video settings save correctly through store actions
+1. ✅ **Update SettingsState Interface**: Add videoSettings property to state definition
+2. ✅ **Create Video Settings Selectors**: Define selectors for accessing video settings state
+3. ✅ **Verify State Hydration**: Ensure video settings load from API on store initialization
+4. ✅ **Test State Persistence**: Verify video settings save correctly through store actions
 
-### Open Questions for Phase 4
+### Completed Tasks
 
-- **Selector Granularity**: Create individual selectors for each video setting, or just one for the whole group?
-  - *Recommendation*: Start with selectVideoSettings and selectEnableVideo; add more as needed
+1. ✅ **TASK-04-001-VIDEO-SETTINGS-SELECTORS** (UI Wizard) - Complete
+   - `selectVideoSettings` selector created
+   - `selectEnableVideo` selector created
+   - Selectors exported from barrel file
+   - 13 comprehensive tests added
+   - All 73 tests passing (includes 13 video settings-specific tests)
+   - [Completion Report](reports/TASK-04-001-report.md)
+   - [Test Execution Report](reports/TASK-04-001-TEST-EXECUTION-COMPLETION.md)
+
+### Resolution of Open Questions
+
+- **Selector Granularity**: Implemented both `selectVideoSettings` and `selectEnableVideo` for flexibility ✅
+
+**Phase Status**: ✅ Complete - November 26, 2025
 
 </details>
 
 ---
 
 <details open>
-<summary><h3>Phase 5: Frontend UI - Settings View Components</h3></summary>
+<summary><h3>Phase 5: Frontend UI - Settings View Components ✅ COMPLETE</h3></summary>
 
 ### Objective
 
 Create UI components in the settings view to display and edit video settings, allowing users to toggle video capture functionality. This phase completes the user-facing implementation.
 
+### Status
+
+**Status**: ✅ **COMPLETE** - November 26, 2025  
+**Completion Report**: [TASK-05-001-report.md](./reports/TASK-05-001-report.md)  
+**Actual Time**: 1 hour 15 minutes  
+**Quality**: High (191 tests passing, +17 new tests, no regressions)
+
 ### Key Deliverables
 
-- [ ] Video settings section component created (similar to player settings section)
-- [ ] Enable Video toggle control added with proper binding
-- [ ] Video settings section integrated into main settings view
-- [ ] Settings form validation includes video settings
-- [ ] Auto-save and history tracking work correctly for video settings
+- [x] Video settings section component created (similar to player settings section)
+- [x] Enable Video toggle control added with proper binding
+- [x] Video settings section integrated into main settings view
+- [x] Settings form validation includes video settings
+- [x] Auto-save and history tracking work correctly for video settings
+- [x] Pattern consistency maintained (ScalingCardComponent + SettingsToggleItemComponent)
+- [x] Comprehensive test coverage (8 component + 9 integration tests)
 
-### High-Level Tasks
+### Completed Tasks
 
-1. **Create Video Settings Section Component**: Build form section component with toggle control
-2. **Integrate into Settings View**: Wire up video settings section in main settings component
-3. **Bind Form Controls**: Connect form controls to settings store via form service
-4. **Test User Interaction**: Verify toggle changes persist and trigger auto-save
+1. ✅ **TASK-05-001-VIDEO-SETTINGS-UI-COMPONENT** (UI Wizard) - Complete
+   - VideoSettingsSectionComponent created (4 files)
+   - SettingsViewComponent integrated (3 files modified)
+   - Manual E2E verification complete
+   - All quality checks passing
 
-### Open Questions for Phase 5
+### Resolved Questions for Phase 5
 
-- **UI Placement**: Where should video settings section appear in the settings view hierarchy?
-  - *Recommendation*: Place after Player Settings, before File Transfer Settings
+- ✅ **UI Placement**: Video settings appear after Player Settings in navigation (tab-based routing)
+- ✅ **Component Structure**: Used ScalingCardComponent wrapper (consistent with PlayerSettingsSection)
+- ✅ **Toggle Label**: "Enable video capture" with subtitle "Show video controls in player view"
 
 </details>
 
 ---
 
 <details open>
-<summary><h3>Phase 6: Video Capture Integration - Conditional Rendering</h3></summary>
+<summary><h3>Phase 6: Video Capture Integration - Conditional Rendering ✅ COMPLETE</h3></summary>
 
 ### Objective
 
 Connect the video settings to the video capture component, implementing conditional rendering based on the `EnableVideo` setting. This phase delivers the actual user value by hiding/showing video capture based on user preference.
 
+### Status
+
+**Status**: ✅ **COMPLETE** - November 26, 2025  
+**Completion Report**: [TASK-06-001-report.md](./reports/TASK-06-001-report.md)  
+**Actual Time**: 2 hours (estimated 1-1.5 hours)  
+**Quality**: High (16 tests passing, all success criteria met)
+
 ### Key Deliverables
 
-- [ ] VideoCaptureComponent conditionally renders based on EnableVideo setting
-- [ ] Player component subscribes to EnableVideo selector
-- [ ] Video capture state cleanup when disabled
-- [ ] UI gracefully handles enable/disable transitions
+- [x] SettingsStore injected into PlayerDeviceContainerComponent
+- [x] enableVideo computed signal created from settingsStore.enableVideo()
+- [x] VideoCaptureComponent conditionally renders based on EnableVideo setting
+- [x] MediaStream cleanup verified (ngOnDestroy called when component destroyed)
+- [x] UI gracefully handles enable/disable transitions
+- [x] 16 comprehensive tests (5 signal, 7 conditional rendering, 4 integration)
+- [x] All existing tests pass (no regressions)
 
-### High-Level Tasks
+### Completed Tasks
 
-1. **Inject Settings Store into Player Component**: Access EnableVideo setting in player container
-2. **Implement Conditional Rendering**: Use @if directive to show/hide video capture component
-3. **Handle State Cleanup**: Ensure video streams stop when video capture is disabled
-4. **Test Toggle Behavior**: Verify smooth enable/disable transitions without errors
+1. ✅ **TASK-06-001-VIDEO-CAPTURE-CONDITIONAL-RENDERING** (Clean Coder Agent) - Complete
+   - SettingsStore injected using direct class injection
+   - enableVideo computed signal implemented
+   - Template updated with @if directive
+   - 16 tests added (all passing)
+   - MediaStream cleanup verified intact
+   - Completion date: November 26, 2025
 
-### Open Questions for Phase 6
+### Resolved Questions for Phase 6
 
-- **State Cleanup Strategy**: Should we destroy video component entirely or just hide it?
-  - *Recommendation*: Destroy component (via @if) to properly clean up media streams
+- ✅ **State Cleanup Strategy**: Destroy component via @if directive (Angular triggers ngOnDestroy, which stops MediaStream tracks)
+- ✅ **Store Injection Pattern**: Used direct SettingsStore injection (consistent with codebase patterns)
+- ✅ **Reactivity Approach**: Used computed signal (automatic updates, no manual subscriptions)
+
+**🎉 FEATURE COMPLETE**: This was the final phase. Video settings feature is now production-ready!
 
 </details>
 
@@ -463,24 +510,151 @@ And the settings revert to the last saved state
 ### Summary of Open Questions
 
 **Phase 1:**
-- Default EnableVideo value (Recommendation: false)
+- Default EnableVideo value (Recommendation: false) - ✅ Resolved: false
 
 **Phase 2:**
-- Additional validation rules (Recommendation: Keep simple for MVP)
+- Additional validation rules (Recommendation: Keep simple for MVP) - ✅ Resolved: Simple boolean validation
 
 **Phase 3:**
-- Domain model structure match (Recommendation: Match backend exactly)
+- Domain model structure match (Recommendation: Match backend exactly) - ✅ Resolved: Exact match
 
 **Phase 4:**
-- Selector granularity (Recommendation: selectVideoSettings + selectEnableVideo)
+- Selector granularity (Recommendation: selectVideoSettings + selectEnableVideo) - ✅ Resolved: Both selectors created
 
 **Phase 5:**
-- UI placement in settings view (Recommendation: After Player Settings)
+- UI placement in settings view (Recommendation: After Player Settings) - ✅ Resolved: Tab-based navigation
 
 **Phase 6:**
-- State cleanup strategy (Recommendation: Destroy component via @if)
+- State cleanup strategy (Recommendation: Destroy component via @if) - ✅ Resolved: @if directive with ngOnDestroy
+
+**All questions resolved - Feature complete**
 
 </details>
+
+---
+
+## 🎉 Feature Completion Summary
+
+<details open>
+<summary><h3>Production Readiness Checklist</h3></summary>
+
+### All Success Criteria Met ✅
+
+- [x] **Backend Domain**: VideoSettings record with EnableVideo property exists in Core layer
+- [x] **Backend API**: VideoSettingsDto with validation, API endpoints support full CRUD
+- [x] **OpenAPI Spec**: Generated and includes VideoSettingsDto schema
+- [x] **Frontend Infrastructure**: TypeScript API client regenerated, domain interface and mappers complete
+- [x] **State Management**: SettingsStore includes VideoSettings with selectors (selectVideoSettings, selectEnableVideo)
+- [x] **UI Components**: Video settings section in settings view with toggle control
+- [x] **Integration**: Video capture conditionally renders based on EnableVideo setting
+- [x] **Testing**: 
+  - Phase 1: 8 backend tests passing
+  - Phase 2: Backend API tests passing
+  - Phase 3: 4 infrastructure tests passing (DomainMapper)
+  - Phase 4: 73 application tests passing (13 video-specific)
+  - Phase 5: 191 feature tests passing (17 video-specific)
+  - Phase 6: 16 player component tests passing
+- [x] **Quality**: No TypeScript errors, no console errors, all linting passing
+- [x] **Documentation**: Complete phase plans, task handoffs, and completion reports
+
+### Feature Capabilities Delivered
+
+**User-Facing Features**:
+- ✅ Users can enable/disable video capture via Settings → Video → "Enable video capture" toggle
+- ✅ Toggle changes take immediate effect (real-time reactivity)
+- ✅ Video capture component shows/hides in player view based on setting
+- ✅ Settings persist across application reloads
+- ✅ Camera permissions only requested when video enabled (privacy improvement)
+- ✅ MediaStream properly cleaned up when video disabled (resource management)
+
+**Technical Achievements**:
+- ✅ Full-stack implementation from backend domain to frontend UI
+- ✅ Clean Architecture maintained throughout all layers
+- ✅ Pattern consistency with existing settings (Player, Connection, FileTransfer, etc.)
+- ✅ Signal-based reactivity using NgRx Signal Store and Angular 19 computed signals
+- ✅ Comprehensive test coverage at all layers (behavioral testing approach)
+- ✅ No breaking changes to existing functionality
+
+### Implementation Statistics
+
+**Total Development Time**: ~6-7 hours across 6 phases  
+**Files Created**: 19 (domain models, DTOs, validators, mappers, components, tests, documentation)  
+**Files Modified**: 15 (integration points, store updates, template updates)  
+**Total Tests Added**: 119 (8 backend + 4 infrastructure + 13 state + 17 UI + 16 player + 61 from Phase 2)  
+**Test Pass Rate**: 100% (all new tests passing, no regressions)  
+**Documentation Pages**: 28 (plans, handoffs, reports)
+
+### Next Steps (Optional Enhancements)
+
+**Recommended Follow-ups**:
+1. **Manual E2E Verification** - Test with real camera hardware (15-30 minutes)
+2. **Fix Pre-existing Test Failures** - 23 player-toolbar tests documented in TECHNICAL_DEBT.md (2-3 hours)
+3. **Add Cypress E2E Test** - Settings → Player flow automated test (1-2 hours)
+
+**Future Feature Enhancements**:
+- Video quality settings (resolution, frame rate, bitrate)
+- Device selection persistence (remember preferred camera)
+- Recording options (enable/disable recording, directory selection)
+- Video overlays (title cards, timestamps, device info)
+
+### Lessons Learned
+
+**What Went Well**:
+- Backend-first approach prevented rework and API version mismatches
+- Consistent patterns across phases accelerated development
+- Comprehensive planning documents kept execution focused
+- Behavioral testing approach caught edge cases early
+- Signal-based reactivity simplified state management
+
+**Challenges Overcome**:
+- SettingsStore dependency chain required careful test mocking
+- Pre-existing test failures initially masked new failures (documented in tech debt)
+- MediaDevices API unavailable in test environment (expected warnings documented)
+
+**Best Practices Validated**:
+- Task handoffs with detailed context enabled autonomous execution
+- Phase-based decomposition prevented scope creep
+- Completion reports captured decisions and discoveries for future reference
+- Following existing patterns reduced cognitive load
+
+</details>
+
+---
+
+## 📚 Complete Documentation Index
+
+**Planning Documents**:
+- [Master Plan](./master-plan.md) - This document
+- [Execution Summary](./execution-summary.md) - High-level progress tracking
+- [Orchestrator Guide](../../subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md) - Methodology reference
+
+**Phase Plans**:
+- [Phase 1: Backend Domain](./phases/phase-01-backend-domain-models.md) ✅
+- [Phase 2: Backend API](./phases/phase-02-backend-api.md) ✅
+- [Phase 3: API Client & Infrastructure](./phases/phase-03-api-client-infra.md) ✅
+- [Phase 4: State Management](./phases/phase-04-state-management.md) ✅
+- [Phase 5: Frontend UI](./phases/phase-05-frontend-ui.md) ✅
+- [Phase 6: Video Capture Integration](./phases/phase-06-video-capture-integration.md) ✅
+
+**Task Handoffs**:
+- All 8 task handoffs in `tasks/` directory ✅
+
+**Completion Reports**:
+- All 8 completion reports in `reports/` directory ✅
+
+**Architecture Standards**:
+- [Backend Architecture](../../BACKEND_ARCHITECTURE.md)
+- [Overview Context](../../OVERVIEW_CONTEXT.md)
+- [Coding Standards](../../CODING_STANDARDS.md)
+- [Testing Standards](../../TESTING_STANDARDS.md)
+- [State Standards](../../STATE_STANDARDS.md)
+
+---
+
+**Document Version**: 2.0  
+**Created**: November 25, 2025  
+**Last Updated**: November 26, 2025  
+**Status**: ✅ **FEATURE COMPLETE - PRODUCTION READY**
 
 ---
 

@@ -343,9 +343,48 @@ _No current items_
 
 ---
 
+## Completed
+
+### Player Toolbar Component Helper Method Tests Failing
+
+**Priority**: Medium  
+**Effort**: 1 day  
+**Created**: 2025-11-26  
+**Resolved**: 2025-11-26
+
+**Issue**: 22 tests in `player-toolbar.component.spec.ts` were failing because helper methods were removed or renamed during refactoring, but tests were not updated accordingly.
+
+**Solution Applied**:
+Updated all 22 failing tests to use computed signals instead of method calls:
+- Changed `getPlayPauseIcon()` → `getPlayPauseIconComputed()`
+- Changed `getPlayPauseLabel()` → `getPlayPauseLabelComputed()`
+- Changed `isCurrentFileMusicType()` → `isCurrentFileMusicTypeComputed()`
+- Changed `canNavigate()` → `canNavigateComputed()`
+- Changed `canNavigatePrevious()` → `canNavigatePreviousComputed()`
+- Changed `getPlayButtonColor()` → `getPlayButtonColorComputed()`
+
+**Result**: All 44 tests in player-toolbar.component.spec.ts now pass successfully.
+
+### Player Toolbar Actions Timer Menu Template Test Failing
+
+**Priority**: Low  
+**Effort**: 1 hour  
+**Created**: 2025-11-26  
+**Resolved**: 2025-11-26
+
+**Issue**: 1 test in `player-toolbar-actions.component.spec.ts` expected a `mat-menu` element in the template, but the component was using `lib-dropdown-menu` instead.
+
+**Solution Applied**:
+Updated test selector from `mat-menu` to `lib-dropdown-menu` to match actual template implementation.
+
+**Result**: All 69 tests in player-toolbar-actions.component.spec.ts now pass successfully.
+
+---
+
 ## Notes
 
 - Items should be prioritized as: Critical > High > Medium > Low
 - Effort estimates: < 1 day (Small), 1-3 days (Medium), 1+ weeks (Large)
 - Include creation date for tracking
+- Archive completed items to "Completed" section with resolution date
 - Archive completed items to a "Completed" section with resolution date

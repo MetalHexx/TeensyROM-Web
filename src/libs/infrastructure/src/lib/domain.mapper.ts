@@ -17,6 +17,7 @@ import {
   SaveSettingsRequest,
   ConnectionSettingsDto,
   PlayerSettingsDto,
+  VideoSettingsDto,
   FileTransferSettingsDto,
   SearchSettingsDto,
   SearchWeightsDto,
@@ -42,6 +43,7 @@ import {
   Settings,
   ConnectionSettings,
   PlayerSettings,
+  VideoSettings,
   FileTransferSettings,
   SearchSettings,
   SearchWeights,
@@ -343,6 +345,7 @@ export class DomainMapper {
     return {
       connectionSettings: this.toConnectionSettings(dto.connectionSettings),
       playerSettings: this.toPlayerSettings(dto.playerSettings),
+      videoSettings: this.toVideoSettings(dto.videoSettings),
       fileTransferSettings: this.toFileTransferSettings(dto.fileTransferSettings),
       searchSettings: this.toSearchSettings(dto.searchSettings),
       appSettings: this.toAppSettings(dto.appSettings),
@@ -356,6 +359,7 @@ export class DomainMapper {
     return {
       connectionSettings: this.toConnectionSettingsDto(settings.connectionSettings),
       playerSettings: this.toPlayerSettingsDto(settings.playerSettings),
+      videoSettings: this.toVideoSettingsDto(settings.videoSettings),
       fileTransferSettings: this.toFileTransferSettingsDto(settings.fileTransferSettings),
       searchSettings: this.toSearchSettingsDto(settings.searchSettings),
       appSettings: this.toAppSettingsDto(settings.appSettings),
@@ -406,6 +410,28 @@ export class DomainMapper {
       startupFilter: filterMap[settings.startupFilter] as any,
       startupLaunchEnabled: settings.startupLaunchEnabled,
       startupLaunchRandom: settings.startupLaunchRandom,
+    };
+  }
+
+  /**
+   * Maps VideoSettingsDto from API to domain VideoSettings model
+   * @param dto - VideoSettingsDto from API response
+   * @returns VideoSettings domain model
+   */
+  private static toVideoSettings(dto: VideoSettingsDto): VideoSettings {
+    return {
+      enableVideo: dto.enableVideo,
+    };
+  }
+
+  /**
+   * Maps VideoSettings domain model to VideoSettingsDto for API request
+   * @param settings - VideoSettings domain model
+   * @returns VideoSettingsDto for API
+   */
+  private static toVideoSettingsDto(settings: VideoSettings): VideoSettingsDto {
+    return {
+      enableVideo: settings.enableVideo,
     };
   }
 

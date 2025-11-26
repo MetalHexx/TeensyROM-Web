@@ -7,7 +7,7 @@ import { FileImageComponent } from './file-image/file-image.component';
 import { VideoCaptureComponent } from './video-capture/video-capture.component';
 import { PlayerToolbarComponent } from './player-toolbar/player-toolbar.component';
 import { StorageContainerComponent } from './storage-container/storage-container.component';
-import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 
 @Component({
   selector: 'lib-player-device-container',
@@ -25,10 +25,17 @@ import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
 })
 export class PlayerDeviceContainerComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
+  private readonly settingsStore = inject(SettingsStore);
 
   device = input<Device>();
 
   readonly deviceId = computed(() => this.device()?.deviceId ?? '');
+
+  /**
+   * Whether video capture is enabled in settings.
+   * Controls visibility of video capture component.
+   */
+  readonly enableVideo = computed(() => this.settingsStore.enableVideo());
 
   constructor() {
     // Initialize player state when device container mounts

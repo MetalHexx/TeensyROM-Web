@@ -192,6 +192,9 @@ export class SettingsFormService {
         startupLaunchEnabled: [settings.playerSettings.startupLaunchEnabled],
         startupLaunchRandom: [settings.playerSettings.startupLaunchRandom],
       }),
+      videoSettings: this.fb.group({
+        enableVideo: [settings.videoSettings.enableVideo],
+      }),
       fileTransferSettings: this.fb.group({
         watchDirectoryLocation: [settings.fileTransferSettings.watchDirectoryLocation],
         autoTransferPath: [settings.fileTransferSettings.autoTransferPath, Validators.required],
@@ -271,6 +274,9 @@ export class SettingsFormService {
         startupLaunchEnabled: settings.playerSettings.startupLaunchEnabled,
         startupLaunchRandom: settings.playerSettings.startupLaunchRandom,
       },
+      videoSettings: {
+        enableVideo: settings.videoSettings.enableVideo,
+      },
       fileTransferSettings: {
         watchDirectoryLocation: settings.fileTransferSettings.watchDirectoryLocation,
         autoTransferPath: settings.fileTransferSettings.autoTransferPath,
@@ -314,6 +320,9 @@ export class SettingsFormService {
         startupFilter: formValue.playerSettings.startupFilter,
         startupLaunchEnabled: formValue.playerSettings.startupLaunchEnabled,
         startupLaunchRandom: formValue.playerSettings.startupLaunchRandom,
+      },
+      videoSettings: {
+        enableVideo: formValue.videoSettings.enableVideo,
       },
       fileTransferSettings: {
         watchDirectoryLocation: formValue.fileTransferSettings.watchDirectoryLocation,
@@ -403,6 +412,17 @@ export class SettingsFormService {
       throw new Error('Settings form not initialized');
     }
     return form.get('playerSettings') as FormGroup;
+  }
+
+  /**
+   * Helper method to get typed FormGroup for video settings section
+   */
+  getVideoSettings(): FormGroup {
+    const form = this.settingsForm();
+    if (!form) {
+      throw new Error('Settings form not initialized');
+    }
+    return form.get('videoSettings') as FormGroup;
   }
 
   /**

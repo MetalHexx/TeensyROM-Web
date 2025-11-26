@@ -617,9 +617,9 @@ describe('PlayerToolbarActionsComponent', () => {
   });
 
   describe('Task 4: Timer Menu', () => {
-    it('should render mat-menu in template', () => {
+    it('should render lib-dropdown-menu in template', () => {
       const compiled = fixture.nativeElement as HTMLElement;
-      const menu = compiled.querySelector('mat-menu');
+      const menu = compiled.querySelector('lib-dropdown-menu');
       expect(menu).toBeTruthy();
     });
 

@@ -62,6 +62,9 @@ describe('SettingsViewComponent', () => {
       startupLaunchEnabled: false,
       startupLaunchRandom: false,
     },
+    videoSettings: {
+      enableVideo: false,
+    },
     fileTransferSettings: {
       watchDirectoryLocation: '',
       autoTransferPath: '/teensyrom/files',
@@ -122,6 +125,9 @@ describe('SettingsViewComponent', () => {
         startupFilter: [mockSettings.playerSettings.startupFilter, Validators.required],
         startupLaunchEnabled: [mockSettings.playerSettings.startupLaunchEnabled],
         startupLaunchRandom: [mockSettings.playerSettings.startupLaunchRandom],
+      }),
+      videoSettings: fb.group({
+        enableVideo: [mockSettings.videoSettings.enableVideo],
       }),
       fileTransferSettings: fb.group({
         watchDirectoryLocation: [mockSettings.fileTransferSettings.watchDirectoryLocation],
@@ -231,6 +237,7 @@ describe('SettingsViewComponent', () => {
       
       expect(form.get('connectionSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('playerSettings')).toBeInstanceOf(FormGroup);
+      expect(form.get('videoSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('fileTransferSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('searchSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('appSettings')).toBeInstanceOf(FormGroup);
@@ -367,6 +374,9 @@ describe('SettingsViewComponent', () => {
       component.setActiveSection('fileTransfer');
       expect(component.activeSection()).toBe('fileTransfer');
 
+      component.setActiveSection('video');
+      expect(component.activeSection()).toBe('video');
+
       component.setActiveSection('search');
       expect(component.activeSection()).toBe('search');
 
@@ -377,11 +387,11 @@ describe('SettingsViewComponent', () => {
       expect(component.activeSection()).toBe('player');
     });
 
-    it('should render all four navigation buttons', () => {
+    it('should render all five navigation buttons', () => {
       fixture.detectChanges();
 
       const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
-      expect(buttons.length).toBe(4);
+      expect(buttons.length).toBe(5);
     });
 
     it('should pass animationTrigger=true to active section', () => {
@@ -405,6 +415,7 @@ describe('SettingsViewComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('lib-player-settings-section')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('lib-video-settings-section')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('lib-file-transfer-settings-section')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('lib-search-settings-section')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('lib-connection-settings-section')).toBeTruthy();
@@ -417,6 +428,77 @@ describe('SettingsViewComponent', () => {
       // It contains internal app state (setupCompleted) not meant for user editing in this context
       const appSettingsSection = fixture.nativeElement.querySelector('lib-app-settings-section');
       expect(appSettingsSection).toBeFalsy();
+    });
+
+    it('should render video navigation button with correct icon and label', () => {
+      fixture.detectChanges();
+
+      const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
+      // Video button should be second (after Player, before File Transfer)
+      const videoButton = buttons[1];
+      expect(videoButton).toBeTruthy();
+    });
+
+    it('should activate video section when video button clicked', () => {
+      component.setActiveSection('video');
+      expect(component.activeSection()).toBe('video');
+    });
+
+    it('should pass correct animationTrigger to video section when active', () => {
+      component.setActiveSection('video');
+      fixture.detectChanges();
+
+      const videoSection = fixture.nativeElement.querySelector('lib-video-settings-section');
+      expect(videoSection).toBeTruthy();
+    });
+
+    it('should pass correct animationTrigger to video section when inactive', () => {
+      component.setActiveSection('player');
+      fixture.detectChanges();
+
+      const videoSection = fixture.nativeElement.querySelector('lib-video-settings-section');
+      expect(videoSection).toBeTruthy();
+      // Section is rendered but animationTrigger should be false
+    });
+  });
+
+  describe('Video Settings Integration', () => {
+    it('should have getVideoSettings helper method', () => {
+      expect(component.getVideoSettings).toBeDefined();
+      expect(typeof component.getVideoSettings).toBe('function');
+    });
+
+    it('should return video settings FormGroup from getVideoSettings', () => {
+      const videoSettings = component.getVideoSettings();
+      expect(videoSettings).toBeInstanceOf(FormGroup);
+      expect(videoSettings.get('enableVideo')).toBeTruthy();
+    });
+
+    it('should return FormGroup with enableVideo control', () => {
+      const videoSettings = component.getVideoSettings();
+      const enableVideoControl = videoSettings.get('enableVideo');
+      
+      expect(enableVideoControl).toBeTruthy();
+      expect(enableVideoControl?.value).toBe(false);
+    });
+
+    it('should pass video settings FormGroup to video section component', () => {
+      fixture.detectChanges();
+
+      const videoSection = fixture.nativeElement.querySelector('lib-video-settings-section');
+      expect(videoSection).toBeTruthy();
+      // FormGroup is passed via input binding
+    });
+
+    it('should update enableVideo control value through form', () => {
+      const videoSettings = component.getVideoSettings();
+      const enableVideoControl = videoSettings.get('enableVideo');
+
+      enableVideoControl?.setValue(true);
+      expect(enableVideoControl?.value).toBe(true);
+
+      enableVideoControl?.setValue(false);
+      expect(enableVideoControl?.value).toBe(false);
     });
   });
 

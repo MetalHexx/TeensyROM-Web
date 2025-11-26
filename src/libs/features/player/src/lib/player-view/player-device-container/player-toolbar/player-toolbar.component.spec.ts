@@ -268,25 +268,25 @@ describe('PlayerToolbarComponent', () => {
       it('should return "play_arrow" when status is Stopped', () => {
         playerStatusSignal.set(PlayerStatus.Stopped);
 
-        expect(component.getPlayPauseIcon()).toBe('play_arrow');
+        expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
       });
 
       it('should return "play_arrow" when status is Paused', () => {
         playerStatusSignal.set(PlayerStatus.Paused);
 
-        expect(component.getPlayPauseIcon()).toBe('play_arrow');
+        expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
       });
 
       it('should return "pause" when status is Playing', () => {
         playerStatusSignal.set(PlayerStatus.Playing);
 
-        expect(component.getPlayPauseIcon()).toBe('pause');
+        expect(component.getPlayPauseIconComputed()).toBe('pause');
       });
 
       it('should return "play_arrow" when deviceId is empty', () => {
         fixture.componentRef.setInput('deviceId', '');
 
-        expect(component.getPlayPauseIcon()).toBe('play_arrow');
+        expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
       });
     });
 
@@ -294,25 +294,25 @@ describe('PlayerToolbarComponent', () => {
       it('should return "Play" when status is Stopped', () => {
         playerStatusSignal.set(PlayerStatus.Stopped);
 
-        expect(component.getPlayPauseLabel()).toBe('Play');
+        expect(component.getPlayPauseLabelComputed()).toBe('Play');
       });
 
       it('should return "Play" when status is Paused', () => {
         playerStatusSignal.set(PlayerStatus.Paused);
 
-        expect(component.getPlayPauseLabel()).toBe('Play');
+        expect(component.getPlayPauseLabelComputed()).toBe('Play');
       });
 
       it('should return "Pause" when status is Playing', () => {
         playerStatusSignal.set(PlayerStatus.Playing);
 
-        expect(component.getPlayPauseLabel()).toBe('Pause');
+        expect(component.getPlayPauseLabelComputed()).toBe('Pause');
       });
 
       it('should return "Play" when deviceId is empty', () => {
         fixture.componentRef.setInput('deviceId', '');
 
-        expect(component.getPlayPauseLabel()).toBe('Play');
+        expect(component.getPlayPauseLabelComputed()).toBe('Play');
       });
     });
 
@@ -326,7 +326,7 @@ describe('PlayerToolbarComponent', () => {
           isShuffleMode: false,
         });
 
-        expect(component.isCurrentFileMusicType()).toBe(true);
+        expect(component.isCurrentFileMusicTypeComputed()).toBe(true);
       });
 
       it('should return false when current file is a Game', () => {
@@ -338,7 +338,7 @@ describe('PlayerToolbarComponent', () => {
           isShuffleMode: false,
         });
 
-        expect(component.isCurrentFileMusicType()).toBe(false);
+        expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
       });
 
       it('should return false when current file is an Image', () => {
@@ -350,19 +350,19 @@ describe('PlayerToolbarComponent', () => {
           isShuffleMode: false,
         });
 
-        expect(component.isCurrentFileMusicType()).toBe(false);
+        expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
       });
 
       it('should return false when no current file', () => {
         currentFileSignal.set(null);
 
-        expect(component.isCurrentFileMusicType()).toBe(false);
+        expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
       });
 
       it('should return false when deviceId is empty', () => {
         fixture.componentRef.setInput('deviceId', '');
 
-        expect(component.isCurrentFileMusicType()).toBe(false);
+        expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
       });
     });
 
@@ -375,7 +375,7 @@ describe('PlayerToolbarComponent', () => {
           currentIndex: 0,
         });
 
-        expect(component.canNavigate()).toBe(true);
+        expect(component.canNavigateComputed()).toBe(true);
       });
 
       it('should return false when file context has only one file', () => {
@@ -386,27 +386,27 @@ describe('PlayerToolbarComponent', () => {
           currentIndex: 0,
         });
 
-        expect(component.canNavigate()).toBe(false);
+        expect(component.canNavigateComputed()).toBe(false);
       });
 
       it('should return true when in shuffle mode regardless of file context', () => {
         launchModeSignal.set(LaunchMode.Shuffle);
         fileContextSignal.set(null);
 
-        expect(component.canNavigate()).toBe(true);
+        expect(component.canNavigateComputed()).toBe(true);
       });
 
       it('should return false when no file context and not in shuffle mode', () => {
         launchModeSignal.set(LaunchMode.Directory);
         fileContextSignal.set(null);
 
-        expect(component.canNavigate()).toBe(false);
+        expect(component.canNavigateComputed()).toBe(false);
       });
 
       it('should return false when deviceId is empty', () => {
         fixture.componentRef.setInput('deviceId', '');
 
-        expect(component.canNavigate()).toBe(false);
+        expect(component.canNavigateComputed()).toBe(false);
       });
     });
 
@@ -419,8 +419,8 @@ describe('PlayerToolbarComponent', () => {
           currentIndex: 0,
         });
 
-        expect(component.canNavigatePrevious()).toBe(component.canNavigate());
-        expect(component.canNavigatePrevious()).toBe(true);
+        expect(component.canNavigatePreviousComputed()).toBe(component.canNavigateComputed());
+        expect(component.canNavigatePreviousComputed()).toBe(true);
       });
     });
 
@@ -632,7 +632,7 @@ describe('PlayerToolbarComponent', () => {
       });
       fixture.detectChanges();
 
-      expect(component.getPlayButtonColor()).toBe('error');
+      expect(component.getPlayButtonColorComputed()).toBe('error');
     });
 
     it('should show normal color on play button when file is compatible', () => {
@@ -645,14 +645,14 @@ describe('PlayerToolbarComponent', () => {
       });
       fixture.detectChanges();
 
-      expect(component.getPlayButtonColor()).toBe('normal');
+      expect(component.getPlayButtonColorComputed()).toBe('normal');
     });
 
     it('should show normal color when no file is loaded', () => {
       currentFileSignal.set(null);
       fixture.detectChanges();
 
-      expect(component.getPlayButtonColor()).toBe('normal');
+      expect(component.getPlayButtonColorComputed()).toBe('normal');
     });
 
     it('should detect errors with hasError computed property', () => {

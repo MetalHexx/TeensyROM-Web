@@ -89,6 +89,14 @@ export interface PlayerSettings {
 }
 
 /**
+ * Video settings for video capture component in player view
+ */
+export interface VideoSettings {
+  /** Enable video capture component visibility in player view */
+  enableVideo: boolean;
+}
+
+/**
  * Application-level settings
  */
 export interface AppSettings {
@@ -104,6 +112,8 @@ export interface Settings {
   connectionSettings: ConnectionSettings;
   /** Player-related settings */
   playerSettings: PlayerSettings;
+  /** Video settings for video capture component */
+  videoSettings: VideoSettings;
   /** File transfer and watch folder settings */
   fileTransferSettings: FileTransferSettings;
   /** Search configuration settings */

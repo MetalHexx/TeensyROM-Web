@@ -9,9 +9,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingTextComponent, ScalingCompactCardComponent, ActionButtonComponent } from '@teensyrom-nx/ui/components';
 import { ConnectionSettingsSectionComponent } from './connection-settings-section/connection-settings-section.component';
 import { PlayerSettingsSectionComponent } from './player-settings-section/player-settings-section.component';
+import { VideoSettingsSectionComponent } from './video-settings-section/video-settings-section.component';
 import { FileTransferSettingsSectionComponent } from './file-transfer-settings-section/file-transfer-settings-section.component';
 import { SearchSettingsSectionComponent } from './search-settings-section/search-settings-section.component';
-import { AppSettingsSectionComponent } from './app-settings-section/app-settings-section.component';
 import { SettingsFormService } from './settings-form.service';
 
 @Component({
@@ -30,6 +30,7 @@ import { SettingsFormService } from './settings-form.service';
     ActionButtonComponent,
     ConnectionSettingsSectionComponent,
     PlayerSettingsSectionComponent,
+    VideoSettingsSectionComponent,
     FileTransferSettingsSectionComponent,
     SearchSettingsSectionComponent,
   ],
@@ -42,7 +43,7 @@ export class SettingsViewComponent {
   private readonly formService = inject(SettingsFormService);
 
   // Active section state
-  readonly activeSection = signal<'player' | 'fileTransfer' | 'search' | 'connection'>('player');
+  readonly activeSection = signal<'player' | 'video' | 'fileTransfer' | 'search' | 'connection'>('player');
 
   // Expose service state to template
   readonly settings = this.formService.settings;
@@ -88,7 +89,7 @@ export class SettingsViewComponent {
   /**
    * Sets the active settings section
    */
-  setActiveSection(section: 'player' | 'fileTransfer' | 'search' | 'connection'): void {
+  setActiveSection(section: 'player' | 'video' | 'fileTransfer' | 'search' | 'connection'): void {
     this.activeSection.set(section);
   }
 
@@ -102,6 +103,10 @@ export class SettingsViewComponent {
 
   getPlayerSettings(): FormGroup {
     return this.formService.getPlayerSettings();
+  }
+
+  getVideoSettings(): FormGroup {
+    return this.formService.getVideoSettings();
   }
 
   getFileTransferSettings(): FormGroup {

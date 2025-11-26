@@ -5,7 +5,9 @@
       <lib-file-image [currentFile]="currentFile()"></lib-file-image>
     </div>
     <lib-file-other [deviceId]="deviceId()"></lib-file-other>
-    <lib-video-capture [deviceId]="deviceId()"></lib-video-capture>
+    @if (enableVideo()) {
+      <lib-video-capture [deviceId]="deviceId()"></lib-video-capture>
+    }
   </div>
   <!-- @if (isPlayerLoaded() && fileDescription()) {
     <div class="marquee-container">

@@ -247,7 +247,7 @@ describe('SettingsFormService', () => {
       const saveSpy = vi.spyOn(service, 'saveSettings');
 
       // Create a new service instance to test initialization
-      const newService = TestBed.runInInjectionContext(() => new SettingsFormService());
+      void TestBed.runInInjectionContext(() => new SettingsFormService());
       TestBed.flushEffects();
       tick(1000);
 
@@ -442,7 +442,9 @@ describe('SettingsFormService', () => {
     });
 
     it('should log error and continue when saveSettings fails', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation
+      });
       vi.mocked(mockSettingsStore.saveSettings).mockRejectedValueOnce(new Error('Save failed'));
 
       await service.saveSettings();
