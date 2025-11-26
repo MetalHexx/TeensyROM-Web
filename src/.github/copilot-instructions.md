@@ -249,6 +249,22 @@ Real-time communication via SignalR hubs:
 
 Infrastructure services manage hub lifecycle and reconnection logic.
 
+## Documentation Standards
+
+### Markdown Diagrams
+
+**Always use Mermaid syntax for diagrams in planning documents** (e.g., phase plans, architecture docs, brainstorming). ASCII art is acceptable in chat-window responses only, never in committed Markdown files.
+
+```markdown
+✅ In documentation files:
+- Use Mermaid syntax: `graph TD`, `graph LR`, `sequenceDiagram`, etc.
+- Provides better rendering in GitHub/tools
+
+❌ Never in documentation files:
+- Use ASCII box diagrams
+- Use ASCII flow diagrams
+```
+
 ## References
 
 - **Architecture Deep Dive**: `docs/OVERVIEW_CONTEXT.md`
