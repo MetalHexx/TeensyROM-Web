@@ -8,6 +8,7 @@ namespace TeensyRom.Core.Settings
   {
     public ConnectionSettings ConnectionSettings { get; set; } = new();
     public PlayerSettings PlayerSettings { get; set; } = new();
+    public VideoSettings VideoSettings { get; set; } = new();
     public FileTransferSettings FileTransferSettings { get; set; } = new();
     public SearchSettings SearchSettings { get; set; } = new();
     public AppSettings AppSettings { get; set; } = new();

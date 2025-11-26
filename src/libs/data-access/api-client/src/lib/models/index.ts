@@ -43,5 +43,6 @@ export * from './StorageCacheDto';
 export * from './TeensyFilterType';
 export * from './TeensyStorageType';
 export * from './ToggleMusicResponse';
+export * from './VideoSettingsDto';
 export * from './ViewableItemImageDto';
 export * from './YouTubeVideoDto';

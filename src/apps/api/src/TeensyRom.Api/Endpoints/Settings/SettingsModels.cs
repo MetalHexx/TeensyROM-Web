@@ -118,6 +118,17 @@ namespace TeensyRom.Api.Endpoints.Settings
     }
 
     /// <summary>
+    /// Video capture and display preferences.
+    /// </summary>
+    public record VideoSettingsDto
+    {
+        /// <summary>
+        /// Enable video capture component visibility in player view.
+        /// </summary>
+        [Required] public bool EnableVideo { get; set; }
+    }
+
+    /// <summary>
     /// File transfer, synchronization, and directory watching preferences.
     /// </summary>
     public record FileTransferSettingsDto

@@ -10,6 +10,7 @@ namespace TeensyRom.Core.Settings
   public interface ISettingsService : 
     IConnectionSettingsProvider,
     IPlayerSettingsProvider,
+    IVideoSettingsProvider,
     IFileTransferSettingsProvider,
     ISearchSettingsProvider,
     IAppSettingsProvider

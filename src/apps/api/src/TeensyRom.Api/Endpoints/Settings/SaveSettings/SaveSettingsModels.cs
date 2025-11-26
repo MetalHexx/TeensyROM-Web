@@ -18,6 +18,11 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         [Required] public PlayerSettingsDto PlayerSettings { get; set; } = null!;
 
         /// <summary>
+        /// Video capture and display preferences.
+        /// </summary>
+        [Required] public VideoSettingsDto VideoSettings { get; set; } = null!;
+
+        /// <summary>
         /// File transfer, synchronization, and directory watching preferences.
         /// </summary>
         [Required] public FileTransferSettingsDto FileTransferSettings { get; set; } = null!;
@@ -56,6 +61,10 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             RuleFor(x => x.PlayerSettings)
                 .NotNull().WithMessage("Player settings are required.")
                 .SetValidator(new PlayerSettingsValidator());
+
+            RuleFor(x => x.VideoSettings)
+                .NotNull().WithMessage("Video settings are required.")
+                .SetValidator(new VideoSettingsValidator());
 
             RuleFor(x => x.FileTransferSettings)
                 .NotNull().WithMessage("File transfer settings are required.")
@@ -123,6 +132,15 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         {
             RuleFor(x => x.StartupFilter)
                 .IsInEnum().WithMessage("Startup filter must be a valid TeensyFilterType enum value.");
+        }
+    }
+
+    public class VideoSettingsValidator : AbstractValidator<VideoSettingsDto>
+    {
+        public VideoSettingsValidator()
+        {
+            // EnableVideo is bool with [Required] - no additional validation needed for MVP
+            // Future properties (quality, resolution, etc.) would add rules here
         }
     }
 

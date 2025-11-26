@@ -1421,6 +1421,7 @@
         "required": [
           "connectionSettings",
           "playerSettings",
+          "videoSettings",
           "fileTransferSettings",
           "searchSettings",
           "appSettings"
@@ -1432,6 +1433,9 @@
           },
           "playerSettings": {
             "$ref": "#/components/schemas/PlayerSettingsDto"
+          },
+          "videoSettings": {
+            "$ref": "#/components/schemas/VideoSettingsDto"
           },
           "fileTransferSettings": {
             "$ref": "#/components/schemas/FileTransferSettingsDto"
@@ -1666,6 +1670,7 @@
         "required": [
           "connectionSettings",
           "playerSettings",
+          "videoSettings",
           "fileTransferSettings",
           "searchSettings",
           "appSettings"
@@ -1677,6 +1682,9 @@
           },
           "playerSettings": {
             "$ref": "#/components/schemas/PlayerSettingsDto"
+          },
+          "videoSettings": {
+            "$ref": "#/components/schemas/VideoSettingsDto"
           },
           "fileTransferSettings": {
             "$ref": "#/components/schemas/FileTransferSettingsDto"
@@ -1874,6 +1882,17 @@
         "properties": {
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "VideoSettingsDto": {
+        "required": [
+          "enableVideo"
+        ],
+        "type": "object",
+        "properties": {
+          "enableVideo": {
+            "type": "boolean"
           }
         }
       },

@@ -48,6 +48,7 @@ models/StorageCacheDto.ts
 models/TeensyFilterType.ts
 models/TeensyStorageType.ts
 models/ToggleMusicResponse.ts
+models/VideoSettingsDto.ts
 models/ViewableItemImageDto.ts
 models/YouTubeVideoDto.ts
 models/index.ts

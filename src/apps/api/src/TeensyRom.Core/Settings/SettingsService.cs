@@ -17,6 +17,8 @@ namespace TeensyRom.Core.Settings
         _settings.Select(s => s.ConnectionSettings).DistinctUntilChanged();
         public IObservable<PlayerSettings> PlayerSettings => 
             _settings.Select(s => s.PlayerSettings).DistinctUntilChanged();
+        public IObservable<VideoSettings> VideoSettings => 
+            _settings.Select(s => s.VideoSettings).DistinctUntilChanged();
         public IObservable<FileTransferSettings> FileTransferSettings => 
             _settings.Select(s => s.FileTransferSettings).DistinctUntilChanged();
         public IObservable<SearchSettings> SearchSettings => 
@@ -66,6 +68,7 @@ namespace TeensyRom.Core.Settings
 
         public ConnectionSettings GetConnectionSettings() => GetSettings().ConnectionSettings;
         public PlayerSettings GetPlayerSettings() => GetSettings().PlayerSettings;
+        public VideoSettings GetVideoSettings() => GetSettings().VideoSettings;
         public FileTransferSettings GetFileTransferSettings() => GetSettings().FileTransferSettings;
         public SearchSettings GetSearchSettings() => GetSettings().SearchSettings;
         public AppSettings GetAppSettings() => GetSettings().AppSettings;

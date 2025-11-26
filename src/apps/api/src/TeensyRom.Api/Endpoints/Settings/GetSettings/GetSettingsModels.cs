@@ -18,6 +18,11 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         [Required] public PlayerSettingsDto PlayerSettings { get; set; } = null!;
 
         /// <summary>
+        /// Video capture and display preferences.
+        /// </summary>
+        [Required] public VideoSettingsDto VideoSettings { get; set; } = null!;
+
+        /// <summary>
         /// File transfer, synchronization, and directory watching preferences.
         /// </summary>
         [Required] public FileTransferSettingsDto FileTransferSettings { get; set; } = null!;

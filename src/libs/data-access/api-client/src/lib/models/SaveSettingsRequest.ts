@@ -34,6 +34,13 @@ import {
     PlayerSettingsDtoToJSON,
     PlayerSettingsDtoToJSONTyped,
 } from './PlayerSettingsDto';
+import type { VideoSettingsDto } from './VideoSettingsDto';
+import {
+    VideoSettingsDtoFromJSON,
+    VideoSettingsDtoFromJSONTyped,
+    VideoSettingsDtoToJSON,
+    VideoSettingsDtoToJSONTyped,
+} from './VideoSettingsDto';
 import type { FileTransferSettingsDto } from './FileTransferSettingsDto';
 import {
     FileTransferSettingsDtoFromJSON,
@@ -69,6 +76,12 @@ export interface SaveSettingsRequest {
     playerSettings: PlayerSettingsDto;
     /**
      * 
+     * @type {VideoSettingsDto}
+     * @memberof SaveSettingsRequest
+     */
+    videoSettings: VideoSettingsDto;
+    /**
+     * 
      * @type {FileTransferSettingsDto}
      * @memberof SaveSettingsRequest
      */
@@ -93,6 +106,7 @@ export interface SaveSettingsRequest {
 export function instanceOfSaveSettingsRequest(value: object): value is SaveSettingsRequest {
     if (!('connectionSettings' in value) || value['connectionSettings'] === undefined) return false;
     if (!('playerSettings' in value) || value['playerSettings'] === undefined) return false;
+    if (!('videoSettings' in value) || value['videoSettings'] === undefined) return false;
     if (!('fileTransferSettings' in value) || value['fileTransferSettings'] === undefined) return false;
     if (!('searchSettings' in value) || value['searchSettings'] === undefined) return false;
     if (!('appSettings' in value) || value['appSettings'] === undefined) return false;
@@ -111,6 +125,7 @@ export function SaveSettingsRequestFromJSONTyped(json: any, ignoreDiscriminator:
         
         'connectionSettings': ConnectionSettingsDtoFromJSON(json['connectionSettings']),
         'playerSettings': PlayerSettingsDtoFromJSON(json['playerSettings']),
+        'videoSettings': VideoSettingsDtoFromJSON(json['videoSettings']),
         'fileTransferSettings': FileTransferSettingsDtoFromJSON(json['fileTransferSettings']),
         'searchSettings': SearchSettingsDtoFromJSON(json['searchSettings']),
         'appSettings': AppSettingsDtoFromJSON(json['appSettings']),
@@ -130,6 +145,7 @@ export function SaveSettingsRequestToJSONTyped(value?: SaveSettingsRequest | nul
         
         'connectionSettings': ConnectionSettingsDtoToJSON(value['connectionSettings']),
         'playerSettings': PlayerSettingsDtoToJSON(value['playerSettings']),
+        'videoSettings': VideoSettingsDtoToJSON(value['videoSettings']),
         'fileTransferSettings': FileTransferSettingsDtoToJSON(value['fileTransferSettings']),
         'searchSettings': SearchSettingsDtoToJSON(value['searchSettings']),
         'appSettings': AppSettingsDtoToJSON(value['appSettings']),

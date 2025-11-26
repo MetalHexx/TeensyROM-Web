@@ -93,6 +93,8 @@ public class SettingsServiceTests : IDisposable
         settings.ConnectionSettings.Should().NotBeNull();
         settings.ConnectionSettings.AutoConnectEnabled.Should().BeTrue();
         settings.PlayerSettings.Should().NotBeNull();
+        settings.VideoSettings.Should().NotBeNull();
+        settings.VideoSettings.EnableVideo.Should().BeFalse();
         settings.FileTransferSettings.Should().NotBeNull();
         settings.FileTransferSettings.WatchDirectoryLocation.Should().NotBeNullOrEmpty();
         settings.SearchSettings.Should().NotBeNull();
@@ -200,6 +202,10 @@ public class SettingsServiceTests : IDisposable
                 RepeatModeOnStartup = true,
                 PlayTimerEnabled = true
             },
+            VideoSettings = new VideoSettings
+            {
+                EnableVideo = true
+            },
             FileTransferSettings = new FileTransferSettings 
             { 
                 AutoFileCopyEnabled = true,
@@ -224,6 +230,7 @@ public class SettingsServiceTests : IDisposable
         actualSettings.ConnectionSettings.ConnectionType.Should().Be(expectedSettings.ConnectionSettings.ConnectionType);
         actualSettings.ConnectionSettings.AutoConnectEnabled.Should().Be(expectedSettings.ConnectionSettings.AutoConnectEnabled);
         actualSettings.PlayerSettings.RepeatModeOnStartup.Should().Be(expectedSettings.PlayerSettings.RepeatModeOnStartup);
+        actualSettings.VideoSettings.EnableVideo.Should().Be(expectedSettings.VideoSettings.EnableVideo);
         actualSettings.FileTransferSettings.AutoFileCopyEnabled.Should().Be(expectedSettings.FileTransferSettings.AutoFileCopyEnabled);
         actualSettings.SearchSettings.BannedFiles.Should().BeEquivalentTo(expectedSettings.SearchSettings.BannedFiles);
         actualSettings.AppSettings.FirstTimeSetup.Should().Be(expectedSettings.AppSettings.FirstTimeSetup);
@@ -584,6 +591,96 @@ public class SettingsServiceTests : IDisposable
         subscription.Dispose();
         emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
         emittedValues.Last().RepeatModeOnStartup.Should().Be(settings.PlayerSettings.RepeatModeOnStartup);
+    }
+
+    #endregion
+
+    #region Provider Interface Tests - VideoSettings
+
+    [Fact]
+    public void GetVideoSettings_ShouldReturnVideoSettings()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+
+        // Act
+        var videoSettings = service.GetVideoSettings();
+
+        // Assert
+        videoSettings.Should().NotBeNull();
+        videoSettings.Should().BeOfType<VideoSettings>();
+    }
+
+    [Fact]
+    public async Task VideoSettings_Observable_ShouldEmitInitialValue()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        VideoSettings? received = null;
+
+        // Act
+        await service.VideoSettings
+            .Take(1)
+            .Do(s => received = s)
+            .ToTask();
+
+        // Assert
+        received.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task VideoSettings_Observable_ShouldEmit_WhenVideoSettingsChange()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var emittedValues = new List<VideoSettings>();
+        var subscription = service.VideoSettings.Subscribe(emittedValues.Add);
+
+        var settings = service.GetSettings();
+        settings = settings with
+        {
+            VideoSettings = settings.VideoSettings with
+            {
+                EnableVideo = !settings.VideoSettings.EnableVideo
+            }
+        };
+
+        // Act
+        service.SaveSettings(settings);
+        await Task.Delay(100);
+
+        // Assert
+        subscription.Dispose();
+        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
+        emittedValues.Last().EnableVideo.Should().Be(settings.VideoSettings.EnableVideo);
+    }
+
+    [Fact]
+    public async Task VideoSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var videoEmissions = new List<VideoSettings>();
+        var subscription = service.VideoSettings.Subscribe(videoEmissions.Add);
+
+        var settings = service.GetSettings();
+        
+        // Modify only PlayerSettings (not VideoSettings)
+        settings = settings with
+        {
+            PlayerSettings = settings.PlayerSettings with
+            {
+                RepeatModeOnStartup = !settings.PlayerSettings.RepeatModeOnStartup
+            }
+        };
+
+        // Act
+        service.SaveSettings(settings);
+        await Task.Delay(100);
+
+        // Assert
+        subscription.Dispose();
+        videoEmissions.Should().HaveCount(1, "VideoSettings observable should not emit when only PlayerSettings changes");
     }
 
     #endregion
@@ -1017,8 +1114,6 @@ public class SettingsServiceTests : IDisposable
         // Assert
         connectionSettings.ConnectionType.Should().Be(ConnectionType.Serial);
         connectionSettings.AutoConnectEnabled.Should().BeTrue();
-        connectionSettings.Serial.Should().NotBeNull();
-        connectionSettings.Tcp.Should().NotBeNull();
     }
 
     [Fact]
@@ -1035,6 +1130,17 @@ public class SettingsServiceTests : IDisposable
         playerSettings.MuteRandomSeek.Should().BeFalse();
         playerSettings.StartupLaunchEnabled.Should().BeTrue();
         playerSettings.StartupLaunchRandom.Should().BeFalse();
+    }
+
+    [Fact]
+    public void VideoSettings_ShouldHaveValidDefaults()
+    {
+        // Arrange & Act
+        var service = new SettingsService(_mockLogger);
+        var videoSettings = service.GetVideoSettings();
+
+        // Assert
+        videoSettings.EnableVideo.Should().BeFalse();
     }
 
     [Fact]
@@ -1373,8 +1479,6 @@ public class SettingsServiceTests : IDisposable
             {
                 ConnectionType = settings.ConnectionSettings.ConnectionType,
                 AutoConnectEnabled = settings.ConnectionSettings.AutoConnectEnabled,
-                Serial = settings.ConnectionSettings.Serial,
-                Tcp = settings.ConnectionSettings.Tcp
             }
         };
 

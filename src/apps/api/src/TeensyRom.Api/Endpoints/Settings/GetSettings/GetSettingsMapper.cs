@@ -10,6 +10,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
             {
                 ConnectionSettings = MapConnectionSettings(entity.ConnectionSettings),
                 PlayerSettings = MapPlayerSettings(entity.PlayerSettings),
+                VideoSettings = MapVideoSettings(entity.VideoSettings),
                 FileTransferSettings = MapFileTransferSettings(entity.FileTransferSettings),
                 SearchSettings = MapSearchSettings(entity.SearchSettings),
                 AppSettings = MapAppSettings(entity.AppSettings)
@@ -51,6 +52,14 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
                 StartupFilter = entity.StartupFilter,
                 StartupLaunchEnabled = entity.StartupLaunchEnabled,
                 StartupLaunchRandom = entity.StartupLaunchRandom
+            };
+        }
+
+        private static VideoSettingsDto MapVideoSettings(VideoSettings entity)
+        {
+            return new VideoSettingsDto
+            {
+                EnableVideo = entity.EnableVideo
             };
         }
 

@@ -20,6 +20,7 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             {
                 //ConnectionSettings = MapConnectionSettings(request.ConnectionSettings),
                 PlayerSettings = MapPlayerSettings(request.PlayerSettings),
+                VideoSettings = MapVideoSettings(request.VideoSettings),
                 FileTransferSettings = MapFileTransferSettings(request.FileTransferSettings),
                 SearchSettings = MapSearchSettings(request.SearchSettings),
                 AppSettings = MapAppSettings(request.AppSettings)
@@ -60,6 +61,14 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
                 StartupFilter = entity.StartupFilter,
                 StartupLaunchEnabled = entity.StartupLaunchEnabled,
                 StartupLaunchRandom = entity.StartupLaunchRandom
+            };
+        }
+
+        private static VideoSettingsDto MapVideoSettingsDto(VideoSettings entity)
+        {
+            return new VideoSettingsDto
+            {
+                EnableVideo = entity.EnableVideo
             };
         }
 
@@ -136,6 +145,14 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
                 StartupFilter = dto.StartupFilter,
                 StartupLaunchEnabled = dto.StartupLaunchEnabled,
                 StartupLaunchRandom = dto.StartupLaunchRandom
+            };
+        }
+
+        private static VideoSettings MapVideoSettings(VideoSettingsDto dto)
+        {
+            return new VideoSettings
+            {
+                EnableVideo = dto.EnableVideo
             };
         }
 
