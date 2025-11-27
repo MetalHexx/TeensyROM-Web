@@ -251,19 +251,22 @@ Infrastructure services manage hub lifecycle and reconnection logic.
 
 ## Documentation Standards
 
-### Markdown Diagrams
+**Markdown Diagrams**: Use Mermaid syntax in planning docs (not ASCII). ASCII only in chat responses.
 
-**Always use Mermaid syntax for diagrams in planning documents** (e.g., phase plans, architecture docs, brainstorming). ASCII art is acceptable in chat-window responses only, never in committed Markdown files.
-
-```markdown
-✅ In documentation files:
-- Use Mermaid syntax: `graph TD`, `graph LR`, `sequenceDiagram`, etc.
-- Provides better rendering in GitHub/tools
-
-❌ Never in documentation files:
-- Use ASCII box diagrams
-- Use ASCII flow diagrams
+**Mermaid Dark Mode Colors** (from design system):
 ```
+%%{init: {'theme': 'dark', 'primaryColor': '#890089', 'primaryBorderColor': '#b333b3', 'primaryTextColor': '#fff', 'secondaryColor': '#00f7ff', 'tertiaryColor': '#6fdc8c', 'lineColor': '#656363', 'tertiaryTextColor': '#000'}}%%
+```
+
+| Use | Color | Purpose |
+|-----|-------|---------|
+| `fill:#890089` | Primary Purple | Main nodes, containers |
+| `fill:#b333b3` | Bright Purple | Emphasis, secondary importance |
+| `fill:#00f7ff` | Cyan | Important flows, highlights |
+| `fill:#6fdc8c` | Green | Success, positive states |
+| `fill:#ff6f6f` | Red | Errors, critical paths |
+| `fill:#f5e29e` | Yellow | Data, storage, resources |
+| `stroke:#656363` | Gray | Edges, borders |
 
 ## References
 

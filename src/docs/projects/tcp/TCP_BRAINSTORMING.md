@@ -17,6 +17,7 @@ The current TeensyROM system is built around **serial (COM port) communication**
 ### Device Management Hierarchy
 
 ```mermaid
+%%{init: {'theme': 'dark', 'primaryColor': '#890089', 'primaryBorderColor': '#b333b3', 'primaryTextColor': '#fff', 'secondaryColor': '#00f7ff', 'tertiaryColor': '#6fdc8c', 'lineColor': '#656363', 'tertiaryTextColor': '#000'}}%%
 graph TD
     DCM["DeviceConnectionManager<br/>(Singleton)"]
     TRD["TeensyRomDevice<br/>(Aggregate Root)"]
@@ -30,6 +31,13 @@ graph TD
     TRD --> ISC
     TRD --> SDS
     TRD --> USB
+    
+    style DCM fill:#b333b3,stroke:#00f7ff,stroke-width:2px,color:#fff
+    style TRD fill:#890089,stroke:#b333b3,stroke-width:2px,color:#fff
+    style Cart fill:#f5e29e,stroke:#656363,stroke-width:1px,color:#000
+    style ISC fill:#f5e29e,stroke:#656363,stroke-width:1px,color:#000
+    style SDS fill:#6fdc8c,stroke:#656363,stroke-width:1px,color:#000
+    style USB fill:#6fdc8c,stroke:#656363,stroke-width:1px,color:#000
 ```
 
 ### Key Abstractions
@@ -76,6 +84,7 @@ A TCP implementation (`TcpObservablePort`) could implement this same interface -
 ### Polymorphic Transport Layer
 
 ```mermaid
+%%{init: {'theme': 'dark', 'primaryColor': '#890089', 'primaryBorderColor': '#b333b3', 'primaryTextColor': '#fff', 'secondaryColor': '#00f7ff', 'tertiaryColor': '#6fdc8c', 'lineColor': '#656363', 'tertiaryTextColor': '#000'}}%%
 graph TD
     ISC["ISerialStateContext<br/>(state machine, unchanged)"]
     IOSP["IObservableSerialPort<br/>(transport abstraction interface)"]
@@ -85,6 +94,11 @@ graph TD
     ISC --> IOSP
     IOSP --> SOAP
     IOSP --> TCP
+    
+    style ISC fill:#b333b3,stroke:#00f7ff,stroke-width:2px,color:#fff
+    style IOSP fill:#890089,stroke:#b333b3,stroke-width:2px,color:#fff
+    style SOAP fill:#6fdc8c,stroke:#656363,stroke-width:1px,color:#000
+    style TCP fill:#00f7ff,stroke:#656363,stroke-width:1px,color:#000
 ```
 
 ### Extended Cart Model
@@ -222,14 +236,15 @@ Once devices are discovered and persisted, the **existing connection flow** hand
 This separation keeps discovery fast and reuses existing validation logic.
 
 ```mermaid
+%%{init: {'theme': 'dark', 'primaryColor': '#890089', 'primaryBorderColor': '#b333b3', 'primaryTextColor': '#fff', 'secondaryColor': '#00f7ff', 'tertiaryColor': '#6fdc8c', 'lineColor': '#656363', 'tertiaryTextColor': '#000'}}%%
 graph TD
     DISC["DISCOVERY PHASE<br/>(TcpDeviceFinder)<br/>- Parallel scan IP range<br/>- TCP connect + Ping token<br/>- Check for 'teensyrom' in response<br/>- Persist IP, Port, DiscoveredAt to disk<br/>- FAST: ~1 second for /24"]
     CONN["CONNECTION PHASE<br/>(existing flow)<br/>- Load known TCP devices from disk<br/>- Create TcpObservablePort for each<br/>- FwVersionCheck command (same as serial)<br/>- Tag storage, create TeensyRomDevice<br/>- Full validation, identical to serial path"]
     
     DISC --> CONN
     
-    style DISC fill:#e1f5ff,stroke:#333,stroke-width:2px
-    style CONN fill:#fff4e1,stroke:#333,stroke-width:2px
+    style DISC fill:#890089,stroke:#00f7ff,stroke-width:2px,color:#fff
+    style CONN fill:#b333b3,stroke:#6fdc8c,stroke-width:2px,color:#fff
 ```
 
 ---
