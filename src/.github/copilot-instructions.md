@@ -255,18 +255,28 @@ Infrastructure services manage hub lifecycle and reconnection logic.
 
 **Mermaid Dark Mode Colors** (from design system):
 ```
-%%{init: {'theme': 'dark', 'primaryColor': '#890089', 'primaryBorderColor': '#b333b3', 'primaryTextColor': '#fff', 'secondaryColor': '#00f7ff', 'tertiaryColor': '#6fdc8c', 'lineColor': '#656363', 'tertiaryTextColor': '#000'}}%%
+%%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
 ```
 
-| Use | Color | Purpose |
-|-----|-------|---------|
-| `fill:#890089` | Primary Purple | Main nodes, containers |
-| `fill:#b333b3` | Bright Purple | Emphasis, secondary importance |
-| `fill:#00f7ff` | Cyan | Important flows, highlights |
-| `fill:#6fdc8c` | Green | Success, positive states |
-| `fill:#ff6f6f` | Red | Errors, critical paths |
-| `fill:#f5e29e` | Yellow | Data, storage, resources |
-| `stroke:#656363` | Gray | Edges, borders |
+**Color Palette with Text Contrast**:
+
+| Use | Color | Text Color | Purpose |
+|-----|-------|-----------|----------|
+| `fill:#5a2c6b` | Dark Purple | White | Primary nodes, main containers |
+| `fill:#7d3fa3` | Medium Purple | White | Emphasis, secondary importance |
+| `fill:#0066cc` | Dark Blue | White | Important flows, service boundaries |
+| `fill:#2d7a3e` | Dark Green | White | Success, positive states |
+| `fill:#d4a574` | Tan/Gold | Black | Data storage, resources |
+| `fill:#cc3333` | Dark Red | White | Errors, critical paths |
+| `stroke:#b3b3b3` | Light Gray | - | Edges, borders (good contrast on dark background) |
+| `stroke:#7d3fa3` | Medium Purple | - | Component borders |
+
+**Critical Rules for Readability**:
+1. **Always specify text color** with `color:#fff` (white) for dark backgrounds or `color:#000` (black) for light backgrounds
+2. **Test contrast** - white text must be readable on background color (WCAG AA minimum ratio: 4.5:1)
+3. **Avoid light backgrounds** on dark theme - use dark blues, purples, greens instead
+4. **Use stroke borders** (2px minimum) to separate nodes from background
+5. **Example style rule**: `style NODE fill:#0066cc,color:#fff,stroke:#0052a3,stroke-width:2px`
 
 ## References
 
