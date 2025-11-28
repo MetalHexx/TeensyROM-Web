@@ -2693,6 +2693,155 @@ import {
 
 - [`video-dialog.component.html`](../libs/features/player/src/lib/player-view/player-device-container/video-capture/video-dialog/video-dialog.component.html) - Video capture dialog (future integration)
 
+### `ContentOverlayContainerComponent`
+
+**Purpose**: A pure presentation layout container component that manages overlay positioning, hover-to-reveal behavior, and optional fullscreen support via 9 named content projection slots. Enables flexible composition of any content (video, images, documents) with overlays for toolbars, controls, and status indicators.
+
+**Selector**: `lib-content-overlay-container`
+
+**Properties**:
+
+- `showOverlaysOnHover` (optional): `boolean` - Enable hover-to-reveal behavior for all overlay slots. Defaults to `true`.
+- `overlayTransitionMs` (optional): `number` - Transition duration in milliseconds for overlay animations. Defaults to `300`.
+
+**Outputs**:
+
+- `fullscreenChange`: `OutputEmitterRef<boolean>` - Emits when fullscreen state changes. `true` when entering, `false` when exiting.
+
+**Public Methods**:
+
+| Method | Description |
+|--------|-------------|
+| `enterFullscreen()` | Request fullscreen mode on the container element |
+| `exitFullscreen()` | Exit fullscreen mode |
+| `toggleFullscreen()` | Toggle between fullscreen and normal mode |
+| `isFullscreen()` | Signal returning current fullscreen state |
+
+**Named Content Projection Slots (9 total)**:
+
+| Slot Attribute | Position | Typical Content |
+|----------------|----------|-----------------|
+| `content` | Background layer | `lib-video-stream`, `lib-crt-effect-wrapper`, images, any element |
+| `topLeftCorner` | Top-left corner | Logo, branding |
+| `topOverlay` | Top-center | Filter toolbar |
+| `topRightCorner` | Top-right corner | Close button |
+| `leftControls` | Left side (middle) | Settings panel |
+| `rightControls` | Right side (middle) | Action buttons |
+| `bottomLeftControls` | Bottom-left | Player controls |
+| `bottomOverlay` | Bottom-center | Now playing info |
+| `bottomRightControls` | Bottom-right | Extra controls (timer, shuffle) |
+
+**Usage Examples**:
+
+```html
+<!-- Video with hover-revealed overlays -->
+<lib-content-overlay-container [showOverlaysOnHover]="true" (fullscreenChange)="onFullscreen($event)">
+  <lib-video-stream content [stream]="mediaStream"></lib-video-stream>
+  <lib-filter-toolbar topOverlay></lib-filter-toolbar>
+  <lib-icon-button topRightCorner icon="close" (buttonClick)="close()"></lib-icon-button>
+  <lib-player-toolbar bottomOverlay></lib-player-toolbar>
+</lib-content-overlay-container>
+
+<!-- Image gallery with overlays -->
+<lib-content-overlay-container [showOverlaysOnHover]="true">
+  <img content [src]="currentImage" alt="Gallery image" />
+  <lib-icon-button topRightCorner icon="close" (buttonClick)="closeGallery()"></lib-icon-button>
+  <div bottomOverlay>{{ imageCaption }}</div>
+  <div bottomRightControls>
+    <lib-icon-button icon="arrow_back" (buttonClick)="prevImage()"></lib-icon-button>
+    <lib-icon-button icon="arrow_forward" (buttonClick)="nextImage()"></lib-icon-button>
+  </div>
+</lib-content-overlay-container>
+
+<!-- Full video dialog composition with CRT effects -->
+<lib-content-overlay-container #container [showOverlaysOnHover]="true">
+  <!-- Video with CRT effects -->
+  <lib-crt-effect-wrapper content [settings]="crtSettings" [enabled]="crtEnabled">
+    <lib-video-stream [stream]="mediaStream"></lib-video-stream>
+  </lib-crt-effect-wrapper>
+
+  <!-- Top row -->
+  <img topLeftCorner src="/logo.png" alt="Logo" />
+  <lib-filter-toolbar topOverlay [deviceId]="deviceId"></lib-filter-toolbar>
+  <lib-icon-button topRightCorner icon="close" (buttonClick)="close()"></lib-icon-button>
+
+  <!-- Side controls -->
+  <lib-crt-settings-panel leftControls [settings]="crtSettings"></lib-crt-settings-panel>
+  <lib-compact-card-layout rightControls>
+    <lib-icon-button icon="tv" (buttonClick)="toggleCrt()"></lib-icon-button>
+    <lib-icon-button icon="fullscreen" (buttonClick)="container.toggleFullscreen()"></lib-icon-button>
+  </lib-compact-card-layout>
+
+  <!-- Bottom row -->
+  <lib-player-controls bottomLeftControls></lib-player-controls>
+  <lib-now-playing bottomOverlay [song]="currentSong"></lib-now-playing>
+  <div bottomRightControls>
+    <lib-icon-button icon="shuffle"></lib-icon-button>
+    <lib-icon-button icon="favorite"></lib-icon-button>
+  </div>
+</lib-content-overlay-container>
+
+<!-- Always-visible overlays (no hover reveal) -->
+<lib-content-overlay-container [showOverlaysOnHover]="false">
+  <lib-video-stream content [stream]="mediaStream"></lib-video-stream>
+  <lib-player-toolbar bottomOverlay></lib-player-toolbar>
+</lib-content-overlay-container>
+```
+
+**TypeScript Import**:
+
+```typescript
+import { ContentOverlayContainerComponent } from '@teensyrom-nx/ui/components';
+```
+
+**Features**:
+
+- **9 Named Slots**: Flexible content projection for any overlay arrangement
+- **Hover-to-Reveal**: CSS-based show/hide with slide animations (configurable)
+- **Focus Persistence**: Overlays stay visible when child elements have focus (`:focus-within`)
+- **Fullscreen Support**: Native Fullscreen API integration with fixed positioning
+- **Content Agnostic**: Any content can be projected into any slot (video, images, documents, etc.)
+- **Pure Presentation**: No store dependencies - consumer provides all content
+
+**Hover Animation Behavior**:
+
+When `showOverlaysOnHover` is `true`:
+- All overlays hidden by default (opacity 0, pointer-events none)
+- On container hover: overlays slide in from edges with 300ms transition
+- Corner overlays slide diagonally
+- Side overlays slide horizontally
+- Top/bottom overlays slide vertically
+- Overlays remain visible while hovered or focused
+
+**Fullscreen Behavior**:
+
+- Overlays use `position: fixed` in fullscreen mode
+- z-index increased to 9999 for visibility
+- All hover behaviors work in fullscreen
+- `fullscreenChange` event emits on state changes
+
+**CSS Custom Properties**:
+
+| Variable | Purpose |
+|----------|---------|
+| `--transition-ms` | Animation duration (set via `overlayTransitionMs` input) |
+
+**Best Practice**: Use named slots to separate concerns - the container handles positioning and visibility, consumers handle content. For video dialogs, compose with `lib-video-stream` and `lib-crt-effect-wrapper` in the content slot. For image galleries, project `<img>` directly into the content slot.
+
+**Intended Use Cases**:
+
+- Video dialog with player controls
+- Video capture preview with toolbars
+- Image galleries with navigation overlays
+- Document viewers with toolbars
+- Media player overlays
+- Any fullscreen-capable content display
+- Composable UI patterns with overlays
+
+**Used In**:
+
+- [`video-dialog.component.html`](../libs/features/player/src/lib/player-view/player-device-container/video-capture/video-dialog/video-dialog.component.html) - Video capture dialog (future integration)
+
 ### `CycleImageComponent`
 
 **Purpose**: An advanced image carousel component that automatically cycles through multiple images with smooth fade transitions and optional blurred background effects. Supports multiple size variants from small thumbnails to large detail views.

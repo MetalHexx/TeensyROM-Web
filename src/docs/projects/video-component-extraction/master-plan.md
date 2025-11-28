@@ -196,8 +196,8 @@ Create the foundational `lib-video-stream` component that handles `MediaStream` 
 
 ---
 
-<details open>
-<summary><h3>🔄 Phase 2: CRT Effect Wrapper (IN PROGRESS)</h3></summary>
+<details>
+<summary><h3>✅ Phase 2: CRT Effect Wrapper (COMPLETE)</h3></summary>
 
 ### Objective
 
@@ -205,11 +205,20 @@ Extract CRT visual effects into a reusable CSS wrapper that can enhance any cont
 
 ### Key Deliverables
 
-- [ ] `lib-crt-effect-wrapper` component with `settings` and `enabled` inputs
-- [ ] All 8 CRT effects as CSS custom properties (scanlines, vignette, curvature, brightness, saturation, contrast, blur, flicker)
-- [ ] Smooth enable/disable transitions
-- [ ] Unit tests verifying CSS property application
-- [ ] Export from `libs/ui/components` barrel
+- [x] `lib-crt-effect-wrapper` component with `settings` and `enabled` inputs
+- [x] All 8 CRT effects as CSS custom properties (scanlines, vignette, curvature, filters)
+- [x] Smooth enable/disable transitions (300ms)
+- [x] Unit tests verifying CSS property application (21 tests)
+- [x] Export from `libs/ui/components` barrel
+- [x] `CRT_PRESETS` with 4 preset configurations (full, filtersOnly, scanlines, none)
+
+### Completion Notes
+
+- **Completed**: November 28, 2025
+- **Report**: [Phase 2 Report](./reports/phase-02-report.md)
+- **Tests**: 21 behavioral tests, all passing (289 total in ui-components)
+- **Key Pattern**: Preset system allows `CRT_PRESETS.full`, `.filtersOnly`, `.scanlines`, `.none` for common use cases
+- **Bonus**: Angular `.px` binding syntax for cleaner CSS variable bindings
 
 ### Phase Documents
 
@@ -220,8 +229,8 @@ Extract CRT visual effects into a reusable CSS wrapper that can enhance any cont
 
 ---
 
-<details>
-<summary><h3>Phase 3: Video Overlay Container</h3></summary>
+<details open>
+<summary><h3>🔄 Phase 3: Video Overlay Container (IN PROGRESS)</h3></summary>
 
 ### Objective
 
@@ -239,6 +248,7 @@ Create the layout container with named content slots for composing video with ov
 ### Phase Documents
 
 - [Phase Plan](./phases/phase-03-overlay-container.md)
+- [Task Handoff](./tasks/phase-03-task-handoff.md)
 
 </details>
 
@@ -422,8 +432,10 @@ Phase 7 (Cleanup) ← production readiness ────────────�
 
 **Phase 1 Complete**: `lib-video-stream` delivered with 11 tests. See [Phase 1 Report](./reports/phase-01-report.md).
 
-**Phase 2 Ready**: [Task Handoff](./tasks/phase-02-task-handoff.md) is ready for execution.
+**Phase 2 Complete**: `lib-crt-effect-wrapper` delivered with 21 tests and 4 presets. See [Phase 2 Report](./reports/phase-02-report.md).
 
-**Document Version**: 1.1  
+**Phase 3 Ready**: [Task Handoff](./tasks/phase-03-task-handoff.md) is ready for execution.
+
+**Document Version**: 1.2  
 **Created**: 2025-11-28  
-**Updated**: 2025-11-28 (Phase 1 complete)
+**Updated**: 2025-11-28 (Phase 2 complete)

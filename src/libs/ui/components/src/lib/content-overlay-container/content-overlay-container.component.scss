@@ -1,0 +1,345 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #000;
+
+  // CSS custom property for transition duration
+  --transition-ms: 300ms;
+}
+
+// =============================================================================
+// CONTENT LAYER
+// =============================================================================
+
+.content-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+
+  // Ensure projected content fills the layer
+  ::ng-deep > * {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// =============================================================================
+// OVERLAY LAYER
+// =============================================================================
+
+.overlay-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+
+  // All direct children are overlay slots
+  > * {
+    position: absolute;
+    pointer-events: all;
+    z-index: 10;
+  }
+}
+
+// =============================================================================
+// TOP ROW POSITIONING
+// =============================================================================
+
+.top-left-corner {
+  top: 16px;
+  left: 16px;
+}
+
+.top-overlay {
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+}
+
+.top-right-corner {
+  top: 16px;
+  right: 16px;
+}
+
+// =============================================================================
+// MIDDLE ROW POSITIONING (SIDES)
+// =============================================================================
+
+.left-controls {
+  top: 50%;
+  left: 16px;
+  transform: translateY(-50%);
+  max-height: calc(100% - 200px);
+}
+
+.right-controls {
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  max-height: calc(100% - 200px);
+}
+
+// =============================================================================
+// BOTTOM ROW POSITIONING
+// =============================================================================
+
+.bottom-left-controls {
+  bottom: 16px;
+  left: 16px;
+}
+
+.bottom-overlay {
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+}
+
+.bottom-right-controls {
+  bottom: 16px;
+  right: 16px;
+}
+
+// =============================================================================
+// HOVER-TO-REVEAL BEHAVIOR
+// =============================================================================
+
+.overlay-container.hover-reveal {
+  // Default: hide all overlays
+  .overlay-layer > * {
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity calc(var(--transition-ms) * 1ms) ease-in-out,
+      transform calc(var(--transition-ms) * 1ms) ease-in-out;
+  }
+
+  // Slide-out transforms for hidden state
+  .top-left-corner {
+    transform: translate(-100%, -100%);
+  }
+
+  .top-overlay {
+    transform: translate(-50%, -100%);
+  }
+
+  .top-right-corner {
+    transform: translate(100%, -100%);
+  }
+
+  .left-controls {
+    transform: translate(-100%, -50%);
+  }
+
+  .right-controls {
+    transform: translate(100%, -50%);
+  }
+
+  .bottom-left-controls {
+    transform: translate(-100%, 100%);
+  }
+
+  .bottom-overlay {
+    transform: translate(-50%, 100%);
+  }
+
+  .bottom-right-controls {
+    transform: translate(100%, 100%);
+  }
+
+  // Show overlays on container hover
+  &:hover .overlay-layer > * {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  // Slide-in transforms for visible state
+  &:hover {
+    .top-left-corner {
+      transform: translate(0, 0);
+    }
+
+    .top-overlay {
+      transform: translateX(-50%);
+    }
+
+    .top-right-corner {
+      transform: translate(0, 0);
+    }
+
+    .left-controls {
+      transform: translateY(-50%);
+    }
+
+    .right-controls {
+      transform: translateY(-50%);
+    }
+
+    .bottom-left-controls {
+      transform: translate(0, 0);
+    }
+
+    .bottom-overlay {
+      transform: translateX(-50%);
+    }
+
+    .bottom-right-controls {
+      transform: translate(0, 0);
+    }
+  }
+
+  // Keep visible when overlay has focus (dropdowns, inputs, menus)
+  .overlay-layer > *:focus-within {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .top-left-corner:focus-within {
+    transform: translate(0, 0);
+  }
+
+  .top-overlay:focus-within {
+    transform: translateX(-50%);
+  }
+
+  .top-right-corner:focus-within {
+    transform: translate(0, 0);
+  }
+
+  .left-controls:focus-within {
+    transform: translateY(-50%);
+  }
+
+  .right-controls:focus-within {
+    transform: translateY(-50%);
+  }
+
+  .bottom-left-controls:focus-within {
+    transform: translate(0, 0);
+  }
+
+  .bottom-overlay:focus-within {
+    transform: translateX(-50%);
+  }
+
+  .bottom-right-controls:focus-within {
+    transform: translate(0, 0);
+  }
+
+  // Keep visible when hovering the overlay itself
+  .overlay-layer > *:hover {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .top-left-corner:hover {
+    transform: translate(0, 0);
+  }
+
+  .top-overlay:hover {
+    transform: translateX(-50%);
+  }
+
+  .top-right-corner:hover {
+    transform: translate(0, 0);
+  }
+
+  .left-controls:hover {
+    transform: translateY(-50%);
+  }
+
+  .right-controls:hover {
+    transform: translateY(-50%);
+  }
+
+  .bottom-left-controls:hover {
+    transform: translate(0, 0);
+  }
+
+  .bottom-overlay:hover {
+    transform: translateX(-50%);
+  }
+
+  .bottom-right-controls:hover {
+    transform: translate(0, 0);
+  }
+}
+
+// =============================================================================
+// FULLSCREEN MODE
+// =============================================================================
+
+.overlay-container.fullscreen,
+.overlay-container:fullscreen {
+  // Fixed positioning for overlays in fullscreen
+  .overlay-layer > * {
+    position: fixed;
+    z-index: 9999;
+  }
+
+  // Maintain same positioning in fullscreen
+  .top-left-corner {
+    top: 16px;
+    left: 16px;
+  }
+
+  .top-overlay {
+    top: 16px;
+    left: 50%;
+  }
+
+  .top-right-corner {
+    top: 16px;
+    right: 16px;
+  }
+
+  .left-controls {
+    top: 50%;
+    left: 16px;
+  }
+
+  .right-controls {
+    top: 50%;
+    right: 16px;
+  }
+
+  .bottom-left-controls {
+    bottom: 16px;
+    left: 16px;
+  }
+
+  .bottom-overlay {
+    bottom: 16px;
+    left: 50%;
+  }
+
+  .bottom-right-controls {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  // Content layer also needs fullscreen treatment
+  .content-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+}
+
+// Hover behavior also works in fullscreen
+.overlay-container.fullscreen.hover-reveal,
+.overlay-container:fullscreen.hover-reveal {
+  &:hover .overlay-layer > * {
+    opacity: 1;
+    pointer-events: all;
+  }
+}

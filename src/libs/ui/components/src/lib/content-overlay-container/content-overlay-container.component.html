@@ -1,0 +1,50 @@
+<div
+  #container
+  class="overlay-container"
+  [class.fullscreen]="isFullscreen()"
+  [class.hover-reveal]="showOverlaysOnHover()"
+  [style.--transition-ms.ms]="overlayTransitionMs()"
+>
+  <!-- Content layer (lowest z-index) -->
+  <div class="content-layer">
+    <ng-content select="[content]"></ng-content>
+  </div>
+
+  <!-- Overlay layer (above content) -->
+  <div class="overlay-layer">
+    <!-- Top row -->
+    <div class="top-left-corner">
+      <ng-content select="[topLeftCorner]"></ng-content>
+    </div>
+
+    <div class="top-overlay">
+      <ng-content select="[topOverlay]"></ng-content>
+    </div>
+
+    <div class="top-right-corner">
+      <ng-content select="[topRightCorner]"></ng-content>
+    </div>
+
+    <!-- Middle row (sides) -->
+    <div class="left-controls">
+      <ng-content select="[leftControls]"></ng-content>
+    </div>
+
+    <div class="right-controls">
+      <ng-content select="[rightControls]"></ng-content>
+    </div>
+
+    <!-- Bottom row -->
+    <div class="bottom-left-controls">
+      <ng-content select="[bottomLeftControls]"></ng-content>
+    </div>
+
+    <div class="bottom-overlay">
+      <ng-content select="[bottomOverlay]"></ng-content>
+    </div>
+
+    <div class="bottom-right-controls">
+      <ng-content select="[bottomRightControls]"></ng-content>
+    </div>
+  </div>
+</div>
