@@ -9,6 +9,7 @@ import { updateSettings } from './update-settings';
 import { undo } from './undo';
 import { redo } from './redo';
 import { clearHistory } from './clear-history';
+import { updateDeviceVideoDeviceId } from './update-device-video-device-id';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -22,6 +23,7 @@ export function withSettingsActions() {
       ...undo(writableStore),
       ...redo(writableStore),
       ...clearHistory(writableStore),
+      ...updateDeviceVideoDeviceId(writableStore, settingsService),
     };
   });
 }

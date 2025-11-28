@@ -11,6 +11,7 @@ import { selectDeviceSettings } from './select-device-settings';
 import { selectEnableVideoForDevice } from './select-enable-video-for-device';
 import { selectAutoConnectForDevice } from './select-auto-connect-for-device';
 import { selectKnownDevices } from './select-known-devices';
+import { selectVideoDeviceForDevice } from './select-video-device-for-device';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -28,6 +29,7 @@ export function withSettingsSelectors() {
       ...selectEnableVideoForDevice(writableStore),
       ...selectAutoConnectForDevice(writableStore),
       ...selectKnownDevices(writableStore),
+      ...selectVideoDeviceForDevice(writableStore),
     };
   });
 }

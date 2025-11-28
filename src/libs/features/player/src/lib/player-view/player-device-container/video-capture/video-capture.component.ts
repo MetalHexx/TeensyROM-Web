@@ -5,6 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatDialog } from '@angular/material/dialog';
 import { ScalingCompactCardComponent, IconButtonComponent } from '@teensyrom-nx/ui/components';
 import { VideoDialogComponent } from './video-dialog/video-dialog.component';
+import { SettingsStore } from '@teensyrom-nx/application';
 
 interface VideoDevice {
   deviceId: string;
@@ -19,6 +20,7 @@ interface VideoDevice {
 })
 export class VideoCaptureComponent implements OnDestroy {
   private readonly dialog = inject(MatDialog);
+  private readonly settingsStore = inject(SettingsStore);
   
   deviceId = input.required<string>();
 
@@ -77,19 +79,45 @@ export class VideoCaptureComponent implements OnDestroy {
 
       this.videoDevices.set(videoInputs);
 
-      // Auto-select second device if available, otherwise first
-      if (videoInputs.length > 1) {
-        this.selectedDeviceId.set(videoInputs[1].deviceId);
-        setTimeout(() => this.switchToDevice(videoInputs[1].deviceId), 100);
-      } else if (videoInputs.length > 0) {
-        this.selectedDeviceId.set(videoInputs[0].deviceId);
-        setTimeout(() => this.switchToDevice(videoInputs[0].deviceId), 100);
-      }
+      // Select initial device based on stored preference or fallback to first
+      this.selectInitialDevice(videoInputs);
     } catch (error) {
       console.error('Failed to enumerate video devices:', error);
       if ((error as Error).name === 'NotAllowedError') {
         this.permissionDenied.set(true);
       }
+    }
+  }
+
+  /**
+   * Select initial video device based on stored preference.
+   * Falls back to first available device if stored device not found or not available.
+   */
+  private selectInitialDevice(videoInputs: VideoDevice[]): void {
+    if (videoInputs.length === 0) {
+      console.log('🎥 No video devices available');
+      return;
+    }
+
+    const teensyDeviceId = this.deviceId();
+    const storedVideoDeviceId = this.settingsStore.videoDeviceIdForDevice(teensyDeviceId)();
+    
+    console.log('🎥 Looking for stored video device:', storedVideoDeviceId);
+
+    // Check if stored device exists in available devices
+    const storedDeviceExists = storedVideoDeviceId && 
+      videoInputs.some(d => d.deviceId === storedVideoDeviceId);
+
+    if (storedDeviceExists) {
+      console.log('🎥 Using stored video device:', storedVideoDeviceId);
+      this.selectedDeviceId.set(storedVideoDeviceId);
+      setTimeout(() => this.switchToDevice(storedVideoDeviceId), 100);
+    } else {
+      // Fallback to first device
+      const firstDevice = videoInputs[0];
+      console.log('🎥 Stored device not found, falling back to first device:', firstDevice.deviceId);
+      this.selectedDeviceId.set(firstDevice.deviceId);
+      setTimeout(() => this.switchToDevice(firstDevice.deviceId), 100);
     }
   }
 
@@ -158,10 +186,18 @@ export class VideoCaptureComponent implements OnDestroy {
   /**
    * Handle device selection from dropdown
    */
-  onDeviceSelected(deviceId: string): void {
-    console.log('🎥 User selected device:', deviceId);
-    this.selectedDeviceId.set(deviceId);
-    this.switchToDevice(deviceId);
+  onDeviceSelected(videoDeviceId: string): void {
+    console.log('🎥 User selected device:', videoDeviceId);
+    this.selectedDeviceId.set(videoDeviceId);
+    this.switchToDevice(videoDeviceId);
+    
+    // Persist the selection immediately
+    const teensyDeviceId = this.deviceId();
+    console.log('🎥 Persisting video device selection for TeensyROM device:', teensyDeviceId);
+    this.settingsStore.updateDeviceVideoDeviceId({
+      deviceId: teensyDeviceId,
+      videoDeviceId,
+    });
   }
 
   /**

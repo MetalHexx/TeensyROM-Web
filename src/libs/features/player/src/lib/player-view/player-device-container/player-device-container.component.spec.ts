@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { Signal, signal } from '@angular/core';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { PlayerDeviceContainerComponent } from './player-device-container.component';
-import { PLAYER_CONTEXT, IPlayerContext, SettingsStore } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT, IPlayerContext, SettingsStore, PlayTimerConfig } from '@teensyrom-nx/application';
 import { 
   LaunchMode, 
   PlayerStatus, 
@@ -104,6 +105,38 @@ describe('PlayerDeviceContainerComponent', () => {
       getShuffleSettings: vi.fn().mockReturnValue(signal(null).asReadonly()),
       isHistoryViewVisible: vi.fn().mockReturnValue(() => signal(false).asReadonly()),
       getPlayHistory: vi.fn().mockReturnValue(() => ({ entries: [], currentIndex: -1 })),
+      startListeningToPopState: vi.fn(),
+      stopListeningToPopState: vi.fn(),
+      updateCurrentFileFavoriteStatus: vi.fn(),
+      getTimerState: vi.fn().mockReturnValue(signal(null).asReadonly()),
+
+      getPlayTimerConfig: function (deviceId: string): Signal<PlayTimerConfig | null> {
+        throw new Error('Function not implemented.');
+      },
+      setCustomTimer: function (deviceId: string, enabled: boolean, durationMs: number): void {
+        throw new Error('Function not implemented.');
+      },
+      isCurrentFileCompatible: function (deviceId: string): Signal<boolean> {
+        throw new Error('Function not implemented.');
+      },
+      getCurrentHistoryPosition: function (deviceId: string): Signal<number> {
+        throw new Error('Function not implemented.');
+      },
+      canNavigateBackwardInHistory: function (deviceId: string): Signal<boolean> {
+        throw new Error('Function not implemented.');
+      },
+      canNavigateForwardInHistory: function (deviceId: string): Signal<boolean> {
+        throw new Error('Function not implemented.');
+      },
+      clearHistory: function (deviceId: string): void {
+        throw new Error('Function not implemented.');
+      },
+      toggleHistoryView: function (deviceId: string): void {
+        throw new Error('Function not implemented.');
+      },
+      navigateToHistoryPosition: function (deviceId: string, position: number): Promise<void> {
+        throw new Error('Function not implemented.');
+      }
     } satisfies IPlayerContext;
 
     await TestBed.configureTestingModule({
