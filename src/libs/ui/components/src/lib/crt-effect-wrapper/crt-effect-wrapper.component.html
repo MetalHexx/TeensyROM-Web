@@ -1,14 +1,14 @@
 <div
   class="crt-wrapper"
   [class.crt-enabled]="enabled()"
-  [style.--scanline-intensity]="settings().scanlineIntensity"
-  [style.--scanline-thickness.px]="settings().scanlineThickness"
-  [style.--scanline-spacing.px]="settings().scanlineSpacing"
-  [style.--vignette-strength]="settings().vignetteStrength"
-  [style.--screen-curvature.px]="settings().screenCurvature"
-  [style.--crt-contrast]="settings().contrast"
-  [style.--crt-brightness]="settings().brightness"
-  [style.--crt-saturation]="settings().saturation"
+  [style.--scanline-intensity]="effectiveSettings().scanlineIntensity"
+  [style.--scanline-thickness.px]="effectiveSettings().scanlineThickness"
+  [style.--scanline-spacing.px]="effectiveSettings().scanlineSpacing"
+  [style.--vignette-strength]="effectiveSettings().vignetteStrength"
+  [style.--screen-curvature.px]="effectiveSettings().screenCurvature"
+  [style.--crt-contrast]="effectiveSettings().contrast"
+  [style.--crt-brightness]="effectiveSettings().brightness"
+  [style.--crt-saturation]="effectiveSettings().saturation"
 >
   <div class="crt-content">
     <ng-content></ng-content>

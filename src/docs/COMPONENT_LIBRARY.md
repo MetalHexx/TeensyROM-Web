@@ -2581,6 +2581,17 @@ export class FileInfoComponent {
 - Future video playback features
 - Any MediaStream-based video display
 
+---
+
+## CRT Effect System
+
+The CRT effect system consists of two cohesive components that share the same configuration model:
+
+- **`CrtEffectWrapperComponent`** - Applies CRT visual effects to any content
+- **`CrtSettingsPanelComponent`** - UI panel for adjusting CRT settings
+
+Both components accept `CrtSettings` (values) and `CrtSettingsConfig` (feature flags) to work together seamlessly.
+
 ### `CrtEffectWrapperComponent`
 
 **Purpose**: A pure presentation wrapper component that applies CRT (cathode ray tube) visual effects to any projected content via CSS custom properties. Encapsulates scanlines, vignette, screen curvature, and color filter effects without any store dependencies.
@@ -2589,10 +2600,20 @@ export class FileInfoComponent {
 
 **Properties**:
 
-- `settings` (optional): `CrtSettings` - CRT effect configuration. Use `CRT_PRESETS` for common configurations or provide custom values. Defaults to `DEFAULT_CRT_SETTINGS` (full CRT experience).
+- `settings` (optional): `CrtSettings` - CRT effect configuration values. Use `CRT_PRESETS` for common configurations or provide custom values. Defaults to `DEFAULT_CRT_SETTINGS` (full CRT experience).
+- `config` (optional): `CrtSettingsConfig` - Controls which effect groups are enabled. Use `CRT_CONFIGS` for common configurations. Defaults to `DEFAULT_CRT_CONFIG` (all groups enabled).
 - `enabled` (optional): `boolean` - Whether CRT effects are applied. When false, content renders without effects with smooth transition. Defaults to `true`.
 
-**CrtSettings Interface**:
+**CrtSettingsConfig Interface** (Feature Flags):
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `showScanlines` | `boolean` | Enable scanline effects (intensity, thickness, spacing). |
+| `showVignette` | `boolean` | Enable vignette edge darkening effect. |
+| `showCurvature` | `boolean` | Enable screen curvature border-radius. |
+| `showColorFilters` | `boolean` | Enable color filters (contrast, brightness, saturation). |
+
+**CrtSettings Interface** (Values):
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -2605,7 +2626,7 @@ export class FileInfoComponent {
 | `brightness` | `number` | CSS filter brightness multiplier. 1 = no change, >1 = brighter. |
 | `saturation` | `number` | CSS filter saturation multiplier. 1 = no change, >1 = more saturated. |
 
-**Preset Configurations** (`CRT_PRESETS`):
+**Preset Configurations** (`CRT_PRESETS` and matching `CRT_CONFIGS`):
 
 | Preset | Description | Use Case |
 |--------|-------------|----------|
@@ -2644,8 +2665,11 @@ export class FileInfoComponent {
 import {
   CrtEffectWrapperComponent,
   CrtSettings,
+  CrtSettingsConfig,
   CRT_PRESETS,
+  CRT_CONFIGS,
   DEFAULT_CRT_SETTINGS,
+  DEFAULT_CRT_CONFIG,
 } from '@teensyrom-nx/ui/components';
 ```
 
@@ -2653,6 +2677,8 @@ import {
 
 - **Content Agnostic**: Wraps any projected content (video, images, text, etc.)
 - **Preset System**: Four pre-configured presets for common use cases
+- **Config System**: Feature flags control which effect groups are applied
+- **Cohesive with Settings Panel**: Same config model works with `lib-crt-settings-panel`
 - **Customizable**: Spread presets to override individual values
 - **Smooth Transitions**: 300ms CSS transitions for enable/disable toggle
 - **CSS-Only Effects**: All effects via pseudo-elements and CSS filters (no JS animation overhead)
@@ -2692,6 +2718,128 @@ import {
 **Used In**:
 
 - [`video-dialog.component.html`](../libs/features/player/src/lib/player-view/player-device-container/video-capture/video-dialog/video-dialog.component.html) - Video capture dialog (future integration)
+
+### `CrtSettingsPanelComponent`
+
+**Purpose**: A configurable settings panel for CRT visual effects. Works cohesively with `lib-crt-effect-wrapper` using the same `CrtSettings` and `CrtSettingsConfig` interfaces. Displays sliders only for effect groups enabled in the `config` input.
+
+**Selector**: `lib-crt-settings-panel`
+
+**Properties**:
+
+- `settings` (optional): `CrtSettings` - Current CRT settings values that populate the sliders. Defaults to `DEFAULT_CRT_SETTINGS`.
+- `config` (optional): `CrtSettingsConfig` - Controls which effect groups/sliders are shown. Defaults to `DEFAULT_CRT_CONFIG` (all groups visible).
+- `visible` (optional): `boolean` - Controls panel visibility when used in overlay contexts. Defaults to `true`.
+
+**Events**:
+
+| Event | Type | Description |
+|-------|------|-------------|
+| `settingsChange` | `CrtSettings` | Emits when any slider value changes. Emits complete settings object. |
+| `resetRequested` | `void` | Emits when reset button is clicked. Parent should apply `DEFAULT_CRT_SETTINGS`. |
+| `presetSelected` | `CrtPresetName` | Emits when preset is selected from menu. Parent should apply `CRT_PRESETS[name]`. |
+
+**Slider Configurations** (matches original video-dialog implementation):
+
+| Setting | Min | Max | Step | Format |
+|---------|-----|-----|------|--------|
+| Scanline Intensity | 0 | 0.5 | 0.01 | 2 decimals |
+| Scanline Thickness | 1 | 4 | 1 | px suffix |
+| Scanline Gap | 1 | 8 | 1 | px suffix |
+| Vignette | 0 | 2 | 0.05 | 2 decimals |
+| Screen Curvature | 0 | 115 | 5 | px suffix |
+| Contrast | 0.8 | 1.5 | 0.05 | 2 decimals |
+| Brightness | 0.8 | 1.5 | 0.05 | 2 decimals |
+| Saturation | 0.8 | 1.5 | 0.05 | 2 decimals |
+
+**Usage Examples**:
+
+```html
+<!-- Full settings panel (all 8 sliders) -->
+<lib-crt-settings-panel
+  [settings]="crtSettings()"
+  (settingsChange)="onSettingsChange($event)"
+  (resetRequested)="onReset()"
+  (presetSelected)="onPresetSelect($event)">
+</lib-crt-settings-panel>
+
+<!-- Scanlines + color filters only (6 sliders) -->
+<lib-crt-settings-panel
+  [settings]="crtSettings()"
+  [config]="CRT_CONFIGS.scanlines"
+  (settingsChange)="onSettingsChange($event)">
+</lib-crt-settings-panel>
+
+<!-- Color filters only (3 sliders) -->
+<lib-crt-settings-panel
+  [settings]="crtSettings()"
+  [config]="CRT_CONFIGS.filtersOnly"
+  (settingsChange)="onSettingsChange($event)">
+</lib-crt-settings-panel>
+
+<!-- In overlay container slot -->
+<lib-content-overlay-container>
+  <lib-crt-settings-panel leftControls
+    [settings]="crtSettings()"
+    [visible]="showPanel()"
+    (settingsChange)="onSettingsChange($event)">
+  </lib-crt-settings-panel>
+</lib-content-overlay-container>
+```
+
+**Cohesive Usage with CrtEffectWrapper**:
+
+```html
+<!-- Both components share the same settings and config -->
+<lib-crt-effect-wrapper
+  [settings]="crtSettings()"
+  [config]="CRT_CONFIGS.scanlines"
+  [enabled]="crtEnabled()">
+  <lib-video-stream [stream]="mediaStream"></lib-video-stream>
+</lib-crt-effect-wrapper>
+
+<lib-crt-settings-panel
+  [settings]="crtSettings()"
+  [config]="CRT_CONFIGS.scanlines"
+  (settingsChange)="crtSettings.set($event)">
+</lib-crt-settings-panel>
+```
+
+**TypeScript Import**:
+
+```typescript
+import {
+  CrtSettingsPanelComponent,
+  CrtPresetName,
+  CrtSettings,
+  CrtSettingsConfig,
+  CRT_PRESETS,
+  CRT_CONFIGS,
+  DEFAULT_CRT_SETTINGS,
+  DEFAULT_CRT_CONFIG,
+} from '@teensyrom-nx/ui/components';
+```
+
+**Features**:
+
+- **Config-Driven UI**: Only shows sliders for enabled effect groups
+- **Cohesive with Effect Wrapper**: Same config model for consistent behavior
+- **Preset Menu**: Quick access to full, scanlines, filtersOnly, none presets
+- **Reset Button**: Restore defaults with one click
+- **Real-time Updates**: Slider changes emit immediately for live preview
+- **Compact Design**: Vertical layout suitable for overlay side panels
+- **Glassy Styling**: Uses `lib-compact-card-layout` with glassy-card class
+
+**Best Practice**: Use matching `CRT_CONFIGS` with both `lib-crt-effect-wrapper` and `lib-crt-settings-panel` to ensure the displayed sliders match the applied effects. Handle `presetSelected` by applying `CRT_PRESETS[presetName]` to your settings state.
+
+**Intended Use Cases**:
+
+- Video dialog CRT controls overlay
+- Settings panels for CRT-themed content
+- Image editor filter controls
+- Any adjustable CRT effect interface
+
+---
 
 ### `ContentOverlayContainerComponent`
 

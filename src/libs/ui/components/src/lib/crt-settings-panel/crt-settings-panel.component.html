@@ -1,0 +1,125 @@
+<lib-compact-card-layout cardClass="glassy-card crt-controls-card">
+  <!-- Header with preset menu and reset button -->
+  <div class="crt-card-header">
+    <span class="header-title">CRT Effect</span>
+    <div class="header-actions">
+      <!-- Preset menu button -->
+      <button
+        mat-icon-button
+        [matMenuTriggerFor]="presetMenu"
+        matTooltip="Select preset"
+        class="header-button"
+      >
+        <mat-icon>tune</mat-icon>
+      </button>
+      <mat-menu #presetMenu="matMenu">
+        @for (preset of presetNames; track preset) {
+          <button mat-menu-item (click)="onPresetSelect(preset)">
+            {{ getPresetLabel(preset) }}
+          </button>
+        }
+      </mat-menu>
+
+      <!-- Reset button -->
+      <button
+        mat-icon-button
+        (click)="onReset()"
+        matTooltip="Reset to defaults"
+        class="header-button"
+      >
+        <mat-icon>refresh</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Scanline Controls -->
+  @if (config().showScanlines) {
+    @for (slider of scanlineSliders; track slider.key) {
+      <div class="crt-control-group">
+        <span class="control-label">{{ slider.label }}</span>
+        <mat-slider
+          [min]="slider.min"
+          [max]="slider.max"
+          [step]="slider.step"
+          discrete
+        >
+          <input
+            matSliderThumb
+            [ngModel]="settings()[slider.key]"
+            (ngModelChange)="onSliderChange(slider.key, $event)"
+          />
+        </mat-slider>
+        <span class="control-value">{{ formatValue(settings()[slider.key], slider) }}</span>
+      </div>
+    }
+  }
+
+  <!-- Vignette Control -->
+  @if (config().showVignette) {
+    <div class="crt-control-group">
+      <span class="control-label">{{ vignetteSlider.label }}</span>
+      <mat-slider
+        [min]="vignetteSlider.min"
+        [max]="vignetteSlider.max"
+        [step]="vignetteSlider.step"
+        discrete
+      >
+        <input
+          matSliderThumb
+          [ngModel]="settings()[vignetteSlider.key]"
+          (ngModelChange)="onSliderChange(vignetteSlider.key, $event)"
+        />
+      </mat-slider>
+      <span class="control-value">{{ formatValue(settings()[vignetteSlider.key], vignetteSlider) }}</span>
+    </div>
+  }
+
+  <!-- Curvature Control -->
+  @if (config().showCurvature) {
+    <div class="crt-control-group">
+      <span class="control-label">{{ curvatureSlider.label }}</span>
+      <mat-slider
+        [min]="curvatureSlider.min"
+        [max]="curvatureSlider.max"
+        [step]="curvatureSlider.step"
+        discrete
+      >
+        <input
+          matSliderThumb
+          [ngModel]="settings()[curvatureSlider.key]"
+          (ngModelChange)="onSliderChange(curvatureSlider.key, $event)"
+        />
+      </mat-slider>
+      <span class="control-value">{{ formatValue(settings()[curvatureSlider.key], curvatureSlider) }}</span>
+    </div>
+  }
+
+  <!-- Color Filter Controls -->
+  @if (config().showColorFilters) {
+    @for (slider of colorFilterSliders; track slider.key) {
+      <div class="crt-control-group">
+        <span class="control-label">{{ slider.label }}</span>
+        <mat-slider
+          [min]="slider.min"
+          [max]="slider.max"
+          [step]="slider.step"
+          discrete
+        >
+          <input
+            matSliderThumb
+            [ngModel]="settings()[slider.key]"
+            (ngModelChange)="onSliderChange(slider.key, $event)"
+          />
+        </mat-slider>
+        <span class="control-value">{{ formatValue(settings()[slider.key], slider) }}</span>
+      </div>
+    }
+  }
+
+  <!-- Empty state when no sliders are shown -->
+  @if (!hasAnySliders()) {
+    <div class="crt-empty-state">
+      <span>No settings available</span>
+    </div>
+  }
+</lib-compact-card-layout>

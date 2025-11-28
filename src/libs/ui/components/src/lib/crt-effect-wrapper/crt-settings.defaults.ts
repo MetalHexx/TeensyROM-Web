@@ -1,4 +1,68 @@
-import { CrtSettings } from './crt-settings.interface';
+import { CrtSettings, CrtSettingsConfig } from './crt-settings.interface';
+
+/**
+ * Default configuration - all CRT effect groups enabled.
+ * Use this when you want full control over all CRT settings.
+ */
+export const DEFAULT_CRT_CONFIG: CrtSettingsConfig = {
+  showScanlines: true,
+  showVignette: true,
+  showCurvature: true,
+  showColorFilters: true,
+};
+
+/**
+ * Preset configurations for feature visibility.
+ * Match these with CRT_PRESETS for cohesive behavior.
+ *
+ * @example
+ * ```typescript
+ * // Use matching config with preset
+ * <lib-crt-effect-wrapper [settings]="CRT_PRESETS.scanlines" [config]="CRT_CONFIGS.scanlines">
+ * <lib-crt-settings-panel [settings]="settings()" [config]="CRT_CONFIGS.scanlines">
+ * ```
+ */
+export const CRT_CONFIGS = {
+  /**
+   * Full CRT experience - all controls visible.
+   */
+  full: {
+    showScanlines: true,
+    showVignette: true,
+    showCurvature: true,
+    showColorFilters: true,
+  },
+
+  /**
+   * Color filters only - hides scanline, vignette, and curvature controls.
+   */
+  filtersOnly: {
+    showScanlines: false,
+    showVignette: false,
+    showCurvature: false,
+    showColorFilters: true,
+  },
+
+  /**
+   * Scanlines + color filters - hides vignette and curvature controls.
+   */
+  scanlines: {
+    showScanlines: true,
+    showVignette: false,
+    showCurvature: false,
+    showColorFilters: true,
+  },
+
+  /**
+   * No controls - empty panel (typically used with CRT_PRESETS.none).
+   */
+  none: {
+    showScanlines: false,
+    showVignette: false,
+    showCurvature: false,
+    showColorFilters: false,
+  },
+} as const satisfies Record<string, CrtSettingsConfig>;
 
 /**
  * Preset configurations for common CRT effect use cases.

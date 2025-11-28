@@ -1,4 +1,47 @@
 /**
+ * Configuration interface for which CRT effect groups are enabled.
+ *
+ * Use this to control which sliders appear in the settings panel
+ * and which effects are applied by the effect wrapper.
+ *
+ * @example
+ * ```typescript
+ * // Show only scanlines and color filters
+ * const config: CrtSettingsConfig = {
+ *   showScanlines: true,
+ *   showVignette: false,
+ *   showCurvature: false,
+ *   showColorFilters: true,
+ * };
+ * ```
+ */
+export interface CrtSettingsConfig {
+  /**
+   * Show scanline controls (intensity, thickness, spacing).
+   * When false, scanline effect is disabled and sliders hidden.
+   */
+  showScanlines: boolean;
+
+  /**
+   * Show vignette control (edge darkening strength).
+   * When false, vignette effect is disabled and slider hidden.
+   */
+  showVignette: boolean;
+
+  /**
+   * Show screen curvature control (border radius).
+   * When false, curvature effect is disabled and slider hidden.
+   */
+  showCurvature: boolean;
+
+  /**
+   * Show color filter controls (contrast, brightness, saturation).
+   * When false, color filters are disabled and sliders hidden.
+   */
+  showColorFilters: boolean;
+}
+
+/**
  * Configuration interface for CRT (cathode ray tube) visual effects.
  *
  * All properties are numeric values that map to CSS custom properties.

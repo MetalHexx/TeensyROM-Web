@@ -46,29 +46,30 @@ After extraction, we have reusable presentation components:
 
 ```
 libs/ui/components/
-├── lib-video-stream        # Pure video display, accepts MediaStream
-├── lib-crt-effect-wrapper  # CSS-only CRT effects, wraps any content
-├── lib-video-overlay-container  # Layout container with named slots
-└── lib-crt-settings-panel  # Settings UI, inputs/outputs pattern
+├── lib-video-stream              # Pure video display, accepts MediaStream
+├── lib-crt-effect-wrapper        # CSS-only CRT effects, wraps any content
+├── lib-content-overlay-container # Layout container with 9 named slots (content-agnostic)
+└── lib-crt-settings-panel        # Settings UI, inputs/outputs pattern
 ```
 
 These compose together in the smart components:
 
 ```
 VideoDialogComponent (Smart - Orchestrator)
-└── lib-video-overlay-container
-    ├── [video] lib-crt-effect-wrapper
+└── lib-content-overlay-container      ← Renamed from video-overlay-container (Phase 3 decision)
+    ├── [content] lib-crt-effect-wrapper
     │   └── lib-video-stream [stream]="mediaStream"
-    ├── [topOverlay] lib-filter-toolbar
-    ├── [bottomOverlay] lib-player-toolbar  
-    ├── [cornerControls] close button
-    └── [sideControls] CRT toggle, fullscreen
+    ├── [topOverlay] lib-filter-toolbar         ← Center top slot
+    ├── [bottomOverlay] lib-player-toolbar      ← Center bottom slot
+    ├── [topRightCorner] close button           ← Top-right corner slot
+    ├── [leftControls] lib-crt-settings-panel   ← Left side panel slot
+    └── [rightControls] CRT toggle, fullscreen  ← Right side buttons slot
 
 VideoCaptureComponent (Smart - Device Manager)
-└── lib-video-overlay-container
-    ├── [video] lib-video-stream [stream]="mediaStream"
+└── lib-content-overlay-container
+    ├── [content] lib-video-stream [stream]="mediaStream"
     ├── [topOverlay] device selector dropdown
-    └── [sideControls] maximize button
+    └── [rightControls] maximize button
 ```
 
 ---
@@ -96,31 +97,45 @@ export class VideoStreamComponent {
 
 **Key Insight**: The smart components (VideoCapture, VideoDialog) own the store interactions. The new UI components just display what they're given.
 
-### Pattern 2: Content Projection with Named Slots
+### Pattern 2: Content Projection with 9 Named Slots
 
-The overlay container uses Angular's `ng-content` with `select` for flexible composition:
+The overlay container uses Angular's `ng-content` with `select` for flexible composition. Phase 3 expanded to **9 slots** (from original 6) for maximum layout flexibility:
 
 ```html
-<!-- lib-video-overlay-container template -->
-<div class="video-layer">
-  <ng-content select="[video]"></ng-content>
+<!-- lib-content-overlay-container template -->
+<div class="content-layer">
+  <ng-content select="[content]"></ng-content>
 </div>
 <div class="overlay-layer">
+  <!-- Top row (slide in from top) -->
+  <div class="top-left-corner"><ng-content select="[topLeftCorner]"></ng-content></div>
   <div class="top-overlay"><ng-content select="[topOverlay]"></ng-content></div>
+  <div class="top-right-corner"><ng-content select="[topRightCorner]"></ng-content></div>
+  <!-- Middle row (slide in from sides) -->
+  <div class="left-controls"><ng-content select="[leftControls]"></ng-content></div>
+  <div class="right-controls"><ng-content select="[rightControls]"></ng-content></div>
+  <!-- Bottom row (slide in from bottom) -->
+  <div class="bottom-left-controls"><ng-content select="[bottomLeftControls]"></ng-content></div>
   <div class="bottom-overlay"><ng-content select="[bottomOverlay]"></ng-content></div>
-  <div class="side-controls"><ng-content select="[sideControls]"></ng-content></div>
-  <div class="corner-controls"><ng-content select="[cornerControls]"></ng-content></div>
+  <div class="bottom-right-controls"><ng-content select="[bottomRightControls]"></ng-content></div>
 </div>
 ```
 
-**Usage**:
+**Key Features** (from Phase 3):
+- **Hover-to-reveal**: Overlays hidden by default, appear on container hover
+- **Focus-within persistence**: Overlays stay visible during dropdown/menu interactions
+- **8-direction slide animations**: Each slot slides in from its logical position
+- **Fullscreen support**: `position: fixed` with z-index 9999 in fullscreen mode
+
+**Usage Example**:
 ```html
-<lib-video-overlay-container [fullscreen]="isFullscreen">
-  <lib-video-stream video [stream]="mediaStream"></lib-video-stream>
+<lib-content-overlay-container [showOverlaysOnHover]="true" [overlayTransitionMs]="300">
+  <lib-video-stream content [stream]="mediaStream"></lib-video-stream>
   <lib-filter-toolbar topOverlay></lib-filter-toolbar>
   <lib-player-toolbar bottomOverlay></lib-player-toolbar>
-  <button cornerControls (click)="close()">×</button>
-</lib-video-overlay-container>
+  <lib-icon-button topRightCorner icon="close" (click)="close()"></lib-icon-button>
+  <lib-crt-settings-panel leftControls [settings]="crtSettings" (settingsChange)="onSettingsChange($event)"></lib-crt-settings-panel>
+</lib-content-overlay-container>
 ```
 
 ### Pattern 3: CSS-Only Effect Wrapper
@@ -229,21 +244,30 @@ Extract CRT visual effects into a reusable CSS wrapper that can enhance any cont
 
 ---
 
-<details open>
-<summary><h3>🔄 Phase 3: Video Overlay Container (IN PROGRESS)</h3></summary>
+<details>
+<summary><h3>✅ Phase 3: Content Overlay Container (COMPLETE)</h3></summary>
 
 ### Objective
 
-Create the layout container with named content slots for composing video with overlay controls.
+Create the layout container with named content slots for composing any content with overlay controls.
 
 ### Key Deliverables
 
-- [ ] `lib-video-overlay-container` with named `ng-content` slots
-- [ ] Slots: `video`, `topOverlay`, `bottomOverlay`, `sideControls`, `cornerControls`
-- [ ] Fullscreen mode support with proper overlay positioning
-- [ ] Auto-hide behavior for overlays (show on hover/activity)
-- [ ] Unit tests for slot projection and fullscreen state
-- [ ] Export from `libs/ui/components` barrel
+- [x] `lib-content-overlay-container` with **9 named `ng-content` slots** (expanded from 6)
+- [x] Slots: `content`, `topLeftCorner`, `topOverlay`, `topRightCorner`, `leftControls`, `rightControls`, `bottomLeftControls`, `bottomOverlay`, `bottomRightControls`
+- [x] Fullscreen mode support with proper overlay positioning (fixed positioning, z-index 9999)
+- [x] Auto-hide behavior for overlays with slide animations (8 directions)
+- [x] Unit tests for slot projection, hover behavior, fullscreen (36 tests)
+- [x] Export from `libs/ui/components` barrel
+
+### Completion Notes
+
+- **Completed**: November 28, 2025
+- **Report**: [Phase 3 Report](./reports/phase-03-report.md)
+- **Tests**: 36 behavioral tests, all passing (325 total in ui-components)
+- **Key Decision**: Renamed to `lib-content-overlay-container` for content-agnostic reuse
+- **Key Decision**: Expanded to 9 slots based on video dialog analysis (8 overlay regions + content)
+- **Key Pattern**: `:focus-within` keeps overlays visible during dropdown interactions
 
 ### Phase Documents
 
@@ -254,25 +278,45 @@ Create the layout container with named content slots for composing video with ov
 
 ---
 
-<details>
-<summary><h3>Phase 4: CRT Settings Panel</h3></summary>
+<details open>
+<summary><h3>🔜 Phase 4: CRT Settings Panel (NEXT)</h3></summary>
 
 ### Objective
 
-Extract the CRT settings controls into a reusable panel component.
+Extract the CRT settings controls into a reusable panel component that can be projected into the `leftControls` slot of `lib-content-overlay-container`.
 
 ### Key Deliverables
 
 - [ ] `lib-crt-settings-panel` with `settings` input and `settingsChange` output
-- [ ] Slider controls for all 8 CRT parameters
-- [ ] Reset to defaults functionality
-- [ ] Compact design suitable for side panels
+- [ ] Slider controls for all 8 CRT parameters (matching existing video-dialog ranges)
+- [ ] Reset to defaults functionality (using `DEFAULT_CRT_SETTINGS` from Phase 2)
+- [ ] Preset selector dropdown (using `CRT_PRESETS` from Phase 2)
+- [ ] Compact vertical design suitable for `leftControls` side slot
 - [ ] Unit tests for input/output behavior
 - [ ] Export from `libs/ui/components` barrel
+
+### Integration with Phase 3
+
+The settings panel will be composed in `leftControls` slot:
+```html
+<lib-content-overlay-container>
+  <!-- content and other slots -->
+  <lib-crt-settings-panel leftControls
+    [settings]="crtSettings()"
+    (settingsChange)="onCrtSettingsChange($event)">
+  </lib-crt-settings-panel>
+</lib-content-overlay-container>
+```
+
+This leverages the **hover-to-reveal** and **focus-within persistence** from Phase 3, ensuring the settings panel:
+- Slides in from the left when user hovers
+- Stays visible while interacting with sliders (focus-within)
+- Slides out when user moves away and sliders lose focus
 
 ### Phase Documents
 
 - [Phase Plan](./phases/phase-04-crt-settings-panel.md)
+- [Task Handoff](./tasks/phase-04-task-handoff.md) *(to be created)*
 
 </details>
 
@@ -287,11 +331,19 @@ Refactor the existing VideoDialogComponent to compose the new UI components, val
 
 ### Key Deliverables
 
-- [ ] VideoDialogComponent uses `lib-video-overlay-container`
+- [ ] VideoDialogComponent uses `lib-content-overlay-container` (renamed from video-overlay-container)
 - [ ] VideoDialogComponent uses `lib-crt-effect-wrapper` around `lib-video-stream`
-- [ ] VideoDialogComponent uses `lib-crt-settings-panel` for settings
+- [ ] VideoDialogComponent uses `lib-crt-settings-panel` in `leftControls` slot
+- [ ] Map existing overlays to 9-slot architecture:
+  - `content` → `lib-crt-effect-wrapper` wrapping `lib-video-stream`
+  - `topOverlay` → `lib-filter-toolbar`
+  - `bottomOverlay` → `lib-player-toolbar`
+  - `topRightCorner` → close button
+  - `leftControls` → `lib-crt-settings-panel` (conditional on CRT enabled)
+  - `rightControls` → CRT toggle, fullscreen buttons
 - [ ] All existing functionality preserved (fullscreen, close, toolbars)
 - [ ] Component SCSS reduced significantly (effects moved to wrapper)
+- [ ] Fullscreen delegated to `lib-content-overlay-container`
 - [ ] All existing tests pass
 
 ### Phase Documents
@@ -311,9 +363,12 @@ Refactor VideoCaptureComponent to use shared components, validating reusability.
 
 ### Key Deliverables
 
-- [ ] VideoCaptureComponent uses `lib-video-overlay-container`
+- [ ] VideoCaptureComponent uses `lib-content-overlay-container` (content-agnostic name)
 - [ ] VideoCaptureComponent uses `lib-video-stream`
-- [ ] Device selector and maximize controls in overlay slots
+- [ ] Map overlay slots:
+  - `content` → `lib-video-stream`
+  - `topOverlay` → device selector dropdown
+  - `rightControls` → maximize button
 - [ ] All existing functionality preserved
 - [ ] All existing tests pass
 
@@ -372,12 +427,14 @@ Phase 7 (Cleanup) ← production readiness ────────────�
 ## 🏗️ Architecture Decisions
 
 | Decision | Choice | Rationale |
-|----------|--------|-----------|
+|----------|--------|----------|
 | **Component Location** | `libs/ui/components` | Pure presentation layer, reusable across features |
 | **Stream Input** | Accept `MediaStream` directly | Loose coupling - caller owns device enumeration |
 | **CRT Implementation** | CSS-only wrapper | Reusable for any content, not just video |
-| **Overlay Layout** | Named `ng-content` slots | Maximum composition flexibility |
-| **Fullscreen** | Managed by overlay container | Centralized, proper z-index handling |
+| **Overlay Container Name** | `lib-content-overlay-container` | Content-agnostic - usable for video, images, documents (Phase 3 decision) |
+| **Overlay Slots** | 9 named slots | Maximum composition flexibility - 8 overlay positions + content (Phase 3 decision) |
+| **Overlay Behavior** | Hover-reveal with focus-within | Overlays stay visible during interaction with controls inside them (Phase 3 decision) |
+| **Fullscreen** | Managed by overlay container | Centralized, proper z-index handling with fixed positioning |
 | **Settings Persistence** | Deferred (input/output pattern) | Open for future per-device persistence |
 
 ---
@@ -386,10 +443,10 @@ Phase 7 (Cleanup) ← production readiness ────────────�
 
 ### Unit Tests (Per Component)
 
-- [ ] `lib-video-stream`: Stream binding, loading state, lifecycle events
-- [ ] `lib-crt-effect-wrapper`: CSS property application, enabled toggle
-- [ ] `lib-video-overlay-container`: Slot projection, fullscreen state
-- [ ] `lib-crt-settings-panel`: Input/output binding, reset functionality
+- [x] `lib-video-stream`: Stream binding, loading state, lifecycle events (11 tests)
+- [x] `lib-crt-effect-wrapper`: CSS property application, enabled toggle (21 tests)
+- [x] `lib-content-overlay-container`: Slot projection, hover behavior, fullscreen state (36 tests)
+- [ ] `lib-crt-settings-panel`: Input/output binding, reset functionality, preset selection
 
 ### Integration Tests (Refactored Components)
 
@@ -407,14 +464,26 @@ Phase 7 (Cleanup) ← production readiness ────────────�
 
 ## ✅ Success Criteria
 
-- [ ] All 4 new UI components are pure presentation (no store dependencies)
-- [ ] VideoDialogComponent successfully composes new components
-- [ ] VideoCaptureComponent successfully composes new components  
+- [x] All 4 new UI components are pure presentation (no store dependencies)
+  - [x] `lib-video-stream` - \u2705 Complete (Phase 1)
+  - [x] `lib-crt-effect-wrapper` - \u2705 Complete (Phase 2)
+  - [x] `lib-content-overlay-container` - \u2705 Complete (Phase 3)
+  - [ ] `lib-crt-settings-panel` - Next (Phase 4)
+- [ ] VideoDialogComponent successfully composes new components (Phase 5)
+- [ ] VideoCaptureComponent successfully composes new components (Phase 6)
 - [ ] All existing functionality preserved (no regressions)
 - [ ] CRT settings can be provided externally (open to future persistence)
-- [ ] COMPONENT_LIBRARY.md updated with new components
+- [x] COMPONENT_LIBRARY.md updated with new components (ongoing per phase)
 - [ ] All unit and integration tests pass
-- [ ] VideoDialogComponent SCSS reduced by ~400 lines
+- [ ] VideoDialogComponent SCSS reduced by ~400 lines (Phase 5)
+
+### Completed Metrics
+
+| Phase | Tests Added | Total Tests |
+|-------|-------------|-------------|
+| Phase 1 | 11 | 268 |
+| Phase 2 | 21 | 289 |
+| Phase 3 | 36 | 325 |
 
 ---
 
@@ -434,8 +503,20 @@ Phase 7 (Cleanup) ← production readiness ────────────�
 
 **Phase 2 Complete**: `lib-crt-effect-wrapper` delivered with 21 tests and 4 presets. See [Phase 2 Report](./reports/phase-02-report.md).
 
-**Phase 3 Ready**: [Task Handoff](./tasks/phase-03-task-handoff.md) is ready for execution.
+**Phase 3 Complete**: `lib-content-overlay-container` delivered with 36 tests and 9 named slots. See [Phase 3 Report](./reports/phase-03-report.md).
 
-**Document Version**: 1.2  
+### Key Decisions from Phase 3
+
+1. **Expanded to 9 slots** (from original 6): Analysis of video dialog UI revealed 8 distinct overlay regions plus content, enabling maximum composition flexibility.
+
+2. **Renamed to `lib-content-overlay-container`**: Generic naming enables reuse for any content type (video, images, documents), not just video.
+
+3. **Focus-within persistence**: Overlays stay visible when interacting with dropdowns or form controls inside them - critical for CRT settings sliders in Phase 4.
+
+4. **8-direction slide animations**: Each slot has contextual slide-in direction (top-left slides diagonally, bottom-center slides up, etc.).
+
+**Phase 4 Ready**: CRT Settings Panel is next. Task handoff to be created.
+
+**Document Version**: 1.3  
 **Created**: 2025-11-28  
-**Updated**: 2025-11-28 (Phase 2 complete)
+**Updated**: 2025-11-28 (Phase 3 complete)
