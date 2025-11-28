@@ -21,10 +21,6 @@ describe('PlayerDeviceContainerComponent', () => {
   let mockSettingsService: ISettingsService;
 
   const createMockSettings = (enableVideo: boolean) => ({
-    connectionSettings: {
-      connectionType: 'Serial',
-      autoConnectEnabled: false,
-    },
     playerSettings: {
       repeatModeOnStartup: false,
       playTimerEnabled: false,
@@ -33,9 +29,6 @@ describe('PlayerDeviceContainerComponent', () => {
       startupFilter: 'All',
       startupLaunchEnabled: false,
       startupLaunchRandom: false,
-    },
-    videoSettings: {
-      enableVideo,
     },
     fileTransferSettings: {
       watchDirectoryLocation: '',
@@ -60,6 +53,19 @@ describe('PlayerDeviceContainerComponent', () => {
     appSettings: {
       setupCompleted: false,
     },
+    knownDevices: [
+      {
+        deviceId: 'test-device',
+        videoSettings: {
+          enableVideo,
+          videoDeviceId: '',
+        },
+        connectionSettings: {
+          connectionType: 'Serial',
+          autoConnectEnabled: false,
+        },
+      },
+    ],
   });
 
   beforeEach(async () => {

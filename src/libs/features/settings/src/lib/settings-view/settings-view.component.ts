@@ -1,15 +1,14 @@
 import { ChangeDetectionStrategy, Component, inject, computed, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormArray, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingTextComponent, ScalingCompactCardComponent, ActionButtonComponent } from '@teensyrom-nx/ui/components';
-import { ConnectionSettingsSectionComponent } from './connection-settings-section/connection-settings-section.component';
+import { DeviceSettingsSectionComponent } from './device-settings-section/device-settings-section.component';
 import { PlayerSettingsSectionComponent } from './player-settings-section/player-settings-section.component';
-import { VideoSettingsSectionComponent } from './video-settings-section/video-settings-section.component';
 import { FileTransferSettingsSectionComponent } from './file-transfer-settings-section/file-transfer-settings-section.component';
 import { SearchSettingsSectionComponent } from './search-settings-section/search-settings-section.component';
 import { SettingsFormService } from './settings-form.service';
@@ -28,9 +27,8 @@ import { SettingsFormService } from './settings-form.service';
     EmptyStateMessageComponent,
     ScalingCompactCardComponent,
     ActionButtonComponent,
-    ConnectionSettingsSectionComponent,
+    DeviceSettingsSectionComponent,
     PlayerSettingsSectionComponent,
-    VideoSettingsSectionComponent,
     FileTransferSettingsSectionComponent,
     SearchSettingsSectionComponent,
   ],
@@ -43,7 +41,7 @@ export class SettingsViewComponent {
   private readonly formService = inject(SettingsFormService);
 
   // Active section state
-  readonly activeSection = signal<'player' | 'video' | 'fileTransfer' | 'search' | 'connection'>('player');
+  readonly activeSection = signal<'player' | 'devices' | 'fileTransfer' | 'search'>('player');
 
   // Expose service state to template
   readonly settings = this.formService.settings;
@@ -89,7 +87,7 @@ export class SettingsViewComponent {
   /**
    * Sets the active settings section
    */
-  setActiveSection(section: 'player' | 'video' | 'fileTransfer' | 'search' | 'connection'): void {
+  setActiveSection(section: 'player' | 'devices' | 'fileTransfer' | 'search'): void {
     this.activeSection.set(section);
   }
 
@@ -97,16 +95,12 @@ export class SettingsViewComponent {
    * Helper methods to get typed FormGroups for each settings section
    * Delegates to form service
    */
-  getConnectionSettings(): FormGroup {
-    return this.formService.getConnectionSettings();
+  getKnownDevices(): FormArray {
+    return this.formService.getKnownDevices();
   }
 
   getPlayerSettings(): FormGroup {
     return this.formService.getPlayerSettings();
-  }
-
-  getVideoSettings(): FormGroup {
-    return this.formService.getVideoSettings();
   }
 
   getFileTransferSettings(): FormGroup {

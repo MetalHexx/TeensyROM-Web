@@ -18,100 +18,25 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         {
             return new TeensySettings
             {
-                //ConnectionSettings = MapConnectionSettings(request.ConnectionSettings),
+                KnownDevices = request.KnownDevices.Select(MapDeviceSettings).ToList(),
                 PlayerSettings = MapPlayerSettings(request.PlayerSettings),
-                VideoSettings = MapVideoSettings(request.VideoSettings),
                 FileTransferSettings = MapFileTransferSettings(request.FileTransferSettings),
                 SearchSettings = MapSearchSettings(request.SearchSettings),
                 AppSettings = MapAppSettings(request.AppSettings)
             };
         }
 
-        // Entity to DTO mappings (for FromEntity)
-        private static ConnectionSettingsDto MapConnectionSettingsDto(ConnectionSettings entity)
+        // DTO to Entity mappings
+        private static DeviceSettings MapDeviceSettings(DeviceSettingsDto dto)
         {
-            return new ConnectionSettingsDto
+            return new DeviceSettings
             {
-                ConnectionType = entity.ConnectionType,
-                AutoConnectEnabled = entity.AutoConnectEnabled,
-                //Serial = new SerialConnectionSettingsDto
-                //{
-                //    Port = entity.Serial.Port,
-                //    BaudRate = entity.Serial.BaudRate
-                //},
-                //Tcp = new TcpConnectionSettingsDto
-                //{
-                //    HostAddress = entity.Tcp.HostAddress,
-                //    Port = entity.Tcp.Port,
-                //    ConnectionTimeoutMs = entity.Tcp.ConnectionTimeoutMs,
-                //    ReadTimeoutMs = entity.Tcp.ReadTimeoutMs,
-                //    WriteTimeoutMs = entity.Tcp.WriteTimeoutMs
-                //}
+                DeviceId = dto.DeviceId,
+                VideoSettings = MapVideoSettings(dto.VideoSettings),
+                ConnectionSettings = MapConnectionSettings(dto.ConnectionSettings)
             };
         }
 
-        private static PlayerSettingsDto MapPlayerSettingsDto(PlayerSettings entity)
-        {
-            return new PlayerSettingsDto
-            {
-                RepeatModeOnStartup = entity.RepeatModeOnStartup,
-                PlayTimerEnabled = entity.PlayTimerEnabled,
-                MuteFastForward = entity.MuteFastForward,
-                MuteRandomSeek = entity.MuteRandomSeek,
-                StartupFilter = entity.StartupFilter,
-                StartupLaunchEnabled = entity.StartupLaunchEnabled,
-                StartupLaunchRandom = entity.StartupLaunchRandom
-            };
-        }
-
-        private static VideoSettingsDto MapVideoSettingsDto(VideoSettings entity)
-        {
-            return new VideoSettingsDto
-            {
-                EnableVideo = entity.EnableVideo
-            };
-        }
-
-        private static FileTransferSettingsDto MapFileTransferSettingsDto(FileTransferSettings entity)
-        {
-            return new FileTransferSettingsDto
-            {
-                WatchDirectoryLocation = entity.WatchDirectoryLocation,
-                AutoTransferPath = entity.AutoTransferPath.ToString(),
-                AutoFileCopyEnabled = entity.AutoFileCopyEnabled,
-                AutoLaunchOnCopyEnabled = entity.AutoLaunchOnCopyEnabled,
-                NavToDirOnLaunch = entity.NavToDirOnLaunch,
-                SyncFilesEnabled = entity.SyncFilesEnabled
-            };
-        }
-
-        private static SearchSettingsDto MapSearchSettingsDto(SearchSettings entity)
-        {
-            return new SearchSettingsDto
-            {
-                SearchWeights = new SearchWeightsDto
-                {
-                    Title = entity.SearchWeights.Title,
-                    FileName = entity.SearchWeights.FileName,
-                    FilePath = entity.SearchWeights.FilePath,
-                    Creator = entity.SearchWeights.Creator,
-                    Description = entity.SearchWeights.Description
-                },
-                SearchStopWords = entity.SearchStopWords,
-                BannedDirectories = entity.BannedDirectories,
-                BannedFiles = entity.BannedFiles
-            };
-        }
-
-        private static AppSettingsDto MapAppSettingsDto(AppSettings entity)
-        {
-            return new AppSettingsDto
-            {
-                FirstTimeSetup = entity.FirstTimeSetup
-            };
-        }
-
-        // DTO to Entity mappings (for ToEntity)
         private static ConnectionSettings MapConnectionSettings(ConnectionSettingsDto dto)
         {
             return new ConnectionSettings
@@ -152,7 +77,8 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         {
             return new VideoSettings
             {
-                EnableVideo = dto.EnableVideo
+                EnableVideo = dto.EnableVideo,
+                VideoDeviceId = dto.VideoDeviceId
             };
         }
 

@@ -813,15 +813,16 @@ describe('DomainMapper (Settings)', () => {
   });
 
   describe('toSettings - Full Settings Mapping', () => {
-    it('should map all connection settings correctly', () => {
+    it('should map all connection settings correctly via knownDevices', () => {
       const dto = createMockGetSettingsResponse({
         connectionType: 'Serial',
         autoConnectEnabled: true,
       });
       const result = DomainMapper.toSettings(dto);
 
-      expect(result.connectionSettings.connectionType).toBe('Serial');
-      expect(result.connectionSettings.autoConnectEnabled).toBe(true);
+      expect(result.knownDevices.length).toBe(1);
+      expect(result.knownDevices[0].connectionSettings.connectionType).toBe('Serial');
+      expect(result.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(true);
     });
 
     it('should map all player settings correctly', () => {
@@ -870,16 +871,46 @@ describe('DomainMapper (Settings)', () => {
       expect(result.appSettings.setupCompleted).toBe(true);
     });
 
-    it('should map video settings correctly', () => {
+    it('should map video settings correctly via knownDevices', () => {
       const dto = createMockGetSettingsResponse({ enableVideo: true });
       const result = DomainMapper.toSettings(dto);
-      expect(result.videoSettings.enableVideo).toBe(true);
+      expect(result.knownDevices[0].videoSettings.enableVideo).toBe(true);
     });
 
-    it('should map video settings with false value', () => {
+    it('should map video settings with false value via knownDevices', () => {
       const dto = createMockGetSettingsResponse({ enableVideo: false });
       const result = DomainMapper.toSettings(dto);
-      expect(result.videoSettings.enableVideo).toBe(false);
+      expect(result.knownDevices[0].videoSettings.enableVideo).toBe(false);
+    });
+
+    it('should handle empty knownDevices array', () => {
+      const dto = createMockGetSettingsResponse({ knownDevices: [] });
+      const result = DomainMapper.toSettings(dto);
+      expect(result.knownDevices).toEqual([]);
+    });
+
+    it('should map multiple devices in knownDevices', () => {
+      const dto = createMockGetSettingsResponse({
+        knownDevices: [
+          {
+            deviceId: 'device-1',
+            videoSettings: { enableVideo: true, videoDeviceId: 'cam-1' },
+            connectionSettings: { connectionType: 'Serial', autoConnectEnabled: true },
+          },
+          {
+            deviceId: 'device-2',
+            videoSettings: { enableVideo: false, videoDeviceId: '' },
+            connectionSettings: { connectionType: 'Tcp', autoConnectEnabled: false },
+          },
+        ],
+      });
+      const result = DomainMapper.toSettings(dto);
+
+      expect(result.knownDevices.length).toBe(2);
+      expect(result.knownDevices[0].deviceId).toBe('device-1');
+      expect(result.knownDevices[0].videoSettings.enableVideo).toBe(true);
+      expect(result.knownDevices[1].deviceId).toBe('device-2');
+      expect(result.knownDevices[1].connectionSettings.connectionType).toBe('Tcp');
     });
   });
 
@@ -920,38 +951,32 @@ describe('DomainMapper (Settings)', () => {
       expect(result.appSettings.firstTimeSetup).toBe(false);
     });
 
-    it('should map video settings to DTO correctly', () => {
+    it('should map video settings to DTO correctly via knownDevices', () => {
       const domainSettings = createMockDomainSettings({ enableVideo: true });
       const result = DomainMapper.toSettingsDto(domainSettings);
-      expect(result.videoSettings.enableVideo).toBe(true);
+      expect(result.knownDevices[0].videoSettings.enableVideo).toBe(true);
     });
 
     it('should preserve video settings through round-trip transformation', () => {
       const originalSettings = createMockDomainSettings({ enableVideo: true });
       const dto = DomainMapper.toSettingsDto(originalSettings);
       const response: GetSettingsResponse = {
-        connectionSettings: dto.connectionSettings,
+        knownDevices: dto.knownDevices,
         playerSettings: dto.playerSettings,
-        videoSettings: dto.videoSettings,
         fileTransferSettings: dto.fileTransferSettings,
         searchSettings: dto.searchSettings,
         appSettings: dto.appSettings,
       };
       const result = DomainMapper.toSettings(response);
-      
-      expect(result.videoSettings).toEqual(originalSettings.videoSettings);
-      expect(result.videoSettings.enableVideo).toBe(true);
+
+      expect(result.knownDevices[0].videoSettings).toEqual(originalSettings.knownDevices[0].videoSettings);
+      expect(result.knownDevices[0].videoSettings.enableVideo).toBe(true);
     });
   });
 });
 
 // Helper functions for settings tests
 function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSettingsResponse {
-  const connectionSettings: ConnectionSettingsDto = {
-    connectionType: overrides.connectionType ?? 'Serial',
-    autoConnectEnabled: overrides.autoConnectEnabled ?? false,
-  };
-
   const playerSettings: PlayerSettingsDto = {
     repeatModeOnStartup: overrides.repeatModeOnStartup ?? false,
     playTimerEnabled: overrides.playTimerEnabled ?? true,
@@ -960,10 +985,6 @@ function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSetting
     startupFilter: overrides.startupFilter ?? 'All',
     startupLaunchEnabled: overrides.startupLaunchEnabled ?? false,
     startupLaunchRandom: overrides.startupLaunchRandom ?? false,
-  };
-
-  const videoSettings: VideoSettingsDto = {
-    enableVideo: overrides.enableVideo ?? false,
   };
 
   const fileTransferSettings: FileTransferSettingsDto = {
@@ -994,10 +1015,24 @@ function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSetting
     firstTimeSetup: overrides.firstTimeSetup ?? true,
   };
 
+  // Create knownDevices array with device settings
+  const knownDevices = overrides.knownDevices ?? [
+    {
+      deviceId: overrides.deviceId ?? 'test-device-1',
+      videoSettings: {
+        enableVideo: overrides.enableVideo ?? false,
+        videoDeviceId: overrides.videoDeviceId ?? '',
+      },
+      connectionSettings: {
+        connectionType: overrides.connectionType ?? 'Serial',
+        autoConnectEnabled: overrides.autoConnectEnabled ?? false,
+      },
+    },
+  ];
+
   return {
-    connectionSettings,
+    knownDevices,
     playerSettings,
-    videoSettings,
     fileTransferSettings,
     searchSettings,
     appSettings,
@@ -1006,10 +1041,6 @@ function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSetting
 
 function createMockDomainSettings(overrides: Partial<any> = {}): Settings {
   return {
-    connectionSettings: {
-      connectionType: overrides.connectionType ?? ('Serial' as ConnectionType),
-      autoConnectEnabled: overrides.autoConnectEnabled ?? false,
-    },
     playerSettings: {
       repeatModeOnStartup: overrides.repeatModeOnStartup ?? false,
       playTimerEnabled: overrides.playTimerEnabled ?? true,
@@ -1018,9 +1049,6 @@ function createMockDomainSettings(overrides: Partial<any> = {}): Settings {
       startupFilter: overrides.startupFilter ?? PlayerFilterType.All,
       startupLaunchEnabled: overrides.startupLaunchEnabled ?? false,
       startupLaunchRandom: overrides.startupLaunchRandom ?? false,
-    },
-    videoSettings: {
-      enableVideo: overrides.enableVideo ?? false,
     },
     fileTransferSettings: {
       watchDirectoryLocation: overrides.watchDirectoryLocation ?? '',
@@ -1045,5 +1073,18 @@ function createMockDomainSettings(overrides: Partial<any> = {}): Settings {
     appSettings: {
       setupCompleted: overrides.setupCompleted ?? false,
     },
+    knownDevices: overrides.knownDevices ?? [
+      {
+        deviceId: overrides.deviceId ?? 'test-device-1',
+        videoSettings: {
+          enableVideo: overrides.enableVideo ?? false,
+          videoDeviceId: overrides.videoDeviceId ?? '',
+        },
+        connectionSettings: {
+          connectionType: overrides.connectionType ?? ('Serial' as ConnectionType),
+          autoConnectEnabled: overrides.autoConnectEnabled ?? false,
+        },
+      },
+    ],
   };
 }

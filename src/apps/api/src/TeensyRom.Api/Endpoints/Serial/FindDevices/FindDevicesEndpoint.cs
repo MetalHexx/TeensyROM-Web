@@ -4,7 +4,9 @@ using TeensyRom.Core.Abstractions;
 
 namespace TeensyRom.Api.Endpoints.FindCarts
 {
-    public class FindDevicesEndpoint(IDeviceConnectionManager deviceManager, IConnectionSettingsProvider connectionSettings) : RadEndpointWithoutRequest<FindDevicesResponse>
+    public class FindDevicesEndpoint(
+        IDeviceConnectionManager deviceManager,
+        IDeviceSettingsProvider deviceSettingsProvider) : RadEndpointWithoutRequest<FindDevicesResponse>
     {
         public override void Configure()
         {
@@ -20,21 +22,29 @@ namespace TeensyRom.Api.Endpoints.FindCarts
                     "Returns all available and connected TeensyROM devices.\n\n" +
                     "- This will momentarily disconnect all devices.\n" +
                     "- All available COM ports will be scanned for TeensyROM devices.\n" +
-                    "- All previously connected devices will reconnect."
+                    "- Devices with auto-connect enabled will reconnect automatically."
                 );
         }
 
         public override async Task Handle(CancellationToken ct)
         {
-            var autoConnect = connectionSettings.GetConnectionSettings().AutoConnectEnabled;
-
-            var devices = await deviceManager.FindDevices(autoConnect, ct);
+            var devices = await deviceManager.FindDevices(autoConnect: false, ct);
 
             if (devices.Count == 0)
             {
                 SendNotFound("No TeensyRom devices found.");
                 return;
             }
+            foreach (var device in devices)
+            {
+                var deviceSettings = deviceSettingsProvider.GetOrCreateDeviceSettings(device.DeviceId);
+                
+                if (deviceSettings.ConnectionSettings.AutoConnectEnabled)
+                {
+                    deviceManager.Connect(device.DeviceId);
+                }
+            }
+
             List<CartDto> deviceDtos = [.. await Task.WhenAll(devices.Select(CartDto.FromDevice))];
 
             Response = new()

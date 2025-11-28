@@ -2,7 +2,7 @@ import '@analogjs/vitest-angular/setup-zone';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal, WritableSignal } from '@angular/core';
-import { FormGroup, FormBuilder, Validators } from '@angular/forms';
+import { FormGroup, FormBuilder, Validators, FormArray } from '@angular/forms';
 import { SettingsViewComponent } from './settings-view.component';
 import { Settings, SETTINGS_SERVICE, ISettingsService } from '@teensyrom-nx/domain';
 import { SettingsFormService } from './settings-form.service';
@@ -49,10 +49,6 @@ describe('SettingsViewComponent', () => {
   let historyPositionDisplaySignal: WritableSignal<string | null>;
 
   const mockSettings: Settings = {
-    connectionSettings: {
-      connectionType: 'Serial',
-      autoConnectEnabled: true,
-    },
     playerSettings: {
       repeatModeOnStartup: false,
       playTimerEnabled: true,
@@ -61,9 +57,6 @@ describe('SettingsViewComponent', () => {
       startupFilter: 'All',
       startupLaunchEnabled: false,
       startupLaunchRandom: false,
-    },
-    videoSettings: {
-      enableVideo: false,
     },
     fileTransferSettings: {
       watchDirectoryLocation: '',
@@ -88,6 +81,19 @@ describe('SettingsViewComponent', () => {
     appSettings: {
       setupCompleted: true,
     },
+    knownDevices: [
+      {
+        deviceId: 'test-device-123',
+        videoSettings: {
+          enableVideo: false,
+          videoDeviceId: '',
+        },
+        connectionSettings: {
+          connectionType: 'Serial',
+          autoConnectEnabled: true,
+        },
+      },
+    ],
   };
 
   beforeEach(async () => {
@@ -113,10 +119,6 @@ describe('SettingsViewComponent', () => {
     // Build a real form for testing
     const fb = new FormBuilder();
     const mockForm = fb.group({
-      connectionSettings: fb.group({
-        connectionType: [mockSettings.connectionSettings.connectionType, Validators.required],
-        autoConnectEnabled: [mockSettings.connectionSettings.autoConnectEnabled],
-      }),
       playerSettings: fb.group({
         repeatModeOnStartup: [mockSettings.playerSettings.repeatModeOnStartup],
         playTimerEnabled: [mockSettings.playerSettings.playTimerEnabled],
@@ -125,9 +127,6 @@ describe('SettingsViewComponent', () => {
         startupFilter: [mockSettings.playerSettings.startupFilter, Validators.required],
         startupLaunchEnabled: [mockSettings.playerSettings.startupLaunchEnabled],
         startupLaunchRandom: [mockSettings.playerSettings.startupLaunchRandom],
-      }),
-      videoSettings: fb.group({
-        enableVideo: [mockSettings.videoSettings.enableVideo],
       }),
       fileTransferSettings: fb.group({
         watchDirectoryLocation: [mockSettings.fileTransferSettings.watchDirectoryLocation],
@@ -166,6 +165,21 @@ describe('SettingsViewComponent', () => {
       appSettings: fb.group({
         setupCompleted: [mockSettings.appSettings.setupCompleted],
       }),
+      knownDevices: fb.array(
+        mockSettings.knownDevices.map(device =>
+          fb.group({
+            deviceId: [device.deviceId, Validators.required],
+            videoSettings: fb.group({
+              enableVideo: [device.videoSettings.enableVideo],
+              videoDeviceId: [device.videoSettings.videoDeviceId],
+            }),
+            connectionSettings: fb.group({
+              connectionType: [device.connectionSettings.connectionType, Validators.required],
+              autoConnectEnabled: [device.connectionSettings.autoConnectEnabled],
+            }),
+          })
+        )
+      ),
     });
     settingsFormSignal = signal(mockForm);
 
@@ -186,7 +200,7 @@ describe('SettingsViewComponent', () => {
       saveSettings: vi.fn(),
       undo: vi.fn(),
       redo: vi.fn(),
-      getConnectionSettings: vi.fn(() => mockForm.get('connectionSettings') as FormGroup),
+      getKnownDevices: vi.fn(() => mockForm.get('knownDevices') as FormArray),
       getPlayerSettings: vi.fn(() => mockForm.get('playerSettings') as FormGroup),
       getFileTransferSettings: vi.fn(() => mockForm.get('fileTransferSettings') as FormGroup),
       getSearchSettings: vi.fn(() => mockForm.get('searchSettings') as FormGroup),
@@ -235,12 +249,11 @@ describe('SettingsViewComponent', () => {
       expect(form).toBeTruthy();
       if (!form) return;
       
-      expect(form.get('connectionSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('playerSettings')).toBeInstanceOf(FormGroup);
-      expect(form.get('videoSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('fileTransferSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('searchSettings')).toBeInstanceOf(FormGroup);
       expect(form.get('appSettings')).toBeInstanceOf(FormGroup);
+      expect(form.get('knownDevices')).toBeInstanceOf(FormArray);
     });
 
     it('should create nested weights FormGroup in searchSettings', () => {
@@ -257,10 +270,14 @@ describe('SettingsViewComponent', () => {
       expect(form).toBeTruthy();
       if (!form) return;
       
-      expect(form.get('connectionSettings.connectionType')?.value).toBe('Serial');
-      expect(form.get('connectionSettings.autoConnectEnabled')?.value).toBe(true);
       expect(form.get('playerSettings.playTimerEnabled')?.value).toBe(true);
       expect(form.get('appSettings.setupCompleted')?.value).toBe(true);
+      
+      // Per-device settings
+      const knownDevices = form.get('knownDevices') as FormArray;
+      expect(knownDevices.length).toBe(1);
+      expect(knownDevices.at(0).get('connectionSettings.connectionType')?.value).toBe('Serial');
+      expect(knownDevices.at(0).get('connectionSettings.autoConnectEnabled')?.value).toBe(true);
     });
 
     it('should convert array fields to comma-separated strings', () => {
@@ -374,24 +391,21 @@ describe('SettingsViewComponent', () => {
       component.setActiveSection('fileTransfer');
       expect(component.activeSection()).toBe('fileTransfer');
 
-      component.setActiveSection('video');
-      expect(component.activeSection()).toBe('video');
+      component.setActiveSection('devices');
+      expect(component.activeSection()).toBe('devices');
 
       component.setActiveSection('search');
       expect(component.activeSection()).toBe('search');
-
-      component.setActiveSection('connection');
-      expect(component.activeSection()).toBe('connection');
 
       component.setActiveSection('player');
       expect(component.activeSection()).toBe('player');
     });
 
-    it('should render all five navigation buttons', () => {
+    it('should render all four navigation buttons', () => {
       fixture.detectChanges();
 
       const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
-      expect(buttons.length).toBe(5);
+      expect(buttons.length).toBe(4);
     });
 
     it('should pass animationTrigger=true to active section', () => {
@@ -415,10 +429,9 @@ describe('SettingsViewComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('lib-player-settings-section')).toBeTruthy();
-      expect(fixture.nativeElement.querySelector('lib-video-settings-section')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('lib-device-settings-section')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('lib-file-transfer-settings-section')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('lib-search-settings-section')).toBeTruthy();
-      expect(fixture.nativeElement.querySelector('lib-connection-settings-section')).toBeTruthy();
     });
 
     it('should not render app-settings-section in main view', () => {
@@ -430,69 +443,71 @@ describe('SettingsViewComponent', () => {
       expect(appSettingsSection).toBeFalsy();
     });
 
-    it('should render video navigation button with correct icon and label', () => {
+    it('should render devices navigation button with correct icon and label', () => {
       fixture.detectChanges();
 
       const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
-      // Video button should be second (after Player, before File Transfer)
-      const videoButton = buttons[1];
-      expect(videoButton).toBeTruthy();
+      // Devices button should be second (after Player, before File Transfer)
+      const devicesButton = buttons[1];
+      expect(devicesButton).toBeTruthy();
     });
 
-    it('should activate video section when video button clicked', () => {
-      component.setActiveSection('video');
-      expect(component.activeSection()).toBe('video');
+    it('should activate devices section when devices button clicked', () => {
+      component.setActiveSection('devices');
+      expect(component.activeSection()).toBe('devices');
     });
 
-    it('should pass correct animationTrigger to video section when active', () => {
-      component.setActiveSection('video');
+    it('should pass correct animationTrigger to devices section when active', () => {
+      component.setActiveSection('devices');
       fixture.detectChanges();
 
-      const videoSection = fixture.nativeElement.querySelector('lib-video-settings-section');
-      expect(videoSection).toBeTruthy();
+      const devicesSection = fixture.nativeElement.querySelector('lib-device-settings-section');
+      expect(devicesSection).toBeTruthy();
     });
 
-    it('should pass correct animationTrigger to video section when inactive', () => {
+    it('should pass correct animationTrigger to devices section when inactive', () => {
       component.setActiveSection('player');
       fixture.detectChanges();
 
-      const videoSection = fixture.nativeElement.querySelector('lib-video-settings-section');
-      expect(videoSection).toBeTruthy();
+      const devicesSection = fixture.nativeElement.querySelector('lib-device-settings-section');
+      expect(devicesSection).toBeTruthy();
       // Section is rendered but animationTrigger should be false
     });
   });
 
-  describe('Video Settings Integration', () => {
-    it('should have getVideoSettings helper method', () => {
-      expect(component.getVideoSettings).toBeDefined();
-      expect(typeof component.getVideoSettings).toBe('function');
+  describe('Device Settings Integration', () => {
+    it('should have getKnownDevices helper method', () => {
+      expect(component.getKnownDevices).toBeDefined();
+      expect(typeof component.getKnownDevices).toBe('function');
     });
 
-    it('should return video settings FormGroup from getVideoSettings', () => {
-      const videoSettings = component.getVideoSettings();
-      expect(videoSettings).toBeInstanceOf(FormGroup);
-      expect(videoSettings.get('enableVideo')).toBeTruthy();
+    it('should return known devices FormArray from getKnownDevices', () => {
+      const knownDevices = component.getKnownDevices();
+      expect(knownDevices).toBeInstanceOf(FormArray);
+      expect(knownDevices.length).toBe(1);
     });
 
-    it('should return FormGroup with enableVideo control', () => {
-      const videoSettings = component.getVideoSettings();
-      const enableVideoControl = videoSettings.get('enableVideo');
+    it('should return FormArray with device entries', () => {
+      const knownDevices = component.getKnownDevices();
+      const firstDevice = knownDevices.at(0);
       
-      expect(enableVideoControl).toBeTruthy();
-      expect(enableVideoControl?.value).toBe(false);
+      expect(firstDevice).toBeTruthy();
+      expect(firstDevice.get('deviceId')?.value).toBe('test-device-123');
+      expect(firstDevice.get('videoSettings.enableVideo')?.value).toBe(false);
     });
 
-    it('should pass video settings FormGroup to video section component', () => {
+    it('should pass known devices FormArray to device section component', () => {
       fixture.detectChanges();
 
-      const videoSection = fixture.nativeElement.querySelector('lib-video-settings-section');
-      expect(videoSection).toBeTruthy();
-      // FormGroup is passed via input binding
+      const devicesSection = fixture.nativeElement.querySelector('lib-device-settings-section');
+      expect(devicesSection).toBeTruthy();
+      // FormArray is passed via input binding
     });
 
-    it('should update enableVideo control value through form', () => {
-      const videoSettings = component.getVideoSettings();
-      const enableVideoControl = videoSettings.get('enableVideo');
+    it('should update device settings through form', () => {
+      const knownDevices = component.getKnownDevices();
+      const firstDevice = knownDevices.at(0);
+      const enableVideoControl = firstDevice.get('videoSettings.enableVideo');
 
       enableVideoControl?.setValue(true);
       expect(enableVideoControl?.value).toBe(true);
@@ -757,11 +772,12 @@ describe('SettingsViewComponent', () => {
   });
 
   describe('Validation', () => {
-    it('should validate connectionType as required', () => {
+    it('should validate device connectionType as required', () => {
       const form = component.settingsForm();
       expect(form).toBeTruthy();
       if (!form) return;
-      const control = form.get('connectionSettings.connectionType');
+      const knownDevices = form.get('knownDevices') as FormArray;
+      const control = knownDevices.at(0).get('connectionSettings.connectionType');
       
       control?.setValue('');
       

@@ -1,6 +1,6 @@
 ---
 description: 'Expert backend architect for TeensyROM .NET API, MediatR CQRS, serial protocol, and storage systems.'
-tools: ['search', 'fetch', 'usages', 'edit']
+tools: ['edit', 'runNotebooks', 'search', 'new', 'runCommands', 'runTasks', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'openSimpleBrowser', 'fetch', 'githubRepo', 'extensions', 'todos', 'runSubagent', 'runTests']
 ---
 
 # Backend Guru - The Wizardly Architect of TeensyROM

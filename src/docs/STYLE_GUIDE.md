@@ -46,6 +46,102 @@ Available color variables for semantic styling:
 
 ---
 
+## Design Tokens
+
+Design tokens are CSS custom properties that provide consistent, reusable values across the application. They are defined in `libs/ui/styles/src/lib/theme/styles.scss` and support both light and dark themes.
+
+### Spacing Tokens
+
+Spacing tokens provide consistent inline spacing for gaps, margins, and padding:
+
+| Token | Value | Pixels | Use Case |
+|-------|-------|--------|----------|
+| `--spacing-inline-xs` | 0.375rem | 6px | Tight spacing for compact layouts |
+| `--spacing-inline-sm` | 0.5rem | 8px | Default comfortable spacing |
+| `--spacing-inline-md` | 0.625rem | 10px | Breathing room for larger elements |
+| `--spacing-inline-lg` | 1rem | 16px | Generous spacing for prominent displays |
+
+**Usage Example:**
+
+```scss
+.my-container {
+  gap: var(--spacing-inline-sm);
+  padding: var(--spacing-inline-md);
+}
+```
+
+### Typography Tokens
+
+#### Font Size Tokens
+
+Font size tokens provide a consistent type scale:
+
+| Token | Value | Pixels | Use Case |
+|-------|-------|--------|----------|
+| `--font-size-sm` | 0.875rem | 14px | Smaller text for compact layouts, captions |
+| `--font-size-md` | 1rem | 16px | Base text size, default body text |
+| `--font-size-lg` | 1.25rem | 20px | Larger text for emphasis, subheadings |
+| `--font-size-xl` | 1.75rem | 28px | Prominent headings, hero text |
+
+**Usage Example:**
+
+```scss
+.caption {
+  font-size: var(--font-size-sm);
+}
+
+.heading {
+  font-size: var(--font-size-xl);
+}
+```
+
+#### Font Weight Tokens
+
+Font weight tokens ensure consistent text emphasis:
+
+| Token | Value | Use Case |
+|-------|-------|----------|
+| `--font-weight-normal` | 400 | Default body text |
+| `--font-weight-medium` | 500 | Slightly emphasized text, labels |
+| `--font-weight-semibold` | 600 | Subheadings, important labels |
+| `--font-weight-bold` | 700 | Headings, strong emphasis |
+
+**Usage Example:**
+
+```scss
+.label {
+  font-weight: var(--font-weight-medium);
+}
+
+.section-title {
+  font-weight: var(--font-weight-semibold);
+}
+```
+
+### Using Design Tokens
+
+**Best Practices:**
+
+1. **Always prefer tokens over hardcoded values** for consistency across the application
+2. **Tokens work in both themes** - values are defined in both `html` and `html.dark-mode` blocks
+3. **Combine tokens for compound styles**:
+
+```scss
+.prominent-label {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  gap: var(--spacing-inline-md);
+}
+```
+
+4. **Use semantic meaning** - choose tokens based on intent (e.g., `--font-size-lg` for emphasis, not just "20px")
+
+**Component Integration:**
+
+Design tokens are used by reusable components like [IconLabelComponent](COMPONENT_LIBRARY.md#iconlabelcomponent) to provide size presets. See the Component Library for components that leverage these tokens.
+
+---
+
 ## Utility Classes
 
 ### `.dimmed`

@@ -12,6 +12,7 @@ models/CompetitionDto.ts
 models/ConnectDeviceResponse.ts
 models/ConnectionSettingsDto.ts
 models/ConnectionType.ts
+models/DeviceSettingsDto.ts
 models/DeviceStartResponse.ts
 models/DeviceState.ts
 models/DeviceStopResponse.ts

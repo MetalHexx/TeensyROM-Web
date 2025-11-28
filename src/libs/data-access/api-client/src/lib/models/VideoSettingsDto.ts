@@ -25,6 +25,12 @@ export interface VideoSettingsDto {
      * @memberof VideoSettingsDto
      */
     enableVideo: boolean;
+    /**
+     * 
+     * @type {string}
+     * @memberof VideoSettingsDto
+     */
+    videoDeviceId: string;
 }
 
 /**
@@ -32,6 +38,7 @@ export interface VideoSettingsDto {
  */
 export function instanceOfVideoSettingsDto(value: object): value is VideoSettingsDto {
     if (!('enableVideo' in value) || value['enableVideo'] === undefined) return false;
+    if (!('videoDeviceId' in value) || value['videoDeviceId'] === undefined) return false;
     return true;
 }
 
@@ -46,6 +53,7 @@ export function VideoSettingsDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
     return {
         
         'enableVideo': json['enableVideo'],
+        'videoDeviceId': json['videoDeviceId'],
     };
 }
 
@@ -61,6 +69,7 @@ export function VideoSettingsDtoToJSONTyped(value?: VideoSettingsDto | null, ign
     return {
         
         'enableVideo': value['enableVideo'],
+        'videoDeviceId': value['videoDeviceId'],
     };
 }
 

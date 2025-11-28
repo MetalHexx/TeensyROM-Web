@@ -6,11 +6,10 @@ namespace TeensyRom.Core.Settings
   /// </summary>
   public record TeensySettings
   {
-    public ConnectionSettings ConnectionSettings { get; set; } = new();
     public PlayerSettings PlayerSettings { get; set; } = new();
-    public VideoSettings VideoSettings { get; set; } = new();
     public FileTransferSettings FileTransferSettings { get; set; } = new();
     public SearchSettings SearchSettings { get; set; } = new();
     public AppSettings AppSettings { get; set; } = new();
+    public List<DeviceSettings> KnownDevices { get; set; } = [];
   }
 }

@@ -90,11 +90,8 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         settings.Should().NotBeNull();
-        settings.ConnectionSettings.Should().NotBeNull();
-        settings.ConnectionSettings.AutoConnectEnabled.Should().BeTrue();
+        settings.KnownDevices.Should().NotBeNull();
         settings.PlayerSettings.Should().NotBeNull();
-        settings.VideoSettings.Should().NotBeNull();
-        settings.VideoSettings.EnableVideo.Should().BeFalse();
         settings.FileTransferSettings.Should().NotBeNull();
         settings.FileTransferSettings.WatchDirectoryLocation.Should().NotBeNullOrEmpty();
         settings.SearchSettings.Should().NotBeNull();
@@ -159,7 +156,7 @@ public class SettingsServiceTests : IDisposable
         // Arrange
         var service = new SettingsService(_mockLogger);
         var originalSettings = service.GetSettings();
-        var originalAutoConnect = originalSettings.ConnectionSettings.AutoConnectEnabled;
+        var originalFirstTimeSetup = originalSettings.AppSettings.FirstTimeSetup;
 
         // Act - Attempt to modify through the API (but GetSettings returns a new copy each time)
         var copiedSettings = service.GetSettings();
@@ -167,9 +164,9 @@ public class SettingsServiceTests : IDisposable
         // Modify using proper record syntax to create a new instance
         var modifiedSettings = copiedSettings with
         {
-            ConnectionSettings = copiedSettings.ConnectionSettings with
+            AppSettings = copiedSettings.AppSettings with
             {
-                AutoConnectEnabled = !originalAutoConnect
+                FirstTimeSetup = !originalFirstTimeSetup
             }
         };
         
@@ -177,7 +174,7 @@ public class SettingsServiceTests : IDisposable
         
         // Assert - Original cached value should not be affected since we didn't save
         var refreshedSettings = service.GetSettings();
-        refreshedSettings.ConnectionSettings.AutoConnectEnabled.Should().Be(originalAutoConnect);
+        refreshedSettings.AppSettings.FirstTimeSetup.Should().Be(originalFirstTimeSetup);
     }
 
     [Fact]
@@ -192,19 +189,10 @@ public class SettingsServiceTests : IDisposable
         var service = new SettingsService(_mockLogger);
         var expectedSettings = new TeensySettings
         {
-            ConnectionSettings = new ConnectionSettings 
-            { 
-                ConnectionType = ConnectionType.Tcp,
-                AutoConnectEnabled = false
-            },
             PlayerSettings = new PlayerSettings 
             { 
                 RepeatModeOnStartup = true,
                 PlayTimerEnabled = true
-            },
-            VideoSettings = new VideoSettings
-            {
-                EnableVideo = true
             },
             FileTransferSettings = new FileTransferSettings 
             { 
@@ -227,10 +215,7 @@ public class SettingsServiceTests : IDisposable
         var actualSettings = newService.GetSettings();
 
         // Assert
-        actualSettings.ConnectionSettings.ConnectionType.Should().Be(expectedSettings.ConnectionSettings.ConnectionType);
-        actualSettings.ConnectionSettings.AutoConnectEnabled.Should().Be(expectedSettings.ConnectionSettings.AutoConnectEnabled);
         actualSettings.PlayerSettings.RepeatModeOnStartup.Should().Be(expectedSettings.PlayerSettings.RepeatModeOnStartup);
-        actualSettings.VideoSettings.EnableVideo.Should().Be(expectedSettings.VideoSettings.EnableVideo);
         actualSettings.FileTransferSettings.AutoFileCopyEnabled.Should().Be(expectedSettings.FileTransferSettings.AutoFileCopyEnabled);
         actualSettings.SearchSettings.BannedFiles.Should().BeEquivalentTo(expectedSettings.SearchSettings.BannedFiles);
         actualSettings.AppSettings.FirstTimeSetup.Should().Be(expectedSettings.AppSettings.FirstTimeSetup);
@@ -248,9 +233,9 @@ public class SettingsServiceTests : IDisposable
         var newSettings = service.GetSettings();
         newSettings = newSettings with
         {
-            ConnectionSettings = newSettings.ConnectionSettings with
+            AppSettings = newSettings.AppSettings with
             {
-                ConnectionType = ConnectionType.Tcp
+                FirstTimeSetup = false
             }
         };
 
@@ -263,8 +248,8 @@ public class SettingsServiceTests : IDisposable
         
         // Verify by reading the file directly
         var fileContent = File.ReadAllText(_settingsFilePath);
-        fileContent.Should().Contain("\"connectionType\"");
-        fileContent.Should().Contain("1"); // Tcp enum value
+        fileContent.Should().Contain("\"firstTimeSetup\"");
+        fileContent.Should().Contain("false"); // FirstTimeSetup value
     }
 
     [Fact]
@@ -415,9 +400,9 @@ public class SettingsServiceTests : IDisposable
         var newSettings = service.GetSettings();
         newSettings = newSettings with
         {
-            ConnectionSettings = newSettings.ConnectionSettings with
+            AppSettings = newSettings.AppSettings with
             {
-                ConnectionType = ConnectionType.Tcp
+                FirstTimeSetup = false
             }
         };
 
@@ -428,7 +413,7 @@ public class SettingsServiceTests : IDisposable
         // Assert
         subscription.Dispose();
         emittedSettings.Should().HaveCountGreaterThanOrEqualTo(2); // Initial + updated
-        emittedSettings.Last().ConnectionSettings.ConnectionType.Should().Be(ConnectionType.Tcp);
+        emittedSettings.Last().AppSettings.FirstTimeSetup.Should().BeFalse();
     }
 
     [Fact]
@@ -466,31 +451,189 @@ public class SettingsServiceTests : IDisposable
 
     #endregion
 
-    #region Provider Interface Tests - ConnectionSettings
+    #region Provider Interface Tests - IDeviceSettingsProvider
 
     [Fact]
-    public void GetConnectionSettings_ShouldReturnConnectionSettings()
+    public void GetDeviceSettings_ShouldReturnNull_WhenDeviceNotFound()
     {
         // Arrange
         var service = new SettingsService(_mockLogger);
+        var nonExistentDeviceId = "NON_EXISTENT_DEVICE";
 
         // Act
-        var connectionSettings = service.GetConnectionSettings();
+        var deviceSettings = service.GetDeviceSettings(nonExistentDeviceId);
 
         // Assert
-        connectionSettings.Should().NotBeNull();
-        connectionSettings.Should().BeOfType<ConnectionSettings>();
+        deviceSettings.Should().BeNull();
     }
 
     [Fact]
-    public async Task ConnectionSettings_Observable_ShouldEmitInitialValue()
+    public void GetDeviceSettings_ShouldReturnDeviceSettings_WhenDeviceExists()
     {
         // Arrange
         var service = new SettingsService(_mockLogger);
-        ConnectionSettings? received = null;
+        var testDeviceId = "TEST_DEVICE_123";
+        
+        // Create a device first
+        var created = service.GetOrCreateDeviceSettings(testDeviceId);
 
         // Act
-        await service.ConnectionSettings
+        var retrieved = service.GetDeviceSettings(testDeviceId);
+
+        // Assert
+        retrieved.Should().NotBeNull();
+        retrieved!.DeviceId.Should().Be(testDeviceId);
+        retrieved.Should().BeEquivalentTo(created);
+    }
+
+    [Fact]
+    public void GetOrCreateDeviceSettings_ShouldCreateNewDevice_WithDefaultValues()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var newDeviceId = "NEW_DEVICE_456";
+
+        // Act
+        var deviceSettings = service.GetOrCreateDeviceSettings(newDeviceId);
+
+        // Assert
+        deviceSettings.Should().NotBeNull();
+        deviceSettings.DeviceId.Should().Be(newDeviceId);
+        deviceSettings.VideoSettings.Should().NotBeNull();
+        deviceSettings.VideoSettings.EnableVideo.Should().BeFalse();
+        deviceSettings.ConnectionSettings.Should().NotBeNull();
+        deviceSettings.ConnectionSettings.AutoConnectEnabled.Should().BeTrue();
+        deviceSettings.ConnectionSettings.ConnectionType.Should().Be(ConnectionType.Serial);
+    }
+
+    [Fact]
+    public void GetOrCreateDeviceSettings_ShouldReturnExistingDevice_WhenAlreadyExists()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var deviceId = "EXISTING_DEVICE_789";
+        var firstCall = service.GetOrCreateDeviceSettings(deviceId);
+        
+        // Modify the device
+        firstCall = firstCall with
+        {
+            VideoSettings = firstCall.VideoSettings with { EnableVideo = true }
+        };
+        service.SaveDeviceSettings(firstCall);
+
+        // Act
+        var secondCall = service.GetOrCreateDeviceSettings(deviceId);
+
+        // Assert
+        secondCall.DeviceId.Should().Be(deviceId);
+        secondCall.VideoSettings.EnableVideo.Should().BeTrue();
+    }
+
+    [Fact]
+    public void GetOrCreateDeviceSettings_ShouldPersistNewDevice_Immediately()
+    {
+        // Arrange
+        var service1 = new SettingsService(_mockLogger);
+        var deviceId = "PERSIST_TEST_DEVICE";
+
+        // Act
+        service1.GetOrCreateDeviceSettings(deviceId);
+        
+        // Create new service instance to verify persistence
+        var service2 = new SettingsService(_mockLogger);
+        var retrieved = service2.GetDeviceSettings(deviceId);
+
+        // Assert
+        retrieved.Should().NotBeNull();
+        retrieved!.DeviceId.Should().Be(deviceId);
+    }
+
+    [Fact]
+    public void SaveDeviceSettings_ShouldUpdateExistingDevice()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var deviceId = "UPDATE_TEST_DEVICE";
+        var original = service.GetOrCreateDeviceSettings(deviceId);
+        
+        var updated = original with
+        {
+            VideoSettings = original.VideoSettings with { EnableVideo = true },
+            ConnectionSettings = original.ConnectionSettings with { AutoConnectEnabled = false }
+        };
+
+        // Act
+        service.SaveDeviceSettings(updated);
+        var retrieved = service.GetDeviceSettings(deviceId);
+
+        // Assert
+        retrieved.Should().NotBeNull();
+        retrieved!.VideoSettings.EnableVideo.Should().BeTrue();
+        retrieved.ConnectionSettings.AutoConnectEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SaveDeviceSettings_ShouldAddNewDevice_WhenNotExists()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var deviceId = "NEW_SAVE_DEVICE";
+        var newDevice = new DeviceSettings
+        {
+            DeviceId = deviceId,
+            VideoSettings = new VideoSettings { EnableVideo = true },
+            ConnectionSettings = new ConnectionSettings 
+            { 
+                AutoConnectEnabled = false,
+                ConnectionType = ConnectionType.Tcp
+            }
+        };
+
+        // Act
+        service.SaveDeviceSettings(newDevice);
+        var retrieved = service.GetDeviceSettings(deviceId);
+
+        // Assert
+        retrieved.Should().NotBeNull();
+        retrieved!.DeviceId.Should().Be(deviceId);
+        retrieved.VideoSettings.EnableVideo.Should().BeTrue();
+        retrieved.ConnectionSettings.ConnectionType.Should().Be(ConnectionType.Tcp);
+    }
+
+    [Fact]
+    public void SaveDeviceSettings_ShouldPersistChanges_AcrossServiceInstances()
+    {
+        // Arrange
+        var service1 = new SettingsService(_mockLogger);
+        var deviceId = "PERSISTENCE_CHECK_DEVICE";
+        var device = service1.GetOrCreateDeviceSettings(deviceId);
+        device = device with
+        {
+            VideoSettings = device.VideoSettings with { EnableVideo = true, VideoDeviceId = "TestVideo123" }
+        };
+
+        // Act
+        service1.SaveDeviceSettings(device);
+        
+        // Create new service to verify persistence
+        var service2 = new SettingsService(_mockLogger);
+        var retrieved = service2.GetDeviceSettings(deviceId);
+
+        // Assert
+        retrieved.Should().NotBeNull();
+        retrieved!.VideoSettings.EnableVideo.Should().BeTrue();
+        retrieved.VideoSettings.VideoDeviceId.Should().Be("TestVideo123");
+    }
+
+    [Fact]
+    public async Task KnownDevices_Observable_ShouldEmitInitialValue()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        List<DeviceSettings>? received = null;
+
+        // Act
+        await service.KnownDevices
             .Take(1)
             .Do(s => received = s)
             .ToTask();
@@ -500,24 +643,69 @@ public class SettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ConnectionSettings_Observable_ShouldEmit_WhenConnectionSettingsChange()
+    public async Task KnownDevices_Observable_ShouldEmit_WhenDeviceAdded()
     {
         // Arrange
         var service = new SettingsService(_mockLogger);
-        var emittedValues = new List<ConnectionSettings>();
-        var subscription = service.ConnectionSettings.Subscribe(emittedValues.Add);
+        var emittedValues = new List<List<DeviceSettings>>();
+        var subscription = service.KnownDevices.Subscribe(emittedValues.Add);
+        var deviceId = "OBSERVABLE_TEST_DEVICE";
+
+        // Act
+        service.GetOrCreateDeviceSettings(deviceId);
+        await Task.Delay(100);
+
+        // Assert
+        subscription.Dispose();
+        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2); // Initial + added
+        emittedValues.Last().Should().Contain(d => d.DeviceId == deviceId);
+    }
+
+    [Fact]
+    public async Task KnownDevices_Observable_ShouldEmit_WhenDeviceUpdated()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var deviceId = "UPDATE_OBSERVABLE_DEVICE";
+        var device = service.GetOrCreateDeviceSettings(deviceId);
+        
+        var emittedValues = new List<List<DeviceSettings>>();
+        var subscription = service.KnownDevices.Subscribe(emittedValues.Add);
+        
+        var updated = device with
+        {
+            VideoSettings = device.VideoSettings with { EnableVideo = true }
+        };
+
+        // Act
+        service.SaveDeviceSettings(updated);
+        await Task.Delay(100);
+
+        // Assert
+        subscription.Dispose();
+        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
+        var lastEmission = emittedValues.Last();
+        var emittedDevice = lastEmission.FirstOrDefault(d => d.DeviceId == deviceId);
+        emittedDevice.Should().NotBeNull();
+        emittedDevice!.VideoSettings.EnableVideo.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task KnownDevices_Observable_ShouldNotEmit_WhenOtherSettingsChange()
+    {
+        // Arrange
+        var service = new SettingsService(_mockLogger);
+        var deviceEmissions = new List<List<DeviceSettings>>();
+        var subscription = service.KnownDevices.Subscribe(deviceEmissions.Add);
 
         var settings = service.GetSettings();
-        var newConnectionType = settings.ConnectionSettings.ConnectionType == ConnectionType.Serial 
-            ? ConnectionType.Tcp 
-            : ConnectionType.Serial;
         
-        // Create a new settings object with a new ConnectionSettings instance
+        // Modify only PlayerSettings (not KnownDevices)
         settings = settings with
         {
-            ConnectionSettings = settings.ConnectionSettings with
+            PlayerSettings = settings.PlayerSettings with
             {
-                ConnectionType = newConnectionType
+                RepeatModeOnStartup = !settings.PlayerSettings.RepeatModeOnStartup
             }
         };
 
@@ -527,8 +715,7 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2); // Initial + changed
-        emittedValues.Last().ConnectionType.Should().Be(newConnectionType);
+        deviceEmissions.Should().HaveCount(1, "KnownDevices observable should not emit when only PlayerSettings changes");
     }
 
     #endregion
@@ -595,95 +782,7 @@ public class SettingsServiceTests : IDisposable
 
     #endregion
 
-    #region Provider Interface Tests - VideoSettings
 
-    [Fact]
-    public void GetVideoSettings_ShouldReturnVideoSettings()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-
-        // Act
-        var videoSettings = service.GetVideoSettings();
-
-        // Assert
-        videoSettings.Should().NotBeNull();
-        videoSettings.Should().BeOfType<VideoSettings>();
-    }
-
-    [Fact]
-    public async Task VideoSettings_Observable_ShouldEmitInitialValue()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        VideoSettings? received = null;
-
-        // Act
-        await service.VideoSettings
-            .Take(1)
-            .Do(s => received = s)
-            .ToTask();
-
-        // Assert
-        received.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task VideoSettings_Observable_ShouldEmit_WhenVideoSettingsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var emittedValues = new List<VideoSettings>();
-        var subscription = service.VideoSettings.Subscribe(emittedValues.Add);
-
-        var settings = service.GetSettings();
-        settings = settings with
-        {
-            VideoSettings = settings.VideoSettings with
-            {
-                EnableVideo = !settings.VideoSettings.EnableVideo
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
-        emittedValues.Last().EnableVideo.Should().Be(settings.VideoSettings.EnableVideo);
-    }
-
-    [Fact]
-    public async Task VideoSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var videoEmissions = new List<VideoSettings>();
-        var subscription = service.VideoSettings.Subscribe(videoEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Modify only PlayerSettings (not VideoSettings)
-        settings = settings with
-        {
-            PlayerSettings = settings.PlayerSettings with
-            {
-                RepeatModeOnStartup = !settings.PlayerSettings.RepeatModeOnStartup
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        videoEmissions.Should().HaveCount(1, "VideoSettings observable should not emit when only PlayerSettings changes");
-    }
-
-    #endregion
 
     #region Provider Interface Tests - FileTransferSettings
 
@@ -961,9 +1060,9 @@ public class SettingsServiceTests : IDisposable
         var settings = service.GetSettings();
         settings = settings with
         {
-            ConnectionSettings = settings.ConnectionSettings with
+            AppSettings = settings.AppSettings with
             {
-                AutoConnectEnabled = true
+                FirstTimeSetup = true
             }
         };
 
@@ -972,9 +1071,9 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         var fileContent = File.ReadAllText(_settingsFilePath);
-        fileContent.Should().Contain("\"autoConnectEnabled\""); // camelCase
+        fileContent.Should().Contain("\"firstTimeSetup\""); // camelCase
         fileContent.Should().Contain("true");
-        fileContent.Should().Contain("connectionSettings");
+        fileContent.Should().Contain("appSettings");
     }
 
     [Fact]
@@ -1105,18 +1204,6 @@ public class SettingsServiceTests : IDisposable
     #region Settings Type-Specific Tests
 
     [Fact]
-    public void ConnectionSettings_ShouldHaveValidDefaults()
-    {
-        // Arrange & Act
-        var service = new SettingsService(_mockLogger);
-        var connectionSettings = service.GetConnectionSettings();
-
-        // Assert
-        connectionSettings.ConnectionType.Should().Be(ConnectionType.Serial);
-        connectionSettings.AutoConnectEnabled.Should().BeTrue();
-    }
-
-    [Fact]
     public void PlayerSettings_ShouldHaveValidDefaults()
     {
         // Arrange & Act
@@ -1130,17 +1217,6 @@ public class SettingsServiceTests : IDisposable
         playerSettings.MuteRandomSeek.Should().BeFalse();
         playerSettings.StartupLaunchEnabled.Should().BeTrue();
         playerSettings.StartupLaunchRandom.Should().BeFalse();
-    }
-
-    [Fact]
-    public void VideoSettings_ShouldHaveValidDefaults()
-    {
-        // Arrange & Act
-        var service = new SettingsService(_mockLogger);
-        var videoSettings = service.GetVideoSettings();
-
-        // Assert
-        videoSettings.EnableVideo.Should().BeFalse();
     }
 
     [Fact]
@@ -1218,19 +1294,19 @@ public class SettingsServiceTests : IDisposable
     {
         // Arrange
         var service = new SettingsService(_mockLogger);
-        var connectionEmissions = new List<ConnectionSettings>();
+        var deviceEmissions = new List<List<DeviceSettings>>();
         var playerEmissions = new List<PlayerSettings>();
         
-        var connSub = service.ConnectionSettings.Subscribe(connectionEmissions.Add);
+        var deviceSub = service.KnownDevices.Subscribe(deviceEmissions.Add);
         var playerSub = service.PlayerSettings.Subscribe(playerEmissions.Add);
 
+        var deviceId = "MULTI_PROVIDER_TEST_DEVICE";
+        service.GetOrCreateDeviceSettings(deviceId);
+        await Task.Delay(100);
+        
         var settings = service.GetSettings();
         settings = settings with
         {
-            ConnectionSettings = settings.ConnectionSettings with
-            {
-                AutoConnectEnabled = !settings.ConnectionSettings.AutoConnectEnabled
-            },
             PlayerSettings = settings.PlayerSettings with
             {
                 RepeatModeOnStartup = !settings.PlayerSettings.RepeatModeOnStartup
@@ -1242,47 +1318,18 @@ public class SettingsServiceTests : IDisposable
         await Task.Delay(100);
 
         // Assert
-        connSub.Dispose();
+        deviceSub.Dispose();
         playerSub.Dispose();
 
-        connectionEmissions.Should().HaveCountGreaterThanOrEqualTo(2);
+        deviceEmissions.Should().HaveCountGreaterThanOrEqualTo(2);
         playerEmissions.Should().HaveCountGreaterThanOrEqualTo(2);
-        connectionEmissions.Last().AutoConnectEnabled.Should().Be(settings.ConnectionSettings.AutoConnectEnabled);
+        deviceEmissions.Last().Should().Contain(d => d.DeviceId == deviceId);
         playerEmissions.Last().RepeatModeOnStartup.Should().Be(settings.PlayerSettings.RepeatModeOnStartup);
     }
 
     #endregion
 
     #region Observable Isolation Tests - DistinctUntilChanged Verification
-
-    [Fact]
-    public async Task ConnectionSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var connectionEmissions = new List<ConnectionSettings>();
-        var subscription = service.ConnectionSettings.Subscribe(connectionEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Modify only PlayerSettings (not ConnectionSettings)
-        settings = settings with
-        {
-            PlayerSettings = settings.PlayerSettings with
-            {
-                RepeatModeOnStartup = !settings.PlayerSettings.RepeatModeOnStartup
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        // Should only have initial emission, no new emission since ConnectionSettings didn't change
-        connectionEmissions.Should().HaveCount(1, "ConnectionSettings observable should not emit when only PlayerSettings changes");
-    }
 
     [Fact]
     public async Task PlayerSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
@@ -1294,14 +1341,12 @@ public class SettingsServiceTests : IDisposable
 
         var settings = service.GetSettings();
         
-        // Modify only ConnectionSettings (not PlayerSettings)
+        // Modify only AppSettings (not PlayerSettings)
         settings = settings with
         {
-            ConnectionSettings = settings.ConnectionSettings with
+            AppSettings = settings.AppSettings with
             {
-                ConnectionType = settings.ConnectionSettings.ConnectionType == ConnectionType.Serial 
-                    ? ConnectionType.Tcp 
-                    : ConnectionType.Serial
+                FirstTimeSetup = !settings.AppSettings.FirstTimeSetup
             }
         };
 
@@ -1311,7 +1356,7 @@ public class SettingsServiceTests : IDisposable
 
         // Assert
         subscription.Dispose();
-        playerEmissions.Should().HaveCount(1, "PlayerSettings observable should not emit when only ConnectionSettings changes");
+        playerEmissions.Should().HaveCount(1, "PlayerSettings observable should not emit when only AppSettings changes");
     }
 
     [Fact]
@@ -1404,39 +1449,32 @@ public class SettingsServiceTests : IDisposable
         // Arrange - Subscribe to all section observables
         var service = new SettingsService(_mockLogger);
         
-        var connectionEmissions = new List<ConnectionSettings>();
+        var knownDevicesEmissions = new List<List<DeviceSettings>>();
         var playerEmissions = new List<PlayerSettings>();
         var fileTransferEmissions = new List<FileTransferSettings>();
         var searchEmissions = new List<SearchSettings>();
         var appEmissions = new List<AppSettings>();
         
-        var connSub = service.ConnectionSettings.Subscribe(connectionEmissions.Add);
+        var devicesSub = service.KnownDevices.Subscribe(knownDevicesEmissions.Add);
         var playerSub = service.PlayerSettings.Subscribe(playerEmissions.Add);
         var fileSub = service.FileTransferSettings.Subscribe(fileTransferEmissions.Add);
         var searchSub = service.SearchSettings.Subscribe(searchEmissions.Add);
         var appSub = service.AppSettings.Subscribe(appEmissions.Add);
 
-        // Act 1 - Modify only ConnectionSettings
-        var settings = service.GetSettings();
-        settings = settings with
-        {
-            ConnectionSettings = settings.ConnectionSettings with
-            {
-                AutoConnectEnabled = !settings.ConnectionSettings.AutoConnectEnabled
-            }
-        };
-        service.SaveSettings(settings);
+        // Act 1 - Modify only KnownDevices (add a device)
+        var deviceId = "TEST_DEVICE_SECTION_OBSERVABLE";
+        service.GetOrCreateDeviceSettings(deviceId);
         await Task.Delay(100);
 
-        // Assert 1 - Only ConnectionSettings should emit
-        connectionEmissions.Should().HaveCount(2, "ConnectionSettings changed");
+        // Assert 1 - Only KnownDevices should emit
+        knownDevicesEmissions.Should().HaveCount(2, "KnownDevices changed");
         playerEmissions.Should().HaveCount(1, "PlayerSettings didn't change");
         fileTransferEmissions.Should().HaveCount(1, "FileTransferSettings didn't change");
         searchEmissions.Should().HaveCount(1, "SearchSettings didn't change");
         appEmissions.Should().HaveCount(1, "AppSettings didn't change");
 
         // Act 2 - Modify only PlayerSettings
-        settings = service.GetSettings();
+        var settings = service.GetSettings();
         settings = settings with
         {
             PlayerSettings = settings.PlayerSettings with
@@ -1447,15 +1485,15 @@ public class SettingsServiceTests : IDisposable
         service.SaveSettings(settings);
         await Task.Delay(100);
 
-        // Assert 2 - Only PlayerSettings should emit (ConnectionSettings stays at 2)
-        connectionEmissions.Should().HaveCount(2, "ConnectionSettings didn't change in second save");
+        // Assert 2 - Only PlayerSettings should emit (KnownDevices stays at 2)
+        knownDevicesEmissions.Should().HaveCount(2, "KnownDevices didn't change in second save");
         playerEmissions.Should().HaveCount(2, "PlayerSettings changed");
         fileTransferEmissions.Should().HaveCount(1, "FileTransferSettings didn't change");
         searchEmissions.Should().HaveCount(1, "SearchSettings didn't change");
         appEmissions.Should().HaveCount(1, "AppSettings didn't change");
 
         // Cleanup
-        connSub.Dispose();
+        devicesSub.Dispose();
         playerSub.Dispose();
         fileSub.Dispose();
         searchSub.Dispose();
@@ -1467,19 +1505,16 @@ public class SettingsServiceTests : IDisposable
     {
         // Arrange
         var service = new SettingsService(_mockLogger);
-        var connectionEmissions = new List<ConnectionSettings>();
-        var subscription = service.ConnectionSettings.Subscribe(connectionEmissions.Add);
+        var knownDevicesEmissions = new List<List<DeviceSettings>>();
+        var subscription = service.KnownDevices.Subscribe(knownDevicesEmissions.Add);
 
         var settings = service.GetSettings();
         
-        // Create a new ConnectionSettings with the same values (value equality, different reference)
+        // Create a new KnownDevices list with the same values (value equality, different reference)
+        var newDevicesList = settings.KnownDevices.Select(d => d with { }).ToList();
         settings = settings with
         {
-            ConnectionSettings = new ConnectionSettings
-            {
-                ConnectionType = settings.ConnectionSettings.ConnectionType,
-                AutoConnectEnabled = settings.ConnectionSettings.AutoConnectEnabled,
-            }
+            KnownDevices = newDevicesList
         };
 
         // Act
@@ -1489,7 +1524,7 @@ public class SettingsServiceTests : IDisposable
         // Assert
         subscription.Dispose();
         // Should not emit because values are the same (record value equality)
-        connectionEmissions.Should().HaveCount(1, "DistinctUntilChanged uses value equality for records");
+        knownDevicesEmissions.Should().HaveCount(1, "DistinctUntilChanged uses value equality for records");
     }
 
     #endregion

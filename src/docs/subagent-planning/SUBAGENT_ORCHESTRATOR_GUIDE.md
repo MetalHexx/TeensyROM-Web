@@ -187,6 +187,33 @@ Task C: Update actions/index.ts with all new exports
 
 For each task, create a **Task Handoff** following [SUBAGENT_HANDOFF.md](./SUBAGENT_HANDOFF.md):
 
+#### ⚠️ Code Detail Level (Critical)
+
+**Handoffs are architectural specs, not implementations.** The worker subagent is a skilled developer—trust them to write the code.
+
+| ✅ Include | ❌ Avoid |
+|-----------|----------|
+| Class/interface/method **names** | Complete implementations |
+| Key signatures (1-5 lines) | Full file contents |
+| Pattern references to existing code | Every line they should write |
+| Default values and edge cases | Detailed method bodies |
+| Behavioral requirements | Copy-paste ready code |
+
+**Good Example:**
+```markdown
+Create selector `enableVideoForDevice(deviceId: string)`:
+- Search `knownDevices` array for matching device
+- Return `device.videoSettings.enableVideo ?? false`
+- Follow pattern in existing `get-settings.ts`
+```
+
+**Bad Example:**
+```markdown
+[30+ lines of complete TypeScript implementation...]
+```
+
+**Rule of Thumb**: If your code snippet is longer than 10 lines, you're probably over-specifying. Point to existing patterns in the codebase instead.
+
 #### Essential Elements
 
 1. **Task Identity**
@@ -745,6 +772,12 @@ Before handing off any task, verify:
 - [ ] No assumptions about codebase knowledge
 - [ ] Anti-patterns and pitfalls are called out
 - [ ] Testing requirements are explicit
+
+### Code Detail Level
+- [ ] No code snippets longer than 10 lines
+- [ ] Specifies names, signatures, and behaviors—not implementations
+- [ ] Points to existing patterns rather than rewriting them
+- [ ] Trusts worker to implement from architectural specs
 
 ### Feasibility
 - [ ] Task fits comfortably in context window

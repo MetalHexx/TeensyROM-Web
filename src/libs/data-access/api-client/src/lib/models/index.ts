@@ -7,6 +7,7 @@ export * from './CompetitionDto';
 export * from './ConnectDeviceResponse';
 export * from './ConnectionSettingsDto';
 export * from './ConnectionType';
+export * from './DeviceSettingsDto';
 export * from './DeviceStartResponse';
 export * from './DeviceState';
 export * from './DeviceStopResponse';

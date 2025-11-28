@@ -22,6 +22,7 @@ import {
   SearchSettingsDto,
   SearchWeightsDto,
   AppSettingsDto,
+  DeviceSettingsDto,
 } from '@teensyrom-nx/data-access/api-client';
 import { DeviceState as ApiDeviceState } from '@teensyrom-nx/data-access/api-client';
 import {
@@ -49,6 +50,7 @@ import {
   SearchWeights,
   AppSettings,
   ConnectionType,
+  DeviceSettings,
 } from '@teensyrom-nx/domain';
 
 /**
@@ -343,12 +345,29 @@ export class DomainMapper {
    */
   static toSettings(dto: GetSettingsResponse): Settings {
     return {
-      connectionSettings: this.toConnectionSettings(dto.connectionSettings),
       playerSettings: this.toPlayerSettings(dto.playerSettings),
-      videoSettings: this.toVideoSettings(dto.videoSettings),
       fileTransferSettings: this.toFileTransferSettings(dto.fileTransferSettings),
       searchSettings: this.toSearchSettings(dto.searchSettings),
       appSettings: this.toAppSettings(dto.appSettings),
+      knownDevices: this.toKnownDevices(dto.knownDevices),
+    };
+  }
+
+  /**
+   * Maps array of DeviceSettingsDto to domain DeviceSettings array
+   */
+  private static toKnownDevices(dtos: DeviceSettingsDto[]): DeviceSettings[] {
+    return dtos?.map((d) => this.toDeviceSettings(d)) ?? [];
+  }
+
+  /**
+   * Maps DeviceSettingsDto to domain DeviceSettings
+   */
+  private static toDeviceSettings(dto: DeviceSettingsDto): DeviceSettings {
+    return {
+      deviceId: dto.deviceId,
+      videoSettings: this.toVideoSettings(dto.videoSettings),
+      connectionSettings: this.toConnectionSettings(dto.connectionSettings),
     };
   }
 
@@ -357,12 +376,29 @@ export class DomainMapper {
    */
   static toSettingsDto(settings: Settings): SaveSettingsRequest {
     return {
-      connectionSettings: this.toConnectionSettingsDto(settings.connectionSettings),
       playerSettings: this.toPlayerSettingsDto(settings.playerSettings),
-      videoSettings: this.toVideoSettingsDto(settings.videoSettings),
       fileTransferSettings: this.toFileTransferSettingsDto(settings.fileTransferSettings),
       searchSettings: this.toSearchSettingsDto(settings.searchSettings),
       appSettings: this.toAppSettingsDto(settings.appSettings),
+      knownDevices: this.toKnownDevicesDto(settings.knownDevices),
+    };
+  }
+
+  /**
+   * Maps array of domain DeviceSettings to DeviceSettingsDto array
+   */
+  private static toKnownDevicesDto(devices: DeviceSettings[]): DeviceSettingsDto[] {
+    return devices?.map((d) => this.toDeviceSettingsDto(d)) ?? [];
+  }
+
+  /**
+   * Maps domain DeviceSettings to DeviceSettingsDto
+   */
+  private static toDeviceSettingsDto(settings: DeviceSettings): DeviceSettingsDto {
+    return {
+      deviceId: settings.deviceId,
+      videoSettings: this.toVideoSettingsDto(settings.videoSettings),
+      connectionSettings: this.toConnectionSettingsDto(settings.connectionSettings),
     };
   }
 
@@ -421,6 +457,7 @@ export class DomainMapper {
   private static toVideoSettings(dto: VideoSettingsDto): VideoSettings {
     return {
       enableVideo: dto.enableVideo,
+      videoDeviceId: dto.videoDeviceId ?? '',
     };
   }
 
@@ -432,6 +469,7 @@ export class DomainMapper {
   private static toVideoSettingsDto(settings: VideoSettings): VideoSettingsDto {
     return {
       enableVideo: settings.enableVideo,
+      videoDeviceId: settings.videoDeviceId ?? '',
     };
   }
 

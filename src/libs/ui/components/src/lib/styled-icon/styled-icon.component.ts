@@ -2,7 +2,7 @@ import { Component, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 
-export type StyledIconSize = 'small' | 'medium' | 'large';
+export type StyledIconSize = 'small' | 'medium' | 'large' | 'extra-large';
 export type StyledIconColor =
   | 'normal'
   | 'primary'
@@ -35,6 +35,9 @@ export class StyledIconComponent {
         break;
       case 'large':
         classes.push('styled-icon-large');
+        break;
+      case 'extra-large':
+        classes.push('styled-icon-extra-large');
         break;
     }
 

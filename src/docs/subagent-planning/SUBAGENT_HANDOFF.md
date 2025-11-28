@@ -108,7 +108,40 @@ The orchestrator must provide comprehensive task instructions including:
 - Known pitfalls in this area of the codebase
 ```
 
-#### 6. Testing Requirements
+#### 6. Code Detail Level (IMPORTANT)
+
+Handoff documents should provide **architectural guidance**, not complete implementations.
+
+**✅ DO include:**
+- Class, interface, method, and property **names**
+- Key signatures for contracts and public APIs (1-5 lines)
+- Brief code snippets to illustrate patterns (max 5-10 lines)
+- References to existing similar implementations in codebase
+- Default values and edge case behaviors
+
+**❌ DON'T include:**
+- Complete method implementations
+- Full file contents
+- Every line of code the worker should write
+- Detailed implementations that belong in the worker's domain
+
+**Example - Good (architectural guidance):**
+```markdown
+Create selector `getDeviceSettings(deviceId: string)` that:
+- Searches `settings.knownDevices` array by `deviceId`
+- Returns `DeviceSettings | null`
+- Returns `null` when device not found or settings not loaded
+- Follow pattern in existing `get-settings.ts` selector
+```
+
+**Example - Bad (too much implementation):**
+```markdown
+[30+ lines of complete implementation code...]
+```
+
+The worker subagent is a skilled developer who can implement from architectural specifications. Trust them to write the code—your job is to define *what* to build and *how it fits together*, not *every line of code*.
+
+#### 7. Testing Requirements
 
 ```markdown
 **Test Coverage Required**:
@@ -122,7 +155,7 @@ The orchestrator must provide comprehensive task instructions including:
 - What error conditions should be handled?
 ```
 
-#### 7. Reference Materials
+#### 8. Reference Materials
 
 ```markdown
 **Related Documentation**:
@@ -428,6 +461,7 @@ Follow the [SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md) template:
 - ❌ Poor task ordering (frontend before backend contracts)
 - ❌ File conflicts (multiple tasks touching same files)
 - ❌ Scope creep (expanding task during execution)
+- ❌ **Too much code** (writing full implementations instead of architectural specs)
 
 ### Worker Pitfalls
 

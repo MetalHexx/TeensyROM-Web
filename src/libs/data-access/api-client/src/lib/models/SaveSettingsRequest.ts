@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { DeviceSettingsDto } from './DeviceSettingsDto';
+import {
+    DeviceSettingsDtoFromJSON,
+    DeviceSettingsDtoFromJSONTyped,
+    DeviceSettingsDtoToJSON,
+    DeviceSettingsDtoToJSONTyped,
+} from './DeviceSettingsDto';
 import type { AppSettingsDto } from './AppSettingsDto';
 import {
     AppSettingsDtoFromJSON,
@@ -20,13 +27,6 @@ import {
     AppSettingsDtoToJSON,
     AppSettingsDtoToJSONTyped,
 } from './AppSettingsDto';
-import type { ConnectionSettingsDto } from './ConnectionSettingsDto';
-import {
-    ConnectionSettingsDtoFromJSON,
-    ConnectionSettingsDtoFromJSONTyped,
-    ConnectionSettingsDtoToJSON,
-    ConnectionSettingsDtoToJSONTyped,
-} from './ConnectionSettingsDto';
 import type { PlayerSettingsDto } from './PlayerSettingsDto';
 import {
     PlayerSettingsDtoFromJSON,
@@ -34,13 +34,6 @@ import {
     PlayerSettingsDtoToJSON,
     PlayerSettingsDtoToJSONTyped,
 } from './PlayerSettingsDto';
-import type { VideoSettingsDto } from './VideoSettingsDto';
-import {
-    VideoSettingsDtoFromJSON,
-    VideoSettingsDtoFromJSONTyped,
-    VideoSettingsDtoToJSON,
-    VideoSettingsDtoToJSONTyped,
-} from './VideoSettingsDto';
 import type { FileTransferSettingsDto } from './FileTransferSettingsDto';
 import {
     FileTransferSettingsDtoFromJSON,
@@ -64,22 +57,16 @@ import {
 export interface SaveSettingsRequest {
     /**
      * 
-     * @type {ConnectionSettingsDto}
+     * @type {Array<DeviceSettingsDto>}
      * @memberof SaveSettingsRequest
      */
-    connectionSettings: ConnectionSettingsDto;
+    knownDevices: Array<DeviceSettingsDto>;
     /**
      * 
      * @type {PlayerSettingsDto}
      * @memberof SaveSettingsRequest
      */
     playerSettings: PlayerSettingsDto;
-    /**
-     * 
-     * @type {VideoSettingsDto}
-     * @memberof SaveSettingsRequest
-     */
-    videoSettings: VideoSettingsDto;
     /**
      * 
      * @type {FileTransferSettingsDto}
@@ -104,9 +91,8 @@ export interface SaveSettingsRequest {
  * Check if a given object implements the SaveSettingsRequest interface.
  */
 export function instanceOfSaveSettingsRequest(value: object): value is SaveSettingsRequest {
-    if (!('connectionSettings' in value) || value['connectionSettings'] === undefined) return false;
+    if (!('knownDevices' in value) || value['knownDevices'] === undefined) return false;
     if (!('playerSettings' in value) || value['playerSettings'] === undefined) return false;
-    if (!('videoSettings' in value) || value['videoSettings'] === undefined) return false;
     if (!('fileTransferSettings' in value) || value['fileTransferSettings'] === undefined) return false;
     if (!('searchSettings' in value) || value['searchSettings'] === undefined) return false;
     if (!('appSettings' in value) || value['appSettings'] === undefined) return false;
@@ -123,9 +109,8 @@ export function SaveSettingsRequestFromJSONTyped(json: any, ignoreDiscriminator:
     }
     return {
         
-        'connectionSettings': ConnectionSettingsDtoFromJSON(json['connectionSettings']),
+        'knownDevices': ((json['knownDevices'] as Array<any>).map(DeviceSettingsDtoFromJSON)),
         'playerSettings': PlayerSettingsDtoFromJSON(json['playerSettings']),
-        'videoSettings': VideoSettingsDtoFromJSON(json['videoSettings']),
         'fileTransferSettings': FileTransferSettingsDtoFromJSON(json['fileTransferSettings']),
         'searchSettings': SearchSettingsDtoFromJSON(json['searchSettings']),
         'appSettings': AppSettingsDtoFromJSON(json['appSettings']),
@@ -143,9 +128,8 @@ export function SaveSettingsRequestToJSONTyped(value?: SaveSettingsRequest | nul
 
     return {
         
-        'connectionSettings': ConnectionSettingsDtoToJSON(value['connectionSettings']),
+        'knownDevices': ((value['knownDevices'] as Array<any>).map(DeviceSettingsDtoToJSON)),
         'playerSettings': PlayerSettingsDtoToJSON(value['playerSettings']),
-        'videoSettings': VideoSettingsDtoToJSON(value['videoSettings']),
         'fileTransferSettings': FileTransferSettingsDtoToJSON(value['fileTransferSettings']),
         'searchSettings': SearchSettingsDtoToJSON(value['searchSettings']),
         'appSettings': AppSettingsDtoToJSON(value['appSettings']),

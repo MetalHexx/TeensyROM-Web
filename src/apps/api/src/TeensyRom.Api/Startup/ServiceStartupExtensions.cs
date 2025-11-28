@@ -34,7 +34,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IAlertService, AlertService>();
             services.AddSingleton<SettingsService>();
             services.AddSingleton<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
-            services.AddSingleton<IConnectionSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
+            services.AddSingleton<IDeviceSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IPlayerSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IFileTransferSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<ISearchSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());

@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { IconLabelComponent } from './icon-label.component';
+import { IconLabelComponent, IconLabelSize } from './icon-label.component';
 import { ComponentRef } from '@angular/core';
-import { StyledIconColor, StyledIconSize } from '../styled-icon/styled-icon.component';
+import { StyledIconColor } from '../styled-icon/styled-icon.component';
 
 describe('IconLabelComponent', () => {
   let component: IconLabelComponent;
@@ -61,8 +61,8 @@ describe('IconLabelComponent', () => {
     });
   });
 
-  it('should apply custom size', () => {
-    const sizes: StyledIconSize[] = ['small', 'medium', 'large'];
+  it('should apply custom size and compute correct preset values', () => {
+    const sizes: IconLabelSize[] = ['small', 'medium', 'large', 'extra-large'];
 
     sizes.forEach((size) => {
       componentRef.setInput('icon', 'folder');
@@ -71,6 +71,47 @@ describe('IconLabelComponent', () => {
       fixture.detectChanges();
 
       expect(component.size()).toBe(size);
+      
+      // Verify computed signals produce correct values
+      if (size === 'small') {
+        expect(component.iconSize()).toBe('small');
+        expect(component.textClass()).toBe('text-small');
+        expect(component.gapClass()).toBe('gap-small');
+      } else if (size === 'medium') {
+        expect(component.iconSize()).toBe('medium');
+        expect(component.textClass()).toBe('text-medium');
+        expect(component.gapClass()).toBe('gap-medium');
+      } else if (size === 'large') {
+        expect(component.iconSize()).toBe('large');
+        expect(component.textClass()).toBe('text-large');
+        expect(component.gapClass()).toBe('gap-large');
+      } else if (size === 'extra-large') {
+        expect(component.iconSize()).toBe('extra-large');
+        expect(component.textClass()).toBe('text-extra-large');
+        expect(component.gapClass()).toBe('gap-extra-large');
+      }
+    });
+  });
+
+  it('should apply correct CSS classes based on size preset', () => {
+    const testCases: Array<{ size: IconLabelSize; expectedTextClass: string; expectedGapClass: string }> = [
+      { size: 'small', expectedTextClass: 'text-small', expectedGapClass: 'gap-small' },
+      { size: 'medium', expectedTextClass: 'text-medium', expectedGapClass: 'gap-medium' },
+      { size: 'large', expectedTextClass: 'text-large', expectedGapClass: 'gap-large' },
+      { size: 'extra-large', expectedTextClass: 'text-extra-large', expectedGapClass: 'gap-extra-large' },
+    ];
+
+    testCases.forEach(({ size, expectedTextClass, expectedGapClass }) => {
+      componentRef.setInput('icon', 'folder');
+      componentRef.setInput('label', 'Test');
+      componentRef.setInput('size', size);
+      fixture.detectChanges();
+
+      const container = fixture.nativeElement.querySelector('.icon-label-container');
+      const labelElement = fixture.nativeElement.querySelector('.icon-label-text');
+
+      expect(container.classList.contains(expectedGapClass)).toBe(true);
+      expect(labelElement.classList.contains(expectedTextClass)).toBe(true);
     });
   });
 

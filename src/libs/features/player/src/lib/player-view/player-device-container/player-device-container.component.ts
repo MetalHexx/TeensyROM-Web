@@ -32,10 +32,15 @@ export class PlayerDeviceContainerComponent {
   readonly deviceId = computed(() => this.device()?.deviceId ?? '');
 
   /**
-   * Whether video capture is enabled in settings.
+   * Whether video capture is enabled for this device.
    * Controls visibility of video capture component.
+   * Uses per-device settings - returns false if device not found (safe default).
    */
-  readonly enableVideo = computed(() => this.settingsStore.enableVideo());
+  readonly enableVideo = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+    return this.settingsStore.enableVideoForDevice(deviceId)();
+  });
 
   constructor() {
     // Initialize player state when device container mounts

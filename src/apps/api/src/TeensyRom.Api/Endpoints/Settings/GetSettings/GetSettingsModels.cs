@@ -8,19 +8,15 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
     public record GetSettingsResponse
     {
         /// <summary>
-        /// Device connectivity preferences - supports both Serial and TCP/Ethernet connections.
+        /// List of known devices with their per-device settings.
+        /// Each device has its own video and connection preferences.
         /// </summary>
-        [Required] public ConnectionSettingsDto ConnectionSettings { get; set; } = null!;
+        [Required] public List<DeviceSettingsDto> KnownDevices { get; set; } = [];
 
         /// <summary>
         /// Playback behavior and player-related preferences.
         /// </summary>
         [Required] public PlayerSettingsDto PlayerSettings { get; set; } = null!;
-
-        /// <summary>
-        /// Video capture and display preferences.
-        /// </summary>
-        [Required] public VideoSettingsDto VideoSettings { get; set; } = null!;
 
         /// <summary>
         /// File transfer, synchronization, and directory watching preferences.

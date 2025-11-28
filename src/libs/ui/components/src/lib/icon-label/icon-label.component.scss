@@ -1,7 +1,23 @@
 .icon-label-container {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+
+  // Gap spacing presets using design tokens
+  &.gap-small {
+    gap: var(--spacing-inline-xs);
+  }
+
+  &.gap-medium {
+    gap: var(--spacing-inline-sm);
+  }
+
+  &.gap-large {
+    gap: var(--spacing-inline-md);
+  }
+
+  &.gap-extra-large {
+    gap: var(--spacing-inline-lg);
+  }
 }
 
 .icon-label-text {
@@ -13,5 +29,27 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+
+  // Text size presets using design tokens
+  &.text-small {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+  }
+
+  &.text-medium {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-normal);
+  }
+
+  &.text-large {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-normal);
+  }
+
+  &.text-extra-large {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.1;
   }
 }

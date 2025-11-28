@@ -2,4 +2,5 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0; // Prevent icon from being squished
 }

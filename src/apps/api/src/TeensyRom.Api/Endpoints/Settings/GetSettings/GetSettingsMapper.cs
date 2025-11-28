@@ -8,9 +8,8 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         {
             return new GetSettingsResponse
             {
-                ConnectionSettings = MapConnectionSettings(entity.ConnectionSettings),
+                KnownDevices = entity.KnownDevices.Select(MapDeviceSettings).ToList(),
                 PlayerSettings = MapPlayerSettings(entity.PlayerSettings),
-                VideoSettings = MapVideoSettings(entity.VideoSettings),
                 FileTransferSettings = MapFileTransferSettings(entity.FileTransferSettings),
                 SearchSettings = MapSearchSettings(entity.SearchSettings),
                 AppSettings = MapAppSettings(entity.AppSettings)
@@ -18,6 +17,16 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         }
 
         public TeensySettings ToEntity(object request) => throw new NotImplementedException();
+
+        private static DeviceSettingsDto MapDeviceSettings(DeviceSettings entity)
+        {
+            return new DeviceSettingsDto
+            {
+                DeviceId = entity.DeviceId,
+                VideoSettings = MapVideoSettings(entity.VideoSettings),
+                ConnectionSettings = MapConnectionSettings(entity.ConnectionSettings)
+            };
+        }
 
         private static ConnectionSettingsDto MapConnectionSettings(ConnectionSettings entity)
         {
@@ -59,7 +68,8 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         {
             return new VideoSettingsDto
             {
-                EnableVideo = entity.EnableVideo
+                EnableVideo = entity.EnableVideo,
+                VideoDeviceId = entity.VideoDeviceId
             };
         }
 

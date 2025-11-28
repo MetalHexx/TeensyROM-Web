@@ -4,6 +4,28 @@ using TeensyRom.Core.Settings;
 namespace TeensyRom.Api.Endpoints.Settings
 {
     /// <summary>
+    /// Per-device settings including video and connection preferences.
+    /// Each TeensyROM device has its own settings entry in the KnownDevices list.
+    /// </summary>
+    public record DeviceSettingsDto
+    {
+        /// <summary>
+        /// Unique device identifier (hash from cart-tag.txt).
+        /// </summary>
+        [Required] public string DeviceId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Video capture and display preferences for this device.
+        /// </summary>
+        [Required] public VideoSettingsDto VideoSettings { get; set; } = null!;
+
+        /// <summary>
+        /// Connection preferences for this device.
+        /// </summary>
+        [Required] public ConnectionSettingsDto ConnectionSettings { get; set; } = null!;
+    }
+
+    /// <summary>
     /// Device connectivity preferences - supports both Serial and TCP/Ethernet connections.
     /// </summary>
     public record ConnectionSettingsDto
@@ -14,7 +36,7 @@ namespace TeensyRom.Api.Endpoints.Settings
         [Required] public ConnectionType ConnectionType { get; set; } = ConnectionType.Serial;
 
         /// <summary>
-        /// Automatically attempt to connect to devices on startup.
+        /// Automatically attempt to connect to this device on startup.
         /// </summary>
         [Required] public bool AutoConnectEnabled { get; set; }
 
@@ -126,6 +148,11 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// Enable video capture component visibility in player view.
         /// </summary>
         [Required] public bool EnableVideo { get; set; }
+
+        /// <summary>
+        /// Identifier of the video device to use for capture.
+        /// </summary>
+        [Required] public string VideoDeviceId { get; set; } = string.Empty;
     }
 
     /// <summary>

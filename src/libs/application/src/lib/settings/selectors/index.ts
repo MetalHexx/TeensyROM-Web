@@ -7,8 +7,10 @@ import { canRedo } from './can-redo';
 import { getHistoryPosition } from './get-history-position';
 import { isNavigatingHistory } from './is-navigating-history';
 import { historyPositionDisplay } from './history-position-display';
-import { selectVideoSettings } from './select-video-settings';
-import { selectEnableVideo } from './select-enable-video';
+import { selectDeviceSettings } from './select-device-settings';
+import { selectEnableVideoForDevice } from './select-enable-video-for-device';
+import { selectAutoConnectForDevice } from './select-auto-connect-for-device';
+import { selectKnownDevices } from './select-known-devices';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -22,8 +24,10 @@ export function withSettingsSelectors() {
       ...getHistoryPosition(writableStore),
       ...isNavigatingHistory(writableStore),
       ...historyPositionDisplay(writableStore),
-      ...selectVideoSettings(writableStore),
-      ...selectEnableVideo(writableStore),
+      ...selectDeviceSettings(writableStore),
+      ...selectEnableVideoForDevice(writableStore),
+      ...selectAutoConnectForDevice(writableStore),
+      ...selectKnownDevices(writableStore),
     };
   });
 }

@@ -141,7 +141,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - All previously connected devices will reconnect.
+     * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - Devices with auto-connect enabled will reconnect automatically.
      * Find Devices
      */
     async findDevicesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
@@ -160,7 +160,7 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - All previously connected devices will reconnect.
+     * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - Devices with auto-connect enabled will reconnect automatically.
      * Find Devices
      */
     async findDevices(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindDevicesResponse> {

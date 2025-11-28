@@ -94,6 +94,8 @@ export interface PlayerSettings {
 export interface VideoSettings {
   /** Enable video capture component visibility in player view */
   enableVideo: boolean;
+  /** Video capture device identifier */
+  videoDeviceId: string;
 }
 
 /**
@@ -105,19 +107,29 @@ export interface AppSettings {
 }
 
 /**
+ * Per-device settings containing video and connection configuration
+ */
+export interface DeviceSettings {
+  /** Unique device identifier */
+  deviceId: string;
+  /** Video settings for this device */
+  videoSettings: VideoSettings;
+  /** Connection settings for this device */
+  connectionSettings: ConnectionSettings;
+}
+
+/**
  * Root settings object containing all configuration categories
  */
 export interface Settings {
-  /** Device connection settings */
-  connectionSettings: ConnectionSettings;
   /** Player-related settings */
   playerSettings: PlayerSettings;
-  /** Video settings for video capture component */
-  videoSettings: VideoSettings;
   /** File transfer and watch folder settings */
   fileTransferSettings: FileTransferSettings;
   /** Search configuration settings */
   searchSettings: SearchSettings;
   /** Application-level settings */
   appSettings: AppSettings;
+  /** Per-device settings for all known devices */
+  knownDevices: DeviceSettings[];
 }

@@ -39,6 +39,22 @@ html {
 
   // Design Tokens - Spacing
   --spacing-form-control-gap: 0.75rem; // 12px - spacing between form controls and their labels
+  --spacing-inline-xs: 0.375rem; // 6px - extra small inline spacing
+  --spacing-inline-sm: 0.5rem; // 8px - small inline spacing
+  --spacing-inline-md: 0.625rem; // 10px - medium inline spacing
+  --spacing-inline-lg: 1rem; // 16px - large inline spacing
+
+  // Design Tokens - Typography - Font Sizes
+  --font-size-sm: 0.875rem; // 14px - small text, secondary content
+  --font-size-md: 1rem; // 16px - base body text
+  --font-size-lg: 1.25rem; // 20px - emphasized text, subheadings
+  --font-size-xl: 1.75rem; // 28px - headings, prominent labels
+
+  // Design Tokens - Typography - Font Weights
+  --font-weight-normal: 400; // normal text
+  --font-weight-medium: 500; // medium emphasis
+  --font-weight-semibold: 600; // strong emphasis, subheadings
+  --font-weight-bold: 700; // maximum emphasis, headings
 
   @include mat.theme(
     (
@@ -64,6 +80,22 @@ html.dark-mode {
   --color-dimmed: #656363;
   --color-directory: #f5e29e;
   --glassy-color: 255, 255, 255;
+
+  // Design Tokens - Spacing (inherited from light mode, redeclared for completeness)
+  --spacing-inline-xs: 0.375rem;
+  --spacing-inline-sm: 0.5rem;
+  --spacing-inline-md: 0.625rem;
+  --spacing-inline-lg: 1rem;
+
+  // Design Tokens - Typography (same values as light mode)
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.75rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
   @include mat.theme(
     (
@@ -508,8 +540,10 @@ mat-card-title {
 .styled-icon-small {
   font-size: 16px;
   line-height: 1;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -518,8 +552,10 @@ mat-card-title {
 .styled-icon-medium {
   font-size: 24px;
   line-height: 1;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -528,8 +564,22 @@ mat-card-title {
 .styled-icon-large {
   font-size: 32px;
   line-height: 1;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.styled-icon-extra-large {
+  font-size: 48px;
+  line-height: 1;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -4,9 +4,7 @@ import {
   SettingsApiService,
   GetSettingsResponse,
   SaveSettingsResponse,
-  ConnectionSettingsDto,
   PlayerSettingsDto,
-  VideoSettingsDto,
   FileTransferSettingsDto,
   SearchSettingsDto,
   SearchWeightsDto,
@@ -19,10 +17,19 @@ import { Settings, ALERT_SERVICE, IAlertService, PlayerFilterType } from '@teens
  * Creates a complete test GetSettingsResponse DTO
  */
 const createGetSettingsResponseDto = (): GetSettingsResponse => ({
-  connectionSettings: {
-    connectionType: 'Serial',
-    autoConnectEnabled: false,
-  } as ConnectionSettingsDto,
+  knownDevices: [
+    {
+      deviceId: 'test-device-1',
+      videoSettings: {
+        enableVideo: false,
+        videoDeviceId: '',
+      },
+      connectionSettings: {
+        connectionType: 'Serial',
+        autoConnectEnabled: false,
+      },
+    },
+  ],
   playerSettings: {
     repeatModeOnStartup: true,
     playTimerEnabled: true,
@@ -32,9 +39,6 @@ const createGetSettingsResponseDto = (): GetSettingsResponse => ({
     startupLaunchEnabled: true,
     startupLaunchRandom: false,
   } as PlayerSettingsDto,
-  videoSettings: {
-    enableVideo: false,
-  } as VideoSettingsDto,
   fileTransferSettings: {
     watchDirectoryLocation: '/test/watch',
     autoTransferPath: '/test/transfer',
@@ -64,10 +68,6 @@ const createGetSettingsResponseDto = (): GetSettingsResponse => ({
  * Creates a complete test domain Settings object
  */
 const createDomainSettings = (): Settings => ({
-  connectionSettings: {
-    connectionType: 'Serial',
-    autoConnectEnabled: false,
-  },
   playerSettings: {
     repeatModeOnStartup: true,
     playTimerEnabled: true,
@@ -76,9 +76,6 @@ const createDomainSettings = (): Settings => ({
     startupFilter: PlayerFilterType.All,
     startupLaunchEnabled: true,
     startupLaunchRandom: false,
-  },
-  videoSettings: {
-    enableVideo: false,
   },
   fileTransferSettings: {
     watchDirectoryLocation: '/test/watch',
@@ -103,6 +100,19 @@ const createDomainSettings = (): Settings => ({
   appSettings: {
     setupCompleted: true,
   },
+  knownDevices: [
+    {
+      deviceId: 'test-device-1',
+      videoSettings: {
+        enableVideo: false,
+        videoDeviceId: '',
+      },
+      connectionSettings: {
+        connectionType: 'Serial',
+        autoConnectEnabled: false,
+      },
+    },
+  ],
 });
 
 describe('SettingsService', () => {
@@ -149,8 +159,9 @@ describe('SettingsService', () => {
       });
 
       expect(mockSettingsApi.getSettings).toHaveBeenCalledWith();
-      expect(result.connectionSettings.connectionType).toBe('Serial');
-      expect(result.connectionSettings.autoConnectEnabled).toBe(false);
+      expect(result.knownDevices.length).toBe(1);
+      expect(result.knownDevices[0].connectionSettings.connectionType).toBe('Serial');
+      expect(result.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(false);
       expect(result.playerSettings.repeatModeOnStartup).toBe(true);
       expect(result.playerSettings.playTimerEnabled).toBe(true);
       expect(result.playerSettings.startupLaunchEnabled).toBe(true);
@@ -234,7 +245,7 @@ describe('SettingsService', () => {
       expect(mockSettingsApi.saveSettings).toHaveBeenCalled();
       const callArg = mockSettingsApi.saveSettings.mock.calls[0][0];
       expect(callArg.saveSettingsRequest).toBeDefined();
-      expect(callArg.saveSettingsRequest.connectionSettings).toBeDefined();
+      expect(callArg.saveSettingsRequest.knownDevices).toBeDefined();
       expect(callArg.saveSettingsRequest.playerSettings).toBeDefined();
       expect(callArg.saveSettingsRequest.fileTransferSettings).toBeDefined();
       expect(callArg.saveSettingsRequest.searchSettings).toBeDefined();
@@ -262,9 +273,11 @@ describe('SettingsService', () => {
       const callArg = mockSettingsApi.saveSettings.mock.calls[0][0];
       const requestDto = callArg.saveSettingsRequest;
 
-      // Verify connection settings mapping
-      expect(requestDto.connectionSettings.connectionType).toBe('Serial');
-      expect(requestDto.connectionSettings.autoConnectEnabled).toBe(false);
+      // Verify knownDevices mapping
+      expect(requestDto.knownDevices).toBeDefined();
+      expect(requestDto.knownDevices.length).toBe(1);
+      expect(requestDto.knownDevices[0].connectionSettings.connectionType).toBe('Serial');
+      expect(requestDto.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(false);
 
       // Verify player settings mapping
       expect(requestDto.playerSettings.repeatModeOnStartup).toBe(true);
@@ -355,7 +368,7 @@ describe('SettingsService', () => {
       });
 
       // Verify all sections are mapped
-      expect(result.connectionSettings).toBeDefined();
+      expect(result.knownDevices).toBeDefined();
       expect(result.playerSettings).toBeDefined();
       expect(result.fileTransferSettings).toBeDefined();
       expect(result.searchSettings).toBeDefined();

@@ -19,10 +19,6 @@ describe('SettingsFormService', () => {
   let historyPositionSignal: WritableSignal<number>;
 
   const mockSettings: Settings = {
-    connectionSettings: {
-      connectionType: 'Serial',
-      autoConnectEnabled: true,
-    },
     playerSettings: {
       repeatModeOnStartup: false,
       playTimerEnabled: true,
@@ -55,6 +51,18 @@ describe('SettingsFormService', () => {
     appSettings: {
       setupCompleted: true,
     },
+    knownDevices: [
+      {
+        deviceId: 'device-1',
+        connectionSettings: {
+          connectionType: 'Serial',
+          autoConnectEnabled: true,
+        },
+        videoSettings: {
+          enableVideo: true,
+        },
+      },
+    ],
   };
 
   beforeEach(() => {
@@ -132,7 +140,7 @@ describe('SettingsFormService', () => {
       expect(form).toBeTruthy();
       if (!form) return;
 
-      expect(form.get('connectionSettings')).toBeTruthy();
+      expect(form.get('knownDevices')).toBeTruthy();
       expect(form.get('playerSettings')).toBeTruthy();
       expect(form.get('fileTransferSettings')).toBeTruthy();
       expect(form.get('searchSettings')).toBeTruthy();
@@ -144,8 +152,13 @@ describe('SettingsFormService', () => {
       expect(form).toBeTruthy();
       if (!form) return;
 
-      expect(form.get('connectionSettings.connectionType')?.value).toBe('Serial');
-      expect(form.get('connectionSettings.autoConnectEnabled')?.value).toBe(true);
+      const knownDevices = service.getKnownDevices();
+      expect(knownDevices.length).toBe(1);
+      const deviceGroup = knownDevices.at(0);
+      expect(deviceGroup.get('deviceId')?.value).toBe('device-1');
+      expect(deviceGroup.get('connectionSettings.connectionType')?.value).toBe('Serial');
+      expect(deviceGroup.get('connectionSettings.autoConnectEnabled')?.value).toBe(true);
+      expect(deviceGroup.get('videoSettings.enableVideo')?.value).toBe(true);
       expect(form.get('playerSettings.playTimerEnabled')?.value).toBe(true);
       expect(form.get('appSettings.setupCompleted')?.value).toBe(true);
     });
@@ -181,7 +194,7 @@ describe('SettingsFormService', () => {
       const saveSpy = vi.spyOn(service, 'saveSettings');
 
       // Change a value
-      form.get('connectionSettings.autoConnectEnabled')?.setValue(false);
+      form.get('playerSettings.playTimerEnabled')?.setValue(false);
       tick(500); // Not enough time
 
       expect(saveSpy).not.toHaveBeenCalled();
@@ -200,7 +213,7 @@ describe('SettingsFormService', () => {
       if (!form) return;
       const saveSpy = vi.spyOn(service, 'saveSettings');
 
-      form.get('connectionSettings.autoConnectEnabled')?.setValue(false);
+      form.get('playerSettings.playTimerEnabled')?.setValue(false);
       tick(1000);
 
       expect(saveSpy).not.toHaveBeenCalled();
@@ -230,7 +243,7 @@ describe('SettingsFormService', () => {
       // Simulate undo/redo by changing history position
       historyPositionSignal.set(0);
       const newSettings = { ...mockSettings };
-      newSettings.connectionSettings.autoConnectEnabled = false;
+      newSettings.playerSettings = { ...mockSettings.playerSettings, playTimerEnabled: false };
       settingsSignal.set(newSettings);
 
       // Flush effects to trigger store sync
@@ -272,12 +285,12 @@ describe('SettingsFormService', () => {
       const form = service.settingsForm();
       expect(form).toBeTruthy();
       if (!form) return;
-      form.get('connectionSettings.autoConnectEnabled')?.setValue(false);
+      form.get('playerSettings.playTimerEnabled')?.setValue(false);
 
       await service.saveSettings();
 
       const callArg = vi.mocked(mockSettingsStore.updateSettings).mock.calls[0][0];
-      expect(callArg.settings.connectionSettings.autoConnectEnabled).toBe(false);
+      expect(callArg.settings.playerSettings.playTimerEnabled).toBe(false);
     });
 
     it('should convert comma-separated strings to arrays', async () => {
@@ -354,11 +367,14 @@ describe('SettingsFormService', () => {
   });
 
   describe('Helper Methods', () => {
-    it('getConnectionSettings should return typed FormGroup', () => {
-      const formGroup = service.getConnectionSettings();
-      expect(formGroup).toBeTruthy();
-      expect(formGroup.get('connectionType')).toBeTruthy();
-      expect(formGroup.get('autoConnectEnabled')).toBeTruthy();
+    it('getKnownDevices should return FormArray', () => {
+      const formArray = service.getKnownDevices();
+      expect(formArray).toBeTruthy();
+      expect(formArray.length).toBe(1);
+      const deviceGroup = formArray.at(0);
+      expect(deviceGroup.get('deviceId')).toBeTruthy();
+      expect(deviceGroup.get('connectionSettings')).toBeTruthy();
+      expect(deviceGroup.get('videoSettings')).toBeTruthy();
     });
 
     it('getPlayerSettings should return typed FormGroup', () => {
@@ -411,10 +427,10 @@ describe('SettingsFormService', () => {
       expect(mockSettingsStore.saveSettings).not.toHaveBeenCalled();
     });
 
-    it('should throw when getConnectionSettings called with null form', () => {
+    it('should throw when getKnownDevices called with null form', () => {
       service['settingsForm'].set(null);
 
-      expect(() => service.getConnectionSettings()).toThrow('Settings form not initialized');
+      expect(() => service.getKnownDevices()).toThrow('Settings form not initialized');
     });
 
     it('should throw when getPlayerSettings called with null form', () => {
@@ -521,14 +537,14 @@ describe('SettingsFormService', () => {
       if (!form) return;
 
       const newSettings = { ...mockSettings };
-      newSettings.connectionSettings.autoConnectEnabled = false;
+      newSettings.playerSettings = { ...mockSettings.playerSettings, playTimerEnabled: false };
       historyPositionSignal.set(0); // Simulate undo/redo
       settingsSignal.set(newSettings);
       
       // Flush effects to trigger sync
       TestBed.flushEffects();
 
-      expect(form.get('connectionSettings.autoConnectEnabled')?.value).toBe(false);
+      expect(form.get('playerSettings.playTimerEnabled')?.value).toBe(false);
     });
   });
 
@@ -589,11 +605,11 @@ describe('SettingsFormService', () => {
   });
 
   describe('Validation', () => {
-    it('should validate connectionType as required', () => {
-      const form = service.settingsForm();
-      expect(form).toBeTruthy();
-      if (!form) return;
-      const control = form.get('connectionSettings.connectionType');
+    it('should validate device connectionType as required', () => {
+      const knownDevices = service.getKnownDevices();
+      expect(knownDevices.length).toBe(1);
+      const deviceGroup = knownDevices.at(0);
+      const control = deviceGroup.get('connectionSettings.connectionType');
 
       control?.setValue('');
 

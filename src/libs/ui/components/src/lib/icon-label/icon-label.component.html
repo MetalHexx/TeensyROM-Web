@@ -1,4 +1,4 @@
-<span class="icon-label-container">
-  <lib-styled-icon [icon]="icon()" [color]="color()" [size]="size()"></lib-styled-icon>
-  <span class="icon-label-text" [class.truncate]="truncate()" [title]="label()">{{ label() }}</span>
+<span class="icon-label-container" [class]="gapClass()">
+  <lib-styled-icon [icon]="icon()" [color]="color()" [size]="iconSize()"></lib-styled-icon>
+  <span class="icon-label-text" [class]="textClass()" [class.truncate]="truncate()" [title]="label()">{{ label() }}</span>
 </span>

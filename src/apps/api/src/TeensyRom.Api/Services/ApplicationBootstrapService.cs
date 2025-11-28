@@ -31,11 +31,8 @@ namespace TeensyRom.Api.Services
 
             try
             {
-                // Settings are guaranteed to be loaded (singleton constructor ran during DI)
-                var settings = _settingsService.GetSettings();
-
                 // Execute startup operations in sequence
-                await PerformDeviceAutoConnect(settings, cancellationToken);
+                await PerformDeviceAutoConnect(cancellationToken);
 
                 // Add additional startup operations here...
                 // await InitializeOtherServices(settings, cancellationToken);
@@ -60,32 +57,50 @@ namespace TeensyRom.Api.Services
         }
 
         /// <summary>
-        /// Performs device auto-connect if enabled in settings.
-        /// Discovers and connects to all available TeensyROM devices on startup.
+        /// Performs per-device auto-connect based on individual device settings.
+        /// Discovers all devices first, then connects only those with autoConnectEnabled=true.
+        /// New devices are automatically registered with default settings.
         /// </summary>
-        private async Task PerformDeviceAutoConnect(TeensyRom.Core.Settings.TeensySettings settings, CancellationToken cancellationToken)
+        private async Task PerformDeviceAutoConnect(CancellationToken cancellationToken)
         {
-            if (!settings.ConnectionSettings.AutoConnectEnabled)
-            {
-                _log.Internal("ApplicationBootstrap: Device auto-connect disabled - skipping");
-                return;
-            }
-
-            _log.Internal("ApplicationBootstrap: Device auto-connect enabled - scanning for devices...");
+            _log.Internal("ApplicationBootstrap: Scanning for devices...");
 
             try
             {
-                // Find all devices and auto-connect new ones
-                var devices = await _deviceManager.FindDevices(autoConnect: true, cancellationToken);
+                // 1. Discover all devices (don't auto-connect yet)
+                var devices = await _deviceManager.FindDevices(autoConnect: false, cancellationToken);
 
-                if (devices.Count > 0)
-                {
-                    _log.InternalSuccess($"ApplicationBootstrap: Successfully connected to {devices.Count} device(s)");
-                }
-                else
+                if (devices.Count == 0)
                 {
                     _log.InternalWarning("ApplicationBootstrap: No TeensyROM devices found on startup");
+                    return;
                 }
+
+                _log.Internal($"ApplicationBootstrap: Found {devices.Count} device(s), checking per-device settings...");
+
+                int connectedCount = 0;
+                int skippedCount = 0;
+
+                foreach (var device in devices)
+                {
+                    // 2. Get or create device settings (creates with defaults if new)
+                    var deviceSettings = _settingsService.GetOrCreateDeviceSettings(device.DeviceId);
+
+                    // 3. Auto-connect only if enabled for this device
+                    if (deviceSettings.ConnectionSettings.AutoConnectEnabled)
+                    {
+                        _deviceManager.Connect(device.DeviceId);
+                        _log.InternalSuccess($"ApplicationBootstrap: Auto-connected device: {device.DeviceId}");
+                        connectedCount++;
+                    }
+                    else
+                    {
+                        _log.Internal($"ApplicationBootstrap: Skipped auto-connect for device: {device.DeviceId} (disabled in settings)");
+                        skippedCount++;
+                    }
+                }
+
+                _log.InternalSuccess($"ApplicationBootstrap: Connected {connectedCount} device(s), skipped {skippedCount}");
             }
             catch (OperationCanceledException)
             {

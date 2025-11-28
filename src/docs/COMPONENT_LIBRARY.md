@@ -2859,7 +2859,7 @@ export class MyComponent {
 
 ### `IconLabelComponent`
 
-**Purpose**: A versatile component that displays a styled icon alongside text with optional color, size, and text truncation controls. Built on [StyledIconComponent](COMPONENT_LIBRARY.md#stylediconcomponent) for consistent icon styling.
+**Purpose**: A versatile component that displays a styled icon alongside text with preset size variations, color options, and text truncation controls. Built on [StyledIconComponent](COMPONENT_LIBRARY.md#stylediconcomponent) for consistent icon styling. Uses [Design Tokens](STYLE_GUIDE.md#design-tokens) for typography and spacing to ensure consistency across the application.
 
 **Selector**: `lib-icon-label`
 
@@ -2868,20 +2868,53 @@ export class MyComponent {
 - `icon` (optional): `string` - Material Design icon name to display - defaults to empty string
 - `label` (optional): `string` - Text label to display next to the icon - defaults to empty string
 - `color` (optional): `'normal' | 'primary' | 'highlight' | 'success' | 'error' | 'dimmed' | 'directory'` - Icon color from design system - defaults to 'normal'
-- `size` (optional): `'small' | 'medium' | 'large'` - Icon size - defaults to 'medium'
+- `size` (optional): `'small' | 'medium' | 'large' | 'extra-large'` - Size preset that controls icon size, text size, font weight, and gap spacing - defaults to 'medium'
 - `truncate` (optional): `boolean` - Enable text truncation with ellipsis (20ch max width) - defaults to true
+
+**Size Presets**:
+
+The `size` parameter automatically adjusts multiple styling aspects for cohesive visual hierarchy. All typography values are derived from [Design Tokens](STYLE_GUIDE.md#design-tokens):
+
+| Preset | Icon | Font Size Token | Font Weight Token | Spacing Token | Use Case |
+|--------|------|-----------------|-------------------|---------------|----------|
+| `'small'` | small | `--font-size-sm` | `--font-weight-normal` | `--spacing-inline-xs` | Compact lists, secondary info |
+| `'medium'` | medium | `--font-size-md` | `--font-weight-normal` | `--spacing-inline-sm` | Default, body content |
+| `'large'` | large | `--font-size-lg` | `--font-weight-normal` | `--spacing-inline-md` | Section headers, emphasis |
+| `'extra-large'` | extra-large | `--font-size-xl` | `--font-weight-medium` | `--spacing-inline-lg` | Page titles, headings |
+
+See [Typography Tokens](STYLE_GUIDE.md#typography-tokens) and [Spacing Tokens](STYLE_GUIDE.md#spacing-tokens) for actual values.
 
 **Usage Examples**:
 
 ```html
-<!-- Basic usage (backward compatible) -->
-<lib-icon-label icon="folder" label="Documents"> </lib-icon-label>
+<!-- Medium size (default) - general purpose -->
+<lib-icon-label icon="folder" label="Documents"></lib-icon-label>
 
-<!-- With custom color and size -->
-<lib-icon-label icon="folder" label="My Folder" color="directory" size="large"> </lib-icon-label>
+<!-- Small size - for tight layouts and secondary info -->
+<lib-icon-label icon="info" label="Details" size="small"></lib-icon-label>
 
-<!-- Directory tree node pattern -->
-<lib-icon-label icon="folder" label="Games" color="directory" size="medium" [truncate]="false">
+<!-- Large size - for section headers and emphasized content -->
+<lib-icon-label 
+  icon="desktop_windows" 
+  label="Device Settings" 
+  size="large" 
+  color="primary">
+</lib-icon-label>
+
+<!-- Extra-large size - for page titles and major headings -->
+<lib-icon-label 
+  icon="devices" 
+  label="Connected Devices" 
+  size="extra-large" 
+  color="highlight">
+</lib-icon-label>
+
+<!-- Directory tree node pattern with default medium size -->
+<lib-icon-label 
+  icon="folder" 
+  label="Games" 
+  color="directory" 
+  [truncate]="false">
 </lib-icon-label>
 
 <!-- File listing in table (no truncation) -->
@@ -2889,13 +2922,15 @@ export class MyComponent {
   [icon]="file.isDirectory ? 'folder' : 'insert_drive_file'"
   [label]="file.name"
   [color]="file.isDirectory ? 'directory' : 'normal'"
-  size="medium"
-  [truncate]="false"
->
+  [truncate]="false">
 </lib-icon-label>
 
-<!-- Device info with truncation -->
-<lib-icon-label icon="tag" [label]="'Device ID: ' + deviceId"> </lib-icon-label>
+<!-- Device info with truncation and extra-large sizing -->
+<lib-icon-label 
+  icon="tag" 
+  [label]="'Device ID: ' + deviceId" 
+  size="extra-large">
+</lib-icon-label>
 ```
 
 **Advanced Usage Patterns**:
@@ -2924,42 +2959,62 @@ export class FileListComponent {
 ```
 
 ```html
-<!-- In template -->
+<!-- In template with default medium size -->
 <lib-icon-label
   [icon]="getFileIcon(file)"
   [label]="file.name"
   [color]="getFileColor(file)"
-  size="medium"
-  [truncate]="false"
->
+  [truncate]="false">
+</lib-icon-label>
+
+<!-- Device section header with extra-large sizing -->
+<lib-icon-label
+  icon="desktop_windows"
+  [label]="deviceName"
+  size="extra-large"
+  color="primary"
+  [truncate]="true">
 </lib-icon-label>
 ```
 
 **Features**:
 
 - **Styled Icons**: Uses [StyledIconComponent](COMPONENT_LIBRARY.md#stylediconcomponent) internally for consistent icon appearance
-- **Flexible Layout**: Icon and text horizontally aligned with 0.5rem gap
+- **Design Token Integration**: Typography and spacing use [Design Tokens](STYLE_GUIDE.md#design-tokens) for consistency
+- **Preset Sizing System**: Four size presets that automatically adjust icon, text, weight, and spacing for proper visual hierarchy
+- **Flexible Layout**: Icon and text horizontally aligned with preset-based gap spacing
 - **Text Truncation**: Optional ellipsis truncation for long labels (enabled by default)
 - **Accessibility**: Text includes `title` attribute for tooltips on hover
-- **Backward Compatible**: Works with minimal props (just icon/label) using sensible defaults
+- **Backward Compatible**: Maintains original `small`, `medium`, `large` size values with new `extra-large` option
 
 **Style Integration**:
 
 The component leverages:
 
 - [StyledIconComponent](COMPONENT_LIBRARY.md#stylediconcomponent) for icon styling
-- [`.icon-label-container`](STYLE_GUIDE.md) for flex layout
+- [Design Tokens](STYLE_GUIDE.md#design-tokens) for typography and spacing values
+- Size-specific CSS classes for text styling (`.text-small`, `.text-medium`, `.text-large`, `.text-extra-large`)
+- Size-specific gap classes for spacing (`.gap-small`, `.gap-medium`, `.gap-large`, `.gap-extra-large`)
 - Conditional `.truncate` class for text overflow handling
 
-**Best Practice**: Use for any icon-text combination throughout the application. The enhanced props (color, size, truncate) allow it to work in diverse contexts:
+**Visual Hierarchy Guidance**:
 
-- **Device info displays** - default truncation for long IDs
-- **Directory trees** - colored icons with no truncation
-- **File tables** - dynamic icons based on file type with full text display
-- **Navigation menus** - consistent icon-label pattern
+- **`small`**: Use for secondary information, metadata labels, or when space is constrained
+- **`medium`**: Default for most UI elements - body content, lists, navigation items
+- **`large`**: Section headers, category titles, device names - commands attention without overwhelming
+- **`extra-large`**: Page titles, major headings, primary focal points - use sparingly for maximum impact
+
+**Best Practice**: Choose size based on content hierarchy, not personal preference. The preset system ensures consistent visual language across the application:
+
+- **Device settings sections** - `extra-large` for device names that group related settings
+- **Directory trees** - `medium` (default) with colored icons for file/folder browsing
+- **File tables** - `medium` or `small` with dynamic icons based on file type
+- **Navigation menus** - `medium` for consistent menu item appearance
+- **Page headers** - `extra-large` for main page titles, `large` for subsection headers
 
 **Used In**:
 
+- `libs/features/settings/src/lib/settings-view/device-settings-section/device-settings-section.component.html` - Device section headers (extra-large size)
 - [`device-item.component.html`](../libs/features/devices/src/lib/device-view/device-item/device-item.component.html) - Device information labels
 - [`storage-item.component.html`](../libs/features/devices/src/lib/device-view/storage-item/storage-item.component.html) - Storage information labels
 - [`action-button.component.html`](../libs/ui/components/src/lib/action-button/action-button.component.html) - Button labels with icons

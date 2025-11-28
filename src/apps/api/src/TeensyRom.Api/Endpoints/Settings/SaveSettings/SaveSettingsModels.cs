@@ -8,19 +8,15 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
     public record SaveSettingsRequest
     {
         /// <summary>
-        /// Device connectivity preferences - supports both Serial and TCP/Ethernet connections.
+        /// List of known devices with their per-device settings.
+        /// Each device has its own video and connection preferences.
         /// </summary>
-        [Required] public ConnectionSettingsDto ConnectionSettings { get; set; } = null!;
+        [Required] public List<DeviceSettingsDto> KnownDevices { get; set; } = [];
 
         /// <summary>
         /// Playback behavior and player-related preferences.
         /// </summary>
         [Required] public PlayerSettingsDto PlayerSettings { get; set; } = null!;
-
-        /// <summary>
-        /// Video capture and display preferences.
-        /// </summary>
-        [Required] public VideoSettingsDto VideoSettings { get; set; } = null!;
 
         /// <summary>
         /// File transfer, synchronization, and directory watching preferences.
@@ -54,17 +50,15 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
     {
         public SaveSettingsRequestValidator()
         {
-            RuleFor(x => x.ConnectionSettings)
-                .NotNull().WithMessage("Connection settings are required.")
-                .SetValidator(new ConnectionSettingsValidator());
+            RuleFor(x => x.KnownDevices)
+                .NotNull().WithMessage("Known devices list is required.");
+            
+            RuleForEach(x => x.KnownDevices)
+                .SetValidator(new DeviceSettingsValidator());
 
             RuleFor(x => x.PlayerSettings)
                 .NotNull().WithMessage("Player settings are required.")
                 .SetValidator(new PlayerSettingsValidator());
-
-            RuleFor(x => x.VideoSettings)
-                .NotNull().WithMessage("Video settings are required.")
-                .SetValidator(new VideoSettingsValidator());
 
             RuleFor(x => x.FileTransferSettings)
                 .NotNull().WithMessage("File transfer settings are required.")
@@ -77,6 +71,23 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             RuleFor(x => x.AppSettings)
                 .NotNull().WithMessage("App settings are required.")
                 .SetValidator(new AppSettingsValidator());
+        }
+    }
+
+    public class DeviceSettingsValidator : AbstractValidator<DeviceSettingsDto>
+    {
+        public DeviceSettingsValidator()
+        {
+            RuleFor(x => x.DeviceId)
+                .NotEmpty().WithMessage("Device ID is required.");
+
+            RuleFor(x => x.VideoSettings)
+                .NotNull().WithMessage("Video settings are required for each device.")
+                .SetValidator(new VideoSettingsValidator());
+
+            RuleFor(x => x.ConnectionSettings)
+                .NotNull().WithMessage("Connection settings are required for each device.")
+                .SetValidator(new ConnectionSettingsValidator());
         }
     }
 

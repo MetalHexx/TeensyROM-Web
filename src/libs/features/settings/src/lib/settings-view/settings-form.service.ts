@@ -1,9 +1,9 @@
 import { Injectable, inject, signal, computed, effect, DestroyRef } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { debounceTime, filter } from 'rxjs/operators';
 import { SettingsStore } from '@teensyrom-nx/application';
-import { Settings } from '@teensyrom-nx/domain';
+import { Settings, DeviceSettings } from '@teensyrom-nx/domain';
 import { arrayToString, stringToArray } from '@teensyrom-nx/utils';
 
 /**
@@ -179,10 +179,6 @@ export class SettingsFormService {
    */
   private buildForm(settings: Settings): FormGroup {
     return this.fb.group({
-      connectionSettings: this.fb.group({
-        connectionType: [settings.connectionSettings.connectionType, Validators.required],
-        autoConnectEnabled: [settings.connectionSettings.autoConnectEnabled],
-      }),
       playerSettings: this.fb.group({
         repeatModeOnStartup: [settings.playerSettings.repeatModeOnStartup],
         playTimerEnabled: [settings.playerSettings.playTimerEnabled],
@@ -191,9 +187,6 @@ export class SettingsFormService {
         startupFilter: [settings.playerSettings.startupFilter, Validators.required],
         startupLaunchEnabled: [settings.playerSettings.startupLaunchEnabled],
         startupLaunchRandom: [settings.playerSettings.startupLaunchRandom],
-      }),
-      videoSettings: this.fb.group({
-        enableVideo: [settings.videoSettings.enableVideo],
       }),
       fileTransferSettings: this.fb.group({
         watchDirectoryLocation: [settings.fileTransferSettings.watchDirectoryLocation],
@@ -233,6 +226,26 @@ export class SettingsFormService {
       appSettings: this.fb.group({
         setupCompleted: [settings.appSettings.setupCompleted],
       }),
+      knownDevices: this.fb.array(
+        settings.knownDevices.map(device => this.createDeviceFormGroup(device))
+      ),
+    });
+  }
+
+  /**
+   * Creates a FormGroup for a single device's settings
+   */
+  private createDeviceFormGroup(device: DeviceSettings): FormGroup {
+    return this.fb.group({
+      deviceId: [device.deviceId, Validators.required],
+      videoSettings: this.fb.group({
+        enableVideo: [device.videoSettings.enableVideo],
+        videoDeviceId: [device.videoSettings.videoDeviceId],
+      }),
+      connectionSettings: this.fb.group({
+        connectionType: [device.connectionSettings.connectionType, Validators.required],
+        autoConnectEnabled: [device.connectionSettings.autoConnectEnabled],
+      }),
     });
   }
 
@@ -261,10 +274,6 @@ export class SettingsFormService {
    */
   private settingsToFormValue(settings: Settings): ReturnType<FormGroup['getRawValue']> {
     return {
-      connectionSettings: {
-        connectionType: settings.connectionSettings.connectionType,
-        autoConnectEnabled: settings.connectionSettings.autoConnectEnabled,
-      },
       playerSettings: {
         repeatModeOnStartup: settings.playerSettings.repeatModeOnStartup,
         playTimerEnabled: settings.playerSettings.playTimerEnabled,
@@ -273,9 +282,6 @@ export class SettingsFormService {
         startupFilter: settings.playerSettings.startupFilter,
         startupLaunchEnabled: settings.playerSettings.startupLaunchEnabled,
         startupLaunchRandom: settings.playerSettings.startupLaunchRandom,
-      },
-      videoSettings: {
-        enableVideo: settings.videoSettings.enableVideo,
       },
       fileTransferSettings: {
         watchDirectoryLocation: settings.fileTransferSettings.watchDirectoryLocation,
@@ -300,6 +306,17 @@ export class SettingsFormService {
       appSettings: {
         setupCompleted: settings.appSettings.setupCompleted,
       },
+      knownDevices: settings.knownDevices.map(device => ({
+        deviceId: device.deviceId,
+        videoSettings: {
+          enableVideo: device.videoSettings.enableVideo,
+          videoDeviceId: device.videoSettings.videoDeviceId,
+        },
+        connectionSettings: {
+          connectionType: device.connectionSettings.connectionType,
+          autoConnectEnabled: device.connectionSettings.autoConnectEnabled,
+        },
+      })),
     };
   }
 
@@ -308,10 +325,6 @@ export class SettingsFormService {
    */
   private formValueToSettings(formValue: ReturnType<FormGroup['getRawValue']>): Settings {
     return {
-      connectionSettings: {
-        connectionType: formValue.connectionSettings.connectionType,
-        autoConnectEnabled: formValue.connectionSettings.autoConnectEnabled,
-      },
       playerSettings: {
         repeatModeOnStartup: formValue.playerSettings.repeatModeOnStartup,
         playTimerEnabled: formValue.playerSettings.playTimerEnabled,
@@ -320,9 +333,6 @@ export class SettingsFormService {
         startupFilter: formValue.playerSettings.startupFilter,
         startupLaunchEnabled: formValue.playerSettings.startupLaunchEnabled,
         startupLaunchRandom: formValue.playerSettings.startupLaunchRandom,
-      },
-      videoSettings: {
-        enableVideo: formValue.videoSettings.enableVideo,
       },
       fileTransferSettings: {
         watchDirectoryLocation: formValue.fileTransferSettings.watchDirectoryLocation,
@@ -347,6 +357,17 @@ export class SettingsFormService {
       appSettings: {
         setupCompleted: formValue.appSettings.setupCompleted,
       },
+      knownDevices: formValue.knownDevices.map((device: DeviceSettings) => ({
+        deviceId: device.deviceId,
+        videoSettings: {
+          enableVideo: device.videoSettings.enableVideo,
+          videoDeviceId: device.videoSettings.videoDeviceId,
+        },
+        connectionSettings: {
+          connectionType: device.connectionSettings.connectionType,
+          autoConnectEnabled: device.connectionSettings.autoConnectEnabled,
+        },
+      })),
     };
   }
 
@@ -393,14 +414,14 @@ export class SettingsFormService {
   }
 
   /**
-   * Helper method to get typed FormGroup for connection settings section
+   * Helper method to get typed FormArray for known devices section
    */
-  getConnectionSettings(): FormGroup {
+  getKnownDevices(): FormArray {
     const form = this.settingsForm();
     if (!form) {
       throw new Error('Settings form not initialized');
     }
-    return form.get('connectionSettings') as FormGroup;
+    return form.get('knownDevices') as FormArray;
   }
 
   /**
@@ -412,17 +433,6 @@ export class SettingsFormService {
       throw new Error('Settings form not initialized');
     }
     return form.get('playerSettings') as FormGroup;
-  }
-
-  /**
-   * Helper method to get typed FormGroup for video settings section
-   */
-  getVideoSettings(): FormGroup {
-    const form = this.settingsForm();
-    if (!form) {
-      throw new Error('Settings form not initialized');
-    }
-    return form.get('videoSettings') as FormGroup;
   }
 
   /**

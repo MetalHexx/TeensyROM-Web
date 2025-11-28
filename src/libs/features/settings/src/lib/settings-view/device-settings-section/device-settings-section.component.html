@@ -1,0 +1,63 @@
+<lib-scaling-card title="Device Settings" [animationTrigger]="animationTrigger()">
+  @if (knownDevicesArray().length === 0) {
+    <div class="empty-state">
+      <mat-icon>devices</mat-icon>
+      <p>No devices have been connected yet.</p>
+      <p class="hint">Connect a TeensyROM device to configure its settings.</p>
+    </div>
+  } @else {
+    @for (deviceGroup of knownDevicesArray().controls; track deviceGroup.get('deviceId')?.value; let i = $index) {
+      <div class="device-section">
+        <lib-icon-label
+          icon="desktop_windows"
+          [label]="getDeviceTitle(deviceGroup)"
+          size="extra-large"
+          color="primary"
+          [truncate]="true"
+        ></lib-icon-label>
+
+        <form [formGroup]="asFormGroup(deviceGroup)">
+          <div class="settings-grid">
+            <!-- Video Settings Group -->
+            <div class="settings-group">
+              <h4 class="group-title">Video Settings</h4>
+
+              @if (getEnableVideoControl(deviceGroup); as enableVideoCtrl) {
+                <lib-settings-toggle-item
+                  label="Enable Video Overlay"
+                  description="Show video capture overlay for this device. Requires a video capture device connected to your C64 video output."
+                  [control]="enableVideoCtrl" />
+              }
+            </div>
+
+            <!-- Connection Settings Group -->
+            <div class="settings-group">
+              <h4 class="group-title">Connection Settings</h4>
+
+              @if (getAutoConnectControl(deviceGroup); as autoConnectCtrl) {
+                <lib-settings-toggle-item
+                  label="Auto-connect on startup"
+                  description="Automatically connect to this device when the API starts."
+                  [control]="autoConnectCtrl" />
+              }
+
+              @if (getConnectionTypeControl(deviceGroup); as connectionTypeCtrl) {
+                <div class="connection-type-field">
+                  <span class="connection-type-label">Connection Type</span>
+                  <mat-radio-group [formControl]="$any(connectionTypeCtrl)" class="connection-type-group">
+                    <mat-radio-button value="Serial">Serial</mat-radio-button>
+                    <mat-radio-button value="Tcp">TCP/Ethernet</mat-radio-button>
+                  </mat-radio-group>
+                </div>
+              }
+            </div>
+          </div>
+        </form>
+      </div>
+
+      @if (i < knownDevicesArray().length - 1) {
+        <hr class="device-divider" />
+      }
+    }
+  }
+</lib-scaling-card>

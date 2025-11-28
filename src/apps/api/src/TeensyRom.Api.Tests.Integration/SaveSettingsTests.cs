@@ -15,23 +15,22 @@ namespace TeensyRom.Api.Tests.Integration
         {
             return new SaveSettingsRequest
             {
-                ConnectionSettings = new ConnectionSettingsDto
+                KnownDevices = new List<DeviceSettingsDto>
                 {
-                    ConnectionType = ConnectionType.Serial,
-                    AutoConnectEnabled = true,
-                    //Serial = new SerialConnectionSettingsDto
-                    //{
-                    //    Port = "COM3",
-                    //    BaudRate = 115200
-                    //},
-                    //Tcp = new TcpConnectionSettingsDto
-                    //{
-                    //    HostAddress = "192.168.1.100",
-                    //    Port = 5001,
-                    //    ConnectionTimeoutMs = 5000,
-                    //    ReadTimeoutMs = 1000,
-                    //    WriteTimeoutMs = 1000
-                    //}
+                    new DeviceSettingsDto
+                    {
+                        DeviceId = "TEST_DEVICE_123",
+                        VideoSettings = new VideoSettingsDto
+                        {
+                            EnableVideo = false,
+                            VideoDeviceId = string.Empty
+                        },
+                        ConnectionSettings = new ConnectionSettingsDto
+                        {
+                            ConnectionType = ConnectionType.Serial,
+                            AutoConnectEnabled = true
+                        }
+                    }
                 },
                 PlayerSettings = new PlayerSettingsDto
                 {
@@ -200,14 +199,14 @@ namespace TeensyRom.Api.Tests.Integration
         {
             // Arrange
             var request = CreateValidRequest();
-            request.ConnectionSettings.ConnectionType = (ConnectionType)999;
+            request.KnownDevices[0].ConnectionSettings.ConnectionType = (ConnectionType)999;
 
             // Act
             var r = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, ValidationProblemDetails>(request);
 
             // Assert
             r.Should().BeValidationProblem()
-                .WithKey("ConnectionSettings.ConnectionType");
+                .WithKey("KnownDevices[0].ConnectionSettings.ConnectionType");
         }
 
         [Fact]
@@ -289,12 +288,12 @@ namespace TeensyRom.Api.Tests.Integration
             initialSettings.Should().BeSuccessful<GetSettingsResponse>();
 
             var initialPlayerFilter = initialSettings.Content.PlayerSettings.StartupFilter;
-            //var initialBaudRate = initialSettings.Content.ConnectionSettings.Serial.BaudRate;
+            var initialDeviceCount = initialSettings.Content.KnownDevices.Count;
 
             // Arrange - Modify only player settings
             var saveRequest = CreateValidRequest();
             saveRequest.PlayerSettings.StartupFilter = TeensyFilterType.Music;
-            //saveRequest.ConnectionSettings.Serial.BaudRate = initialBaudRate; // Keep same
+            saveRequest.KnownDevices = initialSettings.Content.KnownDevices; // Keep existing devices
 
             // Act - Save
             var saveResponse = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(saveRequest);
@@ -306,7 +305,7 @@ namespace TeensyRom.Api.Tests.Integration
             // Assert - Verify changes
             getResponse.Should().BeSuccessful<GetSettingsResponse>();
             getResponse.Content.PlayerSettings.StartupFilter.Should().Be(TeensyFilterType.Music);
-            //getResponse.Content.ConnectionSettings.Serial.BaudRate.Should().Be(initialBaudRate);
+            getResponse.Content.KnownDevices.Count.Should().Be(initialDeviceCount);
         }
 
         //[Fact]

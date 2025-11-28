@@ -15,33 +15,23 @@
         <lib-action-button
           icon="play_circle"
           label="Player"
-          [variant]="activeSection() === 'player' ? 'raised' : 'stroked'"
-          [color]="activeSection() === 'player' ? 'primary' : 'normal'"
+          [color]="activeSection() === 'player' ? 'highlight' : 'normal'"
           (buttonClick)="setActiveSection('player')" />
         <lib-action-button
-          icon="videocam"
-          label="Video"
-          [variant]="activeSection() === 'video' ? 'raised' : 'stroked'"
-          [color]="activeSection() === 'video' ? 'primary' : 'normal'"
-          (buttonClick)="setActiveSection('video')" />
+          icon="devices"
+          label="Devices"
+          [color]="activeSection() === 'devices' ? 'highlight' : 'normal'"
+          (buttonClick)="setActiveSection('devices')" />
         <lib-action-button
           icon="folder"
           label="File Transfer"
-          [variant]="activeSection() === 'fileTransfer' ? 'raised' : 'stroked'"
-          [color]="activeSection() === 'fileTransfer' ? 'primary' : 'normal'"
+          [color]="activeSection() === 'fileTransfer' ? 'highlight' : 'normal'"
           (buttonClick)="setActiveSection('fileTransfer')" />
         <lib-action-button
           icon="search"
           label="Search"
-          [variant]="activeSection() === 'search' ? 'raised' : 'stroked'"
-          [color]="activeSection() === 'search' ? 'primary' : 'normal'"
+          [color]="activeSection() === 'search' ? 'highlight' : 'normal'"
           (buttonClick)="setActiveSection('search')" />
-        <lib-action-button
-          icon="settings_ethernet"
-          label="Connection"
-          [variant]="activeSection() === 'connection' ? 'raised' : 'stroked'"
-          [color]="activeSection() === 'connection' ? 'primary' : 'normal'"
-          (buttonClick)="setActiveSection('connection')" />
       </div>
     </lib-scaling-compact-card>
 
@@ -54,9 +44,9 @@
             [animationTrigger]="activeSection() === 'player'" />
         <!-- } -->
 
-        <lib-video-settings-section
-          [formGroup]="getVideoSettings()"
-          [animationTrigger]="activeSection() === 'video'" />
+        <lib-device-settings-section
+          [knownDevicesArray]="getKnownDevices()"
+          [animationTrigger]="activeSection() === 'devices'" />
 
         <lib-file-transfer-settings-section
           [formGroup]="getFileTransferSettings()"
@@ -65,10 +55,6 @@
         <lib-search-settings-section
           [formGroup]="getSearchSettings()"
           [animationTrigger]="activeSection() === 'search'" />
-
-        <lib-connection-settings-section
-          [formGroup]="getConnectionSettings()"
-          [animationTrigger]="activeSection() === 'connection'" />
       </div>
     </form>
 

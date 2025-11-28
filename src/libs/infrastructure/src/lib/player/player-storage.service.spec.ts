@@ -147,7 +147,7 @@ describe('PlayerStorageService', () => {
   });
 
   describe('load', () => {
-    it('should load and merge saved state with baseline', () => {
+    it('should load saved state and return DevicePlayerState with ephemeral fields reset', () => {
       const savedState = {
         deviceId: 'device-123',
         currentFile: {
@@ -200,51 +200,45 @@ describe('PlayerStorageService', () => {
 
       localStorageSpy.getItem.mockReturnValue(JSON.stringify(savedState));
 
-      const baselineState = createMockDeviceState('device-123');
-      const result = service.load('device-123', baselineState);
+      const result = service.load('device-123');
 
       // Persisted fields from saved state
-      expect(result.currentFile?.file.name).toBe('saved.sid');
-      expect(result.launchMode).toBe(LaunchMode.Directory);
-      expect(result.historyViewVisible).toBe(true);
-      expect(result.playTimerConfig.enabled).toBe(false);
+      expect(result).not.toBeNull();
+      expect(result!.currentFile?.file.name).toBe('saved.sid');
+      expect(result!.launchMode).toBe(LaunchMode.Directory);
+      expect(result!.historyViewVisible).toBe(true);
+      expect(result!.playTimerConfig.enabled).toBe(false);
 
-      // Ephemeral fields from baseline
-      expect(result.status).toBe(PlayerStatus.Playing);
-      expect(result.isLoading).toBe(false);
-      expect(result.error).toBe(null);
-      expect(result.timerState).toBe(null);
+      // Ephemeral fields are reset to defaults (not from any baseline)
+      expect(result!.status).toBe(PlayerStatus.Stopped);
+      expect(result!.isLoading).toBe(false);
+      expect(result!.error).toBe(null);
     });
 
-    it('should return baseline state when no saved state exists', () => {
+    it('should return null when no saved state exists', () => {
       localStorageSpy.getItem.mockReturnValue(null);
 
-      const baselineState = createMockDeviceState('device-123');
-      const result = service.load('device-123', baselineState);
+      const result = service.load('device-123');
 
-      expect(result).toBe(baselineState);
+      expect(result).toBeNull();
     });
 
-    it('should handle localStorage read errors gracefully', () => {
+    it('should return null on localStorage read errors', () => {
       localStorageSpy.getItem.mockImplementation(() => {
         throw new Error('Storage error');
       });
 
-      const baselineState = createMockDeviceState('device-123');
-      const result = service.load('device-123', baselineState);
+      const result = service.load('device-123');
 
-      // Should return baseline state on error
-      expect(result).toBe(baselineState);
+      expect(result).toBeNull();
     });
 
-    it('should handle malformed JSON gracefully', () => {
+    it('should return null on malformed JSON', () => {
       localStorageSpy.getItem.mockReturnValue('{ invalid json }');
 
-      const baselineState = createMockDeviceState('device-123');
-      const result = service.load('device-123', baselineState);
+      const result = service.load('device-123');
 
-      // Should return baseline state on parse error
-      expect(result).toBe(baselineState);
+      expect(result).toBeNull();
     });
   });
 
