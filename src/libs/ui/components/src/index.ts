@@ -28,6 +28,7 @@ export * from './lib/scrolling-marquee/scrolling-marquee.component';
 export * from './lib/storage-item/storage-item.component';
 export * from './lib/storage-item/storage-item-actions.component';
 export * from './lib/empty-state-message';
+export * from './lib/video-stream/video-stream.component';
 export * from './lib/shared/animation.types';
 export * from './lib/shared/animation-tokens';
 export * from './lib/shared/glassy.types';

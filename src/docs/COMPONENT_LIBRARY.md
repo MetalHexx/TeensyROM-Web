@@ -2518,6 +2518,69 @@ export class FileInfoComponent {
 
 - [`file-info.component.html`](../libs/features/player/src/lib/player-view/player-device-container/player-toolbar/file-info/file-info.component.html) - Media player file information display
 
+### `VideoStreamComponent`
+
+**Purpose**: A pure presentation component that displays a MediaStream in a video element with loading state management. Encapsulates video element lifecycle (autoplay, muted, srcObject binding) and provides a clean interface for displaying video streams without any store dependencies.
+
+**Selector**: `lib-video-stream`
+
+**Properties**:
+
+- `stream` (optional): `MediaStream | null` - The MediaStream to display in the video element - defaults to `null`
+- `objectFit` (optional): `'contain' | 'cover' | 'fill'` - CSS object-fit property for the video element - defaults to `'contain'`
+- `showLoadingState` (optional): `boolean` - Whether to show loading indicator when stream is null - defaults to `true`
+
+**Events**:
+
+- `streamReady`: `void` - Emits when video element starts playing
+- `streamError`: `ErrorEvent` - Emits when video element encounters an error
+
+**Usage Examples**:
+
+```html
+<!-- Basic usage - display a MediaStream -->
+<lib-video-stream [stream]="mediaStream"></lib-video-stream>
+
+<!-- Cover fit for fullscreen video -->
+<lib-video-stream
+  [stream]="captureStream"
+  [objectFit]="'cover'"
+  (streamReady)="onVideoStarted()"
+  (streamError)="onVideoError($event)"
+></lib-video-stream>
+
+<!-- Hide loading state (useful when parent handles loading UI) -->
+<lib-video-stream [stream]="webcamStream" [showLoadingState]="false"></lib-video-stream>
+
+<!-- Compose with CRT effects (Phase 3) -->
+<lib-crt-effect-wrapper [settings]="crtSettings">
+  <lib-video-stream [stream]="retroStream" [objectFit]="'contain'"></lib-video-stream>
+</lib-crt-effect-wrapper>
+```
+
+**Features**:
+
+- **Stream Lifecycle**: Automatically binds/unbinds MediaStream to video element via srcObject
+- **Autoplay Support**: Video element includes `autoplay`, `muted`, and `playsinline` attributes for browser autoplay policy compliance
+- **Loading State**: Optional loading overlay with animated text when no stream is available
+- **Event Emissions**: Notifies parent when video starts playing or encounters an error
+- **Accessibility**: Includes `aria-label` and `role="img"` for screen reader support
+
+**Visual Properties**:
+
+- Container fills parent (`width: 100%; height: 100%`)
+- Black background for letterboxing
+- Loading overlay with semi-transparent backdrop and pulsing text animation
+
+**Best Practice**: Use as the foundation for any video display in the application. The component handles null streams gracefully, making it safe for async stream acquisition scenarios. Compose with overlay containers and effect wrappers for advanced video UI.
+
+**Intended Use Cases**:
+
+- Video capture preview
+- Video dialog displays
+- Future video playback features
+- Any MediaStream-based video display
+
 ### `CycleImageComponent`
 
 **Purpose**: An advanced image carousel component that automatically cycles through multiple images with smooth fade transitions and optional blurred background effects. Supports multiple size variants from small thumbnails to large detail views.

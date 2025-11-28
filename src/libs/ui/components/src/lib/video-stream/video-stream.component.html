@@ -1,0 +1,19 @@
+<div class="video-stream-container">
+  <video
+    #videoElement
+    autoplay
+    muted
+    playsinline
+    [style.object-fit]="objectFit()"
+    (playing)="onVideoPlaying()"
+    (error)="onVideoError($event)"
+    aria-label="Video stream display"
+    role="img"
+  ></video>
+
+  @if (showLoading()) {
+    <div class="loading-overlay" aria-live="polite" aria-busy="true">
+      <span class="loading-text">Loading video...</span>
+    </div>
+  }
+</div>

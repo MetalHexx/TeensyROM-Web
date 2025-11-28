@@ -166,7 +166,7 @@ This allows:
 ## 📋 Implementation Phases
 
 <details>
-<summary><h3>Phase 1: Core Video Stream Component</h3></summary>
+<summary><h3>✅ Phase 1: Core Video Stream Component (COMPLETE)</h3></summary>
 
 ### Objective
 
@@ -174,11 +174,18 @@ Create the foundational `lib-video-stream` component that handles `MediaStream` 
 
 ### Key Deliverables
 
-- [ ] `lib-video-stream` component with `stream`, `objectFit`, `showLoadingState` inputs
-- [ ] `streamReady` and `streamError` outputs for lifecycle events
-- [ ] Loading state display when stream is null
-- [ ] Unit tests for all behaviors
-- [ ] Export from `libs/ui/components` barrel
+- [x] `lib-video-stream` component with `stream`, `objectFit`, `showLoadingState` inputs
+- [x] `streamReady` and `streamError` outputs for lifecycle events
+- [x] Loading state display when stream is null
+- [x] Unit tests for all behaviors (11 tests)
+- [x] Export from `libs/ui/components` barrel
+
+### Completion Notes
+
+- **Completed**: November 28, 2025
+- **Report**: [Phase 1 Report](./reports/phase-01-report.md)
+- **Tests**: 11 behavioral tests, all passing (268 total in ui-components)
+- **Key Pattern**: Uses `effect()` for reactive stream binding with `DestroyRef` cleanup
 
 ### Phase Documents
 
@@ -189,8 +196,8 @@ Create the foundational `lib-video-stream` component that handles `MediaStream` 
 
 ---
 
-<details>
-<summary><h3>Phase 2: CRT Effect Wrapper</h3></summary>
+<details open>
+<summary><h3>🔄 Phase 2: CRT Effect Wrapper (IN PROGRESS)</h3></summary>
 
 ### Objective
 
@@ -207,6 +214,7 @@ Extract CRT visual effects into a reusable CSS wrapper that can enhance any cont
 ### Phase Documents
 
 - [Phase Plan](./phases/phase-02-crt-effect-wrapper.md)
+- [Task Handoff](./tasks/phase-02-task-handoff.md)
 
 </details>
 
@@ -412,7 +420,10 @@ Phase 7 (Cleanup) ← production readiness ────────────�
 
 ## 📝 Notes
 
-**Phase 1 Ready**: [Task Handoff](./tasks/phase-01-task-handoff.md) is complete and ready for execution.
+**Phase 1 Complete**: `lib-video-stream` delivered with 11 tests. See [Phase 1 Report](./reports/phase-01-report.md).
 
-**Document Version**: 1.0  
-**Created**: 2025-11-28
+**Phase 2 Ready**: [Task Handoff](./tasks/phase-02-task-handoff.md) is ready for execution.
+
+**Document Version**: 1.1  
+**Created**: 2025-11-28  
+**Updated**: 2025-11-28 (Phase 1 complete)
