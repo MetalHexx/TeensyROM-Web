@@ -1349,6 +1349,47 @@ The application layout features a subtle animated synthwave-inspired background 
 
 ---
 
+## CRT Effect CSS Variables
+
+The `lib-crt-effect-wrapper` component exposes CSS custom properties that can be styled or inspected for debugging. These variables are set on the `.crt-wrapper` element.
+
+### Variable Reference
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `--scanline-intensity` | `0-1` | Opacity of scanline overlay. 0 = hidden |
+| `--scanline-thickness` | `px` | Height of dark scanline bands |
+| `--scanline-spacing` | `px` | Gap between scanline bands |
+| `--vignette-strength` | `0-2` | Edge/corner darkening intensity. 0 = hidden |
+| `--screen-curvature` | `px` | Border-radius for curved screen effect. 0 = flat |
+| `--crt-contrast` | `1+` | CSS filter contrast. 1 = no change |
+| `--crt-brightness` | `1+` | CSS filter brightness. 1 = no change |
+| `--crt-saturation` | `1+` | CSS filter saturation. 1 = no change |
+
+### Usage in Custom Styles
+
+While these variables are typically set by the component's `[settings]` input, they can be inspected or overridden for special cases:
+
+```scss
+// Override specific variable in parent context
+.my-container lib-crt-effect-wrapper {
+  .crt-wrapper {
+    --crt-brightness: 1.8; // Extra bright for this context
+  }
+}
+```
+
+### Transition Behavior
+
+All CRT effect variables transition smoothly over 300ms when the `[enabled]` input changes:
+- `border-radius` - screen curvature morphs smoothly
+- `filter` - color effects fade in/out
+- `opacity` - scanlines and vignette overlays fade in/out
+
+**See Also**: [CrtEffectWrapperComponent](./COMPONENT_LIBRARY.md#crteffectwrappercomponent) in Component Library
+
+---
+
 ## Related Files
 
 - **Main Styles**: `libs/ui/styles/src/lib/theme/styles.scss`

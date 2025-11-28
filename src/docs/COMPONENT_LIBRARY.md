@@ -2581,6 +2581,118 @@ export class FileInfoComponent {
 - Future video playback features
 - Any MediaStream-based video display
 
+### `CrtEffectWrapperComponent`
+
+**Purpose**: A pure presentation wrapper component that applies CRT (cathode ray tube) visual effects to any projected content via CSS custom properties. Encapsulates scanlines, vignette, screen curvature, and color filter effects without any store dependencies.
+
+**Selector**: `lib-crt-effect-wrapper`
+
+**Properties**:
+
+- `settings` (optional): `CrtSettings` - CRT effect configuration. Use `CRT_PRESETS` for common configurations or provide custom values. Defaults to `DEFAULT_CRT_SETTINGS` (full CRT experience).
+- `enabled` (optional): `boolean` - Whether CRT effects are applied. When false, content renders without effects with smooth transition. Defaults to `true`.
+
+**CrtSettings Interface**:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `scanlineIntensity` | `number` | Opacity of scanline overlay (0-1). Set to 0 to disable. |
+| `scanlineThickness` | `number` | Pixel height of dark scanline bands (typically 2-4px). |
+| `scanlineSpacing` | `number` | Pixel gap between scanline bands (typically 1-3px). |
+| `vignetteStrength` | `number` | Intensity of edge/corner darkening (0-2). Set to 0 to disable. |
+| `screenCurvature` | `number` | Border-radius in pixels for curved screen effect. Set to 0 for flat. |
+| `contrast` | `number` | CSS filter contrast multiplier. 1 = no change, >1 = increased. |
+| `brightness` | `number` | CSS filter brightness multiplier. 1 = no change, >1 = brighter. |
+| `saturation` | `number` | CSS filter saturation multiplier. 1 = no change, >1 = more saturated. |
+
+**Preset Configurations** (`CRT_PRESETS`):
+
+| Preset | Description | Use Case |
+|--------|-------------|----------|
+| `full` | All effects enabled (scanlines, vignette, curvature, color boost) | Video streams, terminal displays |
+| `filtersOnly` | Color enhancement only, no overlays or curvature | Images, screenshots |
+| `scanlines` | Scanlines + color, no vignette or curvature | Flat-screen retro aesthetic |
+| `none` | All effects neutral (pass-through) | Temporarily disable effects |
+
+**Usage Examples**:
+
+```html
+<!-- Full CRT effects on video -->
+<lib-crt-effect-wrapper [settings]="CRT_PRESETS.full" [enabled]="showCrt">
+  <lib-video-stream [stream]="mediaStream"></lib-video-stream>
+</lib-crt-effect-wrapper>
+
+<!-- Color enhancement only on images -->
+<lib-crt-effect-wrapper [settings]="CRT_PRESETS.filtersOnly">
+  <img [src]="screenshot" alt="Screenshot" />
+</lib-crt-effect-wrapper>
+
+<!-- Custom settings blend -->
+<lib-crt-effect-wrapper [settings]="{ ...CRT_PRESETS.scanlines, brightness: 1.2 }">
+  <lib-video-stream [stream]="retroStream"></lib-video-stream>
+</lib-crt-effect-wrapper>
+
+<!-- Toggle effects on/off -->
+<lib-crt-effect-wrapper [enabled]="crtEnabled()">
+  <div class="terminal-output">...</div>
+</lib-crt-effect-wrapper>
+```
+
+**TypeScript Import**:
+
+```typescript
+import {
+  CrtEffectWrapperComponent,
+  CrtSettings,
+  CRT_PRESETS,
+  DEFAULT_CRT_SETTINGS,
+} from '@teensyrom-nx/ui/components';
+```
+
+**Features**:
+
+- **Content Agnostic**: Wraps any projected content (video, images, text, etc.)
+- **Preset System**: Four pre-configured presets for common use cases
+- **Customizable**: Spread presets to override individual values
+- **Smooth Transitions**: 300ms CSS transitions for enable/disable toggle
+- **CSS-Only Effects**: All effects via pseudo-elements and CSS filters (no JS animation overhead)
+- **Effect Isolation**: Scanlines/vignette via ::before/::after, filters on content wrapper
+
+**CSS Custom Properties (for advanced styling)**:
+
+| Variable | Maps To |
+|----------|---------|
+| `--scanline-intensity` | `settings.scanlineIntensity` |
+| `--scanline-thickness` | `settings.scanlineThickness` (px) |
+| `--scanline-spacing` | `settings.scanlineSpacing` (px) |
+| `--vignette-strength` | `settings.vignetteStrength` |
+| `--screen-curvature` | `settings.screenCurvature` (px) |
+| `--crt-contrast` | `settings.contrast` |
+| `--crt-brightness` | `settings.brightness` |
+| `--crt-saturation` | `settings.saturation` |
+
+**Visual Properties**:
+
+- Container fills parent (`width: 100%; height: 100%`)
+- Scanlines: Repeating horizontal dark bands via CSS gradient
+- Vignette: Radial + linear gradients with blur for edge darkening
+- Screen Curvature: CSS border-radius with overflow hidden
+- Filters: CSS filter property on content wrapper
+
+**Best Practice**: Use presets for most scenarios - they cover the common CRT aesthetic needs. Only create custom settings when you need precise control. When effects don't make sense for content type (e.g., images in a gallery), use `CRT_PRESETS.filtersOnly` or `CRT_PRESETS.none`.
+
+**Intended Use Cases**:
+
+- Video dialog/capture displays (with full CRT)
+- Screenshot galleries (with filtersOnly)
+- Terminal/log output displays
+- Retro-themed UI elements
+- Any content needing vintage monitor aesthetics
+
+**Used In**:
+
+- [`video-dialog.component.html`](../libs/features/player/src/lib/player-view/player-device-container/video-capture/video-dialog/video-dialog.component.html) - Video capture dialog (future integration)
+
 ### `CycleImageComponent`
 
 **Purpose**: An advanced image carousel component that automatically cycles through multiple images with smooth fade transitions and optional blurred background effects. Supports multiple size variants from small thumbnails to large detail views.
