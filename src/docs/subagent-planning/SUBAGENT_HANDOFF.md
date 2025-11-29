@@ -37,13 +37,16 @@ The orchestrator must provide comprehensive task instructions including:
 
 #### 1. Task Identity
 ```markdown
-**Task ID**: [Unique identifier, e.g., "TASK-001-AUTH-STATE"]
+**Task ID**: [e.g., "USER-AUTH-TASK-01-001-AUTH-STATE"]
 **Task Name**: [Descriptive name of the task]
 **Assigned To**: [Backend Wizard | UI Wizard | UI Test Wizard]
 **Agent Chatmode**: [Path to chatmode file]
 **Priority**: [High/Medium/Low]
 **Estimated Context Size**: [Small/Medium/Large - helps with scope awareness]
 ```
+
+> **⚠️ NAMING CONVENTION**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete naming rules.
+> Pattern: `<PROJECT-NAME>-TASK-<##>-<###>-<NAME>` (e.g., `USER-AUTH-TASK-01-001-DOMAIN-MODELS`)
 
 #### 2. Objective
 ```markdown
@@ -164,8 +167,8 @@ The worker subagent is a skilled developer who can implement from architectural 
 - [Link to API documentation](./path/to/api-docs.md)
 
 **Related Tasks** (for context):
-- TASK-XXX: Brief description of related work
-- TASK-YYY: Brief description of dependent work
+- <PROJECT>-TASK-##-###-NAME: Brief description of related work
+- <PROJECT>-TASK-##-###-NAME: Brief description of dependent work
 
 **Reports from Previous Tasks** (if applicable):
 - Inline or attached reports from prior subagents
@@ -178,15 +181,17 @@ The worker subagent is a skilled developer who can implement from architectural 
 
 The orchestrator **must** specify the output location using the standardized project structure:
 
+> **⚠️ NAMING CONVENTION**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete naming rules.
+
 ```markdown
-**Output Report Location**: `docs/projects/[project-name]/reports/TASK-[##]-[###]-report.md`
+**Output Report Location**: `docs/projects/<PROJECT-NAME>/reports/<PROJECT-NAME>-TASK-<##>-<###>-REPORT.md`
 **Report Template**: Follow [SUBAGENT_REPORT.md](../../subagent-planning/SUBAGENT_REPORT.md)
 **Return Value**: File path of saved report
 ```
 
 **Example**:
 ```markdown
-**Output Report Location**: `docs/projects/feature-x/reports/TASK-02-003-report.md`
+**Output Report Location**: `docs/projects/FEATURE-X/reports/FEATURE-X-TASK-02-003-REPORT.md`
 ```
 
 ---
@@ -204,7 +209,7 @@ I am handing off the following task to a worker subagent:
 
 ### INPUT_DOC
 
-**Task ID**: TASK-02-003-DOMAIN-HANDLERS
+**Task ID**: FEATURE-X-TASK-02-003-DOMAIN-HANDLERS
 **Task Name**: Implement MediatR Command and Query Handlers
 **Assigned To**: Backend Wizard
 **Agent Chatmode**: `.github/chatmodes/Backend Wizard.chatmode.md`
@@ -226,8 +231,8 @@ I am handing off the following task to a worker subagent:
 ---
 
 **Prerequisites Completed**:
-- TASK-02-001: API contracts (DTOs) defined
-- TASK-02-002: Domain services implemented
+- FEATURE-X-TASK-02-001-API-CONTRACTS: API contracts (DTOs) defined
+- FEATURE-X-TASK-02-002-DOMAIN-SERVICES: Domain services implemented
 
 **Dependencies**:
 - `TeensyRom.Core` - Domain services and entities
@@ -327,25 +332,25 @@ I am handing off the following task to a worker subagent:
 ---
 
 **Related Documentation**:
-- [Master Plan](../master-plan.md#phase-2)
-- [Phase 2 Plan](../phases/phase-02-backend-api.md)
-- [API Contracts Task Report](../reports/TASK-02-001-report.md) - DTO definitions
-- [Domain Logic Task Report](../reports/TASK-02-002-report.md) - Service methods
+- [Master Plan](../FEATURE-X-MASTER-PLAN.md#phase-2)
+- [Phase 2 Plan](../phases/FEATURE-X-PHASE-02-BACKEND-API.md)
+- [API Contracts Task Report](../reports/FEATURE-X-TASK-02-001-REPORT.md) - DTO definitions
+- [Domain Logic Task Report](../reports/FEATURE-X-TASK-02-002-REPORT.md) - Service methods
 
 **Related Tasks**:
-- TASK-02-001: API contracts (completed) - defines request/response models
-- TASK-02-002: Domain logic (completed) - services handlers will call
-- TASK-02-004: API endpoints (pending) - will consume these handlers
+- FEATURE-X-TASK-02-001-API-CONTRACTS: API contracts (completed) - defines request/response models
+- FEATURE-X-TASK-02-002-DOMAIN-SERVICES: Domain logic (completed) - services handlers will call
+- FEATURE-X-TASK-02-004-API-ENDPOINTS: API endpoints (pending) - will consume these handlers
 
 ---
 
 ### OUTPUT_DOC
 
-**Output Report Location**: `docs/projects/feature-x/reports/TASK-02-003-report.md`
+**Output Report Location**: `docs/projects/FEATURE-X/reports/FEATURE-X-TASK-02-003-REPORT.md`
 
 **Report Template**: Follow the structure defined in [SUBAGENT_REPORT.md](../../../docs/subagent-planning/SUBAGENT_REPORT.md)
 
-**Return Value**: Return the file path when complete: `docs/projects/feature-x/reports/TASK-02-003-report.md`
+**Return Value**: Return the file path when complete: `docs/projects/FEATURE-X/reports/FEATURE-X-TASK-02-003-REPORT.md`
 
 ---
 

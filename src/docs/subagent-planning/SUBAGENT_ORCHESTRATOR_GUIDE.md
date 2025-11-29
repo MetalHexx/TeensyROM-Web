@@ -229,14 +229,16 @@ Create selector `enableVideoForDevice(deviceId: string)`:
 
 1. **Task Identity**
    ```markdown
-   **Task ID**: TASK-[Phase#]-[Sequence#]-[ShortName]
-   Example: TASK-02-001-HISTORY-STATE
+   **Task ID**: <PROJECT-NAME>-TASK-<##>-<###>-<NAME>
+   Example: USER-AUTH-TASK-02-001-HISTORY-STATE
    
    **Task Name**: [Clear, descriptive name]
    **Assigned To**: [Agent capability needed]
    **Priority**: [High/Medium/Low]
    **Estimated Context Size**: [Small/Medium/Large]
    ```
+   
+   > **⚠️ NAMING CONVENTION**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete naming rules.
 
 2. **Crystal Clear Objective**
    ```markdown
@@ -284,7 +286,7 @@ Create selector `enableVideoForDevice(deviceId: string)`:
 
 8. **Output Specification**
    ```markdown
-   **Output Report Location**: docs/reports/TASK-XX-XXX-report.md
+   **Output Report Location**: docs/projects/<PROJECT-NAME>/reports/<PROJECT-NAME>-TASK-##-###-REPORT.md
    **Report Template**: Follow SUBAGENT_REPORT.md
    ```
 
@@ -388,21 +390,21 @@ Choose the appropriate specialized agent for each task based on the work domain:
 ### Task Assignment Examples
 
 **Backend Tasks** → **Backend Wizard**:
-- TASK-01-001-API-CONTRACTS (Create DTOs and request/response models)
-- TASK-02-002-DOMAIN-SERVICES (Implement domain services with business logic)
-- TASK-02-003-MEDIATR-HANDLERS (Create command/query handlers)
-- TASK-02-004-API-ENDPOINTS (Build RadEndpoints)
+- <PROJECT>-TASK-01-001-API-CONTRACTS (Create DTOs and request/response models)
+- <PROJECT>-TASK-02-002-DOMAIN-SERVICES (Implement domain services with business logic)
+- <PROJECT>-TASK-02-003-MEDIATR-HANDLERS (Create command/query handlers)
+- <PROJECT>-TASK-02-004-API-ENDPOINTS (Build RadEndpoints)
 
 **Frontend Tasks** → **UI Wizard**:
-- TASK-03-001-USER-STORE (Create NgRx Signal Store)
-- TASK-04-001-PROFILE-COMPONENT (Build user profile component)
-- TASK-04-003-FORM-COMPONENT (Create reactive form component)
-- TASK-05-001-INTEGRATION (Wire components to state and routing)
+- <PROJECT>-TASK-03-001-USER-STORE (Create NgRx Signal Store)
+- <PROJECT>-TASK-04-001-PROFILE-COMPONENT (Build user profile component)
+- <PROJECT>-TASK-04-003-FORM-COMPONENT (Create reactive form component)
+- <PROJECT>-TASK-05-001-INTEGRATION (Wire components to state and routing)
 
 **Testing Tasks** → **UI Test Wizard**:
-- TASK-06-001-COMPONENT-TESTS (Write component unit tests)
-- TASK-06-002-E2E-TESTS (Create Cypress E2E test suite)
-- TASK-06-003-TEST-REFINEMENT (Fix failing tests and improve coverage)
+- <PROJECT>-TASK-06-001-COMPONENT-TESTS (Write component unit tests)
+- <PROJECT>-TASK-06-002-E2E-TESTS (Create Cypress E2E test suite)
+- <PROJECT>-TASK-06-003-TEST-REFINEMENT (Fix failing tests and improve coverage)
 
 **Full-Stack Tasks**: Break into separate backend and frontend tasks, assign to appropriate agents
 
@@ -413,7 +415,7 @@ Choose the appropriate specialized agent for each task based on the work domain:
 In each task handoff document, include:
 
 ```markdown
-**Task ID**: TASK-02-003-DOMAIN-HANDLERS
+**Task ID**: FEATURE-X-TASK-02-003-DOMAIN-HANDLERS
 **Task Name**: Implement MediatR Command and Query Handlers
 **Assigned To**: Backend Wizard
 **Agent Chatmode**: `.github/chatmodes/Backend Wizard.chatmode.md`
@@ -449,7 +451,7 @@ This ensures the orchestrator can:
 ### Template: Contract/Interface Task
 
 ```markdown
-**Task ID**: TASK-[Phase]-[Seq]-[Name]
+**Task ID**: <PROJECT-NAME>-TASK-<##>-<###>-<NAME>
 **Task Name**: Define [Domain] Interfaces and Types
 **Assigned To**: Backend Wizard
 **Agent Chatmode**: `.github/chatmodes/Backend Wizard.chatmode.md`
@@ -486,7 +488,7 @@ This ensures the orchestrator can:
 ### Template: State Management Task
 
 ```markdown
-**Task ID**: TASK-[Phase]-[Seq]-[Name]
+**Task ID**: <PROJECT-NAME>-TASK-<##>-<###>-<NAME>
 **Task Name**: Implement [Feature] State Management
 **Assigned To**: UI Wizard
 **Agent Chatmode**: `.github/chatmodes/UI Wizard.chatmode.md`
@@ -504,7 +506,7 @@ This ensures the orchestrator can:
 - [ ] Integration tests verify state transitions
 
 **Prerequisites**:
-- TASK-XXX: [Interface definitions] completed
+- <PROJECT>-TASK-##-###-<NAME>: [Interface definitions] completed
 
 **Files to Create**:
 - `libs/application/[feature]-store/[feature]-store.ts`
@@ -531,7 +533,7 @@ This ensures the orchestrator can:
 ### Template: Component Task
 
 ```markdown
-**Task ID**: TASK-[Phase]-[Seq]-[Name]
+**Task ID**: <PROJECT-NAME>-TASK-<##>-<###>-<NAME>
 **Task Name**: Create [ComponentName] Component
 **Assigned To**: UI Wizard
 **Agent Chatmode**: `.github/chatmodes/UI Wizard.chatmode.md`
@@ -549,8 +551,8 @@ This ensures the orchestrator can:
 - [ ] Accessibility requirements met
 
 **Prerequisites**:
-- TASK-XXX: [State management] completed
-- TASK-YYY: [Required services] completed
+- <PROJECT>-TASK-##-###-<NAME>: [State management] completed
+- <PROJECT>-TASK-##-###-<NAME>: [Required services] completed
 
 **Files to Create**:
 - `libs/features/[feature]/components/[name]/[name].component.ts`
@@ -578,7 +580,7 @@ This ensures the orchestrator can:
 ### Template: Integration Task
 
 ```markdown
-**Task ID**: TASK-[Phase]-[Seq]-[Name]
+**Task ID**: <PROJECT-NAME>-TASK-<##>-<###>-<NAME>
 **Task Name**: Integrate [Component/Feature] with [System]
 **Assigned To**: UI Wizard
 **Agent Chatmode**: `.github/chatmodes/UI Wizard.chatmode.md`
@@ -595,9 +597,9 @@ This ensures the orchestrator can:
 - [ ] Integration tests verify end-to-end flow
 
 **Prerequisites**:
-- TASK-XXX: [Component] completed
-- TASK-YYY: [State] completed
-- TASK-ZZZ: [Service] completed
+- <PROJECT>-TASK-##-###-<NAME>: [Component] completed
+- <PROJECT>-TASK-##-###-<NAME>: [State] completed
+- <PROJECT>-TASK-##-###-<NAME>: [Service] completed
 
 **Files to Modify**:
 - `libs/features/[feature]/[container].component.ts`
@@ -734,57 +736,57 @@ Before handing off any task, verify:
 
 ## 📊 Example: Full Project Decomposition
 
-### Project: Feature X (Generic Example)
+### Project: FEATURE-X (Generic Example)
 
-**Master Plan**: `docs/projects/feature-x/master-plan.md`
+**Master Plan**: `docs/projects/FEATURE-X/FEATURE-X-MASTER-PLAN.md`
 
 **Phase 1: Foundation (3 tasks)**
 ```
-TASK-01-001-DATA-MODELS     → Define domain interfaces and types
-TASK-01-002-CONFIGURATION   → Create configuration constants
-TASK-01-003-UTILITIES       → Build helper functions
+FEATURE-X-TASK-01-001-DATA-MODELS     → Define domain interfaces and types
+FEATURE-X-TASK-01-002-CONFIGURATION   → Create configuration constants
+FEATURE-X-TASK-01-003-UTILITIES       → Build helper functions
 ```
 
 **Phase 2: Backend API (4 tasks)**
 ```
-TASK-02-001-API-CONTRACTS   → Define DTOs and request/response models
-TASK-02-002-DOMAIN-LOGIC    → Implement domain services
-TASK-02-003-HANDLERS        → Create MediatR command/query handlers
-TASK-02-004-ENDPOINTS       → Build API endpoints
+FEATURE-X-TASK-02-001-API-CONTRACTS   → Define DTOs and request/response models
+FEATURE-X-TASK-02-002-DOMAIN-LOGIC    → Implement domain services
+FEATURE-X-TASK-02-003-HANDLERS        → Create MediatR command/query handlers
+FEATURE-X-TASK-02-004-ENDPOINTS       → Build API endpoints
 ```
 
 **Phase 3: Frontend State (3 tasks)**
 ```
-TASK-03-001-STORE-SETUP     → Create store structure
-TASK-03-002-ACTIONS         → Implement store actions
-TASK-03-003-SELECTORS       → Create selectors and computed state
+FEATURE-X-TASK-03-001-STORE-SETUP     → Create store structure
+FEATURE-X-TASK-03-002-ACTIONS         → Implement store actions
+FEATURE-X-TASK-03-003-SELECTORS       → Create selectors and computed state
 ```
 
 **Phase 4: UI Components (4 tasks)**
 ```
-TASK-04-001-LIST-COMPONENT      → Create list display component
-TASK-04-002-DETAIL-COMPONENT    → Create detail view component
-TASK-04-003-FORM-COMPONENT      → Create input form component
-TASK-04-004-CONTAINER           → Create smart container component
+FEATURE-X-TASK-04-001-LIST-COMPONENT      → Create list display component
+FEATURE-X-TASK-04-002-DETAIL-COMPONENT    → Create detail view component
+FEATURE-X-TASK-04-003-FORM-COMPONENT      → Create input form component
+FEATURE-X-TASK-04-004-CONTAINER           → Create smart container component
 ```
 
 **Phase 5: Integration (2 tasks)**
 ```
-TASK-05-001-WIRE-COMPONENTS → Connect components to store and API
-TASK-05-002-ADD-ROUTING     → Integrate with application routing
+FEATURE-X-TASK-05-001-WIRE-COMPONENTS → Connect components to store and API
+FEATURE-X-TASK-05-002-ADD-ROUTING     → Integrate with application routing
 ```
 
 **Phase 6: Testing & Polish (2 tasks)**
 ```
-TASK-06-001-E2E-TESTS       → Create Cypress end-to-end tests
-TASK-06-002-DOCUMENTATION   → Update user and developer documentation
+FEATURE-X-TASK-06-001-E2E-TESTS       → Create Cypress end-to-end tests
+FEATURE-X-TASK-06-002-DOCUMENTATION   → Update user and developer documentation
 ```
 
 **Total: 18 tasks across 6 phases**
 
 **Execution Strategy**:
 - Sequential within phases (avoid file conflicts)
-- Phase 3 can start after Phase 2 Task 4 completes (API contracts established)
+- Phase 3 can start after Phase 2 FEATURE-X-TASK-02-004-ENDPOINTS completes (API contracts established)
 - Phase 4 tasks can run in parallel (different component files)
 - Phase 5 waits for Phases 3 & 4 completion
 - Phase 6 runs after full integration

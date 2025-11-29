@@ -9,109 +9,134 @@
 Every subagent project MUST use this exact folder structure:
 
 ```
-docs/projects/<project-name>/
-├── master-plan.md
+docs/projects/<PROJECT-NAME>/
+├── <PROJECT-NAME>-MASTER-PLAN.md
 ├── phases/
-│   ├── phase-01-<name>.md
-│   ├── phase-02-<name>.md
+│   ├── <PROJECT-NAME>-PHASE-01-<NAME>.md
+│   ├── <PROJECT-NAME>-PHASE-02-<NAME>.md
 │   └── ...
 ├── tasks/
-│   ├── TASK-01-001-<NAME>.md
-│   ├── TASK-01-002-<NAME>.md
+│   ├── <PROJECT-NAME>-TASK-01-001-<NAME>.md
+│   ├── <PROJECT-NAME>-TASK-01-002-<NAME>.md
 │   └── ...
 └── reports/
-    ├── TASK-01-001-report.md
-    ├── TASK-01-002-report.md
+    ├── <PROJECT-NAME>-TASK-01-001-REPORT.md
+    ├── <PROJECT-NAME>-TASK-01-002-REPORT.md
     └── ...
 ```
 
 ---
 
-## 📐 Naming Conventions
+## 📐 Naming Convention Summary
 
-### Summary Table
+| Artifact       | Pattern                                    | Example                                        |
+| -------------- | ------------------------------------------ | ---------------------------------------------- |
+| Project Folder | `<PROJECT-NAME>/`                          | `USER-AUTH/`                                   |
+| Master Plan    | `<PROJECT-NAME>-MASTER-PLAN.md`            | `USER-AUTH-MASTER-PLAN.md`                     |
+| Phase Folder   | `phases/`                                  | `phases/`                                      |
+| Phase File     | `<PROJECT-NAME>-PHASE-<##>-<NAME>.md`      | `USER-AUTH-PHASE-01-FOUNDATION.md`             |
+| Tasks Folder   | `tasks/`                                   | `tasks/`                                       |
+| Task File      | `<PROJECT-NAME>-TASK-<##>-<###>-<NAME>.md` | `USER-AUTH-TASK-01-001-DOMAIN-MODELS.md`       |
+| Reports Folder | `reports/`                                 | `reports/`                                     |
+| Report File    | `<PROJECT-NAME>-TASK-<##>-<###>-REPORT.md` | `USER-AUTH-TASK-01-001-REPORT.md`              |
 
-| Artifact | Naming Convention | Example |
-|----------|-------------------|---------|
-| Project folder | `kebab-case` | `user-authentication` |
-| Master plan | `master-plan.md` (exact) | `master-plan.md` |
-| Phase folder | `phases` (exact) | `phases/` |
-| Phase file | `phase-<##>-<name>.md` | `phase-01-foundation.md` |
-| Tasks folder | `tasks` (exact) | `tasks/` |
-| Task file | `TASK-<##>-<###>-<NAME>.md` | `TASK-01-001-API-CONTRACTS.md` |
-| Reports folder | `reports` (exact) | `reports/` |
-| Report file | `TASK-<##>-<###>-report.md` | `TASK-01-001-report.md` |
+**ALL file and folder names use UPPER-KEBAB-CASE** (uppercase letters with hyphens).
 
 ---
 
 ## 📝 Detailed Rules
 
 ### Project Folder
-- **Convention**: `kebab-case` (lowercase with hyphens)
-- **Location**: `docs/projects/<project-name>/`
-- ✅ Valid: `user-authentication`, `device-manager`, `file-browser-v2`
-- ❌ Invalid: `UserAuthentication`, `user_auth`, `File Browser`
+
+- **Pattern**: `<PROJECT-NAME>/`
+- **Convention**: UPPER-KEBAB-CASE (uppercase with hyphens)
+- **Location**: `docs/projects/<PROJECT-NAME>/`
+- ✅ Valid: `USER-AUTH/`, `DEVICE-MANAGER/`, `FILE-BROWSER-V2/`
+- ❌ Invalid: `user-authentication/`, `UserAuthentication/`, `user_auth/`
 
 ### Master Plan
-- **Filename**: Always exactly `master-plan.md`
-- **Location**: `docs/projects/<project-name>/master-plan.md`
+
+- **Pattern**: `<PROJECT-NAME>-MASTER-PLAN.md`
+- **Location**: `docs/projects/<PROJECT-NAME>/<PROJECT-NAME>-MASTER-PLAN.md`
 - **Template**: Use [PLANNING_TEMPLATE.md](../PLANNING_TEMPLATE.md)
-- ❌ Never: `masterplan.md`, `plan.md`, `Master-Plan.md`
+- ✅ Valid: `USER-AUTH-MASTER-PLAN.md`, `DEVICE-MANAGER-MASTER-PLAN.md`
+- ❌ Invalid: `master-plan.md`, `MASTER-PLAN.md`, `UserAuth-Master-Plan.md`
 
 ### Phase Files
-- **Convention**: `phase-<##>-<name>.md`
+
+- **Pattern**: `<PROJECT-NAME>-PHASE-<##>-<NAME>.md`
+  - `<PROJECT-NAME>` = Project identifier in UPPER-KEBAB-CASE
   - `<##>` = 2-digit phase number, zero-padded (`01`, `02`, `10`)
-  - `<name>` = kebab-case descriptive name (lowercase)
-- **Location**: `docs/projects/<project-name>/phases/`
+  - `<NAME>` = UPPER-KEBAB-CASE descriptive name (2-4 words)
+- **Location**: `docs/projects/<PROJECT-NAME>/phases/`
 - **Template**: Use [PHASE_TEMPLATE.md](../PHASE_TEMPLATE.md)
-- ✅ Valid: `phase-01-foundation.md`, `phase-02-state-management.md`, `phase-10-final-polish.md`
-- ❌ Invalid: `Phase1.md`, `phase-1-foundation.md`, `phase-01-Foundation.md`
+- ✅ Valid: `USER-AUTH-PHASE-01-FOUNDATION.md`, `USER-AUTH-PHASE-02-STATE-MANAGEMENT.md`
+- ❌ Invalid: `PHASE-01-FOUNDATION.md`, `phase-01-foundation.md`, `USER-AUTH-Phase-01-Foundation.md`
 
 ### Task Files
-- **Convention**: `TASK-<##>-<###>-<NAME>.md`
-  - `TASK` = Literal uppercase prefix
+
+- **Pattern**: `<PROJECT-NAME>-TASK-<##>-<###>-<NAME>.md`
+  - `<PROJECT-NAME>` = Project identifier in UPPER-KEBAB-CASE
   - `<##>` = 2-digit phase number, zero-padded (`01`, `02`, `10`)
   - `<###>` = 3-digit sequence number, zero-padded (`001`, `002`, `010`)
   - `<NAME>` = UPPER-KEBAB-CASE short name (2-4 words)
-- **Location**: `docs/projects/<project-name>/tasks/`
+- **Location**: `docs/projects/<PROJECT-NAME>/tasks/`
 - **Template**: Use [SUBAGENT_HANDOFF.md](./SUBAGENT_HANDOFF.md)
-- ✅ Valid: `TASK-01-001-DOMAIN-MODELS.md`, `TASK-02-003-USER-STORE.md`, `TASK-10-015-FINAL-CLEANUP.md`
-- ❌ Invalid: `task-01-001-domain-models.md`, `TASK-1-1-Models.md`, `TASK-01-001.md`
+- ✅ Valid: `USER-AUTH-TASK-01-001-DOMAIN-MODELS.md`, `USER-AUTH-TASK-02-003-USER-STORE.md`
+- ❌ Invalid: `TASK-01-001-DOMAIN-MODELS.md`, `task-01-001-domain-models.md`
 
-### Task ID (used in content, not just filenames)
-- **Convention**: `TASK-<##>-<###>-<NAME>`
+### Task ID (In-Content References)
+
+- **Pattern**: `<PROJECT-NAME>-TASK-<##>-<###>-<NAME>`
 - Same rules as task filenames, without the `.md` extension
 - Use consistently in: task handoffs, reports, cross-references, master plan tracking
+- ✅ Valid: `USER-AUTH-TASK-01-001-DOMAIN-MODELS`
+- ❌ Invalid: `TASK-01-001-DOMAIN-MODELS`, `User-Auth-Task-01-001`
 
 ### Report Files
-- **Convention**: `TASK-<##>-<###>-report.md`
-  - Must match the corresponding task's phase and sequence numbers
-  - Always lowercase `report` suffix
-- **Location**: `docs/projects/<project-name>/reports/`
+
+- **Pattern**: `<PROJECT-NAME>-TASK-<##>-<###>-REPORT.md`
+  - Must match the corresponding task's project, phase, and sequence numbers
+  - Always ends with `-REPORT.md`
+- **Location**: `docs/projects/<PROJECT-NAME>/reports/`
 - **Template**: Use [SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md)
-- ✅ Valid: `TASK-01-001-report.md`, `TASK-02-003-report.md`
-- ❌ Invalid: `report-01-001.md`, `TASK-01-001-REPORT.md`, `task-01-001-report.md`
+- ✅ Valid: `USER-AUTH-TASK-01-001-REPORT.md`, `USER-AUTH-TASK-02-003-REPORT.md`
+- ❌ Invalid: `TASK-01-001-REPORT.md`, `USER-AUTH-TASK-01-001-report.md`
 
 ---
 
 ## 🔢 Numbering Rules
 
 ### Phase Numbers
+
 - Always 2 digits: `01`, `02`, `03`, ... `10`, `11`, ...
 - Never single digit: ~~`1`~~, ~~`2`~~
 - Start at `01` for each project
 
 ### Sequence Numbers
+
 - Always 3 digits: `001`, `002`, `003`, ... `010`, `011`, ... `100`
 - Never less than 3 digits: ~~`1`~~, ~~`01`~~
 - Restart at `001` for each phase (tasks are phase-scoped)
 
-### Examples by Phase
+### Complete Examples
 
 ```
-Phase 1 tasks:  TASK-01-001, TASK-01-002, TASK-01-003
-Phase 2 tasks:  TASK-02-001, TASK-02-002, TASK-02-003
-Phase 10 tasks: TASK-10-001, TASK-10-002, TASK-10-003
+Project: USER-AUTH
+
+Phase 1 Tasks:
+  USER-AUTH-TASK-01-001-DOMAIN-MODELS.md
+  USER-AUTH-TASK-01-002-API-CONTRACTS.md
+  USER-AUTH-TASK-01-003-VALIDATION.md
+
+Phase 2 Tasks:
+  USER-AUTH-TASK-02-001-USER-STORE.md
+  USER-AUTH-TASK-02-002-AUTH-SERVICE.md
+  USER-AUTH-TASK-02-003-TOKEN-REFRESH.md
+
+Phase 10 Tasks:
+  USER-AUTH-TASK-10-001-FINAL-CLEANUP.md
+  USER-AUTH-TASK-10-002-DOCUMENTATION.md
 ```
 
 ---
@@ -120,31 +145,32 @@ Phase 10 tasks: TASK-10-001, TASK-10-002, TASK-10-003
 
 Before creating any project artifact, verify:
 
-- [ ] Project folder uses `kebab-case`
-- [ ] Master plan is exactly `master-plan.md`
-- [ ] Phase files use `phase-##-<name>.md` format (lowercase name)
-- [ ] Task files use `TASK-##-###-<NAME>.md` format (UPPERCASE name)
-- [ ] Report files use `TASK-##-###-report.md` format
+- [ ] Project folder uses UPPER-KEBAB-CASE: `<PROJECT-NAME>/`
+- [ ] Master plan includes project name: `<PROJECT-NAME>-MASTER-PLAN.md`
+- [ ] Phase files include project name: `<PROJECT-NAME>-PHASE-##-<NAME>.md`
+- [ ] Task files include project name: `<PROJECT-NAME>-TASK-##-###-<NAME>.md`
+- [ ] Report files include project name: `<PROJECT-NAME>-TASK-##-###-REPORT.md`
+- [ ] ALL names are UPPER-KEBAB-CASE (no lowercase, no underscores)
 - [ ] All phase numbers are 2 digits (zero-padded)
 - [ ] All sequence numbers are 3 digits (zero-padded)
 - [ ] `phases/`, `tasks/`, and `reports/` folders all exist
 
 ---
 
-## 🔗 Cross-References
+## 🔗 Cross-Reference Examples
 
 When referencing files in documents, use consistent relative paths:
 
 ```markdown
 <!-- From a task file to other artifacts -->
-[Master Plan](../master-plan.md)
-[Phase 1 Plan](../phases/phase-01-foundation.md)
-[Previous Task](./TASK-01-001-DOMAIN-MODELS.md)
-[Task Report](../reports/TASK-01-001-report.md)
+[Master Plan](../USER-AUTH-MASTER-PLAN.md)
+[Phase 1 Plan](../phases/USER-AUTH-PHASE-01-FOUNDATION.md)
+[Previous Task](./USER-AUTH-TASK-01-001-DOMAIN-MODELS.md)
+[Task Report](../reports/USER-AUTH-TASK-01-001-REPORT.md)
 
 <!-- From master plan to phases -->
-[Phase 1: Foundation](./phases/phase-01-foundation.md)
-[Phase 2: State Management](./phases/phase-02-state-management.md)
+[Phase 1: Foundation](./phases/USER-AUTH-PHASE-01-FOUNDATION.md)
+[Phase 2: State Management](./phases/USER-AUTH-PHASE-02-STATE-MANAGEMENT.md)
 ```
 
 ---

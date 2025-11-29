@@ -19,7 +19,7 @@ Project: <Brief feature description>
 ```
 
 **What happens**:
-- ✅ Creates `docs/projects/<project-name>/` folder structure
+- ✅ Creates `docs/projects/<PROJECT-NAME>/` folder structure
 - ✅ Generates master plan (high-level overview)
 - ✅ Creates Phase 1 detailed plan
 - ✅ Creates first task handoff document
@@ -42,14 +42,21 @@ Repeat this loop until all tasks complete:
 
 **Command**:
 ```
-Execute task: #file:docs/projects/<project-name>/tasks/TASK-<##>-<###>-<NAME>.md
+Execute task: #file:docs/projects/<PROJECT-NAME>/tasks/<PROJECT-NAME>-TASK-<##>-<###>-<NAME>.md
 ```
+
+**Example**:
+```
+Execute task: #file:docs/projects/USER-AUTH/tasks/USER-AUTH-TASK-01-001-DOMAIN-MODELS.md
+```
+
+> **⚠️ NAMING CONVENTION**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete naming rules.
 
 **Worker does**:
 1. Reads task handoff document
 2. Implements changes to code files
 3. Writes tests
-4. Saves completion report to `reports/TASK-<##>-<###>-report.md`
+4. Saves completion report to `reports/<PROJECT-NAME>-TASK-<##>-<###>-REPORT.md`
 
 **You do**:
 1. ✅ Review code changes in VS Code
@@ -65,7 +72,7 @@ Execute task: #file:docs/projects/<project-name>/tasks/TASK-<##>-<###>-<NAME>.md
 **Command**:
 ```
 Follow instructions in .github/prompts/subagent-execute.prompt.md
-Project: <project-name>
+Project: <PROJECT-NAME>
 ```
 
 **Architect does**:
@@ -213,13 +220,18 @@ Session 10 (UI Wizard): Task 5 → 40 min
 ### "Agent seems confused about what to do"
 **Fix**: Provide the task handoff file directly:
 ```
-Execute task: #file:docs/projects/<project-name>/tasks/TASK-<##>-<###>-<NAME>.md
+Execute task: #file:docs/projects/<PROJECT-NAME>/tasks/<PROJECT-NAME>-TASK-<##>-<###>-<NAME>.md
+```
+
+**Example**:
+```
+Execute task: #file:docs/projects/USER-AUTH/tasks/USER-AUTH-TASK-01-001-DOMAIN-MODELS.md
 ```
 
 ### "Tests are failing"
 **Options**:
 1. Ask current worker to fix tests in same session
-2. Create separate TASK-XX-XXX-TEST-FIX handoff for UI Test Wizard
+2. Create separate `<PROJECT>-TASK-##-###-TEST-FIX` handoff for UI Test Wizard
 3. Review test expectations in task handoff
 
 ### "Code doesn't match standards"

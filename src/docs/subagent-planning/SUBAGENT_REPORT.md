@@ -1,13 +1,17 @@
 # Subagent Task Completion Report
 
+> **⚠️ NAMING CONVENTION**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete naming rules.
+> - Task ID Pattern: `<PROJECT-NAME>-TASK-<##>-<###>-<NAME>` (e.g., `USER-AUTH-TASK-01-001-DOMAIN-MODELS`)
+> - Report File Pattern: `<PROJECT-NAME>-TASK-<##>-<###>-REPORT.md` (e.g., `USER-AUTH-TASK-01-001-REPORT.md`)
+
 ## 📋 Report Metadata
 
-**Task ID**: [Copy from INPUT_DOC]  
+**Task ID**: [Copy from INPUT_DOC - e.g., USER-AUTH-TASK-01-001-DOMAIN-MODELS]  
 **Task Name**: [Copy from INPUT_DOC]  
 **Completed By**: [Worker agent identifier]  
 **Date Completed**: [ISO date]  
 **Execution Time**: [Approximate time spent]  
-**Report File**: [Path to this report file]  
+**Report File**: [Path to this report - e.g., docs/projects/USER-AUTH/reports/USER-AUTH-TASK-01-001-REPORT.md]  
 
 ---
 
@@ -297,7 +301,7 @@ interface ExampleInterface {
 ### Immediate Next Tasks
 1. **[Task Title]** - **PRIORITY**: [High/Medium/Low]
    - **Description**: [What should be done next]
-   - **Depends On**: This task (TASK-XXX)
+   - **Depends On**: This task (<PROJECT>-TASK-##-###-<NAME>)
    - **Estimated Size**: [Small/Medium/Large]
    - **Rationale**: [Why this should be next]
 
@@ -367,7 +371,7 @@ interface ExampleInterface {
 **Reason**: [Why or why not]
 
 ### Recommended Next Task
-**Task ID**: [Suggest next task ID]  
+**Task ID**: [Suggest next task ID - e.g., <PROJECT>-TASK-##-###-<NAME>]  
 **Task Name**: [Suggest descriptive name]  
 **Rationale**: [Why this should be next based on your work]
 
