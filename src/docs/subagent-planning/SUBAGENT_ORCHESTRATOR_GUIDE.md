@@ -1,5 +1,18 @@
 # Subagent Orchestrator Planning Guide
 
+> ## ⚠️ CRITICAL REMINDER FOR WORKER SUBAGENTS
+> 
+> **YOU MUST WRITE A COMPLETION REPORT WHEN YOUR TASK IS DONE.**
+> 
+> Before considering any task complete:
+> 1. **Create the report file** at the location specified in the task handoff (`docs/projects/<PROJECT-NAME>/reports/<TASK-ID>-REPORT.md`)
+> 2. **Follow the [SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md) template** exactly
+> 3. **Document all outcomes**: success criteria met, files changed, discoveries, blockers, and recommendations
+> 
+> **No report = incomplete task.** The orchestrator cannot proceed without your completion report.
+
+---
+
 ## 🎯 Purpose
 
 This guide teaches **Orchestrator Agents** how to use the Subagent Planning System to break down complex projects into manageable, well-sequenced tasks for worker subagents. This system maximizes productivity by ensuring tasks are:
