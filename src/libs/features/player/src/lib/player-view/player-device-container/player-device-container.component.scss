@@ -66,3 +66,16 @@
     flex: none;
   }
 }
+
+.crt-settings-overlay-fixed {
+  position: fixed;
+  top: 120px; // Below app header and some spacing
+  left: 1rem;
+  z-index: 9999;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  
+  // Remove any container constraints
+  width: auto;
+  max-width: none;
+}

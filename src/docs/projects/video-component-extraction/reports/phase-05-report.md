@@ -244,6 +244,74 @@ crtSettings = signal<CrtSettings>(DEFAULT_CRT_SETTINGS);
 
 ---
 
+## 🐛 Post-Implementation Fixes
+
+### Fix 1: CSS Transition Syntax Error
+
+**Issue**: Overlay animations not working - `calc(var(--transition-ms) * 1ms)` syntax invalid  
+**Root Cause**: CSS calc() cannot convert unitless number to time unit  
+**Solution**: Changed to direct time values (`250ms`, `300ms`) with cubic-bezier easing curves  
+**Impact**: Smooth fade/slide animations now work correctly  
+**Lesson**: Use CSS custom properties for colors/sizes, not computed time values
+
+### Fix 2: Blur Artifact When Panel Hidden
+
+**Issue**: Ghost blur effect remained visible when CRT settings panel was hidden  
+**Root Cause**: `backdrop-filter` applied to empty overlay slot position  
+**Solution**: Removed backdrop-filter from overlay-container; child components provide their own  
+**Impact**: No visual artifacts when overlays are hidden  
+**Lesson**: Apply backdrop-filter to actual content elements, not empty positioned containers
+
+### Fix 3: Bottom Toolbar Constrained Width
+
+**Issue**: Player toolbar was centered with `max-width: 90%` instead of full width  
+**Root Cause**: Top overlay styling pattern (centered, constrained) copied to bottom  
+**Solution**: Changed bottom-overlay to `left: 0; right: 0; width: 100%; bottom: 0;` with translateY slide  
+**Impact**: Player toolbar now spans full width like a proper toolbar  
+**Lesson**: Different overlay positions need different layout strategies (centered vs full-width)
+
+### Fix 4: Video Aspect Ratio Cropping
+
+**Issue**: 4:3 video appeared "zoomed in" with edges cropped  
+**Root Cause**: `objectFit: 'cover'` was filling container by cropping video  
+**Solution**: Changed to `objectFit: 'contain'` for proper letterboxing/pillarboxing  
+**Impact**: Full video visible with black bars as needed  
+**Lesson**: Use `contain` for video players to preserve full frame; `cover` for backgrounds
+
+### Fix 5: CRT Effects Extend Beyond Video in Fullscreen
+
+**Issue**: Screen curvature and vignette effects extended to black letterbox/pillarbox bars  
+**Root Cause**: Effects applied to full container, not just visible 4:3 video area  
+**Solution**: Added `contentAspectRatio` input to CRT wrapper with computed `clip-path` calculation  
+**Implementation**:
+```typescript
+readonly contentAspectRatio = input<number | null>(null);
+protected readonly clipPath = computed(() => {
+  // Calculate visible area based on aspect ratio
+  // Returns: `inset(topPct% rightPct% bottomPct% leftPct% round curvaturepx)`
+});
+```
+**Impact**: CRT effects now properly constrain to visible video area only  
+**Lesson**: When applying visual effects, calculate visible content area dynamically based on aspect ratios
+
+### Fix 6: Filter Toolbar Top Margin Mismatch
+
+**Issue**: Filter toolbar had visually larger top margin than left/right controls  
+**Root Cause**: Component-level padding/margin not accounted for in overlay positioning  
+**Solution**: Added `::ng-deep lib-filter-toolbar[topOverlay] { margin-top: -8px; }` to video-dialog SCSS  
+**Impact**: Consistent visual spacing across all overlay positions  
+**Lesson**: Component-specific spacing adjustments better than modifying shared component CSS
+
+### Fix 7: Black Bars in Non-Fullscreen Dialog
+
+**Issue**: Tiny black vertical bars visible on sides in non-fullscreen dialog view  
+**Root Cause**: Video-stream's black background showing through sub-pixel gaps with `objectFit: contain`  
+**Solution**: Added `::ng-deep lib-video-stream .video-stream-container { background-color: transparent; }` to video-dialog SCSS  
+**Impact**: Sub-pixel gaps now show dialog backdrop instead of black bars  
+**Lesson**: Make container backgrounds transparent when content uses `contain` to avoid artifact visibility
+
+---
+
 ## 📊 Metrics
 
 ### Code Reduction
@@ -274,6 +342,8 @@ crtSettings = signal<CrtSettings>(DEFAULT_CRT_SETTINGS);
 1. **Remove lib-filter-toolbar dependency** - May not be needed in video dialog
 2. **Add keyboard shortcuts** - Arrow keys for settings, Escape for close
 3. **Persist CRT settings** - Store user preferences in localStorage
+4. **Dynamic aspect ratio detection** - Auto-detect video aspect ratio instead of hardcoding 4/3
+5. **Adaptive objectFit** - Use `cover` in sized dialogs, `contain` in fullscreen automatically
 
 ---
 
@@ -285,6 +355,17 @@ crtSettings = signal<CrtSettings>(DEFAULT_CRT_SETTINGS);
 - Settings panel uses same config model ensuring UI/effect consistency
 - Test file can serve as documentation for component behavior
 - Material Dialog overrides are necessary for fullscreen behavior
+- **CRT clip-path solution**: Pass `contentAspectRatio` to wrapper for proper effect containment
+- **Component-specific adjustments**: Use ::ng-deep in consumer SCSS for positioning tweaks rather than modifying shared components
+- **Background transparency**: Use transparent backgrounds on containers when content uses `objectFit: contain`
+
+**Critical Patterns from Post-Implementation**:
+1. **CSS transitions**: Use direct time values, not calc() with custom properties
+2. **Backdrop effects**: Apply to content elements, not empty positioned containers  
+3. **Toolbar layouts**: Full-width toolbars need different positioning than centered overlays
+4. **Video display**: Use `contain` for players, `cover` for backgrounds
+5. **Effect clipping**: Calculate visible content area based on aspect ratios
+6. **Sub-pixel gaps**: Transparent container backgrounds prevent black artifact visibility
 
 **Configuration Reference**:
 ```typescript

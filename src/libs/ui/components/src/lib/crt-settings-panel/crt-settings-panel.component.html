@@ -1,10 +1,13 @@
-<lib-compact-card-layout cardClass="glassy-card crt-controls-card">
+<lib-compact-card-layout
+  [cardClass]="'glassy-card crt-controls-card ' + cardClass()"
+  [enableOverflow]="true"
+>
   <!-- Header with preset menu and reset button -->
   <div class="crt-card-header">
     <span class="header-title">CRT Effect</span>
     <div class="header-actions">
       <!-- Preset menu button -->
-      <lib-dropdown-menu #presetDropdown>
+      <!-- <lib-dropdown-menu #presetDropdown>
         <lib-icon-button
           icon="tune"
           ariaLabel="Select preset"
@@ -21,7 +24,7 @@
             </lib-dropdown-menu-item>
           }
         </div>
-      </lib-dropdown-menu>
+      </lib-dropdown-menu> -->
 
       <!-- Reset button -->
       <lib-icon-button

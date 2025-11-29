@@ -166,8 +166,6 @@ const COLOR_FILTER_SLIDERS: SliderConfig[] = [
     MatTooltipModule,
     CompactCardLayoutComponent,
     IconButtonComponent,
-    DropdownMenuComponent,
-    DropdownMenuItemComponent,
   ],
   templateUrl: './crt-settings-panel.component.html',
   styleUrl: './crt-settings-panel.component.scss',
@@ -195,6 +193,12 @@ export class CrtSettingsPanelComponent {
    * When false, panel can be hidden/animated out by parent.
    */
   readonly visible = input<boolean>(true);
+
+  /**
+   * Optional additional CSS class(es) forwarded to the inner compact card.
+   * Useful for consumers that need to style the panel card externally.
+   */
+  readonly cardClass = input<string>('');
 
   // ─────────────────────────────────────────────────────────────────────────
   // Outputs
@@ -228,7 +232,7 @@ export class CrtSettingsPanelComponent {
   protected readonly colorFilterSliders = COLOR_FILTER_SLIDERS;
 
   /** Available preset names for the preset menu */
-  protected readonly presetNames: CrtPresetName[] = ['full', 'scanlines', 'filtersOnly', 'none'];
+  protected readonly presetNames: CrtPresetName[] = ['full', 'standard', 'small', 'none'];
 
   // ─────────────────────────────────────────────────────────────────────────
   // Computed Properties
@@ -288,8 +292,8 @@ export class CrtSettingsPanelComponent {
   protected getPresetLabel(presetName: CrtPresetName): string {
     const labels: Record<CrtPresetName, string> = {
       full: 'Full CRT',
-      scanlines: 'Scanlines Only',
-      filtersOnly: 'Color Filters Only',
+      standard: 'Standard CRT',
+      small: 'Small CRT',
       none: 'No Effects',
     };
     return labels[presetName];

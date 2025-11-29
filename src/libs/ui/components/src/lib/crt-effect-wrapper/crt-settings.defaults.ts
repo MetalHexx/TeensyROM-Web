@@ -18,8 +18,8 @@ export const DEFAULT_CRT_CONFIG: CrtSettingsConfig = {
  * @example
  * ```typescript
  * // Use matching config with preset
- * <lib-crt-effect-wrapper [settings]="CRT_PRESETS.scanlines" [config]="CRT_CONFIGS.scanlines">
- * <lib-crt-settings-panel [settings]="settings()" [config]="CRT_CONFIGS.scanlines">
+ * <lib-crt-effect-wrapper [settings]="CRT_PRESETS.standard" [config]="CRT_CONFIGS.standard">
+ * <lib-crt-settings-panel [settings]="settings()" [config]="CRT_CONFIGS.standard">
  * ```
  */
 export const CRT_CONFIGS = {
@@ -34,21 +34,23 @@ export const CRT_CONFIGS = {
   },
 
   /**
-   * Color filters only - hides scanline, vignette, and curvature controls.
+   * Standard CRT - scanlines, vignette, and color filters (no curvature).
+   * Good for embedded previews where screen curvature isn't desired.
    */
-  filtersOnly: {
-    showScanlines: false,
-    showVignette: false,
+  standard: {
+    showScanlines: true,
+    showVignette: true,
     showCurvature: false,
     showColorFilters: true,
   },
 
   /**
-   * Scanlines + color filters - hides vignette and curvature controls.
+   * Small CRT - subtle scanlines for compact displays.
+   * Minimal scanline thickness for smaller video components.
    */
-  scanlines: {
+  small: {
     showScanlines: true,
-    showVignette: false,
+    showVignette: true,
     showCurvature: false,
     showColorFilters: true,
   },
@@ -93,14 +95,14 @@ export const CRT_PRESETS = {
   },
 
   /**
-   * Color enhancement only - no overlays or curvature.
-   * Best for images or content where scanlines/vignette don't make sense.
+   * Standard CRT - scanlines, vignette, and color enhancement (no curvature).
+   * Good for embedded previews where flat-screen aesthetic is preferred.
    */
-  filtersOnly: {
-    scanlineIntensity: 0,
-    scanlineThickness: 0,
-    scanlineSpacing: 0,
-    vignetteStrength: 0,
+  standard: {
+    scanlineIntensity: 0.5,
+    scanlineThickness: 3,
+    scanlineSpacing: 2,
+    vignetteStrength: 1.3,
     screenCurvature: 0,
     contrast: 1.1,
     brightness: 1.5,
@@ -108,18 +110,18 @@ export const CRT_PRESETS = {
   },
 
   /**
-   * Scanlines + color enhancement - no vignette or curvature.
-   * Good for flat-screen retro aesthetic without the curved monitor look.
+   * Small CRT - subtle scanlines for compact video displays.
+   * Minimal scanline thickness (1px) for smaller video components.
    */
-  scanlines: {
+  small: {
     scanlineIntensity: 0.5,
-    scanlineThickness: 3,
-    scanlineSpacing: 2,
-    vignetteStrength: 0,
+    scanlineThickness: 1,
+    scanlineSpacing: 1,
+    vignetteStrength: 1.5,
     screenCurvature: 0,
-    contrast: 1.1,
+    contrast: 1.05,
     brightness: 1.5,
-    saturation: 1.3,
+    saturation: 1.25,
   },
 
   /**

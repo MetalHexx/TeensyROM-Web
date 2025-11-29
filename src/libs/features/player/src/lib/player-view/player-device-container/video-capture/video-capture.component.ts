@@ -1,9 +1,20 @@
-import { Component, computed, signal, viewChild, ElementRef, OnDestroy, inject, input } from '@angular/core';
+import { Component, computed, signal, OnDestroy, inject, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatDialog } from '@angular/material/dialog';
-import { ScalingCompactCardComponent, IconButtonComponent } from '@teensyrom-nx/ui/components';
+import {
+  VideoStreamComponent,
+  ContentOverlayContainerComponent,
+  CrtEffectWrapperComponent,
+  CrtSettingsPanelComponent,
+  CompactCardLayoutComponent,
+  IconButtonComponent,
+  ScalingCompactCardComponent,
+  CRT_CONFIGS,
+  CRT_PRESETS,
+  CrtSettings,
+} from '@teensyrom-nx/ui/components';
 import { VideoDialogComponent } from './video-dialog/video-dialog.component';
 import { SettingsStore } from '@teensyrom-nx/application';
 
@@ -14,7 +25,18 @@ interface VideoDevice {
 
 @Component({
   selector: 'lib-video-capture',
-  imports: [CommonModule, ScalingCompactCardComponent, IconButtonComponent, MatSelectModule, MatFormFieldModule],
+  imports: [
+    CommonModule,
+    VideoStreamComponent,
+    ContentOverlayContainerComponent,
+    CrtEffectWrapperComponent,
+    CrtSettingsPanelComponent,
+    CompactCardLayoutComponent,
+    IconButtonComponent,
+    ScalingCompactCardComponent,
+    MatSelectModule,
+    MatFormFieldModule,
+  ],
   templateUrl: './video-capture.component.html',
   styleUrl: './video-capture.component.scss',
 })
@@ -24,14 +46,21 @@ export class VideoCaptureComponent implements OnDestroy {
   
   deviceId = input.required<string>();
 
+  // CRT configuration - small preset (subtle scanlines for compact display)
+  readonly crtConfig = CRT_CONFIGS.small;
+
+  // CRT state signals
+  protected readonly isCrtEnabled = signal<boolean>(true);
+  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS.small);
+  protected readonly showCrtControls = signal<boolean>(false);
+  protected readonly isDeviceSelectorOpen = signal<boolean>(false);
+  protected readonly showDeviceSelector = signal<boolean>(false);
+
   // Signals for reactive state
   private videoDevices = signal<VideoDevice[]>([]);
   private selectedDeviceId = signal<string | null>(null);
-  private currentStream = signal<MediaStream | null>(null);
+  protected readonly currentStream = signal<MediaStream | null>(null);
   private permissionDenied = signal<boolean>(false);
-
-  // ViewChild for video element
-  private videoElement = viewChild<ElementRef<HTMLVideoElement>>('videoElement');
 
   // Computed signals
   devices = computed(() => this.videoDevices());
@@ -43,6 +72,10 @@ export class VideoCaptureComponent implements OnDestroy {
   constructor() {
     // Initialize device enumeration on component creation
     this.enumerateVideoDevices();
+  }
+
+  protected onDeviceSelectorOpenedChange(isOpen: boolean): void {
+    this.isDeviceSelectorOpen.set(isOpen);
   }
 
   /**
@@ -150,30 +183,6 @@ export class VideoCaptureComponent implements OnDestroy {
       console.log('🎥 Video track ready state:', videoTrack?.readyState);
       
       this.currentStream.set(stream);
-
-      // Attach stream to video element
-      const videoEl = this.videoElement()?.nativeElement;
-      if (videoEl) {
-        console.log('🎥 Video element found, attaching stream...');
-        videoEl.srcObject = stream;
-        console.log('🎥 Stream attached to video element');
-        console.log('🎥 Video element dimensions:', videoEl.videoWidth, 'x', videoEl.videoHeight);
-        
-        // Wait for metadata and play
-        videoEl.onloadedmetadata = () => {
-          console.log('🎥 Metadata loaded, dimensions:', videoEl.videoWidth, 'x', videoEl.videoHeight);
-        };
-        
-        // Force play (some browsers need this)
-        const playPromise = videoEl.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => console.log('🎥 Video playing successfully'))
-            .catch(err => console.error('🎥 Play error:', err));
-        }
-      } else {
-        console.error('🎥 Video element not found!');
-      }
     } catch (error) {
       console.error('🎥 Failed to switch video device:', error);
       console.error('🎥 Error details:', JSON.stringify(error, null, 2));
@@ -209,7 +218,7 @@ export class VideoCaptureComponent implements OnDestroy {
 
     const deviceLabel = this.devices().find(d => d.deviceId === this.selectedDeviceId())?.label || 'Video Capture';
 
-    const dialogRef = this.dialog.open(VideoDialogComponent, {
+    this.dialog.open(VideoDialogComponent, {
       data: { stream, deviceLabel, deviceId: this.deviceId() },
       width: '85vw',
       height: '85vh',
@@ -217,16 +226,48 @@ export class VideoCaptureComponent implements OnDestroy {
       maxHeight: '900px',
       panelClass: 'video-dialog-fullscreen',
     });
+  }
 
-    // Reattach stream to main video element when dialog closes
-    dialogRef.afterClosed().subscribe(() => {
-      const videoEl = this.videoElement()?.nativeElement;
-      if (videoEl && stream) {
-        videoEl.srcObject = stream;
-        videoEl.play().catch(err => console.error('🎥 Reattach play error:', err));
-        console.log('🎥 Stream reattached to main video element');
-      }
-    });
+  /**
+   * Toggle CRT effect on/off
+   */
+  toggleCrtEffect(): void {
+    this.isCrtEnabled.update(enabled => !enabled);
+  }
+
+  /**
+   * Toggle CRT controls panel visibility
+   */
+  toggleCrtControls(): void {
+    this.showCrtControls.update(show => !show);
+  }
+
+  /**
+   * Toggle device selector visibility
+   */
+  toggleDeviceSelector(): void {
+    this.showDeviceSelector.update(show => !show);
+  }
+
+  /**
+   * Handle CRT settings changes from settings panel
+   */
+  onCrtSettingsChange(settings: CrtSettings): void {
+    this.crtSettings.set(settings);
+  }
+
+  /**
+   * Reset CRT settings to default preset
+   */
+  onCrtReset(): void {
+    this.crtSettings.set(CRT_PRESETS.small);
+  }
+
+  /**
+   * Apply a CRT preset
+   */
+  onCrtPresetSelected(presetName: keyof typeof CRT_PRESETS): void {
+    this.crtSettings.set(CRT_PRESETS[presetName]);
   }
 
   /**

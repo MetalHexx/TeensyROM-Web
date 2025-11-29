@@ -112,4 +112,12 @@ describe('CompactCardLayoutComponent', () => {
     expect(compiled.querySelector('.child2')).toBeTruthy();
     expect(compiled.querySelector('.child3')).toBeTruthy();
   });
+
+  it('should apply custom class provided via cardClass input', () => {
+    fixture.componentRef.setInput('cardClass', 'my-custom-class');
+    fixture.detectChanges();
+
+    const matCard = fixture.nativeElement.querySelector('mat-card') as HTMLElement;
+    expect(matCard.classList.contains('my-custom-class')).toBe(true);
+  });
 });

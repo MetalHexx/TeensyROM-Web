@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ComponentRef } from '@angular/core';
+import { ComponentRef, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { VideoCaptureComponent } from './video-capture.component';
 import { SETTINGS_SERVICE, ISettingsService } from '@teensyrom-nx/domain';
@@ -16,6 +16,8 @@ import { of } from 'rxjs';
  * 1. Component creation and basic structure
  * 2. Device enumeration mechanics (mocked navigator.mediaDevices)
  * 3. Device selection UI behavior
+ * 4. CRT effect state management
+ * 5. Composed component integration
  * 
  * The store persistence behavior is verified via:
  * - Action unit tests in settings/actions/update-device-video-device-id.spec.ts
@@ -130,6 +132,7 @@ describe('VideoCaptureComponent', () => {
         { provide: MatDialog, useValue: mockDialog },
         { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
       ],
+      schemas: [CUSTOM_ELEMENTS_SCHEMA], // For shallow testing of composed components
     }).compileComponents();
   }
 
@@ -238,6 +241,99 @@ describe('VideoCaptureComponent', () => {
       
       // Before any async operations, hasStream should be false
       expect(component.hasStream()).toBe(false);
+    });
+  });
+
+  describe('CRT effects', () => {
+    it('should have CRT enabled by default', async () => {
+      await setupTestBed([
+        { deviceId: 'cam-123', label: 'Front Camera' },
+      ]);
+      await createComponent('teensy-device-1');
+
+      expect(component['isCrtEnabled']()).toBe(true);
+    });
+
+    it('should toggle CRT effect when toggleCrtEffect is called', async () => {
+      await setupTestBed([
+        { deviceId: 'cam-123', label: 'Front Camera' },
+      ]);
+      await createComponent('teensy-device-1');
+
+      const initialState = component['isCrtEnabled']();
+      component.toggleCrtEffect();
+      expect(component['isCrtEnabled']()).toBe(!initialState);
+    });
+
+    it('should toggle CRT controls panel visibility', async () => {
+      await setupTestBed([
+        { deviceId: 'cam-123', label: 'Front Camera' },
+      ]);
+      await createComponent('teensy-device-1');
+
+      expect(component['showCrtControls']()).toBe(false);
+      component.toggleCrtControls();
+      expect(component['showCrtControls']()).toBe(true);
+    });
+
+    it('should update CRT settings when onCrtSettingsChange is called', async () => {
+      await setupTestBed([
+        { deviceId: 'cam-123', label: 'Front Camera' },
+      ]);
+      await createComponent('teensy-device-1');
+
+      const newSettings = {
+        scanlineIntensity: 0.7,
+        scanlineThickness: 4,
+        scanlineSpacing: 3,
+        vignetteStrength: 1.5,
+        screenCurvature: 0,
+        contrast: 1.2,
+        brightness: 1.6,
+        saturation: 1.4,
+      };
+
+      component.onCrtSettingsChange(newSettings);
+      expect(component['crtSettings']()).toEqual(newSettings);
+    });
+
+    it('should reset CRT settings to standard preset', async () => {
+      await setupTestBed([
+        { deviceId: 'cam-123', label: 'Front Camera' },
+      ]);
+      await createComponent('teensy-device-1');
+
+      // Change settings first
+      component.onCrtSettingsChange({
+        scanlineIntensity: 0.9,
+        scanlineThickness: 5,
+        scanlineSpacing: 4,
+        vignetteStrength: 2.0,
+        screenCurvature: 0,
+        contrast: 1.5,
+        brightness: 2.0,
+        saturation: 2.0,
+      });
+
+      // Reset should restore small preset (current default)
+      component.onCrtReset();
+      const settings = component['crtSettings']();
+      expect(settings.scanlineIntensity).toBe(0.5);
+      expect(settings.vignetteStrength).toBe(1.5);
+    });
+  });
+
+  describe('composed components', () => {
+    it('should use standard CRT config', async () => {
+      await setupTestBed([
+        { deviceId: 'cam-123', label: 'Front Camera' },
+      ]);
+      await createComponent('teensy-device-1');
+
+      expect(component.crtConfig).toBeDefined();
+      expect(component.crtConfig.showScanlines).toBe(true);
+      expect(component.crtConfig.showVignette).toBe(true);
+      expect(component.crtConfig.showCurvature).toBe(false);
     });
   });
 });

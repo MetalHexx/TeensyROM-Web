@@ -1,51 +1,113 @@
-<lib-scaling-compact-card [enableOverflow]="true">
-  <div class="video-wrapper">
-    @if (hasDevices() && !isPermissionDenied()) {
-      <!-- Device Selection Dropdown -->
-      <div class="device-selector">
-        <mat-form-field appearance="outline">
-          <mat-label>Video Device</mat-label>
-          <mat-select 
-            [value]="selectedDevice()"
-            (selectionChange)="onDeviceSelected($event.value)"
-          >
-            @for (device of devices(); track device.deviceId) {
-              <mat-option [value]="device.deviceId">
-                {{ device.label }}
-              </mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-      </div>
+@if (hasDevices() && !isPermissionDenied()) {
+  <div class="video-container">
+    <div class="video-with-settings-wrapper">
+      <lib-scaling-compact-card [enableOverflow]="true">
+      <lib-content-overlay-container [showOverlaysOnHover]="!isDeviceSelectorOpen()">
+        <!-- Content slot: CRT wrapper around video stream -->
+        <ng-container content>
+          <lib-crt-effect-wrapper
+            [settings]="crtSettings()"
+            [config]="crtConfig"
+            [enabled]="isCrtEnabled()">
+            <lib-video-stream 
+              [stream]="currentStream()" 
+              [objectFit]="'contain'">
+            </lib-video-stream>
+          </lib-crt-effect-wrapper>
+        </ng-container>
 
-      <!-- Maximize button -->
-      <div class="maximize-button">
-        <lib-icon-button
-          icon="fullscreen"
-          ariaLabel="Open in dialog"
-          variant="rounded-transparent"
-          (buttonClick)="openVideoDialog()"
-        >
-        </lib-icon-button>
-      </div>
+        <ng-template #deviceSelectorTemplate>
+          <lib-compact-card-layout cardClass="glassy-card device-selector-card">
+            <div class="device-selector">
+              <mat-form-field appearance="outline">
+                <mat-label>Video Device</mat-label>
+                <mat-select 
+                  [value]="selectedDevice()"
+                  (selectionChange)="onDeviceSelected($event.value)"
+                  (openedChange)="onDeviceSelectorOpenedChange($event)">
+                  @for (device of devices(); track device.deviceId) {
+                    <mat-option [value]="device.deviceId">
+                      {{ device.label }}
+                    </mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </lib-compact-card-layout>
+        </ng-template>
 
-      <!-- Video Stream -->
-      <video 
-        #videoElement 
-        autoplay 
-        playsinline 
-        muted
-        class="video-stream"
-      ></video>
-    } @else if (isPermissionDenied()) {
-      <div class="error-message">
-        <p>Camera permission denied</p>
-        <p class="error-hint">Please allow camera access in your browser settings</p>
-      </div>
-    } @else {
-      <div class="no-devices-message">
-        <p>No video capture devices detected</p>
-      </div>
-    }
+        @if (showDeviceSelector()) {
+          <ng-container topRightCorner>
+            <ng-container [ngTemplateOutlet]="deviceSelectorTemplate"></ng-container>
+          </ng-container>
+        }
+
+        <!-- Top left corner: CRT settings panel -->
+        @if (isCrtEnabled() && showCrtControls()) {
+          <lib-crt-settings-panel
+            topLeftCorner
+            [settings]="crtSettings()"
+            [config]="crtConfig"
+            [visible]="showCrtControls()"
+            cardClass="crt-panel-scrollable"
+            [class.panel-hidden]="!showCrtControls()"
+            (settingsChange)="onCrtSettingsChange($event)"
+            (resetRequested)="onCrtReset()"
+            (presetSelected)="onCrtPresetSelected($event)">
+          </lib-crt-settings-panel>
+        }
+
+        <!-- Right controls: CRT toggle, settings toggle, maximize -->
+        <ng-container rightControls>
+          <div class="right-controls-wrapper">
+            <lib-compact-card-layout cardClass="glassy-card">
+              <!-- CRT toggle button -->
+              <lib-icon-button
+                [icon]="isCrtEnabled() ? 'tv' : 'tv_off'"
+                ariaLabel="Toggle CRT effect"
+                variant="rounded-transparent"
+                (buttonClick)="toggleCrtEffect()">
+              </lib-icon-button>
+
+              <!-- CRT settings toggle (only when CRT enabled) -->
+              @if (isCrtEnabled()) {
+                <lib-icon-button
+                  icon="tune"
+                  ariaLabel="CRT settings"
+                  variant="rounded-transparent"
+                  (buttonClick)="toggleCrtControls()">
+                </lib-icon-button>
+              }
+
+              <!-- Video device selector toggle -->
+              <lib-icon-button
+                icon="videocam"
+                ariaLabel="Select video device"
+                variant="rounded-transparent"
+                (buttonClick)="toggleDeviceSelector()">
+              </lib-icon-button>
+
+              <!-- Maximize button -->
+              <lib-icon-button
+                icon="fullscreen"
+                ariaLabel="Open in dialog"
+                variant="rounded-transparent"
+                (buttonClick)="openVideoDialog()">
+              </lib-icon-button>
+            </lib-compact-card-layout>
+          </div>
+        </ng-container>
+      </lib-content-overlay-container>
+    </lib-scaling-compact-card>
+    </div>
   </div>
-</lib-scaling-compact-card>
+} @else if (isPermissionDenied()) {
+  <div class="error-message">
+    <p>Camera permission denied</p>
+    <p class="error-hint">Please allow camera access in your browser settings</p>
+  </div>
+} @else {
+  <div class="no-devices-message">
+    <p>No video capture devices detected</p>
+  </div>
+}
