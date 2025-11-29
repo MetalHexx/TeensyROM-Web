@@ -368,17 +368,7 @@ Worker subagent: Please read this handoff document, execute the task, and save y
 
 ### File Organization
 
-Use the standard project structure for all artifacts:
-
-```
-docs/projects/[project-name]/
-├── master-plan.md
-├── phases/phase-[##]-[name].md
-├── tasks/TASK-[##]-[###]-[NAME].md
-└── reports/TASK-[##]-[###]-report.md
-```
-
-See [Project File Organization](#-project-file-organization) section above for details.
+> **⚠️ CRITICAL**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete file structure and naming conventions.
 
 ### Task Ordering Strategy
 

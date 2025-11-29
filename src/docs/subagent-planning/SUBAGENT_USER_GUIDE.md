@@ -15,11 +15,11 @@ The subagent system breaks large features into manageable tasks executed across 
 **Command**: Run in Architect mode:
 ```
 Follow instructions in .github/prompts/subagent-plan.prompt.md
-Project: [Brief feature description]
+Project: <Brief feature description>
 ```
 
 **What happens**:
-- ✅ Creates `docs/projects/[project-name]/` folder structure
+- ✅ Creates `docs/projects/<project-name>/` folder structure
 - ✅ Generates master plan (high-level overview)
 - ✅ Creates Phase 1 detailed plan
 - ✅ Creates first task handoff document
@@ -42,14 +42,14 @@ Repeat this loop until all tasks complete:
 
 **Command**:
 ```
-Execute task: #file:docs/projects/[project-name]/tasks/TASK-[##]-[###]-[NAME].md
+Execute task: #file:docs/projects/<project-name>/tasks/TASK-<##>-<###>-<NAME>.md
 ```
 
 **Worker does**:
 1. Reads task handoff document
 2. Implements changes to code files
 3. Writes tests
-4. Saves completion report to `reports/TASK-[##]-[###]-report.md`
+4. Saves completion report to `reports/TASK-<##>-<###>-report.md`
 
 **You do**:
 1. ✅ Review code changes in VS Code
@@ -65,7 +65,7 @@ Execute task: #file:docs/projects/[project-name]/tasks/TASK-[##]-[###]-[NAME].md
 **Command**:
 ```
 Follow instructions in .github/prompts/subagent-execute.prompt.md
-Project: [project-name]
+Project: <project-name>
 ```
 
 **Architect does**:
@@ -80,23 +80,7 @@ Project: [project-name]
 
 ## 🗂️ Project Structure
 
-```
-docs/projects/[project-name]/
-├── master-plan.md              # High-level feature overview (6-8 phases)
-├── execution-summary.md        # Progress tracking dashboard
-├── phases/
-│   ├── phase-01-[name].md     # Detailed implementation guide for phase 1
-│   ├── phase-02-[name].md     # Created when phase 2 starts
-│   └── ...
-├── tasks/
-│   ├── TASK-01-001-[name].md  # Executable handoff for task 1
-│   ├── TASK-02-001-[name].md  # Created when task ready
-│   └── ...
-└── reports/
-    ├── TASK-01-001-report.md  # Worker's completion report
-    ├── TASK-02-001-report.md  # Next worker's report
-    └── ...
-```
+> **⚠️ CRITICAL**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete file structure and naming conventions.
 
 ---
 
@@ -229,7 +213,7 @@ Session 10 (UI Wizard): Task 5 → 40 min
 ### "Agent seems confused about what to do"
 **Fix**: Provide the task handoff file directly:
 ```
-Execute task: #file:docs/projects/[project-name]/tasks/TASK-XX-XXX-[NAME].md
+Execute task: #file:docs/projects/<project-name>/tasks/TASK-<##>-<###>-<NAME>.md
 ```
 
 ### "Tests are failing"
@@ -259,6 +243,9 @@ Execute task: #file:docs/projects/[project-name]/tasks/TASK-XX-XXX-[NAME].md
 ---
 
 ## 📚 Reference Documentation
+
+**File Conventions** (read first):
+- [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) - **Single source of truth for naming**
 
 **For Planning**:
 - [SUBAGENT_ORCHESTRATOR_GUIDE.md](./SUBAGENT_ORCHESTRATOR_GUIDE.md) - Detailed methodology

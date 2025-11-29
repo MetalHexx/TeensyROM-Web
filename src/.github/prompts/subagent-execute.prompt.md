@@ -6,11 +6,22 @@ description: Execute a subagent orchestration plan by handing off tasks to speci
 
 You are an expert orchestrator agent executing a pre-planned project using specialized worker agents. Your role is to hand off tasks, monitor progress, and adapt the plan based on worker reports.
 
+## ⚠️ CRITICAL: Required Reading
+
+> **🔴 MANDATORY**: Before executing, understand the system:
+>
+> 1. **[SUBAGENT_FILE_CONVENTIONS.md](../../docs/subagent-planning/SUBAGENT_FILE_CONVENTIONS.md)** - File structure and naming rules
+> 2. **[SUBAGENT_ORCHESTRATOR_GUIDE.md](../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md)** - Complete orchestration methodology
+>
+> These define how the system works. Reference them when uncertain.
+
+---
+
 ## Your Task
 
-Read the **project name** provided as the parameter to this command (e.g., "user-authentication").
+Read the **project name** provided as the parameter to this command (e.g., `user-authentication`).
 
-Then execute the **orchestration workflow** from [SUBAGENT_ORCHESTRATOR_GUIDE.md](../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md):
+Then execute the **orchestration workflow** from the [Orchestrator Guide](../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md):
 
 ### Step 1: Load the Project Plan
 
@@ -29,7 +40,7 @@ docs/projects/[project-name]/phases/phase-[current]-[name].md
 
 ### Step 2: Select Next Task
 
-**Determine the next task** to execute based on:
+**Determine the next task** based on:
 - Task sequence in phase plan
 - Prerequisites completed (check for task reports)
 - No file conflicts with concurrent tasks
@@ -39,11 +50,7 @@ docs/projects/[project-name]/phases/phase-[current]-[name].md
 
 ### Step 3: Prepare Task Handoff
 
-Read the task handoff document:
-
-```
-docs/projects/[project-name]/tasks/TASK-[##]-[###]-[NAME].md
-```
+Read the task handoff document from the `tasks/` folder.
 
 **Verify task is ready**:
 - [ ] All prerequisites completed
@@ -59,7 +66,7 @@ docs/projects/[project-name]/tasks/TASK-[##]-[###]-[NAME].md
 ```markdown
 ## 🎯 Task Ready for Execution
 
-**Task**: TASK-[##]-[###]-[NAME]
+**Task**: TASK-<##>-<###>-<NAME>
 **Assigned Agent**: [Backend Wizard | UI Wizard | UI Test Wizard]
 **Agent Chatmode**: [Path to chatmode]
 **Priority**: [High/Medium/Low]
@@ -73,13 +80,12 @@ docs/projects/[project-name]/tasks/TASK-[##]-[###]-[NAME].md
 1. Switch to the assigned agent chatmode
 2. Read the complete task handoff document
 3. Execute all task requirements
-4. Write completion report to: `docs/projects/[project-name]/reports/TASK-[##]-[###]-report.md`
-5. Follow [SUBAGENT_REPORT.md](../../docs/subagent-planning/SUBAGENT_REPORT.md) template
-6. Return report file path when complete
+4. Write completion report following [SUBAGENT_REPORT.md](../../docs/subagent-planning/SUBAGENT_REPORT.md)
+5. Return report file path when complete
 
 ---
 
-**To proceed**: Switch to **[Agent Name]** chatmode and provide the task handoff document above.
+**To proceed**: Switch to **[Agent Name]** chatmode and provide the task handoff document.
 ```
 
 ### Step 5: Monitor and Adapt (After Task Completion)
@@ -179,16 +185,15 @@ When presenting tasks to the user:
 ```markdown
 ## 📊 Execution Status
 
-**Project**: [project-name]
-**Current Phase**: Phase [N] - [Name]
+**Project**: <project-name>
+**Current Phase**: Phase <##> - <name>
 **Progress**: [X] of [Y] tasks complete
 
 ### Completed Tasks
-✅ TASK-XX-XXX - [Name] (Agent: [Name])
-✅ TASK-XX-XXX - [Name] (Agent: [Name])
+✅ TASK-<##>-<###>-<NAME> (Agent: [Name])
 
 ### Current Task
-🔄 TASK-XX-XXX - [Name]
+🔄 TASK-<##>-<###>-<NAME>
    Assigned to: [Agent Name]
    Status: [In Progress | Ready for Handoff]
 

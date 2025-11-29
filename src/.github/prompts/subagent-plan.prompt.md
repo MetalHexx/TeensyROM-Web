@@ -20,6 +20,29 @@ Then execute the **complete orchestration process** from the guide:
 5. **Create task handoffs** - Generate task documents following [SUBAGENT_HANDOFF.md](../../docs/subagent-planning/SUBAGENT_HANDOFF.md)
 6. **Provide execution summary** - Roadmap with dependencies and first task identified
 
+---
+
+## ⚠️ CRITICAL: File Structure & Naming
+
+> **🔴 MANDATORY**: Read [SUBAGENT_FILE_CONVENTIONS.md](../../docs/subagent-planning/SUBAGENT_FILE_CONVENTIONS.md) BEFORE creating any files.
+>
+> This is the **single source of truth** for all naming conventions. Do NOT deviate from it.
+
+**Quick Summary** (see conventions doc for full rules):
+
+```
+docs/projects/<project-name>/           ← kebab-case
+├── master-plan.md                      ← exact filename
+├── phases/
+│   └── phase-<##>-<name>.md            ← lowercase name
+├── tasks/
+│   └── TASK-<##>-<###>-<NAME>.md       ← UPPERCASE name
+└── reports/
+    └── TASK-<##>-<###>-report.md
+```
+
+---
+
 ## Key Requirements
 
 - **Backend-first sequencing** for full-stack features (see [BACKEND_ARCHITECTURE.md](../../docs/BACKEND_ARCHITECTURE.md))
@@ -28,14 +51,19 @@ Then execute the **complete orchestration process** from the guide:
 - **Complete context** in every task handoff
 - **Project isolation** - each project in its own folder
 
-## Deliverables
+---
 
-Create all planning documents and provide a summary report showing:
-- Project structure created
-- Phase breakdown
-- Task list for Phase 1 (ready for execution)
-- Execution recommendations (dependencies, parallel opportunities, critical path)
+## Deliverables Checklist
+
+Before finishing, verify you created:
+
+- [ ] `docs/projects/<project-name>/master-plan.md`
+- [ ] `docs/projects/<project-name>/phases/` folder with all phase files
+- [ ] `docs/projects/<project-name>/tasks/` folder with Phase 1 task files
+- [ ] `docs/projects/<project-name>/reports/` folder (empty, for worker use)
+- [ ] Summary report showing phase breakdown and execution order
 
 ## Reference
 
-Follow **all guidance** from [SUBAGENT_ORCHESTRATOR_GUIDE.md](../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md) - it contains the complete methodology, templates, examples, and quality standards.
+- **File Conventions**: [SUBAGENT_FILE_CONVENTIONS.md](../../docs/subagent-planning/SUBAGENT_FILE_CONVENTIONS.md) - **READ FIRST**
+- **Orchestration Guide**: [SUBAGENT_ORCHESTRATOR_GUIDE.md](../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md) - Complete methodology

@@ -15,11 +15,22 @@ This guide teaches **Orchestrator Agents** how to use the Subagent Planning Syst
 
 The Subagent Planning System consists of:
 
-1. **[SUBAGENT_HANDOFF.md](./SUBAGENT_HANDOFF.md)** - Protocol for handing work to subagents
-2. **[SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md)** - Template for subagents to report completion
-3. **This document** - Planning methodology for orchestrators
-4. **[PHASE_TEMPLATE.md](./PHASE_TEMPLATE.md)** - For planning individual phases
-5. **[PLANNING_TEMPLATE.md](./PLANNING_TEMPLATE.md)** - For planning entire features
+1. **[SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md)** - **READ FIRST** - File structure and naming rules
+2. **[SUBAGENT_HANDOFF.md](./SUBAGENT_HANDOFF.md)** - Protocol for handing work to subagents
+3. **[SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md)** - Template for subagents to report completion
+4. **This document** - Planning methodology for orchestrators
+5. **[PHASE_TEMPLATE.md](../PHASE_TEMPLATE.md)** - For planning individual phases
+6. **[PLANNING_TEMPLATE.md](../PLANNING_TEMPLATE.md)** - For planning entire features
+
+---
+
+## 📐 File Structure & Naming Conventions
+
+> **⚠️ CRITICAL**: All file structure and naming conventions are defined in a single location.
+> 
+> **👉 See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for ALL naming rules.**
+>
+> Do NOT define naming conventions elsewhere. Always reference the centralized document.
 
 ---
 
@@ -420,62 +431,7 @@ This ensures the orchestrator can:
 
 ## 📁 Project File Organization
 
-### Standard Project Structure
-
-Each project/feature should have its own isolated folder structure to prevent mixing contexts:
-
-```
-docs/
-├── subagent-planning/           # System documentation (this folder)
-│   ├── SUBAGENT_ORCHESTRATOR_GUIDE.md
-│   ├── SUBAGENT_HANDOFF.md
-│   └── SUBAGENT_REPORT.md
-│
-├── projects/                    # Root for all orchestrated projects
-│   │
-│   ├── [project-name]/         # Individual project folder
-│   │   ├── master-plan.md      # High-level project plan
-│   │   ├── phases/             # Phase planning documents
-│   │   │   ├── phase-01-[name].md
-│   │   │   ├── phase-02-[name].md
-│   │   │   └── phase-03-[name].md
-│   │   ├── tasks/              # Task handoff documents
-│   │   │   ├── TASK-01-001-[name].md
-│   │   │   ├── TASK-01-002-[name].md
-│   │   │   └── TASK-02-001-[name].md
-│   │   ├── reports/            # Worker completion reports
-│   │   │   ├── TASK-01-001-report.md
-│   │   │   ├── TASK-01-002-report.md
-│   │   │   └── TASK-02-001-report.md
-│   │   └── decisions/          # Architectural decision records (optional)
-│   │       ├── ADR-001-state-management.md
-│   │       └── ADR-002-api-design.md
-│   │
-│   └── [another-project]/      # Completely separate project
-│       ├── master-plan.md
-│       ├── phases/
-│       ├── tasks/
-│       └── reports/
-```
-
-### Naming Conventions
-
-**Projects**: 
-- Use kebab-case: `user-authentication`, `device-manager`, `file-browser`
-- Be specific and descriptive
-
-**Phases**: 
-- Format: `phase-[##]-[descriptive-name].md`
-- Example: `phase-01-foundation.md`, `phase-02-state-management.md`
-
-**Tasks**: 
-- Format: `TASK-[Phase#]-[Seq#]-[SHORT-NAME].md`
-- Example: `TASK-01-001-API-CONTRACTS.md`, `TASK-02-003-USER-STORE.md`
-
-**Reports**: 
-- Format: `TASK-[Phase#]-[Seq#]-report.md`
-- Example: `TASK-01-001-report.md`
-- Always matches corresponding task file name
+> **⚠️ CRITICAL**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete file structure and naming rules.
 
 ### Benefits of This Structure
 
@@ -485,23 +441,6 @@ docs/
 4. **Clean Handoffs**: Worker agents receive clear file paths for outputs
 5. **Historical Record**: Complete audit trail of planning and execution
 6. **Easy Cleanup**: Remove completed project folders without affecting others
-
-### Example Handoff Path References
-
-When creating task handoffs, use project-relative paths:
-
-```markdown
-**Output Report Location**: `docs/projects/[project-name]/reports/TASK-01-001-report.md`
-```
-
-When referencing planning docs:
-
-```markdown
-**Related Documentation**:
-- [Master Plan](../master-plan.md)
-- [Phase 1 Plan](../phases/phase-01-foundation.md)
-- [Previous Task Report](../reports/TASK-01-001-report.md)
-```
 
 ---
 
