@@ -13,7 +13,7 @@ Refactor `VideoDialogComponent` to compose the new UI components while preservin
 - [ ] [Phase 1 Report](../reports/phase-01-report.md) - `lib-video-stream` component
 - [ ] [Phase 2 Report](../reports/phase-02-report.md) - `lib-crt-effect-wrapper` and presets
 - [ ] [Phase 3 Report](../reports/phase-03-report.md) - `lib-content-overlay-container` with 9 slots
-- [ ] [Phase 4 Plan](./phase-04-crt-settings-panel.md) - `lib-crt-settings-panel` (must be complete)
+- [ ] [Phase 4 Report](../reports/phase-04-report.md) - `lib-crt-settings-panel` with **unified config model** (CRITICAL)
 
 **Current Implementation:**
 - [ ] `libs/features/player/.../video-dialog/video-dialog.component.ts` - Current smart component
@@ -22,65 +22,32 @@ Refactor `VideoDialogComponent` to compose the new UI components while preservin
 
 ---
 
-## 🔄 Before/After Architecture
+## 🔄 Slot Migration Summary
 
-### Current Structure (Tightly Coupled)
-```html
-<div class="video-container">
-  <div class="video-wrapper" [class.crt-effect]="..." [style.--scanline-...]="...">
-    <video #dialogVideoElement autoplay playsinline muted></video>
-  </div>
-  <div class="crt-controls-overlay"><!-- 8 inline sliders --></div>
-  <div class="filter-toolbar-overlay"><!-- toolbar --></div>
-  <div class="player-toolbar-overlay"><!-- toolbar --></div>
-  <div class="video-controls"><!-- buttons --></div>
-</div>
-```
+The VideoDialogComponent has 6 distinct UI regions that must be migrated to the 9-slot architecture:
 
-### Target Structure (Composed Components)
-```html
-<lib-content-overlay-container #overlayContainer
-  [showOverlaysOnHover]="true"
-  [overlayTransitionMs]="300"
-  (fullscreenChange)="onFullscreenChange($event)">
-  
-  <!-- Content: Video with CRT effects -->
-  <lib-crt-effect-wrapper content [settings]="crtSettings()" [enabled]="isCrtEnabled()">
-    <lib-video-stream [stream]="data.stream" (streamReady)="onStreamReady()"></lib-video-stream>
-  </lib-crt-effect-wrapper>
-  
-  <!-- Top overlay: Filter toolbar -->
-  <lib-filter-toolbar topOverlay [deviceId]="data.deviceId"></lib-filter-toolbar>
-  
-  <!-- Bottom overlay: Player toolbar -->
-  <lib-player-toolbar bottomOverlay [deviceId]="data.deviceId"></lib-player-toolbar>
-  
-  <!-- Top-right corner: Close button -->
-  <lib-icon-button topRightCorner icon="close" (buttonClick)="onClose()"></lib-icon-button>
-  
-  <!-- Left controls: CRT settings panel (conditional) -->
-  @if (isCrtEnabled()) {
-    <lib-crt-settings-panel leftControls
-      [settings]="crtSettings()"
-      [visible]="showCrtControls()"
-      (settingsChange)="onCrtSettingsChange($event)"
-      (resetRequested)="onResetSettings()">
-    </lib-crt-settings-panel>
-  }
-  
-  <!-- Right controls: Control buttons -->
-  <div rightControls class="control-buttons">
-    <lib-compact-card-layout cardClass="glassy-card">
-      @if (isCrtEnabled()) {
-        <lib-icon-button icon="tune" (buttonClick)="toggleCrtControls()"></lib-icon-button>
-      }
-      <lib-icon-button icon="tv" [class.active]="isCrtEnabled()" (buttonClick)="toggleCrtEffect()"></lib-icon-button>
-      <lib-icon-button [icon]="isFullscreen() ? 'fullscreen_exit' : 'fullscreen'" 
-        (buttonClick)="toggleFullscreen()"></lib-icon-button>
-    </lib-compact-card-layout>
-  </div>
-</lib-content-overlay-container>
-```
+### Complete Slot Mapping
+
+| Current Element | Target Slot | New Component | Notes |
+|-----------------|-------------|---------------|-------|
+| `.video-wrapper` + `<video>` | `content` | `lib-crt-effect-wrapper` wrapping `lib-video-stream` | Pass `config` to wrapper |
+| `.filter-toolbar-overlay` | `topOverlay` | `lib-filter-toolbar` (existing) | Already a component, just move to slot |
+| `.player-toolbar-overlay` | `bottomOverlay` | `lib-player-toolbar` (existing) | Already a component, just move to slot |
+| `.close-button` | `topRightCorner` | `lib-icon-button` | Use `icon="close"` |
+| `.crt-controls-overlay` (8 sliders) | `leftControls` | `lib-crt-settings-panel` | Pass same `config` as wrapper |
+| `.right-controls-card` | `rightControls` | Card with icon buttons | CRT toggle, settings toggle, fullscreen |
+
+### Unused Slots (Available for Future)
+- `topLeftCorner` - not used in video dialog
+- `bottomLeftControls` - not used in video dialog  
+- `bottomRightControls` - not used in video dialog
+
+### Key Migration Points
+
+1. **Toolbars**: `lib-filter-toolbar` and `lib-player-toolbar` already exist - just add slot attribute
+2. **Close Button**: Move from inline div to `lib-icon-button` with `topRightCorner` attribute
+3. **Right Controls**: Group CRT toggle, settings toggle, and fullscreen button in card
+4. **Unified Config**: Same `config` input to both `lib-crt-effect-wrapper` AND `lib-crt-settings-panel`
 
 ---
 
@@ -96,30 +63,21 @@ libs/features/player/src/lib/player-view/player-device-container/video-capture/v
 ---
 
 <details open>
-<summary><h3>Task 1: Update Template to Use New Components</h3></summary>
+<summary><h3>Task 1: Migrate Template to Slot Architecture</h3></summary>
 
-**Purpose**: Replace inline implementation with composed components.
+**Purpose**: Move all 6 UI regions to appropriate slots in `lib-content-overlay-container`.
 
-**Implementation Subtasks:**
-- [ ] Replace `<video>` element with `<lib-video-stream [stream]="data.stream">`
-- [ ] Wrap video-stream with `<lib-crt-effect-wrapper [settings]="crtSettings()" [enabled]="isCrtEnabled()">`
-- [ ] Replace root container with `<lib-content-overlay-container>`
-- [ ] Map existing overlays to 9-slot architecture (see mapping below)
-- [ ] Replace inline CRT sliders with `<lib-crt-settings-panel>` in `leftControls` slot
+**Subtasks:**
+- [ ] Use `lib-content-overlay-container` as root (replaces `.video-container`)
+- [ ] Migrate all 6 elements per slot mapping table above
+- [ ] Ensure `config` is passed to both wrapper and settings panel
+- [ ] Keep existing toolbar components - just add slot attributes
 
-**Slot Mapping:**
-
-| Current Element | Target Slot | Content |
-|-----------------|-------------|---------|
-| `.video-wrapper` | `[content]` | `lib-crt-effect-wrapper` > `lib-video-stream` |
-| `.filter-toolbar-overlay` | `[topOverlay]` | `lib-filter-toolbar` |
-| `.player-toolbar-overlay` | `[bottomOverlay]` | `lib-player-toolbar` |
-| `.close-button` | `[topRightCorner]` | `lib-icon-button` |
-| `.crt-controls-overlay` | `[leftControls]` | `lib-crt-settings-panel` |
-| `.right-controls-card` | `[rightControls]` | CRT toggle, fullscreen buttons |
-
-**Testing Subtask:**
-- [ ] Verify all slots render correctly in composed structure
+**Verification:**
+- [ ] All overlays appear in correct positions
+- [ ] Hover-to-reveal behavior works for all slots
+- [ ] Close button in top-right corner
+- [ ] Right controls slide in from right side
 
 </details>
 
@@ -134,28 +92,18 @@ libs/features/player/src/lib/player-view/player-device-container/video-capture/v
 - [ ] Remove `afterNextRender` stream attachment (now in `lib-video-stream`)
 - [ ] Remove `setupFullscreenListener` (now in `lib-content-overlay-container`)
 - [ ] Convert individual CRT signals to single `crtSettings` signal of type `CrtSettings`
-- [ ] Add `onCrtSettingsChange(settings: CrtSettings)` handler
+- [ ] Add `crtConfig` signal of type `CrtSettingsConfig` (use `CRT_CONFIGS.full`)
 - [ ] Add `@ViewChild` reference to `lib-content-overlay-container` for fullscreen methods
 - [ ] Keep dialog-specific logic: `onClose()`, dialog data handling
 
-**Before (individual signals):**
-```typescript
-scanlineIntensity = signal<number>(0.50);
-scanlineThickness = signal<number>(3);
-// ... 6 more signals
-```
+**Key Consolidation:**
+- Replace 8 individual CRT signals → single `crtSettings` signal of type `CrtSettings`
+- Add `crtConfig` signal using `CRT_CONFIGS.full` for full video dialog experience
+- Settings panel outputs update the signal directly (no handler methods needed)
 
-**After (single CrtSettings signal):**
-```typescript
-crtSettings = signal<CrtSettings>(DEFAULT_CRT_SETTINGS);
-
-onCrtSettingsChange(settings: CrtSettings) {
-  this.crtSettings.set(settings);
-}
-```
-
-**Testing Subtask:**
-- [ ] Verify CRT settings changes propagate correctly
+**Verification:**
+- [ ] CRT settings changes propagate to wrapper
+- [ ] Same config passed to both wrapper and panel
 
 </details>
 
@@ -197,6 +145,10 @@ onCrtSettingsChange(settings: CrtSettings) {
   - `CrtEffectWrapperComponent`
   - `ContentOverlayContainerComponent`
   - `CrtSettingsPanelComponent`
+- [ ] Add imports for Phase 4 types and constants:
+  - `CrtSettings`, `CrtSettingsConfig` (types)
+  - `DEFAULT_CRT_SETTINGS`, `CRT_PRESETS` (settings presets)
+  - `CRT_CONFIGS`, `DEFAULT_CRT_CONFIG` (feature flag configs)
 - [ ] Keep existing imports:
   - `IconButtonComponent`
   - `CompactCardLayoutComponent`
@@ -273,11 +225,14 @@ onCrtSettingsChange(settings: CrtSettings) {
 - [ ] All existing functionality preserved (no regressions)
 - [ ] Template uses composed components instead of inline implementation
 - [ ] Component logic simplified (delegated to children)
+- [ ] **NEW**: Same `config` passed to both `lib-crt-effect-wrapper` and `lib-crt-settings-panel`
+- [ ] **NEW**: Uses `CRT_CONFIGS.full` for full video dialog CRT experience
 - [ ] SCSS reduced by ~400+ lines
 - [ ] All unit tests pass (updated for new structure)
 - [ ] Visual appearance matches before refactor
 - [ ] Fullscreen works via overlay container
 - [ ] CRT settings work via settings panel
+- [ ] Preset selection works via `presetSelected` output
 
 ---
 

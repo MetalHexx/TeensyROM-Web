@@ -4,31 +4,33 @@
     <span class="header-title">CRT Effect</span>
     <div class="header-actions">
       <!-- Preset menu button -->
-      <button
-        mat-icon-button
-        [matMenuTriggerFor]="presetMenu"
-        matTooltip="Select preset"
-        class="header-button"
-      >
-        <mat-icon>tune</mat-icon>
-      </button>
-      <mat-menu #presetMenu="matMenu">
-        @for (preset of presetNames; track preset) {
-          <button mat-menu-item (click)="onPresetSelect(preset)">
-            {{ getPresetLabel(preset) }}
-          </button>
-        }
-      </mat-menu>
+      <lib-dropdown-menu #presetDropdown>
+        <lib-icon-button
+          icon="tune"
+          ariaLabel="Select preset"
+          size="small"
+          [matTooltip]="'Select preset'"
+          (buttonClick)="presetDropdown.toggle()">
+        </lib-icon-button>
+
+        <div dropdown-content>
+          @for (preset of presetNames; track preset) {
+            <lib-dropdown-menu-item
+              (itemClick)="onPresetSelect(preset)">
+              {{ getPresetLabel(preset) }}
+            </lib-dropdown-menu-item>
+          }
+        </div>
+      </lib-dropdown-menu>
 
       <!-- Reset button -->
-      <button
-        mat-icon-button
-        (click)="onReset()"
-        matTooltip="Reset to defaults"
-        class="header-button"
-      >
-        <mat-icon>refresh</mat-icon>
-      </button>
+      <lib-icon-button
+        icon="refresh"
+        ariaLabel="Reset to defaults"
+        size="small"
+        [matTooltip]="'Reset to defaults'"
+        (buttonClick)="onReset()">
+      </lib-icon-button>
     </div>
   </div>
 

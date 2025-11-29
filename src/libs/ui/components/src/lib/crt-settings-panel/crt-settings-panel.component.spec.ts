@@ -214,12 +214,16 @@ describe('CrtSettingsPanelComponent', () => {
       component.resetRequested.subscribe(resetSpy);
       fixture.detectChanges();
 
-      const resetButton = fixture.nativeElement.querySelector(
-        'button[mattooltip="Reset to defaults"]'
-      );
+      // Find lib-icon-button with refresh icon
+      const iconButtons = fixture.nativeElement.querySelectorAll('lib-icon-button');
+      const resetButton = Array.from(iconButtons).find((btn: Element) => 
+        btn.querySelector('mat-icon')?.textContent?.trim() === 'refresh'
+      ) as HTMLElement;
       expect(resetButton).toBeTruthy();
 
-      resetButton.click();
+      // Click the button inside lib-icon-button
+      const innerButton = resetButton.querySelector('button');
+      innerButton?.click();
       expect(resetSpy).toHaveBeenCalled();
     });
   });
@@ -313,19 +317,21 @@ describe('CrtSettingsPanelComponent', () => {
     it('should have preset menu button with tune icon', () => {
       fixture.detectChanges();
 
-      // Look for the button in header-actions that contains the tune icon
-      const headerActions = fixture.nativeElement.querySelector('.header-actions');
-      expect(headerActions).toBeTruthy();
-
-      const buttons = headerActions.querySelectorAll('button');
-      expect(buttons.length).toBeGreaterThanOrEqual(2); // preset menu and reset button
+      // Look for lib-icon-button with tune icon
+      const iconButtons = fixture.nativeElement.querySelectorAll('lib-icon-button');
+      const tuneButton = Array.from(iconButtons).find((btn: Element) => 
+        btn.querySelector('mat-icon')?.textContent?.trim() === 'tune'
+      );
+      expect(tuneButton).toBeTruthy();
     });
 
     it('should have reset button', () => {
       fixture.detectChanges();
 
-      const resetButton = fixture.nativeElement.querySelector(
-        'button[mattooltip="Reset to defaults"]'
+      // Find lib-icon-button with refresh icon
+      const iconButtons = fixture.nativeElement.querySelectorAll('lib-icon-button');
+      const resetButton = Array.from(iconButtons).find((btn: Element) => 
+        btn.querySelector('mat-icon')?.textContent?.trim() === 'refresh'
       );
       expect(resetButton).toBeTruthy();
     });

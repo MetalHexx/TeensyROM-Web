@@ -12,7 +12,8 @@ Refactor `VideoCaptureComponent` to compose the new UI components for the embedd
 - [ ] [Master Plan](../master-plan.md) - Target architecture and component composition
 - [ ] [Phase 1 Report](../reports/phase-01-report.md) - `lib-video-stream` component
 - [ ] [Phase 3 Report](../reports/phase-03-report.md) - `lib-content-overlay-container` with 9 slots
-- [ ] [Phase 5 Plan](./phase-05-refactor-video-dialog.md) - Dialog refactor (should be complete)
+- [ ] [Phase 4 Report](../reports/phase-04-report.md) - `lib-crt-settings-panel` with unified config model
+- [ ] [Phase 5 Report](../reports/phase-05-report.md) - Dialog refactor (should be complete)
 
 **Current Implementation:**
 - [ ] `libs/features/player/.../video-capture/video-capture.component.ts`

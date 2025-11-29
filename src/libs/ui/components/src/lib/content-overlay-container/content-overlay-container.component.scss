@@ -9,7 +9,9 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #000;
+  // Background is transparent to allow dialog backdrop to show through rounded corners
+  // The content (video/image) provides the visual background
+  background-color: transparent;
 
   // CSS custom property for transition duration
   --transition-ms: 300ms;
@@ -98,10 +100,11 @@
 }
 
 .bottom-overlay {
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 90%;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  transform: none;
 }
 
 .bottom-right-controls {
@@ -114,13 +117,14 @@
 // =============================================================================
 
 .overlay-container.hover-reveal {
-  // Default: hide all overlays
+  // Default: hide all overlays with smooth transitions
   .overlay-layer > * {
     opacity: 0;
     pointer-events: none;
+    // Fade out with ease-in (accelerates as it disappears)
     transition:
-      opacity calc(var(--transition-ms) * 1ms) ease-in-out,
-      transform calc(var(--transition-ms) * 1ms) ease-in-out;
+      opacity 250ms ease-in,
+      transform 300ms cubic-bezier(0.4, 0, 1, 1);
   }
 
   // Slide-out transforms for hidden state
@@ -149,21 +153,25 @@
   }
 
   .bottom-overlay {
-    transform: translate(-50%, 100%);
+    transform: translateY(100%);
   }
 
   .bottom-right-controls {
     transform: translate(100%, 100%);
   }
 
-  // Show overlays on container hover
-  &:hover .overlay-layer > * {
+  // Show overlays when mouse is over container (controlled by JS signal)
+  &.overlays-visible .overlay-layer > * {
     opacity: 1;
     pointer-events: all;
+    // Fade in with ease-out (decelerates as it appears)
+    transition:
+      opacity 200ms ease-out,
+      transform 250ms cubic-bezier(0, 0, 0.2, 1);
   }
 
   // Slide-in transforms for visible state
-  &:hover {
+  &.overlays-visible {
     .top-left-corner {
       transform: translate(0, 0);
     }
@@ -189,88 +197,12 @@
     }
 
     .bottom-overlay {
-      transform: translateX(-50%);
+      transform: translateY(0);
     }
 
     .bottom-right-controls {
       transform: translate(0, 0);
     }
-  }
-
-  // Keep visible when overlay has focus (dropdowns, inputs, menus)
-  .overlay-layer > *:focus-within {
-    opacity: 1;
-    pointer-events: all;
-  }
-
-  .top-left-corner:focus-within {
-    transform: translate(0, 0);
-  }
-
-  .top-overlay:focus-within {
-    transform: translateX(-50%);
-  }
-
-  .top-right-corner:focus-within {
-    transform: translate(0, 0);
-  }
-
-  .left-controls:focus-within {
-    transform: translateY(-50%);
-  }
-
-  .right-controls:focus-within {
-    transform: translateY(-50%);
-  }
-
-  .bottom-left-controls:focus-within {
-    transform: translate(0, 0);
-  }
-
-  .bottom-overlay:focus-within {
-    transform: translateX(-50%);
-  }
-
-  .bottom-right-controls:focus-within {
-    transform: translate(0, 0);
-  }
-
-  // Keep visible when hovering the overlay itself
-  .overlay-layer > *:hover {
-    opacity: 1;
-    pointer-events: all;
-  }
-
-  .top-left-corner:hover {
-    transform: translate(0, 0);
-  }
-
-  .top-overlay:hover {
-    transform: translateX(-50%);
-  }
-
-  .top-right-corner:hover {
-    transform: translate(0, 0);
-  }
-
-  .left-controls:hover {
-    transform: translateY(-50%);
-  }
-
-  .right-controls:hover {
-    transform: translateY(-50%);
-  }
-
-  .bottom-left-controls:hover {
-    transform: translate(0, 0);
-  }
-
-  .bottom-overlay:hover {
-    transform: translateX(-50%);
-  }
-
-  .bottom-right-controls:hover {
-    transform: translate(0, 0);
   }
 }
 
@@ -318,8 +250,10 @@
   }
 
   .bottom-overlay {
-    bottom: 16px;
-    left: 50%;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
   }
 
   .bottom-right-controls {
@@ -335,10 +269,10 @@
   }
 }
 
-// Hover behavior also works in fullscreen
+// Overlay visibility also works in fullscreen
 .overlay-container.fullscreen.hover-reveal,
 .overlay-container:fullscreen.hover-reveal {
-  &:hover .overlay-layer > * {
+  &.overlays-visible .overlay-layer > * {
     opacity: 1;
     pointer-events: all;
   }

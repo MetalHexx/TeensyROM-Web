@@ -14,10 +14,8 @@
   overflow: hidden;
 
   // Apply screen curvature via border-radius
+  // Note: No transition on border-radius to avoid trailing artifacts during adjustment
   border-radius: var(--screen-curvature, 0px);
-
-  // Transition for smooth enable/disable
-  transition: border-radius 0.3s ease-in-out;
 
   // Content container for filter application
   .crt-content {

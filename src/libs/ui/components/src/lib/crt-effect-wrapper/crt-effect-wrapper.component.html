@@ -1,4 +1,5 @@
 <div
+  #wrapper
   class="crt-wrapper"
   [class.crt-enabled]="enabled()"
   [style.--scanline-intensity]="effectiveSettings().scanlineIntensity"
@@ -9,6 +10,7 @@
   [style.--crt-contrast]="effectiveSettings().contrast"
   [style.--crt-brightness]="effectiveSettings().brightness"
   [style.--crt-saturation]="effectiveSettings().saturation"
+  [style.clip-path]="clipPath()"
 >
   <div class="crt-content">
     <ng-content></ng-content>

@@ -1,11 +1,15 @@
-// AGGRESSIVE: Kill Material Dialog spacing for video only
+// Material Dialog overrides for fullscreen video dialog
+// These styles target the dialog container which exists outside the component
 ::ng-deep {
   .video-dialog-fullscreen {
     padding: 0 !important;
     margin: 0 !important;
     background: transparent !important;
-    
+    background-color: transparent !important;
+
+    // Target all Material 3 dialog elements
     .mdc-dialog__container,
+    .mdc-dialog__surface,
     .mat-mdc-dialog-surface,
     .mat-mdc-dialog-container,
     .cdk-overlay-pane,
@@ -14,88 +18,13 @@
       margin: 0 !important;
       background: transparent !important;
       background-color: transparent !important;
+      box-shadow: none !important;
       box-sizing: border-box !important;
     }
 
-    // Ensure hover events work on video dialog without requiring focus
-    &:hover {
-      lib-video-dialog {
-        .video-container {
-          .player-toolbar-overlay,
-          .filter-toolbar-overlay {
-            opacity: 1 !important;
-          }
-
-          .player-toolbar-overlay {
-            transform: translateY(0) !important;
-          }
-
-          .filter-toolbar-overlay {
-            transform: translate(-50%, 0) !important;
-          }
-
-          .video-controls {
-            opacity: 1 !important;
-
-            .close-button {
-              opacity: 1 !important;
-            }
-
-            .right-controls-card {
-              opacity: 1 !important;
-              transform: translateX(0) !important;
-            }
-          }
-
-          .crt-controls-overlay.slide-in {
-            opacity: 1 !important;
-            transform: translateX(0) !important;
-          }
-        }
-      }
-    }
-  }
-
-  // Keep video dialog toolbars visible when dropdown menu is open
-  body:has(.dropdown-menu-wrapper) {
-    .video-container {
-      .player-toolbar-overlay,
-      .filter-toolbar-overlay {
-        opacity: 1 !important;
-        pointer-events: all !important;
-      }
-
-      .player-toolbar-overlay {
-        transform: translateY(0) !important;
-      }
-
-      .filter-toolbar-overlay {
-        transform: translate(-50%, 0) !important;
-      }
-
-      .crt-controls-overlay.slide-in {
-        opacity: 1 !important;
-        transform: translateX(0) !important;
-      }
-
-      .video-controls {
-        opacity: 1 !important;
-
-        .right-controls-card {
-          opacity: 1 !important;
-          transform: translateX(0) !important;
-          pointer-events: all !important;
-
-          lib-compact-card-layout,
-          ::ng-deep lib-compact-card-layout {
-            opacity: 1 !important;
-          }
-        }
-
-        .close-button {
-          opacity: 1 !important;
-        }
-      }
+    // Override Material 3 surface token
+    .mat-mdc-dialog-surface {
+      --mdc-dialog-container-color: transparent !important;
     }
   }
 }
@@ -110,441 +39,38 @@
   pointer-events: auto !important;
 }
 
-.video-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  background-color: transparent;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--screen-curvature, 12px);
-  pointer-events: auto !important;
-
-  // Show controls on container hover only (not focus-within for initial state)
-  &:hover .video-controls {
-    opacity: 1 !important;
-  }
-
-  &:hover .video-controls .close-button {
-    opacity: 1 !important;
-  }
-
-  // Show and slide in CRT controls on container hover (when slide-in is active)
-  &:hover .crt-controls-overlay.slide-in {
-    opacity: 1 !important;
-    transform: translateX(0) !important;
-  }
-
-  // Show and slide in right controls on container hover
-  &:hover .video-controls .right-controls-card {
-    opacity: 1 !important;
-    transform: translateX(0) !important;
-  }
-
-  // Show toolbars on container hover
-  &:hover .player-toolbar-overlay,
-  &:hover .filter-toolbar-overlay {
-    opacity: 1 !important;
-    pointer-events: all !important;
-  }
-
-  &:hover .player-toolbar-overlay {
-    transform: translateY(0) !important;
-  }
-
-  &:hover .filter-toolbar-overlay {
-    transform: translate(-50%, 0) !important;
-  }
-
-  .video-wrapper {
-    position: relative;
-    width: 100%;
-    height: 100%;
-
-    // CRT effect styling
-    &.crt-effect {
-      // Apply border radius for screen curvature
-      border-radius: var(--screen-curvature);
-      overflow: hidden;
-
-      // Scanlines overlay using pseudo-element
-      &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-image: repeating-linear-gradient(
-          0deg,
-          rgba(0, 0, 0, var(--scanline-intensity)) 0px,
-          rgba(0, 0, 0, var(--scanline-intensity)) var(--scanline-thickness),
-          transparent var(--scanline-thickness),
-          transparent calc(var(--scanline-thickness) + var(--scanline-spacing))
-        );
-        background-size: 100% calc(var(--scanline-thickness) + var(--scanline-spacing));
-        pointer-events: none;
-        z-index: 2;
-        border-radius: var(--screen-curvature);
-      }
-
-      // Vignette effect using pseudo-element (hybrid approach)
-      &::after {
-        content: '';
-        position: absolute;
-        top: -20px;
-        left: -20px;
-        right: -20px;
-        bottom: -20px;
-        background: 
-          /* Corners (elliptical) */
-          radial-gradient(
-            ellipse at center,
-            transparent 78%,
-            rgba(0, 0, 0, calc(var(--vignette-strength) * 0.4)) 90%,
-            rgba(0, 0, 0, calc(var(--vignette-strength) * 0.6)) 100%
-          ),
-          /* Top edge */
-          linear-gradient(to bottom, rgba(0, 0, 0, calc(var(--vignette-strength) * 0.5)) 0%, transparent 8%),
-          /* Bottom edge */
-          linear-gradient(to top, rgba(0, 0, 0, calc(var(--vignette-strength) * 0.5)) 0%, transparent 8%),
-          /* Left edge */
-          linear-gradient(to right, rgba(0, 0, 0, calc(var(--vignette-strength) * 0.5)) 0%, transparent 8%),
-          /* Right edge */
-          linear-gradient(to left, rgba(0, 0, 0, calc(var(--vignette-strength) * 0.5)) 0%, transparent 8%);
-        filter: blur(12px);
-        pointer-events: none;
-        z-index: 2;
-        border-radius: var(--screen-curvature);
-      }
-
-      .video-stream {
-        filter: contrast(var(--crt-contrast)) brightness(var(--crt-brightness)) saturate(var(--crt-saturation));
-        border-radius: var(--screen-curvature);
-      }
-    }
-  }
-
-  .video-stream {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background-color: #000;
-    opacity: 0;
-    animation: fadeIn 1200ms cubic-bezier(0.35, 0, 0.25, 1) 400ms forwards;
-    transition: filter 0.3s ease-in-out;
-  }
-
-  // When container is in fullscreen
-  &:fullscreen {
-    .video-wrapper {
-      .video-stream {
-        object-fit: contain;
-      }
-
-      // Apply dynamic positioning for pseudo-elements in fullscreen only
-      &.crt-effect {
-        // Use clip-path for proper curved masking in fullscreen
-        clip-path: inset(
-          0 
-          calc((100% - var(--video-visible-width)) / 2)
-          0 
-          calc((100% - var(--video-visible-width)) / 2)
-          round var(--screen-curvature)
-        );
-
-        &::before {
-          left: var(--video-visible-left);
-          width: var(--video-visible-width);
-          // Remove border-radius in fullscreen (clip-path handles it)
-          border-radius: 0;
-        }
-
-        &::after {
-          left: calc(var(--video-visible-left) - 20px);
-          width: calc(var(--video-visible-width) + 40px);
-          // Remove border-radius in fullscreen (clip-path handles it)
-          border-radius: 0;
-        }
-
-        .video-stream {
-          // Remove border-radius in fullscreen (clip-path handles it)
-          border-radius: 0;
-        }
-      }
-    }
-
-    .player-toolbar-overlay,
-    .filter-toolbar-overlay {
-      position: fixed;
-      left: 0;
-      right: 0;
-      z-index: 9999;
-    }
-
-    .player-toolbar-overlay {
-      bottom: 0;
-      transform: translateY(100%);
-    }
-
-    .filter-toolbar-overlay {
-      top: 16px;
-      bottom: auto;
-      left: 50%;
-      right: auto;
-      transform: translate(-50%, -100%);
-
-      // Stay visible when hovering in fullscreen
-      &:hover {
-        opacity: 1 !important;
-        transform: translate(-50%, 0) !important;
-      }
-    }
-
-    // Show toolbars on container hover in fullscreen
-    &:hover .player-toolbar-overlay {
-      transform: translateY(0) !important;
-      opacity: 1 !important;
-      pointer-events: all !important;
-    }
-
-    &:hover .filter-toolbar-overlay {
-      transform: translate(-50%, 0) !important;
-      opacity: 1 !important;
-      pointer-events: all !important;
-    }
-
-    &:hover .video-controls {
-      opacity: 1 !important;
-    }
-
-    &:hover .video-controls .close-button {
-      opacity: 1 !important;
-    }
-
-    &:hover .video-controls .right-controls-card {
-      opacity: 1 !important;
-      transform: translateX(0) !important;
-    }
-
-    &:hover .crt-controls-overlay.slide-in {
-      opacity: 1 !important;
-      transform: translateX(0) !important;
-    }
-
-    // Fix card positioning in fullscreen
-    .crt-controls-overlay {
-      position: fixed;
-      bottom: 120px;
-      left: 16px;
-      z-index: 9999;
-    }
-
-    .video-controls .right-controls-card {
-      position: fixed;
-      bottom: 120px;
-      right: 16px;
-      z-index: 9999;
-    }
-
-    .video-controls .close-button {
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      z-index: 9999;
-    }
-  }
-
-  .filter-toolbar-overlay {
-    position: absolute;
-    top: 16px;
-    left: 50%;
-    transform: translate(-50%, -100%);
-    pointer-events: all;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-    z-index: 16;
-    width: auto;
-    max-width: 90%;
-
-    &.slide-in {
-      transform: translate(-50%, 0);
-    }
-
-    // Stay visible when hovering over the toolbar itself
-    &:hover {
-      opacity: 1 !important;
-      transform: translate(-50%, 0) !important;
-    }
-
-    // Stay visible when menu has focus
-    &:focus-within {
-      opacity: 1 !important;
-      transform: translate(-50%, 0) !important;
-    }
-
-    // Only remove outer margins
-    ::ng-deep lib-scaling-compact-card {
-      margin: 0 !important;
-    }
-  }
-
-  .player-toolbar-overlay {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    transform: translateY(100%);
-    pointer-events: all;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-    z-index: 15;
-
-    // Stay visible when hovering over the toolbar itself
-    &:hover {
-      opacity: 1 !important;
-      transform: translateY(0) !important;
-    }
-
-    // Stay visible when menu has focus
-    &:focus-within {
-      opacity: 1 !important;
-      transform: translateY(0) !important;
-    }
-
-    // Only remove outer margins, leave everything else alone
-    ::ng-deep lib-sliding-container {
-      margin: 0 !important;
-    }
-  }
-
-  .video-controls {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-    z-index: 10;
-
-    .close-button {
-      position: absolute;
-      top: 16px;
-      right:50px;
-      pointer-events: all;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 1;
-    }
-
-    .right-controls-card {
-      position: absolute;
-      bottom: 120px;
-      right: 16px;
-      pointer-events: all;
-      transform: translateX(100%);
-      opacity: 0;
-      transition: transform 300ms cubic-bezier(0.4, 0.0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
-      z-index: 1; // Ensure it's above the parent's opacity
-
-      ::ng-deep lib-compact-card-layout {
-        margin: 0;
-
-        .compact-card.glassy-card {
-          padding: 8px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-      }
-
-      // Highlight when CRT effect or settings are active
-      ::ng-deep lib-icon-button.active {
-        .icon-button {
-          background-color: rgba(var(--glassy-color), 0.2) !important;
-          border: 1px solid var(--color-highlight);
-        }
-
-        mat-icon {
-          color: var(--color-highlight);
-        }
-      }
-    }
-  }
-
-  .crt-controls-overlay {
-    position: absolute;
-    bottom: 120px;
-    left: 16px;
-    transform: translateX(-100%);
-    pointer-events: none;
-    z-index: 20;
-    max-width: 320px;
-    opacity: 0;
-    transition: transform 300ms cubic-bezier(0.4, 0.0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
-
-    &.slide-in {
-      transform: translateX(0);
-      opacity: 1;
-      pointer-events: all;
-    }
-
-    ::ng-deep lib-compact-card-layout {
-      margin: 0;
-      
-      .compact-card.glassy-card {
-        padding: 16px 32px 16px 16px;
-        min-width: 200px;
-      }
-    }
-
-    .crt-card-header {
-      font-size: 0.9375rem;
-      font-weight: 600;
-      margin-bottom: 0.375rem;
-      opacity: 0.95;
-    }
-
-    .crt-control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      margin-bottom: 0.25rem;
-
-      &:last-child {
-        margin-bottom: 0;
-      }
-
-      .control-label {
-        font-size: 0.8125rem;
-        font-weight: 500;
-        opacity: 0.9;
-        margin-bottom: 1px;
-        line-height: 1.2;
-      }
-
-      mat-slider {
-        width: 100%;
-        margin-bottom: 1px;
-      }
-
-      .control-value {
-        font-size: 0.6875rem;
-        opacity: 0.7;
-        text-align: right;
-        line-height: 1.2;
-      }
-    }
-  }
+// Adjust filter toolbar top margin to match left/right controls
+::ng-deep lib-filter-toolbar[topOverlay] {
+  margin-top: -8px;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
+// Remove black background from video container to prevent visible gaps
+::ng-deep lib-video-stream .video-stream-container {
+  background-color: transparent;
+}
+
+// Right controls wrapper styling
+.right-controls-wrapper {
+  ::ng-deep lib-compact-card-layout {
+    margin: 0;
+
+    .compact-card.glassy-card {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
   }
-  to {
-    opacity: 1;
+
+  // Highlight when CRT effect or settings are active
+  ::ng-deep lib-icon-button.active {
+    .icon-button {
+      background-color: rgba(var(--glassy-color), 0.2) !important;
+      border: 1px solid var(--color-highlight);
+    }
+
+    mat-icon {
+      color: var(--color-highlight);
+    }
   }
 }

@@ -8,12 +8,13 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSliderModule } from '@angular/material/slider';
-import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatMenuModule } from '@angular/material/menu';
 
 import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-layout.component';
+import { IconButtonComponent } from '../icon-button/icon-button.component';
+import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
+import { DropdownMenuItemComponent } from '../dropdown-menu/dropdown-menu-item.component';
 import { CrtSettings, CrtSettingsConfig } from '../crt-effect-wrapper/crt-settings.interface';
 import {
   DEFAULT_CRT_SETTINGS,
@@ -161,11 +162,12 @@ const COLOR_FILTER_SLIDERS: SliderConfig[] = [
     CommonModule,
     FormsModule,
     MatSliderModule,
-    MatButtonModule,
     MatIconModule,
     MatTooltipModule,
-    MatMenuModule,
     CompactCardLayoutComponent,
+    IconButtonComponent,
+    DropdownMenuComponent,
+    DropdownMenuItemComponent,
   ],
   templateUrl: './crt-settings-panel.component.html',
   styleUrl: './crt-settings-panel.component.scss',

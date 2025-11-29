@@ -9,7 +9,9 @@ import {
   DestroyRef,
   inject,
   afterNextRender,
+  HostListener,
 } from '@angular/core';
+import { CommonModule } from '@angular/common';
 
 /**
  * A pure presentation layout container component that manages overlay positioning,
@@ -41,7 +43,7 @@ import {
 @Component({
   selector: 'lib-content-overlay-container',
   standalone: true,
-  imports: [],
+  imports: [CommonModule],
   templateUrl: './content-overlay-container.component.html',
   styleUrl: './content-overlay-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -76,6 +78,11 @@ export class ContentOverlayContainerComponent {
    */
   readonly isFullscreen = signal<boolean>(false);
 
+  /**
+   * Tracks whether mouse is currently over the container.
+   */
+  readonly isMouseOver = signal<boolean>(false);
+
   private readonly fullscreenHandler = (): void => {
     const isFs = !!document.fullscreenElement;
     this.isFullscreen.set(isFs);
@@ -90,6 +97,20 @@ export class ContentOverlayContainerComponent {
     this.destroyRef.onDestroy(() => {
       document.removeEventListener('fullscreenchange', this.fullscreenHandler);
     });
+  }
+
+  /**
+   * Handle mouse entering the container - show overlays.
+   */
+  onMouseEnter(): void {
+    this.isMouseOver.set(true);
+  }
+
+  /**
+   * Handle mouse leaving the container - hide overlays.
+   */
+  onMouseLeave(): void {
+    this.isMouseOver.set(false);
   }
 
   /**

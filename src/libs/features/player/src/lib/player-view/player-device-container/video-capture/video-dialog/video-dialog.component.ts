@@ -1,9 +1,19 @@
-import { Component, Inject, ChangeDetectionStrategy, signal, viewChild, ElementRef, afterNextRender, OnDestroy } from '@angular/core';
+import { Component, Inject, ChangeDetectionStrategy, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { MatSliderModule } from '@angular/material/slider';
-import { FormsModule } from '@angular/forms';
-import { IconButtonComponent, CompactCardLayoutComponent } from '@teensyrom-nx/ui/components';
+import {
+  IconButtonComponent,
+  CompactCardLayoutComponent,
+  VideoStreamComponent,
+  CrtEffectWrapperComponent,
+  ContentOverlayContainerComponent,
+  CrtSettingsPanelComponent,
+  CrtSettings,
+  CrtSettingsConfig,
+  CRT_PRESETS,
+  CRT_CONFIGS,
+  DEFAULT_CRT_SETTINGS,
+} from '@teensyrom-nx/ui/components';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
 
@@ -16,134 +26,87 @@ export interface VideoDialogData {
 @Component({
   selector: 'lib-video-dialog',
   standalone: true,
-  imports: [CommonModule, IconButtonComponent, PlayerToolbarComponent, FilterToolbarComponent, MatSliderModule, FormsModule, CompactCardLayoutComponent],
+  imports: [
+    CommonModule,
+    IconButtonComponent,
+    CompactCardLayoutComponent,
+    VideoStreamComponent,
+    CrtEffectWrapperComponent,
+    ContentOverlayContainerComponent,
+    CrtSettingsPanelComponent,
+    PlayerToolbarComponent,
+    FilterToolbarComponent,
+  ],
   templateUrl: './video-dialog.component.html',
   styleUrl: './video-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class VideoDialogComponent implements OnDestroy {
-  private videoElement = viewChild<ElementRef<HTMLVideoElement>>('dialogVideoElement');
-  private containerElement = viewChild<ElementRef<HTMLDivElement>>('videoContainer');
-  isFullscreen = signal<boolean>(false);
-  isCrtEnabled = signal<boolean>(true);
-  showCrtControls = signal<boolean>(false);
-  
-  // CRT effect parameters
-  scanlineIntensity = signal<number>(0.50);
-  scanlineThickness = signal<number>(3);
-  scanlineSpacing = signal<number>(2);
-  vignetteStrength = signal<number>(1.30);
-  screenCurvature = signal<number>(115);
-  contrast = signal<number>(1.10);
-  brightness = signal<number>(1.50);
-  saturation = signal<number>(1.30);
+export class VideoDialogComponent {
+  /** Reference to overlay container for fullscreen control */
+  protected readonly overlayContainer = viewChild<ContentOverlayContainerComponent>('overlayContainer');
 
-  // Aspect ratio detection for fullscreen mode
-  videoVisibleLeft = signal<number>(0);
-  videoVisibleWidth = signal<number>(0);
-  private fullscreenChangeHandler: (() => void) | null = null;
+  /** Whether CRT effects are enabled */
+  protected readonly isCrtEnabled = signal<boolean>(true);
+
+  /** Whether CRT settings panel is visible */
+  protected readonly showCrtControls = signal<boolean>(false);
+
+  /** Unified CRT settings (consolidated from 8 individual signals) */
+  protected readonly crtSettings = signal<CrtSettings>({
+    scanlineIntensity: 0.50,
+    scanlineThickness: 3,
+    scanlineSpacing: 2,
+    vignetteStrength: 1.30,
+    screenCurvature: 115,
+    contrast: 1.10,
+    brightness: 1.50,
+    saturation: 1.30,
+  });
+
+  /** CRT config - full features for video dialog */
+  protected readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.full;
+
+  /** Expose presets for template usage */
+  protected readonly CRT_PRESETS = CRT_PRESETS;
+  protected readonly DEFAULT_CRT_SETTINGS = DEFAULT_CRT_SETTINGS;
 
   constructor(
     public dialogRef: MatDialogRef<VideoDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: VideoDialogData
-  ) {
-    // Attach stream after view init
-    afterNextRender(() => {
-      const videoEl = this.videoElement()?.nativeElement;
-      if (videoEl && this.data.stream) {
-        videoEl.srcObject = this.data.stream;
-        videoEl.play().catch(err => console.error('Dialog video play error:', err));
-      }
+  ) {}
 
-      // Set up fullscreen change listener
-      this.setupFullscreenListener();
-    });
-  }
-
-  ngOnDestroy(): void {
-    if (this.fullscreenChangeHandler) {
-      document.removeEventListener('fullscreenchange', this.fullscreenChangeHandler);
-    }
-  }
-
-  private setupFullscreenListener(): void {
-    this.fullscreenChangeHandler = () => {
-      const isFullscreen = !!document.fullscreenElement;
-      this.isFullscreen.set(isFullscreen);
-      
-      if (isFullscreen) {
-        // Delay calculation to ensure layout is complete
-        setTimeout(() => this.calculateVisibleVideoArea(), 100);
-      } else {
-        // Reset to defaults when exiting fullscreen
-        this.videoVisibleLeft.set(0);
-        this.videoVisibleWidth.set(0);
-      }
-    };
-
-    document.addEventListener('fullscreenchange', this.fullscreenChangeHandler);
-  }
-
-  private calculateVisibleVideoArea(): void {
-    const videoEl = this.videoElement()?.nativeElement;
-    const containerEl = this.containerElement()?.nativeElement;
-    
-    if (!videoEl || !containerEl) return;
-
-    // Get video's intrinsic dimensions
-    const videoAspectRatio = videoEl.videoWidth / videoEl.videoHeight;
-    
-    // Get container dimensions (fullscreen = screen dimensions)
-    const containerWidth = containerEl.clientWidth;
-    const containerHeight = containerEl.clientHeight;
-    const containerAspectRatio = containerWidth / containerHeight;
-
-    // Calculate visible video dimensions using object-fit: contain logic
-    let visibleWidth: number;
-    let visibleLeft: number;
-
-    if (videoAspectRatio > containerAspectRatio) {
-      // Video is wider - letterboxed top/bottom
-      visibleWidth = containerWidth;
-      visibleLeft = 0;
-    } else {
-      // Video is narrower - pillarboxed left/right
-      visibleWidth = containerHeight * videoAspectRatio;
-      visibleLeft = (containerWidth - visibleWidth) / 2;
-    }
-
-    this.videoVisibleLeft.set(visibleLeft);
-    this.videoVisibleWidth.set(visibleWidth);
-  }
-
+  /** Close the dialog */
   onClose(): void {
     this.dialogRef.close();
   }
 
+  /** Toggle fullscreen via overlay container */
   toggleFullscreen(): void {
-    const containerEl = this.containerElement()?.nativeElement;
-    if (!containerEl) return;
-
-    if (!this.isFullscreen()) {
-      // Enter fullscreen
-      if (containerEl.requestFullscreen) {
-        containerEl.requestFullscreen();
-      }
-      this.isFullscreen.set(true);
-    } else {
-      // Exit fullscreen
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-      this.isFullscreen.set(false);
-    }
+    this.overlayContainer()?.toggleFullscreen();
   }
 
+  /** Toggle CRT effect on/off */
   toggleCrtEffect(): void {
     this.isCrtEnabled.update(enabled => !enabled);
   }
 
+  /** Toggle CRT controls panel visibility */
   toggleCrtControls(): void {
     this.showCrtControls.update(show => !show);
+  }
+
+  /** Handle CRT settings changes from settings panel */
+  onCrtSettingsChange(settings: CrtSettings): void {
+    this.crtSettings.set(settings);
+  }
+
+  /** Reset CRT settings to defaults */
+  onCrtReset(): void {
+    this.crtSettings.set(DEFAULT_CRT_SETTINGS);
+  }
+
+  /** Apply a CRT preset */
+  onCrtPresetSelected(presetName: keyof typeof CRT_PRESETS): void {
+    this.crtSettings.set(CRT_PRESETS[presetName]);
   }
 }

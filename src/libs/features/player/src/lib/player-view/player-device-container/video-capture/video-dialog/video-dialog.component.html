@@ -1,166 +1,83 @@
-<!-- Video container with hover controls -->
-<div class="video-container" #videoContainer>
-  <div 
-    class="video-wrapper" 
-    [class.crt-effect]="isCrtEnabled()"
-    [style.--scanline-intensity]="scanlineIntensity()"
-    [style.--scanline-thickness.px]="scanlineThickness()"
-    [style.--scanline-spacing.px]="scanlineSpacing()"
-    [style.--vignette-strength]="vignetteStrength()"
-    [style.--screen-curvature.px]="screenCurvature()"
-    [style.--crt-contrast]="contrast()"
-    [style.--crt-brightness]="brightness()"
-    [style.--crt-saturation]="saturation()"
-    [style.--video-visible-left.px]="videoVisibleLeft()"
-    [style.--video-visible-width.px]="videoVisibleWidth()">
-    <video 
-      #dialogVideoElement 
-      autoplay 
-      playsinline 
-      muted
-      class="video-stream"
-    ></video>
-  </div>
+<!-- Video dialog using composed UI components -->
+<lib-content-overlay-container
+  #overlayContainer
+  [showOverlaysOnHover]="true"
+  [overlayTransitionMs]="300"
+>
+  <!-- Content slot: CRT wrapper around video stream -->
+  <lib-crt-effect-wrapper content
+    [settings]="crtSettings()"
+    [config]="crtConfig"
+    [enabled]="isCrtEnabled()"
+    [contentAspectRatio]="4/3"
+  >
+    <lib-video-stream
+      [stream]="data.stream"
+      [objectFit]="'contain'"
+    ></lib-video-stream>
+  </lib-crt-effect-wrapper>
 
-  <!-- CRT Controls overlay (top left) -->
+  <!-- Top overlay: Filter toolbar -->
+  <lib-filter-toolbar topOverlay
+    [deviceId]="data.deviceId"
+  ></lib-filter-toolbar>
+
+  <!-- Bottom overlay: Player toolbar -->
+  <lib-player-toolbar bottomOverlay
+    [deviceId]="data.deviceId"
+  ></lib-player-toolbar>
+
+  <!-- Top right corner: Close button -->
+  <lib-icon-button topRightCorner
+    icon="close"
+    ariaLabel="Close dialog"
+    variant="rounded-transparent"
+    (buttonClick)="onClose()"
+  ></lib-icon-button>
+
+  <!-- Left controls: CRT settings panel (slides in when showCrtControls is true) -->
   @if (isCrtEnabled()) {
-    <div class="crt-controls-overlay" [class.slide-in]="showCrtControls()">
-      <lib-compact-card-layout cardClass="glassy-card crt-controls-card">
-        <div class="crt-card-header">CRT Effect</div>
-        <div class="crt-control-group">
-          <span class="control-label">Scanline Intensity</span>
-          <mat-slider min="0" max="0.5" step="0.01" discrete>
-            <input matSliderThumb [(ngModel)]="scanlineIntensity" />
-          </mat-slider>
-          <span class="control-value">{{ scanlineIntensity() | number: '1.2-2' }}</span>
-        </div>
-
-        <div class="crt-control-group">
-          <span class="control-label">Scanline Thickness</span>
-          <mat-slider min="1" max="4" step="1" discrete>
-            <input matSliderThumb [(ngModel)]="scanlineThickness" />
-          </mat-slider>
-          <span class="control-value">{{ scanlineThickness() }}px</span>
-        </div>
-
-        <div class="crt-control-group">
-          <span class="control-label">Scanline Gap</span>
-          <mat-slider min="1" max="8" step="1" discrete>
-            <input matSliderThumb [(ngModel)]="scanlineSpacing" />
-          </mat-slider>
-          <span class="control-value">{{ scanlineSpacing() }}px</span>
-        </div>
-
-        <div class="crt-control-group">
-          <span class="control-label">Vignette</span>
-          <mat-slider min="0" max="2" step="0.05" discrete>
-            <input matSliderThumb [(ngModel)]="vignetteStrength" />
-          </mat-slider>
-          <span class="control-value">{{ vignetteStrength() | number: '1.2-2' }}</span>
-        </div>
-
-        <div class="crt-control-group">
-          <span class="control-label">Screen Curvature</span>
-          <mat-slider min="0" max="115" step="5" discrete>
-            <input matSliderThumb [(ngModel)]="screenCurvature" />
-          </mat-slider>
-          <span class="control-value">{{ screenCurvature() }}px</span>
-        </div>
-
-        <div class="crt-control-group">
-          <span class="control-label">Contrast</span>
-          <mat-slider min="0.8" max="1.5" step="0.05" discrete>
-            <input matSliderThumb [(ngModel)]="contrast" />
-          </mat-slider>
-          <span class="control-value">{{ contrast() | number: '1.2-2' }}</span>
-        </div>
-
-        <div class="crt-control-group">
-          <span class="control-label">Brightness</span>
-          <mat-slider min="0.8" max="1.5" step="0.05" discrete>
-            <input matSliderThumb [(ngModel)]="brightness" />
-          </mat-slider>
-          <span class="control-value">{{ brightness() | number: '1.2-2' }}</span>
-        </div>
-
-        <div class="crt-control-group">
-          <span class="control-label">Saturation</span>
-          <mat-slider min="0.8" max="1.5" step="0.05" discrete>
-            <input matSliderThumb [(ngModel)]="saturation" />
-          </mat-slider>
-          <span class="control-value">{{ saturation() | number: '1.2-2' }}</span>
-        </div>
-      </lib-compact-card-layout>
-    </div>
+    <lib-crt-settings-panel leftControls
+      [settings]="crtSettings()"
+      [config]="crtConfig"
+      [visible]="showCrtControls()"
+      [class.panel-hidden]="!showCrtControls()"
+      (settingsChange)="onCrtSettingsChange($event)"
+      (resetRequested)="onCrtReset()"
+      (presetSelected)="onCrtPresetSelected($event)"
+    ></lib-crt-settings-panel>
   }
 
-  <!-- Filter toolbar overlay (above player toolbar) -->
-  <div class="filter-toolbar-overlay">
-    <lib-filter-toolbar [deviceId]="data.deviceId"></lib-filter-toolbar>
-  </div>
-
-  <!-- Player toolbar overlay (bottom) -->
-  <div class="player-toolbar-overlay">
-    <lib-player-toolbar [deviceId]="data.deviceId"></lib-player-toolbar>
-  </div>
-
-  <!-- Control buttons (fade on hover) -->
-  <div class="video-controls">
-    <!-- Close button -->
-    <div class="close-button">
-      <lib-icon-button
-        icon="close"
-        ariaLabel="Close dialog"
-        variant="rounded-transparent"
-        (buttonClick)="onClose()"
-      >
-      </lib-icon-button>
-    </div>
-
-    <!-- Right side controls card -->
-    <div class="right-controls-card">
-      <lib-compact-card-layout cardClass="glassy-card">
-        <!-- CRT settings button -->
-        @if (isCrtEnabled()) {
-          <lib-icon-button
-            icon="tune"
-            ariaLabel="CRT settings"
-            variant="rounded-transparent"
-            [class.active]="showCrtControls()"
-            (buttonClick)="toggleCrtControls()"
-          >
-          </lib-icon-button>
-        }
-
-        <!-- CRT effect toggle button -->
+  <!-- Right controls: CRT toggle, settings toggle, fullscreen -->
+  <div rightControls class="right-controls-wrapper">
+    <lib-compact-card-layout cardClass="glassy-card">
+      <!-- CRT settings button (only when CRT is enabled) -->
+      @if (isCrtEnabled()) {
         <lib-icon-button
-          icon="tv"
-          ariaLabel="Toggle CRT effect"
+          icon="tune"
+          ariaLabel="CRT settings"
           variant="rounded-transparent"
-          [class.active]="isCrtEnabled()"
-          (buttonClick)="toggleCrtEffect()"
-        >
-        </lib-icon-button>
+          [class.active]="showCrtControls()"
+          (buttonClick)="toggleCrtControls()"
+        ></lib-icon-button>
+      }
 
-        <!-- Fullscreen toggle button -->
-        @if (!isFullscreen()) {
-          <lib-icon-button
-            icon="fullscreen"
-            ariaLabel="Enter fullscreen"
-            variant="rounded-transparent"
-            (buttonClick)="toggleFullscreen()"
-          >
-          </lib-icon-button>
-        } @else {
-          <lib-icon-button
-            icon="fullscreen_exit"
-            ariaLabel="Exit fullscreen"
-            variant="rounded-transparent"
-            (buttonClick)="toggleFullscreen()"
-          >
-          </lib-icon-button>
-        }
-      </lib-compact-card-layout>
-    </div>
+      <!-- CRT effect toggle button -->
+      <lib-icon-button
+        icon="tv"
+        ariaLabel="Toggle CRT effect"
+        variant="rounded-transparent"
+        [class.active]="isCrtEnabled()"
+        (buttonClick)="toggleCrtEffect()"
+      ></lib-icon-button>
+
+      <!-- Fullscreen toggle button -->
+      <lib-icon-button
+        [icon]="overlayContainer.isFullscreen() ? 'fullscreen_exit' : 'fullscreen'"
+        [ariaLabel]="overlayContainer.isFullscreen() ? 'Exit fullscreen' : 'Enter fullscreen'"
+        variant="rounded-transparent"
+        (buttonClick)="toggleFullscreen()"
+      ></lib-icon-button>
+    </lib-compact-card-layout>
   </div>
-</div>
+</lib-content-overlay-container>

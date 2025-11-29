@@ -138,43 +138,79 @@ The overlay container uses Angular's `ng-content` with `select` for flexible com
 </lib-content-overlay-container>
 ```
 
-### Pattern 3: CSS-Only Effect Wrapper
+### Pattern 3: CSS-Only Effect Wrapper with Configuration
 
-CRT effects are pure CSS that can wrap any content:
+CRT effects are pure CSS that can wrap any content. **Phase 4 introduced a unified configuration model** where both `lib-crt-effect-wrapper` and `lib-crt-settings-panel` accept a `config` input that controls which effect groups are enabled:
 
+```typescript
+// CrtSettingsConfig controls which effect groups are active
+interface CrtSettingsConfig {
+  showScanlines: boolean;    // Scanline intensity, thickness, gap
+  showVignette: boolean;     // Vignette effect  
+  showCurvature: boolean;    // Screen curvature
+  showColorFilters: boolean; // Contrast, brightness, saturation
+}
+
+// Preset configs match CRT_PRESETS keys
+CRT_CONFIGS = {
+  full: { showScanlines: true, showVignette: true, showCurvature: true, showColorFilters: true },
+  filtersOnly: { showScanlines: false, showVignette: false, showCurvature: false, showColorFilters: true },
+  scanlines: { showScanlines: true, showVignette: false, showCurvature: false, showColorFilters: true },
+  none: { showScanlines: false, showVignette: false, showCurvature: false, showColorFilters: false }
+};
+```
+
+**Usage with config:**
 ```html
-<!-- Wrap video -->
-<lib-crt-effect-wrapper [settings]="crtSettings">
+<!-- Wrap video with full CRT experience -->
+<lib-crt-effect-wrapper [settings]="crtSettings" [config]="CRT_CONFIGS.full">
   <lib-video-stream [stream]="stream"></lib-video-stream>
 </lib-crt-effect-wrapper>
 
-<!-- Wrap an image (future use case) -->
-<lib-crt-effect-wrapper [settings]="crtSettings">
+<!-- Wrap image with only color filters (no scanlines/curvature) -->
+<lib-crt-effect-wrapper [settings]="crtSettings" [config]="CRT_CONFIGS.filtersOnly">
   <img src="screenshot.png" />
-</lib-crt-effect-wrapper>
-
-<!-- Wrap terminal output (future use case) -->
-<lib-crt-effect-wrapper [settings]="crtSettings">
-  <pre class="terminal">{{ logOutput }}</pre>
 </lib-crt-effect-wrapper>
 ```
 
-### Pattern 4: Settings as Inputs (Open for External Persistence)
+**Key Insight**: The wrapper uses `effectiveSettings` computed signal that applies neutral values (0 for overlays, 1 for filters) when config disables a feature group. This allows toggling features without losing slider positions.
 
-Settings UI uses input/output pattern to remain decoupled from where settings are stored:
+### Pattern 4: Cohesive Settings System (Unified Configuration)
+
+Settings UI uses input/output pattern with **shared configuration** for cohesion between wrapper and panel:
 
 ```typescript
 @Component({ selector: 'lib-crt-settings-panel' })
 export class CrtSettingsPanelComponent {
-  settings = input.required<CrtSettings>();      // Consumer provides current values
-  settingsChange = output<CrtSettings>();        // Consumer handles persistence
+  settings = input.required<CrtSettings>();       // Current values
+  config = input<CrtSettingsConfig>(DEFAULT_CRT_CONFIG); // Feature flags
+  settingsChange = output<CrtSettings>();         // Value changes
+  resetRequested = output<void>();                // Reset action
+  presetSelected = output<keyof typeof CRT_PRESETS>(); // Preset selection
 }
 ```
 
-This allows:
-- VideoDialogComponent can manage settings as local component state
-- Future: SettingsStore can persist CRT preferences per device
-- Settings panel doesn't care where values come from or go
+**Critical Pattern**: Pass the **same config** to both components for consistency:
+
+```html
+<!-- Same config ensures wrapper applies only effects that panel can control -->
+<lib-crt-effect-wrapper [settings]="crtSettings()" [config]="crtConfig()">
+  <lib-video-stream [stream]="mediaStream"></lib-video-stream>
+</lib-crt-effect-wrapper>
+
+<lib-crt-settings-panel leftControls
+  [settings]="crtSettings()"
+  [config]="crtConfig()"
+  (settingsChange)="crtSettings.set($event)"
+  (resetRequested)="crtSettings.set(DEFAULT_CRT_SETTINGS)"
+  (presetSelected)="crtSettings.set(CRT_PRESETS[$event])">
+</lib-crt-settings-panel>
+```
+
+**Why This Matters**:
+- When `showScanlines: false`, wrapper applies neutral values AND panel hides scanline sliders
+- No confusing UI showing controls that don't do anything
+- Clean separation between "what user set" and "what's applied"
 
 ---
 
@@ -278,52 +314,55 @@ Create the layout container with named content slots for composing any content w
 
 ---
 
-<details open>
-<summary><h3>🔜 Phase 4: CRT Settings Panel (NEXT)</h3></summary>
+<details>
+<summary><h3>✅ Phase 4: CRT Settings Panel (COMPLETE)</h3></summary>
 
 ### Objective
 
-Extract the CRT settings controls into a reusable panel component that can be projected into the `leftControls` slot of `lib-content-overlay-container`.
+Extract the CRT settings controls into a reusable panel component that works cohesively with `lib-crt-effect-wrapper`.
 
 ### Key Deliverables
 
-- [ ] `lib-crt-settings-panel` with `settings` input and `settingsChange` output
-- [ ] Slider controls for all 8 CRT parameters (matching existing video-dialog ranges)
-- [ ] Reset to defaults functionality (using `DEFAULT_CRT_SETTINGS` from Phase 2)
-- [ ] Preset selector dropdown (using `CRT_PRESETS` from Phase 2)
-- [ ] Compact vertical design suitable for `leftControls` side slot
-- [ ] Unit tests for input/output behavior
-- [ ] Export from `libs/ui/components` barrel
+- [x] `lib-crt-settings-panel` with `settings`, `config`, `visible` inputs
+- [x] Slider controls for all 8 CRT parameters (conditionally shown based on config)
+- [x] Reset to defaults functionality via `resetRequested` output
+- [x] Preset selector menu via `presetSelected` output
+- [x] Compact vertical design suitable for `leftControls` side slot
+- [x] Unit tests for all behaviors (24 tests + 8 wrapper tests)
+- [x] Export from `libs/ui/components` barrel
 
-### Integration with Phase 3
+### Completion Notes
 
-The settings panel will be composed in `leftControls` slot:
-```html
-<lib-content-overlay-container>
-  <!-- content and other slots -->
-  <lib-crt-settings-panel leftControls
-    [settings]="crtSettings()"
-    (settingsChange)="onCrtSettingsChange($event)">
-  </lib-crt-settings-panel>
-</lib-content-overlay-container>
-```
+- **Completed**: November 28, 2025
+- **Report**: [Phase 4 Report](./reports/phase-04-report.md)
+- **Tests**: 32 new behavioral tests, all passing (357 total in ui-components)
 
-This leverages the **hover-to-reveal** and **focus-within persistence** from Phase 3, ensuring the settings panel:
-- Slides in from the left when user hovers
-- Stays visible while interacting with sliders (focus-within)
-- Slides out when user moves away and sliders lose focus
+### Major Architectural Enhancement: Unified Configuration Model
+
+**New Exports**:
+- `CrtSettingsConfig` interface with 4 feature flags
+- `CRT_CONFIGS` preset configurations matching `CRT_PRESETS` keys
+- `DEFAULT_CRT_CONFIG` (all features enabled)
+
+**Key Decisions**:
+1. **Config Input**: Both `lib-crt-effect-wrapper` and `lib-crt-settings-panel` accept `config` input
+2. **Effective Settings**: Wrapper computes effective settings applying neutral values for disabled features
+3. **Cohesive Pairing**: Same config passed to both components ensures consistency
+4. **Conditional Sliders**: Panel hides slider groups when config disables their feature
+
+**Impact on Phase 5**: Must pass same `config` to both wrapper and settings panel.
 
 ### Phase Documents
 
 - [Phase Plan](./phases/phase-04-crt-settings-panel.md)
-- [Task Handoff](./tasks/phase-04-task-handoff.md) *(to be created)*
+- [Task Handoff](./tasks/phase-04-task-handoff.md)
 
 </details>
 
 ---
 
-<details>
-<summary><h3>Phase 5: Refactor VideoDialogComponent</h3></summary>
+<details open>
+<summary><h3>🔜 Phase 5: Refactor VideoDialogComponent (NEXT)</h3></summary>
 
 ### Objective
 
@@ -331,9 +370,10 @@ Refactor the existing VideoDialogComponent to compose the new UI components, val
 
 ### Key Deliverables
 
-- [ ] VideoDialogComponent uses `lib-content-overlay-container` (renamed from video-overlay-container)
+- [ ] VideoDialogComponent uses `lib-content-overlay-container`
 - [ ] VideoDialogComponent uses `lib-crt-effect-wrapper` around `lib-video-stream`
 - [ ] VideoDialogComponent uses `lib-crt-settings-panel` in `leftControls` slot
+- [ ] **NEW**: Pass same `config` to both wrapper and settings panel (unified config model)
 - [ ] Map existing overlays to 9-slot architecture:
   - `content` → `lib-crt-effect-wrapper` wrapping `lib-video-stream`
   - `topOverlay` → `lib-filter-toolbar`
@@ -341,14 +381,39 @@ Refactor the existing VideoDialogComponent to compose the new UI components, val
   - `topRightCorner` → close button
   - `leftControls` → `lib-crt-settings-panel` (conditional on CRT enabled)
   - `rightControls` → CRT toggle, fullscreen buttons
-- [ ] All existing functionality preserved (fullscreen, close, toolbars)
-- [ ] Component SCSS reduced significantly (effects moved to wrapper)
+- [ ] Convert individual CRT signals to single `crtSettings` signal
+- [ ] Add `crtConfig` signal (use `CRT_CONFIGS.full` for full experience)
 - [ ] Fullscreen delegated to `lib-content-overlay-container`
+- [ ] Component SCSS reduced significantly (effects moved to wrapper)
+- [ ] All existing functionality preserved (fullscreen, close, toolbars)
 - [ ] All existing tests pass
+
+### Integration Pattern from Phase 4
+
+```typescript
+// In component class
+protected readonly crtSettings = signal<CrtSettings>(DEFAULT_CRT_SETTINGS);
+protected readonly crtConfig = signal<CrtSettingsConfig>(CRT_CONFIGS.full);
+protected readonly crtEnabled = signal(true);
+```
+
+```html
+<lib-crt-effect-wrapper content [settings]="crtSettings()" [config]="crtConfig()" [enabled]="crtEnabled()">
+  <lib-video-stream [stream]="data.stream"></lib-video-stream>
+</lib-crt-effect-wrapper>
+
+<lib-crt-settings-panel leftControls
+  [settings]="crtSettings()"
+  [config]="crtConfig()"
+  [visible]="showCrtControls()"
+  (settingsChange)="crtSettings.set($event)">
+</lib-crt-settings-panel>
+```
 
 ### Phase Documents
 
 - [Phase Plan](./phases/phase-05-refactor-video-dialog.md)
+- [Task Handoff](./tasks/phase-05-task-handoff.md) *(to be created)*
 
 </details>
 
