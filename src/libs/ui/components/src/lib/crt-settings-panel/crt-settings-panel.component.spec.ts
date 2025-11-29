@@ -9,6 +9,14 @@ import {
   DEFAULT_CRT_CONFIG,
 } from '../crt-effect-wrapper/crt-settings.defaults';
 
+/** Helper to find icon button by mat-icon content */
+function findIconButton(container: HTMLElement, iconName: string): HTMLElement | undefined {
+  const iconButtons = container.querySelectorAll('lib-icon-button');
+  return Array.from(iconButtons).find(
+    (btn) => btn.querySelector('mat-icon')?.textContent?.trim() === iconName
+  ) as HTMLElement | undefined;
+}
+
 describe('CrtSettingsPanelComponent', () => {
   let component: CrtSettingsPanelComponent;
   let fixture: ComponentFixture<CrtSettingsPanelComponent>;
@@ -152,14 +160,19 @@ describe('CrtSettingsPanelComponent', () => {
   });
 
   describe('Settings Change Emission', () => {
+    /** Helper to call protected onSliderChange method */
+    function callOnSliderChange(key: keyof CrtSettings, value: number): void {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (component as any).onSliderChange(key, value);
+    }
+
     it('should emit settingsChange when slider value changes', () => {
       const settingsChangeSpy = vi.fn();
       component.settingsChange.subscribe(settingsChangeSpy);
       fixture.detectChanges();
 
       // Simulate slider change by calling the handler directly
-      (component as unknown as { onSliderChange: (key: keyof CrtSettings, value: number) => void })
-        .onSliderChange('scanlineIntensity', 0.25);
+      callOnSliderChange('scanlineIntensity', 0.25);
 
       expect(settingsChangeSpy).toHaveBeenCalledWith({
         ...DEFAULT_CRT_SETTINGS,
@@ -172,8 +185,7 @@ describe('CrtSettingsPanelComponent', () => {
       component.settingsChange.subscribe(settingsChangeSpy);
       fixture.detectChanges();
 
-      (component as unknown as { onSliderChange: (key: keyof CrtSettings, value: number) => void })
-        .onSliderChange('brightness', 1.2);
+      callOnSliderChange('brightness', 1.2);
 
       const emittedSettings = settingsChangeSpy.mock.calls[0][0] as CrtSettings;
       expect(emittedSettings.brightness).toBe(1.2);
@@ -186,8 +198,7 @@ describe('CrtSettingsPanelComponent', () => {
       component.settingsChange.subscribe(settingsChangeSpy);
       fixture.detectChanges();
 
-      (component as unknown as { onSliderChange: (key: keyof CrtSettings, value: number) => void })
-        .onSliderChange('contrast', 1.3);
+      callOnSliderChange('contrast', 1.3);
 
       expect(settingsChangeSpy).toHaveBeenCalledWith({
         ...DEFAULT_CRT_SETTINGS,
@@ -202,30 +213,30 @@ describe('CrtSettingsPanelComponent', () => {
       component.resetRequested.subscribe(resetSpy);
       fixture.detectChanges();
 
-      // Find lib-icon-button with refresh icon
-      const iconButtons = fixture.nativeElement.querySelectorAll('lib-icon-button');
-      const resetButton = Array.from(iconButtons).find((btn: Element) => 
-        btn.querySelector('mat-icon')?.textContent?.trim() === 'refresh'
-      ) as HTMLElement;
+      const resetButton = findIconButton(fixture.nativeElement, 'refresh');
       expect(resetButton).toBeTruthy();
 
       // Click the button inside lib-icon-button
-      const innerButton = resetButton.querySelector('button');
+      const innerButton = resetButton?.querySelector('button');
       innerButton?.click();
       expect(resetSpy).toHaveBeenCalled();
     });
   });
 
   describe('Preset Selection', () => {
+    /** Helper to call protected onPresetSelect method */
+    function callOnPresetSelect(preset: CrtPresetName): void {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (component as any).onPresetSelect(preset);
+    }
+
     it('should emit presetSelected when preset is chosen', () => {
       const presetSpy = vi.fn();
       component.presetSelected.subscribe(presetSpy);
       fixture.detectChanges();
 
       // Call the handler directly since menu interaction is complex to simulate
-      (component as unknown as { onPresetSelect: (preset: CrtPresetName) => void }).onPresetSelect(
-        'standard'
-      );
+      callOnPresetSelect('standard');
 
       expect(presetSpy).toHaveBeenCalledWith('standard');
     });
@@ -238,9 +249,7 @@ describe('CrtSettingsPanelComponent', () => {
       const presets: CrtPresetName[] = ['full', 'standard', 'none'];
 
       presets.forEach((preset) => {
-        (component as unknown as { onPresetSelect: (preset: CrtPresetName) => void }).onPresetSelect(
-          preset
-        );
+        callOnPresetSelect(preset);
       });
 
       expect(presetSpy).toHaveBeenCalledTimes(3);
@@ -306,10 +315,7 @@ describe('CrtSettingsPanelComponent', () => {
 
       // NOTE: Preset menu is currently commented out in template
       // This test is kept for documentation purposes but will pass without finding the button
-      const iconButtons = fixture.nativeElement.querySelectorAll('lib-icon-button');
-      const tuneButton = Array.from(iconButtons).find((btn: Element) => 
-        btn.querySelector('mat-icon')?.textContent?.trim() === 'tune'
-      );
+      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
       // Expect no tune button since preset menu is commented out
       expect(tuneButton).toBeFalsy();
     });
@@ -317,11 +323,7 @@ describe('CrtSettingsPanelComponent', () => {
     it('should have reset button', () => {
       fixture.detectChanges();
 
-      // Find lib-icon-button with refresh icon
-      const iconButtons = fixture.nativeElement.querySelectorAll('lib-icon-button');
-      const resetButton = Array.from(iconButtons).find((btn: Element) => 
-        btn.querySelector('mat-icon')?.textContent?.trim() === 'refresh'
-      );
+      const resetButton = findIconButton(fixture.nativeElement, 'refresh');
       expect(resetButton).toBeTruthy();
     });
   });
@@ -331,8 +333,25 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.componentRef.setInput('cardClass', 'my-custom-panel-class');
       fixture.detectChanges();
 
-      const matCard = fixture.nativeElement.querySelector('mat-card') as HTMLElement;
-      expect(matCard.classList.contains('my-custom-panel-class')).toBe(true);
+      // Check the computed property value directly
+      expect(component['computedCardClass']()).toContain('my-custom-panel-class');
+    });
+
+    it('should include base classes when cardClass is provided', () => {
+      fixture.componentRef.setInput('cardClass', 'extra-class');
+      fixture.detectChanges();
+
+      const cardClass = component['computedCardClass']();
+      expect(cardClass).toContain('glassy-card');
+      expect(cardClass).toContain('crt-controls-card');
+      expect(cardClass).toContain('extra-class');
+    });
+
+    it('should only have base classes when no cardClass is provided', () => {
+      fixture.detectChanges();
+
+      const cardClass = component['computedCardClass']();
+      expect(cardClass).toBe('glassy-card crt-controls-card');
     });
   });
 });

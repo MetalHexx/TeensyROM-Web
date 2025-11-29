@@ -195,8 +195,8 @@ export class CrtSettingsPanelComponent {
   readonly visible = input<boolean>(true);
 
   /**
-   * Optional additional CSS class(es) forwarded to the inner compact card.
-   * Useful for consumers that need to style the panel card externally.
+   * Additional CSS class(es) to forward to the inner compact card layout.
+   * Use this to apply context-specific styling like height constraints.
    */
   readonly cardClass = input<string>('');
 
@@ -244,6 +244,16 @@ export class CrtSettingsPanelComponent {
   protected readonly hasAnySliders = computed(() => {
     const c = this.config();
     return c.showScanlines || c.showVignette || c.showCurvature || c.showColorFilters;
+  });
+
+  /**
+   * Combined CSS classes for the inner compact card layout.
+   * Merges base classes with any additional cardClass input.
+   */
+  protected readonly computedCardClass = computed(() => {
+    const baseClasses = 'glassy-card crt-controls-card';
+    const additionalClass = this.cardClass();
+    return additionalClass ? `${baseClasses} ${additionalClass}` : baseClasses;
   });
 
   // ─────────────────────────────────────────────────────────────────────────

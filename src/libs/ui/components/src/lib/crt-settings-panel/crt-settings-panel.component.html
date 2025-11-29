@@ -1,7 +1,4 @@
-<lib-compact-card-layout
-  [cardClass]="'glassy-card crt-controls-card ' + cardClass()"
-  [enableOverflow]="true"
->
+<lib-compact-card-layout [cardClass]="computedCardClass()">
   <!-- Header with preset menu and reset button -->
   <div class="crt-card-header">
     <span class="header-title">CRT Effect</span>
