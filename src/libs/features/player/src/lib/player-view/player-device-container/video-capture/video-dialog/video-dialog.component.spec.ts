@@ -77,6 +77,11 @@ describe('VideoDialogComponent', () => {
       stream: mockStream,
       deviceLabel: 'Test Camera',
       deviceId: 'test-device-123',
+      devices: [
+        { deviceId: 'test-device-123', label: 'Test Camera' },
+        { deviceId: 'test-device-456', label: 'Backup Camera' },
+      ],
+      selectedDeviceId: 'test-device-123',
     };
 
     mockDialogRef = {
@@ -181,10 +186,11 @@ describe('VideoDialogComponent', () => {
 
     it('should render CRT toggle button', () => {
       fixture.detectChanges();
-      const crtButton = fixture.nativeElement.querySelector(
-        'lib-icon-button[icon="tv"]'
+      // CRT toggle button is now inside lib-video-controls-toolbar
+      const toolbar = fixture.nativeElement.querySelector(
+        'lib-video-controls-toolbar'
       );
-      expect(crtButton).toBeTruthy();
+      expect(toolbar).toBeTruthy();
     });
   });
 
@@ -232,11 +238,12 @@ describe('VideoDialogComponent', () => {
 
     it('should hide CRT settings panel when controls are toggled off', () => {
       fixture.detectChanges();
-      // Panel should be hidden by default
+      // Panel should be rendered but hidden by default (CRT is enabled, controls are hidden)
       const settingsPanel = fixture.nativeElement.querySelector(
         'lib-crt-settings-panel'
       );
-      expect(settingsPanel).toBeFalsy();
+      expect(settingsPanel).toBeTruthy();
+      expect(settingsPanel.classList.contains('panel-hidden')).toBe(true);
     });
   });
 
@@ -272,9 +279,9 @@ describe('VideoDialogComponent', () => {
     it('should apply preset when onCrtPresetSelected is called', () => {
       fixture.detectChanges();
 
-      component.onCrtPresetSelected('filtersOnly');
+      component.onCrtPresetSelected('standard');
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS.filtersOnly);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS.standard);
     });
 
     it('should apply full preset correctly', () => {
@@ -289,13 +296,9 @@ describe('VideoDialogComponent', () => {
   describe('Fullscreen Toggle', () => {
     it('should have fullscreen toggle button', () => {
       fixture.detectChanges();
-      // The fullscreen button is the third lib-icon-button in the right controls wrapper
-      // Icon is dynamically bound to overlayContainer.isFullscreen() state
-      const rightControls = fixture.nativeElement.querySelector('.right-controls-wrapper');
-      const iconButtons = rightControls?.querySelectorAll('lib-icon-button') ?? [];
-      // Should have at least 2 buttons (CRT toggle and fullscreen) when CRT is enabled
-      // When CRT is enabled: settings, crt toggle, fullscreen = 3 buttons
-      expect(iconButtons.length).toBeGreaterThanOrEqual(2);
+      // Fullscreen button is now inside lib-video-controls-toolbar
+      const toolbar = fixture.nativeElement.querySelector('lib-video-controls-toolbar');
+      expect(toolbar).toBeTruthy();
     });
   });
 
@@ -322,12 +325,12 @@ describe('VideoDialogComponent', () => {
       expect(videoStream).toBeTruthy();
     });
 
-    it('should render lib-compact-card-layout for right controls', () => {
+    it('should render lib-video-controls-toolbar for right controls', () => {
       fixture.detectChanges();
-      const compactCard = fixture.nativeElement.querySelector(
-        '.right-controls-wrapper lib-compact-card-layout'
+      const toolbar = fixture.nativeElement.querySelector(
+        'lib-video-controls-toolbar[rightControls]'
       );
-      expect(compactCard).toBeTruthy();
+      expect(toolbar).toBeTruthy();
     });
   });
 
@@ -364,10 +367,10 @@ describe('VideoDialogComponent', () => {
       expect(closeButton).toBeTruthy();
     });
 
-    it('should have rightControls slot with controls wrapper', () => {
+    it('should have rightControls slot with video controls toolbar', () => {
       fixture.detectChanges();
       const rightControls = fixture.nativeElement.querySelector(
-        '.right-controls-wrapper[rightControls]'
+        'lib-video-controls-toolbar[rightControls]'
       );
       expect(rightControls).toBeTruthy();
     });

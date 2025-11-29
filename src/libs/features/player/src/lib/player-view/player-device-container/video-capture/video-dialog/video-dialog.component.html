@@ -1,7 +1,7 @@
 <!-- Video dialog using composed UI components -->
 <lib-content-overlay-container
   #overlayContainer
-  [showOverlaysOnHover]="true"
+  [showOverlaysOnHover]="!isDeviceSelectorOpen()"
   [overlayTransitionMs]="300"
 >
   <!-- Content slot: CRT wrapper around video stream -->
@@ -12,7 +12,7 @@
     [contentAspectRatio]="4/3"
   >
     <lib-video-stream
-      [stream]="data.stream"
+      [stream]="currentStream()"
       [objectFit]="'contain'"
     ></lib-video-stream>
   </lib-crt-effect-wrapper>
@@ -26,6 +26,17 @@
   <lib-player-toolbar bottomOverlay
     [deviceId]="data.deviceId"
   ></lib-player-toolbar>
+
+  <!-- Top left corner: Device selector (always rendered, visibility controlled by CSS) -->
+  <lib-video-device-selector
+    topLeftCorner
+    slideDirection="left"
+    [visible]="showDeviceSelector()"
+    [devices]="data.devices"
+    [selectedDeviceId]="selectedDeviceId()"
+    (deviceSelected)="onDeviceSelected($event)"
+    (openedChange)="onDeviceSelectorOpenedChange($event)">
+  </lib-video-device-selector>
 
   <!-- Top right corner: Close button -->
   <lib-icon-button topRightCorner
@@ -48,36 +59,18 @@
     ></lib-crt-settings-panel>
   }
 
-  <!-- Right controls: CRT toggle, settings toggle, fullscreen -->
-  <div rightControls class="right-controls-wrapper">
-    <lib-compact-card-layout cardClass="glassy-card">
-      <!-- CRT settings button (only when CRT is enabled) -->
-      @if (isCrtEnabled()) {
-        <lib-icon-button
-          icon="tune"
-          ariaLabel="CRT settings"
-          variant="rounded-transparent"
-          [class.active]="showCrtControls()"
-          (buttonClick)="toggleCrtControls()"
-        ></lib-icon-button>
-      }
-
-      <!-- CRT effect toggle button -->
-      <lib-icon-button
-        icon="tv"
-        ariaLabel="Toggle CRT effect"
-        variant="rounded-transparent"
-        [class.active]="isCrtEnabled()"
-        (buttonClick)="toggleCrtEffect()"
-      ></lib-icon-button>
-
-      <!-- Fullscreen toggle button -->
-      <lib-icon-button
-        [icon]="overlayContainer.isFullscreen() ? 'fullscreen_exit' : 'fullscreen'"
-        [ariaLabel]="overlayContainer.isFullscreen() ? 'Exit fullscreen' : 'Enter fullscreen'"
-        variant="rounded-transparent"
-        (buttonClick)="toggleFullscreen()"
-      ></lib-icon-button>
-    </lib-compact-card-layout>
-  </div>
+  <!-- Right controls toolbar -->
+  <lib-video-controls-toolbar
+    rightControls
+    [isCrtEnabled]="isCrtEnabled()"
+    [showCrtControls]="showCrtControls()"
+    [isDeviceSelectorActive]="showDeviceSelector()"
+    [isFullscreen]="overlayContainer.isFullscreen()"
+    [showFullscreen]="true"
+    [showClose]="false"
+    (crtToggleClick)="toggleCrtEffect()"
+    (crtSettingsClick)="toggleCrtControls()"
+    (deviceSelectorClick)="toggleDeviceSelector()"
+    (fullscreenClick)="toggleFullscreen()">
+  </lib-video-controls-toolbar>
 </lib-content-overlay-container>

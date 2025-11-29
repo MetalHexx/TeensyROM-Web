@@ -1,16 +1,14 @@
 import { Component, computed, signal, OnDestroy, inject, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatSelectModule } from '@angular/material/select';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatDialog } from '@angular/material/dialog';
 import {
   VideoStreamComponent,
   ContentOverlayContainerComponent,
   CrtEffectWrapperComponent,
   CrtSettingsPanelComponent,
-  CompactCardLayoutComponent,
-  IconButtonComponent,
   ScalingCompactCardComponent,
+  VideoDeviceSelectorComponent,
+  VideoControlsToolbarComponent,
   CRT_CONFIGS,
   CRT_PRESETS,
   CrtSettings,
@@ -31,11 +29,9 @@ interface VideoDevice {
     ContentOverlayContainerComponent,
     CrtEffectWrapperComponent,
     CrtSettingsPanelComponent,
-    CompactCardLayoutComponent,
-    IconButtonComponent,
     ScalingCompactCardComponent,
-    MatSelectModule,
-    MatFormFieldModule,
+    VideoDeviceSelectorComponent,
+    VideoControlsToolbarComponent,
   ],
   templateUrl: './video-capture.component.html',
   styleUrl: './video-capture.component.scss',
@@ -217,14 +213,28 @@ export class VideoCaptureComponent implements OnDestroy {
     if (!stream) return;
 
     const deviceLabel = this.devices().find(d => d.deviceId === this.selectedDeviceId())?.label || 'Video Capture';
+    const selectedDeviceId = this.selectedDeviceId() || '';
 
-    this.dialog.open(VideoDialogComponent, {
-      data: { stream, deviceLabel, deviceId: this.deviceId() },
+    const dialogRef = this.dialog.open(VideoDialogComponent, {
+      data: {
+        stream,
+        deviceLabel,
+        deviceId: this.deviceId(),
+        devices: this.devices(),
+        selectedDeviceId,
+      },
       width: '85vw',
       height: '85vh',
       maxWidth: '1200px',
       maxHeight: '900px',
       panelClass: 'video-dialog-fullscreen',
+    });
+
+    // Handle device change from dialog
+    dialogRef.afterClosed().subscribe((result: { selectedDeviceId: string } | null) => {
+      if (result?.selectedDeviceId && result.selectedDeviceId !== this.selectedDeviceId()) {
+        this.onDeviceSelected(result.selectedDeviceId);
+      }
     });
   }
 

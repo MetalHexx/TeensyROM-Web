@@ -1,0 +1,56 @@
+<div class="video-controls-toolbar">
+  <lib-compact-card-layout cardClass="glassy-card">
+    <!-- CRT toggle button -->
+    @if (showCrtToggle()) {
+      <lib-icon-button
+        [icon]="crtIcon"
+        ariaLabel="Toggle CRT effect"
+        variant="rounded-transparent"
+        [class.active]="isCrtEnabled()"
+        (buttonClick)="crtToggleClick.emit()">
+      </lib-icon-button>
+    }
+
+    <!-- CRT settings button (only when CRT is enabled) -->
+    @if (showCrtSettings() && isCrtEnabled()) {
+      <lib-icon-button
+        icon="tune"
+        ariaLabel="CRT settings"
+        variant="rounded-transparent"
+        [class.active]="showCrtControls()"
+        (buttonClick)="crtSettingsClick.emit()">
+      </lib-icon-button>
+    }
+
+    <!-- Device selector toggle button -->
+    @if (showDeviceSelector()) {
+      <lib-icon-button
+        icon="videocam"
+        ariaLabel="Select video device"
+        variant="rounded-transparent"
+        [class.active]="isDeviceSelectorActive()"
+        (buttonClick)="deviceSelectorClick.emit()">
+      </lib-icon-button>
+    }
+
+    <!-- Fullscreen toggle button -->
+    @if (showFullscreen()) {
+      <lib-icon-button
+        [icon]="fullscreenIcon"
+        [ariaLabel]="fullscreenAriaLabel"
+        variant="rounded-transparent"
+        (buttonClick)="fullscreenClick.emit()">
+      </lib-icon-button>
+    }
+
+    <!-- Close button -->
+    @if (showClose()) {
+      <lib-icon-button
+        icon="close"
+        ariaLabel="Close"
+        variant="rounded-transparent"
+        (buttonClick)="closeClick.emit()">
+      </lib-icon-button>
+    }
+  </lib-compact-card-layout>
+</div>

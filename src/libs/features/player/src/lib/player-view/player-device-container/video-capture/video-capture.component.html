@@ -16,34 +16,18 @@
           </lib-crt-effect-wrapper>
         </ng-container>
 
-        <ng-template #deviceSelectorTemplate>
-          <lib-compact-card-layout cardClass="glassy-card device-selector-card">
-            <div class="device-selector">
-              <mat-form-field appearance="outline">
-                <mat-label>Video Device</mat-label>
-                <mat-select 
-                  [value]="selectedDevice()"
-                  (selectionChange)="onDeviceSelected($event.value)"
-                  (openedChange)="onDeviceSelectorOpenedChange($event)">
-                  @for (device of devices(); track device.deviceId) {
-                    <mat-option [value]="device.deviceId">
-                      {{ device.label }}
-                    </mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            </div>
-          </lib-compact-card-layout>
-        </ng-template>
+        <!-- Top right corner: Device selector (always rendered, visibility controlled by CSS) -->
+        <lib-video-device-selector
+          topRightCorner
+          [visible]="showDeviceSelector()"
+          [devices]="devices()"
+          [selectedDeviceId]="selectedDevice() ?? ''"
+          (deviceSelected)="onDeviceSelected($event)"
+          (openedChange)="onDeviceSelectorOpenedChange($event)">
+        </lib-video-device-selector>
 
-        @if (showDeviceSelector()) {
-          <ng-container topRightCorner>
-            <ng-container [ngTemplateOutlet]="deviceSelectorTemplate"></ng-container>
-          </ng-container>
-        }
-
-        <!-- Top left corner: CRT settings panel -->
-        @if (isCrtEnabled() && showCrtControls()) {
+        <!-- Top left corner: CRT settings panel (always rendered when CRT enabled, visibility controlled by CSS) -->
+        @if (isCrtEnabled()) {
           <lib-crt-settings-panel
             topLeftCorner
             [settings]="crtSettings()"
@@ -57,46 +41,19 @@
           </lib-crt-settings-panel>
         }
 
-        <!-- Right controls: CRT toggle, settings toggle, maximize -->
-        <ng-container rightControls>
-          <div class="right-controls-wrapper">
-            <lib-compact-card-layout cardClass="glassy-card">
-              <!-- CRT toggle button -->
-              <lib-icon-button
-                [icon]="isCrtEnabled() ? 'tv' : 'tv_off'"
-                ariaLabel="Toggle CRT effect"
-                variant="rounded-transparent"
-                (buttonClick)="toggleCrtEffect()">
-              </lib-icon-button>
-
-              <!-- CRT settings toggle (only when CRT enabled) -->
-              @if (isCrtEnabled()) {
-                <lib-icon-button
-                  icon="tune"
-                  ariaLabel="CRT settings"
-                  variant="rounded-transparent"
-                  (buttonClick)="toggleCrtControls()">
-                </lib-icon-button>
-              }
-
-              <!-- Video device selector toggle -->
-              <lib-icon-button
-                icon="videocam"
-                ariaLabel="Select video device"
-                variant="rounded-transparent"
-                (buttonClick)="toggleDeviceSelector()">
-              </lib-icon-button>
-
-              <!-- Maximize button -->
-              <lib-icon-button
-                icon="fullscreen"
-                ariaLabel="Open in dialog"
-                variant="rounded-transparent"
-                (buttonClick)="openVideoDialog()">
-              </lib-icon-button>
-            </lib-compact-card-layout>
-          </div>
-        </ng-container>
+        <!-- Right controls toolbar -->
+        <lib-video-controls-toolbar
+          rightControls
+          [isCrtEnabled]="isCrtEnabled()"
+          [showCrtControls]="showCrtControls()"
+          [isDeviceSelectorActive]="showDeviceSelector()"
+          [showFullscreen]="true"
+          [showClose]="false"
+          (crtToggleClick)="toggleCrtEffect()"
+          (crtSettingsClick)="toggleCrtControls()"
+          (deviceSelectorClick)="toggleDeviceSelector()"
+          (fullscreenClick)="openVideoDialog()">
+        </lib-video-controls-toolbar>
       </lib-content-overlay-container>
     </lib-scaling-compact-card>
     </div>

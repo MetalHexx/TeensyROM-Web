@@ -1,0 +1,17 @@
+<lib-compact-card-layout cardClass="glassy-card video-device-selector-card">
+  <div class="video-device-selector">
+    <mat-form-field appearance="outline">
+      <mat-label>Video Device</mat-label>
+      <mat-select
+        [value]="selectedDeviceId()"
+        (selectionChange)="onDeviceSelected($event.value)"
+        (openedChange)="onOpenedChange($event)">
+        @for (device of devices(); track device.deviceId) {
+          <mat-option [value]="device.deviceId">
+            {{ device.label }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+</lib-compact-card-layout>

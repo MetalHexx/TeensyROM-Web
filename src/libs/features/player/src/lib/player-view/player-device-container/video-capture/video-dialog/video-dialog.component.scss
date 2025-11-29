@@ -48,29 +48,3 @@
 ::ng-deep lib-video-stream .video-stream-container {
   background-color: transparent;
 }
-
-// Right controls wrapper styling
-.right-controls-wrapper {
-  ::ng-deep lib-compact-card-layout {
-    margin: 0;
-
-    .compact-card.glassy-card {
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-  }
-
-  // Highlight when CRT effect or settings are active
-  ::ng-deep lib-icon-button.active {
-    .icon-button {
-      background-color: rgba(var(--glassy-color), 0.2) !important;
-      border: 1px solid var(--color-highlight);
-    }
-
-    mat-icon {
-      color: var(--color-highlight);
-    }
-  }
-}
