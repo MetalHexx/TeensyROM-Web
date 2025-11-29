@@ -140,6 +140,20 @@ export const CRT_PRESETS = {
   },
 } as const satisfies Record<string, CrtSettings>;
 
+/** Type for valid preset names */
+export type CrtPresetName = keyof typeof CRT_PRESETS;
+
+/**
+ * Human-readable labels for CRT presets.
+ * Use these for UI display in dropdown menus.
+ */
+export const CRT_PRESET_LABELS: Record<CrtPresetName, string> = {
+  full: 'Full CRT',
+  standard: 'Standard CRT',
+  small: 'Small CRT',
+  none: 'No Effects',
+};
+
 /**
  * Default CRT settings - full CRT experience.
  * Matches the original VideoDialogComponent values.

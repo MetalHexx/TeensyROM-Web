@@ -313,11 +313,8 @@ describe('CrtSettingsPanelComponent', () => {
     it('should have preset menu button with tune icon', () => {
       fixture.detectChanges();
 
-      // NOTE: Preset menu is currently commented out in template
-      // This test is kept for documentation purposes but will pass without finding the button
       const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      // Expect no tune button since preset menu is commented out
-      expect(tuneButton).toBeFalsy();
+      expect(tuneButton).toBeTruthy();
     });
 
     it('should have reset button', () => {
@@ -325,6 +322,103 @@ describe('CrtSettingsPanelComponent', () => {
 
       const resetButton = findIconButton(fixture.nativeElement, 'refresh');
       expect(resetButton).toBeTruthy();
+    });
+  });
+
+  describe('Preset Dropdown', () => {
+    it('should render dropdown trigger button in header', () => {
+      fixture.detectChanges();
+
+      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
+      expect(tuneButton).toBeTruthy();
+    });
+
+    it('should open dropdown when trigger is clicked', async () => {
+      fixture.detectChanges();
+
+      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
+      const innerButton = tuneButton?.querySelector('button');
+      innerButton?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      // Check that the dropdown opened by looking for menu items in the overlay
+      const overlay = document.querySelector('.cdk-overlay-container');
+      const menuItems = overlay?.querySelectorAll('lib-dropdown-menu-item');
+      expect(menuItems?.length).toBe(4);
+    });
+
+    it('should display all four preset options', async () => {
+      fixture.detectChanges();
+
+      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
+      const innerButton = tuneButton?.querySelector('button');
+      innerButton?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const overlay = document.querySelector('.cdk-overlay-container');
+      const menuItems = overlay?.querySelectorAll('lib-dropdown-menu-item');
+      const itemTexts = Array.from(menuItems || []).map((item) =>
+        item.textContent?.trim()
+      );
+
+      expect(itemTexts).toContain('Full CRT');
+      expect(itemTexts).toContain('Standard CRT');
+      expect(itemTexts).toContain('Small CRT');
+      expect(itemTexts).toContain('No Effects');
+    });
+
+    it('should emit presetSelected when dropdown item is clicked', async () => {
+      const presetSpy = vi.fn();
+      component.presetSelected.subscribe(presetSpy);
+      fixture.detectChanges();
+
+      // Open the dropdown
+      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
+      const innerButton = tuneButton?.querySelector('button');
+      innerButton?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      // Click the 'standard' preset item via the button element
+      const overlay = document.querySelector('.cdk-overlay-container');
+      const standardButton = overlay?.querySelector('[data-testid="preset-standard"]') as HTMLElement;
+      standardButton?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(presetSpy).toHaveBeenCalledWith('standard');
+    });
+
+    it('should have dropdown that auto-closes after item click via DropdownMenuItemComponent', async () => {
+      fixture.detectChanges();
+
+      // Open the dropdown
+      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
+      const innerButton = tuneButton?.querySelector('button');
+      innerButton?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      // Verify dropdown is open
+      const overlay = document.querySelector('.cdk-overlay-container');
+      const menuWrapper = overlay?.querySelector('.dropdown-menu-wrapper');
+      expect(menuWrapper).toBeTruthy();
+
+      // Click a preset item - the DropdownMenuItemComponent has autoClose=true by default
+      // which calls parentDropdown.close() after emitting itemClick
+      const fullButton = overlay?.querySelector('[data-testid="preset-full"]') as HTMLElement;
+      fullButton?.click();
+      fixture.detectChanges();
+      
+      // Give time for async close operation  
+      await new Promise(resolve => setTimeout(resolve, 200));
+      fixture.detectChanges();
+
+      // The dropdown should be closed (no menu wrapper visible)
+      const menuWrapperAfter = document.querySelector('.cdk-overlay-container .dropdown-menu-wrapper');
+      expect(menuWrapperAfter).toBeFalsy();
     });
   });
 

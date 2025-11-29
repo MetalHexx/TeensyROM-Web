@@ -4,7 +4,7 @@
     <span class="header-title">CRT Effect</span>
     <div class="header-actions">
       <!-- Preset menu button -->
-      <!-- <lib-dropdown-menu #presetDropdown>
+      <lib-dropdown-menu #presetDropdown>
         <lib-icon-button
           icon="tune"
           ariaLabel="Select preset"
@@ -16,12 +16,13 @@
         <div dropdown-content>
           @for (preset of presetNames; track preset) {
             <lib-dropdown-menu-item
+              [testId]="'preset-' + preset"
               (itemClick)="onPresetSelect(preset)">
               {{ getPresetLabel(preset) }}
             </lib-dropdown-menu-item>
           }
         </div>
-      </lib-dropdown-menu> -->
+      </lib-dropdown-menu>
 
       <!-- Reset button -->
       <lib-icon-button

@@ -19,11 +19,12 @@ import { CrtSettings, CrtSettingsConfig } from '../crt-effect-wrapper/crt-settin
 import {
   DEFAULT_CRT_SETTINGS,
   DEFAULT_CRT_CONFIG,
-  CRT_PRESETS,
+  CRT_PRESET_LABELS,
+  CrtPresetName,
 } from '../crt-effect-wrapper/crt-settings.defaults';
 
-/** Preset names that can be selected */
-export type CrtPresetName = keyof typeof CRT_PRESETS;
+// Re-export CrtPresetName for consumers
+export { CrtPresetName };
 
 /**
  * Slider configuration metadata for each CRT setting.
@@ -166,6 +167,8 @@ const COLOR_FILTER_SLIDERS: SliderConfig[] = [
     MatTooltipModule,
     CompactCardLayoutComponent,
     IconButtonComponent,
+    DropdownMenuComponent,
+    DropdownMenuItemComponent,
   ],
   templateUrl: './crt-settings-panel.component.html',
   styleUrl: './crt-settings-panel.component.scss',
@@ -300,12 +303,6 @@ export class CrtSettingsPanelComponent {
    * Gets human-readable preset label for menu display.
    */
   protected getPresetLabel(presetName: CrtPresetName): string {
-    const labels: Record<CrtPresetName, string> = {
-      full: 'Full CRT',
-      standard: 'Standard CRT',
-      small: 'Small CRT',
-      none: 'No Effects',
-    };
-    return labels[presetName];
+    return CRT_PRESET_LABELS[presetName];
   }
 }

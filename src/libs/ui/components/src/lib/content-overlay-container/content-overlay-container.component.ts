@@ -9,7 +9,7 @@ import {
   DestroyRef,
   inject,
   afterNextRender,
-  HostListener,
+  computed,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
@@ -27,6 +27,11 @@ import { CommonModule } from '@angular/common';
  * - `bottomLeftControls`: Bottom-left (player controls)
  * - `bottomOverlay`: Bottom-center (info, now playing)
  * - `bottomRightControls`: Bottom-right (extra controls)
+ *
+ * **CDK Overlay Awareness**: This component automatically detects when CDK overlays
+ * (dropdowns, menus, dialogs) are opened from within its content and keeps the
+ * overlay layer visible while those overlays are open. This prevents the common
+ * issue where opening a dropdown causes other overlays to disappear.
  *
  * @example
  * ```html
@@ -83,20 +88,84 @@ export class ContentOverlayContainerComponent {
    */
   readonly isMouseOver = signal<boolean>(false);
 
+  /**
+   * Tracks whether a CDK overlay (dropdown, menu, etc.) is currently open.
+   * When true, overlays stay visible even if mouse leaves the container.
+   */
+  readonly hasCdkOverlayOpen = signal<boolean>(false);
+
+  /**
+   * Manual overlay lock counter. Increment to keep overlays visible,
+   * decrement when done. Useful for programmatic overlay control.
+   */
+  readonly overlayLockCount = signal<number>(0);
+
+  /**
+   * Whether overlays should be visible based on all factors:
+   * - Mouse is over container, OR
+   * - A CDK overlay is open, OR
+   * - Manual overlay lock is active
+   */
+  readonly shouldShowOverlays = computed(() => {
+    return this.isMouseOver() || this.hasCdkOverlayOpen() || this.overlayLockCount() > 0;
+  });
+
   private readonly fullscreenHandler = (): void => {
     const isFs = !!document.fullscreenElement;
     this.isFullscreen.set(isFs);
     this.fullscreenChange.emit(isFs);
   };
 
+  /**
+   * MutationObserver to watch for CDK overlay presence.
+   * This detects when dropdowns/menus open and close.
+   */
+  private overlayObserver: MutationObserver | null = null;
+
   constructor() {
     afterNextRender(() => {
       document.addEventListener('fullscreenchange', this.fullscreenHandler);
+      this.setupCdkOverlayObserver();
     });
 
     this.destroyRef.onDestroy(() => {
       document.removeEventListener('fullscreenchange', this.fullscreenHandler);
+      this.overlayObserver?.disconnect();
     });
+  }
+
+  /**
+   * Sets up a MutationObserver to detect when CDK overlays are added/removed.
+   * This allows us to keep overlays visible when dropdowns are open.
+   */
+  private setupCdkOverlayObserver(): void {
+    const overlayContainer = document.querySelector('.cdk-overlay-container');
+    if (!overlayContainer) {
+      // CDK overlay container doesn't exist yet - try again shortly
+      setTimeout(() => this.setupCdkOverlayObserver(), 100);
+      return;
+    }
+
+    this.overlayObserver = new MutationObserver(() => {
+      this.checkForOpenOverlays();
+    });
+
+    this.overlayObserver.observe(overlayContainer, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Initial check
+    this.checkForOpenOverlays();
+  }
+
+  /**
+   * Checks if any CDK overlay panes are currently visible.
+   */
+  private checkForOpenOverlays(): void {
+    const overlayPanes = document.querySelectorAll('.cdk-overlay-pane');
+    const hasOpenOverlay = overlayPanes.length > 0;
+    this.hasCdkOverlayOpen.set(hasOpenOverlay);
   }
 
   /**
@@ -107,10 +176,25 @@ export class ContentOverlayContainerComponent {
   }
 
   /**
-   * Handle mouse leaving the container - hide overlays.
+   * Handle mouse leaving the container - hide overlays (unless locked).
    */
   onMouseLeave(): void {
     this.isMouseOver.set(false);
+  }
+
+  /**
+   * Lock overlays to stay visible. Call unlockOverlays() when done.
+   * Multiple locks can be active simultaneously.
+   */
+  lockOverlays(): void {
+    this.overlayLockCount.update((count) => count + 1);
+  }
+
+  /**
+   * Unlock overlays. Only hides when all locks are released.
+   */
+  unlockOverlays(): void {
+    this.overlayLockCount.update((count) => Math.max(0, count - 1));
   }
 
   /**

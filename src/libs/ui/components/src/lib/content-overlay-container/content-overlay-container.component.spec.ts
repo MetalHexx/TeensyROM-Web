@@ -356,4 +356,108 @@ describe('ContentOverlayContainerComponent (Standalone)', () => {
   it('should call toggleFullscreen without error', () => {
     expect(() => component.toggleFullscreen()).not.toThrow();
   });
+
+  describe('Overlay Lock Mechanism', () => {
+    it('should have overlayLockCount initially at 0', () => {
+      expect(component.overlayLockCount()).toBe(0);
+    });
+
+    it('should increment lock count when lockOverlays is called', () => {
+      component.lockOverlays();
+      expect(component.overlayLockCount()).toBe(1);
+    });
+
+    it('should decrement lock count when unlockOverlays is called', () => {
+      component.lockOverlays();
+      component.lockOverlays();
+      expect(component.overlayLockCount()).toBe(2);
+
+      component.unlockOverlays();
+      expect(component.overlayLockCount()).toBe(1);
+    });
+
+    it('should not go below 0 when unlockOverlays is called too many times', () => {
+      component.unlockOverlays();
+      component.unlockOverlays();
+      expect(component.overlayLockCount()).toBe(0);
+    });
+
+    it('should show overlays when lock count is greater than 0', () => {
+      component.lockOverlays();
+      expect(component.shouldShowOverlays()).toBe(true);
+    });
+  });
+
+  describe('CDK Overlay Awareness', () => {
+    it('should have hasCdkOverlayOpen initially false', () => {
+      expect(component.hasCdkOverlayOpen()).toBe(false);
+    });
+
+    it('should show overlays when CDK overlay is detected', () => {
+      // Simulate CDK overlay being open
+      component['hasCdkOverlayOpen'].set(true);
+      expect(component.shouldShowOverlays()).toBe(true);
+    });
+
+    it('should keep overlays visible when mouse leaves but CDK overlay is open', () => {
+      // Mouse enters
+      component.onMouseEnter();
+      expect(component.shouldShowOverlays()).toBe(true);
+
+      // CDK overlay opens
+      component['hasCdkOverlayOpen'].set(true);
+
+      // Mouse leaves
+      component.onMouseLeave();
+
+      // Overlays should still be visible because CDK overlay is open
+      expect(component.shouldShowOverlays()).toBe(true);
+    });
+
+    it('should hide overlays when mouse leaves and no CDK overlay is open', () => {
+      component.onMouseEnter();
+      expect(component.shouldShowOverlays()).toBe(true);
+
+      component.onMouseLeave();
+      expect(component.shouldShowOverlays()).toBe(false);
+    });
+  });
+
+  describe('shouldShowOverlays computed signal', () => {
+    it('should return true when mouse is over', () => {
+      component.onMouseEnter();
+      expect(component.shouldShowOverlays()).toBe(true);
+    });
+
+    it('should return true when overlay is locked', () => {
+      component.lockOverlays();
+      expect(component.shouldShowOverlays()).toBe(true);
+    });
+
+    it('should return true when CDK overlay is open', () => {
+      component['hasCdkOverlayOpen'].set(true);
+      expect(component.shouldShowOverlays()).toBe(true);
+    });
+
+    it('should return false when none of the conditions are met', () => {
+      expect(component.shouldShowOverlays()).toBe(false);
+    });
+
+    it('should return true when multiple conditions are met', () => {
+      component.onMouseEnter();
+      component.lockOverlays();
+      component['hasCdkOverlayOpen'].set(true);
+      expect(component.shouldShowOverlays()).toBe(true);
+
+      // Remove one condition at a time
+      component.onMouseLeave();
+      expect(component.shouldShowOverlays()).toBe(true);
+
+      component.unlockOverlays();
+      expect(component.shouldShowOverlays()).toBe(true);
+
+      component['hasCdkOverlayOpen'].set(false);
+      expect(component.shouldShowOverlays()).toBe(false);
+    });
+  });
 });

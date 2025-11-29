@@ -3,7 +3,7 @@
   class="overlay-container"
   [class.fullscreen]="isFullscreen()"
   [class.hover-reveal]="showOverlaysOnHover()"
-  [class.overlays-visible]="isMouseOver()"
+  [class.overlays-visible]="shouldShowOverlays()"
   [style.--transition-ms.ms]="overlayTransitionMs()"
   (mouseenter)="onMouseEnter()"
   (mouseleave)="onMouseLeave()"
