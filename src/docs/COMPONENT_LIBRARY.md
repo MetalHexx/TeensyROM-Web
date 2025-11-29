@@ -2518,6 +2518,54 @@ export class FileInfoComponent {
 
 - [`file-info.component.html`](../libs/features/player/src/lib/player-view/player-device-container/player-toolbar/file-info/file-info.component.html) - Media player file information display
 
+---
+
+## Video & CRT Components
+
+Components for video display, capture device management, and retro CRT visual effects. These components work together to create an immersive video viewing experience with optional CRT monitor aesthetics.
+
+**Component Overview**:
+
+| Component | Purpose |
+|-----------|---------|
+| `VideoStreamComponent` | Displays MediaStream in video element with loading states |
+| `VideoControlsToolbarComponent` | Vertical toolbar for video player controls (CRT, device, fullscreen) |
+| `VideoDeviceSelectorComponent` | Dropdown for selecting video capture devices |
+| `CrtEffectWrapperComponent` | Applies CRT visual effects to any content |
+| `CrtSettingsPanelComponent` | UI panel for adjusting CRT effect settings |
+| `ContentOverlayContainerComponent` | 9-slot layout container with hover-reveal overlays |
+
+**Typical Composition Pattern**:
+
+```html
+<lib-content-overlay-container [showOverlaysOnHover]="true">
+  <!-- Video with CRT effects in content slot -->
+  <lib-crt-effect-wrapper content [settings]="crtSettings" [contentAspectRatio]="4/3">
+    <lib-video-stream [stream]="mediaStream"></lib-video-stream>
+  </lib-crt-effect-wrapper>
+  
+  <!-- Controls toolbar in right slot -->
+  <lib-video-controls-toolbar rightControls
+    [isCrtEnabled]="crtEnabled()"
+    (crtToggleClick)="toggleCrt()">
+  </lib-video-controls-toolbar>
+  
+  <!-- Device selector in left slot -->
+  <lib-video-device-selector leftControls
+    [devices]="devices()"
+    [selectedDeviceId]="selectedId()"
+    (deviceSelected)="onDeviceSelected($event)">
+  </lib-video-device-selector>
+  
+  <!-- CRT settings panel in left slot -->
+  <lib-crt-settings-panel leftControls
+    [settings]="crtSettings()"
+    [visible]="showCrtPanel()"
+    (settingsChange)="onSettingsChange($event)">
+  </lib-crt-settings-panel>
+</lib-content-overlay-container>
+```
+
 ### `VideoStreamComponent`
 
 **Purpose**: A pure presentation component that displays a MediaStream in a video element with loading state management. Encapsulates video element lifecycle (autoplay, muted, srcObject binding) and provides a clean interface for displaying video streams without any store dependencies.
@@ -2534,6 +2582,14 @@ export class FileInfoComponent {
 
 - `streamReady`: `void` - Emits when video element starts playing
 - `streamError`: `ErrorEvent` - Emits when video element encounters an error
+
+**Internal Signals** (for advanced use cases):
+
+| Signal/Property | Type | Description |
+|-----------------|------|-------------|
+| `videoElementRef()` | `ElementRef<HTMLVideoElement>` | ViewChild reference to the native video element |
+| `isPlaying()` | `boolean` | Tracks if video is actively playing |
+| `showLoading()` | `boolean` | Computed: `showLoadingState && !stream && !isPlaying` |
 
 **Usage Examples**:
 
@@ -2552,10 +2608,25 @@ export class FileInfoComponent {
 <!-- Hide loading state (useful when parent handles loading UI) -->
 <lib-video-stream [stream]="webcamStream" [showLoadingState]="false"></lib-video-stream>
 
-<!-- Compose with CRT effects (Phase 3) -->
+<!-- Compose with CRT effects -->
 <lib-crt-effect-wrapper [settings]="crtSettings">
   <lib-video-stream [stream]="retroStream" [objectFit]="'contain'"></lib-video-stream>
 </lib-crt-effect-wrapper>
+
+<!-- Full composition with overlay container -->
+<lib-content-overlay-container>
+  <lib-crt-effect-wrapper content [settings]="crtSettings" [contentAspectRatio]="4/3">
+    <lib-video-stream [stream]="stream" [objectFit]="'contain'"></lib-video-stream>
+  </lib-crt-effect-wrapper>
+  <lib-video-controls-toolbar rightControls (crtToggleClick)="toggleCrt()">
+  </lib-video-controls-toolbar>
+</lib-content-overlay-container>
+```
+
+**TypeScript Import**:
+
+```typescript
+import { VideoStreamComponent } from '@teensyrom-nx/ui/components';
 ```
 
 **Features**:
@@ -2565,6 +2636,7 @@ export class FileInfoComponent {
 - **Loading State**: Optional loading overlay with animated text when no stream is available
 - **Event Emissions**: Notifies parent when video starts playing or encounters an error
 - **Accessibility**: Includes `aria-label` and `role="img"` for screen reader support
+- **Cleanup on Destroy**: Automatically clears srcObject when component is destroyed
 
 **Visual Properties**:
 
@@ -2572,7 +2644,7 @@ export class FileInfoComponent {
 - Black background for letterboxing
 - Loading overlay with semi-transparent backdrop and pulsing text animation
 
-**Best Practice**: Use as the foundation for any video display in the application. The component handles null streams gracefully, making it safe for async stream acquisition scenarios. Compose with overlay containers and effect wrappers for advanced video UI.
+**Best Practice**: Use as the foundation for any video display in the application. The component handles null streams gracefully, making it safe for async stream acquisition scenarios. Compose with `lib-content-overlay-container` for hover-revealed controls and `lib-crt-effect-wrapper` for retro visual effects.
 
 **Intended Use Cases**:
 
@@ -2581,9 +2653,9 @@ export class FileInfoComponent {
 - Future video playback features
 - Any MediaStream-based video display
 
----
+**See Also**: [CrtEffectWrapperComponent](#crteffectwrappercomponent), [ContentOverlayContainerComponent](#contentoverlaycontainercomponent)
 
-## CRT Effect System
+### CRT Effect System
 
 The CRT effect system consists of two cohesive components that share the same configuration model:
 
@@ -2592,9 +2664,9 @@ The CRT effect system consists of two cohesive components that share the same co
 
 Both components accept `CrtSettings` (values) and `CrtSettingsConfig` (feature flags) to work together seamlessly.
 
-### `CrtEffectWrapperComponent`
+#### `CrtEffectWrapperComponent`
 
-**Purpose**: A pure presentation wrapper component that applies CRT (cathode ray tube) visual effects to any projected content via CSS custom properties. Encapsulates scanlines, vignette, screen curvature, and color filter effects without any store dependencies.
+**Purpose**: A pure presentation wrapper component that applies CRT (cathode ray tube) visual effects to any projected content via CSS custom properties. Encapsulates scanlines, vignette, screen curvature, and color filter effects without any store dependencies. Supports fullscreen mode with proper aspect ratio handling for non-native content (e.g., 4:3 video on 16:9 screen).
 
 **Selector**: `lib-crt-effect-wrapper`
 
@@ -2603,6 +2675,7 @@ Both components accept `CrtSettings` (values) and `CrtSettingsConfig` (feature f
 - `settings` (optional): `CrtSettings` - CRT effect configuration values. Use `CRT_PRESETS` for common configurations or provide custom values. Defaults to `DEFAULT_CRT_SETTINGS` (full CRT experience).
 - `config` (optional): `CrtSettingsConfig` - Controls which effect groups are enabled. Use `CRT_CONFIGS` for common configurations. Defaults to `DEFAULT_CRT_CONFIG` (all groups enabled).
 - `enabled` (optional): `boolean` - Whether CRT effects are applied. When false, content renders without effects with smooth transition. Defaults to `true`.
+- `contentAspectRatio` (optional): `number | null` - Content aspect ratio (width/height) for proper effect positioning in fullscreen. When provided and content uses `object-fit: contain`, CRT effects are constrained to the visible content area via clip-path, avoiding curvature/vignette on black bars. Example: `4/3` for 4:3 video, `16/9` for 16:9 video. Defaults to `null`.
 
 **CrtSettingsConfig Interface** (Feature Flags):
 
@@ -2630,9 +2703,9 @@ Both components accept `CrtSettings` (values) and `CrtSettingsConfig` (feature f
 
 | Preset | Description | Use Case |
 |--------|-------------|----------|
-| `full` | All effects enabled (scanlines, vignette, curvature, color boost) | Video streams, terminal displays |
-| `filtersOnly` | Color enhancement only, no overlays or curvature | Images, screenshots |
-| `scanlines` | Scanlines + color, no vignette or curvature | Flat-screen retro aesthetic |
+| `full` | All effects enabled (scanlines, vignette, curvature, color boost) | Video streams, terminal displays, fullscreen video |
+| `standard` | Scanlines, vignette, color enhancement (no curvature) | Embedded previews, flat-screen retro aesthetic |
+| `small` | Subtle scanlines (1px thickness) for compact displays | Small video components, thumbnails |
 | `none` | All effects neutral (pass-through) | Temporarily disable effects |
 
 **Usage Examples**:
@@ -2643,13 +2716,25 @@ Both components accept `CrtSettings` (values) and `CrtSettingsConfig` (feature f
   <lib-video-stream [stream]="mediaStream"></lib-video-stream>
 </lib-crt-effect-wrapper>
 
-<!-- Color enhancement only on images -->
-<lib-crt-effect-wrapper [settings]="CRT_PRESETS.filtersOnly">
+<!-- Standard preset (no curvature) for embedded previews -->
+<lib-crt-effect-wrapper [settings]="CRT_PRESETS.standard">
   <img [src]="screenshot" alt="Screenshot" />
 </lib-crt-effect-wrapper>
 
+<!-- Small preset with subtle scanlines for compact displays -->
+<lib-crt-effect-wrapper [settings]="CRT_PRESETS.small">
+  <lib-video-stream [stream]="retroStream"></lib-video-stream>
+</lib-crt-effect-wrapper>
+
+<!-- 4:3 video with proper fullscreen handling (effects constrained to visible area) -->
+<lib-crt-effect-wrapper
+  [settings]="crtSettings()"
+  [contentAspectRatio]="4/3">
+  <lib-video-stream [stream]="stream" [objectFit]="'contain'"></lib-video-stream>
+</lib-crt-effect-wrapper>
+
 <!-- Custom settings blend -->
-<lib-crt-effect-wrapper [settings]="{ ...CRT_PRESETS.scanlines, brightness: 1.2 }">
+<lib-crt-effect-wrapper [settings]="{ ...CRT_PRESETS.standard, brightness: 1.2 }">
   <lib-video-stream [stream]="retroStream"></lib-video-stream>
 </lib-crt-effect-wrapper>
 
@@ -2683,6 +2768,7 @@ import {
 - **Smooth Transitions**: 300ms CSS transitions for enable/disable toggle
 - **CSS-Only Effects**: All effects via pseudo-elements and CSS filters (no JS animation overhead)
 - **Effect Isolation**: Scanlines/vignette via ::before/::after, filters on content wrapper
+- **Fullscreen Aspect Ratio**: Automatically calculates clip-path to constrain effects to visible content area when `contentAspectRatio` is provided
 
 **CSS Custom Properties (for advanced styling)**:
 
@@ -2697,6 +2783,15 @@ import {
 | `--crt-brightness` | `settings.brightness` |
 | `--crt-saturation` | `settings.saturation` |
 
+**Fullscreen Aspect Ratio Behavior**:
+
+When `contentAspectRatio` is provided and the content uses `object-fit: contain`:
+
+- **Letterboxing** (4:3 on 16:9 screen): CRT effects constrained to visible video area, black bars remain unaffected
+- **Pillarboxing** (16:9 on 4:3 screen): Same behavior for vertical black bars
+- **Clip-path Calculation**: Automatically computes inset percentages based on container vs. content aspect ratio
+- **ResizeObserver Integration**: Updates clip-path dynamically when container resizes
+
 **Visual Properties**:
 
 - Container fills parent (`width: 100%; height: 100%`)
@@ -2705,12 +2800,12 @@ import {
 - Screen Curvature: CSS border-radius with overflow hidden
 - Filters: CSS filter property on content wrapper
 
-**Best Practice**: Use presets for most scenarios - they cover the common CRT aesthetic needs. Only create custom settings when you need precise control. When effects don't make sense for content type (e.g., images in a gallery), use `CRT_PRESETS.filtersOnly` or `CRT_PRESETS.none`.
+**Best Practice**: Use presets for most scenarios - they cover the common CRT aesthetic needs. Only create custom settings when you need precise control. For fullscreen video with non-native aspect ratios, always provide `contentAspectRatio` to ensure effects don't appear on black letterbox/pillarbox areas.
 
 **Intended Use Cases**:
 
 - Video dialog/capture displays (with full CRT)
-- Screenshot galleries (with filtersOnly)
+- Fullscreen video with proper aspect ratio handling
 - Terminal/log output displays
 - Retro-themed UI elements
 - Any content needing vintage monitor aesthetics
@@ -2719,7 +2814,7 @@ import {
 
 - [`video-dialog.component.html`](../libs/features/player/src/lib/player-view/player-device-container/video-capture/video-dialog/video-dialog.component.html) - Video capture dialog (future integration)
 
-### `CrtSettingsPanelComponent`
+#### `CrtSettingsPanelComponent`
 
 **Purpose**: A configurable settings panel for CRT visual effects. Works cohesively with `lib-crt-effect-wrapper` using the same `CrtSettings` and `CrtSettingsConfig` interfaces. Displays sliders only for effect groups enabled in the `config` input.
 
@@ -2730,6 +2825,7 @@ import {
 - `settings` (optional): `CrtSettings` - Current CRT settings values that populate the sliders. Defaults to `DEFAULT_CRT_SETTINGS`.
 - `config` (optional): `CrtSettingsConfig` - Controls which effect groups/sliders are shown. Defaults to `DEFAULT_CRT_CONFIG` (all groups visible).
 - `visible` (optional): `boolean` - Controls panel visibility when used in overlay contexts. Defaults to `true`.
+- `cardClass` (optional): `string` - Additional CSS class(es) to forward to the inner compact card layout. Use this to apply context-specific styling like height constraints. Defaults to `''`.
 
 **Events**:
 
@@ -2738,6 +2834,15 @@ import {
 | `settingsChange` | `CrtSettings` | Emits when any slider value changes. Emits complete settings object. |
 | `resetRequested` | `void` | Emits when reset button is clicked. Parent should apply `DEFAULT_CRT_SETTINGS`. |
 | `presetSelected` | `CrtPresetName` | Emits when preset is selected from menu. Parent should apply `CRT_PRESETS[name]`. |
+
+**Available Presets** (accessible via preset menu):
+
+| Preset Name | Description |
+|-------------|-------------|
+| `full` | Full CRT experience - all effects at maximum |
+| `standard` | Standard CRT - no curvature, balanced effects |
+| `small` | Subtle scanlines for compact displays |
+| `none` | No effects - pass-through rendering |
 
 **Slider Configurations** (matches original video-dialog implementation):
 
@@ -2763,17 +2868,17 @@ import {
   (presetSelected)="onPresetSelect($event)">
 </lib-crt-settings-panel>
 
-<!-- Scanlines + color filters only (6 sliders) -->
+<!-- Standard preset config (no curvature slider) -->
 <lib-crt-settings-panel
   [settings]="crtSettings()"
-  [config]="CRT_CONFIGS.scanlines"
+  [config]="CRT_CONFIGS.standard"
   (settingsChange)="onSettingsChange($event)">
 </lib-crt-settings-panel>
 
-<!-- Color filters only (3 sliders) -->
+<!-- With custom card styling -->
 <lib-crt-settings-panel
   [settings]="crtSettings()"
-  [config]="CRT_CONFIGS.filtersOnly"
+  [cardClass]="'max-height-panel'"
   (settingsChange)="onSettingsChange($event)">
 </lib-crt-settings-panel>
 
@@ -2793,14 +2898,14 @@ import {
 <!-- Both components share the same settings and config -->
 <lib-crt-effect-wrapper
   [settings]="crtSettings()"
-  [config]="CRT_CONFIGS.scanlines"
+  [config]="CRT_CONFIGS.standard"
   [enabled]="crtEnabled()">
   <lib-video-stream [stream]="mediaStream"></lib-video-stream>
 </lib-crt-effect-wrapper>
 
 <lib-crt-settings-panel
   [settings]="crtSettings()"
-  [config]="CRT_CONFIGS.scanlines"
+  [config]="CRT_CONFIGS.standard"
   (settingsChange)="crtSettings.set($event)">
 </lib-crt-settings-panel>
 ```
@@ -2824,7 +2929,7 @@ import {
 
 - **Config-Driven UI**: Only shows sliders for enabled effect groups
 - **Cohesive with Effect Wrapper**: Same config model for consistent behavior
-- **Preset Menu**: Quick access to full, scanlines, filtersOnly, none presets
+- **Preset Menu**: Quick access to full, standard, small, none presets
 - **Reset Button**: Restore defaults with one click
 - **Real-time Updates**: Slider changes emit immediately for live preview
 - **Compact Design**: Vertical layout suitable for overlay side panels
@@ -2838,8 +2943,6 @@ import {
 - Settings panels for CRT-themed content
 - Image editor filter controls
 - Any adjustable CRT effect interface
-
----
 
 ### `ContentOverlayContainerComponent`
 
@@ -2856,14 +2959,16 @@ import {
 
 - `fullscreenChange`: `OutputEmitterRef<boolean>` - Emits when fullscreen state changes. `true` when entering, `false` when exiting.
 
-**Public Methods**:
+**Public Methods & Signals**:
 
-| Method | Description |
-|--------|-------------|
+| Method/Signal | Description |
+|---------------|-------------|
 | `enterFullscreen()` | Request fullscreen mode on the container element |
 | `exitFullscreen()` | Exit fullscreen mode |
 | `toggleFullscreen()` | Toggle between fullscreen and normal mode |
-| `isFullscreen()` | Signal returning current fullscreen state |
+| `isFullscreen()` | Signal returning current fullscreen state (`boolean`) |
+| `isMouseOver()` | Signal tracking whether mouse is currently over the container (`boolean`) |
+| `containerRef()` | ViewChild reference to the container element for advanced use cases |
 
 **Named Content Projection Slots (9 total)**:
 
@@ -2989,6 +3094,221 @@ When `showOverlaysOnHover` is `true`:
 **Used In**:
 
 - [`video-dialog.component.html`](../libs/features/player/src/lib/player-view/player-device-container/video-capture/video-dialog/video-dialog.component.html) - Video capture dialog (future integration)
+
+### `VideoControlsToolbarComponent`
+
+**Purpose**: A configurable vertical toolbar for video player controls. Provides toggle buttons for CRT effects, CRT settings panel, device selector, fullscreen mode, and close actions. Buttons show active state styling and automatically adapt icons based on current state (e.g., fullscreen vs exit fullscreen).
+
+**Selector**: `lib-video-controls-toolbar`
+
+**State Inputs** (Reflect current UI state):
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `isCrtEnabled` | `boolean` | `true` | Whether CRT effect is currently enabled (affects toggle icon) |
+| `showCrtControls` | `boolean` | `false` | Whether CRT settings panel is currently visible (affects active styling) |
+| `isDeviceSelectorActive` | `boolean` | `false` | Whether device selector panel is currently visible (affects active styling) |
+| `isFullscreen` | `boolean` | `false` | Whether currently in fullscreen mode (affects fullscreen icon) |
+
+**Visibility Inputs** (Configure which buttons appear):
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `showCrtToggle` | `boolean` | `true` | Show/hide CRT toggle button |
+| `showCrtSettings` | `boolean` | `true` | Show/hide CRT settings button (only visible when CRT is enabled) |
+| `showDeviceSelector` | `boolean` | `true` | Show/hide device selector toggle button |
+| `showFullscreen` | `boolean` | `true` | Show/hide fullscreen toggle button |
+| `showClose` | `boolean` | `false` | Show/hide close button |
+
+**Events**:
+
+| Event | Type | Description |
+|-------|------|-------------|
+| `crtToggleClick` | `void` | Emits when CRT toggle button is clicked |
+| `crtSettingsClick` | `void` | Emits when CRT settings button is clicked |
+| `deviceSelectorClick` | `void` | Emits when device selector button is clicked |
+| `fullscreenClick` | `void` | Emits when fullscreen button is clicked |
+| `closeClick` | `void` | Emits when close button is clicked |
+
+**Usage Examples**:
+
+```html
+<!-- Embedded video view (no close button) -->
+<lib-video-controls-toolbar
+  [isCrtEnabled]="isCrtEnabled()"
+  [showCrtControls]="showCrtPanel()"
+  [isDeviceSelectorActive]="showDeviceSelector()"
+  [showFullscreen]="true"
+  [showClose]="false"
+  (crtToggleClick)="toggleCrt()"
+  (crtSettingsClick)="toggleCrtSettings()"
+  (deviceSelectorClick)="toggleDeviceSelector()"
+  (fullscreenClick)="openDialog()">
+</lib-video-controls-toolbar>
+
+<!-- Dialog video view (with fullscreen and close) -->
+<lib-video-controls-toolbar
+  [isCrtEnabled]="isCrtEnabled()"
+  [showCrtControls]="showCrtPanel()"
+  [isDeviceSelectorActive]="showDeviceSelector()"
+  [isFullscreen]="isFullscreen()"
+  [showFullscreen]="true"
+  [showClose]="true"
+  (crtToggleClick)="toggleCrt()"
+  (crtSettingsClick)="toggleCrtSettings()"
+  (deviceSelectorClick)="toggleDeviceSelector()"
+  (fullscreenClick)="toggleFullscreen()"
+  (closeClick)="closeDialog()">
+</lib-video-controls-toolbar>
+
+<!-- Minimal toolbar (CRT controls only) -->
+<lib-video-controls-toolbar
+  [isCrtEnabled]="isCrtEnabled()"
+  [showDeviceSelector]="false"
+  [showFullscreen]="false"
+  (crtToggleClick)="toggleCrt()"
+  (crtSettingsClick)="toggleCrtSettings()">
+</lib-video-controls-toolbar>
+```
+
+**Icon Behavior**:
+
+- **CRT Toggle**: Shows `tv` when enabled, `tv_off` when disabled
+- **Fullscreen Toggle**: Shows `fullscreen` in normal mode, `fullscreen_exit` in fullscreen mode
+
+**Features**:
+
+- **Vertical Layout**: Buttons stacked vertically for side-panel placement
+- **Active State Styling**: Buttons highlight when their associated panel is open
+- **Conditional Visibility**: CRT settings button only appears when CRT is enabled
+- **Compact Card Container**: Uses `lib-compact-card-layout` with glassy styling
+- **Accessible**: Proper aria-labels for all button states
+
+**TypeScript Import**:
+
+```typescript
+import { VideoControlsToolbarComponent } from '@teensyrom-nx/ui/components';
+```
+
+**Best Practice**: Use in the `rightControls` slot of `lib-content-overlay-container` for consistent video dialog layouts. Wire up state signals and toggle functions in the parent component to manage panel visibility.
+
+**See Also**: [ContentOverlayContainerComponent](#contentoverlaycontainercomponent), [CrtSettingsPanelComponent](#crtsettingspanelcomponent), [VideoDeviceSelectorComponent](#videodeviceselectorcomponent)
+
+### `VideoDeviceSelectorComponent`
+
+**Purpose**: A reusable dropdown for selecting video capture devices. Encapsulates Material select styling, card container, and focus management needed for overlay contexts. Supports visibility animation with configurable slide direction.
+
+**Selector**: `lib-video-device-selector`
+
+**VideoDevice Interface**:
+
+```typescript
+interface VideoDevice {
+  deviceId: string;
+  label: string;
+}
+```
+
+**Properties**:
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `devices` | `VideoDevice[]` | (required) | List of available video devices |
+| `selectedDeviceId` | `string` | (required) | Currently selected device ID |
+| `visible` | `boolean` | `true` | Controls visibility with slide animation |
+| `slideDirection` | `'left' \| 'right'` | `'right'` | Direction the panel slides when hiding |
+
+**Events**:
+
+| Event | Type | Description |
+|-------|------|-------------|
+| `deviceSelected` | `string` | Emits device ID when a device is selected |
+| `openedChange` | `boolean` | Emits when dropdown opens/closes (for pausing hover-based overlays) |
+
+**Usage Examples**:
+
+```html
+<!-- Basic device selector -->
+<lib-video-device-selector
+  [devices]="videoDevices()"
+  [selectedDeviceId]="selectedDeviceId()"
+  (deviceSelected)="onDeviceSelected($event)">
+</lib-video-device-selector>
+
+<!-- With visibility animation (slide right when hidden) -->
+<lib-video-device-selector
+  [devices]="videoDevices()"
+  [selectedDeviceId]="selectedDeviceId()"
+  [visible]="showDeviceSelector()"
+  [slideDirection]="'right'"
+  (deviceSelected)="onDeviceSelected($event)"
+  (openedChange)="onSelectorOpenedChange($event)">
+</lib-video-device-selector>
+
+<!-- Left-positioned panel (slides left when hidden) -->
+<lib-video-device-selector
+  [devices]="videoDevices()"
+  [selectedDeviceId]="selectedDeviceId()"
+  [visible]="showDeviceSelector()"
+  [slideDirection]="'left'"
+  (deviceSelected)="onDeviceSelected($event)">
+</lib-video-device-selector>
+
+<!-- In overlay container slot -->
+<lib-content-overlay-container>
+  <lib-video-device-selector leftControls
+    [devices]="videoDevices()"
+    [selectedDeviceId]="selectedDeviceId()"
+    [visible]="showDeviceSelector()"
+    (deviceSelected)="onDeviceSelected($event)"
+    (openedChange)="onSelectorOpenedChange($event)">
+  </lib-video-device-selector>
+</lib-content-overlay-container>
+```
+
+**TypeScript Integration**:
+
+```typescript
+export class VideoDialogComponent {
+  private readonly videoDevices = signal<VideoDevice[]>([]);
+  private readonly selectedDeviceId = signal<string>('');
+  private readonly showDeviceSelector = signal<boolean>(false);
+
+  onDeviceSelected(deviceId: string): void {
+    this.selectedDeviceId.set(deviceId);
+    // Switch to new device stream...
+  }
+
+  onSelectorOpenedChange(isOpen: boolean): void {
+    // Pause hover-based overlay visibility while dropdown is open
+    // to prevent the dropdown from closing when mouse moves
+  }
+}
+```
+
+**TypeScript Import**:
+
+```typescript
+import { VideoDeviceSelectorComponent, VideoDevice } from '@teensyrom-nx/ui/components';
+```
+
+**Features**:
+
+- **Slide Animation**: Smooth slide animation when showing/hiding via `visible` input
+- **Configurable Direction**: Slide left or right based on panel position
+- **Dropdown State Events**: Emits when dropdown opens/closes for overlay coordination
+- **Compact Card Container**: Uses `lib-compact-card-layout` with glassy styling
+- **Material Select Integration**: Full Material Design select component with proper styling
+
+**CSS Host Binding Classes**:
+
+- `.panel-hidden`: Applied when `visible` is `false`
+- `.slide-left`: Applied when `slideDirection` is `'left'`
+- `.slide-right`: Applied when `slideDirection` is `'right'`
+
+**Best Practice**: Use in overlay contexts with `openedChange` event to coordinate with hover-based visibility. When the dropdown is open, the parent should prevent hover-triggered hiding to avoid jarring UX.
+
+**See Also**: [ContentOverlayContainerComponent](#contentoverlaycontainercomponent), [VideoControlsToolbarComponent](#videocontrolstoolbarcomponent)
 
 ### `CycleImageComponent`
 
