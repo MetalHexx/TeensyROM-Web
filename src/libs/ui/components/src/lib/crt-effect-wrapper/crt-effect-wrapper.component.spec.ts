@@ -114,12 +114,16 @@ describe('CrtEffectWrapperComponent', () => {
       expect(wrapper.style.getPropertyValue('--crt-saturation')).toBe('1.3');
     });
 
+    // Note: Phase 2 CSS custom properties (scanline-opacity, hue-rotate, color-temp,
+    // vertical scanlines, and grid mode attributes) are bound in the template but
+    // cannot be reliably tested in JSDOM. These features are tested through E2E tests.
+
     it('should update CSS variables when settings change', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
 
-      // Update to filtersOnly preset
-      fixture.componentRef.setInput('settings', CRT_PRESETS.filtersOnly);
+      // Update to none preset
+      fixture.componentRef.setInput('settings', CRT_PRESETS.none);
       fixture.detectChanges();
 
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0');
@@ -172,24 +176,36 @@ describe('CrtEffectWrapperComponent', () => {
       expect(wrapper.style.getPropertyValue('--crt-saturation')).toBe('1');
     });
 
-    it('should apply CRT_PRESETS.scanlines with vignette and curvature disabled', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS.scanlines);
+    it('should apply CRT_PRESETS.full with all effects enabled', () => {
+      fixture.componentRef.setInput('settings', CRT_PRESETS.full);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.5');
-      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('0');
-      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
+      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('1.3');
+      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('115px');
     });
 
-    it('should apply CRT_PRESETS.filtersOnly with overlays disabled', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS.filtersOnly);
+    it('should apply CRT_PRESETS.standard with curvature disabled', () => {
+      fixture.componentRef.setInput('settings', CRT_PRESETS.standard);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0');
+      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.5');
+      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
       expect(wrapper.style.getPropertyValue('--crt-brightness')).toBe('1.5');
       expect(wrapper.style.getPropertyValue('--crt-saturation')).toBe('1.3');
+    });
+
+    it('should apply CRT_PRESETS.small with minimal scanlines', () => {
+      fixture.componentRef.setInput('settings', CRT_PRESETS.small);
+      fixture.detectChanges();
+
+      const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
+      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.5');
+      expect(wrapper.style.getPropertyValue('--scanline-thickness')).toBe('1px');
+      expect(wrapper.style.getPropertyValue('--scanline-spacing')).toBe('1px');
+      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
     });
   });
 
@@ -234,32 +250,44 @@ describe('CrtEffectWrapperComponent', () => {
       expect(wrapper.style.getPropertyValue('--crt-saturation')).toBe('1');
     });
 
-    it('should apply CRT_CONFIGS.filtersOnly correctly', () => {
+    it('should apply CRT_CONFIGS.standard correctly (no curvature)', () => {
       fixture.componentRef.setInput('settings', CRT_PRESETS.full);
-      fixture.componentRef.setInput('config', CRT_CONFIGS.filtersOnly);
+      fixture.componentRef.setInput('config', CRT_CONFIGS.standard);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      // Scanlines, vignette, curvature should be disabled
-      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0');
-      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('0');
+      // Scanlines and vignette should still be active
+      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.5');
+      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('1.3');
+      // Curvature should be disabled
       expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
       // Color filters should still be active
       expect(wrapper.style.getPropertyValue('--crt-contrast')).toBe('1.1');
       expect(wrapper.style.getPropertyValue('--crt-brightness')).toBe('1.5');
     });
 
-    it('should apply CRT_CONFIGS.scanlines correctly', () => {
+    it('should apply CRT_CONFIGS.small correctly (minimal scanlines, no curvature)', () => {
       fixture.componentRef.setInput('settings', CRT_PRESETS.full);
-      fixture.componentRef.setInput('config', CRT_CONFIGS.scanlines);
+      fixture.componentRef.setInput('config', CRT_CONFIGS.small);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      // Scanlines should be active
+      // All features should be active for small (same as standard)
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.5');
-      // Vignette and curvature should be disabled
-      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('0');
+      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('1.3');
       expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
+    });
+
+    it('should apply CRT_CONFIGS.full correctly', () => {
+      fixture.componentRef.setInput('settings', CRT_PRESETS.full);
+      fixture.componentRef.setInput('config', CRT_CONFIGS.full);
+      fixture.detectChanges();
+
+      const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
+      // All effects should be active
+      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.5');
+      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('1.3');
+      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('115px');
       // Color filters should be active
       expect(wrapper.style.getPropertyValue('--crt-brightness')).toBe('1.5');
     });
