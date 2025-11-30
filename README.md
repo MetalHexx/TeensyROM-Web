@@ -33,7 +33,7 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 ## ✨ Features
 
 ### Media Player & Playback
-- **File Launch**: Remote launching of games, SID music, and images
+- **File Launch**: Remote launching of Games, Demos, SID music, and images
 - **Random Launch**: Random launching of all file types across storage devices.
 - **Playback Controls**: Play, pause, stop, next, and previous navigation
 - **Launch Modes**: 
