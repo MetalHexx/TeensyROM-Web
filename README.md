@@ -55,6 +55,7 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **CRT Customization**: Adjust scanline intensity, vignette strength, screen curvature, contrast, brightness, saturation, and hue in real-time
 - **Preset Configurations**: Quick-apply CRT presets (full, standard, minimal) for instant visual style switching
 - **Device Selection**: Switch between multiple connected video capture devices on-the-fly
+- NOTE: The video integration is completely optional, but highly recommended!
 
 ### Search & Filter
 - **Full-Text Search**: Search across all indexed files on SD or USB storage (per storage type)
