@@ -29,14 +29,14 @@ Create a single, self-contained executable distribution for Windows, Mac, and Li
 
 ## 📋 Implementation Phases
 
-| Phase | Name | Description | Agent |
-|-------|------|-------------|-------|
-| 01 | Relative URL Migration | Remove hardcoded localhost:5168 URLs from infrastructure | UI Wizard |
-| 02 | API Static File Serving | Configure .NET API to serve Angular production build | Backend Wizard |
-| 03 | Publishing Configuration | Self-contained single-file publish for all platforms | Backend Wizard |
-| 04 | GitHub Actions Workflow | Automated release pipeline with semantic versioning | Backend Wizard |
-| 05 | Homebrew Distribution | macOS distribution via Homebrew tap | Backend Wizard |
-| 06 | Documentation | Create distribution docs and update README | Documentation |
+| Phase | Name | Description | Agent | Status |
+|-------|------|-------------|-------|--------|
+| 01 | Relative URL Migration | Remove hardcoded localhost:5168 URLs from infrastructure | UI Wizard | ✅ Complete |
+| 02 | API Static File Serving | Configure .NET API to serve Angular production build | Backend Wizard | 📋 Planning |
+| 03 | Publishing Configuration | Self-contained single-file publish for all platforms | Backend Wizard | ⏳ Pending |
+| 04 | GitHub Actions Workflow | Automated release pipeline with semantic versioning | Backend Wizard | ⏳ Pending |
+| 05 | Homebrew Distribution | macOS distribution via Homebrew tap | Backend Wizard | ⏳ Pending |
+| 06 | Documentation | Create distribution docs and update README | Documentation | ⏳ Pending |
 
 ---
 
@@ -134,7 +134,7 @@ Phase 06 (Documentation) ← depends on all phases for accurate instructions
 
 ### Project Complete When:
 
-- [ ] **Phase 01**: No hardcoded `localhost:5168` in infrastructure; dev still works
+- [x] **Phase 01**: No hardcoded `localhost:5168` in infrastructure; dev still works
 - [ ] **Phase 02**: API serves Angular production build with correct routing
 - [ ] **Phase 03**: Single-file executable runs on Windows without .NET SDK
 - [ ] **Phase 04**: GitHub Actions creates releases for all 4 platforms

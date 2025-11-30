@@ -40,6 +40,10 @@ builder.Services.AddSignalR().AddJsonProtocol(options =>
 
 var app = builder.Build();
 
+// Configure static file serving for Angular SPA from wwwroot
+app.UseDefaultFiles();  // Serves index.html for root requests
+app.UseStaticFiles();   // Serves files from wwwroot
+
 // Configure static file serving for assets
 // Use the same path resolution as AssetHelper to ensure we serve from where assets are actually unpacked
 var assetsPath = Path.Combine(Assembly.GetExecutingAssembly().GetPath(), "Assets");
@@ -58,6 +62,10 @@ app.MapApiDocs();
 app.MapRadEndpoints();
 app.MapHub<LogsHub>("/api/logHub");
 app.MapHub<DeviceEventHub>("/api/deviceEventHub");
+
+// SPA fallback routing - must be AFTER all API routes and SignalR hubs
+// This allows Angular to handle client-side routing for unknown routes
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

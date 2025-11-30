@@ -1,0 +1,2 @@
+# This file preserves the wwwroot folder in git
+# The Angular production build will be copied here during the build process

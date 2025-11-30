@@ -132,11 +132,50 @@ _For now, if you want to try it out, you'll have to compile and run from source.
 
 ### Prerequisites
 - .NET 9 SDK
-- Node.js 18+ (includes npm)
-- PNPM package manager
 - Talk to Travis or I for a pre-release FW if you want to try this out.
 
-### Install Node.js and npm
+**Install .NET 9 SDK:**
+
+Download and install the .NET 9 SDK from the [official Microsoft download page](https://dotnet.microsoft.com/download/dotnet/9.0).
+
+After installation, verify the installation:
+```bash
+dotnet --version
+```
+
+### Setup & Run
+
+```bash
+# Clone the repository
+git clone https://github.com/MetalHexx/TeensyROM-Web.git
+cd TeensyROM-Web/src/apps/api/src/TeensyRom.Api
+
+# Build and run the application
+dotnet build
+dotnet run
+```
+
+### Access the Application
+
+The API now serves the web application as a single integrated unit:
+
+**Web UI:**
+```
+http://localhost:5168
+```
+
+**API Documentation (Scalar):**
+```
+http://localhost:5168/scalar/v1
+```
+
+## 🛠️ Building the Web Application from Source
+
+If you want to modify and build the web application yourself, you'll need additional prerequisites.
+
+### Additional Prerequisites for Web Development
+
+**Install Node.js:**
 
 Node.js includes npm (Node Package Manager) which is required to install PNPM.
 
@@ -148,7 +187,13 @@ Install Node.js LTS using Windows Package Manager (winget):
 winget install OpenJS.NodeJS.LTS
 ```
 
-After installation, restart your terminal to ensure npm is available in your PATH.
+After installation, verify the installation:
+```bash
+node --version
+npm --version
+```
+
+Restart your terminal to ensure npm is available in your PATH.
 
 #### macOS
 
@@ -158,7 +203,7 @@ _Coming soon_
 
 _Coming soon_
 
-### Install PNPM
+**Install PNPM:**
 
 This project uses PNPM as the package manager. Install it globally using npm:
 
@@ -170,20 +215,17 @@ After installation, restart your terminal to ensure pnpm is available in your PA
 
 Or using other installation methods from [pnpm.io](https://pnpm.io/installation).
 
-### Setup Instructions
+### Web Application Development
 
+**Install Dependencies:**
 ```bash
-# Clone the repository
-git clone https://github.com/MetalHexx/TeensyROM-Web.git
 cd TeensyROM-Web/src
-
-# Install Node.js dependencies
 pnpm install
 ```
 
-### Running the Application
+**Development Mode (Two Terminals):**
 
-You'll need two terminal windows to run both the backend API and frontend simultaneously.
+For active web development with hot-reload, run the API and frontend separately:
 
 **Terminal 1 - Start the API Backend:**
 ```bash
@@ -197,17 +239,18 @@ cd TeensyROM-Web/src
 pnpm start
 ```
 
-### Access the Application
+Access the development server at `http://localhost:4200`
 
-**Web UI:**
-```
-http://localhost:4200
+**Production Build:**
+
+Build the web application and integrate it with the API:
+
+```bash
+cd TeensyROM-Web/src
+pnpm run build:frontend
 ```
 
-**API Documentation (Scalar):**
-```
-http://localhost:5168/scalar/v1
-```
+This builds the Angular application and copies the production files to the API's `wwwroot` folder. The API will then serve these files when you run `dotnet run`.
 
 ## 🤝 Contributing
 

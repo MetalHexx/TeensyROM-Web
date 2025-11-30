@@ -6,6 +6,7 @@
   "scripts": {
     "start": "nx run teensyrom-ui:serve",
     "generate:api-client": "nx run api-client:generate",
+    "build:frontend": "pwsh scripts/copy-frontend.ps1",
     "vite": "vite",
     "format": "prettier --write \"**/*.{ts,js,json,md,html,scss}\"",
     "lint": "nx lint",
