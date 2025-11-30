@@ -64,6 +64,7 @@ export interface CrtSettingsConfig {
 export interface CrtSettings {
   /**
    * Opacity of the scanline overlay (0-1).
+   * 0 = no scanlines, 1 = fully opaque (black) scanlines.
    * Set to 0 to disable scanlines.
    */
   scanlineIntensity: number;
