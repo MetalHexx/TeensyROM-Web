@@ -1,17 +1,43 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CycleImageComponent, ScalingCardComponent } from '@teensyrom-nx/ui/components';
+import {
+  CycleImageComponent,
+  ScalingCardComponent,
+  ContentOverlayContainerComponent,
+  CrtEffectWrapperComponent,
+  CrtSettingsPanelComponent,
+  VideoControlsToolbarComponent,
+  CRT_CONFIGS,
+  CRT_PRESETS,
+  CrtSettings,
+} from '@teensyrom-nx/ui/components';
 import type { LaunchedFile } from '@teensyrom-nx/application';
 
 @Component({
   selector: 'lib-file-image',
-  imports: [CommonModule, ScalingCardComponent, CycleImageComponent],
+  imports: [
+    CommonModule,
+    ScalingCardComponent,
+    CycleImageComponent,
+    ContentOverlayContainerComponent,
+    CrtEffectWrapperComponent,
+    CrtSettingsPanelComponent,
+    VideoControlsToolbarComponent,
+  ],
   templateUrl: './file-image.component.html',
   styleUrl: './file-image.component.scss',
 })
 export class FileImageComponent {
   // Inputs
   currentFile = input<LaunchedFile | null>();
+
+  // CRT configuration - small preset (subtle scanlines for compact display)
+  readonly crtConfig = CRT_CONFIGS.small;
+
+  // CRT state signals
+  protected readonly isCrtEnabled = signal<boolean>(true);
+  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS.small);
+  protected readonly showCrtControls = signal<boolean>(false);
 
   // Computed signals derived from input
   creatorName = computed(() => {
@@ -33,4 +59,39 @@ export class FileImageComponent {
         .filter((url: string) => url && url.length > 0) ?? []
   );
   hasImages = computed(() => this.imageUrls().length > 0);
+
+  /**
+   * Toggle CRT effect on/off
+   */
+  toggleCrtEffect(): void {
+    this.isCrtEnabled.update((enabled) => !enabled);
+  }
+
+  /**
+   * Toggle CRT controls panel visibility
+   */
+  toggleCrtControls(): void {
+    this.showCrtControls.update((show) => !show);
+  }
+
+  /**
+   * Handle CRT settings changes from settings panel
+   */
+  onCrtSettingsChange(settings: CrtSettings): void {
+    this.crtSettings.set(settings);
+  }
+
+  /**
+   * Reset CRT settings to default preset
+   */
+  onCrtReset(): void {
+    this.crtSettings.set(CRT_PRESETS.small);
+  }
+
+  /**
+   * Apply a CRT preset
+   */
+  onCrtPresetSelected(presetName: keyof typeof CRT_PRESETS): void {
+    this.crtSettings.set(CRT_PRESETS[presetName]);
+  }
 }

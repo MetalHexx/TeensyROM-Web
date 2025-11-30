@@ -1,14 +1,52 @@
 <lib-scaling-card
   [title]="creatorName()"
   [metadataSource]="metadataSource()"
-  [enableOverflow]="false"
+  [enableOverflow]="true"
 >
-  <div class="image-wrapper">
-    <lib-cycle-image
-      [images]="imageUrls()"
-      [intervalMs]="8000"
-      animationEntry="from-bottom-left"
-      animationExit="none"
-    />
-  </div>
+  <lib-content-overlay-container [showOverlaysOnHover]="true">
+    <!-- Content slot: CRT wrapper around cycling images -->
+    <ng-container content>
+      <lib-crt-effect-wrapper
+        [settings]="crtSettings()"
+        [config]="crtConfig"
+        [enabled]="isCrtEnabled()">
+        <div class="image-wrapper">
+          <lib-cycle-image
+            [images]="imageUrls()"
+            [intervalMs]="8000"
+            animationEntry="from-bottom-left"
+            animationExit="none"
+          />
+        </div>
+      </lib-crt-effect-wrapper>
+    </ng-container>
+
+    <!-- Top left corner: CRT settings panel (always rendered when CRT enabled, visibility controlled by CSS) -->
+    @if (isCrtEnabled()) {
+      <lib-crt-settings-panel
+        topLeftCorner
+        [settings]="crtSettings()"
+        [config]="crtConfig"
+        [visible]="showCrtControls()"
+        cardClass="crt-panel-scrollable"
+        [class.panel-hidden]="!showCrtControls()"
+        (settingsChange)="onCrtSettingsChange($event)"
+        (resetRequested)="onCrtReset()"
+        (presetSelected)="onCrtPresetSelected($event)">
+      </lib-crt-settings-panel>
+    }
+
+    <!-- Right controls toolbar -->
+    <lib-video-controls-toolbar
+      rightControls
+      [isCrtEnabled]="isCrtEnabled()"
+      [showCrtControls]="showCrtControls()"
+      [isDeviceSelectorActive]="false"
+      [showDeviceSelector]="false"
+      [showFullscreen]="false"
+      [showClose]="false"
+      (crtToggleClick)="toggleCrtEffect()"
+      (crtSettingsClick)="toggleCrtControls()">
+    </lib-video-controls-toolbar>
+  </lib-content-overlay-container>
 </lib-scaling-card>
