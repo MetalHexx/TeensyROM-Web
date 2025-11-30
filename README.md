@@ -6,24 +6,24 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 
 <img width="2557" height="1301" alt="image" src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" />
 
-<table style="width: 100%;">
+<table style="width: 100%; border:none;">
   <tr>
     <td align="center">
       <b>File Browser & Player</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" style="width: 250px; height: 200px; object-fit: cover;">
+        <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" object-fit: cover;">
       </div>
     </td>
     <td align="center">
-      <b>Search & History</b><br>
+      <b>CRT Emulation</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc" style="width: 250px; height: 200px; object-fit: cover;">
+        <img src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc">
       </div>
     </td>
     <td align="center">
-      <b>Device Management</b><br>
+      <b>Full Screen Immersion</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" style="width: 250px; height: 200px; object-fit: cover;">
+        <img src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" style="width: 82%; height: 82%; margin: 0 auto; overflow: hidden;">
       </div>
     </td>
   </tr>
