@@ -252,6 +252,13 @@ export class ContentOverlayContainerComponent {
    * Handle mouse movement within the container - reset inactivity timer.
    */
   onMouseMove(): void {
+    this.onMouseActivity();
+  }
+
+  /**
+   * Handle any mouse activity (move, click, scroll) - keeps overlays visible.
+   */
+  onMouseActivity(): void {
     // Show overlays if they were hidden by inactivity timer
     if (!this.isMouseOver()) {
       this.isMouseOver.set(true);
