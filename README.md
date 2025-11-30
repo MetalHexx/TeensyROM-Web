@@ -1,6 +1,6 @@
 # TeensyROM Web
 
-A cross-platform web application for controlling your Commodore 64/128 through the [TeensyROM Hardware Cartridge](https://github.com/SensoriumEmbedded/TeensyROM). This modern web-based interface enables lightning-fast exploration and remote launching of Games, SID music, Scene Demos, and Images from large file collections.
+A mashup of ancient hardware and modern technology, this cross-platform web app controls your Commodore 64/128 using the [TeensyROM Hardware Cartridge](https://github.com/SensoriumEmbedded/TeensyROM). Unlock lightning-fast exploration and instant remote launching of your favorite games, SID music, scene demos, and images—all from massive file collections stored on your TeensyROM cartridge.
 
 > **Note**: This project is the spiritual successor to the original [TeensyROM-UI WPF desktop application](https://github.com/MetalHexx/TeensyROM-UI). While the original application provided a Windows-only desktop experience, this new implementation offers cross-platform compatibility through a modern web architecture that can run on Windows, macOS, and Linux.
 
