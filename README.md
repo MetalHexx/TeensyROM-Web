@@ -17,13 +17,13 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
     <td align="center">
       <b>With CRT Emulation</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc">
+        <img width="2553" height="1297" alt="image" src="https://github.com/user-attachments/assets/1257f8df-2919-4bed-817e-def585a7cd2c" style="width: 105%; height: 105%; margin: 0 auto; overflow: hidden;"/>
       </div>
     </td>
     <td align="center">
       <b>And Full Screen Immersion</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" style="width: 82%; height: 82%; margin: 0 auto; overflow: hidden;">
+        <img width="2550" height="1437" alt="image" src="https://github.com/user-attachments/assets/a4d84253-3dd6-4110-a656-38d2df1ac3f5" style="width: 90%; height: 90%; margin: 0 auto; overflow: hidden;"/>
       </div>
     </td>
   </tr>
