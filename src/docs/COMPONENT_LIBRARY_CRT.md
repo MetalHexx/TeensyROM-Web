@@ -224,20 +224,19 @@ When `contentAspectRatio` is provided and the content uses `object-fit: contain`
 **Slider Configurations**:
 
 | Setting | Min | Max | Step | Format |
-|---------|-----|-----|------|--------|
-| Scanline Intensity | 0 | 0.5 | 0.01 | 2 decimals |
-| Scanline Thickness | 1 | 4 | 1 | px suffix |
-| Scanline Gap | 1 | 8 | 1 | px suffix |
+|---------|-----|-----|------|
+| Scanline Intensity | 0 | 1.0 | 0.01 | 2 decimals |
+| Scanline Size | 1.0 | 6.0 | 0.1 | px suffix |
 | Vignette | 0 | 2 | 0.05 | 2 decimals |
 | Screen Curvature | 0 | 115 | 5 | px suffix |
 | Contrast | 0.8 | 1.5 | 0.05 | 2 decimals |
-| Brightness | 0.8 | 1.5 | 0.05 | 2 decimals |
+| Brightness | 0.8 | 2.0 | 0.05 | 2 decimals |
 | Saturation | 0.8 | 1.5 | 0.05 | 2 decimals |
 
 **Usage Examples**:
 
 ```html
-<!-- Full settings panel (all 8 sliders) -->
+<!-- Full settings panel (all 7 sliders) -->
 <lib-crt-settings-panel
   [settings]="crtSettings()"
   (settingsChange)="onSettingsChange($event)"
@@ -786,8 +785,8 @@ When `showOverlaysOnHover` is `true`:
 Feature flags that control which effect groups are enabled:
 
 | Property | Type | Description |
-|----------|------|-------------|
-| `showScanlines` | `boolean` | Enable scanline effects (intensity, thickness, spacing) |
+|----------|------|-----------|
+| `showScanlines` | `boolean` | Enable scanline effects (intensity, size) |
 | `showVignette` | `boolean` | Enable vignette edge darkening effect |
 | `showCurvature` | `boolean` | Enable screen curvature border-radius |
 | `showColorFilters` | `boolean` | Enable color filters (contrast, brightness, saturation) |
@@ -797,10 +796,9 @@ Feature flags that control which effect groups are enabled:
 Values that control the intensity and appearance of each effect:
 
 | Property | Type | Description |
-|----------|------|-------------|
+|----------|------|-----------|
 | `scanlineIntensity` | `number` | Opacity of scanline overlay (0-1). Set to 0 to disable. |
-| `scanlineThickness` | `number` | Pixel height of dark scanline bands (typically 2-4px). |
-| `scanlineSpacing` | `number` | Pixel gap between scanline bands (typically 1-3px). |
+| `scanlineSize` | `number` | Size of scanline bands and gaps in pixels (1.0-6.0). Controls both dark band height and spacing with 1:1 ratio. |
 | `vignetteStrength` | `number` | Intensity of edge/corner darkening (0-2). Set to 0 to disable. |
 | `screenCurvature` | `number` | Border-radius in pixels for curved screen effect. Set to 0 for flat. |
 | `contrast` | `number` | CSS filter contrast multiplier. 1 = no change, >1 = increased. |
@@ -815,7 +813,7 @@ Pre-configured presets available via `CRT_PRESETS` and matching `CRT_CONFIGS`:
 |--------|-------------|----------|
 | `full` | All effects enabled (scanlines, vignette, curvature, color boost) | Video streams, terminal displays, fullscreen video |
 | `standard` | Scanlines, vignette, color enhancement (no curvature) | Embedded previews, flat-screen retro aesthetic |
-| `small` | Subtle scanlines (1px thickness) for compact displays | Small video components, thumbnails |
+| `small` | Subtle scanlines (1px size) for compact displays | Small video components, thumbnails |
 | `none` | All effects neutral (pass-through) | Temporarily disable effects |
 
 ---
@@ -895,7 +893,7 @@ This ensures CRT effects (curvature, vignette) are constrained to the visible vi
 Horizontal dark bands that simulate the scan pattern of a CRT electron gun.
 
 - **Implementation**: CSS repeating linear gradient as `::before` pseudo-element
-- **Properties**: `scanlineIntensity` (opacity), `scanlineThickness` (band height), `scanlineSpacing` (gap)
+- **Properties**: `scanlineIntensity` (opacity 0-1), `scanlineSize` (band and gap size in pixels, 1:1 ratio)
 - **Visual Effect**: Creates the characteristic horizontal line pattern of CRT displays
 
 ### Vignette
@@ -931,8 +929,7 @@ The CRT effect wrapper exposes these CSS custom properties for advanced styling:
 | Variable | Maps To |
 |----------|---------|
 | `--scanline-intensity` | `settings.scanlineIntensity` |
-| `--scanline-thickness` | `settings.scanlineThickness` (px) |
-| `--scanline-spacing` | `settings.scanlineSpacing` (px) |
+| `--scanline-size` | `settings.scanlineSize` (px) |
 | `--vignette-strength` | `settings.vignetteStrength` |
 | `--screen-curvature` | `settings.screenCurvature` (px) |
 | `--crt-contrast` | `settings.contrast` |
