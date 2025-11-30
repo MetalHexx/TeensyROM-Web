@@ -9,19 +9,19 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 <table style="width: 100%; border:none;">
   <tr>
     <td align="center">
-      <b>File Browser & Player</b><br>
+      <b>Launch Games and SIDs</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
         <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" object-fit: cover;">
       </div>
     </td>
     <td align="center">
-      <b>CRT Emulation</b><br>
+      <b>With CRT Emulation</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
         <img src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc">
       </div>
     </td>
     <td align="center">
-      <b>Full Screen Immersion</b><br>
+      <b>And Full Screen Immersion</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
         <img src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" style="width: 82%; height: 82%; margin: 0 auto; overflow: hidden;">
       </div>
