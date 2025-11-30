@@ -6,19 +6,25 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 
 <img width="2557" height="1301" alt="image" src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" />
 ## Screenshots
-<table style="width: 100%; table-layout: fixed;">
+<table style="width: 100%;">
   <tr>
-    <td align="center" style="width: 33.333%;">
+    <td align="center">
       <b>File Browser & Player</b><br>
-      <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" width="400" height="300" alt="File Browser and Media Player">      
+      <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
+        <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
     </td>
-    <td align="center" style="width: 33.333%;">
+    <td align="center">
       <b>Search & History</b><br>
-      <img src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc" width="400" height="300" alt="Search and Play History">
+      <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
+        <img src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
     </td>
-    <td align="center" style="width: 33.333%;">
+    <td align="center">
       <b>Device Management</b><br>
-      <img src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" width="400" height="300" alt="Device Management and Logs">
+      <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
+        <img src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" style="width: 100%; height: 100%; object-fit: cover;">
+      </div>
     </td>
   </tr>
 </table>
