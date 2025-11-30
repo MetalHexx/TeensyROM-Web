@@ -56,8 +56,8 @@ app.UseUiCors();
 app.UseRateLimiter();
 app.MapApiDocs();
 app.MapRadEndpoints();
-app.MapHub<LogsHub>("/logHub");
-app.MapHub<DeviceEventHub>("/deviceEventHub");
+app.MapHub<LogsHub>("/api/logHub");
+app.MapHub<DeviceEventHub>("/api/deviceEventHub");
 
 app.Run();
 

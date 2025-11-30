@@ -7,7 +7,7 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
     {
         public override void Configure()
         {
-            Post("/settings")
+            Post("/api/settings")
                 .Produces<SaveSettingsResponse>(StatusCodes.Status200OK)
                 .ProducesValidationProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)

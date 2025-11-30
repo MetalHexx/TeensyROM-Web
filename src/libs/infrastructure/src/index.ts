@@ -1,6 +1,9 @@
 // Centralized domain mapper
 export * from './lib/domain.mapper';
 
+// API Configuration
+export * from './lib/config';
+
 // Device implementations (moved from domain)
 export * from './lib/device/device.service';
 export * from './lib/device/device-logs.service';

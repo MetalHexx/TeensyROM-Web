@@ -3,12 +3,13 @@ import { signal, Signal, WritableSignal, computed } from '@angular/core';
 import { DevicesApiService } from '@teensyrom-nx/data-access/api-client';
 import * as signalR from '@microsoft/signalr';
 import { LogType, logInfo, logError } from '@teensyrom-nx/utils';
-import { IDeviceLogsService, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
+import { IDeviceLogsService, ALERT_SERVICE, IAlertService, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
 
 @Injectable()
 export class DeviceLogsService implements IDeviceLogsService {
   private readonly deviceService: DevicesApiService;
   private readonly alertService: IAlertService;
+  private readonly apiConfig: IApiConfig;
   private hubConnection: signalR.HubConnection | null = null;
   private readonly _logLines: WritableSignal<string[]> = signal([]);
   private readonly _isConnected = signal(false);
@@ -18,10 +19,12 @@ export class DeviceLogsService implements IDeviceLogsService {
 
   constructor(
     deviceService: DevicesApiService,
-    @Inject(ALERT_SERVICE) alertService: IAlertService
+    @Inject(ALERT_SERVICE) alertService: IAlertService,
+    @Inject(API_CONFIG) apiConfig: IApiConfig
   ) {
     this.deviceService = deviceService;
     this.alertService = alertService;
+    this.apiConfig = apiConfig;
   }
 
   connect() {
@@ -33,7 +36,7 @@ export class DeviceLogsService implements IDeviceLogsService {
     });
 
     this.hubConnection = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5168/logHub')
+      .withUrl(`${this.apiConfig.signalRBasePath}/api/logHub`)
       .withAutomaticReconnect()
       .build();
 

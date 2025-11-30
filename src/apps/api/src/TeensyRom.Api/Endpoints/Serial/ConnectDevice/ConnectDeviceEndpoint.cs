@@ -7,7 +7,7 @@ namespace TeensyRom.Api.Endpoints.ConnectDevice
     {
         public override void Configure()
         {
-            Post("/devices/{deviceId}/connect")
+            Post("/api/devices/{deviceId}/connect")
                 .Produces<ConnectDeviceResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .WithName("ConnectDevice")

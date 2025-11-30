@@ -1,4 +1,4 @@
-import { PLAYER_SERVICE, ALERT_SERVICE } from '@teensyrom-nx/domain';
+import { PLAYER_SERVICE, ALERT_SERVICE, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
 import { PLAYER_STORAGE } from '@teensyrom-nx/application';
 import { PlayerService } from './player.service';
 import { PlayerStorageService } from './player-storage.service';
@@ -6,10 +6,11 @@ import { PlayerApiService, Configuration } from '@teensyrom-nx/data-access/api-c
 
 export const PLAYER_API_CLIENT_PROVIDER = {
   provide: PlayerApiService,
-  useFactory: () => {
-    const config = new Configuration({ basePath: 'http://localhost:5168' });
+  useFactory: (apiConfig: IApiConfig) => {
+    const config = new Configuration({ basePath: apiConfig.basePath });
     return new PlayerApiService(config);
   },
+  deps: [API_CONFIG],
 };
 
 export const PLAYER_SERVICE_PROVIDER = {

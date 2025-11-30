@@ -12,7 +12,7 @@ namespace TeensyRom.Api.Endpoints.Files.IndexAll
     {
         public override void Configure()
         {
-            Post("/files/index/all")
+            Post("/api/files/index/all")
                 .Produces<IndexAllResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status404NotFound)
                 .WithName("IndexAll")

@@ -5,7 +5,7 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/settings": {
+    "/api/settings": {
       "post": {
         "tags": [
           "Settings"
@@ -87,7 +87,7 @@
         }
       }
     },
-    "/devices/{deviceId}/reset": {
+    "/api/devices/{deviceId}/reset": {
       "put": {
         "tags": [
           "Devices"
@@ -129,7 +129,7 @@
         }
       }
     },
-    "/devices/{deviceId}/ping": {
+    "/api/devices/{deviceId}/ping": {
       "get": {
         "tags": [
           "Devices"
@@ -171,7 +171,7 @@
         }
       }
     },
-    "/logs": {
+    "/api/logs": {
       "post": {
         "tags": [
           "Devices"
@@ -213,7 +213,7 @@
         }
       }
     },
-    "/devices": {
+    "/api/devices": {
       "get": {
         "tags": [
           "Devices"
@@ -255,7 +255,7 @@
         }
       }
     },
-    "/devices/{deviceId}": {
+    "/api/devices/{deviceId}": {
       "delete": {
         "tags": [
           "Devices"
@@ -297,7 +297,7 @@
         }
       }
     },
-    "/devices/events": {
+    "/api/devices/events": {
       "get": {
         "tags": [
           "Devices"
@@ -339,7 +339,7 @@
         }
       }
     },
-    "/devices/{deviceId}/connect": {
+    "/api/devices/{deviceId}/connect": {
       "post": {
         "tags": [
           "Devices"
@@ -381,7 +381,7 @@
         }
       }
     },
-    "/devices/{deviceId}/toggle-music": {
+    "/api/devices/{deviceId}/toggle-music": {
       "post": {
         "tags": [
           "Player"
@@ -443,7 +443,7 @@
         }
       }
     },
-    "/devices/{deviceId}/storage/{storageType}/random-launch": {
+    "/api/devices/{deviceId}/storage/{storageType}/random-launch": {
       "post": {
         "tags": [
           "Player"
@@ -539,7 +539,7 @@
         }
       }
     },
-    "/devices/{deviceId}/storage/{storageType}/launch": {
+    "/api/devices/{deviceId}/storage/{storageType}/launch": {
       "post": {
         "tags": [
           "Player"
@@ -607,7 +607,7 @@
         }
       }
     },
-    "/devices/{deviceId}/storage/{storageType}/search": {
+    "/api/devices/{deviceId}/storage/{storageType}/search": {
       "get": {
         "tags": [
           "Files"
@@ -700,7 +700,7 @@
         }
       }
     },
-    "/devices/{deviceId}/storage/{storageType}/index": {
+    "/api/devices/{deviceId}/storage/{storageType}/index": {
       "post": {
         "tags": [
           "Files"
@@ -757,7 +757,7 @@
         }
       }
     },
-    "/files/index/all": {
+    "/api/files/index/all": {
       "post": {
         "tags": [
           "Files"
@@ -789,7 +789,7 @@
         }
       }
     },
-    "/devices/{deviceId}/storage/{storageType}/directories": {
+    "/api/devices/{deviceId}/storage/{storageType}/directories": {
       "get": {
         "tags": [
           "Files"
@@ -846,7 +846,7 @@
         }
       }
     },
-    "/devices/{deviceId}/storage/{storageType}/favorite": {
+    "/api/devices/{deviceId}/storage/{storageType}/favorite": {
       "post": {
         "tags": [
           "Files"

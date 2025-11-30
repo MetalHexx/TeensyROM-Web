@@ -11,7 +11,7 @@ namespace TeensyRom.Api.Endpoints.Serial.Logs
     {
         public override void Configure()
         {
-            Delete("/logs")
+            Delete("/api/logs")
                 .WithName("StopLogs")
                 .WithSummary("Stop Logging Channel")
                 .WithTags("Devices")

@@ -94,8 +94,13 @@ export class PlayerApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/launch`;
+        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType'])));
+
         const response = await this.request({
-            path: `/devices/{deviceId}/storage/{storageType}/launch`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
@@ -148,8 +153,13 @@ export class PlayerApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/random-launch`;
+        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType'])));
+
         const response = await this.request({
-            path: `/devices/{deviceId}/storage/{storageType}/random-launch`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
@@ -183,8 +193,12 @@ export class PlayerApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/devices/{deviceId}/toggle-music`;
+        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
+
         const response = await this.request({
-            path: `/devices/{deviceId}/toggle-music`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,

@@ -9,7 +9,7 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
     {
         public override void Configure()
         {
-            Get("/devices/{deviceId}/ping")
+            Get("/api/devices/{deviceId}/ping")
                 .Produces<PingDeviceResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .WithName("PingDevice")

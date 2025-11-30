@@ -10,7 +10,7 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
     {
         public override void Configure()
         {
-            Delete("/devices/{deviceId}/storage/{storageType}/favorite")
+            Delete("/api/devices/{deviceId}/storage/{storageType}/favorite")
                 .Produces<RemoveFavoriteResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)

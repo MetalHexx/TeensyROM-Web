@@ -8,7 +8,7 @@ namespace TeensyRom.Api.Endpoints.GetDeviceEvents
     {
         public override void Configure()
         {
-            Get("/devices/events")
+            Get("/api/devices/events")
                 .WithName("StartDeviceEvents")
                 .WithSummary("Start Device Event Stream")
                 .WithTags("Devices")

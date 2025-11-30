@@ -10,7 +10,7 @@ namespace TeensyRom.Api.Endpoints.Files.Index
     {
         public override void Configure()
         {
-            Post("/devices/{deviceId}/storage/{storageType}/index")
+            Post("/api/devices/{deviceId}/storage/{storageType}/index")
                 .Produces<IndexResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .WithName("Index")

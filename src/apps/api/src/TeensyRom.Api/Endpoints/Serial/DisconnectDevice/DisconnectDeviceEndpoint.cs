@@ -7,7 +7,7 @@ namespace TeensyRom.Api.Endpoints.ClosePort
     {
         public override void Configure()
         {
-            Delete("/devices/{deviceId}")
+            Delete("/api/devices/{deviceId}")
                 .Produces<DisconnectDeviceResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .WithName("DisconnectDevice")

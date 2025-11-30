@@ -9,7 +9,7 @@ namespace TeensyRom.Api.Endpoints.Player.ToggleMusic
     {
         public override void Configure()
         {
-            Post("/devices/{deviceId}/toggle-music")
+            Post("/api/devices/{deviceId}/toggle-music")
                 .Produces<ToggleMusicResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)

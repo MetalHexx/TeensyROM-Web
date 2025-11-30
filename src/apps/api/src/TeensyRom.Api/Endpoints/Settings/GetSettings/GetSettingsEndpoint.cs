@@ -7,7 +7,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
     {
         public override void Configure()
         {
-            Get("/settings")
+            Get("/api/settings")
                 .Produces<GetSettingsResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status500InternalServerError)
                 .WithName("GetSettings")

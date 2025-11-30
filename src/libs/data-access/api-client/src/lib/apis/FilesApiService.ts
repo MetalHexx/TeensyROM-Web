@@ -111,8 +111,13 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/directories`;
+        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType'])));
+
         const response = await this.request({
-            path: `/devices/{deviceId}/storage/{storageType}/directories`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
@@ -157,8 +162,13 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/index`;
+        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType'])));
+
         const response = await this.request({
-            path: `/devices/{deviceId}/storage/{storageType}/index`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
@@ -185,8 +195,11 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/files/index/all`;
+
         const response = await this.request({
-            path: `/files/index/all`,
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
@@ -238,8 +251,13 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/favorite`;
+        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType'])));
+
         const response = await this.request({
-            path: `/devices/{deviceId}/storage/{storageType}/favorite`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            path: urlPath,
             method: 'DELETE',
             headers: headerParameters,
             query: queryParameters,
@@ -291,8 +309,13 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/favorite`;
+        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType'])));
+
         const response = await this.request({
-            path: `/devices/{deviceId}/storage/{storageType}/favorite`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
@@ -370,8 +393,13 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/search`;
+        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType'])));
+
         const response = await this.request({
-            path: `/devices/{deviceId}/storage/{storageType}/search`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,

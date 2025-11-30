@@ -9,7 +9,7 @@ namespace TeensyRom.Api.Endpoints.Files.GetDirectory
     {
         public override void Configure()
         {
-            Get("/devices/{deviceId}/storage/{storageType}/directories")
+            Get("/api/devices/{deviceId}/storage/{storageType}/directories")
                 .Produces<GetDirectoryResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .WithName("GetDirectory")

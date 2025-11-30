@@ -5,6 +5,8 @@ import {
   IDeviceEventsService,
   ALERT_SERVICE,
   IAlertService,
+  API_CONFIG,
+  IApiConfig,
 } from '@teensyrom-nx/domain';
 import * as signalR from '@microsoft/signalr';
 import { LogType, logInfo, logError } from '@teensyrom-nx/utils';
@@ -18,16 +20,19 @@ export type DeviceEvent = {
 export class DeviceEventsService implements IDeviceEventsService {
   private readonly deviceService: DevicesApiService;
   private readonly alertService: IAlertService;
+  private readonly apiConfig: IApiConfig;
   private hubConnection: signalR.HubConnection | null = null;
   private readonly _deviceEventMap: WritableSignal<Map<string, DeviceState>> = signal(new Map());
   readonly allEvents: Signal<Map<string, DeviceState>> = computed(() => this._deviceEventMap());
 
   constructor(
     deviceService: DevicesApiService,
-    @Inject(ALERT_SERVICE) alertService: IAlertService
+    @Inject(ALERT_SERVICE) alertService: IAlertService,
+    @Inject(API_CONFIG) apiConfig: IApiConfig
   ) {
     this.deviceService = deviceService;
     this.alertService = alertService;
+    this.apiConfig = apiConfig;
   }
 
   connect() {
@@ -39,7 +44,7 @@ export class DeviceEventsService implements IDeviceEventsService {
     });
 
     this.hubConnection = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5168/deviceEventHub')
+      .withUrl(`${this.apiConfig.signalRBasePath}/api/deviceEventHub`)
       .withAutomaticReconnect()
       .build();
 

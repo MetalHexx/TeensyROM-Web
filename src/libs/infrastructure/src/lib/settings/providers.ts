@@ -1,5 +1,5 @@
 import { Provider } from '@angular/core';
-import { SETTINGS_SERVICE, ALERT_SERVICE } from '@teensyrom-nx/domain';
+import { SETTINGS_SERVICE, ALERT_SERVICE, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
 import { SettingsService } from './settings.service';
 import { SettingsApiService, Configuration } from '@teensyrom-nx/data-access/api-client';
 
@@ -9,10 +9,11 @@ import { SettingsApiService, Configuration } from '@teensyrom-nx/data-access/api
  */
 export const SETTINGS_API_CLIENT_PROVIDER = {
   provide: SettingsApiService,
-  useFactory: () => {
-    const config = new Configuration({ basePath: 'http://localhost:5168' });
+  useFactory: (apiConfig: IApiConfig) => {
+    const config = new Configuration({ basePath: apiConfig.basePath });
     return new SettingsApiService(config);
   },
+  deps: [API_CONFIG],
 };
 
 /**

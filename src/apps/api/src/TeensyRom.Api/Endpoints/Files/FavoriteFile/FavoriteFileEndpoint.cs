@@ -11,7 +11,7 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
     {
         public override void Configure()
         {
-            Post("/devices/{deviceId}/storage/{storageType}/favorite")
+            Post("/api/devices/{deviceId}/storage/{storageType}/favorite")
                 .Produces<SaveFavoriteResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)

@@ -52,8 +52,11 @@ export class SettingsApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
+
+        let urlPath = `/api/settings`;
+
         const response = await this.request({
-            path: `/settings`,
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
@@ -89,8 +92,11 @@ export class SettingsApiService extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
+
+        let urlPath = `/api/settings`;
+
         const response = await this.request({
-            path: `/settings`,
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,

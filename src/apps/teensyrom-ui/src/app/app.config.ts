@@ -19,6 +19,7 @@ import {
   PLAYER_API_CLIENT_PROVIDER,
   SETTINGS_PROVIDERS,
   CRT_PROVIDERS,
+  API_CONFIG_PROVIDER,
 } from '@teensyrom-nx/infrastructure';
 
 export const appConfig: ApplicationConfig = {
@@ -31,6 +32,8 @@ export const appConfig: ApplicationConfig = {
     PLAYER_CONTEXT_PROVIDER,
     // Alert system provider
     ALERT_SERVICE_PROVIDER,
+    // API Configuration (environment-aware URLs)
+    API_CONFIG_PROVIDER,
     // Infrastructure providers (composition root)
     DEVICE_SERVICE_PROVIDER,
     DEVICE_LOGS_SERVICE_PROVIDER,

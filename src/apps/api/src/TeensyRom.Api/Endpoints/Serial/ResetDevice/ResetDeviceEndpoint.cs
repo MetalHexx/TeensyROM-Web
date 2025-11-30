@@ -9,7 +9,7 @@ namespace TeensyRom.Api.Endpoints.ResetDevice
     {
         public override void Configure()
         {
-            Put("/devices/{deviceId}/reset")
+            Put("/api/devices/{deviceId}/reset")
                 .Produces<ResetDeviceResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .WithName("ResetDevice")

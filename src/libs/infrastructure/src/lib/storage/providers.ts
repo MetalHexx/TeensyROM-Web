@@ -1,14 +1,15 @@
-import { STORAGE_SERVICE } from '@teensyrom-nx/domain';
+import { STORAGE_SERVICE, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
 import { StorageService } from './storage.service';
 import { FilesApiService, Configuration } from '@teensyrom-nx/data-access/api-client';
 
 // API Client provider for Files
 export const FILES_API_CLIENT_PROVIDER = {
   provide: FilesApiService,
-  useFactory: () => {
-    const config = new Configuration({ basePath: 'http://localhost:5168' });
+  useFactory: (apiConfig: IApiConfig) => {
+    const config = new Configuration({ basePath: apiConfig.basePath });
     return new FilesApiService(config);
   },
+  deps: [API_CONFIG],
 };
 
 /**

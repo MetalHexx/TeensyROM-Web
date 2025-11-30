@@ -10,7 +10,7 @@ namespace TeensyRom.Api.Endpoints.Serial.Logs
     {
         public override void Configure()
         {
-            Post("/logs")
+            Post("/api/logs")
                 .WithName("StartLogs")
                 .WithSummary("Start Logging Hub")
                 .WithTags("Devices")

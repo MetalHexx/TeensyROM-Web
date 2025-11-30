@@ -10,7 +10,7 @@ namespace TeensyRom.Api.Endpoints.FindCarts
     {
         public override void Configure()
         {
-            Get("/devices/")
+            Get("/api/devices/")
                 .Produces<FindDevicesResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
                 .ProducesProblem(StatusCodes.Status400BadRequest)

@@ -12,7 +12,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
     {
         public override void Configure()
         {
-            Post("/devices/{deviceId}/storage/{storageType}/launch")
+            Post("/api/devices/{deviceId}/storage/{storageType}/launch")
                 .Produces<LaunchFileResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status502BadGateway)

@@ -13,7 +13,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchRandom
     {
         public override void Configure()
         {
-            Post("/devices/{deviceId}/storage/{storageType}/random-launch")
+            Post("/api/devices/{deviceId}/storage/{storageType}/random-launch")
                 .Produces<LaunchRandomResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)

@@ -8,7 +8,7 @@ namespace TeensyRom.Api.Endpoints.Files.Search
     {
         public override void Configure()
         {
-            Get("/devices/{deviceId}/storage/{storageType}/search")
+            Get("/api/devices/{deviceId}/storage/{storageType}/search")
                 .Produces<SearchResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
