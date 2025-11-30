@@ -5,8 +5,23 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 > **Note**: This project is the spiritual successor to the original [TeensyROM-UI WPF desktop application](https://github.com/MetalHexx/TeensyROM-UI). While the original application provided a Windows-only desktop experience, this new implementation offers cross-platform compatibility through a modern web architecture that can run on Windows, macOS, and Linux.
 
 <img width="2557" height="1301" alt="image" src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" />
-<img width="2553" height="1291" alt="image" src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc" />
-<img width="2556" height="1437" alt="image" src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" />
+## Screenshots
+<table>
+  <tr>
+    <td align="center">
+      <b>File Browser & Player</b><br>
+      <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" width="100%" alt="File Browser and Media Player">      
+    </td>
+    <td align="center">
+      <b>Search & History</b><br>
+      <img src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc" width="100%" alt="Search and Play History">
+    </td>
+    <td align="center">
+      <b>Device Management</b><br>
+      <img src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" width="100%" alt="Device Management and Logs">
+    </td>
+  </tr>
+</table>
 
 
 ## ✨ Features
@@ -22,6 +37,18 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 - **Auto-Play**: Continuous playback through directories or shuffle queues
 - **File Compatibility**: Real-time validation and error feedback for incompatible files
 - **Current File Info**: Display file metadata, creator, release info, and status
+
+### Video Integration & CRT Emulation
+- **Modern Meets Retro**: Seamlessly blend modern streaming control overlays with authentic CRT Video aesthetics to recreate the authentic Commodore 64 experience
+- **Live Video Capture**: Real-time video stream from connected video capture devices
+- **Authentic CRT Effects**: Customizable cathode ray tube emulation with scanlines, vignette, screen curvature, and color filters
+- **Multiple Display Modes**:
+  - **Compact Integrated View**: Watch gameplay inline within the player interface
+  - **Dialog Mode**: And expanded "Theatre Style" video dialog with full control toolbar and device selector
+  - **Fullscreen Mode**: Immersive full-screen experience with responsive CRT effects
+- **CRT Customization**: Adjust scanline intensity, vignette strength, screen curvature, contrast, brightness, saturation, and hue in real-time
+- **Preset Configurations**: Quick-apply CRT presets (full, standard, minimal) for instant visual style switching
+- **Device Selection**: Switch between multiple connected video capture devices on-the-fly
 
 ### Search & Filter
 - **Full-Text Search**: Search across all indexed files on SD or USB storage (per storage type)
