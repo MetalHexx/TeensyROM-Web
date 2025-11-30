@@ -1,29 +1,29 @@
 # TeensyROM Web
 
-A cross-platform web application for controlling your Commodore 64/128 through the [TeensyROM Hardware Cartridge](https://github.com/SensoriumEmbedded/TeensyROM). This modern web-based interface enables lightning-fast exploration and remote launching of Games, SID music, Scene Demos, and Images from large file collections.
+A mashup of ancient hardware and modern technology, this cross-platform web app controls your Commodore 64/128 using the [TeensyROM Hardware Cartridge](https://github.com/SensoriumEmbedded/TeensyROM). Unlock lightning-fast exploration and instant remote launching of your favorite games, SID music, scene demos, and images—all from massive file collections stored on your TeensyROM cartridge.
 
 > **Note**: This project is the spiritual successor to the original [TeensyROM-UI WPF desktop application](https://github.com/MetalHexx/TeensyROM-UI). While the original application provided a Windows-only desktop experience, this new implementation offers cross-platform compatibility through a modern web architecture that can run on Windows, macOS, and Linux.
 
 <img width="2557" height="1301" alt="image" src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" />
-## Screenshots
-<table style="width: 100%;">
+
+<table style="width: 100%; border:none;">
   <tr>
     <td align="center">
-      <b>File Browser & Player</b><br>
+      <b>Launch Games and SIDs</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" style="width: 100%; height: 100%; object-fit: cover;">
+        <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" object-fit: cover;">
       </div>
     </td>
     <td align="center">
-      <b>Search & History</b><br>
+      <b>With CRT Emulation</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc" style="width: 100%; height: 100%; object-fit: cover;">
+        <img width="2553" height="1297" alt="image" src="https://github.com/user-attachments/assets/1257f8df-2919-4bed-817e-def585a7cd2c" style="width: 105%; height: 105%; margin: 0 auto; overflow: hidden;"/>
       </div>
     </td>
     <td align="center">
-      <b>Device Management</b><br>
+      <b>And Full Screen Immersion</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" style="width: 100%; height: 100%; object-fit: cover;">
+        <img width="2550" height="1437" alt="image" src="https://github.com/user-attachments/assets/a4d84253-3dd6-4110-a656-38d2df1ac3f5" style="width: 90%; height: 90%; margin: 0 auto; overflow: hidden;"/>
       </div>
     </td>
   </tr>
@@ -33,7 +33,7 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 ## ✨ Features
 
 ### Media Player & Playback
-- **File Launch**: Remote launching of games, SID music, and images
+- **File Launch**: Remote launching of Games, Demos, SID music, and images
 - **Random Launch**: Random launching of all file types across storage devices.
 - **Playback Controls**: Play, pause, stop, next, and previous navigation
 - **Launch Modes**: 
