@@ -53,11 +53,11 @@ describe('CrtSettingsPanelComponent', () => {
   });
 
   describe('Slider Rendering Based on Config', () => {
-    it('should render all 7 sliders with default config', () => {
+    it('should render all 8 sliders with default config', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(7);
+      expect(sliders.length).toBe(8);
     });
 
     it('should render only scanline sliders when config.showScanlines is true only', () => {
@@ -120,13 +120,14 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(3); // contrast, brightness, saturation
+      expect(sliders.length).toBe(4); // contrast, brightness, saturation, hue
 
       const labels = fixture.nativeElement.querySelectorAll('.control-label') as NodeListOf<Element>;
       const labelTexts = Array.from(labels).map((l) => l.textContent?.trim());
       expect(labelTexts).toContain('Contrast');
       expect(labelTexts).toContain('Brightness');
       expect(labelTexts).toContain('Saturation');
+      expect(labelTexts).toContain('Hue');
     });
 
     it('should render empty state when all features are disabled', () => {
@@ -146,7 +147,7 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(6); // 2 scanline + 1 vignette + 3 color filters
+      expect(sliders.length).toBe(7); // 2 scanline + 1 vignette + 4 color filters
 
       const labels = fixture.nativeElement.querySelectorAll('.control-label') as NodeListOf<Element>;
       const labelTexts = Array.from(labels).map((l) => l.textContent?.trim());
@@ -259,12 +260,12 @@ describe('CrtSettingsPanelComponent', () => {
   });
 
   describe('Value Display Formatting', () => {
-    it('should display decimal values with 2 decimal places', () => {
+    it('should display percentage values with % suffix', () => {
       fixture.detectChanges();
 
       const controlValues = fixture.nativeElement.querySelectorAll('.control-value') as NodeListOf<Element>;
       const intensityValue = Array.from(controlValues).find((el) =>
-        el.textContent?.includes('0.50')
+        el.textContent?.includes('50%')
       );
       expect(intensityValue).toBeTruthy();
     });
@@ -295,8 +296,8 @@ describe('CrtSettingsPanelComponent', () => {
       const controlValues = fixture.nativeElement.querySelectorAll('.control-value') as NodeListOf<Element>;
       const valueTexts = Array.from(controlValues).map((el) => el.textContent?.trim());
 
-      expect(valueTexts).toContain('0.25');
-      expect(valueTexts).toContain('1.30');
+      expect(valueTexts).toContain('25%');
+      expect(valueTexts).toContain('130%');
     });
   });
 

@@ -2533,7 +2533,116 @@ The CRT emulation system includes components for video display, capture device m
 | `VideoStreamComponent` | Displays MediaStream in video element with loading states |
 | `VideoControlsToolbarComponent` | Vertical toolbar for video player controls (CRT, device, fullscreen) |
 | `VideoDeviceSelectorComponent` | Dropdown for selecting video capture devices |
-| `ContentOverlayContainerComponent` | 9-slot layout container with hover-reveal overlays |
+| `ContentOverlayContainerComponent` | 9-slot layout container with hover-reveal overlays and inactivity timer |
+
+### `ContentOverlayContainerComponent`
+
+**Purpose**: A sophisticated layout container for video players and media displays that provides 9 named content projection slots with smart hover-to-reveal behavior, inactivity timer, CDK overlay awareness, and fullscreen support. Perfect for building Netflix-style video interfaces.
+
+**Selector**: `lib-content-overlay-container`
+
+**Properties**:
+
+- `showOverlaysOnHover`: Enable hover-reveal behavior (default: `true`)
+- `overlayTransitionMs`: Transition duration in ms (default: `300`)
+- `inactivityTimeoutMs`: Milliseconds of no mouse movement before hiding overlays (default: `3000`). Set to `0` to disable timer.
+
+**Events**:
+
+- `fullscreenChange`: Emitted when fullscreen state changes (`boolean`)
+
+**Computed Signals**:
+
+- `isFullscreen()`: Current fullscreen state
+- `shouldShowOverlays()`: Whether overlays are currently visible
+
+**Content Slots** (9 named projection slots):
+
+```
+┌─────────────────────────────────────┐
+│ topLeftCorner  topOverlay  topRight │  ← Top row
+├─────────────────────────────────────┤
+│ leftControls   content   rightCtrl  │  ← Middle (content + sides)
+├─────────────────────────────────────┤
+│ btmLeftCtrls  btmOverlay  btmRight  │  ← Bottom row
+└─────────────────────────────────────┘
+```
+
+**Smart Behavior**:
+
+- **Hover-Reveal**: Overlays hidden by default, shown on mouse enter
+- **Inactivity Timer**: Overlays auto-hide after 3 seconds of no mouse movement (configurable)
+- **CDK Overlay Awareness**: Overlays stay visible when tooltips/dropdowns are open
+- **Fullscreen Support**: Built-in fullscreen API integration
+- **Manual Lock**: Use `overlayLockCount` signal to programmatically keep overlays visible
+
+**Usage**:
+
+```html
+<!-- Basic video player with inactivity timer -->
+<lib-content-overlay-container 
+  [showOverlaysOnHover]="true"
+  [inactivityTimeoutMs]="3000"
+  (fullscreenChange)="onFullscreen($event)"
+>
+  <!-- Background content -->
+  <lib-video-stream content [stream]="mediaStream"></lib-video-stream>
+  
+  <!-- Top overlays -->
+  <lib-filter-toolbar topOverlay></lib-filter-toolbar>
+  <lib-icon-button topRightCorner icon="close" (buttonClick)="close()"></lib-icon-button>
+  
+  <!-- Side controls -->
+  <lib-crt-settings-panel leftControls [settings]="crtSettings"></lib-crt-settings-panel>
+  
+  <!-- Bottom overlays -->
+  <lib-player-controls bottomLeftControls></lib-player-controls>
+  <lib-now-playing bottomOverlay [song]="currentSong"></lib-now-playing>
+</lib-content-overlay-container>
+
+<!-- Disable inactivity timer (overlays stay visible on hover) -->
+<lib-content-overlay-container [inactivityTimeoutMs]="0">
+  <img content src="photo.jpg" />
+  <div topOverlay>Photo metadata</div>
+</lib-content-overlay-container>
+
+<!-- Custom inactivity timeout (5 seconds) -->
+<lib-content-overlay-container [inactivityTimeoutMs]="5000">
+  <video content src="video.mp4"></video>
+  <div bottomOverlay>Video controls</div>
+</lib-content-overlay-container>
+```
+
+**Advanced CDK Overlay Handling**:
+
+The component automatically detects when CDK overlays (Material tooltips, custom dropdowns) are opened from within its content and keeps overlays visible. This works correctly whether used standalone or inside Material Dialogs.
+
+```typescript
+// Component tracks overlay state automatically
+export class VideoPlayerComponent {
+  // Manual overlay lock example (rare - usually not needed)
+  lockOverlays() {
+    this.overlayLockCount.update(c => c + 1);
+  }
+  
+  unlockOverlays() {
+    this.overlayLockCount.update(c => Math.max(0, c - 1));
+  }
+}
+```
+
+**Inactivity Timer Behavior**:
+
+- Mouse enters → overlays appear, timer starts (3 seconds)
+- Mouse moves → timer resets (another 3 seconds)
+- No movement for 3 seconds → overlays fade out
+- Mouse leaves → overlays immediately hide, timer cleared
+- Dropdown/tooltip opens → timer ignored, overlays stay visible
+- Set to `0` → timer disabled, overlays stay visible while hovering
+
+**Used In**:
+- `libs/features/player/src/lib/player-view/player-device-container/video-capture/video-capture.component.ts`
+- `libs/features/player/src/lib/player-view/player-device-container/video-capture/video-dialog/video-dialog.component.ts`
 
 ---
 

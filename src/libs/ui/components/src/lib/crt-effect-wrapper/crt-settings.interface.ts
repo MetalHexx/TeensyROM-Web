@@ -105,4 +105,11 @@ export interface CrtSettings {
    * 1 = no change, >1 = more saturated.
    */
   saturation: number;
+
+  /**
+   * CSS filter hue-rotate in degrees (-60 to 60).
+   * 0 = no rotation, positive = shift towards red/yellow, negative = shift towards blue/cyan.
+   * Useful for matching color output between different C64 video devices.
+   */
+  hue: number;
 }

@@ -232,11 +232,12 @@ When `contentAspectRatio` is provided and the content uses `object-fit: contain`
 | Contrast | 0.8 | 1.5 | 0.05 | 2 decimals |
 | Brightness | 0.8 | 2.0 | 0.05 | 2 decimals |
 | Saturation | 0.8 | 1.5 | 0.05 | 2 decimals |
+| Hue | -60 | 60 | 1 | degrees (integer) |
 
 **Usage Examples**:
 
 ```html
-<!-- Full settings panel (all 7 sliders) -->
+<!-- Full settings panel (all 8 sliders) -->
 <lib-crt-settings-panel
   [settings]="crtSettings()"
   (settingsChange)="onSettingsChange($event)"
@@ -789,7 +790,7 @@ Feature flags that control which effect groups are enabled:
 | `showScanlines` | `boolean` | Enable scanline effects (intensity, size) |
 | `showVignette` | `boolean` | Enable vignette edge darkening effect |
 | `showCurvature` | `boolean` | Enable screen curvature border-radius |
-| `showColorFilters` | `boolean` | Enable color filters (contrast, brightness, saturation) |
+| `showColorFilters` | `boolean` | Enable color filters (contrast, brightness, saturation, hue) |
 
 ### `CrtSettings` Interface
 
@@ -804,6 +805,7 @@ Values that control the intensity and appearance of each effect:
 | `contrast` | `number` | CSS filter contrast multiplier. 1 = no change, >1 = increased. |
 | `brightness` | `number` | CSS filter brightness multiplier. 1 = no change, >1 = brighter. |
 | `saturation` | `number` | CSS filter saturation multiplier. 1 = no change, >1 = more saturated. |
+| `hue` | `number` | CSS filter hue-rotate in degrees (-60 to 60). 0 = no rotation, positive = shift towards red/yellow, negative = shift towards blue/cyan. Useful for matching color output between different C64 video devices. Fine 1° steps provide precise control for matching between C64 video outputs. |
 
 ### Preset Configurations
 
@@ -914,11 +916,11 @@ Curved edges simulating the bulging glass of vintage CRT monitors.
 
 ### Color Filters
 
-Post-processing color adjustments for authentic retro color reproduction.
+Post-processing color adjustments for authentic retro color reproduction and device matching.
 
 - **Implementation**: CSS `filter` property on content wrapper
-- **Properties**: `contrast`, `brightness`, `saturation` (multipliers, 1 = neutral)
-- **Visual Effect**: Enhanced/muted colors typical of vintage displays
+- **Properties**: `contrast`, `brightness`, `saturation` (multipliers, 1 = neutral), `hue` (degrees, 0 = neutral)
+- **Visual Effect**: Enhanced/muted colors typical of vintage displays, with hue adjustment for matching color output between different C64 video devices
 
 ---
 
@@ -927,7 +929,7 @@ Post-processing color adjustments for authentic retro color reproduction.
 The CRT effect wrapper exposes these CSS custom properties for advanced styling:
 
 | Variable | Maps To |
-|----------|---------|
+|----------|---------||
 | `--scanline-intensity` | `settings.scanlineIntensity` |
 | `--scanline-size` | `settings.scanlineSize` (px) |
 | `--vignette-strength` | `settings.vignetteStrength` |
@@ -935,6 +937,7 @@ The CRT effect wrapper exposes these CSS custom properties for advanced styling:
 | `--crt-contrast` | `settings.contrast` |
 | `--crt-brightness` | `settings.brightness` |
 | `--crt-saturation` | `settings.saturation` |
+| `--crt-hue` | `settings.hue` (deg) |
 
 ---
 

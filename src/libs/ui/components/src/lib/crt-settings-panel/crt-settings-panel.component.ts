@@ -36,7 +36,7 @@ interface SliderConfig {
   min: number;
   max: number;
   step: number;
-  format: 'decimal' | 'px';
+  format: 'decimal' | 'px' | 'percentage' | 'deg';
   decimalPlaces?: number;
 }
 
@@ -48,8 +48,8 @@ const SCANLINE_SLIDERS: SliderConfig[] = [
     min: 0,
     max: 1.0,
     step: 0.01,
-    format: 'decimal',
-    decimalPlaces: 2,
+    format: 'percentage',
+    decimalPlaces: 0,
   },
   {
     key: 'scanlineSize',
@@ -69,8 +69,8 @@ const VIGNETTE_SLIDER: SliderConfig = {
   min: 0,
   max: 2,
   step: 0.05,
-  format: 'decimal',
-  decimalPlaces: 2,
+  format: 'percentage',
+  decimalPlaces: 0,
 };
 
 /** Curvature slider configuration */
@@ -91,8 +91,8 @@ const COLOR_FILTER_SLIDERS: SliderConfig[] = [
     min: 0.8,
     max: 1.5,
     step: 0.05,
-    format: 'decimal',
-    decimalPlaces: 2,
+    format: 'percentage',
+    decimalPlaces: 0,
   },
   {
     key: 'brightness',
@@ -100,8 +100,8 @@ const COLOR_FILTER_SLIDERS: SliderConfig[] = [
     min: 0.8,
     max: 2.0,
     step: 0.05,
-    format: 'decimal',
-    decimalPlaces: 2,
+    format: 'percentage',
+    decimalPlaces: 0,
   },
   {
     key: 'saturation',
@@ -109,8 +109,17 @@ const COLOR_FILTER_SLIDERS: SliderConfig[] = [
     min: 0.8,
     max: 1.5,
     step: 0.05,
-    format: 'decimal',
-    decimalPlaces: 2,
+    format: 'percentage',
+    decimalPlaces: 0,
+  },
+  {
+    key: 'hue',
+    label: 'Hue',
+    min: -60,
+    max: 60,
+    step: 1,
+    format: 'deg',
+    decimalPlaces: 0,
   },
 ];
 
@@ -288,6 +297,13 @@ export class CrtSettingsPanelComponent {
   protected formatValue(value: number, slider: SliderConfig): string {
     if (slider.format === 'px') {
       return `${value}px`;
+    }
+    if (slider.format === 'deg') {
+      return `${value}°`;
+    }
+    if (slider.format === 'percentage') {
+      const percentage = Math.round(value * 100);
+      return `${percentage}%`;
     }
     return value.toFixed(slider.decimalPlaces ?? 2);
   }

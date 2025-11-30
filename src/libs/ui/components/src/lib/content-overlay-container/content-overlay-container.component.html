@@ -6,6 +6,7 @@
   [class.overlays-visible]="shouldShowOverlays()"
   [style.--transition-ms.ms]="overlayTransitionMs()"
   (mouseenter)="onMouseEnter()"
+  (mousemove)="onMouseMove()"
   (mouseleave)="onMouseLeave()"
 >
   <!-- Content layer (lowest z-index) -->

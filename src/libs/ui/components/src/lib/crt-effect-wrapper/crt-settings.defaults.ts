@@ -91,6 +91,7 @@ export const CRT_PRESETS = {
     contrast: 1.1,
     brightness: 1.5,
     saturation: 1.3,
+    hue: 0,
   },
 
   /**
@@ -105,6 +106,7 @@ export const CRT_PRESETS = {
     contrast: 1.1,
     brightness: 1.5,
     saturation: 1.3,
+    hue: 0,
   },
 
   /**
@@ -119,6 +121,7 @@ export const CRT_PRESETS = {
     contrast: 1.05,
     brightness: 1.5,
     saturation: 1.25,
+    hue: 0,
   },
 
   /**
@@ -133,6 +136,7 @@ export const CRT_PRESETS = {
     contrast: 1,
     brightness: 1,
     saturation: 1,
+    hue: 0,
   },
 } as const satisfies Record<string, CrtSettings>;
 

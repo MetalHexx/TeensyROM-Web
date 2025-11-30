@@ -34,7 +34,8 @@
     .crt-content {
       filter: contrast(var(--crt-contrast, 1))
         brightness(var(--crt-brightness, 1))
-        saturate(var(--crt-saturation, 1));
+        saturate(var(--crt-saturation, 1))
+        hue-rotate(var(--crt-hue, 0deg));
     }
 
     // Scanlines overlay using pseudo-element

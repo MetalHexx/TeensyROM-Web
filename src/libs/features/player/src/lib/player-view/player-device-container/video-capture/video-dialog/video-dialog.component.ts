@@ -84,6 +84,7 @@ export class VideoDialogComponent implements OnDestroy {
     contrast: 1.10,
     brightness: 1.50,
     saturation: 1.30,
+    hue: 0,
   });
 
   /** CRT config - full features for video dialog */

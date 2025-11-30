@@ -28,10 +28,11 @@ import { CommonModule } from '@angular/common';
  * - `bottomOverlay`: Bottom-center (info, now playing)
  * - `bottomRightControls`: Bottom-right (extra controls)
  *
- * **CDK Overlay Awareness**: This component automatically detects when CDK overlays
- * (dropdowns, menus, dialogs) are opened from within its content and keeps the
- * overlay layer visible while those overlays are open. This prevents the common
- * issue where opening a dropdown causes other overlays to disappear.
+ * **CDK Overlay Awareness**: This component uses scoped detection to identify when CDK overlays
+ * (dropdowns, menus) are opened from within its content. The overlay layer stays visible while
+ * those overlays are open, preventing them from disappearing unexpectedly. The detection is
+ * scoped to only track overlays triggered from within this container, so it works correctly
+ * whether the component is used standalone or inside a Material Dialog.
  *
  * @example
  * ```html
@@ -68,6 +69,14 @@ export class ContentOverlayContainerComponent {
   readonly overlayTransitionMs = input<number>(300);
 
   /**
+   * Inactivity timeout in milliseconds before hiding overlays.
+   * Set to 0 to disable inactivity timer (overlays stay visible on hover).
+   * Typical video player behavior: 3000ms (3 seconds).
+   * @default 3000
+   */
+  readonly inactivityTimeoutMs = input<number>(3000);
+
+  /**
    * Emits when fullscreen state changes.
    * True when entering fullscreen, false when exiting.
    */
@@ -89,7 +98,8 @@ export class ContentOverlayContainerComponent {
   readonly isMouseOver = signal<boolean>(false);
 
   /**
-   * Tracks whether a CDK overlay (dropdown, menu, etc.) is currently open.
+   * Tracks whether a CDK overlay (dropdown, menu, etc.) owned by this container is currently open.
+   * Uses scoped detection to only track overlays triggered from within this container.
    * When true, overlays stay visible even if mouse leaves the container.
    */
   readonly hasCdkOverlayOpen = signal<boolean>(false);
@@ -122,8 +132,22 @@ export class ContentOverlayContainerComponent {
    */
   private overlayObserver: MutationObserver | null = null;
 
+  /**
+   * Reference to the container DOM element for scoped overlay detection.
+   * Used to determine if CDK overlays originated from within this container.
+   */
+  private containerElement: HTMLElement | null = null;
+
+  /**
+   * Timer ID for inactivity timeout.
+   * Cleared on mouse movement, set when mouse stops moving.
+   */
+  private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
     afterNextRender(() => {
+      // Initialize container element reference for scoped overlay detection
+      this.containerElement = this.containerRef()?.nativeElement ?? null;
       document.addEventListener('fullscreenchange', this.fullscreenHandler);
       this.setupCdkOverlayObserver();
     });
@@ -131,6 +155,7 @@ export class ContentOverlayContainerComponent {
     this.destroyRef.onDestroy(() => {
       document.removeEventListener('fullscreenchange', this.fullscreenHandler);
       this.overlayObserver?.disconnect();
+      this.clearInactivityTimer();
     });
   }
 
@@ -160,19 +185,79 @@ export class ContentOverlayContainerComponent {
   }
 
   /**
-   * Checks if any CDK overlay panes are currently visible.
+   * Checks if any CDK overlay panes owned by this container are currently visible.
+   * Uses scoped detection to only count overlays triggered from within this container,
+   * preventing false positives from parent dialogs or other components' overlays.
    */
   private checkForOpenOverlays(): void {
+    if (!this.containerElement) {
+      this.hasCdkOverlayOpen.set(false);
+      return;
+    }
+
     const overlayPanes = document.querySelectorAll('.cdk-overlay-pane');
-    const hasOpenOverlay = overlayPanes.length > 0;
-    this.hasCdkOverlayOpen.set(hasOpenOverlay);
+    const ownedOverlays = Array.from(overlayPanes).filter((pane) =>
+      this.isOverlayOwnedByContainer(pane)
+    );
+
+    this.hasCdkOverlayOpen.set(ownedOverlays.length > 0);
   }
 
   /**
-   * Handle mouse entering the container - show overlays.
+   * Determines if a CDK overlay pane is owned by (triggered from within) this container.
+   * 
+   * Uses a pragmatic approach:
+   * 1. Exclude parent overlays that contain our container (e.g., parent dialog)
+   * 2. Include all tooltip and dropdown overlays (assume they're ours if not excluded above)
+   * 
+   * This approach works because:
+   * - We can't reliably check trigger elements (they may be hidden when overlays appear)
+   * - Tooltips/dropdowns are transient and unlikely to overlap between components
+   * - The parent exclusion prevents false positives from containing dialogs
+   *
+   * @param overlayPane The CDK overlay pane element to check
+   * @returns True if the overlay should keep our overlays visible
+   */
+  private isOverlayOwnedByContainer(overlayPane: Element): boolean {
+    if (!this.containerElement) return false;
+
+    // Strategy 0: Exclude parent overlays that contain our container
+    // This handles the case where we're inside a dialog
+    if (overlayPane.contains(this.containerElement)) {
+      return false;
+    }
+
+    // Strategy 1: If it's a tooltip or dropdown, assume it's ours
+    // We can't reliably check trigger elements because they may be hidden when this runs
+    const isTooltip = overlayPane.classList.contains('mat-mdc-tooltip-panel');
+    const isDropdown = overlayPane.querySelector('.dropdown-menu-wrapper') !== null;
+    
+    if (isTooltip || isDropdown) {
+      return true;
+    }
+
+    // If it's not a tooltip/dropdown and doesn't contain us, it might be another component's overlay
+    return false;
+  }
+
+  /**
+   * Handle mouse entering the container - show overlays and start inactivity timer.
    */
   onMouseEnter(): void {
     this.isMouseOver.set(true);
+    this.resetInactivityTimer();
+  }
+
+  /**
+   * Handle mouse movement within the container - reset inactivity timer.
+   */
+  onMouseMove(): void {
+    // Show overlays if they were hidden by inactivity timer
+    if (!this.isMouseOver()) {
+      this.isMouseOver.set(true);
+    }
+    // Reset timer to restart countdown
+    this.resetInactivityTimer();
   }
 
   /**
@@ -180,6 +265,38 @@ export class ContentOverlayContainerComponent {
    */
   onMouseLeave(): void {
     this.isMouseOver.set(false);
+    this.clearInactivityTimer();
+  }
+
+  /**
+   * Resets the inactivity timer. Clears existing timer and starts a new one.
+   * After the timeout period with no mouse movement, overlays will be hidden.
+   */
+  private resetInactivityTimer(): void {
+    this.clearInactivityTimer();
+
+    const timeout = this.inactivityTimeoutMs();
+    if (timeout <= 0) {
+      // Inactivity timer disabled
+      return;
+    }
+
+    this.inactivityTimer = setTimeout(() => {
+      // Only hide if no CDK overlays are open and no manual locks
+      if (!this.hasCdkOverlayOpen() && this.overlayLockCount() === 0) {
+        this.isMouseOver.set(false);
+      }
+    }, timeout);
+  }
+
+  /**
+   * Clears the inactivity timer if one is active.
+   */
+  private clearInactivityTimer(): void {
+    if (this.inactivityTimer !== null) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
   }
 
   /**

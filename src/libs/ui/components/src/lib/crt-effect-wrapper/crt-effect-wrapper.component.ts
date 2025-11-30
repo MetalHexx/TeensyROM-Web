@@ -148,10 +148,11 @@ export class CrtEffectWrapperComponent {
       // Curvature: 0 disables the effect
       screenCurvature: c.showCurvature ? s.screenCurvature : 0,
 
-      // Color filters: 1 is neutral (no change)
+      // Color filters: 1 is neutral (no change), 0 is neutral for hue
       contrast: c.showColorFilters ? s.contrast : 1,
       brightness: c.showColorFilters ? s.brightness : 1,
       saturation: c.showColorFilters ? s.saturation : 1,
+      hue: c.showColorFilters ? s.hue : 0,
     };
   });
 
