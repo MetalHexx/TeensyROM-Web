@@ -1,4 +1,4 @@
-import { Component, Inject, ChangeDetectionStrategy, signal, viewChild, OnDestroy } from '@angular/core';
+import { Component, Inject, ChangeDetectionStrategy, signal, viewChild, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
@@ -7,7 +7,6 @@ import {
   CrtEffectWrapperComponent,
   ContentOverlayContainerComponent,
   CrtSettingsPanelComponent,
-  CrtSettings,
   CrtSettingsConfig,
   CRT_PRESETS,
   CRT_CONFIGS,
@@ -15,6 +14,7 @@ import {
   VideoDeviceSelectorComponent,
   VideoControlsToolbarComponent,
 } from '@teensyrom-nx/ui/components';
+import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
 
@@ -51,6 +51,8 @@ export interface VideoDialogData {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VideoDialogComponent implements OnDestroy {
+  private readonly crtStorage = inject(CRT_STORAGE);
+
   /** Reference to overlay container for fullscreen control */
   protected readonly overlayContainer = viewChild<ContentOverlayContainerComponent>('overlayContainer');
 
@@ -100,6 +102,12 @@ export class VideoDialogComponent implements OnDestroy {
   ) {
     this.currentStream.set(data.stream);
     this.selectedDeviceId.set(data.selectedDeviceId);
+
+    // Load saved CRT settings for this device
+    const savedSettings = this.crtStorage.load(data.deviceId, 'video-dialog');
+    if (savedSettings) {
+      this.crtSettings.set(savedSettings);
+    }
   }
 
   /** Close the dialog */
@@ -171,6 +179,7 @@ export class VideoDialogComponent implements OnDestroy {
   /** Handle CRT settings changes from settings panel */
   onCrtSettingsChange(settings: CrtSettings): void {
     this.crtSettings.set(settings);
+    this.crtStorage.save(this.data.deviceId, 'video-dialog', settings);
   }
 
   /** Reset CRT settings to defaults */

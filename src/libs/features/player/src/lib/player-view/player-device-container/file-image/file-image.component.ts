@@ -1,4 +1,4 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input, signal, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   CycleImageComponent,
@@ -9,8 +9,8 @@ import {
   VideoControlsToolbarComponent,
   CRT_CONFIGS,
   CRT_PRESETS,
-  CrtSettings,
 } from '@teensyrom-nx/ui/components';
+import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
 import type { LaunchedFile } from '@teensyrom-nx/application';
 
 @Component({
@@ -28,7 +28,10 @@ import type { LaunchedFile } from '@teensyrom-nx/application';
   styleUrl: './file-image.component.scss',
 })
 export class FileImageComponent {
+  private readonly crtStorage = inject(CRT_STORAGE);
+
   // Inputs
+  deviceId = input.required<string>();
   currentFile = input<LaunchedFile | null>();
 
   // CRT configuration - small preset (subtle scanlines for compact display)
@@ -38,6 +41,19 @@ export class FileImageComponent {
   protected readonly isCrtEnabled = signal<boolean>(true);
   protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS.small);
   protected readonly showCrtControls = signal<boolean>(false);
+
+  constructor() {
+    // Load saved CRT settings when component initializes
+    effect(() => {
+      const deviceId = this.deviceId();
+      if (deviceId) {
+        const savedSettings = this.crtStorage.load(deviceId, 'file-image');
+        if (savedSettings) {
+          this.crtSettings.set(savedSettings);
+        }
+      }
+    }, { allowSignalWrites: true });
+  }
 
   // Computed signals derived from input
   creatorName = computed(() => {
@@ -76,9 +92,14 @@ export class FileImageComponent {
 
   /**
    * Handle CRT settings changes from settings panel
+   * Persists settings to localStorage per device
    */
   onCrtSettingsChange(settings: CrtSettings): void {
     this.crtSettings.set(settings);
+    const deviceId = this.deviceId();
+    if (deviceId) {
+      this.crtStorage.save(deviceId, 'file-image', settings);
+    }
   }
 
   /**

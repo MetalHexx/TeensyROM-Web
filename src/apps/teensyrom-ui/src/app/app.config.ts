@@ -18,6 +18,7 @@ import {
   PLAYER_STORAGE_PROVIDER,
   PLAYER_API_CLIENT_PROVIDER,
   SETTINGS_PROVIDERS,
+  CRT_PROVIDERS,
 } from '@teensyrom-nx/infrastructure';
 
 export const appConfig: ApplicationConfig = {
@@ -42,5 +43,6 @@ export const appConfig: ApplicationConfig = {
     PLAYER_STORAGE_PROVIDER,
     PLAYER_API_CLIENT_PROVIDER,
     SETTINGS_PROVIDERS,
+    CRT_PROVIDERS,
   ],
 };

@@ -1,4 +1,4 @@
-import { Component, computed, signal, OnDestroy, inject, input } from '@angular/core';
+import { Component, computed, signal, OnDestroy, inject, input, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import {
@@ -11,8 +11,8 @@ import {
   VideoControlsToolbarComponent,
   CRT_CONFIGS,
   CRT_PRESETS,
-  CrtSettings,
 } from '@teensyrom-nx/ui/components';
+import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
 import { VideoDialogComponent } from './video-dialog/video-dialog.component';
 import { SettingsStore } from '@teensyrom-nx/application';
 
@@ -39,6 +39,7 @@ interface VideoDevice {
 export class VideoCaptureComponent implements OnDestroy {
   private readonly dialog = inject(MatDialog);
   private readonly settingsStore = inject(SettingsStore);
+  private readonly crtStorage = inject(CRT_STORAGE);
   
   deviceId = input.required<string>();
 
@@ -68,6 +69,17 @@ export class VideoCaptureComponent implements OnDestroy {
   constructor() {
     // Initialize device enumeration on component creation
     this.enumerateVideoDevices();
+
+    // Load saved CRT settings when component initializes
+    effect(() => {
+      const deviceId = this.deviceId();
+      if (deviceId) {
+        const savedSettings = this.crtStorage.load(deviceId, 'video-compact');
+        if (savedSettings) {
+          this.crtSettings.set(savedSettings);
+        }
+      }
+    }, { allowSignalWrites: true });
   }
 
   protected onDeviceSelectorOpenedChange(isOpen: boolean): void {
@@ -261,9 +273,14 @@ export class VideoCaptureComponent implements OnDestroy {
 
   /**
    * Handle CRT settings changes from settings panel
+   * Persists settings to localStorage per device
    */
   onCrtSettingsChange(settings: CrtSettings): void {
     this.crtSettings.set(settings);
+    const deviceId = this.deviceId();
+    if (deviceId) {
+      this.crtStorage.save(deviceId, 'video-compact', settings);
+    }
   }
 
   /**

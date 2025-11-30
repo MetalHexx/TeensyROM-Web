@@ -2,7 +2,7 @@
 <div class="device-container">
   <div class="device-header">
     <div class="compact-section-width">
-      <lib-file-image [currentFile]="currentFile()"></lib-file-image>
+      <lib-file-image [deviceId]="deviceId()" [currentFile]="currentFile()"></lib-file-image>
     </div>
     <lib-file-other [deviceId]="deviceId()"></lib-file-other>
     @if (enableVideo()) {
