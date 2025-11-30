@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, computed, signal, ElementRef, viewChild, afterNextRender, inject, DestroyRef } from '@angular/core';
-import { CrtSettings, CrtSettingsConfig } from './crt-settings.interface';
-import { DEFAULT_CRT_SETTINGS, DEFAULT_CRT_CONFIG } from './crt-settings.defaults';
+import { CrtSettings } from './crt-settings.interface';
+import { DEFAULT_CRT_SETTINGS } from './crt-settings.defaults';
 
 /**
  * A pure presentation wrapper component that applies CRT (cathode ray tube) visual effects
@@ -50,13 +50,6 @@ export class CrtEffectWrapperComponent {
    * Use CRT_PRESETS for common configurations or provide custom values.
    */
   readonly settings = input<CrtSettings>(DEFAULT_CRT_SETTINGS);
-
-  /**
-   * Controls which effect groups are enabled.
-   * Use CRT_CONFIGS for common configurations matching CRT_PRESETS.
-   * When a group is disabled, its CSS effects are not applied regardless of settings values.
-   */
-  readonly config = input<CrtSettingsConfig>(DEFAULT_CRT_CONFIG);
 
   /**
    * Whether CRT effects are applied.
@@ -130,31 +123,10 @@ export class CrtEffectWrapperComponent {
   });
 
   /**
-   * Computed CSS variable values that respect both settings and config.
-   * Returns neutral values for disabled effect groups.
+   * Computed CSS variable values - directly uses settings.
+   * All effect control (enable/disable) is now handled by setting values to neutral.
    */
-  protected readonly effectiveSettings = computed(() => {
-    const s = this.settings();
-    const c = this.config();
-
-    return {
-      // Scanlines: 0 intensity disables the effect
-      scanlineIntensity: c.showScanlines ? s.scanlineIntensity : 0,
-      scanlineSize: c.showScanlines ? s.scanlineSize : 0,
-
-      // Vignette: 0 strength disables the effect
-      vignetteStrength: c.showVignette ? s.vignetteStrength : 0,
-
-      // Curvature: 0 disables the effect
-      screenCurvature: c.showCurvature ? s.screenCurvature : 0,
-
-      // Color filters: 1 is neutral (no change), 0 is neutral for hue
-      contrast: c.showColorFilters ? s.contrast : 1,
-      brightness: c.showColorFilters ? s.brightness : 1,
-      saturation: c.showColorFilters ? s.saturation : 1,
-      hue: c.showColorFilters ? s.hue : 0,
-    };
-  });
+  protected readonly effectiveSettings = computed(() => this.settings());
 
   constructor() {
     afterNextRender(() => {

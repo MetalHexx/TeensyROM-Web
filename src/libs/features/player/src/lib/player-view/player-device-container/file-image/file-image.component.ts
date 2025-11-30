@@ -34,12 +34,12 @@ export class FileImageComponent {
   deviceId = input.required<string>();
   currentFile = input<LaunchedFile | null>();
 
-  // CRT configuration - small preset (subtle scanlines for compact display)
-  readonly crtConfig = CRT_CONFIGS.small;
+  // CRT configuration - standard config (hide curvature since it's hardcoded to 16px)
+  readonly crtConfig = CRT_CONFIGS.standard;
 
   // CRT state signals
   protected readonly isCrtEnabled = signal<boolean>(true);
-  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS.small);
+  protected readonly crtSettings = signal<CrtSettings>({ ...CRT_PRESETS.full, screenCurvature: 16 });
   protected readonly showCrtControls = signal<boolean>(false);
 
   constructor() {
@@ -49,7 +49,8 @@ export class FileImageComponent {
       if (deviceId) {
         const savedSettings = this.crtStorage.load(deviceId, 'file-image');
         if (savedSettings) {
-          this.crtSettings.set(savedSettings);
+          // Force screenCurvature to 16px to match cycle-image border-radius
+          this.crtSettings.set({ ...savedSettings, screenCurvature: 16 });
         }
       }
     }, { allowSignalWrites: true });
@@ -95,7 +96,8 @@ export class FileImageComponent {
    * Persists settings to localStorage per device
    */
   onCrtSettingsChange(settings: CrtSettings): void {
-    this.crtSettings.set(settings);
+    // Force screenCurvature to 16px to match cycle-image border-radius
+    this.crtSettings.set({ ...settings, screenCurvature: 16 });
     const deviceId = this.deviceId();
     if (deviceId) {
       this.crtStorage.save(deviceId, 'file-image', settings);
@@ -106,13 +108,15 @@ export class FileImageComponent {
    * Reset CRT settings to default preset
    */
   onCrtReset(): void {
-    this.crtSettings.set(CRT_PRESETS.small);
+    // Force screenCurvature to 16px to match cycle-image border-radius
+    this.crtSettings.set({ ...CRT_PRESETS.small, screenCurvature: 16 });
   }
 
   /**
    * Apply a CRT preset
    */
   onCrtPresetSelected(presetName: keyof typeof CRT_PRESETS): void {
-    this.crtSettings.set(CRT_PRESETS[presetName]);
+    // Force screenCurvature to 16px to match cycle-image border-radius
+    this.crtSettings.set({ ...CRT_PRESETS[presetName], screenCurvature: 16 });
   }
 }

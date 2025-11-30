@@ -1,14 +1,13 @@
 <lib-scaling-card
   [title]="creatorName()"
   [metadataSource]="metadataSource()"
-  [enableOverflow]="true"
+  [enableOverflow]="false"
 >
   <lib-content-overlay-container [showOverlaysOnHover]="true">
     <!-- Content slot: CRT wrapper around cycling images -->
     <ng-container content>
       <lib-crt-effect-wrapper
         [settings]="crtSettings()"
-        [config]="crtConfig"
         [enabled]="isCrtEnabled()">
         <div class="image-wrapper">
           <lib-cycle-image
