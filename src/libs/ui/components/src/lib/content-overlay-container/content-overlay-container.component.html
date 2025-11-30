@@ -8,8 +8,8 @@
   (mouseenter)="onMouseEnter()"
   (mousemove)="onMouseMove()"
   (mouseleave)="onMouseLeave()"
-  (wheel)="onMouseActivity()"
-  (click)="onMouseActivity()"
+  (wheel.passive)="onMouseActivity()"
+  (mousedown.passive)="onMouseActivity()"
 >
   <!-- Content layer (lowest z-index) -->
   <div class="content-layer">
