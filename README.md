@@ -4,26 +4,26 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 
 > **Note**: This project is the spiritual successor to the original [TeensyROM-UI WPF desktop application](https://github.com/MetalHexx/TeensyROM-UI). While the original application provided a Windows-only desktop experience, this new implementation offers cross-platform compatibility through a modern web architecture that can run on Windows, macOS, and Linux.
 
-<img width="2557" height="1301" alt="image" src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" />
+<img width="2557" height="1301" alt="image" src=".github/images/hero-screenshot.png" />
 
 <table style="width: 100%; border:none;">
   <tr>
     <td align="center">
       <b>Launch Games and SIDs</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" object-fit: cover;">
+        <img src=".github/images/hero-screenshot.png" object-fit: cover;">
       </div>
     </td>
     <td align="center">
       <b>With CRT Emulation</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img width="2553" height="1297" alt="image" src="https://github.com/user-attachments/assets/1257f8df-2919-4bed-817e-def585a7cd2c" style="width: 105%; height: 105%; margin: 0 auto; overflow: hidden;"/>
+        <img width="2553" height="1297" alt="image" src=".github/images/crt-emulation.png" style="width: 105%; height: 105%; margin: 0 auto; overflow: hidden;"/>
       </div>
     </td>
     <td align="center">
       <b>And Full Screen Immersion</b><br>
       <div style="width: 250px; height: 200px; margin: 0 auto; overflow: hidden;">
-        <img width="2550" height="1437" alt="image" src="https://github.com/user-attachments/assets/a4d84253-3dd6-4110-a656-38d2df1ac3f5" style="width: 90%; height: 90%; margin: 0 auto; overflow: hidden;"/>
+        <img width="2550" height="1437" alt="image" src=".github/images/fullscreen-immersion.png" style="width: 90%; height: 90%; margin: 0 auto; overflow: hidden;"/>
       </div>
     </td>
   </tr>
@@ -285,7 +285,7 @@ See [LICENSE.md](LICENSE.md) for details.
 
 <p align="center">
   <img
-    src="https://github.com/user-attachments/assets/d330fa67-5902-4765-ad32-b56cfd6bec0b"
+    src=".github/images/teensyrom-logo.png"
     alt="image"
     width="25%"
   />
