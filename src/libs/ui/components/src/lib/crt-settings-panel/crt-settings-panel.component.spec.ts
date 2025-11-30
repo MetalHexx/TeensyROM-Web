@@ -53,11 +53,11 @@ describe('CrtSettingsPanelComponent', () => {
   });
 
   describe('Slider Rendering Based on Config', () => {
-    it('should render all 8 sliders with default config', () => {
+    it('should render all 7 sliders with default config', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(8);
+      expect(sliders.length).toBe(7);
     });
 
     it('should render only scanline sliders when config.showScanlines is true only', () => {
@@ -70,13 +70,12 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(3); // intensity, thickness, gap
+      expect(sliders.length).toBe(2); // intensity, size
 
       const labels = fixture.nativeElement.querySelectorAll('.control-label') as NodeListOf<Element>;
       const labelTexts = Array.from(labels).map((l) => l.textContent?.trim());
       expect(labelTexts).toContain('Scanline Intensity');
-      expect(labelTexts).toContain('Scanline Thickness');
-      expect(labelTexts).toContain('Scanline Gap');
+      expect(labelTexts).toContain('Scanline Size');
     });
 
     it('should render only vignette slider when config.showVignette is true only', () => {
@@ -147,7 +146,7 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(7); // 3 scanline + 1 vignette + 3 color filters
+      expect(sliders.length).toBe(6); // 2 scanline + 1 vignette + 3 color filters
 
       const labels = fixture.nativeElement.querySelectorAll('.control-label') as NodeListOf<Element>;
       const labelTexts = Array.from(labels).map((l) => l.textContent?.trim());
@@ -274,10 +273,10 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       const controlValues = fixture.nativeElement.querySelectorAll('.control-value') as NodeListOf<Element>;
-      const thicknessValue = Array.from(controlValues).find((el) =>
-        el.textContent?.includes('3px')
+      const sizeValue = Array.from(controlValues).find((el) =>
+        el.textContent?.includes('2.5px')
       );
-      expect(thicknessValue).toBeTruthy();
+      expect(sizeValue).toBeTruthy();
     });
   });
 

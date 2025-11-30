@@ -48,11 +48,11 @@
       background-image: repeating-linear-gradient(
         0deg,
         rgba(0, 0, 0, var(--scanline-intensity, 0)) 0px,
-        rgba(0, 0, 0, var(--scanline-intensity, 0)) var(--scanline-thickness, 0px),
-        transparent var(--scanline-thickness, 0px),
-        transparent calc(var(--scanline-thickness, 0px) + var(--scanline-spacing, 0px))
+        rgba(0, 0, 0, var(--scanline-intensity, 0)) var(--scanline-size, 0px),
+        transparent var(--scanline-size, 0px),
+        transparent calc(var(--scanline-size, 0px) * 2)
       );
-      background-size: 100% calc(var(--scanline-thickness, 0px) + var(--scanline-spacing, 0px));
+      background-size: 100% calc(var(--scanline-size, 0px) * 2);
       pointer-events: none;
       z-index: 2;
       border-radius: var(--screen-curvature, 0px);

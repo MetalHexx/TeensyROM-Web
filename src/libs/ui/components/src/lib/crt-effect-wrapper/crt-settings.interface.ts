@@ -51,8 +51,7 @@ export interface CrtSettingsConfig {
  * ```typescript
  * const settings: CrtSettings = {
  *   scanlineIntensity: 0.5,  // 50% opacity scanlines
- *   scanlineThickness: 3,    // 3px dark bands
- *   scanlineSpacing: 2,      // 2px gaps between bands
+ *   scanlineSize: 2.5,       // 2.5px scanline bands and gaps
  *   vignetteStrength: 1.3,   // Strong edge darkening
  *   screenCurvature: 115,    // Curved screen corners
  *   contrast: 1.1,           // 10% contrast boost
@@ -70,16 +69,12 @@ export interface CrtSettings {
   scanlineIntensity: number;
 
   /**
-   * Pixel height of dark scanline bands.
-   * Typically 2-4px for realistic CRT look.
+   * Size of scanline bands and gaps in pixels (1.0-6.0).
+   * Controls both the dark band height and the spacing between bands (1:1 ratio).
+   * Lower values = finer/subtler lines, higher values = thicker/bolder lines.
+   * Typical values: 1.0 (fine), 2.5 (standard), 4.0 (heavy).
    */
-  scanlineThickness: number;
-
-  /**
-   * Pixel gap between scanline bands.
-   * Typically 1-3px for realistic CRT look.
-   */
-  scanlineSpacing: number;
+  scanlineSize: number;
 
   /**
    * Intensity of edge/corner darkening (0-2).

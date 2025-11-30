@@ -52,20 +52,13 @@ const SCANLINE_SLIDERS: SliderConfig[] = [
     decimalPlaces: 2,
   },
   {
-    key: 'scanlineThickness',
-    label: 'Scanline Thickness',
-    min: 1,
-    max: 4,
-    step: 1,
+    key: 'scanlineSize',
+    label: 'Scanline Size',
+    min: 1.0,
+    max: 6.0,
+    step: 0.1,
     format: 'px',
-  },
-  {
-    key: 'scanlineSpacing',
-    label: 'Scanline Gap',
-    min: 1,
-    max: 8,
-    step: 1,
-    format: 'px',
+    decimalPlaces: 1,
   },
 ];
 

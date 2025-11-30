@@ -72,16 +72,10 @@ describe('CrtEffectWrapperComponent', () => {
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.5');
     });
 
-    it('should bind scanline-thickness CSS variable with px unit', () => {
+    it('should bind scanline-size CSS variable with px unit', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--scanline-thickness')).toBe('3px');
-    });
-
-    it('should bind scanline-spacing CSS variable with px unit', () => {
-      fixture.detectChanges();
-      const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--scanline-spacing')).toBe('2px');
+      expect(wrapper.style.getPropertyValue('--scanline-size')).toBe('2.5px');
     });
 
     it('should bind vignette-strength CSS variable', () => {
@@ -203,8 +197,7 @@ describe('CrtEffectWrapperComponent', () => {
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.5');
-      expect(wrapper.style.getPropertyValue('--scanline-thickness')).toBe('1px');
-      expect(wrapper.style.getPropertyValue('--scanline-spacing')).toBe('1px');
+      expect(wrapper.style.getPropertyValue('--scanline-size')).toBe('1px');
       expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
     });
   });
@@ -217,8 +210,7 @@ describe('CrtEffectWrapperComponent', () => {
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0');
-      expect(wrapper.style.getPropertyValue('--scanline-thickness')).toBe('0px');
-      expect(wrapper.style.getPropertyValue('--scanline-spacing')).toBe('0px');
+      expect(wrapper.style.getPropertyValue('--scanline-size')).toBe('0px');
     });
 
     it('should disable vignette when config.showVignette is false', () => {

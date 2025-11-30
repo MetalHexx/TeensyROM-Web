@@ -140,8 +140,7 @@ export class CrtEffectWrapperComponent {
     return {
       // Scanlines: 0 intensity disables the effect
       scanlineIntensity: c.showScanlines ? s.scanlineIntensity : 0,
-      scanlineThickness: c.showScanlines ? s.scanlineThickness : 0,
-      scanlineSpacing: c.showScanlines ? s.scanlineSpacing : 0,
+      scanlineSize: c.showScanlines ? s.scanlineSize : 0,
 
       // Vignette: 0 strength disables the effect
       vignetteStrength: c.showVignette ? s.vignetteStrength : 0,

@@ -78,8 +78,7 @@ export class VideoDialogComponent implements OnDestroy {
   /** Unified CRT settings (consolidated from 8 individual signals) */
   protected readonly crtSettings = signal<CrtSettings>({
     scanlineIntensity: 0.50,
-    scanlineThickness: 3,
-    scanlineSpacing: 2,
+    scanlineSize: 2.5,
     vignetteStrength: 1.30,
     screenCurvature: 115,
     contrast: 1.10,

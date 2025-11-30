@@ -85,8 +85,7 @@ export const CRT_PRESETS = {
    */
   full: {
     scanlineIntensity: 0.5,
-    scanlineThickness: 3,
-    scanlineSpacing: 2,
+    scanlineSize: 2.5,
     vignetteStrength: 1.3,
     screenCurvature: 115,
     contrast: 1.1,
@@ -100,8 +99,7 @@ export const CRT_PRESETS = {
    */
   standard: {
     scanlineIntensity: 0.5,
-    scanlineThickness: 3,
-    scanlineSpacing: 2,
+    scanlineSize: 2.5,
     vignetteStrength: 1.3,
     screenCurvature: 0,
     contrast: 1.1,
@@ -115,8 +113,7 @@ export const CRT_PRESETS = {
    */
   small: {
     scanlineIntensity: 0.5,
-    scanlineThickness: 1,
-    scanlineSpacing: 1,
+    scanlineSize: 1.0,
     vignetteStrength: 1.5,
     screenCurvature: 0,
     contrast: 1.05,
@@ -130,8 +127,7 @@ export const CRT_PRESETS = {
    */
   none: {
     scanlineIntensity: 0,
-    scanlineThickness: 0,
-    scanlineSpacing: 0,
+    scanlineSize: 0,
     vignetteStrength: 0,
     screenCurvature: 0,
     contrast: 1,
