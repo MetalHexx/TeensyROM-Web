@@ -4,7 +4,10 @@ A cross-platform web application for controlling your Commodore 64/128 through t
 
 > **Note**: This project is the spiritual successor to the original [TeensyROM-UI WPF desktop application](https://github.com/MetalHexx/TeensyROM-UI). While the original application provided a Windows-only desktop experience, this new implementation offers cross-platform compatibility through a modern web architecture that can run on Windows, macOS, and Linux.
 
-<img width="2506" height="1280" alt="image" src="https://github.com/user-attachments/assets/c716e1a7-1a63-4dde-8702-c387812b5f37" />
+<img width="2557" height="1301" alt="image" src="https://github.com/user-attachments/assets/d0ac7bf4-8348-40bb-abd2-bfdc2785e918" />
+<img width="2553" height="1291" alt="image" src="https://github.com/user-attachments/assets/bbeb1350-01c3-485c-8fa3-cb91f7c3cadc" />
+<img width="2556" height="1437" alt="image" src="https://github.com/user-attachments/assets/56719496-74fb-49f3-a677-3251a231c300" />
+
 
 ## ✨ Features
 
