@@ -83,22 +83,24 @@ jobs:
       
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+        working-directory: src
       
       - name: Build frontend (production)
         run: pnpm nx build teensyrom-ui --configuration=production
+        working-directory: src
       
       - name: Copy frontend to wwwroot
         run: |
-          mkdir -p apps/api/src/TeensyRom.Api/wwwroot
-          rm -rf apps/api/src/TeensyRom.Api/wwwroot/*
-          cp -r dist/apps/teensyrom-ui/browser/* apps/api/src/TeensyRom.Api/wwwroot/
+          mkdir -p src/apps/api/src/TeensyRom.Api/wwwroot
+          rm -rf src/apps/api/src/TeensyRom.Api/wwwroot/*
+          cp -r src/dist/apps/teensyrom-ui/browser/* src/apps/api/src/TeensyRom.Api/wwwroot/
       
       - name: Restore .NET dependencies
-        run: dotnet restore apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj
+        run: dotnet restore src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj
       
       - name: Publish for ${{ matrix.rid }}
         run: |
-          dotnet publish apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
+          dotnet publish src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
             -c Release \
             -r ${{ matrix.rid }} \
             --self-contained true \
