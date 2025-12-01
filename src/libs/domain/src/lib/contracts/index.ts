@@ -19,5 +19,8 @@ export * from './alert.contract';
 // Settings contracts
 export * from './settings.contract';
 
+// Version contracts
+export * from './version.contract';
+
 // CRT contracts
 export * from './crt-storage.contract';

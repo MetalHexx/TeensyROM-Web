@@ -4,6 +4,9 @@
   <span class="app-title">TeensyROM</span>
   <span class="spacer"></span>
 
+  <!-- Version Display -->
+  <span class="version-text">{{ appVersion() }}</span>
+
   <!-- Dark/Light Toggle -->
   <button mat-icon-button aria-label="Toggle dark/light theme" (click)="themeService.toggleTheme()">
     @if (currentTheme() === 'dark') {

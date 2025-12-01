@@ -21,6 +21,7 @@ export * from './FileTransferSettingsDto';
 export * from './FindDevicesResponse';
 export * from './GetDirectoryResponse';
 export * from './GetSettingsResponse';
+export * from './GetVersionResponse';
 export * from './HttpValidationProblemDetails';
 export * from './IndexAllResponse';
 export * from './IndexResponse';

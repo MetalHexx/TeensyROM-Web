@@ -3,6 +3,7 @@ apis/DevicesApi.ts
 apis/FilesApi.ts
 apis/PlayerApi.ts
 apis/SettingsApi.ts
+apis/VersionApi.ts
 apis/index.ts
 index.ts
 models/AppSettingsDto.ts
@@ -26,6 +27,7 @@ models/FileTransferSettingsDto.ts
 models/FindDevicesResponse.ts
 models/GetDirectoryResponse.ts
 models/GetSettingsResponse.ts
+models/GetVersionResponse.ts
 models/HttpValidationProblemDetails.ts
 models/IndexAllResponse.ts
 models/IndexResponse.ts

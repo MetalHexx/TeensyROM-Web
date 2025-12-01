@@ -21,6 +21,10 @@ export * from './lib/player/providers';
 // Settings implementations
 export * from './lib/settings';
 
+// Version implementations
+export * from './lib/version/version.service';
+export * from './lib/version/providers';
+
 // CRT implementations
 export * from './lib/crt/crt-storage.service';
 export * from './lib/crt/providers';

@@ -8,6 +8,8 @@
     <DockerfileContext>..\..</DockerfileContext>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <Version>1.0.0-alpha.1</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
     <OpenApiDocumentsDirectory>$(OutputPath)api-spec</OpenApiDocumentsDirectory>
     <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
@@ -59,7 +61,7 @@
   </ItemGroup>
 
   <!-- Build and copy frontend before publish -->
-  <Target Name="BuildFrontend" BeforeTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+  <Target Name="BuildFrontend" BeforeTargets="Publish" Condition="'$(Configuration)' == 'Release' AND '$(SkipBuildFrontend)' != 'true'">
     <PropertyGroup>
       <WorkspaceRoot>$(MSBuildProjectDirectory)\..\..\..\..</WorkspaceRoot>
       <FrontendScript>$(WorkspaceRoot)\scripts\copy-frontend.ps1</FrontendScript>

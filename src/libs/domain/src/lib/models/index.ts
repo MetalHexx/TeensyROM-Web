@@ -30,5 +30,8 @@ export * from './alert-message.model';
 // Settings models
 export * from './settings.model';
 
+// Version models
+export * from './version.model';
+
 // CRT models
 export * from './crt-settings.model';

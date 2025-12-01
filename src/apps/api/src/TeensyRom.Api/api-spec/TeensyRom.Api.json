@@ -1,10 +1,42 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "TeensyRom.Api | v1",
-    "version": "1.0.0"
+    "title": "TeensyRom.Api | v1.0.0-alpha.1",
+    "version": "1.0.0-alpha.1"
   },
   "paths": {
+    "/api/version": {
+      "get": {
+        "tags": [
+          "Version"
+        ],
+        "summary": "Get Application Version",
+        "description": "Retrieves the current semantic version of the TeensyROM application.\n\nThe version follows semantic versioning format: **Major.Minor.Patch[-prerelease]**\n\n**Version Information:**\n- **Major**: Breaking changes or significant new features\n- **Minor**: Backward-compatible new features\n- **Patch**: Backward-compatible bug fixes\n- **Prerelease**: Optional prerelease identifier (e.g., alpha.1, beta.2)\n\nThis version is read from the assembly metadata and matches the version specified in the TeensyRom.Api.csproj file.",
+        "operationId": "GetVersion",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetVersionResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "post": {
         "tags": [
@@ -1466,6 +1498,17 @@
           }
         }
       },
+      "GetVersionResponse": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          }
+        }
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -1967,6 +2010,9 @@
     }
   },
   "tags": [
+    {
+      "name": "Version"
+    },
     {
       "name": "Settings"
     },
