@@ -82,12 +82,14 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
       - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: src
+        run: |
+          cd src
+          pnpm install --frozen-lockfile
       
       - name: Build frontend (production)
-        run: pnpm nx build teensyrom-ui --configuration=production
-        working-directory: src
+        run: |
+          cd src
+          pnpm nx build teensyrom-ui --configuration=production
       
       - name: Copy frontend to wwwroot
         run: |
