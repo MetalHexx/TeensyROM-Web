@@ -37,9 +37,18 @@ export class FileImageComponent {
   // CRT configuration - standard config (hide curvature since it's hardcoded to 16px)
   readonly crtConfig = CRT_CONFIGS.standard;
 
+  // File-image specific default CRT settings (brightness at 100%, curvature locked to 16px)
+  private readonly fileImageDefaultSettings: CrtSettings = {
+    ...CRT_PRESETS.full,
+    brightness: 1.0,
+    screenCurvature: 16,
+    scanlineSize: 1.2,
+    scanlineIntensity: 0.69,
+  };
+
   // CRT state signals
   protected readonly isCrtEnabled = signal<boolean>(true);
-  protected readonly crtSettings = signal<CrtSettings>({ ...CRT_PRESETS.full, screenCurvature: 16 });
+  protected readonly crtSettings = signal<CrtSettings>(this.fileImageDefaultSettings);
   protected readonly showCrtControls = signal<boolean>(false);
 
   constructor() {
@@ -49,9 +58,10 @@ export class FileImageComponent {
       if (deviceId) {
         const savedSettings = this.crtStorage.load(deviceId, 'file-image');
         if (savedSettings) {
-          // Force screenCurvature to 16px to match cycle-image border-radius
+          // Use saved settings (user's preference), force screenCurvature to 16px
           this.crtSettings.set({ ...savedSettings, screenCurvature: 16 });
         }
+        // If no saved settings, fileImageDefaultSettings from signal initialization is used
       }
     }, { allowSignalWrites: true });
   }
@@ -108,8 +118,8 @@ export class FileImageComponent {
    * Reset CRT settings to default preset
    */
   onCrtReset(): void {
-    // Force screenCurvature to 16px to match cycle-image border-radius
-    this.crtSettings.set({ ...CRT_PRESETS.small, screenCurvature: 16 });
+    // Reset to file-image default settings (brightness 1.0, curvature 16px)
+    this.crtSettings.set(this.fileImageDefaultSettings);
   }
 
   /**
