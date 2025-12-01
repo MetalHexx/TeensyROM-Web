@@ -1,0 +1,160 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  NODE_VERSION: '20.x'
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+      is_prerelease: ${{ steps.extract.outputs.is_prerelease }}
+    
+    steps:
+      - name: Extract version from tag
+        id: extract
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          if [[ ! "$VERSION" =~ ^v ]]; then
+            echo "::error::Tag must start with 'v' (e.g., v1.0.0)"
+            exit 1
+          fi
+          VERSION="${VERSION#v}"  # Remove 'v' prefix
+          
+          # Validate semver format
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Invalid version format: $VERSION. Expected: X.Y.Z or X.Y.Z-suffix"
+            exit 1
+          fi
+          
+          # Check for pre-release (contains hyphen)
+          if [[ "$VERSION" =~ - ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "::notice::Detected pre-release version: $VERSION"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "::notice::Detected stable version: $VERSION"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "::notice::Building version $VERSION"
+
+  build:
+    name: Build ${{ matrix.rid }}
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - rid: win-x64
+            extension: zip
+          - rid: osx-x64
+            extension: tar.gz
+          - rid: osx-arm64
+            extension: tar.gz
+          - rid: linux-x64
+            extension: tar.gz
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Build frontend (production)
+        run: pnpm nx build teensyrom-ui --configuration=production
+      
+      - name: Copy frontend to wwwroot
+        run: |
+          mkdir -p apps/api/src/TeensyRom.Api/wwwroot
+          rm -rf apps/api/src/TeensyRom.Api/wwwroot/*
+          cp -r dist/apps/teensyrom-ui/browser/* apps/api/src/TeensyRom.Api/wwwroot/
+      
+      - name: Restore .NET dependencies
+        run: dotnet restore apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj
+      
+      - name: Publish for ${{ matrix.rid }}
+        run: |
+          dotnet publish apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:SkipBuildFrontend=true \
+            -o ./publish/${{ matrix.rid }}
+      
+      - name: Package (zip)
+        if: matrix.extension == 'zip'
+        run: |
+          cd publish/${{ matrix.rid }}
+          zip -r ../../TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.zip .
+      
+      - name: Package (tar.gz)
+        if: matrix.extension == 'tar.gz'
+        run: |
+          cd publish/${{ matrix.rid }}
+          chmod +x TeensyRom.Api
+          tar -czvf ../../TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.tar.gz .
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}
+          path: TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.${{ matrix.extension }}
+          retention-days: 5
+
+  release:
+    name: Create GitHub Release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      
+      - name: List artifacts
+        run: ls -la artifacts/
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: TeensyROM Web v${{ needs.validate.outputs.version }}
+          draft: false
+          prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
+          files: |
+            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-win-x64.zip
+            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-osx-x64.tar.gz
+            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-osx-arm64.tar.gz
+            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-linux-x64.tar.gz
