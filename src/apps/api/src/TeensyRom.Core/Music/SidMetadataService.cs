@@ -189,24 +189,31 @@ namespace TeensyRom.Core.Music
             }
         }
 
-        /// <summary>
-        /// Assigns a composer image to a sid
-        /// </summary>
-        /// <remarks>
-        /// To add a new composer image for a composer not in the HVSC:
-        /// Add SID in the HVSC /musicians/<letter> folder structure 
-        /// Add composer image with musicians_<letter>_<musicianname>.jpg
-        /// TODO: Make more generic and remove HVSC folder structure requirement
-        /// </remarks>
-        /// <param name="song"></param>
-        private void EnrichWithDeepSidComposerImage(SongItem song)
+    /// <summary>
+    /// Assigns a composer image to a sid.
+    /// </summary>
+    /// <remarks>
+    /// To add a new composer image for a composer not in the HVSC:
+    /// Add SID in the HVSC /musicians/&lt;letter&gt; folder structure.
+    /// Add composer image with musicians_&lt;letter&gt;_&lt;musicianname&gt;.jpg.
+    /// TODO: Make more generic and remove HVSC folder structure requirement.
+    /// </remarks>
+    /// <param name="song">The song item to enrich with composer image.</param>
+    private void EnrichWithDeepSidComposerImage(SongItem song)
         {
-            var currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var currentDirectory = Assembly.GetExecutingAssembly().GetPath();
+            
+            // Guard against empty directory path
+            if (string.IsNullOrEmpty(currentDirectory))
+            {
+                return;
+            }
+            
             var songPath = song.MetadataSourcePath.IsEmpty ? song.Path : song.MetadataSourcePath;
 
             var remainingPathSegments = songPath.Value.GetRemainingPathSegments(MusicConstants.Hvsc_Musician_Base_Remote_Path);
 
-            var hsvcImageName = $"{Path.Combine(currentDirectory!, MusicConstants.Musician_Image_Local_Path)}musicians";
+            var hsvcImageName = $"{Path.Combine(currentDirectory, MusicConstants.Musician_Image_Local_Path)}musicians";
 
             foreach (var segment in remainingPathSegments)
             {

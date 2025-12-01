@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using TeensyRom.Core.Assets;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 
@@ -11,8 +12,8 @@ namespace TeensyRom.Core.Storage.Tools.D64Extraction
     public class D64Extractor(ILoggingService log) : ID64Extractor
     {
         private readonly ILoggingService _log = log;
-        private string? AssemblyBasePath => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-        private string OutputPath => Path.Combine(AssemblyBasePath!, AssetConstants.VicePath, "output");
+        private string AssemblyBasePath => Assembly.GetExecutingAssembly().GetPath();
+        private string OutputPath => Path.Combine(AssemblyBasePath, AssetConstants.VicePath, "output");
 
         public void ClearOutputDirectory()
         {

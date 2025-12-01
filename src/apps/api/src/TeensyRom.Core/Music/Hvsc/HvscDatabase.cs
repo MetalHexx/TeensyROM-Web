@@ -62,9 +62,9 @@ public class HvscDatabase : IHvscDatabase
 
     private static string GetHvscFilePath()
     {
-        var currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+        var currentDirectory = Assembly.GetExecutingAssembly().GetPath();
 
-        if (currentDirectory is null) return string.Empty;
+        if (string.IsNullOrEmpty(currentDirectory)) return string.Empty;
 
         var sidListPath = Path.Combine(currentDirectory, MusicConstants.SidList_Local_Path);
 

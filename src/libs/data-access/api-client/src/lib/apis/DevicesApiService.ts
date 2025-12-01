@@ -86,12 +86,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/{deviceId}/connect`;
-        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/devices/{deviceId}/connect`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
@@ -125,12 +121,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/{deviceId}`;
-        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/devices/{deviceId}`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
             method: 'DELETE',
             headers: headerParameters,
             query: queryParameters,
@@ -157,11 +149,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices`;
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/devices`,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
@@ -195,12 +184,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/{deviceId}/ping`;
-        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/devices/{deviceId}/ping`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
@@ -234,12 +219,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/{deviceId}/reset`;
-        urlPath = urlPath.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId'])));
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/devices/{deviceId}/reset`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
             method: 'PUT',
             headers: headerParameters,
             query: queryParameters,
@@ -266,11 +247,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/events`;
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/devices/events`,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
@@ -297,11 +275,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/logs`;
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/logs`,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
@@ -328,11 +303,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/events`;
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/devices/events`,
             method: 'DELETE',
             headers: headerParameters,
             query: queryParameters,
@@ -359,11 +331,8 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/logs`;
-
         const response = await this.request({
-            path: urlPath,
+            path: `/api/logs`,
             method: 'DELETE',
             headers: headerParameters,
             query: queryParameters,

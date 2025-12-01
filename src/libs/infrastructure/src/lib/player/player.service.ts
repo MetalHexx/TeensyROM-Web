@@ -10,6 +10,8 @@ import {
   StorageType,
   ALERT_SERVICE,
   IAlertService,
+  API_CONFIG,
+  IApiConfig,
 } from '@teensyrom-nx/domain';
 import { logError } from '@teensyrom-nx/utils';
 import { extractErrorMessage } from '../error/api-error.utils';
@@ -21,11 +23,11 @@ export class PlayerService implements IPlayerService {
 
   constructor(
     private readonly apiService: PlayerApiService,
-    @Inject(ALERT_SERVICE) alertService: IAlertService
+    @Inject(ALERT_SERVICE) alertService: IAlertService,
+    @Inject(API_CONFIG) apiConfig: IApiConfig
   ) {
-    // Extract base URL from API service configuration with fallback
-    this.baseApiUrl = (this.apiService as any).configuration?.basePath || 'http://localhost:5168';
-    this.alertService = alertService;
+    this.baseApiUrl = apiConfig.getBaseUrl();
+    this.alertService = alertService; 
   }
 
   launchFile(deviceId: string, storageType: StorageType, filePath: string): Observable<FileItem> {

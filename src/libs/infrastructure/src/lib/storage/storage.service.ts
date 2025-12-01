@@ -13,6 +13,7 @@ import {
   FileItem,
   PlayerFilterType,
   ALERT_SERVICE,
+  API_CONFIG,
 } from '@teensyrom-nx/domain';
 import { DomainMapper } from '../domain.mapper';
 import { Observable, map, catchError, from, throwError, mergeMap } from 'rxjs';
@@ -24,13 +25,10 @@ export class StorageService implements IStorageService {
   private readonly baseApiUrl: string;
   private readonly apiService = inject(FilesApiService);
   private readonly alertService = inject(ALERT_SERVICE);
+  private readonly apiConfig = inject(API_CONFIG);
 
   constructor() {
-    // Extract base URL from API service configuration with fallback
-    // Configuration is protected, so we access it via unknown cast
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const config = (this.apiService as any).configuration;
-    this.baseApiUrl = config?.basePath || 'http://localhost:5168';
+    this.baseApiUrl = this.apiConfig.getBaseUrl();
   }
 
   getDirectory(

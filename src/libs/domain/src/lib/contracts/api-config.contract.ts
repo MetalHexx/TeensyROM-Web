@@ -21,6 +21,15 @@ export interface IApiConfig {
    * - Production: '' (empty string for relative URLs)
    */
   signalRBasePath: string;
+
+  /**
+   * Gets the base URL for constructing absolute URLs to API resources.
+   * Returns basePath if non-empty, otherwise returns window.location.origin.
+   * This is used for building full URLs to assets served by the API.
+   *
+   * @returns The base URL to use for API resource URLs
+   */
+  getBaseUrl(): string;
 }
 
 export const API_CONFIG = new InjectionToken<IApiConfig>('API_CONFIG');

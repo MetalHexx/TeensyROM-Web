@@ -16,7 +16,7 @@ export const PLAYER_API_CLIENT_PROVIDER = {
 export const PLAYER_SERVICE_PROVIDER = {
   provide: PLAYER_SERVICE,
   useClass: PlayerService,
-  deps: [PlayerApiService, ALERT_SERVICE],
+  deps: [PlayerApiService, ALERT_SERVICE, API_CONFIG],
 };
 
 export const PLAYER_STORAGE_PROVIDER = {

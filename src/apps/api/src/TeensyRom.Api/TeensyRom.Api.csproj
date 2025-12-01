@@ -11,6 +11,14 @@
     <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
     <OpenApiDocumentsDirectory>$(OutputPath)api-spec</OpenApiDocumentsDirectory>
     <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+    <!-- Self-contained single-file publishing configuration -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Don't include all content in single file - keep Assets as separate files -->
+    <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
@@ -49,5 +57,31 @@
     <None Remove="Endpoints\Serial\LogHub\**" />
     <None Remove="Endpoints\Serial\StopLogs\**" />
   </ItemGroup>
+
+  <!-- Build and copy frontend before publish -->
+  <Target Name="BuildFrontend" BeforeTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <WorkspaceRoot>$(MSBuildProjectDirectory)\..\..\..\..</WorkspaceRoot>
+      <FrontendScript>$(WorkspaceRoot)\scripts\copy-frontend.ps1</FrontendScript>
+    </PropertyGroup>
+    <Message Text="Building Angular frontend..." Importance="high" />
+    <Exec Command="pwsh -File &quot;$(FrontendScript)&quot;" WorkingDirectory="$(WorkspaceRoot)" />
+  </Target>
+
+  <!-- Include Assets from TeensyRom.Core build output for publishing -->
+  <Target Name="IncludeCoreAssets" AfterTargets="Build">
+    <ItemGroup>
+      <CoreAssets Include="$(MSBuildProjectDirectory)\..\TeensyRom.Core\bin\$(Configuration)\$(TargetFramework)\Assets\**\*.*" Exclude="$(MSBuildProjectDirectory)\..\TeensyRom.Core\bin\$(Configuration)\$(TargetFramework)\Assets\**\*.cs" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CoreAssets)" DestinationFolder="$(OutDir)Assets\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Ensure Assets are included in publish output -->
+  <Target Name="PublishCoreAssets" AfterTargets="Publish">
+    <ItemGroup>
+      <CoreAssetsForPublish Include="$(OutDir)Assets\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CoreAssetsForPublish)" DestinationFolder="$(PublishDir)Assets\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

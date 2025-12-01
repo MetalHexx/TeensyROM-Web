@@ -22,12 +22,12 @@ Write-Host ""
 
 # Step 1: Build Angular frontend
 Write-Host "📦 Building Angular frontend (production)..." -ForegroundColor Cyan
-Write-Host "   Command: pnpm nx build teensyrom-ui --configuration=production" -ForegroundColor Gray
+Write-Host "   Command: pnpm nx build teensyrom-ui --configuration=production --skip-nx-cache" -ForegroundColor Gray
 Write-Host ""
 
 Push-Location $repoRoot
 try {
-    $buildOutput = pnpm nx build teensyrom-ui --configuration=production 2>&1
+    $buildOutput = pnpm nx build teensyrom-ui --configuration=production --skip-nx-cache 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Build failed!" -ForegroundColor Red
         Write-Host $buildOutput
