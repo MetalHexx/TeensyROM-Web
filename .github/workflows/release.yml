@@ -108,6 +108,7 @@ jobs:
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:SkipBuildFrontend=true \
+            -p:SkipOpenApiGeneration=true \
             -o ./publish/${{ matrix.rid }}
       
       - name: Package (zip)

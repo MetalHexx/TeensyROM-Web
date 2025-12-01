@@ -10,9 +10,10 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
     <Version>1.0.0-alpha.1</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
+    <!-- OpenAPI generation disabled in CI to avoid platform-specific binary execution issues -->
+    <OpenApiGenerateDocuments Condition="'$(SkipOpenApiGeneration)' != 'true'">true</OpenApiGenerateDocuments>
     <OpenApiDocumentsDirectory>$(OutputPath)api-spec</OpenApiDocumentsDirectory>
-    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiGenerateDocumentsOnBuild Condition="'$(SkipOpenApiGeneration)' != 'true'">true</OpenApiGenerateDocumentsOnBuild>
     <!-- Self-contained single-file publishing configuration -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
