@@ -33,8 +33,9 @@ Create a single, self-contained executable distribution for Windows, Mac, and Li
 |-------|------|-------------|-------|--------|
 | 01 | Relative URL Migration | Remove hardcoded localhost:5168 URLs from infrastructure | UI Wizard | ✅ Complete |
 | 02 | API Static File Serving | Configure .NET API to serve Angular production build | Backend Wizard | ✅ Complete |
-| 03 | Publishing Configuration | Self-contained single-file publish for all platforms | Backend Wizard | 📋 Planning |
-| 04 | GitHub Actions Workflow | Automated release pipeline with semantic versioning | Backend Wizard | ⏳ Pending |
+| 03 | Publishing Configuration | Self-contained single-file publish for all platforms | Backend Wizard | ✅ Complete |
+| 3a | Semantic Versioning | Add version endpoint and display in UI header | Backend + UI | ✅ Complete |
+| 04 | GitHub Actions Workflow | Automated release pipeline with semantic versioning | Backend Wizard | 📋 Planning |
 | 05 | Homebrew Distribution | macOS distribution via Homebrew tap | Backend Wizard | ⏳ Pending |
 | 06 | Documentation | Create distribution docs and update README | Documentation | ⏳ Pending |
 
@@ -136,7 +137,8 @@ Phase 06 (Documentation) ← depends on all phases for accurate instructions
 
 - [x] **Phase 01**: No hardcoded `localhost:5168` in infrastructure; dev still works
 - [x] **Phase 02**: API serves Angular production build with correct routing
-- [ ] **Phase 03**: Single-file executable runs on Windows without .NET SDK
+- [x] **Phase 03**: Single-file executable runs on Windows without .NET SDK
+- [x] **Phase 3a**: Version endpoint exists and version displays in UI header
 - [ ] **Phase 04**: GitHub Actions creates releases for all 4 platforms
 - [ ] **Phase 05**: Homebrew installation works on macOS (Intel + ARM)
 - [ ] **Phase 06**: DISTRIBUTION.md created with complete instructions
@@ -227,10 +229,16 @@ Phase 06 (Documentation) ← depends on all phases for accurate instructions
 | DISTRIBUTION-PACKAGING-TASK-02-002 | BUILD-INTEGRATION | Create build script for frontend → wwwroot copy |
 
 ### Phase 03: Publishing Configuration (2 tasks)
+| Task ID | Name | Description | Status |
+|---------|------|-------------|--------|
+| DISTRIBUTION-PACKAGING-TASK-03-001 | CSPROJ-PUBLISH-SETTINGS | Add self-contained publish properties | ✅ Complete |
+| DISTRIBUTION-PACKAGING-TASK-03-002 | LOCAL-PUBLISH-TEST | Test local publish and verify functionality | ⏭️ Superseded (done in 03-001) |
+
+### Phase 3a: Semantic Versioning (2 tasks)
 | Task ID | Name | Description |
 |---------|------|-------------|
-| DISTRIBUTION-PACKAGING-TASK-03-001 | CSPROJ-PUBLISH-SETTINGS | Add self-contained publish properties |
-| DISTRIBUTION-PACKAGING-TASK-03-002 | LOCAL-PUBLISH-TEST | Test local publish and verify functionality |
+| DISTRIBUTION-PACKAGING-TASK-3A-001 | VERSION-ENDPOINT | Add version to .csproj, create /api/version endpoint, update Scalar docs |
+| DISTRIBUTION-PACKAGING-TASK-3A-002 | VERSION-UI | Add version contract, service, store, and display in header |
 
 ### Phase 04: GitHub Actions Workflow (2 tasks)
 | Task ID | Name | Description |
@@ -265,4 +273,4 @@ Execute phases sequentially. Within each phase, tasks proceed in order as listed
 4. TASK-01-003: Update Providers (Frontend)
 5. TASK-01-004: Update SignalR Services (Frontend)
 
-**Estimated Total Tasks**: 15 tasks across 6 phases
+**Estimated Total Tasks**: 17 tasks across 7 phases (including Phase 3a)

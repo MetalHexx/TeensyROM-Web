@@ -4,9 +4,31 @@
 
 Create an automated release pipeline using GitHub Actions that builds, packages, and publishes releases for all supported platforms with semantic versioning.
 
-**Value Delivered**: One-click releases with automatic artifact generation for Windows, macOS (Intel + ARM), and Linux.
+**Value Delivered**: Tag-triggered releases with automatic artifact generation for Windows, macOS (Intel + ARM), and Linux.
 
-**Prerequisite**: Phase 03 (Publishing Configuration) must be complete.
+**Prerequisite**: Phase 03 (Publishing Configuration) and Phase 3a (Semantic Versioning) must be complete.
+
+---
+
+## 🔑 Key Design Decisions (from Brainstorming)
+
+### Versioning Strategy: Manual (Option A)
+- **`.csproj` is source of truth** - version in file is what gets published
+- **Git tag triggers release** - `git tag v1.0.0-alpha.1 && git push origin v1.0.0-alpha.1`
+- **CI uses .csproj version** - no override, builds what's in the file
+- **Developer workflow**: Update .csproj → commit → tag → push = release
+- **Your responsibility**: Keep `.csproj` version in sync with tag before pushing
+
+### Build Environment: Ubuntu with Bash
+- **Ubuntu runners** - faster startup, common practice
+- **Frontend built in CI** - bash commands replicate `copy-frontend.ps1`
+- **.csproj has `SkipBuildFrontend` condition** - CI passes `-p:SkipBuildFrontend=true`
+- **Local dev unchanged** - `dotnet publish -c Release` still runs PowerShell script
+
+### wwwroot Not in Source Control
+- Add `apps/api/src/TeensyRom.Api/wwwroot/` to `.gitignore`
+- CI builds fresh frontend each time
+- Keep `.gitkeep` file for directory structure
 
 ---
 
@@ -24,6 +46,9 @@ Create an automated release pipeline using GitHub Actions that builds, packages,
 .github/
 └── workflows/
     └── release.yml                          ✨ New - Complete release workflow
+
+apps/api/src/TeensyRom.Api/
+└── TeensyRom.Api.csproj                     📝 Modify - Add SkipBuildFrontend condition
 ```
 
 ---
@@ -39,40 +64,36 @@ Create an automated release pipeline using GitHub Actions that builds, packages,
 
 **Implementation Subtasks**:
 
+- [ ] Modify `.csproj` to add `SkipBuildFrontend` condition
 - [ ] Create `.github/workflows/release.yml`
-- [ ] Configure triggers: `push: tags: ['v*']` and `workflow_dispatch` with version input
-- [ ] Add `validate` job for semantic version validation
+- [ ] Configure trigger: `push: tags: ['v*']`
+- [ ] Add `validate` job for version extraction and pre-release detection
 - [ ] Add `build` job with matrix for 4 platforms (win-x64, osx-x64, osx-arm64, linux-x64)
 - [ ] Add `release` job to create GitHub Release with artifacts
-- [ ] Add `update-homebrew` job for formula updates (Phase 05 integration point)
 
 **Workflow Structure**:
 
 ```
 Jobs:
 1. validate
-   - Determine version from tag or input
-   - Validate semantic version format
-   - Check for pre-release suffix
+   - Extract version from tag (strip 'v' prefix)
+   - Detect pre-release (version contains '-')
 
 2. build (matrix: 4 platforms)
-   - Setup Node.js, pnpm, .NET
-   - Build frontend (production)
-   - Copy frontend to wwwroot
-   - Publish .NET (self-contained)
+   - Setup Node.js 20.x, pnpm 9, .NET 9.0.x
+   - pnpm install --frozen-lockfile
+   - pnpm nx build teensyrom-ui --configuration=production
+   - Copy dist → wwwroot (bash)
+   - dotnet publish -c Release -r {rid} -p:SkipBuildFrontend=true
    - Package (zip for Windows, tar.gz for Unix)
    - Upload artifacts
 
 3. release
    - Download all artifacts
-   - Create GitHub Release
+   - Create GitHub Release with softprops/action-gh-release
    - Attach all platform artifacts
    - Mark pre-releases appropriately
-
-4. update-homebrew (conditional)
-   - Only for non-prerelease
-   - Calculate SHA256 for macOS artifacts
-   - Update formula in tap repo
+   - Auto-generate release notes
 ```
 
 **Key Configuration**:
@@ -81,12 +102,12 @@ Jobs:
 |---------|-------|
 | `DOTNET_VERSION` | `9.0.x` |
 | `NODE_VERSION` | `20.x` |
+| `PNPM_VERSION` | `9` |
 | Artifact retention | 5 days |
 | Pre-release detection | Version contains `-` suffix |
 
-**Triggers**:
+**Trigger**:
 - Tag push: `v*` (e.g., `v1.0.0`, `v1.0.0-beta.1`)
-- Manual: `workflow_dispatch` with version input
 
 **Testing Subtask**:
 - [ ] Commit workflow to repository
