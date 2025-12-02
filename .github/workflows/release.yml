@@ -98,7 +98,7 @@ jobs:
           cp -r src/dist/apps/teensyrom-ui/browser/* src/apps/api/src/TeensyRom.Api/wwwroot/
       
       - name: Restore .NET dependencies
-        run: dotnet restore src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj
+        run: dotnet restore src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj -p:SkipOpenApiGeneration=true
       
       - name: Publish for ${{ matrix.rid }}
         run: |
