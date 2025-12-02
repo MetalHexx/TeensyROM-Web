@@ -98,7 +98,10 @@ jobs:
           cp -r src/dist/apps/teensyrom-ui/browser/* src/apps/api/src/TeensyRom.Api/wwwroot/
       
       - name: Restore .NET dependencies
-        run: dotnet restore src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj -p:SkipOpenApiGeneration=true
+        run: |
+          dotnet restore src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
+            -p:OpenApiGenerateDocuments=false \
+            -p:OpenApiGenerateDocumentsOnBuild=false
       
       - name: Publish for ${{ matrix.rid }}
         run: |
@@ -108,7 +111,8 @@ jobs:
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:SkipBuildFrontend=true \
-            -p:SkipOpenApiGeneration=true \
+            -p:OpenApiGenerateDocuments=false \
+            -p:OpenApiGenerateDocumentsOnBuild=false \
             -o ./publish/${{ matrix.rid }}
       
       - name: Package (zip)
