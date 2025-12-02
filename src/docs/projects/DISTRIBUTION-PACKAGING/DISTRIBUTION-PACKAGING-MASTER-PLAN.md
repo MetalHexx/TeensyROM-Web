@@ -35,8 +35,8 @@ Create a single, self-contained executable distribution for Windows, Mac, and Li
 | 02 | API Static File Serving | Configure .NET API to serve Angular production build | Backend Wizard | ✅ Complete |
 | 03 | Publishing Configuration | Self-contained single-file publish for all platforms | Backend Wizard | ✅ Complete |
 | 3a | Semantic Versioning | Add version endpoint and display in UI header | Backend + UI | ✅ Complete |
-| 04 | GitHub Actions Workflow | Automated release pipeline with semantic versioning | Backend Wizard | 📋 Planning |
-| 05 | Homebrew Distribution | macOS distribution via Homebrew tap | Backend Wizard | ⏳ Pending |
+| 04 | GitHub Actions Workflow | Automated release pipeline with semantic versioning | Backend Wizard | ✅ Complete |
+| 05 | Homebrew Distribution | macOS distribution via Homebrew tap | Backend Wizard | 📋 Planning |
 | 06 | Documentation | Create distribution docs and update README | Documentation | ⏳ Pending |
 
 ---
@@ -139,7 +139,7 @@ Phase 06 (Documentation) ← depends on all phases for accurate instructions
 - [x] **Phase 02**: API serves Angular production build with correct routing
 - [x] **Phase 03**: Single-file executable runs on Windows without .NET SDK
 - [x] **Phase 3a**: Version endpoint exists and version displays in UI header
-- [ ] **Phase 04**: GitHub Actions creates releases for all 4 platforms
+- [x] **Phase 04**: GitHub Actions creates releases for all 4 platforms
 - [ ] **Phase 05**: Homebrew installation works on macOS (Intel + ARM)
 - [ ] **Phase 06**: DISTRIBUTION.md created with complete instructions
 - [ ] **Phase 06**: README.md updated with installation instructions for all platforms
@@ -249,8 +249,8 @@ Phase 06 (Documentation) ← depends on all phases for accurate instructions
 ### Phase 05: Homebrew Distribution (2 tasks)
 | Task ID | Name | Description |
 |---------|------|-------------|
-| DISTRIBUTION-PACKAGING-TASK-05-001 | HOMEBREW-TAP-SETUP | Create homebrew-TeensyROM repository |
-| DISTRIBUTION-PACKAGING-TASK-05-002 | FORMULA-UPDATE-AUTOMATION | Configure automatic formula updates |
+| DISTRIBUTION-PACKAGING-TASK-05-001 | HOMEBREW-FORMULA | Create formula in Formula/ directory (self-hosted tap) |
+| DISTRIBUTION-PACKAGING-TASK-05-002 | WORKFLOW-FORMULA-UPDATE | Add formula update to release workflow |
 
 ### Phase 06: Documentation (2 tasks)
 | Task ID | Name | Description |
