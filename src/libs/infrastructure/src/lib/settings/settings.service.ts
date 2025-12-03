@@ -1,9 +1,8 @@
 import { Injectable, Inject } from '@angular/core';
-import { from, Observable, catchError, map, mergeMap, throwError } from 'rxjs';
+import { from, Observable, catchError, map, throwError } from 'rxjs';
 import { SettingsApiService } from '@teensyrom-nx/data-access/api-client';
 import { ISettingsService, Settings, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
 import { DomainMapper } from '../domain.mapper';
-import { extractErrorMessage } from '../error/api-error.utils';
 import { logError } from '@teensyrom-nx/utils';
 
 /**
@@ -52,26 +51,20 @@ export class SettingsService implements ISettingsService {
   }
 
   /**
-   * Handles API errors by extracting error messages, dispatching alerts, and rethrowing errors.
-   *
-   * Follows the PlayerService pattern for consistent error handling across services.
+   * Handles API errors by logging, dispatching user-friendly alerts, and rethrowing errors.
    *
    * @param error - Error from API call
    * @param methodName - Name of the method where error occurred
-   * @param fallbackMessage - User-friendly fallback message
+   * @param friendlyMessage - User-friendly message to display to the user
    * @returns Observable that throws the error after handling
    */
   private handleError(
     error: unknown,
     methodName: string,
-    fallbackMessage: string
+    friendlyMessage: string
   ): Observable<never> {
-    return from(extractErrorMessage(error, fallbackMessage)).pipe(
-      mergeMap((message) => {
-        logError(`SettingsService.${methodName} failed:`, error);
-        this.alertService.error(message);
-        return throwError(() => (error instanceof Error ? error : new Error(fallbackMessage)));
-      })
-    );
+    logError(`SettingsService.${methodName} failed:`, error);
+    this.alertService.error(friendlyMessage);
+    return throwError(() => error);
   }
 }

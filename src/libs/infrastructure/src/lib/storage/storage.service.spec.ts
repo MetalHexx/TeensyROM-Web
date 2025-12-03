@@ -21,7 +21,15 @@ import {
   FileItem,
   ALERT_SERVICE,
   IAlertService,
+  API_CONFIG,
+  IApiConfig,
 } from '@teensyrom-nx/domain';
+
+const createMockApiConfig = (): IApiConfig => ({
+  basePath: 'http://localhost:5168',
+  signalRBasePath: 'http://localhost:5168',
+  getBaseUrl: () => 'http://localhost:5168',
+});
 
 describe('StorageService', () => {
   let service: StorageService;
@@ -56,6 +64,7 @@ describe('StorageService', () => {
         StorageService,
         { provide: FilesApiService, useValue: mockFilesApiService },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
+        { provide: API_CONFIG, useValue: createMockApiConfig() },
       ],
     });
 
@@ -892,12 +901,11 @@ describe('StorageService', () => {
       });
     });
 
-    it('should handle API errors and display error alert', async () => {
+    it('should handle API errors and display friendly error alert', async () => {
       // Arrange
-      const errorMessage = 'Device not found';
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-      mockFilesApiService.saveFavorite.mockRejectedValue(new Error(errorMessage));
+      mockFilesApiService.saveFavorite.mockRejectedValue(new Error('Device not found'));
 
       // Act & Assert
       await expect(
@@ -907,10 +915,10 @@ describe('StorageService', () => {
             error: reject,
           });
         })
-      ).rejects.toThrow(errorMessage);
+      ).rejects.toThrow();
 
-      // Verify error alert displayed
-      expect(mockAlertService.error).toHaveBeenCalledWith(errorMessage);
+      // Verify friendly error alert displayed (not extracted error message)
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to save favorite');
 
       // Verify error logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -922,7 +930,7 @@ describe('StorageService', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should use fallback message when API error has no message', async () => {
+    it('should use friendly message regardless of error structure', async () => {
       // Arrange
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       mockFilesApiService.saveFavorite.mockRejectedValue({});
@@ -1066,12 +1074,11 @@ describe('StorageService', () => {
       });
     });
 
-    it('should handle API errors and display error alert', async () => {
+    it('should handle API errors and display friendly error alert', async () => {
       // Arrange
-      const errorMessage = 'File not found';
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-      mockFilesApiService.removeFavorite.mockRejectedValue(new Error(errorMessage));
+      mockFilesApiService.removeFavorite.mockRejectedValue(new Error('File not found'));
 
       // Act & Assert
       await expect(
@@ -1081,10 +1088,10 @@ describe('StorageService', () => {
             error: reject,
           });
         })
-      ).rejects.toThrow(errorMessage);
+      ).rejects.toThrow();
 
-      // Verify error alert displayed
-      expect(mockAlertService.error).toHaveBeenCalledWith(errorMessage);
+      // Verify friendly error alert displayed (not extracted error message)
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to remove favorite');
 
       // Verify error logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -1096,7 +1103,7 @@ describe('StorageService', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should use fallback message when API error has no message', async () => {
+    it('should use friendly message regardless of error structure', async () => {
       // Arrange
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       mockFilesApiService.removeFavorite.mockRejectedValue({});
@@ -1174,6 +1181,7 @@ describe('StorageService', () => {
           StorageService,
           { provide: FilesApiService, useValue: mockFilesApiService },
           { provide: ALERT_SERVICE, useValue: mockAlertService },
+          { provide: API_CONFIG, useValue: createMockApiConfig() },
         ],
       });
 
@@ -1186,7 +1194,7 @@ describe('StorageService', () => {
     });
 
     describe('getDirectory error handling with alerts', () => {
-      it('should display error alert when API fails with error message', async () => {
+      it('should display friendly message when API fails', async () => {
         const error = new Error('Directory not found');
         mockFilesApiService.getDirectory.mockRejectedValue(error);
 
@@ -1199,11 +1207,11 @@ describe('StorageService', () => {
           })
         ).rejects.toThrow();
 
-        expect(mockAlertService.error).toHaveBeenCalledWith('Directory not found');
+        expect(mockAlertService.error).toHaveBeenCalledWith('Failed to retrieve directory');
       });
 
-      it('should extract message from error.error.message for getDirectory', async () => {
-        // Test that non-Error objects with nested structure use fallback message
+      it('should use friendly message regardless of error structure for getDirectory', async () => {
+        // Test that non-Error objects with nested structure still use friendly message
         const error = { error: { message: 'Storage device offline' } };
         mockFilesApiService.getDirectory.mockRejectedValue(error);
 
@@ -1216,11 +1224,11 @@ describe('StorageService', () => {
           })
         ).rejects.toThrow();
 
-        // Non-Error objects use fallback message
+        // Always uses friendly message
         expect(mockAlertService.error).toHaveBeenCalledWith('Failed to retrieve directory');
       });
 
-      it('should use fallback message when no error message available for getDirectory', async () => {
+      it('should use friendly message when error is empty for getDirectory', async () => {
         const error = {};
         mockFilesApiService.getDirectory.mockRejectedValue(error);
 
@@ -1256,7 +1264,7 @@ describe('StorageService', () => {
     });
 
     describe('search error handling with alerts', () => {
-      it('should display error alert when search fails', async () => {
+      it('should display friendly message when search fails', async () => {
         const error = new Error('Search timeout');
         mockFilesApiService.search.mockRejectedValue(error);
 
@@ -1269,10 +1277,10 @@ describe('StorageService', () => {
           })
         ).rejects.toThrow();
 
-        expect(mockAlertService.error).toHaveBeenCalledWith('Search timeout');
+        expect(mockAlertService.error).toHaveBeenCalledWith('Search operation failed');
       });
 
-      it('should use search fallback message when error is empty', async () => {
+      it('should use friendly message regardless of error structure for search', async () => {
         const error = { error: {} };
         mockFilesApiService.search.mockRejectedValue(error);
 
@@ -1308,7 +1316,7 @@ describe('StorageService', () => {
     });
 
     describe('index error handling with alerts', () => {
-      it('should display error alert when index fails', async () => {
+      it('should display friendly message when index fails', async () => {
         const error = new Error('Index operation failed');
         mockFilesApiService.index.mockRejectedValue(error);
 
@@ -1321,10 +1329,10 @@ describe('StorageService', () => {
           })
         ).rejects.toThrow();
 
-        expect(mockAlertService.error).toHaveBeenCalledWith('Index operation failed');
+        expect(mockAlertService.error).toHaveBeenCalledWith('Failed to index storage');
       });
 
-      it('should use index fallback message when error is empty', async () => {
+      it('should use friendly message regardless of error structure for index', async () => {
         const error = {};
         mockFilesApiService.index.mockRejectedValue(error);
 
@@ -1342,7 +1350,7 @@ describe('StorageService', () => {
     });
 
     describe('indexAll error handling with alerts', () => {
-      it('should display error alert when indexAll fails', async () => {
+      it('should display friendly message when indexAll fails', async () => {
         const error = new Error('Global index failed');
         mockFilesApiService.indexAll.mockRejectedValue(error);
 
@@ -1355,10 +1363,10 @@ describe('StorageService', () => {
           })
         ).rejects.toThrow();
 
-        expect(mockAlertService.error).toHaveBeenCalledWith('Global index failed');
+        expect(mockAlertService.error).toHaveBeenCalledWith('Failed to index all storage');
       });
 
-      it('should use indexAll fallback message when error is empty', async () => {
+      it('should use friendly message regardless of error structure for indexAll', async () => {
         const error = { error: { message: null } };
         mockFilesApiService.indexAll.mockRejectedValue(error);
 

@@ -19,7 +19,15 @@ import {
   StorageType,
   ALERT_SERVICE,
   IAlertService,
+  API_CONFIG,
+  IApiConfig,
 } from '@teensyrom-nx/domain';
+
+const createMockApiConfig = (): IApiConfig => ({
+  basePath: 'http://localhost:5168',
+  signalRBasePath: 'http://localhost:5168',
+  getBaseUrl: () => 'http://localhost:5168',
+});
 
 const createFileItemDto = (): FileItemDto => ({
   name: 'Test File',
@@ -84,6 +92,7 @@ describe('PlayerService', () => {
         { provide: PlayerApiService, useValue: mockPlayerApi },
         { provide: DevicesApiService, useValue: mockDevicesApi },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
+        { provide: API_CONFIG, useValue: createMockApiConfig() },
       ],
     });
 
@@ -553,6 +562,7 @@ describe('PlayerService', () => {
           { provide: PlayerApiService, useValue: mockPlayerApi },
           { provide: DevicesApiService, useValue: mockDevicesApi },
           { provide: ALERT_SERVICE, useValue: mockAlertService },
+          { provide: API_CONFIG, useValue: createMockApiConfig() },
         ],
       });
 
@@ -560,7 +570,7 @@ describe('PlayerService', () => {
     });
 
     describe('launchFile error handling with alerts', () => {
-      it('should display error alert when launchFile fails', async () => {
+      it('should display friendly message when launchFile fails', async () => {
         const error = new Error('File launch failed');
         mockPlayerApi.launchFile.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -574,11 +584,11 @@ describe('PlayerService', () => {
           })
         ).rejects.toThrow();
 
-        expect(mockAlertService.error).toHaveBeenCalledWith('File launch failed');
+        expect(mockAlertService.error).toHaveBeenCalledWith('Failed to launch file');
         consoleSpy.mockRestore();
       });
 
-      it('should extract message from error.error.message for launchFile', async () => {
+      it('should use friendly message regardless of error structure for launchFile', async () => {
         const error = { error: { message: 'Device not ready' } };
         mockPlayerApi.launchFile.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -592,12 +602,12 @@ describe('PlayerService', () => {
           })
         ).rejects.toThrow();
 
-        // Non-Error objects use fallback message
+        // Always uses friendly message, not extracted error message
         expect(mockAlertService.error).toHaveBeenCalledWith('Failed to launch file');
         consoleSpy.mockRestore();
       });
 
-      it('should use fallback message when no error message for launchFile', async () => {
+      it('should use friendly message when error has no message for launchFile', async () => {
         const error = {};
         mockPlayerApi.launchFile.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -634,7 +644,7 @@ describe('PlayerService', () => {
     });
 
     describe('launchRandom error handling with alerts', () => {
-      it('should display error alert when launchRandom fails', async () => {
+      it('should display friendly message when launchRandom fails', async () => {
         const error = new Error('Random selection failed');
         mockPlayerApi.launchRandom.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -648,11 +658,11 @@ describe('PlayerService', () => {
           })
         ).rejects.toThrow();
 
-        expect(mockAlertService.error).toHaveBeenCalledWith('Random selection failed');
+        expect(mockAlertService.error).toHaveBeenCalledWith('Failed to launch random file');
         consoleSpy.mockRestore();
       });
 
-      it('should use fallback message for launchRandom', async () => {
+      it('should use friendly message regardless of error structure for launchRandom', async () => {
         const error = { error: {} };
         mockPlayerApi.launchRandom.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -672,7 +682,7 @@ describe('PlayerService', () => {
     });
 
     describe('toggleMusic error handling with alerts', () => {
-      it('should display error alert when toggleMusic fails', async () => {
+      it('should display friendly message when toggleMusic fails', async () => {
         const error = new Error('Toggle failed');
         mockPlayerApi.toggleMusic.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -686,11 +696,11 @@ describe('PlayerService', () => {
           })
         ).rejects.toThrow();
 
-        expect(mockAlertService.error).toHaveBeenCalledWith('Toggle failed');
+        expect(mockAlertService.error).toHaveBeenCalledWith('Failed to toggle music');
         consoleSpy.mockRestore();
       });
 
-      it('should use fallback message for toggleMusic', async () => {
+      it('should use friendly message regardless of error structure for toggleMusic', async () => {
         const error = {};
         mockPlayerApi.toggleMusic.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);

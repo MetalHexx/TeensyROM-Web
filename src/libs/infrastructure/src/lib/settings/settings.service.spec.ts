@@ -172,7 +172,7 @@ describe('SettingsService', () => {
       expect(result.appSettings.setupCompleted).toBe(true);
     });
 
-    it('should handle API errors and display error alert', async () => {
+    it('should handle API errors and display friendly error alert', async () => {
       const error = new Error('Network error');
       mockSettingsApi.getSettings.mockRejectedValue(error);
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -184,13 +184,13 @@ describe('SettingsService', () => {
             error: reject,
           });
         })
-      ).rejects.toThrow('Network error');
+      ).rejects.toThrow();
 
-      expect(mockAlertService.error).toHaveBeenCalledWith('Network error');
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to load settings');
       consoleSpy.mockRestore();
     });
 
-    it('should use fallback message when error has no message', async () => {
+    it('should use friendly message regardless of error structure', async () => {
       const error = {};
       mockSettingsApi.getSettings.mockRejectedValue(error);
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -298,7 +298,7 @@ describe('SettingsService', () => {
       expect(requestDto.appSettings.firstTimeSetup).toBe(false); // Inverse of setupCompleted
     });
 
-    it('should handle API errors and display error alert', async () => {
+    it('should handle API errors and display friendly error alert', async () => {
       const domainSettings = createDomainSettings();
       const error = new Error('Save failed');
       mockSettingsApi.saveSettings.mockRejectedValue(error);
@@ -311,13 +311,13 @@ describe('SettingsService', () => {
             error: reject,
           });
         })
-      ).rejects.toThrow('Save failed');
+      ).rejects.toThrow();
 
-      expect(mockAlertService.error).toHaveBeenCalledWith('Save failed');
+      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to save settings');
       consoleSpy.mockRestore();
     });
 
-    it('should use fallback message when save error has no message', async () => {
+    it('should use friendly message regardless of save error structure', async () => {
       const domainSettings = createDomainSettings();
       const error = {};
       mockSettingsApi.saveSettings.mockRejectedValue(error);

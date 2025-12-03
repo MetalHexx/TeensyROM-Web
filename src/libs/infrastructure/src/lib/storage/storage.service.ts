@@ -16,9 +16,8 @@ import {
   API_CONFIG,
 } from '@teensyrom-nx/domain';
 import { DomainMapper } from '../domain.mapper';
-import { Observable, map, catchError, from, throwError, mergeMap } from 'rxjs';
+import { Observable, map, catchError, from, throwError } from 'rxjs';
 import { logError } from '@teensyrom-nx/utils';
-import { extractErrorMessage } from '../error/api-error.utils';
 
 @Injectable({ providedIn: 'root' })
 export class StorageService implements IStorageService {
@@ -130,14 +129,10 @@ export class StorageService implements IStorageService {
   private handleError(
     error: unknown,
     methodName: string,
-    fallbackMessage: string
+    friendlyMessage: string
   ): Observable<never> {
-    return from(extractErrorMessage(error, fallbackMessage)).pipe(
-      mergeMap((message) => {
-        logError(`StorageService.${methodName} error:`, error);
-        this.alertService.error(message);
-        return throwError(() => error);
-      })
-    );
+    logError(`StorageService.${methodName} error:`, error);
+    this.alertService.error(friendlyMessage);
+    return throwError(() => error);
   }
 }
