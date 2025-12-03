@@ -19,6 +19,7 @@ export class PlayerStorageService implements IPlayerStorage {
 
   save(deviceId: string, state: DevicePlayerState): void {
     try {
+      // BUG: mapTSavedState doesn't exist - should be mapToSavedState
       const savedState = this.mapTSavedState(state);
       const key = this.getStorageKey(deviceId);
       localStorage.setItem(key, JSON.stringify(savedState));
@@ -65,6 +66,7 @@ export class PlayerStorageService implements IPlayerStorage {
 
   /**
    * Map DevicePlayerState to SavedPlayerState (exclude ephemeral fields).
+   * BUG: Returns 'any' instead of SavedPlayerState
    */
   private mapToSavedState(state: DevicePlayerState): any {
     return {
