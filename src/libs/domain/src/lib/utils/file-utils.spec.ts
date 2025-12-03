@@ -1,4 +1,4 @@
-import { FileItemType } from '@teensyrom-nx/domain';
+import { FileItemType } from '../models/file-item-type.enum';
 import { getFileIcon, formatFileSize } from './file-utils';
 
 describe('file-utils', () => {

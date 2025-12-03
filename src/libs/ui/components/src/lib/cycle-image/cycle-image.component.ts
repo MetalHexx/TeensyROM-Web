@@ -57,7 +57,7 @@ export class CycleImageComponent {
   constructor() {
     // Reset when images change and trigger animation
     effect(() => {
-      const imgs = this.images();
+      this.images(); // Trigger on images change
       this.currentIndex.set(0);
       this.previousIndex.set(null);
       this.showPrevious.set(false);

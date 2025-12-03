@@ -6,7 +6,17 @@ import { VideoDialogComponent, VideoDialogData } from './video-dialog.component'
 import { CRT_CONFIGS, DEFAULT_CRT_SETTINGS, CRT_PRESETS } from '@teensyrom-nx/ui/components';
 import { CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
 import { PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
-import { STORAGE_SERVICE, PlayerStatus, LaunchMode } from '@teensyrom-nx/domain';
+import { STORAGE_SERVICE, PlayerStatus, LaunchMode, CRT_STORAGE, ICrtStorage } from '@teensyrom-nx/domain';
+
+/** Mock CRT storage for testing - stores nothing, returns null */
+const mockCrtStorage: ICrtStorage = {
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  save: () => {},
+  load: () => null,
+  hasSavedSettings: () => false,
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  clear: () => {},
+};
 
 // Mock HTMLMediaElement.play and pause for JSDOM environment
 HTMLMediaElement.prototype.play = vi.fn().mockImplementation(function () {
@@ -100,6 +110,7 @@ describe('VideoDialogComponent', () => {
             getDirectory: vi.fn(),
           },
         },
+        { provide: CRT_STORAGE, useValue: mockCrtStorage },
       ],
       // Use CUSTOM_ELEMENTS_SCHEMA for shallow testing to ignore child components
       schemas: [CUSTOM_ELEMENTS_SCHEMA],

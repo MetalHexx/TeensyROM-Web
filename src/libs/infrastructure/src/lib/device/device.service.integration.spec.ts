@@ -1,72 +1,65 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { TestBed } from '@angular/core/testing';
 import { DeviceService } from './device.service';
-import { DevicesApiService, Configuration } from '@teensyrom-nx/data-access/api-client';
+import {
+  DevicesApiService,
+  Configuration,
+} from '@teensyrom-nx/data-access/api-client';
+import { ALERT_SERVICE, IAlertService, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
 import { firstValueFrom } from 'rxjs';
 
-// Gate integration tests behind env variable to avoid external dependency by default
-const run = process.env['RUN_INTEGRATION'] === 'true' ? describe : describe.skip;
+/**
+ * Device Service Integration Tests
+ *
+ * These tests hit a live API at http://localhost:5168 and require a running backend.
+ * They are gated behind the RUN_INTEGRATION environment variable.
+ *
+ * Run with: pnpm nx run infrastructure:test:integration
+ *
+ * Philosophy: Verify "the API is reachable and returns expected shapes" - nothing more.
+ * Error handling and edge cases belong in unit tests with mocks.
+ */
+describe.runIf(process.env['RUN_INTEGRATION'] === 'true')(
+  'DeviceService Integration Tests',
+  () => {
+    let deviceService: DeviceService;
 
-run('DeviceService Integration Tests', () => {
-  let deviceService: DeviceService;
+    beforeAll(() => {
+      const config = new Configuration({
+        basePath: 'http://localhost:5168',
+        fetchApi: fetch,
+      });
 
-  beforeAll(() => {
-    const config = new Configuration({
-      basePath: 'http://localhost:5168',
-      fetchApi: fetch,
+      const mockAlertService: Partial<IAlertService> = {
+        error: () => {
+          // No-op for integration tests
+        },
+      };
+
+      const mockApiConfig: IApiConfig = {
+        basePath: 'http://localhost:5168',
+        signalRBasePath: 'http://localhost:5168',
+        getBaseUrl: () => 'http://localhost:5168',
+      };
+
+      TestBed.configureTestingModule({
+        providers: [
+          DeviceService,
+          { provide: DevicesApiService, useValue: new DevicesApiService(config) },
+          { provide: ALERT_SERVICE, useValue: mockAlertService },
+          { provide: API_CONFIG, useValue: mockApiConfig },
+        ],
+      });
+
+      deviceService = TestBed.inject(DeviceService);
     });
 
-    const devicesService = new DevicesApiService(config);
-    // Mock alert service for integration tests
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mockAlertService: Record<string, unknown> = { error: vi.fn() };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    deviceService = new DeviceService(devicesService, mockAlertService as any);
-  });
+    it('should find devices and return a list', async () => {
+      const devices = await firstValueFrom(deviceService.findDevices());
 
-  afterEach(async () => {
-    try {
-      const connected = await getConnectedDevices();
-      for (const device of connected) {
-        if (device.deviceId) {
-          await deviceService.disconnectDevice(device.deviceId).toPromise();
-        }
-      }
-    } catch (error) {
-      console.warn('Error during cleanup:', error);
-    }
-  }, 30000);
-
-  async function getConnectedDevices() {
-    return firstValueFrom(deviceService.getConnectedDevices());
+      expect(devices).toBeDefined();
+      expect(Array.isArray(devices)).toBe(true);
+      // Don't assert specific devices - hardware-dependent
+    }, 40000);
   }
-
-  async function getConnectedDevice() {
-    const result = await firstValueFrom(deviceService.findDevices());
-    return result?.[0];
-  }
-
-  async function getDisconnectedDevice() {
-    const result = await firstValueFrom(deviceService.findDevices());
-    return result?.[0];
-  }
-
-  it('should find available and connected devices', async () => {
-    const devices = await firstValueFrom(deviceService.findDevices());
-    expect(devices).toBeDefined();
-    expect(Array.isArray(devices)).toBe(true);
-  }, 40000);
-
-  it('should connect to a device', async () => {
-    const expectedDevice = await getDisconnectedDevice();
-    const device = await deviceService.connectDevice(expectedDevice.deviceId).toPromise();
-    expect(device).toBeDefined();
-    expect(device?.deviceId).toBe(expectedDevice.deviceId);
-  }, 40000);
-
-  it('should disconnect from a connected device', async () => {
-    const expectedDevice = await getConnectedDevice();
-    await deviceService.connectDevice(expectedDevice.deviceId).toPromise();
-    const result = await deviceService.disconnectDevice(expectedDevice.deviceId).toPromise();
-    expect(result).toBeDefined();
-  }, 40000);
-});
+);

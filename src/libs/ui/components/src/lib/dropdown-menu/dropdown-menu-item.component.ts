@@ -1,4 +1,4 @@
-import { Component, input, output, inject, Optional } from '@angular/core';
+import { Component, input, output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { DropdownMenuComponent } from './dropdown-menu.component';

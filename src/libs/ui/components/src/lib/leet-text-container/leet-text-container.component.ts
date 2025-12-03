@@ -3,10 +3,10 @@ import {
   input,
   output,
   signal,
-  effect,
   Self,
   ElementRef,
   AfterViewInit,
+  OnDestroy,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import type { AnimationParentMode } from '../shared/animation.types';
@@ -30,7 +30,7 @@ import { PARENT_ANIMATION_COMPLETE } from '../shared/animation-tokens';
     },
   ],
 })
-export class LeetTextContainerComponent implements AfterViewInit {
+export class LeetTextContainerComponent implements AfterViewInit, OnDestroy {
   /**
    * Animation trigger - controls fade in/out and leet animation
    * - true: Fade in and run leet animation
@@ -95,7 +95,9 @@ export class LeetTextContainerComponent implements AfterViewInit {
   // Spinner animation characters
   private spinnerChars = ['/', '-', '\\', '|'];
   private spinnerIndex = 0;
-  private spinnerInterval: any;
+  private spinnerInterval: ReturnType<typeof setInterval> | null = null;
+  private leetAnimationInterval: ReturnType<typeof setInterval> | null = null;
+  private cycleInterval: ReturnType<typeof setInterval> | null = null;
 
   // Store text content from ng-content
   private textContent = signal<string>('');
@@ -174,7 +176,7 @@ export class LeetTextContainerComponent implements AfterViewInit {
     }, 200); // Cycle every 200ms
 
     // Store interval for cleanup
-    (this as any).cycleInterval = cycleInterval;
+    this.cycleInterval = cycleInterval;
   }
 
   ngOnDestroy(): void {
@@ -183,12 +185,12 @@ export class LeetTextContainerComponent implements AfterViewInit {
       clearInterval(this.spinnerInterval);
     }
     // Clean up leet animation interval
-    if ((this as any).leetAnimationInterval) {
-      clearInterval((this as any).leetAnimationInterval);
+    if (this.leetAnimationInterval) {
+      clearInterval(this.leetAnimationInterval);
     }
     // Clean up cycle interval
-    if ((this as any).cycleInterval) {
-      clearInterval((this as any).cycleInterval);
+    if (this.cycleInterval) {
+      clearInterval(this.cycleInterval);
     }
   }
 
@@ -235,13 +237,13 @@ export class LeetTextContainerComponent implements AfterViewInit {
     }, interval);
 
     // Store interval for cleanup
-    (this as any).leetAnimationInterval = animationInterval;
+    this.leetAnimationInterval = animationInterval;
   }
 
   private generateLeetText(text: string, leetAmount: number): string {
     return text
       .split('')
-      .map((char, index) => {
+      .map((char) => {
         const lowerChar = char.toLowerCase();
 
         // Check if this character has a leet mapping

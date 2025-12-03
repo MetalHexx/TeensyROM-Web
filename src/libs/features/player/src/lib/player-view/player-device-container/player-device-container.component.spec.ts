@@ -12,8 +12,18 @@ import {
   SETTINGS_SERVICE, 
   ISettingsService,
   STORAGE_SERVICE,
-  IStorageService
+  IStorageService,
+  CRT_STORAGE,
+  ICrtStorage
 } from '@teensyrom-nx/domain';
+
+/** Mock CRT storage for testing - stores nothing, returns null */
+const mockCrtStorage: ICrtStorage = {
+  save: () => {},
+  load: () => null,
+  hasSavedSettings: () => false,
+  clear: () => {},
+};
 
 describe('PlayerDeviceContainerComponent', () => {
   let component: PlayerDeviceContainerComponent;
@@ -146,6 +156,7 @@ describe('PlayerDeviceContainerComponent', () => {
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
         { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
         { provide: STORAGE_SERVICE, useValue: mockStorageService },
+        { provide: CRT_STORAGE, useValue: mockCrtStorage },
       ],
     }).compileComponents();
 

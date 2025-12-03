@@ -84,7 +84,7 @@ describe('DeviceSettingsSectionComponent', () => {
       fixture.detectChanges();
 
       const toggles = fixture.nativeElement.querySelectorAll('lib-settings-toggle-item');
-      const videoToggle = Array.from(toggles).find((t: Element) =>
+      const videoToggle = Array.from(toggles as Element[]).find((t: Element) =>
         t.getAttribute('label')?.includes('Video')
       );
       expect(videoToggle).toBeTruthy();
@@ -96,7 +96,7 @@ describe('DeviceSettingsSectionComponent', () => {
       fixture.detectChanges();
 
       const toggles = fixture.nativeElement.querySelectorAll('lib-settings-toggle-item');
-      const autoConnectToggle = Array.from(toggles).find((t: Element) =>
+      const autoConnectToggle = Array.from(toggles as Element[]).find((t: Element) =>
         t.getAttribute('label')?.includes('Auto-connect')
       );
       expect(autoConnectToggle).toBeTruthy();
@@ -119,7 +119,7 @@ describe('DeviceSettingsSectionComponent', () => {
       fixture.detectChanges();
 
       const title = component.getDeviceTitle(devicesArray.at(0));
-      expect(title).toBe('Device ID: short-id');
+      expect(title).toBe('Device: short-id');
     });
 
     it('should truncate long device IDs', () => {
@@ -129,8 +129,8 @@ describe('DeviceSettingsSectionComponent', () => {
       fixture.detectChanges();
 
       const title = component.getDeviceTitle(devicesArray.at(0));
-      expect(title).toBe('Device ID: very-long-de...');
-      expect(title.length).toBeLessThan(longId.length + 11); // "Device ID: " prefix adds 11 chars
+      expect(title).toBe('Device: very-long-de...');
+      expect(title.length).toBeLessThan(longId.length + 8); // "Device: " prefix adds 8 chars
     });
 
     it('should return "Unknown" for missing device ID', () => {
@@ -143,7 +143,7 @@ describe('DeviceSettingsSectionComponent', () => {
       fixture.detectChanges();
 
       const title = component.getDeviceTitle(devicesArray.at(0));
-      expect(title).toBe('Device ID: Unknown');
+      expect(title).toBe('Device: Unknown');
     });
   });
 

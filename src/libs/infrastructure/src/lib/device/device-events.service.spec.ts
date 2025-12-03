@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DevicesApiService } from '@teensyrom-nx/data-access/api-client';
 import { DeviceEventsService } from './device-events.service';
-import { ALERT_SERVICE } from '@teensyrom-nx/domain';
+import { ALERT_SERVICE, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
+
+const mockApiConfig: IApiConfig = {
+  basePath: 'http://localhost:5168',
+  signalRBasePath: 'http://localhost:5168',
+  getBaseUrl: () => 'http://localhost:5168',
+};
 
 describe('DeviceEventsService - Alert Integration', () => {
   let service: DeviceEventsService;
@@ -34,6 +40,7 @@ describe('DeviceEventsService - Alert Integration', () => {
         DeviceEventsService,
         { provide: DevicesApiService, useValue: mockDevicesApiService },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
+        { provide: API_CONFIG, useValue: mockApiConfig },
       ],
     });
 

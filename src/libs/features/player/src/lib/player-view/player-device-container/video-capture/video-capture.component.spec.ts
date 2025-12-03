@@ -3,9 +3,21 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ComponentRef, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { VideoCaptureComponent } from './video-capture.component';
-import { SETTINGS_SERVICE, ISettingsService } from '@teensyrom-nx/domain';
+import { SETTINGS_SERVICE, ISettingsService, CRT_STORAGE, ICrtStorage } from '@teensyrom-nx/domain';
 import { vi, describe, it, expect, afterEach } from 'vitest';
 import { of } from 'rxjs';
+
+/** Mock CRT storage for testing - stores nothing, returns null */
+const mockCrtStorage: ICrtStorage = {
+  save: () => {
+    // Mock implementation - intentionally does nothing for testing
+  },
+  load: () => null,
+  hasSavedSettings: () => false,
+  clear: () => {
+    // Mock implementation - intentionally does nothing for testing
+  },
+};
 
 /**
  * VideoCaptureComponent Tests
@@ -131,6 +143,7 @@ describe('VideoCaptureComponent', () => {
         provideNoopAnimations(),
         { provide: MatDialog, useValue: mockDialog },
         { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
+        { provide: CRT_STORAGE, useValue: mockCrtStorage },
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA], // For shallow testing of composed components
     }).compileComponents();
@@ -284,13 +297,13 @@ describe('VideoCaptureComponent', () => {
 
       const newSettings = {
         scanlineIntensity: 0.7,
-        scanlineThickness: 4,
-        scanlineSpacing: 3,
+        scanlineSize: 4,
         vignetteStrength: 1.5,
         screenCurvature: 0,
         contrast: 1.2,
         brightness: 1.6,
         saturation: 1.4,
+        hue: 0,
       };
 
       component.onCrtSettingsChange(newSettings);
@@ -306,13 +319,13 @@ describe('VideoCaptureComponent', () => {
       // Change settings first
       component.onCrtSettingsChange({
         scanlineIntensity: 0.9,
-        scanlineThickness: 5,
-        scanlineSpacing: 4,
+        scanlineSize: 5,
         vignetteStrength: 2.0,
         screenCurvature: 0,
         contrast: 1.5,
         brightness: 2.0,
         saturation: 2.0,
+        hue: 0,
       });
 
       // Reset should restore small preset (current default)

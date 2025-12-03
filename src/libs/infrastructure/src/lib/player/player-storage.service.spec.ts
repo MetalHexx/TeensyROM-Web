@@ -74,7 +74,6 @@ describe('PlayerStorageService', () => {
       enabled: true,
       durationMs: 180000,
     },
-    timerState: null,
     isLoading: false,
     error: null,
     lastUpdated: Date.now(),
@@ -204,15 +203,17 @@ describe('PlayerStorageService', () => {
 
       // Persisted fields from saved state
       expect(result).not.toBeNull();
-      expect(result!.currentFile?.file.name).toBe('saved.sid');
-      expect(result!.launchMode).toBe(LaunchMode.Directory);
-      expect(result!.historyViewVisible).toBe(true);
-      expect(result!.playTimerConfig.enabled).toBe(false);
+      if (result === null) return; // Type guard for TypeScript
+
+      expect(result.currentFile?.file.name).toBe('saved.sid');
+      expect(result.launchMode).toBe(LaunchMode.Directory);
+      expect(result.historyViewVisible).toBe(true);
+      expect(result.playTimerConfig.enabled).toBe(false);
 
       // Ephemeral fields are reset to defaults (not from any baseline)
-      expect(result!.status).toBe(PlayerStatus.Stopped);
-      expect(result!.isLoading).toBe(false);
-      expect(result!.error).toBe(null);
+      expect(result.status).toBe(PlayerStatus.Stopped);
+      expect(result.isLoading).toBe(false);
+      expect(result.error).toBe(null);
     });
 
     it('should return null when no saved state exists', () => {

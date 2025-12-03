@@ -13,12 +13,12 @@ import {
   LaunchRandomScopeEnum,
   GetSettingsResponse,
   PlayerSettingsDto,
-  VideoSettingsDto,
-  ConnectionSettingsDto,
   FileTransferSettingsDto,
   SearchSettingsDto,
   SearchWeightsDto,
   AppSettingsDto,
+  TeensyFilterType as ApiFilterType,
+  ConnectionType as ApiConnectionType,
 } from '@teensyrom-nx/data-access/api-client';
 import { DomainMapper } from './domain.mapper';
 import {
@@ -317,6 +317,7 @@ describe('DomainMapper (Storage)', () => {
         path: '/music/test.sid',
         size: 1024,
         isFavorite: false,
+        isCompatible: undefined,
         title: '',
         creator: '',
         releaseInfo: '',
@@ -338,7 +339,7 @@ describe('DomainMapper (Storage)', () => {
         avgRating: undefined,
         ratingCount: 0,
         type: ApiFileItemType.Song,
-      } as FileItemDto;
+      } as unknown as FileItemDto;
 
       // Act
       const result = DomainMapper.toFileItem(dto, baseApiUrl);
@@ -474,7 +475,7 @@ describe('DomainMapper (Storage)', () => {
       const dto: ViewableItemImageDto = {
         fileName: 'test.png',
         path: '/test.png',
-        baseAssetPath: undefined,
+        baseAssetPath: undefined as unknown as string,
         source: 'local',
       };
 
@@ -806,7 +807,7 @@ describe('DomainMapper (Settings)', () => {
     });
 
     it('should default to PlayerFilterType.All for null/undefined', () => {
-      const dto = createMockGetSettingsResponse({ startupFilter: null as any });
+      const dto = createMockGetSettingsResponse({ startupFilter: null as unknown as string });
       const result = DomainMapper.toSettings(dto);
       expect(result.playerSettings.startupFilter).toBe(PlayerFilterType.All);
     });
@@ -976,13 +977,42 @@ describe('DomainMapper (Settings)', () => {
 });
 
 // Helper functions for settings tests
-function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSettingsResponse {
+
+/** Override options for createMockGetSettingsResponse */
+interface MockSettingsOverrides {
+  repeatModeOnStartup?: boolean;
+  playTimerEnabled?: boolean;
+  muteFastForward?: boolean;
+  muteRandomSeek?: boolean;
+  startupFilter?: string | null;
+  startupLaunchEnabled?: boolean;
+  startupLaunchRandom?: boolean;
+  watchDirectoryLocation?: string;
+  autoTransferPath?: string;
+  autoFileCopyEnabled?: boolean;
+  autoLaunchOnCopyEnabled?: boolean;
+  navToDirOnLaunch?: boolean;
+  syncFilesEnabled?: boolean;
+  firstTimeSetup?: boolean;
+  deviceId?: string;
+  enableVideo?: boolean;
+  videoDeviceId?: string;
+  connectionType?: string;
+  autoConnectEnabled?: boolean;
+  knownDevices?: Array<{
+    deviceId: string;
+    videoSettings: { enableVideo: boolean; videoDeviceId: string };
+    connectionSettings: { connectionType: ApiConnectionType; autoConnectEnabled: boolean };
+  }>;
+}
+
+function createMockGetSettingsResponse(overrides: MockSettingsOverrides = {}): GetSettingsResponse {
   const playerSettings: PlayerSettingsDto = {
     repeatModeOnStartup: overrides.repeatModeOnStartup ?? false,
     playTimerEnabled: overrides.playTimerEnabled ?? true,
     muteFastForward: overrides.muteFastForward ?? false,
     muteRandomSeek: overrides.muteRandomSeek ?? false,
-    startupFilter: overrides.startupFilter ?? 'All',
+    startupFilter: (overrides.startupFilter ?? 'All') as ApiFilterType,
     startupLaunchEnabled: overrides.startupLaunchEnabled ?? false,
     startupLaunchRandom: overrides.startupLaunchRandom ?? false,
   };
@@ -1024,7 +1054,7 @@ function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSetting
         videoDeviceId: overrides.videoDeviceId ?? '',
       },
       connectionSettings: {
-        connectionType: overrides.connectionType ?? 'Serial',
+        connectionType: (overrides.connectionType as ApiConnectionType) ?? ApiConnectionType.Serial,
         autoConnectEnabled: overrides.autoConnectEnabled ?? false,
       },
     },
@@ -1039,7 +1069,31 @@ function createMockGetSettingsResponse(overrides: Partial<any> = {}): GetSetting
   };
 }
 
-function createMockDomainSettings(overrides: Partial<any> = {}): Settings {
+/** Override options for createMockDomainSettings */
+interface MockDomainSettingsOverrides {
+  repeatModeOnStartup?: boolean;
+  playTimerEnabled?: boolean;
+  muteFastForward?: boolean;
+  muteRandomSeek?: boolean;
+  startupFilter?: PlayerFilterType;
+  startupLaunchEnabled?: boolean;
+  startupLaunchRandom?: boolean;
+  watchDirectoryLocation?: string;
+  autoTransferPath?: string;
+  autoFileCopyEnabled?: boolean;
+  autoLaunchOnCopyEnabled?: boolean;
+  navToDirOnLaunch?: boolean;
+  syncFilesEnabled?: boolean;
+  setupCompleted?: boolean;
+  deviceId?: string;
+  enableVideo?: boolean;
+  videoDeviceId?: string;
+  connectionType?: ConnectionType;
+  autoConnectEnabled?: boolean;
+  knownDevices?: Settings['knownDevices'];
+}
+
+function createMockDomainSettings(overrides: MockDomainSettingsOverrides = {}): Settings {
   return {
     playerSettings: {
       repeatModeOnStartup: overrides.repeatModeOnStartup ?? false,

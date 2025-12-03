@@ -24,7 +24,7 @@ describe('provideApiConfig', () => {
       const config = provideApiConfig();
 
       // Assert
-      expect(config).toEqual({
+      expect(config).toMatchObject({
         basePath: 'http://localhost:5168',
         signalRBasePath: 'http://localhost:5168',
       });
@@ -40,7 +40,7 @@ describe('provideApiConfig', () => {
       const config = provideApiConfig();
 
       // Assert
-      expect(config).toEqual({
+      expect(config).toMatchObject({
         basePath: '',
         signalRBasePath: '',
       });

@@ -430,12 +430,12 @@ export class DomainMapper {
 
   private static toPlayerSettingsDto(settings: PlayerSettings): PlayerSettingsDto {
     // Convert PlayerFilterType enum back to TeensyFilterType string
-    const filterMap: Record<PlayerFilterType, string> = {
-      [PlayerFilterType.All]: 'All',
-      [PlayerFilterType.Games]: 'Games',
-      [PlayerFilterType.Music]: 'Music',
-      [PlayerFilterType.Hex]: 'Hex',
-      [PlayerFilterType.Images]: 'Images',
+    const filterMap: Record<PlayerFilterType, NullableOfTeensyFilterType> = {
+      [PlayerFilterType.All]: NullableOfTeensyFilterType.All,
+      [PlayerFilterType.Games]: NullableOfTeensyFilterType.Games,
+      [PlayerFilterType.Music]: NullableOfTeensyFilterType.Music,
+      [PlayerFilterType.Hex]: NullableOfTeensyFilterType.Hex,
+      [PlayerFilterType.Images]: NullableOfTeensyFilterType.Images,
     };
 
     return {
@@ -443,7 +443,7 @@ export class DomainMapper {
       playTimerEnabled: settings.playTimerEnabled,
       muteFastForward: settings.muteFastForward,
       muteRandomSeek: settings.muteRandomSeek,
-      startupFilter: filterMap[settings.startupFilter] as any,
+      startupFilter: filterMap[settings.startupFilter],
       startupLaunchEnabled: settings.startupLaunchEnabled,
       startupLaunchRandom: settings.startupLaunchRandom,
     };

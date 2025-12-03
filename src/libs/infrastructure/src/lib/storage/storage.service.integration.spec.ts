@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, afterAll, beforeEach } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import { firstValueFrom } from 'rxjs';
@@ -13,7 +13,14 @@ import {
   FileItemType as ApiFileItemType,
 } from '@teensyrom-nx/data-access/api-client';
 import { StorageService } from './storage.service';
-import { FileItemType, StorageType, ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
+import {
+  FileItemType,
+  StorageType,
+  ALERT_SERVICE,
+  IAlertService,
+  API_CONFIG,
+  IApiConfig,
+} from '@teensyrom-nx/domain';
 
 describe('StorageService Integration Tests', () => {
   let storageService: StorageService;
@@ -34,7 +41,7 @@ describe('StorageService Integration Tests', () => {
     server.close();
   });
 
-  beforeAll(() => {
+  beforeEach(() => {
     // Create mock alert service
     mockAlertService = {
       error: vi.fn(),
@@ -46,15 +53,25 @@ describe('StorageService Integration Tests', () => {
       fetchApi: fetch, // Use standard fetch API for MSW interception
     });
 
-    const filesApiService = new FilesApiService(config);
+    // Mock API config
+    const mockApiConfig: IApiConfig = {
+      basePath: 'http://localhost:5168',
+      signalRBasePath: 'http://localhost:5168',
+      getBaseUrl: () => 'http://localhost:5168',
+    };
 
-    // Configure TestBed to provide the alert service
+    // Configure TestBed with all required providers
     TestBed.configureTestingModule({
-      providers: [{ provide: ALERT_SERVICE, useValue: mockAlertService }],
+      providers: [
+        StorageService,
+        { provide: FilesApiService, useValue: new FilesApiService(config) },
+        { provide: ALERT_SERVICE, useValue: mockAlertService },
+        { provide: API_CONFIG, useValue: mockApiConfig },
+      ],
     });
 
-    // Create StorageService with TestBed's DI
-    storageService = new StorageService(filesApiService, mockAlertService);
+    // Use TestBed.inject to get the service within Angular's DI context
+    storageService = TestBed.inject(StorageService);
   });
 
   describe('getDirectory', () => {
@@ -116,7 +133,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:5168/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://localhost:5168/api/devices/${deviceId}/storage/${storageType}/directories`,
           ({ request }) => {
             const url = new URL(request.url);
             const pathParam = url.searchParams.get('Path');
@@ -170,7 +187,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:5168/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://localhost:5168/api/devices/${deviceId}/storage/${storageType}/directories`,
           ({ request }) => {
             const url = new URL(request.url);
             const pathParam = url.searchParams.get('Path');
@@ -197,7 +214,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:5168/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://localhost:5168/api/devices/${deviceId}/storage/${storageType}/directories`,
           () => {
             return HttpResponse.json(
               {
@@ -233,7 +250,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:5168/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://localhost:5168/api/devices/${deviceId}/storage/${storageType}/directories`,
           () => HttpResponse.json(mockResponse)
         )
       );
@@ -259,7 +276,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:5168/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://localhost:5168/api/devices/${deviceId}/storage/${storageType}/directories`,
           () => HttpResponse.json(mockResponse)
         )
       );
@@ -285,10 +302,10 @@ describe('StorageService Integration Tests', () => {
 
       // Setup handlers for both storage types
       server.use(
-        http.get(`http://localhost:5168/devices/${deviceId}/storage/SD/directories`, () =>
+        http.get(`http://localhost:5168/api/devices/${deviceId}/storage/SD/directories`, () =>
           HttpResponse.json(createMockResponse('sd'))
         ),
-        http.get(`http://localhost:5168/devices/${deviceId}/storage/USB/directories`, () =>
+        http.get(`http://localhost:5168/api/devices/${deviceId}/storage/USB/directories`, () =>
           HttpResponse.json(createMockResponse('usb'))
         )
       );

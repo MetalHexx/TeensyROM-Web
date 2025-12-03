@@ -16,6 +16,9 @@
         "passWithNoTests": true,
         "reportsDirectory": "../../../coverage/{projectRoot}"
       }
+    },
+    "vite:test": {
+      "command": "echo No tests for app-bootstrap"
     }
   }
 }

@@ -10,6 +10,9 @@
       "options": {
         "command": "node libs/data-access/api-client/scripts/generate-client.js"
       }
+    },
+    "vite:test": {
+      "command": "echo No tests for generated api-client"
     }
   }
 }

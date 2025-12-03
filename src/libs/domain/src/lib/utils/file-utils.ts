@@ -1,4 +1,4 @@
-import { FileItemType } from '@teensyrom-nx/domain';
+import { FileItemType } from '../models/file-item-type.enum';
 
 /**
  * Utility functions for working with files and file metadata
