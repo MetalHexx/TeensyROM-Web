@@ -12,6 +12,8 @@ namespace TeensyRom.Core.Tests.Settings;
 /// Comprehensive behavioral tests for SettingsService functionality.
 /// Tests focus on service behavior, file I/O, observable patterns, and provider interfaces.
 /// File operations write to the test assembly's output directory for isolation.
+/// 
+/// Updated to test workflow path filter changes.
 /// </summary>
 public class SettingsServiceTests : IDisposable
 {
