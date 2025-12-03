@@ -19,7 +19,7 @@ export class PlayerStorageService implements IPlayerStorage {
 
   save(deviceId: string, state: DevicePlayerState): void {
     try {
-      const savedState = this.mapTSavedState(state);
+      const savedState = this.mapToSavedState(state);
       const key = this.getStorageKey(deviceId);
       localStorage.setItem(key, JSON.stringify(savedState));
 
@@ -66,7 +66,7 @@ export class PlayerStorageService implements IPlayerStorage {
   /**
    * Map DevicePlayerState to SavedPlayerState (exclude ephemeral fields).
    */
-  private mapToSavedState(state: DevicePlayerState): any {
+  private mapToSavedState(state: DevicePlayerState): SavedPlayerState {
     return {
       deviceId: state.deviceId,
       currentFile: state.currentFile,
