@@ -78,12 +78,10 @@ export default [
       '**/*.tsx',
       '**/*.cts',
       '**/*.mts',
-      '**/*.js',
-      '**/*.jsx',
-      '**/*.cjs',
-      '**/*.mjs',
     ],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      // Disallow explicit 'any' type annotations - prefer unknown or specific types
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
   },
 ];
