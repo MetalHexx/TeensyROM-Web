@@ -1,4 +1,4 @@
-﻿using System.IO.Ports;
+using System.IO.Ports;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -98,9 +98,11 @@ namespace TeensyRom.Core.Serial
             {
                 _serialPort.Open();
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
-                throw;
+              log.InternalError(failureMessage);
+              log.InternalError("ObservableSerialPort.EnsureConnection: Make sure you don't have multiple TeensyROM API instances running!");
+              throw;
             }
             catch (Exception)
             {
