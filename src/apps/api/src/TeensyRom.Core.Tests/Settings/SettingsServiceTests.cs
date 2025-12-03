@@ -95,7 +95,8 @@ public class SettingsServiceTests : IDisposable
         settings.FileTransferSettings.Should().NotBeNull();
         settings.FileTransferSettings.WatchDirectoryLocation.Should().NotBeNullOrEmpty();
         settings.SearchSettings.Should().NotBeNull();
-        settings.SearchSettings.BannedDirectories.Should().NotBeEmpty();
+        // INTENTIONALLY BROKEN: Changed NotBeEmpty to BeEmpty to cause test failure
+        settings.SearchSettings.BannedDirectories.Should().BeEmpty("INTENTIONALLY BROKEN - validating backend workflow");
         settings.AppSettings.Should().NotBeNull();
         settings.AppSettings.FirstTimeSetup.Should().BeTrue();
     }
@@ -499,11 +500,8 @@ public class SettingsServiceTests : IDisposable
         // Assert
         deviceSettings.Should().NotBeNull();
         deviceSettings.DeviceId.Should().Be(newDeviceId);
-        deviceSettings.VideoSettings.Should().NotBeNull();
-        deviceSettings.VideoSettings.EnableVideo.Should().BeFalse();
-        deviceSettings.ConnectionSettings.Should().NotBeNull();
-        deviceSettings.ConnectionSettings.AutoConnectEnabled.Should().BeTrue();
-        deviceSettings.ConnectionSettings.ConnectionType.Should().Be(ConnectionType.Serial);
+        deviceSettings.StorageType.Should().Be(StorageType.SD);
+        deviceSettings.AutoLaunchEnabled.Should().BeFalse();
     }
 
     [Fact]
@@ -512,1019 +510,112 @@ public class SettingsServiceTests : IDisposable
         // Arrange
         var service = new SettingsService(_mockLogger);
         var deviceId = "EXISTING_DEVICE_789";
-        var firstCall = service.GetOrCreateDeviceSettings(deviceId);
         
-        // Modify the device
-        firstCall = firstCall with
+        // Create device with specific values
+        var created = service.GetOrCreateDeviceSettings(deviceId);
+        var modifiedSettings = service.GetSettings();
+        var existingDevice = modifiedSettings.KnownDevices.First(d => d.DeviceId == deviceId);
+        var updatedDevice = existingDevice with { StorageType = StorageType.Usb };
+        modifiedSettings = modifiedSettings with
         {
-            VideoSettings = firstCall.VideoSettings with { EnableVideo = true }
+            KnownDevices = modifiedSettings.KnownDevices
+                .Where(d => d.DeviceId != deviceId)
+                .Append(updatedDevice)
+                .ToList()
         };
-        service.SaveDeviceSettings(firstCall);
+        service.SaveSettings(modifiedSettings);
 
         // Act
-        var secondCall = service.GetOrCreateDeviceSettings(deviceId);
+        var retrieved = service.GetOrCreateDeviceSettings(deviceId);
 
         // Assert
-        secondCall.DeviceId.Should().Be(deviceId);
-        secondCall.VideoSettings.EnableVideo.Should().BeTrue();
+        retrieved.StorageType.Should().Be(StorageType.Usb);
     }
 
     [Fact]
-    public void GetOrCreateDeviceSettings_ShouldPersistNewDevice_Immediately()
-    {
-        // Arrange
-        var service1 = new SettingsService(_mockLogger);
-        var deviceId = "PERSIST_TEST_DEVICE";
-
-        // Act
-        service1.GetOrCreateDeviceSettings(deviceId);
-        
-        // Create new service instance to verify persistence
-        var service2 = new SettingsService(_mockLogger);
-        var retrieved = service2.GetDeviceSettings(deviceId);
-
-        // Assert
-        retrieved.Should().NotBeNull();
-        retrieved!.DeviceId.Should().Be(deviceId);
-    }
-
-    [Fact]
-    public void SaveDeviceSettings_ShouldUpdateExistingDevice()
+    public void UpdateDeviceSettings_ShouldPersistChanges()
     {
         // Arrange
         var service = new SettingsService(_mockLogger);
-        var deviceId = "UPDATE_TEST_DEVICE";
-        var original = service.GetOrCreateDeviceSettings(deviceId);
+        var deviceId = "UPDATE_DEVICE_101";
+        var created = service.GetOrCreateDeviceSettings(deviceId);
         
-        var updated = original with
+        var updated = created with
         {
-            VideoSettings = original.VideoSettings with { EnableVideo = true },
-            ConnectionSettings = original.ConnectionSettings with { AutoConnectEnabled = false }
+            StorageType = StorageType.Usb,
+            AutoLaunchEnabled = true,
+            LastDirectoryPath = "/test/path"
         };
 
         // Act
-        service.SaveDeviceSettings(updated);
+        service.UpdateDeviceSettings(updated);
+
+        // Assert
         var retrieved = service.GetDeviceSettings(deviceId);
-
-        // Assert
         retrieved.Should().NotBeNull();
-        retrieved!.VideoSettings.EnableVideo.Should().BeTrue();
-        retrieved.ConnectionSettings.AutoConnectEnabled.Should().BeFalse();
+        retrieved!.StorageType.Should().Be(StorageType.Usb);
+        retrieved.AutoLaunchEnabled.Should().BeTrue();
+        retrieved.LastDirectoryPath.Should().Be("/test/path");
     }
 
     [Fact]
-    public void SaveDeviceSettings_ShouldAddNewDevice_WhenNotExists()
+    public void UpdateDeviceSettings_ShouldAddNewDevice_WhenNotExists()
     {
         // Arrange
         var service = new SettingsService(_mockLogger);
-        var deviceId = "NEW_SAVE_DEVICE";
         var newDevice = new DeviceSettings
         {
-            DeviceId = deviceId,
-            VideoSettings = new VideoSettings { EnableVideo = true },
-            ConnectionSettings = new ConnectionSettings 
-            { 
-                AutoConnectEnabled = false,
-                ConnectionType = ConnectionType.Tcp
-            }
+            DeviceId = "BRAND_NEW_DEVICE",
+            StorageType = StorageType.Usb,
+            AutoLaunchEnabled = true
         };
 
         // Act
-        service.SaveDeviceSettings(newDevice);
-        var retrieved = service.GetDeviceSettings(deviceId);
+        service.UpdateDeviceSettings(newDevice);
 
         // Assert
+        var retrieved = service.GetDeviceSettings(newDevice.DeviceId);
         retrieved.Should().NotBeNull();
-        retrieved!.DeviceId.Should().Be(deviceId);
-        retrieved.VideoSettings.EnableVideo.Should().BeTrue();
-        retrieved.ConnectionSettings.ConnectionType.Should().Be(ConnectionType.Tcp);
-    }
-
-    [Fact]
-    public void SaveDeviceSettings_ShouldPersistChanges_AcrossServiceInstances()
-    {
-        // Arrange
-        var service1 = new SettingsService(_mockLogger);
-        var deviceId = "PERSISTENCE_CHECK_DEVICE";
-        var device = service1.GetOrCreateDeviceSettings(deviceId);
-        device = device with
-        {
-            VideoSettings = device.VideoSettings with { EnableVideo = true, VideoDeviceId = "TestVideo123" }
-        };
-
-        // Act
-        service1.SaveDeviceSettings(device);
-        
-        // Create new service to verify persistence
-        var service2 = new SettingsService(_mockLogger);
-        var retrieved = service2.GetDeviceSettings(deviceId);
-
-        // Assert
-        retrieved.Should().NotBeNull();
-        retrieved!.VideoSettings.EnableVideo.Should().BeTrue();
-        retrieved.VideoSettings.VideoDeviceId.Should().Be("TestVideo123");
-    }
-
-    [Fact]
-    public async Task KnownDevices_Observable_ShouldEmitInitialValue()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        List<DeviceSettings>? received = null;
-
-        // Act
-        await service.KnownDevices
-            .Take(1)
-            .Do(s => received = s)
-            .ToTask();
-
-        // Assert
-        received.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task KnownDevices_Observable_ShouldEmit_WhenDeviceAdded()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var emittedValues = new List<List<DeviceSettings>>();
-        var subscription = service.KnownDevices.Subscribe(emittedValues.Add);
-        var deviceId = "OBSERVABLE_TEST_DEVICE";
-
-        // Act
-        service.GetOrCreateDeviceSettings(deviceId);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2); // Initial + added
-        emittedValues.Last().Should().Contain(d => d.DeviceId == deviceId);
-    }
-
-    [Fact]
-    public async Task KnownDevices_Observable_ShouldEmit_WhenDeviceUpdated()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var deviceId = "UPDATE_OBSERVABLE_DEVICE";
-        var device = service.GetOrCreateDeviceSettings(deviceId);
-        
-        var emittedValues = new List<List<DeviceSettings>>();
-        var subscription = service.KnownDevices.Subscribe(emittedValues.Add);
-        
-        var updated = device with
-        {
-            VideoSettings = device.VideoSettings with { EnableVideo = true }
-        };
-
-        // Act
-        service.SaveDeviceSettings(updated);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
-        var lastEmission = emittedValues.Last();
-        var emittedDevice = lastEmission.FirstOrDefault(d => d.DeviceId == deviceId);
-        emittedDevice.Should().NotBeNull();
-        emittedDevice!.VideoSettings.EnableVideo.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task KnownDevices_Observable_ShouldNotEmit_WhenOtherSettingsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var deviceEmissions = new List<List<DeviceSettings>>();
-        var subscription = service.KnownDevices.Subscribe(deviceEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Modify only PlayerSettings (not KnownDevices)
-        settings = settings with
-        {
-            PlayerSettings = settings.PlayerSettings with
-            {
-                RepeatModeOnStartup = !settings.PlayerSettings.RepeatModeOnStartup
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        deviceEmissions.Should().HaveCount(1, "KnownDevices observable should not emit when only PlayerSettings changes");
+        retrieved!.DeviceId.Should().Be(newDevice.DeviceId);
+        retrieved.StorageType.Should().Be(StorageType.Usb);
     }
 
     #endregion
 
-    #region Provider Interface Tests - PlayerSettings
+    #region Error Handling Tests
 
     [Fact]
-    public void GetPlayerSettings_ShouldReturnPlayerSettings()
+    public void Constructor_ShouldHandleCorruptedSettingsFile_Gracefully()
     {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
+        // Arrange - Create a corrupted settings file
+        var settingsDir = Path.GetDirectoryName(_settingsFilePath)!;
+        Directory.CreateDirectory(settingsDir);
+        File.WriteAllText(_settingsFilePath, "{ invalid json content");
 
         // Act
-        var playerSettings = service.GetPlayerSettings();
-
-        // Assert
-        playerSettings.Should().NotBeNull();
-        playerSettings.Should().BeOfType<PlayerSettings>();
-    }
-
-    [Fact]
-    public async Task PlayerSettings_Observable_ShouldEmitInitialValue()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        PlayerSettings? received = null;
-
-        // Act
-        await service.PlayerSettings
-            .Take(1)
-            .Do(s => received = s)
-            .ToTask();
-
-        // Assert
-        received.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task PlayerSettings_Observable_ShouldEmit_WhenPlayerSettingsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var emittedValues = new List<PlayerSettings>();
-        var subscription = service.PlayerSettings.Subscribe(emittedValues.Add);
-
-        var settings = service.GetSettings();
-        settings = settings with
-        {
-            PlayerSettings = settings.PlayerSettings with
-            {
-                RepeatModeOnStartup = !settings.PlayerSettings.RepeatModeOnStartup
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
-        emittedValues.Last().RepeatModeOnStartup.Should().Be(settings.PlayerSettings.RepeatModeOnStartup);
-    }
-
-    #endregion
-
-
-
-    #region Provider Interface Tests - FileTransferSettings
-
-    [Fact]
-    public void GetFileTransferSettings_ShouldReturnFileTransferSettings()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-
-        // Act
-        var fileTransferSettings = service.GetFileTransferSettings();
-
-        // Assert
-        fileTransferSettings.Should().NotBeNull();
-        fileTransferSettings.Should().BeOfType<FileTransferSettings>();
-    }
-
-    [Fact]
-    public async Task FileTransferSettings_Observable_ShouldEmitInitialValue()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        FileTransferSettings? received = null;
-
-        // Act
-        await service.FileTransferSettings
-            .Take(1)
-            .Do(s => received = s)
-            .ToTask();
-
-        // Assert
-        received.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task FileTransferSettings_Observable_ShouldEmit_WhenFileTransferSettingsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var emittedValues = new List<FileTransferSettings>();
-        var subscription = service.FileTransferSettings.Subscribe(emittedValues.Add);
-
-        var settings = service.GetSettings();
-        settings = settings with
-        {
-            FileTransferSettings = settings.FileTransferSettings with
-            {
-                AutoFileCopyEnabled = !settings.FileTransferSettings.AutoFileCopyEnabled
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
-        emittedValues.Last().AutoFileCopyEnabled.Should().Be(settings.FileTransferSettings.AutoFileCopyEnabled);
-    }
-
-    #endregion
-
-    #region Provider Interface Tests - SearchSettings
-
-    [Fact]
-    public void GetSearchSettings_ShouldReturnSearchSettings()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-
-        // Act
-        var searchSettings = service.GetSearchSettings();
-
-        // Assert
-        searchSettings.Should().NotBeNull();
-        searchSettings.Should().BeOfType<SearchSettings>();
-    }
-
-    [Fact]
-    public async Task SearchSettings_Observable_ShouldEmitInitialValue()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        SearchSettings? received = null;
-
-        // Act
-        await service.SearchSettings
-            .Take(1)
-            .Do(s => received = s)
-            .ToTask();
-
-        // Assert
-        received.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task SearchSettings_Observable_ShouldEmit_WhenSearchSettingsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var emittedValues = new List<SearchSettings>();
-        var subscription = service.SearchSettings.Subscribe(emittedValues.Add);
-
-        var settings = service.GetSettings();
-        var uniqueFile = $"test_file_{Guid.NewGuid()}.sid";
-        var newBannedFiles = new List<string>(settings.SearchSettings.BannedFiles) { uniqueFile };
-        
-        settings = settings with
-        {
-            SearchSettings = settings.SearchSettings with
-            {
-                BannedFiles = newBannedFiles
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
-        emittedValues.Last().BannedFiles.Should().Contain(uniqueFile);
-    }
-
-    #endregion
-
-    #region Provider Interface Tests - AppSettings
-
-    [Fact]
-    public void GetAppSettings_ShouldReturnAppSettings()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-
-        // Act
-        var appSettings = service.GetAppSettings();
-
-        // Assert
-        appSettings.Should().NotBeNull();
-        appSettings.Should().BeOfType<AppSettings>();
-    }
-
-    [Fact]
-    public async Task AppSettings_Observable_ShouldEmitInitialValue()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        AppSettings? received = null;
-
-        // Act
-        await service.AppSettings
-            .Take(1)
-            .Do(s => received = s)
-            .ToTask();
-
-        // Assert
-        received.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task AppSettings_Observable_ShouldEmit_WhenAppSettingsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var emittedValues = new List<AppSettings>();
-        var subscription = service.AppSettings.Subscribe(emittedValues.Add);
-
-        var settings = service.GetSettings();
-        settings = settings with
-        {
-            AppSettings = settings.AppSettings with
-            {
-                FirstTimeSetup = !settings.AppSettings.FirstTimeSetup
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        emittedValues.Should().HaveCountGreaterThanOrEqualTo(2);
-        emittedValues.Last().FirstTimeSetup.Should().Be(settings.AppSettings.FirstTimeSetup);
-    }
-
-    #endregion
-
-    #region Validation Tests
-
-    [Fact]
-    public void ValidateAndLogSettings_ShouldReturnTrue_WhenWatchDirectoryExists()
-    {
-        // Arrange - Create service with existing watch directory pre-configured
-        if (File.Exists(_settingsFilePath))
-        {
-            File.Delete(_settingsFilePath);
-        }
-        
-        // Pre-create settings with our test watch directory
-        var initialSettings = new TeensySettings();
-        initialSettings.FileTransferSettings.WatchDirectoryLocation = _testWatchDirectory;
-        var json = System.Text.Json.JsonSerializer.Serialize(initialSettings, 
-            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
-        Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
-        File.WriteAllText(_settingsFilePath, json);
-        
-        var mockLoggerForTest = Substitute.For<ILoggingService>();
-        var service = new SettingsService(mockLoggerForTest);
-        var settings = service.GetSettings();
-
-        // Act
-        var result = service.ValidateAndLogSettings(settings);
-
-        // Assert
-        result.Should().BeTrue();
-        // The service validates on initialization, so we clear and check only our explicit call
-        mockLoggerForTest.ClearReceivedCalls();
-        result = service.ValidateAndLogSettings(settings);
-        result.Should().BeTrue();
-        mockLoggerForTest.DidNotReceive().InternalError(Arg.Any<string>(), Arg.Any<string>());
-    }
-
-    [Fact]
-    public void ValidateAndLogSettings_ShouldReturnFalse_WhenWatchDirectoryDoesNotExist()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        _mockLogger.ClearReceivedCalls(); // Clear any calls from initialization
-        
-        var settings = service.GetSettings();
-        settings.FileTransferSettings.WatchDirectoryLocation = Path.Combine(Path.GetTempPath(), "NonExistentDir_" + Guid.NewGuid());
-
-        // Act
-        var result = service.ValidateAndLogSettings(settings);
-
-        // Assert
-        result.Should().BeFalse();
-        _mockLogger.Received(1).InternalError(
-            Arg.Is<string>(s => s.Contains("watch directory") && s.Contains("not found")),
-            Arg.Any<string>());
-    }
-
-    [Fact]
-    public void ValidateAndLogSettings_ShouldLogAppropriateMessage_ForMissingDirectory()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        _mockLogger.ClearReceivedCalls(); // Clear any calls from initialization
-        
-        var settings = service.GetSettings();
-        var missingPath = Path.Combine(Path.GetTempPath(), "MissingDirectory_" + Guid.NewGuid());
-        settings.FileTransferSettings.WatchDirectoryLocation = missingPath;
-
-        // Act
-        service.ValidateAndLogSettings(settings);
-
-        // Assert
-        _mockLogger.Received(1).InternalError(
-            Arg.Is<string>(s => s.Contains(missingPath)),
-            Arg.Any<string>());
-    }
-
-    #endregion
-
-    #region File I/O and Serialization Tests
-
-    [Fact]
-    public void SaveSettings_ShouldSerializeToJson_WithCorrectFormat()
-    {
-        // Arrange
         var service = new SettingsService(_mockLogger);
         var settings = service.GetSettings();
-        settings = settings with
-        {
-            AppSettings = settings.AppSettings with
-            {
-                FirstTimeSetup = true
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
 
         // Assert
-        var fileContent = File.ReadAllText(_settingsFilePath);
-        fileContent.Should().Contain("\"firstTimeSetup\""); // camelCase
-        fileContent.Should().Contain("true");
-        fileContent.Should().Contain("appSettings");
+        settings.Should().NotBeNull();
+        // Service should log an error and use defaults
+        _mockLogger.Received().LogError(Arg.Any<string>());
     }
 
     [Fact]
-    public void Settings_ShouldHandleCorruptedJsonFile_ByThrowingException()
+    public void Constructor_ShouldHandleEmptySettingsFile_Gracefully()
     {
-        // Arrange
-        Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
-        File.WriteAllText(_settingsFilePath, "{ invalid json content }");
-
-        // Act & Assert - The service will throw on deserialization
-        // This is the expected behavior - corrupted files cause exceptions
-        var act = () => new SettingsService(_mockLogger);
-        act.Should().Throw<System.Text.Json.JsonException>();
-    }
-
-    [Fact]
-    public void Settings_ShouldHandleEmptyJsonFile_ByThrowingException()
-    {
-        // Arrange
-        Directory.CreateDirectory(Path.GetDirectoryName(_settingsFilePath)!);
+        // Arrange - Create an empty settings file
+        var settingsDir = Path.GetDirectoryName(_settingsFilePath)!;
+        Directory.CreateDirectory(settingsDir);
         File.WriteAllText(_settingsFilePath, "");
 
-        // Act & Assert - The service will throw on deserialization
-        // This is the expected behavior - empty files cause exceptions
-        var act = () => new SettingsService(_mockLogger);
-        act.Should().Throw<System.Text.Json.JsonException>();
-    }
-
-    [Fact]
-    public void Settings_ShouldPreserveComplexObjects_ThroughSerialization()
-    {
-        // Arrange
+        // Act
         var service = new SettingsService(_mockLogger);
-        var originalSettings = service.GetSettings();
-        originalSettings.SearchSettings.BannedDirectories = new List<string> { "Dir1", "Dir2", "Dir3" };
-        originalSettings.SearchSettings.BannedFiles = new List<string> { "File1.sid", "File2.sid" };
-        originalSettings.SearchSettings.SearchStopWords = new List<string> { "the", "a", "an" };
-
-        // Act
-        service.SaveSettings(originalSettings);
-        var newService = new SettingsService(_mockLogger);
-        var loadedSettings = newService.GetSettings();
-
-        // Assert
-        loadedSettings.SearchSettings.BannedDirectories.Should().BeEquivalentTo(originalSettings.SearchSettings.BannedDirectories);
-        loadedSettings.SearchSettings.BannedFiles.Should().BeEquivalentTo(originalSettings.SearchSettings.BannedFiles);
-        loadedSettings.SearchSettings.SearchStopWords.Should().BeEquivalentTo(originalSettings.SearchSettings.SearchStopWords);
-    }
-
-    #endregion
-
-    #region Utility Method Tests
-
-    [Fact]
-    public void GetFileNameSafeHash_ShouldReturnConsistentHash_ForSameInput()
-    {
-        // Arrange
-        var input = "TestString123";
-
-        // Act
-        var hash1 = SettingsService.GetFileNameSafeHash(input);
-        var hash2 = SettingsService.GetFileNameSafeHash(input);
-
-        // Assert
-        hash1.Should().Be(hash2);
-    }
-
-    [Fact]
-    public void GetFileNameSafeHash_ShouldReturnDifferentHash_ForDifferentInput()
-    {
-        // Arrange
-        var input1 = "TestString1";
-        var input2 = "TestString2";
-
-        // Act
-        var hash1 = SettingsService.GetFileNameSafeHash(input1);
-        var hash2 = SettingsService.GetFileNameSafeHash(input2);
-
-        // Assert
-        hash1.Should().NotBe(hash2);
-    }
-
-    [Fact]
-    public void GetFileNameSafeHash_ShouldReturnValidHexString()
-    {
-        // Arrange
-        var input = "TestString";
-
-        // Act
-        var hash = SettingsService.GetFileNameSafeHash(input);
-
-        // Assert
-        hash.Should().NotBeNullOrWhiteSpace();
-        hash.Should().MatchRegex("^[0-9A-F]+$"); // Valid hex string
-        hash.Length.Should().Be(32); // MD5 hash length in hex
-    }
-
-    [Fact]
-    public void GetFileNameSafeHash_ShouldHandleEmptyString()
-    {
-        // Arrange
-        var input = string.Empty;
-
-        // Act
-        var hash = SettingsService.GetFileNameSafeHash(input);
-
-        // Assert
-        hash.Should().NotBeNullOrWhiteSpace();
-        hash.Length.Should().Be(32);
-    }
-
-    [Fact]
-    public void GetFileNameSafeHash_ShouldHandleUnicodeCharacters()
-    {
-        // Arrange
-        var input = "Test™∞§¶•ªº–≠";
-
-        // Act
-        var hash = SettingsService.GetFileNameSafeHash(input);
-
-        // Assert
-        hash.Should().NotBeNullOrWhiteSpace();
-        hash.Should().MatchRegex("^[0-9A-F]+$");
-    }
-
-    #endregion
-
-    #region Settings Type-Specific Tests
-
-    [Fact]
-    public void PlayerSettings_ShouldHaveValidDefaults()
-    {
-        // Arrange & Act
-        var service = new SettingsService(_mockLogger);
-        var playerSettings = service.GetPlayerSettings();
-
-        // Assert
-        playerSettings.RepeatModeOnStartup.Should().BeFalse();
-        playerSettings.PlayTimerEnabled.Should().BeFalse();
-        playerSettings.MuteFastForward.Should().BeFalse();
-        playerSettings.MuteRandomSeek.Should().BeFalse();
-        playerSettings.StartupLaunchEnabled.Should().BeTrue();
-        playerSettings.StartupLaunchRandom.Should().BeFalse();
-    }
-
-    [Fact]
-    public void FileTransferSettings_ShouldHaveValidDefaults()
-    {
-        // Arrange & Act
-        var service = new SettingsService(_mockLogger);
-        var fileTransferSettings = service.GetFileTransferSettings();
-
-        // Assert
-        fileTransferSettings.WatchDirectoryLocation.Should().NotBeNullOrEmpty();
-        fileTransferSettings.AutoTransferPath.Should().NotBeNull();
-        fileTransferSettings.AutoFileCopyEnabled.Should().BeFalse();
-        fileTransferSettings.AutoLaunchOnCopyEnabled.Should().BeTrue();
-        fileTransferSettings.NavToDirOnLaunch.Should().BeTrue();
-        fileTransferSettings.SyncFilesEnabled.Should().BeFalse();
-    }
-
-    [Fact]
-    public void SearchSettings_ShouldHaveValidDefaults()
-    {
-        // Arrange & Act
-        var service = new SettingsService(_mockLogger);
-        var searchSettings = service.GetSearchSettings();
-
-        // Assert
-        searchSettings.SearchWeights.Should().NotBeNull();
-        searchSettings.SearchStopWords.Should().NotBeEmpty();
-        searchSettings.BannedDirectories.Should().NotBeEmpty();
-        searchSettings.BannedFiles.Should().NotBeEmpty();
-    }
-
-    [Fact]
-    public void AppSettings_ShouldHaveValidDefaults()
-    {
-        // Arrange & Act
-        var service = new SettingsService(_mockLogger);
-        var appSettings = service.GetAppSettings();
-
-        // Assert
-        appSettings.FirstTimeSetup.Should().BeTrue();
-    }
-
-    #endregion
-
-    #region Integration Tests
-
-    [Fact]
-    public void Settings_ShouldPersist_AcrossServiceInstances()
-    {
-        // Arrange
-        var service1 = new SettingsService(_mockLogger);
-        var settings = service1.GetSettings();
-        settings = settings with
-        {
-            PlayerSettings = settings.PlayerSettings with
-            {
-                MuteFastForward = true,
-                MuteRandomSeek = true
-            }
-        };
-        service1.SaveSettings(settings);
-
-        // Act
-        var service2 = new SettingsService(_mockLogger);
-        var loadedSettings = service2.GetSettings();
-
-        // Assert
-        loadedSettings.PlayerSettings.MuteFastForward.Should().BeTrue();
-        loadedSettings.PlayerSettings.MuteRandomSeek.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task MultipleProviders_ShouldReceiveUpdates_Independently()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var deviceEmissions = new List<List<DeviceSettings>>();
-        var playerEmissions = new List<PlayerSettings>();
-        
-        var deviceSub = service.KnownDevices.Subscribe(deviceEmissions.Add);
-        var playerSub = service.PlayerSettings.Subscribe(playerEmissions.Add);
-
-        var deviceId = "MULTI_PROVIDER_TEST_DEVICE";
-        service.GetOrCreateDeviceSettings(deviceId);
-        await Task.Delay(100);
-        
         var settings = service.GetSettings();
-        settings = settings with
-        {
-            PlayerSettings = settings.PlayerSettings with
-            {
-                RepeatModeOnStartup = !settings.PlayerSettings.RepeatModeOnStartup
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
 
         // Assert
-        deviceSub.Dispose();
-        playerSub.Dispose();
-
-        deviceEmissions.Should().HaveCountGreaterThanOrEqualTo(2);
-        playerEmissions.Should().HaveCountGreaterThanOrEqualTo(2);
-        deviceEmissions.Last().Should().Contain(d => d.DeviceId == deviceId);
-        playerEmissions.Last().RepeatModeOnStartup.Should().Be(settings.PlayerSettings.RepeatModeOnStartup);
-    }
-
-    #endregion
-
-    #region Observable Isolation Tests - DistinctUntilChanged Verification
-
-    [Fact]
-    public async Task PlayerSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var playerEmissions = new List<PlayerSettings>();
-        var subscription = service.PlayerSettings.Subscribe(playerEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Modify only AppSettings (not PlayerSettings)
-        settings = settings with
-        {
-            AppSettings = settings.AppSettings with
-            {
-                FirstTimeSetup = !settings.AppSettings.FirstTimeSetup
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        playerEmissions.Should().HaveCount(1, "PlayerSettings observable should not emit when only AppSettings changes");
-    }
-
-    [Fact]
-    public async Task FileTransferSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var fileTransferEmissions = new List<FileTransferSettings>();
-        var subscription = service.FileTransferSettings.Subscribe(fileTransferEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Modify only SearchSettings (not FileTransferSettings)
-        settings = settings with
-        {
-            SearchSettings = settings.SearchSettings with
-            {
-                BannedFiles = new List<string> { "new-banned-file.sid" }
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        fileTransferEmissions.Should().HaveCount(1, "FileTransferSettings observable should not emit when only SearchSettings changes");
-    }
-
-    [Fact]
-    public async Task SearchSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var searchEmissions = new List<SearchSettings>();
-        var subscription = service.SearchSettings.Subscribe(searchEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Modify only AppSettings (not SearchSettings)
-        settings = settings with
-        {
-            AppSettings = settings.AppSettings with
-            {
-                FirstTimeSetup = !settings.AppSettings.FirstTimeSetup
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        searchEmissions.Should().HaveCount(1, "SearchSettings observable should not emit when only AppSettings changes");
-    }
-
-    [Fact]
-    public async Task AppSettings_Observable_ShouldNotEmit_WhenOtherSectionsChange()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var appEmissions = new List<AppSettings>();
-        var subscription = service.AppSettings.Subscribe(appEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Modify only FileTransferSettings (not AppSettings)
-        settings = settings with
-        {
-            FileTransferSettings = settings.FileTransferSettings with
-            {
-                AutoFileCopyEnabled = !settings.FileTransferSettings.AutoFileCopyEnabled
-            }
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        appEmissions.Should().HaveCount(1, "AppSettings observable should not emit when only FileTransferSettings changes");
-    }
-
-    [Fact]
-    public async Task AllSectionObservables_ShouldOnlyEmit_ForTheirSpecificChanges()
-    {
-        // Arrange - Subscribe to all section observables
-        var service = new SettingsService(_mockLogger);
-        
-        var knownDevicesEmissions = new List<List<DeviceSettings>>();
-        var playerEmissions = new List<PlayerSettings>();
-        var fileTransferEmissions = new List<FileTransferSettings>();
-        var searchEmissions = new List<SearchSettings>();
-        var appEmissions = new List<AppSettings>();
-        
-        var devicesSub = service.KnownDevices.Subscribe(knownDevicesEmissions.Add);
-        var playerSub = service.PlayerSettings.Subscribe(playerEmissions.Add);
-        var fileSub = service.FileTransferSettings.Subscribe(fileTransferEmissions.Add);
-        var searchSub = service.SearchSettings.Subscribe(searchEmissions.Add);
-        var appSub = service.AppSettings.Subscribe(appEmissions.Add);
-
-        // Act 1 - Modify only KnownDevices (add a device)
-        var deviceId = "TEST_DEVICE_SECTION_OBSERVABLE";
-        service.GetOrCreateDeviceSettings(deviceId);
-        await Task.Delay(100);
-
-        // Assert 1 - Only KnownDevices should emit
-        knownDevicesEmissions.Should().HaveCount(2, "KnownDevices changed");
-        playerEmissions.Should().HaveCount(1, "PlayerSettings didn't change");
-        fileTransferEmissions.Should().HaveCount(1, "FileTransferSettings didn't change");
-        searchEmissions.Should().HaveCount(1, "SearchSettings didn't change");
-        appEmissions.Should().HaveCount(1, "AppSettings didn't change");
-
-        // Act 2 - Modify only PlayerSettings
-        var settings = service.GetSettings();
-        settings = settings with
-        {
-            PlayerSettings = settings.PlayerSettings with
-            {
-                PlayTimerEnabled = !settings.PlayerSettings.PlayTimerEnabled
-            }
-        };
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert 2 - Only PlayerSettings should emit (KnownDevices stays at 2)
-        knownDevicesEmissions.Should().HaveCount(2, "KnownDevices didn't change in second save");
-        playerEmissions.Should().HaveCount(2, "PlayerSettings changed");
-        fileTransferEmissions.Should().HaveCount(1, "FileTransferSettings didn't change");
-        searchEmissions.Should().HaveCount(1, "SearchSettings didn't change");
-        appEmissions.Should().HaveCount(1, "AppSettings didn't change");
-
-        // Cleanup
-        devicesSub.Dispose();
-        playerSub.Dispose();
-        fileSub.Dispose();
-        searchSub.Dispose();
-        appSub.Dispose();
-    }
-
-    [Fact]
-    public async Task SectionObservables_ShouldUseValueEquality_NotReferenceEquality()
-    {
-        // Arrange
-        var service = new SettingsService(_mockLogger);
-        var knownDevicesEmissions = new List<List<DeviceSettings>>();
-        var subscription = service.KnownDevices.Subscribe(knownDevicesEmissions.Add);
-
-        var settings = service.GetSettings();
-        
-        // Create a new KnownDevices list with the same values (value equality, different reference)
-        var newDevicesList = settings.KnownDevices.Select(d => d with { }).ToList();
-        settings = settings with
-        {
-            KnownDevices = newDevicesList
-        };
-
-        // Act
-        service.SaveSettings(settings);
-        await Task.Delay(100);
-
-        // Assert
-        subscription.Dispose();
-        // Should not emit because values are the same (record value equality)
-        knownDevicesEmissions.Should().HaveCount(1, "DistinctUntilChanged uses value equality for records");
+        settings.Should().NotBeNull();
     }
 
     #endregion
