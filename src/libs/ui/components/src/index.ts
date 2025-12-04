@@ -36,6 +36,7 @@ export * from './lib/crt-settings-panel/crt-settings-panel.component';
 export * from './lib/content-overlay-container/content-overlay-container.component';
 export * from './lib/video-device-selector/video-device-selector.component';
 export * from './lib/video-controls-toolbar/video-controls-toolbar.component';
+export * from './lib/nav-rail';
 export * from './lib/shared/animation.types';
 export * from './lib/shared/animation-tokens';
 export * from './lib/shared/glassy.types';

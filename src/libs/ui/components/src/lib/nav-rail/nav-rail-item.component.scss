@@ -1,0 +1,60 @@
+// Inherit transition timing from parent nav-rail
+$transition-duration: var(--nav-rail-transition-duration, 250ms);
+$transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
+
+.nav-rail-item {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 16px;
+  cursor: pointer;
+  outline: none;
+  border-radius: 0;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: rgba(var(--glassy-color, 255, 255, 255), 0.15);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight, #00f7ff);
+    outline-offset: -2px;
+  }
+
+  &.active {
+    color: var(--color-highlight, #00f7ff);
+    background-color: rgba(var(--glassy-color, 255, 255, 255), 0.1);
+
+    .item-icon {
+      color: var(--color-highlight, #00f7ff);
+    }
+  }
+
+  .item-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    transition: color 0.15s ease;
+  }
+
+  .item-label {
+    margin-left: 16px;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 0;
+    opacity: 0;
+    transition:
+      max-width $transition-duration $transition-easing,
+      opacity $transition-duration $transition-easing;
+  }
+
+  &.expanded .item-label {
+    max-width: 150px;
+    opacity: 1;
+  }
+}

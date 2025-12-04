@@ -1,0 +1,16 @@
+<lib-scaling-compact-card>
+  <nav class="nav-rail" [class.expanded]="isExpanded()" role="navigation" aria-label="Main navigation">
+    <ul class="nav-rail__list" role="menubar">
+      @for (item of items(); track item.route) {
+        <li role="menuitem">
+          <lib-nav-rail-item
+            [item]="item"
+            [isExpanded]="isExpanded()"
+            [isActive]="isActive(item)"
+            (itemClick)="onItemClick($event)"
+          />
+        </li>
+      }
+    </ul>
+  </nav>
+</lib-scaling-compact-card>

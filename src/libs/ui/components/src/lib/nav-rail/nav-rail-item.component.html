@@ -1,0 +1,15 @@
+<div
+  class="nav-rail-item"
+  [class.active]="isActive()"
+  [class.expanded]="isExpanded()"
+  (click)="onClick()"
+  (keydown.enter)="onClick()"
+  (keydown.space)="onClick()"
+  tabindex="0"
+  role="button"
+  [attr.aria-label]="item().name"
+  [attr.aria-current]="isActive() ? 'page' : null"
+>
+  <mat-icon class="item-icon">{{ item().icon }}</mat-icon>
+  <span class="item-label">{{ item().name }}</span>
+</div>
