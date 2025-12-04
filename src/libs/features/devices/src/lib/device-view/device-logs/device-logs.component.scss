@@ -1,9 +1,24 @@
 @use '@angular/material' as mat;
 
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.device-logs-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 200px;
+}
+
 .logs-content {
-  max-height: 300px;
+  flex: 1;
+  min-height: 100px;
   overflow-y: auto;
-  background: var(--mat-sys-surface-container-low);
+  background: transparent;
 }
 
 .log-line {
@@ -27,6 +42,6 @@
     max-width: 500px;
   }
   .logs-content {
-    max-height: 200px;
+    min-height: 100px;
   }
 }

@@ -1,9 +1,25 @@
+:host {
+  display: block;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
+.device-wrapper {
+  display: flex;
+  justify-content: flex-start;
+  height: 100%;
+  width: 100%;
+}
+
 .device-view {
-  margin: 1.5rem auto;
   display: flex;
   flex-direction: column;
-  align-items: left;
+  flex: 1;
   gap: 1rem;
+  min-height: 0;
+  width: 100%;
+  max-width: 1200px;
 }
 
 .device-list {
@@ -12,15 +28,20 @@
   justify-content: flex-start;
   align-items: flex-start;
   gap: 1rem;
+  width: 100%;
 }
 
 .device-logs {
-  max-width: calc(1000px + 1rem);
+  width: 100%;
   min-width: 300px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .device-toolbar {
-  max-width: calc(1000px + 1rem);
+  width: 100%;
   min-width: 300px;
 }
 

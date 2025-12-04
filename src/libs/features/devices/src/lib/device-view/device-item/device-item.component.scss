@@ -1,5 +1,14 @@
 @use '@angular/material' as mat;
 
+:host {
+  // Half of container width minus half the gap (1rem / 2 = 0.5rem)
+  // This ensures 2 devices fit exactly within the container width with 1rem gap
+  flex: 0 0 calc(50% - 0.5rem);
+  width: calc(50% - 0.5rem);
+  min-width: 300px;
+  box-sizing: border-box;
+}
+
 .device-content {
   display: flex;
   flex-direction: row;
@@ -27,6 +36,12 @@
 }
 
 @media (max-width: 500px) {
+  :host {
+    width: 100%;
+    max-width: 100%;
+    min-width: 200px;
+  }
+
   .device-content {
     display: flex;
     flex-direction: column;
