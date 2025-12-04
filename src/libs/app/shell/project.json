@@ -9,6 +9,12 @@
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint"
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "options": {
+        "reportsDirectory": "../../../coverage/libs/app/shell"
+      }
     }
   }
 }

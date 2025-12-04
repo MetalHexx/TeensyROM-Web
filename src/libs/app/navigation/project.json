@@ -8,6 +8,12 @@
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint"
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "options": {
+        "configFile": "libs/app/navigation/vite.config.mts"
+      }
     }
   }
 }

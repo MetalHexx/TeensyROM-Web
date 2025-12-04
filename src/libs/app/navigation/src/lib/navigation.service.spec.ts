@@ -62,4 +62,66 @@ describe('NavService', () => {
     expect(router.navigate).not.toHaveBeenCalled();
     expect(service.isNavOpen()).toBe(true);
   });
+
+  describe('expansion state', () => {
+    it('should have isExpanded initialized to false', () => {
+      expect(service.isExpanded()).toBe(false);
+    });
+
+    it('should expand nav when expandNav is called', () => {
+      service.expandNav();
+      expect(service.isExpanded()).toBe(true);
+    });
+
+    it('should be idempotent when expandNav is called multiple times', () => {
+      service.expandNav();
+      service.expandNav();
+      expect(service.isExpanded()).toBe(true);
+    });
+
+    it('should collapse nav when collapseNav is called and not pinned', () => {
+      service.expandNav();
+      service.collapseNav();
+      expect(service.isExpanded()).toBe(false);
+    });
+
+    it('should not collapse nav when collapseNav is called and pinned', () => {
+      service.expandNav();
+      service.togglePin(); // Pin it
+      service.collapseNav();
+      expect(service.isExpanded()).toBe(true);
+    });
+  });
+
+  describe('pin state', () => {
+    it('should have isPinned initialized to false', () => {
+      expect(service.isPinned()).toBe(false);
+    });
+
+    it('should toggle isPinned from false to true', () => {
+      service.togglePin();
+      expect(service.isPinned()).toBe(true);
+    });
+
+    it('should toggle isPinned from true to false', () => {
+      service.togglePin(); // false -> true
+      service.togglePin(); // true -> false
+      expect(service.isPinned()).toBe(false);
+    });
+
+    it('should expand nav when pinning if nav is collapsed', () => {
+      expect(service.isExpanded()).toBe(false);
+      service.togglePin();
+      expect(service.isPinned()).toBe(true);
+      expect(service.isExpanded()).toBe(true);
+    });
+
+    it('should not collapse nav when unpinning', () => {
+      service.expandNav();
+      service.togglePin(); // Pin
+      service.togglePin(); // Unpin
+      expect(service.isPinned()).toBe(false);
+      expect(service.isExpanded()).toBe(true);
+    });
+  });
 });

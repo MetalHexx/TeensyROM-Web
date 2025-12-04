@@ -9,8 +9,8 @@ $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 
   padding: 0 16px;
   cursor: pointer;
   outline: none;
-  border-radius: 0;
-  transition: background-color 0.15s ease;
+  border-radius: var(--border-radius-md, 10px);
+  transition: background-color 0.75s ease;
 
   &:hover {
     background-color: rgba(var(--glassy-color, 255, 255, 255), 0.15);

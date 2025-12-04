@@ -2,9 +2,10 @@
   display: block;
 }
 
-app-nav-button,
-.nav-toggle-btn {
-  margin-left: -7px;
+// Hidden: Nav rail provides navigation, hamburger menu no longer needed.
+// Preserved for potential future mobile implementation.
+lib-nav-button {
+  display: none;
 }
 
 mat-toolbar {

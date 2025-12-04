@@ -1,15 +1,14 @@
 import { Component, computed, inject, Signal, effect } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
-import { MatSidenavModule } from '@angular/material/sidenav';
 import { HeaderComponent } from '../components/header/header.component';
-import { NavigationService } from '@teensyrom-nx/app/navigation';
-import { NavMenuComponent } from '../components/nav-menu/nav-menu.component';
+import { NavigationService, NAV_ITEMS } from '@teensyrom-nx/app/navigation';
 import { AlertContainerComponent } from '@teensyrom-nx/app/alerts';
 import { filter, map, mergeMap } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { DeviceStore } from '@teensyrom-nx/application';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BusyDialogComponent } from '../components/busy-dialog/busy-dialog.component';
+import { NavRailComponent, NavRailItem } from '@teensyrom-nx/ui/components';
 
 @Component({
   selector: 'lib-layout',
@@ -17,9 +16,8 @@ import { BusyDialogComponent } from '../components/busy-dialog/busy-dialog.compo
   imports: [
     RouterOutlet,
     HeaderComponent,
-    NavMenuComponent,
-    MatSidenavModule,
     AlertContainerComponent,
+    NavRailComponent,
   ],
   templateUrl: './layout.component.html',
   styleUrls: ['./layout.component.scss'],
@@ -35,6 +33,25 @@ export class LayoutComponent {
   showFindDeviceDialog = computed(() => this.deviceStore.isLoading());
   private indexDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
   private findDeviceDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
+
+  /** Menu items for the nav rail */
+  readonly menuItems: NavRailItem[] = NAV_ITEMS;
+
+  /** Current route URL from router events */
+  private readonly routeUrl = toSignal(
+    this.router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      map((event) => event.urlAfterRedirects)
+    ),
+    { initialValue: this.router.url }
+  );
+
+  /** Active route segment for nav rail highlighting */
+  readonly activeRoute = computed(() => {
+    const url = this.routeUrl();
+    // Extract first path segment (e.g., '/player/browse' → 'player')
+    return url?.split('/')[1] ?? '';
+  });
 
   constructor() {
     this.initBusyDialog(
@@ -88,5 +105,10 @@ export class LayoutComponent {
         dialogRef = null;
       }
     });
+  }
+
+  /** Handle nav rail item click - navigate to the item's route */
+  onNavItemClick(item: NavRailItem): void {
+    this.router.navigate([item.route]);
   }
 }

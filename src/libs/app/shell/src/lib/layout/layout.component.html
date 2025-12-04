@@ -1,20 +1,17 @@
 <lib-header></lib-header>
 
-<mat-sidenav-container class="sidenav-container">
-  <mat-sidenav
-    class="custom-sidenav glassy"
-    mode="over"
-    [opened]="navService.isNavOpen()"
-    (closedStart)="navService.closeNav()"
-  >
-    <lib-nav-menu></lib-nav-menu>
-  </mat-sidenav>
+<div class="layout-container">
+  <lib-nav-rail
+    [items]="menuItems"
+    [activeRoute]="activeRoute()"
+    (itemClick)="onNavItemClick($event)"
+  ></lib-nav-rail>
 
-  <mat-sidenav-content class="router-container">
+  <div class="router-container">
     <div class="router-content">
       <router-outlet />
     </div>
-  </mat-sidenav-content>
-</mat-sidenav-container>
+  </div>
+</div>
 
 <lib-alert-container></lib-alert-container>

@@ -16,12 +16,19 @@ import {
 } from '@teensyrom-nx/domain';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
+import { Component } from '@angular/core';
+import { NAV_ITEMS } from '@teensyrom-nx/app/navigation';
+import { By } from '@angular/platform-browser';
 import '../../test-setup';
+
+@Component({ standalone: true, template: '<p>Test</p>' })
+class TestComponent {}
 
 describe('LayoutComponent', () => {
   let component: LayoutComponent;
   let fixture: ComponentFixture<LayoutComponent>;
+  let router: Router;
 
   beforeEach(async () => {
     const mockDeviceService: Partial<IDeviceService> = {
@@ -57,7 +64,12 @@ describe('LayoutComponent', () => {
       imports: [LayoutComponent],
       providers: [
         provideNoopAnimations(),
-        provideRouter([]),
+        provideRouter([
+          { path: 'player', component: TestComponent },
+          { path: 'player/:subpath', component: TestComponent },
+          { path: 'devices', component: TestComponent },
+          { path: 'settings', component: TestComponent },
+        ]),
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: DEVICE_STORAGE_SERVICE, useValue: mockStorageService },
         { provide: VERSION_SERVICE, useValue: mockVersionService },
@@ -65,6 +77,7 @@ describe('LayoutComponent', () => {
       ],
     }).compileComponents();
 
+    router = TestBed.inject(Router);
     fixture = TestBed.createComponent(LayoutComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -72,5 +85,46 @@ describe('LayoutComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('nav rail integration', () => {
+    it('should render nav rail component', () => {
+      const navRail = fixture.debugElement.query(By.css('lib-nav-rail'));
+      expect(navRail).toBeTruthy();
+    });
+
+    it('should pass menu items to nav rail', () => {
+      expect(component.menuItems).toBe(NAV_ITEMS);
+      expect(component.menuItems.length).toBeGreaterThan(0);
+    });
+
+    it('should have active route initialized from current router url', () => {
+      // Initial route is empty or root
+      expect(component.activeRoute()).toBeDefined();
+    });
+
+    it('should update active route after navigation', async () => {
+      await router.navigate(['player']);
+      fixture.detectChanges();
+
+      expect(component.activeRoute()).toBe('player');
+    });
+
+    it('should navigate when onNavItemClick is called', () => {
+      const navigateSpy = vi.spyOn(router, 'navigate');
+
+      component.onNavItemClick({ name: 'Devices', icon: 'devices', route: 'devices' });
+
+      expect(navigateSpy).toHaveBeenCalledWith(['devices']);
+    });
+
+    it('should extract first path segment for nested routes', async () => {
+      // Navigate to a nested path
+      await router.navigate(['player', 'browse']);
+      fixture.detectChanges();
+
+      // Should only get 'player' from '/player/browse'
+      expect(component.activeRoute()).toBe('player');
+    });
   });
 });

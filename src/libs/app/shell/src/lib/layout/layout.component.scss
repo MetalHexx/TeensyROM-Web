@@ -92,22 +92,19 @@ lib-header {
   flex-shrink: 0;
 }
 
-.sidenav-container {
+.layout-container {
   flex: 1;
+  display: flex;
   overflow: hidden;
   background: transparent; // Let synthwave show through
+  position: relative;
+  padding: 1rem; // Equal padding on all sides
+  gap: 1rem; // Space between nav rail and content
 }
 
-mat-sidenav-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: transparent; // Let synthwave show through
-}
-
-lib-nav-menu {
-  flex: 1;
-  margin-top: 5px;
+lib-nav-rail {
+  flex-shrink: 0;
+  z-index: 100; // Above content, below modals (1000+)
 }
 
 .router-container {
@@ -119,7 +116,7 @@ lib-nav-menu {
 
   .router-content {
     flex: 1;
-    padding: 1rem;
+    padding: 0; // Views handle their own padding if needed
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -136,11 +133,5 @@ lib-nav-menu {
       flex-shrink: 0;
     }
   }
-}
-.custom-sidenav {
-  width: 220px;
-  height: 100%;
-  border-radius: 0 !important;
-  @include mat.elevation(6);
 }
 

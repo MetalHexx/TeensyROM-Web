@@ -24,8 +24,8 @@ Create a modern, floating navigation rail that provides persistent access to app
 
 ## 📋 Implementation Phases
 
-<details open>
-<summary><h3>Phase 1: Core Nav Rail Component</h3></summary>
+<details>
+<summary><h3>Phase 1: Core Nav Rail Component ✅ COMPLETE</h3></summary>
 
 ### Objective
 
@@ -33,30 +33,40 @@ Create the foundational `lib-nav-rail` component with hover-expand/collapse beha
 
 ### Key Deliverables
 
-- [ ] New `lib-nav-rail` component in `libs/ui/components`
-- [ ] Hover detection with configurable delay (150-200ms)
-- [ ] Smooth width transition animation (56px ↔ ~200px)
-- [ ] Active route highlighting using `--color-highlight` token
-- [ ] Wrapped in `lib-scaling-compact-card` for glassy aesthetic
+- [x] New `lib-nav-rail` component in `libs/ui/components`
+- [x] Hover detection with configurable delay (150ms default)
+- [x] Smooth width transition animation (56px ↔ 200px)
+- [x] Active route highlighting using `--color-highlight` token
+- [x] Wrapped in `lib-scaling-compact-card` for glassy aesthetic
 
-### High-Level Tasks
+### Completed Tasks
 
-1. **Create Component Structure**: Set up the nav rail component with inputs for menu items, collapsed/expanded state
-2. **Implement Hover Logic**: Add mouseenter/mouseleave handlers with debounced signals for delayed transitions
-3. **Style the Rail**: CSS for collapsed/expanded states, width transitions, icon centering, label reveal
-4. **Add Active Route Indicator**: Highlight current route using existing style tokens
-5. **Write Unit Tests**: Test hover behavior, state transitions, rendering
+1. **Task 01-001: Component Structure** - Created NavRailComponent with NavRailItem interface, inputs/outputs
+2. **Task 01-002: Hover Logic** - Implemented debounced expand/collapse with configurable delay
+3. **Task 01-003: Item Component** - Created NavRailItemComponent for individual items with accessibility
+4. **Task 01-004: Styling** - CSS transitions with design tokens, 250ms animation duration
 
-### Open Questions for Phase 1
+### Phase 1 Decisions
 
-- **Transition Easing**: Should we use the same easing curve as other animations in the app, or a custom one for this interaction?
+| Decision | Resolution |
+|----------|------------|
+| Transition Easing | Material Design cubic-bezier(0.4, 0, 0.2, 1) |
+| Transition Duration | 250ms for smooth feel |
+| NavRailItem Payload | Generic `<T>` type for flexibility |
+| Active Route Matching | Exact match (parent handles logic) |
+| Component Decoupling | Fully decoupled from router/app concerns |
+
+### Test Results
+
+- **52 tests passing** (20 item component + 32 parent component)
+- All linting passes
 
 </details>
 
 ---
 
 <details open>
-<summary><h3>Phase 2: Layout Integration & Navigation Service</h3></summary>
+<summary><h3>Phase 2: Layout Integration & Navigation Service 🚧 IN PROGRESS</h3></summary>
 
 ### Objective
 
@@ -66,21 +76,30 @@ Integrate the nav rail into the app layout, update the navigation service to sup
 
 - [ ] Nav rail integrated into `LayoutComponent` 
 - [ ] Navigation service updated with expansion state signals
-- [ ] Hamburger button removed or repurposed
+- [ ] Hamburger button hidden (preserved for mobile)
 - [ ] Proper z-index layering with content
 - [ ] Equal margins on all sides of the floating rail
 
-### High-Level Tasks
+### Tasks
 
-1. **Update Layout Template**: Replace `mat-sidenav` with `lib-nav-rail` positioned absolutely
-2. **Extend Navigation Service**: Add signals for `isExpanded`, `isPinned` states
-3. **Handle Header Changes**: Remove or hide the nav toggle button
-4. **Position and Layer**: CSS for absolute positioning with proper margins and z-index
-5. **Test Integration**: Verify layout works across different viewport sizes
+| Task ID | Name | Status | Description |
+|---------|------|--------|-------------|
+| TASK-02-001 | Navigation Service | ⬜ Not Started | Add expansion/pin signals and methods |
+| TASK-02-002 | Layout Template | ⬜ Not Started | Replace mat-sidenav with lib-nav-rail |
+| TASK-02-003 | Layout Styling | ⬜ Not Started | Position rail with margins and z-index |
+| TASK-02-004 | Header Changes | ⬜ Not Started | Hide hamburger button via CSS |
+| TASK-02-005 | Integration Testing | ⬜ Not Started | Verify complete integration |
+
+### Task Dependencies
+
+```
+TASK-02-001 (Service) ──┐
+                        ├──▶ TASK-02-002 (Template) ──▶ TASK-02-003 (Styling) ──▶ TASK-02-004 (Header) ──▶ TASK-02-005 (Testing)
+```
 
 ### Open Questions for Phase 2
 
-- **Header Button**: Should the hamburger button be completely removed, or hidden with CSS for potential mobile use later?
+- **Header Button**: ✅ Resolved: Hide with CSS (not remove) for future mobile use
 
 </details>
 

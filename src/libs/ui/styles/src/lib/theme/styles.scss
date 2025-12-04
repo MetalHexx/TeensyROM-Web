@@ -29,6 +29,7 @@ body {
 html {
   color-scheme: light;
   --color-primary: #890089;
+  --color-primary-rgb: 137, 0, 137;
   --color-primary-bright: #b333b3;
   --color-success: #86c691;
   --color-error: #cc666c;
@@ -56,6 +57,12 @@ html {
   --font-weight-semibold: 600; // strong emphasis, subheadings
   --font-weight-bold: 700; // maximum emphasis, headings
 
+  // Design Tokens - Border Radius
+  --border-radius-sm: 6px; // small elements, chips, badges
+  --border-radius-md: 10px; // buttons, list items, nav items
+  --border-radius-lg: 16px; // cards, dialogs, panels
+  --border-radius-xl: 24px; // large cards, hero sections
+
   @include mat.theme(
     (
       color: mat.$azure-palette,
@@ -73,6 +80,7 @@ html {
 html.dark-mode {
   color-scheme: dark;
   --color-primary: #890089;
+  --color-primary-rgb: 137, 0, 137;
   --color-primary-bright: #b333b3;
   --color-success: #6fdc8c;
   --color-error: #ff6f6f;
@@ -96,6 +104,12 @@ html.dark-mode {
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
+
+  // Design Tokens - Border Radius (same values as light mode)
+  --border-radius-sm: 6px;
+  --border-radius-md: 10px;
+  --border-radius-lg: 16px;
+  --border-radius-xl: 24px;
 
   @include mat.theme(
     (
@@ -166,6 +180,31 @@ body {
   background-color: rgba(0, 0, 0, 0.4) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+
+@mixin glassy-primary-effect {
+  // Glassy effect using primary brand color with semi-transparency
+  // Ideal for headers and branded UI elements that need blur while
+  // maintaining the primary color identity
+  background-color: rgba(var(--color-primary-rgb), 0.85) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+// ─────────────────────────────────────────────
+//  Interactive Element Effects
+// ─────────────────────────────────────────────
+
+@mixin bounce-hover($scale: 1.05, $duration: 0.2s) {
+  transition: transform $duration cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  &:hover {
+    transform: scale($scale);
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
 }
 
 // ─────────────────────────────────────────────

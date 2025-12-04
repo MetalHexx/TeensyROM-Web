@@ -7,6 +7,23 @@
   height: 100%;
 }
 
+// Wrapper forces the card to stretch to full height
+.nav-rail-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  // Force all nested card components to stretch
+  lib-scaling-compact-card,
+  ::ng-deep lib-scaling-container,
+  ::ng-deep lib-compact-card-layout,
+  ::ng-deep .compact-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 .nav-rail {
   display: flex;
   flex-direction: column;

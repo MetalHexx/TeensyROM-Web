@@ -118,6 +118,38 @@ Font weight tokens ensure consistent text emphasis:
 }
 ```
 
+#### Border Radius Tokens
+
+Border radius tokens provide consistent rounded corners across UI elements:
+
+| Token | Value | Use Case |
+|-------|-------|----------|
+| `--border-radius-sm` | 6px | Small elements, chips, badges |
+| `--border-radius-md` | 10px | Buttons, list items, nav items |
+| `--border-radius-lg` | 16px | Cards, dialogs, panels |
+| `--border-radius-xl` | 24px | Large cards, hero sections |
+
+**Usage Example:**
+
+```scss
+.nav-item {
+  border-radius: var(--border-radius-md);
+}
+
+.card {
+  border-radius: var(--border-radius-lg);
+}
+
+.chip {
+  border-radius: var(--border-radius-sm);
+}
+```
+
+**Used In:**
+
+- [`nav-rail-item.component.scss`](../libs/ui/components/src/lib/nav-rail/nav-rail-item.component.scss) - Nav rail items use `--border-radius-md`
+- Global `.glassy-card` class - Uses Material's `--mat-sys-corner-large` (similar to `--border-radius-lg`)
+
 ### Using Design Tokens
 
 **Best Practices:**
@@ -497,6 +529,46 @@ Design tokens are used by reusable components like [IconLabelComponent](COMPONEN
 
 - [Glassy utility classes](#glassy-effect-variations) - All glassy utility classes use these mixins
 - [`selectable-item` mixin](#mixin-selectable-item) - Uses `glassy-subtle-effect` for hover and `glassy-strong-effect` for selected states
+
+---
+
+### `@mixin bounce-hover`
+
+**Purpose**: Provides a sleek, springy scale effect on hover for interactive elements like nav items, buttons, and cards. Creates a polished, modern feel with satisfying tactile feedback.
+
+**Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `$scale` | 1.05 | Scale factor on hover (1.05 = 5% larger) |
+| `$duration` | 0.2s | Animation duration |
+
+**Usage Example:**
+
+```scss
+@use 'libs/ui/styles/src/lib/theme/styles' as styles;
+
+.my-interactive-item {
+  @include styles.bounce-hover;
+}
+
+// Custom scale and duration
+.my-card {
+  @include styles.bounce-hover($scale: 1.08, $duration: 0.3s);
+}
+```
+
+**Visual Effect:**
+
+- **Hover**: Element scales up with a springy bounce (uses `cubic-bezier(0.34, 1.56, 0.64, 1)` for overshoot effect)
+- **Active/Click**: Element scales down slightly (0.95) for tactile press feedback
+- Smooth transition creates a satisfying, polished interaction
+
+**Used In:**
+
+- [`nav-rail-item.component.scss`](../libs/ui/components/src/lib/nav-rail/nav-rail-item.component.scss) - Nav rail items bounce on hover
+
+**Best Practice**: Use for navigation items, icon buttons, and interactive cards where you want to draw attention and provide clear hover feedback. The bounce effect is subtle enough for professional UIs but adds a touch of delight.
 
 ---
 
