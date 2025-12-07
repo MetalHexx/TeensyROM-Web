@@ -48,3 +48,8 @@
 ::ng-deep lib-video-stream .video-stream-container {
   background-color: transparent;
 }
+
+// Force video element to use contain (no stretching)
+::ng-deep lib-video-stream .video-stream-container video {
+  object-fit: contain !important;
+}

@@ -53,11 +53,11 @@ describe('CrtSettingsPanelComponent', () => {
   });
 
   describe('Slider Rendering Based on Config', () => {
-    it('should render all 8 sliders with default config', () => {
+    it('should render all 9 sliders with default config', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(8);
+      expect(sliders.length).toBe(9);
     });
 
     it('should render only scanline sliders when config.showScanlines is true only', () => {
@@ -147,7 +147,7 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(7); // 2 scanline + 1 vignette + 4 color filters
+      expect(sliders.length).toBe(8); // 2 scanline + 1 vignette + 4 color filters + 1 phosphor
 
       const labels = fixture.nativeElement.querySelectorAll('.control-label') as NodeListOf<Element>;
       const labelTexts = Array.from(labels).map((l) => l.textContent?.trim());

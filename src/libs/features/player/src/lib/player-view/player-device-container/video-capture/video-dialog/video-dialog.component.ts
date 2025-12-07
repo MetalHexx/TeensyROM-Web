@@ -87,6 +87,15 @@ export class VideoDialogComponent implements OnDestroy {
     brightness: 1.50,
     saturation: 1.30,
     hue: 0,
+    renderMode: 'webgl',
+    // Advanced effects (disabled by default)
+    phosphorPattern: 'none',
+    phosphorIntensity: 0,
+    bloomEnabled: false,
+    bloomIntensity: 0.3,
+    bloomRadius: 3,
+    barrelDistortion: 0,
+    chromaticAberration: 0,
   });
 
   /** CRT config - full features for video dialog */

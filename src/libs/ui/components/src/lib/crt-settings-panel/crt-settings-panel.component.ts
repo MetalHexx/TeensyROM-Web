@@ -15,113 +15,31 @@ import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-
 import { IconButtonComponent } from '../icon-button/icon-button.component';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
 import { DropdownMenuItemComponent } from '../dropdown-menu/dropdown-menu-item.component';
-import { CrtSettings, CrtSettingsConfig } from '../crt-effect-wrapper/crt-settings.interface';
+import { CrtSettings, CrtSettingsConfig, PhosphorPatternType } from '../crt-effect-wrapper/crt-settings.interface';
 import {
   DEFAULT_CRT_SETTINGS,
   DEFAULT_CRT_CONFIG,
   CRT_PRESET_LABELS,
+  CRT_PRESETS,
   CrtPresetName,
 } from '../crt-effect-wrapper/crt-settings.defaults';
+import { CrtRenderer } from '../crt-effect-wrapper/webgl/crt-renderer';
+import {
+  NumericCrtSettingsKey,
+  SliderConfig,
+  SCANLINE_SLIDERS,
+  VIGNETTE_SLIDER,
+  CURVATURE_SLIDER,
+  COLOR_FILTER_SLIDERS,
+  PHOSPHOR_SLIDER,
+  PHOSPHOR_PATTERN_OPTIONS,
+  PhosphorPatternOption,
+  RENDER_MODE_OPTIONS,
+  RenderModeOption,
+} from './crt-slider-configs';
 
-// Re-export CrtPresetName for consumers
-export { CrtPresetName };
-
-/**
- * Slider configuration metadata for each CRT setting.
- * Matches the exact ranges from the original video-dialog implementation.
- */
-interface SliderConfig {
-  key: keyof CrtSettings;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  format: 'decimal' | 'px' | 'percentage' | 'deg';
-  decimalPlaces?: number;
-}
-
-/** Scanline slider configurations */
-const SCANLINE_SLIDERS: SliderConfig[] = [
-  {
-    key: 'scanlineIntensity',
-    label: 'Scanline Intensity',
-    min: 0,
-    max: 1.0,
-    step: 0.01,
-    format: 'percentage',
-    decimalPlaces: 0,
-  },
-  {
-    key: 'scanlineSize',
-    label: 'Scanline Size',
-    min: 1.0,
-    max: 6.0,
-    step: 0.1,
-    format: 'px',
-    decimalPlaces: 1,
-  },
-];
-
-/** Vignette slider configuration */
-const VIGNETTE_SLIDER: SliderConfig = {
-  key: 'vignetteStrength',
-  label: 'Vignette',
-  min: 0,
-  max: 2,
-  step: 0.05,
-  format: 'percentage',
-  decimalPlaces: 0,
-};
-
-/** Curvature slider configuration */
-const CURVATURE_SLIDER: SliderConfig = {
-  key: 'screenCurvature',
-  label: 'Screen Curvature',
-  min: 0,
-  max: 115,
-  step: 5,
-  format: 'px',
-};
-
-/** Color filter slider configurations */
-const COLOR_FILTER_SLIDERS: SliderConfig[] = [
-  {
-    key: 'contrast',
-    label: 'Contrast',
-    min: 0.8,
-    max: 1.5,
-    step: 0.05,
-    format: 'percentage',
-    decimalPlaces: 0,
-  },
-  {
-    key: 'brightness',
-    label: 'Brightness',
-    min: 0.8,
-    max: 2.0,
-    step: 0.05,
-    format: 'percentage',
-    decimalPlaces: 0,
-  },
-  {
-    key: 'saturation',
-    label: 'Saturation',
-    min: 0.8,
-    max: 1.5,
-    step: 0.05,
-    format: 'percentage',
-    decimalPlaces: 0,
-  },
-  {
-    key: 'hue',
-    label: 'Hue',
-    min: -60,
-    max: 60,
-    step: 1,
-    format: 'deg',
-    decimalPlaces: 0,
-  },
-];
+// Re-export CrtPresetName and CRT_PRESETS for consumers
+export { CrtPresetName, CRT_PRESETS };
 
 /**
  * CRT Settings Panel Component
@@ -235,9 +153,19 @@ export class CrtSettingsPanelComponent {
   protected readonly vignetteSlider = VIGNETTE_SLIDER;
   protected readonly curvatureSlider = CURVATURE_SLIDER;
   protected readonly colorFilterSliders = COLOR_FILTER_SLIDERS;
+  protected readonly phosphorSlider = PHOSPHOR_SLIDER;
+  protected readonly phosphorPatternOptions = PHOSPHOR_PATTERN_OPTIONS;
+  protected readonly renderModeOptions = RENDER_MODE_OPTIONS;
 
   /** Available preset names for the preset menu */
-  protected readonly presetNames: CrtPresetName[] = ['full', 'standard', 'small', 'none'];
+  protected readonly presetNames: CrtPresetName[] = [
+    'fullscreen-css',
+    'fullscreen-webgl',
+    'dialog-css',
+    'dialog-webgl',
+    'image-css',
+    'image-webgl',
+  ];
 
   // ─────────────────────────────────────────────────────────────────────────
   // Computed Properties
@@ -248,7 +176,7 @@ export class CrtSettingsPanelComponent {
    */
   protected readonly hasAnySliders = computed(() => {
     const c = this.config();
-    return c.showScanlines || c.showVignette || c.showCurvature || c.showColorFilters;
+    return c.showScanlines || c.showVignette || c.showCurvature || c.showColorFilters || c.showPhosphor;
   });
 
   /**
@@ -261,6 +189,31 @@ export class CrtSettingsPanelComponent {
     return additionalClass ? `${baseClasses} ${additionalClass}` : baseClasses;
   });
 
+  /**
+   * Computed - which preset name matches current settings (if any).
+   * Returns null if settings don't exactly match any preset.
+   */
+  protected readonly currentPresetName = computed<CrtPresetName | null>(() => {
+    const current = this.settings();
+    const presetEntries = Object.entries(CRT_PRESETS) as Array<[CrtPresetName, CrtSettings]>;
+    
+    for (const [name, preset] of presetEntries) {
+      if (JSON.stringify(current) === JSON.stringify(preset)) {
+        return name;
+      }
+    }
+    return null;
+  });
+
+  /**
+   * Whether phosphor controls should be visible based on render mode.
+   * Phosphor patterns are WebGL-only, so hide when CSS mode is selected.
+   */
+  protected readonly shouldShowPhosphor = computed(() => {
+    const mode = this.settings().renderMode;
+    return this.config().showPhosphor && mode !== 'css';
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
   // Event Handlers
   // ─────────────────────────────────────────────────────────────────────────
@@ -269,7 +222,7 @@ export class CrtSettingsPanelComponent {
    * Handles slider value changes.
    * Emits updated settings with the changed value.
    */
-  protected onSliderChange(key: keyof CrtSettings, value: number): void {
+  protected onSliderChange(key: NumericCrtSettingsKey, value: number): void {
     const updatedSettings: CrtSettings = {
       ...this.settings(),
       [key]: value,
@@ -289,6 +242,48 @@ export class CrtSettingsPanelComponent {
    */
   protected onPresetSelect(presetName: CrtPresetName): void {
     this.presetSelected.emit(presetName);
+  }
+
+  /**
+   * Handles phosphor pattern selection.
+   */
+  protected onPhosphorPatternChange(pattern: PhosphorPatternOption): void {
+    const updatedSettings: CrtSettings = {
+      ...this.settings(),
+      phosphorPattern: pattern as PhosphorPatternType,
+    };
+    this.settingsChange.emit(updatedSettings);
+  }
+
+  /**
+   * Handles render mode toggle (CSS <-> WebGL).
+   */
+  protected onRenderModeToggle(): void {
+    const currentMode = this.settings().renderMode;
+    const newMode = currentMode === 'css' ? 'webgl' : 'css';
+    const updatedSettings: CrtSettings = {
+      ...this.settings(),
+      renderMode: newMode,
+    };
+    this.settingsChange.emit(updatedSettings);
+  }
+
+  /**
+   * Gets the label for the current phosphor pattern.
+   */
+  protected getPhosphorPatternLabel(): string {
+    const pattern = this.settings().phosphorPattern;
+    const option = PHOSPHOR_PATTERN_OPTIONS.find(o => o.value === pattern);
+    return option?.label ?? 'Unknown';
+  }
+
+  /**
+   * Gets the label for the current render mode.
+   */
+  protected getRenderModeLabel(): string {
+    const mode = this.settings().renderMode;
+    const option = RENDER_MODE_OPTIONS.find(o => o.value === mode);
+    return option?.label ?? 'Unknown';
   }
 
   /**

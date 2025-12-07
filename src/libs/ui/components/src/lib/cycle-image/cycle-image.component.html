@@ -10,17 +10,17 @@
   @if (!isSimpleMode()) {
   <!-- Blurred background - previous -->
   @if (showPrevious() && previousImage()) {
-  <img [src]="previousImage()" alt="" class="background-image previous" />
+  <img [src]="previousImage()" alt="" class="background-image previous" crossorigin="anonymous" />
   }
 
   <!-- Blurred background - current -->
   @if (currentImage()) {
-  <img [src]="currentImage()" alt="" class="background-image current" />
+  <img [src]="currentImage()" alt="" class="background-image current" crossorigin="anonymous" />
   } }
 
   <!-- Previous image - fades out -->
   @if (showPrevious() && previousImage()) {
-  <img [src]="previousImage()" alt="Previous image" class="carousel-image previous" />
+  <img [src]="previousImage()" alt="Previous image" class="carousel-image previous" crossorigin="anonymous" />
   }
 
   <!-- Current image - always visible -->
@@ -29,6 +29,7 @@
     [src]="currentImage()"
     alt="Current image"
     class="carousel-image current"
+    crossorigin="anonymous"
     [@fadeIn]="animationKey()"
   />
   }

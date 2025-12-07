@@ -292,7 +292,7 @@ describe('VideoDialogComponent', () => {
 
       component.onCrtPresetSelected('standard');
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS.standard);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS['dialog-webgl']);
     });
 
     it('should apply full preset correctly', () => {
@@ -300,7 +300,7 @@ describe('VideoDialogComponent', () => {
 
       component.onCrtPresetSelected('full');
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS.full);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS['fullscreen-webgl']);
     });
   });
 

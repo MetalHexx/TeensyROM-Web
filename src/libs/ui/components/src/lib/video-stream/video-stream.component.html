@@ -4,7 +4,8 @@
     autoplay
     muted
     playsinline
-    [style.object-fit]="objectFit()"
+    class="video-element"
+    [style.objectFit]="objectFit()"
     (playing)="onVideoPlaying()"
     (error)="onVideoError($event)"
     aria-label="Video stream display"

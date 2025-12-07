@@ -39,7 +39,7 @@ export class FileImageComponent {
 
   // File-image specific default CRT settings (brightness at 100%, curvature locked to 16px)
   private readonly fileImageDefaultSettings: CrtSettings = {
-    ...CRT_PRESETS.full,
+    ...CRT_PRESETS['image-webgl'],
     brightness: 1.0,
     screenCurvature: 16,
     scanlineSize: 1.2,

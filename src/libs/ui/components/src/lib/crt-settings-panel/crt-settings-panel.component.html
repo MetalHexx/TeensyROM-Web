@@ -35,6 +35,50 @@
     </div>
   </div>
 
+  <!-- Render Mode Toggle -->
+  <div class="crt-control-group render-mode-toggle">
+    <span class="control-label">Render Mode</span>
+    <button 
+      class="toggle-button"
+      [class.css-mode]="settings().renderMode === 'css'"
+      [class.webgl-mode]="settings().renderMode === 'webgl'"
+      (click)="onRenderModeToggle()"
+      [matTooltip]="'Click to switch to ' + (settings().renderMode === 'css' ? 'WebGL (High Quality)' : 'CSS (Basic)')"
+      type="button">
+      <mat-icon>{{ settings().renderMode === 'css' ? 'image' : 'grid_on' }}</mat-icon>
+      <span class="mode-label">{{ getRenderModeLabel() }}</span>
+    </button>
+  </div>
+
+  <!-- Preset Selector -->
+  <div class="crt-control-group preset-selector">
+    <span class="control-label">Preset</span>
+    <lib-dropdown-menu #presetSelectorDropdown>
+      <button 
+        class="preset-button" 
+        (click)="presetSelectorDropdown.toggle()"
+        type="button">
+        <span class="preset-name">{{ currentPresetName() ? getPresetLabel(currentPresetName()!) : 'Custom' }}</span>
+        <mat-icon>arrow_drop_down</mat-icon>
+      </button>
+      <div dropdown-content>
+        @for (preset of presetNames; track preset) {
+          <lib-dropdown-menu-item
+            [testId]="'preset-selector-' + preset"
+            [class.active]="currentPresetName() === preset"
+            (itemClick)="onPresetSelect(preset)">
+            <div class="preset-option">
+              <span class="preset-option-label">{{ getPresetLabel(preset) }}</span>
+              @if (currentPresetName() === preset) {
+                <mat-icon class="checkmark">check</mat-icon>
+              }
+            </div>
+          </lib-dropdown-menu-item>
+        }
+      </div>
+    </lib-dropdown-menu>
+  </div>
+
   <!-- Scanline Controls -->
   @if (config().showScanlines) {
     @for (slider of scanlineSliders; track slider.key) {
@@ -117,6 +161,50 @@
         <span class="control-value">{{ formatValue(settings()[slider.key], slider) }}</span>
       </div>
     }
+  }
+
+  <!-- Phosphor Controls (WebGL only) -->
+  @if (shouldShowPhosphor()) {
+    <!-- Phosphor Pattern Selector -->
+    <div class="crt-control-group pattern-selector">
+      <span class="control-label">Phosphor Pattern</span>
+      <lib-dropdown-menu #patternDropdown>
+        <button 
+          class="pattern-button" 
+          (click)="patternDropdown.toggle()"
+          type="button">
+          {{ getPhosphorPatternLabel() }}
+          <mat-icon>arrow_drop_down</mat-icon>
+        </button>
+        <div dropdown-content>
+          @for (option of phosphorPatternOptions; track option.value) {
+            <lib-dropdown-menu-item
+              [testId]="'phosphor-' + option.value"
+              (itemClick)="onPhosphorPatternChange(option.value)">
+              {{ option.label }}
+            </lib-dropdown-menu-item>
+          }
+        </div>
+      </lib-dropdown-menu>
+    </div>
+
+    <!-- Phosphor Intensity Slider -->
+    <div class="crt-control-group">
+      <span class="control-label">{{ phosphorSlider.label }}</span>
+      <mat-slider
+        [min]="phosphorSlider.min"
+        [max]="phosphorSlider.max"
+        [step]="phosphorSlider.step"
+        discrete
+      >
+        <input
+          matSliderThumb
+          [ngModel]="settings()[phosphorSlider.key]"
+          (ngModelChange)="onSliderChange(phosphorSlider.key, $event)"
+        />
+      </mat-slider>
+      <span class="control-value">{{ formatValue(settings()[phosphorSlider.key], phosphorSlider) }}</span>
+    </div>
   }
 
   <!-- Empty state when no sliders are shown -->

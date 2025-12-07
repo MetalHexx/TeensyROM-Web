@@ -48,7 +48,7 @@ export class VideoCaptureComponent implements OnDestroy {
 
   // CRT state signals
   protected readonly isCrtEnabled = signal<boolean>(true);
-  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS.small);
+  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS['image-webgl']);
   protected readonly showCrtControls = signal<boolean>(false);
   protected readonly isDeviceSelectorOpen = signal<boolean>(false);
   protected readonly showDeviceSelector = signal<boolean>(false);
@@ -287,7 +287,7 @@ export class VideoCaptureComponent implements OnDestroy {
    * Reset CRT settings to default preset
    */
   onCrtReset(): void {
-    this.crtSettings.set(CRT_PRESETS.small);
+    this.crtSettings.set(CRT_PRESETS['image-webgl']);
   }
 
   /**

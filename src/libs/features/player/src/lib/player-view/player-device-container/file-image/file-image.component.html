@@ -7,6 +7,7 @@
     <!-- Content slot: CRT wrapper around cycling images -->
     <ng-container content>
       <lib-crt-effect-wrapper
+        #crtWrapper
         [settings]="crtSettings()"
         [enabled]="isCrtEnabled()">
         <div class="image-wrapper">
@@ -15,6 +16,7 @@
             [intervalMs]="8000"
             animationEntry="from-bottom-left"
             animationExit="none"
+            (imageChange)="crtWrapper.refreshImage()"
           />
         </div>
       </lib-crt-effect-wrapper>

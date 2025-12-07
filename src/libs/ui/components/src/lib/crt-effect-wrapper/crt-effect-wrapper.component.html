@@ -1,6 +1,7 @@
 <div
   #wrapper
   class="crt-wrapper"
+  [class]="renderModeClass()"
   [class.crt-enabled]="enabled()"
   [style.--scanline-intensity]="effectiveSettings().scanlineIntensity"
   [style.--scanline-size.px]="effectiveSettings().scanlineSize"
@@ -10,9 +11,20 @@
   [style.--crt-brightness]="effectiveSettings().brightness"
   [style.--crt-saturation]="effectiveSettings().saturation"
   [style.--crt-hue.deg]="effectiveSettings().hue"
-  [style.clip-path]="clipPath()"
+  [style.--clip-path]="clipPath()"
 >
   <div class="crt-content">
     <ng-content></ng-content>
   </div>
+
+  <!-- WebGL Canvas - renders post-processed video with CRT effects -->
+  <!-- Sized to match visible content area when contentAspectRatio is provided -->
+  <canvas
+    #glCanvas
+    class="webgl-canvas"
+    [style.width]="canvasLayout().width"
+    [style.height]="canvasLayout().height"
+    [style.left]="canvasLayout().left"
+    [style.top]="canvasLayout().top"
+  ></canvas>
 </div>

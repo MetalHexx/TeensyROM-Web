@@ -12,6 +12,10 @@
  *   showVignette: false,
  *   showCurvature: false,
  *   showColorFilters: true,
+ *   showPhosphor: false,
+ *   showBloom: false,
+ *   showDistortion: false,
+ *   showChromaticAberration: false,
  * };
  * ```
  */
@@ -39,10 +43,36 @@ export interface CrtSettingsConfig {
    * When false, color filters are disabled and sliders hidden.
    */
   showColorFilters: boolean;
+
+  // === Advanced Effects (WebGL only) ===
+
+  /**
+   * Show phosphor pattern controls (pattern type, intensity).
+   * When false, phosphor controls hidden and effect disabled.
+   */
+  showPhosphor: boolean;
+
+  /**
+   * Show bloom/glow controls (enabled toggle, intensity, radius).
+   * When false, bloom controls hidden and effect disabled.
+   */
+  showBloom: boolean;
+
+  /**
+   * Show barrel distortion control.
+   * When false, distortion control hidden and effect disabled.
+   */
+  showDistortion: boolean;
+
+  /**
+   * Show chromatic aberration control.
+   * When false, CA control hidden and effect disabled.
+   */
+  showChromaticAberration: boolean;
 }
 
 /**
- * Re-export CrtSettings from domain layer for convenience.
- * The actual interface is defined in @teensyrom-nx/domain.
+ * Re-export CrtSettings, CrtRenderMode, and PhosphorPatternType from domain layer for convenience.
+ * The actual interfaces are defined in @teensyrom-nx/domain.
  */
-export type { CrtSettings } from '@teensyrom-nx/domain';
+export type { CrtSettings, CrtRenderMode, PhosphorPatternType } from '@teensyrom-nx/domain';

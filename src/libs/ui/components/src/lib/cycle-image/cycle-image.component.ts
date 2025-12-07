@@ -1,8 +1,20 @@
-import { Component, computed, DestroyRef, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { interval } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { trigger, transition, style, animate } from '@angular/animations';
+
+/**
+ * Event emitted when the displayed image changes.
+ */
+export interface ImageChangeEvent {
+  /** URL of the new current image */
+  currentImage: string;
+  /** Index of the current image in the array */
+  currentIndex: number;
+  /** Total number of images */
+  totalImages: number;
+}
 
 @Component({
   selector: 'lib-cycle-image',
@@ -25,6 +37,13 @@ export class CycleImageComponent {
   intervalMs = input<number>(8000);
   placeholderUrl = input<string>('/placeholder.jpg');
   size = input<'thumbnail' | 'small' | 'medium' | 'large'>('large');
+
+  // Outputs
+  /**
+   * Emitted when the displayed image changes (on cycle or when images input changes).
+   * Useful for parent components that need to react to image changes (e.g., CRT effects).
+   */
+  imageChange = output<ImageChangeEvent>();
 
   // Signals for state management
   currentIndex = signal(0);
@@ -62,6 +81,9 @@ export class CycleImageComponent {
       this.previousIndex.set(null);
       this.showPrevious.set(false);
       this.animationKey.update((v) => v + 1);
+      
+      // Emit image change event
+      this.emitImageChange();
     });
 
     // Start carousel when there are multiple images
@@ -82,6 +104,20 @@ export class CycleImageComponent {
     });
   }
 
+  /**
+   * Emit image change event with current state.
+   */
+  private emitImageChange(): void {
+    const current = this.currentImage();
+    if (current) {
+      this.imageChange.emit({
+        currentImage: current,
+        currentIndex: this.currentIndex(),
+        totalImages: this.effectiveImages().length,
+      });
+    }
+  }
+
   private cycleToNext(): void {
     // Move current to previous
     this.previousIndex.set(this.currentIndex());
@@ -91,6 +127,9 @@ export class CycleImageComponent {
     const nextIndex = (this.currentIndex() + 1) % this.effectiveImages().length;
     this.currentIndex.set(nextIndex);
     this.animationKey.update((v) => v + 1);
+
+    // Emit image change event
+    this.emitImageChange();
 
     // After animation duration, hide previous
     setTimeout(() => {
