@@ -3,35 +3,31 @@ namespace TeensyRom.Api.Startup
     public static class HttpStartupExtensions
     {
         /// <summary>
-        /// Adds the CORS policy for allowing the Angular development server.
+        /// Adds permissive CORS policy for local-only app.
+        /// Allows any origin to support dev (localhost:4200) and production (any port) scenarios.
         /// </summary>
         public static IServiceCollection AddUiCors(this IServiceCollection services)
         {
             services.AddCors(options =>
             {
-                options.AddPolicy("AllowAngularDevServer",
+                options.AddPolicy("AllowAll",
                     builder =>
                     {
-                        builder.WithOrigins("http://localhost:4200") // Angular dev server
+                        builder.SetIsOriginAllowed(_ => true) // Allow any origin
                                .AllowAnyMethod()
                                .AllowAnyHeader()
-                               .AllowCredentials();
-
-                        builder.WithOrigins("http://localhost:3000") // Front-end integration tests
-                               .AllowAnyMethod()
-                               .AllowAnyHeader()
-                               .AllowCredentials();
+                               .AllowCredentials(); // Required for SignalR
                     });
             });
             return services;
         }
 
         /// <summary>
-        /// Applies the CORS policy for the Angular development server.
+        /// Applies permissive CORS policy.
         /// </summary>
         public static WebApplication UseUiCors(this WebApplication app) 
         {
-            app.UseCors("AllowAngularDevServer");
+            app.UseCors("AllowAll");
             return app;
         }
     }

@@ -40,9 +40,8 @@ builder.Services.AddSignalR().AddJsonProtocol(options =>
 
 var app = builder.Build();
 
-// Configure static file serving for Angular SPA from wwwroot
-app.UseDefaultFiles();  // Serves index.html for root requests
-app.UseStaticFiles();   // Serves files from wwwroot
+// Permissive CORS for all requests (API, SignalR, static assets)
+app.UseUiCors();
 
 // Configure static file serving for assets
 // Use the same path resolution as AssetHelper to ensure we serve from where assets are actually unpacked
@@ -56,7 +55,10 @@ if (Directory.Exists(assetsPath))
     });
 }
 
-app.UseUiCors();
+// Configure static file serving for Angular SPA from wwwroot
+app.UseDefaultFiles();  // Serves index.html for root requests
+app.UseStaticFiles();   // Serves files from wwwroot
+
 app.UseRateLimiter();
 app.MapApiDocs();
 app.MapRadEndpoints();
