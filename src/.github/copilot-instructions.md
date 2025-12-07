@@ -1,5 +1,9 @@
 # TeensyROM Copilot Instructions
 
+## Working Style
+
+**Use TODO lists for visibility**: On complex or multi-step tasks, create and maintain a TODO list to track progress. This helps you stay organized and shows the user what's being worked on, especially during longer executions.
+
 ## Project Overview
 
 **Hybrid .NET/Angular Application** for TeensyROM device management and media playback.
