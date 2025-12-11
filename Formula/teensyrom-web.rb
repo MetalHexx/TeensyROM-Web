@@ -2,16 +2,16 @@ class TeensyromWeb < Formula
   desc "Web-based control interface for TeensyROM"
   homepage "https://github.com/MetalHexx/TeensyROM-Web"
   license "MIT"
-  version "1.0.0"
+  version "1.0.0-alpha.3"
 
   on_arm do
     url "https://github.com/MetalHexx/TeensyROM-Web/releases/download/v#{version}/TeensyROM-Web-#{version}-osx-arm64.tar.gz"
-    sha256 "PLACEHOLDER_SHA256_ARM64"
+    sha256 "74a4f5092c98c2c23219f7b68ddb17325adeca0339e2fa4d50c1ddd81119d43c"
   end
 
   on_intel do
     url "https://github.com/MetalHexx/TeensyROM-Web/releases/download/v#{version}/TeensyROM-Web-#{version}-osx-x64.tar.gz"
-    sha256 "PLACEHOLDER_SHA256_X64"
+    sha256 "f3e408adfe3602b088da3a32ee769fe2db861e05623205bd8db7c0a6a7b339e1"
   end
 
   def install
