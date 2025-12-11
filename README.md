@@ -48,14 +48,15 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 > **Note**:  The video integration is completely optional, but highly recommended!
 - **Modern Meets Retro**: Seamlessly blend modern streaming control overlays with authentic CRT Video aesthetics to recreate the authentic Commodore 64 experience
 - **Live Video Capture**: Real-time video stream from connected video capture devices
-- **Authentic CRT Effects**: Customizable cathode ray tube emulation with scanlines, vignette, screen curvature, and color filters
+- **WebGL-Powered Rendering**: Hardware-accelerated effects for authentic CRT emulation
+- **Phosphor Patterns**: Aperture Grille (Trinitron), Shadow Mask (Traditional), Dot Triad (Arcade)
+- **Visual Effects**: Scanlines, vignette, screen curvature
+- **Color Adjustments**: Contrast, brightness, saturation, hue
 - **Multiple Display Modes**:
   - **Compact Integrated View**: Watch gameplay inline within the player interface
-  - **Dialog Mode**: And expanded "Theatre Style" video dialog with full control toolbar and device selector
-  - **Fullscreen Mode**: Immersive full-screen experience with responsive CRT effects
-- **CRT Customization**: Adjust scanline intensity, vignette strength, screen curvature, contrast, brightness, saturation, and hue in real-time
-- **Preset Configurations**: Quick-apply CRT presets (full, standard, minimal) for instant visual style switching
-- **Device Selection**: Switch between multiple connected video capture devices on-the-fly
+  - **Dialog Mode**: Expanded "Theatre Style" video dialog
+  - **Fullscreen Mode**: Immersive full-screen experience
+- **CRT Presets**: Save and load custom CRT effect configurations
 
 ### Search & Filter
 - **Full-Text Search**: Search across all indexed files on SD or USB storage (per storage type)
