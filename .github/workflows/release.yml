@@ -146,6 +146,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Download macOS artifacts
@@ -189,7 +190,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/teensyrom-web.rb
           git commit -m "chore: update Homebrew formula for v${{ needs.validate.outputs.version }}"
-          git push
+          git push origin HEAD:main
 
   release:
     name: Create GitHub Release
