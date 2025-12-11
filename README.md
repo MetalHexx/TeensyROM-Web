@@ -138,27 +138,38 @@ This application can be deployed in two ways:
 
 #### Windows
 
-1. Download `TeensyROM-Web-{version}-win-x64.zip` from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest)
+1. Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest) (`TeensyROM-Web-{version}-win-x64.zip`)
 2. Extract the zip file to a location of your choice
-3. Run `TeensyRom.Api.exe`
+3. Run the application:
+
+```
+TeensyRom.Api.exe
+```
 
 > **Note**: Windows may show a security warning. Click "More info" then "Run anyway".
 
 #### macOS
 
-Using Homebrew:
+1. Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest)
+2. Install using Homebrew:
 
 ```bash
 brew tap MetalHexx/TeensyROM-Web https://github.com/MetalHexx/TeensyROM-Web
 brew install teensyrom-web
+```
+
+3. Run the application:
+
+```bash
 teensyrom-web
 ```
 
-> **Note**: macOS may block the app. Go to System Settings > Privacy & Security and click "Open Anyway".
+> **Note**: macOS may block the app on first run. Go to System Settings > Privacy & Security and click "Open Anyway".
 
 #### Linux
 
-Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest), extract, and run:
+1. Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest)
+2. Extract and run:
 
 ```bash
 tar -xzf TeensyROM-Web-*-linux-x64.tar.gz
@@ -170,20 +181,6 @@ chmod +x TeensyRom.Api
 ### Accessing the Application
 
 Once running, open your browser to access:
-
-**Web UI:**
-```
-http://localhost:5000
-```
-
-**API Documentation (Scalar):**
-```
-http://localhost:5000/scalar/v1
-```
-
-## 🤝 Contributing
-
-Once running, the application serves both the web UI and API documentation:
 
 **Web UI:**
 ```
