@@ -135,9 +135,66 @@ jobs:
           path: TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.${{ matrix.extension }}
           retention-days: 5
 
+  update-formula:
+    name: Update Homebrew Formula
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: TeensyROM-Web-*-osx-*
+          path: artifacts
+          merge-multiple: true
+      
+      - name: Calculate SHA256 checksums
+        id: sha256
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          SHA_ARM64=$(sha256sum artifacts/TeensyROM-Web-${VERSION}-osx-arm64.tar.gz | cut -d ' ' -f1)
+          SHA_X64=$(sha256sum artifacts/TeensyROM-Web-${VERSION}-osx-x64.tar.gz | cut -d ' ' -f1)
+          echo "arm64=$SHA_ARM64" >> $GITHUB_OUTPUT
+          echo "x64=$SHA_X64" >> $GITHUB_OUTPUT
+          echo "ARM64 SHA256: $SHA_ARM64"
+          echo "x64 SHA256: $SHA_X64"
+      
+      - name: Update Homebrew formula
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          FORMULA="Formula/teensyrom-web.rb"
+          
+          # Update version
+          sed -i 's/version ".*"/version "'$VERSION'"/' $FORMULA
+          
+          # Update ARM64 SHA256 (in on_arm block)
+          sed -i '/on_arm do/,/end/ s/sha256 ".*"/sha256 "${{ steps.sha256.outputs.arm64 }}"/' $FORMULA
+          
+          # Update x64 SHA256 (in on_intel block)  
+          sed -i '/on_intel do/,/end/ s/sha256 ".*"/sha256 "${{ steps.sha256.outputs.x64 }}"/' $FORMULA
+          
+          echo "Updated formula:"
+          cat $FORMULA
+      
+      - name: Commit formula changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/teensyrom-web.rb
+          git commit -m "chore: update Homebrew formula for v${{ needs.validate.outputs.version }}"
+          git push
+
   release:
     name: Create GitHub Release
-    needs: [validate, build]
+    needs: [validate, build, update-formula]
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
