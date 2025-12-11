@@ -94,7 +94,6 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 
 Features planned for future releases:
 
-- **Official Releases**: Installable binaries without need to compile source
 - **SID DJ Controls**: Advanced controls for live SID music mixing and performance
 - **MIDI Integration**: Full application control from MIDI devices
 - **Cross-Storage Random Launch**:  Random selection across both SD and USB storage
@@ -129,129 +128,71 @@ This application can be deployed in two ways:
 
 ## 🚀 Quick Start
 
-_For now, if you want to try it out, you'll have to compile and run from source. An installable binary release will be available later in Q4._
-
 ### Prerequisites
-- .NET 9 SDK
-- Talk to Travis or I for a pre-release FW if you want to try this out.
 
-**Install .NET 9 SDK:**
+- **TeensyROM Hardware**: You'll need a [TeensyROM cartridge](https://github.com/SensoriumEmbedded/TeensyROM) connected to your computer
+- **Firmware**: Requires TeensyROM firmware v0.7 or higher
 
-Download and install the .NET 9 SDK from the [official Microsoft download page](https://dotnet.microsoft.com/download/dotnet/9.0).
+### Installation & Setup
 
-After installation, verify the installation:
+#### Windows
+
+1. Download `TeensyROM-Web-{version}-win-x64.zip` from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest)
+2. Extract the zip file to a location of your choice
+3. Run `TeensyRom.Api.exe`
+
+> **Note**: Windows may show a security warning. Click "More info" then "Run anyway".
+
+#### macOS
+
+Using Homebrew:
+
 ```bash
-dotnet --version
+brew tap MetalHexx/TeensyROM-Web https://github.com/MetalHexx/TeensyROM-Web
+brew install teensyrom-web
+teensyrom-web
 ```
 
-### Setup & Run
+> **Note**: macOS may block the app. Go to System Settings > Privacy & Security and click "Open Anyway".
+
+#### Linux
+
+Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest), extract, and run:
 
 ```bash
-# Clone the repository
-git clone https://github.com/MetalHexx/TeensyROM-Web.git
-cd TeensyROM-Web/src/apps/api/src/TeensyRom.Api
-
-# Build and run the application
-dotnet build
-dotnet run
+tar -xzf TeensyROM-Web-*-linux-x64.tar.gz
+cd TeensyROM-Web
+chmod +x TeensyRom.Api
+./TeensyRom.Api
 ```
 
-### Access the Application
+### Accessing the Application
 
-The API now serves the web application as a single integrated unit:
+Once running, open your browser to access:
 
 **Web UI:**
 ```
-http://localhost:5168
+http://localhost:5000
 ```
 
 **API Documentation (Scalar):**
 ```
-http://localhost:5168/scalar/v1
+http://localhost:5000/scalar/v1
 ```
 
-## 🛠️ Building the Web Application from Source
+## 🤝 Contributing
 
-If you want to modify and build the web application yourself, you'll need additional prerequisites.
+Once running, the application serves both the web UI and API documentation:
 
-### Additional Prerequisites for Web Development
-
-**Install Node.js:**
-
-Node.js includes npm (Node Package Manager) which is required to install PNPM.
-
-#### Windows
-
-Install Node.js LTS using Windows Package Manager (winget):
-
-```bash
-winget install OpenJS.NodeJS.LTS
+**Web UI:**
+```
+http://localhost:5000
 ```
 
-After installation, verify the installation:
-```bash
-node --version
-npm --version
+**API Documentation (Scalar):**
 ```
-
-Restart your terminal to ensure npm is available in your PATH.
-
-#### macOS
-
-_Coming soon_
-
-#### Linux
-
-_Coming soon_
-
-**Install PNPM:**
-
-This project uses PNPM as the package manager. Install it globally using npm:
-
-```bash
-npm install -g pnpm
+http://localhost:5000/scalar/v1
 ```
-
-After installation, restart your terminal to ensure pnpm is available in your PATH.
-
-Or using other installation methods from [pnpm.io](https://pnpm.io/installation).
-
-### Web Application Development
-
-**Install Dependencies:**
-```bash
-cd TeensyROM-Web/src
-pnpm install
-```
-
-**Development Mode (Two Terminals):**
-
-For active web development with hot-reload, run the API and frontend separately:
-
-**Terminal 1 - Start the API Backend:**
-```bash
-cd TeensyROM-Web/src/apps/api/src/TeensyRom.Api
-dotnet run
-```
-
-**Terminal 2 - Start the Frontend:**
-```bash
-cd TeensyROM-Web/src
-pnpm start
-```
-
-Access the development server at `http://localhost:4200`
-
-**Production Build:**
-
-Build the web application and integrate it with the API:
-
-```bash
-cd TeensyROM-Web/src
-pnpm run build:frontend
-```
-
-This builds the Angular application and copies the production files to the API's `wwwroot` folder. The API will then serve these files when you run `dotnet run`.
 
 ## 🤝 Contributing
 
