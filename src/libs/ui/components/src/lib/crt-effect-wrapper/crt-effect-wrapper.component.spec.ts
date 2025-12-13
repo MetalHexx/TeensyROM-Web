@@ -3,7 +3,7 @@ import { Component } from '@angular/core';
 import { vi, Mock } from 'vitest';
 import { CrtEffectWrapperComponent } from './crt-effect-wrapper.component';
 import { CrtSettings } from './crt-settings.interface';
-import { CRT_PRESETS, DEFAULT_CRT_SETTINGS } from './crt-settings.defaults';
+import { CRT_PRESETS, CRT_PRESET_KEYS, DEFAULT_CRT_SETTINGS } from './crt-settings.defaults';
 import { CrtRenderer } from './webgl/crt-renderer';
 
 // Mock CrtRenderer class - JSDOM doesn't have WebGL so we need to mock the entire class
@@ -92,7 +92,7 @@ describe('CrtEffectWrapperComponent', () => {
     it('should have default settings matching CRT_PRESETS.fullscreen-webgl', () => {
       fixture.detectChanges();
       expect(component.settings()).toEqual(DEFAULT_CRT_SETTINGS);
-      expect(component.settings()).toEqual(CRT_PRESETS['fullscreen-webgl']);
+      expect(component.settings()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL]);
     });
 
     it('should be enabled by default', () => {
@@ -153,7 +153,7 @@ describe('CrtEffectWrapperComponent', () => {
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
 
       // Update to minimal CSS preset
-      fixture.componentRef.setInput('settings', CRT_PRESETS['image-css']);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_CSS]);
       fixture.detectChanges();
 
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.3');
@@ -193,7 +193,7 @@ describe('CrtEffectWrapperComponent', () => {
 
   describe('Presets', () => {
     it('should apply minimal CRT effects for images', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS['image-css']);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_CSS]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -206,7 +206,7 @@ describe('CrtEffectWrapperComponent', () => {
     });
 
     it('should apply CRT_PRESETS.fullscreen-webgl with strong effects', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS['fullscreen-webgl']);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -216,7 +216,7 @@ describe('CrtEffectWrapperComponent', () => {
     });
 
     it('should apply CRT_PRESETS.dialog-webgl with moderate effects', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS['dialog-webgl']);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.DIALOG_WEBGL]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -227,7 +227,7 @@ describe('CrtEffectWrapperComponent', () => {
     });
 
     it('should apply CRT_PRESETS.image-webgl with subtle scanlines', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS['image-webgl']);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_WEBGL]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -239,7 +239,7 @@ describe('CrtEffectWrapperComponent', () => {
 
   describe('Effect Disabling via Settings', () => {
     it('should minimize effects when using minimal intensity preset', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS['image-css']);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_CSS]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -254,7 +254,7 @@ describe('CrtEffectWrapperComponent', () => {
     it('should allow disabling individual effects by setting values to neutral', () => {
       // Custom settings with scanlines disabled (intensity=0) but other effects enabled
       const customSettings: CrtSettings = {
-        ...CRT_PRESETS['fullscreen-webgl'],
+        ...CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL],
         scanlineIntensity: 0.8,
         scanlineSize: 0,
       };
@@ -272,7 +272,7 @@ describe('CrtEffectWrapperComponent', () => {
 
     it('should allow disabling curvature via settings', () => {
       // Dialog preset has curvature disabled
-      fixture.componentRef.setInput('settings', CRT_PRESETS['dialog-webgl']);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.DIALOG_WEBGL]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -285,7 +285,7 @@ describe('CrtEffectWrapperComponent', () => {
 
     it('should allow disabling color filters via neutral values', () => {
       const customSettings: CrtSettings = {
-        ...CRT_PRESETS['fullscreen-webgl'],
+        ...CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL],
         contrast: 1,
         brightness: 1,
         saturation: 1,
@@ -750,3 +750,6 @@ describe('CrtEffectWrapperComponent Image Cycling (refreshImage)', () => {
     expect(mockRendererInstance.setImageElement.mock.calls.length).toBeGreaterThan(initialCallCount);
   });
 });
+
+
+

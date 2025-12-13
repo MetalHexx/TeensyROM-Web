@@ -1,36 +1,103 @@
-<lib-compact-card-layout [cardClass]="computedCardClass()">
-  <!-- Header with preset menu and reset button -->
+<lib-compact-card-layout 
+  [cardClass]="computedCardClass()" 
+  [style]="panelStyles()">
+  <!-- Header with preset menu and close button -->
   <div class="crt-card-header">
     <span class="header-title">CRT Effect</span>
     <div class="header-actions">
       <!-- Preset menu button -->
       <lib-dropdown-menu #presetDropdown>
         <lib-icon-button
-          icon="tune"
+          icon="bookmark"
           ariaLabel="Select preset"
-          size="small"
+          size="medium"
+          color="normal"
           [matTooltip]="'Select preset'"
           (buttonClick)="presetDropdown.toggle()">
         </lib-icon-button>
 
         <div dropdown-content>
-          @for (preset of presetNames; track preset) {
+          @if (showNameDialog()) {
+            <!-- Preset Name Dialog (shown in place of dropdown menu) -->
+            <lib-preset-name-dialog
+              [title]="isRenaming() ? 'Rename Preset' : 'Save Preset'"
+              [initialValue]="getDialogInitialValue()"
+              [reservedNames]="getReservedNames()"
+              [validationFn]="dialogValidationFn"
+              (confirmed)="onNameDialogConfirmed($event)"
+              (cancelled)="onNameDialogCancelled()">
+            </lib-preset-name-dialog>
+          } @else if (showConfirmDialog()) {
+            <!-- Confirmation Dialog (shown in place of dropdown menu) -->
+            <lib-confirmation-dialog
+              [title]="'Delete Preset'"
+              [message]="getConfirmationMessage()"
+              [confirmLabel]="'Delete'"
+              [cancelLabel]="'Cancel'"
+              (confirmed)="onDeleteConfirmed()"
+              (cancelled)="onDeleteCancelled()">
+            </lib-confirmation-dialog>
+          } @else {
+            <!-- Built-in Presets -->
+          <span class="dropdown-section-label">Built-in Presets</span>
+          @for (preset of allPresets().builtIn; track preset) {
             <lib-dropdown-menu-item
               [testId]="'preset-' + preset"
               (itemClick)="onPresetSelect(preset)">
               {{ getPresetLabel(preset) }}
             </lib-dropdown-menu-item>
           }
+          
+          <div class="dropdown-divider"></div>
+          
+          <!-- Custom Presets -->
+          <span class="dropdown-section-label">Custom Presets</span>
+          @if (allPresets().custom.length > 0) {
+            @for (preset of allPresets().custom; track preset.name) {
+              <lib-dropdown-menu-item
+                [testId]="'preset-' + preset.name"
+                (itemClick)="onPresetSelect(preset.name)">
+                {{ stripCustomPrefix(preset.name) }}
+                <div actions>
+                  <lib-icon-button
+                    icon="edit"
+                    size="medium"
+                    color="highlight"
+                    ariaLabel="Rename preset"
+                    (buttonClick)="onRenamePreset(preset.name)">
+                  </lib-icon-button>
+                  <lib-icon-button
+                    icon="delete"
+                    size="medium"
+                    color="error"
+                    ariaLabel="Delete preset"
+                    (buttonClick)="onDeletePreset(preset.name)">
+                  </lib-icon-button>
+                </div>
+              </lib-dropdown-menu-item>
+            }
+          } @else {
+            <span class="dropdown-empty-state">No custom presets</span>
+          }
+          
+          <div class="dropdown-divider"></div>
+          
+          <!-- Save Action -->
+          <lib-dropdown-menu-item (itemClick)="onSaveAsPreset()">
+            <lib-icon-label icon="save" label="Save Current as Preset"></lib-icon-label>            
+          </lib-dropdown-menu-item>
+          }
         </div>
       </lib-dropdown-menu>
 
-      <!-- Reset button -->
+      <!-- Close button -->
       <lib-icon-button
-        icon="refresh"
-        ariaLabel="Reset to defaults"
-        size="small"
-        [matTooltip]="'Reset to defaults'"
-        (buttonClick)="onReset()">
+        icon="close"
+        ariaLabel="Close CRT settings"
+        size="medium"
+        color="normal"
+        [matTooltip]="'Close'"
+        (buttonClick)="closed.emit()">
       </lib-icon-button>
     </div>
   </div>
@@ -48,35 +115,6 @@
       <mat-icon>{{ settings().renderMode === 'css' ? 'image' : 'grid_on' }}</mat-icon>
       <span class="mode-label">{{ getRenderModeLabel() }}</span>
     </button>
-  </div>
-
-  <!-- Preset Selector -->
-  <div class="crt-control-group preset-selector">
-    <span class="control-label">Preset</span>
-    <lib-dropdown-menu #presetSelectorDropdown>
-      <button 
-        class="preset-button" 
-        (click)="presetSelectorDropdown.toggle()"
-        type="button">
-        <span class="preset-name">{{ currentPresetName() ? getPresetLabel(currentPresetName()!) : 'Custom' }}</span>
-        <mat-icon>arrow_drop_down</mat-icon>
-      </button>
-      <div dropdown-content>
-        @for (preset of presetNames; track preset) {
-          <lib-dropdown-menu-item
-            [testId]="'preset-selector-' + preset"
-            [class.active]="currentPresetName() === preset"
-            (itemClick)="onPresetSelect(preset)">
-            <div class="preset-option">
-              <span class="preset-option-label">{{ getPresetLabel(preset) }}</span>
-              @if (currentPresetName() === preset) {
-                <mat-icon class="checkmark">check</mat-icon>
-              }
-            </div>
-          </lib-dropdown-menu-item>
-        }
-      </div>
-    </lib-dropdown-menu>
   </div>
 
   <!-- Scanline Controls -->

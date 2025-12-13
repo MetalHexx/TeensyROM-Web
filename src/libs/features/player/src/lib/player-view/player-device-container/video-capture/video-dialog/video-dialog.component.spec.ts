@@ -3,10 +3,36 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { VideoDialogComponent, VideoDialogData } from './video-dialog.component';
-import { CRT_CONFIGS, DEFAULT_CRT_SETTINGS, CRT_PRESETS } from '@teensyrom-nx/ui/components';
+import { CRT_CONFIGS, DEFAULT_CRT_SETTINGS, CRT_PRESETS, CRT_PRESET_KEYS } from '@teensyrom-nx/ui/components';
 import { CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
 import { PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
-import { STORAGE_SERVICE, PlayerStatus, LaunchMode, CRT_STORAGE, ICrtStorage } from '@teensyrom-nx/domain';
+import { STORAGE_SERVICE, PlayerStatus, LaunchMode, CRT_STORAGE, ICrtStorage, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
+
+/** Mock custom presets for testing */
+const mockCustomPresets: CustomCrtPreset[] = [
+  {
+    name: 'custom-dialog-preset' as CustomPresetName,
+    settings: {
+      scanlineIntensity: 0.6,
+      scanlineSize: 2.5,
+      vignetteStrength: 1.4,
+      screenCurvature: 115,
+      contrast: 1.2,
+      brightness: 1.4,
+      saturation: 1.2,
+      hue: 0,
+      renderMode: 'webgl',
+      phosphorPattern: 'none',
+      phosphorIntensity: 0,
+      bloomEnabled: false,
+      bloomIntensity: 0.3,
+      bloomRadius: 3,
+      barrelDistortion: 0,
+      chromaticAberration: 0,
+    },
+    createdAt: '2025-12-07T12:00:00.000Z',
+  },
+];
 
 /** Mock CRT storage for testing - stores nothing, returns null */
 const mockCrtStorage: ICrtStorage = {
@@ -16,6 +42,14 @@ const mockCrtStorage: ICrtStorage = {
   hasSavedSettings: () => false,
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   clear: () => {},
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  saveCustomPreset: () => {},
+  loadCustomPresets: vi.fn().mockReturnValue([]),
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  deleteCustomPreset: () => {},
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  renameCustomPreset: () => {},
+  hasCustomPreset: () => false,
 };
 
 // Mock HTMLMediaElement.play and pause for JSDOM environment
@@ -273,34 +307,107 @@ describe('VideoDialogComponent', () => {
       expect(component['crtSettings']().contrast).toBe(1.5);
     });
 
-    it('should reset settings when onCrtReset is called', () => {
-      fixture.detectChanges();
-      // First change settings
-      component.onCrtSettingsChange({
-        ...DEFAULT_CRT_SETTINGS,
-        brightness: 2.0,
-      });
-
-      // Then reset
-      component.onCrtReset();
-
-      expect(component['crtSettings']()).toEqual(DEFAULT_CRT_SETTINGS);
-    });
-
     it('should apply preset when onCrtPresetSelected is called', () => {
       fixture.detectChanges();
 
-      component.onCrtPresetSelected('standard');
+      component.onCrtPresetSelected(CRT_PRESET_KEYS.DIALOG_WEBGL);
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS['dialog-webgl']);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.DIALOG_WEBGL]);
     });
 
     it('should apply full preset correctly', () => {
       fixture.detectChanges();
 
-      component.onCrtPresetSelected('full');
+      component.onCrtPresetSelected(CRT_PRESET_KEYS.FULLSCREEN_WEBGL);
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS['fullscreen-webgl']);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL]);
+    });
+
+    describe('custom preset selection', () => {
+      it('should apply built-in preset settings correctly', () => {
+        fixture.detectChanges();
+
+        component.onCrtPresetSelected(CRT_PRESET_KEYS.DIALOG_CSS);
+        
+        const settings = component['crtSettings']();
+        expect(settings.renderMode).toBe('css');
+      });
+
+      it('should apply custom preset settings correctly', () => {
+        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
+        fixture.detectChanges();
+
+        component.onCrtPresetSelected('custom-dialog-preset' as CustomPresetName);
+        
+        const settings = component['crtSettings']();
+        expect(settings.scanlineIntensity).toBe(0.6);
+        expect(settings.brightness).toBe(1.4);
+      });
+
+      it('should call loadCustomPresets when custom preset selected', () => {
+        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
+        fixture.detectChanges();
+
+        vi.mocked(mockCrtStorage.loadCustomPresets).mockClear();
+
+        component.onCrtPresetSelected('custom-dialog-preset' as CustomPresetName);
+        
+        expect(mockCrtStorage.loadCustomPresets).toHaveBeenCalled();
+      });
+
+      it('should persist custom preset settings to storage', () => {
+        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
+        const saveSpy = vi.spyOn(mockCrtStorage, 'save');
+        fixture.detectChanges();
+
+        saveSpy.mockClear();
+
+        component.onCrtPresetSelected('custom-dialog-preset' as CustomPresetName);
+        
+        expect(saveSpy).toHaveBeenCalledWith(
+          'test-device-123',
+          'video-dialog',
+          expect.objectContaining({
+            scanlineIntensity: 0.6,
+          })
+        );
+      });
+
+      it('should log warning when custom preset not found', () => {
+        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
+        fixture.detectChanges();
+
+        const originalSettings = component['crtSettings']();
+
+        component.onCrtPresetSelected('custom-nonexistent' as CustomPresetName);
+        
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          '[VideoDialogComponent] Custom preset not found: custom-nonexistent'
+        );
+
+        expect(component['crtSettings']()).toEqual(originalSettings);
+
+        consoleWarnSpy.mockRestore();
+      });
+
+      it('should not change settings when custom preset not found', () => {
+        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
+        fixture.detectChanges();
+
+        const customSettings = {
+          ...DEFAULT_CRT_SETTINGS,
+          brightness: 2.5,
+        };
+        component.onCrtSettingsChange(customSettings);
+
+        component.onCrtPresetSelected('custom-missing' as CustomPresetName);
+        
+        expect(component['crtSettings']()).toEqual(customSettings);
+
+        consoleWarnSpy.mockRestore();
+      });
     });
   });
 
@@ -409,3 +516,5 @@ describe('VideoDialogComponent', () => {
     });
   });
 });
+
+

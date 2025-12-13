@@ -31,6 +31,37 @@
       padding: 10px 16px 8px 12px;
       min-width: 180px;
     }
+
+    // Scrollable panel styling - applied when maxHeight input is set
+    .compact-card.scrollable-panel {
+      padding: 0 !important;
+      overflow: hidden auto; // hidden on X, auto on Y - ensures rounded corners clip scrollbar
+      scrollbar-width: thin;
+
+      // Add padding to all direct children to maintain spacing
+      > * {
+        padding: 10px 16px 8px 12px;
+      }
+
+      // Custom scrollbar styling
+      &::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 3px;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 3px;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.5);
+        }
+      }
+    }
   }
 
   // Make Material sliders more compact
@@ -61,6 +92,7 @@
     display: flex;
     align-items: center;
     gap: 0;
+    margin-right: -6px; // Pull buttons closer to right edge to balance top padding (10px)
   }
 }
 
@@ -100,13 +132,16 @@
 .pattern-selector {
   margin-bottom: 0.5rem;
 
+  .control-label {
+    margin-bottom: 8px; // Add consistent spacing between label and button
+  }
+
   .pattern-button {
     display: flex;
     align-items: center;
     justify-content: space-between;
     width: 100%;
     padding: 6px 8px;
-    margin-top: 4px;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 4px;
@@ -132,13 +167,17 @@
 .render-mode-toggle {
   margin-bottom: 0.75rem;
 
+  .control-label {
+    margin-bottom: 8px; // Add consistent spacing between label and button
+  }
+
   .toggle-button {
     display: flex;
     align-items: center;
     gap: 8px;
     width: 100%;
+    min-width: 0; // Allow flex to work properly
     padding: 8px 12px;
-    margin-top: 4px;
     background: rgba(255, 255, 255, 0.08);
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-radius: 6px;
@@ -164,12 +203,15 @@
       font-size: 20px;
       width: 20px;
       height: 20px;
+      flex-shrink: 0; // Prevent icon from shrinking
       opacity: 0.85;
     }
 
     .mode-label {
       flex: 1;
+      min-width: 150px; // Reserve space for longest label "WebGL (High Quality)"
       text-align: left;
+      white-space: nowrap; // Prevent text wrapping
     }
 
     // CSS mode - primary bright
@@ -213,68 +255,39 @@
   }
 }
 
-// Preset selector styling
-.preset-selector {
-  margin-bottom: 0.75rem;
-
-  .preset-button {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 6px 8px;
-    margin-top: 4px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
-    color: inherit;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: background-color 150ms ease;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.12);
-    }
-
-    .preset-name {
-      font-weight: 500;
-    }
-
-    mat-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-      opacity: 0.7;
-    }
-  }
-}
-
-// Preset dropdown menu items
-.preset-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 8px;
-
-  .preset-option-label {
-    font-weight: 500;
-    font-size: 0.9rem;
-    flex: 1;
-  }
-
-  .checkmark {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-    color: #4caf50;
-    flex-shrink: 0;
-  }
-}
-
 // Empty state when no sliders are configured
 .crt-empty-state {
   padding: 16px 0;
   text-align: center;
   opacity: 0.6;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom Preset Dropdown Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Section labels in dropdown (Built-in Presets, Custom Presets)
+.dropdown-section-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-dimmed, rgba(255, 255, 255, 0.5));
+  padding: 8px 16px;
+  font-weight: 600;
+  display: block;
+}
+
+// Divider between sections
+.dropdown-divider {
+  border-top: 1px solid var(--border-dimmed, rgba(255, 255, 255, 0.1));
+  margin: 8px 0;
+}
+
+// Empty state message when no custom presets exist
+.dropdown-empty-state {
+  font-style: italic;
+  color: var(--text-dimmed, rgba(255, 255, 255, 0.5));
+  padding: 8px 16px;
+  text-align: center;
+  display: block;
+  font-size: 0.875rem;
 }

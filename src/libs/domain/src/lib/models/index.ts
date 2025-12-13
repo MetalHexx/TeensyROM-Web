@@ -18,6 +18,10 @@ export * from './storage-directory.model';
 
 // Player models
 export * from './player-status.enum';
+
+// CRT models
+export * from './crt-custom-preset.model';
+export * from './crt-preset-names.const';
 export * from './launch-mode.enum';
 export * from './player-filter-type.enum';
 export * from './player-scope.enum';

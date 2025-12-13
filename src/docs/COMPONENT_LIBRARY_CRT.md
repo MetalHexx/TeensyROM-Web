@@ -109,17 +109,17 @@ Both components accept `CrtSettings` (values) and `CrtSettingsConfig` (feature f
 
 ```html
 <!-- Full CRT effects on video -->
-<lib-crt-effect-wrapper [settings]="CRT_PRESETS.full" [enabled]="showCrt">
+<lib-crt-effect-wrapper [settings]="CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL]" [enabled]="showCrt">
   <lib-video-stream [stream]="mediaStream"></lib-video-stream>
 </lib-crt-effect-wrapper>
 
-<!-- Standard preset (no curvature) for embedded previews -->
-<lib-crt-effect-wrapper [settings]="CRT_PRESETS.standard">
+<!-- Dialog preset for embedded content -->
+<lib-crt-effect-wrapper [settings]="CRT_PRESETS[CRT_PRESET_KEYS.DIALOG_CSS]">
   <img [src]="screenshot" alt="Screenshot" />
 </lib-crt-effect-wrapper>
 
-<!-- Small preset with subtle scanlines for compact displays -->
-<lib-crt-effect-wrapper [settings]="CRT_PRESETS.small">
+<!-- Image preset with subtle effects for static content -->
+<lib-crt-effect-wrapper [settings]="CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_WEBGL]">
   <lib-video-stream [stream]="retroStream"></lib-video-stream>
 </lib-crt-effect-wrapper>
 
@@ -131,7 +131,7 @@ Both components accept `CrtSettings` (values) and `CrtSettingsConfig` (feature f
 </lib-crt-effect-wrapper>
 
 <!-- Custom settings blend -->
-<lib-crt-effect-wrapper [settings]="{ ...CRT_PRESETS.standard, brightness: 1.2 }">
+<lib-crt-effect-wrapper [settings]="{ ...CRT_PRESETS[CRT_PRESET_KEYS.DIALOG_CSS], brightness: 1.2 }">
   <lib-video-stream [stream]="retroStream"></lib-video-stream>
 </lib-crt-effect-wrapper>
 
@@ -149,6 +149,9 @@ import {
   CrtSettings,
   CrtSettingsConfig,
   CRT_PRESETS,
+  CRT_PRESET_KEYS,
+  CRT_RENDER_MODES,
+  CRT_PHOSPHOR_PATTERNS,
   CRT_CONFIGS,
   DEFAULT_CRT_SETTINGS,
   DEFAULT_CRT_CONFIG,
@@ -806,17 +809,30 @@ Values that control the intensity and appearance of each effect:
 | `brightness` | `number` | CSS filter brightness multiplier. 1 = no change, >1 = brighter. |
 | `saturation` | `number` | CSS filter saturation multiplier. 1 = no change, >1 = more saturated. |
 | `hue` | `number` | CSS filter hue-rotate in degrees (-60 to 60). 0 = no rotation, positive = shift towards red/yellow, negative = shift towards blue/cyan. Useful for matching color output between different C64 video devices. Fine 1° steps provide precise control for matching between C64 video outputs. |
+| `renderMode` | `'webgl' \| 'css'` | Rendering mode. Use `CRT_RENDER_MODES.WEBGL` or `CRT_RENDER_MODES.CSS` constants. |
+| `phosphorPattern` | `'aperture-grille' \| 'none'` | Phosphor pattern type (WebGL only). Use `CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE` or `CRT_PHOSPHOR_PATTERNS.NONE` constants. |
 
 ### Preset Configurations
 
-Pre-configured presets available via `CRT_PRESETS` and matching `CRT_CONFIGS`:
+Pre-configured presets available via `CRT_PRESETS` (accessed using `CRT_PRESET_KEYS`):
 
-| Preset | Description | Use Case |
-|--------|-------------|----------|
-| `full` | All effects enabled (scanlines, vignette, curvature, color boost) | Video streams, terminal displays, fullscreen video |
-| `standard` | Scanlines, vignette, color enhancement (no curvature) | Embedded previews, flat-screen retro aesthetic |
-| `small` | Subtle scanlines (1px size) for compact displays | Small video components, thumbnails |
-| `none` | All effects neutral (pass-through) | Temporarily disable effects |
+| Preset Constant | String Value | Description | Use Case |
+|--------|-------------|-------------|----------|
+| `CRT_PRESET_KEYS.FULLSCREEN_WEBGL` | `'default-fullscreen-webgl'` | Full effects with WebGL rendering + phosphor patterns | Fullscreen video, maximum authenticity |
+| `CRT_PRESET_KEYS.FULLSCREEN_CSS` | `'default-fullscreen-css'` | Full effects with lightweight CSS rendering | Fullscreen video, lower performance overhead |
+| `CRT_PRESET_KEYS.DIALOG_WEBGL` | `'default-dialog-webgl'` | Moderate effects with WebGL + phosphor | Dialog/modal contexts, balanced quality |
+| `CRT_PRESET_KEYS.DIALOG_CSS` | `'default-dialog-css'` | Moderate effects with CSS rendering | Dialog/modal contexts, lightweight |
+| `CRT_PRESET_KEYS.IMAGE_WEBGL` | `'default-image-webgl'` | Subtle effects with WebGL + minimal phosphor | Still images, pristine rendering |
+| `CRT_PRESET_KEYS.IMAGE_CSS` | `'default-image-css'` | Subtle effects with CSS rendering | Still images, minimal overhead |
+
+Matching configs available via `CRT_CONFIGS` (for settings panel visibility):
+
+| Config | Description |
+|--------|-------------|
+| `full` | All slider controls visible |
+| `standard` | Standard controls (no curvature slider) |
+| `small` | Minimal controls for compact UI |
+| `none` | No controls (empty panel) |
 
 ---
 
@@ -827,7 +843,7 @@ Pre-configured presets available via `CRT_PRESETS` and matching `CRT_CONFIGS`:
 Simplest usage - wrap any content with CRT effects:
 
 ```html
-<lib-crt-effect-wrapper [settings]="CRT_PRESETS.full">
+<lib-crt-effect-wrapper [settings]="CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL]">
   <video src="retro-game.mp4" autoplay></video>
 </lib-crt-effect-wrapper>
 ```
@@ -943,7 +959,7 @@ The CRT effect wrapper exposes these CSS custom properties for advanced styling:
 
 ## Best Practices
 
-1. **Use Presets First**: Start with `CRT_PRESETS.full`, `standard`, or `small` before customizing individual settings.
+1. **Use Presets with Constants**: Start with `CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL]`, `CRT_PRESET_KEYS.DIALOG_CSS`, or `CRT_PRESET_KEYS.IMAGE_WEBGL` before customizing individual settings. Always use the `CRT_PRESET_KEYS` constants instead of magic strings for type safety and IDE autocomplete support.
 
 2. **Match Config with Settings Panel**: When using `CrtSettingsPanelComponent`, pass the same `CRT_CONFIGS` to both components so sliders match enabled effects.
 
@@ -983,6 +999,9 @@ import {
   
   // Constants
   CRT_PRESETS,
+  CRT_PRESET_KEYS,
+  CRT_RENDER_MODES,
+  CRT_PHOSPHOR_PATTERNS,
   CRT_CONFIGS,
   DEFAULT_CRT_SETTINGS,
   DEFAULT_CRT_CONFIG,

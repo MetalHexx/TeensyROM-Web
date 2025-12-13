@@ -1,0 +1,13 @@
+<lib-dropdown-dialog #dialogRef>
+  <div class="dropdown-container">
+    <ng-content></ng-content>
+  </div>
+  
+  <div dialog-content class="dropdown-menu-wrapper">
+    <lib-compact-card-layout cardClass="glassy-card">
+      <div class="dropdown-menu-content">
+        <ng-content select="[dropdown-content]"></ng-content>
+      </div>
+    </lib-compact-card-layout>
+  </div>
+</lib-dropdown-dialog>

@@ -1,3 +1,98 @@
+// Import and re-export preset constants from domain layer (single source of truth)
+import { CRT_PRESET_PREFIX, CRT_PRESET_KEYS, type PresetKey } from '@teensyrom-nx/domain';
+export { CRT_PRESET_PREFIX, CRT_PRESET_KEYS, type PresetKey };
+
+// Import types from defaults (must come before functions that use them)
+import type { BuiltInPresetName, CustomPresetName, AnyPresetName, CrtPresetName } from './crt-settings.defaults';
+export type { BuiltInPresetName, CustomPresetName, AnyPresetName, CrtPresetName };
+
+/**
+ * Type guard to check if a preset name is a built-in preset.
+ * Built-in presets start with 'default-' prefix.
+ * 
+ * @param name - Preset name to check
+ * @returns True if name is a built-in preset, false otherwise
+ * @example
+ * ```typescript
+ * isBuiltInPreset('default-fullscreen-webgl') // true
+ * isBuiltInPreset('custom-My Preset') // false
+ * ```
+ */
+export function isBuiltInPreset(name: string): name is BuiltInPresetName {
+  return name.startsWith(CRT_PRESET_PREFIX.DEFAULT);
+}
+
+/**
+ * Type guard to check if a preset name is a custom preset.
+ * Custom presets start with 'custom-' prefix.
+ * 
+ * @param name - Preset name to check
+ * @returns True if name is a custom preset, false otherwise
+ * @example
+ * ```typescript
+ * isCustomPreset('custom-My Preset') // true
+ * isCustomPreset('default-fullscreen-webgl') // false
+ * ```
+ */
+export function isCustomPreset(name: string): name is CustomPresetName {
+  return name.startsWith(CRT_PRESET_PREFIX.CUSTOM);
+}
+
+/**
+ * Removes the 'custom-' prefix from a custom preset name for display purposes.
+ * Returns the original string if it doesn't start with 'custom-'.
+ * 
+ * @param name - Custom preset name to strip prefix from
+ * @returns Name without 'custom-' prefix
+ * @example
+ * ```typescript
+ * stripCustomPrefix('custom-My Preset') // 'My Preset'
+ * stripCustomPrefix('My Preset') // 'My Preset' (no prefix to strip)
+ * stripCustomPrefix('default-fullscreen-webgl') // 'default-fullscreen-webgl'
+ * ```
+ */
+export function stripCustomPrefix(name: string): string {
+  return name.startsWith(CRT_PRESET_PREFIX.CUSTOM)
+    ? name.slice(CRT_PRESET_PREFIX.CUSTOM.length)
+    : name;
+}
+
+/**
+ * Adds the 'custom-' prefix to a user-entered preset name.
+ * Does not add prefix if already present (idempotent).
+ * 
+ * @param name - User-entered preset name
+ * @returns Name with 'custom-' prefix
+ * @example
+ * ```typescript
+ * addCustomPrefix('My Preset') // 'custom-My Preset'
+ * addCustomPrefix('custom-My Preset') // 'custom-My Preset' (already has prefix)
+ * ```
+ */
+export function addCustomPrefix(name: string): CustomPresetName {
+  return name.startsWith(CRT_PRESET_PREFIX.CUSTOM)
+    ? (name as CustomPresetName)
+    : (`${CRT_PRESET_PREFIX.CUSTOM}${name}` as CustomPresetName);
+}
+
+/**
+ * Render mode constants to eliminate magic strings.
+ * Use these instead of 'webgl' or 'css' string literals.
+ */
+export const CRT_RENDER_MODES = {
+  WEBGL: 'webgl',
+  CSS: 'css',
+} as const;
+
+/**
+ * Phosphor pattern constants to eliminate magic strings.
+ * Use these instead of 'aperture-grille' or 'none' string literals.
+ */
+export const CRT_PHOSPHOR_PATTERNS = {
+  APERTURE_GRILLE: 'aperture-grille',
+  NONE: 'none',
+} as const;
+
 /**
  * Configuration interface for which CRT effect groups are enabled.
  *

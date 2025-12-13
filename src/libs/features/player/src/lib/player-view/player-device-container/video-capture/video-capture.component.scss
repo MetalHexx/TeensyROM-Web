@@ -32,7 +32,8 @@
 }
 
 // CRT settings panel card - scrollable when constrained via passed cardClass
-:host ::ng-deep lib-crt-settings-panel lib-compact-card-layout .compact-card.glassy-card.crt-panel-scrollable {
+// Scoped to video-capture-crt-scope to prevent affecting other components
+:host .video-capture-crt-scope ::ng-deep lib-crt-settings-panel lib-compact-card-layout .compact-card.glassy-card.crt-panel-scrollable {
   max-height: calc(390px - 32px);
   padding: 0 !important;
   overflow: hidden auto; // hidden on X, auto on Y - ensures rounded corners clip scrollbar
@@ -81,16 +82,13 @@ lib-scaling-compact-card {
   }
 }
 
-// Restore padding for CRT settings panel card (overridden by global mat-card rule above)
-::ng-deep lib-crt-settings-panel mat-card.compact-card {
-  padding: 10px 16px 8px 12px !important;
-  margin: 0;
-}
-
 lib-content-overlay-container {
   width: 100%;
   height: 100%;
 }
+
+// Note: All CRT settings panel styling is now handled by the component itself
+// via the maxHeight input. No ::ng-deep needed!
 
 .error-message,
 .no-devices-message {

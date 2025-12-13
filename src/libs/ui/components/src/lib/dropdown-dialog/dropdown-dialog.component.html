@@ -1,0 +1,9 @@
+<div #trigger>
+  <ng-content></ng-content>
+</div>
+
+<ng-template #dialogTemplate>
+  <div [@fadeInOut]>
+    <ng-content select="[dialog-content]"></ng-content>
+  </div>
+</ng-template>

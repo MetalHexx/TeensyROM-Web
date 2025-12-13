@@ -321,6 +321,42 @@ import { DomainType } from '@teensyrom-nx/domain/feature/services';
 - Use domain enums in state, components, and tests
 - Mock domain enums in tests, not API types
 
+### Magic Strings and Constants
+
+**Standard**: Avoid magic strings; use constants, enums, or typed objects
+
+**Usage Examples**:
+
+```typescript
+// ❌ WRONG
+if (renderMode === 'webgl') { /* ... */ }
+const preset = settings['default-fullscreen-webgl'];
+
+// ✅ CORRECT - Enum
+export enum RenderMode {
+  WebGL = 'webgl',
+  CSS = 'css',
+}
+
+// ✅ CORRECT - Constants object with as const
+export const PRESET_KEYS = {
+  FULLSCREEN_WEBGL: 'default-fullscreen-webgl',
+  FULLSCREEN_CSS: 'default-fullscreen-css',
+} as const;
+```
+
+**Requirements**:
+
+- Define constants at module or in `.constants.ts` files
+- Use `as const` for immutable objects to preserve literal types
+- Group related constants in objects or enums
+- Prefer enums over string unions for domain concepts
+- Use SCREAMING_SNAKE_CASE for constant names
+
+**Benefits**: Prevents typos, enables IDE autocomplete, single source of truth, improves type safety
+
+**Used In**: [`crt-settings.defaults.ts`](../libs/ui/components/src/lib/crt-effect-wrapper/crt-settings.defaults.ts)
+
 ### Imports
 
 **Standard**: Organize imports in the following order with blank lines between groups

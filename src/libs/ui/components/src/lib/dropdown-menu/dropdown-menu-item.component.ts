@@ -7,6 +7,18 @@ import { DropdownMenuComponent } from './dropdown-menu.component';
  * Menu item component for use with lib-dropdown-menu.
  * Provides consistent styling and interaction for dropdown menu items.
  * Automatically closes the parent dropdown when clicked unless autoClose is false.
+ * 
+ * Supports composable actions via named content projection:
+ * @example
+ * ```html
+ * <lib-dropdown-menu-item (itemClick)="onSelect()">
+ *   Item Label
+ *   <div actions>
+ *     <button (click)="onEdit()">Edit</button>
+ *     <button (click)="onDelete()">Delete</button>
+ *   </div>
+ * </lib-dropdown-menu-item>
+ * ```
  */
 @Component({
   selector: 'lib-dropdown-menu-item',
@@ -24,6 +36,9 @@ import { DropdownMenuComponent } from './dropdown-menu.component';
         <mat-icon class="check-icon">check</mat-icon>
       }
       <span class="item-label"><ng-content></ng-content></span>
+      <div class="item-actions" (click)="handleActionsClick($event)">
+        <ng-content select="[actions]"></ng-content>
+      </div>
     </button>
   `,
   styleUrl: './dropdown-menu-item.component.scss'
@@ -44,5 +59,13 @@ export class DropdownMenuItemComponent {
     if (this.autoClose() && this.parentDropdown) {
       this.parentDropdown.close();
     }
+  }
+
+  /**
+   * Prevents click events from actions area from bubbling to parent item.
+   * This prevents itemClick emission when action buttons are clicked.
+   */
+  handleActionsClick(event: MouseEvent): void {
+    event.stopPropagation();
   }
 }

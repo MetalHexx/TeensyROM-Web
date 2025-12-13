@@ -1,4 +1,5 @@
-import { CrtSettings, CrtSettingsConfig } from './crt-settings.interface';
+import { CrtSettings, CrtSettingsConfig, CRT_PRESET_KEYS, CRT_RENDER_MODES, CRT_PHOSPHOR_PATTERNS, CRT_PRESET_PREFIX } from './crt-settings.interface';
+export { CRT_PRESET_KEYS, CRT_RENDER_MODES, CRT_PHOSPHOR_PATTERNS } from './crt-settings.interface';
 
 /**
  * Default configuration - all CRT effect groups enabled.
@@ -89,22 +90,22 @@ export const CRT_CONFIGS = {
 /**
  * Preset configurations for common CRT effect use cases.
  *
- * Use these presets directly or spread them to customize:
+ * Use these presets with CRT_PRESET_KEYS constants for type safety:
  * ```typescript
- * // Use preset directly
- * settings = CRT_PRESETS.full;
+ * // ✅ Use preset with constant (type-safe)
+ * settings = CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL];
  *
- * // Customize a preset
- * settings = { ...CRT_PRESETS.scanlines, brightness: 1.2 };
+ * // ✅ Customize a preset
+ * settings = { ...CRT_PRESETS[CRT_PRESET_KEYS.DIALOG_CSS], brightness: 1.2 };
  * ```
  */
 export const CRT_PRESETS = {
   /**
-   * Full Screen (CSS) - Immersive fullscreen CRT with CSS rendering.
+   * Default Full Screen (CSS) - Immersive fullscreen CRT with CSS rendering.
    * Strong scanlines, vignette, curvature for retro monitor feel.
    * Uses lightweight CSS mode.
    */
-  'fullscreen-css': {
+  [CRT_PRESET_KEYS.FULLSCREEN_CSS]: {
     scanlineIntensity: 0.6,
     scanlineSize: 2.5,
     vignetteStrength: 1.5,
@@ -113,8 +114,8 @@ export const CRT_PRESETS = {
     brightness: 1.5,
     saturation: 1.3,
     hue: 0,
-    renderMode: 'css' as const,
-    phosphorPattern: 'none' as const,
+    renderMode: CRT_RENDER_MODES.CSS,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.NONE,
     phosphorIntensity: 0,
     bloomEnabled: false,
     bloomIntensity: 0,
@@ -124,11 +125,11 @@ export const CRT_PRESETS = {
   },
 
   /**
-   * Full Screen (WebGL) - Immersive fullscreen CRT with GPU-accelerated rendering.
+   * Default Full Screen (WebGL) - Immersive fullscreen CRT with GPU-accelerated rendering.
    * Strong scanlines, vignette, curvature, phosphor patterns for maximum authenticity.
    * Uses WebGL for best quality and no zoom banding artifacts.
    */
-  'fullscreen-webgl': {
+  [CRT_PRESET_KEYS.FULLSCREEN_WEBGL]: {
     scanlineIntensity: 0.6,
     scanlineSize: 2.5,
     vignetteStrength: 1.5,
@@ -137,8 +138,8 @@ export const CRT_PRESETS = {
     brightness: 1.5,
     saturation: 1.3,
     hue: 0,
-    renderMode: 'webgl' as const,
-    phosphorPattern: 'aperture-grille' as const,
+    renderMode: CRT_RENDER_MODES.WEBGL,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
     phosphorIntensity: 0.4,
     bloomEnabled: false,
     bloomIntensity: 0,
@@ -148,11 +149,11 @@ export const CRT_PRESETS = {
   },
 
   /**
-   * Dialog (CSS) - Moderate CRT effect for dialog/modal contexts.
+   * Default Dialog (CSS) - Moderate CRT effect for dialog/modal contexts.
    * Balanced scanlines without curvature, subtle vignette.
    * Uses lightweight CSS mode.
    */
-  'dialog-css': {
+  [CRT_PRESET_KEYS.DIALOG_CSS]: {
     scanlineIntensity: 0.4,
     scanlineSize: 2.0,
     vignetteStrength: 1.0,
@@ -161,8 +162,8 @@ export const CRT_PRESETS = {
     brightness: 1.4,
     saturation: 1.2,
     hue: 0,
-    renderMode: 'css' as const,
-    phosphorPattern: 'none' as const,
+    renderMode: CRT_RENDER_MODES.CSS,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.NONE,
     phosphorIntensity: 0,
     bloomEnabled: false,
     bloomIntensity: 0,
@@ -172,11 +173,11 @@ export const CRT_PRESETS = {
   },
 
   /**
-   * Dialog (WebGL) - Moderate CRT effect for dialog/modal contexts.
+   * Default Dialog (WebGL) - Moderate CRT effect for dialog/modal contexts.
    * Balanced scanlines without curvature, subtle vignette, phosphor pattern.
    * Uses WebGL for crisp rendering without banding.
    */
-  'dialog-webgl': {
+  [CRT_PRESET_KEYS.DIALOG_WEBGL]: {
     scanlineIntensity: 0.4,
     scanlineSize: 2.0,
     vignetteStrength: 1.0,
@@ -185,8 +186,8 @@ export const CRT_PRESETS = {
     brightness: 1.4,
     saturation: 1.2,
     hue: 0,
-    renderMode: 'webgl' as const,
-    phosphorPattern: 'aperture-grille' as const,
+    renderMode: CRT_RENDER_MODES.WEBGL,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
     phosphorIntensity: 0.2,
     bloomEnabled: false,
     bloomIntensity: 0,
@@ -196,11 +197,11 @@ export const CRT_PRESETS = {
   },
 
   /**
-   * Image (CSS) - Subtle CRT effect for still images.
+   * Default Image (CSS) - Subtle CRT effect for still images.
    * Light scanlines, minimal vignette, no curvature.
    * Uses lightweight CSS mode.
    */
-  'image-css': {
+  [CRT_PRESET_KEYS.IMAGE_CSS]: {
     scanlineIntensity: 0.3,
     scanlineSize: 1.5,
     vignetteStrength: 0.7,
@@ -209,8 +210,8 @@ export const CRT_PRESETS = {
     brightness: 1.3,
     saturation: 1.15,
     hue: 0,
-    renderMode: 'css' as const,
-    phosphorPattern: 'none' as const,
+    renderMode: CRT_RENDER_MODES.CSS,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.NONE,
     phosphorIntensity: 0,
     bloomEnabled: false,
     bloomIntensity: 0,
@@ -220,11 +221,11 @@ export const CRT_PRESETS = {
   },
 
   /**
-   * Image (WebGL) - Subtle CRT effect for still images.
+   * Default Image (WebGL) - Subtle CRT effect for still images.
    * Light scanlines, minimal vignette, no curvature, delicate phosphor pattern.
    * Uses WebGL for pristine rendering.
    */
-  'image-webgl': {
+  [CRT_PRESET_KEYS.IMAGE_WEBGL]: {
     scanlineIntensity: 0.3,
     scanlineSize: 1.5,
     vignetteStrength: 0.7,
@@ -233,8 +234,8 @@ export const CRT_PRESETS = {
     brightness: 1.3,
     saturation: 1.15,
     hue: 0,
-    renderMode: 'webgl' as const,
-    phosphorPattern: 'aperture-grille' as const,
+    renderMode: CRT_RENDER_MODES.WEBGL,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
     phosphorIntensity: 0.1,
     bloomEnabled: false,
     bloomIntensity: 0,
@@ -244,23 +245,44 @@ export const CRT_PRESETS = {
   },
 } as const satisfies Record<string, CrtSettings>;
 
-/** Type for valid preset names */
-export type CrtPresetName = keyof typeof CRT_PRESETS;
+/** Type alias for built-in preset names (provides single source of truth) */
+export type BuiltInPresetName = keyof typeof CRT_PRESETS;
+
+/**
+ * Template literal type for custom preset names.
+ * Custom presets must start with 'custom-' prefix.
+ * @example 'custom-My Preset' ✅ | 'My Preset' ❌
+ */
+export type CustomPresetName = `${typeof CRT_PRESET_PREFIX.CUSTOM}${string}`;
+
+/**
+ * Union type for any valid preset name (built-in or custom).
+ * Use this when a function accepts both preset types.
+ */
+export type AnyPresetName = BuiltInPresetName | CustomPresetName;
+
+/**
+ * Type for valid preset names.
+ * Maintained as alias to BuiltInPresetName for backward compatibility.
+ * Use AnyPresetName when you need to support custom presets.
+ */
+export type CrtPresetName = BuiltInPresetName;
 
 /**
  * Human-readable labels for CRT presets.
  * Use these for UI display in dropdown menus.
  */
 export const CRT_PRESET_LABELS: Record<CrtPresetName, string> = {
-  'fullscreen-css': 'Full Screen (CSS)',
-  'fullscreen-webgl': 'Full Screen (WebGL)',
-  'dialog-css': 'Dialog (CSS)',
-  'dialog-webgl': 'Dialog (WebGL)',
-  'image-css': 'Image (CSS)',
-  'image-webgl': 'Image (WebGL)',
+  [CRT_PRESET_KEYS.FULLSCREEN_CSS]: 'Default Full Screen (CSS)',
+  [CRT_PRESET_KEYS.FULLSCREEN_WEBGL]: 'Default Full Screen (WebGL)',
+  [CRT_PRESET_KEYS.DIALOG_CSS]: 'Default Dialog (CSS)',
+  [CRT_PRESET_KEYS.DIALOG_WEBGL]: 'Default Dialog (WebGL)',
+  [CRT_PRESET_KEYS.IMAGE_CSS]: 'Default Image (CSS)',
+  [CRT_PRESET_KEYS.IMAGE_WEBGL]: 'Default Image (WebGL)',
 };
 
 /**
  * Default CRT settings - Full Screen WebGL experience.
  */
-export const DEFAULT_CRT_SETTINGS: CrtSettings = CRT_PRESETS['fullscreen-webgl'];
+export const DEFAULT_CRT_SETTINGS: CrtSettings = CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL];
+

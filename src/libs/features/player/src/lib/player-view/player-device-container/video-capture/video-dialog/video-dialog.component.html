@@ -45,16 +45,15 @@
     (buttonClick)="onClose()"
   ></lib-icon-button>
 
-  <!-- Left controls: CRT settings panel (slides in when showCrtControls is true) -->
-  @if (isCrtEnabled()) {
+  <!-- Left controls: CRT settings panel (only rendered when user wants it visible) -->
+  @if (isCrtEnabled() && showCrtControls()) {
     <lib-crt-settings-panel leftControls
       [settings]="crtSettings()"
       [config]="crtConfig"
-      [visible]="showCrtControls()"
-      [class.panel-hidden]="!showCrtControls()"
+      [validatePresetNameFn]="validatePresetNameFn"
       (settingsChange)="onCrtSettingsChange($event)"
-      (resetRequested)="onCrtReset()"
       (presetSelected)="onCrtPresetSelected($event)"
+      (closed)="toggleCrtControls()">
     ></lib-crt-settings-panel>
   }
 

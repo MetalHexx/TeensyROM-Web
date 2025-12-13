@@ -1,0 +1,71 @@
+// Preset Name Dialog Styles
+// Consistent styling for dialog using design system tokens and Material overrides
+
+:host {
+  display: block;
+}
+
+// Dialog container sizing
+lib-scaling-compact-card {
+  max-width: 400px;
+  width: 100%;
+}
+
+// Dialog header
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-inline-md);
+  margin-bottom: var(--spacing-inline-lg);
+  
+  mat-icon {
+    color: var(--color-primary);
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+  }
+  
+  h2 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-medium);
+    color: var(--mat-sys-on-surface);
+  }
+}
+
+// Material form field overrides
+.preset-name-field {
+  width: 100%;
+  margin-bottom: var(--spacing-inline-md);
+}
+
+// Character counter error state
+.error-text {
+  color: var(--color-error) !important;
+  font-weight: var(--font-weight-medium);
+}
+
+// Button row
+.button-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-inline-sm);
+  margin-top: var(--spacing-inline-md);
+}
+
+// Mobile responsiveness
+@media (max-width: 600px) {
+  lib-scaling-compact-card {
+    max-width: 100%;
+    margin: var(--spacing-inline-sm);
+  }
+  
+  .button-row {
+    flex-direction: column-reverse;
+    gap: var(--spacing-inline-xs);
+    
+    lib-icon-button {
+      width: 100%;
+    }
+  }
+}

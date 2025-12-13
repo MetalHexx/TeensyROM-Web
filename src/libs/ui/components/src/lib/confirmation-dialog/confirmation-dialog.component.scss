@@ -1,0 +1,70 @@
+:host {
+  display: block;
+}
+
+// Dialog container sizing - narrower than name dialog for focused attention
+lib-scaling-compact-card {
+  max-width: 350px;
+  width: 100%;
+}
+
+// Dialog header with warning icon
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-inline-md); // 10px
+  margin-bottom: var(--spacing-inline-lg); // 16px
+
+  .warning-icon {
+    color: var(--color-error); // Red/pink error color
+    font-size: 32px; // Larger than standard 24px
+    width: 32px;
+    height: 32px;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: var(--font-size-lg); // 1.25rem (20px)
+    font-weight: var(--font-weight-medium); // 500
+    color: var(--mat-sys-on-surface); // Material theme color
+  }
+}
+
+// Message text area
+.dialog-message {
+  margin-bottom: var(--spacing-inline-lg); // 16px
+
+  p {
+    margin: 0;
+    font-size: var(--font-size-md); // Base font size
+    color: var(--mat-sys-on-surface-variant); // Slightly dimmed text
+    line-height: 1.5; // Comfortable reading
+    white-space: pre-wrap; // Support multi-line messages
+    word-wrap: break-word; // Wrap long preset names
+  }
+}
+
+// Button row
+.button-row {
+  display: flex;
+  justify-content: flex-end; // Right-aligned buttons
+  gap: var(--spacing-inline-sm); // 8px between buttons
+  margin-top: var(--spacing-inline-md); // 10px top spacing
+}
+
+// Mobile responsiveness
+@media (max-width: 600px) {
+  lib-scaling-compact-card {
+    max-width: 100%;
+    margin: var(--spacing-inline-sm); // 8px margins
+  }
+
+  .button-row {
+    flex-direction: column-reverse; // Cancel on top, confirm on bottom
+    gap: var(--spacing-inline-xs); // 6px between stacked buttons
+
+    lib-icon-button {
+      width: 100%; // Full-width touch targets
+    }
+  }
+}

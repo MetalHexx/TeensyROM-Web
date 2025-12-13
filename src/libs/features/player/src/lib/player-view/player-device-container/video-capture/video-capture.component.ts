@@ -5,14 +5,18 @@ import {
   VideoStreamComponent,
   ContentOverlayContainerComponent,
   CrtEffectWrapperComponent,
-  CrtSettingsPanelComponent,
+  CrtSettingsPanelOverlayComponent,
   ScalingCompactCardComponent,
   VideoDeviceSelectorComponent,
   VideoControlsToolbarComponent,
   CRT_CONFIGS,
   CRT_PRESETS,
+  CRT_PRESET_KEYS,
+  AnyPresetName,
+  isBuiltInPreset,
 } from '@teensyrom-nx/ui/components';
 import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
+import { validatePresetName } from '@teensyrom-nx/infrastructure';
 import { VideoDialogComponent } from './video-dialog/video-dialog.component';
 import { SettingsStore } from '@teensyrom-nx/application';
 
@@ -28,7 +32,7 @@ interface VideoDevice {
     VideoStreamComponent,
     ContentOverlayContainerComponent,
     CrtEffectWrapperComponent,
-    CrtSettingsPanelComponent,
+    CrtSettingsPanelOverlayComponent,
     ScalingCompactCardComponent,
     VideoDeviceSelectorComponent,
     VideoControlsToolbarComponent,
@@ -46,9 +50,18 @@ export class VideoCaptureComponent implements OnDestroy {
   // CRT configuration - small preset (subtle scanlines for compact display)
   readonly crtConfig = CRT_CONFIGS.small;
 
+  /**
+   * Validation function for custom preset names.
+   * Passed to CrtSettingsPanelComponent for preset name validation.
+   */
+  readonly validatePresetNameFn = (name: string, existingNames: string[]) => {
+    const result = validatePresetName(name, existingNames);
+    return { error: result.error ?? null };
+  };
+
   // CRT state signals
   protected readonly isCrtEnabled = signal<boolean>(true);
-  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS['image-webgl']);
+  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_WEBGL]);
   protected readonly showCrtControls = signal<boolean>(false);
   protected readonly isDeviceSelectorOpen = signal<boolean>(false);
   protected readonly showDeviceSelector = signal<boolean>(false);
@@ -286,15 +299,35 @@ export class VideoCaptureComponent implements OnDestroy {
   /**
    * Reset CRT settings to default preset
    */
-  onCrtReset(): void {
-    this.crtSettings.set(CRT_PRESETS['image-webgl']);
-  }
-
   /**
-   * Apply a CRT preset
+   * Apply a CRT preset (built-in or custom)
    */
-  onCrtPresetSelected(presetName: keyof typeof CRT_PRESETS): void {
-    this.crtSettings.set(CRT_PRESETS[presetName]);
+  onCrtPresetSelected(presetName: AnyPresetName): void {
+    let settings: CrtSettings;
+
+    // Branch on preset type using type guard
+    if (isBuiltInPreset(presetName)) {
+      // Built-in preset: load from CRT_PRESETS constant
+      settings = CRT_PRESETS[presetName];
+    } else {
+      // Custom preset: load from storage
+      const customPresets = this.crtStorage.loadCustomPresets();
+      const preset = customPresets.find(p => p.name === presetName);
+
+      if (!preset) {
+        console.warn(`[VideoCaptureComponent] Custom preset not found: ${presetName}`);
+        return; // Early return, don't change settings
+      }
+
+      settings = preset.settings;
+    }
+
+    // Apply settings (same for both preset types)
+    this.crtSettings.set(settings);
+    const deviceId = this.deviceId();
+    if (deviceId) {
+      this.crtStorage.save(deviceId, 'video-compact', settings);
+    }
   }
 
   /**

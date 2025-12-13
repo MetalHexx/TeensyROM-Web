@@ -27,4 +27,5 @@ export * from './lib/version/providers';
 
 // CRT implementations
 export * from './lib/crt/crt-storage.service';
+export * from './lib/crt/crt-validation';
 export * from './lib/crt/providers';

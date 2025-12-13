@@ -22,19 +22,18 @@
       </lib-crt-effect-wrapper>
     </ng-container>
 
-    <!-- Top left corner: CRT settings panel (always rendered when CRT enabled, visibility controlled by CSS) -->
-    @if (isCrtEnabled()) {
-      <lib-crt-settings-panel
+    <!-- Top left corner: CRT settings panel (rendered via CDK Overlay to prevent container clipping) -->
+    @if (isCrtEnabled() && showCrtControls()) {
+      <lib-crt-settings-panel-overlay
         topLeftCorner
         [settings]="crtSettings()"
         [config]="crtConfig"
-        [visible]="showCrtControls()"
-        cardClass="crt-panel-scrollable"
-        [class.panel-hidden]="!showCrtControls()"
+        [maxHeight]="350"
+        [validatePresetNameFn]="validatePresetNameFn"
         (settingsChange)="onCrtSettingsChange($event)"
-        (resetRequested)="onCrtReset()"
-        (presetSelected)="onCrtPresetSelected($event)">
-      </lib-crt-settings-panel>
+        (presetSelected)="onCrtPresetSelected($event)"
+        (closed)="toggleCrtControls()">
+      </lib-crt-settings-panel-overlay>
     }
 
     <!-- Right controls toolbar -->

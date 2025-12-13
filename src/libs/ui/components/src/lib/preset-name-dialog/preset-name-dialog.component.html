@@ -1,0 +1,48 @@
+<lib-scaling-compact-card>
+  <!-- Dialog Header -->
+  <div class="dialog-header">
+    <mat-icon>edit</mat-icon>
+    <h2>{{ title() }}</h2>
+  </div>
+  
+  <!-- Form Field -->
+  <mat-form-field appearance="outline" class="preset-name-field">
+    <mat-label>Preset Name</mat-label>
+    <input 
+      matInput
+      [value]="currentName()"
+      (input)="currentName.set($any($event.target).value)"
+      maxlength="50"
+      (keydown)="onKeyDown($event)"
+      placeholder="Enter preset name"
+      aria-label="Preset name"
+    />
+    
+    <!-- Character Counter -->
+    <mat-hint align="end">
+      <span [class.error-text]="currentName().length > 50">
+        {{ remainingChars() }}
+      </span>
+    </mat-hint>
+    
+    <!-- Validation Error -->
+    @if (validationError()) {
+      <mat-error>{{ validationError() }}</mat-error>
+    }
+  </mat-form-field>
+  
+  <!-- Action Buttons -->
+  <div class="button-row">
+    <lib-icon-button
+      [icon]="'check'"
+      [ariaLabel]="'Save'"
+      [disabled]="!canSave()"
+      (buttonClick)="onSaveClick()"
+    />
+    <lib-icon-button
+      [icon]="'close'"
+      [ariaLabel]="'Cancel'"
+      (buttonClick)="onCancelClick()"
+    />
+  </div>
+</lib-scaling-compact-card>

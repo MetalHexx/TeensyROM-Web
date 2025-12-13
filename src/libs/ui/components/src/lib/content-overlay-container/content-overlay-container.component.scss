@@ -58,6 +58,7 @@
 .top-left-corner {
   top: 16px;
   left: 16px;
+  max-height: calc(100% - 32px); // Prevent overflow with top+bottom padding
 }
 
 .top-overlay {

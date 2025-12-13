@@ -1,5 +1,5 @@
 import { InjectionToken } from '@angular/core';
-import { CrtSettings } from '../models';
+import { CrtSettings, CustomCrtPreset, CustomPresetName } from '../models';
 
 /**
  * Context identifier for CRT settings storage.
@@ -60,6 +60,65 @@ export interface ICrtStorage {
    * @param context - Component context
    */
   clear(deviceId: string, context: CrtStorageContext): void;
+
+  /**
+   * Save a custom preset with the given name and settings.
+   * Name should include 'custom-' prefix.
+   * 
+   * @param name - Preset name with 'custom-' prefix
+   * @param settings - CRT visual effect settings to save
+   * @throws Error if preset limit (50) exceeded or validation fails
+   */
+  saveCustomPreset(name: string, settings: CrtSettings): void;
+
+  /**
+   * Load all custom presets from storage.
+   * 
+   * @returns Array of custom presets, empty array if none exist
+   */
+  loadCustomPresets(): CustomCrtPreset[];
+
+  /**
+   * Delete a custom preset by name.
+   * 
+   * @param name - Preset name with 'custom-' prefix
+   */
+  deleteCustomPreset(name: CustomPresetName): void;
+
+  /**
+   * Rename a custom preset.
+   * 
+   * @param oldName - Current preset name with 'custom-' prefix
+   * @param newName - New name without 'custom-' prefix (will be added by implementation)
+   * @throws Error if new name invalid or conflicts
+   */
+  renameCustomPreset(oldName: CustomPresetName, newName: string): void;
+
+  /**
+   * Check if a specific custom preset exists.
+   * 
+   * @param name - Preset name with 'custom-' prefix
+   * @returns True if preset exists in storage
+   */
+  hasCustomPreset(name: CustomPresetName): boolean;
+}
+
+/**
+ * Type guard to check if a preset name is a custom preset.
+ * Custom presets always start with 'custom-' prefix.
+ * 
+ * @param name - Preset name to check
+ * @returns True if name starts with 'custom-' prefix
+ * 
+ * @example
+ * ```typescript
+ * if (isCustomPresetName('custom-my-preset')) {
+ *   // Handle custom preset
+ * }
+ * ```
+ */
+export function isCustomPresetName(name: string): name is CustomPresetName {
+  return typeof name === 'string' && name.startsWith('custom-');
 }
 
 /**

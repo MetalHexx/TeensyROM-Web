@@ -10,6 +10,7 @@ import {
   inject,
   afterNextRender,
   computed,
+  effect,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
@@ -188,6 +189,9 @@ export class ContentOverlayContainerComponent {
    * Checks if any CDK overlay panes owned by this container are currently visible.
    * Uses scoped detection to only count overlays triggered from within this container,
    * preventing false positives from parent dialogs or other components' overlays.
+   * 
+   * Note: Only transient overlays (tooltips, dropdowns) are counted. Persistent overlays
+   * like CRT settings panel are not included because they should not prevent auto-hide behavior.
    */
   private checkForOpenOverlays(): void {
     if (!this.containerElement) {
@@ -206,17 +210,23 @@ export class ContentOverlayContainerComponent {
   /**
    * Determines if a CDK overlay pane is owned by (triggered from within) this container.
    * 
-   * Uses a pragmatic approach:
+   * Uses spatial proximity detection to prevent cross-component contamination:
    * 1. Exclude parent overlays that contain our container (e.g., parent dialog)
-   * 2. Include all tooltip and dropdown overlays (assume they're ours if not excluded above)
+   * 2. For tooltips, check if positioned near this container (tight tolerance)
+   * 3. For dropdowns, check if positioned near this container (moderate tolerance)
    * 
-   * This approach works because:
+   * Note: CRT panel overlays are intentionally NOT detected here. They're persistent
+   * user-controlled panels that should not prevent auto-hide behavior, so we don't
+   * count them as "open overlays" that keep the overlay layer visible.
+   * 
+   * This approach is necessary because:
    * - We can't reliably check trigger elements (they may be hidden when overlays appear)
-   * - Tooltips/dropdowns are transient and unlikely to overlap between components
-   * - The parent exclusion prevents false positives from containing dialogs
+   * - Multiple component instances may exist on same page (file-image, video-capture, etc.)
+   * - Components outside containers (player toolbar) can trigger overlays
+   * - Spatial proximity is the most reliable way to determine ownership
    *
    * @param overlayPane The CDK overlay pane element to check
-   * @returns True if the overlay should keep our overlays visible
+   * @returns True if the overlay is a transient overlay owned by this container
    */
   private isOverlayOwnedByContainer(overlayPane: Element): boolean {
     if (!this.containerElement) return false;
@@ -227,16 +237,33 @@ export class ContentOverlayContainerComponent {
       return false;
     }
 
-    // Strategy 1: If it's a tooltip or dropdown, assume it's ours
-    // We can't reliably check trigger elements because they may be hidden when this runs
+    const containerRect = this.containerElement.getBoundingClientRect();
+    const overlayRect = overlayPane.getBoundingClientRect();
+
+    // Strategy 1: Tooltips - tight spatial check (50px tolerance)
+    // Tooltips are small and positioned very close to their trigger
     const isTooltip = overlayPane.classList.contains('mat-mdc-tooltip-panel');
-    const isDropdown = overlayPane.querySelector('.dropdown-menu-wrapper') !== null;
-    
-    if (isTooltip || isDropdown) {
-      return true;
+    if (isTooltip) {
+      const isNearContainer = 
+        Math.abs(overlayRect.left - containerRect.left) < 50 &&
+        Math.abs(overlayRect.top - containerRect.top) < 50;
+      return isNearContainer;
     }
 
-    // If it's not a tooltip/dropdown and doesn't contain us, it might be another component's overlay
+    // Strategy 2: Dropdowns - moderate spatial check (150px tolerance)
+    // Dropdowns can be positioned further from trigger but still within general area
+    const isDropdown = overlayPane.querySelector('.dropdown-menu-wrapper') !== null;
+    if (isDropdown) {
+      const isNearContainer = 
+        Math.abs(overlayRect.left - containerRect.left) < 150 &&
+        Math.abs(overlayRect.top - containerRect.top) < 150;
+      return isNearContainer;
+    }
+
+    // Note: CRT panel overlays are intentionally not handled here.
+    // They should not contribute to hasCdkOverlayOpen signal.
+
+    // If it's not a recognized transient overlay type, it's not ours
     return false;
   }
 

@@ -794,3 +794,14 @@ mat-card-title {
   padding-top: 5px;
   padding-right: 20px;
 }
+
+// ─────────────────────────────────────────────
+//  CDK OVERLAY - CRT Settings Panel
+// ─────────────────────────────────────────────
+
+// CDK Overlay container for CRT settings panel
+// This renders at the root level, above all other content
+.cdk-overlay-container .crt-settings-panel-overlay {
+  z-index: 1000; // Above regular content but below dialogs (1100)
+  pointer-events: auto;
+}

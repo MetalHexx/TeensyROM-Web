@@ -13,8 +13,11 @@ import {
   DEFAULT_CRT_SETTINGS,
   VideoDeviceSelectorComponent,
   VideoControlsToolbarComponent,
+  AnyPresetName,
+  isBuiltInPreset,
 } from '@teensyrom-nx/ui/components';
 import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
+import { validatePresetName } from '@teensyrom-nx/infrastructure';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
 
@@ -100,6 +103,15 @@ export class VideoDialogComponent implements OnDestroy {
 
   /** CRT config - full features for video dialog */
   protected readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.full;
+
+  /**
+   * Validation function for custom preset names.
+   * Passed to CrtSettingsPanelComponent for preset name validation.
+   */
+  readonly validatePresetNameFn = (name: string, existingNames: string[]) => {
+    const result = validatePresetName(name, existingNames);
+    return { error: result.error ?? null };
+  };
 
   /** Expose presets for template usage */
   protected readonly CRT_PRESETS = CRT_PRESETS;
@@ -191,14 +203,30 @@ export class VideoDialogComponent implements OnDestroy {
     this.crtStorage.save(this.data.deviceId, 'video-dialog', settings);
   }
 
-  /** Reset CRT settings to defaults */
-  onCrtReset(): void {
-    this.crtSettings.set(DEFAULT_CRT_SETTINGS);
-  }
+  /** Apply a CRT preset (built-in or custom) */
+  onCrtPresetSelected(presetName: AnyPresetName): void {
+    let settings: CrtSettings;
 
-  /** Apply a CRT preset */
-  onCrtPresetSelected(presetName: keyof typeof CRT_PRESETS): void {
-    this.crtSettings.set(CRT_PRESETS[presetName]);
+    // Branch on preset type using type guard
+    if (isBuiltInPreset(presetName)) {
+      // Built-in preset: load from CRT_PRESETS constant
+      settings = CRT_PRESETS[presetName];
+    } else {
+      // Custom preset: load from storage
+      const customPresets = this.crtStorage.loadCustomPresets();
+      const preset = customPresets.find(p => p.name === presetName);
+
+      if (!preset) {
+        console.warn(`[VideoDialogComponent] Custom preset not found: ${presetName}`);
+        return; // Early return, don't change settings
+      }
+
+      settings = preset.settings;
+    }
+
+    // Apply settings and persist (same for both preset types)
+    this.crtSettings.set(settings);
+    this.crtStorage.save(this.data.deviceId, 'video-dialog', settings);
   }
 
   /** Cleanup streams we created on destroy */

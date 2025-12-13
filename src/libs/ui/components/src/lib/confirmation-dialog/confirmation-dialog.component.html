@@ -1,0 +1,27 @@
+<lib-scaling-compact-card (keydown)="onKeyDown($event)">
+  <!-- Dialog Header with Warning Icon -->
+  <div class="dialog-header">
+    <mat-icon class="warning-icon">warning</mat-icon>
+    <h2>{{ title() }}</h2>
+  </div>
+
+  <!-- Message Text -->
+  <div class="dialog-message">
+    <p>{{ message() }}</p>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="button-row">
+    <lib-icon-button
+      [icon]="'delete'"
+      [ariaLabel]="confirmLabel()"
+      [color]="'error'"
+      (buttonClick)="onConfirmClick()"
+    />
+    <lib-icon-button
+      [icon]="'close'"
+      [ariaLabel]="cancelLabel()"
+      (buttonClick)="onCancelClick()"
+    />
+  </div>
+</lib-scaling-compact-card>

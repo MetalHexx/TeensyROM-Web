@@ -1534,22 +1534,21 @@ The component uses a `ScalingCardComponent` with:
 
 ### `DropdownMenuComponent`
 
-**Purpose**: A custom dropdown menu component using Angular CDK Overlay for better control over rendering lifecycle. Provides smooth fade-in/out animations with glassy backdrop styling. Designed to avoid the flicker issues present in Material's mat-menu by managing overlay lifecycle explicitly without automatic focus restoration or aggressive animations.
+**Purpose**: Custom dropdown menu using CDK Overlay. Provides smooth animations and avoids Material's mat-menu flicker issues by explicitly managing overlay lifecycle.
+
+**Architecture**: Internally composes `lib-dropdown-dialog` for positioning (71% code reduction, 100% API compatible).
 
 **Selector**: `lib-dropdown-menu`
 
 **Properties**:
-
-- `isOpen`: `Signal<boolean>` - Read-only signal indicating current open/closed state
+- `isOpen`: `Signal<boolean>` - Read-only signal for current open/closed state
 
 **Methods**:
-
-- `toggle()`: Toggle dropdown open/closed state
-- `open()`: Explicitly open the dropdown
-- `close()`: Explicitly close the dropdown
+- `toggle()`: Toggle dropdown open/closed
+- `open()`: Open dropdown
+- `close()`: Close dropdown
 
 **Events**:
-
 - `opened`: Emitted when dropdown opens
 - `closed`: Emitted when dropdown closes
 
@@ -1665,26 +1664,230 @@ Uses two content projection slots:
 1. **Default slot**: Trigger element (button, icon, etc.)
 2. **`[dropdown-content]` slot**: Menu items wrapped in a div with this attribute
 
-**Best Practice**:
+**Best Practices**:
+- Use `#templateRef` to access component reference for method calls
+- Wrap menu items in `<div dropdown-content>`
+- Call `dropdown.close()` after handling item clicks
+- Use `lib-dropdown-menu-item` for consistent styling
 
-- Always use `#templateRef` to get component reference for toggle/open/close methods
-- Wrap menu items in a `<div dropdown-content>` element
-- Call `dropdown.close()` explicitly after handling menu item clicks
-- Use `lib-dropdown-menu-item` for consistent menu item styling
-- Prefer this over `mat-menu` when experiencing flicker issues
+**Used In**: `player-toolbar-actions.component.html` - Custom play timer menu
 
-**Advantages over mat-menu**:
+**See Also**: [DropdownMenuItemComponent](#dropdownmenuitemcomponent), [DropdownDialogComponent](#dropdowndialogcomponent), [Composition Pattern](#composition-pattern-dropdown-menu--dropdown-dialog)
 
-- **No Flicker**: Explicit lifecycle management prevents browser repaint issues
-- **Smooth Animations**: Controlled fade-in/out without aggressive Material animations
-- **Simpler Lifecycle**: No automatic focus restoration causing visual glitches
-- **Full Control**: Direct access to open/close methods via template reference
+---
+
+## Composition Patterns
+
+### Composition Pattern: Dropdown Menu + Dropdown Dialog
+
+**What**: Dropdown menu delegates overlay positioning to dropdown dialog internally, eliminating code duplication while maintaining 100% API compatibility.
+
+**Why It Works**:
+- Clear separation: Dialog owns positioning/overlay, Menu owns content/styling
+- Zero breaking changes: All public APIs identical
+- Single source of truth: Future overlay components reuse same positioning logic
+- Code reduction: 142 duplicate lines eliminated (71%)
+
+**Pattern Structure**:
+```
+DropdownMenuComponent
+  └─ DropdownDialogComponent (internal composition)
+       ├─ Overlay creation & lifecycle
+       ├─ Positioning strategy
+       ├─ Backdrop management
+       └─ Fullscreen support
+```
+
+**Implementation Approach**:
+```typescript
+// Menu delegates to internal dialog
+private dialogRef = viewChild.required<DropdownDialogComponent>('dialogRef');
+
+open(): void { this.dialogRef().open(); }
+close(): void { this.dialogRef().close(); }
+isOpen = computed(() => this.dialogRef().isOpen());
+```
+
+**When to Use This Pattern**:
+- Multiple components need same complex infrastructure
+- Clear delegation boundaries exist
+- Can maintain identical public API
+- Infrastructure is stable and reusable
+
+**See Also**: [DropdownMenuComponent](#dropdownmenucomponent), [DropdownDialogComponent](#dropdowndialogcomponent)
+
+---
+
+### `DropdownDialogComponent`
+
+**Purpose**: Pure positioning container for dialogs and overlays using CDK. No styling opinions—projects any content via `ng-content`.
+
+**Selector**: `lib-dropdown-dialog`
+
+**Properties**:
+- `isOpen`: `Signal<boolean>` - Current open/closed state
+
+**Methods**:
+- `open()`: Open overlay with positioning
+- `close()`: Close and dispose overlay
+
+**Events**:
+- `opened`: Emitted when dialog opens
+- `closed`: Emitted when dialog closes
+
+**Usage Examples**:
+
+```html
+<!-- Basic dialog with any content -->
+<lib-dropdown-dialog #dialog>
+  <button (click)="dialog.open()">Open Dialog</button>
+  
+  <div dialog-content>
+    <lib-preset-name-dialog
+      title="Save Preset"
+      [initialValue]="''"
+      (save)="onSave($event); dialog.close()"
+      (cancel)="dialog.close()"
+    >
+    </lib-preset-name-dialog>
+  </div>
+</lib-dropdown-dialog>
+
+<!-- With confirmation dialog -->
+<lib-dropdown-dialog #confirmDialog>
+  <button (click)="confirmDialog.open()">Delete Item</button>
+  
+  <div dialog-content>
+    <lib-confirmation-dialog
+      title="Confirm Delete"
+      message="Are you sure you want to delete this item?"
+      (confirm)="onDelete(); confirmDialog.close()"
+      (cancel)="confirmDialog.close()"
+    >
+    </lib-confirmation-dialog>
+  </div>
+</lib-dropdown-dialog>
+
+<!-- Programmatic control -->
+<lib-dropdown-dialog #saveDialog>
+  <lib-icon-button
+    icon="save"
+    ariaLabel="Save"
+    (buttonClick)="saveDialog.open()"
+  >
+  </lib-icon-button>
+  
+  <div dialog-content>
+    <!-- Any dialog component or custom content -->
+  </div>
+</lib-dropdown-dialog>
+```
+
+**Advanced Usage with Programmatic Control**:
+
+```typescript
+export class SettingsComponent {
+  dialog = viewChild<DropdownDialogComponent>('saveDialog');
+  
+  openDialog() {
+    this.dialog()?.open();
+  }
+  
+  closeDialog() {
+    this.dialog()?.close();
+  }
+  
+  handleSave(name: string) {
+    // Perform save operation
+    console.log('Saving:', name);
+    
+    // Explicitly close dialog
+    this.dialog()?.close();
+  }
+}
+```
+
+**Animation Behavior**:
+
+- **Entry**: 150ms fade-in with scale (0.95 → 1.0) and opacity (0 → 1)
+- **Exit**: 100ms fade-out with scale (1.0 → 0.95) and opacity (1 → 0)
+- **Easing**: Smooth cubic-bezier transitions matching dropdown menu
+- **No Styling**: Container only handles positioning - projected content controls appearance
+
+**Positioning**:
+
+Uses Angular CDK's flexible positioning with fallback options (same as dropdown menu):
+
+1. **Primary**: Below trigger element, aligned to start (left edge)
+   - `originY: 'bottom'`, `overlayY: 'top'`, `offsetY: 8px`
+2. **Secondary**: Below trigger element, aligned to end (right edge)
+3. **Tertiary**: Above trigger element, aligned to start
+4. **Quaternary**: Above trigger element, aligned to end
+
+**Fullscreen Support**:
+
+Automatically detects and handles fullscreen mode:
+- Attaches overlay to fullscreen container when active
+- Calculates position relative to fullscreen bounds
+- Restores overlay to body when exiting fullscreen
+- Prevents position miscalculation in fullscreen contexts
+
+**Backdrop Behavior**:
+
+- **Transparent Backdrop**: Invisible backdrop that closes dialog on outside click
+- **Click-to-Close**: Clicking outside dialog automatically closes it
+- **No Visual Overlay**: Unlike Material dialogs, doesn't dim background
+
+**Content Projection**:
+
+Uses two content projection slots:
+
+1. **Default slot**: Trigger element (button, icon, link, etc.)
+2. **`[dialog-content]` slot**: Dialog content wrapped in a div with this attribute
+
+**Composability**:
+
+Designed to wrap existing dialog components without modification:
+- Works with `lib-preset-name-dialog` for text input dialogs
+- Works with `lib-confirmation-dialog` for yes/no confirmations
+- Works with any custom content (forms, cards, panels)
+- Projected content maintains its own styling and behavior
+
+**Design Philosophy**:
+
+This is a **pure positioning container** with zero styling opinions:
+- Only handles overlay lifecycle and positioning
+- No card layouts, borders, shadows, or colors
+- Projected content controls all visual aspects
+- Enables consistent positioning behavior across all dialog types
+
+**Best Practices**:
+
+- Always use `#templateRef` to get component reference for open/close methods
+- Wrap dialog content in a `<div dialog-content>` element
+- Call `dialog.close()` explicitly in event handlers (save, cancel, confirm)
+- Project existing dialog components rather than creating new ones
+- Use for positioned dialogs that need to appear near trigger elements
+
+**Comparison**:
+
+- **DropdownDialogComponent**: Positioned near trigger, transparent backdrop, for dialogs/forms
+- **DropdownMenuComponent**: Positioned near trigger, transparent backdrop, for menus/lists
+- **Material Dialog**: Centered on screen, dimmed backdrop, for modal dialogs
+
+**Use Cases**:
+
+- Preset save/rename dialogs in settings panels
+- Confirmation dialogs for delete actions
+- Form inputs that appear near trigger buttons
+- Context-sensitive dialogs that need to position near specific elements
+- Any overlay content that should close on outside click
 
 **Used In**:
 
-- `player-toolbar-actions.component.html` - Custom play timer menu
+- `libs/ui/components/src/lib/crt-settings-panel/` - CRT preset management (planned)
 
-**See Also**: [DropdownMenuItemComponent](#dropdownmenuitemcomponent), [CompactCardLayoutComponent](#compactcardlayoutcomponent)
+**See Also**: [DropdownMenuComponent](#dropdownmenucomponent), [PresetNameDialogComponent](#presetnamedialogcomponent), [ConfirmationDialogComponent](#confirmationdialogcomponent)
 
 ---
 

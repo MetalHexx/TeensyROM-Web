@@ -5,12 +5,16 @@ import {
   ScalingCardComponent,
   ContentOverlayContainerComponent,
   CrtEffectWrapperComponent,
-  CrtSettingsPanelComponent,
+  CrtSettingsPanelOverlayComponent,
   VideoControlsToolbarComponent,
   CRT_CONFIGS,
   CRT_PRESETS,
+  CRT_PRESET_KEYS,
+  AnyPresetName,
+  isBuiltInPreset,
 } from '@teensyrom-nx/ui/components';
 import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
+import { validatePresetName } from '@teensyrom-nx/infrastructure';
 import type { LaunchedFile } from '@teensyrom-nx/application';
 
 @Component({
@@ -21,7 +25,7 @@ import type { LaunchedFile } from '@teensyrom-nx/application';
     CycleImageComponent,
     ContentOverlayContainerComponent,
     CrtEffectWrapperComponent,
-    CrtSettingsPanelComponent,
+    CrtSettingsPanelOverlayComponent,
     VideoControlsToolbarComponent,
   ],
   templateUrl: './file-image.component.html',
@@ -37,9 +41,18 @@ export class FileImageComponent {
   // CRT configuration - standard config (hide curvature since it's hardcoded to 16px)
   readonly crtConfig = CRT_CONFIGS.standard;
 
+  /**
+   * Validation function for custom preset names.
+   * Passed to CrtSettingsPanelComponent for preset name validation.
+   */
+  readonly validatePresetNameFn = (name: string, existingNames: string[]) => {
+    const result = validatePresetName(name, existingNames);
+    return { error: result.error ?? null };
+  };
+
   // File-image specific default CRT settings (brightness at 100%, curvature locked to 16px)
   private readonly fileImageDefaultSettings: CrtSettings = {
-    ...CRT_PRESETS['image-webgl'],
+    ...CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_WEBGL],
     brightness: 1.0,
     screenCurvature: 16,
     scanlineSize: 1.2,
@@ -117,16 +130,34 @@ export class FileImageComponent {
   /**
    * Reset CRT settings to default preset
    */
-  onCrtReset(): void {
-    // Reset to file-image default settings (brightness 1.0, curvature 16px)
-    this.crtSettings.set(this.fileImageDefaultSettings);
-  }
-
   /**
-   * Apply a CRT preset
+   * Apply a CRT preset (built-in or custom)
    */
-  onCrtPresetSelected(presetName: keyof typeof CRT_PRESETS): void {
-    // Force screenCurvature to 16px to match cycle-image border-radius
-    this.crtSettings.set({ ...CRT_PRESETS[presetName], screenCurvature: 16 });
+  onCrtPresetSelected(presetName: AnyPresetName): void {
+    let settings: CrtSettings;
+
+    // Branch on preset type using type guard
+    if (isBuiltInPreset(presetName)) {
+      // Built-in preset: load from CRT_PRESETS constant
+      settings = CRT_PRESETS[presetName];
+    } else {
+      // Custom preset: load from storage
+      const customPresets = this.crtStorage.loadCustomPresets();
+      const preset = customPresets.find(p => p.name === presetName);
+
+      if (!preset) {
+        console.warn(`[FileImageComponent] Custom preset not found: ${presetName}`);
+        return; // Early return, don't change settings
+      }
+
+      settings = preset.settings;
+    }
+
+    // Force screenCurvature to 16px to match cycle-image border-radius (same for both types)
+    this.crtSettings.set({ ...settings, screenCurvature: 16 });
+    const deviceId = this.deviceId();
+    if (deviceId) {
+      this.crtStorage.save(deviceId, 'file-image', settings);
+    }
   }
 }
