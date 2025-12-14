@@ -356,6 +356,13 @@ describe('VideoCaptureComponent', () => {
         brightness: 1.6,
         saturation: 1.4,
         hue: 0,
+        phosphorPattern: 'none' as const,
+        phosphorIntensity: 0,
+        bloomEnabled: false,
+        bloomIntensity: 0.3,
+        bloomRadius: 3,
+        barrelDistortion: 0,
+        chromaticAberration: 0,
       };
 
       component.onCrtSettingsChange(newSettings);
@@ -437,6 +444,13 @@ describe('VideoCaptureComponent', () => {
           brightness: 1.8,
           saturation: 1.6,
           hue: 0,
+          phosphorPattern: 'none' as const,
+          phosphorIntensity: 0,
+          bloomEnabled: false,
+          bloomIntensity: 0.3,
+          bloomRadius: 3,
+          barrelDistortion: 0,
+          chromaticAberration: 0,
         };
 
         component.onCrtSettingsChange(newSettings);
@@ -465,6 +479,13 @@ describe('VideoCaptureComponent', () => {
         brightness: 2.0,
         saturation: 2.0,
         hue: 0,
+        phosphorPattern: 'none' as const,
+        phosphorIntensity: 0,
+        bloomEnabled: false,
+        bloomIntensity: 0.3,
+        bloomRadius: 3,
+        barrelDistortion: 0,
+        chromaticAberration: 0,
       });
     });
   });
@@ -584,6 +605,13 @@ describe('VideoCaptureComponent', () => {
           brightness: 2.5,
           saturation: 2.0,
           hue: 0,
+          phosphorPattern: 'none' as const,
+          phosphorIntensity: 0,
+          bloomEnabled: false,
+          bloomIntensity: 0.3,
+          bloomRadius: 3,
+          barrelDistortion: 0,
+          chromaticAberration: 0,
         };
         component.onCrtSettingsChange(customSettings);
 
