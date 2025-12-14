@@ -20,7 +20,7 @@ import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component'
 import { DropdownMenuItemComponent } from '../dropdown-menu/dropdown-menu-item.component';
 import { PresetNameDialogComponent, PresetNameValidationFn } from '../preset-name-dialog/preset-name-dialog.component';
 import { ConfirmationDialogComponent } from '../confirmation-dialog/confirmation-dialog.component';
-import { CrtSettings, CrtSettingsConfig, PhosphorPatternType, CRT_RENDER_MODES } from '../crt-effect-wrapper/crt-settings.interface';
+import { CrtSettings, CrtSettingsConfig, PhosphorPatternType } from '../crt-effect-wrapper/crt-settings.interface';
 import {
   DEFAULT_CRT_SETTINGS,
   DEFAULT_CRT_CONFIG,
@@ -39,7 +39,6 @@ import {
   PHOSPHOR_SLIDER,
   PHOSPHOR_PATTERN_OPTIONS,
   PhosphorPatternOption,
-  RENDER_MODE_OPTIONS,
 } from './crt-slider-configs';
 import { CRT_STORAGE, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 import { IconLabelComponent } from "../icon-label/icon-label.component";
@@ -177,16 +176,11 @@ export class CrtSettingsPanelComponent {
   protected readonly colorFilterSliders = COLOR_FILTER_SLIDERS;
   protected readonly phosphorSlider = PHOSPHOR_SLIDER;
   protected readonly phosphorPatternOptions = PHOSPHOR_PATTERN_OPTIONS;
-  protected readonly renderModeOptions = RENDER_MODE_OPTIONS;
 
   /** Available preset names for the preset menu */
   protected readonly presetNames: CrtPresetName[] = [
-    CRT_PRESET_KEYS.FULLSCREEN_CSS,
-    CRT_PRESET_KEYS.FULLSCREEN_WEBGL,
-    CRT_PRESET_KEYS.DIALOG_CSS,
-    CRT_PRESET_KEYS.DIALOG_WEBGL,
-    CRT_PRESET_KEYS.IMAGE_CSS,
-    CRT_PRESET_KEYS.IMAGE_WEBGL,
+    CRT_PRESET_KEYS.SMALL_WEBGL,
+    CRT_PRESET_KEYS.LARGE_WEBGL,
   ];
 
   /** Validation function adapter for preset name dialog */
@@ -305,12 +299,11 @@ export class CrtSettingsPanelComponent {
   });
 
   /**
-   * Whether phosphor controls should be visible based on render mode.
-   * Phosphor patterns are WebGL-only, so hide when CSS mode is selected.
+   * Whether phosphor controls should be visible.
+   * Phosphor patterns are WebGL-only (now the only mode).
    */
   protected readonly shouldShowPhosphor = computed(() => {
-    const mode = this.settings().renderMode;
-    return this.config().showPhosphor && mode !== CRT_RENDER_MODES.CSS;
+    return this.config().showPhosphor;
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -351,33 +344,11 @@ export class CrtSettingsPanelComponent {
   }
 
   /**
-   * Handles render mode toggle (CSS <-> WebGL).
-   */
-  protected onRenderModeToggle(): void {
-    const currentMode = this.settings().renderMode;
-    const newMode = currentMode === CRT_RENDER_MODES.CSS ? CRT_RENDER_MODES.WEBGL : CRT_RENDER_MODES.CSS;
-    const updatedSettings: CrtSettings = {
-      ...this.settings(),
-      renderMode: newMode,
-    };
-    this.settingsChange.emit(updatedSettings);
-  }
-
-  /**
    * Gets the label for the current phosphor pattern.
    */
   protected getPhosphorPatternLabel(): string {
     const pattern = this.settings().phosphorPattern;
     const option = PHOSPHOR_PATTERN_OPTIONS.find(o => o.value === pattern);
-    return option?.label ?? 'Unknown';
-  }
-
-  /**
-   * Gets the label for the current render mode.
-   */
-  protected getRenderModeLabel(): string {
-    const mode = this.settings().renderMode;
-    const option = RENDER_MODE_OPTIONS.find(o => o.value === mode);
     return option?.label ?? 'Unknown';
   }
 
@@ -540,7 +511,7 @@ export class CrtSettingsPanelComponent {
       // Check if deleted preset was currently active
       if (this.currentPresetName() === presetName) {
         // Reset to default preset when active preset is deleted
-        this.presetSelected.emit(CRT_PRESET_KEYS.FULLSCREEN_WEBGL);
+        this.presetSelected.emit(CRT_PRESET_KEYS.LARGE_WEBGL);
       }
       
       // Refresh preset list and close dialog

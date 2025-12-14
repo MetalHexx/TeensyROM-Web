@@ -321,6 +321,47 @@ import { DomainType } from '@teensyrom-nx/domain/feature/services';
 - Use domain enums in state, components, and tests
 - Mock domain enums in tests, not API types
 
+### Avoid ::ng-deep and /deep/
+
+**Standard**: Never use `::ng-deep`, `/deep/`, or `>>>` selectors for style encapsulation piercing
+
+**Rationale**:
+- `::ng-deep` is deprecated and will be removed from Angular
+- Creates brittle coupling between parent and child components
+- Makes components harder to refactor and reuse
+- Breaks component encapsulation boundaries
+- Can cause unexpected styling conflicts
+
+**Alternative Approaches**:
+- Use component `@Input()` properties to pass configuration
+- Emit events via `@Output()` to parent for state changes
+- Use CSS custom properties (CSS variables) for themeable values
+- Create wrapper components with proper styling
+- Use Angular's ViewEncapsulation.None only when absolutely necessary and document why
+
+**Example - Wrong**:
+```scss
+// ❌ NEVER DO THIS
+::ng-deep .child-component {
+  color: red;
+}
+```
+
+**Example - Correct**:
+```typescript
+// ✅ Pass configuration via input
+@Component({
+  selector: 'lib-parent',
+  template: '<lib-child [textColor]="red"></lib-child>'
+})
+
+// ✅ Use CSS variables
+@Component({
+  selector: 'lib-parent',
+  template: '<lib-child style="--text-color: red"></lib-child>'
+})
+```
+
 ### Magic Strings and Constants
 
 **Standard**: Avoid magic strings; use constants, enums, or typed objects

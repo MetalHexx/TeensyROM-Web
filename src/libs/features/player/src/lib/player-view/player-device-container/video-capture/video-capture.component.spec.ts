@@ -21,7 +21,6 @@ const mockCustomPresets: CustomCrtPreset[] = [
       brightness: 1.7,
       saturation: 1.5,
       hue: 0,
-      renderMode: 'webgl',
       phosphorPattern: 'none',
       phosphorIntensity: 0,
       bloomEnabled: false,
@@ -43,7 +42,6 @@ const mockCustomPresets: CustomCrtPreset[] = [
       brightness: 1.0,
       saturation: 1.0,
       hue: 0,
-      renderMode: 'css',
       phosphorPattern: 'none',
       phosphorIntensity: 0,
       bloomEnabled: false,
@@ -364,6 +362,93 @@ describe('VideoCaptureComponent', () => {
       expect(component['crtSettings']()).toEqual(newSettings);
     });
 
+    describe('CRT initialization', () => {
+      it('should use SMALL_WEBGL preset when no saved settings', async () => {
+        await setupTestBed([
+          { deviceId: 'cam-123', label: 'Front Camera' },
+        ]);
+        await createComponent('teensy-device-1');
+
+        const settings = component['crtSettings']();
+        expect(settings.phosphorPattern).toBe('aperture-grille');
+        expect(settings.bloomEnabled).toBe(false);
+      });
+
+      it('should load saved settings when they exist', async () => {
+        const savedSettings = {
+          scanlineIntensity: 0.5,
+          scanlineSize: 2,
+          vignetteStrength: 1.2,
+          screenCurvature: 0,
+          contrast: 1.1,
+          brightness: 1.3,
+          saturation: 1.2,
+          hue: 0,
+          phosphorPattern: 'none' as const,
+          phosphorIntensity: 0,
+          bloomEnabled: false,
+          bloomIntensity: 0.3,
+          bloomRadius: 3,
+          barrelDistortion: 0,
+          chromaticAberration: 0,
+        };
+
+        // Mock storage to return saved settings
+        vi.spyOn(mockCrtStorage, 'load').mockReturnValue(savedSettings);
+
+        await setupTestBed([
+          { deviceId: 'cam-123', label: 'Front Camera' },
+        ]);
+        await createComponent('teensy-device-1');
+
+        // Should use saved settings
+        const settings = component['crtSettings']();
+        expect(settings).toEqual(savedSettings);
+      });
+
+      it('should use small CRT config for compact display', async () => {
+        await setupTestBed([
+          { deviceId: 'cam-123', label: 'Front Camera' },
+        ]);
+        await createComponent('teensy-device-1');
+
+        expect(component.crtConfig).toBeDefined();
+        expect(component.crtConfig.showScanlines).toBe(true);
+        expect(component.crtConfig.showVignette).toBe(true);
+        expect(component.crtConfig.showCurvature).toBe(false);
+      });
+
+      it('should persist settings with video-compact storage key', async () => {
+        const saveSpy = vi.spyOn(mockCrtStorage, 'save');
+        
+        await setupTestBed([
+          { deviceId: 'cam-123', label: 'Front Camera' },
+        ]);
+        await createComponent('teensy-device-1');
+
+        saveSpy.mockClear();
+
+        const newSettings = {
+          scanlineIntensity: 0.8,
+          scanlineSize: 3,
+          vignetteStrength: 1.6,
+          screenCurvature: 0,
+          contrast: 1.4,
+          brightness: 1.8,
+          saturation: 1.6,
+          hue: 0,
+        };
+
+        component.onCrtSettingsChange(newSettings);
+
+        expect(saveSpy).toHaveBeenCalledWith(
+          'teensy-device-1',
+          'video-compact',
+          newSettings
+        );
+      });
+    });
+
     it('should reset CRT settings to standard preset', async () => {
       await setupTestBed([
         { deviceId: 'cam-123', label: 'Front Camera' },
@@ -381,24 +466,26 @@ describe('VideoCaptureComponent', () => {
         saturation: 2.0,
         hue: 0,
       });
+    });
+  });
 
-    describe('custom preset selection', () => {
-      it('should apply built-in preset settings correctly', async () => {
+  describe('custom preset selection', () => {
+    it('should apply built-in preset settings correctly', async () => {
         await setupTestBed([
           { deviceId: 'cam-123', label: 'Front Camera' },
         ]);
         await createComponent('teensy-device-1');
 
-        // Select a built-in preset
-        component.onCrtPresetSelected(CRT_PRESET_KEYS.FULLSCREEN_WEBGL);
+        // Select a built-in preset (use SMALL_WEBGL for compact view)
+        component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_WEBGL);
         
         const settings = component['crtSettings']();
         // Verify settings match the built-in preset
         expect(settings).toBeDefined();
-        expect(settings.renderMode).toBe('webgl');
-      });
+        expect(settings.phosphorPattern).toBe('aperture-grille');
+    });
 
-      it('should apply custom preset settings correctly', async () => {
+    it('should apply custom preset settings correctly', async () => {
         // Mock storage to return custom presets
         vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
 
@@ -415,9 +502,9 @@ describe('VideoCaptureComponent', () => {
         expect(settings.scanlineIntensity).toBe(0.7);
         expect(settings.scanlineSize).toBe(3);
         expect(settings.vignetteStrength).toBe(1.8);
-      });
+    });
 
-      it('should call loadCustomPresets when custom preset selected', async () => {
+    it('should call loadCustomPresets when custom preset selected', async () => {
         vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
 
         await setupTestBed([
@@ -430,9 +517,9 @@ describe('VideoCaptureComponent', () => {
         component.onCrtPresetSelected('custom-my-preset' as CustomPresetName);
         
         expect(mockCrtStorage.loadCustomPresets).toHaveBeenCalled();
-      });
+    });
 
-      it('should persist custom preset settings to storage', async () => {
+    it('should persist custom preset settings to storage', async () => {
         vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
         const saveSpy = vi.spyOn(mockCrtStorage, 'save');
 
@@ -453,9 +540,9 @@ describe('VideoCaptureComponent', () => {
             scanlineSize: 3,
           })
         );
-      });
+    });
 
-      it('should log warning when custom preset not found', async () => {
+    it('should log warning when custom preset not found', async () => {
         vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
         const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
 
@@ -476,9 +563,9 @@ describe('VideoCaptureComponent', () => {
         expect(component['crtSettings']()).toEqual(originalSettings);
 
         consoleWarnSpy.mockRestore();
-      });
+    });
 
-      it('should not change settings when custom preset not found', async () => {
+    it('should not change settings when custom preset not found', async () => {
         vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
         const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
 
@@ -507,9 +594,9 @@ describe('VideoCaptureComponent', () => {
         expect(component['crtSettings']()).toEqual(customSettings);
 
         consoleWarnSpy.mockRestore();
-      });
+    });
 
-      it('should handle empty custom presets array gracefully', async () => {
+    it('should handle empty custom presets array gracefully', async () => {
         vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
 
         await setupTestBed([
@@ -526,7 +613,6 @@ describe('VideoCaptureComponent', () => {
 
         // Settings should remain unchanged
         expect(component['crtSettings']()).toEqual(originalSettings);
-      });
     });
   });
 

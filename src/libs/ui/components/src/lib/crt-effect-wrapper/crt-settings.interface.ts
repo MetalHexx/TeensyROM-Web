@@ -14,7 +14,7 @@ export type { BuiltInPresetName, CustomPresetName, AnyPresetName, CrtPresetName 
  * @returns True if name is a built-in preset, false otherwise
  * @example
  * ```typescript
- * isBuiltInPreset('default-fullscreen-webgl') // true
+ * isBuiltInPreset('default-large-webgl') // true
  * isBuiltInPreset('custom-My Preset') // false
  * ```
  */
@@ -31,7 +31,7 @@ export function isBuiltInPreset(name: string): name is BuiltInPresetName {
  * @example
  * ```typescript
  * isCustomPreset('custom-My Preset') // true
- * isCustomPreset('default-fullscreen-webgl') // false
+ * isCustomPreset('default-large-webgl') // false
  * ```
  */
 export function isCustomPreset(name: string): name is CustomPresetName {
@@ -48,7 +48,7 @@ export function isCustomPreset(name: string): name is CustomPresetName {
  * ```typescript
  * stripCustomPrefix('custom-My Preset') // 'My Preset'
  * stripCustomPrefix('My Preset') // 'My Preset' (no prefix to strip)
- * stripCustomPrefix('default-fullscreen-webgl') // 'default-fullscreen-webgl'
+ * stripCustomPrefix('default-large-webgl') // 'default-large-webgl'
  * ```
  */
 export function stripCustomPrefix(name: string): string {
@@ -76,20 +76,19 @@ export function addCustomPrefix(name: string): CustomPresetName {
 }
 
 /**
- * Render mode constants to eliminate magic strings.
- * Use these instead of 'webgl' or 'css' string literals.
- */
-export const CRT_RENDER_MODES = {
-  WEBGL: 'webgl',
-  CSS: 'css',
-} as const;
-
-/**
  * Phosphor pattern constants to eliminate magic strings.
- * Use these instead of 'aperture-grille' or 'none' string literals.
+ * Use these instead of string literals in code.
+ * 
+ * Patterns:
+ * - APERTURE_GRILLE: Vertical RGB stripes (Sony Trinitron style)
+ * - SHADOW_MASK: Traditional staggered RGB dots
+ * - DOT_TRIAD: Triangular RGB arrangement (arcade monitors)
+ * - NONE: No phosphor pattern
  */
 export const CRT_PHOSPHOR_PATTERNS = {
   APERTURE_GRILLE: 'aperture-grille',
+  SHADOW_MASK: 'shadow-mask',
+  DOT_TRIAD: 'dot-triad',
   NONE: 'none',
 } as const;
 
@@ -167,7 +166,7 @@ export interface CrtSettingsConfig {
 }
 
 /**
- * Re-export CrtSettings, CrtRenderMode, and PhosphorPatternType from domain layer for convenience.
+ * Re-export CrtSettings and PhosphorPatternType from domain layer for convenience.
  * The actual interfaces are defined in @teensyrom-nx/domain.
  */
-export type { CrtSettings, CrtRenderMode, PhosphorPatternType } from '@teensyrom-nx/domain';
+export type { CrtSettings, PhosphorPatternType } from '@teensyrom-nx/domain';

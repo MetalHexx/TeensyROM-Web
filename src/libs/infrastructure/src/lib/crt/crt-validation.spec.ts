@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validatePresetName } from './crt-validation';
+import { validatePresetName } from '@teensyrom-nx/domain';
 
 describe('validatePresetName', () => {
   describe('Empty/Whitespace Tests', () => {
@@ -103,57 +103,36 @@ describe('validatePresetName', () => {
   });
 
   describe('Reserved Name Tests', () => {
-    it('should fail validation for exact match to built-in preset (fullscreen-webgl)', () => {
-      const result = validatePresetName('fullscreen-webgl', []);
+    it('should fail validation for exact match to built-in preset (small-webgl)', () => {
+      const result = validatePresetName('small-webgl', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
     });
 
-    it('should fail validation for case-insensitive match (FULLSCREEN-WEBGL)', () => {
-      const result = validatePresetName('FULLSCREEN-WEBGL', []);
+    it('should fail validation for case-insensitive match (SMALL-WEBGL)', () => {
+      const result = validatePresetName('SMALL-WEBGL', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
     });
 
-    it('should fail validation for mixed case match (Fullscreen-WebGL)', () => {
-      const result = validatePresetName('Fullscreen-WebGL', []);
+    it('should fail validation for mixed case match (Small-WebGL)', () => {
+      const result = validatePresetName('Small-WebGL', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
     });
 
-    it('should fail validation for fullscreen-css', () => {
-      const result = validatePresetName('fullscreen-css', []);
+    it('should fail validation for large-webgl', () => {
+      const result = validatePresetName('large-webgl', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
     });
 
-    it('should fail validation for dialog-webgl', () => {
-      const result = validatePresetName('dialog-webgl', []);
-      
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe('This name is reserved for a built-in preset');
-    });
-
-    it('should fail validation for dialog-css', () => {
-      const result = validatePresetName('dialog-css', []);
-      
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe('This name is reserved for a built-in preset');
-    });
-
-    it('should fail validation for image-css', () => {
-      const result = validatePresetName('image-css', []);
-      
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe('This name is reserved for a built-in preset');
-    });
-
-    it('should fail validation for image-webgl', () => {
-      const result = validatePresetName('image-webgl', []);
+    it('should fail validation for Large-Webgl (mixed case)', () => {
+      const result = validatePresetName('Large-Webgl', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
@@ -219,8 +198,8 @@ describe('validatePresetName', () => {
       expect(result.error).toBe('A preset with this name already exists');
     });
 
-    it('should fail validation for name with mixed case reserved word (FuLlScReEn-WebGL)', () => {
-      const result = validatePresetName('FuLlScReEn-WebGL', []);
+    it('should fail validation for name with mixed case reserved word (SmAlL-WebGL)', () => {
+      const result = validatePresetName('SmAlL-WebGL', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');

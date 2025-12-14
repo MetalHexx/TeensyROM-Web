@@ -10,7 +10,6 @@ import {
   inject,
   afterNextRender,
   computed,
-  effect,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
@@ -112,6 +111,12 @@ export class ContentOverlayContainerComponent {
   readonly overlayLockCount = signal<number>(0);
 
   /**
+   * Tracks if a mouse leave event occurred while a tooltip was active.
+   * Used to properly hide overlays once the tooltip closes.
+   */
+  private pendingMouseLeave = false;
+
+  /**
    * Whether overlays should be visible based on all factors:
    * - Mouse is over container, OR
    * - A CDK overlay is open, OR
@@ -204,7 +209,14 @@ export class ContentOverlayContainerComponent {
       this.isOverlayOwnedByContainer(pane)
     );
 
-    this.hasCdkOverlayOpen.set(ownedOverlays.length > 0);
+    const hasOverlays = ownedOverlays.length > 0;
+    this.hasCdkOverlayOpen.set(hasOverlays);
+
+    // If overlays just closed and we had a pending mouse leave, apply it now
+    if (!hasOverlays && this.pendingMouseLeave) {
+      this.pendingMouseLeave = false;
+      this.isMouseOver.set(false);
+    }
   }
 
   /**
@@ -240,23 +252,31 @@ export class ContentOverlayContainerComponent {
     const containerRect = this.containerElement.getBoundingClientRect();
     const overlayRect = overlayPane.getBoundingClientRect();
 
-    // Strategy 1: Tooltips - tight spatial check (50px tolerance)
-    // Tooltips are small and positioned very close to their trigger
+    // Strategy 1: Tooltips - check if tooltip is within or very close to container bounds
+    // Tooltips appear near their trigger elements, which are inside the container
     const isTooltip = overlayPane.classList.contains('mat-mdc-tooltip-panel');
     if (isTooltip) {
+      // Check if tooltip is within expanded container bounds (100px padding for positioning)
+      const tolerance = 100;
       const isNearContainer = 
-        Math.abs(overlayRect.left - containerRect.left) < 50 &&
-        Math.abs(overlayRect.top - containerRect.top) < 50;
+        overlayRect.left < containerRect.right + tolerance &&
+        overlayRect.right > containerRect.left - tolerance &&
+        overlayRect.top < containerRect.bottom + tolerance &&
+        overlayRect.bottom > containerRect.top - tolerance;
       return isNearContainer;
     }
 
-    // Strategy 2: Dropdowns - moderate spatial check (150px tolerance)
+    // Strategy 2: Dropdowns - check if dropdown is within or very close to container bounds
     // Dropdowns can be positioned further from trigger but still within general area
     const isDropdown = overlayPane.querySelector('.dropdown-menu-wrapper') !== null;
     if (isDropdown) {
+      // Check if dropdown is within expanded container bounds (150px padding for positioning)
+      const tolerance = 150;
       const isNearContainer = 
-        Math.abs(overlayRect.left - containerRect.left) < 150 &&
-        Math.abs(overlayRect.top - containerRect.top) < 150;
+        overlayRect.left < containerRect.right + tolerance &&
+        overlayRect.right > containerRect.left - tolerance &&
+        overlayRect.top < containerRect.bottom + tolerance &&
+        overlayRect.bottom > containerRect.top - tolerance;
       return isNearContainer;
     }
 
@@ -272,6 +292,7 @@ export class ContentOverlayContainerComponent {
    */
   onMouseEnter(): void {
     this.isMouseOver.set(true);
+    this.pendingMouseLeave = false; // Clear any pending leave state
     this.resetInactivityTimer();
   }
 
@@ -296,9 +317,21 @@ export class ContentOverlayContainerComponent {
 
   /**
    * Handle mouse leaving the container - hide overlays (unless locked).
+   * Uses microtask delay to ensure MutationObserver has processed any tooltip
+   * overlay changes before checking hasCdkOverlayOpen signal.
    */
   onMouseLeave(): void {
-    this.isMouseOver.set(false);
+    // Defer the check to next event loop tick to ensure MutationObserver has run
+    setTimeout(() => {
+      // Don't hide overlays if user moved to a tooltip/dropdown owned by this container
+      if (!this.hasCdkOverlayOpen()) {
+        this.isMouseOver.set(false);
+        this.pendingMouseLeave = false;
+      } else {
+        // Mark that we should hide when the overlay closes
+        this.pendingMouseLeave = true;
+      }
+    }, 0);
     this.clearInactivityTimer();
   }
 

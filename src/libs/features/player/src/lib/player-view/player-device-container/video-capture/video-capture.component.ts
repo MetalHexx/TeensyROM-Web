@@ -15,8 +15,7 @@ import {
   AnyPresetName,
   isBuiltInPreset,
 } from '@teensyrom-nx/ui/components';
-import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
-import { validatePresetName } from '@teensyrom-nx/infrastructure';
+import { CrtSettings, CRT_STORAGE, validatePresetName } from '@teensyrom-nx/domain';
 import { VideoDialogComponent } from './video-dialog/video-dialog.component';
 import { SettingsStore } from '@teensyrom-nx/application';
 
@@ -61,7 +60,7 @@ export class VideoCaptureComponent implements OnDestroy {
 
   // CRT state signals
   protected readonly isCrtEnabled = signal<boolean>(true);
-  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_WEBGL]);
+  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
   protected readonly showCrtControls = signal<boolean>(false);
   protected readonly isDeviceSelectorOpen = signal<boolean>(false);
   protected readonly showDeviceSelector = signal<boolean>(false);
@@ -90,6 +89,9 @@ export class VideoCaptureComponent implements OnDestroy {
         const savedSettings = this.crtStorage.load(deviceId, 'video-compact');
         if (savedSettings) {
           this.crtSettings.set(savedSettings);
+        } else {
+          // Default to SMALL_WEBGL preset for new users
+          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
         }
       }
     }, { allowSignalWrites: true });

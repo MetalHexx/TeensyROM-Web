@@ -1,5 +1,5 @@
-import { CrtSettings, CrtSettingsConfig, CRT_PRESET_KEYS, CRT_RENDER_MODES, CRT_PHOSPHOR_PATTERNS, CRT_PRESET_PREFIX } from './crt-settings.interface';
-export { CRT_PRESET_KEYS, CRT_RENDER_MODES, CRT_PHOSPHOR_PATTERNS } from './crt-settings.interface';
+import { CrtSettings, CrtSettingsConfig, CRT_PRESET_KEYS, CRT_PHOSPHOR_PATTERNS, CRT_PRESET_PREFIX } from './crt-settings.interface';
+export { CRT_PRESET_KEYS, CRT_PHOSPHOR_PATTERNS } from './crt-settings.interface';
 
 /**
  * Default configuration - all CRT effect groups enabled.
@@ -17,49 +17,34 @@ export const DEFAULT_CRT_CONFIG: CrtSettingsConfig = {
 };
 
 /**
- * Preset configurations for feature visibility.
- * Match these with CRT_PRESETS for cohesive behavior.
- *
+ * CRT settings panel configuration variants.
+ * 
+ * Controls which sliders and controls are visible in the settings panel.
+ * 
+ * - small: For compact displays (file-image, video-capture)
+ *   - Hides curvature control (not relevant for small displays)
+ *   - Shows all other controls
+ * 
+ * - large: For fullscreen displays (video-dialog)
+ *   - Shows all controls including curvature
+ *   - Full immersive CRT experience
+ * 
+ * - none: Completely hides settings panel
+ *   - All controls disabled
+ *   - Edge case for completely static CRT effects
+ * 
  * @example
  * ```typescript
  * // Use matching config with preset
- * <lib-crt-effect-wrapper [settings]="CRT_PRESETS.standard" [config]="CRT_CONFIGS.standard">
- * <lib-crt-settings-panel [settings]="settings()" [config]="CRT_CONFIGS.standard">
+ * <lib-crt-effect-wrapper [settings]="CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]" [config]="CRT_CONFIGS.small">
+ * <lib-crt-settings-panel [settings]="settings()" [config]="CRT_CONFIGS.large">
  * ```
  */
+// NOTE: Phase 2 will update component references from old 'full'/'standard' keys to 'small'/'large'
 export const CRT_CONFIGS = {
   /**
-   * Full CRT experience - all controls visible.
-   */
-  full: {
-    showScanlines: true,
-    showVignette: true,
-    showCurvature: true,
-    showColorFilters: true,
-    showPhosphor: true,
-    showBloom: true,
-    showDistortion: true,
-    showChromaticAberration: true,
-  },
-
-  /**
-   * Standard CRT - scanlines, vignette, and color filters (no curvature).
-   * Good for embedded previews where screen curvature isn't desired.
-   */
-  standard: {
-    showScanlines: true,
-    showVignette: true,
-    showCurvature: false,
-    showColorFilters: true,
-    showPhosphor: true,
-    showBloom: true,
-    showDistortion: true,
-    showChromaticAberration: true,
-  },
-
-  /**
-   * Small CRT - subtle scanlines for compact displays.
-   * Minimal scanline thickness for smaller video components.
+   * Small config - for compact displays.
+   * Hides curvature control (not relevant for small displays), shows all other controls.
    */
   small: {
     showScanlines: true,
@@ -73,7 +58,23 @@ export const CRT_CONFIGS = {
   },
 
   /**
-   * No controls - empty panel (typically used with CRT_PRESETS.none).
+   * Large config - for fullscreen displays.
+   * Shows all controls including curvature for full immersive CRT experience.
+   */
+  large: {
+    showScanlines: true,
+    showVignette: true,
+    showCurvature: true,
+    showColorFilters: true,
+    showPhosphor: true,
+    showBloom: true,
+    showDistortion: true,
+    showChromaticAberration: true,
+  },
+
+  /**
+   * No controls - empty panel.
+   * All controls disabled for completely static CRT effects.
    */
   none: {
     showScanlines: false,
@@ -88,144 +89,37 @@ export const CRT_CONFIGS = {
 } as const satisfies Record<string, CrtSettingsConfig>;
 
 /**
- * Preset configurations for common CRT effect use cases.
+ * Built-in CRT effect presets using size-based naming.
+ *
+ * SMALL presets: Optimized for compact displays (thumbnails, compact video)
+ * - No screen curvature (screenCurvature: 0)
+ * - Subtle scanlines and vignette
+ *
+ * LARGE presets: Optimized for fullscreen displays (video dialog, fullscreen images)
+ * - Screen curvature enabled (screenCurvature: 115)
+ * - Strong scanlines and vignette for immersion
+ *
+ * CSS vs WebGL:
+ * - CSS: Pure CSS implementation, phosphor patterns disabled
+ * - WebGL: Advanced effects with phosphor patterns and bloom
  *
  * Use these presets with CRT_PRESET_KEYS constants for type safety:
  * ```typescript
  * // ✅ Use preset with constant (type-safe)
- * settings = CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL];
+ * settings = CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL];
  *
  * // ✅ Customize a preset
- * settings = { ...CRT_PRESETS[CRT_PRESET_KEYS.DIALOG_CSS], brightness: 1.2 };
+ * settings = { ...CRT_PRESETS[CRT_PRESET_KEYS.SMALL_CSS], brightness: 1.2 };
  * ```
  */
 export const CRT_PRESETS = {
   /**
-   * Default Full Screen (CSS) - Immersive fullscreen CRT with CSS rendering.
-   * Strong scanlines, vignette, curvature for retro monitor feel.
-   * Uses lightweight CSS mode.
-   */
-  [CRT_PRESET_KEYS.FULLSCREEN_CSS]: {
-    scanlineIntensity: 0.6,
-    scanlineSize: 2.5,
-    vignetteStrength: 1.5,
-    screenCurvature: 115,
-    contrast: 1.15,
-    brightness: 1.5,
-    saturation: 1.3,
-    hue: 0,
-    renderMode: CRT_RENDER_MODES.CSS,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.NONE,
-    phosphorIntensity: 0,
-    bloomEnabled: false,
-    bloomIntensity: 0,
-    bloomRadius: 1,
-    barrelDistortion: 0,
-    chromaticAberration: 0,
-  },
-
-  /**
-   * Default Full Screen (WebGL) - Immersive fullscreen CRT with GPU-accelerated rendering.
-   * Strong scanlines, vignette, curvature, phosphor patterns for maximum authenticity.
-   * Uses WebGL for best quality and no zoom banding artifacts.
-   */
-  [CRT_PRESET_KEYS.FULLSCREEN_WEBGL]: {
-    scanlineIntensity: 0.6,
-    scanlineSize: 2.5,
-    vignetteStrength: 1.5,
-    screenCurvature: 115,
-    contrast: 1.15,
-    brightness: 1.5,
-    saturation: 1.3,
-    hue: 0,
-    renderMode: CRT_RENDER_MODES.WEBGL,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
-    phosphorIntensity: 0.4,
-    bloomEnabled: false,
-    bloomIntensity: 0,
-    bloomRadius: 1,
-    barrelDistortion: 0,
-    chromaticAberration: 0,
-  },
-
-  /**
-   * Default Dialog (CSS) - Moderate CRT effect for dialog/modal contexts.
-   * Balanced scanlines without curvature, subtle vignette.
-   * Uses lightweight CSS mode.
-   */
-  [CRT_PRESET_KEYS.DIALOG_CSS]: {
-    scanlineIntensity: 0.4,
-    scanlineSize: 2.0,
-    vignetteStrength: 1.0,
-    screenCurvature: 0,
-    contrast: 1.1,
-    brightness: 1.4,
-    saturation: 1.2,
-    hue: 0,
-    renderMode: CRT_RENDER_MODES.CSS,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.NONE,
-    phosphorIntensity: 0,
-    bloomEnabled: false,
-    bloomIntensity: 0,
-    bloomRadius: 1,
-    barrelDistortion: 0,
-    chromaticAberration: 0,
-  },
-
-  /**
-   * Default Dialog (WebGL) - Moderate CRT effect for dialog/modal contexts.
-   * Balanced scanlines without curvature, subtle vignette, phosphor pattern.
-   * Uses WebGL for crisp rendering without banding.
-   */
-  [CRT_PRESET_KEYS.DIALOG_WEBGL]: {
-    scanlineIntensity: 0.4,
-    scanlineSize: 2.0,
-    vignetteStrength: 1.0,
-    screenCurvature: 0,
-    contrast: 1.1,
-    brightness: 1.4,
-    saturation: 1.2,
-    hue: 0,
-    renderMode: CRT_RENDER_MODES.WEBGL,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
-    phosphorIntensity: 0.2,
-    bloomEnabled: false,
-    bloomIntensity: 0,
-    bloomRadius: 1,
-    barrelDistortion: 0,
-    chromaticAberration: 0,
-  },
-
-  /**
-   * Default Image (CSS) - Subtle CRT effect for still images.
-   * Light scanlines, minimal vignette, no curvature.
-   * Uses lightweight CSS mode.
-   */
-  [CRT_PRESET_KEYS.IMAGE_CSS]: {
-    scanlineIntensity: 0.3,
-    scanlineSize: 1.5,
-    vignetteStrength: 0.7,
-    screenCurvature: 0,
-    contrast: 1.05,
-    brightness: 1.3,
-    saturation: 1.15,
-    hue: 0,
-    renderMode: CRT_RENDER_MODES.CSS,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.NONE,
-    phosphorIntensity: 0,
-    bloomEnabled: false,
-    bloomIntensity: 0,
-    bloomRadius: 1,
-    barrelDistortion: 0,
-    chromaticAberration: 0,
-  },
-
-  /**
-   * Default Image (WebGL) - Subtle CRT effect for still images.
+   * Small (WebGL) - Subtle CRT effect for compact displays with WebGL enhancements.
    * Light scanlines, minimal vignette, no curvature, delicate phosphor pattern.
    * Uses WebGL for pristine rendering.
+   * Ideal for: thumbnails, compact video players, embedded content.
    */
-  [CRT_PRESET_KEYS.IMAGE_WEBGL]: {
+  [CRT_PRESET_KEYS.SMALL_WEBGL]: {
     scanlineIntensity: 0.3,
     scanlineSize: 1.5,
     vignetteStrength: 0.7,
@@ -234,9 +128,32 @@ export const CRT_PRESETS = {
     brightness: 1.3,
     saturation: 1.15,
     hue: 0,
-    renderMode: CRT_RENDER_MODES.WEBGL,
     phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
     phosphorIntensity: 0.1,
+    bloomEnabled: false,
+    bloomIntensity: 0,
+    bloomRadius: 1,
+    barrelDistortion: 0,
+    chromaticAberration: 0,
+  },
+
+  /**
+   * Large (WebGL) - Immersive fullscreen CRT with GPU-accelerated rendering.
+   * Strong scanlines, vignette, curvature, phosphor patterns for maximum authenticity.
+   * Uses WebGL for best quality and no zoom banding artifacts.
+   * Ideal for: fullscreen video, large images, immersive viewing.
+   */
+  [CRT_PRESET_KEYS.LARGE_WEBGL]: {
+    scanlineIntensity: 0.6,
+    scanlineSize: 2.5,
+    vignetteStrength: 1.5,
+    screenCurvature: 115,
+    contrast: 1.15,
+    brightness: 1.5,
+    saturation: 1.3,
+    hue: 0,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
+    phosphorIntensity: 0.4,
     bloomEnabled: false,
     bloomIntensity: 0,
     bloomRadius: 1,
@@ -273,16 +190,12 @@ export type CrtPresetName = BuiltInPresetName;
  * Use these for UI display in dropdown menus.
  */
 export const CRT_PRESET_LABELS: Record<CrtPresetName, string> = {
-  [CRT_PRESET_KEYS.FULLSCREEN_CSS]: 'Default Full Screen (CSS)',
-  [CRT_PRESET_KEYS.FULLSCREEN_WEBGL]: 'Default Full Screen (WebGL)',
-  [CRT_PRESET_KEYS.DIALOG_CSS]: 'Default Dialog (CSS)',
-  [CRT_PRESET_KEYS.DIALOG_WEBGL]: 'Default Dialog (WebGL)',
-  [CRT_PRESET_KEYS.IMAGE_CSS]: 'Default Image (CSS)',
-  [CRT_PRESET_KEYS.IMAGE_WEBGL]: 'Default Image (WebGL)',
+  [CRT_PRESET_KEYS.SMALL_WEBGL]: 'Small (WebGL)',
+  [CRT_PRESET_KEYS.LARGE_WEBGL]: 'Large (WebGL)',
 };
 
 /**
- * Default CRT settings - Full Screen WebGL experience.
+ * Default CRT settings - Large WebGL experience for fullscreen viewing.
  */
-export const DEFAULT_CRT_SETTINGS: CrtSettings = CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL];
+export const DEFAULT_CRT_SETTINGS: CrtSettings = CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL];
 

@@ -1,4 +1,4 @@
-import { Component, Inject, ChangeDetectionStrategy, signal, viewChild, OnDestroy, inject } from '@angular/core';
+import { Component, Inject, ChangeDetectionStrategy, signal, viewChild, OnDestroy, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
@@ -16,8 +16,7 @@ import {
   AnyPresetName,
   isBuiltInPreset,
 } from '@teensyrom-nx/ui/components';
-import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
-import { validatePresetName } from '@teensyrom-nx/infrastructure';
+import { CrtSettings, CRT_STORAGE, validatePresetName, CRT_PRESET_KEYS } from '@teensyrom-nx/domain';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from '../../storage-container/filter-toolbar/filter-toolbar.component';
 
@@ -80,29 +79,11 @@ export class VideoDialogComponent implements OnDestroy {
   /** Track if we created the current stream (vs using parent's) */
   private ownsCurrentStream = false;
 
-  /** Unified CRT settings (consolidated from 8 individual signals) */
-  protected readonly crtSettings = signal<CrtSettings>({
-    scanlineIntensity: 0.50,
-    scanlineSize: 2.5,
-    vignetteStrength: 1.30,
-    screenCurvature: 115,
-    contrast: 1.10,
-    brightness: 1.50,
-    saturation: 1.30,
-    hue: 0,
-    renderMode: 'webgl',
-    // Advanced effects (disabled by default)
-    phosphorPattern: 'none',
-    phosphorIntensity: 0,
-    bloomEnabled: false,
-    bloomIntensity: 0.3,
-    bloomRadius: 3,
-    barrelDistortion: 0,
-    chromaticAberration: 0,
-  });
+  /** Unified CRT settings (initialized with detection logic in constructor) */
+  protected readonly crtSettings = signal<CrtSettings>({} as CrtSettings);
 
-  /** CRT config - full features for video dialog */
-  protected readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.full;
+  /** CRT config - large display with all controls */
+  protected readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.large;
 
   /**
    * Validation function for custom preset names.
@@ -124,11 +105,19 @@ export class VideoDialogComponent implements OnDestroy {
     this.currentStream.set(data.stream);
     this.selectedDeviceId.set(data.selectedDeviceId);
 
-    // Load saved CRT settings for this device
-    const savedSettings = this.crtStorage.load(data.deviceId, 'video-dialog');
-    if (savedSettings) {
-      this.crtSettings.set(savedSettings);
-    }
+    // Initialize CRT settings from saved settings or default preset
+    effect(() => {
+      const deviceId = data.deviceId;
+      if (deviceId) {
+        const saved = this.crtStorage.load(deviceId, 'video-dialog');
+        if (saved) {
+          this.crtSettings.set(saved);
+        } else {
+          // Default to LARGE_WEBGL preset for new users
+          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+        }
+      }
+    }, { allowSignalWrites: true });
   }
 
   /** Close the dialog */

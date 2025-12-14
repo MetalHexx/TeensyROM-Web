@@ -15,7 +15,8 @@
 
   // Apply screen curvature via border-radius
   // Note: No transition on border-radius to avoid trailing artifacts during adjustment
-  border-radius: var(--screen-curvature, 0px);
+  // When curvature is 0, inherit parent card's border-radius (16px)
+  border-radius: max(var(--screen-curvature, 0px), 16px);
 
   // Content container for filter application
   .crt-content {
@@ -55,10 +56,10 @@
         transparent var(--scanline-size, 0px),
         transparent calc(var(--scanline-size, 0px) * 2)
       );
-      background-size: 100% calc(var(--scanline-size, 0px) * 2);
+      background-size: 100% calc(var(--screen-curvature, 0px) * 2);
       pointer-events: none;
       z-index: 2;
-      border-radius: var(--screen-curvature, 0px);
+      border-radius: max(var(--screen-curvature, 0px), 16px);
 
       // Transition for smooth enable/disable
       opacity: 1;
@@ -108,7 +109,7 @@
       filter: blur(12px);
       pointer-events: none;
       z-index: 2;
-      border-radius: var(--screen-curvature, 0px);
+      border-radius: max(var(--screen-curvature, 0px), 16px);
 
       // Transition for smooth enable/disable
       opacity: 1;
@@ -132,93 +133,62 @@
 
   // === WEBGL CANVAS ===
   // Positioned via template bindings for aspect-ratio-aware sizing
+  // In WebGL post-processing mode:
+  // - CSS overlays are hidden (WebGL shader handles scanlines + vignette)
+  // - Original video/content is hidden (canvas shows processed output)
+  // - Canvas is the only visible layer
   .webgl-canvas {
     position: absolute;
     // width, height, left, top set via template bindings from canvasLayout()
     pointer-events: none;
     z-index: 2;
-    border-radius: var(--screen-curvature, 0px);
-
-    // Hidden by default - shown only in WebGL mode
+    border-radius: max(var(--screen-curvature, 0px), 16px);
     display: none;
   }
 
-  // === CSS RENDER MODE ===
-  &.mode-css {
-    // Ensure content is visible (overrides any WebGL visibility rules)
-    .crt-content {
-      visibility: visible;
-      pointer-events: auto;
-    }
-
-    // CSS scanlines visible (existing ::before behavior)
-    &.crt-enabled::before {
-      opacity: 1;
-    }
-
-    // WebGL canvas hidden
-    .webgl-canvas {
+  // === WEBGL RENDERING (Post-Processing Pipeline) ===
+  &.crt-enabled {
+    // Hide CSS overlay effects when WebGL is handling them
+    &::before,
+    &::after {
       display: none;
-    }
-  }
-
-  // === WEBGL RENDER MODE (Post-Processing Pipeline) ===
-  &.mode-webgl {
-    // In WebGL post-processing mode:
-    // - CSS overlays are hidden (WebGL shader handles scanlines + vignette)
-    // - Original video/content is hidden (canvas shows processed output)
-    // - Canvas is the only visible layer
-    
-    &.crt-enabled {
-      // Hide CSS overlay effects when WebGL is handling them
-      &::before,
-      &::after {
-        display: none;
-        opacity: 0;
-      }
-
-      // Hide original content (video) when WebGL canvas is active
-      .crt-content {
-        visibility: hidden;
-        pointer-events: none;
-      }
-
-      // Show WebGL canvas (it renders the processed video)
-      .webgl-canvas {
-        display: block;
-        visibility: visible;
-        pointer-events: none;
-      }
+      opacity: 0;
     }
 
-    // CSS is still applied for color filters (contrast, brightness, saturation, hue)
-    // But scanlines/vignette come from WebGL shader
-    &.crt-enabled .crt-content {
+    // Hide original content (video) when WebGL canvas is active
+    .crt-content {
+      visibility: hidden;
+      pointer-events: none;
+      // CSS filters still applied for color correction (used by WebGL)
       filter: contrast(var(--crt-contrast, 1))
         brightness(var(--crt-brightness, 1))
         saturate(var(--crt-saturation, 1))
         hue-rotate(var(--crt-hue, 0deg));
     }
 
-    // Apply color filters to WebGL canvas output too
-    // Brightness uses cubed curve for much stronger effect at higher values
-    &.crt-enabled .webgl-canvas {
+    // Show WebGL canvas (it renders the processed video)
+    .webgl-canvas {
+      display: block;
+      visibility: visible;
+      pointer-events: none;
+      // Apply color filters to WebGL canvas output
+      // Brightness uses cubed curve for much stronger effect at higher values
       filter: contrast(var(--crt-contrast, 1))
         brightness(calc(var(--crt-brightness, 1) * var(--crt-brightness, 1) * var(--crt-brightness, 1)))
         saturate(var(--crt-saturation, 1))
         hue-rotate(var(--crt-hue, 0deg));
     }
+  }
 
-    // When CRT is disabled, show content normally and hide WebGL canvas
-    &:not(.crt-enabled) {
-      .crt-content {
-        visibility: visible;
-        filter: none;
-      }
+  // When CRT is disabled, show content normally and hide WebGL canvas
+  &:not(.crt-enabled) {
+    .crt-content {
+      visibility: visible;
+      filter: none;
+    }
 
-      .webgl-canvas {
-        display: none;
-      }
+    .webgl-canvas {
+      display: none;
     }
   }
 }

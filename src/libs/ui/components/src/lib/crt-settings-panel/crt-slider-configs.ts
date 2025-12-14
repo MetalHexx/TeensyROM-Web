@@ -1,12 +1,12 @@
 import { CrtSettings } from '../crt-effect-wrapper/crt-settings.interface';
 
 /**
- * Numeric-only keys from CrtSettings (excludes renderMode, phosphorPattern, and bloomEnabled).
+ * Numeric-only keys from CrtSettings (excludes phosphorPattern and bloomEnabled).
  * Used for slider configurations.
  */
 export type NumericCrtSettingsKey = Exclude<
   keyof CrtSettings,
-  'renderMode' | 'phosphorPattern' | 'bloomEnabled'
+  'phosphorPattern' | 'bloomEnabled'
 >;
 
 /**
@@ -130,26 +130,4 @@ export const PHOSPHOR_PATTERN_OPTIONS: PhosphorPatternConfig[] = [
   { value: 'aperture-grille', label: 'Aperture Grille (Trinitron)' },
   { value: 'shadow-mask', label: 'Shadow Mask (Traditional)' },
   { value: 'dot-triad', label: 'Dot Triad (Arcade)' },
-];
-
-/** Render mode options for dropdown selector */
-export type RenderModeOption = 'css' | 'webgl';
-
-export interface RenderModeConfig {
-  value: RenderModeOption;
-  label: string;
-  description: string;
-}
-
-export const RENDER_MODE_OPTIONS: RenderModeConfig[] = [
-  { 
-    value: 'css', 
-    label: 'CSS (Basic)', 
-    description: 'Universal compatibility'
-  },
-  { 
-    value: 'webgl', 
-    label: 'WebGL (High Quality)', 
-    description: 'GPU-accelerated, no banding'
-  },
 ];

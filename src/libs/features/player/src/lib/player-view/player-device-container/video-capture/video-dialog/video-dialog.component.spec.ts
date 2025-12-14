@@ -21,7 +21,6 @@ const mockCustomPresets: CustomCrtPreset[] = [
       brightness: 1.4,
       saturation: 1.2,
       hue: 0,
-      renderMode: 'webgl',
       phosphorPattern: 'none',
       phosphorIntensity: 0,
       bloomEnabled: false,
@@ -170,17 +169,15 @@ describe('VideoDialogComponent', () => {
       expect(component['showCrtControls']()).toBe(false);
     });
 
-    it('should use CRT_CONFIGS.full for config', () => {
+    it('should use CRT_CONFIGS.large for config', () => {
       fixture.detectChanges();
-      expect(component['crtConfig']).toEqual(CRT_CONFIGS.full);
+      expect(component['crtConfig']).toEqual(CRT_CONFIGS.large);
     });
 
-    it('should have default CRT settings', () => {
+    it('should use LARGE_WEBGL preset when no saved settings', () => {
       fixture.detectChanges();
       const settings = component['crtSettings']();
-      expect(settings.scanlineIntensity).toBe(0.5);
-      expect(settings.brightness).toBe(1.5);
-      expect(settings.contrast).toBe(1.1);
+      expect(settings).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
     });
   });
 
@@ -310,27 +307,28 @@ describe('VideoDialogComponent', () => {
     it('should apply preset when onCrtPresetSelected is called', () => {
       fixture.detectChanges();
 
-      component.onCrtPresetSelected(CRT_PRESET_KEYS.DIALOG_WEBGL);
+      component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_WEBGL);
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.DIALOG_WEBGL]);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
     });
 
-    it('should apply full preset correctly', () => {
+    it('should apply large WebGL preset correctly', () => {
       fixture.detectChanges();
 
-      component.onCrtPresetSelected(CRT_PRESET_KEYS.FULLSCREEN_WEBGL);
+      component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_WEBGL);
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL]);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
     });
 
     describe('custom preset selection', () => {
       it('should apply built-in preset settings correctly', () => {
         fixture.detectChanges();
 
-        component.onCrtPresetSelected(CRT_PRESET_KEYS.DIALOG_CSS);
+        component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_WEBGL);
         
         const settings = component['crtSettings']();
-        expect(settings.renderMode).toBe('css');
+        expect(settings.phosphorPattern).toBe('aperture-grille');
+        expect(settings.bloomEnabled).toBe(false);
       });
 
       it('should apply custom preset settings correctly', () => {
@@ -511,8 +509,57 @@ describe('VideoDialogComponent', () => {
       expect(crtWrapper).toBeTruthy();
       expect(settingsPanel).toBeTruthy();
 
-      // Component should use CRT_CONFIGS.full for both
-      expect(component['crtConfig']).toEqual(CRT_CONFIGS.full);
+      // Component should use CRT_CONFIGS.large for both
+      expect(component['crtConfig']).toEqual(CRT_CONFIGS.large);
+    });
+  });
+
+  describe('CRT Initialization', () => {
+    it('should use LARGE_WEBGL preset when no saved settings', () => {
+      vi.spyOn(mockCrtStorage, 'load').mockReturnValue(null);
+
+      fixture.detectChanges();
+
+      const settings = component['crtSettings']();
+      expect(settings).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+    });
+
+    it('should load saved settings when they exist', () => {
+      const savedSettings = {
+        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL],
+        brightness: 2.0,
+      };
+      vi.spyOn(mockCrtStorage, 'load').mockReturnValue(savedSettings);
+
+      fixture.detectChanges();
+
+      const settings = component['crtSettings']();
+      expect(settings).toEqual(savedSettings);
+      expect(settings.brightness).toBe(2.0);
+    });
+
+    it('should use large CRT config for fullscreen display', () => {
+      fixture.detectChanges();
+      expect(component['crtConfig']).toEqual(CRT_CONFIGS.large);
+    });
+
+    it('should persist settings with video-dialog storage key', () => {
+      const saveSpy = vi.spyOn(mockCrtStorage, 'save');
+      fixture.detectChanges();
+
+      const newSettings = {
+        ...DEFAULT_CRT_SETTINGS,
+        brightness: 1.8,
+      };
+
+      component.onCrtSettingsChange(newSettings);
+
+      expect(saveSpy).toHaveBeenCalledWith('test-device-123', 'video-dialog', newSettings);
+    });
+
+    it('should receive deviceId from dialog data for storage key', () => {
+      fixture.detectChanges();
+      expect(component.data.deviceId).toBe('test-device-123');
     });
   });
 });

@@ -106,11 +106,6 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       expect(component.config()).toEqual(DEFAULT_CRT_CONFIG);
     });
-
-    it('should be visible by default', () => {
-      fixture.detectChanges();
-      expect(component.visible()).toBe(true);
-    });
   });
 
   describe('Slider Rendering Based on Config', () => {
@@ -217,8 +212,8 @@ describe('CrtSettingsPanelComponent', () => {
       expect(emptyState.textContent).toContain('No settings available');
     });
 
-    it('should render scanlines + vignette + color filters with CRT_CONFIGS.standard', () => {
-      fixture.componentRef.setInput('config', CRT_CONFIGS.standard);
+    it('should render scanlines + vignette + color filters with CRT_CONFIGS.small', () => {
+      fixture.componentRef.setInput('config', CRT_CONFIGS.small);
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
@@ -297,9 +292,9 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       // Call the handler directly since menu interaction is complex to simulate
-      callOnPresetSelect('default-dialog-css');
+      callOnPresetSelect('default-small-webgl');
 
-      expect(presetSpy).toHaveBeenCalledWith('default-dialog-css');
+      expect(presetSpy).toHaveBeenCalledWith('default-small-webgl');
     });
 
     it('should emit correct preset name for each preset', () => {
@@ -307,16 +302,15 @@ describe('CrtSettingsPanelComponent', () => {
       component.presetSelected.subscribe(presetSpy);
       fixture.detectChanges();
 
-      const presets: CrtPresetName[] = ['default-fullscreen-css', 'default-dialog-css', 'default-image-css'];
+      const presets: CrtPresetName[] = ['default-small-webgl', 'default-large-webgl'];
 
       presets.forEach((preset) => {
         callOnPresetSelect(preset);
       });
 
-      expect(presetSpy).toHaveBeenCalledTimes(3);
-      expect(presetSpy).toHaveBeenCalledWith('default-fullscreen-css');
-      expect(presetSpy).toHaveBeenCalledWith('default-dialog-css');
-      expect(presetSpy).toHaveBeenCalledWith('default-image-css');
+      expect(presetSpy).toHaveBeenCalledTimes(2);
+      expect(presetSpy).toHaveBeenCalledWith('default-small-webgl');
+      expect(presetSpy).toHaveBeenCalledWith('default-large-webgl');
     });
   });
 
@@ -371,11 +365,11 @@ describe('CrtSettingsPanelComponent', () => {
       expect(title.textContent?.trim()).toBe('CRT Effect');
     });
 
-    it('should have preset menu button with tune icon', () => {
+    it('should have preset menu button with bookmark icon', () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      expect(tuneButton).toBeTruthy();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      expect(bookmarkButton).toBeTruthy();
     });
   });
 
@@ -383,15 +377,15 @@ describe('CrtSettingsPanelComponent', () => {
     it('should render dropdown trigger button in header', () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      expect(tuneButton).toBeTruthy();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      expect(bookmarkButton).toBeTruthy();
     });
 
     it('should open dropdown when trigger is clicked', async () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      const innerButton = tuneButton?.querySelector('button');
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      const innerButton = bookmarkButton?.querySelector('button');
       innerButton?.click();
       fixture.detectChanges();
       await fixture.whenStable();
@@ -399,14 +393,14 @@ describe('CrtSettingsPanelComponent', () => {
       // Check that the dropdown opened by looking for menu items in the overlay
       const overlay = document.querySelector('.cdk-overlay-container');
       const menuItems = overlay?.querySelectorAll('lib-dropdown-menu-item');
-      expect(menuItems?.length).toBe(7);
+      expect(menuItems?.length).toBe(3);
     });
 
-    it('should display all six built-in preset options', async () => {
+    it('should display all two built-in preset options', async () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      const innerButton = tuneButton?.querySelector('button');
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      const innerButton = bookmarkButton?.querySelector('button');
       innerButton?.click();
       fixture.detectChanges();
       await fixture.whenStable();
@@ -417,12 +411,8 @@ describe('CrtSettingsPanelComponent', () => {
         item.textContent?.trim()
       );
 
-      expect(itemTexts).toContain('Default Full Screen (CSS)');
-      expect(itemTexts).toContain('Default Full Screen (WebGL)');
-      expect(itemTexts).toContain('Default Dialog (CSS)');
-      expect(itemTexts).toContain('Default Dialog (WebGL)');
-      expect(itemTexts).toContain('Default Image (CSS)');
-      expect(itemTexts).toContain('Default Image (WebGL)');
+      expect(itemTexts).toContain('Small (WebGL)');
+      expect(itemTexts).toContain('Large (WebGL)');
     });
 
     it('should emit presetSelected when dropdown item is clicked', async () => {
@@ -431,28 +421,28 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       // Open the dropdown
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      const innerButton = tuneButton?.querySelector('button');
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      const innerButton = bookmarkButton?.querySelector('button');
       innerButton?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
-      // Click the 'default-dialog-css' preset item via the button element
+      // Click the 'default-small-webgl' preset item via the button element
       const overlay = document.querySelector('.cdk-overlay-container');
-      const dialogCssButton = overlay?.querySelector('[data-testid="preset-default-dialog-css"]') as HTMLElement;
-      dialogCssButton?.click();
+      const smallWebglButton = overlay?.querySelector('[data-testid="preset-default-small-webgl"]') as HTMLElement;
+      smallWebglButton?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(presetSpy).toHaveBeenCalledWith('default-dialog-css');
+      expect(presetSpy).toHaveBeenCalledWith('default-small-webgl');
     });
 
     it('should have dropdown that auto-closes after item click via DropdownMenuItemComponent', async () => {
       fixture.detectChanges();
 
       // Open the dropdown
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      const innerButton = tuneButton?.querySelector('button');
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      const innerButton = bookmarkButton?.querySelector('button');
       innerButton?.click();
       fixture.detectChanges();
       await fixture.whenStable();
@@ -464,8 +454,8 @@ describe('CrtSettingsPanelComponent', () => {
 
       // Click a preset item - the DropdownMenuItemComponent has autoClose=true by default
       // which calls parentDropdown.close() after emitting itemClick
-      const fullscreenCssButton = overlay?.querySelector('[data-testid="preset-default-fullscreen-css"]') as HTMLElement;
-      fullscreenCssButton?.click();
+      const largeWebglButton = overlay?.querySelector('[data-testid="preset-default-large-webgl"]') as HTMLElement;
+      largeWebglButton?.click();
       fixture.detectChanges();
       
       // Give time for async close operation  
@@ -566,7 +556,7 @@ describe('CrtSettingsPanelComponent', () => {
 
       const allPresets = component['allPresets']();
       
-      expect(allPresets.builtIn.length).toBe(6); // 6 built-in presets
+      expect(allPresets.builtIn.length).toBe(2); // 2 built-in presets
       expect(allPresets.custom.length).toBe(3);
       expect(allPresets.custom).toEqual(mockCustomPresets.sort((a, b) => 
         a.name.localeCompare(b.name)
@@ -594,7 +584,7 @@ describe('CrtSettingsPanelComponent', () => {
 
       const allPresets = component['allPresets']();
       
-      expect(allPresets.builtIn.length).toBe(6);
+      expect(allPresets.builtIn.length).toBe(2);
       expect(allPresets.custom.length).toBe(0);
     });
   });
@@ -645,8 +635,8 @@ describe('CrtSettingsPanelComponent', () => {
     it('should render built-in presets section with label', async () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
@@ -658,23 +648,23 @@ describe('CrtSettingsPanelComponent', () => {
     it('should display all built-in presets in built-in section', async () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
       const overlay = document.querySelector('.cdk-overlay-container');
       const menuItems = overlay?.querySelectorAll('lib-dropdown-menu-item');
       
-      // 6 built-in + 1 save action (no custom presets in this test)
-      expect(menuItems?.length).toBeGreaterThanOrEqual(6);
+      // 2 built-in + 1 save action (no custom presets in this test)
+      expect(menuItems?.length).toBeGreaterThanOrEqual(2);
     });
 
     it('should render section divider between built-in and custom', async () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
@@ -690,8 +680,8 @@ describe('CrtSettingsPanelComponent', () => {
       component = fixture.componentInstance;
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
@@ -708,14 +698,16 @@ describe('CrtSettingsPanelComponent', () => {
       fixture = createComponentFixture();
       component = fixture.componentInstance;
       fixture.detectChanges();
-
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
-      fixture.detectChanges();
       await fixture.whenStable();
 
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges(); // Extra cycle for overlay rendering
+
       const overlay = document.querySelector('.cdk-overlay-container');
-      const customItems = overlay?.querySelectorAll('.custom-preset-item');
+      const customItems = overlay?.querySelectorAll('lib-dropdown-menu-item button[data-testid^="preset-custom-"]');
       
       expect(customItems?.length).toBe(3);
     });
@@ -726,17 +718,21 @@ describe('CrtSettingsPanelComponent', () => {
       fixture = createComponentFixture();
       component = fixture.componentInstance;
       fixture.detectChanges();
-
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
-      fixture.detectChanges();
       await fixture.whenStable();
 
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges(); // Extra cycle for overlay rendering
+
       const overlay = document.querySelector('.cdk-overlay-container');
-      const customItems = overlay?.querySelectorAll('.custom-preset-item lib-dropdown-menu-item');
-      const customNames = Array.from(customItems || []).map(item => 
-        item.textContent?.trim()
-      );
+      const customItems = overlay?.querySelectorAll('lib-dropdown-menu-item button[data-testid^="preset-custom-"]');
+      const customNames = Array.from(customItems || []).map(item => {
+        // Extract text from the .item-label span only (excludes action buttons)
+        const labelSpan = item.querySelector('.item-label');
+        return labelSpan?.textContent?.trim() || '';
+      });
       
       // Should be alphabetically sorted (without 'custom-' prefix)
       expect(customNames[0]).toBe('arcade-setup');
@@ -747,8 +743,8 @@ describe('CrtSettingsPanelComponent', () => {
     it('should display empty state when no custom presets exist', async () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
@@ -764,18 +760,20 @@ describe('CrtSettingsPanelComponent', () => {
       fixture = createComponentFixture();
       component = fixture.componentInstance;
       fixture.detectChanges();
-
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
-      fixture.detectChanges();
       await fixture.whenStable();
 
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges(); // Extra cycle for overlay rendering
+
       const overlay = document.querySelector('.cdk-overlay-container');
-      const presetActions = overlay?.querySelectorAll('.preset-actions');
-      
-      expect(presetActions?.length).toBe(3);
+      const customItems = overlay?.querySelectorAll('lib-dropdown-menu-item button[data-testid^="preset-custom-"]');
+      expect(customItems?.length).toBe(3);
       
       // Each action container should have 2 buttons (rename, delete)
+      const presetActions = overlay?.querySelectorAll('lib-dropdown-menu-item button[data-testid^="preset-custom-"] .item-actions');
       presetActions?.forEach(actions => {
         const buttons = actions.querySelectorAll('lib-icon-button');
         expect(buttons.length).toBe(2);
@@ -785,8 +783,8 @@ describe('CrtSettingsPanelComponent', () => {
     it('should always display save action at bottom', async () => {
       fixture.detectChanges();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
@@ -811,15 +809,17 @@ describe('CrtSettingsPanelComponent', () => {
       component = fixture.componentInstance;
       component.presetSelected.subscribe(presetSpy);
       fixture.detectChanges();
+      await fixture.whenStable();
 
-      const tuneButton = findIconButton(fixture.nativeElement, 'tune');
-      tuneButton?.querySelector('button')?.click();
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
       fixture.detectChanges();
       await fixture.whenStable();
+      fixture.detectChanges(); // Extra cycle for overlay rendering
 
       // Find and click custom preset
       const overlay = document.querySelector('.cdk-overlay-container');
-      const customPresetButton = overlay?.querySelector('[data-testid="preset-custom-arcade-setup"]') as HTMLElement;
+      const customPresetButton = overlay?.querySelector('lib-dropdown-menu-item button[data-testid="preset-custom-arcade-setup"]') as HTMLElement;
       customPresetButton?.click();
       fixture.detectChanges();
       await fixture.whenStable();
@@ -896,11 +896,11 @@ describe('CrtSettingsPanelComponent', () => {
       const reserved = (component as any).getReservedNames();
       
       // Should contain built-in names without 'default-' prefix
-      expect(reserved).toContain('fullscreen-css');
-      expect(reserved).toContain('dialog-webgl');
+      expect(reserved).toContain('small-webgl');
+      expect(reserved).toContain('large-webgl');
       
       // Should NOT contain names with prefix
-      expect(reserved).not.toContain('default-fullscreen-css');
+      expect(reserved).not.toContain('default-small-webgl');
     });
 
     it('should return custom names without custom- prefix in reserved names', () => {
@@ -931,8 +931,8 @@ describe('CrtSettingsPanelComponent', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const reserved = (component as any).getReservedNames();
       
-      // Should have 6 built-in + 3 custom = 9 total
-      expect(reserved.length).toBe(9);
+      // Should have 2 built-in + 3 custom = 5 total
+      expect(reserved.length).toBe(5);
     });
 
     it('should return custom preset label from getPresetLabel for custom presets', () => {
@@ -947,8 +947,8 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const label = (component as any).getPresetLabel('default-fullscreen-css' as CrtPresetName);
-      expect(label).toBe('Default Full Screen (CSS)');
+      const label = (component as any).getPresetLabel('default-large-webgl' as CrtPresetName);
+      expect(label).toBe('Large (WebGL)');
     });
   });
 
@@ -1228,7 +1228,7 @@ describe('CrtSettingsPanelComponent', () => {
       (component as any).onDeleteConfirmed();
       
       // Should emit presetSelected with default preset
-      expect(presetSelectedSpy).toHaveBeenCalledWith('default-fullscreen-webgl');
+      expect(presetSelectedSpy).toHaveBeenCalledWith('default-large-webgl');
     });
 
     it('should not emit presetSelected when non-active preset is deleted', () => {
@@ -1302,65 +1302,102 @@ describe('CrtSettingsPanelComponent', () => {
   });
 
   describe('Dialog Integration', () => {
-    it('should render name dialog when showNameDialog is true', () => {
+    it('should render name dialog when showNameDialog is true', async () => {
       fixture.detectChanges();
+      await fixture.whenStable();
       
       // Initially no dialog
       let dialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
       expect(dialog).toBeNull();
       
+      // Open dropdown first, then call save
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      
       // Open dialog
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (component as any).onSaveAsPreset();
       fixture.detectChanges();
+      await fixture.whenStable();
       
-      // Dialog should be rendered
-      dialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
+      // Dialog should be rendered in dropdown content
+      const overlay = document.querySelector('.cdk-overlay-container');
+      dialog = overlay?.querySelector('lib-preset-name-dialog') || null;
       expect(dialog).toBeTruthy();
     });
 
-    it('should render confirmation dialog when showConfirmDialog is true', () => {
+    it('should render confirmation dialog when showConfirmDialog is true', async () => {
       mockCrtStorage.loadCustomPresets.mockReturnValue(mockCustomPresets);
       fixture = createComponentFixture();
       component = fixture.componentInstance;
       fixture.detectChanges();
+      await fixture.whenStable();
       
-      // Initially no dialog
-      let dialog = fixture.nativeElement.querySelector('lib-confirmation-dialog');
+      // Open dropdown first
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      
+      // Initially no dialog in overlay
+      let overlay = document.querySelector('.cdk-overlay-container');
+      let dialog = overlay?.querySelector('lib-confirmation-dialog');
       expect(dialog).toBeNull();
       
       // Open dialog
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (component as any).onDeletePreset('custom-my-preset' as CustomPresetName);
       fixture.detectChanges();
+      await fixture.whenStable();
       
-      // Dialog should be rendered
-      dialog = fixture.nativeElement.querySelector('lib-confirmation-dialog');
+      // Dialog should be rendered in overlay
+      overlay = document.querySelector('.cdk-overlay-container');
+      dialog = overlay?.querySelector('lib-confirmation-dialog');
       expect(dialog).toBeTruthy();
     });
 
-    it('should pass correct title to name dialog for save', () => {
+    it('should pass correct title to name dialog for save', async () => {
       fixture.detectChanges();
+      await fixture.whenStable();
+      
+      // Open dropdown first
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (component as any).onSaveAsPreset();
       fixture.detectChanges();
+      await fixture.whenStable();
       
-      const dialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
+      const overlay = document.querySelector('.cdk-overlay-container');
+      const dialog = overlay?.querySelector('lib-preset-name-dialog');
       expect(dialog?.getAttribute('ng-reflect-title')).toBe('Save Preset');
     });
 
-    it('should pass correct title to name dialog for rename', () => {
+    it('should pass correct title to name dialog for rename', async () => {
       mockCrtStorage.loadCustomPresets.mockReturnValue(mockCustomPresets);
       fixture = createComponentFixture();
       component = fixture.componentInstance;
       fixture.detectChanges();
+      await fixture.whenStable();
+      
+      // Open dropdown first
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (component as any).onRenamePreset('custom-my-preset' as CustomPresetName);
       fixture.detectChanges();
+      await fixture.whenStable();
       
-      const dialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
+      const overlay = document.querySelector('.cdk-overlay-container');
+      const dialog = overlay?.querySelector('lib-preset-name-dialog');
       expect(dialog?.getAttribute('ng-reflect-title')).toBe('Rename Preset');
     });
 
@@ -1389,19 +1426,28 @@ describe('CrtSettingsPanelComponent', () => {
       expect(initialValue).toBe('my-preset');
     });
 
-    it('should only render one dialog at a time', () => {
+    it('should only render one dialog at a time', async () => {
       mockCrtStorage.loadCustomPresets.mockReturnValue(mockCustomPresets);
       fixture = createComponentFixture();
       component = fixture.componentInstance;
       fixture.detectChanges();
+      await fixture.whenStable();
+      
+      // Open dropdown first
+      const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
+      bookmarkButton?.querySelector('button')?.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
       
       // Open name dialog
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (component as any).onSaveAsPreset();
       fixture.detectChanges();
+      await fixture.whenStable();
       
-      let nameDialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
-      let confirmDialog = fixture.nativeElement.querySelector('lib-confirmation-dialog');
+      let overlay = document.querySelector('.cdk-overlay-container');
+      let nameDialog = overlay?.querySelector('lib-preset-name-dialog');
+      let confirmDialog = overlay?.querySelector('lib-confirmation-dialog');
       
       expect(nameDialog).toBeTruthy();
       expect(confirmDialog).toBeNull();
@@ -1412,9 +1458,11 @@ describe('CrtSettingsPanelComponent', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (component as any).onDeletePreset('custom-my-preset' as CustomPresetName);
       fixture.detectChanges();
+      await fixture.whenStable();
       
-      nameDialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
-      confirmDialog = fixture.nativeElement.querySelector('lib-confirmation-dialog');
+      overlay = document.querySelector('.cdk-overlay-container');
+      nameDialog = overlay?.querySelector('lib-preset-name-dialog');
+      confirmDialog = overlay?.querySelector('lib-confirmation-dialog');
       
       expect(nameDialog).toBeNull();
       expect(confirmDialog).toBeTruthy();

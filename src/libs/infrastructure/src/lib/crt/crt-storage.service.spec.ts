@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CrtStorageService } from './crt-storage.service';
 import { CrtSettings, CustomPresetName } from '@teensyrom-nx/domain';
-import * as validation from './crt-validation';
+import * as domainValidation from '@teensyrom-nx/domain';
 
 describe('CrtStorageService - Custom Preset Operations', () => {
   let service: CrtStorageService;
@@ -16,7 +16,6 @@ describe('CrtStorageService - Custom Preset Operations', () => {
     brightness: 0.8,
     saturation: 1.1,
     hue: 0,
-    renderMode: 'webgl' as const,
     phosphorPattern: 'none' as const,
     phosphorIntensity: 0,
     bloomEnabled: false,
@@ -94,7 +93,7 @@ describe('CrtStorageService - Custom Preset Operations', () => {
     });
 
     it('should validate name before saving', () => {
-      const validateSpy = vi.spyOn(validation, 'validatePresetName');
+      const validateSpy = vi.spyOn(domainValidation, 'validatePresetName');
       
       service.saveCustomPreset('Valid Name', mockSettings);
 
@@ -102,7 +101,7 @@ describe('CrtStorageService - Custom Preset Operations', () => {
     });
 
     it('should throw error on invalid name', () => {
-      vi.spyOn(validation, 'validatePresetName').mockReturnValue({
+      vi.spyOn(domainValidation, 'validatePresetName').mockReturnValue({
         valid: false,
         error: 'Preset name cannot be empty'
       });
@@ -295,7 +294,7 @@ describe('CrtStorageService - Custom Preset Operations', () => {
 
     it('should validate new name before renaming', () => {
       service.saveCustomPreset('Old', mockSettings);
-      const validateSpy = vi.spyOn(validation, 'validatePresetName');
+      const validateSpy = vi.spyOn(domainValidation, 'validatePresetName');
 
       service.renameCustomPreset('custom-Old' as CustomPresetName, 'New');
 
@@ -304,7 +303,7 @@ describe('CrtStorageService - Custom Preset Operations', () => {
 
     it('should throw error on invalid new name', () => {
       service.saveCustomPreset('Old', mockSettings);
-      vi.spyOn(validation, 'validatePresetName').mockReturnValue({
+      vi.spyOn(domainValidation, 'validatePresetName').mockReturnValue({
         valid: false,
         error: 'Invalid name'
       });
@@ -322,7 +321,7 @@ describe('CrtStorageService - Custom Preset Operations', () => {
       service.saveCustomPreset('Existing', mockSettings);
       service.saveCustomPreset('ToRename', mockSettings);
 
-      vi.spyOn(validation, 'validatePresetName').mockReturnValue({
+      vi.spyOn(domainValidation, 'validatePresetName').mockReturnValue({
         valid: false,
         error: 'A preset with this name already exists'
       });

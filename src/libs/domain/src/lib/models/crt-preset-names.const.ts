@@ -9,16 +9,16 @@ export const CRT_PRESET_PREFIX = {
 } as const;
 
 /**
- * Strongly-typed preset key constants to eliminate magic strings.
- * Use these throughout the codebase instead of string literals.
+ * Built-in CRT preset identifiers using size-based naming.
+ *
+ * Small presets: Optimized for compact displays (thumbnails, video-capture)
+ * Large presets: Optimized for fullscreen displays (video-dialog, fullscreen images)
+ *
+ * All presets use WebGL rendering for high-fidelity output.
  */
 export const CRT_PRESET_KEYS = {
-  FULLSCREEN_CSS: `${CRT_PRESET_PREFIX.DEFAULT}fullscreen-css`,
-  FULLSCREEN_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}fullscreen-webgl`,
-  DIALOG_CSS: `${CRT_PRESET_PREFIX.DEFAULT}dialog-css`,
-  DIALOG_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}dialog-webgl`,
-  IMAGE_CSS: `${CRT_PRESET_PREFIX.DEFAULT}image-css`,
-  IMAGE_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}image-webgl`,
+  SMALL_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}small-webgl`,
+  LARGE_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}large-webgl`,
 } as const;
 
 /**

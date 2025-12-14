@@ -29,14 +29,23 @@ import { DropdownMenuComponent } from './dropdown-menu.component';
       class="dropdown-menu-item" 
       [class.selected]="selected()"
       [attr.data-testid]="testId()"
+      [attr.tabindex]="0"
       (click)="handleClick($event)"
+      (keydown.enter)="handleClick($event)"
+      (keydown.space)="handleClick($event)"
       type="button"
     >
       @if (selected()) {
         <mat-icon class="check-icon">check</mat-icon>
       }
       <span class="item-label"><ng-content></ng-content></span>
-      <div class="item-actions" (click)="handleActionsClick($event)">
+      <div 
+        class="item-actions" 
+        tabindex="0" 
+        role="button"
+        (click)="handleActionsClick($event)"
+        (keydown.enter)="handleActionsClick($event)"
+        (keydown.space)="handleActionsClick($event)">
         <ng-content select="[actions]"></ng-content>
       </div>
     </button>
@@ -50,9 +59,9 @@ export class DropdownMenuItemComponent {
   testId = input<string>('');
   /** Whether to automatically close the parent dropdown on click. Defaults to true. */
   autoClose = input<boolean>(true);
-  itemClick = output<MouseEvent>();
+  itemClick = output<Event>();
 
-  handleClick(event: MouseEvent): void {
+  handleClick(event: Event): void {
     this.itemClick.emit(event);
     
     // Auto-close parent dropdown after emitting the click
@@ -62,10 +71,10 @@ export class DropdownMenuItemComponent {
   }
 
   /**
-   * Prevents click events from actions area from bubbling to parent item.
+   * Prevents events from actions area from bubbling to parent item.
    * This prevents itemClick emission when action buttons are clicked.
    */
-  handleActionsClick(event: MouseEvent): void {
+  handleActionsClick(event: Event): void {
     event.stopPropagation();
   }
 }

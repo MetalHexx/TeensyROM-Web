@@ -23,7 +23,6 @@ describe('CrtRenderer', () => {
     brightness: 1.0,
     saturation: 1.0,
     hue: 0,
-    renderMode: 'webgl',
     // Advanced effects (disabled for tests)
     phosphorPattern: 'none',
     phosphorIntensity: 0,

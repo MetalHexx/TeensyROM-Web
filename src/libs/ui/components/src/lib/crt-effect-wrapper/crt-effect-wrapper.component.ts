@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed, signal, ElementRef, viewChild, afterNextRender, inject, DestroyRef, effect, Injector } from '@angular/core';
-import { CrtSettings, CrtRenderMode } from './crt-settings.interface';
+import { CrtSettings } from './crt-settings.interface';
 import { DEFAULT_CRT_SETTINGS } from './crt-settings.defaults';
 import { CrtRenderer } from './webgl/crt-renderer';
 
@@ -70,7 +70,7 @@ export class CrtEffectWrapperComponent {
   /**
    * Track detected content type for WebGL rendering.
    * WebGL post-processing works with video and image elements.
-   * 'none' triggers CSS fallback for other content types.
+   * 'none' means no compatible content found (component still renders with overlays).
    */
   private readonly webglContentType = signal<'none' | 'video' | 'image'>('none');
 
@@ -128,24 +128,24 @@ export class CrtEffectWrapperComponent {
       return { width: '100%', height: '100%', left: '0', top: '0' };
     }
 
-    // Calculate visible content dimensions using object-fit: contain logic
+    // Calculate visible content dimensions using object-fit: cover logic
     let visibleWidth: number;
     let visibleHeight: number;
     let offsetLeft: number;
     let offsetTop: number;
 
     if (aspectRatio > containerAspectRatio) {
-      // Content is wider - letterboxed (black bars top/bottom)
-      visibleWidth = containerW;
-      visibleHeight = containerW / aspectRatio;
-      offsetLeft = 0;
-      offsetTop = (containerH - visibleHeight) / 2;
-    } else {
-      // Content is narrower - pillarboxed (black bars left/right)
+      // Content is wider - fill height, crop sides
       visibleHeight = containerH;
       visibleWidth = containerH * aspectRatio;
       offsetTop = 0;
       offsetLeft = (containerW - visibleWidth) / 2;
+    } else {
+      // Content is narrower - fill width, crop top/bottom
+      visibleWidth = containerW;
+      visibleHeight = containerW / aspectRatio;
+      offsetLeft = 0;
+      offsetTop = (containerH - visibleHeight) / 2;
     }
 
     return {
@@ -213,39 +213,6 @@ export class CrtEffectWrapperComponent {
    */
   protected readonly effectiveSettings = computed(() => this.settings());
 
-  /**
-   * Determine which render mode is actually active.
-   * Uses explicit 'webgl' or 'css' value from settings.
-   * WebGL will fall back to CSS if not supported or no compatible content.
-   */
-  protected readonly activeRenderMode = computed<CrtRenderMode>(() => {
-    const requested = this.settings().renderMode;
-    const contentType = this.webglContentType();
-    const supported = this.webglSupported();
-
-    console.log('[CRT DEBUG] activeRenderMode - requested:', requested, 'contentType:', contentType, 'webglSupported:', supported);
-
-    // CSS mode is always available
-    if (requested === 'css') return 'css';
-
-    // WebGL requires browser support AND compatible content (video or image)
-    const hasWebGLContent = contentType === 'video' || contentType === 'image';
-    const canUseWebGL = supported && hasWebGLContent;
-
-    console.log('[CRT DEBUG] activeRenderMode - hasWebGLContent:', hasWebGLContent, 'canUseWebGL:', canUseWebGL);
-
-    // If WebGL requested but not available, fall back to CSS
-    const result = canUseWebGL ? 'webgl' : 'css';
-    console.log('[CRT DEBUG] activeRenderMode - returning:', result);
-    return result;
-  });
-
-  /**
-   * CSS class for current render mode.
-   * Applied to wrapper element for mode-specific styling.
-   */
-  protected readonly renderModeClass = computed(() => `mode-${this.activeRenderMode()}`);
-
   constructor() {
     afterNextRender(() => {
       this.setupResizeObserver();
@@ -256,30 +223,26 @@ export class CrtEffectWrapperComponent {
     // Sync settings to WebGL renderer when they change
     effect(() => {
       const settings = this.settings();
-      const requestedMode = settings.renderMode;
       const contentType = this.webglContentType();
 
-      console.log('[CRT DEBUG] Effect triggered - requestedMode:', requestedMode, 'contentType:', contentType, 'renderer:', !!this.renderer);
+      console.log('[CRT DEBUG] Effect triggered - contentType:', contentType, 'renderer:', !!this.renderer);
 
-      // Re-detect content when switching to WebGL mode
-      if (requestedMode === 'webgl' && this.renderer && contentType === 'none') {
-        console.log('[CRT DEBUG] Switching to WebGL mode, re-detecting content...');
+      // Re-detect content if needed
+      if (this.renderer && contentType === 'none') {
+        console.log('[CRT DEBUG] Re-detecting content...');
         const wrapper = this.wrapperRef()?.nativeElement;
         if (wrapper) {
           this.detectAndBindContent(wrapper);
         }
       }
 
-      const mode = this.activeRenderMode();
-      console.log('[CRT DEBUG] Effect - activeRenderMode resolved to:', mode);
-
-      if (mode === 'webgl' && this.renderer) {
+      if (this.renderer) {
         console.log('[CRT DEBUG] Updating WebGL renderer settings');
         this.renderer.updateSettings(settings);
         
         // Handle render loop based on content type
         if (contentType === 'video') {
-          // Ensure video render loop is running when in WebGL mode
+          // Ensure video render loop is running
           console.log('[CRT DEBUG] Starting video render loop');
           this.renderer.startRenderLoop();
         } else if (contentType === 'image') {
@@ -287,10 +250,6 @@ export class CrtEffectWrapperComponent {
           console.log('[CRT DEBUG] Rendering image');
           this.renderer.renderImage();
         }
-      } else if (mode === 'css' && this.renderer) {
-        // Stop render loop when switching to CSS mode
-        console.log('[CRT DEBUG] Stopping render loop (CSS mode)');
-        this.renderer.stopRenderLoop();
       }
     });
 
@@ -316,7 +275,7 @@ export class CrtEffectWrapperComponent {
     const success = this.renderer.init(canvas);
 
     if (!success) {
-      // WebGL init failed - fall back to CSS mode
+      // WebGL init failed - component still renders with CSS overlays
       this.webglSupported.set(false);
       this.renderer = null;
       return;
@@ -335,7 +294,7 @@ export class CrtEffectWrapperComponent {
    * Detects video or image elements from projected content.
    * - Video: starts continuous render loop
    * - Image: renders once, call refreshImage() when content changes
-   * - Other: falls back to CSS mode
+   * - Other: uses CSS overlays only (scanlines, vignette)
    */
   private setupContentTexturePipeline(): void {
     if (!this.renderer) return;
@@ -408,7 +367,7 @@ export class CrtEffectWrapperComponent {
       return;
     }
 
-    // No compatible content found - fall back to CSS mode
+    // No compatible content found - use CSS overlays only
     this.webglContentType.set('none');
   }
 
@@ -564,7 +523,7 @@ export class CrtEffectWrapperComponent {
 
     // Update WebGL canvas size and re-render
     // Also re-apply settings since DPR may have changed (browser zoom)
-    if (this.renderer && this.activeRenderMode() === 'webgl') {
+    if (this.renderer) {
       // Calculate actual canvas dimensions based on contentAspectRatio
       const layout = this.canvasLayout();
       const canvasWidth = layout.width === '100%' ? containerWidth : parseFloat(layout.width);

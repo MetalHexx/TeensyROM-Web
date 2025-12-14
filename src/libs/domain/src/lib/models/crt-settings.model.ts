@@ -1,11 +1,4 @@
 /**
- * Render mode for CRT effects.
- * - 'css': Use CSS-based rendering (lightweight, may have banding at non-100% zoom)
- * - 'webgl': Use WebGL-based rendering (high-fidelity, no banding, requires GPU)
- */
-export type CrtRenderMode = 'css' | 'webgl';
-
-/**
  * Phosphor pattern types for CRT subpixel simulation.
  * - 'none': No phosphor pattern
  * - 'aperture-grille': Vertical RGB stripes (Sony Trinitron style)
@@ -30,7 +23,6 @@ export type PhosphorPatternType = 'none' | 'aperture-grille' | 'shadow-mask' | '
  *   contrast: 1.1,           // 10% contrast boost
  *   brightness: 1.5,         // 50% brightness boost
  *   saturation: 1.3,         // 30% saturation boost
- *   renderMode: 'webgl',     // WebGL rendering (or 'css' for lightweight)
  * };
  * ```
  */
@@ -86,16 +78,6 @@ export interface CrtSettings {
    * Useful for matching color output between different C64 video devices.
    */
   hue: number;
-
-  /**
-   * Rendering mode for CRT effects.
-   * - 'css': CSS-based rendering (lightweight, universal support)
-   * - 'webgl': WebGL-based rendering (eliminates banding at any zoom level)
-   *
-   * Default is 'webgl' if supported, otherwise 'css'.
-   * Components should check CrtRenderer.isSupported() and set appropriately on initialization.
-   */
-  renderMode: CrtRenderMode;
 
   // === Advanced WebGL Effects ===
 

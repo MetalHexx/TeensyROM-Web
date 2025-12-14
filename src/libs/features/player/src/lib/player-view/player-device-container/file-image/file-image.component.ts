@@ -13,8 +13,7 @@ import {
   AnyPresetName,
   isBuiltInPreset,
 } from '@teensyrom-nx/ui/components';
-import { CrtSettings, CRT_STORAGE } from '@teensyrom-nx/domain';
-import { validatePresetName } from '@teensyrom-nx/infrastructure';
+import { CrtSettings, CRT_STORAGE, validatePresetName } from '@teensyrom-nx/domain';
 import type { LaunchedFile } from '@teensyrom-nx/application';
 
 @Component({
@@ -38,8 +37,8 @@ export class FileImageComponent {
   deviceId = input.required<string>();
   currentFile = input<LaunchedFile | null>();
 
-  // CRT configuration - standard config (hide curvature since it's hardcoded to 16px)
-  readonly crtConfig = CRT_CONFIGS.standard;
+  // CRT configuration - small config for file viewing
+  readonly crtConfig = CRT_CONFIGS.small;
 
   /**
    * Validation function for custom preset names.
@@ -50,18 +49,9 @@ export class FileImageComponent {
     return { error: result.error ?? null };
   };
 
-  // File-image specific default CRT settings (brightness at 100%, curvature locked to 16px)
-  private readonly fileImageDefaultSettings: CrtSettings = {
-    ...CRT_PRESETS[CRT_PRESET_KEYS.IMAGE_WEBGL],
-    brightness: 1.0,
-    screenCurvature: 16,
-    scanlineSize: 1.2,
-    scanlineIntensity: 0.69,
-  };
-
-  // CRT state signals
+  // CRT state signals (initialized in constructor based on WebGL detection)
   protected readonly isCrtEnabled = signal<boolean>(true);
-  protected readonly crtSettings = signal<CrtSettings>(this.fileImageDefaultSettings);
+  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
   protected readonly showCrtControls = signal<boolean>(false);
 
   constructor() {
@@ -71,10 +61,11 @@ export class FileImageComponent {
       if (deviceId) {
         const savedSettings = this.crtStorage.load(deviceId, 'file-image');
         if (savedSettings) {
-          // Use saved settings (user's preference), force screenCurvature to 16px
-          this.crtSettings.set({ ...savedSettings, screenCurvature: 16 });
+          this.crtSettings.set(savedSettings);
+        } else {
+          // Default to SMALL_WEBGL preset for new users
+          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
         }
-        // If no saved settings, fileImageDefaultSettings from signal initialization is used
       }
     }, { allowSignalWrites: true });
   }
@@ -119,17 +110,14 @@ export class FileImageComponent {
    * Persists settings to localStorage per device
    */
   onCrtSettingsChange(settings: CrtSettings): void {
-    // Force screenCurvature to 16px to match cycle-image border-radius
-    this.crtSettings.set({ ...settings, screenCurvature: 16 });
+    // Apply settings without modification
+    this.crtSettings.set(settings);
     const deviceId = this.deviceId();
     if (deviceId) {
       this.crtStorage.save(deviceId, 'file-image', settings);
     }
   }
 
-  /**
-   * Reset CRT settings to default preset
-   */
   /**
    * Apply a CRT preset (built-in or custom)
    */
@@ -153,8 +141,8 @@ export class FileImageComponent {
       settings = preset.settings;
     }
 
-    // Force screenCurvature to 16px to match cycle-image border-radius (same for both types)
-    this.crtSettings.set({ ...settings, screenCurvature: 16 });
+    // Apply preset settings without modification
+    this.crtSettings.set(settings);
     const deviceId = this.deviceId();
     if (deviceId) {
       this.crtStorage.save(deviceId, 'file-image', settings);

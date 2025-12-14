@@ -13,24 +13,17 @@ import {
 
 describe('CRT Preset Type Guards and Utilities', () => {
   describe('isBuiltInPreset', () => {
-    it('should return true for default-fullscreen-css', () => {
-      expect(isBuiltInPreset(CRT_PRESET_KEYS.FULLSCREEN_CSS)).toBe(true);
-    });
-
-    it('should return true for all built-in preset names', () => {
-      expect(isBuiltInPreset(CRT_PRESET_KEYS.FULLSCREEN_WEBGL)).toBe(true);
-      expect(isBuiltInPreset(CRT_PRESET_KEYS.DIALOG_CSS)).toBe(true);
-      expect(isBuiltInPreset(CRT_PRESET_KEYS.DIALOG_WEBGL)).toBe(true);
-      expect(isBuiltInPreset(CRT_PRESET_KEYS.IMAGE_CSS)).toBe(true);
-      expect(isBuiltInPreset(CRT_PRESET_KEYS.IMAGE_WEBGL)).toBe(true);
+    it('should return true for new built-in preset names', () => {
+      expect(isBuiltInPreset(CRT_PRESET_KEYS.SMALL_WEBGL)).toBe(true);
+      expect(isBuiltInPreset(CRT_PRESET_KEYS.LARGE_WEBGL)).toBe(true);
     });
 
     it('should return false for custom-My Preset', () => {
       expect(isBuiltInPreset('custom-My Preset')).toBe(false);
     });
 
-    it('should return false for fullscreen-webgl (no prefix)', () => {
-      expect(isBuiltInPreset('fullscreen-webgl')).toBe(false);
+    it('should return false for large-webgl (no prefix)', () => {
+      expect(isBuiltInPreset('large-webgl')).toBe(false);
     });
 
     it('should return false for empty string', () => {
@@ -38,11 +31,11 @@ describe('CRT Preset Type Guards and Utilities', () => {
     });
 
     it('should narrow type correctly', () => {
-      const name = CRT_PRESET_KEYS.FULLSCREEN_CSS as string;
+      const name = CRT_PRESET_KEYS.LARGE_WEBGL as string;
       if (isBuiltInPreset(name)) {
         // Type should be narrowed to BuiltInPresetName
         // Just verify compilation succeeds - runtime check is sufficient
-        expect(name).toBe(CRT_PRESET_KEYS.FULLSCREEN_CSS);
+        expect(name).toBe(CRT_PRESET_KEYS.LARGE_WEBGL);
       }
     });
   });
@@ -56,8 +49,9 @@ describe('CRT Preset Type Guards and Utilities', () => {
       expect(isCustomPreset('custom-')).toBe(true);
     });
 
-    it('should return false for default-fullscreen-webgl', () => {
-      expect(isCustomPreset(CRT_PRESET_KEYS.FULLSCREEN_WEBGL)).toBe(false);
+    it('should return false for built-in preset names', () => {
+      expect(isCustomPreset(CRT_PRESET_KEYS.LARGE_WEBGL)).toBe(false);
+      expect(isCustomPreset(CRT_PRESET_KEYS.SMALL_WEBGL)).toBe(false);
     });
 
     it('should return false for My Preset (no prefix)', () => {
@@ -108,8 +102,8 @@ describe('CRT Preset Type Guards and Utilities', () => {
     });
 
     it('should not strip default- prefix', () => {
-      expect(stripCustomPrefix(CRT_PRESET_KEYS.FULLSCREEN_CSS)).toBe(
-        CRT_PRESET_KEYS.FULLSCREEN_CSS
+      expect(stripCustomPrefix(CRT_PRESET_KEYS.LARGE_WEBGL)).toBe(
+        CRT_PRESET_KEYS.LARGE_WEBGL
       );
     });
 
@@ -163,9 +157,9 @@ describe('CRT Preset Type Guards and Utilities', () => {
 
   describe('Type System Integration', () => {
     it('should allow BuiltInPresetName to be assigned to AnyPresetName', () => {
-      const builtIn: BuiltInPresetName = CRT_PRESET_KEYS.FULLSCREEN_CSS;
+      const builtIn: BuiltInPresetName = CRT_PRESET_KEYS.LARGE_WEBGL;
       const any: AnyPresetName = builtIn;
-      expect(any).toBe(CRT_PRESET_KEYS.FULLSCREEN_CSS);
+      expect(any).toBe(CRT_PRESET_KEYS.LARGE_WEBGL);
     });
 
     it('should allow CustomPresetName to be assigned to AnyPresetName', () => {
@@ -254,6 +248,53 @@ describe('CRT Preset Type Guards and Utilities', () => {
       const withWhitespace = 'Test\nWith\tWhitespace';
       const withPrefix = addCustomPrefix(withWhitespace);
       expect(stripCustomPrefix(withPrefix)).toBe(withWhitespace);
+    });
+  });
+
+  describe('TypeScript Type Tests', () => {
+    describe('BuiltInPresetName type', () => {
+      it('should include all 2 new preset keys as valid assignments', () => {
+        // These assignments should compile without error
+        const smallWebGL: BuiltInPresetName = CRT_PRESET_KEYS.SMALL_WEBGL;
+        const largeWebGL: BuiltInPresetName = CRT_PRESET_KEYS.LARGE_WEBGL;
+
+        // Verify runtime values
+        expect(smallWebGL).toBe('default-small-webgl');
+        expect(largeWebGL).toBe('default-large-webgl');
+      });
+
+      it('should match the 2 preset keys exactly', () => {
+        // Verify we have exactly 2 built-in presets
+        const presetKeys = Object.values(CRT_PRESET_KEYS);
+        expect(presetKeys).toHaveLength(2);
+        
+        // All preset keys should be valid BuiltInPresetName values
+        presetKeys.forEach((key) => {
+          expect(key.startsWith('default-')).toBe(true);
+        });
+      });
+    });
+
+    describe('CustomPresetName type', () => {
+      it('should accept custom- prefixed names', () => {
+        // These assignments should compile without error
+        const custom1: CustomPresetName = 'custom-My Preset';
+        const custom2: CustomPresetName = 'custom-Retro Gaming';
+
+        expect(custom1).toBe('custom-My Preset');
+        expect(custom2).toBe('custom-Retro Gaming');
+      });
+    });
+
+    describe('AnyPresetName type', () => {
+      it('should accept both built-in and custom preset names', () => {
+        // These assignments should compile without error
+        const builtIn: AnyPresetName = CRT_PRESET_KEYS.SMALL_WEBGL;
+        const custom: AnyPresetName = 'custom-My Preset';
+
+        expect(builtIn).toBe('default-small-webgl');
+        expect(custom).toBe('custom-My Preset');
+      });
     });
   });
 });

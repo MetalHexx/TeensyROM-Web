@@ -1,7 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { FileImageComponent } from './file-image.component';
-import { CRT_STORAGE, ICrtStorage, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
+import {
+  CRT_STORAGE,
+  ICrtStorage,
+  CustomCrtPreset,
+  CustomPresetName,
+} from '@teensyrom-nx/domain';
 import { CRT_PRESET_KEYS } from '@teensyrom-nx/ui/components';
 import { vi } from 'vitest';
 
@@ -18,7 +23,6 @@ const mockCustomPresets: CustomCrtPreset[] = [
       brightness: 0.95,
       saturation: 1.1,
       hue: 0,
-      renderMode: 'css',
       phosphorPattern: 'none',
       phosphorIntensity: 0,
       bloomEnabled: false,
@@ -68,16 +72,76 @@ describe('FileImageComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  describe('CRT preset selection', () => {
-    it('should apply built-in preset with forced screenCurvature', () => {
-      component.onCrtPresetSelected(CRT_PRESET_KEYS.IMAGE_CSS);
+  describe('Initialization', () => {
+    it('should use saved settings when available', () => {
+      const savedSettings = {
+        scanlineIntensity: 0.75,
+        scanlineSize: 1.5,
+        vignetteStrength: 1.2,
+        screenCurvature: 20,
+        contrast: 1.1,
+        brightness: 0.9,
+        saturation: 1.0,
+        hue: 0,
+        phosphorPattern: 'none' as const,
+        phosphorIntensity: 0,
+        bloomEnabled: false,
+        bloomIntensity: 0.3,
+        bloomRadius: 3,
+        barrelDistortion: 0,
+        chromaticAberration: 0,
+      };
       
-      const settings = component['crtSettings']();
-      expect(settings.renderMode).toBe('css');
-      expect(settings.screenCurvature).toBe(16); // Always 16 for file-image
+      vi.mocked(mockCrtStorage.load).mockReturnValueOnce(savedSettings);
+
+      // Create new component to trigger initialization
+      const newFixture = TestBed.createComponent(FileImageComponent);
+      newFixture.componentRef.setInput('deviceId', 'saved-device');
+      newFixture.detectChanges();
+      const newComponent = newFixture.componentInstance;
+
+      const settings = newComponent['crtSettings']();
+      expect(settings).toEqual(savedSettings);
     });
 
-    it('should apply custom preset with forced screenCurvature', () => {
+    it('should use SMALL_WEBGL preset when no saved settings', () => {
+      vi.mocked(mockCrtStorage.load).mockReturnValue(null);
+
+      // Create new component to trigger initialization
+      const newFixture = TestBed.createComponent(FileImageComponent);
+      newFixture.componentRef.setInput('deviceId', 'new-device');
+      newFixture.detectChanges();
+      const newComponent = newFixture.componentInstance;
+
+      const settings = newComponent['crtSettings']();
+      // Should match SMALL_WEBGL preset
+      expect(settings.phosphorPattern).toBe('aperture-grille');
+      expect(settings.bloomEnabled).toBe(false);
+    });
+
+    it('should use storage key "file-image"', () => {
+      vi.mocked(mockCrtStorage.load).mockClear();
+
+      // Create new component to trigger initialization
+      const newFixture = TestBed.createComponent(FileImageComponent);
+      newFixture.componentRef.setInput('deviceId', 'test-key-device');
+      newFixture.detectChanges();
+
+      expect(mockCrtStorage.load).toHaveBeenCalledWith('test-key-device', 'file-image');
+    });
+  });
+
+  describe('CRT preset selection', () => {
+    it('should apply built-in preset without modification', () => {
+      component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_WEBGL);
+      
+      const settings = component['crtSettings']();
+      expect(settings.phosphorPattern).toBe('aperture-grille');
+      expect(settings.bloomEnabled).toBe(false);
+      // Settings applied as-is from preset
+    });
+
+    it('should apply custom preset without modification', () => {
       vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
 
       component.onCrtPresetSelected('custom-image-preset' as CustomPresetName);
@@ -85,7 +149,7 @@ describe('FileImageComponent', () => {
       const settings = component['crtSettings']();
       expect(settings.scanlineIntensity).toBe(0.5);
       expect(settings.brightness).toBe(0.95);
-      expect(settings.screenCurvature).toBe(16); // Forced to 16
+      expect(settings.screenCurvature).toBe(16); // From custom preset, not forced
     });
 
     it('should call loadCustomPresets when custom preset selected', () => {
@@ -111,7 +175,7 @@ describe('FileImageComponent', () => {
         'file-image',
         expect.objectContaining({
           scanlineIntensity: 0.5,
-          screenCurvature: 16, // Forced
+          screenCurvature: 16, // From preset, not modified
         })
       );
     });
@@ -146,7 +210,6 @@ describe('FileImageComponent', () => {
         brightness: 2.5,
         saturation: 2.0,
         hue: 0,
-        renderMode: 'webgl' as const,
         phosphorPattern: 'none' as const,
         phosphorIntensity: 0,
         bloomEnabled: false,

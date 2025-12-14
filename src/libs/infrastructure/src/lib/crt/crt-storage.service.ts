@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
-import { ICrtStorage, CrtStorageContext, CrtSettings, CustomCrtPreset, CustomPresetName, CRT_PRESET_PREFIX } from '@teensyrom-nx/domain';
+import { ICrtStorage, CrtStorageContext, CrtSettings, CustomCrtPreset, CustomPresetName, CRT_PRESET_PREFIX, validatePresetName } from '@teensyrom-nx/domain';
 import { logInfo, logWarn, LogType, logError } from '@teensyrom-nx/utils';
-import { validatePresetName } from './crt-validation';
 
 /**
  * Service for persisting CRT visual effect settings to browser localStorage.
