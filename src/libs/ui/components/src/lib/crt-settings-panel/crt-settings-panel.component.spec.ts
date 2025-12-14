@@ -22,6 +22,7 @@ function findIconButton(container: HTMLElement, iconName: string): HTMLElement |
 const mockCrtStorage = {
   loadCustomPresets: vi.fn().mockReturnValue([]),
   saveCustomPreset: vi.fn(),
+  updateCustomPreset: vi.fn(),
   deleteCustomPreset: vi.fn(),
   renameCustomPreset: vi.fn(),
   hasCustomPreset: vi.fn().mockReturnValue(false),
@@ -557,6 +558,20 @@ describe('CrtSettingsPanelComponent', () => {
       const allPresets = component['allPresets']();
       
       expect(allPresets.builtIn.length).toBe(2); // 2 built-in presets
+    });
+
+    it('should filter out excluded presets from allPresets', () => {
+      mockCrtStorage.loadCustomPresets.mockReturnValue(mockCustomPresets);
+      
+      // Create new fixture with excludePresets input
+      fixture = createComponentFixture();
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('excludePresets', ['default-large-webgl' as CrtPresetName]);
+      fixture.detectChanges();
+
+      const allPresets = component['allPresets']();
+      expect(allPresets.builtIn.length).toBe(1); // Only small preset remains
+      expect(allPresets.builtIn[0]).toBe('default-small-webgl');
       expect(allPresets.custom.length).toBe(3);
       expect(allPresets.custom).toEqual(mockCustomPresets.sort((a, b) => 
         a.name.localeCompare(b.name)
@@ -632,7 +647,7 @@ describe('CrtSettingsPanelComponent', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Dropdown UI Sections', () => {
-    it('should render built-in presets section with label', async () => {
+    it('should render built-in presets without section label', async () => {
       fixture.detectChanges();
 
       const bookmarkButton = findIconButton(fixture.nativeElement, 'bookmark');
@@ -641,8 +656,10 @@ describe('CrtSettingsPanelComponent', () => {
       await fixture.whenStable();
 
       const overlay = document.querySelector('.cdk-overlay-container');
-      const sectionLabel = overlay?.querySelector('.dropdown-section-label');
-      expect(sectionLabel?.textContent?.trim()).toBe('Built-in Presets');
+      // Built-in section label should not exist (only "Custom Presets" label should be present)
+      const sectionLabels = overlay?.querySelectorAll('.dropdown-section-label');
+      expect(sectionLabels?.length).toBe(1); // Only custom presets section
+      expect(sectionLabels?.[0]?.textContent?.trim()).toBe('Custom Presets');
     });
 
     it('should display all built-in presets in built-in section', async () => {
@@ -772,11 +789,11 @@ describe('CrtSettingsPanelComponent', () => {
       const customItems = overlay?.querySelectorAll('lib-dropdown-menu-item button[data-testid^="preset-custom-"]');
       expect(customItems?.length).toBe(3);
       
-      // Each action container should have 2 buttons (rename, delete)
+      // Each action container should have 3 buttons (save, rename, delete)
       const presetActions = overlay?.querySelectorAll('lib-dropdown-menu-item button[data-testid^="preset-custom-"] .item-actions');
       presetActions?.forEach(actions => {
         const buttons = actions.querySelectorAll('lib-icon-button');
-        expect(buttons.length).toBe(2);
+        expect(buttons.length).toBe(3);
       });
     });
 
@@ -950,6 +967,24 @@ describe('CrtSettingsPanelComponent', () => {
       const label = (component as any).getPresetLabel('default-large-webgl' as CrtPresetName);
       expect(label).toBe('Large (WebGL)');
     });
+
+    it('should use currentPresetLabel input when provided for built-in presets', () => {
+      fixture.componentRef.setInput('currentPresetLabel', 'Default');
+      fixture.detectChanges();
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const label = (component as any).getPresetLabel('default-small-webgl' as CrtPresetName);
+      expect(label).toBe('Default');
+    });
+
+    it('should still strip custom- prefix for custom presets regardless of currentPresetLabel', () => {
+      fixture.componentRef.setInput('currentPresetLabel', 'Default');
+      fixture.detectChanges();
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const label = (component as any).getPresetLabel('custom-test' as CustomPresetName);
+      expect(label).toBe('test');
+    });
   });
 
   describe('Save Preset Workflow', () => {
@@ -1085,6 +1120,44 @@ describe('CrtSettingsPanelComponent', () => {
       // Custom presets should be updated
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((component as any).customPresets().length).toBe(4);
+    });
+  });
+
+  describe('Update Preset Workflow', () => {
+    beforeEach(() => {
+      mockCrtStorage.loadCustomPresets.mockReturnValue(mockCustomPresets);
+      mockCrtStorage.updateCustomPreset = vi.fn();
+      fixture = createComponentFixture();
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    });
+
+    it('should update existing preset with current settings', () => {
+      const presetName = 'custom-my-preset' as CustomPresetName;
+      const newSettings = { ...DEFAULT_CRT_SETTINGS, brightness: 1.5 };
+      fixture.componentRef.setInput('settings', newSettings);
+      fixture.detectChanges();
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (component as any).onUpdatePreset(presetName);
+      
+      // Should call storage service with preset name and current settings
+      expect(mockCrtStorage.updateCustomPreset).toHaveBeenCalledWith(presetName, newSettings);
+      // Should refresh custom presets
+      expect(mockCrtStorage.loadCustomPresets).toHaveBeenCalled();
+    });
+
+    it('should handle updating preset without changing dropdown state', () => {
+      const presetName = 'custom-arcade-setup' as CustomPresetName;
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (component as any).onUpdatePreset(presetName);
+      
+      // Dialog states should remain unchanged
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((component as any).showNameDialog()).toBe(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((component as any).isRenaming()).toBe(false);
     });
   });
 

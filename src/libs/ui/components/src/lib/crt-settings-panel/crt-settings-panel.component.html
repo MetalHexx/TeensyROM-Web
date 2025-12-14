@@ -39,7 +39,6 @@
             </lib-confirmation-dialog>
           } @else {
             <!-- Built-in Presets -->
-          <span class="dropdown-section-label">Built-in Presets</span>
           @for (preset of allPresets().builtIn; track preset) {
             <lib-dropdown-menu-item
               [testId]="'preset-' + preset"
@@ -59,6 +58,14 @@
                 (itemClick)="onPresetSelect(preset.name)">
                 {{ stripCustomPrefix(preset.name) }}
                 <div actions>
+                  <lib-icon-button
+                    icon="save"
+                    size="medium"
+                    color="normal"
+                    ariaLabel="Update preset with current settings"
+                    [matTooltip]="'Save current settings to this preset'"
+                    (buttonClick)="onUpdatePreset(preset.name)">
+                  </lib-icon-button>
                   <lib-icon-button
                     icon="edit"
                     size="medium"

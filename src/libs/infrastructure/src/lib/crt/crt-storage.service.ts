@@ -1,5 +1,5 @@
-import { Injectable } from '@angular/core';
-import { ICrtStorage, CrtStorageContext, CrtSettings, CustomCrtPreset, CustomPresetName, CRT_PRESET_PREFIX, validatePresetName } from '@teensyrom-nx/domain';
+import { Injectable, Inject } from '@angular/core';
+import { ICrtStorage, CrtStorageContext, CrtSettings, CustomCrtPreset, CustomPresetName, CRT_PRESET_PREFIX, validatePresetName, IAlertService, ALERT_SERVICE } from '@teensyrom-nx/domain';
 import { logInfo, logWarn, LogType, logError } from '@teensyrom-nx/utils';
 
 /**
@@ -21,6 +21,8 @@ export class CrtStorageService implements ICrtStorage {
   private readonly STORAGE_KEY_PREFIX = 'teensyrom_crt_';
   private readonly CUSTOM_PRESETS_KEY = 'teensyrom_crt_custom_presets';
   private readonly MAX_CUSTOM_PRESETS = 50;
+
+  constructor(@Inject(ALERT_SERVICE) private readonly alertService: IAlertService) {}
 
   save(deviceId: string, context: CrtStorageContext, settings: CrtSettings): void {
     try {
@@ -127,6 +129,28 @@ export class CrtStorageService implements ICrtStorage {
     
     this.writeCustomPresets(presets);
     logInfo(LogType.Success, `CrtStorage: Saved custom preset '${fullName}'`);
+    this.alertService.success(`Preset '${name}' saved successfully`);
+  }
+
+  updateCustomPreset(name: CustomPresetName, settings: CrtSettings): void {
+    const presets = this.readCustomPresets();
+    
+    // Find the preset to update
+    const presetIndex = presets.findIndex(p => p.name === name);
+    if (presetIndex === -1) {
+      throw new Error(`Preset not found: ${name}`);
+    }
+    
+    // Update preset settings while preserving name and createdAt timestamp
+    presets[presetIndex] = {
+      ...presets[presetIndex],
+      settings
+    };
+    
+    this.writeCustomPresets(presets);
+    logInfo(LogType.Success, `CrtStorage: Updated custom preset '${name}'`);
+    const displayName = name.replace(/^custom-/, '');
+    this.alertService.success(`Preset '${displayName}' updated successfully`);
   }
 
   loadCustomPresets(): CustomCrtPreset[] {
@@ -139,6 +163,8 @@ export class CrtStorageService implements ICrtStorage {
     
     this.writeCustomPresets(filtered);
     logInfo(LogType.Info, `CrtStorage: Deleted custom preset '${name}'`);
+    const displayName = name.replace(/^custom-/, '');
+    this.alertService.success(`Preset '${displayName}' deleted successfully`);
   }
 
   renameCustomPreset(oldName: CustomPresetName, newName: string): void {
@@ -170,6 +196,7 @@ export class CrtStorageService implements ICrtStorage {
     
     this.writeCustomPresets(presets);
     logInfo(LogType.Info, `CrtStorage: Renamed custom preset '${oldName}' to '${fullNewName}'`);
+    this.alertService.success(`Preset renamed to '${newName}' successfully`);
   }
 
   hasCustomPreset(name: CustomPresetName): boolean {

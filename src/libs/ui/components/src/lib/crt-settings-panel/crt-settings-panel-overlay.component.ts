@@ -15,7 +15,7 @@ import { Overlay, OverlayModule, OverlayRef, ConnectedPosition } from '@angular/
 import { ComponentPortal, PortalModule } from '@angular/cdk/portal';
 import { CrtSettingsPanelComponent } from './crt-settings-panel.component';
 import { CrtSettings, CrtSettingsConfig } from '../crt-effect-wrapper/crt-settings.interface';
-import { AnyPresetName } from '../crt-effect-wrapper/crt-settings.defaults';
+import { AnyPresetName, CrtPresetName } from '../crt-effect-wrapper/crt-settings.defaults';
 
 /**
  * CRT Settings Panel Overlay Component
@@ -86,6 +86,8 @@ export class CrtSettingsPanelOverlayComponent {
   readonly config = input.required<CrtSettingsConfig>();
   readonly maxHeight = input<number | undefined>(undefined);
   readonly cardClass = input<string>('');
+  readonly currentPresetLabel = input<string>();
+  readonly excludePresets = input<CrtPresetName[]>([]);
   readonly validatePresetNameFn = input.required<(name: string, existingNames: string[]) => { error: string | null }>();
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -124,6 +126,8 @@ export class CrtSettingsPanelOverlayComponent {
         this.panelComponentRef.setInput('config', this.config());
         this.panelComponentRef.setInput('maxHeight', this.maxHeight());
         this.panelComponentRef.setInput('cardClass', this.cardClass());
+        this.panelComponentRef.setInput('currentPresetLabel', this.currentPresetLabel());
+        this.panelComponentRef.setInput('excludePresets', this.excludePresets());
         this.panelComponentRef.setInput('validatePresetNameFn', this.validatePresetNameFn());
       }
     });

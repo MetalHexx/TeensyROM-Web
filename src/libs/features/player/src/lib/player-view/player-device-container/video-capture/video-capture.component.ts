@@ -50,6 +50,13 @@ export class VideoCaptureComponent implements OnDestroy {
   readonly crtConfig = CRT_CONFIGS.small;
 
   /**
+   * Context-appropriate label for the current preset.
+   * Shows "Default" to users instead of size-based labels like "Small (WebGL)".
+   */
+  protected readonly currentPresetLabel = computed(() => 'Default');
+  protected readonly excludePresets = computed(() => [CRT_PRESET_KEYS.LARGE_WEBGL]);
+
+  /**
    * Validation function for custom preset names.
    * Passed to CrtSettingsPanelComponent for preset name validation.
    */

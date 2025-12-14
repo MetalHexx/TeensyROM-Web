@@ -13,33 +13,79 @@
 
 ## 🎯 Project Objective
 
-The current CRT preset system has six built-in presets (FULLSCREEN_CSS, FULLSCREEN_WEBGL, DIALOG_CSS, DIALOG_WEBGL, IMAGE_CSS, IMAGE_WEBGL) which create confusion and maintenance overhead. The distinction between "fullscreen", "dialog", and "image" contexts is unclear, and `CRT_CONFIGS` has drifted (standard and small configs are identical).
+**UPDATED**: This project has pivoted from the original six-preset simplification plan to a more radical streamlining:
 
-This project simplifies the system to two clear, size-based variants: **Small** (for compact displays like file-image thumbnails and video-capture compact view) and **Large** (for fullscreen contexts like video-dialog). Each variant will have CSS and WebGL sub-variants, with intelligent defaults based on platform capabilities for first-time users.
+**Current State**: 
+- Two WebGL-only presets exist (SMALL_WEBGL, LARGE_WEBGL)
+- CSS rendering mode has been completely removed
+- Components currently show "Small (WebGL)" and "Large (WebGL)" labels in preset dropdown
 
-**User Value**: Users get clearer, more consistent CRT effects across different viewing contexts. The simplified preset system is easier to understand and customize. Platform-appropriate defaults (WebGL when available, CSS fallback) ensure optimal visual quality without user intervention. All existing user preferences are preserved during migration.
+**Target State**:
+- Each component shows a single "Default" preset in their settings panel
+- Internally: file-image and video-capture use SMALL_WEBGL, video-dialog uses LARGE_WEBGL
+- Users never see confusing "Small" or "Large" labels in inappropriate contexts
+- Custom presets remain available for power users who want personalized settings
 
-**Technical Benefits**: Reduced code complexity, clearer naming conventions, elimination of duplicate configurations, and a streamlined settings panel that adapts to component context (small vs large).
+**User Value**: 
+- **Eliminates confusion** - No more seeing "Small" preset in fullscreen dialog or "Large" preset in thumbnail view
+- **Cleaner UI** - Single optimized "Default" option per component instead of multiple choices
+- **Flexibility preserved** - Custom presets allow power users to save their own configurations
+- **Consistent experience** - Every component presents one sensible default optimized for its context
+
+**Technical Benefits**: 
+- Simplified preset dropdown UI (just "Default" + custom presets)
+- Clear separation between internal architecture (size-based) and user-facing labels (context-based)
+- Reduced cognitive load for users choosing CRT settings
+- Elimination of context-inappropriate preset options
 
 ---
 
 ## 📋 Implementation Phases
 
-<details open>
-<summary><h3>Phase 1: Preset Structure Refactoring</h3></summary>
+### Phase 4: Default Preset Implementation ⭐ NEW PHASE
+
+**Objective**: Simplify user experience by showing only "Default" preset in each component context, while internally using size-appropriate presets (SMALL_WEBGL/LARGE_WEBGL).
+
+**Status**: ✅ **Ready for Implementation**
+
+**Key Changes from Original Plan**:
+- ✂️ **CSS rendering removed** - WebGL-only architecture (no CSS fallback)
+- 🎯 **Single "Default" label** - Users see one optimized preset per component
+- 🔒 **Internal preset mapping** - file-image/video-capture use SMALL_WEBGL, video-dialog uses LARGE_WEBGL
+- 💾 **Custom presets preserved** - Users can still create/save personalized settings
+
+**Deliverables**:
+- [ ] Settings panel accepts `currentPresetLabel` input from components
+- [ ] file-image displays "Default" (maps to SMALL_WEBGL)
+- [ ] video-capture displays "Default" (maps to SMALL_WEBGL)
+- [ ] video-dialog displays "Default" (maps to LARGE_WEBGL)
+- [ ] Custom preset workflows remain unchanged
+- [ ] All tests passing
+
+**Tasks**:
+1. [CRT-PRESET-SIMPLIFICATION-TASK-04-001-DEFAULT-PRESET-LABELS](./tasks/CRT-PRESET-SIMPLIFICATION-TASK-04-001-DEFAULT-PRESET-LABELS.md) - Implement "Default" label across all components
+
+**Phase Document**: [Phase 4 Plan](./phases/CRT-PRESET-SIMPLIFICATION-PHASE-04-DEFAULT-PRESET-IMPLEMENTATION.md)
+
+---
+
+<details>
+<summary><h3>Phase 1: Preset Structure Refactoring (ARCHIVED)</h3></summary>
 
 ### Objective
 
 Refactor domain layer preset constants and UI layer preset definitions to establish the new Small/Large structure. Update `CRT_CONFIGS` to match usage patterns. This phase focuses purely on structural changes without modifying component implementations.
 
+**NOTE**: This phase was superseded by the WebGL-only architecture. CSS presets were removed entirely.
+
 ### Key Deliverables
 
-- [ ] Domain layer `CRT_PRESET_KEYS` updated to four keys (SMALL_CSS, SMALL_WEBGL, LARGE_CSS, LARGE_WEBGL)
-- [ ] UI layer `CRT_PRESETS` object updated with new keys and values
-- [ ] `CRT_PRESET_LABELS` updated for dropdown display
-- [ ] `CRT_CONFIGS` simplified to small/large variants
-- [ ] `DEFAULT_CRT_SETTINGS` points to LARGE_WEBGL
-- [ ] All tests passing after refactoring
+- [x] Domain layer `CRT_PRESET_KEYS` updated to two keys (SMALL_WEBGL, LARGE_WEBGL)
+- [x] UI layer `CRT_PRESETS` object updated with new keys and values
+- [x] `CRT_PRESET_LABELS` updated for dropdown display
+- [x] `CRT_CONFIGS` simplified to small/large variants
+- [x] `DEFAULT_CRT_SETTINGS` points to LARGE_WEBGL
+- [x] All tests passing after refactoring
 
 ### High-Level Tasks
 
@@ -186,16 +232,19 @@ User will manually test and tune default values for Small and Large presets in e
 
 ## ✅ Success Criteria
 
-- [ ] Six old presets reduced to four new presets (SMALL_CSS, SMALL_WEBGL, LARGE_CSS, LARGE_WEBGL)
-- [ ] All three components use simplified preset structure
-- [ ] WebGL detection works for first-time users
-- [ ] Saved user preferences preserved and continue working
-- [ ] No component-specific CRT overrides remain (clean architecture)
-- [ ] Settings panel dropdown shows clear "Small" and "Large" preset names
-- [ ] CRT_CONFIGS simplified to small/large variants matching usage
-- [ ] All unit, integration, and E2E tests passing
-- [ ] Documentation updated with new preset guidance
-- [ ] User-tuned default values applied in Phase 3
+- [x] ~~Six old presets reduced to two WebGL-only presets~~ **COMPLETED** (SMALL_WEBGL, LARGE_WEBGL)
+- [x] ~~All three components use simplified preset structure~~ **COMPLETED**
+- [x] ~~CSS rendering mode completely removed~~ **COMPLETED**
+- [x] ~~Saved user preferences preserved and continue working~~ **COMPLETED**
+- [ ] **NEW**: Each component displays only "Default" preset label to users
+- [ ] **NEW**: file-image shows "Default" (internally SMALL_WEBGL)
+- [ ] **NEW**: video-capture shows "Default" (internally SMALL_WEBGL)
+- [ ] **NEW**: video-dialog shows "Default" (internally LARGE_WEBGL)
+- [ ] **NEW**: Custom presets show their saved names (not "Default")
+- [ ] **NEW**: Settings panel accepts component-provided preset labels
+- [ ] All unit and integration tests passing with updated expectations
+- [ ] No confusing "Small" or "Large" labels visible in any component
+- [ ] Documentation updated to reflect "Default" preset UX
 
 ---
 

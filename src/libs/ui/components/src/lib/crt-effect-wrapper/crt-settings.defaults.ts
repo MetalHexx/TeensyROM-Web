@@ -187,7 +187,10 @@ export type CrtPresetName = BuiltInPresetName;
 
 /**
  * Human-readable labels for CRT presets.
- * Use these for UI display in dropdown menus.
+ * These are fallback labels used when components don't provide their own context-appropriate labels.
+ * Components should pass their own labels via the currentPresetLabel input for better UX.
+ * 
+ * NOTE: WebGL-only architecture - CSS rendering has been removed.
  */
 export const CRT_PRESET_LABELS: Record<CrtPresetName, string> = {
   [CRT_PRESET_KEYS.SMALL_WEBGL]: 'Small (WebGL)',

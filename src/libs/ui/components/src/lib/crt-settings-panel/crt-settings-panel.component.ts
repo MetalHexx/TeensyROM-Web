@@ -144,6 +144,21 @@ export class CrtSettingsPanelComponent {
    */
   readonly validatePresetNameFn = input.required<(name: string, existingNames: string[]) => { error: string | null }>();
 
+  /**
+   * Optional label override for the current preset.
+   * When provided, this label is displayed for built-in presets instead of the global CRT_PRESET_LABELS.
+   * Custom presets always show their saved name regardless of this input.
+   * Use this to provide context-appropriate labels (e.g., "Default" instead of "Small (WebGL)").
+   */
+  readonly currentPresetLabel = input<string>();
+
+  /**
+   * Built-in presets to exclude from the dropdown.
+   * Use this to hide presets that aren't relevant to the component's context.
+   * For example, a compact view might exclude the large preset.
+   */
+  readonly excludePresets = input<CrtPresetName[]>([]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // Outputs
   // ─────────────────────────────────────────────────────────────────────────
@@ -177,11 +192,14 @@ export class CrtSettingsPanelComponent {
   protected readonly phosphorSlider = PHOSPHOR_SLIDER;
   protected readonly phosphorPatternOptions = PHOSPHOR_PATTERN_OPTIONS;
 
-  /** Available preset names for the preset menu */
-  protected readonly presetNames: CrtPresetName[] = [
-    CRT_PRESET_KEYS.SMALL_WEBGL,
-    CRT_PRESET_KEYS.LARGE_WEBGL,
-  ];
+  /** Available preset names for the preset menu (computed to exclude specified presets) */
+  protected readonly presetNames = computed(() => {
+    const allPresets: CrtPresetName[] = [
+      CRT_PRESET_KEYS.SMALL_WEBGL,
+      CRT_PRESET_KEYS.LARGE_WEBGL,
+    ];
+    return allPresets.filter(preset => !this.excludePresets().includes(preset));
+  });
 
   /** Validation function adapter for preset name dialog */
   protected readonly dialogValidationFn: PresetNameValidationFn = (name: string, existingNames: string[]) => {
@@ -268,7 +286,7 @@ export class CrtSettingsPanelComponent {
    * Custom presets are sorted alphabetically for consistent display.
    */
   protected readonly allPresets = computed(() => ({
-    builtIn: this.presetNames,
+    builtIn: this.presetNames(),
     custom: this.customPresets().sort((a, b) => a.name.localeCompare(b.name)),
   }));
 
@@ -371,14 +389,22 @@ export class CrtSettingsPanelComponent {
 
   /**
    * Gets human-readable preset label for menu display.
-   * For custom presets, returns the name without 'custom-' prefix.
+   * For built-in presets: uses component-provided currentPresetLabel if available, otherwise falls back to CRT_PRESET_LABELS.
+   * For custom presets: always returns the name without 'custom-' prefix.
    */
   protected getPresetLabel(presetName: CrtPresetName | CustomPresetName): string {
     // Check if it's a custom preset
     if (typeof presetName === 'string' && presetName.startsWith('custom-')) {
       return this.stripCustomPrefix(presetName as CustomPresetName);
     }
-    // Built-in preset
+    
+    // For built-in presets: use component-provided label if available
+    const providedLabel = this.currentPresetLabel();
+    if (providedLabel) {
+      return providedLabel;
+    }
+    
+    // Fallback to global preset labels
     return CRT_PRESET_LABELS[presetName as CrtPresetName];
   }
 
@@ -413,6 +439,20 @@ export class CrtSettingsPanelComponent {
       isRenaming: this.isRenaming(),
       dialogPresetName: this.dialogPresetName()
     });
+  }
+
+  /**
+   * Handles updating an existing custom preset with current settings.
+   * Overwrites the preset's settings without changing its name.
+   */
+  protected onUpdatePreset(presetName: CustomPresetName): void {
+    console.log('[CrtSettingsPanel] onUpdatePreset called:', presetName);
+    
+    const currentSettings = this.settings();
+    this.crtStorage.updateCustomPreset(presetName, currentSettings);
+    this.refreshCustomPresets();
+    
+    console.log('[CrtSettingsPanel] Preset updated:', presetName);
   }
 
   /**
@@ -458,7 +498,7 @@ export class CrtSettingsPanelComponent {
    */
   protected getReservedNames(): string[] {
     // Get built-in names without 'default-' prefix
-    const builtInNames = this.presetNames.map(k => k.replace(/^default-/, ''));
+    const builtInNames = this.presetNames().map(k => k.replace(/^default-/, ''));
     // Get custom names without 'custom-' prefix
     let customNames = this.customPresets().map(p => this.stripCustomPrefix(p.name));
     

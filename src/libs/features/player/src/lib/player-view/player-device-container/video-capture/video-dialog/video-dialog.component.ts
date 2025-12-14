@@ -1,4 +1,4 @@
-import { Component, Inject, ChangeDetectionStrategy, signal, viewChild, OnDestroy, inject, effect } from '@angular/core';
+import { Component, Inject, ChangeDetectionStrategy, signal, viewChild, OnDestroy, inject, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
@@ -84,6 +84,13 @@ export class VideoDialogComponent implements OnDestroy {
 
   /** CRT config - large display with all controls */
   protected readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.large;
+
+  /**
+   * Context-appropriate label for the current preset.
+   * Shows "Default" to users instead of size-based labels like "Large (WebGL)".
+   */
+  protected readonly currentPresetLabel = computed(() => 'Default');
+  protected readonly excludePresets = computed(() => [CRT_PRESET_KEYS.SMALL_WEBGL]);
 
   /**
    * Validation function for custom preset names.

@@ -51,6 +51,8 @@
       [class.panel-hidden]="!showCrtControls()"
       [settings]="crtSettings()"
       [config]="crtConfig"
+      [currentPresetLabel]="currentPresetLabel()"
+      [excludePresets]="excludePresets()"
       [validatePresetNameFn]="validatePresetNameFn"
       (settingsChange)="onCrtSettingsChange($event)"
       (presetSelected)="onCrtPresetSelected($event)"

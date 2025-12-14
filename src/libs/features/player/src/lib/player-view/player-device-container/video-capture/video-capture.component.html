@@ -32,6 +32,8 @@
             [settings]="crtSettings()"
             [config]="crtConfig"
             [maxHeight]="350"
+            [currentPresetLabel]="currentPresetLabel()"
+            [excludePresets]="excludePresets()"
             [validatePresetNameFn]="validatePresetNameFn"
             (settingsChange)="onCrtSettingsChange($event)"
             (presetSelected)="onCrtPresetSelected($event)"

@@ -72,6 +72,15 @@ export interface ICrtStorage {
   saveCustomPreset(name: string, settings: CrtSettings): void;
 
   /**
+   * Update an existing custom preset with new settings.
+   * 
+   * @param name - Preset name with 'custom-' prefix
+   * @param settings - New CRT visual effect settings
+   * @throws Error if preset doesn't exist or validation fails
+   */
+  updateCustomPreset(name: CustomPresetName, settings: CrtSettings): void;
+
+  /**
    * Load all custom presets from storage.
    * 
    * @returns Array of custom presets, empty array if none exist
