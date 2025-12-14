@@ -53,14 +53,6 @@ const EXPECTED_LABELS = {
   randomLaunch: 'Launch Random File',
 } as const;
 
-// Console log messages
-const CONSOLE_MESSAGES = {
-  allFilter: 'All filter clicked',
-  gamesFilter: 'Games filter clicked',
-  musicFilter: 'Music filter clicked',
-  imagesFilter: 'Images filter clicked',
-} as const;
-
 describe('FilterToolbarComponent', () => {
   let component: FilterToolbarComponent;
   let fixture: ComponentFixture<FilterToolbarComponent>;

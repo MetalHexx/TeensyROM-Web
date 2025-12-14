@@ -48,11 +48,6 @@ export class PlayerToolbarComponent {
     const deviceId = this.deviceId();
     if (!deviceId) return null;
     
-    // Track only file PATH to trigger re-evaluation when file IDENTITY changes
-    // Reading just the path (string primitive) instead of full object prevents
-    // unnecessary re-evaluation during directory loading animations
-    const currentFilePath = this.currentFile()?.file?.path;
-    
     // getTimerState returns Signal<TimerState | null>, call it to get current value
     const timerSignal = this.playerContext.getTimerState(deviceId);
     return timerSignal();

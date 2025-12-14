@@ -25,12 +25,12 @@ describe('YouTubeDialogComponent', () => {
       Element.prototype.animate = vi.fn(() => ({
         finished: Promise.resolve(),
         onfinish: null,
-        playState: 'finished',
+        playState: 'finished' as AnimationPlayState,
         cancel: vi.fn(),
         pause: vi.fn(),
         play: vi.fn(),
         reverse: vi.fn(),
-      })) as any;
+      })) as unknown as typeof Element.prototype.animate;
     }
 
     await TestBed.configureTestingModule({

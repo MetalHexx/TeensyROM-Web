@@ -19,10 +19,14 @@ import {
 
 /** Mock CRT storage for testing - stores nothing, returns null */
 const mockCrtStorage: ICrtStorage = {
-  save: () => {},
+  save: (): void => {
+    // Mock implementation - intentionally does nothing for testing
+  },
   load: () => null,
   hasSavedSettings: () => false,
-  clear: () => {},
+  clear: (): void => {
+    // Mock implementation - intentionally does nothing for testing
+  },
 };
 
 describe('PlayerDeviceContainerComponent', () => {

@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
-import { signal, Signal, WritableSignal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
 import { CompactCardLayoutComponent } from '@teensyrom-nx/ui/components';
 import { DirectoryTrailComponent } from './directory-trail.component';
@@ -158,7 +158,7 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Forward Navigation', () => {
-    let mockStorageStore: any;
+    let mockStorageStore: Partial<StorageStore>;
 
     beforeEach(async () => {
       // Create mock storage store with forward navigation enabled
@@ -226,7 +226,7 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Null State Handling', () => {
-    let mockStorageStore: any;
+    let mockStorageStore: Partial<StorageStore>;
 
     beforeEach(async () => {
       mockStorageStore = {
@@ -312,7 +312,7 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('USB Storage Type', () => {
-    let mockStorageStore: any;
+    let mockStorageStore: Partial<StorageStore>;
 
     beforeEach(async () => {
       mockStorageStore = {
@@ -367,7 +367,7 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Root Path Navigation', () => {
-    let mockStorageStore: any;
+    let mockStorageStore: Partial<StorageStore>;
 
     beforeEach(async () => {
       mockStorageStore = {
@@ -422,7 +422,7 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Loading State', () => {
-    let mockStorageStore: any;
+    let mockStorageStore: Partial<StorageStore>;
 
     beforeEach(async () => {
       mockStorageStore = {
@@ -485,7 +485,7 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Child Component Integration', () => {
-    let mockStorageStore: any;
+    let mockStorageStore: Partial<StorageStore>;
 
     beforeEach(async () => {
       mockStorageStore = {
