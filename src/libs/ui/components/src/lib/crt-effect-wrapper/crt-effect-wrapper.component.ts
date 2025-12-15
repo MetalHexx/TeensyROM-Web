@@ -128,24 +128,25 @@ export class CrtEffectWrapperComponent {
       return { width: '100%', height: '100%', left: '0', top: '0' };
     }
 
-    // Calculate visible content dimensions using object-fit: cover logic
+    // Calculate visible content dimensions using object-fit: contain logic
+    // This ensures the entire content is visible without cropping
     let visibleWidth: number;
     let visibleHeight: number;
     let offsetLeft: number;
     let offsetTop: number;
 
     if (aspectRatio > containerAspectRatio) {
-      // Content is wider - fill height, crop sides
-      visibleHeight = containerH;
-      visibleWidth = containerH * aspectRatio;
-      offsetTop = 0;
-      offsetLeft = (containerW - visibleWidth) / 2;
-    } else {
-      // Content is narrower - fill width, crop top/bottom
+      // Content is wider - fit to width, letterbox top/bottom
       visibleWidth = containerW;
       visibleHeight = containerW / aspectRatio;
       offsetLeft = 0;
       offsetTop = (containerH - visibleHeight) / 2;
+    } else {
+      // Content is taller - fit to height, pillarbox left/right
+      visibleHeight = containerH;
+      visibleWidth = containerH * aspectRatio;
+      offsetTop = 0;
+      offsetLeft = (containerW - visibleWidth) / 2;
     }
 
     return {
