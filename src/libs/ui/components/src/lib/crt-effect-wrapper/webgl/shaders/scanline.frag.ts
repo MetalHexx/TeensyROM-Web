@@ -46,13 +46,14 @@ export const SCANLINE_FRAGMENT_SHADER = `
   precision highp float;
 
   // === Video Texture ===
-  uniform sampler2D u_videoTexture;  // The video frame to process
+  uniform sampler2D u_videoTexture;
 
   // === CRT Settings Uniforms ===
-  uniform float u_scanlineIntensity;  // 0.0 - 1.0, how dark the scanlines get
-  uniform float u_scanlineSize;       // Controls line thickness/spacing
-  uniform float u_vignetteStrength;   // 0.0 - 2.0, edge darkening intensity
-  uniform vec2 u_resolution;          // Canvas width/height in device pixels
+  uniform float u_scanlineIntensity;
+  uniform float u_scanlineSize;
+  uniform float u_vignetteStrength;
+  uniform float u_screenCurvature;
+  uniform vec2 u_resolution;
 
   // === Phosphor Pattern Uniforms ===
   uniform int u_phosphorPattern;      // 0=none, 1=aperture-grille, 2=shadow-mask, 3=dot-triad
@@ -100,14 +101,33 @@ export const SCANLINE_FRAGMENT_SHADER = `
 
   // === Vignette Effect ===
   //
-  // Radial darkening from center to corners. Returns a factor (0-1) where:
+  // Box-shaped vignette with rounded corners matching CSS border-radius.
+  // At curvature=0, creates sharp rectangular vignette.
+  // At curvature>0, rounds corners to match the dialog's border-radius in screen pixels.
+  // Returns a factor (0-1) where:
   // - 1.0 = center (no darkening)
-  // - 0.0 = corners (maximum darkening)
+  // - 0.0 = edges (maximum darkening)
   //
-  float calculateVignette(vec2 uv, float strength) {
-    vec2 center = uv - 0.5;
-    float distSq = dot(center, center);
-    float vignetteFactor = 1.0 - (distSq * strength);
+  float calculateVignette(vec2 uv, float strength, float curvature, vec2 resolution) {
+    vec2 center = abs(uv - 0.5);
+    
+    // Convert curvature (in pixels) to UV space based on smaller dimension
+    // Scale by 1.8x to visually match CSS border-radius (vignette appears tighter due to gradient)
+    float minDimension = min(resolution.x, resolution.y);
+    float cornerRadiusUV = (curvature * 1.8) / minDimension;
+    
+    // Rounded-box vignette matching CSS border-radius
+    // Calculate distance from corner regions
+    vec2 cornerStart = vec2(0.5) - cornerRadiusUV;
+    vec2 toCorner = max(center - cornerStart, 0.0);
+    
+    // Use box distance on edges, add circular distance in corners
+    float boxDist = max(center.x, center.y);
+    float cornerDist = length(toCorner);
+    float dist = boxDist + cornerDist - cornerRadiusUV;
+    
+    // Square and scale to match original vignette intensity
+    float vignetteFactor = 1.0 - (dist * dist * 2.0 * strength);
     return clamp(vignetteFactor, 0.0, 1.0);
   }
 
@@ -222,7 +242,7 @@ export const SCANLINE_FRAGMENT_SHADER = `
     // 2. Calculate all multiplicative factors
     // Scanlines and vignette use raw v_texCoord for screen-space effects
     float scanlineFactor = calculateScanline(v_texCoord, u_scanlineSize, u_resolution);
-    float vignetteFactor = calculateVignette(v_texCoord, u_vignetteStrength);
+    float vignetteFactor = calculateVignette(v_texCoord, u_vignetteStrength, u_screenCurvature, u_resolution);
     // Phosphor uses flippedUv to align with video content
     vec3 phosphorMask = calculatePhosphor(flippedUv, u_resolution, u_phosphorPattern, u_phosphorIntensity);
     

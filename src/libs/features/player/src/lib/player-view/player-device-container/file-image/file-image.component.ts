@@ -37,8 +37,11 @@ export class FileImageComponent {
   deviceId = input.required<string>();
   currentFile = input<LaunchedFile | null>();
 
-  // CRT configuration - small config for file viewing
-  readonly crtConfig = CRT_CONFIGS.small;
+  // CRT configuration - small config for file viewing (vignette disabled for square format)
+  readonly crtConfig = {
+    ...CRT_CONFIGS.small,
+    showVignette: false, // Disable vignette on perfect square format
+  };
 
   /**
    * Context-appropriate label for the current preset.

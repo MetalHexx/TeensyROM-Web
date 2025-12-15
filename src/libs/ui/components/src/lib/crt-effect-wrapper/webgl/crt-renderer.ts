@@ -9,6 +9,7 @@ interface CrtUniforms {
   scanlineIntensity: WebGLUniformLocation | null;
   scanlineSize: WebGLUniformLocation | null;
   vignetteStrength: WebGLUniformLocation | null;
+  screenCurvature: WebGLUniformLocation | null;
   resolution: WebGLUniformLocation | null;
   phosphorPattern: WebGLUniformLocation | null;
   phosphorIntensity: WebGLUniformLocation | null;
@@ -49,6 +50,7 @@ export class CrtRenderer {
     scanlineIntensity: null,
     scanlineSize: null,
     vignetteStrength: null,
+    screenCurvature: null,
     resolution: null,
     phosphorPattern: null,
     phosphorIntensity: null,
@@ -177,6 +179,10 @@ export class CrtRenderer {
 
     if (this.uniforms.vignetteStrength !== null) {
       this.gl.uniform1f(this.uniforms.vignetteStrength, settings.vignetteStrength);
+    }
+
+    if (this.uniforms.screenCurvature !== null) {
+      this.gl.uniform1f(this.uniforms.screenCurvature, settings.screenCurvature);
     }
 
     // Phosphor pattern uniforms
@@ -317,6 +323,7 @@ export class CrtRenderer {
       scanlineIntensity: null,
       scanlineSize: null,
       vignetteStrength: null,
+      screenCurvature: null,
       resolution: null,
       phosphorPattern: null,
       phosphorIntensity: null,
@@ -532,6 +539,7 @@ export class CrtRenderer {
     this.uniforms.scanlineIntensity = this.gl.getUniformLocation(program, 'u_scanlineIntensity');
     this.uniforms.scanlineSize = this.gl.getUniformLocation(program, 'u_scanlineSize');
     this.uniforms.vignetteStrength = this.gl.getUniformLocation(program, 'u_vignetteStrength');
+    this.uniforms.screenCurvature = this.gl.getUniformLocation(program, 'u_screenCurvature');
     this.uniforms.resolution = this.gl.getUniformLocation(program, 'u_resolution');
     this.uniforms.phosphorPattern = this.gl.getUniformLocation(program, 'u_phosphorPattern');
     this.uniforms.phosphorIntensity = this.gl.getUniformLocation(program, 'u_phosphorIntensity');
