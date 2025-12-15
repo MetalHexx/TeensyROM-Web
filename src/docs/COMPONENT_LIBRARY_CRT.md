@@ -4,7 +4,7 @@
 
 The TeensyROM application features a comprehensive CRT (Cathode Ray Tube) emulation system that recreates the authentic visual experience of vintage monitors. This document covers the components, configuration, and best practices for implementing retro CRT visual effects throughout the application.
 
-The CRT system uses **pure CSS** for all effects (scanlines, vignette, curvature, color filters) with no JavaScript animation overhead, making it performant and suitable for real-time video display.
+The CRT system uses **WebGL-based post-processing** for authentic visual effects (scanlines, vignette, phosphor patterns, color filters) with hardware-accelerated rendering, making it performant and suitable for real-time video display.
 
 ---
 
@@ -94,7 +94,7 @@ Both components accept `CrtSettings` (values) and `CrtSettingsConfig` (feature f
 
 ### `CrtEffectWrapperComponent`
 
-**Purpose**: A pure presentation wrapper component that applies CRT (cathode ray tube) visual effects to any projected content via CSS custom properties. Encapsulates scanlines, vignette, screen curvature, and color filter effects without any store dependencies. Supports fullscreen mode with proper aspect ratio handling for non-native content (e.g., 4:3 video on 16:9 screen).
+**Purpose**: A pure presentation wrapper component that applies CRT (cathode ray tube) visual effects to any projected content via WebGL post-processing. Encapsulates scanlines, vignette, phosphor patterns, screen curvature, and color filter effects without any store dependencies. Supports fullscreen mode with proper aspect ratio handling for non-native content (e.g., 4:3 video on 16:9 screen).
 
 **Selector**: `lib-crt-effect-wrapper`
 
@@ -164,18 +164,19 @@ import {
 - **Config System**: Feature flags control which effect groups are applied
 - **Cohesive with Settings Panel**: Same config model works with `lib-crt-settings-panel`
 - **Customizable**: Spread presets to override individual values
-- **Smooth Transitions**: 300ms CSS transitions for enable/disable toggle
-- **CSS-Only Effects**: All effects via pseudo-elements and CSS filters (no JS animation overhead)
-- **Effect Isolation**: Scanlines/vignette via ::before/::after, filters on content wrapper
+- **Smooth Transitions**: Effects fade in/out smoothly when toggling enabled state
+- **WebGL Post-Processing**: Hardware-accelerated effects via fragment shaders (GPU rendering)
+- **Video Texture Sampling**: Processes video frames as textures for authentic CRT appearance with true color filtering
 - **Fullscreen Aspect Ratio**: Automatically calculates clip-path to constrain effects to visible content area when `contentAspectRatio` is provided
 
 **Visual Properties**:
 
 - Container fills parent (`width: 100%; height: 100%`)
-- Scanlines: Repeating horizontal dark bands via CSS gradient
-- Vignette: Radial + linear gradients with blur for edge darkening
-- Screen Curvature: CSS border-radius with overflow hidden
-- Filters: CSS filter property on content wrapper
+- Scanlines: Anti-aliased sine wave pattern via WebGL shader with automatic Moiré prevention
+- Vignette: Rounded-box SDF darkening via WebGL shader, corners match screen curvature
+- Phosphor Patterns: RGB subpixel filtering (aperture grille, shadow mask, dot triad) via WebGL
+- Screen Curvature: CSS border-radius for container shape
+- Color Filters: Applied in shader for true multiplicative color blending
 
 **Fullscreen Aspect Ratio Behavior**:
 
@@ -802,8 +803,8 @@ Values that control the intensity and appearance of each effect:
 |----------|------|-----------|
 | `scanlineIntensity` | `number` | Opacity of scanline overlay (0-1). Set to 0 to disable. |
 | `scanlineSize` | `number` | Size of scanline bands and gaps in pixels (1.0-6.0). Controls both dark band height and spacing with 1:1 ratio. |
-| `vignetteStrength` | `number` | Intensity of edge/corner darkening (0-2). Set to 0 to disable. |
-| `screenCurvature` | `number` | Border-radius in pixels for curved screen effect. Set to 0 for flat. |
+| `vignetteStrength` | `number` | Intensity of rectangular edge darkening (0-2). Set to 0 to disable. Works with `screenCurvature` to create rounded corners matching the CRT bezel. |
+| `screenCurvature` | `number` | Border-radius in pixels for curved screen effect and vignette corner rounding. Set to 0 for flat/sharp corners. The vignette corners match the dialog's border-radius for visual consistency. |
 | `contrast` | `number` | CSS filter contrast multiplier. 1 = no change, >1 = increased. |
 | `brightness` | `number` | CSS filter brightness multiplier. 1 = no change, >1 = brighter. |
 | `saturation` | `number` | CSS filter saturation multiplier. 1 = no change, >1 = more saturated. |
@@ -904,7 +905,7 @@ This ensures CRT effects (curvature, vignette) are constrained to the visible vi
 
 Horizontal dark bands that simulate the scan pattern of a CRT electron gun.
 
-- **Implementation**: CSS repeating linear gradient as `::before` pseudo-element
+- **Implementation**: WebGL fragment shader using anti-aliased sine wave with analytical derivatives for Moiré prevention
 - **Properties**: `scanlineIntensity` (opacity 0-1), `scanlineSize` (band and gap size in pixels, 1:1 ratio)
 - **Visual Effect**: Creates the characteristic horizontal line pattern of CRT displays
 
@@ -912,17 +913,19 @@ Horizontal dark bands that simulate the scan pattern of a CRT electron gun.
 
 Edge and corner darkening that simulates the uneven phosphor glow of curved CRT screens.
 
-- **Implementation**: Radial + linear gradients with blur as `::after` pseudo-element
-- **Properties**: `vignetteStrength` controls overall intensity
-- **Visual Effect**: Darker edges/corners with gradual fade to center, enhancing the "tube" appearance
+- **Implementation**: WebGL shader using rounded-box SDF (Signed Distance Field) for smooth rectangular darkening
+- **Properties**: 
+  - `vignetteStrength` controls overall intensity (0-2)
+  - `screenCurvature` controls corner rounding to match the dialog border-radius
+- **Visual Effect**: Rectangular darkening that follows the screen edges uniformly with rounded corners matching the CRT bezel curvature. At curvature=0, creates sharp rectangular corners; at higher curvature values, corners are smoothly rounded to match the dialog's border-radius
 
 ### Screen Curvature
 
 Curved edges simulating the bulging glass of vintage CRT monitors.
 
-- **Implementation**: CSS `border-radius` with `overflow: hidden`
-- **Properties**: `screenCurvature` in pixels (0 = flat, higher = more curved)
-- **Visual Effect**: Rounds the corners to simulate convex glass tube
+- **Implementation**: CSS `border-radius` with `overflow: hidden` for the container; WebGL shader for vignette corner rounding
+- **Properties**: `screenCurvature` in pixels (0 = flat/sharp corners, higher = more curved)
+- **Visual Effect**: Rounds the container corners to simulate convex glass tube. Also controls the vignette corner rounding to match the CRT bezel shape, creating a cohesive rectangular appearance with consistent curvature throughout
 
 ### Color Filters
 
@@ -953,7 +956,7 @@ The CRT effect wrapper exposes these CSS custom properties for advanced styling:
 
 ## Best Practices
 
-1. **Use Presets with Constants**: Start with `CRT_PRESETS[CRT_PRESET_KEYS.FULLSCREEN_WEBGL]`, `CRT_PRESET_KEYS.DIALOG_CSS`, or `CRT_PRESET_KEYS.IMAGE_WEBGL` before customizing individual settings. Always use the `CRT_PRESET_KEYS` constants instead of magic strings for type safety and IDE autocomplete support.
+1. **Use Presets with Constants**: Start with `CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]`, `CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL`, or `CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL` before customizing individual settings. Always use the `CRT_PRESET_KEYS` constants instead of magic strings for type safety and IDE autocomplete support.
 
 2. **Match Config with Settings Panel**: When using `CrtSettingsPanelComponent`, pass the same `CRT_CONFIGS` to both components so sliders match enabled effects.
 
@@ -967,7 +970,7 @@ The CRT effect wrapper exposes these CSS custom properties for advanced styling:
 
 7. **Coordinate Hover States**: Use `openedChange` events from dropdowns to pause hover-based overlay hiding during user interactions.
 
-8. **Performance**: All effects are CSS-based with no JavaScript animation loops - they're efficient even on lower-powered devices.
+8. **Performance**: All effects are GPU-accelerated via WebGL shaders - they're efficient and leverage hardware acceleration for smooth real-time rendering.
 
 ---
 
@@ -994,7 +997,6 @@ import {
   // Constants
   CRT_PRESETS,
   CRT_PRESET_KEYS,
-  CRT_RENDER_MODES,
   CRT_PHOSPHOR_PATTERNS,
   CRT_CONFIGS,
   DEFAULT_CRT_SETTINGS,
