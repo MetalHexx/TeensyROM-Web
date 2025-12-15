@@ -87,10 +87,10 @@ export class VideoDialogComponent implements OnDestroy {
 
   /**
    * Context-appropriate label for the current preset.
-   * Shows "Default" to users instead of size-based labels like "Large (WebGL)".
+   * Shows "Default" to users instead of context-based labels like "Large Video (WebGL)".
    */
   protected readonly currentPresetLabel = computed(() => 'Default');
-  protected readonly excludePresets = computed(() => [CRT_PRESET_KEYS.SMALL_WEBGL]);
+  protected readonly excludePresets = computed(() => [CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL, CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]);
 
   /**
    * Validation function for custom preset names.
@@ -120,8 +120,8 @@ export class VideoDialogComponent implements OnDestroy {
         if (saved) {
           this.crtSettings.set(saved);
         } else {
-          // Default to LARGE_WEBGL preset for new users
-          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+          // Default to LARGE_VIDEO_WEBGL preset for new users
+          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
         }
       }
     }, { allowSignalWrites: true });

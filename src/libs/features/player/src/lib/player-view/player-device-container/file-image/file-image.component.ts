@@ -42,10 +42,10 @@ export class FileImageComponent {
 
   /**
    * Context-appropriate label for the current preset.
-   * Shows "Default" to users instead of size-based labels like "Small (WebGL)".
+   * Shows "Default" to users instead of context-based labels like "Small Image (WebGL)".
    */
   protected readonly currentPresetLabel = computed(() => 'Default');
-  protected readonly excludePresets = computed(() => [CRT_PRESET_KEYS.LARGE_WEBGL]);
+  protected readonly excludePresets = computed(() => [CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL, CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
 
   /**
    * Validation function for custom preset names.
@@ -58,7 +58,7 @@ export class FileImageComponent {
 
   // CRT state signals (initialized in constructor based on WebGL detection)
   protected readonly isCrtEnabled = signal<boolean>(true);
-  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
+  protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]);
   protected readonly showCrtControls = signal<boolean>(false);
 
   constructor() {
@@ -70,8 +70,8 @@ export class FileImageComponent {
         if (savedSettings) {
           this.crtSettings.set(savedSettings);
         } else {
-          // Default to SMALL_WEBGL preset for new users
-          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
+          // Default to SMALL_IMAGE_WEBGL preset for new users
+          this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]);
         }
       }
     }, { allowSignalWrites: true });

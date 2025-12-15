@@ -89,37 +89,34 @@ export const CRT_CONFIGS = {
 } as const satisfies Record<string, CrtSettingsConfig>;
 
 /**
- * Built-in CRT effect presets using size-based naming.
+ * Built-in CRT effect presets using context-based naming.
  *
- * SMALL presets: Optimized for compact displays (thumbnails, compact video)
- * - No screen curvature (screenCurvature: 0)
- * - Subtle scanlines and vignette
+ * Video presets: Optimized for video content
+ * - SMALL_VIDEO_WEBGL: Compact video displays (no curvature, subtle effects)
+ * - LARGE_VIDEO_WEBGL: Fullscreen video displays (curvature enabled, immersive effects)
  *
- * LARGE presets: Optimized for fullscreen displays (video dialog, fullscreen images)
- * - Screen curvature enabled (screenCurvature: 115)
- * - Strong scanlines and vignette for immersion
+ * Image presets: Optimized for static image content
+ * - SMALL_IMAGE_WEBGL: Static image displays (no curvature, balanced effects for clarity)
  *
- * CSS vs WebGL:
- * - CSS: Pure CSS implementation, phosphor patterns disabled
- * - WebGL: Advanced effects with phosphor patterns and bloom
+ * All presets use WebGL rendering for high-fidelity output.
  *
  * Use these presets with CRT_PRESET_KEYS constants for type safety:
  * ```typescript
  * // ✅ Use preset with constant (type-safe)
- * settings = CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL];
+ * settings = CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL];
  *
  * // ✅ Customize a preset
- * settings = { ...CRT_PRESETS[CRT_PRESET_KEYS.SMALL_CSS], brightness: 1.2 };
+ * settings = { ...CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL], brightness: 1.2 };
  * ```
  */
 export const CRT_PRESETS = {
   /**
-   * Small (WebGL) - Subtle CRT effect for compact displays with WebGL enhancements.
+   * Small Video (WebGL) - Subtle CRT effect for compact video displays.
    * Light scanlines, minimal vignette, no curvature, delicate phosphor pattern.
    * Uses WebGL for pristine rendering.
-   * Ideal for: thumbnails, compact video players, embedded content.
+   * Ideal for: compact video players, video thumbnails, embedded video content.
    */
-  [CRT_PRESET_KEYS.SMALL_WEBGL]: {
+  [CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]: {
     scanlineIntensity: 0.3,
     scanlineSize: 1.5,
     vignetteStrength: 0.7,
@@ -138,12 +135,12 @@ export const CRT_PRESETS = {
   },
 
   /**
-   * Large (WebGL) - Immersive fullscreen CRT with GPU-accelerated rendering.
+   * Large Video (WebGL) - Immersive fullscreen CRT for video content.
    * Strong scanlines, vignette, curvature, phosphor patterns for maximum authenticity.
    * Uses WebGL for best quality and no zoom banding artifacts.
-   * Ideal for: fullscreen video, large images, immersive viewing.
+   * Ideal for: fullscreen video displays, video dialog, immersive video viewing.
    */
-  [CRT_PRESET_KEYS.LARGE_WEBGL]: {
+  [CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]: {
     scanlineIntensity: 0.6,
     scanlineSize: 2.5,
     vignetteStrength: 1.5,
@@ -154,6 +151,30 @@ export const CRT_PRESETS = {
     hue: 0,
     phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
     phosphorIntensity: 0.4,
+    bloomEnabled: false,
+    bloomIntensity: 0,
+    bloomRadius: 1,
+    barrelDistortion: 0,
+    chromaticAberration: 0,
+  },
+
+  /**
+   * Small Image (WebGL) - Balanced CRT effect for static image displays.
+   * Medium scanlines, moderate vignette, no curvature, refined phosphor pattern.
+   * Uses WebGL for sharp, artifact-free rendering.
+   * Ideal for: static image viewers, photo galleries, screenshot displays.
+   */
+  [CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]: {
+    scanlineIntensity: 0.4,
+    scanlineSize: 2.0,
+    vignetteStrength: 1.0,
+    screenCurvature: 0,
+    contrast: 1.1,
+    brightness: 1.4,
+    saturation: 1.2,
+    hue: 0,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
+    phosphorIntensity: 0.2,
     bloomEnabled: false,
     bloomIntensity: 0,
     bloomRadius: 1,
@@ -193,12 +214,13 @@ export type CrtPresetName = BuiltInPresetName;
  * NOTE: WebGL-only architecture - CSS rendering has been removed.
  */
 export const CRT_PRESET_LABELS: Record<CrtPresetName, string> = {
-  [CRT_PRESET_KEYS.SMALL_WEBGL]: 'Small (WebGL)',
-  [CRT_PRESET_KEYS.LARGE_WEBGL]: 'Large (WebGL)',
+  [CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]: 'Small Video (WebGL)',
+  [CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]: 'Large Video (WebGL)',
+  [CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]: 'Small Image (WebGL)',
 };
 
 /**
- * Default CRT settings - Large WebGL experience for fullscreen viewing.
+ * Default CRT settings - Large Video WebGL experience for fullscreen viewing.
  */
-export const DEFAULT_CRT_SETTINGS: CrtSettings = CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL];
+export const DEFAULT_CRT_SETTINGS: CrtSettings = CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL];
 

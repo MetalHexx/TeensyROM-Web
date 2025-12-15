@@ -195,8 +195,9 @@ export class CrtSettingsPanelComponent {
   /** Available preset names for the preset menu (computed to exclude specified presets) */
   protected readonly presetNames = computed(() => {
     const allPresets: CrtPresetName[] = [
-      CRT_PRESET_KEYS.SMALL_WEBGL,
-      CRT_PRESET_KEYS.LARGE_WEBGL,
+      CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL,
+      CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL,
+      CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL,
     ];
     return allPresets.filter(preset => !this.excludePresets().includes(preset));
   });
@@ -548,11 +549,6 @@ export class CrtSettingsPanelComponent {
       this.crtStorage.deleteCustomPreset(presetName);
       console.log(`[CrtSettingsPanel] Deleted custom preset: ${presetName}`);
       
-      // Check if deleted preset was currently active
-      if (this.currentPresetName() === presetName) {
-        // Reset to default preset when active preset is deleted
-        this.presetSelected.emit(CRT_PRESET_KEYS.LARGE_WEBGL);
-      }
       
       // Refresh preset list and close dialog
       this.refreshCustomPresets();

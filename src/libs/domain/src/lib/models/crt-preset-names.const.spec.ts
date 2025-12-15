@@ -11,13 +11,14 @@ describe('CRT_PRESET_PREFIX', () => {
 });
 
 describe('CRT_PRESET_KEYS', () => {
-  it('should have exactly 2 preset keys', () => {
-    expect(Object.keys(CRT_PRESET_KEYS)).toHaveLength(2);
+  it('should have exactly 3 preset keys', () => {
+    expect(Object.keys(CRT_PRESET_KEYS)).toHaveLength(3);
   });
 
-  it('should have size-based key names', () => {
-    expect(CRT_PRESET_KEYS.SMALL_WEBGL).toBeDefined();
-    expect(CRT_PRESET_KEYS.LARGE_WEBGL).toBeDefined();
+  it('should have context-based key names', () => {
+    expect(CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL).toBeDefined();
+    expect(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL).toBeDefined();
+    expect(CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL).toBeDefined();
   });
 
   it('should use default prefix for all keys', () => {
@@ -26,13 +27,14 @@ describe('CRT_PRESET_KEYS', () => {
     });
   });
 
-  it('should follow default-{size}-webgl format for all keys', () => {
-    expect(CRT_PRESET_KEYS.SMALL_WEBGL).toBe('default-small-webgl');
-    expect(CRT_PRESET_KEYS.LARGE_WEBGL).toBe('default-large-webgl');
+  it('should follow default-{context}-webgl format for all keys', () => {
+    expect(CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL).toBe('default-small-video-webgl');
+    expect(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL).toBe('default-large-video-webgl');
+    expect(CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL).toBe('default-small-image-webgl');
   });
 
   it('should have consistent naming convention', () => {
-    const pattern = /^default-(small|large)-webgl$/;
+    const pattern = /^default-(small-video|large-video|small-image)-webgl$/;
     Object.values(CRT_PRESET_KEYS).forEach((key) => {
       expect(key).toMatch(pattern);
     });
@@ -42,8 +44,9 @@ describe('CRT_PRESET_KEYS', () => {
 describe('PresetKey type', () => {
   it('should accept all valid preset key values', () => {
     const validKeys: PresetKey[] = [
-      CRT_PRESET_KEYS.SMALL_WEBGL,
-      CRT_PRESET_KEYS.LARGE_WEBGL,
+      CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL,
+      CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL,
+      CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL,
     ];
 
     validKeys.forEach((key) => {
@@ -54,8 +57,9 @@ describe('PresetKey type', () => {
 
   it('should include all WebGL string literal values', () => {
     const presetKeyValues = Object.values(CRT_PRESET_KEYS);
-    expect(presetKeyValues).toHaveLength(2);
-    expect(presetKeyValues).toContain('default-small-webgl');
-    expect(presetKeyValues).toContain('default-large-webgl');
+    expect(presetKeyValues).toHaveLength(3);
+    expect(presetKeyValues).toContain('default-small-video-webgl');
+    expect(presetKeyValues).toContain('default-large-video-webgl');
+    expect(presetKeyValues).toContain('default-small-image-webgl');
   });
 });

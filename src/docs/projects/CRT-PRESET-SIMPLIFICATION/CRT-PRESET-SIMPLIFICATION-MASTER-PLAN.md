@@ -40,13 +40,26 @@
 
 ---
 
+## � Project Status
+
+**Current Phase**: Phase 5 - Preset Rename & Context Separation  
+**Last Updated**: December 14, 2025  
+**Status**: Ready for implementation
+
+**Recent Changes**:
+- Added Phase 5 to rename presets from size-based to context-based naming
+- Created dedicated image preset (SMALL_IMAGE_WEBGL)
+- Each component now gets its own semantically appropriate default
+
+---
+
 ## 📋 Implementation Phases
 
-### Phase 4: Default Preset Implementation ⭐ NEW PHASE
+### Phase 4: Default Preset Implementation ⭐ COMPLETED
 
 **Objective**: Simplify user experience by showing only "Default" preset in each component context, while internally using size-appropriate presets (SMALL_WEBGL/LARGE_WEBGL).
 
-**Status**: ✅ **Ready for Implementation**
+**Status**: ✅ **Completed** (Components now show "Default" label)
 
 **Key Changes from Original Plan**:
 - ✂️ **CSS rendering removed** - WebGL-only architecture (no CSS fallback)
@@ -66,6 +79,34 @@
 1. [CRT-PRESET-SIMPLIFICATION-TASK-04-001-DEFAULT-PRESET-LABELS](./tasks/CRT-PRESET-SIMPLIFICATION-TASK-04-001-DEFAULT-PRESET-LABELS.md) - Implement "Default" label across all components
 
 **Phase Document**: [Phase 4 Plan](./phases/CRT-PRESET-SIMPLIFICATION-PHASE-04-DEFAULT-PRESET-IMPLEMENTATION.md)
+
+---
+
+### Phase 5: Preset Rename & Context Separation ⭐ NEW PHASE
+
+**Objective**: Rename built-in CRT presets to reflect their intended use contexts (video vs. image) and create a dedicated image preset. This ensures each component type has its own semantically appropriate default.
+
+**Status**: ✅ **Ready for Implementation**
+
+**Key Changes**:
+- 📝 **Rename SMALL_WEBGL → SMALL_VIDEO_WEBGL** - Clarifies video capture context
+- 📝 **Rename LARGE_WEBGL → LARGE_VIDEO_WEBGL** - Clarifies fullscreen video context  
+- ✨ **Add SMALL_IMAGE_WEBGL** - Dedicated preset for static image viewing
+- 🎯 **Context-appropriate defaults** - video-capture uses Small Video, video-dialog uses Large Video, file-image uses Small Image
+- 🚫 **Updated exclusions** - Each component excludes presets from other contexts
+
+**Deliverables**:
+- [ ] Domain layer has 3 semantically named preset keys
+- [ ] UI layer has 3 preset configurations (Small Image copies Small Video config for now)
+- [ ] video-capture uses SMALL_VIDEO_WEBGL and excludes other presets
+- [ ] video-dialog uses LARGE_VIDEO_WEBGL and excludes other presets
+- [ ] file-image uses SMALL_IMAGE_WEBGL and excludes video presets
+- [ ] All tests passing
+
+**Tasks**:
+1. [CRT-PRESET-SIMPLIFICATION-TASK-05-001-PRESET-RENAME](./tasks/CRT-PRESET-SIMPLIFICATION-TASK-05-001-PRESET-RENAME.md) - Rename presets and update all references
+
+**Phase Document**: [Phase 5 Plan](./phases/CRT-PRESET-SIMPLIFICATION-PHASE-05-PRESET-RENAME.md)
 
 ---
 

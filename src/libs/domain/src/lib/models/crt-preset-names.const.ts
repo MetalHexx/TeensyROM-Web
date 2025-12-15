@@ -9,16 +9,21 @@ export const CRT_PRESET_PREFIX = {
 } as const;
 
 /**
- * Built-in CRT preset identifiers using size-based naming.
+ * Built-in CRT preset identifiers using context-based naming.
  *
- * Small presets: Optimized for compact displays (thumbnails, video-capture)
- * Large presets: Optimized for fullscreen displays (video-dialog, fullscreen images)
+ * Video presets: Optimized for video content (video-capture, video-dialog)
+ * - SMALL_VIDEO_WEBGL: Compact video displays
+ * - LARGE_VIDEO_WEBGL: Fullscreen video displays
+ *
+ * Image presets: Optimized for static image content (file-image viewer)
+ * - SMALL_IMAGE_WEBGL: Static image displays
  *
  * All presets use WebGL rendering for high-fidelity output.
  */
 export const CRT_PRESET_KEYS = {
-  SMALL_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}small-webgl`,
-  LARGE_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}large-webgl`,
+  SMALL_VIDEO_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}small-video-webgl`,
+  LARGE_VIDEO_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}large-video-webgl`,
+  SMALL_IMAGE_WEBGL: `${CRT_PRESET_PREFIX.DEFAULT}small-image-webgl`,
 } as const;
 
 /**
