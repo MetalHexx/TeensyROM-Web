@@ -56,7 +56,8 @@
       [validatePresetNameFn]="validatePresetNameFn"
       (settingsChange)="onCrtSettingsChange($event)"
       (presetSelected)="onCrtPresetSelected($event)"
-      (closed)="toggleCrtControls()">
+      (closed)="toggleCrtControls()"
+      (openedChange)="onDeviceSelectorOpenedChange($event)">
     ></lib-crt-settings-panel>
   }
 
