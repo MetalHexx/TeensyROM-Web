@@ -111,10 +111,10 @@ describe('Scanline Fragment Shader - Barrel Distortion', () => {
         SCANLINE_FRAGMENT_SHADER.indexOf('void main()')
       );
       const distortionCall = mainFunction.indexOf('applyBarrelDistortion');
-      const textureSample = mainFunction.indexOf('texture2D(u_videoTexture');
+      const chromaticCall = mainFunction.indexOf('applyChromaticAberration');
 
-      // Distortion must be applied before sampling
-      expect(distortionCall).toBeLessThan(textureSample);
+      // Distortion must be applied before chromatic aberration (which samples the texture)
+      expect(distortionCall).toBeLessThan(chromaticCall);
       expect(distortionCall).toBeGreaterThan(-1);
     });
 
@@ -290,6 +290,296 @@ describe('Barrel Distortion Formula - Mathematical Specification', () => {
       const distortionFunc = shader.substring(funcStart, funcEnd + 1);
       // Check that clamp() function is not called (not just the word in comments)
       expect(distortionFunc).not.toMatch(/clamp\s*\(/);
+    });
+  });
+});
+
+/**
+ * Bloom Effect Shader Tests
+ *
+ * These tests verify the two-pass bloom algorithm:
+ * 1. Bright-pass filter extracts bright pixels above luminance threshold
+ * 2. 9-tap Gaussian blur creates smooth glow around bright areas
+ *
+ * This simulates the phosphor glow characteristic of CRT displays.
+ */
+describe('Scanline Fragment Shader - Bloom Effect', () => {
+  describe('shader structure', () => {
+    it('should declare u_bloomIntensity uniform', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('uniform float u_bloomIntensity');
+    });
+
+    it('should define applyBloom function', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('vec3 applyBloom');
+    });
+
+    it('should accept videoTexture, uv, intensity, and resolution parameters', () => {
+      const functionSignature = /vec3\s+applyBloom\s*\(\s*sampler2D\s+videoTexture\s*,\s*vec2\s+uv\s*,\s*float\s+intensity\s*,\s*vec2\s+resolution\s*\)/;
+      expect(SCANLINE_FRAGMENT_SHADER).toMatch(functionSignature);
+    });
+  });
+
+  describe('zero-intensity optimization', () => {
+    it('should have early return when intensity is 0.0', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('if (intensity <= 0.0)');
+    });
+
+    it('should return texture sample directly when disabled', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      expect(bloomFunc).toContain('return texture2D(videoTexture, uv).rgb');
+    });
+
+    it('should check intensity before any bloom calculations', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const functionStart = shader.indexOf('vec3 applyBloom');
+      const intensityCheck = shader.indexOf('if (intensity <= 0.0)', functionStart);
+      const brightPassCalc = shader.indexOf('brightColor', functionStart);
+
+      expect(intensityCheck).toBeLessThan(brightPassCalc);
+      expect(intensityCheck).toBeGreaterThan(-1);
+    });
+  });
+
+  describe('bright-pass filter algorithm', () => {
+    it('should calculate luminance using standard coefficients', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('dot(originalColor, vec3(0.299, 0.587, 0.114))');
+    });
+
+    it('should define bright-pass threshold', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('brightPassThreshold = 0.6');
+    });
+
+    it('should use smoothstep for soft threshold transition', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      expect(bloomFunc).toMatch(/smoothstep\s*\(\s*brightPassThreshold\s*-\s*0\.1\s*,\s*brightPassThreshold\s*\+\s*0\.1/);
+    });
+
+    it('should extract bright color above threshold', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('brightColor = originalColor * smoothstep');
+    });
+  });
+
+  describe('9-tap Gaussian blur', () => {
+    it('should calculate texel size from resolution', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('texelSize = vec2(1.0) / resolution');
+    });
+
+    it('should scale blur radius with intensity', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('blurRadius = 2.0 * intensity');
+    });
+
+    it('should include center sample with weight 0.25', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('bloom = brightColor * 0.25');
+    });
+
+    it('should include 4 adjacent samples with weight 0.125 each', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      // Count occurrences of * 0.125 (should be 4 for adjacent samples)
+      const adjacentSamples = (bloomFunc.match(/\*\s*0\.125/g) || []).length;
+      expect(adjacentSamples).toBe(4);
+    });
+
+    it('should include 4 diagonal samples with weight 0.0625 each', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      // Count occurrences of * 0.0625 (should be 4 for diagonal samples)
+      const diagonalSamples = (bloomFunc.match(/\*\s*0\.0625/g) || []).length;
+      expect(diagonalSamples).toBe(4);
+    });
+
+    it('should sample all 4 cardinal directions', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      // Check for up, down, left, right samples
+      expect(bloomFunc).toContain('vec2(0.0, blurRadius)');  // up
+      expect(bloomFunc).toContain('vec2(blurRadius, 0.0)');  // right
+      expect(bloomFunc).toMatch(/-\s*vec2\(0\.0,\s*blurRadius\)/); // down
+      expect(bloomFunc).toMatch(/-\s*vec2\(blurRadius,\s*0\.0\)/); // left
+    });
+
+    it('should sample all 4 diagonal corners', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      // Check for diagonal samples (positive/negative combinations)
+      expect(bloomFunc).toContain('vec2(blurRadius, blurRadius)');
+      expect(bloomFunc).toContain('vec2(-blurRadius, blurRadius)');
+      expect(bloomFunc).toContain('vec2(blurRadius, -blurRadius)');
+      expect(bloomFunc).toContain('vec2(-blurRadius, -blurRadius)');
+    });
+  });
+
+  describe('additive blending', () => {
+    it('should combine original color with bloom', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('originalColor + bloom');
+    });
+
+    it('should scale bloom contribution by intensity', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('bloom * intensity * 0.5');
+    });
+
+    it('should return combined color', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      expect(bloomFunc).toMatch(/return\s+originalColor\s+\+\s+bloom\s+\*\s+intensity\s+\*\s+0\.5/);
+    });
+  });
+
+  describe('main() integration', () => {
+    it('should call applyBloom in main() function', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const mainFunc = shader.substring(shader.indexOf('void main()'));
+      expect(mainFunc).toContain('applyBloom');
+    });
+
+    it('should apply bloom BEFORE scanlines and vignette', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const mainFunc = shader.substring(shader.indexOf('void main()'));
+      
+      const bloomCall = mainFunc.indexOf('applyBloom');
+      const scanlineCall = mainFunc.indexOf('calculateScanline');
+      const vignetteCall = mainFunc.indexOf('calculateVignette');
+      
+      expect(bloomCall).toBeGreaterThan(-1);
+      expect(bloomCall).toBeLessThan(scanlineCall);
+      expect(bloomCall).toBeLessThan(vignetteCall);
+    });
+
+    it('should pass video texture to bloom function', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const mainFunc = shader.substring(shader.indexOf('void main()'));
+      expect(mainFunc).toMatch(/applyBloom\s*\(\s*u_videoTexture/);
+    });
+
+    it('should pass bloom intensity uniform', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const mainFunc = shader.substring(shader.indexOf('void main()'));
+      expect(mainFunc).toContain('u_bloomIntensity');
+    });
+
+    it('should pass resolution uniform for texel size calculation', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const mainFunc = shader.substring(shader.indexOf('void main()'));
+      const bloomCall = mainFunc.substring(mainFunc.indexOf('applyBloom'));
+      expect(bloomCall).toContain('u_resolution');
+    });
+
+    it('should use bloomed color for subsequent effects', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const mainFunc = shader.substring(shader.indexOf('void main()'));
+      // Bloom feeds into monochrome phosphor
+      expect(mainFunc).toContain('bloomedColor');
+      expect(mainFunc).toMatch(/applyMonochromePhosphor\s*\(\s*bloomedColor/);
+      // Monochrome color is used in final multiplicative calculation
+      expect(mainFunc).toMatch(/finalColor\s*=\s*monochromeColor\s*\*/);
+    });
+  });
+
+  describe('GLSL syntax compliance', () => {
+    it('should use valid GLSL ES 1.0 texture sampling', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('texture2D(videoTexture');
+    });
+
+    it('should use vec2/vec3 types correctly', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      expect(bloomFunc).toContain('vec2 texelSize');
+      expect(bloomFunc).toContain('vec3 originalColor');
+      expect(bloomFunc).toContain('vec3 brightColor');
+      expect(bloomFunc).toContain('vec3 bloom');
+    });
+
+    it('should use float literals with decimal points', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      // Check that weights are properly formatted
+      expect(bloomFunc).toMatch(/0\.25(?!\d)/); // 0.25, not 0.250
+      expect(bloomFunc).toMatch(/0\.125(?!\d)/); // 0.125, not 0.1250
+      expect(bloomFunc).toMatch(/0\.0625(?!\d)/); // 0.0625
+    });
+  });
+
+  describe('performance considerations', () => {
+    it('should have zero-cost optimization when disabled', () => {
+      // Single texture sample when intensity <= 0
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('if (intensity <= 0.0)');
+    });
+
+    it('should minimize texture samples (9 total when enabled)', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      // Count texture2D calls in bloom function (should be 10: 1 original + 9 blur samples)
+      // 1 for original color, then 9 for Gaussian blur (1 center + 4 adjacent + 4 diagonal)
+      const textureSamples = (bloomFunc.match(/texture2D\(/g) || []).length;
+      expect(textureSamples).toBe(10);
+    });
+
+    it('should use efficient texel size calculation', () => {
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('vec2(1.0) / resolution');
+    });
+  });
+
+  describe('documentation', () => {
+    it('should document the two-pass algorithm', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomComment = shader.substring(
+        shader.indexOf('// === Bloom Effect ==='),
+        shader.indexOf('vec3 applyBloom')
+      );
+      expect(bloomComment).toContain('Two-pass');
+      expect(bloomComment).toContain('Bright-pass filter');
+      expect(bloomComment).toContain('Gaussian blur');
+    });
+
+    it('should document bright-pass threshold value', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomFunc = shader.substring(
+        shader.indexOf('vec3 applyBloom'),
+        shader.indexOf('// === Phosphor Pattern Functions ===')
+      );
+      expect(bloomFunc).toMatch(/0\.6.*60%/);
+    });
+
+    it('should document performance characteristics', () => {
+      const shader = SCANLINE_FRAGMENT_SHADER;
+      const bloomComment = shader.substring(
+        shader.indexOf('// === Bloom Effect ==='),
+        shader.indexOf('vec3 applyBloom')
+      );
+      expect(bloomComment).toContain('Performance');
+      expect(bloomComment).toContain('Zero-intensity optimization');
     });
   });
 });

@@ -14,6 +14,7 @@ export const DEFAULT_CRT_CONFIG: CrtSettingsConfig = {
   showBloom: true,
   showDistortion: true,
   showChromaticAberration: true,
+  showMonochromePhosphor: true,
 };
 
 /**
@@ -55,6 +56,7 @@ export const CRT_CONFIGS = {
     showBloom: true,
     showDistortion: true,
     showChromaticAberration: true,
+    showMonochromePhosphor: true,
   },
 
   /**
@@ -70,6 +72,7 @@ export const CRT_CONFIGS = {
     showBloom: true,
     showDistortion: true,
     showChromaticAberration: true,
+    showMonochromePhosphor: true,
   },
 
   /**
@@ -85,6 +88,7 @@ export const CRT_CONFIGS = {
     showBloom: false,
     showDistortion: false,
     showChromaticAberration: false,
+    showMonochromePhosphor: false,
   },
 } as const satisfies Record<string, CrtSettingsConfig>;
 
@@ -127,11 +131,10 @@ export const CRT_PRESETS = {
     hue: 0,
     phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
     phosphorIntensity: 0.1,
-    bloomEnabled: false,
     bloomIntensity: 0,
-    bloomRadius: 1,
     barrelDistortion: 0,
     chromaticAberration: 0,
+    monochromePhosphor: 'none',
   },
 
   /**
@@ -151,11 +154,10 @@ export const CRT_PRESETS = {
     hue: 0,
     phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
     phosphorIntensity: 0.4,
-    bloomEnabled: false,
-    bloomIntensity: 0,
-    bloomRadius: 1,
+    bloomIntensity: 0.3,
     barrelDistortion: 0,
     chromaticAberration: 0,
+    monochromePhosphor: 'none',
   },
 
   /**
@@ -175,11 +177,10 @@ export const CRT_PRESETS = {
     hue: 0,
     phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
     phosphorIntensity: 0.2,
-    bloomEnabled: false,
     bloomIntensity: 0,
-    bloomRadius: 1,
     barrelDistortion: 0,
     chromaticAberration: 0,
+    monochromePhosphor: 'none',
   },
 } as const satisfies Record<string, CrtSettings>;
 

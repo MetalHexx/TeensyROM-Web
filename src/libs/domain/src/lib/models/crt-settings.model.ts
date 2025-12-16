@@ -8,6 +8,16 @@
 export type PhosphorPatternType = 'none' | 'aperture-grille' | 'shadow-mask' | 'dot-triad';
 
 /**
+ * Monochrome phosphor color types for vintage terminal simulation.
+ * Converts the entire display to a single-color phosphor style reminiscent of early computer terminals.
+ * - 'none': Full color (disabled)
+ * - 'white': White phosphor (IBM PC monochrome, early workstations)
+ * - 'amber': Amber phosphor (classic terminals, warm tone)
+ * - 'green': Green phosphor (VT220, IBM 3270, classic hacker aesthetic)
+ */
+export type MonochromePhosphorType = 'none' | 'white' | 'amber' | 'green';
+
+/**
  * Configuration interface for CRT (cathode ray tube) visual effects.
  *
  * All properties are numeric values that map to CSS custom properties.
@@ -96,25 +106,20 @@ export interface CrtSettings {
   phosphorIntensity: number;
 
   /**
-   * Whether bloom effect is enabled.
+   * Intensity of bloom glow effect (0-2.0).
+   * Creates a soft glowing halo around bright areas, simulating the phosphor glow
+   * characteristic of CRT displays. Uses two-pass algorithm: bright-pass filter
+   * (extracts bright pixels above threshold) + 9-tap Gaussian blur for smooth glow.
+   * 
+   * - 0 = no bloom (zero performance cost)
+   * - 0.5 = subtle glow for small displays
+   * - 1.0 = noticeable glow for medium displays
+   * - 2.0 = dramatic glow for large fullscreen displays
+   * 
    * Only visible in WebGL mode.
-   * @default false
-   */
-  bloomEnabled: boolean;
-
-  /**
-   * Intensity of bloom glow (0-2).
-   * Higher values = more pronounced glow around bright areas.
-   * @default 0.3
+   * @default 0
    */
   bloomIntensity: number;
-
-  /**
-   * Radius of bloom spread in pixels (1-10).
-   * Higher values = softer, wider glow.
-   * @default 3
-   */
-  bloomRadius: number;
 
   /**
    * Amount of barrel distortion (0-0.5).
@@ -133,4 +138,19 @@ export interface CrtSettings {
    * @default 0
    */
   chromaticAberration: number;
+
+  /**
+   * Monochrome phosphor color for vintage terminal appearance.
+   * Converts the display to single-color phosphor output:
+   * - 'none': Full color (effect disabled)
+   * - 'white': White phosphor (IBM PC monochrome, early workstations)
+   * - 'amber': Amber phosphor (warm orange tone, classic terminals)
+   * - 'green': Green phosphor (VT220, IBM 3270, classic hacker aesthetic)
+   * 
+   * Uses luminance calculation to preserve brightness relationships while
+   * tinting all pixels with the selected phosphor color.
+   * Only visible in WebGL mode.
+   * @default 'none'
+   */
+  monochromePhosphor: MonochromePhosphorType;
 }

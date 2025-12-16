@@ -171,6 +171,26 @@
     </div>
   }
 
+  <!-- Bloom Control -->
+  @if (config().showBloom) {
+    <div class="crt-control-group">
+      <span class="control-label">{{ bloomSlider.label }}</span>
+      <mat-slider
+        [min]="bloomSlider.min"
+        [max]="bloomSlider.max"
+        [step]="bloomSlider.step"
+        discrete
+      >
+        <input
+          matSliderThumb
+          [ngModel]="settings()[bloomSlider.key]"
+          (ngModelChange)="onSliderChange(bloomSlider.key, $event)"
+        />
+      </mat-slider>
+      <span class="control-value">{{ formatValue(settings()[bloomSlider.key], bloomSlider) }}</span>
+    </div>
+  }
+
   <!-- Chromatic Aberration Control -->
   @if (config().showChromaticAberration) {
     <div class="crt-control-group">
@@ -274,6 +294,31 @@
         />
       </mat-slider>
       <span class="control-value">{{ formatValue(settings()[phosphorSlider.key], phosphorSlider) }}</span>
+    </div>
+  }
+
+  <!-- Monochrome Phosphor Control (WebGL only) -->
+  @if (shouldShowMonochromePhosphor()) {
+    <div class="crt-control-group pattern-selector">
+      <span class="control-label">Monochrome Phosphor</span>
+      <lib-dropdown-menu #monochromeDropdown>
+        <button 
+          class="pattern-button" 
+          (click)="monochromeDropdown.toggle()"
+          type="button">
+          {{ getMonochromePhosphorLabel() }}
+          <mat-icon>arrow_drop_down</mat-icon>
+        </button>
+        <div dropdown-content>
+          @for (option of monochromePhosphorOptions; track option.value) {
+            <lib-dropdown-menu-item
+              [testId]="'monochrome-' + option.value"
+              (itemClick)="onMonochromePhosphorChange(option.value)">
+              {{ option.label }}
+            </lib-dropdown-menu-item>
+          }
+        </div>
+      </lib-dropdown-menu>
     </div>
   }
 

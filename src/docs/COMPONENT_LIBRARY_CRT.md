@@ -936,6 +936,26 @@ Image warping effect that simulates the pincushion/barrel distortion inherent to
 - **Visual Effect**: Bends straight lines into curves radiating from the center, replicating the physical lens distortion of a convex glass tube. Creates subtle bulge at edges that enhances the perception of viewing content through curved glass. The effect properly extends to viewport edges, creating the authentic appearance of curved CRT glass where corner pixels "pull inward" toward the center.
 - **Performance**: GPU-accelerated with minimal overhead (~7 shader operations per pixel)
 
+### Bloom
+
+Soft glowing halo around bright areas, simulating the phosphor glow characteristic of CRT displays.
+
+- **Implementation**: WebGL fragment shader using two-pass algorithm: bright-pass filter + 9-tap Gaussian blur
+- **Properties**: `bloomIntensity` controls glow intensity (0-2.0, where 0 = disabled, 2.0 = maximum glow)
+- **Algorithm**:
+  1. **Bright-pass filter**: Extract bright pixels above luminance threshold (0.6 = 60% brightness) using standard luminance coefficients (0.299R + 0.587G + 0.114B). Uses `smoothstep` for soft threshold transition to avoid harsh cutoffs.
+  2. **9-tap Gaussian blur**: Apply weighted blur pattern with adaptive radius (2.0 × intensity pixels):
+     - Center sample: weight 0.25
+     - 4 adjacent samples (up/down/left/right): weight 0.125 each
+     - 4 diagonal samples (corners): weight 0.0625 each
+  3. **Additive blending**: Combine original color with bloomed color scaled by intensity × 0.5 for natural glow contribution
+- **Visual Effect**: Creates the characteristic soft halo around bright areas visible on authentic CRT displays due to phosphor persistence and light scattering. Most noticeable around white UI elements, bright video content, and high-contrast edges. Applied BEFORE scanlines and vignette in the rendering pipeline to simulate authentic phosphor glow behavior where light diffuses before the electron gun creates scan artifacts.
+- **Performance**: GPU-accelerated with ~9 texture samples per pixel when enabled (1 center + 4 adjacent + 4 diagonal). Zero-cost optimization provides single-sample passthrough when disabled (intensity ≤ 0).
+- **Use Cases**: 
+  - Subtle glow (0.3-0.5) for small/embedded displays
+  - Noticeable glow (0.5-1.0) for medium displays
+  - Dramatic glow (1.0-2.0) for large fullscreen displays with maximum authenticity
+
 ### Chromatic Aberration
 
 RGB color fringing effect that simulates lens aberration in CRT monitors where RGB channels separate horizontally.
@@ -979,6 +999,7 @@ The CRT effect wrapper exposes these CSS custom properties for advanced styling:
 | `--scanline-intensity` | `settings.scanlineIntensity` |
 | `--scanline-size` | `settings.scanlineSize` (px) |
 | `--vignette-strength` | `settings.vignetteStrength` |
+| `--bloom-intensity` | `settings.bloomIntensity` |
 | `--barrel-distortion` | `settings.barrelDistortion` |
 | `--screen-curvature` | `settings.screenCurvature` (px) |
 | `--crt-contrast` | `settings.contrast` |

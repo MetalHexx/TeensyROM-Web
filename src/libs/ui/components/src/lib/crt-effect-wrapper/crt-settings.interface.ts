@@ -163,10 +163,16 @@ export interface CrtSettingsConfig {
    * When false, CA control hidden and effect disabled.
    */
   showChromaticAberration: boolean;
+
+  /**
+   * Show monochrome phosphor control.
+   * When false, monochrome phosphor dropdown hidden and effect disabled.
+   */
+  showMonochromePhosphor: boolean;
 }
 
 /**
  * Re-export CrtSettings and PhosphorPatternType from domain layer for convenience.
  * The actual interfaces are defined in @teensyrom-nx/domain.
  */
-export type { CrtSettings, PhosphorPatternType } from '@teensyrom-nx/domain';
+export type { CrtSettings, PhosphorPatternType, MonochromePhosphorType } from '@teensyrom-nx/domain';

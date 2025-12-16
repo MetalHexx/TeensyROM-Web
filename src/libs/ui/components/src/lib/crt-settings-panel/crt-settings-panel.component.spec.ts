@@ -7,6 +7,7 @@ import {
   CRT_CONFIGS,
   DEFAULT_CRT_SETTINGS,
   DEFAULT_CRT_CONFIG,
+  CRT_PRESET_KEYS,
 } from '../crt-effect-wrapper/crt-settings.defaults';
 import { CRT_STORAGE, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 
@@ -110,11 +111,11 @@ describe('CrtSettingsPanelComponent', () => {
   });
 
   describe('Slider Rendering Based on Config', () => {
-    it('should render all 9 sliders with default config', () => {
+    it('should render all 12 sliders with default config', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(9); // 2 scanline + 1 vignette + 1 curvature + 4 color + 1 phosphor (bloom disabled)
+      expect(sliders.length).toBe(12); // 2 scanline + 1 vignette + 1 curvature + 4 color + 1 phosphor + 2 barrel + 1 bloom
     });
 
     it('should render only scanline sliders when config.showScanlines is true only', () => {
@@ -257,7 +258,7 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
-      expect(sliders.length).toBe(8); // 2 scanline + 1 vignette + 4 color + 1 phosphor (bloom disabled, no curvature)
+      expect(sliders.length).toBe(11); // 2 scanline + 1 vignette + 4 color + 1 phosphor + 1 bloom + 1 distortion + 1 chromatic (no curvature)
 
       const labels = fixture.nativeElement.querySelectorAll('.control-label') as NodeListOf<Element>;
       const labelTexts = Array.from(labels).map((l) => l.textContent?.trim());
@@ -459,7 +460,7 @@ describe('CrtSettingsPanelComponent', () => {
       // Check that the dropdown opened by looking for menu items in the overlay
       const overlay = document.querySelector('.cdk-overlay-container');
       const menuItems = overlay?.querySelectorAll('lib-dropdown-menu-item');
-      expect(menuItems?.length).toBe(3);
+      expect(menuItems?.length).toBe(4); // 3 built-in presets + 1 save custom
     });
 
     it('should display all two built-in preset options', async () => {
@@ -477,8 +478,9 @@ describe('CrtSettingsPanelComponent', () => {
         item.textContent?.trim()
       );
 
-      expect(itemTexts).toContain('Small (WebGL)');
-      expect(itemTexts).toContain('Large (WebGL)');
+      expect(itemTexts).toContain('Small Video (WebGL)');
+      expect(itemTexts).toContain('Large Video (WebGL)');
+      expect(itemTexts).toContain('Small Image (WebGL)');
     });
 
     it('should emit presetSelected when dropdown item is clicked', async () => {
@@ -493,14 +495,14 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      // Click the 'default-small-webgl' preset item via the button element
+      // Click the 'default-small-video-webgl' preset item via the button element
       const overlay = document.querySelector('.cdk-overlay-container');
-      const smallWebglButton = overlay?.querySelector('[data-testid="preset-default-small-webgl"]') as HTMLElement;
+      const smallWebglButton = overlay?.querySelector('[data-testid="preset-default-small-video-webgl"]') as HTMLElement;
       smallWebglButton?.click();
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(presetSpy).toHaveBeenCalledWith('default-small-webgl');
+      expect(presetSpy).toHaveBeenCalledWith('default-small-video-webgl');
     });
 
     it('should have dropdown that auto-closes after item click via DropdownMenuItemComponent', async () => {
@@ -520,7 +522,7 @@ describe('CrtSettingsPanelComponent', () => {
 
       // Click a preset item - the DropdownMenuItemComponent has autoClose=true by default
       // which calls parentDropdown.close() after emitting itemClick
-      const largeWebglButton = overlay?.querySelector('[data-testid="preset-default-large-webgl"]') as HTMLElement;
+      const largeWebglButton = overlay?.querySelector('[data-testid="preset-default-large-video-webgl"]') as HTMLElement;
       largeWebglButton?.click();
       fixture.detectChanges();
       
@@ -622,7 +624,7 @@ describe('CrtSettingsPanelComponent', () => {
 
       const allPresets = component['allPresets']();
       
-      expect(allPresets.builtIn.length).toBe(2); // 2 built-in presets
+      expect(allPresets.builtIn.length).toBe(3); // 3 built-in presets
     });
 
     it('should filter out excluded presets from allPresets', () => {
@@ -631,12 +633,12 @@ describe('CrtSettingsPanelComponent', () => {
       // Create new fixture with excludePresets input
       fixture = createComponentFixture();
       component = fixture.componentInstance;
-      fixture.componentRef.setInput('excludePresets', ['default-large-webgl' as CrtPresetName]);
+      fixture.componentRef.setInput('excludePresets', ['default-large-video-webgl' as CrtPresetName, 'default-small-image-webgl' as CrtPresetName]);
       fixture.detectChanges();
 
       const allPresets = component['allPresets']();
-      expect(allPresets.builtIn.length).toBe(1); // Only small preset remains
-      expect(allPresets.builtIn[0]).toBe('default-small-webgl');
+      expect(allPresets.builtIn.length).toBe(1); // Only small-video preset remains
+      expect(allPresets.builtIn[0]).toBe('default-small-video-webgl');
       expect(allPresets.custom.length).toBe(3);
       expect(allPresets.custom).toEqual(mockCustomPresets.sort((a, b) => 
         a.name.localeCompare(b.name)
@@ -664,7 +666,7 @@ describe('CrtSettingsPanelComponent', () => {
 
       const allPresets = component['allPresets']();
       
-      expect(allPresets.builtIn.length).toBe(2);
+      expect(allPresets.builtIn.length).toBe(3);
       expect(allPresets.custom.length).toBe(0);
     });
   });
@@ -978,8 +980,9 @@ describe('CrtSettingsPanelComponent', () => {
       const reserved = (component as any).getReservedNames();
       
       // Should contain built-in names without 'default-' prefix
-      expect(reserved).toContain('small-webgl');
-      expect(reserved).toContain('large-webgl');
+      expect(reserved).toContain('small-video-webgl');
+      expect(reserved).toContain('large-video-webgl');
+      expect(reserved).toContain('small-image-webgl');
       
       // Should NOT contain names with prefix
       expect(reserved).not.toContain('default-small-webgl');
@@ -1013,8 +1016,8 @@ describe('CrtSettingsPanelComponent', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const reserved = (component as any).getReservedNames();
       
-      // Should have 2 built-in + 3 custom = 5 total
-      expect(reserved.length).toBe(5);
+      // Should have 3 built-in + 3 custom = 6 total
+      expect(reserved.length).toBe(6);
     });
 
     it('should return custom preset label from getPresetLabel for custom presets', () => {
@@ -1029,8 +1032,8 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const label = (component as any).getPresetLabel('default-large-webgl' as CrtPresetName);
-      expect(label).toBe('Large (WebGL)');
+      const label = (component as any).getPresetLabel('default-large-video-webgl' as CrtPresetName);
+      expect(label).toBe('Large Video (WebGL)');
     });
 
     it('should use currentPresetLabel input when provided for built-in presets', () => {
@@ -1366,7 +1369,7 @@ describe('CrtSettingsPanelComponent', () => {
       (component as any).onDeleteConfirmed();
       
       // Should emit presetSelected with default preset
-      expect(presetSelectedSpy).toHaveBeenCalledWith('default-large-webgl');
+      expect(presetSelectedSpy).toHaveBeenCalledWith(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
     });
 
     it('should not emit presetSelected when non-active preset is deleted', () => {

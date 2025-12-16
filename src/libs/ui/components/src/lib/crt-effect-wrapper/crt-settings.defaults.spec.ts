@@ -91,9 +91,7 @@ describe('CRT_PRESETS', () => {
       'hue',
       'phosphorPattern',
       'phosphorIntensity',
-      'bloomEnabled',
       'bloomIntensity',
-      'bloomRadius',
       'barrelDistortion',
       'chromaticAberration',
     ];
@@ -118,7 +116,6 @@ describe('CRT_PRESETS', () => {
         'hue',
         'phosphorIntensity',
         'bloomIntensity',
-        'bloomRadius',
         'barrelDistortion',
         'chromaticAberration',
       ];
@@ -130,11 +127,7 @@ describe('CRT_PRESETS', () => {
       });
     });
 
-    it('should have boolean bloomEnabled property', () => {
-      Object.values(CRT_PRESETS).forEach((preset) => {
-        expect(typeof preset.bloomEnabled).toBe('boolean');
-      });
-    });
+
 
     it('should have string phosphorPattern property', () => {
       Object.values(CRT_PRESETS).forEach((preset) => {
@@ -178,12 +171,13 @@ describe('CRT_PRESETS', () => {
 
 describe('CRT_PRESET_LABELS', () => {
   it('should have exactly 3 labels', () => {
-    expect(Object.keys(CRT_PRESET_LABELS)).toHaveLength(2);
+    expect(Object.keys(CRT_PRESET_LABELS)).toHaveLength(3);
   });
 
   it('should have labels for all preset keys', () => {
-    expect(CRT_PRESET_LABELS).toHaveProperty(CRT_PRESET_KEYS.SMALL_WEBGL);
-    expect(CRT_PRESET_LABELS).toHaveProperty(CRT_PRESET_KEYS.LARGE_WEBGL);
+    expect(CRT_PRESET_LABELS).toHaveProperty(CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL);
+    expect(CRT_PRESET_LABELS).toHaveProperty(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
+    expect(CRT_PRESET_LABELS).toHaveProperty(CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL);
   });
 
   it('should have label keys matching CRT_PRESET_KEYS values', () => {
@@ -194,13 +188,14 @@ describe('CRT_PRESET_LABELS', () => {
   });
 
   it('should have concise human-readable labels', () => {
-    expect(CRT_PRESET_LABELS[CRT_PRESET_KEYS.SMALL_WEBGL]).toBe('Small (WebGL)');
-    expect(CRT_PRESET_LABELS[CRT_PRESET_KEYS.LARGE_WEBGL]).toBe('Large (WebGL)');
+    expect(CRT_PRESET_LABELS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]).toBe('Small Video (WebGL)');
+    expect(CRT_PRESET_LABELS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]).toBe('Large Video (WebGL)');
+    expect(CRT_PRESET_LABELS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]).toBe('Small Image (WebGL)');
   });
 
-  it('should follow Size (WebGL) format', () => {
+  it('should follow Size (WebGL) or Size Type (WebGL) format', () => {
     Object.values(CRT_PRESET_LABELS).forEach((label) => {
-      expect(label).toMatch(/^(Small|Large) \(WebGL\)$/);
+      expect(label).toMatch(/^(Small|Large)( (Video|Image))? \(WebGL\)$/);
     });
   });
 });
@@ -288,9 +283,7 @@ describe('DEFAULT_CRT_SETTINGS', () => {
       'hue',
       'phosphorPattern',
       'phosphorIntensity',
-      'bloomEnabled',
       'bloomIntensity',
-      'bloomRadius',
       'barrelDistortion',
       'chromaticAberration',
     ];

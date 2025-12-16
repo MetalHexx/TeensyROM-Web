@@ -3,6 +3,7 @@ import {
   SCANLINE_SLIDERS,
   VIGNETTE_SLIDER,
   DISTORTION_SLIDER,
+  BLOOM_SLIDER,
   CURVATURE_SLIDER,
   COLOR_FILTER_SLIDERS,
   PHOSPHOR_SLIDER,
@@ -83,6 +84,30 @@ describe('CRT Slider Configurations', () => {
     it('should have percentage format', () => {
       expect(DISTORTION_SLIDER.format).toBe('percentage');
       expect(DISTORTION_SLIDER.decimalPlaces).toBe(0);
+    });
+  });
+
+  describe('BLOOM_SLIDER', () => {
+    it('should have correct key property', () => {
+      expect(BLOOM_SLIDER.key).toBe('bloomIntensity');
+    });
+
+    it('should have correct label', () => {
+      expect(BLOOM_SLIDER.label).toBe('Bloom');
+    });
+
+    it('should have correct range', () => {
+      expect(BLOOM_SLIDER.min).toBe(0);
+      expect(BLOOM_SLIDER.max).toBe(2.0);
+    });
+
+    it('should have correct step', () => {
+      expect(BLOOM_SLIDER.step).toBe(0.05);
+    });
+
+    it('should have decimal format', () => {
+      expect(BLOOM_SLIDER.format).toBe('decimal');
+      expect(BLOOM_SLIDER.decimalPlaces).toBe(2);
     });
   });
 

@@ -10,11 +10,13 @@ interface CrtUniforms {
   scanlineSize: WebGLUniformLocation | null;
   vignetteStrength: WebGLUniformLocation | null;
   screenCurvature: WebGLUniformLocation | null;
+  bloomIntensity: WebGLUniformLocation | null;
   barrelDistortion: WebGLUniformLocation | null;
   chromaticAberration: WebGLUniformLocation | null;
   resolution: WebGLUniformLocation | null;
   phosphorPattern: WebGLUniformLocation | null;
   phosphorIntensity: WebGLUniformLocation | null;
+  monochromePhosphor: WebGLUniformLocation | null;
   videoTexture: WebGLUniformLocation | null;
 }
 
@@ -53,11 +55,13 @@ export class CrtRenderer {
     scanlineSize: null,
     vignetteStrength: null,
     screenCurvature: null,
+    bloomIntensity: null,
     barrelDistortion: null,
     chromaticAberration: null,
     resolution: null,
     phosphorPattern: null,
     phosphorIntensity: null,
+    monochromePhosphor: null,
     videoTexture: null,
   };
 
@@ -189,6 +193,10 @@ export class CrtRenderer {
       this.gl.uniform1f(this.uniforms.screenCurvature, settings.screenCurvature);
     }
 
+    if (this.uniforms.bloomIntensity !== null) {
+      this.gl.uniform1f(this.uniforms.bloomIntensity, settings.bloomIntensity);
+    }
+
     if (this.uniforms.barrelDistortion !== null) {
       this.gl.uniform1f(this.uniforms.barrelDistortion, settings.barrelDistortion);
     }
@@ -208,6 +216,19 @@ export class CrtRenderer {
 
     if (this.uniforms.phosphorIntensity !== null) {
       this.gl.uniform1f(this.uniforms.phosphorIntensity, settings.phosphorIntensity);
+    }
+
+    // Monochrome phosphor uniform
+    if (this.uniforms.monochromePhosphor !== null) {
+      // Map monochrome phosphor type string to shader float
+      const monochromeMap: Record<string, number> = {
+        'none': 0.0,
+        'white': 1.0,
+        'amber': 2.0,
+        'green': 3.0,
+      };
+      const monochromeValue = monochromeMap[settings.monochromePhosphor] ?? 0.0;
+      this.gl.uniform1f(this.uniforms.monochromePhosphor, monochromeValue);
     }
 
     if (this.uniforms.chromaticAberration !== null) {
@@ -336,11 +357,13 @@ export class CrtRenderer {
       scanlineSize: null,
       vignetteStrength: null,
       screenCurvature: null,
+      bloomIntensity: null,
       barrelDistortion: null,
       chromaticAberration: null,
       resolution: null,
       phosphorPattern: null,
       phosphorIntensity: null,
+      monochromePhosphor: null,
       videoTexture: null,
     };
     this.pendingSettings = null;
@@ -554,11 +577,13 @@ export class CrtRenderer {
     this.uniforms.scanlineSize = this.gl.getUniformLocation(program, 'u_scanlineSize');
     this.uniforms.vignetteStrength = this.gl.getUniformLocation(program, 'u_vignetteStrength');
     this.uniforms.screenCurvature = this.gl.getUniformLocation(program, 'u_screenCurvature');
+    this.uniforms.bloomIntensity = this.gl.getUniformLocation(program, 'u_bloomIntensity');
     this.uniforms.barrelDistortion = this.gl.getUniformLocation(program, 'u_barrelDistortion');
     this.uniforms.chromaticAberration = this.gl.getUniformLocation(program, 'u_chromaticAberration');
     this.uniforms.resolution = this.gl.getUniformLocation(program, 'u_resolution');
     this.uniforms.phosphorPattern = this.gl.getUniformLocation(program, 'u_phosphorPattern');
     this.uniforms.phosphorIntensity = this.gl.getUniformLocation(program, 'u_phosphorIntensity');
+    this.uniforms.monochromePhosphor = this.gl.getUniformLocation(program, 'u_monochromePhosphor');
     this.uniforms.videoTexture = this.gl.getUniformLocation(program, 'u_videoTexture');
 
     // Get attribute location

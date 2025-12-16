@@ -26,9 +26,7 @@ describe('CrtRenderer', () => {
     // Advanced effects (disabled for tests)
     phosphorPattern: 'none',
     phosphorIntensity: 0,
-    bloomEnabled: false,
-    bloomIntensity: 0.3,
-    bloomRadius: 3,
+    bloomIntensity: 0,
     barrelDistortion: 0,
     chromaticAberration: 0,
   };
@@ -121,6 +119,10 @@ describe('CrtRenderer', () => {
       expect(mockGl._mocks.getUniformLocation).toHaveBeenCalledWith(
         expect.anything(),
         'u_screenCurvature'
+      );
+      expect(mockGl._mocks.getUniformLocation).toHaveBeenCalledWith(
+        expect.anything(),
+        'u_bloomIntensity'
       );
       expect(mockGl._mocks.getUniformLocation).toHaveBeenCalledWith(
         expect.anything(),
@@ -229,6 +231,52 @@ describe('CrtRenderer', () => {
       renderer.updateSettings(settingsWithNoDistortion);
 
       expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 0);
+    });
+
+    it('should update bloomIntensity uniform', () => {
+      const settingsWithBloom: CrtSettings = {
+        ...testSettings,
+        bloomIntensity: 0.5,
+      };
+
+      renderer.updateSettings(settingsWithBloom);
+
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 0.5);
+    });
+
+    it('should update bloomIntensity when value changes', () => {
+      // First update with 0.3
+      renderer.updateSettings({ ...testSettings, bloomIntensity: 0.3 });
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 0.3);
+
+      // Clear mock to verify second update
+      mockGl._mocks.uniform1f.mockClear();
+
+      // Second update with 1.0
+      renderer.updateSettings({ ...testSettings, bloomIntensity: 1.0 });
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 1.0);
+    });
+
+    it('should handle bloomIntensity set to zero', () => {
+      const settingsWithNoBloom: CrtSettings = {
+        ...testSettings,
+        bloomIntensity: 0,
+      };
+
+      renderer.updateSettings(settingsWithNoBloom);
+
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 0);
+    });
+
+    it('should handle bloomIntensity at maximum value (2.0)', () => {
+      const settingsWithMaxBloom: CrtSettings = {
+        ...testSettings,
+        bloomIntensity: 2.0,
+      };
+
+      renderer.updateSettings(settingsWithMaxBloom);
+
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 2.0);
     });
 
     it('should not throw when called before init', () => {

@@ -14,8 +14,8 @@ import {
 describe('CRT Preset Type Guards and Utilities', () => {
   describe('isBuiltInPreset', () => {
     it('should return true for new built-in preset names', () => {
-      expect(isBuiltInPreset(CRT_PRESET_KEYS.SMALL_WEBGL)).toBe(true);
-      expect(isBuiltInPreset(CRT_PRESET_KEYS.LARGE_WEBGL)).toBe(true);
+      expect(isBuiltInPreset(CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL)).toBe(true);
+      expect(isBuiltInPreset(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL)).toBe(true);
     });
 
     it('should return false for custom-My Preset', () => {
@@ -31,11 +31,11 @@ describe('CRT Preset Type Guards and Utilities', () => {
     });
 
     it('should narrow type correctly', () => {
-      const name = CRT_PRESET_KEYS.LARGE_WEBGL as string;
+      const name = CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL as string;
       if (isBuiltInPreset(name)) {
         // Type should be narrowed to BuiltInPresetName
         // Just verify compilation succeeds - runtime check is sufficient
-        expect(name).toBe(CRT_PRESET_KEYS.LARGE_WEBGL);
+        expect(name).toBe(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
       }
     });
   });
@@ -50,8 +50,8 @@ describe('CRT Preset Type Guards and Utilities', () => {
     });
 
     it('should return false for built-in preset names', () => {
-      expect(isCustomPreset(CRT_PRESET_KEYS.LARGE_WEBGL)).toBe(false);
-      expect(isCustomPreset(CRT_PRESET_KEYS.SMALL_WEBGL)).toBe(false);
+      expect(isCustomPreset(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL)).toBe(false);
+      expect(isCustomPreset(CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL)).toBe(false);
     });
 
     it('should return false for My Preset (no prefix)', () => {
@@ -102,8 +102,8 @@ describe('CRT Preset Type Guards and Utilities', () => {
     });
 
     it('should not strip default- prefix', () => {
-      expect(stripCustomPrefix(CRT_PRESET_KEYS.LARGE_WEBGL)).toBe(
-        CRT_PRESET_KEYS.LARGE_WEBGL
+      expect(stripCustomPrefix(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL)).toBe(
+        CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL
       );
     });
 
@@ -255,18 +255,18 @@ describe('CRT Preset Type Guards and Utilities', () => {
     describe('BuiltInPresetName type', () => {
       it('should include all 2 new preset keys as valid assignments', () => {
         // These assignments should compile without error
-        const smallWebGL: BuiltInPresetName = CRT_PRESET_KEYS.SMALL_WEBGL;
-        const largeWebGL: BuiltInPresetName = CRT_PRESET_KEYS.LARGE_WEBGL;
+        const smallWebGL: BuiltInPresetName = CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL;
+        const largeWebGL: BuiltInPresetName = CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL;
 
         // Verify runtime values
-        expect(smallWebGL).toBe('default-small-webgl');
-        expect(largeWebGL).toBe('default-large-webgl');
+        expect(smallWebGL).toBe('default-small-video-webgl');
+        expect(largeWebGL).toBe('default-large-video-webgl');
       });
 
       it('should match the 2 preset keys exactly', () => {
-        // Verify we have exactly 2 built-in presets
+        // Verify we have exactly 3 built-in presets
         const presetKeys = Object.values(CRT_PRESET_KEYS);
-        expect(presetKeys).toHaveLength(2);
+        expect(presetKeys).toHaveLength(3);
         
         // All preset keys should be valid BuiltInPresetName values
         presetKeys.forEach((key) => {
@@ -289,10 +289,10 @@ describe('CRT Preset Type Guards and Utilities', () => {
     describe('AnyPresetName type', () => {
       it('should accept both built-in and custom preset names', () => {
         // These assignments should compile without error
-        const builtIn: AnyPresetName = CRT_PRESET_KEYS.SMALL_WEBGL;
+        const builtIn: AnyPresetName = CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL;
         const custom: AnyPresetName = 'custom-My Preset';
 
-        expect(builtIn).toBe('default-small-webgl');
+        expect(builtIn).toBe('default-small-video-webgl');
         expect(custom).toBe('custom-My Preset');
       });
     });

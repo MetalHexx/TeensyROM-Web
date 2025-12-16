@@ -35,12 +35,15 @@ import {
   SCANLINE_SLIDERS,
   VIGNETTE_SLIDER,
   DISTORTION_SLIDER,
+  BLOOM_SLIDER,
   CHROMATIC_ABERRATION_SLIDER,
   CURVATURE_SLIDER,
   COLOR_FILTER_SLIDERS,
   PHOSPHOR_SLIDER,
   PHOSPHOR_PATTERN_OPTIONS,
   PhosphorPatternOption,
+  MONOCHROME_PHOSPHOR_OPTIONS,
+  MonochromePhosphorOption,
 } from './crt-slider-configs';
 import { CRT_STORAGE, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 import { IconLabelComponent } from "../icon-label/icon-label.component";
@@ -190,11 +193,13 @@ export class CrtSettingsPanelComponent {
   protected readonly scanlineSliders = SCANLINE_SLIDERS;
   protected readonly vignetteSlider = VIGNETTE_SLIDER;
   protected readonly distortionSlider = DISTORTION_SLIDER;
+  protected readonly bloomSlider = BLOOM_SLIDER;
   protected readonly chromaticAberrationSlider = CHROMATIC_ABERRATION_SLIDER;
   protected readonly curvatureSlider = CURVATURE_SLIDER;
   protected readonly colorFilterSliders = COLOR_FILTER_SLIDERS;
   protected readonly phosphorSlider = PHOSPHOR_SLIDER;
   protected readonly phosphorPatternOptions = PHOSPHOR_PATTERN_OPTIONS;
+  protected readonly monochromePhosphorOptions = MONOCHROME_PHOSPHOR_OPTIONS;
 
   /** Available preset names for the preset menu (computed to exclude specified presets) */
   protected readonly presetNames = computed(() => {
@@ -329,6 +334,14 @@ export class CrtSettingsPanelComponent {
     return this.config().showPhosphor;
   });
 
+  /**
+   * Whether monochrome phosphor control should be visible.
+   * Monochrome phosphor is WebGL-only.
+   */
+  protected readonly shouldShowMonochromePhosphor = computed(() => {
+    return this.config().showMonochromePhosphor;
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
   // Event Handlers
   // ─────────────────────────────────────────────────────────────────────────
@@ -372,6 +385,26 @@ export class CrtSettingsPanelComponent {
   protected getPhosphorPatternLabel(): string {
     const pattern = this.settings().phosphorPattern;
     const option = PHOSPHOR_PATTERN_OPTIONS.find(o => o.value === pattern);
+    return option?.label ?? 'Unknown';
+  }
+
+  /**
+   * Handles monochrome phosphor selection.
+   */
+  protected onMonochromePhosphorChange(phosphor: MonochromePhosphorOption): void {
+    const updatedSettings: CrtSettings = {
+      ...this.settings(),
+      monochromePhosphor: phosphor as import('@teensyrom-nx/domain').MonochromePhosphorType,
+    };
+    this.settingsChange.emit(updatedSettings);
+  }
+
+  /**
+   * Gets the label for the current monochrome phosphor.
+   */
+  protected getMonochromePhosphorLabel(): string {
+    const phosphor = this.settings().monochromePhosphor;
+    const option = MONOCHROME_PHOSPHOR_OPTIONS.find(o => o.value === phosphor);
     return option?.label ?? 'Unknown';
   }
 
@@ -550,9 +583,15 @@ export class CrtSettingsPanelComponent {
   protected onDeleteConfirmed(): void {
     try {
       const presetName = this.dialogPresetName() as CustomPresetName;
+      const wasActive = this.currentPresetName() === presetName;
+      
       this.crtStorage.deleteCustomPreset(presetName);
       console.log(`[CrtSettingsPanel] Deleted custom preset: ${presetName}`);
       
+      // If deleted preset was active, emit presetSelected with default preset
+      if (wasActive) {
+        this.presetSelected.emit(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
+      }
       
       // Refresh preset list and close dialog
       this.refreshCustomPresets();

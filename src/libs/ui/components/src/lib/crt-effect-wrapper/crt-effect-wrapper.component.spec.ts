@@ -89,10 +89,10 @@ describe('CrtEffectWrapperComponent', () => {
       expect(component).toBeTruthy();
     });
 
-    it('should have default settings matching CRT_PRESETS.large-webgl', () => {
+    it('should have default settings matching CRT_PRESETS.large-video-webgl', () => {
       fixture.detectChanges();
       expect(component.settings()).toEqual(DEFAULT_CRT_SETTINGS);
-      expect(component.settings()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+      expect(component.settings()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
     });
 
     it('should be enabled by default', () => {
@@ -153,7 +153,7 @@ describe('CrtEffectWrapperComponent', () => {
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
 
       // Update to minimal WebGL preset
-      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]);
       fixture.detectChanges();
 
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.3');
@@ -193,7 +193,7 @@ describe('CrtEffectWrapperComponent', () => {
 
   describe('Presets', () => {
     it('should apply small preset with minimal effects', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -204,7 +204,7 @@ describe('CrtEffectWrapperComponent', () => {
     });
 
     it('should apply large preset with strong effects', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -217,7 +217,7 @@ describe('CrtEffectWrapperComponent', () => {
 
   describe('Effect Disabling via Settings', () => {
     it('should minimize effects when using small preset', () => {
-      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -229,7 +229,7 @@ describe('CrtEffectWrapperComponent', () => {
     it('should allow disabling individual effects by setting values to neutral', () => {
       // Custom settings with scanlines disabled (intensity=0) but other effects enabled
       const customSettings: CrtSettings = {
-        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL],
+        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL],
         scanlineIntensity: 0,
         scanlineSize: 0,
       };
@@ -247,7 +247,7 @@ describe('CrtEffectWrapperComponent', () => {
 
     it('should allow disabling curvature via settings', () => {
       // Small preset has curvature disabled
-      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.SMALL_WEBGL]);
+      fixture.componentRef.setInput('settings', CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]);
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
@@ -260,7 +260,7 @@ describe('CrtEffectWrapperComponent', () => {
 
     it('should allow disabling color filters via neutral values', () => {
       const customSettings: CrtSettings = {
-        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL],
+        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL],
         contrast: 1,
         brightness: 1,
         saturation: 1,

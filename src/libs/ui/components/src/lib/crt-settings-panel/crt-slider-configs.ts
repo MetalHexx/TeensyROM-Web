@@ -1,12 +1,12 @@
 import { CrtSettings } from '../crt-effect-wrapper/crt-settings.interface';
 
 /**
- * Numeric-only keys from CrtSettings (excludes phosphorPattern and bloomEnabled).
+ * Numeric-only keys from CrtSettings (excludes phosphorPattern, bloomEnabled, and monochromePhosphor).
  * Used for slider configurations.
  */
 export type NumericCrtSettingsKey = Exclude<
   keyof CrtSettings,
-  'phosphorPattern' | 'bloomEnabled'
+  'phosphorPattern' | 'bloomEnabled' | 'monochromePhosphor'
 >;
 
 /**
@@ -75,6 +75,17 @@ export const DISTORTION_SLIDER: SliderConfig = {
   step: 0.01,
   format: 'percentage',
   decimalPlaces: 0,
+};
+
+/** Bloom intensity slider configuration */
+export const BLOOM_SLIDER: SliderConfig = {
+  key: 'bloomIntensity',
+  label: 'Bloom',
+  min: 0,
+  max: 2.0,
+  step: 0.05,
+  format: 'decimal',
+  decimalPlaces: 2,
 };
 
 /** Chromatic aberration slider configuration */
@@ -152,4 +163,19 @@ export const PHOSPHOR_PATTERN_OPTIONS: PhosphorPatternConfig[] = [
   { value: 'aperture-grille', label: 'Aperture Grille (Trinitron)' },
   { value: 'shadow-mask', label: 'Shadow Mask (Traditional)' },
   { value: 'dot-triad', label: 'Dot Triad (Arcade)' },
+];
+
+/** Monochrome phosphor type options for dropdown selector */
+export type MonochromePhosphorOption = 'none' | 'white' | 'amber' | 'green';
+
+export interface MonochromePhosphorConfig {
+  value: MonochromePhosphorOption;
+  label: string;
+}
+
+export const MONOCHROME_PHOSPHOR_OPTIONS: MonochromePhosphorConfig[] = [
+  { value: 'none', label: 'None (Full Color)' },
+  { value: 'white', label: 'White Phosphor (Monochrome PC)' },
+  { value: 'amber', label: 'Amber Phosphor (Classic Terminal)' },
+  { value: 'green', label: 'Green Phosphor (VT220 / Hacker)' },
 ];
