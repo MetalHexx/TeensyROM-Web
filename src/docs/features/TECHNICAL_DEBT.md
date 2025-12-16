@@ -2,6 +2,61 @@
 
 This document tracks known technical debt items that should be addressed in future iterations.
 
+## UI Components Layer
+
+### CRT_PRESET_LABELS Test Failures
+
+**Priority**: Low  
+**Effort**: 2-4 hours  
+**Created**: 2025-12-14  
+**Discovered During**: BARREL-DISTORTION-TASK-01-001-DOMAIN-INTEGRATION
+
+**Issue**: 4 test failures in `libs/ui/components/src/lib/crt-effect-wrapper/crt-settings.defaults.spec.ts` related to `CRT_PRESET_LABELS` format. Tests reference legacy 2-preset system, but current implementation uses 3 context-based presets.
+
+**Affected Files**:
+- `libs/ui/components/src/lib/crt-effect-wrapper/crt-settings.defaults.spec.ts` (lines 181-205)
+
+**Current Problems**:
+- Test expects 2 labels, actual count is 3
+- Tests reference undefined legacy keys (`SMALL_WEBGL`, `LARGE_WEBGL`)
+- Tests expect format "Small (WebGL)", actual is "Small Video (WebGL)"
+- Regex validation expects no "Video/Image" in label text
+
+**Failing Tests**:
+1. "should have exactly 3 labels" - expects 2, got 3
+2. "should have labels for all preset keys" - Cannot read properties of undefined
+3. "should have concise human-readable labels" - expects "Small (WebGL)", got undefined
+4. "should follow Size (WebGL) format" - expects `/^(Small|Large) \(WebGL\)$/`, got "Small Video (WebGL)"
+
+**Root Cause**: Tests written for legacy preset system before context-based naming migration. Current system has:
+- `SMALL_VIDEO_WEBGL` (was `SMALL_WEBGL`)
+- `LARGE_VIDEO_WEBGL` (was `LARGE_WEBGL`)
+- `SMALL_IMAGE_WEBGL` (new preset)
+
+**Impact**: Test failures only - no runtime impact. `CRT_PRESET_LABELS` is properly defined and used correctly in production code.
+
+**Recommended Solution**:
+```typescript
+// Update test expectations:
+1. Change expected count from 2 to 3
+2. Replace CRT_PRESET_KEYS.SMALL_WEBGL → CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL
+3. Replace CRT_PRESET_KEYS.LARGE_WEBGL → CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL
+4. Update label format regex to: /^(Small|Large) (Video|Image)? \(WebGL\)$/
+5. Update expected label values to match current format
+```
+
+**Benefits**:
+- Test suite back to 100% passing
+- Proper validation of current preset naming
+- Clear documentation of preset label format
+
+**Blockers**: None  
+**Blocks**: None (does not block barrel distortion feature or other work)
+
+**Related**: BARREL-DISTORTION project Phase 1 (verified domain integration was not affected by these failures)
+
+---
+
 ## Testing Infrastructure
 
 ### HTTP Backend Mocking in Integration Tests

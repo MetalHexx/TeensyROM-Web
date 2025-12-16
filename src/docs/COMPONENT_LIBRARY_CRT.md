@@ -805,6 +805,7 @@ Values that control the intensity and appearance of each effect:
 | `scanlineSize` | `number` | Size of scanline bands and gaps in pixels (1.0-6.0). Controls both dark band height and spacing with 1:1 ratio. |
 | `vignetteStrength` | `number` | Intensity of rectangular edge darkening (0-2). Set to 0 to disable. Works with `screenCurvature` to create rounded corners matching the CRT bezel. |
 | `screenCurvature` | `number` | Border-radius in pixels for curved screen effect and vignette corner rounding. Set to 0 for flat/sharp corners. The vignette corners match the dialog's border-radius for visual consistency. |
+| `barrelDistortion` | `number` | Radial image warping intensity (0-0.5). Simulates the geometric distortion of curved CRT glass. 0 = no distortion, higher values increase edge curvature. Applied in WebGL shader before texture sampling. |
 | `contrast` | `number` | CSS filter contrast multiplier. 1 = no change, >1 = increased. |
 | `brightness` | `number` | CSS filter brightness multiplier. 1 = no change, >1 = brighter. |
 | `saturation` | `number` | CSS filter saturation multiplier. 1 = no change, >1 = more saturated. |
@@ -919,6 +920,21 @@ Edge and corner darkening that simulates the uneven phosphor glow of curved CRT 
   - `screenCurvature` controls corner rounding to match the dialog border-radius
 - **Visual Effect**: Rectangular darkening that follows the screen edges uniformly with rounded corners matching the CRT bezel curvature. At curvature=0, creates sharp rectangular corners; at higher curvature values, corners are smoothly rounded to match the dialog's border-radius
 
+### Barrel Distortion
+
+Image warping effect that simulates the pincushion/barrel distortion inherent to CRT tube geometry.
+
+- **Implementation**: WebGL fragment shader using optimized radial UV coordinate warping. Uses the industry-standard quadratic formula `distorted = center + (uv - center) * (1 + intensity * r²)` where r² is computed via efficient dot product (avoiding expensive sqrt). Coordinates outside [0,1] render as black for proper edge handling.
+- **Properties**: `barrelDistortion` controls distortion intensity (0-0.5, where 0 = no distortion)
+- **Algorithm**: 
+  1. Center UV coordinates around (0.5, 0.5)
+  2. Calculate r² using `dot(centered, centered)` (10-20x faster than length() + square)
+  3. Apply quadratic distortion: `centered * (1.0 + intensity * r²)`
+  4. Translate back to UV space
+  5. Out-of-bounds check renders black pixels for clean edges
+- **Visual Effect**: Bends straight lines into curves radiating from the center, replicating the physical lens distortion of a convex glass tube. Creates subtle bulge at edges that enhances the perception of viewing content through curved glass. The effect properly extends to viewport edges, creating the authentic appearance of curved CRT glass where corner pixels "pull inward" toward the center.
+- **Performance**: GPU-accelerated with minimal overhead (~7 shader operations per pixel)
+
 ### Screen Curvature
 
 Curved edges simulating the bulging glass of vintage CRT monitors.
@@ -946,6 +962,7 @@ The CRT effect wrapper exposes these CSS custom properties for advanced styling:
 | `--scanline-intensity` | `settings.scanlineIntensity` |
 | `--scanline-size` | `settings.scanlineSize` (px) |
 | `--vignette-strength` | `settings.vignetteStrength` |
+| `--barrel-distortion` | `settings.barrelDistortion` |
 | `--screen-curvature` | `settings.screenCurvature` (px) |
 | `--crt-contrast` | `settings.contrast` |
 | `--crt-brightness` | `settings.brightness` |

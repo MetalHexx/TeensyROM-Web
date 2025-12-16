@@ -10,6 +10,7 @@ interface CrtUniforms {
   scanlineSize: WebGLUniformLocation | null;
   vignetteStrength: WebGLUniformLocation | null;
   screenCurvature: WebGLUniformLocation | null;
+  barrelDistortion: WebGLUniformLocation | null;
   resolution: WebGLUniformLocation | null;
   phosphorPattern: WebGLUniformLocation | null;
   phosphorIntensity: WebGLUniformLocation | null;
@@ -51,6 +52,7 @@ export class CrtRenderer {
     scanlineSize: null,
     vignetteStrength: null,
     screenCurvature: null,
+    barrelDistortion: null,
     resolution: null,
     phosphorPattern: null,
     phosphorIntensity: null,
@@ -183,6 +185,10 @@ export class CrtRenderer {
 
     if (this.uniforms.screenCurvature !== null) {
       this.gl.uniform1f(this.uniforms.screenCurvature, settings.screenCurvature);
+    }
+
+    if (this.uniforms.barrelDistortion !== null) {
+      this.gl.uniform1f(this.uniforms.barrelDistortion, settings.barrelDistortion);
     }
 
     // Phosphor pattern uniforms
@@ -324,6 +330,7 @@ export class CrtRenderer {
       scanlineSize: null,
       vignetteStrength: null,
       screenCurvature: null,
+      barrelDistortion: null,
       resolution: null,
       phosphorPattern: null,
       phosphorIntensity: null,
@@ -540,6 +547,7 @@ export class CrtRenderer {
     this.uniforms.scanlineSize = this.gl.getUniformLocation(program, 'u_scanlineSize');
     this.uniforms.vignetteStrength = this.gl.getUniformLocation(program, 'u_vignetteStrength');
     this.uniforms.screenCurvature = this.gl.getUniformLocation(program, 'u_screenCurvature');
+    this.uniforms.barrelDistortion = this.gl.getUniformLocation(program, 'u_barrelDistortion');
     this.uniforms.resolution = this.gl.getUniformLocation(program, 'u_resolution');
     this.uniforms.phosphorPattern = this.gl.getUniformLocation(program, 'u_phosphorPattern');
     this.uniforms.phosphorIntensity = this.gl.getUniformLocation(program, 'u_phosphorIntensity');

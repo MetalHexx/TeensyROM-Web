@@ -66,6 +66,17 @@ export const CURVATURE_SLIDER: SliderConfig = {
   format: 'px',
 };
 
+/** Barrel distortion slider configuration */
+export const DISTORTION_SLIDER: SliderConfig = {
+  key: 'barrelDistortion',
+  label: 'Barrel Distortion',
+  min: 0,
+  max: 0.5,
+  step: 0.01,
+  format: 'percentage',
+  decimalPlaces: 0,
+};
+
 /** Color filter slider configurations */
 export const COLOR_FILTER_SLIDERS: SliderConfig[] = [
   {

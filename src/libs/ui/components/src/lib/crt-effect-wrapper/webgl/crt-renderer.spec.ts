@@ -120,6 +120,14 @@ describe('CrtRenderer', () => {
       );
       expect(mockGl._mocks.getUniformLocation).toHaveBeenCalledWith(
         expect.anything(),
+        'u_screenCurvature'
+      );
+      expect(mockGl._mocks.getUniformLocation).toHaveBeenCalledWith(
+        expect.anything(),
+        'u_barrelDistortion'
+      );
+      expect(mockGl._mocks.getUniformLocation).toHaveBeenCalledWith(
+        expect.anything(),
         'u_resolution'
       );
     });
@@ -186,6 +194,41 @@ describe('CrtRenderer', () => {
       renderer.updateSettings(testSettings);
 
       expect(mockGl._mocks.useProgram).toHaveBeenCalled();
+    });
+
+    it('should update barrelDistortion uniform', () => {
+      const settingsWithDistortion: CrtSettings = {
+        ...testSettings,
+        barrelDistortion: 0.25,
+      };
+
+      renderer.updateSettings(settingsWithDistortion);
+
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 0.25);
+    });
+
+    it('should update barrelDistortion when value changes', () => {
+      // First update with 0.1
+      renderer.updateSettings({ ...testSettings, barrelDistortion: 0.1 });
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 0.1);
+
+      // Clear mock to verify second update
+      mockGl._mocks.uniform1f.mockClear();
+
+      // Second update with 0.3
+      renderer.updateSettings({ ...testSettings, barrelDistortion: 0.3 });
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 0.3);
+    });
+
+    it('should handle barrelDistortion set to zero', () => {
+      const settingsWithNoDistortion: CrtSettings = {
+        ...testSettings,
+        barrelDistortion: 0,
+      };
+
+      renderer.updateSettings(settingsWithNoDistortion);
+
+      expect(mockGl._mocks.uniform1f).toHaveBeenCalledWith(expect.anything(), 0);
     });
 
     it('should not throw when called before init', () => {

@@ -177,6 +177,45 @@ describe('CrtSettingsPanelComponent', () => {
       expect(labelTexts).toContain('Screen Curvature');
     });
 
+    it('should render only distortion slider when config.showDistortion is true only', () => {
+      fixture.componentRef.setInput('config', {
+        showScanlines: false,
+        showVignette: false,
+        showCurvature: false,
+        showDistortion: true,
+        showColorFilters: false,
+        showPhosphor: false,
+        showBloom: false,
+        showChromaticAberration: false,
+      });
+      fixture.detectChanges();
+
+      const sliders = fixture.nativeElement.querySelectorAll('mat-slider');
+      expect(sliders.length).toBe(1);
+
+      const labels = fixture.nativeElement.querySelectorAll('.control-label') as NodeListOf<Element>;
+      const labelTexts = Array.from(labels).map((l) => l.textContent?.trim());
+      expect(labelTexts).toContain('Barrel Distortion');
+    });
+
+    it('should not render distortion slider when config.showDistortion is false', () => {
+      fixture.componentRef.setInput('config', {
+        showScanlines: false,
+        showVignette: false,
+        showCurvature: false,
+        showDistortion: false,
+        showColorFilters: false,
+        showPhosphor: false,
+        showBloom: false,
+        showChromaticAberration: false,
+      });
+      fixture.detectChanges();
+
+      const labels = fixture.nativeElement.querySelectorAll('.control-label') as NodeListOf<Element>;
+      const labelTexts = Array.from(labels).map((l) => l.textContent?.trim());
+      expect(labelTexts).not.toContain('Barrel Distortion');
+    });
+
     it('should render only color filter sliders when config.showColorFilters is true only', () => {
       fixture.componentRef.setInput('config', {
         showScanlines: false,
@@ -275,6 +314,32 @@ describe('CrtSettingsPanelComponent', () => {
         ...DEFAULT_CRT_SETTINGS,
         contrast: 1.3,
       });
+    });
+
+    it('should emit settingsChange when distortion slider value changes', () => {
+      const settingsChangeSpy = vi.fn();
+      component.settingsChange.subscribe(settingsChangeSpy);
+      fixture.detectChanges();
+
+      callOnSliderChange('barrelDistortion', 0.3);
+
+      expect(settingsChangeSpy).toHaveBeenCalledWith({
+        ...DEFAULT_CRT_SETTINGS,
+        barrelDistortion: 0.3,
+      });
+    });
+
+    it('should preserve other settings when changing distortion value', () => {
+      const settingsChangeSpy = vi.fn();
+      component.settingsChange.subscribe(settingsChangeSpy);
+      fixture.detectChanges();
+
+      callOnSliderChange('barrelDistortion', 0.2);
+
+      const emittedSettings = settingsChangeSpy.mock.calls[0][0] as CrtSettings;
+      expect(emittedSettings.barrelDistortion).toBe(0.2);
+      expect(emittedSettings.screenCurvature).toBe(DEFAULT_CRT_SETTINGS.screenCurvature);
+      expect(emittedSettings.vignetteStrength).toBe(DEFAULT_CRT_SETTINGS.vignetteStrength);
     });
   });
 

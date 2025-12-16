@@ -131,7 +131,7 @@
     }
   }
 
-  <!-- Vignette Control -->
+  <!-- Visual Effects (Vignette, Distortion, Curvature) -->
   @if (config().showVignette) {
     <div class="crt-control-group">
       <span class="control-label">{{ vignetteSlider.label }}</span>
@@ -148,6 +148,26 @@
         />
       </mat-slider>
       <span class="control-value">{{ formatValue(settings()[vignetteSlider.key], vignetteSlider) }}</span>
+    </div>
+  }
+
+  <!-- Distortion Control -->
+  @if (config().showDistortion) {
+    <div class="crt-control-group">
+      <span class="control-label">{{ distortionSlider.label }}</span>
+      <mat-slider
+        [min]="distortionSlider.min"
+        [max]="distortionSlider.max"
+        [step]="distortionSlider.step"
+        discrete
+      >
+        <input
+          matSliderThumb
+          [ngModel]="settings()[distortionSlider.key]"
+          (ngModelChange)="onSliderChange(distortionSlider.key, $event)"
+        />
+      </mat-slider>
+      <span class="control-value">{{ formatValue(settings()[distortionSlider.key], distortionSlider) }}</span>
     </div>
   }
 
