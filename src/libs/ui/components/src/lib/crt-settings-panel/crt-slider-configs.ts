@@ -77,6 +77,17 @@ export const DISTORTION_SLIDER: SliderConfig = {
   decimalPlaces: 0,
 };
 
+/** Chromatic aberration slider configuration */
+export const CHROMATIC_ABERRATION_SLIDER: SliderConfig = {
+  key: 'chromaticAberration',
+  label: 'Chromatic Aberration',
+  min: 0,
+  max: 10,
+  step: 0.1,
+  format: 'decimal',
+  decimalPlaces: 1,
+};
+
 /** Color filter slider configurations */
 export const COLOR_FILTER_SLIDERS: SliderConfig[] = [
   {

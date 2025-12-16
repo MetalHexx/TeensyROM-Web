@@ -11,6 +11,7 @@ interface CrtUniforms {
   vignetteStrength: WebGLUniformLocation | null;
   screenCurvature: WebGLUniformLocation | null;
   barrelDistortion: WebGLUniformLocation | null;
+  chromaticAberration: WebGLUniformLocation | null;
   resolution: WebGLUniformLocation | null;
   phosphorPattern: WebGLUniformLocation | null;
   phosphorIntensity: WebGLUniformLocation | null;
@@ -53,6 +54,7 @@ export class CrtRenderer {
     vignetteStrength: null,
     screenCurvature: null,
     barrelDistortion: null,
+    chromaticAberration: null,
     resolution: null,
     phosphorPattern: null,
     phosphorIntensity: null,
@@ -207,6 +209,10 @@ export class CrtRenderer {
     if (this.uniforms.phosphorIntensity !== null) {
       this.gl.uniform1f(this.uniforms.phosphorIntensity, settings.phosphorIntensity);
     }
+
+    if (this.uniforms.chromaticAberration !== null) {
+      this.gl.uniform1f(this.uniforms.chromaticAberration, settings.chromaticAberration);
+    }
   }
 
   /**
@@ -331,6 +337,7 @@ export class CrtRenderer {
       vignetteStrength: null,
       screenCurvature: null,
       barrelDistortion: null,
+      chromaticAberration: null,
       resolution: null,
       phosphorPattern: null,
       phosphorIntensity: null,
@@ -548,6 +555,7 @@ export class CrtRenderer {
     this.uniforms.vignetteStrength = this.gl.getUniformLocation(program, 'u_vignetteStrength');
     this.uniforms.screenCurvature = this.gl.getUniformLocation(program, 'u_screenCurvature');
     this.uniforms.barrelDistortion = this.gl.getUniformLocation(program, 'u_barrelDistortion');
+    this.uniforms.chromaticAberration = this.gl.getUniformLocation(program, 'u_chromaticAberration');
     this.uniforms.resolution = this.gl.getUniformLocation(program, 'u_resolution');
     this.uniforms.phosphorPattern = this.gl.getUniformLocation(program, 'u_phosphorPattern');
     this.uniforms.phosphorIntensity = this.gl.getUniformLocation(program, 'u_phosphorIntensity');

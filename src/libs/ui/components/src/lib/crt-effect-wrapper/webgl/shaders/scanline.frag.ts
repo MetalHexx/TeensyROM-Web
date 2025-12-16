@@ -54,6 +54,7 @@ export const SCANLINE_FRAGMENT_SHADER = `
   uniform float u_vignetteStrength;
   uniform float u_screenCurvature;
   uniform float u_barrelDistortion;
+  uniform float u_chromaticAberration;
   uniform vec2 u_resolution;
 
   // === Phosphor Pattern Uniforms ===
@@ -123,6 +124,38 @@ export const SCANLINE_FRAGMENT_SHADER = `
     
     // Return distorted coordinates (no clamping - allows edges to pull inward)
     return vec2(0.5) + centered * (1.0 + intensity * r2);
+  }
+
+  // === Chromatic Aberration Effect ===
+  //
+  // Simulates lens aberration in CRT monitors where RGB channels separate horizontally.
+  // Uses simple horizontal offset - red shifts left, green centered, blue shifts right.
+  // This creates the classic color fringing visible on CRT edges and high-contrast areas.
+  //
+  // Based on the technique used in https://daenavan.github.io/crt-threejs/
+  // which provides a more pronounced and visible chromatic aberration effect.
+  //
+  // Returns vec3 with separated RGB channels sampled from different texture positions.
+  //
+  vec3 applyChromaticAberration(sampler2D videoTexture, vec2 uv, float intensity) {
+    // Zero-intensity optimization - single texture sample when disabled
+    if (intensity <= 0.0) {
+      return texture2D(videoTexture, uv).rgb;
+    }
+    
+    // Convert intensity (0-10 user range) to horizontal UV offset
+    // Scale to 0.001 per unit for subtle but visible separation
+    vec2 offset = vec2(intensity * 0.001, 0.0);
+    
+    // Sample RGB channels with horizontal offset
+    // Red channel shifts left (negative X offset)
+    float r = texture2D(videoTexture, uv - offset).r;
+    // Green channel stays centered (no offset) - anchor point
+    float g = texture2D(videoTexture, uv).g;
+    // Blue channel shifts right (positive X offset)
+    float b = texture2D(videoTexture, uv + offset).b;
+    
+    return vec3(r, g, b);
   }
 
   // === Vignette Effect ===
@@ -272,8 +305,8 @@ export const SCANLINE_FRAGMENT_SHADER = `
       return;
     }
     
-    // 3. Sample video texture with distorted coordinates
-    vec4 videoColor = texture2D(u_videoTexture, flippedUv);
+    // 3. Sample video texture with chromatic aberration (or normal sample if disabled)
+    vec3 videoColor = applyChromaticAberration(u_videoTexture, flippedUv, u_chromaticAberration);
     
     // 4. Calculate all multiplicative factors
     // Scanlines and vignette use raw v_texCoord for screen-space effects
@@ -284,7 +317,7 @@ export const SCANLINE_FRAGMENT_SHADER = `
     
     // 5. Apply multiplicative effects to video color
     // All factors are 0-1, so multiplication darkens the image authentically
-    vec3 finalColor = videoColor.rgb * phosphorMask * scanlineFactor * vignetteFactor;
+    vec3 finalColor = videoColor * phosphorMask * scanlineFactor * vignetteFactor;
     
     // 6. Output full opaque frame (no alpha blending dependency)
     gl_FragColor = vec4(finalColor, 1.0);

@@ -171,6 +171,26 @@
     </div>
   }
 
+  <!-- Chromatic Aberration Control -->
+  @if (config().showChromaticAberration) {
+    <div class="crt-control-group">
+      <span class="control-label">{{ chromaticAberrationSlider.label }}</span>
+      <mat-slider
+        [min]="chromaticAberrationSlider.min"
+        [max]="chromaticAberrationSlider.max"
+        [step]="chromaticAberrationSlider.step"
+        discrete
+      >
+        <input
+          matSliderThumb
+          [ngModel]="settings()[chromaticAberrationSlider.key]"
+          (ngModelChange)="onSliderChange(chromaticAberrationSlider.key, $event)"
+        />
+      </mat-slider>
+      <span class="control-value">{{ formatValue(settings()[chromaticAberrationSlider.key], chromaticAberrationSlider) }}</span>
+    </div>
+  }
+
   <!-- Curvature Control -->
   @if (config().showCurvature) {
     <div class="crt-control-group">

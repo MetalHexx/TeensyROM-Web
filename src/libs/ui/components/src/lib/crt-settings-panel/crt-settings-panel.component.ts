@@ -35,6 +35,7 @@ import {
   SCANLINE_SLIDERS,
   VIGNETTE_SLIDER,
   DISTORTION_SLIDER,
+  CHROMATIC_ABERRATION_SLIDER,
   CURVATURE_SLIDER,
   COLOR_FILTER_SLIDERS,
   PHOSPHOR_SLIDER,
@@ -189,6 +190,7 @@ export class CrtSettingsPanelComponent {
   protected readonly scanlineSliders = SCANLINE_SLIDERS;
   protected readonly vignetteSlider = VIGNETTE_SLIDER;
   protected readonly distortionSlider = DISTORTION_SLIDER;
+  protected readonly chromaticAberrationSlider = CHROMATIC_ABERRATION_SLIDER;
   protected readonly curvatureSlider = CURVATURE_SLIDER;
   protected readonly colorFilterSliders = COLOR_FILTER_SLIDERS;
   protected readonly phosphorSlider = PHOSPHOR_SLIDER;

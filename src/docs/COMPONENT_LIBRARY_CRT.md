@@ -806,6 +806,7 @@ Values that control the intensity and appearance of each effect:
 | `vignetteStrength` | `number` | Intensity of rectangular edge darkening (0-2). Set to 0 to disable. Works with `screenCurvature` to create rounded corners matching the CRT bezel. |
 | `screenCurvature` | `number` | Border-radius in pixels for curved screen effect and vignette corner rounding. Set to 0 for flat/sharp corners. The vignette corners match the dialog's border-radius for visual consistency. |
 | `barrelDistortion` | `number` | Radial image warping intensity (0-0.5). Simulates the geometric distortion of curved CRT glass. 0 = no distortion, higher values increase edge curvature. Applied in WebGL shader before texture sampling. |
+| `chromaticAberration` | `number` | RGB channel separation intensity (0-10). Simulates lens aberration in CRT monitors where RGB channels separate horizontally. 0 = no separation, higher values increase visible color fringing. WebGL-only effect with horizontal offset. |
 | `contrast` | `number` | CSS filter contrast multiplier. 1 = no change, >1 = increased. |
 | `brightness` | `number` | CSS filter brightness multiplier. 1 = no change, >1 = brighter. |
 | `saturation` | `number` | CSS filter saturation multiplier. 1 = no change, >1 = more saturated. |
@@ -934,6 +935,22 @@ Image warping effect that simulates the pincushion/barrel distortion inherent to
   5. Out-of-bounds check renders black pixels for clean edges
 - **Visual Effect**: Bends straight lines into curves radiating from the center, replicating the physical lens distortion of a convex glass tube. Creates subtle bulge at edges that enhances the perception of viewing content through curved glass. The effect properly extends to viewport edges, creating the authentic appearance of curved CRT glass where corner pixels "pull inward" toward the center.
 - **Performance**: GPU-accelerated with minimal overhead (~7 shader operations per pixel)
+
+### Chromatic Aberration
+
+RGB color fringing effect that simulates lens aberration in CRT monitors where RGB channels separate horizontally.
+
+- **Implementation**: WebGL fragment shader using horizontal RGB channel offset sampling. Samples red, green, and blue channels from separate horizontal texture positions. Green channel anchors at the original position while red shifts left and blue shifts right.
+- **Properties**: `chromaticAberration` controls separation intensity (0-10, where 0 = no separation)
+- **Algorithm**:
+  1. Convert intensity (0-10) to horizontal UV offset: `intensity * 0.001`
+  2. Sample red channel at `uv - vec2(offset, 0)` (shifts left)
+  3. Sample green channel at `uv` (anchor point, no shift)
+  4. Sample blue channel at `uv + vec2(offset, 0)` (shifts right)
+  5. Reconstruct RGB color from separated channels
+- **Visual Effect**: Creates authentic color fringing visible across the entire screen, especially pronounced on high-contrast edges. The horizontal separation is particularly noticeable on white text against dark backgrounds, vertical lines, and UI elements. Effect is uniform across the screen, matching classic CRT lens aberration.
+- **Performance**: GPU-accelerated with 3 texture samples per pixel (red, green, blue). Near-zero overhead when disabled (single texture sample).
+- **Inspiration**: Based on the technique used in modern CRT shader implementations for consistent, visible color separation.
 
 ### Screen Curvature
 

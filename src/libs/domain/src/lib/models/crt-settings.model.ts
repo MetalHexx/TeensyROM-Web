@@ -126,7 +126,7 @@ export interface CrtSettings {
   barrelDistortion: number;
 
   /**
-   * Amount of RGB channel separation at edges (0-5).
+   * Amount of RGB channel separation at edges (0-10).
    * Simulates lens aberration in CRT monitors.
    * 0 = no separation, higher = more visible RGB fringing.
    * Only visible in WebGL mode.
