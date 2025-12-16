@@ -130,7 +130,7 @@
 
 // Pattern selector dropdown styling
 .pattern-selector {
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
 
   .control-label {
     margin-bottom: 8px; // Add consistent spacing between label and button
@@ -168,6 +168,60 @@
   padding: 16px 0;
   text-align: center;
   opacity: 0.6;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Expansion Panel Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+::ng-deep mat-accordion {
+  .mat-expansion-panel {
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0;
+    
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    &::before {
+      display: none; // Remove default Material divider
+    }
+  }
+
+  .mat-expansion-panel-header {
+    padding: 0px 12px;
+    min-height: 35px;
+    height: 35px;
+    
+    &:hover:not([aria-disabled="true"]) {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    // Reduced height for expanded state only
+    &.mat-expanded {
+      min-height: 50px;
+      height: 50px;
+    }
+  }
+
+  .mat-expansion-panel-header-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    opacity: 0.95;
+  }
+
+  .mat-expansion-panel-body {
+    padding: 2px 12px 4px 12px;
+  }
+
+  // Expansion indicator styling
+  .mat-expansion-indicator {
+    &::after {
+      color: rgba(255, 255, 255, 0.7);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

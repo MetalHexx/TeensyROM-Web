@@ -7,12 +7,14 @@ import {
   inject,
   signal,
   viewChild,
+  effect,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatExpansionModule } from '@angular/material/expansion';
 
 import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-layout.component';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
@@ -94,6 +96,7 @@ export { CrtPresetName, CRT_PRESETS };
     MatSliderModule,
     MatIconModule,
     MatTooltipModule,
+    MatExpansionModule,
     CompactCardLayoutComponent,
     IconButtonComponent,
     DropdownMenuComponent,
@@ -186,6 +189,14 @@ export class CrtSettingsPanelComponent {
    */
   readonly presetSelected = output<CrtPresetName>();
 
+  /**
+   * Emitted when a dropdown opens or closes.
+   * Parent components (like ContentOverlayContainerComponent) can use this to
+   * prevent overlay hiding while dropdowns are open.
+   * Use this to pause hover-based overlay visibility.
+   */
+  readonly openedChange = output<boolean>();
+
   // ─────────────────────────────────────────────────────────────────────────
   // Slider Configurations (exposed for template)
   // ─────────────────────────────────────────────────────────────────────────
@@ -238,6 +249,29 @@ export class CrtSettingsPanelComponent {
 
   /** Distinguishes save vs rename workflow in name dialog */
   protected readonly isRenaming = signal(false);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Expansion Panel State
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Currently expanded panel ID (null if all collapsed) */
+  protected readonly expandedPanel = signal<string | null>(null);
+
+  /** Determines which panel should be expanded by default based on config visibility */
+  protected readonly defaultExpandedPanel = computed<string | null>(() => {
+    const cfg = this.config();
+    
+    // Check Scanlines & Screen panel
+    if (this.hasScanlinesPanelContent()) return 'scanlines-screen';
+    
+    // Check Light & Color panel
+    if (this.hasLightColorPanelContent()) return 'light-color';
+    
+    // Check Phosphor Effects panel
+    if (this.hasPhosphorPanelContent()) return 'phosphor';
+    
+    return null;
+  });
 
   constructor() {
     // Load custom presets on component initialization
@@ -343,6 +377,37 @@ export class CrtSettingsPanelComponent {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Panel Visibility Helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Checks if the Scanlines & Screen panel has any visible controls.
+   * @returns true if at least one control in the panel is visible
+   */
+  protected hasScanlinesPanelContent(): boolean {
+    const cfg = this.config();
+    return cfg.showScanlines || cfg.showVignette || cfg.showCurvature || cfg.showDistortion;
+  }
+
+  /**
+   * Checks if the Light & Color panel has any visible controls.
+   * @returns true if at least one control in the panel is visible
+   */
+  protected hasLightColorPanelContent(): boolean {
+    const cfg = this.config();
+    return cfg.showBloom || cfg.showChromaticAberration || cfg.showColorFilters;
+  }
+
+  /**
+   * Checks if the Phosphor Effects panel has any visible controls.
+   * @returns true if at least one control in the panel is visible
+   */
+  protected hasPhosphorPanelContent(): boolean {
+    const cfg = this.config();
+    return cfg.showPhosphor || cfg.showMonochromePhosphor;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Event Handlers
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -356,6 +421,14 @@ export class CrtSettingsPanelComponent {
       [key]: value,
     };
     this.settingsChange.emit(updatedSettings);
+  }
+
+  /**
+   * Handle dropdown open/close state change.
+   * Emits to parent so overlay containers can keep overlays visible while dropdown is open.
+   */
+  protected onDropdownOpenedChange(isOpen: boolean): void {
+    this.openedChange.emit(isOpen);
   }
 
   /**

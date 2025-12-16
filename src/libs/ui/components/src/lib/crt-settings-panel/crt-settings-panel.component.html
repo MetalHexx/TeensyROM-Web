@@ -109,218 +109,260 @@
     </div>
   </div>
 
-  <!-- Scanline Controls -->
-  @if (config().showScanlines) {
-    @for (slider of scanlineSliders; track slider.key) {
-      <div class="crt-control-group">
-        <span class="control-label">{{ slider.label }}</span>
-        <mat-slider
-          [min]="slider.min"
-          [max]="slider.max"
-          [step]="slider.step"
-          discrete
-        >
-          <input
-            matSliderThumb
-            [ngModel]="settings()[slider.key]"
-            (ngModelChange)="onSliderChange(slider.key, $event)"
-          />
-        </mat-slider>
-        <span class="control-value">{{ formatValue(settings()[slider.key], slider) }}</span>
-      </div>
-    }
-  }
+  <!-- Expansion Panels for Grouped Controls -->
+  <mat-accordion [multi]="false">
+    
+    <!-- Scanlines & Screen Panel -->
+    @if (hasScanlinesPanelContent()) {
+      <mat-expansion-panel 
+        [expanded]="expandedPanel() === 'scanlines-screen'"
+        (expandedChange)="expandedPanel.set($event ? 'scanlines-screen' : null)">
+        <mat-expansion-panel-header>
+          <mat-panel-title>Scanlines & Screen</mat-panel-title>
+        </mat-expansion-panel-header>
 
-  <!-- Visual Effects (Vignette, Distortion, Curvature) -->
-  @if (config().showVignette) {
-    <div class="crt-control-group">
-      <span class="control-label">{{ vignetteSlider.label }}</span>
-      <mat-slider
-        [min]="vignetteSlider.min"
-        [max]="vignetteSlider.max"
-        [step]="vignetteSlider.step"
-        discrete
-      >
-        <input
-          matSliderThumb
-          [ngModel]="settings()[vignetteSlider.key]"
-          (ngModelChange)="onSliderChange(vignetteSlider.key, $event)"
-        />
-      </mat-slider>
-      <span class="control-value">{{ formatValue(settings()[vignetteSlider.key], vignetteSlider) }}</span>
-    </div>
-  }
-
-  <!-- Distortion Control -->
-  @if (config().showDistortion) {
-    <div class="crt-control-group">
-      <span class="control-label">{{ distortionSlider.label }}</span>
-      <mat-slider
-        [min]="distortionSlider.min"
-        [max]="distortionSlider.max"
-        [step]="distortionSlider.step"
-        discrete
-      >
-        <input
-          matSliderThumb
-          [ngModel]="settings()[distortionSlider.key]"
-          (ngModelChange)="onSliderChange(distortionSlider.key, $event)"
-        />
-      </mat-slider>
-      <span class="control-value">{{ formatValue(settings()[distortionSlider.key], distortionSlider) }}</span>
-    </div>
-  }
-
-  <!-- Bloom Control -->
-  @if (config().showBloom) {
-    <div class="crt-control-group">
-      <span class="control-label">{{ bloomSlider.label }}</span>
-      <mat-slider
-        [min]="bloomSlider.min"
-        [max]="bloomSlider.max"
-        [step]="bloomSlider.step"
-        discrete
-      >
-        <input
-          matSliderThumb
-          [ngModel]="settings()[bloomSlider.key]"
-          (ngModelChange)="onSliderChange(bloomSlider.key, $event)"
-        />
-      </mat-slider>
-      <span class="control-value">{{ formatValue(settings()[bloomSlider.key], bloomSlider) }}</span>
-    </div>
-  }
-
-  <!-- Chromatic Aberration Control -->
-  @if (config().showChromaticAberration) {
-    <div class="crt-control-group">
-      <span class="control-label">{{ chromaticAberrationSlider.label }}</span>
-      <mat-slider
-        [min]="chromaticAberrationSlider.min"
-        [max]="chromaticAberrationSlider.max"
-        [step]="chromaticAberrationSlider.step"
-        discrete
-      >
-        <input
-          matSliderThumb
-          [ngModel]="settings()[chromaticAberrationSlider.key]"
-          (ngModelChange)="onSliderChange(chromaticAberrationSlider.key, $event)"
-        />
-      </mat-slider>
-      <span class="control-value">{{ formatValue(settings()[chromaticAberrationSlider.key], chromaticAberrationSlider) }}</span>
-    </div>
-  }
-
-  <!-- Curvature Control -->
-  @if (config().showCurvature) {
-    <div class="crt-control-group">
-      <span class="control-label">{{ curvatureSlider.label }}</span>
-      <mat-slider
-        [min]="curvatureSlider.min"
-        [max]="curvatureSlider.max"
-        [step]="curvatureSlider.step"
-        discrete
-      >
-        <input
-          matSliderThumb
-          [ngModel]="settings()[curvatureSlider.key]"
-          (ngModelChange)="onSliderChange(curvatureSlider.key, $event)"
-        />
-      </mat-slider>
-      <span class="control-value">{{ formatValue(settings()[curvatureSlider.key], curvatureSlider) }}</span>
-    </div>
-  }
-
-  <!-- Color Filter Controls -->
-  @if (config().showColorFilters) {
-    @for (slider of colorFilterSliders; track slider.key) {
-      <div class="crt-control-group">
-        <span class="control-label">{{ slider.label }}</span>
-        <mat-slider
-          [min]="slider.min"
-          [max]="slider.max"
-          [step]="slider.step"
-          discrete
-        >
-          <input
-            matSliderThumb
-            [ngModel]="settings()[slider.key]"
-            (ngModelChange)="onSliderChange(slider.key, $event)"
-          />
-        </mat-slider>
-        <span class="control-value">{{ formatValue(settings()[slider.key], slider) }}</span>
-      </div>
-    }
-  }
-
-  <!-- Phosphor Controls (WebGL only) -->
-  @if (shouldShowPhosphor()) {
-    <!-- Phosphor Pattern Selector -->
-    <div class="crt-control-group pattern-selector">
-      <span class="control-label">Phosphor Pattern</span>
-      <lib-dropdown-menu #patternDropdown>
-        <button 
-          class="pattern-button" 
-          (click)="patternDropdown.toggle()"
-          type="button">
-          {{ getPhosphorPatternLabel() }}
-          <mat-icon>arrow_drop_down</mat-icon>
-        </button>
-        <div dropdown-content>
-          @for (option of phosphorPatternOptions; track option.value) {
-            <lib-dropdown-menu-item
-              [testId]="'phosphor-' + option.value"
-              (itemClick)="onPhosphorPatternChange(option.value)">
-              {{ option.label }}
-            </lib-dropdown-menu-item>
+        <!-- Scanline Controls -->
+        @if (config().showScanlines) {
+          @for (slider of scanlineSliders; track slider.key) {
+            <div class="crt-control-group">
+              <span class="control-label">{{ slider.label }}</span>
+              <mat-slider
+                [min]="slider.min"
+                [max]="slider.max"
+                [step]="slider.step"
+                discrete
+              >
+                <input
+                  matSliderThumb
+                  [ngModel]="settings()[slider.key]"
+                  (ngModelChange)="onSliderChange(slider.key, $event)"
+                />
+              </mat-slider>
+              <span class="control-value">{{ formatValue(settings()[slider.key], slider) }}</span>
+            </div>
           }
-        </div>
-      </lib-dropdown-menu>
-    </div>
+        }
 
-    <!-- Phosphor Intensity Slider -->
-    <div class="crt-control-group">
-      <span class="control-label">{{ phosphorSlider.label }}</span>
-      <mat-slider
-        [min]="phosphorSlider.min"
-        [max]="phosphorSlider.max"
-        [step]="phosphorSlider.step"
-        discrete
-      >
-        <input
-          matSliderThumb
-          [ngModel]="settings()[phosphorSlider.key]"
-          (ngModelChange)="onSliderChange(phosphorSlider.key, $event)"
-        />
-      </mat-slider>
-      <span class="control-value">{{ formatValue(settings()[phosphorSlider.key], phosphorSlider) }}</span>
-    </div>
-  }
+        <!-- Visual Effects (Vignette, Distortion, Curvature) -->
+        @if (config().showVignette) {
+          <div class="crt-control-group">
+            <span class="control-label">{{ vignetteSlider.label }}</span>
+            <mat-slider
+              [min]="vignetteSlider.min"
+              [max]="vignetteSlider.max"
+              [step]="vignetteSlider.step"
+              discrete
+            >
+              <input
+                matSliderThumb
+                [ngModel]="settings()[vignetteSlider.key]"
+                (ngModelChange)="onSliderChange(vignetteSlider.key, $event)"
+              />
+            </mat-slider>
+            <span class="control-value">{{ formatValue(settings()[vignetteSlider.key], vignetteSlider) }}</span>
+          </div>
+        }
 
-  <!-- Monochrome Phosphor Control (WebGL only) -->
-  @if (shouldShowMonochromePhosphor()) {
-    <div class="crt-control-group pattern-selector">
-      <span class="control-label">Monochrome Phosphor</span>
-      <lib-dropdown-menu #monochromeDropdown>
-        <button 
-          class="pattern-button" 
-          (click)="monochromeDropdown.toggle()"
-          type="button">
-          {{ getMonochromePhosphorLabel() }}
-          <mat-icon>arrow_drop_down</mat-icon>
-        </button>
-        <div dropdown-content>
-          @for (option of monochromePhosphorOptions; track option.value) {
-            <lib-dropdown-menu-item
-              [testId]="'monochrome-' + option.value"
-              (itemClick)="onMonochromePhosphorChange(option.value)">
-              {{ option.label }}
-            </lib-dropdown-menu-item>
+        @if (config().showCurvature) {
+          <div class="crt-control-group">
+            <span class="control-label">{{ curvatureSlider.label }}</span>
+            <mat-slider
+              [min]="curvatureSlider.min"
+              [max]="curvatureSlider.max"
+              [step]="curvatureSlider.step"
+              discrete
+            >
+              <input
+                matSliderThumb
+                [ngModel]="settings()[curvatureSlider.key]"
+                (ngModelChange)="onSliderChange(curvatureSlider.key, $event)"
+              />
+            </mat-slider>
+            <span class="control-value">{{ formatValue(settings()[curvatureSlider.key], curvatureSlider) }}</span>
+          </div>
+        }
+
+        @if (config().showDistortion) {
+          <div class="crt-control-group">
+            <span class="control-label">{{ distortionSlider.label }}</span>
+            <mat-slider
+              [min]="distortionSlider.min"
+              [max]="distortionSlider.max"
+              [step]="distortionSlider.step"
+              discrete
+            >
+              <input
+                matSliderThumb
+                [ngModel]="settings()[distortionSlider.key]"
+                (ngModelChange)="onSliderChange(distortionSlider.key, $event)"
+              />
+            </mat-slider>
+            <span class="control-value">{{ formatValue(settings()[distortionSlider.key], distortionSlider) }}</span>
+          </div>
+        }
+      </mat-expansion-panel>
+    }
+
+    <!-- Light & Color Panel -->
+    @if (hasLightColorPanelContent()) {
+      <mat-expansion-panel 
+        [expanded]="expandedPanel() === 'light-color'"
+        (expandedChange)="expandedPanel.set($event ? 'light-color' : null)">
+        <mat-expansion-panel-header>
+          <mat-panel-title>Light & Color</mat-panel-title>
+        </mat-expansion-panel-header>
+
+        <!-- Bloom Control -->
+        @if (config().showBloom) {
+          <div class="crt-control-group">
+            <span class="control-label">{{ bloomSlider.label }}</span>
+            <mat-slider
+              [min]="bloomSlider.min"
+              [max]="bloomSlider.max"
+              [step]="bloomSlider.step"
+              discrete
+            >
+              <input
+                matSliderThumb
+                [ngModel]="settings()[bloomSlider.key]"
+                (ngModelChange)="onSliderChange(bloomSlider.key, $event)"
+              />
+            </mat-slider>
+            <span class="control-value">{{ formatValue(settings()[bloomSlider.key], bloomSlider) }}</span>
+          </div>
+        }
+
+        <!-- Chromatic Aberration Control -->
+        @if (config().showChromaticAberration) {
+          <div class="crt-control-group">
+            <span class="control-label">{{ chromaticAberrationSlider.label }}</span>
+            <mat-slider
+              [min]="chromaticAberrationSlider.min"
+              [max]="chromaticAberrationSlider.max"
+              [step]="chromaticAberrationSlider.step"
+              discrete
+            >
+              <input
+                matSliderThumb
+                [ngModel]="settings()[chromaticAberrationSlider.key]"
+                (ngModelChange)="onSliderChange(chromaticAberrationSlider.key, $event)"
+              />
+            </mat-slider>
+            <span class="control-value">{{ formatValue(settings()[chromaticAberrationSlider.key], chromaticAberrationSlider) }}</span>
+          </div>
+        }
+
+        <!-- Color Filter Controls -->
+        @if (config().showColorFilters) {
+          @for (slider of colorFilterSliders; track slider.key) {
+            <div class="crt-control-group">
+              <span class="control-label">{{ slider.label }}</span>
+              <mat-slider
+                [min]="slider.min"
+                [max]="slider.max"
+                [step]="slider.step"
+                discrete
+              >
+                <input
+                  matSliderThumb
+                  [ngModel]="settings()[slider.key]"
+                  (ngModelChange)="onSliderChange(slider.key, $event)"
+                />
+              </mat-slider>
+              <span class="control-value">{{ formatValue(settings()[slider.key], slider) }}</span>
+            </div>
           }
-        </div>
-      </lib-dropdown-menu>
-    </div>
-  }
+        }
+      </mat-expansion-panel>
+    }
+
+    <!-- Phosphor Effects Panel -->
+    @if (hasPhosphorPanelContent()) {
+      <mat-expansion-panel 
+        [expanded]="expandedPanel() === 'phosphor'"
+        (expandedChange)="expandedPanel.set($event ? 'phosphor' : null)">
+        <mat-expansion-panel-header>
+          <mat-panel-title>Phosphor Effects</mat-panel-title>
+        </mat-expansion-panel-header>
+
+        <!-- Phosphor Controls (WebGL only) -->
+        @if (shouldShowPhosphor()) {
+          <!-- Phosphor Pattern Selector -->
+          <div class="crt-control-group pattern-selector">
+            <span class="control-label">Phosphor Pattern</span>
+            <lib-dropdown-menu 
+              #patternDropdown
+              (opened)="onDropdownOpenedChange(true)"
+              (closed)="onDropdownOpenedChange(false)">
+              <button 
+                class="pattern-button" 
+                (click)="patternDropdown.toggle()"
+                type="button">
+                {{ getPhosphorPatternLabel() }}
+                <mat-icon>arrow_drop_down</mat-icon>
+              </button>
+              <div dropdown-content>
+                @for (option of phosphorPatternOptions; track option.value) {
+                  <lib-dropdown-menu-item
+                    [testId]="'phosphor-' + option.value"
+                    (itemClick)="onPhosphorPatternChange(option.value)">
+                    {{ option.label }}
+                  </lib-dropdown-menu-item>
+                }
+              </div>
+            </lib-dropdown-menu>
+          </div>
+
+          <!-- Phosphor Intensity Slider -->
+          <div class="crt-control-group">
+            <span class="control-label">{{ phosphorSlider.label }}</span>
+            <mat-slider
+              [min]="phosphorSlider.min"
+              [max]="phosphorSlider.max"
+              [step]="phosphorSlider.step"
+              discrete
+            >
+              <input
+                matSliderThumb
+                [ngModel]="settings()[phosphorSlider.key]"
+                (ngModelChange)="onSliderChange(phosphorSlider.key, $event)"
+              />
+            </mat-slider>
+            <span class="control-value">{{ formatValue(settings()[phosphorSlider.key], phosphorSlider) }}</span>
+          </div>
+        }
+
+        <!-- Monochrome Phosphor Control (WebGL only) -->
+        @if (shouldShowMonochromePhosphor()) {
+          <div class="crt-control-group pattern-selector">
+            <span class="control-label">Monochrome Phosphor</span>
+            <lib-dropdown-menu 
+              #monochromeDropdown
+              (opened)="onDropdownOpenedChange(true)"
+              (closed)="onDropdownOpenedChange(false)">
+              <button 
+                class="pattern-button" 
+                (click)="monochromeDropdown.toggle()"
+                type="button">
+                {{ getMonochromePhosphorLabel() }}
+                <mat-icon>arrow_drop_down</mat-icon>
+              </button>
+              <div dropdown-content>
+                @for (option of monochromePhosphorOptions; track option.value) {
+                  <lib-dropdown-menu-item
+                    [testId]="'monochrome-' + option.value"
+                    (itemClick)="onMonochromePhosphorChange(option.value)">
+                    {{ option.label }}
+                  </lib-dropdown-menu-item>
+                }
+              </div>
+            </lib-dropdown-menu>
+          </div>
+        }
+      </mat-expansion-panel>
+    }
+
+  </mat-accordion>
 
   <!-- Empty state when no sliders are shown -->
   @if (!hasAnySliders()) {
