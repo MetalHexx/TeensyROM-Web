@@ -48,10 +48,18 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 > **Note**:  The video integration is completely optional, but highly recommended!
 - **Modern Meets Retro**: Seamlessly blend modern streaming control overlays with authentic CRT Video aesthetics to recreate the authentic Commodore 64 experience
 - **Live Video Capture**: Real-time video stream from connected video capture devices
-- **WebGL-Powered Rendering**: Hardware-accelerated effects for authentic CRT emulation
-- **Phosphor Patterns**: Aperture Grille (Trinitron), Shadow Mask (Traditional), Dot Triad (Arcade)
-- **Visual Effects**: Scanlines, vignette, screen curvature
-- **Color Adjustments**: Contrast, brightness, saturation, hue
+- **WebGL-Powered Rendering**: Hardware-accelerated GPU effects for authentic CRT emulation
+- **Authentic CRT Effects**:
+  - **Scanlines**: Horizontal scanlines with size and intensity controls.
+  - **Vignette**: Rounded-box edge darkening matching screen curvature
+  - **Barrel Distortion**: Curved glass warping simulating CRT tube geometry
+  - **Bloom**: Phosphor glow simulation for bright areas
+  - **Chromatic Aberration**: RGB color separation for lens aberration simulation
+  - **Screen Curvature**: Rounded container edges simulating convex glass tube
+- **Phosphor Emulation**:
+  - **RGB Patterns**: Aperture Grille (Trinitron), Shadow Mask (Traditional), Dot Triad (Arcade)
+  - **Monochrome Modes**: White, Amber, Green terminal phosphor styles
+- **Color Adjustments**: Contrast, brightness, saturation, hue for authentic retro color reproduction
 - **Multiple Display Modes**:
   - **Compact Integrated View**: Watch gameplay inline within the player interface
   - **Dialog Mode**: Expanded "Theatre Style" video dialog
