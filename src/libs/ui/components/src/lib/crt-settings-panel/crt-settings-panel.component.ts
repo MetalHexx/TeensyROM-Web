@@ -411,7 +411,12 @@ export class CrtSettingsPanelComponent {
   /**
    * Formats slider display value based on configuration.
    */
-  protected formatValue(value: number, slider: SliderConfig): string {
+  protected formatValue(value: number | string, slider: SliderConfig): string {
+    // Handle non-numeric values (e.g., monochromePhosphor type)
+    if (typeof value !== 'number') {
+      return String(value);
+    }
+    
     if (slider.format === 'px') {
       return `${value}px`;
     }

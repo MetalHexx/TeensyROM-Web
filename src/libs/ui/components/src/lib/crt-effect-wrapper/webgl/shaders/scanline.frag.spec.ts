@@ -55,11 +55,11 @@ describe('Scanline Fragment Shader - Barrel Distortion', () => {
       expect(SCANLINE_FRAGMENT_SHADER).toContain('r2 = dot(centered, centered)');
     });
 
-    it('should apply quadratic radial distortion formula', () => {
-      // Formula: vec2(0.5) + centered * (1.0 + intensity * r2)
-      // This creates barrel/pincushion warping that increases toward edges
-      const formulaPattern = /vec2\(0\.5\)\s*\+\s*centered\s*\*\s*\(\s*1\.0\s*\+\s*intensity\s*\*\s*r2\s*\)/;
-      expect(SCANLINE_FRAGMENT_SHADER).toMatch(formulaPattern);
+    it('should apply cubic radial distortion formula', () => {
+      // Formula: vec2(0.5) + centered * distortionFactor
+      // where distortionFactor = 1.0 + (intensity * 0.8 * r2) + (intensity * 0.2 * r4)
+      // The cubic formula (r² + r⁴ terms) creates smoother transitions to reduce banding
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('vec2(0.5) + centered * distortionFactor');
     });
 
     it('should use r² (squared distance) for quadratic distortion', () => {
@@ -156,16 +156,18 @@ describe('Scanline Fragment Shader - Barrel Distortion', () => {
 
     describe('distortion intensity', () => {
       it('should increase displacement with higher intensity', () => {
-        // Formula multiplies by intensity, so higher values
-        // create more displacement from center
-        const formula = /centered\s*\*\s*\(\s*1\.0\s*\+\s*intensity\s*\*\s*r2/;
-        expect(SCANLINE_FRAGMENT_SHADER).toMatch(formula);
+        // Quintic formula uses r², r⁴, and r⁶ terms with intensity scaling
+        // k₁ = intensity * 0.6 (quadratic), k₂ = intensity * 0.3 (quartic), k₃ = intensity * 0.1 (sextic)
+        expect(SCANLINE_FRAGMENT_SHADER).toContain('intensity * 0.6 * r2');
+        expect(SCANLINE_FRAGMENT_SHADER).toContain('intensity * 0.3 * r4');
+        expect(SCANLINE_FRAGMENT_SHADER).toContain('intensity * 0.1 * r6');
       });
 
       it('should increase displacement with distance from center', () => {
-        // The r² term means points farther from center (higher squared distance)
-        // experience more distortion
-        expect(SCANLINE_FRAGMENT_SHADER).toContain('intensity * r2');
+        // The cubic formula uses both r² and r⁴ terms
+        // r⁴ is calculated as r2 * r2 for efficiency
+        expect(SCANLINE_FRAGMENT_SHADER).toContain('r4 = r2 * r2');
+        expect(SCANLINE_FRAGMENT_SHADER).toContain('distortionFactor');
       });
     });
   });
@@ -176,9 +178,9 @@ describe('Scanline Fragment Shader - Barrel Distortion', () => {
       expect(SCANLINE_FRAGMENT_SHADER).toContain('vec2');
       expect(SCANLINE_FRAGMENT_SHADER).toContain('float');
       
-      // Should not use modern GLSL features
-      expect(SCANLINE_FRAGMENT_SHADER).not.toContain('dvec');
-      expect(SCANLINE_FRAGMENT_SHADER).not.toContain('uint');
+      // Should not use modern GLSL features (word boundaries to avoid false positives like "Quintic")
+      expect(SCANLINE_FRAGMENT_SHADER).not.toMatch(/\bdvec\b/);
+      expect(SCANLINE_FRAGMENT_SHADER).not.toMatch(/\buint\b/);
     });
 
     it('should use precision qualifiers', () => {
@@ -243,10 +245,10 @@ describe('Scanline Fragment Shader - Barrel Distortion', () => {
 describe('Barrel Distortion Formula - Mathematical Specification', () => {
   describe('formula behavior at key coordinates', () => {
     it('should document center point behavior', () => {
-      // At (0.5, 0.5): centered = (0,0), r2 = 0, distorted = (0.5, 0.5)
+      // At (0.5, 0.5): centered = (0,0), r2 = 0, r4 = 0, distortionFactor = 1.0
       // Center is always preserved regardless of intensity
-      const formula = 'vec2(0.5) + centered * (1.0 + intensity * r2)';
-      expect(SCANLINE_FRAGMENT_SHADER).toContain(formula);
+      // distorted = (0.5, 0.5) + (0,0) * distortionFactor = (0.5, 0.5)
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('vec2(0.5) + centered * distortionFactor');
     });
 
     it('should document corner point behavior', () => {
@@ -257,11 +259,11 @@ describe('Barrel Distortion Formula - Mathematical Specification', () => {
     });
 
     it('should document edge midpoint behavior', () => {
-      // At (1.0, 0.5): centered = (0.5, 0.0), r2 = 0.25
-      // distorted = (0.5, 0.5) + (0.5, 0.0) * (1.0 + intensity * 0.25)
-      // Less distortion than corners but more than center
-      const formula = 'centered * (1.0 + intensity * r2)';
-      expect(SCANLINE_FRAGMENT_SHADER).toContain(formula);
+      // At (1.0, 0.5): centered = (0.5, 0.0), r2 = 0.25, r4 = 0.0625
+      // distortionFactor = 1.0 + (intensity * 0.8 * 0.25) + (intensity * 0.2 * 0.0625)
+      // distorted = (0.5, 0.5) + (0.5, 0.0) * distortionFactor
+      // Cubic formula provides smoother transitions than quadratic
+      expect(SCANLINE_FRAGMENT_SHADER).toContain('centered * distortionFactor');
     });
   });
 

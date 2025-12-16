@@ -108,11 +108,14 @@ export const SCANLINE_FRAGMENT_SHADER = `
   // === Barrel Distortion Effect ===
   //
   // Applies geometric warping to texture coordinates to simulate curved CRT glass.
-  // Uses radial distortion formula: distorted = center + (original - center) * (1 + intensity * r²)
-  // The quadratic term (r²) creates smooth barrel curve increasing toward edges.
+  // Uses quintic (5th order) distortion formula to minimize banding artifacts:
+  //   distorted = center + (original - center) * (1 + k₁*r² + k₂*r⁴ + k₃*r⁶)
   //
-  // Performance optimization: Uses dot product for r² instead of length() + square
-  // to avoid expensive sqrt operation (10-20x faster per pixel).
+  // Anti-banding approach: Higher-order polynomial provides smoother gradient
+  // across the distortion range. The 60/30/10 coefficient split creates a
+  // natural falloff curve that avoids the sharp transitions causing banding.
+  //
+  // Performance: Only 2 extra multiplies vs quadratic (r4 = r2*r2, r6 = r4*r2)
   //
   // Returns distorted UV coordinates (may be outside [0.0, 1.0] range at edges).
   // Out-of-bounds coordinates are handled in main() to show black.
@@ -120,14 +123,23 @@ export const SCANLINE_FRAGMENT_SHADER = `
   vec2 applyBarrelDistortion(vec2 uv, float intensity) {
     // Zero-intensity optimization - critical for performance when effect is disabled
     if (intensity == 0.0) return uv;
-    
+
     // Calculate radial distortion from center point
     // Use dot product for r² directly (no sqrt needed)
     vec2 centered = uv - vec2(0.5);
     float r2 = dot(centered, centered);
+
+    // Quintic distortion formula with optimized coefficients
+    // k₁ (r²): Primary distortion strength (intensity * 0.6)
+    // k₂ (r⁴): Mid-range smoothing (intensity * 0.3)
+    // k₃ (r⁶): Edge smoothing to eliminate banding (intensity * 0.1)
+    // This distribution creates a smooth S-curve gradient
+    float r4 = r2 * r2;
+    float r6 = r4 * r2;
+    float distortionFactor = 1.0 + (intensity * 0.6 * r2) + (intensity * 0.3 * r4) + (intensity * 0.1 * r6);
     
     // Return distorted coordinates (no clamping - allows edges to pull inward)
-    return vec2(0.5) + centered * (1.0 + intensity * r2);
+    return vec2(0.5) + centered * distortionFactor;
   }
 
   // === Chromatic Aberration Effect ===

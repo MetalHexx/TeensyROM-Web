@@ -359,9 +359,9 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
 
       // Call the handler directly since menu interaction is complex to simulate
-      callOnPresetSelect('default-small-webgl');
+      callOnPresetSelect('default-small-video-webgl');
 
-      expect(presetSpy).toHaveBeenCalledWith('default-small-webgl');
+      expect(presetSpy).toHaveBeenCalledWith('default-small-video-webgl');
     });
 
     it('should emit correct preset name for each preset', () => {
@@ -369,15 +369,15 @@ describe('CrtSettingsPanelComponent', () => {
       component.presetSelected.subscribe(presetSpy);
       fixture.detectChanges();
 
-      const presets: CrtPresetName[] = ['default-small-webgl', 'default-large-webgl'];
+      const presets: CrtPresetName[] = ['default-small-video-webgl', 'default-large-video-webgl'];
 
       presets.forEach((preset) => {
         callOnPresetSelect(preset);
       });
 
       expect(presetSpy).toHaveBeenCalledTimes(2);
-      expect(presetSpy).toHaveBeenCalledWith('default-small-webgl');
-      expect(presetSpy).toHaveBeenCalledWith('default-large-webgl');
+      expect(presetSpy).toHaveBeenCalledWith('default-small-video-webgl');
+      expect(presetSpy).toHaveBeenCalledWith('default-large-video-webgl');
     });
   });
 
