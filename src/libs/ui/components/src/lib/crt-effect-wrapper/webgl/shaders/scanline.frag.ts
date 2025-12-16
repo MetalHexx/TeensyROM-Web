@@ -445,8 +445,9 @@ export const SCANLINE_FRAGMENT_SHADER = `
     vec3 monochromeColor = applyMonochromePhosphor(bloomedColor, u_monochromePhosphor);
     
     // 6. Calculate all multiplicative factors
-    // Scanlines and vignette use raw v_texCoord for screen-space effects
-    float scanlineFactor = calculateScanline(v_texCoord, u_scanlineSize, u_resolution);
+    // Scanlines use distorted flippedUv to follow screen curvature (matches real CRT behavior)
+    // Vignette uses raw v_texCoord for screen-space edge darkening
+    float scanlineFactor = calculateScanline(flippedUv, u_scanlineSize, u_resolution);
     float vignetteFactor = calculateVignette(v_texCoord, u_vignetteStrength, u_screenCurvature, u_resolution);
     // Phosphor uses distorted flippedUv to align with video content
     vec3 phosphorMask = calculatePhosphor(flippedUv, u_resolution, u_phosphorPattern, u_phosphorIntensity);
