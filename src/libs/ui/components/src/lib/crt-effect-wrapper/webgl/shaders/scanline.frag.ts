@@ -396,10 +396,11 @@ export const SCANLINE_FRAGMENT_SHADER = `
       phosphorColor = vec3(1.0, 1.0, 1.0);
     } else if (phosphorType == 2.0) {
       // Amber phosphor - warm orange-amber tone of classic terminals
-      phosphorColor = vec3(1.0, 0.75, 0.0);
+      phosphorColor = vec3(1.0, 0.6, 0.0);
     } else if (phosphorType == 3.0) {
-      // Green phosphor - VT220, IBM 3270 style
-      phosphorColor = vec3(0.0, 1.0, 0.0);
+      // Green phosphor - VT220, IBM 3270, Apple II style
+      // Classic P1 phosphor green: RGB(77, 255, 89) normalized
+      phosphorColor = vec3(0.3, 1.0, 0.35);
     } else {
       // Fallback to white for invalid values
       phosphorColor = vec3(1.0, 1.0, 1.0);
