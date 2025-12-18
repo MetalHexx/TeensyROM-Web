@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
 import { CrtStorageService } from './crt-storage.service';
-import { CrtSettings, CustomPresetName } from '@teensyrom-nx/domain';
+import { CrtSettings, CustomPresetName, ALERT_SERVICE, type IAlertService } from '@teensyrom-nx/domain';
+import { of } from 'rxjs';
 import * as domainValidation from '@teensyrom-nx/domain';
 
 describe('CrtStorageService - Custom Preset Operations', () => {
   let service: CrtStorageService;
   let storage: Map<string, string>;
+  let mockAlertService: IAlertService;
 
   const mockSettings: CrtSettings = {
     scanlineIntensity: 0.7,
@@ -27,7 +30,25 @@ describe('CrtStorageService - Custom Preset Operations', () => {
 
   beforeEach(() => {
     storage = new Map<string, string>();
-    service = new CrtStorageService();
+
+    mockAlertService = {
+      alerts$: of([]),
+      show: vi.fn(),
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+      info: vi.fn(),
+      dismiss: vi.fn(),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        CrtStorageService,
+        { provide: ALERT_SERVICE, useValue: mockAlertService },
+      ],
+    });
+
+    service = TestBed.inject(CrtStorageService);
 
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => storage.get(key) ?? null);
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key: string, value: string) => {

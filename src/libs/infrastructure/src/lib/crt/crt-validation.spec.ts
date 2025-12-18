@@ -63,14 +63,14 @@ describe('validatePresetName', () => {
       const result = validatePresetName('My Preset!@#', []);
       
       expect(result.valid).toBe(false);
-      expect(result.error).toBe('Preset name can only contain letters, numbers, spaces, and hyphens');
+      expect(result.error).toBe('Preset name can only contain letters, numbers, spaces, hyphens, periods, and underscores');
     });
 
-    it('should fail validation for name with underscores', () => {
+    it('should pass validation for name with underscores', () => {
       const result = validatePresetName('My_Preset', []);
       
-      expect(result.valid).toBe(false);
-      expect(result.error).toBe('Preset name can only contain letters, numbers, spaces, and hyphens');
+      expect(result.valid).toBe(true);
+      expect(result.error).toBeUndefined();
     });
 
     it('should pass validation for name with alphanumeric only', () => {
@@ -103,36 +103,36 @@ describe('validatePresetName', () => {
   });
 
   describe('Reserved Name Tests', () => {
-    it('should fail validation for exact match to built-in preset (small-webgl)', () => {
-      const result = validatePresetName('small-webgl', []);
+    it('should fail validation for exact match to built-in preset (small-video-webgl)', () => {
+      const result = validatePresetName('small-video-webgl', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
     });
 
-    it('should fail validation for case-insensitive match (SMALL-WEBGL)', () => {
-      const result = validatePresetName('SMALL-WEBGL', []);
+    it('should fail validation for case-insensitive match (SMALL-VIDEO-WEBGL)', () => {
+      const result = validatePresetName('SMALL-VIDEO-WEBGL', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
     });
 
-    it('should fail validation for mixed case match (Small-WebGL)', () => {
-      const result = validatePresetName('Small-WebGL', []);
+    it('should fail validation for mixed case match (Small-Video-WebGL)', () => {
+      const result = validatePresetName('Small-Video-WebGL', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
     });
 
-    it('should fail validation for large-webgl', () => {
-      const result = validatePresetName('large-webgl', []);
+    it('should fail validation for large-video-webgl', () => {
+      const result = validatePresetName('large-video-webgl', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
     });
 
-    it('should fail validation for Large-Webgl (mixed case)', () => {
-      const result = validatePresetName('Large-Webgl', []);
+    it('should fail validation for Large-Video-Webgl (mixed case)', () => {
+      const result = validatePresetName('Large-Video-Webgl', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
@@ -198,8 +198,8 @@ describe('validatePresetName', () => {
       expect(result.error).toBe('A preset with this name already exists');
     });
 
-    it('should fail validation for name with mixed case reserved word (SmAlL-WebGL)', () => {
-      const result = validatePresetName('SmAlL-WebGL', []);
+    it('should fail validation for name with mixed case reserved word (SmAlL-Video-WebGL)', () => {
+      const result = validatePresetName('SmAlL-Video-WebGL', []);
       
       expect(result.valid).toBe(false);
       expect(result.error).toBe('This name is reserved for a built-in preset');
