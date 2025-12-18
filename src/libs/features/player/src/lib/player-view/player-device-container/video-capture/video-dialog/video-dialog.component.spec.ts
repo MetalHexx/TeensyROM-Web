@@ -174,10 +174,10 @@ describe('VideoDialogComponent', () => {
       expect(component['crtConfig']).toEqual(CRT_CONFIGS.large);
     });
 
-    it('should use LARGE_WEBGL preset when no saved settings', () => {
+    it('should use LARGE_VIDEO_WEBGL preset when no saved settings', () => {
       fixture.detectChanges();
       const settings = component['crtSettings']();
-      expect(settings).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+      expect(settings).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
     });
   });
 
@@ -307,28 +307,28 @@ describe('VideoDialogComponent', () => {
     it('should apply preset when onCrtPresetSelected is called', () => {
       fixture.detectChanges();
 
-      component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_WEBGL);
+      component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
     });
 
     it('should apply large WebGL preset correctly', () => {
       fixture.detectChanges();
 
-      component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_WEBGL);
+      component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
 
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
     });
 
     describe('custom preset selection', () => {
       it('should apply built-in preset settings correctly', () => {
         fixture.detectChanges();
 
-        component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_WEBGL);
+        component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
         
         const settings = component['crtSettings']();
         expect(settings.phosphorPattern).toBe('aperture-grille');
-        expect(settings.bloomEnabled).toBe(false);
+        expect(settings.bloomIntensity).toBe(0.3);
       });
 
       it('should apply custom preset settings correctly', () => {
@@ -515,18 +515,18 @@ describe('VideoDialogComponent', () => {
   });
 
   describe('CRT Initialization', () => {
-    it('should use LARGE_WEBGL preset when no saved settings', () => {
+    it('should use LARGE_VIDEO_WEBGL preset when no saved settings', () => {
       vi.spyOn(mockCrtStorage, 'load').mockReturnValue(null);
 
       fixture.detectChanges();
 
       const settings = component['crtSettings']();
-      expect(settings).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL]);
+      expect(settings).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
     });
 
     it('should load saved settings when they exist', () => {
       const savedSettings = {
-        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_WEBGL],
+        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL],
         brightness: 2.0,
       };
       vi.spyOn(mockCrtStorage, 'load').mockReturnValue(savedSettings);

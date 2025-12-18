@@ -104,7 +104,7 @@ describe('FileImageComponent', () => {
       expect(settings).toEqual(savedSettings);
     });
 
-    it('should use SMALL_WEBGL preset when no saved settings', () => {
+    it('should use SMALL_IMAGE_WEBGL preset when no saved settings', () => {
       vi.mocked(mockCrtStorage.load).mockReturnValue(null);
 
       // Create new component to trigger initialization
@@ -114,9 +114,9 @@ describe('FileImageComponent', () => {
       const newComponent = newFixture.componentInstance;
 
       const settings = newComponent['crtSettings']();
-      // Should match SMALL_WEBGL preset
+      // Should match SMALL_IMAGE_WEBGL preset
       expect(settings.phosphorPattern).toBe('aperture-grille');
-      expect(settings.bloomEnabled).toBe(false);
+      expect(settings.bloomIntensity).toBe(0);
     });
 
     it('should use storage key "file-image"', () => {
@@ -133,11 +133,11 @@ describe('FileImageComponent', () => {
 
   describe('CRT preset selection', () => {
     it('should apply built-in preset without modification', () => {
-      component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_WEBGL);
+      component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL);
       
       const settings = component['crtSettings']();
       expect(settings.phosphorPattern).toBe('aperture-grille');
-      expect(settings.bloomEnabled).toBe(false);
+      expect(settings.bloomIntensity).toBe(0);
       // Settings applied as-is from preset
     });
 
