@@ -130,6 +130,28 @@
 
 ---
 
+### Phase 6: CRT Settings Panel Dialog Separation
+
+**Objective**: Refactor the CRT settings panel preset dialogs to display as independent positioned overlays rather than inline within the dropdown menu content. When users trigger save/rename/delete actions, the dropdown menu should close and the respective dialog should appear in the same position. Upon dialog completion (confirm/cancel), the dropdown menu should reopen automatically.
+
+**Key Deliverables**:
+- [ ] Dialogs moved from inside dropdown-content to sibling elements
+- [ ] Dropdown closes when dialogs open (save/rename/delete triggers)
+- [ ] Dropdown reopens when dialogs close (confirm/cancel)
+- [ ] Dialogs positioned anchored to preset button (same position as dropdown)
+- [ ] All unit tests passing with updated assertions
+- [ ] Smooth visual transitions between dropdown and dialogs
+
+**High-Level Tasks**:
+1. Refactor template structure to move dialogs outside dropdown
+2. Implement dropdown/dialog state coordination (close/open logic)
+3. Add dialog positioning anchored to preset button
+4. Update and expand test suite for new behavior
+
+**User Value**: Cleaner UX where dialogs appear as independent overlays rather than nested within dropdown menu styling. More intuitive spatial relationship between trigger and dialogs. Easier to maintain and extend in the future.
+
+---
+
 ## 🏗️ Architecture Overview
 
 ### Design Philosophy
