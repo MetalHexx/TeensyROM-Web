@@ -89,6 +89,7 @@
   }
 
   .header-actions {
+    position: relative; // Position context for dialog container
     display: flex;
     align-items: center;
     gap: 0;

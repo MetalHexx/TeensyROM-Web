@@ -1,4 +1,8 @@
-<lib-scaling-compact-card (keydown)="onKeyDown($event)">
+<div 
+  (keydown)="onKeyDown($event)"
+  tabindex="0"
+  role="dialog"
+  [attr.aria-label]="title()">
   <!-- Dialog Header with Warning Icon -->
   <div class="dialog-header">
     <mat-icon class="warning-icon">warning</mat-icon>
@@ -24,4 +28,4 @@
       (buttonClick)="onCancelClick()"
     />
   </div>
-</lib-scaling-compact-card>
+</div>

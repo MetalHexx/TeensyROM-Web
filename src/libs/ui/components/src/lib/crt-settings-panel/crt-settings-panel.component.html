@@ -6,7 +6,7 @@
     <span class="header-title">CRT Effect</span>
     <div class="header-actions">
       <!-- Preset menu button -->
-      <lib-dropdown-menu #presetDropdown>
+      <lib-dropdown-menu #presetDropdown (closed)="onPresetDropdownClosed()">
         <lib-icon-button
           icon="bookmark"
           ariaLabel="Select preset"
@@ -17,8 +17,75 @@
         </lib-icon-button>
 
         <div dropdown-content>
+          <!-- Show preset menu when no dialog is active -->
+          @if (!showNameDialog() && !showConfirmDialog()) {
+            <!-- Built-in Presets -->
+            @for (preset of allPresets().builtIn; track preset) {
+              <lib-dropdown-menu-item
+                [testId]="'preset-' + preset"
+                (itemClick)="onPresetSelect(preset)">
+                {{ getPresetLabel(preset) }}
+              </lib-dropdown-menu-item>
+            }
+            
+            <div class="dropdown-divider"></div>
+            
+            <!-- Custom Presets -->
+            <span class="dropdown-section-label">Custom Presets</span>
+            @if (allPresets().custom.length > 0) {
+              @for (preset of allPresets().custom; track preset.name) {
+                <lib-dropdown-menu-item
+                  [testId]="'preset-' + preset.name"
+                  (itemClick)="onPresetSelect(preset.name)">
+                  {{ stripCustomPrefix(preset.name) }}
+                  <div actions>
+                    <lib-icon-button
+                      icon="save"
+                      size="medium"
+                      color="normal"
+                      ariaLabel="Update preset with current settings"
+                      [matTooltip]="'Save current settings to this preset'"
+                      (buttonClick)="onUpdatePreset(preset.name)">
+                    </lib-icon-button>
+                    <lib-icon-button
+                      icon="edit"
+                      size="medium"
+                      color="highlight"
+                      ariaLabel="Rename preset"
+                      (buttonClick)="onRenamePreset(preset.name)">
+                    </lib-icon-button>
+                    <lib-icon-button
+                      icon="delete"
+                      size="medium"
+                      color="error"
+                      ariaLabel="Delete preset"
+                      (buttonClick)="onDeletePreset(preset.name)">
+                    </lib-icon-button>
+                  </div>
+                </lib-dropdown-menu-item>
+              }
+            } @else {
+              <span class="dropdown-empty-state">No custom presets</span>
+            }
+            
+            <div class="dropdown-divider"></div>
+            
+            <!-- Save Action -->
+            <lib-dropdown-menu-item>
+              <div 
+                (click)="onSaveAsPreset(); $event.stopPropagation()" 
+                (keydown.enter)="onSaveAsPreset(); $event.stopPropagation()"
+                (keydown.space)="onSaveAsPreset(); $event.stopPropagation(); $event.preventDefault()"
+                tabindex="0"
+                role="button"
+                style="cursor: pointer; width: 100%;">
+                <lib-icon-label icon="save" label="Save Current as Preset"></lib-icon-label>
+              </div>
+            </lib-dropdown-menu-item>
+          }
+
+          <!-- Show name dialog when active -->
           @if (showNameDialog()) {
-            <!-- Preset Name Dialog (shown in place of dropdown menu) -->
             <lib-preset-name-dialog
               [title]="isRenaming() ? 'Rename Preset' : 'Save Preset'"
               [initialValue]="getDialogInitialValue()"
@@ -27,8 +94,10 @@
               (confirmed)="onNameDialogConfirmed($event)"
               (cancelled)="onNameDialogCancelled()">
             </lib-preset-name-dialog>
-          } @else if (showConfirmDialog()) {
-            <!-- Confirmation Dialog (shown in place of dropdown menu) -->
+          }
+
+          <!-- Show confirmation dialog when active -->
+          @if (showConfirmDialog()) {
             <lib-confirmation-dialog
               [title]="'Delete Preset'"
               [message]="getConfirmationMessage()"
@@ -37,62 +106,6 @@
               (confirmed)="onDeleteConfirmed()"
               (cancelled)="onDeleteCancelled()">
             </lib-confirmation-dialog>
-          } @else {
-            <!-- Built-in Presets -->
-          @for (preset of allPresets().builtIn; track preset) {
-            <lib-dropdown-menu-item
-              [testId]="'preset-' + preset"
-              (itemClick)="onPresetSelect(preset)">
-              {{ getPresetLabel(preset) }}
-            </lib-dropdown-menu-item>
-          }
-          
-          <div class="dropdown-divider"></div>
-          
-          <!-- Custom Presets -->
-          <span class="dropdown-section-label">Custom Presets</span>
-          @if (allPresets().custom.length > 0) {
-            @for (preset of allPresets().custom; track preset.name) {
-              <lib-dropdown-menu-item
-                [testId]="'preset-' + preset.name"
-                (itemClick)="onPresetSelect(preset.name)">
-                {{ stripCustomPrefix(preset.name) }}
-                <div actions>
-                  <lib-icon-button
-                    icon="save"
-                    size="medium"
-                    color="normal"
-                    ariaLabel="Update preset with current settings"
-                    [matTooltip]="'Save current settings to this preset'"
-                    (buttonClick)="onUpdatePreset(preset.name)">
-                  </lib-icon-button>
-                  <lib-icon-button
-                    icon="edit"
-                    size="medium"
-                    color="highlight"
-                    ariaLabel="Rename preset"
-                    (buttonClick)="onRenamePreset(preset.name)">
-                  </lib-icon-button>
-                  <lib-icon-button
-                    icon="delete"
-                    size="medium"
-                    color="error"
-                    ariaLabel="Delete preset"
-                    (buttonClick)="onDeletePreset(preset.name)">
-                  </lib-icon-button>
-                </div>
-              </lib-dropdown-menu-item>
-            }
-          } @else {
-            <span class="dropdown-empty-state">No custom presets</span>
-          }
-          
-          <div class="dropdown-divider"></div>
-          
-          <!-- Save Action -->
-          <lib-dropdown-menu-item (itemClick)="onSaveAsPreset()">
-            <lib-icon-label icon="save" label="Save Current as Preset"></lib-icon-label>            
-          </lib-dropdown-menu-item>
           }
         </div>
       </lib-dropdown-menu>

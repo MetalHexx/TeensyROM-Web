@@ -2,7 +2,6 @@ import { Component, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { ScalingCompactCardComponent } from '../scaling-compact-card/scaling-compact-card.component';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
 
 @Component({
@@ -12,7 +11,6 @@ import { IconButtonComponent } from '../icon-button/icon-button.component';
     CommonModule,
     MatButtonModule,
     MatIconModule,
-    ScalingCompactCardComponent,
     IconButtonComponent,
   ],
   templateUrl: './confirmation-dialog.component.html',

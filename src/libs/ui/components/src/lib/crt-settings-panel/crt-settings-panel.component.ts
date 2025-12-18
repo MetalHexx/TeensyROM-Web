@@ -533,28 +533,9 @@ export class CrtSettingsPanelComponent {
    * Opens name dialog for user to enter preset name.
    */
   protected onSaveAsPreset(): void {
-    console.log('[CrtSettingsPanel] onSaveAsPreset called');
-    console.log('[CrtSettingsPanel] Current state:', {
-      showNameDialog: this.showNameDialog(),
-      isRenaming: this.isRenaming(),
-      dialogPresetName: this.dialogPresetName(),
-      customPresetsCount: this.customPresets().length
-    });
-    
     this.isRenaming.set(false);
     this.dialogPresetName.set('');
     this.showNameDialog.set(true);
-    
-    // Ensure dropdown is open to show the dialog
-    if (!this.presetDropdown()?.isOpen()) {
-      this.presetDropdown()?.open();
-    }
-    
-    console.log('[CrtSettingsPanel] After updates:', {
-      showNameDialog: this.showNameDialog(),
-      isRenaming: this.isRenaming(),
-      dialogPresetName: this.dialogPresetName()
-    });
   }
 
   /**
@@ -562,13 +543,9 @@ export class CrtSettingsPanelComponent {
    * Overwrites the preset's settings without changing its name.
    */
   protected onUpdatePreset(presetName: CustomPresetName): void {
-    console.log('[CrtSettingsPanel] onUpdatePreset called:', presetName);
-    
     const currentSettings = this.settings();
     this.crtStorage.updateCustomPreset(presetName, currentSettings);
     this.refreshCustomPresets();
-    
-    console.log('[CrtSettingsPanel] Preset updated:', presetName);
   }
 
   /**
@@ -579,11 +556,6 @@ export class CrtSettingsPanelComponent {
     this.isRenaming.set(true);
     this.dialogPresetName.set(presetName);
     this.showNameDialog.set(true);
-    
-    // Ensure dropdown is open to show the dialog
-    if (!this.presetDropdown()?.isOpen()) {
-      this.presetDropdown()?.open();
-    }
   }
 
   /**
@@ -593,11 +565,6 @@ export class CrtSettingsPanelComponent {
   protected onDeletePreset(presetName: CustomPresetName): void {
     this.dialogPresetName.set(presetName);
     this.showConfirmDialog.set(true);
-    
-    // Ensure dropdown is open to show the dialog
-    if (!this.presetDropdown()?.isOpen()) {
-      this.presetDropdown()?.open();
-    }
   }
 
   /**
@@ -651,6 +618,9 @@ export class CrtSettingsPanelComponent {
     this.showNameDialog.set(false);
     this.dialogPresetName.set('');
     this.isRenaming.set(false);
+    
+    // Reopen dropdown after dialog closes
+    this.presetDropdown()?.open();
   }
 
   /**
@@ -675,12 +645,16 @@ export class CrtSettingsPanelComponent {
       this.refreshCustomPresets();
       this.showConfirmDialog.set(false);
       this.dialogPresetName.set('');
+      
+      // Reopen dropdown after successful delete
+      this.presetDropdown()?.open();
     } catch (error) {
       console.error('[CrtSettingsPanel] Failed to delete preset:', error);
       // Future: show error toast
       // Close dialog even on error to reset state
       this.showConfirmDialog.set(false);
       this.dialogPresetName.set('');
+      this.presetDropdown()?.open();
     }
   }
 
@@ -691,6 +665,9 @@ export class CrtSettingsPanelComponent {
   protected onDeleteCancelled(): void {
     this.showConfirmDialog.set(false);
     this.dialogPresetName.set('');
+    
+    // Reopen dropdown after dialog closes
+    this.presetDropdown()?.open();
   }
 
   /**
@@ -732,6 +709,7 @@ export class CrtSettingsPanelComponent {
         console.warn('[CrtSettingsPanel] Maximum preset limit reached (50)');
         // Future: show error toast to user
         this.showNameDialog.set(false);
+        this.presetDropdown()?.open();
         return;
       }
       
@@ -742,11 +720,15 @@ export class CrtSettingsPanelComponent {
       // Refresh preset list and close dialog
       this.refreshCustomPresets();
       this.showNameDialog.set(false);
+      
+      // Reopen dropdown after successful save
+      this.presetDropdown()?.open();
     } catch (error) {
       console.error('[CrtSettingsPanel] Failed to save preset:', error);
       // Future: show error toast
       // Close dialog even on error to reset state
       this.showNameDialog.set(false);
+      this.presetDropdown()?.open();
     }
   }
 
@@ -765,6 +747,9 @@ export class CrtSettingsPanelComponent {
       this.showNameDialog.set(false);
       this.dialogPresetName.set('');
       this.isRenaming.set(false);
+      
+      // Reopen dropdown after successful rename
+      this.presetDropdown()?.open();
     } catch (error) {
       console.error('[CrtSettingsPanel] Failed to rename preset:', error);
       // Future: show error toast
@@ -772,7 +757,17 @@ export class CrtSettingsPanelComponent {
       this.showNameDialog.set(false);
       this.dialogPresetName.set('');
       this.isRenaming.set(false);
+      this.presetDropdown()?.open();
     }
+  }
+
+  /**
+   * Handles preset dropdown close event.
+   * Resets dialog states to show preset list when dropdown reopens.
+   */
+  protected onPresetDropdownClosed(): void {
+    this.showNameDialog.set(false);
+    this.showConfirmDialog.set(false);
   }
 
   /**
