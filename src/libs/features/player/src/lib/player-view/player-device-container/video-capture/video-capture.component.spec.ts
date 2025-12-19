@@ -370,7 +370,7 @@ describe('VideoCaptureComponent', () => {
     });
 
     describe('CRT initialization', () => {
-      it('should use SMALL_WEBGL preset when no saved settings', async () => {
+      it('should use SMALL_VIDEO_WEBGL preset when no saved settings', async () => {
         await setupTestBed([
           { deviceId: 'cam-123', label: 'Front Camera' },
         ]);
@@ -378,7 +378,7 @@ describe('VideoCaptureComponent', () => {
 
         const settings = component['crtSettings']();
         expect(settings.phosphorPattern).toBe('aperture-grille');
-        expect(settings.bloomEnabled).toBe(false);
+        expect(settings.bloomIntensity).toBe(0);
       });
 
       it('should load saved settings when they exist', async () => {
@@ -497,8 +497,8 @@ describe('VideoCaptureComponent', () => {
         ]);
         await createComponent('teensy-device-1');
 
-        // Select a built-in preset (use SMALL_WEBGL for compact view)
-        component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_WEBGL);
+        // Select a built-in preset (use SMALL_VIDEO_WEBGL for compact view)
+        component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL);
         
         const settings = component['crtSettings']();
         // Verify settings match the built-in preset

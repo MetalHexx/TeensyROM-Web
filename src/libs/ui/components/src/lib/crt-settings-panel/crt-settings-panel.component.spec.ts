@@ -1448,7 +1448,7 @@ describe('CrtSettingsPanelComponent', () => {
       await fixture.whenStable();
       
       // Initially no dialog
-      let dialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
+      let dialog = document.querySelector('.cdk-overlay-container lib-preset-name-dialog');
       expect(dialog).toBeNull();
       
       // Open dropdown first, then call save
@@ -1463,8 +1463,8 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       
-      // Dialog should be rendered in component DOM (no longer in dropdown overlay)
-      dialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
+      // Dialog should be rendered in CDK overlay container
+      dialog = document.querySelector('.cdk-overlay-container lib-preset-name-dialog');
       expect(dialog).toBeTruthy();
     });
 
@@ -1482,7 +1482,7 @@ describe('CrtSettingsPanelComponent', () => {
       await fixture.whenStable();
       
       // Initially no dialog
-      let dialog = fixture.nativeElement.querySelector('lib-confirmation-dialog');
+      let dialog = document.querySelector('.cdk-overlay-container lib-confirmation-dialog');
       expect(dialog).toBeNull();
       
       // Open dialog
@@ -1491,8 +1491,8 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       
-      // Dialog should be rendered in component DOM (no longer in dropdown overlay)
-      dialog = fixture.nativeElement.querySelector('lib-confirmation-dialog');
+      // Dialog should be rendered in CDK overlay container
+      dialog = document.querySelector('.cdk-overlay-container lib-confirmation-dialog');
       expect(dialog).toBeTruthy();
     });
 
@@ -1511,7 +1511,7 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       
-      const dialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
+      const dialog = document.querySelector('.cdk-overlay-container lib-preset-name-dialog');
       expect(dialog?.getAttribute('ng-reflect-title')).toBe('Save Preset');
     });
 
@@ -1533,7 +1533,7 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       
-      const dialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
+      const dialog = document.querySelector('.cdk-overlay-container lib-preset-name-dialog');
       expect(dialog?.getAttribute('ng-reflect-title')).toBe('Rename Preset');
     });
 
@@ -1581,8 +1581,8 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       
-      let nameDialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
-      let confirmDialog = fixture.nativeElement.querySelector('lib-confirmation-dialog');
+      let nameDialog = document.querySelector('.cdk-overlay-container lib-preset-name-dialog');
+      let confirmDialog = document.querySelector('.cdk-overlay-container lib-confirmation-dialog');
       
       expect(nameDialog).toBeTruthy();
       expect(confirmDialog).toBeNull();
@@ -1595,8 +1595,8 @@ describe('CrtSettingsPanelComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
       
-      nameDialog = fixture.nativeElement.querySelector('lib-preset-name-dialog');
-      confirmDialog = fixture.nativeElement.querySelector('lib-confirmation-dialog');
+      nameDialog = document.querySelector('.cdk-overlay-container lib-preset-name-dialog');
+      confirmDialog = document.querySelector('.cdk-overlay-container lib-confirmation-dialog');
       
       expect(nameDialog).toBeNull();
       expect(confirmDialog).toBeTruthy();
