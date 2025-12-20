@@ -1,6 +1,7 @@
 using Microsoft.Extensions.FileProviders;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using TeensyRom.Api.Endpoints.DJ;
 using TeensyRom.Api.Endpoints.GetDeviceEvents;
 using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Api.Http;
@@ -64,6 +65,7 @@ app.MapApiDocs();
 app.MapRadEndpoints();
 app.MapHub<LogsHub>("/api/logHub");
 app.MapHub<DeviceEventHub>("/api/deviceEventHub");
+app.MapHub<DJHub>("/api/djHub");
 
 // SPA fallback routing - must be AFTER all API routes and SignalR hubs
 // This allows Angular to handle client-side routing for unknown routes
