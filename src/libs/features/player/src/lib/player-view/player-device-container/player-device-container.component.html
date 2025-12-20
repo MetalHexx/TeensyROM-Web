@@ -16,6 +16,11 @@
       </lib-scaling-compact-card>
     </div>
   } -->
+  @if (isPlayerLoaded() && isSidFile()) {
+  <div class="dj-toolbar-container">
+    <lib-dj-toolbar [deviceId]="deviceId()"></lib-dj-toolbar>
+  </div>
+  }
   @if (isPlayerLoaded()) {
   <div class="player-toolbar">
     <lib-player-toolbar [deviceId]="deviceId()"></lib-player-toolbar>

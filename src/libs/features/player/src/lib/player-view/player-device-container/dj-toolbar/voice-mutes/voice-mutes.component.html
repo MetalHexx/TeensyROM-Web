@@ -1,0 +1,31 @@
+<div class="voice-controls">
+  <mat-checkbox
+    class="voice-checkbox"
+    [checked]="voice1Enabled()"
+    [disabled]="isLoading()"
+    (change)="toggleVoice1()"
+    aria-label="Toggle Voice 1"
+  >
+    Voice 1
+  </mat-checkbox>
+
+  <mat-checkbox
+    class="voice-checkbox"
+    [checked]="voice2Enabled()"
+    [disabled]="isLoading()"
+    (change)="toggleVoice2()"
+    aria-label="Toggle Voice 2"
+  >
+    Voice 2
+  </mat-checkbox>
+
+  <mat-checkbox
+    class="voice-checkbox"
+    [checked]="voice3Enabled()"
+    [disabled]="isLoading()"
+    (change)="toggleVoice3()"
+    aria-label="Toggle Voice 3"
+  >
+    Voice 3
+  </mat-checkbox>
+</div>

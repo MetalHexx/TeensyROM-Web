@@ -19,6 +19,9 @@ export * from './storage-directory.model';
 // Player models
 export * from './player-status.enum';
 
+// DJ models
+export * from './voice-state.model';
+
 // CRT models
 export * from './crt-custom-preset.model';
 export * from './crt-preset-names.const';

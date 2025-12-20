@@ -1,12 +1,13 @@
 import { Component, input, computed, inject, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Device } from '@teensyrom-nx/domain';
+import { Device, FileItemType } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
 import { FileOtherComponent } from './file-other/file-other.component';
 import { FileImageComponent } from './file-image/file-image.component';
 import { VideoCaptureComponent } from './video-capture/video-capture.component';
 import { PlayerToolbarComponent } from './player-toolbar/player-toolbar.component';
 import { StorageContainerComponent } from './storage-container/storage-container.component';
+import { DjToolbarComponent } from './dj-toolbar/dj-toolbar.component';
 import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 
 @Component({
@@ -19,6 +20,7 @@ import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
     FileOtherComponent,
     PlayerToolbarComponent,
     StorageContainerComponent,
+    DjToolbarComponent,
   ],
   templateUrl: './player-device-container.component.html',
   styleUrl: './player-device-container.component.scss',
@@ -72,4 +74,13 @@ export class PlayerDeviceContainerComponent {
     const currentFile = this.currentFile();
     return currentFile?.file?.description ?? '';
   });
+
+  /**
+   * Check if current file is a SID music file.
+   * DJ toolbar should only be visible for Song type files (SID files).
+   */
+  protected isSidFile(): boolean {
+    const currentFile = this.currentFile();
+    return currentFile?.file?.type === FileItemType.Song;
+  }
 }

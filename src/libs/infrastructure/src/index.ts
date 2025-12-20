@@ -10,6 +10,10 @@ export * from './lib/device/device-logs.service';
 export * from './lib/device/device-events.service';
 export * from './lib/device/providers';
 
+// DJ implementations
+export * from './lib/dj/dj.service';
+export * from './lib/dj/providers';
+
 // Storage implementations (moved from domain)
 export * from './lib/storage/storage.service';
 export * from './lib/storage/providers';

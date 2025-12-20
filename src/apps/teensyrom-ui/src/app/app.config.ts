@@ -21,6 +21,7 @@ import {
   VERSION_PROVIDERS,
   CRT_PROVIDERS,
   API_CONFIG_PROVIDER,
+  DJ_PROVIDERS,
 } from '@teensyrom-nx/infrastructure';
 
 export const appConfig: ApplicationConfig = {
@@ -49,5 +50,6 @@ export const appConfig: ApplicationConfig = {
     SETTINGS_PROVIDERS,
     VERSION_PROVIDERS,
     CRT_PROVIDERS,
+    DJ_PROVIDERS,
   ],
 };
