@@ -17,12 +17,13 @@ class TeensyromWeb < Formula
   def install
     # Install all files to libexec, create wrapper script in bin
     libexec.install Dir["*"]
-    
+
     (bin/"teensyrom-web").write <<~EOS
       #!/bin/zsh
-      exec "#{libexec}/TeensyRom.Api" "$@"
+      cd "#{libexec}"
+      exec "./TeensyRom.Api" "$@"
     EOS
-    
+
     chmod 0755, bin/"teensyrom-web"
   end
 
