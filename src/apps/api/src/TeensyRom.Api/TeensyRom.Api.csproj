@@ -21,7 +21,8 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <!-- Don't include all content in single file - keep Assets as separate files -->
     <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
-    <PublishReadyToRun>true</PublishReadyToRun>
+    <!-- Disable ReadyToRun on macOS due to memory corruption issues with single-file publishing -->
+    <PublishReadyToRun Condition="'$(RuntimeIdentifier)' != 'osx-x64' AND '$(RuntimeIdentifier)' != 'osx-arm64'">true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
