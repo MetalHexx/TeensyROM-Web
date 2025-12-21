@@ -4,9 +4,13 @@ using System.Text.Json.Serialization;
 using TeensyRom.Api.Endpoints.GetDeviceEvents;
 using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Api.Http;
+using TeensyRom.Api.Middleware;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Startup;
 using TeensyRom.Core.Common;
+
+// Initialize global exception handlers BEFORE anything else
+GlobalExceptionHandler.Initialize();
 
 AssetStartupHelper.UnpackAssets();
 
@@ -40,6 +44,9 @@ builder.Services.AddSignalR().AddJsonProtocol(options =>
 
 var app = builder.Build();
 
+// Global exception middleware - catches HTTP request exceptions
+app.UseMiddleware<ExceptionMiddleware>();
+
 // Permissive CORS for all requests (API, SignalR, static assets)
 app.UseUiCors();
 
@@ -70,11 +77,5 @@ app.MapHub<DeviceEventHub>("/api/deviceEventHub");
 app.MapFallbackToFile("index.html");
 
 app.Run();
-
-//TODO: Put this somewhere else.
-AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
-{
-    Console.WriteLine("UNHANDLED: " + args.ExceptionObject);
-};
 
 public partial class Program;

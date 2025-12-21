@@ -8,17 +8,19 @@
     <DockerfileContext>..\..</DockerfileContext>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
-    <Version>1.0.0-alpha.5</Version>
+    <Version>1.0.0-alpha.6</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <!-- OpenAPI generation disabled in CI to avoid platform-specific binary execution issues -->
     <OpenApiGenerateDocuments Condition="'$(SkipOpenApiGeneration)' != 'true'">true</OpenApiGenerateDocuments>
     <OpenApiDocumentsDirectory>$(OutputPath)api-spec</OpenApiDocumentsDirectory>
     <OpenApiGenerateDocumentsOnBuild Condition="'$(SkipOpenApiGeneration)' != 'true'">true</OpenApiGenerateDocumentsOnBuild>
     <!-- Self-contained single-file publishing configuration -->
-    <PublishSingleFile>true</PublishSingleFile>
+    <!-- Disable single-file on macOS - .NET 9 has widespread memory corruption with it -->
+    <PublishSingleFile Condition="'$(RuntimeIdentifier)' != 'osx-x64' AND '$(RuntimeIdentifier)' != 'osx-arm64'">true</PublishSingleFile>
     <SelfContained>true</SelfContained>
-    <!-- Disable compression and native library extraction on macOS due to .NET 9 memory corruption -->
+    <!-- Disable compression on macOS - causes Scalar endpoint crashes -->
     <EnableCompressionInSingleFile Condition="'$(RuntimeIdentifier)' != 'osx-x64' AND '$(RuntimeIdentifier)' != 'osx-arm64'">true</EnableCompressionInSingleFile>
+    <!-- Keep native libraries as separate files on macOS -->
     <IncludeNativeLibrariesForSelfExtract Condition="'$(RuntimeIdentifier)' != 'osx-x64' AND '$(RuntimeIdentifier)' != 'osx-arm64'">true</IncludeNativeLibrariesForSelfExtract>
     <!-- Don't include all content in single file - keep Assets as separate files -->
     <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
