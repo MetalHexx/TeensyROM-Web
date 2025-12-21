@@ -16,7 +16,7 @@ namespace TeensyRom.Api.Services
         private CancellationTokenSource? _fileLoggingCancellationSource;
         private CancellationTokenSource? _clientLoggingCancellationSource;
         private Task? _logStreamTask;
-        private readonly string _logPath = Path.Combine(Assembly.GetExecutingAssembly().GetPath(), LogConstants.LogPath);
+        private readonly string _logPath = Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), LogConstants.LogPath);
         private readonly string _logFilename = $"{LogConstants.LogFileName}{DateTime.Now:yyyy-MM-dd_HH-mm-ss}{LogConstants.LogFileExtention}";
         private readonly ILogStream _logStream;
         private const int _batchSize = 20;
@@ -37,9 +37,18 @@ namespace TeensyRom.Api.Services
         }
         private void StartFileLogging()
         {
-            if (_fileLoggingCancellationSource is not null) return; 
+            if (_fileLoggingCancellationSource is not null) return;
 
-            _logPath.EnsureLocalPath();
+            try
+            {
+                _logPath.EnsureLocalPath();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Warning: Could not create log directory at {_logPath}: {ex.Message}");
+                // Continue without file logging - logs will still go to stdout/SignalR
+                return;
+            }
 
             _fileLoggingCancellationSource = new CancellationTokenSource();
 

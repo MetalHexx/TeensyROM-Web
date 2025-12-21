@@ -9,10 +9,10 @@ namespace TeensyRom.Core.Games
 {
     public class GameMetadataService(ILoggingService log) : IGameMetadataService
     {  
-        private string _gameArtPath => Path.Combine(Assembly.GetExecutingAssembly().GetPath(), GameConstants.Game_Image_Local_Path);        
+        private string _gameArtPath => Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), GameConstants.Game_Image_Local_Path);        
         private string _localLoadingScreenPath => Path.Combine(_gameArtPath, GameConstants.Loading_Screen_Sub_Path);        
         private string _localScreenshotPath => Path.Combine(_gameArtPath, GameConstants.Screenshots_Sub_Path);
-        private string _gameMetadataFilePath => Path.Combine(Assembly.GetExecutingAssembly().GetPath(), GameConstants.Game_Image_Metadata_File_Path);
+        private string _gameMetadataFilePath => Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), GameConstants.Game_Image_Metadata_File_Path);
         private List<ViewableItemImage> _gameMetadata = [];
 
         private List<ViewableItemImage> LoadGameMetadata()

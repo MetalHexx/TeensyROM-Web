@@ -20,14 +20,14 @@ namespace TeensyRom.Core.Storage
             if(cartStorage.Type == TeensyStorageType.SD)
             {
                 _cacheFilePath = Path.Combine(
-                    Assembly.GetExecutingAssembly().GetPath(),
+                    Assembly.GetExecutingAssembly().GetDataPath(),
                     StorageHelper.Cache_File_Relative_Path,
                     $"{StorageHelper.Sd_Cache_File_Name}{cartStorage.DeviceId}{StorageHelper.Cache_File_Extension}");
             }
             else
             {
                 _cacheFilePath = Path.Combine(
-                    Assembly.GetExecutingAssembly().GetPath(),
+                    Assembly.GetExecutingAssembly().GetDataPath(),
                     StorageHelper.Cache_File_Relative_Path,
                     $"{StorageHelper.Usb_Cache_File_Name}{cartStorage.DeviceId}{StorageHelper.Cache_File_Extension}");
             }

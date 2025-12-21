@@ -33,7 +33,7 @@ namespace TeensyRom.Core.Settings
 
         private BehaviorSubject<TeensySettings> _settings;
         private TeensySettings? _currentSettings;
-        private string _settingsFilePath => Path.Combine(Assembly.GetExecutingAssembly().GetPath(), SettingsConstants.SettingsPath);
+        private string _settingsFilePath => Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), SettingsConstants.SettingsPath);
 
         private readonly object _lock = new object();
 

@@ -20,6 +20,8 @@ class TeensyromWeb < Formula
 
     (bin/"teensyrom-web").write <<~EOS
       #!/bin/zsh
+      export TEENSYROM_DATA_DIR="${HOME}/Library/Application Support/TeensyROM-Web"
+      mkdir -p "${TEENSYROM_DATA_DIR}"
       cd "#{libexec}"
       exec "./TeensyRom.Api" "$@"
     EOS

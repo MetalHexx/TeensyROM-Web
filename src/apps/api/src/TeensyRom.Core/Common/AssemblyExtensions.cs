@@ -23,5 +23,24 @@ namespace TeensyRom.Core.Common
             // Regular deployment - use assembly location
             return Path.GetDirectoryName(location) ?? AppContext.BaseDirectory;
         }
+
+        /// <summary>
+        /// Get the writable data directory path.
+        /// Checks TEENSYROM_DATA_DIR environment variable first, then falls back to assembly path.
+        /// This allows package managers (like Homebrew) to specify a writable location
+        /// while maintaining backward compatibility for manual installations.
+        /// </summary>
+        public static string GetDataPath(this Assembly assembly)
+        {
+            var envDataDir = Environment.GetEnvironmentVariable("TEENSYROM_DATA_DIR");
+            
+            if (!string.IsNullOrWhiteSpace(envDataDir))
+            {
+                return envDataDir;
+            }
+            
+            // Fallback to assembly path for backward compatibility
+            return assembly.GetPath();
+        }
     }
 }
