@@ -118,13 +118,12 @@ jobs:
       - name: Unpack Assets (avoid runtime extraction in read-only directories)
         run: |
           cd publish/${{ matrix.rid }}/Assets
-          # Unpack all zip files
-          for zip in *.zip; do
-            if [ -f "$zip" ]; then
-              echo "Extracting $zip..."
-              unzip -o "$zip"
-              rm "$zip"
-            fi
+          # Recursively unpack all zip files in place
+          find . -name "*.zip" -type f | while read zip; do
+            dir=$(dirname "$zip")
+            echo "Extracting $zip to $dir..."
+            unzip -o "$zip" -d "$dir"
+            rm "$zip"
           done
 
       - name: Package (zip)
