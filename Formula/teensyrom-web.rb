@@ -6,12 +6,12 @@ class TeensyromWeb < Formula
 
   on_arm do
     url "https://github.com/MetalHexx/TeensyROM-Web/releases/download/v#{version}/TeensyROM-Web-#{version}-osx-arm64.tar.gz"
-    sha256 "b2914d54df5df0322ef980fd2173c4bd8d3802a37caa3f1e5c72ff69253f8203"
+    sha256 "886cbb45063988355abdda60179b38d3d2132211007a2a7a359bdd675db2fe52"
   end
 
   on_intel do
     url "https://github.com/MetalHexx/TeensyROM-Web/releases/download/v#{version}/TeensyROM-Web-#{version}-osx-x64.tar.gz"
-    sha256 "e8e4771900bf12d821a9221e35a5d7a81c6451c65f0883f60a7cd3ea9d48edd8"
+    sha256 "9c0838e05158deabdf7619b933aafc181ed722119bfd273d1a2c9d6b276516e0"
   end
 
   def install
