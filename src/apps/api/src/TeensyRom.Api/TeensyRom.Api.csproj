@@ -17,8 +17,9 @@
     <!-- Self-contained single-file publishing configuration -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Disable compression and native library extraction on macOS due to .NET 9 memory corruption -->
+    <EnableCompressionInSingleFile Condition="'$(RuntimeIdentifier)' != 'osx-x64' AND '$(RuntimeIdentifier)' != 'osx-arm64'">true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract Condition="'$(RuntimeIdentifier)' != 'osx-x64' AND '$(RuntimeIdentifier)' != 'osx-arm64'">true</IncludeNativeLibrariesForSelfExtract>
     <!-- Don't include all content in single file - keep Assets as separate files -->
     <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
     <!-- Disable ReadyToRun on macOS due to memory corruption issues with single-file publishing -->
