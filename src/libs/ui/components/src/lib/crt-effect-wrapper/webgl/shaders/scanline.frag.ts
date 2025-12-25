@@ -422,9 +422,16 @@ export const SCANLINE_FRAGMENT_SHADER = `
       return;
     }
     
+    // 2.5. Scale UV coordinates to crop video texture edges (removes capture device borders)
+    // Center-crop by 3% to hide magenta border from capture device
+    // Maps 0.0-1.0 to 0.015-0.985 (centered 97% crop)
+    vec2 cropScale = vec2(0.97);
+    vec2 cropOffset = vec2(0.015);
+    vec2 croppedUv = flippedUv * cropScale + cropOffset;
+    
     // 3. Sample video texture with chromatic aberration (RGB color separation)
     // This is a lens effect that happens during image capture, before phosphor glow
-    vec3 baseColor = applyChromaticAberration(u_videoTexture, flippedUv, u_chromaticAberration);
+    vec3 baseColor = applyChromaticAberration(u_videoTexture, croppedUv, u_chromaticAberration);
     
     // 4. Apply bloom to the base color (phosphor glow effect)
     // Note: Current bloom implementation samples texture directly, so we get double bloom
@@ -432,10 +439,10 @@ export const SCANLINE_FRAGMENT_SHADER = `
     // For now, blend between CA-only and bloom-only based on bloom intensity
     vec3 bloomedColor;
     if (u_bloomIntensity > 0.0) {
-      vec3 bloomResult = applyBloom(u_videoTexture, flippedUv, u_bloomIntensity, u_resolution);
+      vec3 bloomResult = applyBloom(u_videoTexture, croppedUv, u_bloomIntensity, u_resolution);
       // Blend: use CA color for base, add bloom glow on top
       // This isn't perfect but maintains both effects
-      bloomedColor = baseColor + (bloomResult - texture2D(u_videoTexture, flippedUv).rgb) * u_bloomIntensity * 0.5;
+      bloomedColor = baseColor + (bloomResult - texture2D(u_videoTexture, croppedUv).rgb) * u_bloomIntensity * 0.5;
     } else {
       bloomedColor = baseColor;
     }
