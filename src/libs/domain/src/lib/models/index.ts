@@ -25,6 +25,7 @@ export * from './crt-preset-names.const';
 export * from './launch-mode.enum';
 export * from './player-filter-type.enum';
 export * from './player-scope.enum';
+export * from './c64-video-modes.model';
 
 // Alert models
 export * from './alert-severity.enum';

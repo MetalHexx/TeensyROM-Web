@@ -225,6 +225,12 @@
   }
 }
 
+// Spacing between toggles in Advanced Detection panel
+.toggle-spacing {
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom Preset Dropdown Styles
 // ─────────────────────────────────────────────────────────────────────────────
@@ -253,4 +259,27 @@
   text-align: center;
   display: block;
   font-size: 0.875rem;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Video Standard Dropdown Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Video standard option with label and description
+.video-standard-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  .option-label {
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.2;
+  }
+
+  .option-description {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    line-height: 1.3;
+  }
 }

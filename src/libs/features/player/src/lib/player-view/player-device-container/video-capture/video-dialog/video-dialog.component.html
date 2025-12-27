@@ -9,6 +9,7 @@
     [settings]="crtSettings()"
     [enabled]="isCrtEnabled()"
     [contentAspectRatio]="4/3"
+    [debugMode]="debugMode()"
   >
     <lib-video-stream
       [stream]="currentStream()"
@@ -54,8 +55,10 @@
       [currentPresetLabel]="currentPresetLabel()"
       [excludePresets]="excludePresets()"
       [validatePresetNameFn]="validatePresetNameFn"
+      [debugMode]="debugMode()"
       (settingsChange)="onCrtSettingsChange($event)"
       (presetSelected)="onCrtPresetSelected($event)"
+      (debugModeChange)="onDebugModeChange($event)"
       (closed)="toggleCrtControls()"
       (openedChange)="onDeviceSelectorOpenedChange($event)">
     ></lib-crt-settings-panel>

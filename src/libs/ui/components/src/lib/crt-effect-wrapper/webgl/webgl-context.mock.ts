@@ -26,8 +26,13 @@ export const GL_CONSTANTS = {
   TEXTURE_MAG_FILTER: 10240,
   CLAMP_TO_EDGE: 33071,
   LINEAR: 9729,
+  NEAREST: 9728,
   RGBA: 6408,
   UNSIGNED_BYTE: 5121,
+  // Framebuffer constants
+  FRAMEBUFFER: 36160,
+  COLOR_ATTACHMENT0: 36064,
+  FRAMEBUFFER_COMPLETE: 36053,
 } as const;
 
 /**
@@ -65,6 +70,7 @@ export interface MockWebGLContext extends Partial<WebGLRenderingContext> {
     uniform1i: ReturnType<typeof vi.fn>;
     uniform1f: ReturnType<typeof vi.fn>;
     uniform2f: ReturnType<typeof vi.fn>;
+    uniform4f: ReturnType<typeof vi.fn>;
     createBuffer: ReturnType<typeof vi.fn>;
     bindBuffer: ReturnType<typeof vi.fn>;
     bufferData: ReturnType<typeof vi.fn>;
@@ -86,6 +92,12 @@ export interface MockWebGLContext extends Partial<WebGLRenderingContext> {
     texImage2D: ReturnType<typeof vi.fn>;
     deleteTexture: ReturnType<typeof vi.fn>;
     activeTexture: ReturnType<typeof vi.fn>;
+    createFramebuffer: ReturnType<typeof vi.fn>;
+    bindFramebuffer: ReturnType<typeof vi.fn>;
+    framebufferTexture2D: ReturnType<typeof vi.fn>;
+    checkFramebufferStatus: ReturnType<typeof vi.fn>;
+    deleteFramebuffer: ReturnType<typeof vi.fn>;
+    readPixels: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -147,6 +159,7 @@ export function createMockWebGLContext(
     uniform1i: vi.fn(),
     uniform1f: vi.fn(),
     uniform2f: vi.fn(),
+    uniform4f: vi.fn(),
 
     // Buffers
     createBuffer: vi.fn(() => mockBuffer),
@@ -178,6 +191,14 @@ export function createMockWebGLContext(
     texImage2D: vi.fn(),
     deleteTexture: vi.fn(),
     activeTexture: vi.fn(),
+
+    // Framebuffers
+    createFramebuffer: vi.fn(() => ({ _type: 'WebGLFramebuffer' })),
+    bindFramebuffer: vi.fn(),
+    framebufferTexture2D: vi.fn(),
+    checkFramebufferStatus: vi.fn(() => GL_CONSTANTS.FRAMEBUFFER_COMPLETE),
+    deleteFramebuffer: vi.fn(),
+    readPixels: vi.fn(),
   };
 
   // Create the mock context object
@@ -207,8 +228,13 @@ export function createMockWebGLContext(
     TEXTURE_MAG_FILTER: GL_CONSTANTS.TEXTURE_MAG_FILTER,
     CLAMP_TO_EDGE: GL_CONSTANTS.CLAMP_TO_EDGE,
     LINEAR: GL_CONSTANTS.LINEAR,
+    NEAREST: GL_CONSTANTS.NEAREST,
     RGBA: GL_CONSTANTS.RGBA,
     UNSIGNED_BYTE: GL_CONSTANTS.UNSIGNED_BYTE,
+    // Framebuffer constants
+    FRAMEBUFFER: GL_CONSTANTS.FRAMEBUFFER,
+    COLOR_ATTACHMENT0: GL_CONSTANTS.COLOR_ATTACHMENT0,
+    FRAMEBUFFER_COMPLETE: GL_CONSTANTS.FRAMEBUFFER_COMPLETE,
 
     // Bind mock functions
     createShader: mocks.createShader as unknown as WebGLRenderingContext['createShader'],
@@ -235,6 +261,7 @@ export function createMockWebGLContext(
     uniform1i: mocks.uniform1i as unknown as WebGLRenderingContext['uniform1i'],
     uniform1f: mocks.uniform1f as unknown as WebGLRenderingContext['uniform1f'],
     uniform2f: mocks.uniform2f as unknown as WebGLRenderingContext['uniform2f'],
+    uniform4f: mocks.uniform4f as unknown as WebGLRenderingContext['uniform4f'],
     createBuffer: mocks.createBuffer as unknown as WebGLRenderingContext['createBuffer'],
     bindBuffer: mocks.bindBuffer as unknown as WebGLRenderingContext['bindBuffer'],
     bufferData: mocks.bufferData as unknown as WebGLRenderingContext['bufferData'],
@@ -259,6 +286,16 @@ export function createMockWebGLContext(
     texImage2D: mocks.texImage2D as unknown as WebGLRenderingContext['texImage2D'],
     deleteTexture: mocks.deleteTexture as unknown as WebGLRenderingContext['deleteTexture'],
     activeTexture: mocks.activeTexture as unknown as WebGLRenderingContext['activeTexture'],
+    createFramebuffer:
+      mocks.createFramebuffer as unknown as WebGLRenderingContext['createFramebuffer'],
+    bindFramebuffer: mocks.bindFramebuffer as unknown as WebGLRenderingContext['bindFramebuffer'],
+    framebufferTexture2D:
+      mocks.framebufferTexture2D as unknown as WebGLRenderingContext['framebufferTexture2D'],
+    checkFramebufferStatus:
+      mocks.checkFramebufferStatus as unknown as WebGLRenderingContext['checkFramebufferStatus'],
+    deleteFramebuffer:
+      mocks.deleteFramebuffer as unknown as WebGLRenderingContext['deleteFramebuffer'],
+    readPixels: mocks.readPixels as unknown as WebGLRenderingContext['readPixels'],
   };
 
   return mockContext;

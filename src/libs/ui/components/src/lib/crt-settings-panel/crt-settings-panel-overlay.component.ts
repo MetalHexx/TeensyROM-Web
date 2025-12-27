@@ -89,6 +89,7 @@ export class CrtSettingsPanelOverlayComponent {
   readonly currentPresetLabel = input<string>();
   readonly excludePresets = input<CrtPresetName[]>([]);
   readonly validatePresetNameFn = input.required<(name: string, existingNames: string[]) => { error: string | null }>();
+  readonly debugMode = input<boolean>(false);
   
   // ─────────────────────────────────────────────────────────────────────────
   // Outputs (pass-through from CrtSettingsPanelComponent)
@@ -97,6 +98,7 @@ export class CrtSettingsPanelOverlayComponent {
   readonly settingsChange = output<CrtSettings>();
   readonly presetSelected = output<AnyPresetName>();
   readonly closed = output<void>();
+  readonly debugModeChange = output<boolean>();
   
   // ─────────────────────────────────────────────────────────────────────────
   // Overlay Management
@@ -129,6 +131,7 @@ export class CrtSettingsPanelOverlayComponent {
         this.panelComponentRef.setInput('currentPresetLabel', this.currentPresetLabel());
         this.panelComponentRef.setInput('excludePresets', this.excludePresets());
         this.panelComponentRef.setInput('validatePresetNameFn', this.validatePresetNameFn());
+        this.panelComponentRef.setInput('debugMode', this.debugMode());
       }
     });
     
@@ -171,6 +174,7 @@ export class CrtSettingsPanelOverlayComponent {
     componentRef.setInput('maxHeight', this.maxHeight());
     componentRef.setInput('cardClass', this.cardClass());
     componentRef.setInput('validatePresetNameFn', this.validatePresetNameFn());
+    componentRef.setInput('debugMode', this.debugMode());
     
     // Wire up outputs
     componentRef.instance.settingsChange.subscribe((settings) => {
@@ -183,6 +187,10 @@ export class CrtSettingsPanelOverlayComponent {
     
     componentRef.instance.closed.subscribe(() => {
       this.closed.emit();
+    });
+
+    componentRef.instance.debugModeChange.subscribe((enabled: boolean) => {
+      this.debugModeChange.emit(enabled);
     });
   }
   

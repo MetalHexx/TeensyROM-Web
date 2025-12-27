@@ -7,9 +7,10 @@
         <ng-container content>
           <lib-crt-effect-wrapper
             [settings]="crtSettings()"
-            [enabled]="isCrtEnabled()">
-            <lib-video-stream 
-              [stream]="currentStream()" 
+            [enabled]="isCrtEnabled()"
+            [debugMode]="debugMode()">
+            <lib-video-stream
+              [stream]="currentStream()"
               [objectFit]="'contain'">
             </lib-video-stream>
           </lib-crt-effect-wrapper>
@@ -35,8 +36,10 @@
             [currentPresetLabel]="currentPresetLabel()"
             [excludePresets]="excludePresets()"
             [validatePresetNameFn]="validatePresetNameFn"
+            [debugMode]="debugMode()"
             (settingsChange)="onCrtSettingsChange($event)"
             (presetSelected)="onCrtPresetSelected($event)"
+            (debugModeChange)="onDebugModeChange($event)"
             (closed)="toggleCrtControls()">
           </lib-crt-settings-panel-overlay>
         }

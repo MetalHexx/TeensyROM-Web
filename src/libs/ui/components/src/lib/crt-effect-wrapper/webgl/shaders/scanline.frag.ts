@@ -58,6 +58,9 @@ export const SCANLINE_FRAGMENT_SHADER = `
   uniform float u_chromaticAberration;
   uniform vec2 u_resolution;
 
+  // === Black Bar Crop Uniform ===
+  uniform vec4 u_cropRect;  // (left, top, width, height) in 0-1 normalized coords
+
   // === Phosphor Pattern Uniforms ===
   uniform int u_phosphorPattern;      // 0=none, 1=aperture-grille, 2=shadow-mask, 3=dot-triad
   uniform float u_phosphorIntensity;  // 0.0 - 1.0, strength of phosphor effect
@@ -422,12 +425,20 @@ export const SCANLINE_FRAGMENT_SHADER = `
       return;
     }
     
+    // 2.3. Apply dynamic black bar crop (auto-detected content area)
+    // Remaps UVs from [0,1] to [cropRect.xy, cropRect.xy + cropRect.zw]
+    // When u_cropRect = (0,0,1,1), this is a no-op (full frame)
+    // When black bars detected, this zooms/pans to show only content area
+    vec2 cropScale = u_cropRect.zw;  // width, height
+    vec2 cropOffset = u_cropRect.xy;  // left, top
+    flippedUv = flippedUv * cropScale + cropOffset;
+    
     // 2.5. Scale UV coordinates to crop video texture edges (removes capture device borders)
     // Center-crop by 3% to hide magenta border from capture device
     // Maps 0.0-1.0 to 0.015-0.985 (centered 97% crop)
-    vec2 cropScale = vec2(0.97);
-    vec2 cropOffset = vec2(0.015);
-    vec2 croppedUv = flippedUv * cropScale + cropOffset;
+    vec2 staticCropScale = vec2(0.97);
+    vec2 staticCropOffset = vec2(0.015);
+    vec2 croppedUv = flippedUv * staticCropScale + staticCropOffset;
     
     // 3. Sample video texture with chromatic aberration (RGB color separation)
     // This is a lens effect that happens during image capture, before phosphor glow

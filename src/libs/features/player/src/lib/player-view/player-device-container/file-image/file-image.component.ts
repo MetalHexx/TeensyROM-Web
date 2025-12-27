@@ -12,6 +12,7 @@ import {
   CRT_PRESET_KEYS,
   AnyPresetName,
   isBuiltInPreset,
+  type CrtSettingsConfig,
 } from '@teensyrom-nx/ui/components';
 import { CrtSettings, CRT_STORAGE, validatePresetName } from '@teensyrom-nx/domain';
 import type { LaunchedFile } from '@teensyrom-nx/application';
@@ -33,14 +34,12 @@ import type { LaunchedFile } from '@teensyrom-nx/application';
 export class FileImageComponent {
   private readonly crtStorage = inject(CRT_STORAGE);
 
-  // Inputs
   deviceId = input.required<string>();
   currentFile = input<LaunchedFile | null>();
 
-  // CRT configuration - small config for file viewing (vignette disabled for square format)
-  readonly crtConfig = {
+  readonly crtConfig: CrtSettingsConfig = {
     ...CRT_CONFIGS.small,
-    showVignette: false, // Disable vignette on perfect square format
+    showVignette: false,
   };
 
   /**
@@ -59,13 +58,11 @@ export class FileImageComponent {
     return { error: result.error ?? null };
   };
 
-  // CRT state signals (initialized in constructor based on WebGL detection)
   protected readonly isCrtEnabled = signal<boolean>(true);
   protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]);
   protected readonly showCrtControls = signal<boolean>(false);
 
   constructor() {
-    // Load saved CRT settings when component initializes
     effect(() => {
       const deviceId = this.deviceId();
       if (deviceId) {
@@ -73,14 +70,12 @@ export class FileImageComponent {
         if (savedSettings) {
           this.crtSettings.set(savedSettings);
         } else {
-          // Default to SMALL_IMAGE_WEBGL preset for new users
           this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]);
         }
       }
     }, { allowSignalWrites: true });
   }
 
-  // Computed signals derived from input
   creatorName = computed(() => {
     const creator = this.currentFile()?.file.creator;
     return creator && creator.trim().length > 0 ? creator : 'Welcome to TeensyROM!';
@@ -120,7 +115,6 @@ export class FileImageComponent {
    * Persists settings to localStorage per device
    */
   onCrtSettingsChange(settings: CrtSettings): void {
-    // Apply settings without modification
     this.crtSettings.set(settings);
     const deviceId = this.deviceId();
     if (deviceId) {
@@ -128,30 +122,23 @@ export class FileImageComponent {
     }
   }
 
-  /**
-   * Apply a CRT preset (built-in or custom)
-   */
   onCrtPresetSelected(presetName: AnyPresetName): void {
     let settings: CrtSettings;
 
-    // Branch on preset type using type guard
     if (isBuiltInPreset(presetName)) {
-      // Built-in preset: load from CRT_PRESETS constant
       settings = CRT_PRESETS[presetName];
     } else {
-      // Custom preset: load from storage
       const customPresets = this.crtStorage.loadCustomPresets();
       const preset = customPresets.find(p => p.name === presetName);
 
       if (!preset) {
         console.warn(`[FileImageComponent] Custom preset not found: ${presetName}`);
-        return; // Early return, don't change settings
+        return;
       }
 
       settings = preset.settings;
     }
 
-    // Apply preset settings without modification
     this.crtSettings.set(settings);
     const deviceId = this.deviceId();
     if (deviceId) {

@@ -124,10 +124,10 @@
 
   <!-- Expansion Panels for Grouped Controls -->
   <mat-accordion [multi]="false">
-    
+
     <!-- Scanlines & Screen Panel -->
     @if (hasScanlinesPanelContent()) {
-      <mat-expansion-panel 
+      <mat-expansion-panel
         [expanded]="expandedPanel() === 'scanlines-screen'"
         (expandedChange)="expandedPanel.set($event ? 'scanlines-screen' : null)">
         <mat-expansion-panel-header>
@@ -372,6 +372,101 @@
             </lib-dropdown-menu>
           </div>
         }
+      </mat-expansion-panel>
+    }
+
+    <!-- Advanced Detection Panel -->
+    @if (config().showAdvancedDetection) {
+      <mat-expansion-panel
+        [expanded]="expandedPanel() === 'advanced'"
+        (expandedChange)="expandedPanel.set($event ? 'advanced' : null)">
+        <mat-expansion-panel-header>
+          <mat-panel-title>Advanced Detection</mat-panel-title>
+        </mat-expansion-panel-header>
+
+        <!-- Auto-Crop Border Toggle -->
+        <div class="crt-control-group">
+          <mat-slide-toggle
+            [ngModel]="settings().autoCropBlackBars"
+            (ngModelChange)="onToggleChange('autoCropBlackBars', $event)"
+            [matTooltip]="'Automatically remove black borders from video'">
+            Auto-Crop Border
+          </mat-slide-toggle>
+        </div>
+
+        <!-- Spacing between toggles -->
+        <div class="toggle-spacing"></div>
+
+        <!-- Debug Visualization Toggle (Phase 1.1 - Task 01.1-006) -->
+        <div class="crt-control-group">
+          <mat-slide-toggle
+            [ngModel]="debugMode()"
+            (ngModelChange)="onDebugModeChange($event)"
+            [matTooltip]="'Show detection overlay on full uncropped video (D key)'">
+            Show Debug Overlay
+          </mat-slide-toggle>
+        </div>
+
+        <!-- Spacing before video standard selector -->
+        <div class="toggle-spacing"></div>
+
+        <!-- Video Standard Selector (PAL/NTSC) -->
+        <div class="crt-control-group pattern-selector">
+          <span class="control-label">Video Standard</span>
+          <lib-dropdown-menu
+            #videoStandardDropdown
+            (opened)="onDropdownOpenedChange(true)"
+            (closed)="onDropdownOpenedChange(false)">
+            <button
+              class="pattern-button"
+              (click)="videoStandardDropdown.toggle()"
+              type="button">
+              {{ getVideoStandardLabel() }}
+              <mat-icon>arrow_drop_down</mat-icon>
+            </button>
+            <div dropdown-content>
+              @for (option of videoStandardOptions; track option.value) {
+                <lib-dropdown-menu-item
+                  [testId]="'video-standard-' + option.value.toLowerCase()"
+                  (itemClick)="onVideoStandardChange(option.value)">
+                  <div class="video-standard-option">
+                    <span class="option-label">{{ option.label }}</span>
+                    <span class="option-description">{{ option.description }}</span>
+                  </div>
+                </lib-dropdown-menu-item>
+              }
+            </div>
+          </lib-dropdown-menu>
+        </div>
+
+        <!-- Spacing before video mode selector -->
+        <div class="toggle-spacing"></div>
+
+        <!-- Video Mode Selector -->
+        <div class="crt-control-group pattern-selector">
+          <span class="control-label">Video Mode</span>
+          <lib-dropdown-menu
+            #videoModeDropdown
+            (opened)="onDropdownOpenedChange(true)"
+            (closed)="onDropdownOpenedChange(false)">
+            <button
+              class="pattern-button"
+              (click)="videoModeDropdown.toggle()"
+              type="button">
+              {{ getVideoModeLabel() }}
+              <mat-icon>arrow_drop_down</mat-icon>
+            </button>
+            <div dropdown-content>
+              @for (option of videoModeOptions(); track option.value) {
+                <lib-dropdown-menu-item
+                  [testId]="getVideoModeTestId(option.value)"
+                  (itemClick)="onVideoModeChange(option.value)">
+                  {{ option.label }}
+                </lib-dropdown-menu-item>
+              }
+            </div>
+          </lib-dropdown-menu>
+        </div>
       </mat-expansion-panel>
     }
 

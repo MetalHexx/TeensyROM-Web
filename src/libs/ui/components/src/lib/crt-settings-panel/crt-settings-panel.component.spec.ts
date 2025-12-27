@@ -8,6 +8,7 @@ import {
   DEFAULT_CRT_SETTINGS,
   DEFAULT_CRT_CONFIG,
   CRT_PRESET_KEYS,
+  CRT_PRESETS,
 } from '../crt-effect-wrapper/crt-settings.defaults';
 import { CRT_STORAGE, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 
@@ -107,6 +108,19 @@ describe('CrtSettingsPanelComponent', () => {
     it('should have default config with all features enabled', () => {
       fixture.detectChanges();
       expect(component.config()).toEqual(DEFAULT_CRT_CONFIG);
+    });
+
+    it('should have autoCropBlackBars property in default settings', () => {
+      fixture.detectChanges();
+      expect(component.settings().autoCropBlackBars).toBe(true);
+    });
+
+    it('should have autoCropBlackBars property in all presets', () => {
+      // Verify all built-in presets include autoCropBlackBars with true default
+      Object.values(CRT_PRESET_KEYS).forEach((presetKey) => {
+        const preset = CRT_PRESETS[presetKey];
+        expect(preset.autoCropBlackBars).toBe(true);
+      });
     });
   });
 
@@ -344,6 +358,115 @@ describe('CrtSettingsPanelComponent', () => {
     });
   });
 
+  describe('Auto-Crop Border Toggle', () => {
+    /** Helper to call protected onToggleChange method */
+    function callOnToggleChange(key: keyof CrtSettings, value: boolean): void {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (component as any).onToggleChange(key, value);
+    }
+
+    it('should render auto crop toggle in Scanlines & Screen panel', () => {
+      fixture.detectChanges();
+      
+      const toggle = fixture.nativeElement.querySelector('mat-slide-toggle');
+      expect(toggle).toBeTruthy();
+      expect(toggle.textContent?.trim()).toBe('Auto-Crop Border');
+    });
+
+    it('should bind toggle to settings().autoCropBlackBars', async () => {
+      fixture.componentRef.setInput('settings', {
+        ...DEFAULT_CRT_SETTINGS,
+        autoCropBlackBars: false,
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges(); // One more change detection after microtask flush
+
+      let toggle = fixture.nativeElement.querySelector('mat-slide-toggle');
+      let button = toggle.querySelector('button') as HTMLButtonElement;
+      expect(button.getAttribute('aria-checked')).toBe('false');
+
+      fixture.componentRef.setInput('settings', {
+        ...DEFAULT_CRT_SETTINGS,
+        autoCropBlackBars: true,
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges(); // One more change detection after microtask flush
+
+      toggle = fixture.nativeElement.querySelector('mat-slide-toggle');
+      button = toggle.querySelector('button') as HTMLButtonElement;
+      expect(button.getAttribute('aria-checked')).toBe('true');
+    });
+
+    it('should emit settingsChange when toggle is changed', () => {
+      const settingsChangeSpy = vi.fn();
+      component.settingsChange.subscribe(settingsChangeSpy);
+      fixture.detectChanges();
+
+      callOnToggleChange('autoCropBlackBars', false);
+
+      expect(settingsChangeSpy).toHaveBeenCalledWith({
+        ...DEFAULT_CRT_SETTINGS,
+        autoCropBlackBars: false,
+      });
+    });
+
+    it('should preserve other settings when changing toggle value', () => {
+      const settingsChangeSpy = vi.fn();
+      component.settingsChange.subscribe(settingsChangeSpy);
+      fixture.componentRef.setInput('settings', {
+        ...DEFAULT_CRT_SETTINGS,
+        scanlineIntensity: 0.8,
+        brightness: 1.2,
+      });
+      fixture.detectChanges();
+
+      callOnToggleChange('autoCropBlackBars', false);
+
+      const emittedSettings = settingsChangeSpy.mock.calls[0][0] as CrtSettings;
+      expect(emittedSettings.autoCropBlackBars).toBe(false);
+      expect(emittedSettings.scanlineIntensity).toBe(0.8);
+      expect(emittedSettings.brightness).toBe(1.2);
+    });
+
+    it('should have tooltip with correct text', () => {
+      fixture.detectChanges();
+
+      const toggle = fixture.nativeElement.querySelector('mat-slide-toggle');
+      const tooltip = toggle.getAttribute('ng-reflect-message');
+      // ng-reflect-message truncates in test DOM, so check partial match
+      expect(tooltip).toContain('Automatically remove black');
+    });
+
+    it('should update toggle when preset is loaded', async () => {
+      // Start with autoCropBlackBars = false
+      fixture.componentRef.setInput('settings', {
+        ...DEFAULT_CRT_SETTINGS,
+        autoCropBlackBars: false,
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      let toggle = fixture.nativeElement.querySelector('mat-slide-toggle');
+      let button = toggle.querySelector('button') as HTMLButtonElement;
+      expect(button.getAttribute('aria-checked')).toBe('false');
+
+      // Load preset with autoCropBlackBars = true
+      fixture.componentRef.setInput('settings', {
+        ...CRT_PRESETS['default-large-video-webgl'],
+        autoCropBlackBars: true,
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      toggle = fixture.nativeElement.querySelector('mat-slide-toggle');
+      button = toggle.querySelector('button') as HTMLButtonElement;
+      expect(button.getAttribute('aria-checked')).toBe('true');
+    });
+  });
 
 
   describe('Preset Selection', () => {

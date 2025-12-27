@@ -79,6 +79,19 @@ export class CrtEffectWrapperComponent {
    */
   private currentImageElement: HTMLImageElement | null = null;
   private imageLoadHandler: (() => void) | null = null;
+  
+  /**
+   * Debug mode input from parent component.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  readonly debugMode = input<boolean>(false);
+
+  /**
+   * Debug visualization state for black bar detection overlay.
+   * Internal signal for tracking current debug state.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  readonly debugVisualizationEnabled = signal<boolean>(false);
 
   /**
    * CRT effect configuration values.
@@ -108,41 +121,34 @@ export class CrtEffectWrapperComponent {
 
   /**
    * Computed canvas layout for WebGL mode.
-   * When contentAspectRatio is provided, canvas is sized to match visible content area
-   * (respecting object-fit: contain behavior).
+   * Sizes canvas to match visible content area when contentAspectRatio is provided.
    */
   protected readonly canvasLayout = computed(() => {
     const aspectRatio = this.contentAspectRatio();
     const containerW = this.containerWidth();
     const containerH = this.containerHeight();
 
-    // No aspect ratio constraint - fill container
     if (!aspectRatio || containerW === 0 || containerH === 0) {
       return { width: '100%', height: '100%', left: '0', top: '0' };
     }
 
     const containerAspectRatio = containerW / containerH;
 
-    // Same aspect ratio - fill container
     if (Math.abs(aspectRatio - containerAspectRatio) < 0.01) {
       return { width: '100%', height: '100%', left: '0', top: '0' };
     }
 
-    // Calculate visible content dimensions using object-fit: contain logic
-    // This ensures the entire content is visible without cropping
     let visibleWidth: number;
     let visibleHeight: number;
     let offsetLeft: number;
     let offsetTop: number;
 
     if (aspectRatio > containerAspectRatio) {
-      // Content is wider - fit to width, letterbox top/bottom
       visibleWidth = containerW;
       visibleHeight = containerW / aspectRatio;
       offsetLeft = 0;
       offsetTop = (containerH - visibleHeight) / 2;
     } else {
-      // Content is taller - fit to height, pillarbox left/right
       visibleHeight = containerH;
       visibleWidth = containerH * aspectRatio;
       offsetTop = 0;
@@ -166,45 +172,38 @@ export class CrtEffectWrapperComponent {
     const containerH = this.containerHeight();
     const curvature = this.effectiveSettings().screenCurvature;
 
-    // No clipping needed if no aspect ratio specified or container not measured
     if (!aspectRatio || containerW === 0 || containerH === 0) {
       return null;
     }
 
     const containerAspectRatio = containerW / containerH;
 
-    // If content fills container (same aspect ratio), no clipping needed
     if (Math.abs(aspectRatio - containerAspectRatio) < 0.01) {
       return null;
     }
 
-    // Calculate visible content dimensions using object-fit: contain logic
     let visibleWidth: number;
     let visibleHeight: number;
     let insetLeft: number;
     let insetTop: number;
 
     if (aspectRatio > containerAspectRatio) {
-      // Content is wider - letterboxed (black bars top/bottom)
       visibleWidth = containerW;
       visibleHeight = containerW / aspectRatio;
       insetLeft = 0;
       insetTop = (containerH - visibleHeight) / 2;
     } else {
-      // Content is narrower - pillarboxed (black bars left/right)
       visibleHeight = containerH;
       visibleWidth = containerH * aspectRatio;
       insetTop = 0;
       insetLeft = (containerW - visibleWidth) / 2;
     }
 
-    // Convert to percentages for clip-path
     const leftPct = (insetLeft / containerW) * 100;
     const rightPct = ((containerW - insetLeft - visibleWidth) / containerW) * 100;
     const topPct = (insetTop / containerH) * 100;
     const bottomPct = ((containerH - insetTop - visibleHeight) / containerH) * 100;
 
-    // Return clip-path inset with curvature for rounded corners
     return `inset(${topPct}% ${rightPct}% ${bottomPct}% ${leftPct}% round ${curvature}px)`;
   });
 
@@ -219,18 +218,20 @@ export class CrtEffectWrapperComponent {
       this.setupResizeObserver();
       this.setupDprListener();
       this.initializeWebGL();
+      this.setupKeyboardShortcuts();
     });
 
-    // Sync settings to WebGL renderer when they change
     effect(() => {
       const settings = this.settings();
       const contentType = this.webglContentType();
+      const debugModeValue = this.debugMode();
 
-      console.log('[CRT DEBUG] Effect triggered - contentType:', contentType, 'renderer:', !!this.renderer);
+      this.debugVisualizationEnabled.set(debugModeValue);
+      if (this.renderer) {
+        this.renderer.setDebugVisualization(debugModeValue);
+      }
 
-      // Re-detect content if needed
       if (this.renderer && contentType === 'none') {
-        console.log('[CRT DEBUG] Re-detecting content...');
         const wrapper = this.wrapperRef()?.nativeElement;
         if (wrapper) {
           this.detectAndBindContent(wrapper);
@@ -238,17 +239,11 @@ export class CrtEffectWrapperComponent {
       }
 
       if (this.renderer) {
-        console.log('[CRT DEBUG] Updating WebGL renderer settings');
         this.renderer.updateSettings(settings);
-        
-        // Handle render loop based on content type
+
         if (contentType === 'video') {
-          // Ensure video render loop is running
-          console.log('[CRT DEBUG] Starting video render loop');
           this.renderer.startRenderLoop();
         } else if (contentType === 'image') {
-          // For images, re-render on settings change (no continuous loop)
-          console.log('[CRT DEBUG] Rendering image');
           this.renderer.renderImage();
         }
       }
@@ -259,6 +254,7 @@ export class CrtEffectWrapperComponent {
       this.resizeObserver?.disconnect();
       this.cleanupDprListener();
       this.cleanupImageHandlers();
+      this.cleanupKeyboardShortcuts();
       this.contentObserver?.disconnect();
       this.renderer?.destroy();
     });
@@ -266,7 +262,6 @@ export class CrtEffectWrapperComponent {
 
   /**
    * Initialize WebGL renderer if supported.
-   * Called once after first render when canvas is available.
    */
   private initializeWebGL(): void {
     const canvas = this.canvasRef()?.nativeElement;
@@ -276,26 +271,18 @@ export class CrtEffectWrapperComponent {
     const success = this.renderer.init(canvas);
 
     if (!success) {
-      // WebGL init failed - component still renders with CSS overlays
       this.webglSupported.set(false);
       this.renderer = null;
       return;
     }
 
-    // Initial settings and render
     this.renderer.updateSettings(this.settings());
     this.handleResize();
-
-    // Set up content texture pipeline (video or image)
     this.setupContentTexturePipeline();
   }
 
   /**
    * Set up texture pipeline for post-processing.
-   * Detects video or image elements from projected content.
-   * - Video: starts continuous render loop
-   * - Image: renders once, call refreshImage() when content changes
-   * - Other: uses CSS overlays only (scanlines, vignette)
    */
   private setupContentTexturePipeline(): void {
     if (!this.renderer) return;
@@ -303,18 +290,14 @@ export class CrtEffectWrapperComponent {
     const wrapper = this.wrapperRef()?.nativeElement;
     if (!wrapper) return;
 
-    // Detect and bind to current content
     this.detectAndBindContent(wrapper);
 
-    // Set up MutationObserver to watch for content changes (video/image elements added)
     this.contentObserver = new MutationObserver(() => {
       if (!this.isDestroyed && this.renderer) {
-        console.log('[CRT DEBUG] Content mutation detected, re-detecting content...');
         this.detectAndBindContent(wrapper);
       }
     });
 
-    // Watch for child elements being added/removed (video/img elements)
     this.contentObserver.observe(wrapper, {
       childList: true,
       subtree: true,
@@ -327,27 +310,16 @@ export class CrtEffectWrapperComponent {
   private detectAndBindContent(wrapper: HTMLElement): void {
     if (!this.renderer) return;
 
-    // Priority: video first, then image
     const video = wrapper.querySelector('video') as HTMLVideoElement | null;
 
-    console.log('[CRT DEBUG] detectAndBindContent - video element:', video);
-    console.log('[CRT DEBUG] detectAndBindContent - video readyState:', video?.readyState);
-
     if (video) {
-      // Video found - use WebGL post-processing with render loop
-      console.log('[CRT DEBUG] Setting webglContentType to "video"');
       this.webglContentType.set('video');
       this.renderer.setVideoElement(video);
 
-      // Wait for video metadata to be available before starting render loop
       if (video.readyState >= video.HAVE_METADATA) {
-        console.log('[CRT DEBUG] Video metadata available, starting render loop');
         this.renderer.startRenderLoop();
       } else {
-        // Video not ready yet - wait for loadedmetadata
-        console.log('[CRT DEBUG] Video metadata not ready, waiting for loadedmetadata event');
         const handler = () => {
-          console.log('[CRT DEBUG] Video loadedmetadata event fired, starting render loop');
           this.renderer?.startRenderLoop();
           video.removeEventListener('loadedmetadata', handler);
         };
@@ -356,19 +328,15 @@ export class CrtEffectWrapperComponent {
       return;
     }
 
-    // Try to find image element in projected content
-    // Look for the "current" carousel image specifically, or any img
     const image = (wrapper.querySelector('img.carousel-image.current') ||
                    wrapper.querySelector('img')) as HTMLImageElement | null;
 
     if (image) {
-      // Image found - use WebGL post-processing (render once)
       this.webglContentType.set('image');
       this.setupImagePipeline(image);
       return;
     }
 
-    // No compatible content found - use CSS overlays only
     this.webglContentType.set('none');
   }
 
@@ -384,110 +352,64 @@ export class CrtEffectWrapperComponent {
    * ```
    */
   refreshImage(): void {
-    console.log('[CRT DEBUG] refreshImage called', {
-      hasRenderer: !!this.renderer,
-      contentType: this.webglContentType(),
-      isDestroyed: this.isDestroyed
-    });
-    
     if (!this.renderer || this.webglContentType() !== 'image') {
-      console.log('[CRT DEBUG] refreshImage early return - no renderer or not image mode');
       return;
     }
 
-    // Reset retry count for new refresh cycle
     this.refreshRetryCount = 0;
-
-    // Use setTimeout to defer to next event loop tick, allowing Angular to update the DOM.
-    // afterNextRender may not fire if no render is pending.
-    console.log('[CRT DEBUG] scheduling deferred refresh');
     setTimeout(() => this.doRefreshImage(), 0);
   }
 
   /**
    * Internal method that performs the actual image refresh with retry logic.
-   * Retries up to MAX_IMAGE_REFRESH_RETRIES times if the image element is not found,
-   * as Angular's DOM updates may take multiple render cycles.
    */
   private doRefreshImage(): void {
-    console.log('[CRT DEBUG] doRefreshImage called', {
-      isDestroyed: this.isDestroyed,
-      hasRenderer: !!this.renderer,
-      retryCount: this.refreshRetryCount
-    });
-    
-    // Guard against operations after component destruction
     if (this.isDestroyed || !this.renderer) return;
 
     const wrapper = this.wrapperRef()?.nativeElement;
     if (!wrapper) {
-      console.log('[CRT DEBUG] no wrapper element');
       return;
     }
 
-    // Find the current image (may have changed)
     const image = (wrapper.querySelector('img.carousel-image.current') ||
                    wrapper.querySelector('img')) as HTMLImageElement | null;
 
-    console.log('[CRT DEBUG] image query result', {
-      found: !!image,
-      src: image?.src?.substring(0, 80),
-      complete: image?.complete,
-      naturalWidth: image?.naturalWidth
-    });
-
     if (!image) {
-      // Image not found - retry if we haven't exceeded max attempts
       this.refreshRetryCount++;
-      console.log('[CRT DEBUG] no image found, retry count:', this.refreshRetryCount);
       if (this.refreshRetryCount <= MAX_IMAGE_REFRESH_RETRIES) {
-        // Schedule another attempt after a brief delay
         setTimeout(() => this.doRefreshImage(), 16);
       }
       return;
     }
 
-    // Reset retry count on success
     this.refreshRetryCount = 0;
-
-    // Clean up any previous load handler
     this.cleanupImageHandlers();
     
     this.currentImageElement = image;
-    console.log('[CRT DEBUG] calling setImageElement');
     this.renderer.setImageElement(image);
 
     // Set up load handler for when image finishes loading
     this.imageLoadHandler = () => {
-      console.log('[CRT DEBUG] image load event fired, rendering');
       this.renderer?.renderImage();
     };
     image.addEventListener('load', this.imageLoadHandler);
 
-    // Check if image is already loaded
-    // Note: When src changes, complete becomes false until new image loads
     if (image.complete && image.naturalWidth > 0) {
-      console.log('[CRT DEBUG] image already complete, rendering immediately');
       this.renderer.renderImage();
-    } else {
-      console.log('[CRT DEBUG] image not complete yet, waiting for load event');
     }
   }
 
   /**
    * Set up image-specific WebGL pipeline.
-   * Handles initial render. Src changes are handled by contentObserver.
    */
   private setupImagePipeline(image: HTMLImageElement): void {
     if (!this.renderer) return;
 
-    // Clean up any previous image handlers
     this.cleanupImageHandlers();
 
     this.currentImageElement = image;
     this.renderer.setImageElement(image);
 
-    // Render when image is loaded
     if (image.complete && image.naturalWidth > 0) {
       this.renderer.renderImage();
     } else {
@@ -522,10 +444,7 @@ export class CrtEffectWrapperComponent {
     this.containerWidth.set(containerWidth);
     this.containerHeight.set(containerHeight);
 
-    // Update WebGL canvas size and re-render
-    // Also re-apply settings since DPR may have changed (browser zoom)
     if (this.renderer) {
-      // Calculate actual canvas dimensions based on contentAspectRatio
       const layout = this.canvasLayout();
       const canvasWidth = layout.width === '100%' ? containerWidth : parseFloat(layout.width);
       const canvasHeight = layout.height === '100%' ? containerHeight : parseFloat(layout.height);
@@ -533,7 +452,6 @@ export class CrtEffectWrapperComponent {
       this.renderer.updateSettings(this.settings());
       this.renderer.resize(canvasWidth, canvasHeight);
 
-      // For images, explicitly re-render (video uses continuous loop)
       const contentType = this.webglContentType();
       if (contentType === 'image') {
         this.renderer.renderImage();
@@ -545,25 +463,18 @@ export class CrtEffectWrapperComponent {
 
   /**
    * Set up listener for device pixel ratio changes (browser zoom).
-   * ResizeObserver doesn't fire when zoom changes but element size stays the same.
    */
   private setupDprListener(): void {
-    // Skip in test environments where matchMedia isn't available
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return;
     }
 
-    // Clean up any existing listener
     this.cleanupDprListener();
 
-    // Create a media query that matches the current DPR
-    // When DPR changes (zoom), the match state changes and we get notified
     const dpr = window.devicePixelRatio || 1;
     this.dprMediaQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
 
     this.dprChangeHandler = () => {
-      // DPR changed - need to set up new listener for new DPR value
-      // and re-render with updated settings
       this.setupDprListener();
       this.handleResize();
     };
@@ -583,8 +494,7 @@ export class CrtEffectWrapperComponent {
   }
 
   /**
-   * Set up ResizeObserver to track container dimensions for clip-path calculation
-   * and WebGL canvas sizing.
+   * Set up ResizeObserver to track container dimensions.
    */
   private setupResizeObserver(): void {
     const wrapper = this.wrapperRef()?.nativeElement;
@@ -595,8 +505,49 @@ export class CrtEffectWrapperComponent {
     });
 
     this.resizeObserver.observe(wrapper);
-
-    // Initial measurement
     this.handleResize();
+  }
+
+  /**
+   * Set up keyboard shortcuts for debug controls.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  private keyboardHandler: ((event: KeyboardEvent) => void) | null = null;
+
+  private setupKeyboardShortcuts(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    this.keyboardHandler = (event: KeyboardEvent) => {
+      if (event.key === 'd' || event.key === 'D') {
+        this.toggleDebugVisualization();
+      }
+    };
+
+    window.addEventListener('keydown', this.keyboardHandler);
+  }
+
+  /**
+   * Clean up keyboard shortcut listener.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  private cleanupKeyboardShortcuts(): void {
+    if (this.keyboardHandler) {
+      window.removeEventListener('keydown', this.keyboardHandler);
+      this.keyboardHandler = null;
+    }
+  }
+
+  /**
+   * Toggle debug visualization for black bar detection.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  toggleDebugVisualization(): void {
+    const newState = !this.debugVisualizationEnabled();
+    this.debugVisualizationEnabled.set(newState);
+    this.renderer?.setDebugVisualization(newState);
+
+    console.log(`[CrtEffectWrapper] Debug visualization ${newState ? 'enabled' : 'disabled'} (press 'D' to toggle)`);
   }
 }

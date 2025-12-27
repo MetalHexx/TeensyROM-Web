@@ -15,25 +15,33 @@ export const DEFAULT_CRT_CONFIG: CrtSettingsConfig = {
   showDistortion: true,
   showChromaticAberration: true,
   showMonochromePhosphor: true,
+  showAdvancedDetection: true,
 };
 
 /**
  * CRT settings panel configuration variants.
- * 
+ *
  * Controls which sliders and controls are visible in the settings panel.
- * 
- * - small: For compact displays (file-image, video-capture)
+ *
+ * - small: For compact displays (file-image)
  *   - Hides curvature control (not relevant for small displays)
+ *   - Hides Advanced Detection panel (static images don't need video detection)
  *   - Shows all other controls
- * 
+ *
+ * - smallVideo: For compact video displays (video-capture)
+ *   - Hides curvature control (not relevant for small displays)
+ *   - Shows Advanced Detection panel (video content needs PAL/NTSC detection)
+ *   - Shows all other controls
+ *
  * - large: For fullscreen displays (video-dialog)
  *   - Shows all controls including curvature
+ *   - Shows Advanced Detection panel
  *   - Full immersive CRT experience
- * 
+ *
  * - none: Completely hides settings panel
  *   - All controls disabled
  *   - Edge case for completely static CRT effects
- * 
+ *
  * @example
  * ```typescript
  * // Use matching config with preset
@@ -44,8 +52,8 @@ export const DEFAULT_CRT_CONFIG: CrtSettingsConfig = {
 // NOTE: Phase 2 will update component references from old 'full'/'standard' keys to 'small'/'large'
 export const CRT_CONFIGS = {
   /**
-   * Small config - for compact displays.
-   * Hides curvature control (not relevant for small displays), shows all other controls.
+   * Small config - for compact static image displays.
+   * Hides curvature and Advanced Detection (not relevant for static images), shows all other controls.
    */
   small: {
     showScanlines: true,
@@ -57,11 +65,29 @@ export const CRT_CONFIGS = {
     showDistortion: true,
     showChromaticAberration: true,
     showMonochromePhosphor: true,
+    showAdvancedDetection: false,
+  },
+
+  /**
+   * Small Video config - for compact video displays.
+   * Hides curvature control but shows Advanced Detection for PAL/NTSC video mode detection.
+   */
+  smallVideo: {
+    showScanlines: true,
+    showVignette: true,
+    showCurvature: false,
+    showColorFilters: true,
+    showPhosphor: true,
+    showBloom: true,
+    showDistortion: true,
+    showChromaticAberration: true,
+    showMonochromePhosphor: true,
+    showAdvancedDetection: true,
   },
 
   /**
    * Large config - for fullscreen displays.
-   * Shows all controls including curvature for full immersive CRT experience.
+   * Shows all controls including curvature and Advanced Detection for full immersive CRT experience.
    */
   large: {
     showScanlines: true,
@@ -73,6 +99,7 @@ export const CRT_CONFIGS = {
     showDistortion: true,
     showChromaticAberration: true,
     showMonochromePhosphor: true,
+    showAdvancedDetection: true,
   },
 
   /**
@@ -89,6 +116,7 @@ export const CRT_CONFIGS = {
     showDistortion: false,
     showChromaticAberration: false,
     showMonochromePhosphor: false,
+    showAdvancedDetection: false,
   },
 } as const satisfies Record<string, CrtSettingsConfig>;
 
@@ -135,6 +163,9 @@ export const CRT_PRESETS = {
     barrelDistortion: 0,
     chromaticAberration: 0,
     monochromePhosphor: 'none',
+    autoCropBlackBars: true,
+    videoStandard: 'PAL',
+    videoMode: 'auto',
   },
 
   /**
@@ -158,6 +189,9 @@ export const CRT_PRESETS = {
     barrelDistortion: 0,
     chromaticAberration: 0,
     monochromePhosphor: 'none',
+    autoCropBlackBars: true,
+    videoStandard: 'PAL',
+    videoMode: 'auto',
   },
 
   /**
@@ -181,6 +215,9 @@ export const CRT_PRESETS = {
     barrelDistortion: 0,
     chromaticAberration: 0,
     monochromePhosphor: 'none',
+    autoCropBlackBars: true,
+    videoStandard: 'PAL',
+    videoMode: 'auto',
   },
 } as const satisfies Record<string, CrtSettings>;
 
