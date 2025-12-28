@@ -19,6 +19,7 @@ const mockRendererInstance: {
   stopRenderLoop: Mock;
   setImageElement: Mock;
   renderImage: Mock;
+  setDebugVisualization: Mock;
 } = {
   init: vi.fn(() => true),
   updateSettings: vi.fn(),
@@ -31,6 +32,7 @@ const mockRendererInstance: {
   stopRenderLoop: vi.fn(),
   setImageElement: vi.fn(),
   renderImage: vi.fn(),
+  setDebugVisualization: vi.fn(),
 };
 
 vi.mock('./webgl/crt-renderer', () => ({
@@ -320,7 +322,6 @@ describe('CrtEffectWrapperComponent Content Projection', () => {
 });
 
 describe('CrtEffectWrapperComponent WebGL Mode', () => {
-  let component: CrtEffectWrapperComponent;
   let fixture: ComponentFixture<CrtEffectWrapperComponent>;
 
   beforeEach(async () => {
@@ -334,7 +335,7 @@ describe('CrtEffectWrapperComponent WebGL Mode', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(CrtEffectWrapperComponent);
-    component = fixture.componentInstance;
+    // Component not used in these tests
   });
 
   describe('Canvas Element', () => {
@@ -354,7 +355,6 @@ describe('CrtEffectWrapperComponent WebGL Mode', () => {
 
 describe('CrtEffectWrapperComponent WebGL Video Support (mocked as supported)', () => {
   let fixture: ComponentFixture<TestHostWithVideoComponent>;
-  let hostComponent: TestHostWithVideoComponent;
 
   beforeEach(async () => {
     // Reset all mocks and set WebGL as supported for these tests
@@ -367,7 +367,7 @@ describe('CrtEffectWrapperComponent WebGL Video Support (mocked as supported)', 
     }).compileComponents();
 
     fixture = TestBed.createComponent(TestHostWithVideoComponent);
-    hostComponent = fixture.componentInstance;
+    // Host component not used in these tests
   });
 
   it('should detect video element and set it on renderer', async () => {

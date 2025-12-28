@@ -7,7 +7,6 @@ import {
   inject,
   signal,
   viewChild,
-  effect,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -285,8 +284,6 @@ export class CrtSettingsPanelComponent {
 
   /** Determines which panel should be expanded by default based on config visibility */
   protected readonly defaultExpandedPanel = computed<string | null>(() => {
-    const cfg = this.config();
-
     if (this.hasScanlinesPanelContent()) return 'scanlines-screen';
     if (this.hasLightColorPanelContent()) return 'light-color';
     if (this.hasPhosphorPanelContent()) return 'phosphor';

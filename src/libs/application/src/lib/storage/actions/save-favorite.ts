@@ -23,7 +23,7 @@ export function saveFavorite(store: WritableStore<StorageState>, storageService:
       logInfo(LogType.Start, `Starting save favorite for ${filePath} on ${key}`);
 
       // Set loading state
-      updateState(store, actionMessage, (state) => ({
+      updateState(store, actionMessage, () => ({
         favoriteOperationsState: {
           isProcessing: true,
           error: null,
@@ -78,7 +78,7 @@ export function saveFavorite(store: WritableStore<StorageState>, storageService:
         }
 
         // Clear loading state
-        updateState(store, actionMessage, (state) => ({
+        updateState(store, actionMessage, () => ({
           favoriteOperationsState: {
             isProcessing: false,
             error: null,
@@ -89,7 +89,7 @@ export function saveFavorite(store: WritableStore<StorageState>, storageService:
       } catch (error) {
         logError(`Save favorite error for ${filePath}:`, error);
 
-        updateState(store, actionMessage, (state) => ({
+        updateState(store, actionMessage, () => ({
           favoriteOperationsState: {
             isProcessing: false,
             error: error instanceof Error ? error.message : 'Failed to save favorite',

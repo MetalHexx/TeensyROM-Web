@@ -201,12 +201,13 @@ describe('CRT_PRESET_LABELS', () => {
 });
 
 describe('CRT_CONFIGS', () => {
-  it('should have exactly 3 config variants', () => {
-    expect(Object.keys(CRT_CONFIGS)).toHaveLength(3);
+  it('should have exactly 4 config variants', () => {
+    expect(Object.keys(CRT_CONFIGS)).toHaveLength(4);
   });
 
-  it('should have small, large, and none variants', () => {
+  it('should have small, smallVideo, large, and none variants', () => {
     expect(CRT_CONFIGS.small).toBeDefined();
+    expect(CRT_CONFIGS.smallVideo).toBeDefined();
     expect(CRT_CONFIGS.large).toBeDefined();
     expect(CRT_CONFIGS.none).toBeDefined();
   });

@@ -158,27 +158,7 @@ export class EdgeAnalysisProcessor {
    *
    * @param depthMapTexture - Depth map texture to read from (currently unused, reads from bound FBO)
    * @returns Normalized depth values (0-1) for each edge
-   */
-  private readDepthMap(
-    depthMapTexture: WebGLTexture
-  ): { top: number; bottom: number; left: number; right: number } {
-    const gl = this.gl;
-
-    // Note: DetectionPassRenderer.readDepthResults() already handles FBO binding
-    // For this implementation, we'll use that method directly rather than duplicating logic
-    // This is a design decision to avoid redundant FBO binding/unbinding
-
-    // Read 1x1 pixel at (0,0) containing all depth results
-    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.pixelBuffer);
-
-    // Extract depths from buffer (0-255 → 0-1)
-    return {
-      top: this.pixelBuffer[0] / 255.0,
-      bottom: this.pixelBuffer[1] / 255.0,
-      left: this.pixelBuffer[2] / 255.0,
-      right: this.pixelBuffer[3] / 255.0,
-    };
-  }
+   */  
 
   /**
    * Calculate confidence score based on temporal stability.

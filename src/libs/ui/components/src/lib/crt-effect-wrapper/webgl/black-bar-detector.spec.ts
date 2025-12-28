@@ -410,7 +410,7 @@ describe('BlackBarDetector', () => {
       });
 
       vi.mocked(performance.now).mockReturnValue(0);
-      const result = detector.detect(mockGl as WebGLRenderingContext, mockTexture, width, height);
+      detector.detect(mockGl as WebGLRenderingContext, mockTexture, width, height);
 
       // With randomness this is probabilistic, but should generally detect
       // Let's make it deterministic instead

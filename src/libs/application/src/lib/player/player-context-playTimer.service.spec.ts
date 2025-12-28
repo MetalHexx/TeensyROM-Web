@@ -77,12 +77,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
     pingDevice: ReturnType<typeof vi.fn>;
   };
   let mockAlertService: IAlertService;
-  let mockPlayerStorage: {
-    save: ReturnType<typeof vi.fn>;
-    load: ReturnType<typeof vi.fn>;
-    hasSavedState: ReturnType<typeof vi.fn>;
-    clear: ReturnType<typeof vi.fn>;
-  };
 
   const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
 
@@ -134,13 +128,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       dismiss: vi.fn(),
       alerts$: of([]),
     } as IAlertService;
-
-    mockPlayerStorage = {
-      save: vi.fn(),
-      load: vi.fn().mockReturnValue({}),
-      hasSavedState: vi.fn().mockReturnValue(false),
-      clear: vi.fn(),
-    };
 
     mockSettingsStore.settings.mockReturnValue({
       playerSettings: {

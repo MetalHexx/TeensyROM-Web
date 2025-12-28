@@ -449,6 +449,8 @@ describe('CrtSettingsPanelComponent', () => {
       });
       fixture.detectChanges();
       await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges(); // One more change detection after microtask flush
 
       let toggle = fixture.nativeElement.querySelector('mat-slide-toggle');
       let button = toggle.querySelector('button') as HTMLButtonElement;
@@ -456,11 +458,13 @@ describe('CrtSettingsPanelComponent', () => {
 
       // Load preset with autoCropBlackBars = true
       fixture.componentRef.setInput('settings', {
-        ...CRT_PRESETS['default-large-video-webgl'],
+        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL],
         autoCropBlackBars: true,
       });
       fixture.detectChanges();
       await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges(); // One more change detection after microtask flush
 
       toggle = fixture.nativeElement.querySelector('mat-slide-toggle');
       button = toggle.querySelector('button') as HTMLButtonElement;

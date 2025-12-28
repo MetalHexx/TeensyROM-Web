@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { of, Subject } from 'rxjs';
+import { of, Subject, Observable } from 'rxjs';
 import {
   DEVICE_SERVICE,
   ALERT_SERVICE,
@@ -9,6 +9,7 @@ import {
   IDeviceService,
   IPlayerService,
   IAlertService,
+  AlertMessage,
   LaunchMode,
   PLAYER_SERVICE,
   StorageType,
@@ -19,6 +20,7 @@ import { StorageStore } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { PlayerTimerManager } from './player-timer-manager';
 import { PLAYER_STORAGE } from './player-storage.interface';
+import { TimerState } from './timer-state.interface';
 
 type StorageStoreContract = Partial<typeof StorageStore>;
 
@@ -59,19 +61,13 @@ describe('PlayerContextService - Favorite Synchronization', () => {
   let mockStorageStore: Partial<StorageStoreContract>;
   let mockSettingsStore: Partial<typeof SettingsStore>;
   let mockTimerManager: Partial<PlayerTimerManager>;
-  let mockPlayerStorage: {
-    save: ReturnType<typeof vi.fn>;
-    load: ReturnType<typeof vi.fn>;
-    hasSavedState: ReturnType<typeof vi.fn>;
-    clear: ReturnType<typeof vi.fn>;
-  };
-  let timerUpdateSubject: Subject<unknown>;
+  let timerUpdateSubject: Subject<TimerState>;
   let timerCompleteSubject: Subject<void>;
 
   const deviceId = 'device-favorite-test';
   const storageType = StorageType.Sd;
   beforeEach(() => {
-    timerUpdateSubject = new Subject();
+    timerUpdateSubject = new Subject<TimerState>();
     timerCompleteSubject = new Subject<void>();
 
     mockPlayerService = {
@@ -90,7 +86,7 @@ describe('PlayerContextService - Favorite Synchronization', () => {
     };
 
     mockAlertService = {
-      alerts$: vi.fn(),
+      alerts$: of([] as AlertMessage[]),
       show: vi.fn(),
       success: vi.fn(),
       error: vi.fn(),
@@ -99,23 +95,9 @@ describe('PlayerContextService - Favorite Synchronization', () => {
       dismiss: vi.fn(),
     };
 
-    mockPlayerStorage = {
-      save: vi.fn(),
-      load: vi.fn().mockReturnValue({}),
-      hasSavedState: vi.fn().mockReturnValue(false),
-      clear: vi.fn(),
-    };
+    mockStorageStore = {};
 
-    mockStorageStore = {
-      navigateToDirectory: vi
-        .fn<StorageStoreContract['navigateToDirectory']>()
-        .mockResolvedValue(undefined),
-      getSelectedDirectoryState: vi.fn<StorageStoreContract['getSelectedDirectoryState']>(),
-    };
-
-    mockSettingsStore = {
-      settings: vi.fn(() => null),
-    };
+    mockSettingsStore = {};
 
     mockTimerManager = {
       createTimer: vi.fn<PlayerTimerManager['createTimer']>(),
@@ -127,7 +109,7 @@ describe('PlayerContextService - Favorite Synchronization', () => {
       getTimerState: vi.fn<PlayerTimerManager['getTimerState']>(),
       onTimerUpdate$: vi
         .fn<PlayerTimerManager['onTimerUpdate$']>()
-        .mockReturnValue(timerUpdateSubject.asObservable()),
+        .mockReturnValue(timerUpdateSubject.asObservable() as Observable<TimerState>),
       onTimerComplete$: vi
         .fn<PlayerTimerManager['onTimerComplete$']>()
         .mockReturnValue(timerCompleteSubject.asObservable()),

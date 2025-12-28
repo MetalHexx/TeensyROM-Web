@@ -1,6 +1,6 @@
 import { computed } from '@angular/core';
 import { WritableStore } from '../player-helpers';
-import { PlayerState, ShuffleSettings } from '../player-store';
+import { PlayerState } from '../player-store';
 
 export function getShuffleSettings(store: WritableStore<PlayerState>) {
   return {

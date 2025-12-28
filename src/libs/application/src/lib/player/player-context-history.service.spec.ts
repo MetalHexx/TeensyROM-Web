@@ -12,6 +12,7 @@ import {
   IPlayerService,
   IDeviceService,
   IAlertService,
+  AlertMessage,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -41,6 +42,11 @@ const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   subtuneLengths: [],
   startSubtuneNum: 0,
   images: [],
+  links: [],
+  tags: [],
+  youTubeVideos: [],
+  competitions: [],
+  ratingCount: 0,
   ...overrides,
 });
 
@@ -79,12 +85,6 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
     pingDevice: MockedFunction<IDeviceService['pingDevice']>;
   };
   let mockAlertService: Partial<IAlertService>;
-  let mockPlayerStorage: {
-    save: ReturnType<typeof vi.fn>;
-    load: ReturnType<typeof vi.fn>;
-    hasSavedState: ReturnType<typeof vi.fn>;
-    clear: ReturnType<typeof vi.fn>;
-  };
 
   // Helper to wait for async operations
   const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -124,20 +124,13 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
     };
 
     mockAlertService = {
-      alerts$: vi.fn(),
+      alerts$: of([] as AlertMessage[]),
       show: vi.fn(),
       success: vi.fn(),
       error: vi.fn(),
       warning: vi.fn(),
       info: vi.fn(),
       dismiss: vi.fn(),
-    };
-
-    mockPlayerStorage = {
-      save: vi.fn(),
-      load: vi.fn().mockReturnValue({}),
-      hasSavedState: vi.fn().mockReturnValue(false),
-      clear: vi.fn(),
     };
 
     TestBed.configureTestingModule({

@@ -1,4 +1,3 @@
-import { updateState } from '@angular-architects/ngrx-toolkit';
 import { firstValueFrom } from 'rxjs';
 import { createAction, LogType, logInfo, logError } from '@teensyrom-nx/utils';
 import { WritableStore } from '../player-helpers';
@@ -13,7 +12,7 @@ import {
   createLaunchedFile,
   createPlayerFileContext,
 } from '../player-helpers';
-import { LaunchMode, PlayerFilterType, PlayerScope } from '@teensyrom-nx/domain';
+import { LaunchMode } from '@teensyrom-nx/domain';
 
 export function launchRandomFile(store: WritableStore<PlayerState>, playerService: IPlayerService) {
   return {

@@ -26,7 +26,7 @@ export function removeFavorite(
       logInfo(LogType.Start, `Starting remove favorite for ${filePath} on ${key}`);
 
       // Set loading state
-      updateState(store, actionMessage, (state) => ({
+      updateState(store, actionMessage, () => ({
         favoriteOperationsState: {
           isProcessing: true,
           error: null,
@@ -116,7 +116,7 @@ export function removeFavorite(
         }
 
         // Clear loading state
-        updateState(store, actionMessage, (state) => ({
+        updateState(store, actionMessage, () => ({
           favoriteOperationsState: {
             isProcessing: false,
             error: null,
@@ -127,7 +127,7 @@ export function removeFavorite(
       } catch (error) {
         logError(`Remove favorite error for ${filePath}:`, error);
 
-        updateState(store, actionMessage, (state) => ({
+        updateState(store, actionMessage, () => ({
           favoriteOperationsState: {
             isProcessing: false,
             error: error instanceof Error ? error.message : 'Failed to remove favorite',
