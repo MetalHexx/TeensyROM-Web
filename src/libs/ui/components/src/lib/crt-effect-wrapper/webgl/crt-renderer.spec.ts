@@ -113,7 +113,7 @@ describe('CrtRenderer', () => {
           stroke: vi.fn(),
           fill: vi.fn(),
         };
-        vi.spyOn(mockDebugCanvas, 'getContext').mockReturnValue(mockCtx2d as any);
+        vi.spyOn(mockDebugCanvas, 'getContext').mockReturnValue(mockCtx2d as unknown as CanvasRenderingContext2D);
         return mockDebugCanvas;
       }
       return originalCreateElement(tagName);
