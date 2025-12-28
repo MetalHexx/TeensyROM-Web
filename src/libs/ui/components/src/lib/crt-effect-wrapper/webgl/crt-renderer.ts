@@ -307,7 +307,6 @@ export class CrtRenderer {
 
               if (!cropRect) {
                 if (previousCrop) {
-                  console.log(`[CrtRenderer] Keeping previous crop during stabilization`);
                   cropRect = previousCrop;
                 } else {
                   cropRect = {
