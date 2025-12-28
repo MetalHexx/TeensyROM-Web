@@ -20,6 +20,7 @@
  */
 
 import { C64VideoMode, C64_VIDEO_MODE_PRESETS } from '@teensyrom-nx/domain';
+import { logInfo, LogType } from '@teensyrom-nx/utils';
 
 /**
  * Crop rectangle in normalized coordinates (0-1).
@@ -159,7 +160,7 @@ export class VideoModeDetector {
       const crop = this.convertToCropRect(matchedMode);
 
       if (this.lastMatchedMode !== matchedMode.name) {
-        console.log(`[CrtRenderer] Mode: ${matchedMode.name}`);
+        logInfo(LogType.Info, `CrtRenderer: Mode: ${matchedMode.name}`);
         this.lastMatchedMode = matchedMode.name;
         this.detectionHistory = [];
       }
@@ -168,9 +169,6 @@ export class VideoModeDetector {
     }
 
     // Not stable yet
-    if (this.lastMatchedMode) {
-      console.log(`[VideoModeDetector] Stabilizing: ${matchedMode.name} (${this.detectionHistory.length}/5)`);
-    }
 
     return null;
   }
