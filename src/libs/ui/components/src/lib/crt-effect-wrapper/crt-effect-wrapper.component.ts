@@ -218,7 +218,6 @@ export class CrtEffectWrapperComponent {
       this.setupResizeObserver();
       this.setupDprListener();
       this.initializeWebGL();
-      this.setupKeyboardShortcuts();
     });
 
     effect(() => {
@@ -254,7 +253,6 @@ export class CrtEffectWrapperComponent {
       this.resizeObserver?.disconnect();
       this.cleanupDprListener();
       this.cleanupImageHandlers();
-      this.cleanupKeyboardShortcuts();
       this.contentObserver?.disconnect();
       this.renderer?.destroy();
     });
@@ -508,46 +506,4 @@ export class CrtEffectWrapperComponent {
     this.handleResize();
   }
 
-  /**
-   * Set up keyboard shortcuts for debug controls.
-   * (Phase 1.1 - Task 01.1-006)
-   */
-  private keyboardHandler: ((event: KeyboardEvent) => void) | null = null;
-
-  private setupKeyboardShortcuts(): void {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    this.keyboardHandler = (event: KeyboardEvent) => {
-      if (event.key === 'd' || event.key === 'D') {
-        this.toggleDebugVisualization();
-      }
-    };
-
-    window.addEventListener('keydown', this.keyboardHandler);
-  }
-
-  /**
-   * Clean up keyboard shortcut listener.
-   * (Phase 1.1 - Task 01.1-006)
-   */
-  private cleanupKeyboardShortcuts(): void {
-    if (this.keyboardHandler) {
-      window.removeEventListener('keydown', this.keyboardHandler);
-      this.keyboardHandler = null;
-    }
-  }
-
-  /**
-   * Toggle debug visualization for black bar detection.
-   * (Phase 1.1 - Task 01.1-006)
-   */
-  toggleDebugVisualization(): void {
-    const newState = !this.debugVisualizationEnabled();
-    this.debugVisualizationEnabled.set(newState);
-    this.renderer?.setDebugVisualization(newState);
-
-    console.log(`[CrtEffectWrapper] Debug visualization ${newState ? 'enabled' : 'disabled'} (press 'D' to toggle)`);
-  }
 }
