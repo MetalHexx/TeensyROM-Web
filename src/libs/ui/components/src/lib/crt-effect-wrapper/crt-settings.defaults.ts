@@ -170,23 +170,23 @@ export const CRT_PRESETS = {
 
   /**
    * Large Video (WebGL) - Immersive fullscreen CRT for video content.
-   * Strong scanlines, vignette, curvature, phosphor patterns for maximum authenticity.
+   * Strong scanlines, moderate vignette, no curvature, dot-triad phosphor pattern.
    * Uses WebGL for best quality and no zoom banding artifacts.
    * Ideal for: fullscreen video displays, video dialog, immersive video viewing.
    */
   [CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]: {
-    scanlineIntensity: 0.6,
-    scanlineSize: 2.5,
-    vignetteStrength: 1.5,
-    screenCurvature: 115,
-    contrast: 1.15,
-    brightness: 1.5,
-    saturation: 1.3,
+    scanlineIntensity: 1,
+    scanlineSize: 2,
+    vignetteStrength: 0.95,
+    screenCurvature: 0,
+    contrast: 1.02,
+    brightness: 1.55,
+    saturation: 1.18,
     hue: 0,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
-    phosphorIntensity: 0.4,
-    bloomIntensity: 0.3,
-    barrelDistortion: 0,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.DOT_TRIAD,
+    phosphorIntensity: 0.31,
+    bloomIntensity: 0.55,
+    barrelDistortion: 0.5,
     chromaticAberration: 0,
     monochromePhosphor: 'none',
     autoCropBlackBars: true,
@@ -196,22 +196,22 @@ export const CRT_PRESETS = {
 
   /**
    * Small Image (WebGL) - Balanced CRT effect for static image displays.
-   * Medium scanlines, moderate vignette, no curvature, refined phosphor pattern.
+   * Strong scanlines, subtle vignette, no curvature, dot-triad phosphor pattern.
    * Uses WebGL for sharp, artifact-free rendering.
    * Ideal for: static image viewers, photo galleries, screenshot displays.
    */
   [CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]: {
-    scanlineIntensity: 0.4,
-    scanlineSize: 2.0,
-    vignetteStrength: 1.0,
+    scanlineIntensity: 1,
+    scanlineSize: 1,
+    vignetteStrength: 0.31,
     screenCurvature: 0,
-    contrast: 1.1,
-    brightness: 1.4,
-    saturation: 1.2,
+    contrast: 1.05,
+    brightness: 1.49,
+    saturation: 1.18,
     hue: 0,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
-    phosphorIntensity: 0.2,
-    bloomIntensity: 0,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.DOT_TRIAD,
+    phosphorIntensity: 0.5,
+    bloomIntensity: 0.65,
     barrelDistortion: 0,
     chromaticAberration: 0,
     monochromePhosphor: 'none',
