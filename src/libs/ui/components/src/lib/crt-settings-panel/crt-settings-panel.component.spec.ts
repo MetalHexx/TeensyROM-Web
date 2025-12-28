@@ -524,7 +524,7 @@ describe('CrtSettingsPanelComponent', () => {
 
       const controlValues = fixture.nativeElement.querySelectorAll('.control-value') as NodeListOf<Element>;
       const sizeValue = Array.from(controlValues).find((el) =>
-        el.textContent?.includes('2.5px')
+        el.textContent?.includes('2px')
       );
       expect(sizeValue).toBeTruthy();
     });

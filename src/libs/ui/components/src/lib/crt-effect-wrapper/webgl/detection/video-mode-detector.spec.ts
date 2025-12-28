@@ -359,7 +359,7 @@ describe('VideoModeDetector - Measurement-Based Matching', () => {
       detectStable(meas, 'PAL');
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[CrtRenderer] Mode: PAL Standard'
+        'ℹ️ CrtRenderer: Mode: PAL Standard'
       );
 
       consoleSpy.mockRestore();

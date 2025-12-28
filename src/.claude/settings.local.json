@@ -69,7 +69,8 @@
       "Bash(pnpm nx run infrastructure:test:integration:*)",
       "Bash(pnpm exec nx typecheck:*)",
       "Bash(pnpm exec nx test:*)",
-      "Bash(pnpm exec nx run-many:*)"
+      "Bash(pnpm exec nx run-many:*)",
+      "Bash(nx run:*)"
     ],
     "deny": [],
     "ask": []

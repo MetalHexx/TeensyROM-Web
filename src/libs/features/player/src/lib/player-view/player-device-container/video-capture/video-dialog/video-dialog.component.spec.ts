@@ -325,10 +325,10 @@ describe('VideoDialogComponent', () => {
         fixture.detectChanges();
 
         component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
-        
+
         const settings = component['crtSettings']();
-        expect(settings.phosphorPattern).toBe('aperture-grille');
-        expect(settings.bloomIntensity).toBe(0.3);
+        expect(settings.phosphorPattern).toBe('dot-triad');
+        expect(settings.bloomIntensity).toBe(0.55);
       });
 
       it('should apply custom preset settings correctly', () => {

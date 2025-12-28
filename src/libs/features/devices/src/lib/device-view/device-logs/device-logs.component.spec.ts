@@ -38,13 +38,23 @@ describe('DeviceLogsComponent', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
 
-    // Make scrollTop writable in jsdom for testing
+    // Make scrollTop and scrollHeight writable in jsdom for testing
     const logsContent = fixture.nativeElement.querySelector('.logs-content');
     if (logsContent) {
       Object.defineProperty(logsContent, 'scrollTop', {
         writable: true,
         configurable: true,
         value: 0,
+      });
+      Object.defineProperty(logsContent, 'scrollHeight', {
+        writable: true,
+        configurable: true,
+        value: 0,
+      });
+      Object.defineProperty(logsContent, 'clientHeight', {
+        writable: true,
+        configurable: true,
+        value: 150,
       });
     }
   });
@@ -183,6 +193,9 @@ describe('DeviceLogsComponent', () => {
       const logsContent = fixture.nativeElement.querySelector('.logs-content');
       const initialScrollTop = logsContent.scrollTop;
 
+      // Set scrollHeight to simulate content that needs scrolling
+      Object.defineProperty(logsContent, 'scrollHeight', { value: 500, configurable: true });
+
       // Add more logs
       logsSignal.set(['Log 1', 'Log 2']);
       fixture.detectChanges();
@@ -218,10 +231,19 @@ describe('DeviceLogsComponent', () => {
       const logsContent = fixture.nativeElement.querySelector('.logs-content');
       const initialScrollTop = logsContent.scrollTop;
 
+      // Set scrollHeight to simulate content that needs scrolling
+      Object.defineProperty(logsContent, 'scrollHeight', { value: 500, configurable: true });
+
       // Trigger ngAfterViewInit by creating a new component
       const newFixture = TestBed.createComponent(DeviceLogsComponent);
       logsSignal.set(['Log 1', 'Log 2', 'Log 3']);
       newFixture.detectChanges();
+
+      // Set scrollHeight on the new fixture's element as well
+      const newLogsContent = newFixture.nativeElement.querySelector('.logs-content');
+      Object.defineProperty(newLogsContent, 'scrollTop', { writable: true, configurable: true, value: 0 });
+      Object.defineProperty(newLogsContent, 'scrollHeight', { value: 500, configurable: true });
+      Object.defineProperty(newLogsContent, 'clientHeight', { value: 150, configurable: true });
 
       // Wait for double RAF
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));

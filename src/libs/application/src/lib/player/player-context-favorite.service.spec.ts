@@ -97,7 +97,9 @@ describe('PlayerContextService - Favorite Synchronization', () => {
 
     mockStorageStore = {};
 
-    mockSettingsStore = {};
+    mockSettingsStore = {
+      settings: vi.fn().mockReturnValue(null),
+    };
 
     mockTimerManager = {
       createTimer: vi.fn<PlayerTimerManager['createTimer']>(),

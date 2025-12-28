@@ -89,6 +89,35 @@ describe('CrtRenderer', () => {
     renderer = new CrtRenderer();
     mockGl = createMockWebGLContext();
     mockCanvas = createMockCanvas(mockGl);
+
+    // Mock document.createElement to return a properly mocked canvas for debug canvas creation
+    // This is needed because createDebugCanvas calls getContext('2d') which jsdom doesn't implement
+    // IMPORTANT: Set this up AFTER creating mockCanvas so it doesn't interfere with that
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      if (tagName === 'canvas') {
+        // Return a mock canvas with 2d context support for debug canvas
+        const mockDebugCanvas = originalCreateElement('canvas') as HTMLCanvasElement;
+        const mockCtx2d = {
+          strokeStyle: '',
+          fillStyle: '',
+          font: '',
+          lineWidth: 0,
+          fillRect: vi.fn(),
+          strokeRect: vi.fn(),
+          clearRect: vi.fn(),
+          beginPath: vi.fn(),
+          closePath: vi.fn(),
+          moveTo: vi.fn(),
+          lineTo: vi.fn(),
+          stroke: vi.fn(),
+          fill: vi.fn(),
+        };
+        vi.spyOn(mockDebugCanvas, 'getContext').mockReturnValue(mockCtx2d as any);
+        return mockDebugCanvas;
+      }
+      return originalCreateElement(tagName);
+    });
   });
 
   afterEach(() => {

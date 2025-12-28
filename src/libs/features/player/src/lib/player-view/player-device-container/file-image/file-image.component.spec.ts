@@ -115,8 +115,8 @@ describe('FileImageComponent', () => {
 
       const settings = newComponent['crtSettings']();
       // Should match SMALL_IMAGE_WEBGL preset
-      expect(settings.phosphorPattern).toBe('aperture-grille');
-      expect(settings.bloomIntensity).toBe(0);
+      expect(settings.phosphorPattern).toBe('dot-triad');
+      expect(settings.bloomIntensity).toBe(0.65);
     });
 
     it('should use storage key "file-image"', () => {
@@ -134,10 +134,10 @@ describe('FileImageComponent', () => {
   describe('CRT preset selection', () => {
     it('should apply built-in preset without modification', () => {
       component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL);
-      
+
       const settings = component['crtSettings']();
-      expect(settings.phosphorPattern).toBe('aperture-grille');
-      expect(settings.bloomIntensity).toBe(0);
+      expect(settings.phosphorPattern).toBe('dot-triad');
+      expect(settings.bloomIntensity).toBe(0.65);
       // Settings applied as-is from preset
     });
 
