@@ -19,6 +19,7 @@ const mockRendererInstance: {
   stopRenderLoop: Mock;
   setImageElement: Mock;
   renderImage: Mock;
+  setDebugVisualization: Mock;
 } = {
   init: vi.fn(() => true),
   updateSettings: vi.fn(),
@@ -31,6 +32,7 @@ const mockRendererInstance: {
   stopRenderLoop: vi.fn(),
   setImageElement: vi.fn(),
   renderImage: vi.fn(),
+  setDebugVisualization: vi.fn(),
 };
 
 vi.mock('./webgl/crt-renderer', () => ({
@@ -105,43 +107,43 @@ describe('CrtEffectWrapperComponent', () => {
     it('should bind scanline-intensity CSS variable', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.6');
+      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('1');
     });
 
     it('should bind scanline-size CSS variable with px unit', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--scanline-size')).toBe('2.5px');
+      expect(wrapper.style.getPropertyValue('--scanline-size')).toBe('2px');
     });
 
     it('should bind vignette-strength CSS variable', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('1.5');
+      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('0.95');
     });
 
     it('should bind screen-curvature CSS variable with px unit', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('115px');
+      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
     });
 
     it('should bind crt-contrast CSS variable', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--crt-contrast')).toBe('1.15');
+      expect(wrapper.style.getPropertyValue('--crt-contrast')).toBe('1.02');
     });
 
     it('should bind crt-brightness CSS variable', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--crt-brightness')).toBe('1.5');
+      expect(wrapper.style.getPropertyValue('--crt-brightness')).toBe('1.55');
     });
 
     it('should bind crt-saturation CSS variable', () => {
       fixture.detectChanges();
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--crt-saturation')).toBe('1.3');
+      expect(wrapper.style.getPropertyValue('--crt-saturation')).toBe('1.18');
     });
 
     // Note: Phase 2 CSS custom properties (scanline-opacity, hue-rotate, color-temp,
@@ -208,10 +210,10 @@ describe('CrtEffectWrapperComponent', () => {
       fixture.detectChanges();
 
       const wrapper = fixture.nativeElement.querySelector('.crt-wrapper');
-      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.6');
-      expect(wrapper.style.getPropertyValue('--scanline-size')).toBe('2.5px');
-      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('1.5');
-      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('115px');
+      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('1');
+      expect(wrapper.style.getPropertyValue('--scanline-size')).toBe('2px');
+      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('0.95');
+      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
     });
   });
 
@@ -241,8 +243,8 @@ describe('CrtEffectWrapperComponent', () => {
       expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0');
       expect(wrapper.style.getPropertyValue('--scanline-size')).toBe('0px');
       // Other effects should still be active
-      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('1.5');
-      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('115px');
+      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('0.95');
+      expect(wrapper.style.getPropertyValue('--screen-curvature')).toBe('0px');
     });
 
     it('should allow disabling curvature via settings', () => {
@@ -274,8 +276,8 @@ describe('CrtEffectWrapperComponent', () => {
       expect(wrapper.style.getPropertyValue('--crt-brightness')).toBe('1');
       expect(wrapper.style.getPropertyValue('--crt-saturation')).toBe('1');
       // Other effects should still be active
-      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('0.6');
-      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('1.5');
+      expect(wrapper.style.getPropertyValue('--scanline-intensity')).toBe('1');
+      expect(wrapper.style.getPropertyValue('--vignette-strength')).toBe('0.95');
     });
   });
 });
@@ -320,7 +322,6 @@ describe('CrtEffectWrapperComponent Content Projection', () => {
 });
 
 describe('CrtEffectWrapperComponent WebGL Mode', () => {
-  let component: CrtEffectWrapperComponent;
   let fixture: ComponentFixture<CrtEffectWrapperComponent>;
 
   beforeEach(async () => {
@@ -334,7 +335,7 @@ describe('CrtEffectWrapperComponent WebGL Mode', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(CrtEffectWrapperComponent);
-    component = fixture.componentInstance;
+    // Component not used in these tests
   });
 
   describe('Canvas Element', () => {
@@ -354,7 +355,6 @@ describe('CrtEffectWrapperComponent WebGL Mode', () => {
 
 describe('CrtEffectWrapperComponent WebGL Video Support (mocked as supported)', () => {
   let fixture: ComponentFixture<TestHostWithVideoComponent>;
-  let hostComponent: TestHostWithVideoComponent;
 
   beforeEach(async () => {
     // Reset all mocks and set WebGL as supported for these tests
@@ -367,7 +367,7 @@ describe('CrtEffectWrapperComponent WebGL Video Support (mocked as supported)', 
     }).compileComponents();
 
     fixture = TestBed.createComponent(TestHostWithVideoComponent);
-    hostComponent = fixture.componentInstance;
+    // Host component not used in these tests
   });
 
   it('should detect video element and set it on renderer', async () => {

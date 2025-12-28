@@ -82,6 +82,9 @@ export class VideoDialogComponent implements OnDestroy {
   /** Unified CRT settings (initialized with detection logic in constructor) */
   protected readonly crtSettings = signal<CrtSettings>({} as CrtSettings);
 
+  /** Debug mode state for black bar detection visualization (Phase 1.1 - Task 01.1-006) */
+  protected readonly debugMode = signal<boolean>(false);
+
   /** CRT config - large display with all controls */
   protected readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.large;
 
@@ -197,6 +200,11 @@ export class VideoDialogComponent implements OnDestroy {
   onCrtSettingsChange(settings: CrtSettings): void {
     this.crtSettings.set(settings);
     this.crtStorage.save(this.data.deviceId, 'video-dialog', settings);
+  }
+
+  /** Handle debug mode toggle from settings panel (Phase 1.1 - Task 01.1-006) */
+  onDebugModeChange(enabled: boolean): void {
+    this.debugMode.set(enabled);
   }
 
   /** Apply a CRT preset (built-in or custom) */

@@ -22,6 +22,13 @@
 // Main renderer class
 export { CrtRenderer } from './crt-renderer';
 
+// Black bar detection
+export { BlackBarDetector } from './black-bar-detector';
+export type { CropRect } from './black-bar-detector';
+
+// Crop animation
+export { CropAnimator } from './crop-animator';
+
 // Shader sources (for advanced customization)
 export { PASSTHROUGH_VERTEX_SHADER } from './shaders/passthrough.vert';
 export { SCANLINE_FRAGMENT_SHADER } from './shaders/scanline.frag';

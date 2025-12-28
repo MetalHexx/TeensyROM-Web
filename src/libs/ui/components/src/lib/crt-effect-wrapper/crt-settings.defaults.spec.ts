@@ -29,17 +29,17 @@ describe('CRT_PRESETS', () => {
   });
 
   describe('Large video preset', () => {
-    it('should have screen curvature', () => {
-      expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].screenCurvature).toBe(115);
+    it('should have no screen curvature', () => {
+      expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].screenCurvature).toBe(0);
     });
 
     it('should have strong scanline values', () => {
-      expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].scanlineIntensity).toBe(0.6);
-      expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].scanlineSize).toBe(2.5);
+      expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].scanlineIntensity).toBe(1);
+      expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].scanlineSize).toBe(2);
     });
 
-    it('should have strong vignette', () => {
-      expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].vignetteStrength).toBe(1.5);
+    it('should have moderate vignette', () => {
+      expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].vignetteStrength).toBe(0.95);
     });
   });
 
@@ -49,26 +49,29 @@ describe('CRT_PRESETS', () => {
     });
 
     it('should have balanced scanline values', () => {
-      expect(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL].scanlineIntensity).toBe(0.4);
-      expect(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL].scanlineSize).toBe(2.0);
+      expect(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL].scanlineIntensity).toBe(1);
+      expect(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL].scanlineSize).toBe(1);
     });
 
-    it('should have moderate vignette', () => {
-      expect(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL].vignetteStrength).toBe(1.0);
+    it('should have minimal vignette', () => {
+      expect(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL].vignetteStrength).toBe(0.31);
     });
   });
 
   describe('WebGL presets', () => {
 
-    it('should have aperture-grille phosphor pattern', () => {
+    it('should have appropriate phosphor patterns', () => {
+      // SMALL_VIDEO_WEBGL uses aperture-grille for subtle effect
       expect(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL].phosphorPattern).toBe(
         CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE
       );
+      // LARGE_VIDEO_WEBGL uses dot-triad for immersive effect
       expect(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL].phosphorPattern).toBe(
-        CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE
+        CRT_PHOSPHOR_PATTERNS.DOT_TRIAD
       );
+      // SMALL_IMAGE_WEBGL uses dot-triad for balanced effect
       expect(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL].phosphorPattern).toBe(
-        CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE
+        CRT_PHOSPHOR_PATTERNS.DOT_TRIAD
       );
     });
 
@@ -137,9 +140,9 @@ describe('CRT_PRESETS', () => {
   });
 
   describe('Value inheritance verification', () => {
-    it('should maintain Small Video WebGL values from legacy small preset', () => {
+    it('should maintain Small Video WebGL values', () => {
       const smallVideoWebgl = CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL];
-      // Verify key inherited values
+      // Verify key values
       expect(smallVideoWebgl.scanlineIntensity).toBe(0.3);
       expect(smallVideoWebgl.scanlineSize).toBe(1.5);
       expect(smallVideoWebgl.vignetteStrength).toBe(0.7);
@@ -147,24 +150,24 @@ describe('CRT_PRESETS', () => {
       expect(smallVideoWebgl.phosphorIntensity).toBe(0.1);
     });
 
-    it('should maintain Large Video WebGL values from legacy large preset', () => {
+    it('should maintain Large Video WebGL values', () => {
       const largeVideoWebgl = CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL];
-      // Verify key inherited values
-      expect(largeVideoWebgl.scanlineIntensity).toBe(0.6);
-      expect(largeVideoWebgl.scanlineSize).toBe(2.5);
-      expect(largeVideoWebgl.vignetteStrength).toBe(1.5);
-      expect(largeVideoWebgl.screenCurvature).toBe(115);
-      expect(largeVideoWebgl.phosphorIntensity).toBe(0.4);
+      // Verify key values
+      expect(largeVideoWebgl.scanlineIntensity).toBe(1);
+      expect(largeVideoWebgl.scanlineSize).toBe(2);
+      expect(largeVideoWebgl.vignetteStrength).toBe(0.95);
+      expect(largeVideoWebgl.screenCurvature).toBe(0);
+      expect(largeVideoWebgl.phosphorIntensity).toBe(0.31);
     });
 
     it('should define Small Image WebGL values for static image viewing', () => {
       const smallImageWebgl = CRT_PRESETS[CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL];
       // Verify balanced values for image content
-      expect(smallImageWebgl.scanlineIntensity).toBe(0.4);
-      expect(smallImageWebgl.scanlineSize).toBe(2.0);
-      expect(smallImageWebgl.vignetteStrength).toBe(1.0);
+      expect(smallImageWebgl.scanlineIntensity).toBe(1);
+      expect(smallImageWebgl.scanlineSize).toBe(1);
+      expect(smallImageWebgl.vignetteStrength).toBe(0.31);
       expect(smallImageWebgl.screenCurvature).toBe(0);
-      expect(smallImageWebgl.phosphorIntensity).toBe(0.2);
+      expect(smallImageWebgl.phosphorIntensity).toBe(0.5);
     });
   });
 });
@@ -201,12 +204,13 @@ describe('CRT_PRESET_LABELS', () => {
 });
 
 describe('CRT_CONFIGS', () => {
-  it('should have exactly 3 config variants', () => {
-    expect(Object.keys(CRT_CONFIGS)).toHaveLength(3);
+  it('should have exactly 4 config variants', () => {
+    expect(Object.keys(CRT_CONFIGS)).toHaveLength(4);
   });
 
-  it('should have small, large, and none variants', () => {
+  it('should have small, smallVideo, large, and none variants', () => {
     expect(CRT_CONFIGS.small).toBeDefined();
+    expect(CRT_CONFIGS.smallVideo).toBeDefined();
     expect(CRT_CONFIGS.large).toBeDefined();
     expect(CRT_CONFIGS.none).toBeDefined();
   });
@@ -266,8 +270,8 @@ describe('DEFAULT_CRT_SETTINGS', () => {
   });
 
   it('should have large preset characteristics', () => {
-    expect(DEFAULT_CRT_SETTINGS.screenCurvature).toBe(115);
-    expect(DEFAULT_CRT_SETTINGS.phosphorPattern).toBe(CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE);
+    expect(DEFAULT_CRT_SETTINGS.screenCurvature).toBe(0);
+    expect(DEFAULT_CRT_SETTINGS.phosphorPattern).toBe(CRT_PHOSPHOR_PATTERNS.DOT_TRIAD);
     expect(DEFAULT_CRT_SETTINGS.phosphorIntensity).toBeGreaterThan(0);
   });
 

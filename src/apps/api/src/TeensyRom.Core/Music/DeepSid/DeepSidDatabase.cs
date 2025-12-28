@@ -57,9 +57,9 @@ public class DeepSidDatabase : IDeepSidDatabase
 
     private static string GetDeepSidFilePath()
     {
-        var currentDirectory = Path.GetDirectoryName(typeof(DeepSidDatabase).Assembly.Location);
+        var currentDirectory = Assembly.GetExecutingAssembly().GetPath();
 
-        if (currentDirectory is null) return string.Empty;
+        if (string.IsNullOrEmpty(currentDirectory)) return string.Empty;
 
         // Look for exported JSON in the DeepSidDB directory
         var exportedDbPath = Path.Combine(currentDirectory, MusicConstants.DeepSid_Db_Local_Path, "deepsid_db.json");

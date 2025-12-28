@@ -7,11 +7,11 @@ import {
   inject,
   signal,
   viewChild,
-  effect,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSliderModule } from '@angular/material/slider';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -46,6 +46,10 @@ import {
   PhosphorPatternOption,
   MONOCHROME_PHOSPHOR_OPTIONS,
   MonochromePhosphorOption,
+  VIDEO_MODE_OPTIONS,
+  VIDEO_STANDARD_OPTIONS,
+  type VideoModeOption,
+  type VideoStandardOption,
 } from './crt-slider-configs';
 import { CRT_STORAGE, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 import { IconLabelComponent } from "../icon-label/icon-label.component";
@@ -94,6 +98,7 @@ export { CrtPresetName, CRT_PRESETS };
     CommonModule,
     FormsModule,
     MatSliderModule,
+    MatSlideToggleModule,
     MatIconModule,
     MatTooltipModule,
     MatExpansionModule,
@@ -184,6 +189,16 @@ export class CrtSettingsPanelComponent {
   readonly settingsChange = output<CrtSettings>();
 
   /**
+   * Debug mode state from parent component.
+   */
+  readonly debugMode = input<boolean>(false);
+
+  /**
+   * Emits when debug mode toggle changes.
+   */
+  readonly debugModeChange = output<boolean>();
+
+  /**
    * Emits when a preset is selected from the menu.
    * Emits the preset name so parent can apply CRT_PRESETS[name].
    */
@@ -211,6 +226,16 @@ export class CrtSettingsPanelComponent {
   protected readonly phosphorSlider = PHOSPHOR_SLIDER;
   protected readonly phosphorPatternOptions = PHOSPHOR_PATTERN_OPTIONS;
   protected readonly monochromePhosphorOptions = MONOCHROME_PHOSPHOR_OPTIONS;
+  protected readonly videoStandardOptions = VIDEO_STANDARD_OPTIONS;
+
+  /** Video mode options filtered by current video standard */
+  protected readonly videoModeOptions = computed(() => {
+    const currentStandard = this.settings().videoStandard;
+
+    return VIDEO_MODE_OPTIONS.filter(option =>
+      option.region === 'all' || option.region === currentStandard
+    );
+  });
 
   /** Available preset names for the preset menu (computed to exclude specified presets) */
   protected readonly presetNames = computed(() => {
@@ -259,22 +284,14 @@ export class CrtSettingsPanelComponent {
 
   /** Determines which panel should be expanded by default based on config visibility */
   protected readonly defaultExpandedPanel = computed<string | null>(() => {
-    const cfg = this.config();
-    
-    // Check Scanlines & Screen panel
     if (this.hasScanlinesPanelContent()) return 'scanlines-screen';
-    
-    // Check Light & Color panel
     if (this.hasLightColorPanelContent()) return 'light-color';
-    
-    // Check Phosphor Effects panel
     if (this.hasPhosphorPanelContent()) return 'phosphor';
-    
+
     return null;
   });
 
   constructor() {
-    // Load custom presets on component initialization
     try {
       const presets = this.crtStorage.loadCustomPresets();
       this.customPresets.set(presets);
@@ -302,17 +319,16 @@ export class CrtSettingsPanelComponent {
    */
   protected readonly computedCardClass = computed(() => {
     const classes: string[] = ['glassy-card', 'crt-controls-card'];
-    
-    // Add scrollable class when maxHeight is set
+
     if (this.maxHeight() !== undefined) {
       classes.push('scrollable-panel');
     }
-    
+
     const additionalClass = this.cardClass();
     if (additionalClass) {
       classes.push(additionalClass);
     }
-    
+
     return classes.join(' ');
   });
 
@@ -341,37 +357,29 @@ export class CrtSettingsPanelComponent {
    */
   protected readonly currentPresetName = computed<CrtPresetName | CustomPresetName | null>(() => {
     const current = this.settings();
-    
-    // Check built-in presets
+
     const presetEntries = Object.entries(CRT_PRESETS) as Array<[CrtPresetName, CrtSettings]>;
     for (const [name, preset] of presetEntries) {
       if (JSON.stringify(current) === JSON.stringify(preset)) {
         return name;
       }
     }
-    
-    // Check custom presets
+
     for (const preset of this.customPresets()) {
       if (JSON.stringify(current) === JSON.stringify(preset.settings)) {
         return preset.name;
       }
     }
-    
+
     return null;
   });
 
-  /**
-   * Whether phosphor controls should be visible.
-   * Phosphor patterns are WebGL-only (now the only mode).
-   */
+  /** Whether phosphor controls should be visible */
   protected readonly shouldShowPhosphor = computed(() => {
     return this.config().showPhosphor;
   });
 
-  /**
-   * Whether monochrome phosphor control should be visible.
-   * Monochrome phosphor is WebGL-only.
-   */
+  /** Whether monochrome phosphor control should be visible */
   protected readonly shouldShowMonochromePhosphor = computed(() => {
     return this.config().showMonochromePhosphor;
   });
@@ -421,6 +429,26 @@ export class CrtSettingsPanelComponent {
       [key]: value,
     };
     this.settingsChange.emit(updatedSettings);
+  }
+
+  /**
+   * Handles boolean toggle changes (e.g., autoCropBlackBars).
+   * Emits updated settings with the changed value.
+   */
+  protected onToggleChange(key: keyof CrtSettings, value: boolean): void {
+    const updatedSettings: CrtSettings = {
+      ...this.settings(),
+      [key]: value,
+    };
+    this.settingsChange.emit(updatedSettings);
+  }
+
+  /**
+   * Handles debug mode toggle changes.
+   * Emits the new debug mode state to parent component.
+   */
+  protected onDebugModeChange(value: boolean): void {
+    this.debugModeChange.emit(value);
   }
 
   /**
@@ -482,14 +510,67 @@ export class CrtSettingsPanelComponent {
   }
 
   /**
+   * Handles video mode selection.
+   */
+  protected onVideoModeChange(mode: VideoModeOption): void {
+    const updatedSettings: CrtSettings = {
+      ...this.settings(),
+      videoMode: mode,
+    };
+    this.settingsChange.emit(updatedSettings);
+  }
+
+  /**
+   * Gets the label for the current video mode.
+   */
+  protected getVideoModeLabel(): string {
+    const mode = this.settings().videoMode;
+    const option = VIDEO_MODE_OPTIONS.find(o => o.value === mode);
+    return option?.label ?? 'Unknown';
+  }
+
+  /**
+   * Generates a test ID for video mode options (replaces spaces with hyphens).
+   */
+  protected getVideoModeTestId(mode: VideoModeOption): string {
+    return 'video-mode-' + mode.replace(/\s+/g, '-');
+  }
+
+  /**
+   * Handles video standard (PAL/NTSC) selection.
+   * Resets video mode to 'auto' when standard changes to prevent invalid combinations.
+   */
+  protected onVideoStandardChange(standard: VideoStandardOption): void {
+    const updatedSettings: CrtSettings = {
+      ...this.settings(),
+      videoStandard: standard,
+      // Reset video mode to auto when switching standards to prevent PAL mode on NTSC or vice versa
+      videoMode: 'auto',
+    };
+    this.settingsChange.emit(updatedSettings);
+  }
+
+  /**
+   * Gets the label for the current video standard.
+   */
+  protected getVideoStandardLabel(): string {
+    const standard = this.settings().videoStandard;
+    const option = VIDEO_STANDARD_OPTIONS.find(o => o.value === standard);
+    return option?.label ?? 'Unknown';
+  }
+
+  /**
    * Formats slider display value based on configuration.
    */
-  protected formatValue(value: number | string, slider: SliderConfig): string {
-    // Handle non-numeric values (e.g., monochromePhosphor type)
+  protected formatValue(value: number | string | boolean, slider: SliderConfig): string {
+    if (typeof value === 'boolean') {
+      return '';
+    }
+
     if (typeof value !== 'number') {
       return String(value);
     }
-    
+
     if (slider.format === 'px') {
       return `${value}px`;
     }
@@ -509,18 +590,15 @@ export class CrtSettingsPanelComponent {
    * For custom presets: always returns the name without 'custom-' prefix.
    */
   protected getPresetLabel(presetName: CrtPresetName | CustomPresetName): string {
-    // Check if it's a custom preset
     if (typeof presetName === 'string' && presetName.startsWith('custom-')) {
       return this.stripCustomPrefix(presetName as CustomPresetName);
     }
-    
-    // For built-in presets: use component-provided label if available
+
     const providedLabel = this.currentPresetLabel();
     if (providedLabel) {
       return providedLabel;
     }
-    
-    // Fallback to global preset labels
+
     return CRT_PRESET_LABELS[presetName as CrtPresetName];
   }
 
@@ -580,17 +658,14 @@ export class CrtSettingsPanelComponent {
    * When renaming, excludes current preset name to allow keeping same name.
    */
   protected getReservedNames(): string[] {
-    // Get built-in names without 'default-' prefix
     const builtInNames = this.presetNames().map(k => k.replace(/^default-/, ''));
-    // Get custom names without 'custom-' prefix
     let customNames = this.customPresets().map(p => this.stripCustomPrefix(p.name));
-    
-    // When renaming, exclude current preset name (allow keeping same name)
+
     if (this.isRenaming() && this.dialogPresetName()) {
       const currentName = this.stripCustomPrefix(this.dialogPresetName() as CustomPresetName);
       customNames = customNames.filter(n => n !== currentName);
     }
-    
+
     return [...builtInNames, ...customNames];
   }
 
@@ -618,8 +693,7 @@ export class CrtSettingsPanelComponent {
     this.showNameDialog.set(false);
     this.dialogPresetName.set('');
     this.isRenaming.set(false);
-    
-    // Reopen dropdown after dialog closes
+
     this.presetDropdown()?.open();
   }
 
@@ -632,26 +706,21 @@ export class CrtSettingsPanelComponent {
     try {
       const presetName = this.dialogPresetName() as CustomPresetName;
       const wasActive = this.currentPresetName() === presetName;
-      
+
       this.crtStorage.deleteCustomPreset(presetName);
       console.log(`[CrtSettingsPanel] Deleted custom preset: ${presetName}`);
-      
-      // If deleted preset was active, emit presetSelected with default preset
+
       if (wasActive) {
         this.presetSelected.emit(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
       }
-      
-      // Refresh preset list and close dialog
+
       this.refreshCustomPresets();
       this.showConfirmDialog.set(false);
       this.dialogPresetName.set('');
-      
-      // Reopen dropdown after successful delete
+
       this.presetDropdown()?.open();
     } catch (error) {
       console.error('[CrtSettingsPanel] Failed to delete preset:', error);
-      // Future: show error toast
-      // Close dialog even on error to reset state
       this.showConfirmDialog.set(false);
       this.dialogPresetName.set('');
       this.presetDropdown()?.open();
@@ -665,8 +734,7 @@ export class CrtSettingsPanelComponent {
   protected onDeleteCancelled(): void {
     this.showConfirmDialog.set(false);
     this.dialogPresetName.set('');
-    
-    // Reopen dropdown after dialog closes
+
     this.presetDropdown()?.open();
   }
 
@@ -704,29 +772,22 @@ export class CrtSettingsPanelComponent {
    */
   private handleSavePreset(name: string): void {
     try {
-      // Check maximum preset limit
       if (this.customPresets().length >= 50) {
         console.warn('[CrtSettingsPanel] Maximum preset limit reached (50)');
-        // Future: show error toast to user
         this.showNameDialog.set(false);
         this.presetDropdown()?.open();
         return;
       }
-      
-      // Save preset with current settings
+
       this.crtStorage.saveCustomPreset(name, this.settings());
       console.log(`[CrtSettingsPanel] Saved custom preset: custom-${name}`);
-      
-      // Refresh preset list and close dialog
+
       this.refreshCustomPresets();
       this.showNameDialog.set(false);
-      
-      // Reopen dropdown after successful save
+
       this.presetDropdown()?.open();
     } catch (error) {
       console.error('[CrtSettingsPanel] Failed to save preset:', error);
-      // Future: show error toast
-      // Close dialog even on error to reset state
       this.showNameDialog.set(false);
       this.presetDropdown()?.open();
     }
@@ -741,19 +802,15 @@ export class CrtSettingsPanelComponent {
       const oldName = this.dialogPresetName() as CustomPresetName;
       this.crtStorage.renameCustomPreset(oldName, newName);
       console.log(`[CrtSettingsPanel] Renamed preset: ${oldName} -> custom-${newName}`);
-      
-      // Refresh preset list and close dialog
+
       this.refreshCustomPresets();
       this.showNameDialog.set(false);
       this.dialogPresetName.set('');
       this.isRenaming.set(false);
-      
-      // Reopen dropdown after successful rename
+
       this.presetDropdown()?.open();
     } catch (error) {
       console.error('[CrtSettingsPanel] Failed to rename preset:', error);
-      // Future: show error toast
-      // Close dialog even on error to reset state
       this.showNameDialog.set(false);
       this.dialogPresetName.set('');
       this.isRenaming.set(false);
@@ -780,7 +837,6 @@ export class CrtSettingsPanelComponent {
       this.customPresets.set(presets);
     } catch (error) {
       console.error('[CrtSettingsPanel] Failed to refresh presets:', error);
-      // Keep existing list on error
     }
   }
 }

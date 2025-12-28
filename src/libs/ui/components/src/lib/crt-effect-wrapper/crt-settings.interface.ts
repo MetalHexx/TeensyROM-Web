@@ -169,6 +169,13 @@ export interface CrtSettingsConfig {
    * When false, monochrome phosphor dropdown hidden and effect disabled.
    */
   showMonochromePhosphor: boolean;
+
+  /**
+   * Show Advanced Detection panel (PAL/NTSC selection, video mode selection).
+   * When false, advanced detection controls hidden and auto-detection uses defaults.
+   * Used for static image displays where video detection is not applicable.
+   */
+  showAdvancedDetection: boolean;
 }
 
 /**

@@ -179,3 +179,42 @@ export const MONOCHROME_PHOSPHOR_OPTIONS: MonochromePhosphorConfig[] = [
   { value: 'amber', label: 'Amber Phosphor (Classic Terminal)' },
   { value: 'green', label: 'Green Phosphor (VT220 / Hacker)' },
 ];
+
+/** Video mode options for dropdown selector */
+export type VideoModeOption = 'auto' | 'PAL Standard' | 'PAL Open Border' | 'NTSC Standard' | 'NTSC Open Border';
+
+export interface VideoModeConfig {
+  value: VideoModeOption;
+  label: string;
+  region: 'PAL' | 'NTSC' | 'all';
+}
+
+export const VIDEO_MODE_OPTIONS: VideoModeConfig[] = [
+  { value: 'auto', label: 'Auto Detect', region: 'all' },
+  { value: 'PAL Standard', label: 'PAL Standard', region: 'PAL' },
+  { value: 'PAL Open Border', label: 'PAL Open Border', region: 'PAL' },
+  { value: 'NTSC Standard', label: 'NTSC Standard', region: 'NTSC' },
+  { value: 'NTSC Open Border', label: 'NTSC Open Border', region: 'NTSC' },
+];
+
+/** Video standard options for dropdown selector */
+export type VideoStandardOption = 'PAL' | 'NTSC';
+
+export interface VideoStandardConfig {
+  value: VideoStandardOption;
+  label: string;
+  description: string;
+}
+
+export const VIDEO_STANDARD_OPTIONS: VideoStandardConfig[] = [
+  {
+    value: 'PAL',
+    label: 'PAL (Europe)',
+    description: '50 Hz, 256 lines, symmetric borders'
+  },
+  {
+    value: 'NTSC',
+    label: 'NTSC (Americas)',
+    description: '60 Hz, 240 lines, asymmetric borders'
+  },
+];

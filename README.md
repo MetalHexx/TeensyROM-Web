@@ -65,6 +65,7 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
   - **Dialog Mode**: Expanded "Theatre Style" video dialog
   - **Fullscreen Mode**: Immersive full-screen experience
 - **CRT Presets**: Save and load custom CRT effect configurations
+- **Auto Black Bar/Border Cropping**: GPU-accelerated detection removes black bars/borders with smooth animated transitions, PAL/NTSC aware
 
 ### Search & Filter
 - **Full-Text Search**: Search across all indexed files on SD or USB storage (per storage type)

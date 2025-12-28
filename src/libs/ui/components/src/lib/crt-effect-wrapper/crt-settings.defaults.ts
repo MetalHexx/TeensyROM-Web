@@ -15,25 +15,33 @@ export const DEFAULT_CRT_CONFIG: CrtSettingsConfig = {
   showDistortion: true,
   showChromaticAberration: true,
   showMonochromePhosphor: true,
+  showAdvancedDetection: true,
 };
 
 /**
  * CRT settings panel configuration variants.
- * 
+ *
  * Controls which sliders and controls are visible in the settings panel.
- * 
- * - small: For compact displays (file-image, video-capture)
+ *
+ * - small: For compact displays (file-image)
  *   - Hides curvature control (not relevant for small displays)
+ *   - Hides Advanced Detection panel (static images don't need video detection)
  *   - Shows all other controls
- * 
+ *
+ * - smallVideo: For compact video displays (video-capture)
+ *   - Hides curvature control (not relevant for small displays)
+ *   - Shows Advanced Detection panel (video content needs PAL/NTSC detection)
+ *   - Shows all other controls
+ *
  * - large: For fullscreen displays (video-dialog)
  *   - Shows all controls including curvature
+ *   - Shows Advanced Detection panel
  *   - Full immersive CRT experience
- * 
+ *
  * - none: Completely hides settings panel
  *   - All controls disabled
  *   - Edge case for completely static CRT effects
- * 
+ *
  * @example
  * ```typescript
  * // Use matching config with preset
@@ -44,8 +52,8 @@ export const DEFAULT_CRT_CONFIG: CrtSettingsConfig = {
 // NOTE: Phase 2 will update component references from old 'full'/'standard' keys to 'small'/'large'
 export const CRT_CONFIGS = {
   /**
-   * Small config - for compact displays.
-   * Hides curvature control (not relevant for small displays), shows all other controls.
+   * Small config - for compact static image displays.
+   * Hides curvature and Advanced Detection (not relevant for static images), shows all other controls.
    */
   small: {
     showScanlines: true,
@@ -57,11 +65,29 @@ export const CRT_CONFIGS = {
     showDistortion: true,
     showChromaticAberration: true,
     showMonochromePhosphor: true,
+    showAdvancedDetection: false,
+  },
+
+  /**
+   * Small Video config - for compact video displays.
+   * Hides curvature control but shows Advanced Detection for PAL/NTSC video mode detection.
+   */
+  smallVideo: {
+    showScanlines: true,
+    showVignette: true,
+    showCurvature: false,
+    showColorFilters: true,
+    showPhosphor: true,
+    showBloom: true,
+    showDistortion: true,
+    showChromaticAberration: true,
+    showMonochromePhosphor: true,
+    showAdvancedDetection: true,
   },
 
   /**
    * Large config - for fullscreen displays.
-   * Shows all controls including curvature for full immersive CRT experience.
+   * Shows all controls including curvature and Advanced Detection for full immersive CRT experience.
    */
   large: {
     showScanlines: true,
@@ -73,6 +99,7 @@ export const CRT_CONFIGS = {
     showDistortion: true,
     showChromaticAberration: true,
     showMonochromePhosphor: true,
+    showAdvancedDetection: true,
   },
 
   /**
@@ -89,6 +116,7 @@ export const CRT_CONFIGS = {
     showDistortion: false,
     showChromaticAberration: false,
     showMonochromePhosphor: false,
+    showAdvancedDetection: false,
   },
 } as const satisfies Record<string, CrtSettingsConfig>;
 
@@ -135,52 +163,61 @@ export const CRT_PRESETS = {
     barrelDistortion: 0,
     chromaticAberration: 0,
     monochromePhosphor: 'none',
+    autoCropBlackBars: true,
+    videoStandard: 'PAL',
+    videoMode: 'auto',
   },
 
   /**
    * Large Video (WebGL) - Immersive fullscreen CRT for video content.
-   * Strong scanlines, vignette, curvature, phosphor patterns for maximum authenticity.
+   * Strong scanlines, moderate vignette, no curvature, dot-triad phosphor pattern.
    * Uses WebGL for best quality and no zoom banding artifacts.
    * Ideal for: fullscreen video displays, video dialog, immersive video viewing.
    */
   [CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]: {
-    scanlineIntensity: 0.6,
-    scanlineSize: 2.5,
-    vignetteStrength: 1.5,
-    screenCurvature: 115,
-    contrast: 1.15,
-    brightness: 1.5,
-    saturation: 1.3,
+    scanlineIntensity: 1,
+    scanlineSize: 2,
+    vignetteStrength: 0.95,
+    screenCurvature: 0,
+    contrast: 1.02,
+    brightness: 1.55,
+    saturation: 1.18,
     hue: 0,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
-    phosphorIntensity: 0.4,
-    bloomIntensity: 0.3,
-    barrelDistortion: 0,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.DOT_TRIAD,
+    phosphorIntensity: 0.31,
+    bloomIntensity: 0.55,
+    barrelDistortion: 0.5,
     chromaticAberration: 0,
     monochromePhosphor: 'none',
+    autoCropBlackBars: true,
+    videoStandard: 'PAL',
+    videoMode: 'auto',
   },
 
   /**
    * Small Image (WebGL) - Balanced CRT effect for static image displays.
-   * Medium scanlines, moderate vignette, no curvature, refined phosphor pattern.
+   * Strong scanlines, subtle vignette, no curvature, dot-triad phosphor pattern.
    * Uses WebGL for sharp, artifact-free rendering.
    * Ideal for: static image viewers, photo galleries, screenshot displays.
    */
   [CRT_PRESET_KEYS.SMALL_IMAGE_WEBGL]: {
-    scanlineIntensity: 0.4,
-    scanlineSize: 2.0,
-    vignetteStrength: 1.0,
+    scanlineIntensity: 1,
+    scanlineSize: 1,
+    vignetteStrength: 0.31,
     screenCurvature: 0,
-    contrast: 1.1,
-    brightness: 1.4,
-    saturation: 1.2,
+    contrast: 1.05,
+    brightness: 1.49,
+    saturation: 1.18,
     hue: 0,
-    phosphorPattern: CRT_PHOSPHOR_PATTERNS.APERTURE_GRILLE,
-    phosphorIntensity: 0.2,
-    bloomIntensity: 0,
+    phosphorPattern: CRT_PHOSPHOR_PATTERNS.DOT_TRIAD,
+    phosphorIntensity: 0.5,
+    bloomIntensity: 0.65,
     barrelDistortion: 0,
     chromaticAberration: 0,
     monochromePhosphor: 'none',
+    autoCropBlackBars: true,
+    videoStandard: 'PAL',
+    videoMode: 'auto',
   },
 } as const satisfies Record<string, CrtSettings>;
 

@@ -43,11 +43,10 @@ export class VideoCaptureComponent implements OnDestroy {
   private readonly dialog = inject(MatDialog);
   private readonly settingsStore = inject(SettingsStore);
   private readonly crtStorage = inject(CRT_STORAGE);
-  
+
   deviceId = input.required<string>();
 
-  // CRT configuration - small preset (subtle scanlines for compact display)
-  readonly crtConfig = CRT_CONFIGS.small;
+  readonly crtConfig = CRT_CONFIGS.smallVideo;
 
   /**
    * Context-appropriate label for the current preset.
@@ -65,20 +64,20 @@ export class VideoCaptureComponent implements OnDestroy {
     return { error: result.error ?? null };
   };
 
-  // CRT state signals
   protected readonly isCrtEnabled = signal<boolean>(true);
   protected readonly crtSettings = signal<CrtSettings>(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]);
   protected readonly showCrtControls = signal<boolean>(false);
   protected readonly isDeviceSelectorOpen = signal<boolean>(false);
   protected readonly showDeviceSelector = signal<boolean>(false);
 
-  // Signals for reactive state
+  /** Debug mode state for black bar detection visualization */
+  protected readonly debugMode = signal<boolean>(false);
+
   private videoDevices = signal<VideoDevice[]>([]);
   private selectedDeviceId = signal<string | null>(null);
   protected readonly currentStream = signal<MediaStream | null>(null);
   private permissionDenied = signal<boolean>(false);
 
-  // Computed signals
   devices = computed(() => this.videoDevices());
   hasDevices = computed(() => this.videoDevices().length > 0);
   isPermissionDenied = computed(() => this.permissionDenied());
@@ -86,10 +85,8 @@ export class VideoCaptureComponent implements OnDestroy {
   selectedDevice = computed(() => this.selectedDeviceId());
 
   constructor() {
-    // Initialize device enumeration on component creation
     this.enumerateVideoDevices();
 
-    // Load saved CRT settings when component initializes
     effect(() => {
       const deviceId = this.deviceId();
       if (deviceId) {
@@ -97,7 +94,6 @@ export class VideoCaptureComponent implements OnDestroy {
         if (savedSettings) {
           this.crtSettings.set(savedSettings);
         } else {
-          // Default to SMALL_VIDEO_WEBGL preset for new users
           this.crtSettings.set(CRT_PRESETS[CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL]);
         }
       }
@@ -119,14 +115,11 @@ export class VideoCaptureComponent implements OnDestroy {
         return;
       }
 
-      // CRITICAL: Request permission first to unlock device labels
-      // Without this, enumerateDevices returns empty labels for privacy
       const permissionStream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: false,
       });
 
-      // Now enumerate with full labels
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoInputs = devices
         .filter((device) => device.kind === 'videoinput')
@@ -137,12 +130,10 @@ export class VideoCaptureComponent implements OnDestroy {
 
       console.log('🎥 Video devices found:', videoInputs);
 
-      // Stop the permission stream (we'll get the right device next)
       permissionStream.getTracks().forEach((track) => track.stop());
 
       this.videoDevices.set(videoInputs);
 
-      // Select initial device based on stored preference or fallback to first
       this.selectInitialDevice(videoInputs);
     } catch (error) {
       console.error('Failed to enumerate video devices:', error);
@@ -164,11 +155,10 @@ export class VideoCaptureComponent implements OnDestroy {
 
     const teensyDeviceId = this.deviceId();
     const storedVideoDeviceId = this.settingsStore.videoDeviceIdForDevice(teensyDeviceId)();
-    
+
     console.log('🎥 Looking for stored video device:', storedVideoDeviceId);
 
-    // Check if stored device exists in available devices
-    const storedDeviceExists = storedVideoDeviceId && 
+    const storedDeviceExists = storedVideoDeviceId &&
       videoInputs.some(d => d.deviceId === storedVideoDeviceId);
 
     if (storedDeviceExists) {
@@ -176,7 +166,6 @@ export class VideoCaptureComponent implements OnDestroy {
       this.selectedDeviceId.set(storedVideoDeviceId);
       setTimeout(() => this.switchToDevice(storedVideoDeviceId), 100);
     } else {
-      // Fallback to first device
       const firstDevice = videoInputs[0];
       console.log('🎥 Stored device not found, falling back to first device:', firstDevice.deviceId);
       this.selectedDeviceId.set(firstDevice.deviceId);
@@ -191,15 +180,13 @@ export class VideoCaptureComponent implements OnDestroy {
   private async switchToDevice(deviceId: string): Promise<void> {
     try {
       console.log('🎥 Switching to device:', deviceId);
-      
-      // Stop current stream if exists
+
       const currentStream = this.currentStream();
       if (currentStream) {
         console.log('🎥 Stopping current stream...');
         currentStream.getTracks().forEach((track) => track.stop());
       }
 
-      // Request new stream with selected device
       console.log('🎥 Requesting stream from device:', deviceId);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: deviceId } },
@@ -229,8 +216,7 @@ export class VideoCaptureComponent implements OnDestroy {
     console.log('🎥 User selected device:', videoDeviceId);
     this.selectedDeviceId.set(videoDeviceId);
     this.switchToDevice(videoDeviceId);
-    
-    // Persist the selection immediately
+
     const teensyDeviceId = this.deviceId();
     console.log('🎥 Persisting video device selection for TeensyROM device:', teensyDeviceId);
     this.settingsStore.updateDeviceVideoDeviceId({
@@ -264,7 +250,6 @@ export class VideoCaptureComponent implements OnDestroy {
       panelClass: 'video-dialog-fullscreen',
     });
 
-    // Handle device change from dialog
     dialogRef.afterClosed().subscribe((result: { selectedDeviceId: string } | null) => {
       if (result?.selectedDeviceId && result.selectedDeviceId !== this.selectedDeviceId()) {
         this.onDeviceSelected(result.selectedDeviceId);
@@ -306,32 +291,29 @@ export class VideoCaptureComponent implements OnDestroy {
   }
 
   /**
-   * Reset CRT settings to default preset
+   * Handle debug mode toggle from settings panel
    */
-  /**
-   * Apply a CRT preset (built-in or custom)
-   */
+  onDebugModeChange(enabled: boolean): void {
+    this.debugMode.set(enabled);
+  }
+
   onCrtPresetSelected(presetName: AnyPresetName): void {
     let settings: CrtSettings;
 
-    // Branch on preset type using type guard
     if (isBuiltInPreset(presetName)) {
-      // Built-in preset: load from CRT_PRESETS constant
       settings = CRT_PRESETS[presetName];
     } else {
-      // Custom preset: load from storage
       const customPresets = this.crtStorage.loadCustomPresets();
       const preset = customPresets.find(p => p.name === presetName);
 
       if (!preset) {
         console.warn(`[VideoCaptureComponent] Custom preset not found: ${presetName}`);
-        return; // Early return, don't change settings
+        return;
       }
 
       settings = preset.settings;
     }
 
-    // Apply settings (same for both preset types)
     this.crtSettings.set(settings);
     const deviceId = this.deviceId();
     if (deviceId) {
@@ -339,9 +321,6 @@ export class VideoCaptureComponent implements OnDestroy {
     }
   }
 
-  /**
-   * Cleanup on component destroy
-   */
   ngOnDestroy(): void {
     const stream = this.currentStream();
     if (stream) {

@@ -1,6 +1,9 @@
 import { CrtSettings } from '@teensyrom-nx/domain';
 import { PASSTHROUGH_VERTEX_SHADER } from './shaders/passthrough.vert';
 import { SCANLINE_FRAGMENT_SHADER } from './shaders/scanline.frag';
+import { CropAnimator } from './crop-animator';
+import { DetectionPassRenderer } from './detection/detection-pass-renderer';
+import { VideoModeDetector, CropRect } from './detection/video-mode-detector';
 
 /**
  * Uniform locations for CRT effect shader parameters.
@@ -18,6 +21,7 @@ interface CrtUniforms {
   phosphorIntensity: WebGLUniformLocation | null;
   monochromePhosphor: WebGLUniformLocation | null;
   videoTexture: WebGLUniformLocation | null;
+  cropRect: WebGLUniformLocation | null;
 }
 
 /**
@@ -49,6 +53,12 @@ export class CrtRenderer {
   private vertexBuffer: WebGLBuffer | null = null;
   private positionLocation = -1;
 
+  constructor() {
+    // Initialize animator and video mode detector (detection pipeline created in init after GL context)
+    this.cropAnimator = new CropAnimator();
+    this.videoModeDetector = new VideoModeDetector();
+  }
+
   // Uniform locations
   private uniforms: CrtUniforms = {
     scanlineIntensity: null,
@@ -63,6 +73,7 @@ export class CrtRenderer {
     phosphorIntensity: null,
     monochromePhosphor: null,
     videoTexture: null,
+    cropRect: null,
   };
 
   // Video texture pipeline
@@ -73,6 +84,21 @@ export class CrtRenderer {
 
   // Content type tracking
   private contentType: 'none' | 'video' | 'image' = 'none';
+
+  // GPU-based black bar detection (Phase 1.1) and animation
+  private detectionPassRenderer: DetectionPassRenderer | null = null;
+  private videoModeDetector: VideoModeDetector;
+  private cropAnimator: CropAnimator;
+  private lastDetectionTime = -1; // -1 = never detected, allows first detection immediately
+  private detectionEnabled = false;
+  private readonly DETECTION_THROTTLE_MS = 200; // 5 FPS detection rate
+
+  // Debug visualization for crop detection (Phase 1.1 - Task 01.1-006)
+  private debugVisualizationEnabled = false;
+  private debugCanvas: HTMLCanvasElement | null = null;
+  private debugCtx: CanvasRenderingContext2D | null = null;
+  private lastEdgeMeasurements: { left: number; top: number; right: number; bottom: number } | null = null;
+  private lastCropRect: CropRect | null = null;
 
   // Context loss handling
   private contextLost = false;
@@ -108,8 +134,8 @@ export class CrtRenderer {
   init(canvas: HTMLCanvasElement): boolean {
     this.canvas = canvas;
 
-    // Get WebGL context for post-processing pipeline
-    // alpha:false because we output full opaque frames (not overlay)
+    this.createDebugCanvas();
+
     const gl = canvas.getContext('webgl', {
       alpha: false,
       premultipliedAlpha: false,
@@ -118,7 +144,6 @@ export class CrtRenderer {
     });
 
     if (!gl) {
-      // Try experimental-webgl for older browsers
       const experimentalGl = canvas.getContext('experimental-webgl', {
         alpha: false,
         premultipliedAlpha: false,
@@ -136,25 +161,26 @@ export class CrtRenderer {
       this.gl = gl;
     }
 
-    // Enable OES_standard_derivatives extension for fwidth() in shader
     const ext = this.gl.getExtension('OES_standard_derivatives');
     if (!ext) {
       console.warn('CrtRenderer: OES_standard_derivatives not available, anti-aliasing disabled');
     }
 
-    // Set up context loss handling
     this.setupContextLossHandling();
 
-    // Compile shaders and create program
     if (!this.setupShaders()) {
       this.destroy();
       return false;
     }
 
-    // Create vertex buffer for fullscreen quad
     this.setupBuffers();
 
-    // Disable blending for post-processing (we output full opaque frames)
+    try {
+      this.detectionPassRenderer = new DetectionPassRenderer(this.gl);
+    } catch (error) {
+      console.error('CrtRenderer: Failed to initialize GPU detection pipeline:', error);
+    }
+
     this.gl.disable(this.gl.BLEND);
 
     return true;
@@ -166,7 +192,6 @@ export class CrtRenderer {
    * @param settings The current CRT effect settings
    */
   updateSettings(settings: CrtSettings): void {
-    // Store settings for context restoration
     this.pendingSettings = settings;
 
     if (!this.gl || !this.program || this.contextLost) {
@@ -175,13 +200,11 @@ export class CrtRenderer {
 
     this.gl.useProgram(this.program);
 
-    // Update all uniforms
     if (this.uniforms.scanlineIntensity !== null) {
       this.gl.uniform1f(this.uniforms.scanlineIntensity, settings.scanlineIntensity);
     }
 
     if (this.uniforms.scanlineSize !== null) {
-      // Pass lineSize directly - shader handles DPR via resolution uniform
       this.gl.uniform1f(this.uniforms.scanlineSize, settings.scanlineSize);
     }
 
@@ -201,9 +224,7 @@ export class CrtRenderer {
       this.gl.uniform1f(this.uniforms.barrelDistortion, settings.barrelDistortion);
     }
 
-    // Phosphor pattern uniforms
     if (this.uniforms.phosphorPattern !== null) {
-      // Map pattern type string to shader integer
       const patternMap: Record<string, number> = {
         'none': 0,
         'aperture-grille': 1,
@@ -218,9 +239,7 @@ export class CrtRenderer {
       this.gl.uniform1f(this.uniforms.phosphorIntensity, settings.phosphorIntensity);
     }
 
-    // Monochrome phosphor uniform
     if (this.uniforms.monochromePhosphor !== null) {
-      // Map monochrome phosphor type string to shader float
       const monochromeMap: Record<string, number> = {
         'none': 0.0,
         'white': 1.0,
@@ -234,6 +253,13 @@ export class CrtRenderer {
     if (this.uniforms.chromaticAberration !== null) {
       this.gl.uniform1f(this.uniforms.chromaticAberration, settings.chromaticAberration);
     }
+
+    this.detectionEnabled = settings.autoCropBlackBars || this.debugVisualizationEnabled;
+    if (!this.detectionEnabled) {
+      this.cropAnimator.reset();
+      this.videoModeDetector.reset();
+      this.lastDetectionTime = -1;
+    }
   }
 
   /**
@@ -245,26 +271,121 @@ export class CrtRenderer {
       return;
     }
 
-    // Clear with opaque black (WebGL post-processing, not overlay)
+    if (
+      this.detectionEnabled &&
+      this.videoTexture &&
+      this.canvas &&
+      this.detectionPassRenderer &&
+      this.pendingSettings
+    ) {
+      const now = performance.now();
+      if (this.lastDetectionTime < 0 || now - this.lastDetectionTime >= this.DETECTION_THROTTLE_MS) {
+        this.lastDetectionTime = now;
+
+        try {
+          const videoWidth = this.videoElement?.videoWidth || this.imageElement?.naturalWidth || this.canvas.width;
+          const videoHeight = this.videoElement?.videoHeight || this.imageElement?.naturalHeight || this.canvas.height;
+
+          this.detectionPassRenderer.renderEdgeDetection(
+            this.videoTexture,
+            videoWidth,
+            videoHeight
+          );
+
+          const edgeMeasurements = this.detectionPassRenderer.readEdgeMeasurements();
+
+          if (edgeMeasurements) {
+              this.lastEdgeMeasurements = edgeMeasurements;
+
+              let cropRect = this.videoModeDetector.detectMode(
+                edgeMeasurements,
+                this.pendingSettings.videoStandard,
+                this.pendingSettings.videoMode
+              );
+
+              const previousCrop = this.lastCropRect;
+
+              if (!cropRect) {
+                if (previousCrop) {
+                  cropRect = previousCrop;
+                } else {
+                  cropRect = {
+                    left: 0,
+                    top: 0,
+                    width: 1,
+                    height: 1
+                  };
+                }
+              }
+
+              this.lastCropRect = cropRect;
+
+              if (cropRect && this.cropAnimator) {
+                const isValid =
+                  cropRect.left >= 0 && cropRect.left <= 1 &&
+                  cropRect.top >= 0 && cropRect.top <= 1 &&
+                  cropRect.width > 0 && cropRect.width <= 1 &&
+                  cropRect.height > 0 && cropRect.height <= 1 &&
+                  (cropRect.left + cropRect.width) <= 1.001 &&
+                  (cropRect.top + cropRect.height) <= 1.001;
+
+                if (isValid) {
+                  this.cropAnimator.setTarget(cropRect);
+                } else {
+                  console.warn('[Detection] Invalid crop rejected:', cropRect);
+                }
+              }
+          }
+        } catch (error) {
+          console.warn('CrtRenderer: Detection pipeline error:', error);
+        }
+
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      }
+    }
+
+    let currentCrop = this.cropAnimator.update();
+
+    if (this.debugVisualizationEnabled) {
+      currentCrop = { left: 0, top: 0, width: 1, height: 1 };
+      this.drawDebugOverlay();
+    }
+
+    if (currentCrop.width <= 0 || currentCrop.height <= 0) {
+      console.warn('[CrtRenderer] Invalid crop detected, resetting:', currentCrop);
+      this.cropAnimator.reset();
+      currentCrop.left = 0;
+      currentCrop.top = 0;
+      currentCrop.width = 1;
+      currentCrop.height = 1;
+    }
+
     this.gl.clearColor(0, 0, 0, 1);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 
-    // Use our shader program
     this.gl.useProgram(this.program);
 
-    // Bind video texture to uniform sampler
     if (this.videoTexture && this.uniforms.videoTexture !== null) {
       this.gl.activeTexture(this.gl.TEXTURE0);
       this.gl.bindTexture(this.gl.TEXTURE_2D, this.videoTexture);
       this.gl.uniform1i(this.uniforms.videoTexture, 0);
     }
 
-    // Bind vertex buffer and set up attribute
+    if (this.uniforms.cropRect !== null) {
+      this.gl.uniform4f(
+        this.uniforms.cropRect,
+        currentCrop.left,
+        currentCrop.top,
+        currentCrop.width,
+        currentCrop.height
+      );
+    }
+
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
     this.gl.enableVertexAttribArray(this.positionLocation);
     this.gl.vertexAttribPointer(this.positionLocation, 2, this.gl.FLOAT, false, 0, 0);
 
-    // Draw fullscreen quad (4 vertices as triangle strip)
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
   }
 
@@ -284,18 +405,19 @@ export class CrtRenderer {
 
     const dpr = window.devicePixelRatio || 1;
 
-    // Set actual canvas size (drawing buffer) at device pixel ratio
     this.canvas.width = Math.floor(width * dpr);
     this.canvas.height = Math.floor(height * dpr);
 
-    // Set display size (CSS pixels)
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
 
-    // Update viewport to match canvas size
+    if (this.debugCanvas) {
+      this.debugCanvas.width = this.canvas.width;
+      this.debugCanvas.height = this.canvas.height;
+    }
+
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
-    // Update resolution uniform for shader calculations
     if (this.uniforms.resolution !== null && this.program) {
       this.gl.useProgram(this.program);
       this.gl.uniform2f(this.uniforms.resolution, this.canvas.width, this.canvas.height);
@@ -307,10 +429,8 @@ export class CrtRenderer {
    * Call this when the renderer is no longer needed.
    */
   destroy(): void {
-    // Stop render loop
     this.stopRenderLoop();
 
-    // Remove context loss event listeners
     if (this.canvas) {
       if (this.contextLostHandler) {
         this.canvas.removeEventListener('webglcontextlost', this.contextLostHandler);
@@ -322,31 +442,36 @@ export class CrtRenderer {
       }
     }
 
-    // Clean up WebGL resources
     if (this.gl) {
-      // Disable blending
       this.gl.disable(this.gl.BLEND);
 
-      // Delete video texture
+      if (this.detectionPassRenderer) {
+        this.detectionPassRenderer.destroy();
+        this.detectionPassRenderer = null;
+      }
+
       if (this.videoTexture) {
         this.gl.deleteTexture(this.videoTexture);
         this.videoTexture = null;
       }
 
-      // Delete vertex buffer
       if (this.vertexBuffer) {
         this.gl.deleteBuffer(this.vertexBuffer);
         this.vertexBuffer = null;
       }
 
-      // Delete program (shaders are automatically detached)
       if (this.program) {
         this.gl.deleteProgram(this.program);
         this.program = null;
       }
     }
 
-    // Clear references
+    if (this.debugCanvas) {
+      this.debugCanvas.remove();
+      this.debugCanvas = null;
+      this.debugCtx = null;
+    }
+
     this.gl = null;
     this.canvas = null;
     this.videoElement = null;
@@ -365,6 +490,7 @@ export class CrtRenderer {
       phosphorIntensity: null,
       monochromePhosphor: null,
       videoTexture: null,
+      cropRect: null,
     };
     this.pendingSettings = null;
     this.contextLost = false;
@@ -413,15 +539,6 @@ export class CrtRenderer {
    * or when settings change.
    */
   renderImage(): void {
-    console.log('[CRT RENDERER DEBUG] renderImage called', {
-      hasGl: !!this.gl,
-      hasImage: !!this.imageElement,
-      contentType: this.contentType,
-      complete: this.imageElement?.complete,
-      naturalWidth: this.imageElement?.naturalWidth,
-      src: this.imageElement?.src?.substring(0, 80)
-    });
-    
     if (!this.gl || !this.imageElement || this.contentType !== 'image') {
       return;
     }
@@ -585,6 +702,7 @@ export class CrtRenderer {
     this.uniforms.phosphorIntensity = this.gl.getUniformLocation(program, 'u_phosphorIntensity');
     this.uniforms.monochromePhosphor = this.gl.getUniformLocation(program, 'u_monochromePhosphor');
     this.uniforms.videoTexture = this.gl.getUniformLocation(program, 'u_videoTexture');
+    this.uniforms.cropRect = this.gl.getUniformLocation(program, 'u_cropRect');
 
     // Get attribute location
     this.positionLocation = this.gl.getAttribLocation(program, 'a_position');
@@ -701,20 +819,14 @@ export class CrtRenderer {
    */
   private updateImageTexture(): void {
     if (!this.gl || !this.videoTexture || !this.imageElement) {
-      console.log('[CRT RENDERER DEBUG] updateImageTexture early return - missing gl/texture/image');
       return;
     }
 
     // Don't update if image is not ready
     if (!this.imageElement.complete || this.imageElement.naturalWidth === 0) {
-      console.log('[CRT RENDERER DEBUG] updateImageTexture - image not ready', {
-        complete: this.imageElement.complete,
-        naturalWidth: this.imageElement.naturalWidth
-      });
       return;
     }
 
-    console.log('[CRT RENDERER DEBUG] updateImageTexture - uploading texture');
     try {
       this.gl.bindTexture(this.gl.TEXTURE_2D, this.videoTexture);
       this.gl.texImage2D(
@@ -728,6 +840,301 @@ export class CrtRenderer {
     } catch (error) {
       // This can happen with cross-origin images
       console.warn('CrtRenderer: Failed to update image texture:', error);
+    }
+  }
+
+  /**
+   * Create debug canvas overlay for visualizing black bar detection.
+   * Canvas is positioned absolutely over the main WebGL canvas.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  private createDebugCanvas(): void {
+    if (!this.canvas) {
+      return;
+    }
+
+    this.debugCanvas = document.createElement('canvas');
+    this.debugCanvas.style.position = 'absolute';
+    this.debugCanvas.style.top = '0';
+    this.debugCanvas.style.left = '0';
+    this.debugCanvas.style.pointerEvents = 'none'; // Don't block mouse events
+    this.debugCanvas.style.zIndex = '1000'; // Above video
+
+    // Match main canvas size
+    this.debugCanvas.width = this.canvas.width;
+    this.debugCanvas.height = this.canvas.height;
+
+    // Insert after main canvas
+    this.canvas.parentElement?.appendChild(this.debugCanvas);
+
+    this.debugCtx = this.debugCanvas.getContext('2d');
+
+    if (this.debugCtx) {
+      // Set default styles for neon green CRT aesthetic
+      this.debugCtx.strokeStyle = '#00ff00';
+      this.debugCtx.fillStyle = '#00ff00';
+      this.debugCtx.font = 'bold 24px monospace';
+      this.debugCtx.lineWidth = 4;
+    }
+  }
+
+  /**
+   * Enable or disable debug visualization overlay.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  setDebugVisualization(enabled: boolean): void {
+    this.debugVisualizationEnabled = enabled;
+    
+    // Enable/disable detection based on debug mode or auto-crop setting
+    if (this.pendingSettings) {
+      this.detectionEnabled = this.pendingSettings.autoCropBlackBars || enabled;
+      
+      // Reset detection on state change to get fresh results
+      if (enabled) {
+        this.lastDetectionTime = -1; // Allow immediate detection
+      }
+    }
+    
+    // Clear canvas when disabled
+    if (!enabled && this.debugCanvas && this.debugCtx) {
+      this.debugCtx.clearRect(0, 0, this.debugCanvas.width, this.debugCanvas.height);
+    }
+    
+    console.log(`[CrtRenderer] Debug visualization ${enabled ? 'enabled' : 'disabled'} (press 'D' to toggle)`);
+  }
+
+  /**
+   * Get current debug visualization state.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  getDebugVisualization(): boolean {
+    return this.debugVisualizationEnabled;
+  }
+
+  /**
+   * Draw debug overlay showing detected black bar boundaries and measurements.
+   * Called every frame when debugVisualizationEnabled is true.
+   * (Phase 1.1 - Task 01.1-006)
+   */
+  private drawDebugOverlay(): void {
+    if (!this.debugCanvas || !this.debugCtx || !this.canvas) {
+      return;
+    }
+
+    const ctx = this.debugCtx;
+    let width = this.debugCanvas.width;
+    let height = this.debugCanvas.height;
+
+    // Ensure debug canvas matches main canvas size
+    if (this.debugCanvas.width !== this.canvas.width || this.debugCanvas.height !== this.canvas.height) {
+      this.debugCanvas.width = this.canvas.width;
+      this.debugCanvas.height = this.canvas.height;
+      // Update local variables after resize
+      width = this.debugCanvas.width;
+      height = this.debugCanvas.height;
+    }
+
+    // Clear previous frame
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw the downsampled detection image as background
+    if (this.videoElement || this.imageElement) {
+      const source = this.videoElement || this.imageElement;
+      if (!source) return;
+
+      const sourceWidth = this.videoElement
+        ? this.videoElement.videoWidth
+        : this.imageElement?.naturalWidth || width;
+      const sourceHeight = this.videoElement
+        ? this.videoElement.videoHeight
+        : this.imageElement?.naturalHeight || height;
+
+      // Calculate 1/8 downsampled dimensions
+      const detectionWidth = Math.floor(sourceWidth / 8);
+      const detectionHeight = Math.floor(sourceHeight / 8);
+
+      // Create temporary canvas to downsample
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = detectionWidth;
+      tempCanvas.height = detectionHeight;
+      const tempCtx = tempCanvas.getContext('2d');
+
+      if (tempCtx) {
+        // Draw downsampled image
+        tempCtx.drawImage(source, 0, 0, detectionWidth, detectionHeight);
+
+        // Scale it up to fill the debug canvas (pixelated/nearest neighbor)
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tempCanvas, 0, 0, width, height);
+
+        // Add label showing detection resolution
+        ctx.font = 'bold 16px monospace';
+        ctx.shadowBlur = 5;
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(width - 220, height - 40, 210, 30);
+        ctx.fillStyle = '#00ff00';
+        ctx.shadowColor = '#00ff00';
+        ctx.fillText(`Detection: ${detectionWidth}x${detectionHeight}`, width - 20, height - 18);
+      }
+    }
+
+    // Use actual edge measurements from brute-force detection
+    // Default to 0 if no measurements yet
+    const leftMeasure = this.lastEdgeMeasurements?.left ?? 0;
+    const topMeasure = this.lastEdgeMeasurements?.top ?? 0;
+    const rightMeasure = this.lastEdgeMeasurements?.right ?? 0;
+    const bottomMeasure = this.lastEdgeMeasurements?.bottom ?? 0;
+
+    const leftBarWidth = Math.max(leftMeasure * width, 0);
+    const topBarHeight = Math.max(topMeasure * height, 0);
+    const rightBarX = width - Math.max(rightMeasure * width, 0);
+    const bottomBarY = height - Math.max(bottomMeasure * height, 0);
+
+    // Draw semi-transparent red overlay on detected black bar regions
+    // Always draw if measurement > 0, or show thin 1px indicator if at edge
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; // Red tint with transparency
+
+    // Draw boxes for detected black bars
+    if (leftMeasure > 0) {
+      ctx.fillRect(0, 0, leftBarWidth, height); // Left bar
+    }
+    if (topMeasure > 0) {
+      ctx.fillRect(0, 0, width, topBarHeight); // Top bar
+    }
+    if (rightMeasure > 0) {
+      ctx.fillRect(rightBarX, 0, width - rightBarX, height); // Right bar
+    }
+    if (bottomMeasure > 0) {
+      ctx.fillRect(0, bottomBarY, width, height - bottomBarY); // Bottom bar
+    }
+
+    // Draw neon green borders at the detected content boundaries
+    // ALWAYS draw these lines during debug mode so you can see detection even if 0
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = '#00ff00';
+    ctx.shadowBlur = 10;
+
+    // Left border (always draw during debug)
+    ctx.beginPath();
+    ctx.moveTo(leftBarWidth, 0);
+    ctx.lineTo(leftBarWidth, height);
+    ctx.stroke();
+
+    // Top border
+    ctx.beginPath();
+    ctx.moveTo(0, topBarHeight);
+    ctx.lineTo(width, topBarHeight);
+    ctx.stroke();
+
+    // Right border
+    ctx.beginPath();
+    ctx.moveTo(rightBarX, 0);
+    ctx.lineTo(rightBarX, height);
+    ctx.stroke();
+
+    // Bottom border
+    ctx.beginPath();
+    ctx.moveTo(0, bottomBarY);
+    ctx.lineTo(width, bottomBarY);
+    ctx.stroke();
+
+    // Draw debug info stacked on left side
+    let currentY = 10;
+
+    // 1. Draw measurement text with label at top
+    ctx.font = 'bold 24px monospace';
+    ctx.shadowBlur = 5;
+    ctx.textAlign = 'left';
+
+    // Section label
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(10, currentY, 115, 30);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('Detection', 20, currentY + 22);
+
+    currentY += 40;
+
+    // Measurements
+    ctx.font = 'bold 24px monospace';
+    const measurementText = `L:${(leftMeasure * 100).toFixed(0)}% T:${(topMeasure * 100).toFixed(0)}% R:${(rightMeasure * 100).toFixed(0)}% B:${(bottomMeasure * 100).toFixed(0)}%`;
+
+    // Background for text readability
+    const textMetrics = ctx.measureText(measurementText);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(10, currentY, textMetrics.width + 20, 45);
+
+    // Draw text
+    ctx.fillStyle = '#00ff00';
+    ctx.fillText(measurementText, 20, currentY + 32);
+
+    // Move to next position (45 height + 12 gap = 57)
+    currentY += 57;
+
+    // 2. Draw crop rect info with label below measurements (or "Stabilizing...")
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'left';
+
+    // Section label
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(10, currentY, 60, 30);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('Crop', 20, currentY + 22);
+
+    currentY += 40;
+
+    // Crop values with proper labels
+    ctx.font = 'bold 20px monospace';
+    if (this.lastCropRect) {
+      // CropRect stores content region (left, top, width, height)
+      // Convert to crop percentages for each edge
+      const cropLeft = (this.lastCropRect.left ?? 0) * 100;
+      const cropTop = (this.lastCropRect.top ?? 0) * 100;
+      const cropRight = (1 - (this.lastCropRect.left ?? 0) - (this.lastCropRect.width ?? 0)) * 100;
+      const cropBottom = (1 - (this.lastCropRect.top ?? 0) - (this.lastCropRect.height ?? 0)) * 100;
+
+      const cropText = `L:${cropLeft.toFixed(0)}% T:${cropTop.toFixed(0)}% R:${cropRight.toFixed(0)}% B:${cropBottom.toFixed(0)}%`;
+      const cropMetrics = ctx.measureText(cropText);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(10, currentY, cropMetrics.width + 20, 40);
+      ctx.fillStyle = '#00ff00';
+      ctx.fillText(cropText, 20, currentY + 28);
+
+      // Move to next position (40 height + 12 gap = 52)
+      currentY += 52;
+    } else {
+      // Show "Stabilizing..." if we have measurements but no stable crop yet
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(10, currentY, 205, 40);
+      ctx.fillStyle = '#ffff00';
+      ctx.fillText('Stabilizing...', 20, currentY + 28);
+
+      // Move to next position (40 height + 12 gap = 52)
+      currentY += 52;
+    }
+
+    // 3. Draw current mode with label at the bottom
+    const currentMode = this.videoModeDetector.getCurrentMode();
+    if (currentMode) {
+      // Section label
+      ctx.font = 'bold 18px monospace';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(10, currentY, 65, 30);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('Mode', 20, currentY + 22);
+
+      currentY += 40;
+
+      // Mode value
+      const modeText = `${currentMode}`;
+      ctx.font = 'bold 20px monospace';
+      const modeMetrics = ctx.measureText(modeText);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(10, currentY, modeMetrics.width + 20, 35);
+      ctx.fillStyle = '#00ffff';  // Cyan for mode
+      ctx.fillText(modeText, 20, currentY + 25);
     }
   }
 }

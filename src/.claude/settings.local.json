@@ -3,8 +3,8 @@
     "ANTHROPIC_AUTH_TOKEN": "ca0e2f3d8a7b44e2afd33af7823d11a8.Chv68WCUJCImI3ix",
     "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.6",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-4.6"
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-4.7"
   },
   "permissions": {
     "allow": [
@@ -61,7 +61,16 @@
       "Bash(pnpm tsc:*)",
       "Bash(nx show:*)",
       "Bash(node ./.claude/hooks/angular-nx-quality/quality-check.cjs:*)",
-      "Bash(pnpm dlx tsc:*)"
+      "Bash(pnpm dlx tsc:*)",
+      "Bash(pnpm exec nx run:*)",
+      "Bash(dir C:devsrcTeensyROM-Web)",
+      "Bash(dir:*)",
+      "Bash(pnpm nx test:*)",
+      "Bash(pnpm nx run infrastructure:test:integration:*)",
+      "Bash(pnpm exec nx typecheck:*)",
+      "Bash(pnpm exec nx test:*)",
+      "Bash(pnpm exec nx run-many:*)",
+      "Bash(nx run:*)"
     ],
     "deny": [],
     "ask": []

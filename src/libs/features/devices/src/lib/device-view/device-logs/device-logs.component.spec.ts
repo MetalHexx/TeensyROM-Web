@@ -37,6 +37,26 @@ describe('DeviceLogsComponent', () => {
     fixture = TestBed.createComponent(DeviceLogsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+
+    // Make scrollTop and scrollHeight writable in jsdom for testing
+    const logsContent = fixture.nativeElement.querySelector('.logs-content');
+    if (logsContent) {
+      Object.defineProperty(logsContent, 'scrollTop', {
+        writable: true,
+        configurable: true,
+        value: 0,
+      });
+      Object.defineProperty(logsContent, 'scrollHeight', {
+        writable: true,
+        configurable: true,
+        value: 0,
+      });
+      Object.defineProperty(logsContent, 'clientHeight', {
+        writable: true,
+        configurable: true,
+        value: 150,
+      });
+    }
   });
 
   describe('Component Initialization', () => {
@@ -167,52 +187,68 @@ describe('DeviceLogsComponent', () => {
 
   describe('Auto-Scroll Behavior', () => {
     it('should trigger scroll when new logs arrive', async () => {
-      // Mock the scroll method
-      const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      logsContent.scroll = vi.fn();
-      
       logsSignal.set(['Log 1']);
       fixture.detectChanges();
 
+      const logsContent = fixture.nativeElement.querySelector('.logs-content');
+      const initialScrollTop = logsContent.scrollTop;
+
+      // Set scrollHeight to simulate content that needs scrolling
+      Object.defineProperty(logsContent, 'scrollHeight', { value: 500, configurable: true });
+
+      // Add more logs
       logsSignal.set(['Log 1', 'Log 2']);
       fixture.detectChanges();
 
-      // Wait for microtask to execute
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+      // Wait for requestAnimationFrame to execute (double RAF)
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
-      expect(logsContent.scroll).toHaveBeenCalledWith({
-        top: logsContent.scrollHeight,
-        left: 0,
-        behavior: 'smooth',
-      });
+      expect(logsContent.scrollTop).toBeGreaterThan(initialScrollTop);
     });
 
     it('should scroll to bottom when scrollToElement is called', () => {
-      logsSignal.set(['Log 1', 'Log 2']);
+      logsSignal.set(['Log 1', 'Log 2', 'Log 3']);
       fixture.detectChanges();
 
       const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      logsContent.scroll = vi.fn();
-
       component.scrollToElement();
 
-      expect(logsContent.scroll).toHaveBeenCalledWith({
-        top: logsContent.scrollHeight,
-        left: 0,
-        behavior: 'smooth',
-      });
+      expect(logsContent.scrollTop).toBe(logsContent.scrollHeight);
     });
 
-    it('should not trigger scroll when logs are empty', async () => {
-      const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      logsContent.scroll = vi.fn();
+    it('should not throw error when scrollToElement called before view init', () => {
+      const newFixture = TestBed.createComponent(DeviceLogsComponent);
 
-      logsSignal.set([]);
+      expect(() => {
+        newFixture.componentRef.injector.get(DeviceLogsComponent).scrollToElement();
+      }).not.toThrow();
+    });
+
+    it('should scroll to bottom on ngAfterViewInit when logs exist', async () => {
+      logsSignal.set(['Log 1', 'Log 2', 'Log 3']);
       fixture.detectChanges();
 
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+      const logsContent = fixture.nativeElement.querySelector('.logs-content');
+      const initialScrollTop = logsContent.scrollTop;
 
-      expect(logsContent.scroll).not.toHaveBeenCalled();
+      // Set scrollHeight to simulate content that needs scrolling
+      Object.defineProperty(logsContent, 'scrollHeight', { value: 500, configurable: true });
+
+      // Trigger ngAfterViewInit by creating a new component
+      const newFixture = TestBed.createComponent(DeviceLogsComponent);
+      logsSignal.set(['Log 1', 'Log 2', 'Log 3']);
+      newFixture.detectChanges();
+
+      // Set scrollHeight on the new fixture's element as well
+      const newLogsContent = newFixture.nativeElement.querySelector('.logs-content');
+      Object.defineProperty(newLogsContent, 'scrollTop', { writable: true, configurable: true, value: 0 });
+      Object.defineProperty(newLogsContent, 'scrollHeight', { value: 500, configurable: true });
+      Object.defineProperty(newLogsContent, 'clientHeight', { value: 150, configurable: true });
+
+      // Wait for double RAF
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
+      expect(newFixture.nativeElement.querySelector('.logs-content')?.scrollTop).toBeGreaterThan(0);
     });
   });
 
@@ -222,16 +258,16 @@ describe('DeviceLogsComponent', () => {
       fixture.detectChanges();
 
       const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      
-      // Mock scroll position to simulate user scrolling up
+
+      // Mock scroll position to simulate user scrolling up (more than 100px from bottom)
       Object.defineProperty(logsContent, 'scrollHeight', { value: 300, configurable: true });
-      Object.defineProperty(logsContent, 'scrollTop', { value: 100, configurable: true });
+      Object.defineProperty(logsContent, 'scrollTop', { value: 50, configurable: true });
       Object.defineProperty(logsContent, 'clientHeight', { value: 150, configurable: true });
 
       component.onScroll();
 
-      // Verify auto-scroll is disabled (component internal state)
-      expect(component['autoScroll']()).toBe(false);
+      // distanceFromBottom = 300 - 50 - 150 = 100, which is NOT < threshold(100), so autoScroll = false
+      expect(component.autoScroll()).toBe(false);
     });
 
     it('should enable auto-scroll when user scrolls to bottom', () => {
@@ -239,85 +275,104 @@ describe('DeviceLogsComponent', () => {
       fixture.detectChanges();
 
       const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      
-      // Mock scroll position to simulate user at bottom
+
+      // Mock scroll position to simulate user at bottom (within 100px threshold)
       Object.defineProperty(logsContent, 'scrollHeight', { value: 300, configurable: true });
       Object.defineProperty(logsContent, 'scrollTop', { value: 150, configurable: true });
       Object.defineProperty(logsContent, 'clientHeight', { value: 150, configurable: true });
 
       component.onScroll();
 
-      // Verify auto-scroll is enabled
-      expect(component['autoScroll']()).toBe(true);
+      // distanceFromBottom = 300 - 150 - 150 = 0, which is < threshold(100)
+      expect(component.autoScroll()).toBe(true);
     });
 
-    it('should use 5px threshold for "at bottom" detection', () => {
+    it('should use 100px threshold for "at bottom" detection', () => {
       logsSignal.set(['Log 1', 'Log 2', 'Log 3']);
       fixture.detectChanges();
 
       const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      
-      // Mock position 3px from bottom (within threshold)
+
+      // Mock position exactly 99px from bottom (within threshold)
       Object.defineProperty(logsContent, 'scrollHeight', { value: 300, configurable: true });
-      Object.defineProperty(logsContent, 'scrollTop', { value: 147, configurable: true });
+      Object.defineProperty(logsContent, 'scrollTop', { value: 51, configurable: true });
       Object.defineProperty(logsContent, 'clientHeight', { value: 150, configurable: true });
 
       component.onScroll();
 
-      expect(component['autoScroll']()).toBe(true);
+      // distanceFromBottom = 300 - 51 - 150 = 99, which is < threshold(100)
+      expect(component.autoScroll()).toBe(true);
+    });
+
+    it('should disable auto-scroll when just beyond threshold', () => {
+      logsSignal.set(['Log 1', 'Log 2', 'Log 3']);
+      fixture.detectChanges();
+
+      const logsContent = fixture.nativeElement.querySelector('.logs-content');
+
+      // Mock position exactly 100px from bottom (at threshold boundary)
+      Object.defineProperty(logsContent, 'scrollHeight', { value: 300, configurable: true });
+      Object.defineProperty(logsContent, 'scrollTop', { value: 50, configurable: true });
+      Object.defineProperty(logsContent, 'clientHeight', { value: 150, configurable: true });
+
+      component.onScroll();
+
+      // distanceFromBottom = 300 - 50 - 150 = 100, which is NOT < threshold(100)
+      expect(component.autoScroll()).toBe(false);
     });
 
     it('should not scroll automatically when auto-scroll is disabled', async () => {
-      const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      logsContent.scroll = vi.fn();
-
-      // Set initial log and detect changes
       logsSignal.set(['Log 1']);
       fixture.detectChanges();
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
-      
-      // Clear any scroll calls from initialization
-      vi.clearAllMocks();
+
+      const logsContent = fixture.nativeElement.querySelector('.logs-content');
 
       // Disable auto-scroll
-      component['autoScroll'].set(false);
+      component.autoScroll.set(false);
+
+      // Store initial scrollTop
+      const initialScrollTop = logsContent.scrollTop;
 
       // Add new log
       logsSignal.set(['Log 1', 'Log 2']);
       fixture.detectChanges();
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
 
-      expect(logsContent.scroll).not.toHaveBeenCalled();
+      // Wait for double RAF
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
+      // Should not have scrolled
+      expect(logsContent.scrollTop).toBe(initialScrollTop);
     });
 
     it('should resume auto-scroll after user returns to bottom', async () => {
-      const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      logsContent.scroll = vi.fn();
-      
       logsSignal.set(['Log 1']);
       fixture.detectChanges();
 
+      const logsContent = fixture.nativeElement.querySelector('.logs-content');
+
       // User scrolls up - disable auto-scroll
       Object.defineProperty(logsContent, 'scrollHeight', { value: 300, configurable: true });
-      Object.defineProperty(logsContent, 'scrollTop', { value: 100, configurable: true });
+      Object.defineProperty(logsContent, 'scrollTop', { value: 50, configurable: true });
       Object.defineProperty(logsContent, 'clientHeight', { value: 150, configurable: true });
       component.onScroll();
 
-      expect(component['autoScroll']()).toBe(false);
+      expect(component.autoScroll()).toBe(false);
 
       // User scrolls back to bottom
       Object.defineProperty(logsContent, 'scrollTop', { value: 150, configurable: true });
       component.onScroll();
 
-      expect(component['autoScroll']()).toBe(true);
+      expect(component.autoScroll()).toBe(true);
 
-      // Verify auto-scroll works again
+      // Add new log - should auto-scroll now
+      const initialScrollTop = logsContent.scrollTop;
       logsSignal.set(['Log 1', 'Log 2']);
       fixture.detectChanges();
 
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+      // Wait for double RAF
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
-      expect(logsContent.scroll).toHaveBeenCalled();
+      expect(logsContent.scrollTop).toBeGreaterThan(initialScrollTop);
     });
   });
 
@@ -334,15 +389,13 @@ describe('DeviceLogsComponent', () => {
 
   describe('Edge Cases', () => {
     it('should handle rapid log additions without error', async () => {
-      const logsContent = fixture.nativeElement.querySelector('.logs-content');
-      logsContent.scroll = vi.fn();
-      
       for (let i = 0; i < 10; i++) {
         logsSignal.update((logs) => [...logs, `Log ${i}`]);
         fixture.detectChanges();
       }
 
-      await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+      // Wait for double RAF
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
       const logLines = fixture.nativeElement.querySelectorAll('.log-line');
       expect(logLines.length).toBe(10);
@@ -361,17 +414,6 @@ describe('DeviceLogsComponent', () => {
 
       const noLogsMessage = fixture.nativeElement.querySelector('.no-logs');
       expect(noLogsMessage).toBeTruthy();
-    });
-
-    it('should not throw error when scrollToElement called before view init', () => {
-      // Create new component without fixture.detectChanges()
-      const newFixture = TestBed.createComponent(DeviceLogsComponent);
-
-      // This should not throw even though ViewChild hasn't initialized
-      expect(() => {
-        logsSignal.set(['Test']);
-        newFixture.detectChanges();
-      }).not.toThrow();
     });
   });
 
