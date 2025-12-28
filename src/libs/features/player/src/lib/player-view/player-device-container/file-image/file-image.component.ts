@@ -37,10 +37,7 @@ export class FileImageComponent {
   deviceId = input.required<string>();
   currentFile = input<LaunchedFile | null>();
 
-  readonly crtConfig: CrtSettingsConfig = {
-    ...CRT_CONFIGS.small,
-    showVignette: false,
-  };
+  readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.small;
 
   /**
    * Context-appropriate label for the current preset.
