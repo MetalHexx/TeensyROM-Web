@@ -43,7 +43,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ICartFinder, CartFinder>();
             services.AddSingleton<ICartTagger, CartTagger>();
             services.AddSingleton<IDeviceConnectionManager, DeviceConnectionManager>();
-            services.AddSingleton<ISerialFactory, SerialFactory>();
+            services.AddSingleton<IDeviceTransportFactory, DeviceTransportFactory>();
             services.AddSingleton<IStorageFactory, StorageFactory>();
             services.AddSingleton<IGameMetadataService, GameMetadataService>();
             services.AddSingleton<IHvscDatabase, HvscDatabase>();

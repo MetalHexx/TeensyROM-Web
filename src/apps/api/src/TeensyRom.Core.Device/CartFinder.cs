@@ -6,6 +6,7 @@ using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Serial.Commands.FwVersionCheck;
+using TeensyRom.Core.Settings;
 using TeensyRom.Core.Storage;
 
 namespace TeensyRom.Core.Device
@@ -15,7 +16,7 @@ namespace TeensyRom.Core.Device
         Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct);
     }
 
-    public class CartFinder(ILoggingService log, ISerialFactory serialFactory, IStorageFactory storageFactory,ICartTagger tagger, IFwVersionChecker versionChecker, IMediator mediator) : ICartFinder
+    public class CartFinder(ILoggingService log, IDeviceTransportFactory transportFactory, IStorageFactory storageFactory,ICartTagger tagger, IFwVersionChecker versionChecker, IMediator mediator) : ICartFinder
     {
         private const string _undefinedDeviceIdBase = "Unidentified";
         public async Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct)
@@ -33,7 +34,7 @@ namespace TeensyRom.Core.Device
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    serial = serialFactory.Create(port);
+                    serial = transportFactory.CreateSerial(port);
                     try
                     {
                         serial.OpenPort();
@@ -62,7 +63,8 @@ namespace TeensyRom.Core.Device
                         ComPort = port,
                         Name = "Unnamed",
                         FwVersion = versionResult.Version?.ToString() ?? "",
-                        IsCompatible = versionResult.IsCompatible
+                        IsCompatible = versionResult.IsCompatible,
+                        ConnectionType = ConnectionType.Serial
                     };
                     var sdStorage = await tagger.EnsureTag(serial, TeensyStorageType.SD);
                     var usbStorage = await tagger.EnsureTag(serial, TeensyStorageType.USB);

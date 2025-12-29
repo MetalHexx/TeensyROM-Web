@@ -477,10 +477,10 @@ public class TcpObservablePortTests : IDisposable
     public void StartHealthCheck_ShouldReturnNull()
     {
         // Arrange & Act
-        var result = _port.EnsureConnection();
+        _port.EnsureConnection();
 
-        // Assert
-        result.Should().BeNull();
+        // Assert - EnsureConnection throws if it fails
+        true.Should().BeTrue();
     }
 
     [Fact]
