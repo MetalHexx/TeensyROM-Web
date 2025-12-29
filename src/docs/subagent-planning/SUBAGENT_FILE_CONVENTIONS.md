@@ -4,25 +4,32 @@
 
 ---
 
+## 🚨 Path Discovery Required
+
+**All agents MUST discover the actual path by finding existing files before writing.**
+
+```bash
+# Find existing reports to determine correct path:
+find . -type f -name "*-REPORT.md" | grep <PROJECT-NAME>
+```
+
+- Paths may be `docs/projects/` OR `src/docs/projects/` depending on repo structure
+- Always match existing file locations - NEVER assume from current directory
+- Use discovered path in task handoff OUTPUT_DOC section
+
+---
+
 ## 📁 Required Project Structure
 
-Every subagent project MUST use this exact folder structure:
-
 ```
-docs/projects/<PROJECT-NAME>/
+docs/projects/<PROJECT-NAME>/  (or src/docs/projects/<PROJECT-NAME>/)
 ├── <PROJECT-NAME>-MASTER-PLAN.md
 ├── phases/
-│   ├── <PROJECT-NAME>-PHASE-01-<NAME>.md
-│   ├── <PROJECT-NAME>-PHASE-02-<NAME>.md
-│   └── ...
+│   └── <PROJECT-NAME>-PHASE-##-<NAME>.md
 ├── tasks/
-│   ├── <PROJECT-NAME>-TASK-01-001-<NAME>.md
-│   ├── <PROJECT-NAME>-TASK-01-002-<NAME>.md
-│   └── ...
+│   └── <PROJECT-NAME>-TASK-##-###-<NAME>.md
 └── reports/
-    ├── <PROJECT-NAME>-TASK-01-001-REPORT.md
-    ├── <PROJECT-NAME>-TASK-01-002-REPORT.md
-    └── ...
+    └── <PROJECT-NAME>-TASK-##-###-REPORT.md
 ```
 
 ---
@@ -96,12 +103,10 @@ docs/projects/<PROJECT-NAME>/
 ### Report Files
 
 - **Pattern**: `<PROJECT-NAME>-TASK-<##>-<###>-REPORT.md`
-  - Must match the corresponding task's project, phase, and sequence numbers
-  - Always ends with `-REPORT.md`
-- **Location**: `docs/projects/<PROJECT-NAME>/reports/`
-- **Template**: Use [SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md)
-- ✅ Valid: `USER-AUTH-TASK-01-001-REPORT.md`, `USER-AUTH-TASK-02-003-REPORT.md`
-- ❌ Invalid: `TASK-01-001-REPORT.md`, `USER-AUTH-TASK-01-001-report.md`
+- **Location**: Discover via `find . -type f -name "*-REPORT.md"` first
+- **Template**: [SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md)
+- ✅ Valid: `USER-AUTH-TASK-01-001-REPORT.md`
+- ❌ Invalid: `task-01-001-report.md`, `report.md`
 
 ---
 

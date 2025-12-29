@@ -45,7 +45,7 @@ The orchestrator must provide comprehensive task instructions including:
 **Estimated Context Size**: [Small/Medium/Large - helps with scope awareness]
 ```
 
-> **⚠️ NAMING CONVENTION**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete naming rules.
+> **⚠️ NAMING CONVENTION AND FILE LOCATION**: See [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) for complete naming rules an locations to read/write handoff docs.
 > Pattern: `<PROJECT-NAME>-TASK-<##>-<###>-<NAME>` (e.g., `USER-AUTH-TASK-01-001-DOMAIN-MODELS`)
 
 #### 2. Objective
