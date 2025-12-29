@@ -94,27 +94,38 @@ Extend the domain models to support both Serial and TCP connection types, and cr
 
 ### Objective
 
-Integrate TCP devices into the existing `DeviceConnectionManager` so they are discovered via network scanning and managed alongside serial devices. The auto-connect infrastructure should work for both transport types without modification.
+Refactor `CartFinder` and `DeviceConnectionManager` to support both Serial and TCP devices through a unified discovery and validation pipeline. Create transport-agnostic strategies for device discovery and reconnection, enabling seamless management of devices across both transport types.
+
+**Key Design**: Separate "finding endpoints" from "validating devices" using strategy pattern. Both Serial and TCP discovery return `DiscoveredEndpoint` records, which then flow through a common validation pipeline (version check, tag ensure, device creation).
 
 ### Key Deliverables
 
-- [ ] Updated `DeviceConnectionManager` to scan for TCP devices via `TcpDeviceFinder`
-- [ ] TCP device validation using existing version check mechanism
-- [ ] TCP reconnection handling in `ConnectToNextPort()`
-- [ ] Health check logging using `ConnectionDisplay` property (healthcheck already handled by `DeviceConnectionManager.StartHealthCheck()`)
+- [ ] `IDiscoveryStrategy` interface and `DiscoveredEndpoint` record type
+- [ ] `SerialDiscoveryStrategy` wrapping `SerialHelper.GetPorts()`
+- [ ] `TcpDiscoveryStrategy` wrapping `TcpDeviceFinder.ScanLocalSubnet()`
+- [ ] Refactored `CartFinder` orchestrating parallel discovery + unified validation
+- [ ] `IReconnectionStrategy` interface with Serial and TCP implementations
+- [ ] Renamed `ReconnectDevice()` method (was `ConnectToNextPort()`)
+- [ ] Health check logging using `Cart.ConnectionDisplay` property
+- [ ] DI registration for all new services
 - [ ] Integration tests with mixed Serial/TCP devices
 
 ### High-Level Tasks
 
-1. **Scan for TCP Devices**: Modify `FindDevices()` to also call `TcpDeviceFinder.ScanLocalSubnet()` and discover TCP devices
-2. **TCP Reconnection**: Update `ConnectToNextPort()` to handle TCP reconnection (retry same endpoint vs scanning ports)
-3. **Update Logging**: Use `Cart.ConnectionDisplay` property in health check logging messages
-4. **Register Services**: Add `ITcpDeviceFinder`, `IDeviceTransportFactory` to DI container
-5. **Integration Testing**: Test with multiple devices on different transports simultaneously
+1. **Discovery Strategies**: Create `IDiscoveryStrategy` interface, Serial and TCP implementations, `DiscoveredEndpoint` record
+2. **Refactor CartFinder**: Split discovery from validation, orchestrate parallel discovery, unified validation pipeline
+3. **Reconnection Strategies**: Create `IReconnectionStrategy` interface, Serial (COM port hunting) and TCP (retry with backoff) implementations
+4. **Rename Reconnect Method**: `ConnectToNextPort()` → `ReconnectDevice()` using strategy pattern
+5. **Update Logging**: Use `Cart.ConnectionDisplay` in health check log messages
+6. **Register Services**: Add discovery/reconnection strategies, `ITcpDeviceFinder`, `IDeviceTransportFactory` to DI container
+7. **Integration Testing**: Test mixed transport scenarios, reconnection logic, health checks
 
-### Open Questions for Phase 3
+### Design Decisions
 
-- **TCP Connection Retry**: How many retry attempts for TCP connection failures before marking device offline?
+- **Parallel Discovery**: Serial and TCP strategies run via `Task.WhenAll()` for fastest results
+- **TCP Reconnection**: 3 retry attempts with 500ms/1s/1.5s backoff, then fail (no network rescan)
+- **Unified Pipeline**: Both transports go through same version check, tag ensure, device creation flow
+- **Strategy Pattern**: Separates transport-specific logic from common validation
 
 </details>
 
