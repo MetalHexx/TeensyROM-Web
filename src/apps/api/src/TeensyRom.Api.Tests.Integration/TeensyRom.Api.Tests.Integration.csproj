@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TeensyRom.Api\TeensyRom.Api.csproj" />
+    <ProjectReference Include="..\TeensyRom.Core.Serial.Tests.Integration\TeensyRom.Core.Serial.Tests.Integration.csproj" />
   </ItemGroup>
 
   <ItemGroup>

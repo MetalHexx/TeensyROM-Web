@@ -1,0 +1,11 @@
+global using Xunit;
+global using FluentAssertions;
+global using NSubstitute;
+global using AutoFixture;
+global using TeensyRom.Core.Logging;
+global using TeensyRom.Core.Serial;
+global using TeensyRom.Core.Serial.State;
+global using TeensyRom.Core.Common;
+global using TeensyRom.Core.Abstractions;
+global using System.Reactive.Linq;
+global using System.Reactive.Threading.Tasks;
