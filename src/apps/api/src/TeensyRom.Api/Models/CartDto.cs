@@ -5,6 +5,7 @@ using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Serial.State;
+using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Api.Models
 {
@@ -29,6 +30,21 @@ namespace TeensyRom.Api.Models
         /// The COM port the device is connected to.
         /// </summary>
         [Required] public string ComPort { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The connection type of the device (Serial or TCP).
+        /// </summary>
+        [Required] public ConnectionType ConnectionType { get; set; } = ConnectionType.Serial;
+
+        /// <summary>
+        /// The IP address of the device (for TCP connections).
+        /// </summary>
+        [Required] public string IpAddress { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The TCP port of the device (for TCP connections).
+        /// </summary>
+        [Required] public int TcpPort { get; set; } = 80;
 
         /// <summary>
         /// The user-friendly name of the device.
@@ -64,6 +80,9 @@ namespace TeensyRom.Api.Models
             {
                 DeviceId = device.DeviceId ?? string.Empty,
                 ComPort = device.Cart.ComPort,
+                ConnectionType = device.Cart.ConnectionType,
+                IpAddress = device.Cart.IpAddress,
+                TcpPort = device.Cart.TcpPort,
                 Name = device.Cart.Name,
                 FwVersion = device.Cart.FwVersion,
                 IsCompatible = device.Cart.IsCompatible,

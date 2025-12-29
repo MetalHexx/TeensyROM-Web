@@ -1052,6 +1052,9 @@
           "isConnected",
           "deviceState",
           "comPort",
+          "connectionType",
+          "ipAddress",
+          "tcpPort",
           "name",
           "fwVersion",
           "isCompatible",
@@ -1071,6 +1074,16 @@
           },
           "comPort": {
             "type": "string"
+          },
+          "connectionType": {
+            "$ref": "#/components/schemas/ConnectionType"
+          },
+          "ipAddress": {
+            "type": "string"
+          },
+          "tcpPort": {
+            "type": "integer",
+            "format": "int32"
           },
           "name": {
             "type": "string"
