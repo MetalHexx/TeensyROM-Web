@@ -72,7 +72,9 @@
       "Bash(pnpm exec nx run-many:*)",
       "Bash(nx run:*)",
       "Bash(dotnet build:*)",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "Bash(uuidgen:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []
