@@ -38,15 +38,26 @@ namespace TeensyRom.Core.Serial
 
         public static (Version? version, bool isSupported) IsVersionSupported(string input)
         {
-            string pattern = @"\d+\.\d+\.\d+";
+            // Match both two-part (0.7) and three-part (0.7.0) version numbers
+            string pattern = @"\d+\.\d+(\.\d+)?";
             Match match = Regex.Match(input, pattern);
             Version? parsedVersion = null;
 
-            if (match.Success && Version.TryParse(match.Value, out parsedVersion))
+            if (match.Success)
             {
-                return input.Contains("minimal")
-                    ? (parsedVersion, parsedVersion >= MinimalRomVersion)
-                    : (parsedVersion, parsedVersion >= FullRomVersion);
+                // Normalize two-part versions to three-part by appending .0 if needed
+                var versionString = match.Value;
+                if (versionString.Count(c => c == '.') == 1)
+                {
+                    versionString += ".0";
+                }
+
+                if (Version.TryParse(versionString, out parsedVersion))
+                {
+                    return input.Contains("minimal")
+                        ? (parsedVersion, parsedVersion >= MinimalRomVersion)
+                        : (parsedVersion, parsedVersion >= FullRomVersion);
+                }
             }
             return (parsedVersion, false);
         }
