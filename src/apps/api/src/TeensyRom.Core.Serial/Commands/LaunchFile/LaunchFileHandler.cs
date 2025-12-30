@@ -174,7 +174,7 @@ namespace TeensyRom.Core.Commands.File.LaunchFile
                 if (command.DeviceId is not null)
                 {
                     await Task.Delay(4000);
-                    var connected = await deviceManager.ConnectToNextPort(command.DeviceId);
+                    var connected = await deviceManager.ReconnectDevice(command.DeviceId);
 
                     if (connected) 
                     {

@@ -1,4 +1,4 @@
-﻿using CsvHelper.Configuration.Attributes;
+using CsvHelper.Configuration.Attributes;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,12 +12,13 @@ using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Serial.State;
+using TeensyRom.Core.Settings;
 using TeensyRom.Core.Storage;
 
 namespace TeensyRom.Core.Device
 {
     public record DeviceStateSubscription(string DeviceId, IDisposable EventSubscription);
-    
+
     public class DeviceConnectionManager : IDeviceConnectionManager
     {
         public IObservable<DeviceStateChange?> DeviceStateChanges => _deviceStates.AsObservable();
@@ -28,23 +29,28 @@ namespace TeensyRom.Core.Device
 
         private readonly ICartFinder _finder;
         private readonly ILoggingService _log;
-        private readonly IFwVersionChecker _versionChecker;
+        private readonly IReconnectionStrategy _serialReconnection;
+        private readonly IReconnectionStrategy _tcpReconnection;
         private bool _healthCheckEnabled = false;
 
         private readonly List<DeviceStateSubscription> _deviceEventSubscriptions = [];
 
-        public DeviceConnectionManager(ICartFinder finder, ILoggingService log, IFwVersionChecker versionChecker)
+        public DeviceConnectionManager(
+            ICartFinder finder,
+            ILoggingService log,
+            IEnumerable<IReconnectionStrategy> reconnectionStrategies)
         {
             _finder = finder;
             _log = log;
-            _versionChecker = versionChecker;
+            _serialReconnection = reconnectionStrategies.OfType<SerialReconnectionStrategy>().Single();
+            _tcpReconnection = reconnectionStrategies.OfType<TcpReconnectionStrategy>().Single();
         }
 
         public List<TeensyRomDevice> GetConnectedDevices() => _connectedDevices.Select(d => d.Value).ToList();
         public TeensyRomDevice? GetConnectedDevice(string deviceId) => GetConnectedDevices().FirstOrDefault(d => d.DeviceId == deviceId);
         public TeensyRomDevice? GetDisconnectedDevice(string deviceId) => _disconnectedDevices.TryGetValue(deviceId, out var device) ? device : null;
 
-        public void ClosePort(string deviceId) 
+        public void ClosePort(string deviceId)
         {
             if (_connectedDevices.TryRemove(deviceId, out var device))
             {
@@ -53,58 +59,24 @@ namespace TeensyRom.Core.Device
             }
         }
 
-        private List<string> GetAvailablePorts()
+        public async Task<bool> ReconnectDevice(string deviceId)
         {
-            var ports = SerialHelper.GetPorts();
-            var availablePorts = ports.Except(_connectedDevices.Select(d => d.Value.Cart.ComPort)).ToList();
-            return availablePorts;
-        }
-
-        public async Task<bool> ConnectToNextPort(string deviceId) 
-        {            
-            var availablePorts = GetAvailablePorts();
-
             var device = GetConnectedDevice(deviceId);
 
             if (device is null)
             {
                 throw new TeensyException($"Device with ID {deviceId} not found in connected devices.");
-            }   
-            
-            foreach (var port in availablePorts)
-            {
-                var state = await device.SerialState.CurrentState.FirstAsync();
-
-                device.SerialState.TransitionTo(typeof(SerialConnectedState));
-
-                if (device.SerialState.IsOpen) 
-                {
-                    try
-                    {
-                        device.SerialState.ClosePort();
-                    }
-                    catch (Exception ex) 
-                    { 
-                    }
-                }                
-                device.SerialState.SetPort(port);
-                device.SerialState.OpenPort();
-                device.SerialState.Lock();
-                device.SerialState.TransitionTo(typeof(SerialBusyState));
-
-                var (isTeensyRom, isMinimal, isVersionCompatible, version) = _versionChecker.GetAllVersionInfo(device.SerialState);
-
-                if (!isTeensyRom) 
-                {
-                    continue;
-                }
-                device.Cart.ComPort = port;
-                return true;
             }
-            _log.InternalError($"Could not reconnect to {deviceId}.  Check your devices and try reconnnecting.");
-            device.SerialState.ClosePort();
 
-            return false;
+            // Select strategy based on ConnectionType
+            var strategy = device.Cart.ConnectionType switch
+            {
+                ConnectionType.Serial => _serialReconnection,
+                ConnectionType.Tcp => _tcpReconnection,
+                _ => throw new ArgumentException($"Unknown connection type: {device.Cart.ConnectionType}")
+            };
+
+            return await strategy.TryReconnect(device, CancellationToken.None);
         }
 
         public async Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct)
@@ -246,7 +218,7 @@ namespace TeensyRom.Core.Device
                         }
                         _devicesToKill.ForEach(d =>
                         {
-                            _log.InternalWarning($"Device {d.Cart.Name} - {d.DeviceId} @ {d.Cart.ComPort} is no longer connected.  Removing from device list.");
+                            _log.InternalWarning($"Device {d.Cart.Name} - {d.DeviceId} @ {d.Cart.ConnectionDisplay} is no longer connected.  Removing from device list.");
                             _connectedDevices.TryRemove(d.DeviceId, out TeensyRomDevice? device);
                             device?.SerialState.Dispose();
                             var deviceSubscription = _deviceEventSubscriptions.FirstOrDefault(sub => sub.DeviceId == d.DeviceId);
@@ -288,7 +260,7 @@ namespace TeensyRom.Core.Device
             }
             catch (UnauthorizedAccessException)
             {
-                _log.InternalError($"DeviceConnectionManager.CheckDeviceHealth: Unauthorized access to {device.Cart.Name} - {device.DeviceId} @ {device.Cart.ComPort}.");
+                _log.InternalError($"DeviceConnectionManager.CheckDeviceHealth: Unauthorized access to {device.Cart.Name} - {device.DeviceId} @ {device.Cart.ConnectionDisplay}.");
                 _log.InternalError($"Please check if the port is already in use.");
                 return null;
             }

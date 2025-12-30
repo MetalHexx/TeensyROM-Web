@@ -29,11 +29,34 @@ namespace TeensyRom.Core.Serial
 
         private readonly Queue<byte> _receiveBuffer = new();
         private readonly object _lockObject = new();
-        private IDisposable? _dataReceptionSubscription;
 
-        public int BytesToRead => _receiveBuffer.Count;
+        public int BytesToRead => _receiveBuffer.Count + (_networkStream?.DataAvailable == true ? 1 : 0);
 
-        public bool IsOpen => _tcpClient?.Connected == true && _networkStream != null;
+        public bool IsOpen => _tcpClient?.Connected == true && _networkStream != null && IsConnectionActuallyHealthy();
+
+        private bool IsConnectionActuallyHealthy()
+        {
+            if (_tcpClient == null || _networkStream == null)
+                return false;
+
+            if (!_tcpClient.Connected)
+                return false;
+
+            try
+            {
+                // Check if the socket is writable - this is the real test of connection health
+                // Using NetworkStream.CanWrite which checks the actual socket state
+                return _networkStream.CanWrite;
+            }
+            catch (ObjectDisposedException)
+            {
+                return false;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+        }
 
         public Unit SetPort(string port)
         {
@@ -88,18 +111,10 @@ namespace TeensyRom.Core.Serial
 
         public void EnsureConnection(int waitTimeMs = 200)
         {
+            // If already open and healthy, return
             if (IsOpen) return;
 
-            Lock();
-
-            if (_tcpClient != null && _tcpClient.Connected)
-            {
-                _tcpClient.Close();
-            }
-
-            log.Internal($"TcpObservablePort.EnsureConnection: Attempting to connect to {_endpoint}");
-
-            var failureMessage = $"TcpObservablePort.EnsureConnection: Unable to connect to {_endpoint}";
+            log.Internal($"TcpObservablePort.EnsureConnection: Connecting to {_endpoint}");
 
             try
             {
@@ -127,99 +142,32 @@ namespace TeensyRom.Core.Serial
 
                 if (_tcpClient!.Connected == false)
                 {
-                    throw new TeensyException(failureMessage);
+                    throw new TeensyException($"Unable to connect to {_endpoint}");
                 }
 
                 _networkStream = _tcpClient.GetStream();
                 _networkStream!.ReadTimeout = _readTimeoutMs;
                 _networkStream.WriteTimeout = _writeTimeoutMs;
 
+                _state.OnNext(typeof(SerialConnectedState));
                 log.InternalSuccess($"TcpObservablePort.EnsureConnection: Successfully connected to {_endpoint}");
-
-                Unlock();
-                return;
-            }
-            catch (AggregateException ex) when (ex.InnerException is SocketException)
-            {
-                log.ExternalError(failureMessage);
-                throw new TeensyException(failureMessage, ex.InnerException);
-            }
-            catch (SocketException ex)
-            {
-                log.ExternalError(failureMessage);
-                throw new TeensyException(failureMessage, ex);
-            }
-            catch (TimeoutException ex)
-            {
-                log.ExternalError(failureMessage);
-                throw new TeensyException(failureMessage, ex);
             }
             catch (Exception ex)
             {
-                log.ExternalError(failureMessage);
-                throw new TeensyException(failureMessage, ex);
+                _state.OnNext(typeof(SerialConnectionLostState));
+                log.InternalError($"TcpObservablePort.EnsureConnection: {ex.Message}");
+                throw;
             }
         }
 
         public void Lock()
         {
-            ClearBuffers();
-            _dataReceptionSubscription?.Dispose();
-            _dataReceptionSubscription = null;
+            // No-op for TCP
         }
 
         public void Unlock()
         {
-            _dataReceptionSubscription?.Dispose();
-
-            _dataReceptionSubscription = Observable
-                .Interval(TimeSpan.FromMilliseconds(50))
-                .SelectMany(_ => Observable.FromAsync(async token =>
-                {
-                    try
-                    {
-                        if (!IsOpen || _networkStream == null)
-                        {
-                            return Array.Empty<byte>();
-                        }
-
-                        if (_networkStream.DataAvailable)
-                        {
-                            var buffer = new byte[4096];
-                            var bytesRead = await _networkStream.ReadAsync(buffer, 0, buffer.Length, token);
-
-                            if (bytesRead > 0)
-                            {
-                                var receivedData = buffer.Take(bytesRead).ToArray();
-
-                                lock (_lockObject)
-                                {
-                                    foreach (var b in receivedData)
-                                    {
-                                        _receiveBuffer.Enqueue(b);
-                                    }
-                                }
-
-                                return receivedData;
-                            }
-                        }
-                        return [];
-                    }
-                    catch (IOException)
-                    {
-                        return [];
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return [];
-                    }
-                }))
-                .Where(bytes => bytes.Length > 0)
-                .Select(bytes => bytes.ToLogString())
-                .Where(logEntry => !string.IsNullOrWhiteSpace(logEntry))
-                .Publish()
-                .RefCount()
-                .Subscribe(logs => log.External(logs));
+            // No-op for TCP
         }
 
         public void Write(string text)
@@ -320,15 +268,28 @@ namespace TeensyRom.Core.Serial
         {
             Thread.Sleep(msToWait);
 
-            if (BytesToRead == 0)
+            if (_networkStream == null || !IsOpen)
                 return string.Empty;
 
-            byte[] receivedData = new byte[BytesToRead];
-            Read(receivedData, 0, receivedData.Length);
+            // Read() handles both _receiveBuffer and network stream automatically
+            var buffer = new byte[4096];
+            try
+            {
+                int bytesRead = Read(buffer, 0, buffer.Length);
+                if (bytesRead > 0)
+                {
+                    var receivedData = new byte[bytesRead];
+                    Array.Copy(buffer, 0, receivedData, 0, bytesRead);
+                    var dataString = receivedData.ToUtf8();
+                    return string.IsNullOrWhiteSpace(dataString) ? string.Empty : dataString;
+                }
+            }
+            catch (IOException)
+            {
+                // Connection error
+            }
 
-            var dataString = receivedData.ToUtf8();
-
-            return string.IsNullOrWhiteSpace(dataString) ? string.Empty : dataString;
+            return string.Empty;
         }
 
         public string ReadAndLogSerialAsString(int msToWait = 0)
@@ -413,11 +374,35 @@ namespace TeensyRom.Core.Serial
 
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
-                if (BytesToRead >= numBytes)
+                // First check if we have enough in the buffer
+                if (_receiveBuffer.Count >= numBytes)
                 {
                     sw.Stop();
                     return;
                 }
+
+                // If not, try to read from network stream into buffer
+                if (_networkStream != null && _networkStream.DataAvailable)
+                {
+                    lock (_lockObject)
+                    {
+                        // Read all available data into buffer
+                        var tempBuffer = new byte[4096];
+                        int bytesRead = _networkStream.Read(tempBuffer, 0, tempBuffer.Length);
+                        for (int i = 0; i < bytesRead; i++)
+                        {
+                            _receiveBuffer.Enqueue(tempBuffer[i]);
+                        }
+                    }
+
+                    // Check again after buffering
+                    if (_receiveBuffer.Count >= numBytes)
+                    {
+                        sw.Stop();
+                        return;
+                    }
+                }
+
                 Thread.Sleep(10);
             }
 
@@ -467,6 +452,7 @@ namespace TeensyRom.Core.Serial
 
         public void StopHealthCheck()
         {
+            EnsureConnection();
         }
 
         public void StartPortPoll()
@@ -483,7 +469,6 @@ namespace TeensyRom.Core.Serial
             _tcpClient?.Dispose();
             _networkStream?.Dispose();
             _ports?.Dispose();
-            _dataReceptionSubscription?.Dispose();
 
             lock (_lockObject)
             {

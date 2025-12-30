@@ -11,7 +11,7 @@ namespace TeensyRom.Core.Abstractions
         Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct);
         List<TeensyRomDevice> GetConnectedDevices();
         TeensyRomDevice? GetConnectedDevice(string deviceId);
-        Task<bool> ConnectToNextPort(string deviceId);
+        Task<bool> ReconnectDevice(string deviceId);
         void ClosePort(string deviceId);
         void StopHealthCheck();
     }

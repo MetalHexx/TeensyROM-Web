@@ -1,7 +1,7 @@
 using System.Text;
 using TeensyRom.Core.Device;
 
-namespace TeensyRom.Core.Serial.Tests.Integration;
+namespace TeensyRom.Core.Device.Tests.Integration;
 
 /// <summary>
 /// Generates Markdown reports for TeensyROM device discovery.
@@ -96,6 +96,20 @@ public class TeensyRomDiscoveryReport
             var response = device.Response?.Replace("|", "\\|") ?? "(no response)";
             var shortResponse = response.Length > 50 ? response.Substring(0, 47) + "..." : response;
             _report.AppendLine($"| {index++} | {device.IpAddress} | {device.Port} | {device.Endpoint} | {shortResponse} | {device.DiscoveredAt:yyyy-MM-dd HH:mm:ss} |");
+        }
+
+        _report.AppendLine();
+    }
+
+    public void WriteEndpointTable(IEnumerable<DiscoveredEndpoint> endpoints)
+    {
+        _report.AppendLine("| # | Connection Type | Address | Port | Display |");
+        _report.AppendLine("|---|-----------------|---------|------|---------|");
+
+        int index = 1;
+        foreach (var endpoint in endpoints)
+        {
+            _report.AppendLine($"| {index++} | {endpoint.ConnectionType} | {endpoint.Address} | {endpoint.Port?.ToString() ?? "(N/A)"} | {endpoint.Display} |");
         }
 
         _report.AppendLine();

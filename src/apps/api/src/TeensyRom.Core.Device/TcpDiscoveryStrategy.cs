@@ -5,37 +5,66 @@ using System.Net.Sockets;
 using System.Text;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial;
+using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Device;
 
 /// <summary>
-/// Scans the local network in parallel to discover TeensyROM devices listening on TCP port 80.
+/// Discovers TeensyROM devices on the local network via TCP scanning.
 /// Uses true async I/O without thread pool blocking for efficient parallel scanning.
+/// Implements IDiscoveryStrategy to provide a unified discovery interface.
 /// </summary>
-public class TcpDeviceFinder(ILoggingService log) : ITcpDeviceFinder
+public class TcpDiscoveryStrategy(ILoggingService log) : IDiscoveryStrategy
 {
     private const int _maxDegreeOfParallelism = 256;
     private const int _connectionTimeoutMs = 150;
     private const int _readTimeoutMs = 100;
     private const int _bufferSize = 4096;
 
+    #region IDiscoveryStrategy Implementation
+
+    /// <summary>
+    /// Finds all available TCP endpoints on the local network.
+    /// Implements IDiscoveryStrategy to provide unified discovery across transport types.
+    /// </summary>
+    /// <param name="ct">Cancellation token to abort the network scan.</param>
+    /// <returns>List of TCP endpoints (IP:port) where TeensyROM devices were found.</returns>
+    public async Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct)
+    {
+        var discoveredDevices = await ScanLocalSubnet(ct);
+
+        var endpoints = discoveredDevices
+            .Select(device => new DiscoveredEndpoint(
+                ConnectionType.Tcp,
+                device.IpAddress,
+                device.Port
+            ))
+            .ToList();
+
+        return endpoints;
+    }
+
+    #endregion
+
+    #region Private Methods
+
     /// <summary>
     /// Scans the local subnet for TeensyROM devices.
     /// Automatically detects the local subnet range and performs a parallel scan.
     /// </summary>
-    public async Task<List<TcpDiscoveredDevice>> ScanLocalSubnet(CancellationToken ct)
+    private async Task<List<TcpDiscoveredDevice>> ScanLocalSubnet(CancellationToken ct)
     {
-        log.Internal("TcpDeviceFinder: Scanning local subnet for TeensyROM devices");
+        log.Internal("TcpDiscoveryStrategy: Scanning local subnet for TeensyROM devices");
 
         var subnetRange = NetworkHelper.GetLocalSubnetRange();
         if (!subnetRange.HasValue)
         {
-            log.InternalError("TcpDeviceFinder: Unable to detect local subnet range");
+            log.InternalError("TcpDiscoveryStrategy: Unable to detect local subnet range");
             return [];
         }
 
         var (startIp, endIp) = subnetRange.Value;
-        log.Internal($"TcpDeviceFinder: Scanning range {startIp} to {endIp}");
+        log.Internal($"TcpDiscoveryStrategy: Scanning range {startIp} to {endIp}");
 
         return await ScanNetwork(startIp, endIp, ct);
     }
@@ -44,7 +73,7 @@ public class TcpDeviceFinder(ILoggingService log) : ITcpDeviceFinder
     /// Scans the specified IP range for TeensyROM devices using parallel TCP connections.
     /// Each IP is probed with a TeensyROM ping token (0x6455) to validate the device.
     /// </summary>
-    public async Task<List<TcpDiscoveredDevice>> ScanNetwork(IPAddress startIp, IPAddress endIp, CancellationToken ct)
+    private async Task<List<TcpDiscoveredDevice>> ScanNetwork(IPAddress startIp, IPAddress endIp, CancellationToken ct)
     {
         var ipRange = NetworkHelper.GenerateIpRange(startIp, endIp);
         var discoveredDevices = new ConcurrentBag<TcpDiscoveredDevice>();
@@ -55,7 +84,7 @@ public class TcpDeviceFinder(ILoggingService log) : ITcpDeviceFinder
             CancellationToken = ct
         };
 
-        log.Internal($"TcpDeviceFinder: Scanning {ipRange.Count} IP addresses with MaxDegreeOfParallelism = {_maxDegreeOfParallelism}");
+        log.Internal($"TcpDiscoveryStrategy: Scanning {ipRange.Count} IP addresses with MaxDegreeOfParallelism = {_maxDegreeOfParallelism}");
 
         await Parallel.ForEachAsync(ipRange, parallelOptions, async (ip, ct) =>
         {
@@ -65,12 +94,12 @@ public class TcpDeviceFinder(ILoggingService log) : ITcpDeviceFinder
             if (device != null)
             {
                 discoveredDevices.Add(device);
-                log.InternalSuccess($"TcpDeviceFinder: Discovered TeensyROM device at {device.IpAddress}:{device.Port}");
+                log.InternalSuccess($"TcpDiscoveryStrategy: Discovered TeensyROM device at {device.IpAddress}:{device.Port}");
             }
         });
 
         var result = discoveredDevices.ToList();
-        log.InternalSuccess($"TcpDeviceFinder: Scan complete. Found {result.Count} device(s)");
+        log.InternalSuccess($"TcpDiscoveryStrategy: Scan complete. Found {result.Count} device(s)");
 
         return result;
     }
@@ -144,7 +173,11 @@ public class TcpDeviceFinder(ILoggingService log) : ITcpDeviceFinder
         {
             // Connection error - not a TeensyROM device
         }
-
+        finally
+        {
+          tcpClient.Close();
+          tcpClient.Dispose();
+        }
         return null;
     }
 
@@ -162,4 +195,6 @@ public class TcpDeviceFinder(ILoggingService log) : ITcpDeviceFinder
         var responseLower = response.ToLowerInvariant();
         return responseLower.Contains("teensyrom") || responseLower.Contains("busy");
     }
+
+    #endregion
 }

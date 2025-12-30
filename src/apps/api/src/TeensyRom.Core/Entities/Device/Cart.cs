@@ -15,5 +15,12 @@ namespace TeensyRom.Core.Entities.Device
         public bool IsCompatible { get; set; }
         public CartStorage SdStorage { get; set; } = new(TeensyStorageType.SD, available: false);
         public CartStorage UsbStorage { get; set; } = new(TeensyStorageType.USB, available: false);
+
+        public string ConnectionDisplay => ConnectionType switch
+        {
+            ConnectionType.Serial => $"Port: {ComPort}",
+            ConnectionType.Tcp => $"IP: {IpAddress}:{TcpPort}",
+            _ => "Unknown"
+        };
     }
 }

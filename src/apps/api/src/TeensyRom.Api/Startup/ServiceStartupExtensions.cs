@@ -45,6 +45,10 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IDeviceConnectionManager, DeviceConnectionManager>();
             services.AddSingleton<IDeviceTransportFactory, DeviceTransportFactory>();
             services.AddSingleton<IStorageFactory, StorageFactory>();
+            services.AddSingleton<IDiscoveryStrategy, SerialDiscoveryStrategy>();
+            services.AddSingleton<IDiscoveryStrategy, TcpDiscoveryStrategy>();
+            services.AddSingleton<IReconnectionStrategy, SerialReconnectionStrategy>();
+            services.AddSingleton<IReconnectionStrategy, TcpReconnectionStrategy>();
             services.AddSingleton<IGameMetadataService, GameMetadataService>();
             services.AddSingleton<IHvscDatabase, HvscDatabase>();
             services.AddSingleton<IDeepSidDatabase, DeepSidDatabase>();
