@@ -401,3 +401,5 @@ FodyWeavers.xsd
 *.sln.iml
 Source/Windows/TeensyRom.Ui/src/TeensyRom.Api/ClientApp/teensyrom-nx/apps/teensyrom-ui-e2e/cypress/downloads/downloads.htm
 /src/apps/api/src/TeensyRom.Core.Serial.Tests.Integration/test-reports
+/src/apps/api/src/TeensyRom.Core.Device.Tests.Integration/test-reports/device-manager-discover-tcp-report.md
+/src/apps/api/src/TeensyRom.Core.Device.Tests.Integration/test-reports/local-subnet-scan-report.md
