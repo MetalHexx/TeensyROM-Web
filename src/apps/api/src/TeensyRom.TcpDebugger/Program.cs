@@ -42,8 +42,6 @@ class Program
             LogSuccess($"Response: '{versionResponse?.Trim()}'");
             Console.WriteLine();
 
-            await Task.Delay(500);
-
             // Ping Command #2 (with reconnect)
             LogHeader("Ping #2 with reconnect");
             ReconnectForNextCommand(transport);
@@ -53,8 +51,6 @@ class Program
             LogSuccess($"Response: '{pingResponse?.Trim()}'");
             Console.WriteLine();
 
-            await Task.Delay(500);
-
             // Ping Command #3 (with reconnect)
             LogHeader("Ping #3 (CartTagger) with reconnect");
             ReconnectForNextCommand(transport);
@@ -63,8 +59,6 @@ class Program
             var ping3Response = transport.ReadAndLogSerialAsString(500);
             LogSuccess($"Response: '{ping3Response?.Trim()}'");
             Console.WriteLine();
-
-            await Task.Delay(500);
 
             // Get File Command
             LogHeader("GetFile Command (/cart-tag.txt) with reconnect");
@@ -172,11 +166,9 @@ class Program
         LogDetail("→ Reconnecting for next command...");
         transport.TransitionTo(typeof(SerialConnectedState));
         transport.ClosePort();
-        Task.Delay(50).Wait();
 
         transport.OpenPort();
         transport.TransitionTo(typeof(SerialBusyState));
-        Task.Delay(50).Wait();
         LogSuccess("→ Ready");
     }
 
