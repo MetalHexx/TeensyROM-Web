@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.SignalR;
-using TeensyRom.Api.Endpoints.GetDeviceEvents;
 using TeensyRom.Core.Abstractions;
 
 namespace TeensyRom.Api.Endpoints.Serial.GetLogs
