@@ -11,7 +11,6 @@ namespace TeensyRom.Api.Services
     /// </summary>
     public class ApplicationBootstrapService : IHostedService
     {
-        private readonly ISettingsService _settingsService;
         private readonly IDeviceConnectionManager _deviceManager;
         private readonly ILoggingService _log;
 
@@ -20,7 +19,6 @@ namespace TeensyRom.Api.Services
             IDeviceConnectionManager deviceManager,
             ILoggingService log)
         {
-            _settingsService = settingsService;
             _deviceManager = deviceManager;
             _log = log;
         }
@@ -31,11 +29,8 @@ namespace TeensyRom.Api.Services
 
             try
             {
-                // Execute startup operations in sequence
-                await PerformDeviceAutoConnect(cancellationToken);
+                await PerformDeviceAutoDiscovery(cancellationToken);
 
-                // Add additional startup operations here...
-                // await InitializeOtherServices(settings, cancellationToken);
 
                 _log.Internal("ApplicationBootstrap: Bootstrap complete");
             }
@@ -46,7 +41,6 @@ namespace TeensyRom.Api.Services
             catch (Exception ex)
             {
                 _log.ExternalError($"ApplicationBootstrap: Bootstrap failed: {ex.Message}");
-                // Non-critical: App continues even if bootstrap fails
             }
         }
 
@@ -61,7 +55,7 @@ namespace TeensyRom.Api.Services
         /// Discovers all devices first, then connects only those with autoConnectEnabled=true.
         /// New devices are automatically registered with default settings.
         /// </summary>
-        private async Task PerformDeviceAutoConnect(CancellationToken cancellationToken)
+        private async Task PerformDeviceAutoDiscovery(CancellationToken cancellationToken)
         {
             _log.Internal("ApplicationBootstrap: Scanning for devices...");
 
@@ -76,31 +70,7 @@ namespace TeensyRom.Api.Services
                     return;
                 }
 
-                _log.Internal($"ApplicationBootstrap: Found {devices.Count} device(s), checking per-device settings...");
-
-                int connectedCount = 0;
-                int skippedCount = 0;
-
-                foreach (var device in devices)
-                {
-                    // 2. Get or create device settings (creates with defaults if new)
-                    var deviceSettings = _settingsService.GetOrCreateDeviceSettings(device.DeviceId);
-
-                    // 3. Auto-connect only if enabled for this device
-                    if (deviceSettings.ConnectionSettings.AutoConnectEnabled)
-                    {
-                        _deviceManager.Connect(device.DeviceId);
-                        _log.InternalSuccess($"ApplicationBootstrap: Auto-connected device: {device.DeviceId}");
-                        connectedCount++;
-                    }
-                    else
-                    {
-                        _log.Internal($"ApplicationBootstrap: Skipped auto-connect for device: {device.DeviceId} (disabled in settings)");
-                        skippedCount++;
-                    }
-                }
-
-                _log.InternalSuccess($"ApplicationBootstrap: Connected {connectedCount} device(s), skipped {skippedCount}");
+                _log.Internal($"ApplicationBootstrap: Discovered {devices.Count} device(s).");
             }
             catch (OperationCanceledException)
             {
@@ -108,8 +78,7 @@ namespace TeensyRom.Api.Services
             }
             catch (Exception ex)
             {
-                _log.InternalError($"ApplicationBootstrap: Device auto-connect failed: {ex.Message}");
-                // Non-critical: Continue bootstrap even if auto-connect fails
+                _log.InternalError($"ApplicationBootstrap: Device discovery failed: {ex.Message}");
             }
         }
     }
