@@ -1,6 +1,4 @@
-﻿using MediatR;
 using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Commands.MuteSidVoices;
 
 namespace TeensyRom.Core.Serial.Commands.Composite.FastForward
 {
@@ -10,6 +8,6 @@ namespace TeensyRom.Core.Serial.Commands.Composite.FastForward
         public required bool ShouldMuteVoices { get; init; }
         public required double Speed { get; init; }
         public string? DeviceId { get; set; }
-        public required ISerialStateContext Serial { get; init; }
+        public required ICommunicationPort CommunicationPort { get; init; }
     }
 }

@@ -36,4 +36,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="test-reports\" />
+  </ItemGroup>
+
 </Project>

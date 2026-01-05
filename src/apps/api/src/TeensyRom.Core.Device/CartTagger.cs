@@ -1,48 +1,39 @@
-﻿using MediatR;
-using System.IO.Ports;
-using System.Reactive.Linq;
-using System.Reflection.Metadata.Ecma335;
-using System.Transactions;
+using MediatR;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Commands.GetFile;
 using TeensyRom.Core.Common;
-using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Serial;
-using TeensyRom.Core.Serial.Commands.GetFile;
-using TeensyRom.Core.Serial.Commands.SaveFiles;
-using TeensyRom.Core.Settings;
 using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Device
 {
     public interface ICartTagger
     {
-        Task<CartStorage> EnsureTag(ISerialStateContext serial, TeensyStorageType storageType);
+        Task<CartStorage> EnsureTag(ICommunicationPort communicationPort, TeensyStorageType storageType);
     }
     public class CartTagger(ILoggingService log, IMediator mediator) : ICartTagger
     {
-        public async Task<CartStorage> EnsureTag(ISerialStateContext serial, TeensyStorageType storageType)
+        public async Task<CartStorage> EnsureTag(ICommunicationPort communicationPort, TeensyStorageType storageType)
         {
             var methodName = "CartTagger.EnsureTag:";
             var pingResult = await mediator.Send(new PingCommand 
             {
-                Serial = serial
+                CommunicationPort = communicationPort
             });
             if (pingResult.IsBusy) 
             {
                 await mediator.Send(new ResetCommand
                 {
-                    Serial = serial
+                    CommunicationPort = communicationPort
                 });
             }
             var getFileCommand = new GetFileCommand
             {
                 StorageType = storageType,
                 FilePath = new FilePath("/cart-tag.txt"),
-                Serial = serial
+                CommunicationPort = communicationPort
             };
             var getFileResult = await mediator.Send(getFileCommand);
 
@@ -98,7 +89,7 @@ namespace TeensyRom.Core.Device
             var saveFileCommand = new SaveFilesCommand
             {
                 Files = [fileTransferItem],
-                Serial = serial
+                CommunicationPort = communicationPort
             };
             var saveFileResult = await mediator.Send(saveFileCommand);
 

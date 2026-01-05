@@ -1,16 +1,17 @@
-﻿using MediatR;
+using MediatR;
 using TeensyRom.Core.Common;
+using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Commands.PlaySubtune
 {
 
-    public class PlaySubtuneHandler(IPlaySubtuneSerialRoutine playSubtune) : IRequestHandler<PlaySubtuneCommand, PlaySubtuneResult>
+    public class PlaySubtuneHandler() : IRequestHandler<PlaySubtuneCommand, PlaySubtuneResult>
     {
         public async Task<PlaySubtuneResult> Handle(PlaySubtuneCommand request, CancellationToken cancellationToken)
         {
             try
             {
-                playSubtune.Execute(request.Serial, (uint)request.SubtuneIndex);
+                request.CommunicationPort.PlaySubtune((uint)request.SubtuneIndex);
             }
             catch (TeensyException ex)
             {
@@ -20,7 +21,10 @@ namespace TeensyRom.Core.Commands.PlaySubtune
                     Error = ex.Message
                 };
             }
-            return new PlaySubtuneResult();
+            return new PlaySubtuneResult
+            {
+                IsSuccess = true
+            };
         }
     }
 }

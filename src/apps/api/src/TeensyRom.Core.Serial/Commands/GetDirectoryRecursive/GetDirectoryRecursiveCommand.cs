@@ -1,6 +1,6 @@
-﻿using TeensyRom.Core.Entities.Storage;
-using TeensyRom.Core.Serial.Commands;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Serial.Commands;
 using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Commands
@@ -11,6 +11,6 @@ namespace TeensyRom.Core.Commands
         public required DirectoryPath Path { get; init; }
         public required bool Recursive { get; init; }
         public string? DeviceId { get; set; }
-        public required ISerialStateContext Serial { get; init; }
+        public required ICommunicationPort CommunicationPort { get; init; }
     }
 }

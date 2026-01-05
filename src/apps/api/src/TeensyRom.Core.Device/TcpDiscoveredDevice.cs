@@ -1,8 +1,10 @@
+using TeensyRom.Core.Abstractions;
+
 namespace TeensyRom.Core.Device;
 
 /// <summary>
 /// Represents a TeensyROM device discovered during TCP network scanning.
-/// This is a lightweight DTO for discovered devices, not yet converted to a Cart entity.
+/// This is a lightweight DTO for discovered devices, optionally including the open port.
 /// </summary>
 public class TcpDiscoveredDevice
 {
@@ -30,4 +32,10 @@ public class TcpDiscoveredDevice
     /// Gets the endpoint string in "ip:port" format.
     /// </summary>
     public string Endpoint => $"{IpAddress}:{Port}";
+
+    /// <summary>
+    /// Gets the open communication port for this discovered device.
+    /// This port is already connected and validated - ready for use.
+    /// </summary>
+    public ICommunicationPort? CommunicationPort { get; init; }
 }

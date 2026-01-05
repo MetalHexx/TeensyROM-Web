@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands.MuteSidVoices;
 using TeensyRom.Core.Music;
@@ -8,7 +8,7 @@ namespace TeensyRom.Core.Serial.Commands.Composite.EndFastForward
     public class EndFastForwardCommand : ITeensyCommand<EndFastForwardResult>
     {
         public string? DeviceId { get; set; }
-        public required ISerialStateContext Serial { get; init; }
+        public required ICommunicationPort CommunicationPort { get; init; }
         public required bool ShouldEnableVoices { get; init; }
         public required double OriginalSpeed { get; init; }
         public required MusicSpeedCurveTypes SpeedCurve { get; init; }

@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 
 namespace TeensyRom.Core.Commands.SendString
 {
@@ -6,7 +6,7 @@ namespace TeensyRom.Core.Commands.SendString
     {
         public Task<SendStringResult> Handle(SendStringCommand request, CancellationToken cancellationToken)
         {
-            request.Serial.Write(request.StringToSend);   
+            request.CommunicationPort.Write(request.StringToSend);   
             return Task.FromResult(new SendStringResult());
         }
     }

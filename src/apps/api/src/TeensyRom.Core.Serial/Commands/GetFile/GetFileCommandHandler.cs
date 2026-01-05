@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Entities.Storage;
@@ -18,20 +18,20 @@ namespace TeensyRom.Core.Commands.GetFile
 
     public class GetFileCommandHandler() : IRequestHandler<GetFileCommand, GetFileResult>
     {
-        private ISerialStateContext _serial = null!;
+        private ICommunicationPort _communicationPort = null!;
         public async Task<GetFileResult> Handle(GetFileCommand r, CancellationToken cancellationToken)
         {
-            _serial = r.Serial;
+            _communicationPort = r.CommunicationPort;
 
-            _serial.ClearBuffers();
-            _serial.SendIntBytes(TeensyToken.GetFile, 2);
-            _serial.HandleAck();
-            _serial.SendIntBytes(r.StorageType.GetStorageToken(), 1);
-            _serial.Write($"{r.FilePath}\0");
+            _communicationPort.ClearBuffers();
+            _communicationPort.SendIntBytes(TeensyToken.GetFile, 2);
+            _communicationPort.HandleAck();
+            _communicationPort.SendIntBytes(r.StorageType.GetStorageToken(), 1);
+            _communicationPort.Write($"{r.FilePath}\0");
 
             try
             {
-                _serial.HandleAck();
+                _communicationPort.HandleAck();
             }
             catch (Exception ex)
             {
@@ -52,10 +52,10 @@ namespace TeensyRom.Core.Commands.GetFile
                 };
             }
 
-            var fileLength = _serial.ReadIntBytes(4);
-            var checksum = _serial.ReadIntBytes(4);
+            var fileLength = _communicationPort.ReadIntBytes(4);
+            var checksum = _communicationPort.ReadIntBytes(4);
             var buffer = GetFileBytes(fileLength);
-            _serial.HandleAck();
+            _communicationPort.HandleAck();
 
             var receivedChecksum = buffer.CalculateChecksum();
 
@@ -81,7 +81,7 @@ namespace TeensyRom.Core.Commands.GetFile
 
             while (bytesRead < fileLength)
             {
-                bytesRead += _serial.Read(buffer, bytesRead, fileLengthInt - bytesRead);
+              bytesRead += _communicationPort.Read(buffer, bytesRead, fileLengthInt - bytesRead);
             }
 
             return buffer;

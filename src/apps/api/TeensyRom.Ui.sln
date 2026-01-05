@@ -32,8 +32,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Api.Tests.Unit", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TeensyRom.Core.Serial.Tests.Unit", "src\TeensyRom.Core.Serial.Tests.Unit\TeensyRom.Core.Serial.Tests.Unit.csproj", "{8B948440-CF94-4684-B09E-B1DC6575591B}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Serial.Tests.Integration", "src\TeensyRom.Core.Serial.Tests.Integration\TeensyRom.Core.Serial.Tests.Integration.csproj", "{429EA16D-89B7-4388-B21D-471485E74124}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Device.Tests.Unit", "src\TeensyRom.Core.Device.Tests.Unit\TeensyRom.Core.Device.Tests.Unit.csproj", "{FEF4C593-342C-47DE-AC8F-AAB2AE2B5A35}"
@@ -245,7 +243,7 @@ Global
 		{429EA16D-89B7-4388-B21D-471485E74124} = {7E3C6ECA-A1A8-446F-A8D0-A662F109F2B9}
 		{FEF4C593-342C-47DE-AC8F-AAB2AE2B5A35} = {7E3C6ECA-A1A8-446F-A8D0-A662F109F2B9}
 		{B02B6B71-CBFA-4B4B-9BC0-D3D1817DFA22} = {7E3C6ECA-A1A8-446F-A8D0-A662F109F2B9}
-		{7BBA86DA-05C3-46F7-B705-BD48084B496B} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{7BBA86DA-05C3-46F7-B705-BD48084B496B} = {7E3C6ECA-A1A8-446F-A8D0-A662F109F2B9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CEA1D327-E773-4A3D-837C-6B01037E16E5}

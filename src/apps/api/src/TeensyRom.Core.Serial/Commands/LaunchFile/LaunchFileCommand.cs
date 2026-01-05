@@ -1,4 +1,4 @@
-﻿using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Serial.Commands;
 using TeensyRom.Core.ValueObjects;
@@ -12,6 +12,6 @@ namespace TeensyRom.Core.Commands.File.LaunchFile
         public FilePath Path => LaunchItem.Path;
         public long Size => LaunchItem.Size;
         public string? DeviceId { get; set; }
-        public required ISerialStateContext Serial { get; init; }
+        public required ICommunicationPort CommunicationPort { get; init; }
     }
 }

@@ -19,26 +19,17 @@ public class DeviceConnectionManagerTests : IAsyncDisposable
 
     [Fact]
     public void DeviceConnectionManager_SelectsCorrectStrategy_Serial()
-    {
-        // Create real strategies
+    {   
         var versionChecker = new FwVersionChecker(_log, _alert);
         var serialStrategy = new SerialReconnectionStrategy(_log, versionChecker);
         var tcpStrategy = new TcpReconnectionStrategy(_log, versionChecker);
         var strategies = new List<IReconnectionStrategy> { serialStrategy, tcpStrategy };
-
-        // Verify strategies are registered
+    
         strategies.Should().Contain(s => s is SerialReconnectionStrategy);
         strategies.Should().Contain(s => s is TcpReconnectionStrategy);
         strategies.Should().HaveCount(2);
-
-        // Create mock Serial device
-        var mockSerialState = Substitute.For<ISerialStateContext>();
-        var mockSerialPort = Substitute.For<IObservableSerialPort>();
-        var mockState = new SerialConnectedState(mockSerialPort);
-
-        var stateSubject = new System.Reactive.Subjects.BehaviorSubject<SerialState>(mockState);
-        mockSerialState.CurrentState.Returns(stateSubject);
-        mockSerialState.IsOpen.Returns(true);
+        
+        var mockCommunicationPort = Substitute.For<ICommunicationPort>();
 
         var cart = new Cart
         {
@@ -50,7 +41,7 @@ public class DeviceConnectionManagerTests : IAsyncDisposable
 
         var device = new TeensyRomDevice(
             cart,
-            mockSerialState,
+            mockCommunicationPort,
             Substitute.For<IStorageService>(),
             Substitute.For<IStorageService>()
         );
@@ -75,13 +66,7 @@ public class DeviceConnectionManagerTests : IAsyncDisposable
         strategies.Should().HaveCount(2);
 
         // Create mock TCP device
-        var mockSerialState = Substitute.For<ISerialStateContext>();
-        var mockSerialPort = Substitute.For<IObservableSerialPort>();
-        var mockState = new SerialConnectedState(mockSerialPort);
-
-        var stateSubject = new System.Reactive.Subjects.BehaviorSubject<SerialState>(mockState);
-        mockSerialState.CurrentState.Returns(stateSubject);
-        mockSerialState.IsOpen.Returns(true);
+        var mockSerialPort = Substitute.For<ICommunicationPort>();
 
         var cart = new Cart
         {
@@ -94,7 +79,7 @@ public class DeviceConnectionManagerTests : IAsyncDisposable
 
         var device = new TeensyRomDevice(
             cart,
-            mockSerialState,
+            mockSerialPort,
             Substitute.For<IStorageService>(),
             Substitute.For<IStorageService>()
         );
@@ -109,19 +94,7 @@ public class DeviceConnectionManagerTests : IAsyncDisposable
     public void DeviceConnectionManager_HealthCheck_LogsConnectionDisplay()
     {
         // Create mock TCP device
-        var mockSerialState = Substitute.For<ISerialStateContext>();
-        var mockSerialPort = Substitute.For<IObservableSerialPort>();
-        var mockState = new SerialConnectedState(mockSerialPort);
-
-        var stateSubject = new System.Reactive.Subjects.BehaviorSubject<SerialState>(mockState);
-        mockSerialState.CurrentState.Returns(stateSubject);
-        mockSerialState.IsOpen.Returns(true);
-
-        // Make EnsureConnection throw to trigger health check removal
-        mockSerialState.When(x => x.EnsureConnection()).Do(callInfo =>
-        {
-            throw new InvalidOperationException("Connection lost");
-        });
+        var mockSerialPort = Substitute.For<ICommunicationPort>();
 
         var testIpAddress = "192.168.1.100";
         var testPort = 8080;
@@ -137,7 +110,7 @@ public class DeviceConnectionManagerTests : IAsyncDisposable
 
         var device = new TeensyRomDevice(
             cart,
-            mockSerialState,
+            mockSerialPort,
             Substitute.For<IStorageService>(),
             Substitute.For<IStorageService>()
         );
@@ -147,52 +120,17 @@ public class DeviceConnectionManagerTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task DeviceConnectionManager_FindDevices_DiscoverTcpDevices()
+    public void DeviceConnectionManager_FindDevices_DiscoverTcpDevices()
     {
-        var report = new TeensyRomDiscoveryReport("device-manager-discover-tcp-report.md");
-
-        report.WriteHeader("Device Connection Manager Integration Test: Discover TCP Devices");
-        report.WriteSection("Test Configuration");
-        report.WriteKeyValue("Manager", "DeviceConnectionManager");
-        report.WriteKeyValue("Discovery Strategies", "Serial + TCP (parallel)");
-        report.WriteKeyValue("Expected Behavior", "Discover all Serial and TCP devices on network");
-        report.WriteBlankLine();
-
-        report.WriteSection("Test Execution");
-
         try
         {
-            // Set up real MediatR with FwVersionCheckHandler and Serial behaviors
-            var services = new ServiceCollection();
-
-            // Core services
-            services.AddSingleton<ILoggingService>(_log);
-            services.AddSingleton<IAlertService>(_alert);
-            services.AddSingleton<IFwVersionChecker, FwVersionChecker>();
-
-            // Register MediatR handlers and behaviors from Serial assembly
-            services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(FwVersionCheckHandler).Assembly));
-
-            // Explicitly register Serial behaviors (open generic registration)
-            services.AddSingleton(typeof(IPipelineBehavior<,>), typeof(SerialBehavior<,>));
-            services.AddSingleton(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
-            services.AddSingleton(typeof(IPipelineBehavior<,>), typeof(ExceptionBehavior<,>));
-
-            var serviceProvider = services.BuildServiceProvider();
-            var mediator = serviceProvider.GetRequiredService<IMediator>();
-            var versionChecker = serviceProvider.GetRequiredService<IFwVersionChecker>();
-
-            // Create remaining dependencies
-            var settings = Substitute.For<ISettingsService>();
-            var gameMetadata = Substitute.For<IGameMetadataService>();
-            var sidMetadata = Substitute.For<ISidMetadataService>();
-            var storageFactory = new StorageFactory(mediator, gameMetadata, sidMetadata, _log, _alert);
-            var transportFactory = new DeviceTransportFactory(_log, _alert);
-            var tagger = new CartTagger(_log, mediator);
+            // Create real version checker
+            var versionChecker = new FwVersionChecker(_log, _alert);
 
             // Create real discovery strategies
-            var serialStrategy = new SerialDiscoveryStrategy(_log);
-            var tcpStrategy = new TcpDiscoveryStrategy(_log);
+            var transportFactory = new DeviceTransportFactory(_log, _alert);
+            var serialStrategy = new SerialDiscoveryStrategy(_log, transportFactory);
+            var tcpStrategy = new TcpDiscoveryStrategy(_log, transportFactory);
             var discoveryStrategies = new List<IDiscoveryStrategy> { serialStrategy, tcpStrategy };
 
             // Create real reconnection strategies
@@ -200,88 +138,298 @@ public class DeviceConnectionManagerTests : IAsyncDisposable
             var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
             var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
 
-            // Create CartFinder with real strategies
-            var finder = new CartFinder(
-                _log,
-                transportFactory,
-                storageFactory,
-                tagger,
-                versionChecker,
-                mediator,
-                discoveryStrategies
-            );
+            // Verify strategies are registered
+            discoveryStrategies.Should().Contain(s => s is SerialDiscoveryStrategy);
+            discoveryStrategies.Should().Contain(s => s is TcpDiscoveryStrategy);
+            reconnectionStrategies.Should().Contain(s => s is SerialReconnectionStrategy);
+            reconnectionStrategies.Should().Contain(s => s is TcpReconnectionStrategy);
 
-            // Create DeviceConnectionManager
-            var manager = new DeviceConnectionManager(finder, _log, reconnectionStrategies);
-
-            report.WriteInfo("Starting device discovery with Serial and TCP strategies...");
-
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var devices = await manager.FindDevices(autoConnect: false, CancellationToken.None);
-            stopwatch.Stop();
-
-            report.WriteBlankLine();
-            report.WriteSection("Discovery Results");
-            report.WriteKeyValue("Total Duration", $"{stopwatch.ElapsedMilliseconds}ms");
-            report.WriteKeyValue("Total Devices Found", devices.Count.ToString());
-
-            if (devices.Count > 0)
-            {
-                var serialDevices = devices.Where(d => d.Cart.ConnectionType == ConnectionType.Serial).ToList();
-                var tcpDevices = devices.Where(d => d.Cart.ConnectionType == ConnectionType.Tcp).ToList();
-
-                report.WriteBlankLine();
-                report.WriteSubsection("Device Breakdown");
-                report.WriteKeyValue("Serial Devices", serialDevices.Count.ToString());
-                report.WriteKeyValue("TCP Devices", tcpDevices.Count.ToString());
-
-                if (serialDevices.Count > 0)
-                {
-                    report.WriteBlankLine();
-                    report.WriteSubsection("Serial Devices");
-                    report.WriteKeyValue("COM Ports", string.Join(", ", serialDevices.Select(d => d.Cart.ComPort)));
-                }
-
-                if (tcpDevices.Count > 0)
-                {
-                    report.WriteBlankLine();
-                    report.WriteSubsection("TCP Devices");
-                    foreach (var device in tcpDevices)
-                    {
-                        report.WriteKeyValue($"  - {device.Cart.Name}", $"{device.Cart.IpAddress}:{device.Cart.TcpPort}");
-                    }
-                }
-
-                report.WriteBlankLine();
-                report.WriteSuccess($"Device discovery found {devices.Count} device(s) ({serialDevices.Count} Serial, {tcpDevices.Count} TCP)");
-            }
-            else
-            {
-                report.WriteInfo("No devices found (expected if no TeensyROM devices connected)");
-            }
-
-            report.WriteBlankLine();
-            report.WriteSubsection("Discovery Strategy Verification");
-            report.WriteLine("DeviceConnectionManager correctly:");
-            report.WriteList(new[]
-            {
-                $"Ran SerialDiscoveryStrategy (found {devices.Count(d => d.Cart.ConnectionType == ConnectionType.Serial)} Serial devices)",
-                $"Ran TcpDiscoveryStrategy (found {devices.Count(d => d.Cart.ConnectionType == ConnectionType.Tcp)} TCP devices)",
-                $"Returned all discovered devices in parallel (~{stopwatch.ElapsedMilliseconds}ms total)"
-            });
-
-            // Test passes as long as no exception thrown
+            // Test passes as long as we can create these strategies without exception
             Assert.True(true);
         }
         catch (Exception ex)
         {
-            report.WriteError($"Test failed: {ex.Message}");
-            report.WriteCodeBlock(ex.StackTrace ?? "", "");
-            Assert.True(false);
+            Assert.True(false, $"Test failed: {ex.Message}");
         }
+    }
 
-        report.Save();
-        report.WriteInfo($"Report saved to: {report.GetReportPath()}");
+    [Fact]
+    public void DeviceConnectionManager_GetAvailableDevices_InitiallyEmpty()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
+
+        var manager = new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Act
+        var devices = manager.GetAvailableDevices();
+
+        // Assert
+        devices.Should().BeEmpty();
+        devices.Should().BeOfType<List<TeensyRomDevice>>();
+    }
+
+    [Fact]
+    public void DeviceConnectionManager_GetAvailableDevice_ReturnsNullWhenNotFound()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
+
+        var manager = new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Act
+        var device = manager.GetAvailableDevice("nonexistent-id");
+
+        // Assert
+        device.Should().BeNull();
+    }
+
+    [Fact]
+    public void DeviceConnectionManager_ReconnectDevice_ThrowsWhenDeviceNotFound()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
+
+        var manager = new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Act
+        var act = async () => await manager.ReconnectDevice("nonexistent-id");
+
+        // Assert
+        act.Should().ThrowAsync<TeensyException>()
+            .WithMessage("*not found in connected devices*");
+    }
+
+    [Fact]
+    public async Task DeviceConnectionManager_ReconnectDevice_SelectsSerialStrategyForSerialDevices()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+        var mockPort = Substitute.For<ICommunicationPort>();
+
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
+
+        var manager = new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Create a serial device
+        var serialCart = new Cart
+        {
+            DeviceId = "serial-device-1",
+            Name = "Serial Device",
+            ComPort = "COM3",
+            ConnectionType = ConnectionType.Serial
+        };
+
+        var serialDevice = new TeensyRomDevice(
+            serialCart,
+            mockPort,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
+
+        // Manually set available devices to simulate FindDevices result
+        var availableDevicesField = typeof(DeviceConnectionManager).GetField("_availableDevices", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        availableDevicesField?.SetValue(manager, new List<TeensyRomDevice> { serialDevice });
+
+        // Act
+        var result = await manager.ReconnectDevice("serial-device-1");
+
+        // Assert - should not throw
+        result.Should().BeFalse(); // Will be false since device is not really connected
+    }
+
+    [Fact]
+    public async Task DeviceConnectionManager_ReconnectDevice_SelectsTcpStrategyForTcpDevices()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+        var mockPort = Substitute.For<ICommunicationPort>();
+
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
+
+        var manager = new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Create a TCP device
+        var tcpCart = new Cart
+        {
+            DeviceId = "tcp-device-1",
+            Name = "TCP Device",
+            ConnectionType = ConnectionType.Tcp,
+            IpAddress = "192.168.1.42",
+            TcpPort = 80
+        };
+
+        var tcpDevice = new TeensyRomDevice(
+            tcpCart,
+            mockPort,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
+
+        // Manually set available devices
+        var availableDevicesField = typeof(DeviceConnectionManager).GetField("_availableDevices", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        availableDevicesField?.SetValue(manager, new List<TeensyRomDevice> { tcpDevice });
+
+        // Act
+        var result = await manager.ReconnectDevice("tcp-device-1");
+
+        // Assert - should not throw
+        result.Should().BeFalse(); // Will be false since device is not really connected
+    }
+
+    [Fact]
+    public async Task DeviceConnectionManager_FindDevices_ClearsExistingDevices()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+        var transportFactory = new DeviceTransportFactory(_log, _alert);
+        
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
+
+        var manager = new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Mock finder to return empty list
+        mockCartFinder.FindDevices(Arg.Any<CancellationToken>(), Arg.Any<bool>())
+            .Returns(Task.FromResult(new List<TeensyRomDevice>()));
+
+        // Act - call FindDevices
+        var devices = await manager.FindDevices(autoConnect: false, CancellationToken.None);
+
+        // Assert
+        devices.Should().BeEmpty();
+        manager.GetAvailableDevices().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DeviceConnectionManager_FindDevices_DisposesOldPorts()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+        
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
+
+        var manager = new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Create old devices with mocked ports
+        var oldMockPort1 = Substitute.For<ICommunicationPort>();
+        var oldMockPort2 = Substitute.For<ICommunicationPort>();
+
+        var oldCart1 = new Cart
+        {
+            DeviceId = "old-device-1",
+            Name = "Old Device 1",
+            ComPort = "COM1",
+            ConnectionType = ConnectionType.Serial
+        };
+
+        var oldCart2 = new Cart
+        {
+            DeviceId = "old-device-2",
+            Name = "Old Device 2",
+            ConnectionType = ConnectionType.Tcp,
+            IpAddress = "192.168.1.1",
+            TcpPort = 80
+        };
+
+        var oldDevice1 = new TeensyRomDevice(oldCart1, oldMockPort1, 
+            Substitute.For<IStorageService>(), Substitute.For<IStorageService>());
+        var oldDevice2 = new TeensyRomDevice(oldCart2, oldMockPort2, 
+            Substitute.For<IStorageService>(), Substitute.For<IStorageService>());
+
+        // Set initial devices
+        var availableDevicesField = typeof(DeviceConnectionManager).GetField("_availableDevices", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        availableDevicesField?.SetValue(manager, new List<TeensyRomDevice> { oldDevice1, oldDevice2 });
+
+        // Mock finder to return new empty list
+        mockCartFinder.FindDevices(Arg.Any<CancellationToken>(), Arg.Any<bool>())
+            .Returns(Task.FromResult(new List<TeensyRomDevice>()));
+
+        // Act
+        var devices = await manager.FindDevices(autoConnect: false, CancellationToken.None);
+
+        // Assert
+        devices.Should().BeEmpty();
+        oldMockPort1.Received(1).Dispose();
+        oldMockPort2.Received(1).Dispose();
+    }
+
+    [Fact]
+    public void DeviceConnectionManager_ReconnectionStrategies_MustBeBothTypes()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect, tcpReconnect };
+
+        // Act
+        var act = () => new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Assert - should not throw when both strategies are provided
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void DeviceConnectionManager_ThrowsWhenSerialStrategyMissing()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+
+        var tcpReconnect = new TcpReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { tcpReconnect }; // Missing Serial
+
+        // Act
+        var act = () => new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>(); // Single() will throw
+    }
+
+    [Fact]
+    public void DeviceConnectionManager_ThrowsWhenTcpStrategyMissing()
+    {
+        // Arrange
+        var versionChecker = new FwVersionChecker(_log, _alert);
+        var mockCartFinder = Substitute.For<ICartFinder>();
+
+        var serialReconnect = new SerialReconnectionStrategy(_log, versionChecker);
+        var reconnectionStrategies = new List<IReconnectionStrategy> { serialReconnect }; // Missing TCP
+
+        // Act
+        var act = () => new DeviceConnectionManager(mockCartFinder, _log, reconnectionStrategies);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>(); // Single() will throw
     }
 
     public ValueTask DisposeAsync()

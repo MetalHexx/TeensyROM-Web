@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 
 namespace TeensyRom.Core.Common
 {
@@ -24,7 +24,22 @@ namespace TeensyRom.Core.Common
             return index < 0 ? input : input.Remove(index, pattern.Length);
         }
 
-        public static string DropLastComma(this string message) => message.TrimEnd(',', ' ');
+        /// <summary>
+        /// Validates whether the response string indicates a TeensyROM device.
+        /// TeensyROM devices respond with "teensyrom" or "busy" (case-insensitive).
+        /// </summary>
+        public static bool IsTeensyRom(this string? response)
+        {
+          if (string.IsNullOrWhiteSpace(response))
+          {
+            return false;
+          }
+
+          var responseLower = response.ToLowerInvariant();
+          return responseLower.Contains("teensyrom") || responseLower.Contains("busy");
+        }
+
+    public static string DropLastComma(this string message) => message.TrimEnd(',', ' ');
         public static string DropLastNewLine(this string message) => message.TrimEnd('\r', '\n', ' ');
     }
 }

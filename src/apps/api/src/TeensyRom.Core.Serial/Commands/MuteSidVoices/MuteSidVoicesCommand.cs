@@ -1,6 +1,4 @@
-﻿using MediatR;
 using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Common;
 using TeensyRom.Core.Serial.Commands;
 
 namespace TeensyRom.Core.Commands.MuteSidVoices
@@ -11,6 +9,6 @@ namespace TeensyRom.Core.Commands.MuteSidVoices
         public required VoiceState Voice2Enabled { get; init; }
         public required VoiceState Voice3Enabled { get; init; }
         public string? DeviceId { get; set; }
-        public required ISerialStateContext Serial { get; init; }
+        public required ICommunicationPort CommunicationPort { get; init; }
     }
 }

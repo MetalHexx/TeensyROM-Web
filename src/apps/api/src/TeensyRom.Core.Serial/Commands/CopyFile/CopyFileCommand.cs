@@ -1,4 +1,3 @@
-﻿using MediatR;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Serial.Commands;
@@ -12,6 +11,6 @@ namespace TeensyRom.Core.Commands
         public required FilePath SourcePath { get; init; }
         public required FilePath DestPath { get; init; }
         public string? DeviceId { get; set; }
-        public required ISerialStateContext Serial { get; init; }
+        public required ICommunicationPort CommunicationPort { get; init; }
     }
 }

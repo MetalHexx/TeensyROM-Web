@@ -1,5 +1,6 @@
 using MediatR;
 using TeensyRom.Core.Logging;
+using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Commands
 {
@@ -7,8 +8,7 @@ namespace TeensyRom.Core.Commands
     {        
         public async Task<ResetResult> Handle(ResetCommand request, CancellationToken cancellationToken)
         {
-            var resetRoutine = new ResetSerialRoutine(request.Serial, alert);
-            var resetResult = await resetRoutine.Execute();
+            var resetResult = await request.CommunicationPort.ReconnectPort();
 
             return resetResult
                 ? new ResetResult()

@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using System.Reactive.Linq;
 using System.Text;
 using System.Text.Json;
@@ -16,7 +16,7 @@ namespace TeensyRom.Core.Commands
 {
     public class GetDirectoryRecursiveHandler : IRequestHandler<GetDirectoryRecursiveCommand, GetDirectoryRecursiveResult>
     {
-        private ISerialStateContext _serialState;
+        private ICommunicationPort _communicationPort;
         private readonly ILoggingService _log;
         private string? _deviceId = null;
         private bool _recursive;
@@ -29,7 +29,7 @@ namespace TeensyRom.Core.Commands
         public Task<GetDirectoryRecursiveResult> Handle(GetDirectoryRecursiveCommand r, CancellationToken ct = default)
         {
             _deviceId = r.DeviceId;
-            _serialState = r.Serial;
+            _communicationPort = r.CommunicationPort;
             _recursive = r.Recursive;
 
             return Task.Run(() =>
@@ -50,7 +50,7 @@ namespace TeensyRom.Core.Commands
                     }
 
                     try
-                    {
+                    {   
                         GetDirectoryContent(r.Path, r.StorageType, result, sb, ct);
                     }
                     catch (OperationCanceledException)
@@ -115,18 +115,18 @@ namespace TeensyRom.Core.Commands
 
             DirectoryContent? directoryContent;
 
-            _serialState.SendIntBytes(TeensyToken.ListDirectory, 2);
+            _communicationPort.SendIntBytes(TeensyToken.ListDirectory, 2);
 
-            _serialState.HandleAck();
-            _serialState.SendIntBytes(storageType.GetStorageToken(), 1);
-            _serialState.SendIntBytes(0, 2); //skip
-            _serialState.SendIntBytes(9999, 2); //take
-            _serialState.Write($"{path}\0");
-            _serialState.HandleAck();
+            _communicationPort.HandleAck();
+            _communicationPort.SendIntBytes(storageType.GetStorageToken(), 1);
+            _communicationPort.SendIntBytes(0, 2); //skip
+            _communicationPort.SendIntBytes(9999, 2); //take
+            _communicationPort.Write($"{path}\0");
+            _communicationPort.HandleAck();
 
             if (WaitForDirectoryStartToken() != TeensyToken.StartDirectoryList)
             {
-                _serialState.ReadAndLogSerialAsString(msToWait: 100);
+                _communicationPort.ReadAndLogSerialAsString(msToWait: 100);
                 throw new TeensyException("Error waiting for Directory Start Token");
             }
             ct.ThrowIfCancellationRequested();
@@ -135,7 +135,7 @@ namespace TeensyRom.Core.Commands
 
             if (directoryContent is null)
             {
-                _serialState.ReadAndLogSerialAsString(msToWait: 100);
+                _communicationPort.ReadAndLogSerialAsString(msToWait: 100);
                 throw new TeensyException("Error waiting for Directory Start Token");
             }
             directoryContent.Path = path;
@@ -243,10 +243,10 @@ namespace TeensyRom.Core.Commands
                         throw new TeensyException($"Timeout waiting for expected reply from TeensyROM -- Received Bytes:\r\n{GetLogString(receivedBytes)}");
                     }
 
-                    if (_serialState.BytesToRead > 0)
+                    if (_communicationPort.BytesToRead > 0)
                     {
-                        int bytesToRead = Math.Min(_serialState.BytesToRead, buffer.Length);
-                        int bytesRead = _serialState.Read(buffer, 0, bytesToRead);
+                        int bytesToRead = Math.Min(_communicationPort.BytesToRead, buffer.Length);
+                        int bytesRead = _communicationPort.Read(buffer, 0, bytesToRead);
 
                         for (int i = 0; i < bytesRead; i++)
                         {
@@ -292,10 +292,10 @@ namespace TeensyRom.Core.Commands
 
         public TeensyToken WaitForDirectoryStartToken()
         {
-            _serialState.WaitForSerialData(numBytes: 2, timeoutMs: 200);
+            _communicationPort.WaitForSerialData(numBytes: 2, timeoutMs: 200);
 
             byte[] recBuf = new byte[2];
-            _serialState.Read(recBuf, 0, 2);
+            _communicationPort.Read(recBuf, 0, 2);
             ushort recU16 = recBuf.ToInt16();
 
             return recU16 switch

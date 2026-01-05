@@ -1,13 +1,9 @@
-﻿using MediatR;
+using MediatR;
 using System.Diagnostics;
-using System.Reflection;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
-using TeensyRom.Core.Common;
 using TeensyRom.Core.Logging;
+using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Serial.Commands.Behaviors
 {
@@ -67,7 +63,13 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 
         private static bool IsNativeType(Type type)
         {
-            return type.IsPrimitive || type == typeof(string) || type == typeof(decimal) || type == typeof(DateTime) || type.IsEnum;
+            return type.IsPrimitive
+                || type == typeof(string)
+                || type == typeof(decimal)
+                || type == typeof(DateTime)
+                || type.IsEnum
+                || type == typeof(FilePath)
+                || type == typeof(DirectoryPath);
         }
 
         private string FormatResponse(TResponse response) => string.IsNullOrWhiteSpace(response.Error)

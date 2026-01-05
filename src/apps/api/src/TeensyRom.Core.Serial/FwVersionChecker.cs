@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO.Ports;
@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Logging;
 
 namespace TeensyRom.Core.Serial
@@ -16,10 +17,10 @@ namespace TeensyRom.Core.Serial
         public static readonly Version FullRomVersion = new(0, 6, 6);
         public static readonly Version MinimalRomVersion = new(0, 0, 2);
 
-        public (bool IsTeensyRom, bool? IsMinimal, bool? isVersionCompatible, Version? Version) GetAllVersionInfo(ISerialStateContext serial)
+        public (bool IsTeensyRom, bool? IsMinimal, bool? isVersionCompatible, Version? Version) GetAllVersionInfo(ICommunicationPort communicationPort)
         {   
-            serial.Write([(byte)TeensyToken.VersionCheck.Value], 0, 1);
-            var versionResponse = serial.ReadAndLogSerialAsString(200);
+            communicationPort.Write([(byte)TeensyToken.VersionCheck.Value], 0, 1);
+            var versionResponse = communicationPort.ReadAndLogSerialAsString(200);
 
             if (versionResponse.Contains("busy", StringComparison.OrdinalIgnoreCase))
             {

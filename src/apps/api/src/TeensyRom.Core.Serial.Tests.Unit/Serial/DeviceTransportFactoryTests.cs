@@ -1,4 +1,5 @@
 using FluentAssertions;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Settings;
 
@@ -22,7 +23,7 @@ public class DeviceTransportFactoryTests
     #region CreateSerial Tests
 
     [Fact]
-    public void CreateSerial_ShouldReturnSerialStateContext()
+    public void CreateSerial_ShouldReturnICommunicationPort()
     {
         // Arrange
         const string portName = "COM3";
@@ -30,8 +31,8 @@ public class DeviceTransportFactoryTests
         // Act
         var act = () => _factory.CreateSerial(portName);
 
-        // Assert - May throw TeensyException if port doesn't exist, but factory creates the context
-        // The important thing is that it attempts to create SerialStateContext
+        // Assert - May throw TeensyException if port doesn't exist
+        // The important thing is that it attempts to create the port
         act.Should().ThrowExactly<TeensyException>()
             .WithMessage("*currently unavailable*");
     }
@@ -56,7 +57,7 @@ public class DeviceTransportFactoryTests
     #region CreateTcp Tests
 
     [Fact]
-    public void CreateTcp_ShouldReturnSerialStateContext()
+    public void CreateTcp_ShouldReturnICommunicationPort()
     {
         // Arrange
         const string endpoint = "192.168.1.42:80";
@@ -66,11 +67,11 @@ public class DeviceTransportFactoryTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().BeOfType<SerialStateContext>();
+        result.Should().BeAssignableTo<ICommunicationPort>();
     }
 
     [Fact]
-    public void CreateTcp_ShouldCallSetPortWithProvidedEndpoint()
+    public void CreateTcp_ShouldReturnTcpObservablePort()
     {
         // Arrange
         const string endpoint = "192.168.1.42:8080";
@@ -80,8 +81,7 @@ public class DeviceTransportFactoryTests
 
         // Assert
         result.Should().NotBeNull();
-        // Verify logging was called with endpoint info
-        _mockLog.Received().Internal(Arg.Is<string>(s => s.Contains(endpoint)));
+        result.Should().BeOfType<TcpObservablePort>();
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public class DeviceTransportFactoryTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().BeOfType<SerialStateContext>();
+        result.Should().BeAssignableTo<ICommunicationPort>();
     }
 
     [Theory]
@@ -208,7 +208,7 @@ public class DeviceTransportFactoryTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().BeOfType<SerialStateContext>();
+        result.Should().BeAssignableTo<ICommunicationPort>();
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class DeviceTransportFactoryTests
 
         // Assert
         result.Should().NotBeNull();
-        _mockLog.Received().Internal(Arg.Is<string>(s => s.Contains("192.168.1.42:8080")));
+        result.Should().BeOfType<TcpObservablePort>();
     }
 
     [Fact]
@@ -285,7 +285,7 @@ public class DeviceTransportFactoryTests
         // Assert
         serialAct.Should().Throw<TeensyException>(); // Serial port may not exist
         tcpContext.Should().NotBeNull();
-        tcpContext.Should().BeOfType<SerialStateContext>();
+        tcpContext.Should().BeAssignableTo<ICommunicationPort>();
     }
 
     [Fact]
@@ -311,6 +311,7 @@ public class DeviceTransportFactoryTests
         // Assert
         serialAct.Should().Throw<TeensyException>(); // Serial port may not exist
         tcpContext.Should().NotBeNull();
+        tcpContext.Should().BeAssignableTo<ICommunicationPort>();
     }
 
     #endregion

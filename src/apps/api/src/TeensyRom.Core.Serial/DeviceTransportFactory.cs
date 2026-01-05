@@ -1,8 +1,6 @@
 using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Serial.State;
 using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial
@@ -18,7 +16,7 @@ namespace TeensyRom.Core.Serial
             _alert = alert;
         }
 
-        public ISerialStateContext Create(Cart cart)
+        public ICommunicationPort Create(Cart cart)
         {
             return cart.ConnectionType switch
             {
@@ -28,15 +26,14 @@ namespace TeensyRom.Core.Serial
             };
         }
 
-        public ISerialStateContext CreateSerial(string portName)
+        public ICommunicationPort CreateSerial(string portName)
         {
-            var serial = new SimpleObservableSerialPort(_log, _alert);
-            var context = new SerialStateContext(serial, _log);
-            serial.SetPort(portName);
-            return context;
+            var serialPort = new SimpleObservableSerialPort(_log);
+            serialPort.SetPort(portName);
+            return serialPort;
         }
 
-        public ISerialStateContext CreateTcp(string endpoint)
+        public ICommunicationPort CreateTcp(string endpoint)
         {
             if (!NetworkHelper.TryParseEndpoint(endpoint, out var host, out var port))
             {
@@ -44,9 +41,8 @@ namespace TeensyRom.Core.Serial
             }
 
             var tcpPort = new TcpObservablePort(_log);
-            var context = new SerialStateContext(tcpPort, _log);
             tcpPort.SetPort(endpoint);
-            return context;
+            return tcpPort;
         }
     }
 }

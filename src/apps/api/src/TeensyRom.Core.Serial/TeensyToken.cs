@@ -27,6 +27,7 @@ namespace TeensyRom.Core.Serial
         public static readonly TeensyToken RetryLaunch = new(0x9B7E, nameof(RetryLaunch));
         public static readonly TeensyToken Ping = new(0x6455, nameof(Ping));
         public static readonly TeensyToken Reset = new(0x64EE, nameof(Reset));
+        public static readonly TeensyToken MinimalCheck = new(0x64E0, nameof(MinimalCheck));
         public static readonly TeensyToken VersionCheck = new('v', nameof(VersionCheck));
 
         private TeensyToken(ushort value, string name) : base(name, value) { }

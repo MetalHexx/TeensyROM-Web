@@ -1,6 +1,5 @@
-﻿using MediatR;
+using MediatR;
 using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial;
@@ -9,12 +8,12 @@ namespace TeensyRom.Core.Commands
 {
     public class SaveFilesCommandHandler(ILoggingService logService) : IRequestHandler<SaveFilesCommand, SaveFilesResult>
     {
-        private ISerialStateContext _serialState = null!;
+        private ICommunicationPort _communicationPort = null!;
         private readonly int _retryLimit = 3;
 
         public Task<SaveFilesResult> Handle(SaveFilesCommand command, CancellationToken ct)
         {
-            _serialState = command.Serial;
+            _communicationPort = command.CommunicationPort;
 
             logService.Internal($"Saving {command.Files.Count} file(s) to the TR");
 
@@ -46,17 +45,17 @@ namespace TeensyRom.Core.Commands
 
             while (retry < _retryLimit)
             {
-                _serialState.ClearBuffers();
+                _communicationPort.ClearBuffers();
                 try
                 {
-                    _serialState.SendIntBytes(TeensyToken.SendFile, 2);
-                    _serialState.HandleAck();
-                    _serialState.SendIntBytes(file.StreamLength, 4);
-                    _serialState.SendIntBytes(file.Checksum, 2);
-                    _serialState.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
-                    _serialState.Write($"{file.TargetPath.Value}\0");
-                    _serialState.HandleAck();
-                    _serialState.ClearBuffers();
+                    _communicationPort.SendIntBytes(TeensyToken.SendFile, 2);
+                    _communicationPort.HandleAck();
+                    _communicationPort.SendIntBytes(file.StreamLength, 4);
+                    _communicationPort.SendIntBytes(file.Checksum, 2);
+                    _communicationPort.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
+                    _communicationPort.Write($"{file.TargetPath.Value}\0");
+                    _communicationPort.HandleAck();
+                    _communicationPort.ClearBuffers();
 
                     var bytesSent = 0;
 
@@ -64,17 +63,17 @@ namespace TeensyRom.Core.Commands
                     {
                         var bytesToSend = 16 * 1024;
                         if (file.StreamLength - bytesSent < bytesToSend) bytesToSend = (int)file.StreamLength - bytesSent;
-                        _serialState.Write(file.Buffer, bytesSent, bytesToSend);
+                        _communicationPort.Write(file.Buffer, bytesSent, bytesToSend);
 
                         bytesSent += bytesToSend;
                     }
-                    _serialState.HandleAck();
+                    _communicationPort.HandleAck();
                     return true;
                 }
                 catch (Exception ex)
                 {
                     retry++;
-                    var response = _serialState.ReadSerialAsString(500);
+                    var response = _communicationPort.ReadSerialAsString(500);
                     var fileExistsParseMessage = "File already exists";
 
                     var fileExists = response.Contains(fileExistsParseMessage, StringComparison.OrdinalIgnoreCase)
@@ -99,12 +98,12 @@ namespace TeensyRom.Core.Commands
         {
             try
             {
-                _serialState.ClearBuffers();
-                _serialState.SendIntBytes(TeensyToken.DeleteFile, 2);
-                _serialState.HandleAck();
-                _serialState.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
-                _serialState.Write($"{file.TargetPath.Value}\0");
-                _serialState.HandleAck();
+                _communicationPort.ClearBuffers();
+                _communicationPort.SendIntBytes(TeensyToken.DeleteFile, 2);
+                _communicationPort.HandleAck();
+                _communicationPort.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
+                _communicationPort.Write($"{file.TargetPath.Value}\0");
+                _communicationPort.HandleAck();
                 logService.InternalSuccess($"Delete Success: {file.TargetPath}");
             }
             catch (Exception ex)

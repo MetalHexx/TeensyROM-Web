@@ -18,9 +18,9 @@ namespace TeensyRom.Core.Storage
         public List<string> BannedDirectories { get; set; } = [];
         public List<string> BannedFiles { get; set; } = [];
     }
-    public class StorageService(IStorageCache cache, StorageSettings settings, IMediator mediator, IAlertService alert, ILoggingService log, ISidMetadataService sidMetadata, IGameMetadataService gameMetadata, ISerialStateContext serial) : IStorageService
+    public class StorageService(IStorageCache cache, StorageSettings settings, IMediator mediator, IAlertService alert, ILoggingService log, ISidMetadataService sidMetadata, IGameMetadataService gameMetadata, ICommunicationPort communicationPort) : IStorageService
     {
-        private readonly ISerialStateContext _serial = serial;
+        private readonly ICommunicationPort _communicationPort = communicationPort;
         public async Task<FileItem?> GetFile(FilePath path)
         {
             var directory = await GetDirectory(path.Directory);
@@ -56,7 +56,7 @@ namespace TeensyRom.Core.Storage
                 Path = path,
                 Recursive = false,
                 DeviceId = settings.CartStorage.DeviceId,
-                Serial = _serial
+                CommunicationPort = _communicationPort
             });
 
             if (!response.IsSuccess) return null;
@@ -97,7 +97,7 @@ namespace TeensyRom.Core.Storage
             var _ = await mediator.Send(new ResetCommand
             {
                 DeviceId = settings.CartStorage.DeviceId,
-                Serial = _serial
+                CommunicationPort = _communicationPort
             });
             log.Internal($"Refreshing cache for {path} and all nested directories.", settings.CartStorage.DeviceId);
 
@@ -107,7 +107,7 @@ namespace TeensyRom.Core.Storage
                 Path = path,
                 Recursive = true,
                 DeviceId = settings.CartStorage.DeviceId,
-                Serial = _serial
+                CommunicationPort = _communicationPort
             };
 
             var response = await mediator.Send(getDirectoryCommand, ct);
@@ -171,7 +171,7 @@ namespace TeensyRom.Core.Storage
                     StorageType = settings.CartStorage.Type,
                     FilePath = playlistFile.Path,
                     DeviceId = settings.CartStorage.DeviceId,
-                    Serial = _serial
+                    CommunicationPort = _communicationPort
                 });
 
                 var playlist = LaunchableItemSerializer.Deserialize<Playlist>(customResult.FileData);
@@ -263,7 +263,7 @@ namespace TeensyRom.Core.Storage
                 SourcePath = launchItem.Path,
                 TargetPath = newFavPath,
                 DeviceId = settings.CartStorage.DeviceId,
-                Serial = _serial
+                CommunicationPort = _communicationPort
             };
 
             var result = await mediator.Send(favCommand, ct);
@@ -322,7 +322,7 @@ namespace TeensyRom.Core.Storage
                 StorageType = storageType,
                 Path = fav.Path,
                 DeviceId = settings.CartStorage.DeviceId,
-                Serial = _serial
+                CommunicationPort = _communicationPort
             };
             var result = await mediator.Send(deleteCommand, ct);
 

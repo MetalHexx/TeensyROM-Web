@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Serial;
 
@@ -8,12 +8,12 @@ namespace TeensyRom.Core.Commands
     {
         public Task<FavoriteFileResult> Handle(FavoriteFileCommand request, CancellationToken cancellationToken)
         {
-            request.Serial.SendIntBytes(TeensyToken.CopyFile, 2);
-            request.Serial.HandleAck();
-            request.Serial.SendIntBytes(request.StorageType.GetStorageToken(), 1);
-            request.Serial.Write($"{request.SourcePath}\0");
-            request.Serial.Write($"{request.TargetPath}\0");
-            request.Serial.HandleAck();
+            request.CommunicationPort.SendIntBytes(TeensyToken.CopyFile, 2);
+            request.CommunicationPort.HandleAck();
+            request.CommunicationPort.SendIntBytes(request.StorageType.GetStorageToken(), 1);
+            request.CommunicationPort.Write($"{request.SourcePath}\0");
+            request.CommunicationPort.Write($"{request.TargetPath}\0");
+            request.CommunicationPort.HandleAck();
             return Task.FromResult(new FavoriteFileResult());
         }
     }

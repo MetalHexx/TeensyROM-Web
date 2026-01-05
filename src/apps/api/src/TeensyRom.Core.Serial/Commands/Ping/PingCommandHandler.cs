@@ -1,6 +1,5 @@
-﻿using MediatR;
-using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Serial;
+using MediatR;
+using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Commands
 {
@@ -8,8 +7,7 @@ namespace TeensyRom.Core.Commands
     {
         public Task<PingResult> Handle(PingCommand request, CancellationToken cancellationToken)
         {
-            request.Serial.SendIntBytes(TeensyToken.Ping, 2);
-            var response = request.Serial.ReadAndLogSerialAsString(30);
+            var response = request.CommunicationPort.PingDevice();
 
             return Task.FromResult(new PingResult 
             {

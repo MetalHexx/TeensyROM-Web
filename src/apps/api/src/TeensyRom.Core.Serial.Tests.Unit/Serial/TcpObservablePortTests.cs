@@ -1,5 +1,4 @@
 using System.Net.Sockets;
-using System.Reactive;
 using System.Text;
 
 namespace TeensyRom.Core.Serial.Tests.Unit;
@@ -44,30 +43,6 @@ public class TcpObservablePortTests : IDisposable
         port.Should().NotBeNull();
         port.IsOpen.Should().BeFalse();
         port.BytesToRead.Should().Be(0);
-    }
-
-    [Fact]
-    public void Ports_ShouldReturnEmptyArray()
-    {
-        // Arrange & Act
-        var ports = new List<string[]>();
-        using var _ = _port.Ports.Subscribe(ports.Add);
-
-        // Assert
-        ports.Should().HaveCount(1);
-        ports[0].Should().BeEmpty();
-    }
-
-    [Fact]
-    public void State_ShouldEmitSerialStartState_Initially()
-    {
-        // Arrange & Act
-        var states = new List<Type>();
-        using var _ = _port.State.Subscribe(states.Add);
-
-        // Assert
-        states.Should().HaveCount(1);
-        states[0].Should().Be(typeof(SerialStartState));
     }
 
     #endregion
@@ -152,21 +127,6 @@ public class TcpObservablePortTests : IDisposable
     }
 
     [Fact]
-    public void SetPort_ShouldEmitSerialConnectableState_WhenValid()
-    {
-        // Arrange
-        var states = new List<Type>();
-        using var _ = _port.State.Subscribe(states.Add);
-
-        // Act
-        _port.SetPort("192.168.1.42:80");
-
-        // Assert
-        states.Should().HaveCountGreaterThanOrEqualTo(2);
-        states[^1].Should().Be(typeof(SerialConnectableState));
-    }
-
-    [Fact]
     public void SetPort_ShouldReturnUnit_WhenSuccessful()
     {
         // Arrange & Act
@@ -180,38 +140,9 @@ public class TcpObservablePortTests : IDisposable
 
     #region OpenPort Tests
 
-    [Fact]
-    public void OpenPort_ShouldCallStartHealthCheck_AndReturnEndpoint()
-    {
-        // Arrange
-        _port.SetPort("127.0.0.1:8080");
-
-        // Act
-        // Note: StartHealthCheck catches exceptions and returns null
-        var result = _port.OpenPort();
-
-        // Assert - Returns the endpoint even if connection fails
-        result.Should().Be("127.0.0.1:8080");
-    }
-
     #endregion
 
     #region ClosePort Tests
-
-    [Fact]
-    public void ClosePort_ShouldEmitSerialConnectableState()
-    {
-        // Arrange
-        var states = new List<Type>();
-        using var _ = _port.State.Subscribe(states.Add);
-        _port.SetPort("127.0.0.1:8080");
-
-        // Act
-        _port.ClosePort();
-
-        // Assert
-        states.Should().Contain(typeof(SerialConnectableState));
-    }
 
     [Fact]
     public void ClosePort_ShouldReturnUnit()
@@ -240,11 +171,11 @@ public class TcpObservablePortTests : IDisposable
 
         // Assert
         act.Should().Throw<TeensyException>()
-            .WithMessage("*Unable to connect to*");
+            .WithMessage("*Invalid endpoint format*");
     }
 
     [Fact]
-    public void EnsureConnection_ShouldTimeout_WhenConnectionFails()
+    public void EnsureConnection_ShouldThrowSocketException_WhenConnectionFails()
     {
         // Arrange
         _port.SetPort("192.168.1.254:9999"); // Non-existent host
@@ -252,9 +183,8 @@ public class TcpObservablePortTests : IDisposable
         // Act
         var act = () => _port.EnsureConnection();
 
-        // Assert - Should timeout after 2000ms
-        act.Should().Throw<TeensyException>()
-            .WithMessage("*Unable to connect*");
+        // Assert - TryConnect rethrows SocketException from TcpClient.Connect
+        act.Should().Throw<System.Net.Sockets.SocketException>();
     }
 
     #endregion
@@ -371,42 +301,6 @@ public class TcpObservablePortTests : IDisposable
 
     #endregion
 
-    #region Lock/Unlock Tests
-
-    [Fact]
-    public void Lock_ShouldClearBuffers()
-    {
-        // Arrange
-        _port.SetPort("127.0.0.1:8080");
-
-        // Act
-        _port.Lock();
-
-        // Assert
-        _port.BytesToRead.Should().Be(0);
-    }
-
-    [Fact]
-    public void Lock_ShouldNotThrow()
-    {
-        // Arrange & Act
-        var act = () => _port.Lock();
-
-        // Assert
-        act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void Unlock_ShouldNotThrow()
-    {
-        // Arrange & Act
-        var act = () => _port.Unlock();
-
-        // Assert
-        act.Should().NotThrow();
-    }
-
-    #endregion
 
     #region ClearBuffers Tests
 
@@ -471,67 +365,6 @@ public class TcpObservablePortTests : IDisposable
 
     #endregion
 
-    #region Health Check Tests
-
-    [Fact]
-    public void StartHealthCheck_ShouldReturnNull()
-    {
-        // Arrange & Act
-        _port.EnsureConnection();
-
-        // Assert - EnsureConnection throws if it fails
-        true.Should().BeTrue();
-    }
-
-    [Fact]
-    public void StopHealthCheck_ShouldNotThrow()
-    {
-        // Arrange & Act
-        var act = () => _port.StopHealthCheck();
-
-        // Assert
-        act.Should().NotThrow();
-    }
-
-    #endregion
-
-    #region StartPortPoll Tests
-
-    [Fact]
-    public void StartPortPoll_ShouldNotThrow()
-    {
-        // Arrange & Act
-        var act = () => _port.StartPortPoll();
-
-        // Assert
-        act.Should().NotThrow();
-    }
-
-    #endregion
-
-    #region State Transition Tests
-
-    [Fact]
-    public void State_ShouldTransitionThroughLifecycle()
-    {
-        // Arrange
-        var states = new List<Type>();
-        using var _ = _port.State.Subscribe(states.Add);
-
-        // Act - Initial state should be SerialStartState
-        states[0].Should().Be(typeof(SerialStartState));
-
-        // Act - SetPort should transition to SerialConnectableState
-        _port.SetPort("127.0.0.1:8080");
-        states[^1].Should().Be(typeof(SerialConnectableState));
-
-        // Act - ClosePort should maintain SerialConnectableState
-        _port.ClosePort();
-        states[^1].Should().Be(typeof(SerialConnectableState));
-    }
-
-    #endregion
-
     #region Dispose Tests
 
     [Fact]
@@ -559,6 +392,118 @@ public class TcpObservablePortTests : IDisposable
 
         // Assert
         act.Should().NotThrow();
+    }
+
+    #endregion
+
+    #region Constructor Overload Tests
+
+    [Fact]
+    public void Constructor_WithConnectedClient_ShouldThrowException_WhenClientIsNull()
+    {
+        // Arrange & Act
+        var act = () => new TcpObservablePort(_mockLogger, null!);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("connectedClient");
+    }
+
+    #endregion
+
+    #region BytesToRead Property Tests
+
+    [Fact]
+    public void BytesToRead_ShouldReturnZero_WhenNoDataAvailable()
+    {
+        // Arrange & Act
+        var result = _port.BytesToRead;
+
+        // Assert
+        result.Should().Be(0);
+    }
+
+    #endregion
+
+    #region IsOpen Property Tests
+
+    [Fact]
+    public void IsOpen_ShouldBeFalse_WhenNotConnected()
+    {
+        // Arrange & Act
+        var result = _port.IsOpen;
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region OpenPort Tests
+
+    [Fact]
+    public void OpenPort_ShouldThrowSocketException_WhenConnectionFails()
+    {
+        // Arrange
+        _port.SetPort("192.168.1.254:9999");
+
+        // Act
+        var act = () => _port.OpenPort();
+
+        // Assert
+        act.Should().Throw<SocketException>();
+    }
+
+    [Fact]
+    public void OpenPort_WithUseRetryLoop_ShouldUseRetryLogicByDefault()
+    {
+        // Arrange
+        _port.SetPort("192.168.1.254:9999");
+
+        // Act
+        var act = () => _port.OpenPort(useRetryLoop: true);
+
+        // Assert
+        act.Should().Throw<SocketException>();
+    }
+
+    #endregion
+
+    #region ReadIntBytes Tests
+
+    [Fact]
+    public void ReadIntBytes_ShouldThrowException_WhenNotConnected()
+    {
+        // Arrange & Act
+        var act = () => _port.ReadIntBytes(4);
+
+        // Assert
+        act.Should().Throw<TeensyException>();
+    }
+
+    [Fact]
+    public void ReadIntBytes_ShouldThrowTimeoutException_WhenInsufficientData()
+    {
+        // Arrange & Act
+        var act = () => _port.ReadIntBytes(4);
+
+        // Assert
+        act.Should().Throw<TeensyException>();
+    }
+
+    #endregion
+
+    #region Write Encoding Tests
+
+    [Fact]
+    public void Write_String_ShouldThrowException_WhenNotConnected()
+    {
+        // Arrange & Act
+        var act = () => _port.Write("hello world");
+
+        // Assert
+        act.Should().Throw<TeensyException>()
+            .WithMessage("*Cannot write: TCP connection is not open*");
     }
 
     #endregion
