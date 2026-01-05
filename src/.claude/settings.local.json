@@ -74,7 +74,8 @@
       "Bash(dotnet build:*)",
       "Bash(dotnet test:*)",
       "Bash(uuidgen:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(dotnet run:*)"
     ],
     "deny": [],
     "ask": []
