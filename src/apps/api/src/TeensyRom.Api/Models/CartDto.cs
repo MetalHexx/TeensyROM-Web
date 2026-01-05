@@ -1,10 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.Net.NetworkInformation;
-using System.Reactive.Linq;
-using TeensyRom.Core.Abstractions;
+using System.ComponentModel.DataAnnotations;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
-using TeensyRom.Core.Serial.State;
 using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Api.Models
@@ -86,36 +82,8 @@ namespace TeensyRom.Api.Models
                 Name = device.Cart.Name,
                 FwVersion = device.Cart.FwVersion,
                 IsCompatible = device.Cart.IsCompatible,
-                IsConnected = device.IsConnected,
-                DeviceState = await GetDeviceState(device),
                 SdStorage = CartStorageDto.FromStorage(device.Cart.SdStorage),
                 UsbStorage = CartStorageDto.FromStorage(device.Cart.UsbStorage)
-            };
-        }
-
-        public static async Task<DeviceState> GetDeviceState(TeensyRomDevice device)
-        {
-            var state = await device.SerialState.CurrentState.FirstAsync();
-
-            return state switch
-            {
-                SerialConnectableState => DeviceState.Connectable,
-                SerialConnectedState => DeviceState.Connected,
-                SerialBusyState => DeviceState.Busy,
-                SerialConnectionLostState => DeviceState.ConnectionLost,
-                _ => DeviceState.Unknown
-            };            
-        }
-
-        public static DeviceState FromSerialState(ISerialState state) 
-        {
-            return state switch
-            {
-                SerialConnectableState => DeviceState.Connectable,
-                SerialConnectedState => DeviceState.Connected,
-                SerialBusyState => DeviceState.Busy,
-                SerialConnectionLostState => DeviceState.ConnectionLost,
-                _ => DeviceState.Unknown
             };
         }
     }

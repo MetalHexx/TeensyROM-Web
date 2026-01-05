@@ -1,12 +1,11 @@
 using TeensyRom.Api.Http;
-using TeensyRom.Api.Models;
 using TeensyRom.Core.Abstractions;
 
 namespace TeensyRom.Api.Endpoints.FindCarts
 {
     public class FindDevicesEndpoint(
         IDeviceConnectionManager deviceManager,
-        IDeviceSettingsProvider deviceSettingsProvider) : RadEndpointWithoutRequest<FindDevicesResponse>
+        IDeviceSettingsProvider deviceSettingsProvider) : RadEndpoint<FindDevicesRequest, FindDevicesResponse>
     {
         public override void Configure()
         {
@@ -22,27 +21,20 @@ namespace TeensyRom.Api.Endpoints.FindCarts
                     "Returns all available and connected TeensyROM devices.\n\n" +
                     "- This will momentarily disconnect all devices.\n" +
                     "- All available COM ports will be scanned for TeensyROM devices.\n" +
+                    "- TCP devices use cached IPs by default (fullScan=false) for fast discovery.\n" +
+                    "- Set fullScan=true to perform a complete network scan for TCP devices.\n" +
                     "- Devices with auto-connect enabled will reconnect automatically."
                 );
         }
 
-        public override async Task Handle(CancellationToken ct)
+        public override async Task Handle(FindDevicesRequest request, CancellationToken ct)
         {
-            var devices = await deviceManager.FindDevices(autoConnect: false, ct);
+            var devices = await deviceManager.FindDevices(autoConnect: false, ct, fullScan: request.FullScan);
 
             if (devices.Count == 0)
             {
                 SendNotFound("No TeensyRom devices found.");
                 return;
-            }
-            foreach (var device in devices)
-            {
-                var deviceSettings = deviceSettingsProvider.GetOrCreateDeviceSettings(device.DeviceId);
-                
-                if (deviceSettings.ConnectionSettings.AutoConnectEnabled)
-                {
-                    deviceManager.Connect(device.DeviceId);
-                }
             }
 
             List<CartDto> deviceDtos = [.. await Task.WhenAll(devices.Select(CartDto.FromDevice))];
