@@ -24,7 +24,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
 
         public override async Task Handle(LaunchFileRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId);
 
             if (device is null)
             {
@@ -73,7 +73,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
                 StorageType = TeensyStorageType.SD,
                 LaunchItem = launchItem,
                 DeviceId = r.DeviceId,
-                Serial = device.SerialState
+                CommunicationPort = device.CommunicationPort
             };
             var result = await mediator.Send(launchCommand, ct);
 

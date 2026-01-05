@@ -24,7 +24,7 @@ namespace TeensyRom.Api.Endpoints.Files.FavoriteFile
 
         public override async Task Handle(SaveFavoriteRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId);
 
             if (device is null)
             {

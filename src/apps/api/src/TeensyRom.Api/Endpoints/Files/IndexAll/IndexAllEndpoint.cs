@@ -29,7 +29,7 @@ namespace TeensyRom.Api.Endpoints.Files.IndexAll
 
         public override async Task Handle(CancellationToken ct)
         {
-            var devices = deviceManager.GetConnectedDevices();
+            var devices = deviceManager.GetAvailableDevices();
 
             if (devices.Count == 0)
             {

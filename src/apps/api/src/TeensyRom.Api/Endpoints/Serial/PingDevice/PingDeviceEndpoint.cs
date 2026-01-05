@@ -22,7 +22,7 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
         }
         public override async Task Handle(PingDeviceRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId);
             
             if (device is null)
             {
@@ -32,7 +32,7 @@ namespace TeensyRom.Api.Endpoints.Serial.PingDevice
             await mediator.Send(new PingCommand
             {
                 DeviceId = device.Cart.DeviceId,
-                Serial = device.SerialState
+                CommunicationPort = device.CommunicationPort
             });
             Response = new();
             Send();

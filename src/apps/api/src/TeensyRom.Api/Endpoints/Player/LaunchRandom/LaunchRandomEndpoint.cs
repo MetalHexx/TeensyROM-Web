@@ -36,7 +36,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchRandom
 
         public override async Task Handle(LaunchRandomRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId);
             
             if (device is null)
             {
@@ -88,7 +88,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchRandom
                 StorageType = r.StorageType,
                 LaunchItem = file,
                 DeviceId = r.DeviceId,
-                Serial = device.SerialState
+                CommunicationPort = device.CommunicationPort
             });
 
             // Check if this was a successful launch or compatibility issue vs actual system error

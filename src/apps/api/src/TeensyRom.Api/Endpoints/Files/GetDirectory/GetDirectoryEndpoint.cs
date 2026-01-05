@@ -25,7 +25,7 @@ namespace TeensyRom.Api.Endpoints.Files.GetDirectory
 
         public override async Task Handle(GetDirectoryRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId!);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId!);
             if (device is null)
             {
                 SendNotFound($"The device {r.DeviceId} was not found.");

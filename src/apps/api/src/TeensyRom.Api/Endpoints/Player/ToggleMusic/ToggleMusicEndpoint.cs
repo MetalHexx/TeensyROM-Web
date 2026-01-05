@@ -22,7 +22,7 @@ namespace TeensyRom.Api.Endpoints.Player.ToggleMusic
 
         public override async Task Handle(ToggleMusicRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId);
 
             if (device is null)
             {
@@ -33,7 +33,7 @@ namespace TeensyRom.Api.Endpoints.Player.ToggleMusic
             var toggleCommand = new ToggleMusicCommand
             {
                 DeviceId = r.DeviceId,
-                Serial = device.SerialState
+                CommunicationPort = device.CommunicationPort
             };
             var result = await mediator.Send(toggleCommand, ct);
 

@@ -26,7 +26,7 @@ namespace TeensyRom.Api.Endpoints.Files.Index
 
         public override async Task Handle(IndexRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId);
 
             if (device is null) 
             {

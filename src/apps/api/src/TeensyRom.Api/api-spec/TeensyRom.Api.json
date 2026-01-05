@@ -251,8 +251,18 @@
           "Devices"
         ],
         "summary": "Find Devices",
-        "description": "Returns all available and connected TeensyROM devices.\n\n- This will momentarily disconnect all devices.\n- All available COM ports will be scanned for TeensyROM devices.\n- Devices with auto-connect enabled will reconnect automatically.",
+        "description": "Returns all available and connected TeensyROM devices.\n\n- This will momentarily disconnect all devices.\n- All available COM ports will be scanned for TeensyROM devices.\n- TCP devices use cached IPs by default (fullScan=false) for fast discovery.\n- Set fullScan=true to perform a complete network scan for TCP devices.\n- Devices with auto-connect enabled will reconnect automatically.",
         "operationId": "FindDevices",
+        "parameters": [
+          {
+            "name": "FullScan",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -270,132 +280,6 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/devices/{deviceId}": {
-      "delete": {
-        "tags": [
-          "Devices"
-        ],
-        "summary": "Disconnect Device",
-        "description": "Disconnnects from a TeensyROM device.\n\n- Once you disconnect from a device, most endpoints won't work until you reconnect.",
-        "operationId": "DisconnectDevice",
-        "parameters": [
-          {
-            "name": "deviceId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DisconnectDeviceResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/devices/events": {
-      "get": {
-        "tags": [
-          "Devices"
-        ],
-        "summary": "Start Device Event Stream",
-        "description": "Starts the device event stream.",
-        "operationId": "StartDeviceEvents",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeviceStartResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Devices"
-        ],
-        "summary": "Stop Device Event Stream",
-        "description": "Stops the device event stream.",
-        "operationId": "StopDeviceEvents",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeviceStopResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/devices/{deviceId}/connect": {
-      "post": {
-        "tags": [
-          "Devices"
-        ],
-        "summary": "Connect Device",
-        "description": "Connects to a TeensyROM device.\n\n- You must be connected to a TeensyROM device in order to call most other endpoints.",
-        "operationId": "ConnectDevice",
-        "parameters": [
-          {
-            "name": "deviceId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConnectDeviceResponse"
                 }
               }
             }
@@ -1137,21 +1021,6 @@
           }
         }
       },
-      "ConnectDeviceResponse": {
-        "required": [
-          "connectedCart",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "connectedCart": {
-            "$ref": "#/components/schemas/CartDto"
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      },
       "ConnectionSettingsDto": {
         "required": [
           "connectionType",
@@ -1192,14 +1061,6 @@
           }
         }
       },
-      "DeviceStartResponse": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string"
-          }
-        }
-      },
       "DeviceState": {
         "enum": [
           "Connected",
@@ -1208,14 +1069,6 @@
           "Busy",
           "Unknown"
         ]
-      },
-      "DeviceStopResponse": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string"
-          }
-        }
       },
       "DirectoryItemDto": {
         "required": [
@@ -1228,17 +1081,6 @@
             "type": "string"
           },
           "path": {
-            "type": "string"
-          }
-        }
-      },
-      "DisconnectDeviceResponse": {
-        "required": [
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "message": {
             "type": "string"
           }
         }

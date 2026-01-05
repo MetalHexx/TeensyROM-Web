@@ -23,7 +23,7 @@ namespace TeensyRom.Api.Endpoints.ResetDevice
 
         public override async Task Handle(ResetDeviceRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId);
             
             if (device is null)
             {
@@ -33,7 +33,7 @@ namespace TeensyRom.Api.Endpoints.ResetDevice
             await mediator.Send(new ResetCommand
             {
                 DeviceId = device.Cart.DeviceId,
-                Serial = device.SerialState
+                CommunicationPort = device.CommunicationPort
             });
             Response = new();
 

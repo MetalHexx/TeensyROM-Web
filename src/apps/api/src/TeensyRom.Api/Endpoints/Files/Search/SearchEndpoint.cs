@@ -29,7 +29,7 @@ namespace TeensyRom.Api.Endpoints.Files.Search
 
         public override Task Handle(SearchRequest r, CancellationToken ct)
         {
-            var device = deviceManager.GetConnectedDevice(r.DeviceId!);
+            var device = deviceManager.GetAvailableDevice(r.DeviceId!);
             if (device is null)
             {
                 SendNotFound($"The device {r.DeviceId} was not found.");
