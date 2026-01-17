@@ -32,7 +32,6 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         {
             return new ConnectionSettingsDto
             {
-                ConnectionType = entity.ConnectionType,
                 AutoConnectEnabled = entity.AutoConnectEnabled,
                 //Serial = new SerialConnectionSettingsDto
                 //{

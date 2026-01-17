@@ -30,25 +30,12 @@ namespace TeensyRom.Api.Endpoints.Settings
     /// </summary>
     public record ConnectionSettingsDto
     {
-        /// <summary>
-        /// Connection type preference for device communication.
-        /// </summary>
-        [Required] public ConnectionType ConnectionType { get; set; } = ConnectionType.Serial;
 
         /// <summary>
         /// Automatically attempt to connect to this device on startup.
         /// </summary>
         [Required] public bool AutoConnectEnabled { get; set; }
 
-        ///// <summary>
-        ///// Serial port specific connection settings.
-        ///// </summary>
-        //[Required] public SerialConnectionSettingsDto Serial { get; set; } = null!;
-
-        ///// <summary>
-        ///// TCP/Ethernet connection settings.
-        ///// </summary>
-        //[Required] public TcpConnectionSettingsDto Tcp { get; set; } = null!;
     }
 
     /// <summary>

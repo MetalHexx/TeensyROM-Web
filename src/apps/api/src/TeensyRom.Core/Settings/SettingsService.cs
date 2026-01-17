@@ -105,8 +105,7 @@ namespace TeensyRom.Core.Settings
                     VideoSettings = new VideoSettings { EnableVideo = false },
                     ConnectionSettings = new ConnectionSettings
                     {
-                        AutoConnectEnabled = true,
-                        ConnectionType = ConnectionType.Serial
+                        AutoConnectEnabled = true                        
                     }
                 };
 

@@ -95,8 +95,8 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
     {
         public ConnectionSettingsValidator()
         {
-            RuleFor(x => x.ConnectionType)
-                .IsInEnum().WithMessage("Connection type must be a valid enum value (Serial or Tcp).");
+            //RuleFor(x => x.ConnectionType)
+            //    .IsInEnum().WithMessage("Connection type must be a valid enum value (Serial or Tcp).");
 
             //RuleFor(x => x.Serial)
             //    .NotNull().WithMessage("Serial connection settings are required.")
