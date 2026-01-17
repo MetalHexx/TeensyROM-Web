@@ -1,5 +1,4 @@
 using MediatR;
-using System.Reactive.Linq;
 using System.Text;
 using System.Text.Json;
 using TeensyRom.Core.Abstractions;
@@ -11,28 +10,27 @@ using TeensyRom.Core.Serial.Commands.Common;
 using System.Diagnostics;
 using System.Buffers;
 using TeensyRom.Core.ValueObjects;
+using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Commands
 {
-    public class GetDirectoryRecursiveHandler : IRequestHandler<GetDirectoryRecursiveCommand, GetDirectoryRecursiveResult>
-    {
-        private ICommunicationPort _communicationPort;
-        private readonly ILoggingService _log;
+    public class GetDirectoryRecursiveHandler(ILoggingService log) : IRequestHandler<GetDirectoryRecursiveCommand, GetDirectoryRecursiveResult>
+	{
+        private ICommunicationPort _communicationPort = null!;
         private string? _deviceId = null;
         private bool _recursive;
 
-        public GetDirectoryRecursiveHandler(ILoggingService log)
-        {
-            _log = log;
-        }
-
-        public Task<GetDirectoryRecursiveResult> Handle(GetDirectoryRecursiveCommand r, CancellationToken ct = default)
+		public async Task<GetDirectoryRecursiveResult> Handle(GetDirectoryRecursiveCommand r, CancellationToken ct = default)
         {
             _deviceId = r.DeviceId;
             _communicationPort = r.CommunicationPort;
             _recursive = r.Recursive;
 
-            return Task.Run(() =>
+			r.CommunicationPort.ResetDevice(log);						
+
+			await Task.Delay(1000);
+
+			return await Task.Run(() =>
             {
                 var result = new GetDirectoryRecursiveResult();
                 StringBuilder sb = new();
@@ -111,13 +109,13 @@ namespace TeensyRom.Core.Commands
         {
             ct.ThrowIfCancellationRequested();
 
-            _log.Internal($"=> Indexing: {path}", _deviceId);
+            log.Internal($"=> Indexing: {path}", _deviceId);
 
             DirectoryContent? directoryContent;
 
             _communicationPort.SendIntBytes(TeensyToken.ListDirectory, 2);
 
-            _communicationPort.HandleAck();
+            var ack = _communicationPort.HandleAck();
             _communicationPort.SendIntBytes(storageType.GetStorageToken(), 1);
             _communicationPort.SendIntBytes(0, 2); //skip
             _communicationPort.SendIntBytes(9999, 2); //take
@@ -215,8 +213,8 @@ namespace TeensyRom.Core.Commands
                 }
                 catch (JsonException)
                 {
-                    _log.InternalError($"There was an error parsing a item in {basePath}");
-                    _log.InternalError("Continuing to next item.");
+                    log.InternalError($"There was an error parsing a item in {basePath}");
+                    log.InternalError("Continuing to next item.");
                     continue;
                 }
             }
