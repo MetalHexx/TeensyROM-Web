@@ -3,7 +3,7 @@ using TeensyRom.Core.Commands;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.ValueObjects;
 
-namespace TeensyRom.Core.Serial.Commands.LaunchFile.LaunchFileTcp
+namespace TeensyRom.Core.Serial.Commands.LaunchFile
 {
     public class LaunchFileCommand : ITeensyCommand<LaunchFileResult>, IRequiresFullFw
     {

@@ -6,9 +6,9 @@ using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial.Routines;
 
-namespace TeensyRom.Core.Serial.Commands.LaunchFile.LaunchFileTcp
+namespace TeensyRom.Core.Serial.Commands.LaunchFile
 {
-	public class LaunchFileHandler(ILoggingService log, IAlertService alert, IDeviceConnectionManager deviceManager) : IRequestHandler<LaunchFileCommand, LaunchFileResult>
+	public class LaunchFileHandler(ILoggingService log) : IRequestHandler<LaunchFileCommand, LaunchFileResult>
 	{
 		public async Task<LaunchFileResult> Handle(LaunchFileCommand r, CancellationToken cancellationToken)
 		{
@@ -51,7 +51,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile.LaunchFileTcp
 			ushort result = BitConverter.ToUInt16(recBuf, 0);
 			string firmware = result == 0 ? "TeensyROM" : "MinimalBoot";
 			log.External($"Response: {result} ({firmware})");
-			return result == 0 ? false : true;
+			return result != 0;
 		}
 
 		private TeensyToken TryLaunchCommand(LaunchFileCommand command)
@@ -138,7 +138,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile.LaunchFileTcp
 			}
 			return LaunchFileResultType.NoResponse;
 		}
-		private LaunchFileResult GetFinalResult(LaunchFileResultType resultType)
+		private static LaunchFileResult GetFinalResult(LaunchFileResultType resultType)
 		{
 			return resultType switch
 			{
