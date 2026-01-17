@@ -1,4 +1,5 @@
 using MediatR;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Commands
@@ -9,10 +10,11 @@ namespace TeensyRom.Core.Commands
         {
             var response = request.CommunicationPort.PingDevice();
 
+
             return Task.FromResult(new PingResult 
             {
                 Response = response,
-                IsBusy = response.Contains("busy", StringComparison.OrdinalIgnoreCase)
+                IsBusy = response.IsTeensyRomBusy()
             });
         }
     }
