@@ -5,10 +5,11 @@ using System.Text;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Logging;
+using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial
 {
-  public class SimpleObservableSerialPort(ILoggingService log) : ICommunicationPort
+  public class SerialCommunicationPort(ILoggingService log) : ICommunicationPort
   {
     private readonly SerialPort _serialPort = new()
     {
@@ -103,6 +104,16 @@ namespace TeensyRom.Core.Serial
       log.InternalSuccess($"ObservableSerialPort.EnsureConnection: Successfully connected to {_serialPort.PortName}");
 
       return;
+    }
+
+    public string GetEndpoint()
+    {
+      return _serialPort.PortName ?? string.Empty;
+    }
+
+    public ConnectionType GetConnectionType()
+    {
+      return ConnectionType.Serial;
     }
 
     public void Dispose()

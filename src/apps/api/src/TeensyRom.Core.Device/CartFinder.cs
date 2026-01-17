@@ -1,4 +1,6 @@
 using MediatR;
+using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Commands;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
@@ -8,162 +10,245 @@ using TeensyRom.Core.Storage;
 
 namespace TeensyRom.Core.Device
 {
-  public interface ICartFinder
-  {
-    Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct, bool fullScan = false);
-  }
+	public interface ICartFinder
+	{
+		Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct, bool fullScan = false);
+	}
 
-  public class CartFinder(
-      ILoggingService log,
-      IStorageFactory storageFactory,
-      ICartTagger tagger,
-      IFwVersionChecker versionChecker,
-      IMediator mediator,
-      IEnumerable<IDiscoveryStrategy> discoveryStrategies) : ICartFinder
-  {
-    private const string _undefinedDeviceIdBase = "Unidentified";
-    private readonly IEnumerable<IDiscoveryStrategy> _discoveryStrategies = discoveryStrategies;
+	public class CartFinder(
+		ILoggingService log,
+		IStorageFactory storageFactory,
+		ICartTagger tagger,
+		IFwVersionChecker versionChecker,
+		IMediator mediator,
+		IEnumerable<IDiscoveryStrategy> discoveryStrategies,
+		IDeviceSettingsProvider settingsProvider) : ICartFinder
+	{
+		private const string _undefinedDeviceIdBase = "Unidentified";
+		private readonly IEnumerable<IDiscoveryStrategy> _discoveryStrategies = discoveryStrategies;
+		private readonly IDeviceSettingsProvider _settingsProvider = settingsProvider;
 
-    public async Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct, bool fullScan = false)
-    {
-      string methodName = "CartFinder.FindDevices:";
-      List<TeensyRomDevice> foundDevices = [];
+		public async Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct, bool fullScan = false)
+		{
+			string methodName = "CartFinder.FindDevices:";
+			List<TeensyRomDevice> foundDevices = [];
 
-      try
-      {
-        log.Internal($"{methodName} Starting device discovery using {_discoveryStrategies.Count()} strategy(ies) (fullScan={fullScan})");
+			try
+			{
+				log.Internal($"{methodName} Starting device discovery using {_discoveryStrategies.Count()} {(_discoveryStrategies.Count() == 1 ? "strategy" : "strategies")} (fullScan={fullScan})");
 
-        var endpoints = await DiscoverAllEndpoints(ct, fullScan);
+				var endpoints = await DiscoverAllEndpoints(ct, fullScan);
 
-        if (endpoints.Count == 0)
-        {
-          log.Internal($"{methodName} No endpoints discovered");
-          return foundDevices;
-        }
+				if (endpoints.Count == 0)
+				{
+					log.Internal($"{methodName} No endpoints discovered");
+					return foundDevices;
+				}
 
-        log.Internal($"{methodName} Found {endpoints.Count} endpoint(s), validating each as TeensyROM device");
+				log.Internal($"{methodName} Found {endpoints.Count} endpoint(s), validating each as TeensyROM device");
 
-        foreach (var endpoint in endpoints)
-        {
-          ct.ThrowIfCancellationRequested();
+				foreach (var endpoint in endpoints)
+				{
+					ct.ThrowIfCancellationRequested();
 
-          var device = await ValidateAndCreateDevice(endpoint, ct);
-          if (device != null)
-          {
-            if (string.IsNullOrWhiteSpace(device.Cart.DeviceId))
-            {
-              var unknownCartId = foundDevices
-                  .Where(d => d.Cart.DeviceId!.Contains(_undefinedDeviceIdBase))
-                  .ToList()
-                  .Count();
+					var device = await ValidateAndCreateDevice(endpoint, ct);
+					if (device != null)
+					{
+						if (string.IsNullOrWhiteSpace(device.Cart.DeviceId))
+						{
+							var unknownCartId = foundDevices
+								.Where(d => d.Cart.DeviceId!.Contains(_undefinedDeviceIdBase))
+								.ToList()
+								.Count();
 
-              var deviceId = $"{_undefinedDeviceIdBase}[{unknownCartId}]";
+							var deviceId = $"{_undefinedDeviceIdBase}[{unknownCartId}]";
 
-              device.Cart.DeviceId = deviceId;
-              device.Cart.SdStorage.DeviceId = deviceId;
-              device.Cart.UsbStorage.DeviceId = deviceId;
-            }
+							device.Cart.DeviceId = deviceId;
+							device.Cart.SdStorage.DeviceId = deviceId;
+							device.Cart.UsbStorage.DeviceId = deviceId;
+						}
 
-            foundDevices.Add(device);
-          }
-        }
-        log.InternalSuccess($"{methodName} Discovery complete. Found {foundDevices.Count} TeensyROM device(s)");
-      }
-      catch (OperationCanceledException)
-      {
-        foreach (var device in foundDevices)
-        {
-          device.CommunicationPort.Dispose();
-        }
-        throw;
-      }
-      return foundDevices;
-    }
+						foundDevices.Add(device);
+					}
+				}
+				log.InternalSuccess($"{methodName} Discovery complete. Found {foundDevices.Count} TeensyROM device(s)");
+				foundDevices = DeduplicateByDeviceId(foundDevices);
 
-    /// <summary>
-    /// Runs all discovery strategies in parallel and merges the results.
-    /// </summary>
-    private async Task<List<DiscoveredEndpoint>> DiscoverAllEndpoints(CancellationToken ct, bool fullScan)
-    {
-      if (!_discoveryStrategies.Any())
-      {
-        log.Internal("CartFinder.DiscoverAllEndpoints: No discovery strategies registered");
-        return [];
-      }
-      var tasks = _discoveryStrategies.Select(s => s.FindEndpoints(ct, fullScan));
-      var results = await Task.WhenAll(tasks);
-      var allEndpoints = results.SelectMany(r => r).ToList();
+				foreach (var device in foundDevices)
+				{
+					if (device.Cart?.DeviceId is not null)
+					{
+						EnsureDeviceInSettings(device.Cart.DeviceId);
+					}
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				foreach (var device in foundDevices)
+				{
+					device.CommunicationPort.Dispose();
+				}
+				throw;
+			}
+			return foundDevices;
+		}
 
-      log.Internal($"CartFinder.DiscoverAllEndpoints: Discovered {allEndpoints.Count} endpoint(s) across {_discoveryStrategies.Count()} strategy(ies)");
+		/// <summary>
+		/// Runs all discovery strategies in parallel and merges the results.
+		/// </summary>
+		private async Task<List<DiscoveredEndpoint>> DiscoverAllEndpoints(CancellationToken ct, bool fullScan)
+		{
+			if (!_discoveryStrategies.Any())
+			{
+				log.Internal("CartFinder.DiscoverAllEndpoints: No discovery strategies registered");
+				return [];
+			}
+			var tasks = _discoveryStrategies.Select(s => s.FindEndpoints(ct, fullScan));
+			var results = await Task.WhenAll(tasks);
+			var allEndpoints = results.SelectMany(r => r).ToList();
 
-      return allEndpoints;
-    }
+			log.Internal($"CartFinder.DiscoverAllEndpoints: Discovered {allEndpoints.Count} endpoint(s) across {_discoveryStrategies.Count()} strategy(ies)");
 
-    /// <summary>
-    /// Validates a discovered endpoint as a TeensyROM device and creates a device instance.
-    /// This unified pipeline works for both Serial and TCP endpoints.
-    /// Expects discovery strategies to always provide an open ICommunicationPort.
-    /// </summary>
-    private async Task<TeensyRomDevice?> ValidateAndCreateDevice(
-        DiscoveredEndpoint endpoint, CancellationToken ct)
-    {
-      string methodName = $"CartFinder.ValidateAndCreateDevice({endpoint.Display}):";
+			return allEndpoints;
+		}
 
-      var communicationPort = endpoint.CommunicationPort
-          ?? throw new ArgumentException($"Discovered endpoint must provide a communication port: {endpoint.Display}", nameof(endpoint));
+		/// <summary>
+		/// Validates a discovered endpoint as a TeensyROM device and creates a device instance.
+		/// This unified pipeline works for both Serial and TCP endpoints.
+		/// Expects discovery strategies to always provide an open ICommunicationPort.
+		/// </summary>
+		private async Task<TeensyRomDevice?> ValidateAndCreateDevice(
+			DiscoveredEndpoint endpoint, CancellationToken ct)
+		{
+			string methodName = $"CartFinder.ValidateAndCreateDevice({endpoint.Display}):";
 
-      log.Internal($"{methodName} Using pre-validated port from discovery for {endpoint.Display}");
+			var communicationPort = endpoint.CommunicationPort
+				?? throw new ArgumentException($"Discovered endpoint must provide a communication port: {endpoint.Display}", nameof(endpoint));
 
-      try
-      {
-        if (endpoint.PingResponse is null)
-        {
-          log.ExternalError($"{methodName} Version check failed for {endpoint.Display}.  PingResponse was null.");
-          return null;
-        }
-        var (isCompatible, version) = versionChecker.VersionCheck(endpoint.PingResponse);
-        
-        var cart = new Cart
-        {
-          ConnectionType = endpoint.ConnectionType,
-          ComPort = endpoint.ConnectionType == ConnectionType.Serial ? endpoint.Address : string.Empty,
-          IpAddress = endpoint.ConnectionType == ConnectionType.Tcp ? endpoint.Address : string.Empty,
-          TcpPort = endpoint.ConnectionType == ConnectionType.Tcp ? endpoint.Port ?? 80 : 80,
-          Name = "Unnamed",
-          FwVersion = version?.ToString() ?? "",
-          IsCompatible = isCompatible
-        };
+			log.Internal($"{methodName} Using pre-validated port from discovery for {endpoint.Display}");
 
-        var sdStorage = await tagger.EnsureTag(communicationPort, TeensyStorageType.SD);
-        var usbStorage = await tagger.EnsureTag(communicationPort, TeensyStorageType.USB);
+			try
+			{
+				if (endpoint.PingResponse is null)
+				{
+					log.ExternalError($"{methodName} Version check failed for {endpoint.Display}.  PingResponse was null.");
+					return null;
+				}
+				log.Internal($"Performing Version Check on port: {endpoint.Address}");
+				var (isCompatible, version) = versionChecker.VersionCheck(endpoint.PingResponse);
 
-        var deviceId = string.IsNullOrWhiteSpace(sdStorage.DeviceId)
-            ? usbStorage.DeviceId
-            : sdStorage.DeviceId;
+				var cart = new Cart
+				{
+					Name = "Unnamed",
+					FwVersion = version?.ToString() ?? "",
+					IsCompatible = isCompatible
+				};
 
-        cart.DeviceId = deviceId ?? string.Empty;
-        sdStorage.DeviceId = deviceId ?? string.Empty;
-        usbStorage.DeviceId = deviceId ?? string.Empty;
+				if (endpoint.PingResponse.Contains("busy"))
+				{
+					log.Internal($"{methodName}  TR is Busy, restarting");
+					await mediator.Send(new ResetCommand
+					{
+						CommunicationPort = communicationPort
+					});
+				}
 
-        cart.SdStorage = sdStorage;
-        cart.UsbStorage = usbStorage;
+				log.Internal($"Checking for SD storage on Port {endpoint.Address}");
+				var sdStorage = await tagger.EnsureTag(communicationPort, TeensyStorageType.SD);
+				log.Internal($"SD storage {(sdStorage.Available ? sdStorage.DeviceId : "not")} found");
 
-        var device = new TeensyRomDevice(
-            cart,
-            communicationPort,
-            storageFactory.Create(sdStorage, communicationPort),
-            storageFactory.Create(usbStorage, communicationPort)
-        );
+				log.Internal($"Checking for USB storage on Port {endpoint.Address}");
+				var usbStorage = await tagger.EnsureTag(communicationPort, TeensyStorageType.USB);
+				log.Internal($"USB storage {(usbStorage.Available ? sdStorage.DeviceId : "not")} found");
 
-        log.InternalSuccess($"{methodName} Validated and created device {cart.DeviceId} at {endpoint.Display}");
+				var deviceId = string.IsNullOrWhiteSpace(sdStorage.DeviceId)
+					? usbStorage.DeviceId
+					: sdStorage.DeviceId;
 
-        return device;
-      }
-      catch (Exception ex)
-      {
-        log.ExternalError($"{methodName} Error creating device: {ex.Message}");
-        return null;
-      }
-    }
-  }
+				cart.DeviceId = deviceId ?? string.Empty;
+				sdStorage.DeviceId = deviceId ?? string.Empty;
+				usbStorage.DeviceId = deviceId ?? string.Empty;
+
+				cart.SdStorage = sdStorage;
+				cart.UsbStorage = usbStorage;
+
+				var device = new TeensyRomDevice(
+					cart,
+					communicationPort,
+					storageFactory.Create(sdStorage, communicationPort),
+					storageFactory.Create(usbStorage, communicationPort)
+				);
+
+				log.InternalSuccess($"{methodName} Validated and created device {cart.DeviceId} at {endpoint.Display}");
+
+				return device;
+			}
+			catch (Exception ex)
+			{
+				log.ExternalError($"{methodName} Error creating device: {ex.Message}");
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// Ensures a discovered device is saved to settings.
+		/// Skips unidentified devices (no stable DeviceId).
+		/// </summary>
+		private void EnsureDeviceInSettings(string deviceId)
+		{
+			if (string.IsNullOrWhiteSpace(deviceId) || deviceId.StartsWith(_undefinedDeviceIdBase))
+			{
+				log.Internal($"CartFinder.EnsureDeviceInSettings: Skipping unidentified device {deviceId}");
+				return;
+			}
+
+			try
+			{
+				_settingsProvider.GetOrCreateDeviceSettings(deviceId);
+				log.Internal($"CartFinder.EnsureDeviceInSettings: Ensured device {deviceId} exists in settings");
+			}
+			catch (Exception ex)
+			{
+				log.InternalError($"CartFinder.EnsureDeviceInSettings: Failed to save device {deviceId}: {ex.Message}");
+			}
+		}
+
+		/// <summary>
+		/// Deduplicates devices discovered on multiple transports.
+		/// When same device found via Serial + TCP, prefers TCP.
+		/// Disposes communication ports for non-preferred transports.
+		/// </summary>
+		private List<TeensyRomDevice> DeduplicateByDeviceId(List<TeensyRomDevice> devices)
+		{
+			var grouped = devices.GroupBy(d => d.Cart.DeviceId);
+			var result = new List<TeensyRomDevice>();
+
+			foreach (var group in grouped)
+			{
+				if (group.Count() == 1)
+				{
+					// Only one transport found - use it
+					result.Add(group.First());
+					continue;
+				}
+
+				// Multiple transports for same device - prefer TCP over Serial
+				var tcp = group.FirstOrDefault(d => d.ConnectionType == ConnectionType.Tcp);
+				var preferred = tcp ?? group.First();
+
+				result.Add(preferred);
+
+				log.Internal($"CartFinder.DeduplicateByDeviceId: Device {group.Key} found on {group.Count()} transport(s), keeping {preferred.ConnectionType}");
+
+				// Dispose non-preferred transports
+				foreach (var device in group.Where(d => d != preferred))
+				{
+					log.Internal($"CartFinder.DeduplicateByDeviceId: Disposing duplicate {device.ConnectionType} connection for {device.Cart.DeviceId}");
+					device.CommunicationPort.Dispose();
+				}
+			}
+
+			return result;
+		}
+	}
 }

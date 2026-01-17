@@ -81,7 +81,7 @@ public class DeviceTransportFactoryTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().BeOfType<TcpObservablePort>();
+        result.Should().BeOfType<TcpCommunicationPort>();
     }
 
     [Fact]
@@ -178,14 +178,24 @@ public class DeviceTransportFactoryTests
     public void Create_ShouldCallCreateSerial_WhenConnectionTypeIsSerial()
     {
         // Arrange
+        var mockComm = Substitute.For<ICommunicationPort>();
+        mockComm.GetEndpoint().Returns("COM3");
+        mockComm.GetConnectionType().Returns(ConnectionType.Serial);
+
         var cart = new Cart
         {
-            ConnectionType = ConnectionType.Serial,
-            ComPort = "COM3"
+            DeviceId = "test-device",
+            Name = "Test Serial Device"
         };
+        var device = new TeensyRomDevice(
+            cart,
+            mockComm,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
 
         // Act
-        var act = () => _factory.Create(cart);
+        var act = () => _factory.Create(device);
 
         // Assert - Serial port validation will fail if COM3 doesn't exist
         act.Should().Throw<TeensyException>()
@@ -196,15 +206,24 @@ public class DeviceTransportFactoryTests
     public void Create_ShouldCallCreateTcp_WhenConnectionTypeIsTcp()
     {
         // Arrange
+        var mockComm = Substitute.For<ICommunicationPort>();
+        mockComm.GetEndpoint().Returns("192.168.1.42:8080");
+        mockComm.GetConnectionType().Returns(ConnectionType.Tcp);
+
         var cart = new Cart
         {
-            ConnectionType = ConnectionType.Tcp,
-            IpAddress = "192.168.1.42",
-            TcpPort = 8080
+            DeviceId = "test-device",
+            Name = "Test TCP Device"
         };
+        var device = new TeensyRomDevice(
+            cart,
+            mockComm,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
 
         // Act
-        var result = _factory.Create(cart);
+        var result = _factory.Create(device);
 
         // Assert
         result.Should().NotBeNull();
@@ -215,16 +234,24 @@ public class DeviceTransportFactoryTests
     public void Create_ShouldThrowArgumentException_WhenConnectionTypeIsUnknown()
     {
         // Arrange
-        // Create a cart with an invalid connection type (if enum has more than 2 values)
-        // For now, we test the switch statement logic
+        var mockComm = Substitute.For<ICommunicationPort>();
+        mockComm.GetEndpoint().Returns("COM3");
+        mockComm.GetConnectionType().Returns((ConnectionType)99); // Invalid enum value
+
         var cart = new Cart
         {
-            ConnectionType = (ConnectionType)99, // Invalid enum value
-            ComPort = "COM3"
+            DeviceId = "test-device",
+            Name = "Test Device"
         };
+        var device = new TeensyRomDevice(
+            cart,
+            mockComm,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
 
         // Act
-        var act = () => _factory.Create(cart);
+        var act = () => _factory.Create(device);
 
         // Assert
         act.Should().Throw<ArgumentException>()
@@ -235,33 +262,52 @@ public class DeviceTransportFactoryTests
     public void Create_ShouldFormatTcpEndpointFromCartProperties()
     {
         // Arrange
+        var mockComm = Substitute.For<ICommunicationPort>();
+        mockComm.GetEndpoint().Returns("192.168.1.42:8080");
+        mockComm.GetConnectionType().Returns(ConnectionType.Tcp);
+
         var cart = new Cart
         {
-            ConnectionType = ConnectionType.Tcp,
-            IpAddress = "192.168.1.42",
-            TcpPort = 8080
+            DeviceId = "test-device",
+            Name = "Test TCP Device"
         };
+        var device = new TeensyRomDevice(
+            cart,
+            mockComm,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
 
         // Act
-        var result = _factory.Create(cart);
+        var result = _factory.Create(device);
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().BeOfType<TcpObservablePort>();
+        result.Should().BeOfType<TcpCommunicationPort>();
     }
 
     [Fact]
     public void Create_ShouldUseComPortForSerialConnection()
     {
         // Arrange
+        var mockComm = Substitute.For<ICommunicationPort>();
+        mockComm.GetEndpoint().Returns("COM1");
+        mockComm.GetConnectionType().Returns(ConnectionType.Serial);
+
         var cart = new Cart
         {
-            ConnectionType = ConnectionType.Serial,
-            ComPort = "COM1"
+            DeviceId = "test-device",
+            Name = "Test Device"
         };
+        var device = new TeensyRomDevice(
+            cart,
+            mockComm,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
 
         // Act
-        var act = () => _factory.Create(cart);
+        var act = () => _factory.Create(device);
 
         // Assert - Should attempt to use COM1 (throws because port doesn't exist)
         act.Should().Throw<TeensyException>();
@@ -292,21 +338,33 @@ public class DeviceTransportFactoryTests
     public void Factory_ShouldCreateFromCartWithBothConnectionTypes()
     {
         // Arrange
-        var serialCart = new Cart
-        {
-            ConnectionType = ConnectionType.Serial,
-            ComPort = "COM3"
-        };
-        var tcpCart = new Cart
-        {
-            ConnectionType = ConnectionType.Tcp,
-            IpAddress = "192.168.1.42",
-            TcpPort = 8080
-        };
+        var serialComm = Substitute.For<ICommunicationPort>();
+        serialComm.GetEndpoint().Returns("COM3");
+        serialComm.GetConnectionType().Returns(ConnectionType.Serial);
+
+        var serialCart = new Cart { DeviceId = "serial-device", Name = "Serial Device" };
+        var serialDevice = new TeensyRomDevice(
+            serialCart,
+            serialComm,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
+
+        var tcpComm = Substitute.For<ICommunicationPort>();
+        tcpComm.GetEndpoint().Returns("192.168.1.42:8080");
+        tcpComm.GetConnectionType().Returns(ConnectionType.Tcp);
+
+        var tcpCart = new Cart { DeviceId = "tcp-device", Name = "TCP Device" };
+        var tcpDevice = new TeensyRomDevice(
+            tcpCart,
+            tcpComm,
+            Substitute.For<IStorageService>(),
+            Substitute.For<IStorageService>()
+        );
 
         // Act
-        var serialAct = () => _factory.Create(serialCart);
-        var tcpContext = _factory.Create(tcpCart);
+        var serialAct = () => _factory.Create(serialDevice);
+        var tcpContext = _factory.Create(tcpDevice);
 
         // Assert
         serialAct.Should().Throw<TeensyException>(); // Serial port may not exist

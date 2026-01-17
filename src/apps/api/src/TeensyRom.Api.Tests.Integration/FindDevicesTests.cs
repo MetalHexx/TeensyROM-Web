@@ -1,11 +1,9 @@
-using TeensyRom.Api.Endpoints.ClosePort;
 using TeensyRom.Api.Endpoints.FindCarts;
-using TeensyRom.Api.Endpoints.ConnectDevice;
 
 namespace TeensyRom.Api.Tests.Integration
 {
     [Collection("Endpoint")]
-    public class FindDevicesTests(EndpointFixture f) :IDisposable
+    public class FindDevicesTests(EndpointFixture f)
     {        
 
 
@@ -13,7 +11,10 @@ namespace TeensyRom.Api.Tests.Integration
         public async Task Given_DevicesAvailable_WhenCalled_DevicesReturned()
         {
             // Arrange
-            var r = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
+            var r = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest
+            {
+              FullScan = false
+            });
 
             // Assert
             r.Should().BeSuccessful<FindDevicesResponse>()
@@ -21,8 +22,7 @@ namespace TeensyRom.Api.Tests.Integration
                 .WithContentNotNull();
 
             r.Content.Devices.Count.Should().BeGreaterThan(0);
+            r.Content.Devices.Should().ContainSingle();
         }
-
-        public void Dispose() => f.Reset();
     }
 }

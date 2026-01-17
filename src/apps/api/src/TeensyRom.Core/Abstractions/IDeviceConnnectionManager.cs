@@ -8,6 +8,5 @@ namespace TeensyRom.Core.Abstractions
         Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false);
         List<TeensyRomDevice> GetAvailableDevices();
         TeensyRomDevice? GetAvailableDevice(string deviceId);
-        Task<bool> ReconnectDevice(string deviceId);
     }
 }

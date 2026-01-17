@@ -75,10 +75,10 @@ namespace TeensyRom.Api.Models
             return new CartDto
             {
                 DeviceId = device.DeviceId ?? string.Empty,
-                ComPort = device.Cart.ComPort,
-                ConnectionType = device.Cart.ConnectionType,
-                IpAddress = device.Cart.IpAddress,
-                TcpPort = device.Cart.TcpPort,
+                ComPort = device.ComPort,
+                ConnectionType = device.ConnectionType,
+                IpAddress = device.IpAddress,
+                TcpPort = device.TcpPort,
                 Name = device.Cart.Name,
                 FwVersion = device.Cart.FwVersion,
                 IsCompatible = device.Cart.IsCompatible,

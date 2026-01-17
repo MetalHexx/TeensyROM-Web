@@ -8,7 +8,7 @@ namespace TeensyRom.Core.Serial
     {
         public static TeensyToken HandleAck(this ICommunicationPort serialState)
         {
-            serialState.WaitForSerialData(numBytes: 2, timeoutMs: 10000);
+            serialState.WaitForSerialData(numBytes: 2, timeoutMs: 20000);
 
             byte[] recBuf = new byte[2];
             serialState.Read(recBuf, 0, 2);

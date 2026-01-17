@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -18,8 +17,8 @@ namespace TeensyRom.Core.Device;
 /// </summary>
 public record DeviceIpCache
 {
-  public DateTime LastUpdated { get; init; } = DateTime.UtcNow;
-  public List<CachedDeviceIp> KnownEndpoints { get; init; } = new();
+	public DateTime LastUpdated { get; init; } = DateTime.UtcNow;
+	public List<CachedDeviceIp> KnownEndpoints { get; init; } = new();
 }
 
 /// <summary>
@@ -27,9 +26,9 @@ public record DeviceIpCache
 /// </summary>
 public record CachedDeviceIp
 {
-  public required string IpAddress { get; init; }
-  public int Port { get; init; } = 80;
-  public DateTime LastSeen { get; init; } = DateTime.UtcNow;
+	public required string IpAddress { get; init; }
+	public int Port { get; init; } = 80;
+	public DateTime LastSeen { get; init; } = DateTime.UtcNow;
 }
 
 /// <summary>
@@ -38,338 +37,338 @@ public record CachedDeviceIp
 /// Implements IDiscoveryStrategy to provide a unified discovery interface.
 /// </summary>
 public class TcpDiscoveryStrategy(
-    ILoggingService log,
-    IDeviceTransportFactory transportFactory) : IDiscoveryStrategy
+	ILoggingService log,
+	IDeviceTransportFactory transportFactory) : IDiscoveryStrategy
 {
-  private const int _maxDegreeOfParallelism = 256;  // High parallelism safe with true async I/O (no thread blocking)
-  private readonly string _cacheFilePath = Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), "Assets/System/Config/DeviceIps.json");
-  private readonly object _lock = new();
+	private const int _maxDegreeOfParallelism = 256;  // High parallelism safe with true async I/O (no thread blocking)
+	private readonly string _cacheFilePath = Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), "Assets/System/Config/DeviceIps.json");
+	private readonly object _lock = new();
 
-  /// <summary>
-  /// Finds all available TCP endpoints on the local network.
-  /// If fullScan is true, performs complete subnet scan (ignoring cache).
-  /// If fullScan is false, tries cached endpoints first and falls back to full scan if cache is empty.
-  /// Implements IDiscoveryStrategy to provide unified discovery across transport types.
-  /// </summary>
-  /// <param name="ct">Cancellation token to abort the network scan.</param>
-  /// <param name="fullScan">If true, skips cache and performs full subnet scan. If false, tries cache first with fallback to full scan. Defaults to false.</param>
-  /// <returns>List of TCP endpoints (IP:port) where TeensyROM devices were found.</returns>
-  public async Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct, bool fullScan = false)
-  {
-    if (fullScan)
-    {
-      log.Internal("TcpDiscoveryStrategy: fullScan=true, skipping cache and performing full subnet scan");
-      return await PerformFullScan(ct);
-    }
+	/// <summary>
+	/// Finds all available TCP endpoints on the local network.
+	/// If fullScan is true, performs complete subnet scan (ignoring cache).
+	/// If fullScan is false, tries cached endpoints first and falls back to full scan if cache is empty.
+	/// Implements IDiscoveryStrategy to provide unified discovery across transport types.
+	/// </summary>
+	/// <param name="ct">Cancellation token to abort the network scan.</param>
+	/// <param name="fullScan">If true, skips cache and performs full subnet scan. If false, tries cache first with fallback to full scan. Defaults to false.</param>
+	/// <returns>List of TCP endpoints (IP:port) where TeensyROM devices were found.</returns>
+	public async Task<List<DiscoveredEndpoint>> FindEndpoints(CancellationToken ct, bool fullScan = false)
+	{
+		if (fullScan)
+		{
+			log.Internal("TcpDiscoveryStrategy: fullScan=true, skipping cache and performing full subnet scan");
+			return await PerformFullScan(ct);
+		}
 
-    log.Internal("TcpDiscoveryStrategy: fullScan=false, attempting fast discovery using cached endpoints");
+		log.Internal("TcpDiscoveryStrategy: fullScan=false, attempting fast discovery using cached endpoints");
 
-    var knownEndpoints = await FindKnownEndpoints(ct);
-    
-    if (knownEndpoints.Count > 0)
-    {
-      log.InternalSuccess($"TcpDiscoveryStrategy: Fast discovery successful - found {knownEndpoints.Count} cached device(s)");
-      return knownEndpoints;
-    }
+		var knownEndpoints = await FindKnownEndpoints(ct);
 
-    log.Internal("TcpDiscoveryStrategy: No cached devices found, falling back to full subnet scan");
-    return await PerformFullScan(ct);
-  }
+		if (knownEndpoints.Count > 0)
+		{
+			log.InternalSuccess($"TcpDiscoveryStrategy: Fast discovery successful - found {knownEndpoints.Count} cached device(s)");
+			return knownEndpoints;
+		}
 
-  /// <summary>
-  /// Performs a full subnet scan and caches discovered devices.
-  /// </summary>
-  private async Task<List<DiscoveredEndpoint>> PerformFullScan(CancellationToken ct)
-  {
-    var subnetRange = NetworkHelper.GetLocalSubnetRange();
+		log.Internal("TcpDiscoveryStrategy: No cached devices found, falling back to full subnet scan");
+		return await PerformFullScan(ct);
+	}
 
-    if (!subnetRange.HasValue)
-    {
-      log.InternalError("TcpDiscoveryStrategy: Unable to detect local subnet range");
-      return [];
-    }
+	/// <summary>
+	/// Performs a full subnet scan and caches discovered devices.
+	/// </summary>
+	private async Task<List<DiscoveredEndpoint>> PerformFullScan(CancellationToken ct)
+	{
+		var subnetRange = NetworkHelper.GetLocalSubnetRange();
 
-    var (startIp, endIp) = subnetRange.Value;
-    log.Internal($"TcpDiscoveryStrategy: Scanning range {startIp} to {endIp}");
+		if (!subnetRange.HasValue)
+		{
+			log.InternalError("TcpDiscoveryStrategy: Unable to detect local subnet range");
+			return [];
+		}
 
-    var discoveredDevices = await ScanNetwork(startIp, endIp, ct);
+		var (startIp, endIp) = subnetRange.Value;
+		log.Internal($"TcpDiscoveryStrategy: Scanning range {startIp} to {endIp}");
 
-    // Save discovered devices to cache for future fast discovery
-    if (discoveredDevices.Count > 0)
-    {
-      SaveKnownIps(discoveredDevices);
-    }
+		var discoveredDevices = await ScanNetwork(startIp, endIp, ct);
 
-    var endpoints = discoveredDevices
-        .Select(device => new DiscoveredEndpoint(
-            ConnectionType.Tcp,
-            device.IpAddress,
-            device.Port,
-            device.Response,
-            device.CommunicationPort
-        ))
-        .ToList();
+		// Save discovered devices to cache for future fast discovery
+		if (discoveredDevices.Count > 0)
+		{
+			SaveKnownIps(discoveredDevices);
+		}
 
-    return endpoints;
-  }
+		var endpoints = discoveredDevices
+			.Select(device => new DiscoveredEndpoint(
+				ConnectionType.Tcp,
+				device.IpAddress,
+				device.Port,
+				device.Response,
+				device.CommunicationPort
+			))
+			.ToList();
 
-  /// <summary>
-  /// Scans previously discovered (cached) device endpoints for fast reconnection.
-  /// Reads IP addresses from DeviceIps.json and validates they are still active.
-  /// </summary>
-  /// <param name="ct">Cancellation token to abort the scan.</param>
-  /// <returns>List of discovered endpoints from the cache, or empty if none found.</returns>
-  private async Task<List<DiscoveredEndpoint>> FindKnownEndpoints(CancellationToken ct)
-  {
-    var cache = LoadKnownIps();
-    
-    if (cache == null || cache.KnownEndpoints.Count == 0)
-    {
-      log.Internal("TcpDiscoveryStrategy: No cached endpoints found");
-      return [];
-    }
+		return endpoints;
+	}
 
-    log.Internal($"TcpDiscoveryStrategy: Scanning {cache.KnownEndpoints.Count} cached endpoint(s)");
+	/// <summary>
+	/// Scans previously discovered (cached) device endpoints for fast reconnection.
+	/// Reads IP addresses from DeviceIps.json and validates they are still active.
+	/// </summary>
+	/// <param name="ct">Cancellation token to abort the scan.</param>
+	/// <returns>List of discovered endpoints from the cache, or empty if none found.</returns>
+	private async Task<List<DiscoveredEndpoint>> FindKnownEndpoints(CancellationToken ct)
+	{
+		var cache = LoadKnownIps();
 
-    var discoveredDevices = new ConcurrentBag<TcpDiscoveredDevice>();
+		if (cache == null || cache.KnownEndpoints.Count == 0)
+		{
+			log.Internal("TcpDiscoveryStrategy: No cached endpoints found");
+			return [];
+		}
 
-    var parallelOptions = new ParallelOptions
-    {
-      MaxDegreeOfParallelism = cache.KnownEndpoints.Count,
-      CancellationToken = ct
-    };
+		log.Internal($"TcpDiscoveryStrategy: Scanning {cache.KnownEndpoints.Count} cached endpoint(s)");
 
-    await Parallel.ForEachAsync(cache.KnownEndpoints, parallelOptions, async (cachedIp, ct) =>
-    {
-      ct.ThrowIfCancellationRequested();
+		var discoveredDevices = new ConcurrentBag<TcpDiscoveredDevice>();
 
-      if (!IPAddress.TryParse(cachedIp.IpAddress, out var ip))
-      {
-        log.InternalError($"TcpDiscoveryStrategy: Invalid cached IP address: {cachedIp.IpAddress}");
-        return;
-      }
+		var parallelOptions = new ParallelOptions
+		{
+			MaxDegreeOfParallelism = cache.KnownEndpoints.Count,
+			CancellationToken = ct
+		};
 
-      var device = await TryDiscoverDeviceAsync(ip, cachedIp.Port);
-      if (device != null)
-      {
-        discoveredDevices.Add(device);
-        log.InternalSuccess($"TcpDiscoveryStrategy: Cached device found at {device.IpAddress}:{device.Port}");
-      }
-    });
+		await Parallel.ForEachAsync(cache.KnownEndpoints, parallelOptions, async (cachedIp, ct) =>
+		{
+			ct.ThrowIfCancellationRequested();
 
-    var endpoints = discoveredDevices
-        .Select(device => new DiscoveredEndpoint(
-            ConnectionType.Tcp,
-            device.IpAddress,
-            device.Port,
-            device.Response,
-            device.CommunicationPort
-        ))
-        .ToList();
+			if (!IPAddress.TryParse(cachedIp.IpAddress, out var ip))
+			{
+				log.InternalError($"TcpDiscoveryStrategy: Invalid cached IP address: {cachedIp.IpAddress}");
+				return;
+			}
 
-    return endpoints;
-  }
+			var device = await TryDiscoverDeviceAsync(ip, cachedIp.Port);
+			if (device != null)
+			{
+				discoveredDevices.Add(device);
+				log.InternalSuccess($"TcpDiscoveryStrategy: Cached device found at {device.IpAddress}:{device.Port}");
+			}
+		});
 
-  /// <summary>
-  /// Scans the specified IP range for TeensyROM devices using parallel TCP connections.
-  /// Each IP is probed with a TeensyROM ping token (0x6455) to validate the device.
-  /// </summary>
-  private async Task<List<TcpDiscoveredDevice>> ScanNetwork(IPAddress startIp, IPAddress endIp, CancellationToken ct)
-  {
-    var ipRange = NetworkHelper.GenerateIpRange(startIp, endIp);
-    var discoveredDevices = new ConcurrentBag<TcpDiscoveredDevice>();
+		var endpoints = discoveredDevices
+			.Select(device => new DiscoveredEndpoint(
+				ConnectionType.Tcp,
+				device.IpAddress,
+				device.Port,
+				device.Response,
+				device.CommunicationPort
+			))
+			.ToList();
 
-    var parallelOptions = new ParallelOptions
-    {
-      MaxDegreeOfParallelism = _maxDegreeOfParallelism,
-      CancellationToken = ct
-    };
+		return endpoints;
+	}
 
-    log.Internal($"TcpDiscoveryStrategy: Scanning {ipRange.Count} IP addresses with MaxDegreeOfParallelism = {_maxDegreeOfParallelism}");
+	/// <summary>
+	/// Scans the specified IP range for TeensyROM devices using parallel TCP connections.
+	/// Each IP is probed with a TeensyROM ping token (0x6455) to validate the device.
+	/// </summary>
+	private async Task<List<TcpDiscoveredDevice>> ScanNetwork(IPAddress startIp, IPAddress endIp, CancellationToken ct)
+	{
+		var ipRange = NetworkHelper.GenerateIpRange(startIp, endIp);
+		var discoveredDevices = new ConcurrentBag<TcpDiscoveredDevice>();
 
-    await Parallel.ForEachAsync(ipRange, parallelOptions, async (ip, ct) =>
-    {
-      ct.ThrowIfCancellationRequested();
+		var parallelOptions = new ParallelOptions
+		{
+			MaxDegreeOfParallelism = _maxDegreeOfParallelism,
+			CancellationToken = ct
+		};
 
-      var device = await TryDiscoverDeviceAsync(ip, 80);
-      if (device != null)
-      {
-        discoveredDevices.Add(device);
-        log.InternalSuccess($"TcpDiscoveryStrategy: Discovered TeensyROM device at {device.IpAddress}:{device.Port}");
-      }
-    });
+		log.Internal($"TcpDiscoveryStrategy: Scanning {ipRange.Count} IP addresses with MaxDegreeOfParallelism = {_maxDegreeOfParallelism}");
 
-    var result = discoveredDevices.ToList();
-    log.InternalSuccess($"TcpDiscoveryStrategy: Scan complete. Found {result.Count} device(s)");
+		await Parallel.ForEachAsync(ipRange, parallelOptions, async (ip, ct) =>
+		{
+			ct.ThrowIfCancellationRequested();
 
-    return result;
-  }
+			var device = await TryDiscoverDeviceAsync(ip, 80);
+			if (device != null)
+			{
+				discoveredDevices.Add(device);
+				log.InternalSuccess($"TcpDiscoveryStrategy: Discovered TeensyROM device at {device.IpAddress}:{device.Port}");
+			}
+		});
 
-  /// <summary>
-  /// Attempts to discover a TeensyROM device at the specified IP address and port.
-  /// Uses raw TcpClient with true async I/O for fast, non-blocking network scanning.
-  /// If device validates as TeensyROM, wraps the live connection in TcpObservablePort for reuse.
-  /// </summary>
-  private async Task<TcpDiscoveredDevice?> TryDiscoverDeviceAsync(IPAddress ip, int port)
-  {
-    TcpClient? tcpClient = null;
-    ICommunicationPort? communicationPort = null;
+		var result = discoveredDevices.ToList();
+		log.InternalSuccess($"TcpDiscoveryStrategy: Scan complete. Found {result.Count} device(s)");
 
-    try
-    {
-      var endpoint = $"{ip}:{port}";
-      tcpClient = new TcpClient();
+		return result;
+	}
 
-      using var connectCts = new CancellationTokenSource(100);
-      await tcpClient.ConnectAsync(ip, port, connectCts.Token);
+	/// <summary>
+	/// Attempts to discover a TeensyROM device at the specified IP address and port.
+	/// Uses raw TcpClient with true async I/O for fast, non-blocking network scanning.
+	/// If device validates as TeensyROM, wraps the live connection in TcpObservablePort for reuse.
+	/// </summary>
+	private async Task<TcpDiscoveredDevice?> TryDiscoverDeviceAsync(IPAddress ip, int port)
+	{
+		TcpClient? tcpClient = null;
+		ICommunicationPort? communicationPort = null;
 
-      if (!tcpClient.Connected)
-      {
-        tcpClient?.Dispose();
-        return null;
-      }
+		try
+		{
+			var endpoint = $"{ip}:{port}";
+			tcpClient = new TcpClient();
 
-      var stream = tcpClient.GetStream();
-      stream.ReadTimeout = 500;
-      stream.WriteTimeout = 500;
+			using var connectCts = new CancellationTokenSource(100);
+			await tcpClient.ConnectAsync(ip, port, connectCts.Token);
 
-      byte[] sendBytes = BitConverter.GetBytes(TeensyToken.MinimalCheck.Value);
-      if (BitConverter.IsLittleEndian)
-      {
-        Array.Reverse(sendBytes);
-      }
+			if (!tcpClient.Connected)
+			{
+				tcpClient?.Dispose();
+				return null;
+			}
 
-      using var writeCts = new CancellationTokenSource(100);
-      await stream.WriteAsync(sendBytes, 0, sendBytes.Length, writeCts.Token);
-      await stream.FlushAsync(writeCts.Token);
+			var stream = tcpClient.GetStream();
+			stream.ReadTimeout = 500;
+			stream.WriteTimeout = 500;
 
-      await Task.Delay(75);
+			byte[] sendBytes = BitConverter.GetBytes(TeensyToken.MinimalCheck.Value);
+			if (BitConverter.IsLittleEndian)
+			{
+				Array.Reverse(sendBytes);
+			}
 
-      byte[] responseBytes = new byte[2];
-      using var readCts = new CancellationTokenSource(500);
-      int bytesRead = await stream.ReadAsync(responseBytes, 0, 2, readCts.Token);
+			using var writeCts = new CancellationTokenSource(100);
+			await stream.WriteAsync(sendBytes, 0, sendBytes.Length, writeCts.Token);
+			await stream.FlushAsync(writeCts.Token);
 
-      if (bytesRead != 2)
-      {
-        tcpClient.Dispose();
-        return null;
-      }
+			await Task.Delay(75);
 
-      ushort minimalCheckResult = BitConverter.ToUInt16(responseBytes, 0);
-      
-      if (minimalCheckResult != 0 && minimalCheckResult != 1)
-      {
-        tcpClient.Dispose();
-        return null;
-      }
-      
-      bool isMinimalMode = minimalCheckResult == 1;
+			byte[] responseBytes = new byte[2];
+			using var readCts = new CancellationTokenSource(500);
+			int bytesRead = await stream.ReadAsync(responseBytes, 0, 2, readCts.Token);
 
-      communicationPort = new TcpObservablePort(log, tcpClient);
+			if (bytesRead != 2)
+			{
+				tcpClient.Dispose();
+				return null;
+			}
 
-      if (isMinimalMode)
-      {
-        log.Internal($"TcpDiscoveryStrategy: Device at {endpoint} is in minimal mode, resetting...");
-        communicationPort.ResetDevice(log);
-        communicationPort.ClosePort();
-        communicationPort.OpenPort();
+			ushort minimalCheckResult = BitConverter.ToUInt16(responseBytes, 0);
 
-        if (!communicationPort.IsOpen)
-        {
-          communicationPort.Dispose();
-          return null;
-        }
+			if (minimalCheckResult != 0 && minimalCheckResult != 1)
+			{
+				tcpClient.Dispose();
+				return null;
+			}
 
-        log.InternalSuccess($"TcpDiscoveryStrategy: Reconnected to {endpoint} after reset");
-      }
+			bool isMinimalMode = minimalCheckResult == 1;
 
-      var response = communicationPort.PingDevice();
+			communicationPort = new TcpCommunicationPort(log, tcpClient);
 
-      if (response.IsTeensyRom())
-      {
-        return new TcpDiscoveredDevice
-        {
-          IpAddress = ip.ToString(),
-          Port = port,
-          Response = response,
-          DiscoveredAt = DateTime.UtcNow,
-          CommunicationPort = communicationPort
-        };
-      }
-      communicationPort.Dispose();
-      return null;
-    }
-    catch (Exception)
-    {
-      tcpClient?.Dispose();
-      communicationPort?.Dispose();
-      return null;
-    }
-  }
+			if (isMinimalMode)
+			{
+				log.Internal($"TcpDiscoveryStrategy: Device at {endpoint} is in minimal mode, resetting...");
+				communicationPort.ResetDevice(log);
+				communicationPort.ClosePort();
+				communicationPort.OpenPort();
 
-  /// <summary>
-  /// Loads known device IPs from cache file.
-  /// </summary>
-  /// <returns>DeviceIpCache if file exists and is valid, null otherwise.</returns>
-  private DeviceIpCache? LoadKnownIps()
-  {
-    lock (_lock)
-    {
-      if (!File.Exists(_cacheFilePath))
-      {
-        return null;
-      }
+				if (!communicationPort.IsOpen)
+				{
+					communicationPort.Dispose();
+					return null;
+				}
 
-      try
-      {
-        var content = File.ReadAllText(_cacheFilePath);
-        return JsonSerializer.Deserialize<DeviceIpCache>(content);
-      }
-      catch (Exception ex)
-      {
-        log.InternalError($"TcpDiscoveryStrategy: Failed to load device cache: {ex.Message}");
-        return null;
-      }
-    }
-  }
+				log.InternalSuccess($"TcpDiscoveryStrategy: Reconnected to {endpoint} after reset");
+			}
 
-  /// <summary>
-  /// Saves discovered devices to cache file.
-  /// Replaces existing cache contents with new discoveries.
-  /// </summary>
-  /// <param name="devices">List of discovered devices to cache.</param>
-  private void SaveKnownIps(List<TcpDiscoveredDevice> devices)
-  {
-    lock (_lock)
-    {
-      try
-      {
-        var cache = new DeviceIpCache
-        {
-          LastUpdated = DateTime.UtcNow,
-          KnownEndpoints = devices.Select(d => new CachedDeviceIp
-          {
-            IpAddress = d.IpAddress,
-            Port = d.Port,
-            LastSeen = d.DiscoveredAt
-          }).ToList()
-        };
+			var response = communicationPort.PingDevice();
 
-        var directory = Path.GetDirectoryName(_cacheFilePath);
-        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-        {
-          Directory.CreateDirectory(directory);
-        }
+			if (response.IsTeensyRom())
+			{
+				return new TcpDiscoveredDevice
+				{
+					IpAddress = ip.ToString(),
+					Port = port,
+					Response = response,
+					DiscoveredAt = DateTime.UtcNow,
+					CommunicationPort = communicationPort
+				};
+			}
+			communicationPort.Dispose();
+			return null;
+		}
+		catch (Exception)
+		{
+			tcpClient?.Dispose();
+			communicationPort?.Dispose();
+			return null;
+		}
+	}
 
-        var json = JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(_cacheFilePath, json);
+	/// <summary>
+	/// Loads known device IPs from cache file.
+	/// </summary>
+	/// <returns>DeviceIpCache if file exists and is valid, null otherwise.</returns>
+	private DeviceIpCache? LoadKnownIps()
+	{
+		lock (_lock)
+		{
+			if (!File.Exists(_cacheFilePath))
+			{
+				return null;
+			}
 
-        log.Internal($"TcpDiscoveryStrategy: Saved {devices.Count} device(s) to cache: {_cacheFilePath}");
-      }
-      catch (Exception ex)
-      {
-        log.InternalError($"TcpDiscoveryStrategy: Failed to save device cache: {ex.Message}");
-      }
-    }
-  }
+			try
+			{
+				var content = File.ReadAllText(_cacheFilePath);
+				return JsonSerializer.Deserialize<DeviceIpCache>(content);
+			}
+			catch (Exception ex)
+			{
+				log.InternalError($"TcpDiscoveryStrategy: Failed to load device cache: {ex.Message}");
+				return null;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Saves discovered devices to cache file.
+	/// Replaces existing cache contents with new discoveries.
+	/// </summary>
+	/// <param name="devices">List of discovered devices to cache.</param>
+	private void SaveKnownIps(List<TcpDiscoveredDevice> devices)
+	{
+		lock (_lock)
+		{
+			try
+			{
+				var cache = new DeviceIpCache
+				{
+					LastUpdated = DateTime.UtcNow,
+					KnownEndpoints = devices.Select(d => new CachedDeviceIp
+					{
+						IpAddress = d.IpAddress,
+						Port = d.Port,
+						LastSeen = d.DiscoveredAt
+					}).ToList()
+				};
+
+				var directory = Path.GetDirectoryName(_cacheFilePath);
+				if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+				{
+					Directory.CreateDirectory(directory);
+				}
+
+				var json = JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true });
+				File.WriteAllText(_cacheFilePath, json);
+
+				log.Internal($"TcpDiscoveryStrategy: Saved {devices.Count} device(s) to cache: {_cacheFilePath}");
+			}
+			catch (Exception ex)
+			{
+				log.InternalError($"TcpDiscoveryStrategy: Failed to save device cache: {ex.Message}");
+			}
+		}
+	}
 }

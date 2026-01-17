@@ -16,19 +16,19 @@ namespace TeensyRom.Core.Serial
             _alert = alert;
         }
 
-        public ICommunicationPort Create(Cart cart)
+        public ICommunicationPort Create(TeensyRomDevice device)
         {
-            return cart.ConnectionType switch
+            return device.ConnectionType switch
             {
-                ConnectionType.Serial => CreateSerial(cart.ComPort),
-                ConnectionType.Tcp => CreateTcp($"{cart.IpAddress}:{cart.TcpPort}"),
-                _ => throw new ArgumentException($"Unknown ConnectionType: {cart.ConnectionType}", nameof(cart))
+                ConnectionType.Serial => CreateSerial(device.ComPort),
+                ConnectionType.Tcp => CreateTcp($"{device.IpAddress}:{device.TcpPort}"),
+                _ => throw new ArgumentException($"Unknown ConnectionType: {device.ConnectionType}", nameof(device))
             };
         }
 
         public ICommunicationPort CreateSerial(string portName)
         {
-            var serialPort = new SimpleObservableSerialPort(_log);
+            var serialPort = new SerialCommunicationPort(_log);
             serialPort.SetPort(portName);
             return serialPort;
         }
@@ -40,7 +40,7 @@ namespace TeensyRom.Core.Serial
                 throw new ArgumentException($"Invalid TCP endpoint format: {endpoint}. Expected format: '192.168.1.42:80'", nameof(endpoint));
             }
 
-            var tcpPort = new TcpObservablePort(_log);
+            var tcpPort = new TcpCommunicationPort(_log);
             tcpPort.SetPort(endpoint);
             return tcpPort;
         }

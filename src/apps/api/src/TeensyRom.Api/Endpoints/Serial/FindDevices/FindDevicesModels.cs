@@ -11,7 +11,7 @@ namespace TeensyRom.Api.Endpoints.FindCarts
         /// If true, performs a full network/port scan. If false (default), uses cached TCP endpoints for faster discovery.
         /// Serial COM ports are always fully scanned regardless of this setting.
         /// </summary>
-        public bool FullScan { get; set; } = false;
+        [FromQuery] public bool FullScan { get; set; } = false;
     }
 
     /// <summary>

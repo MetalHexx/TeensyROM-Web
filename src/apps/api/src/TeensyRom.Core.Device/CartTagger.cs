@@ -18,18 +18,8 @@ namespace TeensyRom.Core.Device
         public async Task<CartStorage> EnsureTag(ICommunicationPort communicationPort, TeensyStorageType storageType)
         {
             var methodName = "CartTagger.EnsureTag:";
-            var pingResult = await mediator.Send(new PingCommand 
-            {
-                CommunicationPort = communicationPort
-            });
-            if (pingResult.IsBusy) 
-            {
-                await mediator.Send(new ResetCommand
-                {
-                    CommunicationPort = communicationPort
-                });
-            }
-            var getFileCommand = new GetFileCommand
+			log.Internal($"{methodName}  Fetching /cart-tag.txt from {storageType}");
+			var getFileCommand = new GetFileCommand
             {
                 StorageType = storageType,
                 FilePath = new FilePath("/cart-tag.txt"),
@@ -51,13 +41,20 @@ namespace TeensyRom.Core.Device
             {
                 log.InternalWarning($"{methodName} Failed to get remote config file from {storageType}");
             }
+			if(getFileResult.IsSuccess is false)
+			{
+				var errorMessage = $"{methodName} Failed to get remote config file from {storageType}.  Unknown error occured.";
+				log.InternalWarning(errorMessage);
+				throw new TeensyException(errorMessage);
+			}
             else
             {
+				log.Internal($"{methodName} Deserializing cart-tag.txt for {storageType}");
                 var tagFromTr = getFileResult.FileData.Deserialize<CartTag>();
 
                 if (tagFromTr is not null)
                 {
-                    log.InternalSuccess($"{methodName} Succesfully retrieved tag from device.", tagFromTr.DeviceId);
+                    log.InternalSuccess($"{methodName} Succesfully retrieved tag from {storageType} device.", tagFromTr.DeviceId);
                     return new CartStorage
                     {
                         Available = true,
@@ -65,7 +62,7 @@ namespace TeensyRom.Core.Device
                         DeviceId = tagFromTr.DeviceId
                     };
                 }
-            }
+            }			
             var deviceHash = Guid.NewGuid().ToString().GenerateFilenameSafeHash();
 
             var newTag = new CartTag { DeviceId = deviceHash };
@@ -86,7 +83,10 @@ namespace TeensyRom.Core.Device
                 targetFilePath: new DirectoryPath(StorageHelper.Remote_Path_Root).Combine(new FilePath("cart-tag.txt")),
                 targetStorage: storageType
             );
-            var saveFileCommand = new SaveFilesCommand
+
+			log.Internal($"{methodName} Creating a new cart-tag.txt file for {storageType} and saving to TR.");
+
+			var saveFileCommand = new SaveFilesCommand
             {
                 Files = [fileTransferItem],
                 CommunicationPort = communicationPort
@@ -95,13 +95,14 @@ namespace TeensyRom.Core.Device
 
             if (saveFileResult.IsSuccess is false)
             {
-                log.InternalError($"{methodName} Failed to save remote config file");
+                log.InternalError($"{methodName} Failed to save remote config file to {storageType}");
                 return new CartStorage
                 {
                     Available = false,
                     Type = storageType
                 };
             }
+			log.InternalSuccess($"{methodName} Successfully saved new cart-tag.txt on {storageType} with DeviceId: {deviceHash}");
             return new CartStorage
             {
                 Available = true,

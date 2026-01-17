@@ -5,10 +5,11 @@ using System.Text;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Logging;
+using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial
 {
-  public class TcpObservablePort(ILoggingService log) : ICommunicationPort
+  public class TcpCommunicationPort(ILoggingService log) : ICommunicationPort
   {
     private TcpClient? _tcpClient;
     private NetworkStream? _networkStream;
@@ -24,7 +25,7 @@ namespace TeensyRom.Core.Serial
     /// Creates a TcpObservablePort from an already-connected TcpClient.
     /// Used for discovery to reuse validated connections without reconnecting.
     /// </summary>
-    public TcpObservablePort(ILoggingService log, TcpClient connectedClient) : this(log)
+    public TcpCommunicationPort(ILoggingService log, TcpClient connectedClient) : this(log)
     {
       _tcpClient = connectedClient ?? throw new ArgumentNullException(nameof(connectedClient));
       _networkStream = connectedClient.GetStream();
@@ -390,6 +391,16 @@ namespace TeensyRom.Core.Serial
         }
       }
       catch { }
+    }
+
+    public string GetEndpoint()
+    {
+      return _endpoint ?? string.Empty;
+    }
+
+    public ConnectionType GetConnectionType()
+    {
+      return ConnectionType.Tcp;
     }
 
     public void Dispose()

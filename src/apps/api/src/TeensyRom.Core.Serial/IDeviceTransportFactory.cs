@@ -6,12 +6,12 @@ namespace TeensyRom.Core.Serial
     public interface IDeviceTransportFactory
     {
         /// <summary>
-        /// Creates a serial state context based on the Cart's ConnectionType property.
+        /// Creates a serial state context based on the device's ConnectionType property.
         /// </summary>
-        /// <param name="cart">The cart entity containing connection information.</param>
+        /// <param name="device">The TeensyRomDevice containing connection information.</param>
         /// <returns>A configured ISerialStateContext ready for connection.</returns>
         /// <exception cref="ArgumentException">Thrown when ConnectionType is not recognized.</exception>
-        ICommunicationPort Create(Cart cart);
+        ICommunicationPort Create(TeensyRomDevice device);
 
         /// <summary>
         /// Creates a serial transport state context for the specified COM port.

@@ -1,4 +1,5 @@
 using System.Reactive;
+using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Abstractions
 {
@@ -110,5 +111,17 @@ namespace TeensyRom.Core.Abstractions
     void WaitForSerialData(int numBytes, int timeoutMs);
     void SendSignedChar(sbyte charToSend);
     void SendSignedShort(short value);
+
+    /// <summary>
+    /// Gets the current connection endpoint (COM port name or TCP address:port)
+    /// </summary>
+    /// <returns>COM port name (e.g., "COM3"), TCP endpoint (e.g., "192.168.1.42:80"), or empty string if not set</returns>
+    string GetEndpoint();
+
+    /// <summary>
+    /// Gets the type of connection (Serial or TCP)
+    /// </summary>
+    /// <returns>The connection type for this communication port</returns>
+    ConnectionType GetConnectionType();
   }
 }

@@ -8,15 +8,15 @@ namespace TeensyRom.Core.Serial.Tests.Unit;
 /// Tests focus on TCP transport behavior, connection lifecycle, I/O operations,
 /// observables, and protocol compatibility with the serial transport.
 /// </summary>
-public class TcpObservablePortTests : IDisposable
+public class TcpCommunicationPortTests : IDisposable
 {
     private readonly ILoggingService _mockLogger;
-    private readonly TcpObservablePort _port;
+    private readonly TcpCommunicationPort _port;
 
-    public TcpObservablePortTests()
+    public TcpCommunicationPortTests()
     {
         _mockLogger = Substitute.For<ILoggingService>();
-        _port = new TcpObservablePort(_mockLogger);
+        _port = new TcpCommunicationPort(_mockLogger);
     }
 
     public void Dispose()
@@ -37,7 +37,7 @@ public class TcpObservablePortTests : IDisposable
     public void Constructor_ShouldInitializeWithDefaultState()
     {
         // Arrange & Act
-        var port = new TcpObservablePort(_mockLogger);
+        var port = new TcpCommunicationPort(_mockLogger);
 
         // Assert
         port.Should().NotBeNull();
@@ -371,7 +371,7 @@ public class TcpObservablePortTests : IDisposable
     public void Dispose_ShouldNotThrow()
     {
         // Arrange
-        var port = new TcpObservablePort(_mockLogger);
+        var port = new TcpCommunicationPort(_mockLogger);
 
         // Act
         var act = () => port.Dispose();
@@ -384,7 +384,7 @@ public class TcpObservablePortTests : IDisposable
     public void Dispose_CanBeCalledMultipleTimes()
     {
         // Arrange
-        var port = new TcpObservablePort(_mockLogger);
+        var port = new TcpCommunicationPort(_mockLogger);
 
         // Act
         port.Dispose();
@@ -402,7 +402,7 @@ public class TcpObservablePortTests : IDisposable
     public void Constructor_WithConnectedClient_ShouldThrowException_WhenClientIsNull()
     {
         // Arrange & Act
-        var act = () => new TcpObservablePort(_mockLogger, null!);
+        var act = () => new TcpCommunicationPort(_mockLogger, null!);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()

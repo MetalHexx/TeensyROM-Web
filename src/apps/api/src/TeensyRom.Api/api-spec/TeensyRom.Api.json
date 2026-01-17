@@ -1023,14 +1023,10 @@
       },
       "ConnectionSettingsDto": {
         "required": [
-          "connectionType",
           "autoConnectEnabled"
         ],
         "type": "object",
         "properties": {
-          "connectionType": {
-            "$ref": "#/components/schemas/ConnectionType"
-          },
           "autoConnectEnabled": {
             "type": "boolean"
           }

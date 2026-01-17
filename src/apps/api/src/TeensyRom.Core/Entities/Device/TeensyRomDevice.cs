@@ -1,5 +1,7 @@
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Settings;
+using TeensyRom.Core.Common;
 
 namespace TeensyRom.Core.Entities.Device
 {
@@ -10,6 +12,25 @@ namespace TeensyRom.Core.Entities.Device
         public IStorageService SdStorage { get; private set; }
         public IStorageService UsbStorage { get; private set; }
         public string DeviceId => Cart?.DeviceId ?? string.Empty;
+        public string ComPort => CommunicationPort.GetEndpoint();
+        public ConnectionType ConnectionType => CommunicationPort.GetConnectionType();
+        public string IpAddress
+        {
+            get
+            {
+                var endpoint = CommunicationPort.GetEndpoint();
+                return endpoint.GetIpAddress();
+            }
+        }
+
+        public int TcpPort
+        {
+            get
+            {
+                var endpoint = CommunicationPort.GetEndpoint();
+                return endpoint.GetIpPort();
+            }
+        }
 
         public TeensyRomDevice(Cart cart, ICommunicationPort communicationPort, IStorageService sdStorage, IStorageService usbStorage)
         {
