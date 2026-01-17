@@ -1,6 +1,6 @@
-﻿using TeensyRom.Core.Commands.File.LaunchFile;
+using TeensyRom.Core.Commands;
 
-namespace TeensyRom.Core.Commands.File.LaunchFile
+namespace TeensyRom.Core.Serial.Commands.LaunchFile
 {
     public class LaunchFileResult: TeensyCommandResult 
     {

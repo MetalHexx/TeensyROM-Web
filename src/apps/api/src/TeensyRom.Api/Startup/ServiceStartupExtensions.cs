@@ -10,7 +10,6 @@ using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Core.Music;
 using TeensyRom.Core.Music.Hvsc;
 using TeensyRom.Core.Music.DeepSid;
-using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Api.Startup
 {
@@ -34,15 +33,13 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ISearchSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IAppSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IFwVersionChecker, FwVersionChecker>();
-            services.AddSingleton<ICartFinder, CartFinder>();
-            services.AddSingleton<ICartTagger, CartTagger>();
+			services.AddSingleton<ICartFinder, CartFinder>();
+			services.AddSingleton<ICartTagger, CartTagger>();
             services.AddSingleton<IDeviceConnectionManager, DeviceConnectionManager>();
             services.AddSingleton<IDeviceTransportFactory, DeviceTransportFactory>();
             services.AddSingleton<IStorageFactory, StorageFactory>();
             services.AddSingleton<IDiscoveryStrategy, SerialDiscoveryStrategy>();
             services.AddSingleton<IDiscoveryStrategy, TcpDiscoveryStrategy>();
-            services.AddSingleton<IReconnectionStrategy, SerialReconnectionStrategy>();
-            services.AddSingleton<IReconnectionStrategy, TcpReconnectionStrategy>();
             services.AddSingleton<IGameMetadataService, GameMetadataService>();
             services.AddSingleton<IHvscDatabase, HvscDatabase>();
             services.AddSingleton<IDeepSidDatabase, DeepSidDatabase>();

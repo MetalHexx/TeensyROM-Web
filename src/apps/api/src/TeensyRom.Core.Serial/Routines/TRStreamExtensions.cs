@@ -1,313 +1,486 @@
-using MediatR;
 using System.Diagnostics;
+using System.IO.Ports;
+using System.Reflection.Metadata;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands.MuteSidVoices;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Music;
+using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial.Routines
 {
-  public static class TRStreamExtensions
-  {
-    public static byte[] GetFile(this ICommunicationPort communicationPort, string filePath, TeensyStorageType storageType)
-    {
-      communicationPort.ClearBuffers();
-      communicationPort.SendIntBytes(TeensyToken.GetFile, 2);
-      communicationPort.HandleAck();
-      communicationPort.SendIntBytes(storageType.GetStorageToken(), 1);
-      communicationPort.Write($"{filePath}\0");
+	public static class TRStreamExtensions
+	{
+		private const string _logClass = $"{nameof(TRStreamExtensions)}:";
 
-      try
-      {
-        communicationPort.HandleAck();
-      }
-      catch (Exception ex)
-      {
-        return Array.Empty<byte>();
-      }
+		public static byte[] GetFile(this ICommunicationPort communicationPort, string filePath, TeensyStorageType storageType)
+		{
+			communicationPort.ClearBuffers();
+			communicationPort.SendIntBytes(TeensyToken.GetFile, 2);
+			communicationPort.HandleAck();
+			communicationPort.SendIntBytes(storageType.GetStorageToken(), 1);
+			communicationPort.Write($"{filePath}\0");
 
-      var fileLength = communicationPort.ReadIntBytes(4);
-      var checksum = communicationPort.ReadIntBytes(4);
-      var buffer = communicationPort.GetFileBytes(fileLength);
-      communicationPort.HandleAck();
+			try
+			{
+				communicationPort.HandleAck();
+			}
+			catch (Exception ex)
+			{
+				return Array.Empty<byte>();
+			}
 
-      var receivedChecksum = buffer.CalculateChecksum();
+			var fileLength = communicationPort.ReadIntBytes(4);
+			var checksum = communicationPort.ReadIntBytes(4);
+			var buffer = communicationPort.GetFileBytes(fileLength);
+			communicationPort.HandleAck();
 
-      if (receivedChecksum != checksum)
-      {
-        throw new TeensyException("Checksum Mismatch");
-      }
-      return buffer;
-    }
+			var receivedChecksum = buffer.CalculateChecksum();
 
-    private static byte[] GetFileBytes(this ICommunicationPort communicationPort, uint fileLength)
-    {
-      if (!fileLength.TryParseInt(out int fileLengthInt))
-      {
-        throw new TeensyException("The file size attempting to be fetched is too large.");
-      }
+			if (receivedChecksum != checksum)
+			{
+				throw new TeensyException("Checksum Mismatch");
+			}
+			return buffer;
+		}
 
-      var buffer = new byte[fileLength];
-      int bytesRead = 0;
+		private static byte[] GetFileBytes(this ICommunicationPort communicationPort, uint fileLength)
+		{
+			if (!fileLength.TryParseInt(out int fileLengthInt))
+			{
+				throw new TeensyException("The file size attempting to be fetched is too large.");
+			}
 
-      while (bytesRead < fileLength)
-      {
-        bytesRead += communicationPort.Read(buffer, bytesRead, fileLengthInt - bytesRead);
-      }
+			var buffer = new byte[fileLength];
+			int bytesRead = 0;
 
-      return buffer;
-    }
+			while (bytesRead < fileLength)
+			{
+				bytesRead += communicationPort.Read(buffer, bytesRead, fileLengthInt - bytesRead);
+			}
 
-    public static async Task ToggleSidVoices(this ICommunicationPort communicationPort, VoiceState voice1Enabled, VoiceState voice2Enabled, VoiceState voice3Enabled)
-    {
-      var voiceMuteInfo = (byte)
-      (
-          (voice1Enabled is VoiceState.Enabled ? 0 : 1) << 0 |
-          (voice2Enabled is VoiceState.Enabled ? 0 : 1) << 1 |
-          (voice3Enabled is VoiceState.Enabled ? 0 : 1) << 2
-      );
+			return buffer;
+		}
 
-      var attemptNumber = 1;
+		public static async Task ToggleSidVoices(this ICommunicationPort communicationPort, VoiceState voice1Enabled, VoiceState voice2Enabled, VoiceState voice3Enabled)
+		{
+			var voiceMuteInfo = (byte)
+			(
+				(voice1Enabled is VoiceState.Enabled ? 0 : 1) << 0 |
+				(voice2Enabled is VoiceState.Enabled ? 0 : 1) << 1 |
+				(voice3Enabled is VoiceState.Enabled ? 0 : 1) << 2
+			);
 
-      while (attemptNumber <= 3)
-      {
-        try
-        {
-          communicationPort.SendIntBytes(TeensyToken.SIDVoiceMuting, 2);
-          communicationPort.SendSignedChar((sbyte)voiceMuteInfo);
-          var ack = communicationPort.HandleAck();
-          break;
-        }
-        catch (TeensyException)
-        {
-          await Task.Delay(attemptNumber * 100);
+			var attemptNumber = 1;
 
-          if (attemptNumber == 3)
-          {
-            throw new TeensyDjException();
-          }
-          attemptNumber++;
-          continue;
-        }
-      }
-    }
+			while (attemptNumber <= 3)
+			{
+				try
+				{
+					communicationPort.SendIntBytes(TeensyToken.SIDVoiceMuting, 2);
+					communicationPort.SendSignedChar((sbyte)voiceMuteInfo);
+					var ack = communicationPort.HandleAck();
+					break;
+				}
+				catch (TeensyException)
+				{
+					await Task.Delay(attemptNumber * 100);
 
-    public static void PlaySubtune(this ICommunicationPort communicationPort, uint subtuneIndex)
-    {
-      subtuneIndex = subtuneIndex > 0
-          ? subtuneIndex - 1
-          : 0;
+					if (attemptNumber == 3)
+					{
+						throw new TeensyDjException();
+					}
+					attemptNumber++;
+					continue;
+				}
+			}
+		}
 
-      communicationPort.ClearBuffers();
-      communicationPort.SendIntBytes(TeensyToken.PlaySubtune, 2);
-      communicationPort.SendIntBytes(subtuneIndex, 1);
-      communicationPort.HandleAck();
-    }
+		public static void PlaySubtune(this ICommunicationPort communicationPort, uint subtuneIndex)
+		{
+			subtuneIndex = subtuneIndex > 0
+				? subtuneIndex - 1
+				: 0;
 
-    public static async Task<bool> ReconnectPort(this ICommunicationPort communicationPort)
-    {
-      communicationPort.SendIntBytes(TeensyToken.Reset, 2);
+			communicationPort.ClearBuffers();
+			communicationPort.SendIntBytes(TeensyToken.PlaySubtune, 2);
+			communicationPort.SendIntBytes(subtuneIndex, 1);
+			communicationPort.HandleAck();
+		}
 
-      var response = string.Empty;
-      try
-      {
-        for (int i = 0; i < 10; i++)
-        {
-          response = $"{response}{communicationPort.ReadAndLogSerialAsString(1000)}";
+		public static async Task<bool> ReconnectPort(this ICommunicationPort communicationPort)
+		{
+			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
 
-          if (response.Contains("Resetting C64"))
-          {
-            return true;
-          }
-          await Task.Delay(1000);
-        }
-      }
-      catch (Exception ex)
-      {
-        if (ex.Message.Contains("port is closed"))
-        {
-          communicationPort.OpenPort();
-          return true;
-        }
-        throw;
-      }
-      return false;
-    }
+			var response = string.Empty;
+			try
+			{
+				for (int i = 0; i < 10; i++)
+				{
+					response = $"{response}{communicationPort.ReadAndLogSerialAsString(1000)}";
 
-    public static void ToggleSid(this ICommunicationPort communicationPort)
-    {
-      communicationPort.SendIntBytes(TeensyToken.PauseMusic, 2);
-      communicationPort.HandleAck();
-    }
+					if (response.Contains("Resetting C64"))
+					{
+						return true;
+					}
+					await Task.Delay(1000);
+				}
+			}
+			catch (Exception ex)
+			{
+				if (ex.Message.Contains("port is closed"))
+				{
+					communicationPort.OpenPort();
+					return true;
+				}
+				throw;
+			}
+			return false;
+		}
 
-    public static async Task SetSidSpeed(this ICommunicationPort communicationPort, double requestSpeed, MusicSpeedCurveTypes speedCurve)
-    {
-      var attemptNumber = 1;
+		public static void ToggleSid(this ICommunicationPort communicationPort)
+		{
+			communicationPort.SendIntBytes(TeensyToken.PauseMusic, 2);
+			communicationPort.HandleAck();
+		}
 
-      while (attemptNumber <= 5)
-      {
-        try
-        {
-          short computedSpeed = requestSpeed.ToScaledShort();
+		public static async Task SetSidSpeed(this ICommunicationPort communicationPort, double requestSpeed, MusicSpeedCurveTypes speedCurve)
+		{
+			var attemptNumber = 1;
 
-          if (speedCurve == MusicSpeedCurveTypes.Linear)
-          {
-            if (requestSpeed < MusicConstants.Linear_Speed_Min || requestSpeed > MusicConstants.Linear_Speed_Max)
-              throw new ArgumentOutOfRangeException(nameof(requestSpeed), $"Speed must be between {MusicConstants.Linear_Speed_Min} and {MusicConstants.Linear_Speed_Max}.");
+			while (attemptNumber <= 5)
+			{
+				try
+				{
+					short computedSpeed = requestSpeed.ToScaledShort();
 
-            communicationPort.SendIntBytes(TeensyToken.SetMusicSpeedLinear, 2);
-          }
-          else
-          {
-            if (requestSpeed < MusicConstants.Log_Speed_Min || requestSpeed > MusicConstants.Log_Speed_Max)
-              throw new ArgumentOutOfRangeException(nameof(requestSpeed), $"Speed must be between {MusicConstants.Log_Speed_Min} and {MusicConstants.Log_Speed_Max}.");
+					if (speedCurve == MusicSpeedCurveTypes.Linear)
+					{
+						if (requestSpeed < MusicConstants.Linear_Speed_Min || requestSpeed > MusicConstants.Linear_Speed_Max)
+							throw new ArgumentOutOfRangeException(nameof(requestSpeed), $"Speed must be between {MusicConstants.Linear_Speed_Min} and {MusicConstants.Linear_Speed_Max}.");
 
-            communicationPort.SendIntBytes(TeensyToken.SetMusicSpeedLog, 2);
-          }
-          communicationPort.SendSignedShort(computedSpeed);
-          communicationPort.HandleAck();
-          break;
-        }
-        catch (Exception)
-        {
-          Debug.WriteLine($"Caught Exception in SetMusicSpeedHandler.  Attempt: {attemptNumber} Delay: {100}");
-          await Task.Delay(100);
+						communicationPort.SendIntBytes(TeensyToken.SetMusicSpeedLinear, 2);
+					}
+					else
+					{
+						if (requestSpeed < MusicConstants.Log_Speed_Min || requestSpeed > MusicConstants.Log_Speed_Max)
+							throw new ArgumentOutOfRangeException(nameof(requestSpeed), $"Speed must be between {MusicConstants.Log_Speed_Min} and {MusicConstants.Log_Speed_Max}.");
 
-          if (attemptNumber >= 5)
-          {
-            throw new TeensyDjException();
-          }
-          attemptNumber++;
-          communicationPort.ClearBuffers();
-          continue;
-        }
-      }
-    }
+						communicationPort.SendIntBytes(TeensyToken.SetMusicSpeedLog, 2);
+					}
+					communicationPort.SendSignedShort(computedSpeed);
+					communicationPort.HandleAck();
+					break;
+				}
+				catch (Exception)
+				{
+					Debug.WriteLine($"Caught Exception in SetMusicSpeedHandler.  Attempt: {attemptNumber} Delay: {100}");
+					await Task.Delay(100);
 
-    public static (List<FileTransferItem> SuccessfulFiles, List<FileTransferItem> FailedFiles) SaveFiles(this ICommunicationPort communicationPort, List<FileTransferItem> files, ILoggingService log)
-    {
-      List<FileTransferItem> successfulFiles = [];
-      List<FileTransferItem> failedFiles = [];
+					if (attemptNumber >= 5)
+					{
+						throw new TeensyDjException();
+					}
+					attemptNumber++;
+					communicationPort.ClearBuffers();
+					continue;
+				}
+			}
+		}
 
-      log.Internal($"Saving {files.Count} file(s) to the TR");
+		public static (List<FileTransferItem> SuccessfulFiles, List<FileTransferItem> FailedFiles) SaveFiles(this ICommunicationPort communicationPort, List<FileTransferItem> files, ILoggingService log)
+		{
+			List<FileTransferItem> successfulFiles = [];
+			List<FileTransferItem> failedFiles = [];
 
-      foreach (var file in files)
-      {
-        var success = CopyFile(communicationPort, log, file, files);
+			log.Internal($"{_logClass} Saving {files.Count} file(s) to the TR");
 
-        if (success)
-        {
-          log.Internal($"Copying: {file.TargetPath.FileName} to {file.TargetPath.Directory}");
-          successfulFiles.Add(file);
-        }
-        else
-        {
-          log.InternalError($"Failed to copy {file.TargetPath.FileName} after 3 attempts");
-          failedFiles.Add(file);
-        }
-      }
-      return (successfulFiles, failedFiles);
-    }
+			foreach (var file in files)
+			{
+				var success = CopyFile(communicationPort, log, file, files);
 
-    public static bool CopyFile(this ICommunicationPort communicationPort, ILoggingService log, FileTransferItem file, List<FileTransferItem> files)
-    {
-      var retry = 0;
+				if (success)
+				{
+					log.Internal($"{_logClass} Copying: {file.TargetPath.FileName} to {file.TargetPath.Directory}");
+					successfulFiles.Add(file);
+				}
+				else
+				{
+					log.InternalError($"{_logClass}Failed to copy {file.TargetPath.FileName} after 3 attempts");
+					failedFiles.Add(file);
+				}
+			}
+			return (successfulFiles, failedFiles);
+		}
 
-      while (retry < 3)
-      {
-        communicationPort.ClearBuffers();
-        try
-        {
-          communicationPort.SendIntBytes(TeensyToken.SendFile, 2);
-          communicationPort.HandleAck();
-          communicationPort.SendIntBytes(file.StreamLength, 4);
-          communicationPort.SendIntBytes(file.Checksum, 2);
-          communicationPort.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
-          communicationPort.Write($"{file.TargetPath.Value}\0");
-          communicationPort.HandleAck();
-          communicationPort.ClearBuffers();
+		public static bool CopyFile(this ICommunicationPort communicationPort, ILoggingService log, FileTransferItem file, List<FileTransferItem> files)
+		{
+			var retry = 0;
 
-          var bytesSent = 0;
+			while (retry < 3)
+			{
+				communicationPort.ClearBuffers();
+				try
+				{
+					communicationPort.SendIntBytes(TeensyToken.SendFile, 2);
+					communicationPort.HandleAck();
+					communicationPort.SendIntBytes(file.StreamLength, 4);
+					communicationPort.SendIntBytes(file.Checksum, 2);
+					communicationPort.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
+					communicationPort.Write($"{file.TargetPath.Value}\0");
+					communicationPort.HandleAck();
+					communicationPort.ClearBuffers();
 
-          while (file.StreamLength > bytesSent)
-          {
-            var bytesToSend = 16 * 1024;
-            if (file.StreamLength - bytesSent < bytesToSend) bytesToSend = (int)file.StreamLength - bytesSent;
-            communicationPort.Write(file.Buffer, bytesSent, bytesToSend);
+					var bytesSent = 0;
 
-            bytesSent += bytesToSend;
-          }
-          communicationPort.HandleAck();
-          return true;
-        }
-        catch (Exception ex)
-        {
-          retry++;
-          var response = communicationPort.ReadSerialAsString(500);
-          var fileExistsMessage = "File already exists";
+					while (file.StreamLength > bytesSent)
+					{
+						var bytesToSend = 16 * 1024;
+						if (file.StreamLength - bytesSent < bytesToSend) bytesToSend = (int)file.StreamLength - bytesSent;
+						communicationPort.Write(file.Buffer, bytesSent, bytesToSend);
 
-          var isDuplicateFile = response.Contains(fileExistsMessage, StringComparison.OrdinalIgnoreCase)
-              || ex.Message.Contains(fileExistsMessage, StringComparison.OrdinalIgnoreCase);
+						bytesSent += bytesToSend;
+					}
+					communicationPort.HandleAck();
+					return true;
+				}
+				catch (Exception ex)
+				{
+					retry++;
+					var response = communicationPort.ReadSerialAsString(500);
+					var fileExistsMessage = "File already exists";
 
-          if (isDuplicateFile)
-          {
-            log.InternalError($"Attempting to overwrite: {file.TargetPath.Value}");
-            DeleteFile(communicationPort, log, file);
-            continue;
-          }
-          log.InternalError($"Waiting {retry} seconds to retry.");
-          Thread.Sleep(1000 * retry);
-          log.InternalError($"Retry {retry} of 3");
-        }
-      }
-      return false;
-    }
+					var isDuplicateFile = response.Contains(fileExistsMessage, StringComparison.OrdinalIgnoreCase)
+						|| ex.Message.Contains(fileExistsMessage, StringComparison.OrdinalIgnoreCase);
 
-    public static void DeleteFile(this ICommunicationPort communicationPort, ILoggingService log, FileTransferItem file)
-    {
-      try
-      {
-        communicationPort.ClearBuffers();
-        communicationPort.SendIntBytes(TeensyToken.DeleteFile, 2);
-        communicationPort.HandleAck();
-        communicationPort.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
-        communicationPort.Write($"{file.TargetPath.Value}\0");
-        communicationPort.HandleAck();
-        log.InternalSuccess($"Deleted file {file.TargetPath} successfully");
-      }
-      catch (Exception ex)
-      {
-        log.InternalError($"Error deleting file {file} \r\n => {ex.Message}");
-      }
-    }
+					if (isDuplicateFile)
+					{
+						log.InternalError($"{_logClass}Attempting to overwrite: {file.TargetPath.Value}");
+						DeleteFile(communicationPort, log, file);
+						continue;
+					}
+					log.InternalError($"{_logClass} Waiting {retry} seconds to retry.");
+					Thread.Sleep(1000 * retry);
+					log.InternalError($"Retry {retry} of 3");
+				}
+			}
+			return false;
+		}
 
-    public static bool ExecuteMinimalCheck(this ICommunicationPort communicationPort, ILoggingService log)
-    {
-      log.Internal("Minimal Check Command");
-      communicationPort.SendIntBytes(TeensyToken.MinimalCheck, 2);
-      communicationPort.WaitForSerialData(numBytes: 2, timeoutMs: 500);  // Reduced from 20000 for faster discovery
-      byte[] recBuf = new byte[2];
-      communicationPort.Read(recBuf, 0, 2);
-      ushort result = BitConverter.ToUInt16(recBuf, 0);
-      string firmware = result == 0 ? "TeensyROM" : "MinimalBoot";
-      log.External($"Response: {result} ({firmware})");
-      return result == 0 ? false : true;
-    }
+		public static void DeleteFile(this ICommunicationPort communicationPort, ILoggingService log, FileTransferItem file)
+		{
+			try
+			{
+				communicationPort.ClearBuffers();
+				communicationPort.SendIntBytes(TeensyToken.DeleteFile, 2);
+				communicationPort.HandleAck();
+				communicationPort.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
+				communicationPort.Write($"{file.TargetPath.Value}\0");
+				communicationPort.HandleAck();
+				log.InternalSuccess($"{_logClass} Deleted file {file.TargetPath} successfully");
+			}
+			catch (Exception ex)
+			{
+				log.InternalError($"{_logClass} Error deleting file {file} \r\n => {ex.Message}");
+			}
+		}
 
-    public static void ResetDevice(this ICommunicationPort communicationPort, ILoggingService log)
-    {
-      log.Internal("LaunchFileHandler: Resetting TeensyROM");
-      communicationPort.SendIntBytes(TeensyToken.Reset, 2);
-      var response = communicationPort.ReadAndLogSerialAsString();
-      log.External($"TR Response: '{response?.Trim()}'");
-    }
+		public static int SendMinimalCommand(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			log.Internal($"{_logClass} TRStreamExtensions: Checking for Minimal FW");
+			communicationPort.SendIntBytes(TeensyToken.MinimalCheck, 2);
+			communicationPort.WaitForSerialData(numBytes: 2, timeoutMs: 20000);  // Reduced from 20000 for faster discovery
+			byte[] recBuf = new byte[2];
+			communicationPort.Read(recBuf, 0, 2);
+			ushort result = BitConverter.ToUInt16(recBuf, 0);
+			log.Internal($"{_logClass} FW Response: {result}");
+			return result;
+		}
 
-    public static string PingDevice(this ICommunicationPort communicationPort)
-    {
-      communicationPort.SendIntBytes(TeensyToken.Ping, 2);
-      return communicationPort.ReadAndLogSerialAsString(30);
-    }
-  }
+		public static bool ExecuteMinimalCheck(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			var result = SendMinimalCommand(communicationPort, log);
+
+			if (result == 1) return true;
+
+			if (result == 0) return false;
+
+			throw new TeensyException("Unexpected response from Minimal Check command.");
+		}
+
+		public static void ResetDevice(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			log.Internal($"{_logClass} Resetting TeensyROM");
+			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
+			var response = communicationPort.ReadAndLogSerialAsString(500);
+			log.External($"{_logClass} TR Response: '{response?.Trim()}'");
+		}
+
+		public static string PingDevice(this ICommunicationPort communicationPort, int waitMs = 30)
+		{
+			communicationPort.SendIntBytes(TeensyToken.Ping, 2);
+			return communicationPort.ReadAndLogSerialAsString(waitMs);
+		}
+
+		public static bool ResetAndReconnectToFullFwTcp(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			communicationPort.ResetDevice(log);
+			communicationPort.ClosePort();
+			communicationPort.OpenPort();
+
+			var isMinimal = communicationPort.ExecuteMinimalCheck(log);
+
+			if (!isMinimal)
+			{
+				return true;
+			}
+			return false;
+		}
+
+		public static bool ResetAndReconnectToFullFwSerial(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			communicationPort.ResetDevice(log);
+			return communicationPort.ReconnectToFullFwSerial(log);
+		}
+
+		public static bool ReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			communicationPort.ClosePort();
+			communicationPort.ClearBuffers();
+
+			if (communicationPort.GetConnectionType() is ConnectionType.Serial)
+			{
+				return communicationPort.ReconnectToFullFwSerial(log);
+			}
+			else
+			{
+				return communicationPort.ReconnectToFullFwTcp(log);
+			}			
+		}
+
+		private static bool ReconnectToFullFwTcp(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			communicationPort.ClosePort();
+			communicationPort.OpenPort();
+			return !communicationPort.ExecuteMinimalCheck(log);
+		}
+
+		public static bool ReconnectToFullFwSerial(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			log.Internal("Reconnecting Serial to Default FW.");
+			var stopwatch = Stopwatch.StartNew();
+
+			while (stopwatch.ElapsedMilliseconds < 30000)
+			{
+				var ports = SerialPort.GetPortNames().Distinct();
+
+				foreach (var port in ports)
+				{
+					try
+					{
+						log.Internal($"{_logClass} Closing Port.");
+						communicationPort.ClosePort();
+						communicationPort.SetPort(port);
+						log.Internal($"{_logClass} Opening Port: {port}");
+						communicationPort.OpenPort(useRetryLoop: false);
+						communicationPort.ReadAndLogSerialAsString(500);
+
+						var minimalResult = communicationPort.SendMinimalCommand(log);
+
+						if (minimalResult is 1)
+						{
+							communicationPort.ResetDevice(log);
+							Thread.Sleep(4000);
+							continue;
+						}
+						if (minimalResult is 0)
+						{
+							log.InternalSuccess($"{_logClass} Successfully reconnected to Default TeensyROM FW");
+							communicationPort.ReadAndLogSerialAsString(500);
+							return true;
+						}					
+					}
+					catch
+					{
+						continue;
+					}
+				}								
+			}
+			log.InternalError($"{_logClass} There was an error reconnecting to TeensyROM after minimal mode reset.");
+			return false;
+		}
+
+		public static bool ConnectToMinimalFw(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			if (communicationPort.GetConnectionType() is Settings.ConnectionType.Serial)
+			{
+				return communicationPort.ConnectToMinimalFWSerial(log);
+			}
+			else
+			{
+				return communicationPort.ConnectToMinimalFwTcp(log);
+			}
+		}
+
+		public static bool ConnectToMinimalFwTcp(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			communicationPort.ClosePort();
+
+			//Note to future self:
+			//If there are any bug reports of flaky minimal boot issues, try increasing this delay.
+			Thread.Sleep(500);
+			communicationPort.OpenPort();
+
+			var isMinimal = ExecuteMinimalCheck(communicationPort, log);
+
+			if (isMinimal)
+			{
+				log.Internal($"{_logClass} LaunchFileHandler: Successfully reconnected to minimal mode.");
+			}
+
+			return isMinimal;
+		}
+
+		public static bool ConnectToMinimalFWSerial(this ICommunicationPort communicationPort,ILoggingService log)
+		{
+			Thread.Sleep(3000);
+
+			var stopwatch = Stopwatch.StartNew();
+
+			while (stopwatch.ElapsedMilliseconds < 30000)
+			{
+				var ports = SerialPort.GetPortNames().Distinct();
+
+				foreach (var port in ports)
+				{
+					Thread.Sleep(200);
+
+					try
+					{
+						communicationPort.ClosePort();
+						communicationPort.SetPort(port);
+						communicationPort.OpenPort(useRetryLoop: false);
+						communicationPort.ClearBuffers();
+						Thread.Sleep(200);
+
+						var minimalResult = communicationPort.SendMinimalCommand(log);
+
+						if (minimalResult is 1)
+						{
+							log.InternalSuccess($"{_logClass} Successfully reconnected to Minimal TeensyROM FW");
+							return true;
+						}
+					}
+					catch
+					{
+						continue;
+					}
+				}
+				log.InternalError($"{_logClass} There was an error reconnecting to TeensyROM after minimal mode reset.");
+			}
+			return false;
+		}
+	}
 }

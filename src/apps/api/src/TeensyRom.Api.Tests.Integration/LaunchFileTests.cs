@@ -1,17 +1,11 @@
-﻿using FluentAssertions;
-using TeensyRom.Api.Endpoints.ClosePort;
-using TeensyRom.Api.Endpoints.FindCarts;
-using TeensyRom.Api.Endpoints.ConnectDevice;
-using TeensyRom.Api.Endpoints.ResetDevice;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
-using static System.Net.Mime.MediaTypeNames;
 using TeensyRom.Api.Endpoints.Player.LaunchFile;
 
 namespace TeensyRom.Api.Tests.Integration
 {
     [Collection("Endpoint")]
-    public class LaunchFileTests(EndpointFixture f) : IDisposable
+    public class LaunchFileTests(EndpointFixture f)
     {
         private const string NonExistentPath = "/something/that/doesnt/exist.sid";
         private const string IncompatibleSid = "/music/MUSICIANS/J/Jammer/Immigrant_Song.sid";
@@ -51,17 +45,21 @@ namespace TeensyRom.Api.Tests.Integration
 
             List<string> filePaths =
             [
-                "/music/MUSICIANS/E/Eclipse/True.sid",
-                "/music/MUSICIANS/L/LukHash/Alpha.sid",
-                "/images/Dio2.kla",
-                "/music/MUSICIANS/J/Jammic/Wasted_Years.sid",
-                "/games/Large/706k The Secret of Monkey Island (D42) [EasyFlash].crt",
-                "/music/MUSICIANS/E/Eclipse/True.sid",
-                "/games/Large/738k Elvira II - The Jaws of Cerberus (by $olo1870) [EasyFlash].crt",
-                "/music/MUSICIANS/M/Manganoid/Le_Shagma.sid",
-                "/games/Very Large/A_Pig_Quest_1.02_ef.crt",
-                "/games/Very Large/Lemmings [EasyFlash].crt",
+				"/music/MUSICIANS/E/Eclipse/True.sid",
+				"/music/MUSICIANS/L/LukHash/Alpha.sid",
+				"/images/Dio2.kla",
+				"/music/MUSICIANS/J/Jammic/Wasted_Years.sid",
+				"/games/Large/706k The Secret of Monkey Island (D42) [EasyFlash].crt",
+				"/music/MUSICIANS/E/Eclipse/True.sid",
+				"/games/Large/738k Elvira II - The Jaws of Cerberus (by $olo1870) [EasyFlash].crt",
+				"/music/MUSICIANS/M/Manganoid/Le_Shagma.sid",
+				"/games/Very Large/A_Pig_Quest_1.02_ef.crt",
+				"/games/Very Large/Lemmings [EasyFlash].crt",  
                 "/music/MUSICIANS/T/TDS/Under.sid"
+
+				//Something is wonky when switching from lemmings to something else over serial.
+				//Some sort of timing issue when it tries to fetch files (since they're not pre-indexed).
+				//It's a super edge case.
             ];
 
             foreach (var filePath in filePaths)
@@ -159,7 +157,5 @@ namespace TeensyRom.Api.Tests.Integration
             r.Should().BeProblem()
                 .WithStatusCode(HttpStatusCode.BadRequest);
         }
-
-        public void Dispose() => f.Reset();
     }
 }

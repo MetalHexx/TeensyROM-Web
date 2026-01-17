@@ -1,9 +1,9 @@
 using MediatR;
-using Microsoft.OpenApi.Writers;
-using TeensyRom.Api.Models;
 using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Commands.File.LaunchFile;
 using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Serial.Commands.LaunchFile;
+using TeensyRom.Core.Serial.Commands.LaunchFile.LaunchFileSerial;
+using TeensyRom.Core.Serial.Commands.LaunchFile.LaunchFileTcp;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.ValueObjects;
 
@@ -83,34 +83,31 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchRandom
                 return;
             }
 
-            var result = await mediator.Send(new LaunchFileCommand
-            {
-                StorageType = r.StorageType,
-                LaunchItem = file,
-                DeviceId = r.DeviceId,
-                CommunicationPort = device.CommunicationPort
-            });
+			var result = await mediator.Send(new LaunchFileCommand
+			{
+				StorageType = r.StorageType,
+				LaunchItem = file,
+				DeviceId = r.DeviceId,
+				CommunicationPort = device.CommunicationPort
+			}, ct);
 
-            // Check if this was a successful launch or compatibility issue vs actual system error
-            if (result.IsSuccess || result.IsCompatible == false)
-            {
-                // Either successful launch or compatibility issue - return success with appropriate message and IsCompatible flag
-                var fileDto = FileItemDto.FromLaunchable(file);
-                fileDto.IsCompatible = result.IsCompatible; // Set compatibility based on launch result
+			if (result.IsSuccess || result.IsCompatible == false)
+			{
+				var fileDto = FileItemDto.FromLaunchable(file);
+				fileDto.IsCompatible = result.IsCompatible;
 
-                Response = new()
-                {
-                    LaunchedFile = fileDto,
-                    IsCompatible = result.IsCompatible,
-                    Message = result.IsCompatible ? "Success!" : "File launched but is not compatible with TeensyROM hardware."
-                };
-                Send();
-            }
-            else
-            {
-                // Actual system error (Network, NoResponse, Disconnected, etc.)
-                SendExternalError($"There was an error launching {file.Path}. {result.Error}");
-            }
+				Response = new()
+				{
+					LaunchedFile = fileDto,
+					IsCompatible = result.IsCompatible,
+					Message = result.IsCompatible ? "Success!" : "File launched but is not compatible with TeensyROM hardware."
+				};
+				Send();
+			}
+			else
+			{
+				SendExternalError($"There was an error launching {file.Path}. {result.Error}");
+			}
         }
     }
 }

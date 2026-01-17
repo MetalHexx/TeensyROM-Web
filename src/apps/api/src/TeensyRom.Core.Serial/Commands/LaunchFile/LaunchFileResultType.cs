@@ -1,4 +1,4 @@
-﻿namespace TeensyRom.Core.Commands.File.LaunchFile
+namespace TeensyRom.Core.Serial.Commands.LaunchFile
 {
     public enum LaunchFileResultType
     {

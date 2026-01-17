@@ -1,9 +1,10 @@
 using MediatR;
-using TeensyRom.Api.Models;
 using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Commands.File.LaunchFile;
-using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Serial.Commands.LaunchFile;
+using TeensyRom.Core.Serial.Commands.LaunchFile.LaunchFileSerial;
+using TeensyRom.Core.Serial.Commands.LaunchFile.LaunchFileTcp;
+using TeensyRom.Core.Settings;
 using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Player.LaunchFile
@@ -67,18 +68,17 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
                 SendValidationError($"The file {r.FilePath} is not launchable.");
                 return;
             }
+			            
+			var result = await mediator.Send(new LaunchFileCommand
+			{
+				StorageType = TeensyStorageType.SD,
+				LaunchItem = launchItem,
+				DeviceId = r.DeviceId,
+				CommunicationPort = device.CommunicationPort
+			});
 
-            var launchCommand = new LaunchFileCommand
-            {
-                StorageType = TeensyStorageType.SD,
-                LaunchItem = launchItem,
-                DeviceId = r.DeviceId,
-                CommunicationPort = device.CommunicationPort
-            };
-            var result = await mediator.Send(launchCommand, ct);
-
-            // Check if this was a successful launch or compatibility issue vs actual system error
-            if (result.IsSuccess || result.IsCompatible == false)
+			// Check if this was a successful launch or compatibility issue vs actual system error
+			if (result.IsSuccess || result.IsCompatible == false)
             {
                 // Either successful launch or compatibility issue - return success with appropriate message and IsCompatible flag
                 var fileDto = FileItemDto.FromLaunchable(launchItem);

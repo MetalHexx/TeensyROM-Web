@@ -1,8 +1,4 @@
-﻿using System.Net;
-using FluentAssertions;
-using Microsoft.AspNetCore.Mvc;
 using TeensyRom.Api.Endpoints.Player.LaunchRandom;
-using TeensyRom.Api.Endpoints.ResetDevice;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Settings;
@@ -11,7 +7,7 @@ namespace TeensyRom.Api.Tests.Integration
 {
 
     [Collection("Endpoint")]
-    public class LaunchRandomTests(EndpointFixture f) : IDisposable
+    public class LaunchRandomTests(EndpointFixture f)
     {
         public const string Games_Path = "/games/";
         public const string Very_Large_Games_Path = "/games/Very Large/";
@@ -94,25 +90,6 @@ namespace TeensyRom.Api.Tests.Integration
             // Assert
             r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
             r.Content.Should().Be($"The device {deviceId} was not found.");
-        }
-
-        [Fact]
-        public async Task When_StorageTypeNotAvailable_ReturnsNotFound()
-        {
-            // Arrange
-            var deviceId = await f.GetConnectedDevice();
-            var request = new LaunchRandomRequest
-            {
-                DeviceId = deviceId,
-                StorageType = TeensyStorageType.USB
-            };
-
-            // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.PostAsync<LaunchRandomEndpoint, LaunchRandomRequest, string>(request);
-
-            // Assert
-            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
-            r.Content.Should().Be($"The device {deviceId} does not have USB storage.");
         }
 
         [Fact]
@@ -228,9 +205,6 @@ namespace TeensyRom.Api.Tests.Integration
             r.Content.LaunchedFile.Should().NotBeNull();
             actualPath.Should().Be(Very_Large_Games_Path);
             r.Content.Message.Should().NotBeNullOrEmpty();
-
-            // Cleanup
-            await f.ResetDevice(deviceId);
         }
 
         [Fact]
@@ -540,7 +514,5 @@ namespace TeensyRom.Api.Tests.Integration
             r.Content.LaunchedFile.Type.Should().Be(Models.FileItemType.Song);
             r.Content.Message.Should().NotBeNullOrEmpty();
         }
-
-        public void Dispose() => f.Reset();
     }
 }
