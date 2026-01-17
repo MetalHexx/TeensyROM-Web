@@ -31,8 +31,18 @@ namespace TeensyRom.Core.Commands.GetFile
 
             try
             {
-                _communicationPort.HandleAck();
-            }
+                var ackResult = _communicationPort.HandleAck();
+
+				if (ackResult != TeensyToken.Ack)
+				{
+					return new GetFileResult
+					{
+						IsSuccess = false,
+						ErrorCode = GetFileErrorCode.UnknownError
+					};
+				}
+
+			}
             catch (Exception ex)
             {
                 GetFileErrorCode errorCode = ex.Message switch
