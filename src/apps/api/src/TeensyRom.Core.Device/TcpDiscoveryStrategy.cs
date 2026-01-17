@@ -284,19 +284,29 @@ public class TcpDiscoveryStrategy(
 
 			var response = communicationPort.PingDevice();
 
-			if (response.IsTeensyRom())
+			if (!response.IsTeensyRom())
 			{
-				return new TcpDiscoveredDevice
-				{
-					IpAddress = ip.ToString(),
-					Port = port,
-					Response = response,
-					DiscoveredAt = DateTime.UtcNow,
-					CommunicationPort = communicationPort
-				};
+				communicationPort.Dispose();
+				return null;
 			}
-			communicationPort.Dispose();
-			return null;
+			if (response.IsTeensyRomBusy())
+			{
+				var reconnectedToFull = communicationPort.ResetAndReconnectToFullFwTcp(log);
+
+				if(!reconnectedToFull)
+				{
+					communicationPort.Dispose();
+					return null;
+				}
+			}
+			return new TcpDiscoveredDevice
+			{
+				IpAddress = ip.ToString(),
+				Port = port,
+				Response = response,
+				DiscoveredAt = DateTime.UtcNow,
+				CommunicationPort = communicationPort
+			};
 		}
 		catch (Exception)
 		{

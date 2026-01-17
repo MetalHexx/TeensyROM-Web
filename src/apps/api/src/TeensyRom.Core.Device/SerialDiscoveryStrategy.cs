@@ -162,7 +162,7 @@ public class SerialDiscoveryStrategy(
 			{
 				log.Internal("Minimal mode was detected during discovery.  Initializing reboot to normal firmware.");
 
-				if (!communicationPort.SerialReconnectToDefaultFw(log))
+				if (!communicationPort.ReconnectToFullFwSerial(log))
 				{
 					log.Internal($"Failed to switch to default FW on port: {portName}");
 					return null;
@@ -172,24 +172,28 @@ public class SerialDiscoveryStrategy(
 			}
 			var response = communicationPort.PingDevice(8000);
 
-			if (response.IsTeensyRom())
+			if (!response.IsTeensyRom())
 			{
-				var extraResponse = communicationPort.ReadAndLogSerialAsString(500);
-				communicationPort.ClearBuffers();
-
-				return new DiscoveredEndpoint(
-					ConnectionType.Serial,
-					Address: portName,
-					Port: null,
-					PingResponse: response,
-					communicationPort
-				);
+				communicationPort.Dispose();
+				return null;
 			}
-			communicationPort.Dispose();
+			if (response.IsTeensyRomBusy())
+			{
+				var reconnectedToFull = communicationPort.ResetAndReconnectToFullFwSerial(log);
 
-			log.Internal($"Failed identify TR on port: {portName}.  Ping Response: {response}");
-
-			return null;
+				if (!reconnectedToFull)
+				{
+					communicationPort.Dispose();
+					return null;
+				}
+			}
+			return new DiscoveredEndpoint(
+				ConnectionType.Serial,
+				Address: portName,
+				Port: null,
+				PingResponse: response,
+				communicationPort
+			);
 		}
 		catch (Exception)
 		{
