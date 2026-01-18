@@ -93,12 +93,6 @@ namespace TeensyRom.Core.Storage
                 ClearCache(path);
             }
             log.Internal("Resetting TeensyROM", settings.CartStorage.DeviceId);
-
-            var _ = await mediator.Send(new ResetCommand
-            {
-                DeviceId = settings.CartStorage.DeviceId,
-                CommunicationPort = _communicationPort
-            });
             log.Internal($"Refreshing cache for {path} and all nested directories.", settings.CartStorage.DeviceId);
 
             var getDirectoryCommand = new GetDirectoryRecursiveCommand
@@ -106,7 +100,7 @@ namespace TeensyRom.Core.Storage
                 StorageType = settings.CartStorage.Type,
                 Path = path,
                 Recursive = true,
-                DeviceId = settings.CartStorage.DeviceId,
+				DeviceId = settings.CartStorage.DeviceId,
                 CommunicationPort = _communicationPort
             };
 
