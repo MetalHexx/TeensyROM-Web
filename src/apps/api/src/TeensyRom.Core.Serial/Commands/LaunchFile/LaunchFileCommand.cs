@@ -5,8 +5,8 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Core.Serial.Commands.LaunchFile
 {
-    public class LaunchFileCommand : ITeensyCommand<LaunchFileResult>, IRequiresFullFw
-    {
+    public class LaunchFileCommand : ITeensyCommand<LaunchFileResult>, IBusyTolerant
+	{
         public required TeensyStorageType StorageType { get; init; }
         public required LaunchableItem LaunchItem { get; init; }
         public FilePath Path => LaunchItem.Path;
