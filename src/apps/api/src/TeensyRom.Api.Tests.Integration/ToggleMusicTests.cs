@@ -1,14 +1,12 @@
-using FluentAssertions;
 using TeensyRom.Api.Endpoints.Player.LaunchFile;
 using TeensyRom.Api.Endpoints.Player.ToggleMusic;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
-using System.Net;
 
 namespace TeensyRom.Api.Tests.Integration
 {
     [Collection("Endpoint")]
-    public class ToggleMusicTests(EndpointFixture f) : IDisposable
+    public class ToggleMusicTests(EndpointFixture f)
     {
         private const string TestSidFile = "/music/MUSICIANS/L/LukHash/Alpha.sid";
 
@@ -117,7 +115,5 @@ namespace TeensyRom.Api.Tests.Integration
                 await Task.Delay(1000);
             }
         }
-
-        public void Dispose() => f.Reset();
     }
 }

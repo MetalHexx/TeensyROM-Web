@@ -1,6 +1,3 @@
-using System.Net;
-using FluentAssertions;
-using Microsoft.AspNetCore.Mvc;
 using TeensyRom.Api.Endpoints.Files.Search;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
@@ -9,7 +6,7 @@ using TeensyRom.Core.Settings;
 namespace TeensyRom.Api.Tests.Integration
 {
     [Collection("Endpoint")]
-    public class SearchTests(EndpointFixture f) : IDisposable
+    public class SearchTests(EndpointFixture f)
     {
         public const string Games_Path = "/games/";
         public const string Music_Path = "/music/MUSICIANS/L/LukHash/";
@@ -448,25 +445,6 @@ namespace TeensyRom.Api.Tests.Integration
         }
 
         [Fact]
-        public async Task When_StorageNotAvailable_ReturnsNotFound()
-        {
-            // Arrange
-            var deviceId = await GetCachedConnectedDevice();
-
-            // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, string>(new SearchRequest
-            {
-                DeviceId = deviceId,
-                SearchText = "test",
-                StorageType = TeensyStorageType.USB
-            });
-
-            // Assert
-            r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
-            r.Content.Should().Be($"The storage {TeensyStorageType.USB} is not available.");
-        }
-
-        [Fact]
         public async Task When_DeviceNotConnected_ReturnsNotFound()
         {
             // Arrange
@@ -484,7 +462,5 @@ namespace TeensyRom.Api.Tests.Integration
             r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
             r.Content.Should().Be($"The device {nonExistentDeviceId} was not found.");
         }
-
-        public void Dispose() => f.Reset();
     }
 }

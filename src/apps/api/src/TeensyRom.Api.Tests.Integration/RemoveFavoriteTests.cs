@@ -1,13 +1,11 @@
-using FluentAssertions;
 using TeensyRom.Api.Endpoints.Files.FavoriteFile;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace TeensyRom.Api.Tests.Integration
 {
     [Collection("Endpoint")]
-    public class RemoveFavoriteTests(EndpointFixture f) : IDisposable
+    public class RemoveFavoriteTests(EndpointFixture f)
     {
         private const string _nonExistentPath = "/something/that/doesnt/exist.sid";
 
@@ -175,11 +173,6 @@ namespace TeensyRom.Api.Tests.Integration
             // Assert  
             r.Should().BeValidationProblem()
                 .WithStatusCode(HttpStatusCode.BadRequest);
-        }
-
-        public void Dispose() 
-        {
-            f.Reset();            
         }
     }
 }

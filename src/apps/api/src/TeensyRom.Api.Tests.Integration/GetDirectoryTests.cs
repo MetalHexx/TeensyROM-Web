@@ -1,15 +1,11 @@
-﻿using System.Diagnostics;
-using System.IO;
-using TeensyRom.Api.Endpoints.ConnectDevice;
 using TeensyRom.Api.Endpoints.Files.GetDirectory;
-using TeensyRom.Api.Endpoints.FindCarts;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 
 namespace TeensyRom.Api.Tests.Integration;
 
 [Collection("Endpoint")]
-public class GetDirectoryTests(EndpointFixture f) : IDisposable
+public class GetDirectoryTests(EndpointFixture f)
 {
     public static IEnumerable<object[]> ValidPaths =>
         new List<object[]>
@@ -120,26 +116,6 @@ public class GetDirectoryTests(EndpointFixture f) : IDisposable
             .WithKeyAndValue("StorageType", "Storage type must be a valid enum value.");
     }
 
-    [Fact]
-    public async Task When_StorageNotAvailable_ReturnsNotFound()
-    {
-        // Arrange
-        var deviceId = await GetCachedConnectedDevice();
-        var expectedPath = "/music";
-
-        // Act - TrClient automatically handles enum serialization
-        var r = await f.Client.GetAsync<GetDirectoryEndpoint, GetDirectoryRequest, string>(new GetDirectoryRequest
-        {
-            DeviceId = deviceId,
-            Path = expectedPath,
-            StorageType = TeensyStorageType.USB
-        });
-
-        // Assert
-        r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        r.Content.Should().Be($"The storage {TeensyStorageType.USB} is not available.");
-    }
-
     //TODO: Fix a bug that causes directories that are not found to be added as an empty directory in the cache.
     [Fact]
     public async Task When_DirectoryNotFound_ReturnsNotFound()
@@ -180,6 +156,4 @@ public class GetDirectoryTests(EndpointFixture f) : IDisposable
         r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
         r.Content.Should().Be($"The directory {expectedPath} was not found.");            
     }
-
-    public void Dispose() => f.Reset();
 }

@@ -48,7 +48,6 @@ namespace TeensyRom.Api.Tests.Integration
                 device.DeviceId.Should().NotBeNullOrEmpty();
                 device.VideoSettings.Should().NotBeNull();
                 device.ConnectionSettings.Should().NotBeNull();
-                device.ConnectionSettings.ConnectionType.Should().BeDefined();
             }
 
             // Verify PlayerSettings structure

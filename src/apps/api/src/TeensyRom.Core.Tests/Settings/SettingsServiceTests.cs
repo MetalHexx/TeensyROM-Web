@@ -503,7 +503,6 @@ public class SettingsServiceTests : IDisposable
         deviceSettings.VideoSettings.EnableVideo.Should().BeFalse();
         deviceSettings.ConnectionSettings.Should().NotBeNull();
         deviceSettings.ConnectionSettings.AutoConnectEnabled.Should().BeTrue();
-        deviceSettings.ConnectionSettings.ConnectionType.Should().Be(ConnectionType.Serial);
     }
 
     [Fact]
@@ -584,8 +583,7 @@ public class SettingsServiceTests : IDisposable
             VideoSettings = new VideoSettings { EnableVideo = true },
             ConnectionSettings = new ConnectionSettings 
             { 
-                AutoConnectEnabled = false,
-                ConnectionType = ConnectionType.Tcp
+                AutoConnectEnabled = false
             }
         };
 
@@ -597,7 +595,6 @@ public class SettingsServiceTests : IDisposable
         retrieved.Should().NotBeNull();
         retrieved!.DeviceId.Should().Be(deviceId);
         retrieved.VideoSettings.EnableVideo.Should().BeTrue();
-        retrieved.ConnectionSettings.ConnectionType.Should().Be(ConnectionType.Tcp);
     }
 
     [Fact]

@@ -1,14 +1,10 @@
-﻿using System.Net;
-using TeensyRom.Api.Endpoints.FindCarts;
-using TeensyRom.Api.Endpoints.ConnectDevice;
 using TeensyRom.Api.Endpoints.ResetDevice;
 using TeensyRom.Core.Common;
-using TeensyRom.Core.Entities.Storage;
 
 namespace TeensyRom.Api.Tests.Integration
 {
     [Collection("Endpoint")]
-    public class ResetDeviceTests(EndpointFixture f) : IDisposable
+    public class ResetDeviceTests(EndpointFixture f)
     {
         [Fact]
         public async Task When_Resetting_ValidDevice_ResponseSuccessful()
@@ -38,7 +34,5 @@ namespace TeensyRom.Api.Tests.Integration
             r.Http.StatusCode.Should().Be(HttpStatusCode.NotFound);
             r.Content.Should().Be($"The device {resetRequest.DeviceId} was not found.");
         }
-
-        public void Dispose() => f.Reset();
     }
 }

@@ -1,22 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using TeensyRom.Api.Endpoints.Files.Index;
 using TeensyRom.Api.Endpoints.FindCarts;
-using TeensyRom.Api.Endpoints.ConnectDevice;
-using TeensyRom.Core.Common;
-using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
-using System.Diagnostics;
 
 namespace TeensyRom.Api.Tests.Integration
 {
 
     [Collection("Endpoint")]
-    public class IndexTests(EndpointFixture f) : IDisposable
+    public class IndexTests(EndpointFixture f)
     {
         [Fact]
         public async Task When_Indexing_WithoutPath_SuccessReturned()
@@ -100,8 +90,11 @@ namespace TeensyRom.Api.Tests.Integration
         public async Task When_Indexing_WithBadPath_BadRequestReturned()
         {
             // Arrange - TrClient automatically handles enum serialization and proper request signature
-            var availableDevices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
-            var deviceId = availableDevices.Content.Devices.First().DeviceId;
+            var availableDevices = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest
+			{
+				FullScan = false
+			});
+			var deviceId = availableDevices.Content.Devices.First().DeviceId;
 
             // Act - TrClient automatically handles enum serialization
             var request = new IndexRequest
@@ -135,8 +128,5 @@ namespace TeensyRom.Api.Tests.Integration
                 .BeValidationProblem()
                 .WithKeyAndValue("DeviceId", "Invalid Device Id.");
         }
-
-
-        public void Dispose() => f.Reset();
     }
 }

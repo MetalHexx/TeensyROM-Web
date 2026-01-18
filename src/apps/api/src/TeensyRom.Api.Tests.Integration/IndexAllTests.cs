@@ -1,28 +1,24 @@
-using System.Reflection;
 using TeensyRom.Api.Endpoints.Files.Index;
 using TeensyRom.Api.Endpoints.Files.IndexAll;
 using TeensyRom.Api.Endpoints.FindCarts;
-using TeensyRom.Api.Endpoints.ConnectDevice;
-using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 
 namespace TeensyRom.Api.Tests.Integration
 {
     [Collection("Endpoint")]
-    public class IndexAllTests(EndpointFixture f) : IDisposable
+    public class IndexAllTests(EndpointFixture f)
     {
         [Fact]
         public async Task When_IndexingAll_SuccessReturned()
         {
-            // Arrange - TrClient automatically handles enum serialization
-            var deviceResult = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
+			// Arrange - TrClient automatically handles enum serialization
+			var deviceResult = await f.Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest
+			{
+				FullScan = false
+			});
 
             foreach (var item in deviceResult.Content.Devices)
             {
-                await f.Client.PostAsync<ConnectDeviceEndpoint, ConnectDeviceRequest, ConnectDeviceResponse>(new ConnectDeviceRequest
-                {
-                    DeviceId = item.DeviceId!
-                });
                 f.DeleteCache(item.DeviceId!, TeensyStorageType.SD);
                 f.DeleteCache(item.DeviceId!, TeensyStorageType.USB);
             }
@@ -64,6 +60,5 @@ namespace TeensyRom.Api.Tests.Integration
                 response.Content.Message.Should().Contain("Success");
             }
         }
-        public void Dispose() => f.Reset();
     }
 }

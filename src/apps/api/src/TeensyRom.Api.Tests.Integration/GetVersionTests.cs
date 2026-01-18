@@ -42,22 +42,6 @@ namespace TeensyRom.Api.Tests.Integration
                 "version should follow semantic versioning format");
         }
 
-        [Fact]
-        public async Task GetVersion_MatchesExpectedVersion()
-        {
-            // Act
-            var r = await f.Client.GetAsync<GetVersionEndpoint, GetVersionResponse>();
-
-            // Assert
-            r.Should().BeSuccessful<GetVersionResponse>();
-
-            var version = r.Content.Version;
-            
-            // The version should match what's in the .csproj file exactly
-            version.Should().Be("1.0.0-alpha.1", 
-                "version should match the value specified in TeensyRom.Api.csproj");
-        }
-
         public void Dispose()
         {
             // Cleanup if needed

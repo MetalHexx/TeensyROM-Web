@@ -1,10 +1,5 @@
-using RadEndpoints.Testing;
 using System.Net.Http.Headers;
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using TeensyRom.Api.Endpoints.ClosePort;
-using TeensyRom.Api.Endpoints.ConnectDevice;
 using TeensyRom.Api.Endpoints.Files.Index;
 using TeensyRom.Api.Endpoints.FindCarts;
 using TeensyRom.Api.Endpoints.ResetDevice;
@@ -12,7 +7,6 @@ using TeensyRom.Api.Models;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Settings;
-using TeensyRom.Core.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using TeensyRom.Core.Logging;
 
@@ -75,7 +69,10 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public async Task<string> GetConnectedDevice() 
         {
-            var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
+			var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest
+			{
+				FullScan = false
+			});
             var deviceId = findResponse.Content.Devices.First().DeviceId!;
 
             return deviceId;
@@ -83,17 +80,11 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
         public async Task<List<CartDto>> ConnectToDevices()
         {
-            var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>();
-            return findResponse.Content.Devices;
-        }
-
-        public async Task DisconnectDevice(string deviceId) 
-        {
-            var request = new DisconnectDeviceRequest
-            {
-                DeviceId = deviceId
-            };
-            await Client.DeleteAsync<DisconnectDeviceEndpoint, DisconnectDeviceRequest, DisconnectDeviceResponse>(request);
+			var findResponse = await Client.GetAsync<FindDevicesEndpoint, FindDevicesRequest, FindDevicesResponse>(new FindDevicesRequest
+			{
+				FullScan = false
+			});
+			return findResponse.Content.Devices;
         }
 
         public async Task Preindex(string deviceId, TeensyStorageType storageType, string path) 
@@ -108,22 +99,6 @@ namespace TeensyRom.Api.Tests.Integration.Common
             await Task.Delay(3000);
         }
 
-        public void Reset() 
-        {
-            var initialCarts = Client.GetAsync<FindDevicesEndpoint, FindDevicesResponse>().Result;
-
-            var connectDevices = initialCarts.Content.Devices
-                .Where(d => d.IsConnected)
-                .ToList();
-
-            connectDevices.ForEach(d =>
-            {
-                _ = Client.DeleteAsync<DisconnectDeviceEndpoint, Endpoints.ClosePort.DisconnectDeviceRequest, DisconnectDeviceResponse>(new Endpoints.ClosePort.DisconnectDeviceRequest
-                {
-                    DeviceId = d.DeviceId!
-                }).Result;
-            });
-        }
         public async Task ResetDevice(string deviceId)
         {
             await Client.PutAsync<ResetDeviceEndpoint, ResetDeviceRequest, ResetDeviceResponse>(new ResetDeviceRequest
