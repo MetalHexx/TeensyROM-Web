@@ -1,4 +1,4 @@
-﻿namespace TeensyRom.Core.Commands
+namespace TeensyRom.Core.Commands
 {
 	public interface IRequiresFullFw { };
 }

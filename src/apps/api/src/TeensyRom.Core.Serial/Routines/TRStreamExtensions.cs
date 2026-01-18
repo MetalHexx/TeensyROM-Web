@@ -110,6 +110,14 @@ namespace TeensyRom.Core.Serial.Routines
 			communicationPort.HandleAck();
 		}
 
+		public static void ResetDevice(this ICommunicationPort communicationPort, ILoggingService log)
+		{
+			log.Internal($"{_logClass} Resetting TeensyROM");
+			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
+			var response = communicationPort.ReadAndLogSerialAsString(500);
+			log.External($"{_logClass} TR Response: '{response?.Trim()}'");
+		}
+
 		public static async Task<bool> ReconnectPort(this ICommunicationPort communicationPort)
 		{
 			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
@@ -139,6 +147,40 @@ namespace TeensyRom.Core.Serial.Routines
 			}
 			return false;
 		}
+
+		//public static bool ResetDevice(this ICommunicationPort communicationPort)
+		//{
+		//	communicationPort.SendIntBytes(TeensyToken.Reset, 2);
+
+		//	var response = string.Empty;
+		//	try
+		//	{
+		//		for (int i = 0; i < 10; i++)
+		//		{
+		//			response += $"{communicationPort.ReadAndLogSerialAsString(1000)}";
+
+		//			if (response.Contains("Resetting C64"))
+		//			{
+		//				return true;
+		//			}
+		//			Thread.Sleep(100);
+		//		}
+		//	}
+		//	catch (Exception ex)
+		//	{
+		//		if (ex.Message.Contains("port is closed") || communicationPort.GetConnectionType() is ConnectionType.Tcp)
+		//		{
+		//			Thread.Sleep(1000);
+		//			communicationPort.ClosePort();
+		//			communicationPort.OpenPort();
+		//			Thread.Sleep(1000);
+		//			communicationPort.ClearBuffers();
+		//			return true;
+		//		}
+		//		throw;
+		//	}
+		//	return false;
+		//}
 
 		public static void ToggleSid(this ICommunicationPort communicationPort)
 		{
@@ -310,14 +352,6 @@ namespace TeensyRom.Core.Serial.Routines
 			throw new TeensyException("Unexpected response from Minimal Check command.");
 		}
 
-		public static void ResetDevice(this ICommunicationPort communicationPort, ILoggingService log)
-		{
-			log.Internal($"{_logClass} Resetting TeensyROM");
-			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
-			var response = communicationPort.ReadAndLogSerialAsString(500);
-			log.External($"{_logClass} TR Response: '{response?.Trim()}'");
-		}
-
 		public static string PingDevice(this ICommunicationPort communicationPort, int waitMs = 30)
 		{
 			communicationPort.SendIntBytes(TeensyToken.Ping, 2);
@@ -339,17 +373,14 @@ namespace TeensyRom.Core.Serial.Routines
 			return false;
 		}
 
-		public static bool ResetAndReconnectToFullFwSerial(this ICommunicationPort communicationPort, ILoggingService log)
+		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{
 			communicationPort.ResetDevice(log);
-			return communicationPort.ReconnectToFullFwSerial(log);
+			return communicationPort.ReconnectToFullFw(log);
 		}
 
 		public static bool ReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{
-			communicationPort.ClosePort();
-			communicationPort.ClearBuffers();
-
 			if (communicationPort.GetConnectionType() is ConnectionType.Serial)
 			{
 				return communicationPort.ReconnectToFullFwSerial(log);
@@ -362,6 +393,7 @@ namespace TeensyRom.Core.Serial.Routines
 
 		private static bool ReconnectToFullFwTcp(this ICommunicationPort communicationPort, ILoggingService log)
 		{
+			communicationPort.ResetDevice(log);
 			communicationPort.ClosePort();
 			communicationPort.OpenPort();
 			return !communicationPort.ExecuteMinimalCheck(log);

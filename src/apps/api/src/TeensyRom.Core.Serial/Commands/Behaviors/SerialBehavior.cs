@@ -2,8 +2,8 @@ using MediatR;
 using System.Collections.Concurrent;
 using System.Reactive.Linq;
 using TeensyRom.Core.Commands;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Serial.Commands.LaunchFile;
 using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Serial.Commands.Behaviors
@@ -28,39 +28,51 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 			try
 			{
 				TResponse response = default!;
+				var port = request.CommunicationPort;
 
-				if (!request.CommunicationPort.IsOpen)
+				if (!port.IsOpen)
 				{
-					request.CommunicationPort.ClosePort();
-					request.CommunicationPort.OpenPort();
+					port.ClosePort();
+					port.OpenPort();
 				}
-
-				if (request is IRequiresFullFw)
+				else
 				{
-					var minResult = request.CommunicationPort.SendMinimalCommand(log);
+					port.ClearBuffers();
+				}	
 
-					if (minResult is not 0)
+				if (port.SendMinimalCommand(log) is not 0)
+				{
+					if (!port.ReconnectToFullFw(log))
 					{
-						var isFullFwConnected = request.CommunicationPort.ReconnectToFullFw(log);
-
-						if (!isFullFwConnected)
+						return new()
+						{
+							IsSuccess = false,
+							Error = "SerialBehavior: Command Failed. Cart was in Minimal and was unable to reset to full FW."
+						};
+					}
+				}
+				else if (request is not IBusyTolerant)
+				{
+					if (port.PingDevice().IsTeensyRomBusy())
+					{
+						if (!port.ForceResetAndReconnectToFullFw(log))
 						{
 							return new()
 							{
 								IsSuccess = false,
-								Error = "SerialBehavior: Command Failed.  Couldn't connect to the full firmware."
+								Error = "SerialBehavior: Command Failed. Cart was busy and was unable to reset."
 							};
 						}
-					}					
+					}
 				}
 				try
 				{
-					request.CommunicationPort.ClearBuffers();
+					port.ClearBuffers();
 					response = await next();
 				}
 				catch
 				{
-					request.CommunicationPort?.ClosePort();
+					port?.ClosePort();
 					log.InternalError("Closing port due to an error during communication port command.");
 					throw;
 				}
