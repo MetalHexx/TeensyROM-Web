@@ -179,7 +179,7 @@ public class SerialDiscoveryStrategy(
 			}
 			if (response.IsTeensyRomBusy())
 			{
-				var reconnectedToFull = communicationPort.ResetAndReconnectToFullFwSerial(log);
+				var reconnectedToFull = communicationPort.ForceResetAndReconnectToFullFw(log);
 
 				if (!reconnectedToFull)
 				{

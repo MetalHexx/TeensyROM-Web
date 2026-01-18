@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO.Ports;
 using System.Text;
 using TeensyRom.Core.Common;
@@ -13,22 +13,41 @@ namespace TeensyRom.Core.Serial
             return dataString;
         }
 
-        public static string ReadSerialAsString(this SerialPort serial, int msToWait = 0)
-        {
-            Thread.Sleep(msToWait);
-            if (serial.BytesToRead == 0) return string.Empty;
+		public static string ReadSerialAsString(
+			this SerialPort serial,
+			int idleTimeoutMs = 50)
+		{
+			using var ms = new MemoryStream();
+			var sw = Stopwatch.StartNew();
 
-            byte[] receivedData = new byte[serial.BytesToRead];
-            serial.Read(receivedData, 0, receivedData.Length);
+			while (true)
+			{
+				while (serial.BytesToRead > 0)
+				{
+					var count = serial.BytesToRead;
+					var buffer = new byte[count];
+					var read = serial.Read(buffer, 0, count);
+					if (read > 0)
+					{
+						ms.Write(buffer, 0, read);
+						sw.Restart(); // reset idle timer on activity
+					}
+				}
 
-            var dataString = receivedData.ToUtf8();
+				if (sw.ElapsedMilliseconds >= idleTimeoutMs)
+					break;
 
-            if (string.IsNullOrWhiteSpace(dataString)) return string.Empty;
+				Thread.Sleep(1); // yield CPU, NOT a blind wait
+			}
 
-            return dataString;
-        }
+			if (ms.Length == 0)
+				return string.Empty;
 
-        public static byte[] ReadSerialBytes(this SerialPort serial)
+			var text = Encoding.Latin1.GetString(ms.ToArray());
+			return text.Replace("\0", string.Empty);
+		}
+
+		public static byte[] ReadSerialBytes(this SerialPort serial)
         {
             if (serial.BytesToRead == 0) return [];
 
