@@ -83,5 +83,5 @@ Write-Host ""
 Write-Host "To test, run the API:" -ForegroundColor White
 Write-Host "  cd apps/api/src/TeensyRom.Api" -ForegroundColor Gray
 Write-Host "  dotnet run" -ForegroundColor Gray
-Write-Host "  Navigate to: http://localhost:5168" -ForegroundColor Gray
+Write-Host "  Navigate to: http://localhost:213" -ForegroundColor Gray
 Write-Host ""

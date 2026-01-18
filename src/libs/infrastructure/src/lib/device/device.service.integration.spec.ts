@@ -37,9 +37,9 @@ describe.runIf(process.env['RUN_INTEGRATION'] === 'true')(
       };
 
       const mockApiConfig: IApiConfig = {
-        basePath: 'http://localhost:5168',
-        signalRBasePath: 'http://localhost:5168',
-        getBaseUrl: () => 'http://localhost:5168',
+        basePath: 'http://localhost:213',
+        signalRBasePath: 'http://localhost:213',
+        getBaseUrl: () => 'http://localhost:213',
       };
 
       TestBed.configureTestingModule({

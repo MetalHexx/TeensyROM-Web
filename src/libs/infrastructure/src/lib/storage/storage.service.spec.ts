@@ -26,9 +26,9 @@ import {
 } from '@teensyrom-nx/domain';
 
 const createMockApiConfig = (): IApiConfig => ({
-  basePath: 'http://localhost:5168',
-  signalRBasePath: 'http://localhost:5168',
-  getBaseUrl: () => 'http://localhost:5168',
+  basePath: 'http://localhost:213',
+  signalRBasePath: 'http://localhost:213',
+  getBaseUrl: () => 'http://localhost:213',
 });
 
 describe('StorageService', () => {
@@ -725,10 +725,10 @@ describe('StorageService', () => {
       // Assert
       expect(result).toHaveLength(1);
       expect(result[0].images).toHaveLength(2);
-      expect(result[0].images[0].url).toBe('http://localhost:5168/api/assets/images/cover.png');
+      expect(result[0].images[0].url).toBe('http://localhost:213/api/assets/images/cover.png');
       expect(result[0].images[0].fileName).toBe('cover.png');
       expect(result[0].images[1].url).toBe(
-        'http://localhost:5168/api/assets/images/screenshot.png'
+        'http://localhost:213/api/assets/images/screenshot.png'
       );
       expect(result[0].images[1].fileName).toBe('screenshot.png');
     });

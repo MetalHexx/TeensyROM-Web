@@ -25,8 +25,8 @@ describe('provideApiConfig', () => {
 
       // Assert
       expect(config).toMatchObject({
-        basePath: 'http://localhost:5168',
-        signalRBasePath: 'http://localhost:5168',
+        basePath: 'http://localhost:213',
+        signalRBasePath: 'http://localhost:213',
       });
     });
   });

@@ -13,8 +13,8 @@ import { API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
  * @returns {IApiConfig} Configuration object with base paths
  */
 export function provideApiConfig(): IApiConfig {
-  const basePath = isDevMode() ? 'http://localhost:5168' : '';
-  const signalRBasePath = isDevMode() ? 'http://localhost:5168' : '';
+  const basePath = isDevMode() ? 'http://localhost:213' : '';
+  const signalRBasePath = isDevMode() ? 'http://localhost:213' : '';
   
   return {
     basePath,
