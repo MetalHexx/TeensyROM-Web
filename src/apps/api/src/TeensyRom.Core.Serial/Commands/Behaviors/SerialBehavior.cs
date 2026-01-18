@@ -9,13 +9,22 @@ using TeensyRom.Core.Serial.Routines;
 namespace TeensyRom.Core.Serial.Commands.Behaviors
 {
 	/// <summary>
-	/// Disables the serial read auto-poll behavior for the duration of the command and reneables it after.
-	/// Also manages per-device locking to ensure only one command accesses a port at a time.
+	/// Cross-cutting serial (and TCP) behavior to manage general serial behaviors for
+	/// all serial commands.
+	///
+	/// <remarks>
+	/// Handles general connectivity and manages scenarios where TeensyROM is busy
+	/// or currently operating in Minimal FW mode.  It also ensures only one command at
+	/// a time can be executed.
+	/// </remarks>
 	/// </summary>
 	public class SerialBehavior<TRequest, TResponse>(ILoggingService log) : IPipelineBehavior<TRequest, TResponse>
 		where TRequest : ITeensyCommand<TResponse>
 		where TResponse : TeensyCommandResult, new()
 	{
+		private static readonly ConcurrentDictionary<string, (SemaphoreSlim Lock, DateTime LastUsed)> _locks = new();
+		private const int _staleLockMinutes = 5;
+
 		public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
 		{
 			CleanupStaleLocks();
@@ -104,9 +113,6 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 				_ => throw new InvalidOperationException("Lock should exist"),
 				(_, existing) => (existing.Lock, DateTime.UtcNow));
 		}
-
-		private static readonly ConcurrentDictionary<string, (SemaphoreSlim Lock, DateTime LastUsed)> _locks = new();
-		private const int _staleLockMinutes = 5;
 
 		/// <summary>
 		/// Clears out all stale locks.
