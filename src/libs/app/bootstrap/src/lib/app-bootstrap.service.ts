@@ -9,10 +9,8 @@ import {
 import { DeviceStore, SettingsStore } from '@teensyrom-nx/application';
 import {
   ALERT_SERVICE,
-  DEVICE_EVENTS_SERVICE,
   DEVICE_LOGS_SERVICE,
   IAlertService,
-  IDeviceEventsService,
   IDeviceLogsService,
 } from '@teensyrom-nx/domain';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
@@ -22,7 +20,6 @@ export class AppBootstrapService {
   private readonly settingsStore = inject(SettingsStore);
   private readonly deviceStore = inject(DeviceStore);
   private readonly deviceLogsService: IDeviceLogsService = inject(DEVICE_LOGS_SERVICE);
-  private readonly deviceEventsService: IDeviceEventsService = inject(DEVICE_EVENTS_SERVICE);
   private readonly injector = inject(Injector);
   private readonly alertService: IAlertService = inject(ALERT_SERVICE);
 
@@ -48,8 +45,8 @@ export class AppBootstrapService {
         });
       });
       this.deviceLogsService.connect();
-      this.deviceEventsService.connect();
-      this.deviceStore.findDevices();
+      // Quick scan on bootstrap - don't do full network scan
+      this.deviceStore.findDevices(false);
     });
   }
 
