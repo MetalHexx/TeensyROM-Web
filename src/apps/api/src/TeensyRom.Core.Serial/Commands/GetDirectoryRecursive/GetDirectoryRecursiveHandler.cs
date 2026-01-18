@@ -26,9 +26,7 @@ namespace TeensyRom.Core.Commands
             _communicationPort = r.CommunicationPort;
             _recursive = r.Recursive;
 
-			r.CommunicationPort.ResetDevice(log);						
-
-			await Task.Delay(1000);
+			
 
 			return await Task.Run(() =>
             {
@@ -109,7 +107,7 @@ namespace TeensyRom.Core.Commands
         {
             ct.ThrowIfCancellationRequested();
 
-            log.Internal($"=> Indexing: {path}", _deviceId);
+            log.Internal($"=> Indexing ({storageType}): {path}", _deviceId);
 
             DirectoryContent? directoryContent;
 
