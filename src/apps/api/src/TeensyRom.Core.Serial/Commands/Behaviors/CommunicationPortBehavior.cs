@@ -17,7 +17,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 	/// one command at a time (per device) can be executed.
 	/// </remarks>
 	/// </summary>
-	public class SerialBehavior<TRequest, TResponse>(ILoggingService log) : IPipelineBehavior<TRequest, TResponse>
+	public class CommunicationPortBehavior<TRequest, TResponse>(ILoggingService log) : IPipelineBehavior<TRequest, TResponse>
 		where TRequest : ITeensyCommand<TResponse>
 		where TResponse : TeensyCommandResult, new()
 	{
