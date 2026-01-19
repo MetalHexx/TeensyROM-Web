@@ -9,13 +9,13 @@ using TeensyRom.Core.Serial.Routines;
 namespace TeensyRom.Core.Serial.Commands.Behaviors
 {
 	/// <summary>
-	/// Cross-cutting serial (and TCP) behavior to manage general serial behaviors for
+	/// Cross-cutting Serial/TCP pipeline to manage behaviors for
 	/// all commands.
 	///
 	/// <remarks>
 	/// Handles general connectivity and manages scenarios where TeensyROM is busy
-	/// or currently operating in Minimal FW mode.  It also ensures only one command at
-	/// a time can be executed.
+	/// or or needs to revert to the Full TeeensyROM Firmware.  It also ensures only
+	/// one command at a time (per device) can be executed.
 	/// </remarks>
 	/// </summary>
 	public class SerialBehavior<TRequest, TResponse>(ILoggingService log) : IPipelineBehavior<TRequest, TResponse>
