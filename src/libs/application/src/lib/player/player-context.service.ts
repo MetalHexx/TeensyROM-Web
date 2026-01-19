@@ -1,5 +1,5 @@
 import { Injectable, inject, Signal, Injector, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toSignal, toObservable } from '@angular/core/rxjs-interop';
 import { Location } from '@angular/common';
 import {
   LaunchMode,
@@ -22,10 +22,17 @@ import { TimerState } from './timer-state.interface';
 import { parsePlayLength } from './timer-utils';
 import { DEFAULT_TIMER_MS } from './player.constants';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
-import { Subscription } from 'rxjs';
+import { Subscription, of, timer } from 'rxjs';
+import { map, distinctUntilChanged, switchMap, mapTo } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerContextService implements IPlayerContext {
+  /**
+   * Delay in milliseconds before showing busy dialog for slow file launches.
+   * Prevents dialog flashing for fast operations while providing feedback for large games/programs.
+   */
+  private readonly LAUNCH_DELAY_MS = 2000;
+
   private readonly store = inject(PlayerStore);
   private readonly storageStore = inject(StorageStore);
   private readonly settingsStore = inject(SettingsStore);
@@ -40,6 +47,8 @@ export class PlayerContextService implements IPlayerContext {
   
   // Cache signals per device for reuse (eager creation in createTimerWithCompletion)
   private readonly timerSignals = new Map<string, Signal<TimerState | null>>();
+  // Cached global signal for slow loading state across all devices
+  private slowLoadingSignal: Signal<boolean> | null = null;
   // Track only completion subscriptions for auto-progression
   private readonly completionSubscriptions = new Map<string, Subscription>();
   private popstateListener: ((event: PopStateEvent) => void) | null = null;
@@ -135,6 +144,45 @@ export class PlayerContextService implements IPlayerContext {
 
   isLoading(deviceId: string) {
     return this.store.isPlayerLoading(deviceId);
+  }
+
+  /**
+   * Returns a global signal indicating if ANY device is slow loading (loading for more than 2 seconds).
+   * Uses a delayed emission strategy to avoid showing busy dialogs for fast operations:
+   * - When ANY device starts loading, waits LAUNCH_DELAY_MS before emitting true
+   * - If loading completes before delay, signal stays false (no dialog flash)
+   * - When ALL devices finish loading, immediately emits false (instant feedback)
+   * 
+   * Signal is cached on first call for performance.
+   * @returns Signal<boolean> - true if any device has been loading for more than 2 seconds
+   */
+  isSlowLoading(): Signal<boolean> {
+    // Return cached signal if it exists
+    if (this.slowLoadingSignal) {
+      return this.slowLoadingSignal;
+    }
+
+    // Create observable pipeline that tracks ANY device loading
+    const slowLoading$ = toObservable(this.store.players, { injector: this.injector }).pipe(
+      // Check if ANY device is currently loading
+      map((players) => Object.values(players).some((player) => player.isLoading)),
+      // Only emit when loading state changes
+      distinctUntilChanged(),
+      // Apply delay only when transitioning to loading state
+      switchMap((isLoading) =>
+        isLoading
+          ? timer(this.LAUNCH_DELAY_MS).pipe(mapTo(true)) // Delay showing busy dialog
+          : of(false) // Immediate feedback when done
+      )
+    );
+
+    // Convert to signal and cache the result
+    this.slowLoadingSignal = toSignal(slowLoading$, {
+      injector: this.injector,
+      initialValue: false,
+    });
+
+    return this.slowLoadingSignal;
   }
 
   getError(deviceId: string) {

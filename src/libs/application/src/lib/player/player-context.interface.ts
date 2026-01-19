@@ -29,6 +29,14 @@ export interface IPlayerContext {
   getCurrentFile(deviceId: string): Signal<LaunchedFile | null>;
   getFileContext(deviceId: string): Signal<PlayerFileContext | null>;
   isLoading(deviceId: string): Signal<boolean>;
+  
+  /**
+   * Returns a global signal indicating if ANY device is slow loading (loading for more than 2 seconds).
+   * This is used to show a busy dialog for slow file launches while avoiding flashing for quick operations.
+   * @returns Signal<boolean> - true if any device has been loading for more than 2 seconds
+   */
+  isSlowLoading(): Signal<boolean>;
+  
   getError(deviceId: string): Signal<string | null>;
   getStatus(deviceId: string): Signal<PlayerStatus>;
 

@@ -58,10 +58,6 @@ describe('PlayerContextService - Settings Integration', () => {
 
     mockSettingsStore = {
       settings: vi.fn(() => ({
-        connectionSettings: {
-          connectionType: 'Serial' as const,
-          autoConnectEnabled: false,
-        },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true,
@@ -150,7 +146,6 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true,
@@ -218,7 +213,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: undefined,
         fileTransferSettings: {
           watchDirectoryLocation: '',
@@ -260,7 +255,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true,
@@ -310,7 +305,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true,
@@ -360,7 +355,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true,
@@ -426,7 +421,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true,
@@ -483,7 +478,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true,
@@ -557,7 +552,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true, // Timer enabled in settings
@@ -607,7 +602,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: false, // Timer disabled in settings
@@ -675,7 +670,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: undefined,
         fileTransferSettings: {
           watchDirectoryLocation: '',
@@ -720,7 +715,7 @@ describe('PlayerContextService - Settings Integration', () => {
         settings: ReturnType<typeof vi.fn>;
       };
       settingsStoreMock.settings.mockReturnValue({
-        connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+        connectionSettings: { autoConnectEnabled: false },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: true,

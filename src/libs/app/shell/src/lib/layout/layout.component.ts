@@ -5,7 +5,7 @@ import { NavigationService, NAV_ITEMS } from '@teensyrom-nx/app/navigation';
 import { AlertContainerComponent } from '@teensyrom-nx/app/alerts';
 import { filter, map, mergeMap } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { DeviceStore } from '@teensyrom-nx/application';
+import { DeviceStore, PLAYER_CONTEXT } from '@teensyrom-nx/application';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BusyDialogComponent } from '../components/busy-dialog/busy-dialog.component';
 import { NavRailComponent, NavRailItem } from '@teensyrom-nx/ui/components';
@@ -24,6 +24,7 @@ import { NavRailComponent, NavRailItem } from '@teensyrom-nx/ui/components';
 })
 export class LayoutComponent {
   readonly deviceStore = inject(DeviceStore);
+  readonly playerContext = inject(PLAYER_CONTEXT);
   readonly navService = inject(NavigationService);
   readonly router = inject(Router);
   readonly route = inject(ActivatedRoute);
@@ -31,8 +32,10 @@ export class LayoutComponent {
   pageTitle: Signal<string>;
   showIndexDialog = computed(() => this.deviceStore.isIndexing());
   showFindDeviceDialog = computed(() => this.deviceStore.isLoading());
+  showSlowLoadingDialog: Signal<boolean>;
   private indexDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
   private findDeviceDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
+  private slowLoadingDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
 
   /** Menu items for the nav rail */
   readonly menuItems: NavRailItem[] = NAV_ITEMS;
@@ -54,11 +57,14 @@ export class LayoutComponent {
   });
 
   constructor() {
+    // Initialize slow loading signal
+    this.showSlowLoadingDialog = this.playerContext.isSlowLoading();
+
     this.initBusyDialog(
       this.showFindDeviceDialog,
       this.findDeviceDialogRef,
       'Finding Devices',
-      'Scanning COM ports for TeensyROM devices.'
+      'Scanning COM ports and network for TeensyROM devices.'
     );
 
     this.initBusyDialog(
@@ -67,6 +73,25 @@ export class LayoutComponent {
       'Indexing Storage',
       'This can take a few minutes.  Do not touch your commodore device.'
     );
+
+    // Slow loading dialog effect
+    effect(() => {
+      const isSlowLoading = this.showSlowLoadingDialog();
+      if (isSlowLoading && !this.slowLoadingDialogRef) {
+        this.slowLoadingDialogRef = this.dialog.open(BusyDialogComponent, {
+          data: {
+            title: 'Slow Launch Detected',
+            message: 'TeensyROM may be swapping firmware modes. Hang tight! :)',
+          },
+          disableClose: true,
+          panelClass: 'glassy-dialog',
+          backdropClass: 'busy-dialog-backdrop',
+        });
+      } else if (!isSlowLoading && this.slowLoadingDialogRef) {
+        this.slowLoadingDialogRef.close();
+        this.slowLoadingDialogRef = null;
+      }
+    });
 
     this.pageTitle = toSignal(
       this.router.events.pipe(

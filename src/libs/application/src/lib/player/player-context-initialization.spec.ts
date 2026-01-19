@@ -51,10 +51,6 @@ describe('PlayerContextService - Initialization with Storage', () => {
 
     mockSettingsStore = {
       settings: vi.fn(() => ({
-        connectionSettings: {
-          connectionType: 'Serial' as const,
-          autoConnectEnabled: false,
-        },
         playerSettings: {
           repeatModeOnStartup: false,
           playTimerEnabled: false,
