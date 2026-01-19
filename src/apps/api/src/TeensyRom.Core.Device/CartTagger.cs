@@ -54,7 +54,7 @@ namespace TeensyRom.Core.Device
 
                 if (tagFromTr is not null)
                 {
-                    log.InternalSuccess($"{methodName} Succesfully retrieved tag from {storageType} device.", tagFromTr.DeviceId);
+                    log.InternalSuccess($"{methodName} Successfully retrieved tag from {storageType} device.", tagFromTr.DeviceId);
                     return new CartStorage
                     {
                         Available = true,
