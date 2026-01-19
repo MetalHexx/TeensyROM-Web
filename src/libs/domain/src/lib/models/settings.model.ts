@@ -6,16 +6,9 @@ import { PlayerFilterType } from './player-filter-type.enum';
 export type RepeatMode = 'Off' | 'Single' | 'All';
 
 /**
- * Connection type for device communication
- */
-export type ConnectionType = 'Serial' | 'Tcp';
-
-/**
  * Connection settings for device communication
  */
 export interface ConnectionSettings {
-  /** Type of connection (Serial or TCP) */
-  connectionType: ConnectionType;
   /** Whether to automatically connect on startup */
   autoConnectEnabled: boolean;
 }

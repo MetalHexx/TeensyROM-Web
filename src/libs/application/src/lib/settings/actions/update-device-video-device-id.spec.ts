@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { SettingsStore } from '../settings-store';
 import { SETTINGS_SERVICE } from '@teensyrom-nx/domain';
 import { ISettingsService } from '@teensyrom-nx/domain';
-import { ConnectionType, DeviceSettings, PlayerFilterType, Settings } from '@teensyrom-nx/domain';
+import { DeviceSettings, PlayerFilterType, Settings } from '@teensyrom-nx/domain';
 
 describe('updateDeviceVideoDeviceId', () => {
   let store: InstanceType<typeof SettingsStore>;
@@ -53,7 +53,6 @@ describe('updateDeviceVideoDeviceId', () => {
       videoDeviceId,
     },
     connectionSettings: {
-      connectionType: 'Serial' as ConnectionType,
       autoConnectEnabled: true,
     },
   });
@@ -209,7 +208,6 @@ describe('updateDeviceVideoDeviceId', () => {
         videoDeviceId: 'old-cam',
       },
       connectionSettings: {
-        connectionType: 'Serial' as ConnectionType,
         autoConnectEnabled: true,
       },
     };

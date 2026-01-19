@@ -2,7 +2,6 @@ import { Component, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormGroup, AbstractControl, ReactiveFormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { MatRadioModule } from '@angular/material/radio';
 import { ScalingCardComponent, IconLabelComponent } from '@teensyrom-nx/ui/components';
 import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
 
@@ -25,7 +24,6 @@ import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-to
     CommonModule,
     ReactiveFormsModule,
     MatIconModule,
-    MatRadioModule,
     ScalingCardComponent,
     IconLabelComponent,
     SettingsToggleItemComponent,
@@ -39,7 +37,7 @@ export class DeviceSettingsSectionComponent {
    * Each FormGroup contains:
    * - deviceId: FormControl<string>
    * - videoSettings: FormGroup { enableVideo: FormControl<boolean>, videoDeviceId: FormControl<string> }
-   * - connectionSettings: FormGroup { connectionType: FormControl<ConnectionType>, autoConnectEnabled: FormControl<boolean> }
+   * - connectionSettings: FormGroup { autoConnectEnabled: FormControl<boolean> }
    */
   knownDevicesArray = input.required<FormArray>();
 
@@ -77,12 +75,5 @@ export class DeviceSettingsSectionComponent {
    */
   getAutoConnectControl(deviceGroup: AbstractControl): AbstractControl | null {
     return deviceGroup.get('connectionSettings.autoConnectEnabled');
-  }
-
-  /**
-   * Gets the connectionType form control from a device FormGroup.
-   */
-  getConnectionTypeControl(deviceGroup: AbstractControl): AbstractControl | null {
-    return deviceGroup.get('connectionSettings.connectionType');
   }
 }

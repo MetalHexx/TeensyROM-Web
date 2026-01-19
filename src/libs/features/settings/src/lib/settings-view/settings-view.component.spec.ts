@@ -89,7 +89,6 @@ describe('SettingsViewComponent', () => {
           videoDeviceId: '',
         },
         connectionSettings: {
-          connectionType: 'Serial',
           autoConnectEnabled: true,
         },
       },
@@ -174,7 +173,6 @@ describe('SettingsViewComponent', () => {
               videoDeviceId: [device.videoSettings.videoDeviceId],
             }),
             connectionSettings: fb.group({
-              connectionType: [device.connectionSettings.connectionType, Validators.required],
               autoConnectEnabled: [device.connectionSettings.autoConnectEnabled],
             }),
           })
@@ -276,7 +274,6 @@ describe('SettingsViewComponent', () => {
       // Per-device settings
       const knownDevices = form.get('knownDevices') as FormArray;
       expect(knownDevices.length).toBe(1);
-      expect(knownDevices.at(0).get('connectionSettings.connectionType')?.value).toBe('Serial');
       expect(knownDevices.at(0).get('connectionSettings.autoConnectEnabled')?.value).toBe(true);
     });
 
@@ -772,18 +769,6 @@ describe('SettingsViewComponent', () => {
   });
 
   describe('Validation', () => {
-    it('should validate device connectionType as required', () => {
-      const form = component.settingsForm();
-      expect(form).toBeTruthy();
-      if (!form) return;
-      const knownDevices = form.get('knownDevices') as FormArray;
-      const control = knownDevices.at(0).get('connectionSettings.connectionType');
-      
-      control?.setValue('');
-      
-      expect(control?.hasError('required')).toBe(true);
-    });
-
     it('should validate search weights with custom validator', () => {
       const form = component.settingsForm();
       expect(form).toBeTruthy();

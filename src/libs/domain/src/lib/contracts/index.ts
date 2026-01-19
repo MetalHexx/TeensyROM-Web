@@ -3,7 +3,6 @@ export * from './api-config.contract';
 
 // Device contracts
 export * from './device.contract';
-export * from './device-events.contract';
 export * from './device-logs.contract';
 
 // Storage contracts

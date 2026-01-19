@@ -3,12 +3,7 @@ import { of, throwError, timer } from 'rxjs';
 import { map } from 'rxjs/operators';
 import '@analogjs/vitest-angular/setup-zone';
 import { TestBed } from '@angular/core/testing';
-import {
-  Settings,
-  ISettingsService,
-  SETTINGS_SERVICE,
-  PlayerFilterType,
-} from '@teensyrom-nx/domain';
+import { Settings, ISettingsService, SETTINGS_SERVICE, PlayerFilterType } from '@teensyrom-nx/domain';
 import { SettingsStore } from './settings-store';
 
 // --------------------------------------------------------------------------
@@ -854,7 +849,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-          connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -869,7 +864,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: false, videoDeviceId: '' },
-          connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -880,7 +875,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
           knownDevices: [{
             deviceId: 'test-device',
             videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-            connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+            connectionSettings: { autoConnectEnabled: false },
           }],
         },
       });
@@ -906,7 +901,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: false, videoDeviceId: '' },
-          connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -917,7 +912,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
           knownDevices: [{
             deviceId: 'test-device',
             videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-            connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+            connectionSettings: { autoConnectEnabled: false },
           }],
         },
       });
@@ -932,7 +927,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: false, videoDeviceId: '' },
-          connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -943,7 +938,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
           knownDevices: [{
             deviceId: 'test-device',
             videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-            connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+            connectionSettings: { autoConnectEnabled: false },
           }],
         },
       });
@@ -958,7 +953,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: false, videoDeviceId: '' },
-          connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -969,7 +964,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
           knownDevices: [{
             deviceId: 'test-device',
             videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-            connectionSettings: { connectionType: 'Serial', autoConnectEnabled: false },
+            connectionSettings: { autoConnectEnabled: false },
           }],
         },
       });

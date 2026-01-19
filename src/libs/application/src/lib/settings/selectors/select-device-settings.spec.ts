@@ -4,7 +4,7 @@ import { of } from 'rxjs';
 import { SettingsStore } from '../settings-store';
 import { SETTINGS_SERVICE } from '@teensyrom-nx/domain';
 import { ISettingsService } from '@teensyrom-nx/domain';
-import { ConnectionType, DeviceSettings, Settings } from '@teensyrom-nx/domain';
+import { DeviceSettings, Settings } from '@teensyrom-nx/domain';
 
 describe('selectDeviceSettings', () => {
   let store: InstanceType<typeof SettingsStore>;
@@ -53,7 +53,6 @@ describe('selectDeviceSettings', () => {
       videoDeviceId: '',
     },
     connectionSettings: {
-      connectionType: 'Serial' as ConnectionType,
       autoConnectEnabled: true,
     },
   });

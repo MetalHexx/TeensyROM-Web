@@ -55,7 +55,6 @@ describe('SettingsFormService', () => {
       {
         deviceId: 'device-1',
         connectionSettings: {
-          connectionType: 'Serial',
           autoConnectEnabled: true,
         },
         videoSettings: {
@@ -156,7 +155,6 @@ describe('SettingsFormService', () => {
       expect(knownDevices.length).toBe(1);
       const deviceGroup = knownDevices.at(0);
       expect(deviceGroup.get('deviceId')?.value).toBe('device-1');
-      expect(deviceGroup.get('connectionSettings.connectionType')?.value).toBe('Serial');
       expect(deviceGroup.get('connectionSettings.autoConnectEnabled')?.value).toBe(true);
       expect(deviceGroup.get('videoSettings.enableVideo')?.value).toBe(true);
       expect(form.get('playerSettings.playTimerEnabled')?.value).toBe(true);
@@ -605,17 +603,6 @@ describe('SettingsFormService', () => {
   });
 
   describe('Validation', () => {
-    it('should validate device connectionType as required', () => {
-      const knownDevices = service.getKnownDevices();
-      expect(knownDevices.length).toBe(1);
-      const deviceGroup = knownDevices.at(0);
-      const control = deviceGroup.get('connectionSettings.connectionType');
-
-      control?.setValue('');
-
-      expect(control?.hasError('required')).toBe(true);
-    });
-
     it('should validate search weights with custom validator', () => {
       const form = service.settingsForm();
       expect(form).toBeTruthy();

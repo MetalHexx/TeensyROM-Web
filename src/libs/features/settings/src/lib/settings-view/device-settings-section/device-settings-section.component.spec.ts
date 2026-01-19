@@ -16,7 +16,6 @@ describe('DeviceSettingsSectionComponent', () => {
         videoDeviceId: [''],
       }),
       connectionSettings: fb.group({
-        connectionType: ['Serial'],
         autoConnectEnabled: [autoConnect],
       }),
     });
@@ -101,15 +100,6 @@ describe('DeviceSettingsSectionComponent', () => {
       );
       expect(autoConnectToggle).toBeTruthy();
     });
-
-    it('should display connection type radio buttons for each device', () => {
-      const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
-      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
-      fixture.detectChanges();
-
-      const radioButtons = fixture.nativeElement.querySelectorAll('mat-radio-button');
-      expect(radioButtons.length).toBe(2); // Serial and TCP
-    });
   });
 
   describe('Device Title', () => {
@@ -166,16 +156,6 @@ describe('DeviceSettingsSectionComponent', () => {
       const control = component.getAutoConnectControl(devicesArray.at(0));
       expect(control).toBeTruthy();
       expect(control?.value).toBe(false);
-    });
-
-    it('should get connection type control', () => {
-      const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
-      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
-      fixture.detectChanges();
-
-      const control = component.getConnectionTypeControl(devicesArray.at(0));
-      expect(control).toBeTruthy();
-      expect(control?.value).toBe('Serial');
     });
   });
 

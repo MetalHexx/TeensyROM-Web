@@ -40,16 +40,6 @@
                   description="Automatically connect to this device when the API starts."
                   [control]="autoConnectCtrl" />
               }
-
-              @if (getConnectionTypeControl(deviceGroup); as connectionTypeCtrl) {
-                <div class="connection-type-field">
-                  <span class="connection-type-label">Connection Type</span>
-                  <mat-radio-group [formControl]="$any(connectionTypeCtrl)" class="connection-type-group">
-                    <mat-radio-button value="Serial">Serial</mat-radio-button>
-                    <mat-radio-button value="Tcp">TCP/Ethernet</mat-radio-button>
-                  </mat-radio-group>
-                </div>
-              }
             </div>
           </div>
         </form>

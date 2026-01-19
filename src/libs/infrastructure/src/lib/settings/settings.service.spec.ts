@@ -160,7 +160,6 @@ describe('SettingsService', () => {
 
       expect(mockSettingsApi.getSettings).toHaveBeenCalledWith();
       expect(result.knownDevices.length).toBe(1);
-      expect(result.knownDevices[0].connectionSettings.connectionType).toBe('Serial');
       expect(result.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(false);
       expect(result.playerSettings.repeatModeOnStartup).toBe(true);
       expect(result.playerSettings.playTimerEnabled).toBe(true);
@@ -276,7 +275,6 @@ describe('SettingsService', () => {
       // Verify knownDevices mapping
       expect(requestDto.knownDevices).toBeDefined();
       expect(requestDto.knownDevices.length).toBe(1);
-      expect(requestDto.knownDevices[0].connectionSettings.connectionType).toBe('Serial');
       expect(requestDto.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(false);
 
       // Verify player settings mapping

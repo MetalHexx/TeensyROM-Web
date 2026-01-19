@@ -243,7 +243,6 @@ export class SettingsFormService {
         videoDeviceId: [device.videoSettings.videoDeviceId],
       }),
       connectionSettings: this.fb.group({
-        connectionType: [device.connectionSettings.connectionType, Validators.required],
         autoConnectEnabled: [device.connectionSettings.autoConnectEnabled],
       }),
     });
@@ -313,7 +312,6 @@ export class SettingsFormService {
           videoDeviceId: device.videoSettings.videoDeviceId,
         },
         connectionSettings: {
-          connectionType: device.connectionSettings.connectionType,
           autoConnectEnabled: device.connectionSettings.autoConnectEnabled,
         },
       })),
@@ -364,7 +362,6 @@ export class SettingsFormService {
           videoDeviceId: device.videoSettings.videoDeviceId,
         },
         connectionSettings: {
-          connectionType: device.connectionSettings.connectionType,
           autoConnectEnabled: device.connectionSettings.autoConnectEnabled,
         },
       })),
