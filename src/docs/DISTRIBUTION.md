@@ -66,9 +66,9 @@ The published application:
 5. **Handles SPA routing** - Unknown routes serve `index.html` for Angular routing
 
 **Runtime URL Structure**:
-- API routes: `http://localhost:5000/api/devices`, `http://localhost:5000/api/files`, etc.
-- SignalR hubs: `http://localhost:5000/logHub`, `http://localhost:5000/deviceEventHub`
-- SPA routes: `http://localhost:5000/` (index.html), `http://localhost:5000/player/music` (Angular routing)
+- API routes: `http://localhost:213/api/devices`, `http://localhost:213/api/files`, etc.
+- SignalR hubs: `http://localhost:213/logHub`, `http://localhost:213/deviceEventHub`
+- SPA routes: `http://localhost:213/` (index.html), `http://localhost:213/player/music` (Angular routing)
 
 ---
 
@@ -104,7 +104,7 @@ pnpm start
 - **End users need nothing** (self-contained executable)
 
 **Single executable**:
-- Serves both API and frontend from port 5000
+- Serves both API and frontend from port 213
 - No external dependencies
 - Self-contained .NET runtime
 
@@ -165,7 +165,7 @@ dotnet run
 ```
 
 **Verify in browser**:
-1. Open `http://localhost:5000`
+1. Open `http://localhost:213`
 2. Should see TeensyROM Web app (not Scalar docs)
 3. Check browser DevTools Network tab
    - Angular files served from `/` (e.g., `/main-*.js`)
@@ -218,10 +218,10 @@ cd publish/win-x64
 
 **Test checklist**:
 - [ ] Executable starts without errors
-- [ ] Console shows "Now listening on: http://localhost:5000"
-- [ ] Browser loads Angular app at `http://localhost:5000`
+- [ ] Console shows "Now listening on: http://localhost:213"
+- [ ] Browser loads Angular app at `http://localhost:213`
 - [ ] Device detection works (if TeensyROM connected)
-- [ ] Scalar API docs accessible at `http://localhost:5000/scalar/v1`
+- [ ] Scalar API docs accessible at `http://localhost:213/scalar/v1`
 - [ ] SignalR hubs connect (check browser console)
 
 **Common issues**:
