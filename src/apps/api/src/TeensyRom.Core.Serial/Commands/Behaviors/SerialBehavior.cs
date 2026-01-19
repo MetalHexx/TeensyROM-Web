@@ -10,7 +10,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 {
 	/// <summary>
 	/// Cross-cutting serial (and TCP) behavior to manage general serial behaviors for
-	/// all serial commands.
+	/// all commands.
 	///
 	/// <remarks>
 	/// Handles general connectivity and manages scenarios where TeensyROM is busy
