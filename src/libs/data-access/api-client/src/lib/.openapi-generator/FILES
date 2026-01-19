@@ -10,15 +10,11 @@ models/AppSettingsDto.ts
 models/CartDto.ts
 models/CartStorageDto.ts
 models/CompetitionDto.ts
-models/ConnectDeviceResponse.ts
 models/ConnectionSettingsDto.ts
 models/ConnectionType.ts
 models/DeviceSettingsDto.ts
-models/DeviceStartResponse.ts
 models/DeviceState.ts
-models/DeviceStopResponse.ts
 models/DirectoryItemDto.ts
-models/DisconnectDeviceResponse.ts
 models/FileItemDto.ts
 models/FileItemType.ts
 models/FileLinkDto.ts
