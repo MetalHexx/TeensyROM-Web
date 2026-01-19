@@ -9,7 +9,7 @@ using TeensyRom.Core.Serial.Routines;
 namespace TeensyRom.Core.Serial.Commands.Behaviors
 {
 	/// <summary>
-	/// Cross-cutting Serial/TCP pipeline to manage behaviors for all commands.
+	/// Serial/TCP pipeline to manage cross-cutting behaviors for all commands.
 	///
 	/// <remarks>
 	/// Handles general connectivity and manages scenarios where TeensyROM is busy
