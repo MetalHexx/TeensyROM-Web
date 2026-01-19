@@ -10,7 +10,7 @@
  * 2. All devices disconnected (isConnected: false)
  * 3. At least one device connected (isConnected: true)
  *
- * The Refresh Devices button should remain always enabled in all scenarios.
+ * The Discover Devices button should remain always enabled in all scenarios.
  */
 
 import {
@@ -62,7 +62,7 @@ describe('Device Toolbar Button Disabled State', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.pingButton).should('be.disabled');
     });
 
-    it('should keep Refresh Devices button enabled when no devices exist', () => {
+    it('should keep Discover Devices button enabled when no devices exist', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.refreshButton).should('not.be.disabled');
     });
   });
@@ -89,7 +89,7 @@ describe('Device Toolbar Button Disabled State', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.pingButton).should('be.disabled');
     });
 
-    it('should keep Refresh Devices button enabled when all devices are disconnected', () => {
+    it('should keep Discover Devices button enabled when all devices are disconnected', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.refreshButton).should('not.be.disabled');
     });
 
@@ -120,7 +120,7 @@ describe('Device Toolbar Button Disabled State', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.pingButton).should('not.be.disabled');
     });
 
-    it('should keep Refresh Devices button enabled when at least one device is connected', () => {
+    it('should keep Discover Devices button enabled when at least one device is connected', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.refreshButton).should('not.be.disabled');
     });
 
@@ -151,7 +151,7 @@ describe('Device Toolbar Button Disabled State', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.pingButton).should('not.be.disabled');
     });
 
-    it('should keep Refresh Devices button enabled (mixed state)', () => {
+    it('should keep Discover Devices button enabled (mixed state)', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.refreshButton).should('not.be.disabled');
     });
 
@@ -190,8 +190,8 @@ describe('Device Toolbar Button Disabled State', () => {
       cy.get(DEVICE_TOOLBAR_SELECTORS.pingContainer).should('contain.text', 'Ping Devices');
     });
 
-    it('should have proper button label for always-enabled Refresh button', () => {
-      cy.get(DEVICE_TOOLBAR_SELECTORS.refreshContainer).should('contain.text', 'Refresh Devices');
+    it('should have proper button label for always-enabled Discover button', () => {
+      cy.get(DEVICE_TOOLBAR_SELECTORS.refreshContainer).should('contain.text', 'Discover Devices');
     });
   });
 
@@ -247,7 +247,7 @@ describe('Device Toolbar Button Disabled State', () => {
         cy.get(DEVICE_TOOLBAR_SELECTORS.pingButton).should('be.disabled');
       });
 
-      it('should keep Refresh Devices button enabled throughout connect/disconnect workflow', () => {
+      it('should keep Discover Devices button enabled throughout connect/disconnect workflow', () => {
         cy.get(DEVICE_TOOLBAR_SELECTORS.refreshButton).should('not.be.disabled');
 
         clickPowerButton(0);

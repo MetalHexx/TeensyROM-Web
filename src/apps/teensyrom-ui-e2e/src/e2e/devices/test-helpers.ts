@@ -188,10 +188,10 @@ export function verifyErrorMessage(): void {
 }
 
 /**
- * Click refresh devices button
+ * Click discover devices button (performs full network scan)
  */
 export function clickRefreshDevices(): void {
-  cy.contains('Refresh Devices').click();
+  cy.contains('Discover Devices').click();
 }
 
 /**

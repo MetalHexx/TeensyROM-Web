@@ -76,7 +76,6 @@ describe('PlayerDeviceContainerComponent', () => {
           videoDeviceId: '',
         },
         connectionSettings: {
-          connectionType: 'Serial',
           autoConnectEnabled: false,
         },
       },
@@ -171,6 +170,7 @@ describe('PlayerDeviceContainerComponent', () => {
       name: 'Test Device',
       status: 'connected',
       isConnected: true,
+      isEnabled: true,
     });
     
     // Load settings into store (happens automatically via store initialization)

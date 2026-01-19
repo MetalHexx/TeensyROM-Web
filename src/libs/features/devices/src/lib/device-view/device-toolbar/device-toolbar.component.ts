@@ -23,14 +23,15 @@ import { MatButtonModule } from '@angular/material/button';
 })
 export class DeviceToolbarComponent {
   private readonly deviceStore = inject(DeviceStore);
-  protected readonly hasConnectedDevices = this.deviceStore.hasConnectedDevices;
+  protected readonly hasEnabledDevices = this.deviceStore.hasEnabledDevices;
 
   onIndexAllStorage() {
     this.deviceStore.indexStorageAllStorage();
   }
 
   onRefreshDevices() {
-    this.deviceStore.findDevices();
+    // Full network scan when user manually triggers discovery
+    this.deviceStore.findDevices(true);
   }
 
   onResetDevices() {

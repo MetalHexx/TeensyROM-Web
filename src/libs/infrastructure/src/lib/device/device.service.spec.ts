@@ -8,8 +8,6 @@ describe('DeviceService - Alert Integration', () => {
   let service: DeviceService;
   let mockApiService: {
     findDevices: ReturnType<typeof vi.fn>;
-    connectDevice: ReturnType<typeof vi.fn>;
-    disconnectDevice: ReturnType<typeof vi.fn>;
     resetDevice: ReturnType<typeof vi.fn>;
     pingDevice: ReturnType<typeof vi.fn>;
   };
@@ -20,8 +18,6 @@ describe('DeviceService - Alert Integration', () => {
   beforeEach(() => {
     mockApiService = {
       findDevices: vi.fn(),
-      connectDevice: vi.fn(),
-      disconnectDevice: vi.fn(),
       resetDevice: vi.fn(),
       pingDevice: vi.fn(),
     };
@@ -98,123 +94,6 @@ describe('DeviceService - Alert Integration', () => {
 
       expect(caughtError).toBeDefined();
       expect(caughtError).toBe(error);
-      logSpy.mockRestore();
-    });
-  });
-
-  describe('getConnectedDevices error handling', () => {
-    it('should display friendly error message on failure', async () => {
-      const error = new Error('Some technical error');
-      mockApiService.findDevices.mockRejectedValue(error);
-      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-      await expect(
-        new Promise((resolve, reject) => {
-          service.getConnectedDevices().subscribe({
-            next: resolve,
-            error: reject,
-          });
-        })
-      ).rejects.toThrow();
-
-      // Should use friendly message, not technical error message
-      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to retrieve connected devices');
-      logSpy.mockRestore();
-    });
-
-    it('should always use friendly message regardless of error type', async () => {
-      const error = {};
-      mockApiService.findDevices.mockRejectedValue(error);
-      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-      await expect(
-        new Promise((resolve, reject) => {
-          service.getConnectedDevices().subscribe({
-            next: resolve,
-            error: reject,
-          });
-        })
-      ).rejects.toThrow();
-
-      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to retrieve connected devices');
-      logSpy.mockRestore();
-    });
-  });
-
-  describe('connectDevice error handling', () => {
-    it('should display friendly error message when connection fails', async () => {
-      const error = new Error('Some technical error');
-      mockApiService.connectDevice.mockRejectedValue(error);
-      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-      await expect(
-        new Promise((resolve, reject) => {
-          service.connectDevice('device-123').subscribe({
-            next: resolve,
-            error: reject,
-          });
-        })
-      ).rejects.toThrow();
-
-      // Should use friendly message, not technical error message
-      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to connect to device');
-      logSpy.mockRestore();
-    });
-
-    it('should always use friendly message regardless of error type', async () => {
-      const error = { message: null, error: {} };
-      mockApiService.connectDevice.mockRejectedValue(error);
-      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-      await expect(
-        new Promise((resolve, reject) => {
-          service.connectDevice('device-123').subscribe({
-            next: resolve,
-            error: reject,
-          });
-        })
-      ).rejects.toThrow();
-
-      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to connect to device');
-      logSpy.mockRestore();
-    });
-  });
-
-  describe('disconnectDevice error handling', () => {
-    it('should display friendly error message on disconnect failure', async () => {
-      const error = new Error('Some technical error');
-      mockApiService.disconnectDevice.mockRejectedValue(error);
-      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-      await expect(
-        new Promise((resolve, reject) => {
-          service.disconnectDevice('device-123').subscribe({
-            next: resolve,
-            error: reject,
-          });
-        })
-      ).rejects.toThrow();
-
-      // Should use friendly message, not technical error message
-      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to disconnect device');
-      logSpy.mockRestore();
-    });
-
-    it('should always use friendly message regardless of error type', async () => {
-      const error = {};
-      mockApiService.disconnectDevice.mockRejectedValue(error);
-      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-      await expect(
-        new Promise((resolve, reject) => {
-          service.disconnectDevice('device-123').subscribe({
-            next: resolve,
-            error: reject,
-          });
-        })
-      ).rejects.toThrow();
-
-      expect(mockAlertService.error).toHaveBeenCalledWith('Failed to disconnect device');
       logSpy.mockRestore();
     });
   });
@@ -305,23 +184,6 @@ describe('DeviceService - Alert Integration', () => {
       await expect(
         new Promise((resolve, reject) => {
           service.findDevices().subscribe({
-            next: resolve,
-            error: reject,
-          });
-        })
-      ).rejects.toThrow();
-
-      expect(mockAlertService.error).toHaveBeenCalledTimes(1);
-      logSpy.mockRestore();
-    });
-
-    it('connectDevice should call alert service once', async () => {
-      mockApiService.connectDevice.mockRejectedValue(new Error('Test'));
-      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-      await expect(
-        new Promise((resolve, reject) => {
-          service.connectDevice('dev-1').subscribe({
             next: resolve,
             error: reject,
           });

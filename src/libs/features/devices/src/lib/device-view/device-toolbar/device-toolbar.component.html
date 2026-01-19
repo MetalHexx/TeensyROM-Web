@@ -5,9 +5,9 @@
 >
   <div class="toolbar-button-container">
     <lib-action-button
-      data-testid="toolbar-button-refresh-devices"
+      data-testid="toolbar-button-discover-devices"
       icon="refresh"
-      label="Refresh Devices"
+      label="Discover Devices"
       (buttonClick)="onRefreshDevices()"
     >
     </lib-action-button>
@@ -15,7 +15,7 @@
       data-testid="toolbar-button-reset-devices"
       icon="reset_tv"
       label="Reset Devices"
-      [disabled]="!hasConnectedDevices()"
+      [disabled]="!hasEnabledDevices()"
       (buttonClick)="onResetDevices()"
     >
     </lib-action-button>
@@ -23,7 +23,7 @@
       data-testid="toolbar-button-ping-devices"
       icon="network_ping"
       label="Ping Devices"
-      [disabled]="!hasConnectedDevices()"
+      [disabled]="!hasEnabledDevices()"
       (buttonClick)="onPingDevices()"
     >
     </lib-action-button>
@@ -31,7 +31,7 @@
       data-testid="toolbar-button-index-all"
       icon="download"
       label="Index All"
-      [disabled]="!hasConnectedDevices()"
+      [disabled]="!hasEnabledDevices()"
       (buttonClick)="onIndexAllStorage()"
     >
     </lib-action-button>

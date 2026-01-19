@@ -10,8 +10,8 @@
       <lib-device-item
         [device]="device"
         [attr.data-testid]="'device-item-' + device.deviceId"
-        (connect)="onConnect($event)"
-        (disconnect)="onDisconnect($event)"
+        (enable)="onEnable($event)"
+        (disable)="onDisable($event)"
       >
       </lib-device-item>
 

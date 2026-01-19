@@ -1,12 +1,10 @@
-import { Component, input, computed, output, inject } from '@angular/core';
+import { Component, input, computed, inject, output } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { NgClass } from '@angular/common';
 import {
   Device,
-  DEVICE_EVENTS_SERVICE,
-  IDeviceEventsService,
   StorageType,
 } from '@teensyrom-nx/domain';
 import {
@@ -15,7 +13,6 @@ import {
   ScalingCardComponent,
 } from '@teensyrom-nx/ui/components';
 import { StorageStatusComponent as StorageItemComponent } from '../storage-item/storage-item.component';
-import { DeviceState } from '@teensyrom-nx/domain';
 import { DeviceStore } from '@teensyrom-nx/application';
 
 @Component({
@@ -36,30 +33,22 @@ import { DeviceStore } from '@teensyrom-nx/application';
 })
 export class DeviceItemComponent {
   device = input<Device>();
-  connect = output<string>();
-  disconnect = output<string>();
-  private readonly deviceEventsService: IDeviceEventsService = inject(DEVICE_EVENTS_SERVICE);
+  enable = output<string>();
+  disable = output<string>();
   private readonly deviceStore = inject(DeviceStore);
 
-  readonly connectionStatus = computed(() => this.device()?.isConnected);
+  readonly isEnabled = computed(() => this.device()?.isEnabled ?? true);
   readonly usbStatus = computed(() => this.device()?.usbStorage?.available);
   readonly sdStatus = computed(() => this.device()?.sdStorage?.available);
   readonly StorageType = StorageType;
 
-  readonly deviceState = computed(() => {
-    const id = this.device()?.deviceId;
-
-    if (!id) return DeviceState.Unknown;
-
-    return this.deviceEventsService.getDeviceState(id)();
-  });
-
-  onConnect() {
-    this.connect.emit(this.device()?.deviceId ?? '');
-  }
-
-  onDisconnect() {
-    this.disconnect.emit(this.device()?.deviceId ?? '');
+  onToggleEnabled() {
+    const deviceId = this.device()?.deviceId ?? '';
+    if (this.isEnabled()) {
+      this.disable.emit(deviceId);
+    } else {
+      this.enable.emit(deviceId);
+    }
   }
 
   async onIndex(storageType: StorageType) {

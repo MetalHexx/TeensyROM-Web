@@ -3,9 +3,9 @@
 /**
  * Device Connection Refresh & Recovery E2E Tests
  *
- * Tests device refresh workflows and connection state persistence.
- * Validates that "Refresh Devices" button maintains connection states correctly
- * and that reconnection workflows function after refresh.
+ * Tests device discovery workflows and connection state persistence.
+ * Validates that "Discover Devices" button maintains connection states correctly
+ * and that reconnection workflows function after discovery.
  *
  * **Key Workflows**:
  * - Refresh maintains connected device states

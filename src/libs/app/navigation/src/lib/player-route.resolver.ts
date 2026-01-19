@@ -96,8 +96,6 @@ async function initializePlayer(
   logInfo(LogType.Start, `PlayerInit: Initializing storage for ${devices.length} device(s)`);
 
   for (const currentDevice of devices) {
-    if (!currentDevice.isConnected) continue;
-
     try {
       if (currentDevice.usbStorage?.available) {
         await storageStore.initializeStorage({
@@ -165,8 +163,6 @@ async function initializePlayer(
       }
 
       const savedState = playerStorage.load(currentDevice.deviceId);
-
-      if (!currentDevice.isConnected) continue;
 
       let pathToNavigate = '/';
       let filenameToLaunch: string | null = null;

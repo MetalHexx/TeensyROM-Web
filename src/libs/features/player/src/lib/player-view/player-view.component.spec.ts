@@ -4,14 +4,14 @@ import { PlayerViewComponent } from './player-view.component';
 import {
   DEVICE_SERVICE,
   DEVICE_STORAGE_SERVICE,
-  DEVICE_EVENTS_SERVICE,
   DEVICE_LOGS_SERVICE,
   STORAGE_SERVICE,
   IDeviceService,
   IStorageService,
-  IDeviceEventsService,
   IDeviceLogsService,
 } from '@teensyrom-nx/domain';
+import { DeviceStore } from '@teensyrom-nx/application';
+import { signal } from '@angular/core';
 import { of } from 'rxjs';
 
 describe('PlayerViewComponent', () => {
@@ -19,14 +19,18 @@ describe('PlayerViewComponent', () => {
   let fixture: ComponentFixture<PlayerViewComponent>;
 
   const mockDeviceService: Partial<IDeviceService> = {
-    getConnectedDevices: () => of([]),
+    findDevices: () => of([]),
   };
 
   const mockStorageService: Partial<IStorageService> = {};
 
-  const mockDeviceEventsService: Partial<IDeviceEventsService> = {};
-
   const mockDeviceLogsService: Partial<IDeviceLogsService> = {};
+
+  const mockDeviceStore = {
+    devices: signal([]),
+    isLoading: signal(false),
+    hasEnabledDevices: signal(false),
+  };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -35,9 +39,9 @@ describe('PlayerViewComponent', () => {
         provideNoopAnimations(),
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: STORAGE_SERVICE, useValue: mockStorageService },
-        { provide: DEVICE_EVENTS_SERVICE, useValue: mockDeviceEventsService },
         { provide: DEVICE_LOGS_SERVICE, useValue: mockDeviceLogsService },
         { provide: DEVICE_STORAGE_SERVICE, useValue: {} },
+        { provide: DeviceStore, useValue: mockDeviceStore },
       ],
     }).compileComponents();
 
@@ -54,8 +58,8 @@ describe('PlayerViewComponent', () => {
     expect(component.deviceStore).toBeTruthy();
   });
 
-  it('should compute connected devices', () => {
-    expect(component.connectedDevices).toBeTruthy();
-    expect(component.connectedDevices()).toEqual([]);
+  it('should compute enabled devices', () => {
+    expect(component.enabledDevices).toBeTruthy();
+    expect(component.enabledDevices()).toEqual([]);
   });
 });

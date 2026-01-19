@@ -18,7 +18,6 @@ import {
   SearchWeightsDto,
   AppSettingsDto,
   TeensyFilterType as ApiFilterType,
-  ConnectionType as ApiConnectionType,
 } from '@teensyrom-nx/data-access/api-client';
 import { DomainMapper } from './domain.mapper';
 import {
@@ -28,7 +27,6 @@ import {
   PlayerFilterType,
   PlayerScope,
   Settings,
-  ConnectionType,
 } from '@teensyrom-nx/domain';
 
 describe('DomainMapper (Storage)', () => {
@@ -822,7 +820,6 @@ describe('DomainMapper (Settings)', () => {
       const result = DomainMapper.toSettings(dto);
 
       expect(result.knownDevices.length).toBe(1);
-      expect(result.knownDevices[0].connectionSettings.connectionType).toBe('Serial');
       expect(result.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(true);
     });
 
@@ -896,12 +893,12 @@ describe('DomainMapper (Settings)', () => {
           {
             deviceId: 'device-1',
             videoSettings: { enableVideo: true, videoDeviceId: 'cam-1' },
-            connectionSettings: { connectionType: 'Serial', autoConnectEnabled: true },
+            connectionSettings: { autoConnectEnabled: true },
           },
           {
             deviceId: 'device-2',
             videoSettings: { enableVideo: false, videoDeviceId: '' },
-            connectionSettings: { connectionType: 'Tcp', autoConnectEnabled: false },
+            connectionSettings: { autoConnectEnabled: false },
           },
         ],
       });
@@ -911,7 +908,7 @@ describe('DomainMapper (Settings)', () => {
       expect(result.knownDevices[0].deviceId).toBe('device-1');
       expect(result.knownDevices[0].videoSettings.enableVideo).toBe(true);
       expect(result.knownDevices[1].deviceId).toBe('device-2');
-      expect(result.knownDevices[1].connectionSettings.connectionType).toBe('Tcp');
+      expect(result.knownDevices[1].connectionSettings.autoConnectEnabled).toBe(false);
     });
   });
 
@@ -997,12 +994,11 @@ interface MockSettingsOverrides {
   deviceId?: string;
   enableVideo?: boolean;
   videoDeviceId?: string;
-  connectionType?: string;
   autoConnectEnabled?: boolean;
   knownDevices?: Array<{
     deviceId: string;
     videoSettings: { enableVideo: boolean; videoDeviceId: string };
-    connectionSettings: { connectionType: ApiConnectionType; autoConnectEnabled: boolean };
+    connectionSettings: { autoConnectEnabled: boolean };
   }>;
 }
 
@@ -1054,7 +1050,6 @@ function createMockGetSettingsResponse(overrides: MockSettingsOverrides = {}): G
         videoDeviceId: overrides.videoDeviceId ?? '',
       },
       connectionSettings: {
-        connectionType: (overrides.connectionType as ApiConnectionType) ?? ApiConnectionType.Serial,
         autoConnectEnabled: overrides.autoConnectEnabled ?? false,
       },
     },
@@ -1088,7 +1083,6 @@ interface MockDomainSettingsOverrides {
   deviceId?: string;
   enableVideo?: boolean;
   videoDeviceId?: string;
-  connectionType?: ConnectionType;
   autoConnectEnabled?: boolean;
   knownDevices?: Settings['knownDevices'];
 }
@@ -1135,7 +1129,6 @@ function createMockDomainSettings(overrides: MockDomainSettingsOverrides = {}): 
           videoDeviceId: overrides.videoDeviceId ?? '',
         },
         connectionSettings: {
-          connectionType: overrides.connectionType ?? ('Serial' as ConnectionType),
           autoConnectEnabled: overrides.autoConnectEnabled ?? false,
         },
       },

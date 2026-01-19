@@ -3,10 +3,7 @@ import { Observable } from 'rxjs';
 import { Device } from '../models';
 
 export interface IDeviceService {
-  findDevices(): Observable<Device[]>;
-  getConnectedDevices(): Observable<Device[]>;
-  connectDevice(deviceId: string): Observable<Device>;
-  disconnectDevice(deviceId: string): Observable<void>;
+  findDevices(fullScan?: boolean): Observable<Device[]>;
   resetDevice(deviceId: string): Observable<void>;
   pingDevice(deviceId: string): Observable<void>;
 }

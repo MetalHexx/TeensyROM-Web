@@ -3,13 +3,10 @@ import { DeviceToolbarComponent } from './device-toolbar.component';
 import {
   DEVICE_SERVICE,
   DEVICE_STORAGE_SERVICE,
-  DEVICE_EVENTS_SERVICE,
   DEVICE_LOGS_SERVICE,
   IDeviceService,
   IStorageService,
-  IDeviceEventsService,
   IDeviceLogsService,
-  Device,
   StorageDirectory,
 } from '@teensyrom-nx/domain';
 import { DeviceStore } from '@teensyrom-nx/application';
@@ -27,21 +24,18 @@ interface MockDeviceStoreContract {
   indexStorageAllStorage: ReturnType<typeof vi.fn>;
   resetAllDevices: ReturnType<typeof vi.fn>;
   pingAllDevices: ReturnType<typeof vi.fn>;
-  hasConnectedDevices: Signal<boolean>;
+  hasEnabledDevices: Signal<boolean>;
 }
 
 describe('DeviceToolbarComponent', () => {
   let component: DeviceToolbarComponent;
   let fixture: ComponentFixture<DeviceToolbarComponent>;
   let mockDeviceStore: MockDeviceStoreContract;
-  let connectedDevicesSignal: ReturnType<typeof signal<boolean>>;
+  let enabledDevicesSignal: ReturnType<typeof signal<boolean>>;
 
   beforeEach(async () => {
     const mockDeviceService: Partial<IDeviceService> = {
       findDevices: () => of([]),
-      getConnectedDevices: () => of([]),
-      connectDevice: () => of({} as Device),
-      disconnectDevice: () => of(undefined),
       resetDevice: () => of(undefined),
       pingDevice: () => of(undefined),
     };
@@ -50,17 +44,6 @@ describe('DeviceToolbarComponent', () => {
       getDirectory: () => of({} as StorageDirectory),
       index: () => of({}),
       indexAll: () => of({}),
-    };
-
-    const mockEventsService: Partial<IDeviceEventsService> = {
-      allEvents: signal(new Map()),
-      connect: () => {
-        /* mock implementation */
-      },
-      disconnect: () => {
-        /* mock implementation */
-      },
-      getDeviceState: () => signal(null),
     };
 
     const mockLogsService: Partial<IDeviceLogsService> = {
@@ -78,7 +61,7 @@ describe('DeviceToolbarComponent', () => {
     };
 
     // Create a writable signal that we can update in tests
-    connectedDevicesSignal = signal(false);
+    enabledDevicesSignal = signal(false);
 
     // Create a mock DeviceStore with spy methods and a computed property based on the signal
     mockDeviceStore = {
@@ -86,7 +69,7 @@ describe('DeviceToolbarComponent', () => {
       indexStorageAllStorage: vi.fn(),
       resetAllDevices: vi.fn(),
       pingAllDevices: vi.fn(),
-      hasConnectedDevices: computed(() => connectedDevicesSignal()),
+      hasEnabledDevices: computed(() => enabledDevicesSignal()),
     };
 
     await TestBed.configureTestingModule({
@@ -95,7 +78,6 @@ describe('DeviceToolbarComponent', () => {
         provideNoopAnimations(),
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: DEVICE_STORAGE_SERVICE, useValue: mockStorageService },
-        { provide: DEVICE_EVENTS_SERVICE, useValue: mockEventsService },
         { provide: DEVICE_LOGS_SERVICE, useValue: mockLogsService },
         { provide: DeviceStore, useValue: mockDeviceStore },
       ],
@@ -117,9 +99,9 @@ describe('DeviceToolbarComponent', () => {
     });
   });
 
-  describe('hasConnectedDevices Selector', () => {
-    it('should disable action buttons when no devices are connected', () => {
-      connectedDevicesSignal.set(false);
+  describe('hasEnabledDevices Selector', () => {
+    it('should disable action buttons when no devices are enabled', () => {
+      enabledDevicesSignal.set(false);
       fixture.detectChanges();
 
       const indexAllButton = fixture.nativeElement.querySelector(
@@ -128,8 +110,8 @@ describe('DeviceToolbarComponent', () => {
       expect(indexAllButton?.disabled).toBe(true);
     });
 
-    it('should enable action buttons when at least one device is connected', () => {
-      connectedDevicesSignal.set(true);
+    it('should enable action buttons when at least one device is enabled', () => {
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       const indexAllButton = fixture.nativeElement.querySelector(
@@ -140,8 +122,8 @@ describe('DeviceToolbarComponent', () => {
   });
 
   describe('Button Disabled State Bindings', () => {
-    it('should disable Index All button when hasConnectedDevices is false', () => {
-      connectedDevicesSignal.set(false);
+    it('should disable Index All button when hasEnabledDevices is false', () => {
+      enabledDevicesSignal.set(false);
       fixture.detectChanges();
 
       const indexAllButton = fixture.nativeElement.querySelector(
@@ -150,8 +132,8 @@ describe('DeviceToolbarComponent', () => {
       expect(indexAllButton?.disabled).toBe(true);
     });
 
-    it('should enable Index All button when hasConnectedDevices is true', () => {
-      connectedDevicesSignal.set(true);
+    it('should enable Index All button when hasEnabledDevices is true', () => {
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       const indexAllButton = fixture.nativeElement.querySelector(
@@ -160,8 +142,8 @@ describe('DeviceToolbarComponent', () => {
       expect(indexAllButton?.disabled).toBe(false);
     });
 
-    it('should disable Reset Devices button when hasConnectedDevices is false', () => {
-      connectedDevicesSignal.set(false);
+    it('should disable Reset Devices button when hasEnabledDevices is false', () => {
+      enabledDevicesSignal.set(false);
       fixture.detectChanges();
 
       const resetButton = fixture.nativeElement.querySelector(
@@ -170,8 +152,8 @@ describe('DeviceToolbarComponent', () => {
       expect(resetButton?.disabled).toBe(true);
     });
 
-    it('should enable Reset Devices button when hasConnectedDevices is true', () => {
-      connectedDevicesSignal.set(true);
+    it('should enable Reset Devices button when hasEnabledDevices is true', () => {
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       const resetButton = fixture.nativeElement.querySelector(
@@ -180,8 +162,8 @@ describe('DeviceToolbarComponent', () => {
       expect(resetButton?.disabled).toBe(false);
     });
 
-    it('should disable Ping Devices button when hasConnectedDevices is false', () => {
-      connectedDevicesSignal.set(false);
+    it('should disable Ping Devices button when hasEnabledDevices is false', () => {
+      enabledDevicesSignal.set(false);
       fixture.detectChanges();
 
       const pingButton = fixture.nativeElement.querySelector(
@@ -190,8 +172,8 @@ describe('DeviceToolbarComponent', () => {
       expect(pingButton?.disabled).toBe(true);
     });
 
-    it('should enable Ping Devices button when hasConnectedDevices is true', () => {
-      connectedDevicesSignal.set(true);
+    it('should enable Ping Devices button when hasEnabledDevices is true', () => {
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       const pingButton = fixture.nativeElement.querySelector(
@@ -200,17 +182,17 @@ describe('DeviceToolbarComponent', () => {
       expect(pingButton?.disabled).toBe(false);
     });
 
-    it('should keep Refresh Devices button always enabled regardless of connection state', () => {
-      connectedDevicesSignal.set(false);
+    it('should keep Discover Devices button always enabled regardless of enabled state', () => {
+      enabledDevicesSignal.set(false);
       fixture.detectChanges();
 
       const refreshButton = fixture.nativeElement.querySelector(
-        '[data-testid="toolbar-button-refresh-devices"] button'
+        '[data-testid="toolbar-button-discover-devices"] button'
       );
       expect(refreshButton?.disabled).toBe(false);
 
       // Change to true and verify still enabled
-      connectedDevicesSignal.set(true);
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       expect(refreshButton?.disabled).toBe(false);
@@ -219,7 +201,7 @@ describe('DeviceToolbarComponent', () => {
 
   describe('Button Event Handlers', () => {
     it('should call deviceStore.indexStorageAllStorage when Index All button clicked', () => {
-      connectedDevicesSignal.set(true);
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       const indexAllButton = fixture.nativeElement.querySelector(
@@ -230,17 +212,17 @@ describe('DeviceToolbarComponent', () => {
       expect(mockDeviceStore.indexStorageAllStorage).toHaveBeenCalled();
     });
 
-    it('should call deviceStore.findDevices when Refresh Devices button clicked', () => {
+    it('should call deviceStore.findDevices with fullScan=true when Discover Devices button clicked', () => {
       const refreshButton = fixture.nativeElement.querySelector(
-        '[data-testid="toolbar-button-refresh-devices"] button'
+        '[data-testid="toolbar-button-discover-devices"] button'
       );
       refreshButton.click();
 
-      expect(mockDeviceStore.findDevices).toHaveBeenCalled();
+      expect(mockDeviceStore.findDevices).toHaveBeenCalledWith(true);
     });
 
     it('should call deviceStore.resetAllDevices when Reset Devices button clicked', () => {
-      connectedDevicesSignal.set(true);
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       const resetButton = fixture.nativeElement.querySelector(
@@ -252,7 +234,7 @@ describe('DeviceToolbarComponent', () => {
     });
 
     it('should call deviceStore.pingAllDevices when Ping Devices button clicked', () => {
-      connectedDevicesSignal.set(true);
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       const pingButton = fixture.nativeElement.querySelector(
@@ -275,7 +257,7 @@ describe('DeviceToolbarComponent', () => {
         '[data-testid="toolbar-button-index-all"]'
       );
       const refreshButton = fixture.nativeElement.querySelector(
-        '[data-testid="toolbar-button-refresh-devices"]'
+        '[data-testid="toolbar-button-discover-devices"]'
       );
       const resetButton = fixture.nativeElement.querySelector(
         '[data-testid="toolbar-button-reset-devices"]'
@@ -295,7 +277,7 @@ describe('DeviceToolbarComponent', () => {
         '[data-testid="toolbar-button-index-all"]'
       );
       const refreshButton = fixture.nativeElement.querySelector(
-        '[data-testid="toolbar-button-refresh-devices"]'
+        '[data-testid="toolbar-button-discover-devices"]'
       );
       const resetButton = fixture.nativeElement.querySelector(
         '[data-testid="toolbar-button-reset-devices"]'
@@ -305,16 +287,16 @@ describe('DeviceToolbarComponent', () => {
       );
 
       expect(indexAllButton.textContent).toContain('Index All');
-      expect(refreshButton.textContent).toContain('Refresh Devices');
+      expect(refreshButton.textContent).toContain('Discover Devices');
       expect(resetButton.textContent).toContain('Reset Devices');
       expect(pingButton.textContent).toContain('Ping Devices');
     });
   });
 
   describe('Reactive State Changes', () => {
-    it('should update button disabled state reactively when hasConnectedDevices changes', () => {
-      // Start with no connected devices
-      connectedDevicesSignal.set(false);
+    it('should update button disabled state reactively when hasEnabledDevices changes', () => {
+      // Start with no enabled devices
+      enabledDevicesSignal.set(false);
       fixture.detectChanges();
 
       let indexAllButton = fixture.nativeElement.querySelector(
@@ -322,8 +304,8 @@ describe('DeviceToolbarComponent', () => {
       );
       expect(indexAllButton?.disabled).toBe(true);
 
-      // Simulate device connection
-      connectedDevicesSignal.set(true);
+      // Simulate device being enabled
+      enabledDevicesSignal.set(true);
       fixture.detectChanges();
 
       indexAllButton = fixture.nativeElement.querySelector(
@@ -331,8 +313,8 @@ describe('DeviceToolbarComponent', () => {
       );
       expect(indexAllButton?.disabled).toBe(false);
 
-      // Simulate device disconnection
-      connectedDevicesSignal.set(false);
+      // Simulate device being disabled
+      enabledDevicesSignal.set(false);
       fixture.detectChanges();
 
       indexAllButton = fixture.nativeElement.querySelector(

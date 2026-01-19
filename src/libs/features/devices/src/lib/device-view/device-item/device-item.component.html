@@ -2,18 +2,18 @@
   [title]="device()?.name"
   [enableOverflow]="false"
   data-testid="device-card"
-  [ngClass]="{ dimmed: !connectionStatus() }"
+  [ngClass]="{ dimmed: !isEnabled() }"
   animationEntry="from-left"
 >
-  <!-- Power button in corner slot -->
+  <!-- Power button in corner slot - repurposed for enable/disable -->
   <lib-icon-button
     slot="corner"
     icon="power_settings_new"
-    ariaLabel="Power"
+    ariaLabel="Toggle Enabled"
     data-testid="device-power-button"
-    [color]="connectionStatus() ? 'highlight' : 'normal'"
+    [color]="isEnabled() ? 'highlight' : 'normal'"
     size="medium"
-    (buttonClick)="connectionStatus() ? onDisconnect() : onConnect()"
+    (buttonClick)="onToggleEnabled()"
   >
   </lib-icon-button>
 
@@ -30,17 +30,22 @@
         data-testid="device-firmware-label"
         [label]="'Firmware: ' + (device()?.fwVersion ?? '')"
       ></lib-icon-label>
-      <lib-icon-label
-        icon="usb"
-        data-testid="device-port-label"
-        [label]="'Port: ' + (device()?.comPort ?? '')"
-      >
-      </lib-icon-label>
-      <lib-icon-label
-        icon="device_hub"
-        data-testid="device-state-label"
-        [label]="'State: ' + (deviceState()?.toString() ?? '')"
-      ></lib-icon-label>
+
+      <!-- Show connection info: prefer TCP details when available -->
+      @if (device()?.ipAddress) {
+        <lib-icon-label
+          icon="wifi"
+          data-testid="device-address-label"
+          [label]="(device()?.ipAddress ?? '') + (device()?.tcpPort ? ':' + device()?.tcpPort : '')"
+        ></lib-icon-label>
+      } @else {
+        <lib-icon-label
+          icon="usb"
+          data-testid="device-port-label"
+          [label]="'Port: ' + (device()?.comPort ?? '')"
+        ></lib-icon-label>
+      }
+
       <lib-icon-label
         icon="verified_user"
         data-testid="device-compatible-label"

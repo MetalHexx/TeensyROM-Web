@@ -17,11 +17,11 @@ export class DeviceViewComponent {
   devices = this.deviceStore.devices;
   isLoading = this.deviceStore.isLoading;
 
-  onConnect(deviceId: string) {
-    this.deviceStore.connectDevice(deviceId);
+  onEnable(deviceId: string) {
+    this.deviceStore.enableDevice(deviceId);
   }
 
-  onDisconnect(deviceId: string) {
-    this.deviceStore.disconnectDevice(deviceId);
+  onDisable(deviceId: string) {
+    this.deviceStore.disableDevice(deviceId);
   }
 }

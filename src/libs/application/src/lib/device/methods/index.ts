@@ -1,3 +1,2 @@
 export * from './find-devices';
-export * from './connect-device';
-export * from './disconnect-device';
+export * from './enable-device';

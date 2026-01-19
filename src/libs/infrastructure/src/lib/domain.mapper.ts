@@ -7,6 +7,7 @@ import {
   ViewableItemImageDto,
   FileItemType as ApiFileItemType,
   TeensyStorageType as ApiStorageType,
+  DeviceState as ApiDeviceState,
   LaunchRandomScopeEnum,
   NullableOfTeensyFilterType,
   YouTubeVideoDto,
@@ -24,7 +25,6 @@ import {
   AppSettingsDto,
   DeviceSettingsDto,
 } from '@teensyrom-nx/data-access/api-client';
-import { DeviceState as ApiDeviceState } from '@teensyrom-nx/data-access/api-client';
 import {
   Device,
   DeviceStorage,
@@ -49,7 +49,6 @@ import {
   SearchSettings,
   SearchWeights,
   AppSettings,
-  ConnectionType,
   DeviceSettings,
 } from '@teensyrom-nx/domain';
 
@@ -72,7 +71,10 @@ export class DomainMapper {
       fwVersion: cartDto.fwVersion,
       isCompatible: cartDto.isCompatible,
       isConnected: cartDto.isConnected,
-      deviceState: this.mapDeviceState(cartDto.deviceState),
+      deviceState: cartDto.deviceState as DeviceState,
+      isEnabled: true, // Default to enabled for all devices
+      ipAddress: cartDto.ipAddress,
+      tcpPort: cartDto.tcpPort,
       sdStorage: this.toDeviceStorage(cartDto.sdStorage),
       usbStorage: this.toDeviceStorage(cartDto.usbStorage),
     };
@@ -88,11 +90,6 @@ export class DomainMapper {
 
   static toDeviceList(cartDtos: CartDto[]): Device[] {
     return cartDtos.map((cart) => this.toDevice(cart));
-  }
-
-  private static mapDeviceState(apiState: ApiDeviceState): DeviceState {
-    // Both enums have the same values, so we can safely cast
-    return apiState as unknown as DeviceState;
   }
 
   // ===== STORAGE MAPPING =====
@@ -404,14 +401,12 @@ export class DomainMapper {
 
   private static toConnectionSettings(dto: ConnectionSettingsDto): ConnectionSettings {
     return {
-      connectionType: dto.connectionType as ConnectionType,
       autoConnectEnabled: dto.autoConnectEnabled,
     };
   }
 
   private static toConnectionSettingsDto(settings: ConnectionSettings): ConnectionSettingsDto {
     return {
-      connectionType: settings.connectionType,
       autoConnectEnabled: settings.autoConnectEnabled,
     };
   }

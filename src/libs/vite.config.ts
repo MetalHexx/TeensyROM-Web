@@ -20,5 +20,10 @@ export default defineConfig(() => ({
       reportsDirectory: '../coverage/libs',
       provider: 'v8' as const,
     },
+    server: {
+      deps: {
+        inline: ['@angular/core'],
+      },
+    },
   },
 }));

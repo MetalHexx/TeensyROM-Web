@@ -13,11 +13,11 @@ export function findDevices(
   deviceService: IDeviceService = inject(DEVICE_SERVICE)
 ) {
   return {
-    findDevices: async () => {
+    findDevices: async (fullScan = false) => {
       patchState(store, { isLoading: true });
 
       try {
-        const devices = await firstValueFrom(deviceService.findDevices());
+        const devices = await firstValueFrom(deviceService.findDevices(fullScan));
         patchState(store, {
           devices,
           error: devices.length === 0 ? 'No devices found' : null,

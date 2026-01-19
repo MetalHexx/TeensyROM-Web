@@ -34,7 +34,7 @@ export const DEVICE_VIEW_SELECTORS = {
   deviceList: '[data-testid="device-list"]',
   emptyStateMessage: '[data-testid="empty-state-message"]',
   loadingIndicator: '.busy-dialog-content',
-  refreshButton: 'button:contains("Refresh Devices")',
+  refreshButton: 'button:contains("Discover Devices")',
 } as const;
 
 // Device card and internal elements
@@ -57,11 +57,11 @@ export const DEVICE_CARD_SELECTORS = {
 export const DEVICE_TOOLBAR_SELECTORS = {
   container: '[data-testid="device-toolbar"]',
   indexAllButton: '[data-testid="toolbar-button-index-all"] button',
-  refreshButton: '[data-testid="toolbar-button-refresh-devices"] button',
+  refreshButton: '[data-testid="toolbar-button-discover-devices"] button',
   resetButton: '[data-testid="toolbar-button-reset-devices"] button',
   pingButton: '[data-testid="toolbar-button-ping-devices"] button',
   indexAllContainer: '[data-testid="toolbar-button-index-all"]',
-  refreshContainer: '[data-testid="toolbar-button-refresh-devices"]',
+  refreshContainer: '[data-testid="toolbar-button-discover-devices"]',
   resetContainer: '[data-testid="toolbar-button-reset-devices"]',
   pingContainer: '[data-testid="toolbar-button-ping-devices"]',
 } as const;
