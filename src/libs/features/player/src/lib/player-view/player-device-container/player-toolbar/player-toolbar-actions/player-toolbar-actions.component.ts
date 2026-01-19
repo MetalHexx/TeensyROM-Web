@@ -8,11 +8,6 @@ import { PLAYER_CONTEXT, StorageStore } from '@teensyrom-nx/application';
 import { LaunchMode } from '@teensyrom-nx/domain';
 import { StorageKeyUtil } from '@teensyrom-nx/application';
 
-/**
- * Predefined duration options for custom play timer.
- * Each option provides a label for display and a value in milliseconds.
- * Options range from 5 seconds to 1 hour in ascending order.
- */
 const DURATION_OPTIONS = [
   { label: '5s', valueMs: 5000 },
   { label: '10s', valueMs: 10000 },
@@ -46,61 +41,53 @@ export class PlayerToolbarActionsComponent {
 
   deviceId = input.required<string>();
 
-  /**
-   * Expose duration options for template usage
-   */
   protected readonly durationOptions = DURATION_OPTIONS;
 
-  /**
-   * Custom timer configuration for the current device.
-   * Returns null if no custom timer config exists.
-   */
   customTimerConfig = computed(() => {
     const deviceId = this.deviceId();
     if (!deviceId) return null;
     return this.playerContext.getPlayTimerConfig(deviceId)();
   });
 
-  /**
-   * Whether custom timer is currently enabled for this device.
-   * Defaults to false when config is null.
-   */
   isCustomTimerEnabled = computed(() => {
     const config = this.customTimerConfig();
     return config?.enabled ?? false;
   });
 
-  /**
-   * Currently selected timer duration in milliseconds.
-   * Defaults to 3 minutes (180000ms) when config is null.
-   */
   selectedDurationMs = computed(() => {
     const config = this.customTimerConfig();
     return config?.durationMs ?? 180000;
   });
 
-  /**
-   * Badge text showing the selected timer duration.
-   * Returns the label from DURATION_OPTIONS matching selectedDurationMs.
-   */
   timerBadgeText = computed(() => {
     const durationMs = this.selectedDurationMs();
     const option = DURATION_OPTIONS.find(opt => opt.valueMs === durationMs);
     return option?.label ?? '3m';
   });
 
+
   currentFile = computed(() => {
     const deviceId = this.deviceId();
-    if (!deviceId) return null;
-    // Invoke the inner signal to subscribe to store changes
-    return this.playerContext.getCurrentFile(deviceId)();
+    if (!deviceId) {
+      return null;
+    }
+    const file = this.playerContext.getCurrentFile(deviceId)();
+    return file;
   });
 
-  /**
-   * Handles timer menu item selection.
-   * Selecting "Off" disables the timer while preserving duration.
-   * Selecting a duration enables the timer with that duration.
-   */
+  isFavorite = computed(() => {
+    const launchedFile = this.currentFile();
+    const result = launchedFile?.file?.isFavorite ?? false;
+    console.log('[isFavorite] Computed evaluated:', result, 'file:', launchedFile?.file.path);
+    return result;
+  });
+
+  favoriteIconClass = computed(() => {
+    const result = this.isFavorite() ? 'filled' : 'outlined';
+    console.log('[favoriteIconClass] Computed evaluated:', result);
+    return result;
+  });
+
   onTimerMenuItemClick(durationMs: number | null): void {
     const deviceId = this.deviceId();
     if (!deviceId) return;
@@ -144,8 +131,7 @@ export class PlayerToolbarActionsComponent {
     const isCurrentlyFavorite = file?.isFavorite ?? false;
     const filePath = file.path;
     const newFavoriteStatus = !isCurrentlyFavorite;
-
-    // PESSIMISTIC UPDATE: Wait for storage operation, then update player store
+    
     if (isCurrentlyFavorite) {
       await this.storageStore.removeFavorite({
         deviceId,
@@ -162,16 +148,11 @@ export class PlayerToolbarActionsComponent {
 
     const favoriteState = this.storageStore.favoriteOperationsState();
 
-    if (favoriteState.isProcessing || favoriteState.error) {
+    if (favoriteState.error) {
       return;
     }
 
     this.playerContext.updateCurrentFileFavoriteStatus(deviceId, filePath, newFavoriteStatus);
-  }
-
-  isFavorite(): boolean {
-    const launchedFile = this.currentFile();
-    return launchedFile?.file?.isFavorite ?? false;
   }
 
   isFavoriteOperationInProgress(): boolean {
