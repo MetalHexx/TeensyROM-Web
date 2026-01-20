@@ -8,6 +8,7 @@
       data-testid="toolbar-button-discover-devices"
       icon="refresh"
       label="Discover Devices"
+      tooltip="Scans the local network and COM ports for TeensyROM devices"
       (buttonClick)="onRefreshDevices()"
     >
     </lib-action-button>
@@ -16,6 +17,7 @@
       icon="reset_tv"
       label="Reset Devices"
       [disabled]="!hasEnabledDevices()"
+      [tooltip]="hasEnabledDevices() ? 'Resets all enabled TeensyROM devices' : 'No enabled devices available to reset'"
       (buttonClick)="onResetDevices()"
     >
     </lib-action-button>
@@ -24,6 +26,7 @@
       icon="network_ping"
       label="Ping Devices"
       [disabled]="!hasEnabledDevices()"
+      [tooltip]="hasEnabledDevices() ? 'Sends a ping command to all enabled devices.  See logs for response.' : 'No enabled devices available to ping'"
       (buttonClick)="onPingDevices()"
     >
     </lib-action-button>
@@ -32,6 +35,7 @@
       icon="download"
       label="Index All"
       [disabled]="!hasEnabledDevices()"
+      [tooltip]="hasEnabledDevices() ? 'Download and index files from all enabled device storage. If you have more than one device, they will be indexed in parallel.' : 'No enabled devices available to index'"
       (buttonClick)="onIndexAllStorage()"
     >
     </lib-action-button>
