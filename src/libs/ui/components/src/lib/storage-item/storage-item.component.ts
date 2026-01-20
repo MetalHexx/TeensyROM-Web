@@ -90,9 +90,9 @@ export class StorageItemComponent {
     }
   }
 
-  @HostListener('keydown.space', ['$event'])
-  onSpaceKey(event: KeyboardEvent): void {
-    if (!this.disabled()) {
+  @HostListener('keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent): void {
+    if (!this.disabled() && (event.code === 'Space' || event.key === ' ')) {
       event.preventDefault(); // Prevent scrolling
       this.selectedChange.emit();
     }

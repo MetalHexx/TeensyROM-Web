@@ -25,7 +25,6 @@ const createGetSettingsResponseDto = (): GetSettingsResponse => ({
         videoDeviceId: '',
       },
       connectionSettings: {
-        connectionType: 'Serial',
         autoConnectEnabled: false,
       },
     },
@@ -108,7 +107,6 @@ const createDomainSettings = (): Settings => ({
         videoDeviceId: '',
       },
       connectionSettings: {
-        connectionType: 'Serial',
         autoConnectEnabled: false,
       },
     },

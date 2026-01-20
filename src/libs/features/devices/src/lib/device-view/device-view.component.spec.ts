@@ -50,10 +50,11 @@ describe('DevicesComponent', () => {
     const mockDeviceStore = {
       devices: mockDevices,
       isLoading: signal(false),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       hasEnabledDevices: computed(() => mockDevices().some((device: any) => device.isEnabled)),
       enableDevice: vi.fn(),
       disableDevice: vi.fn(),
-    } as Partial<DeviceStore>;
+    } as Partial<InstanceType<typeof DeviceStore>>;
 
     await TestBed.configureTestingModule({
       imports: [DeviceViewComponent],
