@@ -13,6 +13,9 @@
     data-testid="device-power-button"
     [color]="isEnabled() ? 'highlight' : 'normal'"
     size="medium"
+    [tooltip]="isEnabled() 
+      ? 'Disables the device and makes it unavailable in other parts of the application.' 
+      : 'Enables the device and makes it available in other parts of the application.'"
     (buttonClick)="onToggleEnabled()"
   >
   </lib-icon-button>
