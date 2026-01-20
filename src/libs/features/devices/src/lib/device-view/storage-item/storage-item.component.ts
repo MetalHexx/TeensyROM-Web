@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, computed } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
@@ -25,6 +25,12 @@ export class StorageStatusComponent {
   label = input<string>('');
   status = input<boolean | undefined>(undefined);
   index = output<void>();
+
+  // Computed tooltip message
+  tooltipMessage = computed(() => {
+    const storageType = this.icon() === 'usb' ? 'USB device' : 'SD card';
+    return `Indexes the ${storageType} to make files available for search and random launch.`;
+  });
 
   onIndex() {
     this.index.emit();
