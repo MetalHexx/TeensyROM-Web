@@ -1,4 +1,13 @@
-<span class="icon-label-container" [class]="gapClass()">
+<span [class]="'icon-label-container ' + gapClass()">
   <lib-styled-icon [icon]="icon()" [color]="color()" [size]="iconSize()"></lib-styled-icon>
-  <span class="icon-label-text" [class]="textClass()" [class.truncate]="truncate()" [title]="label()">{{ label() }}</span>
+
+  <span class="text-container">
+    <span [class]="'icon-label-text primary ' + textClass() + ' ' + labelClass()" [class.truncate]="truncate()" [title]="label()">{{ label() }}</span>
+
+    @if (secondaryLabel()) {
+      <span [class]="'icon-label-text secondary ' + secondaryTextClass() + ' ' + secondaryLabelClass()">
+        {{ secondaryLabel() }}
+      </span>
+    }
+  </span>
 </span>

@@ -20,6 +20,12 @@
   }
 }
 
+.text-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 .icon-label-text {
   display: inline-block;
   vertical-align: middle;
@@ -31,25 +37,57 @@
     text-overflow: ellipsis;
   }
 
-  // Text size presets using design tokens
-  &.text-small {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-normal);
+  &.primary {
+    // Text size presets using design tokens
+    &.text-small {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-normal);
+    }
+
+    &.text-medium {
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-normal);
+    }
+
+    &.text-large {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-normal);
+    }
+
+    &.text-extra-large {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.1;
+    }
   }
 
-  &.text-medium {
-    font-size: var(--font-size-md);
-    font-weight: var(--font-weight-normal);
-  }
+  &.secondary {
+    font-style: italic;
 
-  &.text-large {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-normal);
-  }
+    // Scaled sizing based on parent size presets
+    &.text-xs {
+      font-size: var(--font-size-xs);
+    }
 
-  &.text-extra-large {
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.1;
+    &.text-sm {
+      font-size: var(--font-size-sm);
+    }
+
+    &.text-md {
+      font-size: var(--font-size-md);
+    }
+
+    &.text-lg {
+      font-size: var(--font-size-lg);
+    }
+
+    // Semantic color classes for secondary text
+    &.success {
+      color: var(--color-highlight);
+    }
+
+    &.error {
+      color: var(--color-dimmed);
+    }
   }
 }

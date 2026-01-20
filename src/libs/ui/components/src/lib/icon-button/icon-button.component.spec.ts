@@ -198,4 +198,24 @@ describe('IconButtonComponent', () => {
     expect(button.getAttribute('aria-label')).toBe('Accessibility Test Button');
     expect(button.tagName.toLowerCase()).toBe('button');
   });
+
+  it('should display tooltip when provided', () => {
+    componentRef.setInput('icon', 'info');
+    componentRef.setInput('ariaLabel', 'Info');
+    componentRef.setInput('tooltip', 'This is helpful information');
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('button');
+    expect(button.getAttribute('ng-reflect-message')).toBe('This is helpful information');
+  });
+
+  it('should not display tooltip when empty string', () => {
+    componentRef.setInput('icon', 'info');
+    componentRef.setInput('ariaLabel', 'Info');
+    componentRef.setInput('tooltip', '');
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('button');
+    expect(button.getAttribute('ng-reflect-message')).toBe('');
+  });
 });

@@ -3,6 +3,8 @@
   [class]="buttonClasses()"
   [attr.aria-label]="ariaLabel()"
   [disabled]="disabled()"
+  [matTooltip]="tooltip()"
+  matTooltipPosition="above"
   (click)="onButtonClick()"
 >
   @if (hasIcon()) {

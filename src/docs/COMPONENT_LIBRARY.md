@@ -2322,6 +2322,7 @@ export class FileListItemComponent {
 
 - `icon` (optional): `string` - Material Design icon name to display in the button. Use this OR ng-content for custom icons.
 - `ariaLabel` (required): `string` - Accessibility label for screen readers (required for proper accessibility)
+- `tooltip` (optional): `string` - Tooltip text displayed on hover using Material Design tooltip - defaults to empty string
 - `color` (optional): `'normal' | 'highlight' | 'success' | 'error' | 'dimmed'` - Semantic color variant that maps to [STYLE_GUIDE.md](STYLE_GUIDE.md) color system - defaults to 'normal'
 - `size` (optional): `'small' | 'medium' | 'large'` - Size variant that maps to existing style classes - defaults to 'medium'
 - `variant` (optional): `'standard' | 'rounded-primary' | 'rounded-transparent'` - Style variant from [STYLE_GUIDE.md](STYLE_GUIDE.md) - defaults to 'standard'
@@ -2401,6 +2402,16 @@ export class FileListItemComponent {
   ariaLabel="Add to Favorites"
   [color]="isFavorite ? 'success' : 'normal'"
   (buttonClick)="toggleFavorite()"
+>
+</lib-icon-button>
+
+<!-- Button with tooltip -->
+<lib-icon-button
+  icon="power_settings_new"
+  ariaLabel="Toggle Power"
+  [tooltip]="isEnabled() ? 'Disable device' : 'Enable device'"
+  [color]="isEnabled() ? 'highlight' : 'normal'"
+  (buttonClick)="onTogglePower()"
 >
 </lib-icon-button>
 ```
@@ -3199,7 +3210,10 @@ export class MyComponent {
 **Properties**:
 
 - `icon` (optional): `string` - Material Design icon name to display - defaults to empty string
-- `label` (optional): `string` - Text label to display next to the icon - defaults to empty string
+- `label` (optional): `string` - Primary text label to display next to the icon - defaults to empty string
+- `secondaryLabel` (optional): `string` - Optional secondary text displayed below primary label - defaults to empty string
+- `labelClass` (optional): `string` - Optional CSS class applied to primary text - defaults to empty string
+- `secondaryLabelClass` (optional): `string` - Optional CSS class applied to secondary text - defaults to empty string
 - `color` (optional): `'normal' | 'primary' | 'highlight' | 'success' | 'error' | 'dimmed' | 'directory'` - Icon color from design system - defaults to 'normal'
 - `size` (optional): `'small' | 'medium' | 'large' | 'extra-large'` - Size preset that controls icon size, text size, font weight, and gap spacing - defaults to 'medium'
 - `truncate` (optional): `boolean` - Enable text truncation with ellipsis (20ch max width) - defaults to true
@@ -3215,11 +3229,41 @@ The `size` parameter automatically adjusts multiple styling aspects for cohesive
 | `'large'` | large | `--font-size-lg` | `--font-weight-normal` | `--spacing-inline-md` | Section headers, emphasis |
 | `'extra-large'` | extra-large | `--font-size-xl` | `--font-weight-medium` | `--spacing-inline-lg` | Page titles, headings |
 
+**Secondary Text Scaling**:
+
+When using `secondaryLabel`, the secondary text automatically scales proportionally with size presets:
+
+| Size Preset | Primary Text | Secondary Text |
+|-------------|--------------|----------------|
+| `small` | `sm` | `xs` |
+| `medium` | `md` | `sm` |
+| `large` | `lg` | `md` |
+| `extra-large` | `xl` | `lg` |
+
 See [Typography Tokens](STYLE_GUIDE.md#typography-tokens) and [Spacing Tokens](STYLE_GUIDE.md#spacing-tokens) for actual values.
 
 **Usage Examples**:
 
 ```html
+<!-- Single-line (backward compatible) -->
+<lib-icon-label icon="usb" label="USB Stick"></lib-icon-label>
+
+<!-- Two-line with status -->
+<lib-icon-label 
+  icon="usb" 
+  label="USB Stick"
+  secondaryLabel="Available"
+  secondaryLabelClass="success"
+></lib-icon-label>
+
+<!-- Different sizes with secondary text -->
+<lib-icon-label 
+  icon="music_note" 
+  label="Summer of '69"
+  secondaryLabel="Bryan Adams • 1984"
+  size="large"
+></lib-icon-label>
+
 <!-- Medium size (default) - general purpose -->
 <lib-icon-label icon="folder" label="Documents"></lib-icon-label>
 
@@ -3264,6 +3308,26 @@ See [Typography Tokens](STYLE_GUIDE.md#typography-tokens) and [Spacing Tokens](S
   [label]="'Device ID: ' + deviceId" 
   size="extra-large">
 </lib-icon-label>
+```
+
+**Migration Pattern - Before/After**:
+
+```html
+<!-- OLD: Nested containers with manual positioning -->
+<div class="container">
+  <div class="left">
+    <lib-icon-label icon="usb" label="USB"></lib-icon-label>
+    <span style="margin-left: 2rem; margin-top: -0.2rem;">Available</span>
+  </div>
+</div>
+
+<!-- NEW: Clean layout with secondary label -->
+<lib-icon-label 
+  icon="usb" 
+  label="USB"
+  secondaryLabel="Available"
+  secondaryLabelClass="success"
+></lib-icon-label>
 ```
 
 **Advanced Usage Patterns**:
@@ -3349,7 +3413,7 @@ The component leverages:
 
 - `libs/features/settings/src/lib/settings-view/device-settings-section/device-settings-section.component.html` - Device section headers (extra-large size)
 - [`device-item.component.html`](../libs/features/devices/src/lib/device-view/device-item/device-item.component.html) - Device information labels
-- [`storage-item.component.html`](../libs/features/devices/src/lib/device-view/storage-item/storage-item.component.html) - Storage information labels
+- [`storage-item.component.html`](../libs/features/devices/src/lib/device-view/storage-item/storage-item.component.html) - Storage information labels with status as secondary label
 - [`action-button.component.html`](../libs/ui/components/src/lib/action-button/action-button.component.html) - Button labels with icons
 - [`directory-tree-node.component.html`](../libs/features/player/src/lib/player-view/player-device-container/storage-container/directory-tree/directory-tree-node/directory-tree-node.component.html) - Tree node labels with semantic colors
 

@@ -50,9 +50,23 @@ export class IconLabelComponent {
   color = input<StyledIconColor>('normal');
   size = input<IconLabelSize>('medium');
   truncate = input<boolean>(true);
+  secondaryLabel = input<string>('');
+  secondaryLabelClass = input<string>('');
+  labelClass = input<string>('');
 
   // Computed signals for preset-based styling
   iconSize = computed(() => SIZE_PRESETS[this.size()].iconSize);
   textClass = computed(() => SIZE_PRESETS[this.size()].textClass);
   gapClass = computed(() => SIZE_PRESETS[this.size()].gapClass);
+
+  // Computed signal for secondary text size class (scaled down from primary)
+  secondaryTextClass = computed(() => {
+    const sizeMap: Record<IconLabelSize, string> = {
+      'small': 'text-xs',
+      'medium': 'text-sm',
+      'large': 'text-md',
+      'extra-large': 'text-lg',
+    };
+    return sizeMap[this.size()];
+  });
 }
