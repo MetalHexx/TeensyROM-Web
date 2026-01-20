@@ -191,4 +191,24 @@ describe('ActionButtonComponent', () => {
     expect(button.getAttribute('aria-label')).toBe('Get Help');
     expect(button.tagName.toLowerCase()).toBe('button');
   });
+
+  it('should display tooltip when provided', () => {
+    componentRef.setInput('icon', 'info');
+    componentRef.setInput('label', 'Information');
+    componentRef.setInput('tooltip', 'Click for more information');
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('button');
+    expect(button.getAttribute('ng-reflect-message')).toBe('Click for more information');
+  });
+
+  it('should not display tooltip when empty string', () => {
+    componentRef.setInput('icon', 'info');
+    componentRef.setInput('label', 'Information');
+    componentRef.setInput('tooltip', '');
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('button');
+    expect(button.getAttribute('ng-reflect-message')).toBe('');
+  });
 });

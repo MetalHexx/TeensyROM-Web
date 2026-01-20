@@ -2491,6 +2491,7 @@ export class MyComponent {
 - `color` (optional): `'primary' | 'success' | 'error' | 'highlight' | 'normal'` - Semantic color variant using [STYLE_GUIDE.md](STYLE_GUIDE.md) design tokens - defaults to 'primary'
 - `disabled` (optional): `boolean` - Whether the button is disabled - defaults to false
 - `ariaLabel` (optional): `string` - Accessibility label for screen readers (defaults to label value)
+- `tooltip` (optional): `string` - Tooltip text displayed on hover - defaults to empty string (no tooltip)
 
 **Events**:
 
@@ -2524,6 +2525,24 @@ export class MyComponent {
   [disabled]="!hasFiles"
   ariaLabel="Upload selected files to server"
   (buttonClick)="upload()"
+>
+</lib-action-button>
+
+<!-- With tooltip -->
+<lib-action-button
+  icon="info"
+  label="Details"
+  tooltip="View detailed information about this item"
+  (buttonClick)="showDetails()"
+>
+</lib-action-button>
+
+<!-- Conditional tooltip -->
+<lib-action-button
+  icon="power_settings_new"
+  label="Toggle Power"
+  [tooltip]="isPowered ? 'Turn off device' : 'Turn on device'"
+  (buttonClick)="togglePower()"
 >
 </lib-action-button>
 ```
