@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { of } from 'rxjs';
 import { SettingsStore } from '../settings-store';
-import { SETTINGS_SERVICE } from '@teensyrom-nx/domain';
+import { PlayerFilterType, SETTINGS_SERVICE } from '@teensyrom-nx/domain';
 import { ISettingsService } from '@teensyrom-nx/domain';
 import { DeviceSettings, Settings } from '@teensyrom-nx/domain';
 
@@ -16,7 +16,7 @@ describe('selectKnownDevices', () => {
       playTimerEnabled: false,
       muteFastForward: false,
       muteRandomSeek: false,
-      startupFilter: 'All',
+      startupFilter: PlayerFilterType.All,
       startupLaunchEnabled: false,
       startupLaunchRandom: false,
     },
