@@ -27,7 +27,7 @@ public record DeviceIpCache
 public record CachedDeviceIp
 {
 	public required string IpAddress { get; init; }
-	public int Port { get; init; } = 80;
+	public int Port { get; init; } = TcpConstants.TeensyRomPort;
 	public DateTime LastSeen { get; init; } = DateTime.UtcNow;
 }
 
@@ -42,7 +42,7 @@ public class TcpDiscoveryStrategy(
 {
 	private const int _maxDegreeOfParallelism = 256;  // High parallelism safe with true async I/O (no thread blocking)
 	private readonly string _cacheFilePath = Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), "Assets/System/Config/DeviceIps.json");
-	private readonly object _lock = new();
+	private readonly object _lock = new();	
 
 	/// <summary>
 	/// Finds all available TCP endpoints on the local network.
@@ -190,7 +190,7 @@ public class TcpDiscoveryStrategy(
 		{
 			ct.ThrowIfCancellationRequested();
 
-			var device = await TryDiscoverDeviceAsync(ip, 80);
+			var device = await TryDiscoverDeviceAsync(ip, TcpConstants.TeensyRomPort);
 			if (device != null)
 			{
 				discoveredDevices.Add(device);
