@@ -4,11 +4,12 @@ using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Commands
 {
-    public class ResetCommandHandler(IAlertService alert) : IRequestHandler<ResetCommand, ResetResult>
+    public class ResetCommandHandler(ILoggingService log) : IRequestHandler<ResetCommand, ResetResult>
     {        
         public async Task<ResetResult> Handle(ResetCommand request, CancellationToken cancellationToken)
         {
-            var resetResult = await request.CommunicationPort.ReconnectPort();
+			var resetResult = request.CommunicationPort.ForceResetAndReconnectToFullFw(log);
+			await Task.CompletedTask;
 
             return resetResult
                 ? new ResetResult()
