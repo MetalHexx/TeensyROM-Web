@@ -232,7 +232,7 @@ public class TcpDiscoveryStrategy(
 			stream.ReadTimeout = 500;
 			stream.WriteTimeout = 500;
 
-			byte[] sendBytes = BitConverter.GetBytes(TeensyToken.MinimalCheck.Value);
+			byte[] sendBytes = BitConverter.GetBytes(TeensyToken.FwCheckToken.Value);
 			if (BitConverter.IsLittleEndian)
 			{
 				Array.Reverse(sendBytes);
@@ -254,15 +254,15 @@ public class TcpDiscoveryStrategy(
 				return null;
 			}
 
-			ushort minimalCheckResult = BitConverter.ToUInt16(responseBytes, 0);
+			ushort fwCheckResult = BitConverter.ToUInt16(responseBytes, 0);
 
-			if (minimalCheckResult != 0 && minimalCheckResult != 1)
+			if (fwCheckResult != TeensyToken.FWMinimalToken.Value && fwCheckResult != TeensyToken.FWFullToken.Value)
 			{
 				tcpClient.Dispose();
 				return null;
 			}
 
-			bool isMinimalMode = minimalCheckResult == 1;
+			bool isMinimalMode = fwCheckResult == TeensyToken.FWMinimalToken.Value;
 
 			communicationPort = new TcpCommunicationPort(log, tcpClient);
 

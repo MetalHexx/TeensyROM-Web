@@ -43,15 +43,20 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 
 		public bool ExecuteMinimalCheck(ICommunicationPort communicationPort)
 		{
-			log.Internal("Minimal Check Command");
-			communicationPort.SendIntBytes(TeensyToken.MinimalCheck, 2);
+			log.Internal("FW Check Command");
+			communicationPort.SendIntBytes(TeensyToken.FwCheckToken, 2);
 			communicationPort.WaitForSerialData(numBytes: 2, timeoutMs: 20000);
 			byte[] recBuf = new byte[2];
 			communicationPort.Read(recBuf, 0, 2);
 			ushort result = BitConverter.ToUInt16(recBuf, 0);
-			string firmware = result == 0 ? "TeensyROM" : "MinimalBoot";
+			string firmware = result switch
+			{
+				var _ when result == TeensyToken.FWFullToken.Value => "Full FW",
+				var _ when result == TeensyToken.FWMinimalToken.Value => "Minimal FW",
+				_ => "Unknown FW"
+			};
 			log.External($"Response: {result} ({firmware})");
-			return result != 0;
+			return result == TeensyToken.FWMinimalToken.Value;
 		}
 
 		private TeensyToken TryLaunchCommand(LaunchFileCommand command)

@@ -156,9 +156,9 @@ public class SerialDiscoveryStrategy(
 
 			Thread.Sleep(100);  // Port stabilization
 
-			var minimalResult = communicationPort.SendMinimalCommand(log);
+			var fwCheckResult = communicationPort.SendFwCheckCommand(log);
 
-			if (minimalResult is 1)
+			if (fwCheckResult == TeensyToken.FWMinimalToken)
 			{
 				log.Internal("Minimal mode was detected during discovery.  Initializing reboot to normal firmware.");
 

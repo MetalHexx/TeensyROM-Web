@@ -48,7 +48,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					port.ClearBuffers();
 				}	
 
-				if (port.SendMinimalCommand(log) is not 0)
+				if (port.SendFwCheckCommand(log) != TeensyToken.FWFullToken)
 				{
 					if (!port.ReconnectToFullFw(log))
 					{

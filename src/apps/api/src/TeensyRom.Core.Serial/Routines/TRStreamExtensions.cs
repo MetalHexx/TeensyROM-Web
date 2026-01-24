@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.IO.Ports;
-using System.Reflection.Metadata;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands.MuteSidVoices;
 using TeensyRom.Core.Common;
@@ -27,7 +26,7 @@ namespace TeensyRom.Core.Serial.Routines
 			{
 				communicationPort.HandleAck();
 			}
-			catch (Exception ex)
+			catch
 			{
 				return Array.Empty<byte>();
 			}
@@ -329,25 +328,32 @@ namespace TeensyRom.Core.Serial.Routines
 			}
 		}
 
-		public static int SendMinimalCommand(this ICommunicationPort communicationPort, ILoggingService log)
+		public static TeensyToken SendFwCheckCommand(this ICommunicationPort communicationPort, ILoggingService log)
 		{
 			log.Internal($"{_logClass} TRStreamExtensions: Checking for Minimal FW");
-			communicationPort.SendIntBytes(TeensyToken.MinimalCheck, 2);
+			communicationPort.SendIntBytes(TeensyToken.FwCheckToken, 2);
 			communicationPort.WaitForSerialData(numBytes: 2, timeoutMs: 20000);  // Reduced from 20000 for faster discovery
 			byte[] recBuf = new byte[2];
 			communicationPort.Read(recBuf, 0, 2);
 			ushort result = BitConverter.ToUInt16(recBuf, 0);
-			log.Internal($"{_logClass} FW Response: {result}");
-			return result;
+			var token = TeensyToken.FromValue(result);
+			string fwType = token.Name switch
+			{
+				nameof(TeensyToken.FWMinimalToken) => "Minimal FW",
+				nameof(TeensyToken.FWFullToken) => "Full FW",
+				_ => $"Unknown ({result})"
+			};
+			log.Internal($"{_logClass} FW Response: {fwType}");
+			return token;
 		}
 
 		public static bool ExecuteMinimalCheck(this ICommunicationPort communicationPort, ILoggingService log)
 		{
-			var result = SendMinimalCommand(communicationPort, log);
+			var result = SendFwCheckCommand(communicationPort, log);
 
-			if (result == 1) return true;
+			if (result == TeensyToken.FWMinimalToken) return true;
 
-			if (result == 0) return false;
+			if (result == TeensyToken.FWFullToken) return false;
 
 			throw new TeensyException("Unexpected response from Minimal Check command.");
 		}
@@ -373,7 +379,7 @@ namespace TeensyRom.Core.Serial.Routines
 			return false;
 		}
 
-		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
+	public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{
 			communicationPort.ResetDevice(log);
 			return communicationPort.ReconnectToFullFw(log);
@@ -419,15 +425,15 @@ namespace TeensyRom.Core.Serial.Routines
 						communicationPort.OpenPort(useRetryLoop: false);
 						communicationPort.ReadAndLogSerialAsString(500);
 
-						var minimalResult = communicationPort.SendMinimalCommand(log);
+						var minimalResult = communicationPort.SendFwCheckCommand(log);
 
-						if (minimalResult is 1)
+						if (minimalResult == TeensyToken.FWMinimalToken)
 						{
 							communicationPort.ResetDevice(log);
 							Thread.Sleep(4000);
 							continue;
 						}
-						if (minimalResult is 0)
+						if (minimalResult == TeensyToken.FWFullToken)
 						{
 							log.InternalSuccess($"{_logClass} Successfully reconnected to Default TeensyROM FW");
 							communicationPort.ReadAndLogSerialAsString(500);
@@ -497,9 +503,9 @@ namespace TeensyRom.Core.Serial.Routines
 						communicationPort.ClearBuffers();
 						Thread.Sleep(200);
 
-						var minimalResult = communicationPort.SendMinimalCommand(log);
+						var minimalResult = communicationPort.SendFwCheckCommand(log);
 
-						if (minimalResult is 1)
+				if (minimalResult == TeensyToken.FWMinimalToken)
 						{
 							log.InternalSuccess($"{_logClass} Successfully reconnected to Minimal TeensyROM FW");
 							return true;

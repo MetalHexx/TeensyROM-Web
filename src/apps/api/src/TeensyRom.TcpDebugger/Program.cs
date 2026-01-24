@@ -175,19 +175,24 @@ class Program
 
 	static bool ExecuteMinimalCheckCommand(TcpCommunicationPort tcpPort)
 	{
-		LogHeader("Minimal Check Command");
-		LogDetail("SendIntBytes(TeensyToken.MinimalCheck, 2)");
-		tcpPort.SendIntBytes(TeensyToken.MinimalCheck, 2);
+		LogHeader("FW Check Command");
+		LogDetail("SendIntBytes(TeensyToken.FwCheckToken, 2)");
+		tcpPort.SendIntBytes(TeensyToken.FwCheckToken, 2);
 
 		tcpPort.WaitForSerialData(numBytes: 2, timeoutMs: 20000);
 		byte[] recBuf = new byte[2];
 		tcpPort.Read(recBuf, 0, 2);
 		ushort result = BitConverter.ToUInt16(recBuf, 0);
 
-		string firmware = result == 0 ? "TeensyROM" : "MinimalBoot";
+		string firmware = result switch
+		{
+			var _ when result == TeensyToken.FWFullToken.Value => "Full FW",
+			var _ when result == TeensyToken.FWMinimalToken.Value => "Minimal FW",
+			_ => "Unknown"
+		};
 		LogSuccess($"Response: {result} ({firmware})");
 		Console.WriteLine();
-		return result == 0 ? false : true;
+		return result == TeensyToken.FWMinimalToken.Value;
 	}
 
 	static void ExecuteGetFileCommand(TcpCommunicationPort tcpPort, string path)
