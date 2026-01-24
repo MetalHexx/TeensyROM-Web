@@ -113,38 +113,9 @@ namespace TeensyRom.Core.Serial.Routines
 		{
 			log.Internal($"{_logClass} Resetting TeensyROM");
 			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
-			var response = communicationPort.ReadAndLogSerialAsString(500);
+			var response = communicationPort.ReadAndLogSerialAsString(200);
+			Thread.Sleep(1000);
 			log.External($"{_logClass} TR Response: '{response?.Trim()}'");
-		}
-
-		public static async Task<bool> ReconnectPort(this ICommunicationPort communicationPort)
-		{
-			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
-
-			var response = string.Empty;
-			try
-			{
-				for (int i = 0; i < 10; i++)
-				{
-					response = $"{response}{communicationPort.ReadAndLogSerialAsString(1000)}";
-
-					if (response.Contains("Resetting C64"))
-					{
-						return true;
-					}
-					await Task.Delay(1000);
-				}
-			}
-			catch (Exception ex)
-			{
-				if (ex.Message.Contains("port is closed"))
-				{
-					communicationPort.OpenPort();
-					return true;
-				}
-				throw;
-			}
-			return false;
 		}
 
 		//public static bool ResetDevice(this ICommunicationPort communicationPort)
@@ -379,9 +350,12 @@ namespace TeensyRom.Core.Serial.Routines
 			return false;
 		}
 
-	public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
+		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{
-			communicationPort.ResetDevice(log);
+			if (communicationPort.GetConnectionType() is ConnectionType.Serial)
+			{
+				communicationPort.ResetDevice(log);
+			}
 			return communicationPort.ReconnectToFullFw(log);
 		}
 
