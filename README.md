@@ -39,7 +39,7 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Launch Modes**: 
   - **Sequential Mode**: Navigate through files in directory order
   - **Shuffle Mode**: Random file playback with customizable scope and filters
-- **Progress Bar**: Visual playback progress with elapsed/total time for SID music
+- **Progress Bar**: Visual playback progress with elapsed/total time
 - **Auto-Play**: Continuous playback through directories or shuffle queues
 - **File Compatibility**: Real-time validation and error feedback for incompatible files
 - **Current File Info**: Display file metadata, creator, release info, and status
@@ -88,8 +88,8 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Multi-Device Views**: Simultaneous file browsing across multiple connected devices
 
 ### Device Management
-- **Auto-Discovery**: Automatic detection of connected TeensyROM devices via serial ports
-- **Multi-Device Support**: Connect and manage multiple TeensyROM cartridges simultaneously
+- **Auto-Discovery**: Automatic detection of TeensyROM devices via TCP (Ethernet/Wireless) and Serial (COM port)
+- **Multi-Device Support**: Connect and manage multiple TeensyROM cartridges simultaneously with any mix of TCP and Serial connections
 - **Real-Time Device Logs**: Live device log debug monitoring of backend / serial operations
 - **Device Controls**: Ping and reset operations across all connected devices
 - **Storage Indexing**: Index SD and USB storage for fast file access, random launches and search
@@ -114,7 +114,6 @@ Features planned for future releases:
 - **Theme System**: Light/dark mode with custom color schemes and Material theme customization
 - **Keyboard Controls**: Keyboard shortcuts for playback, navigation, and common operations
 - **Cross Storage Scope Selection**: Search/shuffle across all connected device storage (per device, per storage type)
-- **Ethernet Support**: Ethernet support for device communication (alternative to Serial/USB)
 - **Scope Selection**: 
   - **Storage Scope**: Search/shuffle across all storage devices SD or USB storage
   - **Directory Pinning**: Search/shuffle scoped to a specific directory and children.
@@ -141,7 +140,9 @@ This application can be deployed in two ways:
 ### Prerequisites
 
 - **TeensyROM Hardware**: You'll need a [TeensyROM cartridge](https://github.com/SensoriumEmbedded/TeensyROM) connected to your computer
-- **Firmware**: Requires TeensyROM firmware v0.7 or higher
+- **Firmware**: 
+  - **Serial (COM Port) Support**: TeensyROM firmware v0.7 or higher
+  - **TCP/Ethernet Support**: Currently requires a special firmware build. Please inquire on the [TeensyROM Discord Server](https://discord.com/invite/ubSAb74S5U) until an official firmware release with TCP support is available
 
 ### Installation & Setup
 
@@ -187,18 +188,66 @@ chmod +x TeensyRom.Api
 ./TeensyRom.Api
 ```
 
+## 🔌 Device Discovery & Connectivity
+
+TeensyROM Web supports automatic discovery and connection to TeensyROM devices using both **Ethernet/Wireless (TCP)** and **Serial (COM port)** connectivity. Multiple devices can be connected simultaneously using any combination of connection types.
+
+### How to Connect
+- On startup, the backend API automatically scans for TeensyROM devices on your network (TCP) or USB (Serial) connnected devices.
+- Discovered devices are connected to the backend API automatically
+- Device IPs and COM ports are remembered for faster reconnection on subsequent app launches
+- When you start up the Web UI, this will also trigger a fast device discovery scan for remembered devices
+- Refreshing the browser will also re-trigger fast device discovery for remembered devices
+- When connecting new devices, manually trigger a full device discovery scan from the Web UI device panel
+
+### Ethernet/TCP Devices
+
+TeensyROM devices with Ethernet / TCP connectivity are discovered automatically through network port scanning:
+
+- The API scans the same subnet it's running on for TeensyROM devices
+  - So if the Host the API is running on 192.168.1.33, it will scan 192.168.1.0/24 for TR devices on port `2112`
+- Full device scanning over the network can take anywhere from 900ms to 30s depending on the number of cores on your host machine.
+- Previously connected devices will always be prioritized for fast reconnection on subsequent scans
+
+**Setting Up Ethernet on TeensyROM:**
+
+- You'll need to configure your TeensyROM device to enable the Ethernet TCP listener. 
+- Follow the instructions in the official TeensyROM documentation:
+📖 [External App Control via TCP](https://github.com/SensoriumEmbedded/TeensyROM/blob/main/docs/Ethernet_Usage.md#external-app-control-via-tcp)
+
+> 💡 **Performance Tip:** <br>
+For optimal performance when loading extra large CRT files, set a static IP address on your TeensyROM device.  Large CRT files require the TR device to reset into `Minimal Boot` firmware mode, which can take several seconds.  A static IP will reduce the TR reset delays caused by DHCP IP discovery when switching FW modes.  
+
+### Serial/COM Port Devices
+
+- TeensyROM devices connected via USB are automatically discovered and connected to through COM port scanning.
+- If both Serial and TCP are connected for a given device, the application will prefer TCP and drop the Serial connection.
+
+> ⚠️ **Performance Tip:** <br>
+If you **disconnect your ethernet cable or NFC reader device**, I recommend you disable `TCP Listener` and/or `Host Serial Device` on your TeensyROM. Unused connection modes can cause delays as the TR device times out searching for them.  This is particularly impactful when launching extra large CRT files which triggers a FW mode swap to `Minimal Boot` FW mode on the TR. While the app usually handles this gracefully, disabling unused modes will greatly improve the overall performance and connection reliability.
+
+### Multi-Device Operation
+
+The TeensyROM Web application supports connecting to and interacting with multiple devices simultaneously:
+
+- Mix TCP and Serial connected devices if needed
+- Each connected device will render unique panels to allow you to interact with in parallel (DJs, let's go!)
+- All TR devices are tagged with an ID `cart-tag.txt` on your device storage to uniquely identify them -- keep this file.
+- The tags allows for identification of specific devices.  This ensures your index and preferences are preserved
+- Devices are remembered across connection types (e.g., switching from TCP to Serial)
+
 ### Accessing the Application
 
 Once running, open your browser to access:
 
 **Web UI:**
 ```
-http://localhost:5000
+http://localhost:213
 ```
 
 **API Documentation (Scalar):**
 ```
-http://localhost:5000/scalar/v1
+http://localhost:213/scalar/v1
 ```
 
 ## 🤝 Contributing
@@ -218,8 +267,11 @@ Join the TeensyROM community on Discord for support, discussions, and updates:
 ## 🙏 Acknowledgments
 
 - **Travis Smith / Sensorium** - Creator of the [TeensyROM Hardware](https://github.com/SensoriumEmbedded/TeensyROM)
-- **Jens-Christian Huus / DeepSID** - [DeepSID Repo](https://github.com/Chordian/deepsid) lots of metadata sourced from this project.
-- **StatMat / Oneload64** - [Oneload64](https://oneload64.github.io/) lots of metadata sourced from this project.
+- **Jens-Christian Huus / DeepSID** - [DeepSID Repo](https://github.com/Chordian/deepsid) SID metadata sourced from this projects database.
+- **StatMat / Oneload64** - [Oneload64](https://oneload64.github.io/) game image metadata sourced from this project.  
+- **HVSC Community** - For the amazing SID music collection and SID metadata (STIL) resources.
+- **LaLa's SIDList** - [SIDList](https://www.transbyte.org/SID/SIDlist.html) For the handy CSV format HVSC STIL file metadata.
+- **Jamie Honn (JTHonn)** - Extensive early Windows and Mac testing.
 
 ## 🔗 Related Projects
 
