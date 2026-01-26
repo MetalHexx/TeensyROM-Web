@@ -34,21 +34,13 @@ export class PlayerToolbarComponent {
 
   deviceId = input.required<string>();
 
-  // Phase 5: Timer state - computed to react to device ID changes AND file launches
-  // IMPORTANT: We call getTimerState() fresh each time to pick up newly cached signals
-  // When a file launches, setupTimerForFile() caches a new signal, and this computed
-  // will pick it up on the next change detection cycle
-  //
-  // Performance Fix: Track ONLY file path (file identity), not full currentFile object
-  // This prevents jank during directory loading - when large directories (1000+ files) load,
-  // the directory-files component's animation and auto-scroll trigger many change detection
-  // cycles. By tracking only the file path, timerState only re-evaluates when a NEW file
-  // launches, not on every unrelated state update during directory operations.
   timerState = computed(() => {
     const deviceId = this.deviceId();
     if (!deviceId) return null;
     
-    // getTimerState returns Signal<TimerState | null>, call it to get current value
+    // Track file path to detect when files change and timer cache updates
+    void this.playerContext.getCurrentFile(deviceId)()?.file?.path;
+    
     const timerSignal = this.playerContext.getTimerState(deviceId);
     return timerSignal();
   });
