@@ -214,7 +214,34 @@ namespace TeensyRom.Core.Serial
       }
       catch (IOException ex)
       {
-        throw new TeensyException("TCP connection lost during read", ex);
+        var errorMessage = GetBufferContentsAsString(buffer, offset, count);
+        throw new TeensyException(errorMessage, ex);
+      }
+      catch (SocketException ex)
+      {
+        var errorMessage = GetBufferContentsAsString(buffer, offset, count);
+        throw new TeensyException(errorMessage, ex);
+      }
+    }
+
+    private string GetBufferContentsAsString(byte[] buffer, int offset, int count)
+    {
+      try
+      {
+        if (buffer != null && count > 0)
+        {
+          var actualBytes = Math.Min(count, buffer.Length - offset);
+          var bufferSegment = new byte[actualBytes];
+          Array.Copy(buffer, offset, bufferSegment, 0, actualBytes);
+          
+          var bufferString = Encoding.UTF8.GetString(bufferSegment);
+          return bufferString;
+        }
+        return "TCP connection error";
+      }
+      catch
+      {
+        return "TCP connection error - failed to read buffer";
       }
     }
 
