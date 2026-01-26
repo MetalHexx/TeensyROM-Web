@@ -212,7 +212,10 @@ TeensyROM devices with Ethernet / TCP connectivity are discovered automatically 
 **Setting Up Ethernet on TeensyROM:**
 
 - You'll need to configure your TeensyROM device to enable the Ethernet TCP listener. 
-- Follow the instructions in the official TeensyROM documentation:
+- If setting up multiple TeensyROM devices:
+  - Ensure each device has a unique MAC address. By default, TR devices ship with the same MAC address
+  - Ensure each device has a unique IP address.
+- Instructions for configuring Ethernet on TeensyROM can be found here:
 📖 [External App Control via TCP](https://github.com/SensoriumEmbedded/TeensyROM/blob/main/docs/Ethernet_Usage.md#external-app-control-via-tcp)
 
 > 💡 **Performance Tip:** <br>
