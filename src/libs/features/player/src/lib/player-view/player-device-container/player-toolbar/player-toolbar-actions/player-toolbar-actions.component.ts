@@ -9,8 +9,6 @@ import { LaunchMode } from '@teensyrom-nx/domain';
 import { StorageKeyUtil } from '@teensyrom-nx/application';
 
 const DURATION_OPTIONS = [
-  { label: '5s', valueMs: 5000 },
-  { label: '10s', valueMs: 10000 },
   { label: '15s', valueMs: 15000 },
   { label: '30s', valueMs: 30000 },
   { label: '1m', valueMs: 60000 },
@@ -65,6 +63,14 @@ export class PlayerToolbarActionsComponent {
     return option?.label ?? '3m';
   });
 
+  timerTooltip = computed(() => {
+    const baseText = 'Enables a custom play timer for non-SID files.';
+    if (this.isCustomTimerEnabled()) {
+      const durationLabel = this.timerBadgeText();
+      return `${baseText} Current Duration: ${durationLabel}.`;
+    }
+    return baseText;
+  });
 
   currentFile = computed(() => {
     const deviceId = this.deviceId();

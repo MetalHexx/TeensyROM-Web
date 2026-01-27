@@ -3,11 +3,12 @@
   <lib-dropdown-menu #timerDropdown>
     <lib-icon-button
       icon="timer"
-      ariaLabel="Custom Play Timer"
+      [ariaLabel]="timerTooltip()"
+      [tooltip]="timerTooltip()"
+      tool
       size="large"
       variant="rounded-transparent"
-      [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"
-      [matTooltip]="'Custom Play Timer'"
+      [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"      
       [matBadge]="timerBadgeText()"
       matBadgePosition="above after"
       matBadgeColor="primary"
@@ -43,6 +44,7 @@
   <lib-icon-button
     icon="shuffle"
     ariaLabel="Toggle Shuffle Mode"
+    [tooltip]="isShuffleMode() ? 'Disable Shuffle Mode.  Files will play in the order of the directory of the currently playing file.' : 'Enable Shuffle Mode.  Files will play in random order based on the current filter.'"
     size="large"
     variant="rounded-transparent"
     [color]="isShuffleMode() ? 'highlight' : 'normal'"
@@ -53,6 +55,7 @@
   <lib-icon-button
     data-testid="favorite-button"
     [ariaLabel]="isFavorite() ? 'Remove from Favorites' : 'Add to Favorites'"
+    [tooltip]="isFavorite() ? 'Remove from Favorites.  If a game or program are currently running, TeensyROM will reset.' : 'Add to Favorites. If a game or program are currently running, TeensyROM will reset.'"
     size="large"
     variant="rounded-transparent"
     [color]="'normal'"
