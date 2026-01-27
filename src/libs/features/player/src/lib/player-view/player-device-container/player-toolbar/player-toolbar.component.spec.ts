@@ -68,10 +68,13 @@ describe('PlayerToolbarComponent', () => {
       // Core player lifecycle
       initializePlayer: vi.fn(),
       removePlayer: vi.fn(),
+      startListeningToPopState: vi.fn(),
+      stopListeningToPopState: vi.fn(),
 
       // File launching
       launchFileWithContext: vi.fn().mockResolvedValue(undefined),
       launchRandomFile: vi.fn().mockResolvedValue(undefined),
+      updateCurrentFileFavoriteStatus: vi.fn(),
 
       // Phase 3: Playback control methods (tested in this component)
       play: vi.fn().mockResolvedValue(undefined),
@@ -86,6 +89,7 @@ describe('PlayerToolbarComponent', () => {
       getPlayerStatus: vi.fn().mockReturnValue(playerStatusSignal.asReadonly()),
       getStatus: vi.fn().mockReturnValue(playerStatusSignal.asReadonly()),
       isLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
+      isSlowLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
       getError: vi.fn().mockReturnValue(errorSignal.asReadonly()),
 
       // Shuffle functionality
@@ -481,8 +485,8 @@ describe('PlayerToolbarComponent', () => {
 
       fixture.detectChanges();
 
-      const nextButton = findIconButtonByLabel('Next File');
-      const previousButton = findIconButtonByLabel('Previous File');
+      const nextButton = findIconButtonByLabel(/launch the next/);
+      const previousButton = findIconButtonByLabel(/launch the previous/);
 
       expect(nextButton).toBeTruthy();
       expect(previousButton).toBeTruthy();
@@ -502,8 +506,8 @@ describe('PlayerToolbarComponent', () => {
 
       fixture.detectChanges();
 
-      const nextButton = findIconButtonByLabel('Next File');
-      const previousButton = findIconButtonByLabel('Previous File');
+      const nextButton = findIconButtonByLabel(/launch the next/);
+      const previousButton = findIconButtonByLabel(/launch the previous/);
 
       expect(nextButton).toBeTruthy();
       expect(previousButton).toBeTruthy();
@@ -566,7 +570,7 @@ describe('PlayerToolbarComponent', () => {
 
       fixture.detectChanges();
 
-      const nextButton = findIconButtonByLabel('Next File');
+      const nextButton = findIconButtonByLabel(/launch the next/);
       expect(nextButton).toBeTruthy();
 
       if (nextButton) {
@@ -607,7 +611,7 @@ describe('PlayerToolbarComponent', () => {
 
       fixture.detectChanges();
 
-      const previousButton = findIconButtonByLabel('Previous File');
+      const previousButton = findIconButtonByLabel(/launch the previous/);
       expect(previousButton).toBeTruthy();
 
       if (previousButton) {

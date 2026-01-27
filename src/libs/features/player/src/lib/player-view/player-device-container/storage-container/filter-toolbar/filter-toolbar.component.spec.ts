@@ -46,11 +46,11 @@ const SELECTORS = {
 
 // Expected labels for accessibility testing
 const EXPECTED_LABELS = {
-  filterAll: 'Filter: Allow All Files',
-  filterGames: 'Filter: Games Only',
-  filterMusic: 'Filter: Music Only',
-  filterImages: 'Filter: Images Only',
-  randomLaunch: 'Launch Random File',
+  filterAll: 'Filter: Allow All Files.  Random launches and search will include all file types.',
+  filterGames: 'Filter Games/Programs Only.  Random launches and search will only include games and programs.',
+  filterMusic: 'Filter: Music Only. Random launches and search will only include music files.',
+  filterImages: 'Filter: Images / Text files Only. Random launches and search will only include image and text files.',
+  randomLaunch: 'Launch a random file.  Will only launch files matching the current filter.',
 } as const;
 
 describe('FilterToolbarComponent', () => {
