@@ -57,7 +57,7 @@ namespace TeensyRom.Core.Commands.GetFile
                 return new GetFileResult
                 {
                     IsSuccess = false,
-                    Error = ex.Message,
+                    Error = ex.Message.SanitizeForLogging(),
                     ErrorCode = errorCode
                 };
             }

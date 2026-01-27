@@ -18,6 +18,28 @@ namespace TeensyRom.Core.Common
 			return cleanedString.Trim();
 		}
 
+		/// <summary>
+		/// Sanitizes a string for logging by removing control characters and normalizing whitespace.
+		/// Useful for cleaning serial port output or other raw data that may contain excessive newlines,
+		/// null bytes, and other control characters that would disrupt log formatting.
+		/// </summary>
+		/// <param name="input">The raw string to sanitize.</param>
+		/// <returns>A cleaned string with control characters removed and whitespace normalized to single spaces.</returns>
+		public static string SanitizeForLogging(this string input)
+		{
+			if (string.IsNullOrWhiteSpace(input))
+				return input;
+
+			// Remove control characters except basic whitespace (preserves \t, \r, \n for next step)
+			var cleaned = Regex.Replace(input, @"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]", "");
+			
+			// Replace multiple whitespace characters (including \r\n, \n, \r, spaces, tabs) with a single space
+			cleaned = Regex.Replace(cleaned, @"\s+", " ");
+			
+			// Trim and return
+			return cleaned.Trim();
+		}
+
 		public static string RemoveFirstOccurrence(this string input, string pattern)
 		{
 			int index = input.IndexOf(pattern);
