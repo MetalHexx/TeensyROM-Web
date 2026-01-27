@@ -19,12 +19,14 @@
     <lib-icon-button
       [icon]="'delete'"
       [ariaLabel]="confirmLabel()"
+      [tooltip]="confirmLabel()"
       [color]="'error'"
       (buttonClick)="onConfirmClick()"
     />
     <lib-icon-button
       [icon]="'close'"
       [ariaLabel]="cancelLabel()"
+      [tooltip]="cancelLabel()"
       (buttonClick)="onCancelClick()"
     />
   </div>

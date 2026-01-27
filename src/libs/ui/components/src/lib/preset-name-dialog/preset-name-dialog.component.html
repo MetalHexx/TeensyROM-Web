@@ -34,13 +34,15 @@
 <div class="button-row">
   <lib-icon-button
     [icon]="'check'"
-    [ariaLabel]="'Save'"
+    [ariaLabel]="'Save CRT preset'"
+    [tooltip]="'Save CRT preset'"
     [disabled]="!canSave()"
     (buttonClick)="onSaveClick()"
   />
   <lib-icon-button
     [icon]="'close'"
     [ariaLabel]="'Cancel'"
+    [tooltip]="'Cancel'"
     (buttonClick)="onCancelClick()"
   />
 </div>

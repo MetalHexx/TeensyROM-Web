@@ -4,7 +4,8 @@
     @if (showCrtToggle()) {
       <lib-icon-button
         [icon]="crtIcon"
-        ariaLabel="Toggle CRT effect"
+        ariaLabel="isCrtEnabled() ? 'Turn off CRT effect' : 'Turn on CRT effect'"
+        [tooltip]="isCrtEnabled() ? 'Turn off CRT effect' : 'Turn on CRT effect'"
         variant="rounded-transparent"
         [class.active]="isCrtEnabled()"
         (buttonClick)="crtToggleClick.emit()">
@@ -15,7 +16,8 @@
     @if (showCrtSettings() && isCrtEnabled()) {
       <lib-icon-button
         icon="tune"
-        ariaLabel="CRT settings"
+        ariaLabel="Open CRT settings"
+        tooltip="Open CRT settings"
         variant="rounded-transparent"
         [class.active]="showCrtControls()"
         (buttonClick)="crtSettingsClick.emit()">
@@ -26,7 +28,8 @@
     @if (showDeviceSelector()) {
       <lib-icon-button
         icon="videocam"
-        ariaLabel="Select video device"
+        ariaLabel="Select the source video capture device that is connected to your TeensyROM."
+        tooltip="Select the source video capture device that is connected to your TeensyROM."
         variant="rounded-transparent"
         [class.active]="isDeviceSelectorActive()"
         (buttonClick)="deviceSelectorClick.emit()">
@@ -37,7 +40,8 @@
     @if (showFullscreen()) {
       <lib-icon-button
         [icon]="fullscreenIcon"
-        [ariaLabel]="fullscreenAriaLabel"
+        [ariaLabel]="isFullscreen() ? 'Exit fullscreen' : 'Enter fullscreen'"
+        [tooltip]="isFullscreen() ? 'Exit fullscreen' : 'Enter fullscreen'"
         variant="rounded-transparent"
         (buttonClick)="fullscreenClick.emit()">
       </lib-icon-button>
@@ -48,6 +52,7 @@
       <lib-icon-button
         icon="close"
         ariaLabel="Close"
+        tooltip="Close"
         variant="rounded-transparent"
         (buttonClick)="closeClick.emit()">
       </lib-icon-button>

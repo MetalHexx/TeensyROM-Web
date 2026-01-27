@@ -2,15 +2,17 @@
   <div class="filter-buttons">
     <lib-icon-button
       icon="all_inclusive"
-      ariaLabel="Filter: Allow All Files"
+      ariaLabel="Filter: Allow All Files.  Random launches and search will include all file types."
+      tooltip="Filter: Allow All Files.  Random launches and search will include all file types."
       size="large"
       [color]="getButtonColor(PlayerFilterType.All)"
       (buttonClick)="onAllClick()"
       data-testid="filter-all-button"
     />
-
+`
     <lib-icon-button
-      ariaLabel="Filter: Games Only"
+      ariaLabel="Filter Games/Programs Only.  Random launches and search will only include games and programs."
+      tooltip="Filter Games/Programs Only.  Random launches and search will only include games and programs."
       size="large"
       [color]="getButtonColor(PlayerFilterType.Games)"
       (buttonClick)="onGamesClick()"
@@ -21,7 +23,8 @@
 
     <lib-icon-button
       icon="music_note"
-      ariaLabel="Filter: Music Only"
+      ariaLabel="Filter: Music Only. Random launches and search will only include music files."
+      tooltip="Filter: Music Only. Random launches and search will only include music files."
       size="large"
       [color]="getButtonColor(PlayerFilterType.Music)"
       (buttonClick)="onMusicClick()"
@@ -29,7 +32,8 @@
     />
 
     <lib-icon-button
-      ariaLabel="Filter: Images Only"
+      ariaLabel="Filter: Images / Text files Only. Random launches and search will only include image and text files."
+      tooltip="Filter: Images / Text files Only. Random launches and search will only include image and text files."
       size="large"
       [color]="getButtonColor(PlayerFilterType.Images)"
       (buttonClick)="onImagesClick()"

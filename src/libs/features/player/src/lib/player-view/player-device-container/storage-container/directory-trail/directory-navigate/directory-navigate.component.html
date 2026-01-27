@@ -1,7 +1,8 @@
 <div class="nav-buttons">
   <lib-icon-button
     icon="arrow_back"
-    ariaLabel="Back"
+    ariaLabel="Previous directory in your navigation history"
+    tooltip="Previous directory in your navigation history"
     size="large"
     [disabled]="!canNavigateBack()"
     (buttonClick)="onBackClick()"
@@ -9,7 +10,8 @@
 
   <lib-icon-button
     icon="arrow_forward"
-    ariaLabel="Forward"
+    ariaLabel="Next directory in your navigation history"
+    tooltip="Next directory in your navigation history"
     size="large"
     [disabled]="!canNavigateForward()"
     (buttonClick)="onForwardClick()"
@@ -17,7 +19,8 @@
 
   <lib-icon-button
     icon="arrow_upward"
-    ariaLabel="Up"
+    ariaLabel="Go to parent directory of the current directory"
+    tooltip="Go to parent directory of the current directory"
     size="large"
     [disabled]="!canNavigateUp()"
     (buttonClick)="onUpClick()"
@@ -25,7 +28,8 @@
 
   <lib-icon-button
     icon="refresh"
-    ariaLabel="Refresh"
+    ariaLabel="Synchronizes the current directory with the latest files and subdirectories."
+    tooltip="Synchronizes the current directory with the latest files and subdirectories."
     size="large"
     [disabled]="isLoading()"
     (buttonClick)="onRefreshClick()"
@@ -33,7 +37,8 @@
 
   <lib-icon-button
     icon="history"
-    ariaLabel="Toggle History"
+    ariaLabel="historyViewVisible() ? 'Hide navigation history' : 'Show navigation history'"
+    [tooltip]="historyViewVisible() ? 'Hide navigation history' : 'Show navigation history'"
     size="large"
     [color]="historyViewVisible() ? 'highlight' : 'normal'"
     (buttonClick)="onHistoryToggleClick()"
