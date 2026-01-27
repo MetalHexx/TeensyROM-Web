@@ -5,6 +5,7 @@
   [class.size-medium]="size() === 'medium'"
   [class.size-large]="size() === 'large'"
   [class.simple-mode]="isSimpleMode()"
+  [ngStyle]="customStyles()"
 >
   <!-- Blurred background - only in complex mode (medium/large) -->
   @if (!isSimpleMode()) {

@@ -113,4 +113,44 @@ describe('CycleImageComponent', () => {
     fixture.detectChanges();
     expect(component.isSimpleMode()).toBe(false);
   });
+
+  it('should apply custom width and height when provided', () => {
+    componentRef.setInput('images', ['image1.png']);
+    componentRef.setInput('width', '100px');
+    componentRef.setInput('height', '75px');
+    fixture.detectChanges();
+
+    const styles = component.customStyles();
+    expect(styles).toEqual({ width: '100px', height: '75px' });
+
+    const container = fixture.nativeElement.querySelector('.image-container');
+    expect(container?.style.width).toBe('100px');
+    expect(container?.style.height).toBe('75px');
+  });
+
+  it('should return null for customStyles when no custom dimensions provided', () => {
+    componentRef.setInput('images', ['image1.png']);
+    fixture.detectChanges();
+
+    const styles = component.customStyles();
+    expect(styles).toBeNull();
+  });
+
+  it('should apply custom width only', () => {
+    componentRef.setInput('images', ['image1.png']);
+    componentRef.setInput('width', '200px');
+    fixture.detectChanges();
+
+    const styles = component.customStyles();
+    expect(styles).toEqual({ width: '200px' });
+  });
+
+  it('should apply custom height only', () => {
+    componentRef.setInput('images', ['image1.png']);
+    componentRef.setInput('height', '150px');
+    fixture.detectChanges();
+
+    const styles = component.customStyles();
+    expect(styles).toEqual({ height: '150px' });
+  });
 });

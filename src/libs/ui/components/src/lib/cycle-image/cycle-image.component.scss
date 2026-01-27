@@ -33,7 +33,7 @@
   // Simple mode (thumbnail/small) - no blur effects
   &.simple-mode {
     .carousel-image {
-      object-fit: cover; // Cover for small sizes
+      object-fit: fill; // Stretch to fit container dimensions
       clip-path: none;
     }
   }

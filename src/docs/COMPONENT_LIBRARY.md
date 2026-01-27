@@ -2893,6 +2893,8 @@ export class VideoPlayerComponent {
 - `intervalMs` (optional): `number` - Milliseconds between image transitions - defaults to 8000 (8 seconds)
 - `placeholderUrl` (optional): `string` - Fallback image when no images provided - defaults to '/placeholder.jpg'
 - `size` (optional): `'thumbnail' | 'small' | 'medium' | 'large'` - Size variant - defaults to 'large'
+- `width` (optional): `string` - Custom width override (e.g., '76.8px') - takes precedence over size preset
+- `height` (optional): `string` - Custom height override (e.g., '48px') - takes precedence over size preset
 
 **Usage Examples**:
 
@@ -2902,6 +2904,14 @@ export class VideoPlayerComponent {
 
 <!-- Small thumbnail for player toolbar (simple mode - no blur) -->
 <lib-cycle-image [images]="fileItem.images.map(img => img.url)" size="thumbnail"> </lib-cycle-image>
+
+<!-- Custom dimensions for C64 aspect ratio (320x200 = 1.6:1) -->
+<lib-cycle-image 
+  [images]="imageUrls()" 
+  size="thumbnail" 
+  width="76.8px" 
+  height="48px">
+</lib-cycle-image>
 
 <!-- Medium size with custom interval -->
 <lib-cycle-image [images]="galleryImages" size="medium" [intervalMs]="5000"> </lib-cycle-image>

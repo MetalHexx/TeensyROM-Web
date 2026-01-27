@@ -37,6 +37,10 @@ export class CycleImageComponent {
   intervalMs = input<number>(8000);
   placeholderUrl = input<string>('/placeholder.jpg');
   size = input<'thumbnail' | 'small' | 'medium' | 'large'>('large');
+  /** Custom width override (e.g., '76.8px'). Takes precedence over size preset. */
+  width = input<string | undefined>(undefined);
+  /** Custom height override (e.g., '48px'). Takes precedence over size preset. */
+  height = input<string | undefined>(undefined);
 
   // Outputs
   /**
@@ -63,11 +67,27 @@ export class CycleImageComponent {
     return idx !== null ? this.effectiveImages()[idx] || null : null;
   });
   hasMultipleImages = computed(() => this.effectiveImages().length > 1);
+  
+  /**
+   * Determines if cycling should be active.
+   * Only cycle when there are multiple images to display.
+   */
+  private shouldCycle = computed(() => this.images().length > 1);
 
   // Simple mode disables blur/background effects for small sizes
   isSimpleMode = computed(() => {
     const sz = this.size();
     return sz === 'thumbnail' || sz === 'small';
+  });
+  
+  // Custom dimensions override size presets
+  customStyles = computed(() => {
+    const w = this.width();
+    const h = this.height();
+    const styles: { [key: string]: string } = {};
+    if (w) styles['width'] = w;
+    if (h) styles['height'] = h;
+    return Object.keys(styles).length > 0 ? styles : null;
   });
 
   // Dependency injection
@@ -88,14 +108,17 @@ export class CycleImageComponent {
 
     // Start carousel when there are multiple images
     effect((onCleanup) => {
-      if (!this.hasMultipleImages()) {
+      if (!this.shouldCycle()) {
         return;
       }
 
       const subscription = interval(this.intervalMs())
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(() => {
-          this.cycleToNext();
+          // Double-check before cycling
+          if (this.shouldCycle()) {
+            this.cycleToNext();
+          }
         });
 
       onCleanup(() => {
@@ -119,6 +142,11 @@ export class CycleImageComponent {
   }
 
   private cycleToNext(): void {
+    // Guard: Don't cycle if only one image
+    if (!this.shouldCycle()) {
+      return;
+    }
+    
     // Move current to previous
     this.previousIndex.set(this.currentIndex());
     this.showPrevious.set(true);
