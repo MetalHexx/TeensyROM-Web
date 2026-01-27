@@ -638,15 +638,15 @@ export class PlayerContextService implements IPlayerContext {
       `Custom timer config updated for device ${deviceId}: enabled=${enabled}, duration=${durationMs}ms`
     );
 
-    // Get current file and timer state
+    // Get current file
     const currentFile = this.store.getCurrentFile(deviceId)();
-    const timerState = this.timerManager.getTimerState(deviceId);
 
-    // Recreate timer if file is playing with a timer
-    if (currentFile?.file && timerState) {
+    // Setup timer if file is currently loaded (creates new timer or recreates existing)
+    // This ensures timer is created immediately when enabling custom timer on a running game
+    if (currentFile?.file) {
       logInfo(
         LogType.Info,
-        `Recreating timer mid-playback for device ${deviceId} with new config`
+        `Setting up timer for device ${deviceId} with new custom timer config`
       );
       this.setupTimerForFile(deviceId, currentFile.file);
     }

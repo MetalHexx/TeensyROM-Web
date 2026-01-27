@@ -38,8 +38,8 @@ export class PlayerToolbarComponent {
     const deviceId = this.deviceId();
     if (!deviceId) return null;
     
-    // Track file path to detect when files change and timer cache updates
     void this.playerContext.getCurrentFile(deviceId)()?.file?.path;
+    void this.playerContext.getPlayTimerConfig(deviceId)();
     
     const timerSignal = this.playerContext.getTimerState(deviceId);
     return timerSignal();
@@ -160,37 +160,17 @@ export class PlayerToolbarComponent {
 
   showProgressBar = computed(() => {
     const state = this.timerState();
-    const customTimer = this.customTimerConfig();
-    const currentFile = this.currentFile();
     
-    // Show progress bar if Phase 5 timer is active OR custom timer is enabled (Phase 3 demo)
-    if (state !== null && state.showProgress) {
-      return true;
-    }
-    
-    // Phase 3: Show progress bar when custom timer is enabled AND file is loaded
-    // Don't show demo progress bar until a file is actually playing
-    return customTimer !== null && customTimer.enabled && currentFile !== null;
+    // Show progress bar if timer is active (includes custom timers and SID file timers)
+    return state !== null && state.showProgress;
   });
 
   currentTime = computed(() => {
     const state = this.timerState();
-    const customTimer = this.customTimerConfig();
-    const hasError = this.hasError();
     
-    // Use Phase 5 timer if available
+    // Use timer state if available (will be created when custom timer is enabled)
     if (state !== null) {
       return state.currentTime;
-    }
-    
-    // Don't show progress if there's an error (failed launch)
-    if (hasError) {
-      return 0;
-    }
-    
-    // Phase 3 demo: Show half of custom timer duration
-    if (customTimer !== null && customTimer.enabled) {
-      return Math.floor(customTimer.durationMs / 2);
     }
     
     return 0;
@@ -198,22 +178,10 @@ export class PlayerToolbarComponent {
   
   totalTime = computed(() => {
     const state = this.timerState();
-    const customTimer = this.customTimerConfig();
-    const hasError = this.hasError();
     
-    // Use Phase 5 timer if available
+    // Use timer state if available (will be created when custom timer is enabled)
     if (state !== null) {
       return state.totalTime;
-    }
-    
-    // Don't show progress if there's an error (failed launch)
-    if (hasError) {
-      return 0;
-    }
-    
-    // Phase 3 demo: Show custom timer duration
-    if (customTimer !== null && customTimer.enabled) {
-      return customTimer.durationMs;
     }
     
     return 0;

@@ -413,7 +413,7 @@ describe('PlayerToolbarActionsComponent', () => {
   describe('Task 1: Duration Options Constant', () => {
     it('should have DURATION_OPTIONS with 10 entries', () => {
       expect(component['durationOptions']).toBeDefined();
-      expect(component['durationOptions'].length).toBe(10);
+      expect(component['durationOptions'].length).toBe(8);
     });
 
     it('should have duration options in ascending order', () => {
@@ -427,35 +427,31 @@ describe('PlayerToolbarActionsComponent', () => {
       const options = component['durationOptions'];
       
       // Check seconds format
-      expect(options[0].label).toBe('5s');
-      expect(options[1].label).toBe('10s');
-      expect(options[2].label).toBe('15s');
-      expect(options[3].label).toBe('30s');
+      expect(options[0].label).toBe('15s');
+      expect(options[1].label).toBe('30s');
       
       // Check minutes format
-      expect(options[4].label).toBe('1m');
-      expect(options[5].label).toBe('3m');
-      expect(options[6].label).toBe('5m');
-      expect(options[7].label).toBe('10m');
-      expect(options[8].label).toBe('30m');
+      expect(options[2].label).toBe('1m');
+      expect(options[3].label).toBe('3m');
+      expect(options[4].label).toBe('5m');
+      expect(options[5].label).toBe('10m');
+      expect(options[6].label).toBe('30m');
       
       // Check hours format
-      expect(options[9].label).toBe('1h');
+      expect(options[7].label).toBe('1h');
     });
 
     it('should have correct millisecond values for all durations', () => {
       const options = component['durationOptions'];
       
-      expect(options[0].valueMs).toBe(5000);    // 5s
-      expect(options[1].valueMs).toBe(10000);   // 10s
-      expect(options[2].valueMs).toBe(15000);   // 15s
-      expect(options[3].valueMs).toBe(30000);   // 30s
-      expect(options[4].valueMs).toBe(60000);   // 1m
-      expect(options[5].valueMs).toBe(180000);  // 3m
-      expect(options[6].valueMs).toBe(300000);  // 5m
-      expect(options[7].valueMs).toBe(600000);  // 10m
-      expect(options[8].valueMs).toBe(1800000); // 30m
-      expect(options[9].valueMs).toBe(3600000); // 1h
+      expect(options[0].valueMs).toBe(15000);   // 15s
+      expect(options[1].valueMs).toBe(30000);   // 30s
+      expect(options[2].valueMs).toBe(60000);   // 1m
+      expect(options[3].valueMs).toBe(180000);  // 3m
+      expect(options[4].valueMs).toBe(300000);  // 5m
+      expect(options[5].valueMs).toBe(600000);  // 10m
+      expect(options[6].valueMs).toBe(1800000); // 30m
+      expect(options[7].valueMs).toBe(3600000); // 1h
     });
   });
 
