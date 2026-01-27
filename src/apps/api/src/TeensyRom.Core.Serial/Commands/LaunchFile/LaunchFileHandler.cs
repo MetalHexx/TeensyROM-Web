@@ -16,6 +16,8 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 
 			if (r.LaunchItem.Size >= 575000)
 			{
+				await Task.Delay(1000);
+
 				var isMinimalFwReady = r.CommunicationPort.ConnectToMinimalFw(log);
 				if (!isMinimalFwReady)
 				{

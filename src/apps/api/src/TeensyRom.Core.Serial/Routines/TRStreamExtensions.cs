@@ -301,6 +301,7 @@ namespace TeensyRom.Core.Serial.Routines
 
 		public static TeensyToken SendFwCheckCommand(this ICommunicationPort communicationPort, ILoggingService log)
 		{
+			communicationPort.ClearBuffers();
 			log.Internal($"{_logClass} TRStreamExtensions: Checking for Minimal FW");
 			communicationPort.SendIntBytes(TeensyToken.FwCheckToken, 2);
 			communicationPort.WaitForSerialData(numBytes: 2, timeoutMs: 20000);  // Reduced from 20000 for faster discovery
