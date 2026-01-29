@@ -5,7 +5,7 @@ import { NavigationService, NAV_ITEMS } from '@teensyrom-nx/app/navigation';
 import { AlertContainerComponent } from '@teensyrom-nx/app/alerts';
 import { filter, map, mergeMap } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { DeviceStore, PLAYER_CONTEXT } from '@teensyrom-nx/application';
+import { DeviceStore, PLAYER_CONTEXT, StorageStore } from '@teensyrom-nx/application';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BusyDialogComponent } from '../components/busy-dialog/busy-dialog.component';
 import { NavRailComponent, NavRailItem } from '@teensyrom-nx/ui/components';
@@ -25,6 +25,7 @@ import { NavRailComponent, NavRailItem } from '@teensyrom-nx/ui/components';
 export class LayoutComponent {
   readonly deviceStore = inject(DeviceStore);
   readonly playerContext = inject(PLAYER_CONTEXT);
+  readonly storageStore = inject(StorageStore);
   readonly navService = inject(NavigationService);
   readonly router = inject(Router);
   readonly route = inject(ActivatedRoute);
@@ -33,9 +34,11 @@ export class LayoutComponent {
   showIndexDialog = computed(() => this.deviceStore.isIndexing());
   showFindDeviceDialog = computed(() => this.deviceStore.isLoading());
   showSlowLoadingDialog: Signal<boolean>;
+  showSlowFavoriteDialog: Signal<boolean>;
   private indexDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
   private findDeviceDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
   private slowLoadingDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
+  private slowFavoriteDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
 
   /** Menu items for the nav rail */
   readonly menuItems: NavRailItem[] = NAV_ITEMS;
@@ -59,6 +62,8 @@ export class LayoutComponent {
   constructor() {
     // Initialize slow loading signal
     this.showSlowLoadingDialog = this.playerContext.isSlowLoading();
+    // Initialize slow favorite operation signal
+    this.showSlowFavoriteDialog = this.storageStore.isSlowFavoriteOperation();
 
     this.initBusyDialog(
       this.showFindDeviceDialog,
@@ -90,6 +95,25 @@ export class LayoutComponent {
       } else if (!isSlowLoading && this.slowLoadingDialogRef) {
         this.slowLoadingDialogRef.close();
         this.slowLoadingDialogRef = null;
+      }
+    });
+
+    // Slow favorite operation dialog effect
+    effect(() => {
+      const isSlowFavorite = this.showSlowFavoriteDialog();
+      if (isSlowFavorite && !this.slowFavoriteDialogRef) {
+        this.slowFavoriteDialogRef = this.dialog.open(BusyDialogComponent, {
+          data: {
+            title: 'Updating Favorites',
+            message: 'TeensyROM may be swapping firmware modes. Hang tight!',
+          },
+          disableClose: true,
+          panelClass: 'glassy-dialog',
+          backdropClass: 'busy-dialog-backdrop',
+        });
+      } else if (!isSlowFavorite && this.slowFavoriteDialogRef) {
+        this.slowFavoriteDialogRef.close();
+        this.slowFavoriteDialogRef = null;
       }
     });
 
