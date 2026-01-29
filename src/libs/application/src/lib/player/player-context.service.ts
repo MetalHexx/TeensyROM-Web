@@ -10,6 +10,7 @@ import {
   StorageType,
   StorageTypeUtil,
   ALERT_SERVICE,
+  IAlertService,
 } from '@teensyrom-nx/domain';
 import { PlayerStore, LaunchedFile, HistoryEntry } from './player-store';
 import { StorageStore } from '../storage/storage-store';
@@ -38,7 +39,7 @@ export class PlayerContextService implements IPlayerContext {
   private readonly settingsStore = inject(SettingsStore);
   private readonly timerManager = inject(PlayerTimerManager);
   private readonly location = inject(Location);
-  private readonly alertService = inject(ALERT_SERVICE);
+  private readonly alertService: IAlertService = inject(ALERT_SERVICE);
   private readonly playerStorage = inject(PLAYER_STORAGE);
   private readonly injector = inject(Injector);
 
@@ -69,6 +70,29 @@ export class PlayerContextService implements IPlayerContext {
     this.cleanupTimer(deviceId);
 
     this.store.removePlayer({ deviceId });
+  }
+
+  /**
+   * Guard method to prevent duplicate launch commands.
+   * Checks if a launch operation is already in progress for the device.
+   * Shows a warning alert to the user if a launch is blocked.
+   * 
+   * @param deviceId - The device identifier
+   * @param operation - Description of the operation being attempted (for logging/alerts)
+   * @returns true if launch can proceed, false if blocked
+   */
+  private canLaunch(deviceId: string, operation: string): boolean {
+    const isLoading = this.store.isPlayerLoading(deviceId)();
+    
+    if (isLoading) {
+      logWarn(
+        `Launch blocked: ${operation} attempted while launch already in progress for device ${deviceId}`
+      );
+      this.alertService.warning('Please wait - a file is currently loading');
+      return false;
+    }
+    
+    return true;
   }
 
   startListeningToPopState(): void {
@@ -104,6 +128,11 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   async launchFileWithContext(request: LaunchFileContextRequest): Promise<void> {
+    // Guard: Prevent duplicate launches
+    if (!this.canLaunch(request.deviceId, 'launchFileWithContext')) {
+      return;
+    }
+
     const launchMode = request.launchMode ?? LaunchMode.Directory;
     const directoryPath = request.directoryPath ?? '/';
     const files = [...request.files];
@@ -194,6 +223,11 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   async launchRandomFile(deviceId: string): Promise<void> {
+    // Guard: Prevent duplicate launches
+    if (!this.canLaunch(deviceId, 'launchRandomFile')) {
+      return;
+    }
+
     await this.store.launchRandomFile({ deviceId });
 
     const currentFile = this.store.getCurrentFile(deviceId)();
@@ -315,6 +349,11 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   async next(deviceId: string): Promise<void> {
+    // Guard: Prevent duplicate launches
+    if (!this.canLaunch(deviceId, 'next')) {
+      return;
+    }
+
     const launchMode = this.store.getLaunchMode(deviceId)();
 
     // If in shuffle mode AND forward history is available, use history navigation
@@ -366,6 +405,11 @@ export class PlayerContextService implements IPlayerContext {
   }
 
   async previous(deviceId: string): Promise<void> {
+    // Guard: Prevent duplicate launches
+    if (!this.canLaunch(deviceId, 'previous')) {
+      return;
+    }
+
     const launchMode = this.store.getLaunchMode(deviceId)();
 
     // If in shuffle mode AND history navigation is available, use history navigation
@@ -560,8 +604,19 @@ export class PlayerContextService implements IPlayerContext {
     const completeSub = this.timerManager.onTimerComplete$(deviceId).subscribe(() => {
       logInfo(
         LogType.Success,
-        `Timer completed for device ${deviceId}, auto-progressing to next file`
+        `Timer completed for device ${deviceId}, attempting auto-progression to next file`
       );
+      
+      // Check if launch is already in progress before auto-progressing
+      // Use store directly to avoid showing alert - this is auto-progression, not user action
+      const isLoading = this.store.isPlayerLoading(deviceId)();
+      if (isLoading) {
+        logWarn(
+          `Auto-progression skipped: Launch already in progress for device ${deviceId}`
+        );
+        return;
+      }
+      
       void this.next(deviceId);
     });
 
@@ -756,6 +811,11 @@ export class PlayerContextService implements IPlayerContext {
    * Loads directory context and sets up timer after navigation
    */
   async navigateToHistoryPosition(deviceId: string, position: number): Promise<void> {
+    // Guard: Prevent duplicate launches
+    if (!this.canLaunch(deviceId, 'navigateToHistoryPosition')) {
+      return;
+    }
+
     // Navigate to the history position (launches file and updates position)
     await this.store.navigateToHistoryPosition({ deviceId, position });
 
@@ -848,6 +908,16 @@ export class PlayerContextService implements IPlayerContext {
     if (!targetFile) {
       logWarn(`File "${fileName}" not found during browser navigation`);
       this.alertService.warning(`File "${fileName}" not found in directory "${directoryPath}"`);
+      return;
+    }
+
+    // Check if launch is already in progress before browser navigation
+    const isLoading = this.store.isPlayerLoading(deviceId)();
+    if (isLoading) {
+      logWarn(
+        `Browser navigation skipped: Launch already in progress for device ${deviceId}`
+      );
+      this.alertService.warning('Please wait - a file is currently loading');
       return;
     }
 

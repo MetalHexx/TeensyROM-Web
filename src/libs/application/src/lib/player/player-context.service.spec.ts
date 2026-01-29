@@ -13,18 +13,14 @@ import {
   DEVICE_SERVICE,
   ALERT_SERVICE,
   IAlertService,
+  AlertMessage,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore, StorageDirectoryState } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { PLAYER_STORAGE } from './player-storage.interface';
-
-interface TimerState {
-  remainingMs: number;
-  totalMs: number;
-  isActive: boolean;
-}
+import { TimerState } from './timer-state.interface';
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   name: 'test-file.sid',
   path: '/music/test-file.sid',
@@ -46,6 +42,11 @@ const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   subtuneLengths: [],
   startSubtuneNum: 0,
   images: [],
+  links: [],
+  tags: [],
+  youTubeVideos: [],
+  competitions: [],
+  ratingCount: 0,
   ...overrides,
 });
 
@@ -127,7 +128,7 @@ describe('PlayerContextService', () => {
     };
 
     mockAlertService = {
-      alerts$: vi.fn(),
+      alerts$: of([]) as Observable<AlertMessage[]>,
       show: vi.fn(),
       success: vi.fn(),
       error: vi.fn(),
@@ -279,7 +280,7 @@ describe('PlayerContextService', () => {
     });
 
     it('should set loading state during launch operation', async () => {
-      let triggerResolve: () => void;
+      let triggerResolve: (() => void) | undefined;
       const loadingPromise = new Promise<void>((resolve) => {
         triggerResolve = resolve;
       });
@@ -305,7 +306,7 @@ describe('PlayerContextService', () => {
 
       expect(service.isLoading(deviceId)()).toBe(true);
 
-      triggerResolve();
+      triggerResolve?.();
       await launchPromise;
       await nextTick();
 
@@ -350,7 +351,7 @@ describe('PlayerContextService', () => {
         directory: {
           files: createTestDirectoryFiles(),
           directories: [],
-          currentPath: '/games',
+          path: '/games',
         },
       };
 
@@ -1176,7 +1177,7 @@ describe('PlayerContextService', () => {
         file: testFile,
         directoryPath: '/music',
         files: [testFile],
-      });
+        });
       await nextTick();
 
       expect(service.getError(deviceId)()).toBeNull();
@@ -1185,7 +1186,7 @@ describe('PlayerContextService', () => {
 
     it('should maintain loading state consistency during operations', async () => {
       // Create a delayed observable to simulate async loading
-      let triggerResolve: () => void;
+      let triggerResolve: (() => void) | undefined;
       const loadingPromise = new Promise<void>((resolve) => {
         triggerResolve = resolve;
       });
@@ -1212,7 +1213,7 @@ describe('PlayerContextService', () => {
       expect(service.isLoading(deviceId)()).toBe(true);
 
       // Complete operation
-      triggerResolve();
+      triggerResolve?.();
       await operationPromise;
       await nextTick();
 
@@ -1233,7 +1234,6 @@ describe('PlayerContextService', () => {
         files: [file1],
       });
 
-      // Second operation immediately after
       mockPlayerService.launchFile.mockReturnValue(of(file2));
       const promise2 = service.launchFileWithContext({
         deviceId,
@@ -1246,11 +1246,14 @@ describe('PlayerContextService', () => {
       await Promise.all([promise1, promise2]);
       await nextTick();
 
-      // Latest operation should win
+      // First operation should win - second was blocked by launch guard
       const currentFile = service.getCurrentFile(deviceId)();
-      expect(currentFile?.file).toEqual(file2);
+      expect(currentFile?.file).toEqual(file1);
       expect(service.isLoading(deviceId)()).toBe(false);
       expect(service.getError(deviceId)()).toBeNull();
+      
+      // Verify alert service was called to warn about blocked launch
+      expect(mockAlertService.warning).toHaveBeenCalledWith('Please wait - a file is currently loading');
     });
   });
 
@@ -1645,6 +1648,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1657,7 +1661,7 @@ describe('PlayerContextService', () => {
 
       it('should NOT create timer when non-music file launches', async () => {
         const imageFile = createTestFileItem({
-          type: FileItemType.Photo,
+          type: FileItemType.Image,
           playLength: undefined,
         });
 
@@ -1668,6 +1672,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: imageFile,
           files: [imageFile],
+          directoryPath: '/images',
         });
 
         await nextTick();
@@ -1691,6 +1696,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1721,6 +1727,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1750,6 +1757,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1780,6 +1788,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1806,6 +1815,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1834,6 +1844,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1863,6 +1874,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1895,6 +1907,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1916,7 +1929,7 @@ describe('PlayerContextService', () => {
 
       it('should NOT affect timer when pause/play/stop called on non-music file', async () => {
         const imageFile = createTestFileItem({
-          type: FileItemType.Photo,
+          type: FileItemType.Image,
           playLength: undefined,
         });
 
@@ -1929,6 +1942,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: imageFile,
           files: [imageFile],
+          directoryPath: '/images',
         });
 
         await nextTick();
@@ -1969,6 +1983,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -1994,7 +2009,7 @@ describe('PlayerContextService', () => {
           playLength: '3:00',
         });
         const imageFile = createTestFileItem({
-          type: FileItemType.Photo,
+          type: FileItemType.Image,
           playLength: undefined,
         });
 
@@ -2008,6 +2023,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile, imageFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2027,7 +2043,7 @@ describe('PlayerContextService', () => {
 
       it('should create timer when navigating from non-music to music file', async () => {
         const imageFile = createTestFileItem({
-          type: FileItemType.Photo,
+          type: FileItemType.Image,
           playLength: undefined,
         });
         const musicFile = createTestFileItem({
@@ -2046,6 +2062,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: imageFile,
           files: [imageFile, musicFile],
+          directoryPath: '/images',
         });
 
         await nextTick();
@@ -2095,6 +2112,7 @@ describe('PlayerContextService', () => {
           file: musicFile1,
           files: [musicFile1, musicFile2],
           launchMode: LaunchMode.Directory,
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2134,6 +2152,7 @@ describe('PlayerContextService', () => {
           file: musicFile1,
           files: [musicFile1],
           launchMode: LaunchMode.Shuffle,
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2176,6 +2195,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2228,6 +2248,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2, musicFile3],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2260,6 +2281,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2274,6 +2296,61 @@ describe('PlayerContextService', () => {
 
         // Should only have launched once (no auto-progression while paused)
         expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(1);
+      });
+
+      it('should block launch attempts while another launch is in progress', async () => {
+        // Setup: Create two files
+        const file1 = createTestFileItem({ name: 'file1.prg', type: FileItemType.Game });
+        const file2 = createTestFileItem({ name: 'file2.prg', type: FileItemType.Game });
+
+        // Create a controlled observable that won't complete until we tell it to
+        let resolveLaunch: ((value: FileItem) => void) | undefined;
+        const slowLaunch$ = new Observable<FileItem>((subscriber) => {
+          resolveLaunch = (value: FileItem) => {
+            subscriber.next(value);
+            subscriber.complete();
+          };
+        });
+
+        // First launch starts but doesn't complete
+        mockPlayerService.launchFile.mockReturnValueOnce(slowLaunch$);
+        
+        // Start first launch
+        void service.launchFileWithContext({
+          deviceId,
+          storageType: StorageType.Sd,
+          file: file1,
+          files: [file1, file2],
+          directoryPath: '/games',
+        });
+        
+        // Allow first launch to start (sets loading state)
+        await nextTick();
+        await nextTick();
+        
+        // Second launch attempt should be blocked
+        mockPlayerService.launchFile.mockReturnValueOnce(of(file2));
+        await service.launchFileWithContext({
+          deviceId,
+          storageType: StorageType.Sd,
+          file: file2,
+          files: [file1, file2],
+          directoryPath: '/games',
+        });
+        
+        // Verify warning was shown
+        expect(mockAlertService.warning).toHaveBeenCalledWith('Please wait - a file is currently loading');
+        
+        // Verify only one launchFile call was made (second was blocked)
+        expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(1);
+        
+        // Complete the first launch
+        resolveLaunch?.(file1);
+        await nextTick();
+        
+        // Now verify the first file was launched successfully
+        const currentFile = service.getCurrentFile(deviceId)();
+        expect(currentFile?.file.name).toBe('file1.prg');
       });
     });
 
@@ -2293,6 +2370,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2362,6 +2440,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2],
+          directoryPath: '/music',
         });
 
         // Wait for timer to be created (observable emissions are async)
@@ -2407,6 +2486,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile2, musicFile1],
+          directoryPath: '/music',
         });
 
         // Wait for timer to be created (observable emissions are async)
@@ -2524,6 +2604,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Sd,
           file: musicFile1,
           files: [musicFile1],
+          directoryPath: '/music',
         });
 
         // Wait for timer to be created
@@ -2536,6 +2617,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Sd,
           file: musicFile2,
           files: [musicFile2],
+          directoryPath: '/music',
         });
 
         // Timer should be cleaned up (set to null)
@@ -2566,6 +2648,7 @@ describe('PlayerContextService', () => {
           deviceId,
           storageType: StorageType.Sd,
           file: badFile,
+          directoryPath: '/music',
           files: [badFile],
         });
 
@@ -2580,6 +2663,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Sd,
           file: goodFile,
           files: [goodFile],
+          directoryPath: '/music',
         });
 
         // Should recover to success state
@@ -2663,6 +2747,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1],
+          directoryPath: '/music',
         });
 
         // Launch different file on device 2
@@ -2671,6 +2756,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile2,
           files: [musicFile2],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2698,6 +2784,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await service.launchFileWithContext({
@@ -2705,6 +2792,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2737,6 +2825,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await service.launchFileWithContext({
@@ -2744,6 +2833,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2778,6 +2868,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2810,7 +2901,7 @@ describe('PlayerContextService', () => {
 
       it('should handle playback control operations on non-music files without errors', async () => {
         const imageFile = createTestFileItem({
-          type: FileItemType.Photo,
+          type: FileItemType.Image,
           playLength: undefined,
         });
 
@@ -2823,6 +2914,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: imageFile,
           files: [imageFile],
+          directoryPath: '/images',
         });
 
         await nextTick();
@@ -2849,6 +2941,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2876,6 +2969,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2921,6 +3015,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Sd,
           file: incompatibleFile,
           files: [incompatibleFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -2949,7 +3044,7 @@ describe('PlayerContextService', () => {
         });
 
         mockPlayerService.launchRandom.mockReturnValue(of(incompatibleFile));
-        mockStorageStore.navigateToDirectory.mockResolvedValue();
+        mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           path: '/music',
           directory: {
@@ -3007,6 +3102,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Sd,
           file: compatibleFile,
           files: [compatibleFile, incompatibleFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -3056,6 +3152,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Sd,
           file: compatibleFile,
           files: [incompatibleFile, compatibleFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
@@ -3101,6 +3198,7 @@ describe('PlayerContextService', () => {
           storageType: StorageType.Sd,
           file: incompatibleFile,
           files: [incompatibleFile, compatibleFile],
+          directoryPath: '/music',
         });
 
         await nextTick();
