@@ -1,6 +1,9 @@
 // Custom Theming for Angular Material
 // For more information: https://material.angular.dev/guide/theming
 @use '@angular/material' as mat;
+@use './mixins' as mixins;
+// Tooltip styles - Tooltips are rendered outside component tree, so styles must be global
+@use '../../../../components/src/lib/tooltip/tooltip.styles.scss';
 
 html,
 body {
@@ -143,55 +146,6 @@ body {
 }
 
 // ─────────────────────────────────────────────
-//  Glassy Effect Mixins
-// ─────────────────────────────────────────────
-
-@mixin glassy-default-effect {
-  background-color: rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-@mixin glassy-subtle-effect {
-  background-color: rgba(var(--glassy-color), 0.05) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-@mixin glassy-light-effect {
-  background-color: rgba(var(--glassy-color), 0.075) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-@mixin glassy-medium-effect {
-  background-color: rgba(var(--glassy-color), 0.15) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-@mixin glassy-strong-effect {
-  background-color: rgba(var(--glassy-color), 0.2) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-@mixin glassy-dark-effect {
-  background-color: rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-@mixin glassy-primary-effect {
-  // Glassy effect using primary brand color with semi-transparency
-  // Ideal for headers and branded UI elements that need blur while
-  // maintaining the primary color identity
-  background-color: rgba(var(--color-primary-rgb), 0.85) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-// ─────────────────────────────────────────────
 //  Interactive Element Effects
 // ─────────────────────────────────────────────
 
@@ -218,15 +172,15 @@ body {
   transition: background-color 0.2s ease-in-out, backdrop-filter 0.2s ease-in-out;
 
   &:hover {
-    @include glassy-subtle-effect;
+    @include mixins.glassy-subtle-effect;
   }
 
   &.selected {
-    @include glassy-strong-effect;
+    @include mixins.glassy-strong-effect;
   }
 
   &.active {
-    @include glassy-subtle-effect;
+    @include mixins.glassy-subtle-effect;
     @include pulsing-highlight($border-side: left);
   }
 }
@@ -307,31 +261,31 @@ body {
 // Legacy class maintained for backward compatibility - use .glassy-default for new code
 .glassy,
 .glassy-default {
-  @include glassy-default-effect;
+  @include mixins.glassy-default-effect;
 }
 
 .glassy-subtle {
-  @include glassy-subtle-effect;
+  @include mixins.glassy-subtle-effect;
 }
 
 .glassy-light {
-  @include glassy-light-effect;
+  @include mixins.glassy-light-effect;
 }
 
 .glassy-medium {
-  @include glassy-medium-effect;
+  @include mixins.glassy-medium-effect;
 }
 
 .glassy-strong {
-  @include glassy-strong-effect;
+  @include mixins.glassy-strong-effect;
 }
 
 .glassy-dark {
-  @include glassy-dark-effect;
+  @include mixins.glassy-dark-effect;
 }
 
 .glassy-card {
-  @include glassy-dark-effect;
+  @include mixins.glassy-dark-effect;
   border-radius: var(--mat-sys-corner-large) !important;
   box-shadow: var(--mat-sys-level4) !important;
   will-change: transform, backdrop-filter;

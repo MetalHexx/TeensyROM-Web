@@ -1,0 +1,48 @@
+// ─────────────────────────────────────────────
+//  Glassy Effect Mixins
+// ─────────────────────────────────────────────
+
+@mixin glassy-default-effect {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@mixin glassy-subtle-effect {
+  background-color: rgba(var(--glassy-color), 0.05) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@mixin glassy-light-effect {
+  background-color: rgba(var(--glassy-color), 0.075) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@mixin glassy-medium-effect {
+  background-color: rgba(var(--glassy-color), 0.15) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@mixin glassy-strong-effect {
+  background-color: rgba(var(--glassy-color), 0.2) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@mixin glassy-dark-effect {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@mixin glassy-primary-effect {
+  // Glassy effect using primary brand color with semi-transparency
+  // Ideal for headers and branded UI elements that need blur while
+  // maintaining the primary color identity
+  background-color: rgba(var(--color-primary-rgb), 0.85) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
