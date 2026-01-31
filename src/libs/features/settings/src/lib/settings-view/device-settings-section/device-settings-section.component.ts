@@ -1,9 +1,10 @@
-import { Component, input } from '@angular/core';
+import { Component, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormGroup, AbstractControl, ReactiveFormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ScalingCardComponent, IconLabelComponent } from '@teensyrom-nx/ui/components';
 import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
+import { Device } from '@teensyrom-nx/domain';
 
 /**
  * Presentational component for per-device settings section.
@@ -42,9 +43,40 @@ export class DeviceSettingsSectionComponent {
   knownDevicesArray = input.required<FormArray>();
 
   /**
+   * Map of deviceId to Device object for status lookups
+   */
+  deviceMap = input<Map<string, Device>>(new Map());
+
+  /**
    * Controls whether this section's card is visible via animation
    */
   animationTrigger = input<boolean>(true);
+
+  /**
+   * Sorted device controls - online devices first, then alphabetically by deviceId
+   */
+  readonly sortedDeviceControls = computed(() => {
+    const controls = this.knownDevicesArray().controls;
+    const deviceMap = this.deviceMap();
+
+    return [...controls].sort((a, b) => {
+      const deviceIdA = a.get('deviceId')?.value ?? '';
+      const deviceIdB = b.get('deviceId')?.value ?? '';
+      
+      const deviceA = deviceMap.get(deviceIdA);
+      const deviceB = deviceMap.get(deviceIdB);
+      
+      const isOnlineA = deviceA?.deviceState === 'Connected';
+      const isOnlineB = deviceB?.deviceState === 'Connected';
+      
+      // Online devices first
+      if (isOnlineA && !isOnlineB) return -1;
+      if (!isOnlineA && isOnlineB) return 1;
+      
+      // Then alphabetically by deviceId
+      return deviceIdA.localeCompare(deviceIdB);
+    });
+  });
 
   /**
    * Gets a display-friendly title for a device card.
@@ -75,5 +107,30 @@ export class DeviceSettingsSectionComponent {
    */
   getAutoConnectControl(deviceGroup: AbstractControl): AbstractControl | null {
     return deviceGroup.get('connectionSettings.autoConnectEnabled');
+  }
+
+  /**
+   * Gets the Device object for a given device FormGroup.
+   */
+  getDevice(deviceGroup: AbstractControl): Device | undefined {
+    const deviceId = deviceGroup.get('deviceId')?.value;
+    return this.deviceMap().get(deviceId);
+  }
+
+  /**
+   * Checks if a device is disabled (not enabled in device store).
+   */
+  isDeviceDisabled(deviceGroup: AbstractControl): boolean {
+    const device = this.getDevice(deviceGroup);
+    return device ? !device.isEnabled : true;
+  }
+
+  /**
+   * Checks if a device is currently online/connected.
+   * Uses deviceState === 'Connected' for more accurate status.
+   */
+  isDeviceOnline(deviceGroup: AbstractControl): boolean {
+    const device = this.getDevice(deviceGroup);
+    return device?.deviceState === 'Connected';
   }
 }

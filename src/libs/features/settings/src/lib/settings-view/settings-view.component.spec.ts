@@ -4,8 +4,9 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal, WritableSignal } from '@angular/core';
 import { FormGroup, FormBuilder, Validators, FormArray } from '@angular/forms';
 import { SettingsViewComponent } from './settings-view.component';
-import { Settings, SETTINGS_SERVICE, ISettingsService } from '@teensyrom-nx/domain';
+import { Settings, SETTINGS_SERVICE, ISettingsService, Device } from '@teensyrom-nx/domain';
 import { SettingsFormService } from './settings-form.service';
+import { DeviceStore } from '@teensyrom-nx/application';
 
 /**
  * Custom validator to ensure at least one weight is greater than 0
@@ -33,6 +34,7 @@ describe('SettingsViewComponent', () => {
   let fixture: ComponentFixture<SettingsViewComponent>;
   let mockFormService: Partial<SettingsFormService>;
   let mockSettingsService: ISettingsService;
+  let mockDeviceStore: Partial<DeviceStore>;
 
   // Mock signals
   let settingsSignal: WritableSignal<Settings | null>;
@@ -47,6 +49,7 @@ describe('SettingsViewComponent', () => {
   let showSavingSignal: WritableSignal<boolean>;
   let isNavigatingHistorySignal: WritableSignal<boolean>;
   let historyPositionDisplaySignal: WritableSignal<string | null>;
+  let devicesSignal: WritableSignal<Device[]>;
 
   const mockSettings: Settings = {
     playerSettings: {
@@ -114,6 +117,21 @@ describe('SettingsViewComponent', () => {
     showSavingSignal = signal(false);
     isNavigatingHistorySignal = signal(false);
     historyPositionDisplaySignal = signal(null);
+    devicesSignal = signal<Device[]>([
+      {
+        deviceId: 'test-device-123',
+        deviceName: 'Test Device',
+        isConnected: true,
+        isEnabled: true,
+        isPrimary: true,
+        lastSeen: new Date(),
+      },
+    ]);
+
+    // Create mock device store
+    mockDeviceStore = {
+      devices: devicesSignal.asReadonly(),
+    } as Partial<DeviceStore>;
 
     // Build a real form for testing
     const fb = new FormBuilder();
@@ -210,6 +228,7 @@ describe('SettingsViewComponent', () => {
       providers: [
         provideNoopAnimations(),
         { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
+        { provide: DeviceStore, useValue: mockDeviceStore },
       ],
     })
       .overrideComponent(SettingsViewComponent, {
@@ -398,11 +417,12 @@ describe('SettingsViewComponent', () => {
       expect(component.activeSection()).toBe('player');
     });
 
-    it('should render all four navigation buttons', () => {
+    it('should render all navigation buttons (excluding commented out sections)', () => {
       fixture.detectChanges();
 
       const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
-      expect(buttons.length).toBe(4);
+      // File transfer button is currently commented out in the template
+      expect(buttons.length).toBe(3);
     });
 
     it('should pass animationTrigger=true to active section', () => {

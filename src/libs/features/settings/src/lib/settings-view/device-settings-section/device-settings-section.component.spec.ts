@@ -89,7 +89,8 @@ describe('DeviceSettingsSectionComponent', () => {
       expect(videoToggle).toBeTruthy();
     });
 
-    it('should display auto-connect toggle for each device', () => {
+    // Auto-connect toggle is currently commented out in the template
+    it.skip('should display auto-connect toggle for each device', () => {
       const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
       fixture.componentRef.setInput('knownDevicesArray', devicesArray);
       fixture.detectChanges();

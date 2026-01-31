@@ -54,6 +54,7 @@
 
         <lib-device-settings-section
           [knownDevicesArray]="getKnownDevices()"
+          [deviceMap]="deviceMap()"
           [animationTrigger]="activeSection() === 'devices'" />
 
         <lib-file-transfer-settings-section

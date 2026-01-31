@@ -12,6 +12,7 @@ import { PlayerSettingsSectionComponent } from './player-settings-section/player
 import { FileTransferSettingsSectionComponent } from './file-transfer-settings-section/file-transfer-settings-section.component';
 import { SearchSettingsSectionComponent } from './search-settings-section/search-settings-section.component';
 import { SettingsFormService } from './settings-form.service';
+import { DeviceStore } from '@teensyrom-nx/application';
 
 @Component({
   selector: 'lib-settings-view',
@@ -39,9 +40,16 @@ import { SettingsFormService } from './settings-form.service';
 })
 export class SettingsViewComponent {
   private readonly formService = inject(SettingsFormService);
+  private readonly deviceStore = inject(DeviceStore);
 
   // Active section state
   readonly activeSection = signal<'player' | 'devices' | 'fileTransfer' | 'search'>('player');
+
+  // Device map for child components
+  readonly deviceMap = computed(() => {
+    const devices = this.deviceStore.devices();
+    return new Map(devices.map(d => [d.deviceId, d]));
+  });
 
   // Expose service state to template
   readonly settings = this.formService.settings;

@@ -1,4 +1,6 @@
-<lib-scaling-card title="Device Settings" [animationTrigger]="animationTrigger()">
+<lib-scaling-card 
+  title="Device Settings"
+  [animationTrigger]="animationTrigger()">
   @if (knownDevicesArray().length === 0) {
     <div class="empty-state">
       <mat-icon>devices</mat-icon>
@@ -6,17 +8,22 @@
       <p class="hint">Connect a TeensyROM device to configure its settings.</p>
     </div>
   } @else {
-    @for (deviceGroup of knownDevicesArray().controls; track deviceGroup.get('deviceId')?.value; let i = $index) {
-      <div class="device-section">
-        <lib-icon-label
-          icon="desktop_windows"
-          [label]="getDeviceTitle(deviceGroup)"
-          size="extra-large"
-          color="primary"
-          [truncate]="true"
-        ></lib-icon-label>
+    @for (deviceGroup of sortedDeviceControls(); track deviceGroup.get('deviceId')?.value; let i = $index) {
+      <div class="device-section" [class.disabled]="isDeviceDisabled(deviceGroup)">
+        <div class="device-header">
+          <lib-icon-label
+            icon="desktop_windows"
+            [label]="getDeviceTitle(deviceGroup)"
+            size="extra-large"
+            color="primary"
+            [truncate]="true"
+          ></lib-icon-label>
+          @if (!isDeviceOnline(deviceGroup)) {
+            <span class="offline-indicator">(Offline)</span>
+          }
+        </div>
 
-        <form [formGroup]="asFormGroup(deviceGroup)">
+        <form [formGroup]="asFormGroup(deviceGroup)" [class.disabled]="isDeviceDisabled(deviceGroup)">
           <div class="settings-grid">
             <!-- Video Settings Group -->
             <div class="settings-group">
@@ -45,7 +52,7 @@
         </form>
       </div>
 
-      @if (i < knownDevicesArray().length - 1) {
+      @if (i < sortedDeviceControls().length - 1) {
         <hr class="device-divider" />
       }
     }

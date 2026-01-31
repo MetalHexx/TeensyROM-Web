@@ -30,9 +30,28 @@
 .device-section {
   padding: 1rem 0;
 
-  lib-icon-label {
+  .device-header {
     display: flex;
+    align-items: center;
+    gap: 0.75rem;
     margin-bottom: 1rem;
+
+    lib-icon-label {
+      display: flex;
+      flex: 0 1 auto;
+    }
+
+    .offline-indicator {
+      color: var(--color-error);
+      font-size: 1rem;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+  }
+
+  &.disabled {
+    opacity: 0.5;
+    pointer-events: none;
   }
 }
 
@@ -46,6 +65,10 @@ form {
   display: flex;
   flex-direction: column;
   gap: 0;
+
+  &.disabled {
+    pointer-events: none;
+  }
 }
 
 // Responsive grid for settings groups - matches player-settings-section
