@@ -37,8 +37,8 @@ export function navigateToDirectory(
 
       logInfo(LogType.Navigate, `Navigating to ${key} at path: ${path}`);
 
-      // Clear any active search when navigating
-      clearSearchState(store, key, actionMessage);
+      // Clear any active search when navigating (search is device-level, not storage-specific)
+      clearSearchState(store, deviceId, actionMessage);
 
       if (!isSelectedDirectory(store, deviceId, storageType, path)) {
         setDeviceSelectedDirectory(store, deviceId, storageType, path, actionMessage);

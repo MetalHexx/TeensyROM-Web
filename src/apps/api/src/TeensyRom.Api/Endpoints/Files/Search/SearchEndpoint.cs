@@ -1,5 +1,6 @@
-using TeensyRom.Api.Models;
+using System.Text.RegularExpressions;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Api.Endpoints.Files.Search
@@ -8,7 +9,7 @@ namespace TeensyRom.Api.Endpoints.Files.Search
     {
         public override void Configure()
         {
-            Get("/api/devices/{deviceId}/storage/{storageType}/search")
+            Get("/api/devices/{deviceId}/search")
                 .Produces<SearchResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
@@ -16,9 +17,9 @@ namespace TeensyRom.Api.Endpoints.Files.Search
                 .WithSummary("Search Files")
                 .WithTags("Files")
                 .WithDescription(
-                    "Searches for files in the specified storage device based on search text and filter criteria.\n\n" +
+                    "Searches for files across all available storage devices (SD and USB) based on search text and filter criteria.\n\n" +
                     "- Searches through file names, titles, creators, and descriptions.\n" +
-                    "- Returns metadata for all matching files.\n" +
+                    "- Returns metadata for all matching files from all available storages.\n" +
                     "- Supports file type filtering (All, Games, Music, Images, Hex).\n" +
                     "- Supports pagination with Skip and Take parameters.\n" +
                     "- Excludes favorites and playlist directories from search results.\n" +
@@ -35,26 +36,35 @@ namespace TeensyRom.Api.Endpoints.Files.Search
                 SendNotFound($"The device {r.DeviceId} was not found.");
                 return Task.CompletedTask;
             }
-            
-            var storage = device.GetStorage(r.StorageType);
-            if (storage is null)
-            {
-                SendNotFound($"The storage {r.StorageType} is not available.");
-                return Task.CompletedTask;
-            }
 
             var filterType = r.FilterType ?? TeensyFilterType.All;
             
-            // First, get all search results to count total
-            var allSearchResults = storage.Search(r.SearchText, filterType, 0, int.MaxValue).ToList();
-            var totalCount = allSearchResults.Count;
+            // Collect results from all available storages
+            var allResults = new List<LaunchableItem>();
             
-            // Then get the paginated results
-            var paginatedResults = storage.Search(r.SearchText, filterType, r.Skip, r.Take);
-            var fileItems = paginatedResults
-                .Select(FileItemDto.FromLaunchable)
+            if (device.SdStorage is not null)
+            {
+                allResults.AddRange(device.SdStorage.Search(r.SearchText, filterType));
+            }
+            
+            if (device.UsbStorage is not null)
+            {
+                allResults.AddRange(device.UsbStorage.Search(r.SearchText, filterType));
+            }
+            
+            // Score, sort, and paginate combined results
+            var searchTerms = ParseSearchTerms(r.SearchText);
+            var weights = new SearchWeights();
+            
+            var scoredResults = allResults
+                .Select(file => new { File = file, Score = CalculateScore(file, searchTerms, weights) })
+                .OrderByDescending(x => x.Score)
+                .ThenBy(x => x.File.Title)
                 .ToList();
-
+            
+            var totalCount = scoredResults.Count;
+            var paginatedResults = scoredResults.Skip(r.Skip).Take(r.Take);
+            var fileItems = paginatedResults.Select(x => FileItemDto.FromLaunchable(x.File)).ToList();
             var hasMore = (r.Skip + r.Take) < totalCount;
 
             Response = new()
@@ -72,6 +82,55 @@ namespace TeensyRom.Api.Endpoints.Files.Search
             };
             Send();
             return Task.CompletedTask;
+        }
+
+        private static List<string> ParseSearchTerms(string searchText)
+        {
+            var quotedMatches = Regex
+                .Matches(searchText, @"(\+?""([^""]+)"")|(\+?\S+)")
+                .Cast<Match>()
+                .Select(m => m.Groups[2].Success ? (m.Groups[1].Value.StartsWith("+") ? "+" : "") + m.Groups[2].Value : m.Groups[0].Value)
+                .Where(m => !string.IsNullOrEmpty(m))
+                .ToList();
+
+            searchText = searchText.Replace("\"", "");
+            searchText = searchText.Replace("+", "");
+
+            foreach (var quotedMatch in quotedMatches)
+            {
+                var noPlusQuotedMatch = string.IsNullOrWhiteSpace(quotedMatch)
+                    ? string.Empty
+                    : quotedMatch.Replace("+", "");
+
+                searchText = string.IsNullOrWhiteSpace(searchText)
+                    ? string.Empty
+                    : searchText.Replace($"{noPlusQuotedMatch}", "");
+            }
+
+            var searchTerms = searchText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            var stopSearchWords = new List<string> 
+            { 
+                "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", 
+                "if", "in", "is", "it", "no", "not", "of", "on", "or", "that", 
+                "the", "to", "was", "with" 
+            };
+            searchTerms.RemoveAll(term => stopSearchWords.Contains(term.ToLower()));
+
+            searchTerms.AddRange(quotedMatches);
+
+            searchTerms = searchTerms.Select(term => term.TrimStart('+')).ToList();
+
+            return searchTerms;
+        }
+
+        private static double CalculateScore(LaunchableItem file, List<string> searchTerms, SearchWeights weights)
+        {
+            return searchTerms.Sum(term =>
+                (file.Title.Contains(term, StringComparison.OrdinalIgnoreCase) ? weights.Title : 0) +
+                (file.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ? weights.FileName : 0) +
+                (file.Creator.Contains(term, StringComparison.OrdinalIgnoreCase) ? weights.Creator : 0) +
+                (file.Path.Value.Contains(term, StringComparison.OrdinalIgnoreCase) ? weights.FilePath : 0) +
+                (file.Description.Contains(term, StringComparison.OrdinalIgnoreCase) ? weights.Description : 0));
         }
     }
 }

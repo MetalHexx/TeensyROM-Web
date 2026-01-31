@@ -1,4 +1,3 @@
-import { inject } from '@angular/core';
 import { patchState, WritableStateSource } from '@ngrx/signals';
 import { DeviceState } from '../device-store';
 

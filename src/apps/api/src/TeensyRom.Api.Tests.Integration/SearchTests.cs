@@ -34,7 +34,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = deviceId,
                 SearchText = searchText,
-                StorageType = TeensyStorageType.SD,
                 FilterType = TeensyFilterType.All
             });
 
@@ -67,7 +66,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = deviceId,
                 SearchText = searchText,
-                StorageType = TeensyStorageType.SD,
                 FilterType = TeensyFilterType.All,
                 Skip = 5,
                 Take = 10
@@ -106,7 +104,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = deviceId,
                 SearchText = searchText,
-                StorageType = TeensyStorageType.SD,
                 FilterType = TeensyFilterType.All,
                 Skip = 0,
                 Take = 100
@@ -136,7 +133,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = deviceId,
                 SearchText = searchText,
-                StorageType = TeensyStorageType.SD,
                 FilterType = TeensyFilterType.Music
             });
 
@@ -165,7 +161,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = validDeviceId,
                 SearchText = "test",
-                StorageType = TeensyStorageType.SD,
                 Skip = -1
             });
 
@@ -184,7 +179,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = validDeviceId,
                 SearchText = "test",
-                StorageType = TeensyStorageType.SD,
                 Take = 0
             });
 
@@ -203,7 +197,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = validDeviceId,
                 SearchText = "test",
-                StorageType = TeensyStorageType.SD,
                 Take = 1001
             });
 
@@ -227,7 +220,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = deviceId,
                 SearchText = searchText,
-                StorageType = TeensyStorageType.SD,
                 FilterType = TeensyFilterType.Games
             });
 
@@ -265,7 +257,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = deviceId,
                 SearchText = searchText,
-                StorageType = TeensyStorageType.SD,
                 FilterType = TeensyFilterType.Images
             });
 
@@ -306,8 +297,7 @@ namespace TeensyRom.Api.Tests.Integration
             var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, SearchResponse>(new SearchRequest
             {
                 DeviceId = deviceId,
-                SearchText = searchText,
-                StorageType = TeensyStorageType.SD
+                SearchText = searchText
             });
 
             //Assert
@@ -337,8 +327,7 @@ namespace TeensyRom.Api.Tests.Integration
             var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, SearchResponse>(new SearchRequest
             {
                 DeviceId = deviceId,
-                SearchText = searchText,
-                StorageType = TeensyStorageType.SD
+                SearchText = searchText
             });
 
             //Assert
@@ -361,8 +350,7 @@ namespace TeensyRom.Api.Tests.Integration
             var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, ValidationProblemDetails>(new SearchRequest
             {
                 DeviceId = "!!invalid",
-                SearchText = "test",
-                StorageType = TeensyStorageType.SD
+                SearchText = "test"
             });
 
             // Assert
@@ -379,8 +367,7 @@ namespace TeensyRom.Api.Tests.Integration
             var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, ValidationProblemDetails>(new SearchRequest            
             {
                 DeviceId = validDeviceId,
-                SearchText = "",
-                StorageType = TeensyStorageType.SD
+                SearchText = ""
             });
 
             r.Should().BeValidationProblem()
@@ -397,31 +384,11 @@ namespace TeensyRom.Api.Tests.Integration
             var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, ValidationProblemDetails>(new SearchRequest            
             {
                 DeviceId = validDeviceId,
-                SearchText = longSearchText,
-                StorageType = TeensyStorageType.SD
+                SearchText = longSearchText
             });
 
             r.Should().BeValidationProblem()
                 .WithKeyAndValue("SearchText", "Search text must be no more than 100 characters long.");
-        }
-
-        [Fact]
-        public async Task When_InvalidStorageType_ReturnsBadRequest()
-        {
-            // Arrange
-            var validDeviceId = Guid.NewGuid().ToString().GenerateFilenameSafeHash();
-
-            // Act - TrClient automatically handles enum serialization
-            var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, ValidationProblemDetails>(new SearchRequest            
-            {
-                DeviceId = validDeviceId,
-                SearchText = "test",
-                StorageType = (TeensyStorageType)999
-            });
-
-            // Assert
-            r.Should().BeValidationProblem()
-                .WithKeyAndValue("StorageType", "Storage type must be a valid enum value.");
         }
 
         [Fact]
@@ -435,7 +402,6 @@ namespace TeensyRom.Api.Tests.Integration
             {
                 DeviceId = validDeviceId,
                 SearchText = "test",
-                StorageType = TeensyStorageType.SD,
                 FilterType = (TeensyFilterType)999
             });
 
@@ -454,8 +420,7 @@ namespace TeensyRom.Api.Tests.Integration
             var r = await f.Client.GetAsync<SearchEndpoint, SearchRequest, string>(new SearchRequest
             {
                 DeviceId = nonExistentDeviceId,
-                SearchText = "test",
-                StorageType = TeensyStorageType.SD
+                SearchText = "test"
             });
 
             // Assert

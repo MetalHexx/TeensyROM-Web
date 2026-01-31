@@ -50,11 +50,10 @@ type StorageStoreInstance = {
   removeStorage: (args: { deviceId: string; storageType: StorageType }) => void;
   searchFiles: (args: {
     deviceId: string;
-    storageType: StorageType;
     searchText: string;
     filterType?: import('@teensyrom-nx/domain').PlayerFilterType;
   }) => Promise<void>;
-  clearSearch: (args: { deviceId: string; storageType: StorageType }) => void;
+  clearSearch: (args: { deviceId: string }) => void;
   saveFavorite: (args: {
     deviceId: string;
     storageType: StorageType;
@@ -72,8 +71,7 @@ type StorageStoreInstance = {
   getDeviceStorageEntries: (deviceId: string) => () => Record<string, StorageDirectoryState>;
   getDeviceDirectories: (deviceId: string) => () => StorageDirectoryState[];
   getSearchState: (
-    deviceId: string,
-    storageType: StorageType
+    deviceId: string
   ) => () => import('./storage-store').SearchState | null;
 };
 
@@ -1604,7 +1602,6 @@ describe('StorageStore (NgRx Signal Store)', () => {
     let searchMock: MockedFunction<
       (
         deviceId: string,
-        storageType: StorageType,
         searchText: string,
         filterType?: import('@teensyrom-nx/domain').PlayerFilterType
       ) => Observable<import('@teensyrom-nx/domain').FileItem[]>
@@ -1617,7 +1614,6 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
     it('should execute search and store results in searchState', async () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
       const searchText = 'test';
       const mockResults = [
         createMockFileItem({ name: 'test1.sid', path: '/test1.sid' }),
@@ -1626,10 +1622,9 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
       searchMock.mockReturnValue(of(mockResults));
 
-      await store.searchFiles({ deviceId, storageType, searchText });
+      await store.searchFiles({ deviceId, searchText });
 
-      const key = StorageKeyUtil.create(deviceId, storageType);
-      const searchState = store.searchState()[key];
+      const searchState = store.searchState()[deviceId];
 
       expect(searchState).toBeDefined();
       expect(searchState.searchText).toBe(searchText);
@@ -1639,39 +1634,35 @@ describe('StorageStore (NgRx Signal Store)', () => {
       expect(searchState.hasSearched).toBe(true);
       expect(searchState.error).toBeNull();
 
-      expect(searchMock).toHaveBeenCalledWith(deviceId, storageType, searchText, undefined);
+      expect(searchMock).toHaveBeenCalledWith(deviceId, searchText, undefined);
     });
 
     it('should handle search with filter type', async () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
       const searchText = 'game';
       const filterType = 'games' as PlayerFilterType;
       const mockResults = [createMockFileItem({ name: 'game1.sid', path: '/game1.sid' })];
 
       searchMock.mockReturnValue(of(mockResults));
 
-      await store.searchFiles({ deviceId, storageType, searchText, filterType });
+      await store.searchFiles({ deviceId, searchText, filterType });
 
-      const key = StorageKeyUtil.create(deviceId, storageType);
-      const searchState = store.searchState()[key];
+      const searchState = store.searchState()[deviceId];
 
       expect(searchState.filterType).toBe(filterType);
       expect(searchState.results).toEqual(mockResults);
-      expect(searchMock).toHaveBeenCalledWith(deviceId, storageType, searchText, filterType);
+      expect(searchMock).toHaveBeenCalledWith(deviceId, searchText, filterType);
     });
 
     it('should handle empty search results', async () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
       const searchText = 'nonexistent';
 
       searchMock.mockReturnValue(of([]));
 
-      await store.searchFiles({ deviceId, storageType, searchText });
+      await store.searchFiles({ deviceId, searchText });
 
-      const key = StorageKeyUtil.create(deviceId, storageType);
-      const searchState = store.searchState()[key];
+      const searchState = store.searchState()[deviceId];
 
       expect(searchState.results).toEqual([]);
       expect(searchState.hasSearched).toBe(true);
@@ -1680,16 +1671,14 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
     it('should handle search errors', async () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
       const searchText = 'test';
       const errorMessage = 'Search API failed';
 
       searchMock.mockReturnValue(throwError(() => new Error(errorMessage)));
 
-      await store.searchFiles({ deviceId, storageType, searchText });
+      await store.searchFiles({ deviceId, searchText });
 
-      const key = StorageKeyUtil.create(deviceId, storageType);
-      const searchState = store.searchState()[key];
+      const searchState = store.searchState()[deviceId];
 
       expect(searchState.isSearching).toBe(false);
       expect(searchState.hasSearched).toBe(true);
@@ -1699,16 +1688,14 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
     it('should update search state on subsequent searches', async () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
-      const key = StorageKeyUtil.create(deviceId, storageType);
 
       // First search
       searchMock.mockReturnValue(
         of([createMockFileItem({ name: 'first.sid', path: '/first.sid' })])
       );
-      await store.searchFiles({ deviceId, storageType, searchText: 'first' });
+      await store.searchFiles({ deviceId, searchText: 'first' });
 
-      let searchState = store.searchState()[key];
+      let searchState = store.searchState()[deviceId];
       expect(searchState.searchText).toBe('first');
       expect(searchState.results.length).toBe(1);
 
@@ -1719,25 +1706,24 @@ describe('StorageStore (NgRx Signal Store)', () => {
           createMockFileItem({ name: 'second2.sid', path: '/second2.sid' }),
         ])
       );
-      await store.searchFiles({ deviceId, storageType, searchText: 'second' });
+      await store.searchFiles({ deviceId, searchText: 'second' });
 
-      searchState = store.searchState()[key];
+      searchState = store.searchState()[deviceId];
       expect(searchState.searchText).toBe('second');
       expect(searchState.results.length).toBe(2);
     });
 
-    it('should maintain independent search state per device/storageType', async () => {
+    it('should maintain independent search state per device', async () => {
       const device1 = 'device-1';
       const device2 = 'device-2';
-      const storageType = StorageType.Sd;
 
       searchMock.mockReturnValue(of([createMockFileItem({ name: 'test.sid', path: '/test.sid' })]));
 
-      await store.searchFiles({ deviceId: device1, storageType, searchText: 'search1' });
-      await store.searchFiles({ deviceId: device2, storageType, searchText: 'search2' });
+      await store.searchFiles({ deviceId: device1, searchText: 'search1' });
+      await store.searchFiles({ deviceId: device2, searchText: 'search2' });
 
-      const key1 = StorageKeyUtil.create(device1, storageType);
-      const key2 = StorageKeyUtil.create(device2, storageType);
+      const key1 = device1;
+      const key2 = device2;
 
       expect(store.searchState()[key1].searchText).toBe('search1');
       expect(store.searchState()[key2].searchText).toBe('search2');
@@ -1748,7 +1734,6 @@ describe('StorageStore (NgRx Signal Store)', () => {
     let searchMock: MockedFunction<
       (
         deviceId: string,
-        storageType: StorageType,
         searchText: string,
         filterType?: import('@teensyrom-nx/domain').PlayerFilterType
       ) => Observable<import('@teensyrom-nx/domain').FileItem[]>
@@ -1759,38 +1744,35 @@ describe('StorageStore (NgRx Signal Store)', () => {
       mockStorageService.search = searchMock;
     });
 
-    it('should clear search state for specific device/storageType', async () => {
+    it('should clear search state for specific device', async () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
-      const key = StorageKeyUtil.create(deviceId, storageType);
 
       // Setup search state
       searchMock.mockReturnValue(of([createMockFileItem({ name: 'test.sid', path: '/test.sid' })]));
-      await store.searchFiles({ deviceId, storageType, searchText: 'test' });
+      await store.searchFiles({ deviceId, searchText: 'test' });
 
-      expect(store.searchState()[key]).toBeDefined();
+      expect(store.searchState()[deviceId]).toBeDefined();
 
       // Clear search
-      store.clearSearch({ deviceId, storageType });
+      store.clearSearch({ deviceId });
 
-      expect(store.searchState()[key]).toBeUndefined();
+      expect(store.searchState()[deviceId]).toBeUndefined();
     });
 
-    it('should not affect other device/storageType search state', async () => {
+    it('should not affect other device search state', async () => {
       const device1 = 'device-1';
       const device2 = 'device-2';
-      const storageType = StorageType.Sd;
 
       searchMock.mockReturnValue(of([createMockFileItem({ name: 'test.sid', path: '/test.sid' })]));
 
-      await store.searchFiles({ deviceId: device1, storageType, searchText: 'search1' });
-      await store.searchFiles({ deviceId: device2, storageType, searchText: 'search2' });
+      await store.searchFiles({ deviceId: device1, searchText: 'search1' });
+      await store.searchFiles({ deviceId: device2, searchText: 'search2' });
 
-      const key1 = StorageKeyUtil.create(device1, storageType);
-      const key2 = StorageKeyUtil.create(device2, storageType);
+      const key1 = device1;
+      const key2 = device2;
 
       // Clear only device1
-      store.clearSearch({ deviceId: device1, storageType });
+      store.clearSearch({ deviceId: device1 });
 
       expect(store.searchState()[key1]).toBeUndefined();
       expect(store.searchState()[key2]).toBeDefined();
@@ -1802,7 +1784,6 @@ describe('StorageStore (NgRx Signal Store)', () => {
     let searchMock: MockedFunction<
       (
         deviceId: string,
-        storageType: StorageType,
         searchText: string,
         filterType?: import('@teensyrom-nx/domain').PlayerFilterType
       ) => Observable<import('@teensyrom-nx/domain').FileItem[]>
@@ -1815,22 +1796,20 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
     it('should return null when no search state exists', () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
 
-      const searchStateSignal = store.getSearchState(deviceId, storageType);
+      const searchStateSignal = store.getSearchState(deviceId);
       expect(searchStateSignal()).toBeNull();
     });
 
     it('should return search state when it exists', async () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
       const searchText = 'test';
       const mockResults = [createMockFileItem({ name: 'test.sid', path: '/test.sid' })];
 
       searchMock.mockReturnValue(of(mockResults));
-      await store.searchFiles({ deviceId, storageType, searchText });
+      await store.searchFiles({ deviceId, searchText });
 
-      const searchStateSignal = store.getSearchState(deviceId, storageType);
+      const searchStateSignal = store.getSearchState(deviceId);
       const searchState = searchStateSignal();
 
       expect(searchState).not.toBeNull();
@@ -1840,23 +1819,22 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
     it('should reactively update when search state changes', async () => {
       const deviceId = 'device-1';
-      const storageType = StorageType.Sd;
 
-      const searchStateSignal = store.getSearchState(deviceId, storageType);
+      const searchStateSignal = store.getSearchState(deviceId);
 
       // Initially null
       expect(searchStateSignal()).toBeNull();
 
       // Execute search
       searchMock.mockReturnValue(of([createMockFileItem({ name: 'test.sid', path: '/test.sid' })]));
-      await store.searchFiles({ deviceId, storageType, searchText: 'test' });
+      await store.searchFiles({ deviceId, searchText: 'test' });
 
       // Should now have state
       expect(searchStateSignal()).not.toBeNull();
       expect(searchStateSignal()?.searchText).toBe('test');
 
       // Clear search
-      store.clearSearch({ deviceId, storageType });
+      store.clearSearch({ deviceId });
 
       // Should be null again
       expect(searchStateSignal()).toBeNull();
@@ -1867,7 +1845,6 @@ describe('StorageStore (NgRx Signal Store)', () => {
     let searchMock: MockedFunction<
       (
         deviceId: string,
-        storageType: StorageType,
         searchText: string,
         filterType?: import('@teensyrom-nx/domain').PlayerFilterType
       ) => Observable<import('@teensyrom-nx/domain').FileItem[]>
@@ -1881,7 +1858,6 @@ describe('StorageStore (NgRx Signal Store)', () => {
     it('should clear search when navigating to directory', async () => {
       const deviceId = 'device-1';
       const storageType = StorageType.Sd;
-      const key = StorageKeyUtil.create(deviceId, storageType);
 
       // Setup initial state
       getDirectoryMock.mockReturnValue(of(createMockStorageDirectory('/')));
@@ -1889,21 +1865,20 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
       // Execute search
       searchMock.mockReturnValue(of([createMockFileItem({ name: 'test.sid', path: '/test.sid' })]));
-      await store.searchFiles({ deviceId, storageType, searchText: 'test' });
-      expect(store.searchState()[key]).toBeDefined();
+      await store.searchFiles({ deviceId, searchText: 'test' });
+      expect(store.searchState()[deviceId]).toBeDefined();
 
       // Navigate to directory
       getDirectoryMock.mockReturnValue(of(createMockStorageDirectory('/games')));
       await store.navigateToDirectory({ deviceId, storageType, path: '/games' });
 
       // Search should be cleared
-      expect(store.searchState()[key]).toBeUndefined();
+      expect(store.searchState()[deviceId]).toBeUndefined();
     });
 
     it('should clear search when navigating backward', async () => {
       const deviceId = 'device-1';
       const storageType = StorageType.Sd;
-      const key = StorageKeyUtil.create(deviceId, storageType);
 
       // Setup navigation history
       getDirectoryMock.mockReturnValue(of(createMockStorageDirectory('/')));
@@ -1913,21 +1888,20 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
       // Execute search
       searchMock.mockReturnValue(of([createMockFileItem({ name: 'test.sid', path: '/test.sid' })]));
-      await store.searchFiles({ deviceId, storageType, searchText: 'test' });
-      expect(store.searchState()[key]).toBeDefined();
+      await store.searchFiles({ deviceId, searchText: 'test' });
+      expect(store.searchState()[deviceId]).toBeDefined();
 
       // Navigate backward
       getDirectoryMock.mockReturnValue(of(createMockStorageDirectory('/')));
       await store.navigateDirectoryBackward({ deviceId });
 
       // Search should be cleared
-      expect(store.searchState()[key]).toBeUndefined();
+      expect(store.searchState()[deviceId]).toBeUndefined();
     });
 
     it('should clear search when navigating forward', async () => {
       const deviceId = 'device-1';
       const storageType = StorageType.Sd;
-      const key = StorageKeyUtil.create(deviceId, storageType);
 
       // Setup navigation history
       getDirectoryMock.mockReturnValue(of(createMockStorageDirectory('/')));
@@ -1938,21 +1912,20 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
       // Execute search
       searchMock.mockReturnValue(of([createMockFileItem({ name: 'test.sid', path: '/test.sid' })]));
-      await store.searchFiles({ deviceId, storageType, searchText: 'test' });
-      expect(store.searchState()[key]).toBeDefined();
+      await store.searchFiles({ deviceId, searchText: 'test' });
+      expect(store.searchState()[deviceId]).toBeDefined();
 
       // Navigate forward
       getDirectoryMock.mockReturnValue(of(createMockStorageDirectory('/dir')));
       await store.navigateDirectoryForward({ deviceId });
 
       // Search should be cleared
-      expect(store.searchState()[key]).toBeUndefined();
+      expect(store.searchState()[deviceId]).toBeUndefined();
     });
 
     it('should clear search when navigating up one directory', async () => {
       const deviceId = 'device-1';
       const storageType = StorageType.Sd;
-      const key = StorageKeyUtil.create(deviceId, storageType);
 
       // Setup at subdirectory
       getDirectoryMock.mockReturnValue(of(createMockStorageDirectory('/dir')));
@@ -1961,15 +1934,15 @@ describe('StorageStore (NgRx Signal Store)', () => {
 
       // Execute search
       searchMock.mockReturnValue(of([createMockFileItem({ name: 'test.sid', path: '/test.sid' })]));
-      await store.searchFiles({ deviceId, storageType, searchText: 'test' });
-      expect(store.searchState()[key]).toBeDefined();
+      await store.searchFiles({ deviceId, searchText: 'test' });
+      expect(store.searchState()[deviceId]).toBeDefined();
 
       // Navigate up
       getDirectoryMock.mockReturnValue(of(createMockStorageDirectory('/')));
       await store.navigateUpOneDirectory({ deviceId, storageType });
 
       // Search should be cleared
-      expect(store.searchState()[key]).toBeUndefined();
+      expect(store.searchState()[deviceId]).toBeUndefined();
     });
   });
 

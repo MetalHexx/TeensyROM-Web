@@ -523,13 +523,13 @@
         }
       }
     },
-    "/api/devices/{deviceId}/storage/{storageType}/search": {
+    "/api/devices/{deviceId}/search": {
       "get": {
         "tags": [
           "Files"
         ],
         "summary": "Search Files",
-        "description": "Searches for files in the specified storage device based on search text and filter criteria.\n\n- Searches through file names, titles, creators, and descriptions.\n- Returns metadata for all matching files.\n- Supports file type filtering (All, Games, Music, Images, Hex).\n- Supports pagination with Skip and Take parameters.\n- Excludes favorites and playlist directories from search results.\n- Uses weighted search algorithm to rank results by relevance.\n- Default page size is 50, maximum is 200.",
+        "description": "Searches for files across all available storage devices (SD and USB) based on search text and filter criteria.\n\n- Searches through file names, titles, creators, and descriptions.\n- Returns metadata for all matching files from all available storages.\n- Supports file type filtering (All, Games, Music, Images, Hex).\n- Supports pagination with Skip and Take parameters.\n- Excludes favorites and playlist directories from search results.\n- Uses weighted search algorithm to rank results by relevance.\n- Default page size is 50, maximum is 200.",
         "operationId": "Search",
         "parameters": [
           {
@@ -538,14 +538,6 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
-          },
-          {
-            "name": "storageType",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/TeensyStorageType"
             }
           },
           {

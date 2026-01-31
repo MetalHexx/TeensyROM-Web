@@ -20,7 +20,7 @@ namespace TeensyRom.Core.Storage
         void UpsertFile(FileItem fileItem);
         void Clear();
         void EnsureFavorites();
-        IEnumerable<LaunchableItem> Search(string searchText, IEnumerable<DirectoryPath> excludePaths, List<string> stopSearchWords, SearchWeights searchWeights, params TeensyFileType[] fileTypes);
+        IEnumerable<LaunchableItem> Search(string searchText, IEnumerable<DirectoryPath> excludePaths, params TeensyFileType[] fileTypes);
         LaunchableItem? GetRandomFile(StorageScope scope, DirectoryPath scopePath, IEnumerable<DirectoryPath> excludePaths, params TeensyFileType[] fileTypes);
         void WriteToDisk();
         void ClearCache();

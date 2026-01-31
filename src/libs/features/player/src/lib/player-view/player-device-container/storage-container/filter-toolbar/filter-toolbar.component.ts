@@ -67,11 +67,7 @@ export class FilterToolbarComponent {
 
   // Computed signal for search state
   private readonly searchState = computed(() => {
-    const selectedDir = this.storageStore.getSelectedDirectoryState(this.deviceId())();
-    if (!selectedDir) {
-      return null;
-    }
-    return this.storageStore.getSearchState(this.deviceId(), selectedDir.storageType)();
+    return this.storageStore.getSearchState(this.deviceId())();
   });
 
   // Computed signal to check if search is active
@@ -87,13 +83,11 @@ export class FilterToolbarComponent {
       untracked(() => {
         if (searchActive) {
           const state = this.searchState();
-          const selectedDir = this.storageStore.getSelectedDirectoryState(this.deviceId())();
 
           // Only re-search if we have valid state and search text
-          if (state && state.searchText && selectedDir) {
+          if (state && state.searchText) {
             void this.storageStore.searchFiles({
               deviceId: this.deviceId(),
-              storageType: selectedDir.storageType,
               searchText: state.searchText,
               filterType: currentFilter,
             });

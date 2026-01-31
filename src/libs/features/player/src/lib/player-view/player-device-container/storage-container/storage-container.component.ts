@@ -35,14 +35,7 @@ export class StorageContainerComponent {
   );
 
   readonly hasActiveSearch = computed(() => {
-    const selectedDir = this.storageStore.getSelectedDirectoryState(this.deviceId())();
-    if (!selectedDir) {
-      return false;
-    }
-    const searchState = this.storageStore.getSearchState(
-      this.deviceId(),
-      selectedDir.storageType
-    )();
+    const searchState = this.storageStore.getSearchState(this.deviceId())();
     return searchState?.hasSearched ?? false;
   });
 

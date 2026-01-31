@@ -21,12 +21,13 @@ import {
   IPlayerContext,
   LaunchedFile,
   PlayerFileContext,
+  StorageDirectoryState,
 } from '@teensyrom-nx/application';
 
 describe('DirectoryFilesComponent', () => {
   let component: DirectoryFilesComponent;
   let fixture: ComponentFixture<DirectoryFilesComponent>;
-  let mockStorageStore: Partial<typeof StorageStore>;
+  let mockStorageStore: Partial<typeof StorageStore.prototype>;
   let mockPlayerContext: Partial<IPlayerContext>;
 
   // Mock scrollTo for CDK virtual scroll viewport (not available in test environment)
@@ -58,6 +59,11 @@ describe('DirectoryFilesComponent', () => {
     startSubtuneNum: 0,
     images: [],
     isCompatible: true,
+    links: [],
+    tags: [],
+    youTubeVideos: [],
+    competitions: [],
+    ratingCount: 0,
   };
 
   const mockStorageService: Partial<IStorageService> = {
@@ -75,22 +81,23 @@ describe('DirectoryFilesComponent', () => {
     const errorSignal = signal<string | null>(null);
     const statusSignal = signal(PlayerStatus.Stopped);
 
+    const directoryStateSignal = signal<StorageDirectoryState | null>({
+      directory: {
+        directories: [mockDirectoryItem],
+        files: [mockFileItem],
+        path: '/test',
+      },
+      currentPath: '/test',
+      storageType: StorageType.Sd,
+      deviceId: 'device-1',
+      isLoading: false,
+      isLoaded: true,
+      error: null,
+      lastLoadTime: Date.now(),
+    });
+
     mockStorageStore = {
-      getSelectedDirectoryState: vi.fn().mockReturnValue(
-        signal({
-          directory: {
-            directories: [mockDirectoryItem],
-            files: [mockFileItem],
-            path: '/test',
-          },
-          currentPath: '/test',
-          storageType: StorageType.Sd,
-          deviceId: 'device-1',
-          isLoading: false,
-          isLoaded: true,
-          error: null,
-        })
-      ),
+      getSelectedDirectoryState: vi.fn(() => directoryStateSignal.asReadonly()),
       navigateToDirectory: vi.fn(),
     };
 
@@ -151,7 +158,7 @@ describe('DirectoryFilesComponent', () => {
 
     component.onDirectoryDoubleClick(directoryItem);
 
-    expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+    expect(mockStorageStore['navigateToDirectory']).toHaveBeenCalledWith({
       deviceId: 'device-1',
       storageType: StorageType.Sd,
       path: directoryItem.path,

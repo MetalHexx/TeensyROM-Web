@@ -18,7 +18,7 @@ export class DeviceService implements IDeviceService {
     this.alertService = alertService;
   }
 
-  findDevices(fullScan: boolean = false): Observable<Device[]> {
+  findDevices(fullScan = false): Observable<Device[]> {
     return from(this.apiService.findDevices({ fullScan })).pipe(
       map((response: FindDevicesResponse) => DomainMapper.toDeviceList(response.devices)),
       catchError((error) => this.handleError(error, 'findDevices', 'Failed to find devices'))

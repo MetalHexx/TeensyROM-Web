@@ -1,7 +1,6 @@
 import { firstValueFrom } from 'rxjs';
-import { StorageType, IStorageService, PlayerFilterType } from '@teensyrom-nx/domain';
+import { IStorageService, PlayerFilterType } from '@teensyrom-nx/domain';
 import { StorageState } from '../storage-store';
-import { StorageKeyUtil } from '../storage-key.util';
 import { WritableStore } from '../storage-helpers';
 import { createAction, LogType, logInfo, logError } from '@teensyrom-nx/utils';
 import { updateState } from '@angular-architects/ngrx-toolkit';
@@ -10,33 +9,30 @@ export function searchFiles(store: WritableStore<StorageState>, storageService: 
   return {
     searchFiles: async ({
       deviceId,
-      storageType,
       searchText,
       filterType,
     }: {
       deviceId: string;
-      storageType: StorageType;
       searchText: string;
       filterType?: PlayerFilterType;
     }): Promise<void> => {
       const actionMessage = createAction('search-files');
-      const key = StorageKeyUtil.create(deviceId, storageType);
 
       logInfo(
         LogType.Start,
-        `Starting search for ${key} with text: "${searchText}"`,
+        `Starting unified search for device ${deviceId} with text: "${searchText}"`,
         filterType ? { filterType } : undefined
       );
 
       // Get current search state to preserve hasSearched flag
-      const currentSearchState = store.searchState()[key];
+      const currentSearchState = store.searchState()[deviceId];
       const wasAlreadySearching = currentSearchState?.hasSearched ?? false;
 
       // Set searching state
       updateState(store, actionMessage, (state) => ({
         searchState: {
           ...state.searchState,
-          [key]: {
+          [deviceId]: {
             searchText,
             filterType: filterType ?? null,
             results: [],
@@ -48,22 +44,23 @@ export function searchFiles(store: WritableStore<StorageState>, storageService: 
       }));
 
       try {
-        logInfo(LogType.NetworkRequest, `Making search API call for ${key}`);
+        logInfo(LogType.NetworkRequest, `Making search API call for device ${deviceId} (all storages)`);
 
         const results = await firstValueFrom(
-          storageService.search(deviceId, storageType, searchText, filterType)
+          storageService.search(deviceId, searchText, filterType)
         );
 
-        logInfo(LogType.Success, `Search successful for ${key}:`, {
+        logInfo(LogType.Success, `Search successful for device ${deviceId}:`, {
           resultCount: results.length,
+          note: 'Results include files from all available storages (SD + USB)',
         });
 
         // Update with search results
         updateState(store, actionMessage, (state) => ({
           searchState: {
             ...state.searchState,
-            [key]: {
-              ...state.searchState[key],
+            [deviceId]: {
+              ...state.searchState[deviceId],
               results,
               isSearching: false,
               hasSearched: true,
@@ -72,15 +69,15 @@ export function searchFiles(store: WritableStore<StorageState>, storageService: 
           },
         }));
 
-        logInfo(LogType.Finish, `Search completed for ${key}`);
+        logInfo(LogType.Finish, `Search completed for device ${deviceId}`);
       } catch (error) {
-        logError(`Search failed for ${key}:`, error);
+        logError(`Search failed for device ${deviceId}:`, error);
 
         updateState(store, actionMessage, (state) => ({
           searchState: {
             ...state.searchState,
-            [key]: {
-              ...state.searchState[key],
+            [deviceId]: {
+              ...state.searchState[deviceId],
               results: [],
               isSearching: false,
               hasSearched: true,

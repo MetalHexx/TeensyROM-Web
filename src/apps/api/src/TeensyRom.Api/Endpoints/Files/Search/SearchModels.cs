@@ -18,11 +18,6 @@ namespace TeensyRom.Api.Endpoints.Files.Search
         [FromRoute] public string DeviceId { get; set; } = string.Empty;
 
         /// <summary>
-        /// The storage type to search (SD or USB).
-        /// </summary>
-        [FromRoute] public TeensyStorageType StorageType { get; set; } = TeensyStorageType.SD;
-
-        /// <summary>
         /// The search text to look for in file names, titles, creators, and descriptions.
         /// </summary>
         [FromQuery] public string SearchText { get; set; } = string.Empty;
@@ -55,9 +50,6 @@ namespace TeensyRom.Api.Endpoints.Files.Search
                 .NotEmpty().WithMessage("Search text is required.")
                 .MinimumLength(1).WithMessage("Search text must be at least 2 characters long.")
                 .MaximumLength(100).WithMessage("Search text must be no more than 100 characters long.");
-
-            RuleFor(x => x.StorageType)
-                .IsInEnum().WithMessage("Storage type must be a valid enum value.");
 
             RuleFor(x => x.FilterType)
                 .IsInEnum().WithMessage("Filter type must be a valid enum value.");

@@ -186,7 +186,6 @@ describe('SearchToolbarComponent', () => {
 
       expect(mockStorageStore.searchFiles).toHaveBeenCalledWith({
         deviceId: 'test-device',
-        storageType: StorageType.Sd,
         searchText: 'iron maiden',
         filterType: PlayerFilterType.All,
       });
@@ -293,7 +292,6 @@ describe('SearchToolbarComponent', () => {
 
       expect(mockStorageStore.clearSearch).toHaveBeenCalledWith({
         deviceId: 'test-device',
-        storageType: StorageType.Sd,
       });
     });
 

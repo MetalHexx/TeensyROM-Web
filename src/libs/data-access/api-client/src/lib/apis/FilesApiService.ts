@@ -72,7 +72,6 @@ export interface SaveFavoriteRequest {
 
 export interface SearchRequest {
     deviceId: string;
-    storageType: TeensyStorageType;
     searchText: string;
     skip: number;
     take: number;
@@ -311,7 +310,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Searches for files in the specified storage device based on search text and filter criteria.  - Searches through file names, titles, creators, and descriptions. - Returns metadata for all matching files. - Supports file type filtering (All, Games, Music, Images, Hex). - Supports pagination with Skip and Take parameters. - Excludes favorites and playlist directories from search results. - Uses weighted search algorithm to rank results by relevance. - Default page size is 50, maximum is 200.
+     * Searches for files across all available storage devices (SD and USB) based on search text and filter criteria.  - Searches through file names, titles, creators, and descriptions. - Returns metadata for all matching files from all available storages. - Supports file type filtering (All, Games, Music, Images, Hex). - Supports pagination with Skip and Take parameters. - Excludes favorites and playlist directories from search results. - Uses weighted search algorithm to rank results by relevance. - Default page size is 50, maximum is 200.
      * Search Files
      */
     async searchRaw(requestParameters: SearchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SearchResponse>> {
@@ -319,13 +318,6 @@ export class FilesApiService extends runtime.BaseAPI {
             throw new runtime.RequiredError(
                 'deviceId',
                 'Required parameter "deviceId" was null or undefined when calling search().'
-            );
-        }
-
-        if (requestParameters['storageType'] == null) {
-            throw new runtime.RequiredError(
-                'storageType',
-                'Required parameter "storageType" was null or undefined when calling search().'
             );
         }
 
@@ -371,7 +363,7 @@ export class FilesApiService extends runtime.BaseAPI {
         const headerParameters: runtime.HTTPHeaders = {};
 
         const response = await this.request({
-            path: `/api/devices/{deviceId}/storage/{storageType}/search`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+            path: `/api/devices/{deviceId}/search`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
@@ -381,7 +373,7 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Searches for files in the specified storage device based on search text and filter criteria.  - Searches through file names, titles, creators, and descriptions. - Returns metadata for all matching files. - Supports file type filtering (All, Games, Music, Images, Hex). - Supports pagination with Skip and Take parameters. - Excludes favorites and playlist directories from search results. - Uses weighted search algorithm to rank results by relevance. - Default page size is 50, maximum is 200.
+     * Searches for files across all available storage devices (SD and USB) based on search text and filter criteria.  - Searches through file names, titles, creators, and descriptions. - Returns metadata for all matching files from all available storages. - Supports file type filtering (All, Games, Music, Images, Hex). - Supports pagination with Skip and Take parameters. - Excludes favorites and playlist directories from search results. - Uses weighted search algorithm to rank results by relevance. - Default page size is 50, maximum is 200.
      * Search Files
      */
     async search(requestParameters: SearchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SearchResponse> {

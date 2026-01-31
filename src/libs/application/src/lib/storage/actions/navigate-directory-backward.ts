@@ -65,8 +65,8 @@ export function navigateDirectoryBackward(
       );
       const key = StorageKeyUtil.create(deviceId, storageType);
 
-      // Clear any active search when navigating
-      clearSearchState(store, key, actionMessage);
+      // Clear any active search when navigating (search is device-level, not storage-specific)
+      clearSearchState(store, deviceId, actionMessage);
 
       setDeviceSelectedDirectory(store, deviceId, storageType, targetPath, actionMessage);
 

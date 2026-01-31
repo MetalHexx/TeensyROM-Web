@@ -62,19 +62,16 @@ export class StorageService implements IStorageService {
 
   search(
     deviceId: string,
-    storageType: StorageType,
     searchText: string,
     filterType?: PlayerFilterType,
     skip = 0,
     take = 1000
   ): Observable<FileItem[]> {
-    const apiStorageType = DomainMapper.toApiStorageType(storageType);
     const apiFilterType = filterType ? DomainMapper.toApiSearchFilter(filterType) : undefined;
 
     return from(
       this.apiService.search({
         deviceId,
-        storageType: apiStorageType,
         searchText,
         skip,
         take,

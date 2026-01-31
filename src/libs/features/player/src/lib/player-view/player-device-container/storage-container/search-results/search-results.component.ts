@@ -37,11 +37,7 @@ export class SearchResultsComponent {
 
   // Computed signal for search state
   readonly searchState = computed(() => {
-    const storageType = this.currentStorageType();
-    if (!storageType) {
-      return null;
-    }
-    return this.storageStore.getSearchState(this.deviceId(), storageType)();
+    return this.storageStore.getSearchState(this.deviceId())();
   });
 
   // Computed signal for search results

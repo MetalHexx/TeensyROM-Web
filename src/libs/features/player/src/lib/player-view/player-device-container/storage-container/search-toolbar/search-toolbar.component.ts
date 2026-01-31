@@ -57,11 +57,7 @@ export class SearchToolbarComponent {
   readonly currentStorageType = computed(() => this.selectedDirectoryState()?.storageType ?? null);
 
   readonly searchState = computed(() => {
-    const storageType = this.currentStorageType();
-    if (!storageType) {
-      return null;
-    }
-    return this.storageStore.getSearchState(this.deviceId(), storageType)();
+    return this.storageStore.getSearchState(this.deviceId())();
   });
 
   readonly hasActiveSearch = computed(() => this.searchState()?.hasSearched ?? false);
@@ -162,7 +158,6 @@ export class SearchToolbarComponent {
     // Call storage store search action
     void this.storageStore.searchFiles({
       deviceId: this.deviceId(),
-      storageType: storageType,
       searchText: trimmedText,
       filterType: this.currentFilter(),
     });
@@ -183,7 +178,6 @@ export class SearchToolbarComponent {
     // Note: The reactive effect will handle clearing the input field
     this.storageStore.clearSearch({
       deviceId: this.deviceId(),
-      storageType: storageType,
     });
   }
 }

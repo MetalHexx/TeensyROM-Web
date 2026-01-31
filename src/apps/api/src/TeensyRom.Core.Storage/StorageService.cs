@@ -18,7 +18,7 @@ namespace TeensyRom.Core.Storage
         public List<string> BannedDirectories { get; set; } = [];
         public List<string> BannedFiles { get; set; } = [];
     }
-    public class StorageService(IStorageCache cache, StorageSettings settings, IMediator mediator, IAlertService alert, ILoggingService log, ISidMetadataService sidMetadata, IGameMetadataService gameMetadata, ICommunicationPort communicationPort) : IStorageService
+    public class StorageService(IStorageCache cache, StorageSettings settings, IMediator mediator, ILoggingService log, ISidMetadataService sidMetadata, IGameMetadataService gameMetadata, ICommunicationPort communicationPort) : IStorageService
     {
         private readonly ICommunicationPort _communicationPort = communicationPort;
         public async Task<FileItem?> GetFile(FilePath path)
@@ -228,22 +228,12 @@ namespace TeensyRom.Core.Storage
             return cache.GetRandomFile(scope, scopePath, excludePaths, fileTypes);
         }
 
-        public IEnumerable<LaunchableItem> Search(string searchText, TeensyFilterType filterType = TeensyFilterType.All, int skip = 0, int take = 50)
+        public IEnumerable<LaunchableItem> Search(string searchText, TeensyFilterType filterType = TeensyFilterType.All)
         {
             var fileTypes = GetFileTypes(filterType);
             var excludePaths = GetExcludePaths();
             
-            // Use default search weights and stop words from TeensySettings.InitializeDefaults()
-            var searchWeights = new SearchWeights();
-            var stopSearchWords = new List<string> 
-            { 
-                "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", 
-                "if", "in", "is", "it", "no", "not", "of", "on", "or", "that", 
-                "the", "to", "was", "with" 
-            };
-            
-            var allResults = cache.Search(searchText, excludePaths, stopSearchWords, searchWeights, fileTypes);
-            return allResults.Skip(skip).Take(take);
+            return cache.Search(searchText, excludePaths, fileTypes);
         }
 
         public async Task<LaunchableItem?> SaveFavorite(LaunchableItem launchItem, TeensyStorageType storageType, CancellationToken ct)

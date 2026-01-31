@@ -308,7 +308,6 @@ describe('StorageService', () => {
     it('should return mapped FileItem array when search succeeds with multiple results', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'test';
       const filterType = PlayerFilterType.Games;
 
@@ -332,7 +331,7 @@ describe('StorageService', () => {
 
       // Act
       const result = await new Promise<FileItem[]>((resolve, reject) => {
-        service.search(deviceId, storageType, searchText, filterType).subscribe({
+        service.search(deviceId, searchText, filterType).subscribe({
           next: resolve,
           error: reject,
         });
@@ -341,7 +340,6 @@ describe('StorageService', () => {
       // Assert
       expect(mockFilesApiService.search).toHaveBeenCalledWith({
         deviceId,
-        storageType: TeensyStorageType.Sd,
         searchText,
         skip: 0,
         take: 1000,
@@ -357,7 +355,6 @@ describe('StorageService', () => {
     it('should return empty array when search has no results', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Usb;
       const searchText = 'nonexistent';
 
       const mockResponse = createMockSearchResponse([]);
@@ -365,7 +362,7 @@ describe('StorageService', () => {
 
       // Act
       const result = await new Promise<FileItem[]>((resolve, reject) => {
-        service.search(deviceId, storageType, searchText).subscribe({
+        service.search(deviceId, searchText).subscribe({
           next: resolve,
           error: reject,
         });
@@ -374,7 +371,6 @@ describe('StorageService', () => {
       // Assert
       expect(mockFilesApiService.search).toHaveBeenCalledWith({
         deviceId,
-        storageType: TeensyStorageType.Usb,
         searchText,
         skip: 0,
         take: 1000,
@@ -386,7 +382,6 @@ describe('StorageService', () => {
     it('should work correctly without filterType parameter', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'music';
 
       const mockFiles: FileItemDto[] = [
@@ -402,7 +397,7 @@ describe('StorageService', () => {
 
       // Act
       const result = await new Promise<FileItem[]>((resolve, reject) => {
-        service.search(deviceId, storageType, searchText).subscribe({
+        service.search(deviceId, searchText).subscribe({
           next: resolve,
           error: reject,
         });
@@ -411,7 +406,6 @@ describe('StorageService', () => {
       // Assert
       expect(mockFilesApiService.search).toHaveBeenCalledWith({
         deviceId,
-        storageType: TeensyStorageType.Sd,
         searchText,
         skip: 0,
         take: 1000,
@@ -424,7 +418,6 @@ describe('StorageService', () => {
     it('should correctly map PlayerFilterType.All to API enum', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'all';
       const filterType = PlayerFilterType.All;
 
@@ -433,7 +426,7 @@ describe('StorageService', () => {
 
       // Act
       await new Promise((resolve, reject) => {
-        service.search(deviceId, storageType, searchText, filterType).subscribe({
+        service.search(deviceId, searchText, filterType).subscribe({
           next: resolve,
           error: reject,
         });
@@ -442,7 +435,6 @@ describe('StorageService', () => {
       // Assert
       expect(mockFilesApiService.search).toHaveBeenCalledWith({
         deviceId,
-        storageType: TeensyStorageType.Sd,
         searchText,
         skip: 0,
         take: 1000,
@@ -458,7 +450,7 @@ describe('StorageService', () => {
 
       // Act
       await new Promise((resolve, reject) => {
-        service.search('device', StorageType.Sd, 'test', filterType).subscribe({
+        service.search('device', 'test', filterType).subscribe({
           next: resolve,
           error: reject,
         });
@@ -482,7 +474,7 @@ describe('StorageService', () => {
 
       // Act
       await new Promise((resolve, reject) => {
-        service.search('device', StorageType.Sd, 'test', filterType).subscribe({
+        service.search('device', 'test', filterType).subscribe({
           next: resolve,
           error: reject,
         });
@@ -506,7 +498,7 @@ describe('StorageService', () => {
 
       // Act
       await new Promise((resolve, reject) => {
-        service.search('device', StorageType.Sd, 'test', filterType).subscribe({
+        service.search('device', 'test', filterType).subscribe({
           next: resolve,
           error: reject,
         });
@@ -530,7 +522,7 @@ describe('StorageService', () => {
 
       // Act
       await new Promise((resolve, reject) => {
-        service.search('device', StorageType.Sd, 'test', filterType).subscribe({
+        service.search('device', 'test', filterType).subscribe({
           next: resolve,
           error: reject,
         });
@@ -549,7 +541,6 @@ describe('StorageService', () => {
     it('should handle network errors and propagate them', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'test';
       const errorMessage = 'Network error';
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
@@ -561,7 +552,7 @@ describe('StorageService', () => {
       // Act & Assert
       await expect(
         new Promise((resolve, reject) => {
-          service.search(deviceId, storageType, searchText).subscribe({
+          service.search(deviceId, searchText).subscribe({
             error: reject,
           });
         })
@@ -580,7 +571,6 @@ describe('StorageService', () => {
     it('should handle HTTP errors and propagate them', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'test';
       const httpError = { status: 500, message: 'Internal Server Error' };
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {
@@ -592,7 +582,7 @@ describe('StorageService', () => {
       // Act & Assert
       await expect(
         new Promise((resolve, reject) => {
-          service.search(deviceId, storageType, searchText).subscribe({
+          service.search(deviceId, searchText).subscribe({
             error: reject,
           });
         })
@@ -608,7 +598,6 @@ describe('StorageService', () => {
     it('should return empty array when API returns null files array', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'test';
 
       const mockResponse: SearchResponse = {
@@ -626,7 +615,7 @@ describe('StorageService', () => {
 
       // Act
       const result = await new Promise<FileItem[]>((resolve, reject) => {
-        service.search(deviceId, storageType, searchText).subscribe({
+        service.search(deviceId, searchText).subscribe({
           next: resolve,
           error: reject,
         });
@@ -639,7 +628,6 @@ describe('StorageService', () => {
     it('should correctly map all FileItem properties', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'detailed';
 
       const mockFile: FileItemDto = createMockFileItemDto({
@@ -663,7 +651,7 @@ describe('StorageService', () => {
 
       // Act
       const result = await new Promise<FileItem[]>((resolve, reject) => {
-        service.search(deviceId, storageType, searchText).subscribe({
+        service.search(deviceId, searchText).subscribe({
           next: resolve,
           error: reject,
         });
@@ -690,7 +678,6 @@ describe('StorageService', () => {
     it('should construct image URLs with base API URL', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'image';
 
       const mockFile: FileItemDto = createMockFileItemDto({
@@ -716,7 +703,7 @@ describe('StorageService', () => {
 
       // Act
       const result = await new Promise<FileItem[]>((resolve, reject) => {
-        service.search(deviceId, storageType, searchText).subscribe({
+        service.search(deviceId, searchText).subscribe({
           next: resolve,
           error: reject,
         });
@@ -736,7 +723,6 @@ describe('StorageService', () => {
     it('should preserve parentPath for directory context', async () => {
       // Arrange
       const deviceId = 'test-device';
-      const storageType = StorageType.Sd;
       const searchText = 'game';
 
       const mockFiles: FileItemDto[] = [
@@ -762,7 +748,7 @@ describe('StorageService', () => {
 
       // Act
       const result = await new Promise<FileItem[]>((resolve, reject) => {
-        service.search(deviceId, storageType, searchText).subscribe({
+        service.search(deviceId, searchText).subscribe({
           next: resolve,
           error: reject,
         });
@@ -775,42 +761,31 @@ describe('StorageService', () => {
       expect(result[2].parentPath).toBe('/');
     });
 
-    it('should correctly convert StorageType to API type', async () => {
+    it('should search across all available storages', async () => {
       // Arrange
       const mockResponse = createMockSearchResponse([]);
       mockFilesApiService.search.mockResolvedValue(mockResponse);
 
-      // Act - Test SD storage type
+      // Act
       await new Promise((resolve, reject) => {
-        service.search('device', StorageType.Sd, 'test').subscribe({
+        service.search('device', 'test').subscribe({
           next: resolve,
           error: reject,
         });
       });
 
-      // Assert
+      // Assert - storageType is no longer passed to API
       expect(mockFilesApiService.search).toHaveBeenCalledWith(
         expect.objectContaining({
+          deviceId: 'device',
+          searchText: 'test',
           skip: 0,
           take: 1000,
-          storageType: TeensyStorageType.Sd,
         })
       );
-
-      // Act - Test USB storage type
-      await new Promise((resolve, reject) => {
-        service.search('device', StorageType.Usb, 'test').subscribe({
-          next: resolve,
-          error: reject,
-        });
-      });
-
-      // Assert
       expect(mockFilesApiService.search).toHaveBeenCalledWith(
-        expect.objectContaining({
-          skip: 0,
-          take: 1000,
-          storageType: TeensyStorageType.Usb,
+        expect.not.objectContaining({
+          storageType: expect.anything(),
         })
       );
     });
@@ -1270,7 +1245,7 @@ describe('StorageService', () => {
 
         await expect(
           new Promise((resolve, reject) => {
-            service.search('device-1', StorageType.Sd, 'test', PlayerFilterType.Music).subscribe({
+            service.search('device-1', 'test', PlayerFilterType.Music).subscribe({
               next: resolve,
               error: reject,
             });
@@ -1286,7 +1261,7 @@ describe('StorageService', () => {
 
         await expect(
           new Promise((resolve, reject) => {
-            service.search('device-1', StorageType.Sd, 'term').subscribe({
+            service.search('device-1', 'term').subscribe({
               next: resolve,
               error: reject,
             });
@@ -1302,7 +1277,7 @@ describe('StorageService', () => {
 
         let caughtError: Error | null = null;
         await new Promise<void>((resolve) => {
-          service.search('device-1', StorageType.Sd, 'query').subscribe({
+          service.search('device-1', 'query').subscribe({
             error: (err: Error) => {
               caughtError = err;
               resolve();
@@ -1404,7 +1379,7 @@ describe('StorageService', () => {
 
         await expect(
           new Promise((resolve, reject) => {
-            service.search('device-1', StorageType.Sd, 'test').subscribe({
+            service.search('device-1', 'test').subscribe({
               next: resolve,
               error: reject,
             });

@@ -26,7 +26,7 @@ describe('SearchResultsComponent', () => {
   let component: SearchResultsComponent;
   let fixture: ComponentFixture<SearchResultsComponent>;
   let mockStorageStore: {
-    getSearchState: (deviceId: string, storageType: StorageType) => Signal<SearchState | null>;
+    getSearchState: (deviceId: string) => Signal<SearchState | null>;
     getSelectedDirectoryState: (deviceId: string) => Signal<StorageDirectoryState | null>;
   };
   let mockPlayerContext: Partial<IPlayerContext>;
@@ -59,6 +59,11 @@ describe('SearchResultsComponent', () => {
     playLength: '',
     subtuneLengths: [],
     startSubtuneNum: 0,
+    links: [],
+    tags: [],
+    youTubeVideos: [],
+    competitions: [],
+    ratingCount: 0,
   };
 
   const mockFileItem2: FileItem = {
@@ -82,6 +87,11 @@ describe('SearchResultsComponent', () => {
     playLength: '',
     subtuneLengths: [],
     startSubtuneNum: 0,
+    links: [],
+    tags: [],
+    youTubeVideos: [],
+    competitions: [],
+    ratingCount: 0,
   };
 
   beforeEach(async () => {
@@ -450,6 +460,11 @@ describe('SearchResultsComponent', () => {
         playLength: '',
         subtuneLengths: [],
         startSubtuneNum: 0,
+        links: [],
+        tags: [],
+        youTubeVideos: [],
+        competitions: [],
+        ratingCount: 0,
       };
 
       searchStateSignal.set({
@@ -499,7 +514,6 @@ function createLaunchedFile(
     file,
     parentPath,
     launchedAt: Date.now(),
-    launchMode: LaunchMode.Search,
     isCompatible: true,
   };
 }

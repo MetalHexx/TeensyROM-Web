@@ -241,16 +241,16 @@ export function setDeviceSelectedDirectory(
 }
 
 /**
- * Helper to clear search state for a device/storageType
+ * Helper to clear search state for a device
  */
 export function clearSearchState(
   store: WritableStore<StorageState>,
-  key: StorageKey,
+  deviceId: string,
   actionMessage: string
 ): void {
   updateState(store, actionMessage, (state) => {
     const updatedSearchState = { ...state.searchState };
-    delete updatedSearchState[key];
+    delete updatedSearchState[deviceId];
 
     return {
       searchState: updatedSearchState,
@@ -259,16 +259,16 @@ export function clearSearchState(
 }
 
 /**
- * Query helper to get search state for a specific key (read-only, no actionMessage)
+ * Query helper to get search state for a specific device (read-only, no actionMessage)
  */
-export function getSearchState(store: WritableStore<StorageState>, key: StorageKey) {
-  return store.searchState()[key] ?? null;
+export function getSearchState(store: WritableStore<StorageState>, deviceId: string) {
+  return store.searchState()[deviceId] ?? null;
 }
 
 /**
- * Query helper to check if there's an active search (read-only, no actionMessage)
+ * Query helper to check if there's an active search for a device (read-only, no actionMessage)
  */
-export function hasActiveSearch(store: WritableStore<StorageState>, key: StorageKey): boolean {
-  const searchState = getSearchState(store, key);
+export function hasActiveSearch(store: WritableStore<StorageState>, deviceId: string): boolean {
+  const searchState = getSearchState(store, deviceId);
   return !!(searchState && searchState.hasSearched);
 }

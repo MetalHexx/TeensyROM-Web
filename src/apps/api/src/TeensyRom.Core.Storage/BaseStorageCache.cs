@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Entities.Storage;
@@ -166,66 +165,18 @@ namespace TeensyRom.Core.Storage
                 .Select(p => p.Value)
                 .Any(excludePath => kvp.Key.Contains(excludePath));
 
-        public IEnumerable<LaunchableItem> Search(string searchText, IEnumerable<DirectoryPath> excludePaths, List<string> stopSearchWords, SearchWeights searchWeights, params TeensyFileType[] fileTypes)
+        public IEnumerable<LaunchableItem> Search(string searchText, IEnumerable<DirectoryPath> excludePaths, params TeensyFileType[] fileTypes)
         {
-            var quotedMatches = Regex
-                .Matches(searchText, @"(\+?""([^""]+)"")|\+?\S+")
-                .Cast<Match>()
-                .Select(m => m.Groups[2].Success ? (m.Groups[1].Value.StartsWith("+") ? "+" : "") + m.Groups[2].Value : m.Groups[0].Value)
-                .Where(m => !string.IsNullOrEmpty(m))
-                .ToList();
-
-            searchText = searchText.Replace("\"", "");
-            searchText = searchText.Replace("+", "");
-
-            foreach (var quotedMatch in quotedMatches)
-            {
-                var noPlusQuotedMatch = string.IsNullOrWhiteSpace(quotedMatch)
-                    ? string.Empty
-                    : quotedMatch.Replace("+", "");
-
-                searchText = string.IsNullOrWhiteSpace(searchText)
-                    ? string.Empty
-                    : searchText.Replace($"{noPlusQuotedMatch}", "");
-            }
-
-            var searchTerms = searchText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
-            searchTerms.RemoveAll(term => stopSearchWords.Contains(term.ToLower()));
-
-            searchTerms.AddRange(quotedMatches);
-
-            var requiredTerms = searchTerms
-                .Where(term => term.StartsWith("+"))
-                .Select(term => term.Substring(1))
-                .ToList();
-
-            searchTerms = searchTerms.Select(term => term.TrimStart('+')).ToList();
-
             return this
                 .Where(FileExcludeFilter(excludePaths))
                 .SelectMany(c => c.Value.Files)
                 .OfType<LaunchableItem>()
                 .Where(f => fileTypes.Contains(f.FileType) &&
-                            requiredTerms.All(requiredTerm =>
-                                f.Title.Contains(requiredTerm, StringComparison.OrdinalIgnoreCase) ||
-                                f.Name.Contains(requiredTerm, StringComparison.OrdinalIgnoreCase) ||
-                                f.Creator.Contains(requiredTerm, StringComparison.OrdinalIgnoreCase) ||
-                                f.Path.Value.Contains(requiredTerm, StringComparison.OrdinalIgnoreCase) ||
-                                f.Description.Contains(requiredTerm, StringComparison.OrdinalIgnoreCase)))
-                .Select(file => new
-                {
-                    File = file,
-                    Score = searchTerms.Sum(term =>
-                        (file.Title.Contains(term, StringComparison.OrdinalIgnoreCase) ? searchWeights.Title : 0) +
-                        (file.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ? searchWeights.FileName : 0) +
-                        (file.Creator.Contains(term, StringComparison.OrdinalIgnoreCase) ? searchWeights.Creator : 0) +
-                        (file.Path.Value.Contains(term, StringComparison.OrdinalIgnoreCase) ? searchWeights.FilePath : 0) +
-                        (file.Description.Contains(term, StringComparison.OrdinalIgnoreCase) ? searchWeights.Description : 0))
-                })
-                .Where(result => result.Score > 0)
-                .OrderByDescending(result => result.Score)
-                .ThenBy(result => result.File.Title)
-                .Select(result => result.File);
+                            (f.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                             f.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                             f.Creator.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                             f.Path.Value.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                             f.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase)));
         }
 
         public LaunchableItem? GetRandomFile(StorageScope scope, DirectoryPath scopePath, IEnumerable<DirectoryPath> excludePaths, params TeensyFileType[] fileTypes)

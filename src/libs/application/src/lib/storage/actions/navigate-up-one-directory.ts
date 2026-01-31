@@ -45,8 +45,8 @@ export function navigateUpOneDirectory(
 
       logInfo(LogType.Navigate, `Navigating up from ${currentPath} to ${parentPath} for ${key}`);
 
-      // Clear any active search when navigating
-      clearSearchState(store, key, actionMessage);
+      // Clear any active search when navigating (search is device-level, not storage-specific)
+      clearSearchState(store, deviceId, actionMessage);
 
       if (!isSelectedDirectory(store, deviceId, storageType, parentPath)) {
         setDeviceSelectedDirectory(store, deviceId, storageType, parentPath, actionMessage);

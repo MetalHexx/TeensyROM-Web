@@ -7,7 +7,6 @@ import {
   ViewableItemImageDto,
   FileItemType as ApiFileItemType,
   TeensyStorageType as ApiStorageType,
-  DeviceState as ApiDeviceState,
   LaunchRandomScopeEnum,
   NullableOfTeensyFilterType,
   YouTubeVideoDto,
