@@ -990,6 +990,7 @@ export class FileListComponent {
 
 - `label` (required): `string` - The label text displayed above the input field for accessibility and visual clarity
 - `placeholder` (required): `string` - Placeholder text displayed inside the input field as a watermark
+- `tooltip` (optional): `TooltipConfig | undefined` - Tooltip configuration object. Can be a simple string (`'Tooltip text'`) or full config object with `text`, `position`, and `delay` properties
 - `prefixIcon` (optional): `string` - Material Design icon name to display at the beginning of the input field
 - `suffixIcon` (optional): `string` - Material Design icon name to display at the end of the input field
 - `inputType` (optional): `string` - HTML input type (text, search, email, number, password, etc.) - defaults to 'text'
@@ -1006,6 +1007,15 @@ export class FileListComponent {
 ```html
 <!-- Search input with suffix icon -->
 <lib-input-field label="Search" suffixIcon="search"> </lib-input-field>
+
+<!-- Search input with tooltip -->
+<lib-input-field
+  label="Search"
+  placeholder='Ex: +iron +maiden +"Aces High"'
+  prefixIcon="search"
+  [tooltip]="'Use + for required terms, - to exclude terms, and quotes for exact phrases'"
+>
+</lib-input-field>
 
 <!-- Email input with prefix icon -->
 <lib-input-field
@@ -3561,6 +3571,218 @@ export class NavigationComponent {
 ## Utilities
 
 Angular-specific utilities for common UI patterns. Located in `libs/ui/components/src/lib/utils/`.
+
+### TooltipDirective
+
+**Selector:** `[libTooltip]`
+
+**Purpose:** Custom tooltip directive built to replace Angular Material tooltips and eliminate CDK overlay conflicts. Provides rich tooltip functionality via attribute directive with support for titles, body text, custom colors, and flexible positioning. Tooltips are rendered by `TooltipRendererService` using direct DOM manipulation (no overlay) and automatically positioned relative to trigger elements.
+
+**Why Custom?** 
+Material Design's `matTooltip` uses CDK overlay, which created z-index conflicts and positioning issues with our custom modal dialogs and animated containers. This lightweight directive provides the same UX without CDK dependencies.
+
+**Inputs:**
+
+- `libTooltip` (required): `TooltipConfig` - Tooltip configuration object
+
+#### TooltipConfig Interface
+
+```typescript
+export interface TooltipConfig {
+  title?: string;                  // Optional title (larger, bolder text)
+  titleColor?: TooltipTitleColor; // Optional title color variant
+  body?: string;                   // Optional body text
+  position?: TooltipPosition;      // Tooltip position (default: Top)
+  delay?: number;                  // Delay in ms before showing (default: 500)
+}
+```
+
+**Properties:**
+
+- `title` (optional): Title text displayed at top of tooltip. Larger font size (16px) and heavier weight (500) than body text. Omit for body-only tooltips.
+- `titleColor` (optional): Title color variant. Default uses theme text color, highlight uses cyan accent color. Only applies when title is provided.
+- `body` (optional): Body text content. Smaller font size (12px). Omit for title-only tooltips.
+- `position` (optional): Tooltip position relative to trigger element. Defaults to `TooltipPosition.Top`. Tooltip automatically adjusts to stay within viewport bounds.
+- `delay` (optional): Milliseconds to wait after mouseenter before showing tooltip. Defaults to 500ms (industry standard). Set to 0 for instant display.
+
+**Note:** At least one of `title` or `body` must be provided for tooltip to render.
+
+#### TooltipPosition Enum
+
+```typescript
+export enum TooltipPosition {
+  Top = 'top',
+  Bottom = 'bottom',
+  Left = 'left',
+  Right = 'right'
+}
+```
+
+**Values:**
+
+- `Top`: Tooltip appears above the trigger element, centered horizontally
+- `Bottom`: Tooltip appears below the trigger element, centered horizontally
+- `Left`: Tooltip appears to the left of the trigger element, centered vertically
+- `Right`: Tooltip appears to the right of the trigger element, centered vertically
+
+#### TooltipTitleColor Enum
+
+```typescript
+export enum TooltipTitleColor {
+  Default = 'default',
+  Highlight = 'highlight'
+}
+```
+
+**Values:**
+
+- `Default`: Uses theme text color (adapts to light/dark mode)
+- `Highlight`: Uses cyan accent color for emphasis
+
+#### Usage Examples
+
+**Import statements:**
+
+```typescript
+import { Component, signal } from '@angular/core';
+import { TooltipConfig, TooltipPosition, TooltipTitleColor } from '@teensyrom-nx/ui-components';
+```
+
+**Body-only tooltip:**
+
+```typescript
+@Component({
+  template: `<button [libTooltip]="saveTooltip()">Save</button>`
+})
+export class MyComponent {
+  saveTooltip = signal<TooltipConfig>({
+    body: 'Click to save your changes',
+    position: TooltipPosition.Top
+  });
+}
+```
+
+**Title-only tooltip:**
+
+```typescript
+@Component({
+  template: `<button [libTooltip]="closeTooltip()">×</button>`
+})
+export class MyComponent {
+  closeTooltip = signal<TooltipConfig>({
+    title: 'Close',
+    position: TooltipPosition.Bottom
+  });
+}
+```
+
+**Title + body tooltip with highlight color:**
+
+```typescript
+@Component({
+  template: `<button [libTooltip]="deleteTooltip()">Delete</button>`
+})
+export class MyComponent {
+  deleteTooltip = signal<TooltipConfig>({
+    title: 'Delete',
+    titleColor: TooltipTitleColor.Highlight,
+    body: 'Permanently remove this item',
+    position: TooltipPosition.Right
+  });
+}
+```
+
+**Computed tooltip config (transforming string input):**
+
+```typescript
+@Component({
+  template: `<button [libTooltip]="tooltipConfig()">Action</button>`
+})
+export class MyComponent {
+  tooltip = input<string>(''); // External API
+
+  tooltipConfig = computed<TooltipConfig>(() => ({
+    body: this.tooltip(),
+    position: TooltipPosition.Top
+  }));
+}
+```
+
+**Custom delay for instant tooltips:**
+
+```typescript
+@Component({
+  template: `<button [libTooltip]="quickTooltip()">Help</button>`
+})
+export class MyComponent {
+  quickTooltip = signal<TooltipConfig>({
+    title: 'Need Help?',
+    body: 'Click for documentation',
+    position: TooltipPosition.Bottom,
+    delay: 0 // Shows immediately on hover
+  });
+}
+```
+
+#### Accessibility
+
+**Automatic ARIA Support**: The directive automatically sets `aria-describedby` on the host element, pointing to the tooltip element ID when visible. This ensures screen readers announce tooltip content to users navigating with assistive technologies.
+
+**Keyboard Navigation**: Currently mouse-hover only. For keyboard-accessible tooltips, use native `title` attribute or Material's `matTooltip` on non-conflicting elements.
+
+**Best Practices**:
+- Tooltips supplement but don't replace visible labels
+- Keep tooltip text concise (under 150 characters)
+- Don't rely solely on tooltips for critical information
+- Use `title` property for icon-only buttons to provide context
+- Consider using `delay: 0` for tooltips on frequently-used controls
+
+#### Migration from Phase 2 (String API)
+
+Phase 2.1 introduced breaking changes to the tooltip API. Update your components as follows:
+
+**Before (Phase 2):**
+
+```typescript
+// Old string-based API
+<button 
+  [libTooltip]="'Click to save'" 
+  [libTooltipPosition]="'above'">
+  Save
+</button>
+```
+
+**After (Phase 2.1):**
+
+```typescript
+import { TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui-components';
+
+@Component({
+  template: `<button [libTooltip]="saveTooltip()">Save</button>`
+})
+export class MyComponent {
+  saveTooltip = signal<TooltipConfig>({
+    body: 'Click to save',
+    position: TooltipPosition.Top // 'above' → Top
+  });
+}
+```
+
+**Key Changes:**
+
+- `libTooltip` now accepts `TooltipConfig` object instead of string
+- `libTooltipPosition` input removed (now part of config)
+- Position values: `'above'` → `TooltipPosition.Top`, `'below'` → `TooltipPosition.Bottom`
+- All tooltip properties strongly typed with enums (no magic strings)
+
+#### Used In
+
+**Reusable Components:**
+
+- [`action-button.component.ts`](../libs/ui/components/src/lib/action-button/action-button.component.ts) - All 4 button variants (stroked, flat, raised, fab)
+- [`icon-button.component.ts`](../libs/ui/components/src/lib/icon-button/icon-button.component.ts) - Icon button component
+
+**Pattern:** Both components accept string `tooltip` input and internally transform it to `TooltipConfig` using computed signals, maintaining backward-compatible external APIs.
 
 ---
 

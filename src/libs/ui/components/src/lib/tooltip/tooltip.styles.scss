@@ -1,0 +1,126 @@
+/**
+ * Tooltip Styles
+ *
+ * Theme-integrated tooltip styling with glassmorphism effect, smooth transitions,
+ * and proper positioning. Works in both light and dark themes.
+ *
+ * Classes:
+ * - .lib-tooltip: Base tooltip container (initially hidden)
+ * - .lib-tooltip--visible: Applied when tooltip should be visible
+ * - .lib-tooltip__title: Title section (16px, weight 500, 6px margin-bottom)
+ * - .lib-tooltip__title--default: Default theme text color
+ * - .lib-tooltip__title--highlight: Cyan accent color
+ * - .lib-tooltip__body: Body section (12px, weight 400)
+ */
+
+@use '../../../../styles/src/lib/theme/mixins' as mixins;
+
+.lib-tooltip {
+  // ─────────────────────────────────────────────
+  // Positioning & Layout
+  // ─────────────────────────────────────────────
+  position: fixed; // Portal to body, needs fixed positioning
+  z-index: 2147483647; // Match CDK overlay to appear above dialogs
+  pointer-events: none; // Don't interfere with mouse events
+  max-width: 250px; // Prevent overly wide tooltips
+
+  // ─────────────────────────────────────────────
+  // Spacing & Dimensions
+  // ─────────────────────────────────────────────
+  padding: 8px 12px;
+  border-radius: var(--border-radius-sm); // Use design token (6px)
+
+  // ─────────────────────────────────────────────
+  // Typography
+  // ─────────────────────────────────────────────
+  // Base typography for tooltip container
+  // Title and body sections have their own specific typography
+  white-space: normal; // Allow wrapping
+  word-wrap: break-word; // Break long words if needed
+
+  // ─────────────────────────────────────────────
+  // Theme Integration - Glassmorphism Effect
+  // ─────────────────────────────────────────────
+  // Using glassy-dark-effect mixin for proper visibility
+  // 40% black opacity provides good contrast and readability
+  @include mixins.glassy-dark-effect;
+  
+  // Text color from theme
+  color: var(--mat-sys-on-surface);
+
+  // Optional subtle border for definition
+  border: 1px solid rgba(var(--glassy-color), 0.1);
+
+  // ─────────────────────────────────────────────
+  // Depth & Elevation
+  // ─────────────────────────────────────────────
+  // Subtle shadow for depth
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  // Enhanced shadow for dark mode
+  html.dark-mode & {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  // ─────────────────────────────────────────────
+  // Transitions (GPU-Accelerated)
+  // ─────────────────────────────────────────────
+  // Initial state: hidden
+  opacity: 0;
+  transform: scale(0.95); // Slight scale for entrance effect
+  transition:
+    opacity 150ms ease-in-out,
+    transform 150ms ease-in-out;
+
+  // ─────────────────────────────────────────────
+  // Title Section Styles
+  // ─────────────────────────────────────────────
+  &__title {
+    font-size: var(--font-size-md); // 16px (1rem)
+    font-weight: var(--font-weight-medium); // 500
+    line-height: 1.2; // Compact for titles
+    margin-bottom: var(--spacing-inline-xs); // 6px gap before body
+    
+    // Color modifiers
+    &--default {
+      color: var(--mat-sys-on-surface); // Theme text color
+    }
+    
+    &--highlight {
+      color: var(--color-highlight); // Cyan accent
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Body Section Styles
+  // ─────────────────────────────────────────────
+  &__body {
+    font-size: 12px; // 0.75rem - keep existing tooltip size
+    font-weight: var(--font-weight-normal); // 400
+    line-height: 1.4; // Readable body text
+    color: var(--mat-sys-on-surface); // Theme text color
+    white-space: pre-line; // Preserve line breaks from \n characters
+  }
+
+  // ─────────────────────────────────────────────
+  // Visible State
+  // ─────────────────────────────────────────────
+  &--visible {
+    opacity: 1;
+    transform: scale(1); // Full scale when visible
+  }
+}
+
+// ─────────────────────────────────────────────
+// Reduced Motion Support
+// ─────────────────────────────────────────────
+@media (prefers-reduced-motion: reduce) {
+  .lib-tooltip {
+    transition: opacity 100ms ease-in-out;
+    transform: none; // Skip scale animation for reduced motion
+    
+    &--visible {
+      transform: none;
+    }
+  }
+}
