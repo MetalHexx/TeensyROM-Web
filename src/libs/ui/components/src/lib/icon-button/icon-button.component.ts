@@ -2,7 +2,7 @@ import { Component, input, output, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTooltipModule } from '@angular/material/tooltip';
+import { TooltipDirective, TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 
 export type IconButtonSize = 'small' | 'medium' | 'large';
 export type IconButtonVariant = 'standard' | 'rounded-primary' | 'rounded-transparent';
@@ -10,7 +10,7 @@ export type IconButtonColor = 'normal' | 'highlight' | 'success' | 'error' | 'di
 
 @Component({
   selector: 'lib-icon-button',
-  imports: [CommonModule, MatButtonModule, MatIconModule, MatTooltipModule],
+  imports: [CommonModule, MatButtonModule, MatIconModule, TooltipDirective],
   templateUrl: './icon-button.component.html',
   styleUrl: './icon-button.component.scss',
 })
@@ -18,7 +18,7 @@ export class IconButtonComponent {
   // Input properties
   icon = input<string>(); // Optional for cases using ng-content
   ariaLabel = input.required<string>();
-  tooltip = input<string>('');
+  tooltip = input<TooltipConfig | undefined>();
   color = input<IconButtonColor>('normal');
   size = input<IconButtonSize>('medium');
   variant = input<IconButtonVariant>('standard');

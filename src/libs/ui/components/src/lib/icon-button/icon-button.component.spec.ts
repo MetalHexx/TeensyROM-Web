@@ -8,6 +8,7 @@ import {
 } from './icon-button.component';
 import { ComponentRef } from '@angular/core';
 import { vi } from 'vitest';
+import { TooltipDirective, TooltipPosition } from '../tooltip/tooltip.directive';
 
 describe('IconButtonComponent', () => {
   let component: IconButtonComponent;
@@ -16,7 +17,7 @@ describe('IconButtonComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [IconButtonComponent, NoopAnimationsModule],
+      imports: [IconButtonComponent, TooltipDirective, NoopAnimationsModule],
     }).compileComponents();
 
     fixture = TestBed.createComponent(IconButtonComponent);
@@ -197,25 +198,5 @@ describe('IconButtonComponent', () => {
     const button = fixture.nativeElement.querySelector('button');
     expect(button.getAttribute('aria-label')).toBe('Accessibility Test Button');
     expect(button.tagName.toLowerCase()).toBe('button');
-  });
-
-  it('should display tooltip when provided', () => {
-    componentRef.setInput('icon', 'info');
-    componentRef.setInput('ariaLabel', 'Info');
-    componentRef.setInput('tooltip', 'This is helpful information');
-    fixture.detectChanges();
-
-    const button = fixture.nativeElement.querySelector('button');
-    expect(button.getAttribute('ng-reflect-message')).toBe('This is helpful information');
-  });
-
-  it('should not display tooltip when empty string', () => {
-    componentRef.setInput('icon', 'info');
-    componentRef.setInput('ariaLabel', 'Info');
-    componentRef.setInput('tooltip', '');
-    fixture.detectChanges();
-
-    const button = fixture.nativeElement.querySelector('button');
-    expect(button.getAttribute('ng-reflect-message')).toBe('');
   });
 });

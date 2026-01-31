@@ -1,7 +1,7 @@
 <lib-icon-button
   icon="casino"
   ariaLabel="Launch a random file.  Will only launch files matching the current filter."
-  tooltip="Launch a random file.  Will only launch files matching the current filter."
+  [tooltip]="randomTooltip"
   size="large"
   [color]="getButtonColor()"
   (buttonClick)="onButtonClick()"

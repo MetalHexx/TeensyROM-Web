@@ -2,7 +2,7 @@
   <lib-icon-button
     icon="arrow_back"
     ariaLabel="Previous directory in your navigation history"
-    tooltip="Previous directory in your navigation history"
+    [tooltip]="backTooltip"
     size="large"
     [disabled]="!canNavigateBack()"
     (buttonClick)="onBackClick()"
@@ -11,7 +11,7 @@
   <lib-icon-button
     icon="arrow_forward"
     ariaLabel="Next directory in your navigation history"
-    tooltip="Next directory in your navigation history"
+    [tooltip]="forwardTooltip"
     size="large"
     [disabled]="!canNavigateForward()"
     (buttonClick)="onForwardClick()"
@@ -20,7 +20,7 @@
   <lib-icon-button
     icon="arrow_upward"
     ariaLabel="Go to parent directory of the current directory"
-    tooltip="Go to parent directory of the current directory"
+    [tooltip]="upTooltip"
     size="large"
     [disabled]="!canNavigateUp()"
     (buttonClick)="onUpClick()"
@@ -29,7 +29,7 @@
   <lib-icon-button
     icon="refresh"
     ariaLabel="Synchronizes the current directory with the latest files and subdirectories."
-    tooltip="Synchronizes the current directory with the latest files and subdirectories."
+    [tooltip]="refreshTooltip"
     size="large"
     [disabled]="isLoading()"
     (buttonClick)="onRefreshClick()"
@@ -38,7 +38,7 @@
   <lib-icon-button
     icon="history"
     ariaLabel="historyViewVisible() ? 'Hide navigation history' : 'Show navigation history'"
-    [tooltip]="historyViewVisible() ? 'Hide navigation history' : 'Show navigation history'"
+    [tooltip]="historyTooltip()"
     size="large"
     [color]="historyViewVisible() ? 'highlight' : 'normal'"
     (buttonClick)="onHistoryToggleClick()"

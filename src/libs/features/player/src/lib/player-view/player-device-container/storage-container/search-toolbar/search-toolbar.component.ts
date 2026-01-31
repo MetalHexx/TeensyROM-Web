@@ -9,17 +9,13 @@ import {
   viewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {
-  ScalingCompactCardComponent,
-  InputFieldComponent,
-  IconButtonComponent,
-} from '@teensyrom-nx/ui/components';
+import { ScalingCompactCardComponent, InputFieldComponent, IconButtonComponent, TooltipConfig, TooltipPosition, TooltipDirective } from '@teensyrom-nx/ui/components';
 import { StorageStore, PLAYER_CONTEXT } from '@teensyrom-nx/application';
 import { PlayerFilterType } from '@teensyrom-nx/domain';
 
 @Component({
   selector: 'lib-search-toolbar',
-  imports: [CommonModule, ScalingCompactCardComponent, InputFieldComponent, IconButtonComponent],
+  imports: [CommonModule, ScalingCompactCardComponent, InputFieldComponent, IconButtonComponent, TooltipDirective],
   templateUrl: './search-toolbar.component.html',
   styleUrl: './search-toolbar.component.scss',
 })
@@ -33,6 +29,25 @@ export class SearchToolbarComponent {
   // Injected dependencies
   private readonly storageStore = inject(StorageStore);
   private readonly playerContext = inject(PLAYER_CONTEXT);
+
+  readonly searchTooltip: TooltipConfig = {
+    title: 'Search Files',
+    body: `Searches for files using the file name, directory name, and file metadata like composer name, song title, HVSC STIL comments etc.\n
+    ● Enter one or more terms to find files.
+    ● Use quotes to search phrases.
+    ● Put a + before a word or phrase to require it.
+    ● Use the filters to further narrow results.\n
+    Example: +iron +maiden +"Aces High"
+    `,
+    position: TooltipPosition.Top,
+  };
+
+  // Tooltip configuration
+  readonly clearSearchTooltip: TooltipConfig = {
+    title: 'Clear Search',
+    body: 'Clear search results and return to current directory view',
+    position: TooltipPosition.Top,
+  };
 
   // Computed signals for state
   readonly selectedDirectoryState = computed(() =>

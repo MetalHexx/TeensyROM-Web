@@ -4,7 +4,7 @@ import { FormArray, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
+import { EmptyStateMessageComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LoadingTextComponent, ScalingCompactCardComponent, ActionButtonComponent } from '@teensyrom-nx/ui/components';
 import { DeviceSettingsSectionComponent } from './device-settings-section/device-settings-section.component';
@@ -61,6 +61,42 @@ export class SettingsViewComponent {
     const settings = this.settings();
     return settings ? JSON.stringify(settings, null, 2) : null;
   });
+
+  // Tooltip configurations
+  readonly playerNavigateTooltip: TooltipConfig = {
+    body: 'Navigate to player settings',
+    position: TooltipPosition.Top
+  };
+
+  readonly devicesNavigateTooltip: TooltipConfig = {
+    body: 'Navigate to device settings',
+    position: TooltipPosition.Top
+  };
+
+  readonly fileTransferNavigateTooltip: TooltipConfig = {
+    body: 'Navigate to file transfer settings',
+    position: TooltipPosition.Top
+  };
+
+  readonly searchNavigateTooltip: TooltipConfig = {
+    body: 'Navigate to search settings',
+    position: TooltipPosition.Top
+  };
+
+  readonly saveTooltip: TooltipConfig = {
+    body: 'Save all changes',
+    position: TooltipPosition.Top
+  };
+
+  readonly undoTooltip: TooltipConfig = {
+    body: 'Undo the last saved change',
+    position: TooltipPosition.Top
+  };
+
+  readonly redoTooltip: TooltipConfig = {
+    body: 'Redo the last undone change',
+    position: TooltipPosition.Top
+  };
 
   /**
    * Handles Ctrl+Z keyboard shortcut for undo

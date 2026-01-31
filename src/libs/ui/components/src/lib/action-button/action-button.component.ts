@@ -1,15 +1,15 @@
 import { Component, input, output, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { IconLabelComponent } from '../icon-label/icon-label.component';
+import { TooltipDirective, TooltipConfig } from '../tooltip/tooltip.directive';
 
 export type ActionButtonVariant = 'stroked' | 'flat' | 'raised' | 'fab';
 export type ActionButtonColor = 'primary' | 'success' | 'error' | 'highlight' | 'normal';
 
 @Component({
   selector: 'lib-action-button',
-  imports: [CommonModule, MatButtonModule, MatTooltipModule, IconLabelComponent],
+  imports: [CommonModule, MatButtonModule, TooltipDirective, IconLabelComponent],
   templateUrl: './action-button.component.html',
   styleUrl: './action-button.component.scss',
 })
@@ -23,7 +23,7 @@ export class ActionButtonComponent {
   color = input<ActionButtonColor>('primary');
   disabled = input<boolean>(false);
   ariaLabel = input<string>();
-  tooltip = input<string>('');
+  tooltip = input<TooltipConfig | undefined>();
 
   // Events
   buttonClick = output<void>();

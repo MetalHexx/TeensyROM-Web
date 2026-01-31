@@ -5,6 +5,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
+import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 
 /**
  * Validation function type for preset names.
@@ -39,6 +40,17 @@ export class PresetNameDialogComponent implements OnInit {
   cancelled = output<void>();
 
   currentName = signal<string>('');
+
+  // Tooltip configurations
+  readonly saveTooltip: TooltipConfig = {
+    body: 'Save CRT preset',
+    position: TooltipPosition.Top,
+  };
+
+  readonly cancelTooltip: TooltipConfig = {
+    body: 'Cancel',
+    position: TooltipPosition.Top,
+  };
 
   validationError = computed<string>(() => {
     const name = this.currentName();

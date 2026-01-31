@@ -1,8 +1,9 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
+import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 
 @Component({
   selector: 'lib-confirmation-dialog',
@@ -26,6 +27,17 @@ export class ConfirmationDialogComponent {
   // Output events
   confirmed = output<void>();
   cancelled = output<void>();
+
+  // Tooltip configurations
+  readonly confirmTooltip = computed<TooltipConfig>(() => ({
+    body: this.confirmLabel(),
+    position: TooltipPosition.Top,
+  }));
+
+  readonly cancelTooltip = computed<TooltipConfig>(() => ({
+    body: this.cancelLabel(),
+    position: TooltipPosition.Top,
+  }));
 
   // Event handlers
   onConfirmClick(): void {

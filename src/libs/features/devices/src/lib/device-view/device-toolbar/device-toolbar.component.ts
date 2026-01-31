@@ -1,9 +1,9 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
-import { ScalingCompactCardComponent, ActionButtonComponent } from '@teensyrom-nx/ui/components';
+import { ScalingCompactCardComponent, ActionButtonComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 import { DeviceStore } from '@teensyrom-nx/application';
 import { MatButtonModule } from '@angular/material/button';
 
@@ -24,6 +24,37 @@ import { MatButtonModule } from '@angular/material/button';
 export class DeviceToolbarComponent {
   private readonly deviceStore = inject(DeviceStore);
   protected readonly hasEnabledDevices = this.deviceStore.hasEnabledDevices;
+
+  // Tooltip configurations
+  readonly scanTooltip: TooltipConfig = {
+    title: 'Discover Devices',
+    body: 'Scans your local network and COM ports for TeensyROM devices. Searches the subnet associated to the machine the API is running on.',
+    position: TooltipPosition.Top
+  };
+
+  readonly resetTooltip = computed<TooltipConfig>(() => ({
+    title: 'Reset Devices',
+    body: this.hasEnabledDevices() 
+      ? 'Resets all enabled TeensyROM devices' 
+      : 'No enabled TeensyROM devices available to reset',
+    position: TooltipPosition.Top
+  }));
+
+  readonly pingTooltip = computed<TooltipConfig>(() => ({
+    title: 'Ping Devices',
+    body: this.hasEnabledDevices() 
+      ? 'Sends a ping command to all enabled TeensyROM devices.  See logs for response.' 
+      : 'No enabled TeensyROM devices available to ping',
+    position: TooltipPosition.Top
+  }));
+
+  readonly indexAllTooltip = computed<TooltipConfig>(() => ({
+    title: 'Index All Storage',
+    body: this.hasEnabledDevices() 
+      ? 'Indexes files for all enabled TeensyROM devices.  This makes files available for search and random launch.' 
+      : 'No enabled TeensyROM devices available to index',
+    position: TooltipPosition.Top
+  }));
 
   onIndexAllStorage() {
     this.deviceStore.indexStorageAllStorage();

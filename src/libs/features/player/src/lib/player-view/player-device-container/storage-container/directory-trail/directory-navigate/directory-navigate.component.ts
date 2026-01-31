@@ -1,5 +1,5 @@
-import { Component, input, output } from '@angular/core';
-import { IconButtonComponent } from '@teensyrom-nx/ui/components';
+import { Component, input, output, computed } from '@angular/core';
+import { IconButtonComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 
 @Component({
   selector: 'lib-directory-navigate',
@@ -22,6 +22,47 @@ export class DirectoryNavigateComponent {
   upClicked = output<void>();
   refreshClicked = output<void>();
   historyToggleClicked = output<void>();
+
+  // Tooltip configurations
+  readonly backTooltip: TooltipConfig = {
+    title: 'Previous Directory',
+    body: 'Takes you to the previous directory in your navigation history',
+    position: TooltipPosition.Top,
+  };
+
+  readonly forwardTooltip: TooltipConfig = {
+    title: 'Next Directory',
+    body: 'Takes you to the next directory in your navigation history',
+    position: TooltipPosition.Top,
+  };
+
+  readonly upTooltip: TooltipConfig = {
+    title: 'Parent Directory',
+    body: 'Go to parent directory of the current directory',
+    position: TooltipPosition.Top,
+  };
+
+  readonly refreshTooltip: TooltipConfig = {
+    title: 'Refresh Directory',
+    body: 'Synchronizes the current directory with the latest files and subdirectories on your TeensyROM storage.',
+    position: TooltipPosition.Top,
+  };
+
+  readonly showHistoryTooltip: TooltipConfig = {
+    title: 'Show Navigation History',
+    body: 'Takes you to the navigation history view',
+    position: TooltipPosition.Top,
+  };
+
+  readonly hideHistoryTooltip: TooltipConfig = {
+    title: 'Hide Navigation History',
+    body: 'Hides the navigation history view and returns to the directory view',
+    position: TooltipPosition.Top,
+  };
+
+  readonly historyTooltip = computed(() =>
+    this.historyViewVisible() ? this.hideHistoryTooltip : this.showHistoryTooltip
+  );
 
   // Event handlers
   onBackClick(): void {

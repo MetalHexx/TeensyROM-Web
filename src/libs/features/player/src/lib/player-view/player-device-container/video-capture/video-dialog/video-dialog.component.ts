@@ -15,6 +15,8 @@ import {
   VideoControlsToolbarComponent,
   AnyPresetName,
   isBuiltInPreset,
+  TooltipConfig,
+  TooltipPosition,
 } from '@teensyrom-nx/ui/components';
 import { CrtSettings, CRT_STORAGE, validatePresetName, CRT_PRESET_KEYS } from '@teensyrom-nx/domain';
 import { PlayerToolbarComponent } from '../../player-toolbar/player-toolbar.component';
@@ -87,6 +89,12 @@ export class VideoDialogComponent implements OnDestroy {
 
   /** CRT config - large display with all controls */
   protected readonly crtConfig: CrtSettingsConfig = CRT_CONFIGS.large;
+
+  // Tooltip configuration
+  readonly closeTooltip: TooltipConfig = {
+    body: 'Close',
+    position: TooltipPosition.Top,
+  };
 
   /**
    * Context-appropriate label for the current preset.

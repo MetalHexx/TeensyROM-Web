@@ -4,10 +4,11 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { TooltipDirective, TooltipConfig } from '../tooltip/tooltip.directive';
 
 @Component({
   selector: 'lib-input-field',
-  imports: [CommonModule, MatInputModule, MatFormFieldModule, MatIconModule],
+  imports: [CommonModule, MatInputModule, MatFormFieldModule, MatIconModule, TooltipDirective],
   templateUrl: './input-field.component.html',
   styleUrl: './input-field.component.scss',
   providers: [
@@ -24,6 +25,7 @@ export class InputFieldComponent implements ControlValueAccessor {
   placeholder = input.required<string>();
 
   // Optional inputs
+  tooltip = input<TooltipConfig | undefined>();
   prefixIcon = input<string>();
   suffixIcon = input<string>();
   inputType = input<string>('text');

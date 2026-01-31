@@ -13,7 +13,7 @@ import { DEVICE_LOGS_SERVICE, IDeviceLogsService } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { IconButtonComponent, ScalingCardComponent } from '@teensyrom-nx/ui/components';
+import { IconButtonComponent, ScalingCardComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 
 @Component({
   selector: 'lib-device-logs',
@@ -69,6 +69,25 @@ export class DeviceLogsComponent implements AfterViewInit {
   clearLogs() {
     this.logsService.clear();
   }
+
+  // Tooltip configurations
+  readonly startLogsTooltip: TooltipConfig = {
+    title: 'Start Logs',
+    body: 'Start receiving device logs',
+    position: TooltipPosition.Top
+  };
+
+  readonly stopLogsTooltip: TooltipConfig = {
+    title: 'Stop Logs',
+    body: 'Stop receiving device logs',
+    position: TooltipPosition.Top
+  };
+
+  readonly clearLogsTooltip: TooltipConfig = {
+    title: 'Clear Logs',
+    body: 'Clear all device logs',
+    position: TooltipPosition.Top
+  };
 
   scrollToElement(): void {
     if (!this.logsContentRef) return;

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { IconButtonComponent, DropdownMenuComponent, DropdownMenuItemComponent } from '@teensyrom-nx/ui/components';
+import { IconButtonComponent, DropdownMenuComponent, DropdownMenuItemComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 import { PLAYER_CONTEXT, StorageStore } from '@teensyrom-nx/application';
 import { LaunchMode } from '@teensyrom-nx/domain';
 import { StorageKeyUtil } from '@teensyrom-nx/application';
@@ -63,14 +63,39 @@ export class PlayerToolbarActionsComponent {
     return option?.label ?? '3m';
   });
 
-  timerTooltip = computed(() => {
-    const baseText = 'Enables a custom play timer for non-SID files.';
+  timerTooltip = computed<TooltipConfig>(() => {    
+    return {
+      title: this.isCustomTimerEnabled() ? 'Disable Play Timer' : 'Enable Play Timer',
+      body: 'Set a play timer to allow games, demos and images to continuously play in a stream.  SID durations are unaffected.',
+      position: TooltipPosition.Top
+    };
+  });
+
+  timerAriaLabel = computed(() => {
+    const baseText = this.isCustomTimerEnabled() ? 'Disable Play Timer' : 'Enable Play Timer';
     if (this.isCustomTimerEnabled()) {
       const durationLabel = this.timerBadgeText();
-      return `${baseText} Current Duration: ${durationLabel}.`;
+      return `${baseText} - ${durationLabel}`;
     }
     return baseText;
   });
+
+  shuffleTooltip = computed<TooltipConfig>(() => ({
+    title: 'Shuffle Mode',
+    body: `Shuffle mode randomizes file launches and affects the behavior of the Next/Previous buttons.\n
+    ● Enabled: Next/Previous launches random files.
+    ● Disabled: Next/Previous launches files in directory order.
+    ● All launches, regardless of mode, are tracked in launch history.`,
+    position: TooltipPosition.Top
+  }));
+
+  favoriteTooltip = computed<TooltipConfig>(() => ({
+    title: this.isFavorite() ? 'Untag Favorite' : 'Tag Favorite',
+    body: this.isFavorite() 
+      ? '● Removes the file from the /favorites directory.\n● TeensyROM will reset if a game or program is currently running.' 
+      : '● Places a copy of the file in the /favorites directory.\n● TeensyROM will reset if a game or program is currently running.',
+    position: TooltipPosition.Top
+  }));
 
   currentFile = computed(() => {
     const deviceId = this.deviceId();

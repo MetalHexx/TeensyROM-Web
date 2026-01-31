@@ -11,6 +11,8 @@ import {
   IconLabelComponent,
   IconButtonComponent,
   ScalingCardComponent,
+  TooltipConfig,
+  TooltipPosition,
 } from '@teensyrom-nx/ui/components';
 import { StorageStatusComponent as StorageItemComponent } from '../storage-item/storage-item.component';
 import { DeviceStore } from '@teensyrom-nx/application';
@@ -41,6 +43,23 @@ export class DeviceItemComponent {
   readonly usbStatus = computed(() => this.device()?.usbStorage?.available);
   readonly sdStatus = computed(() => this.device()?.sdStorage?.available);
   readonly StorageType = StorageType;
+
+  // Tooltip configurations
+  readonly enabledTooltip: TooltipConfig = {
+    title: 'Disable Device',
+    body: 'Device will be unavailable in other parts of the application like the player view.',
+    position: TooltipPosition.Top,
+  };
+
+  readonly disabledTooltip: TooltipConfig = {
+    title: 'Enable Device',
+    body: 'Device will be available in other parts of the application like the player view.',
+    position: TooltipPosition.Top,
+  };
+
+  readonly toggleTooltip = computed(() => 
+    this.isEnabled() ? this.enabledTooltip : this.disabledTooltip
+  );
 
   onToggleEnabled() {
     const deviceId = this.device()?.deviceId ?? '';

@@ -430,134 +430,80 @@ describe('ContentOverlayContainerComponent (Standalone)', () => {
     });
   });
 
-  describe('Tooltip Interaction (Bug Fix Regression Tests)', () => {
-    it('should keep overlays visible when tooltip appears and mouse leaves container', async () => {
+  describe('Dropdown Overlay Interaction', () => {
+    it('should keep overlays visible when dropdown opens and mouse leaves container', async () => {
       // User hovers a button, overlays appear
       component.onMouseEnter();
       expect(component.shouldShowOverlays()).toBe(true);
 
-      // Tooltip appears (detected by MutationObserver)
+      // Dropdown opens (detected by MutationObserver)
       component['hasCdkOverlayOpen'].set(true);
 
-      // User moves mouse from button to tooltip, triggering mouseleave on container
+      // User moves mouse from button to dropdown, triggering mouseleave on container
       component.onMouseLeave();
 
       // Wait for microtask to complete
       await new Promise(resolve => setTimeout(resolve, 1));
 
-      // Overlays should remain visible because tooltip is active
+      // Overlays should remain visible because dropdown is active
       expect(component.shouldShowOverlays()).toBe(true);
-      expect(component.isMouseOver()).toBe(true); // Should NOT have been set to false
     });
 
-    it('should hide overlays after tooltip closes and mouse is outside container', async () => {
-      // Setup: overlays visible, tooltip active
+    it('should hide overlays after dropdown closes and mouse is outside container', async () => {
+      // Setup: overlays visible, dropdown active
       component.onMouseEnter();
       component['hasCdkOverlayOpen'].set(true);
 
-      // User moves mouse away from tooltip and container
+      // User moves mouse away from dropdown and container
       component.onMouseLeave();
 
       // Wait for microtask
       await new Promise(resolve => setTimeout(resolve, 1));
 
-      // Still visible due to tooltip
+      // Still visible due to dropdown
       expect(component.shouldShowOverlays()).toBe(true);
 
-      // Tooltip closes (simulated by manually setting signal and calling cleanup)
+      // Dropdown closes (simulated by manually setting signal and calling cleanup)
       // In real world, MutationObserver would call checkForOpenOverlays()
       component['hasCdkOverlayOpen'].set(false);
       component['checkForOpenOverlays'](); // Trigger cleanup logic
 
-      // Now overlays should hide because mouse is not over and no tooltip
+      // Now overlays should hide because mouse is not over and no dropdown
       expect(component.shouldShowOverlays()).toBe(false);
     });
 
-    it('should handle rapid tooltip show/hide without flickering', async () => {
-      // User hovers button
-      component.onMouseEnter();
-      component['hasCdkOverlayOpen'].set(true);
-
-      // User quickly moves to tooltip and back
-      component.onMouseLeave();
-      await new Promise(resolve => setTimeout(resolve, 1));
-      expect(component.shouldShowOverlays()).toBe(true);
-
+    it('should handle genuine mouse leave (no overlay) immediately after microtask', async () => {
+      // Mouse enters, no overlay
       component.onMouseEnter();
       expect(component.shouldShowOverlays()).toBe(true);
 
-      // Tooltip closes
-      component['hasCdkOverlayOpen'].set(false);
-
-      // User leaves container
-      component.onMouseLeave();
-      await new Promise(resolve => setTimeout(resolve, 1));
-
-      // Should hide now
-      expect(component.shouldShowOverlays()).toBe(false);
-    });
-
-    it('should handle multiple sequential tooltips correctly', async () => {
-      // First tooltip on preset button
-      component.onMouseEnter();
-      component['hasCdkOverlayOpen'].set(true);
-
-      // Move to tooltip
-      component.onMouseLeave();
-      await new Promise(resolve => setTimeout(resolve, 1));
-      expect(component.shouldShowOverlays()).toBe(true);
-
-      // First tooltip closes, mouse moves to close button
-      component['hasCdkOverlayOpen'].set(false);
-      component.onMouseEnter();
-
-      // Second tooltip appears
-      component['hasCdkOverlayOpen'].set(true);
-
-      // Move to second tooltip
-      component.onMouseLeave();
-      await new Promise(resolve => setTimeout(resolve, 1));
-      expect(component.shouldShowOverlays()).toBe(true);
-
-      // Clean exit - tooltip closes (simulated)
-      component['hasCdkOverlayOpen'].set(false);
-      component['checkForOpenOverlays'](); // Trigger cleanup
-      await new Promise(resolve => setTimeout(resolve, 1));
-      expect(component.shouldShowOverlays()).toBe(false);
-    });
-
-    it('should handle genuine mouse leave (no tooltip) immediately after microtask', async () => {
-      // Mouse enters, no tooltip
-      component.onMouseEnter();
-      expect(component.shouldShowOverlays()).toBe(true);
-
-      // Mouse leaves, no tooltip present
+      // Mouse leaves, no overlay present
       component.onMouseLeave();
 
       // Wait for microtask
       await new Promise(resolve => setTimeout(resolve, 1));
 
-      // Should hide because no tooltip was detected
+      // Should hide because no overlay was detected
       expect(component.shouldShowOverlays()).toBe(false);
       expect(component.isMouseOver()).toBe(false);
     });
 
-    it('should not affect overlay lock behavior with tooltip interaction', async () => {
+    it('should not affect overlay lock behavior with dropdown interaction', async () => {
       // Lock overlays programmatically
       component.lockOverlays();
       expect(component.shouldShowOverlays()).toBe(true);
 
-      // Mouse interaction with tooltip
+      // Mouse interaction with dropdown
       component.onMouseEnter();
       component['hasCdkOverlayOpen'].set(true);
       component.onMouseLeave();
 
       await new Promise(resolve => setTimeout(resolve, 1));
 
-      // Should remain visible due to lock (independent of tooltip)
+      // Should remain visible due to lock (independent of dropdown)
       expect(component.shouldShowOverlays()).toBe(true);
 
-      // Close tooltip and unlock
+      // Close dropdown and unlock
       component['hasCdkOverlayOpen'].set(false);
       component['checkForOpenOverlays'](); // Trigger cleanup
       component.unlockOverlays();

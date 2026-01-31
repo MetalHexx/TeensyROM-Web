@@ -6,6 +6,8 @@ import {
   IconButtonColor,
   JoystickIconComponent,
   ImageIconComponent,
+  TooltipConfig,
+  TooltipPosition,
 } from '@teensyrom-nx/ui/components';
 import { PLAYER_CONTEXT, StorageStore } from '@teensyrom-nx/application';
 import { PlayerFilterType } from '@teensyrom-nx/domain';
@@ -32,6 +34,31 @@ export class FilterToolbarComponent {
 
   // Expose PlayerFilterType enum for template access
   readonly PlayerFilterType = PlayerFilterType;
+
+  // Tooltip configurations
+  readonly allFilterTooltip: TooltipConfig = {
+    title: 'Filter: Allow All Files',
+    body: 'Allows all file types to be included in random launches and search results.',
+    position: TooltipPosition.Top,
+  };
+
+  readonly gamesFilterTooltip: TooltipConfig = {
+    title: 'Filter: Games/Programs Only',
+    body: 'Restricts random launches and search results to games and programs only.',
+    position: TooltipPosition.Top,
+  };
+
+  readonly musicFilterTooltip: TooltipConfig = {
+    title: 'Filter: Music Only',
+    body: 'Restricts random launches and search results to music files only.',
+    position: TooltipPosition.Top,
+  };
+
+  readonly imagesFilterTooltip: TooltipConfig = {
+    title: 'Filter: Images / Text files Only',
+    body: 'Restricts random launches and search results to images and text files only.',
+    position: TooltipPosition.Top,
+  };
 
   // Computed signal for active filter
   activeFilter = computed(

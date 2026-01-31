@@ -18,6 +18,7 @@ import { MatExpansionModule } from '@angular/material/expansion';
 
 import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-layout.component';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
+import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
 import { DropdownMenuItemComponent } from '../dropdown-menu/dropdown-menu-item.component';
 import { PresetNameDialogComponent, PresetNameValidationFn } from '../preset-name-dialog/preset-name-dialog.component';
@@ -211,6 +212,20 @@ export class CrtSettingsPanelComponent {
    * Use this to pause hover-based overlay visibility.
    */
   readonly openedChange = output<boolean>();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Tooltip Configurations
+  // ─────────────────────────────────────────────────────────────────────────
+
+  readonly renamePresetTooltip: TooltipConfig = {
+    body: 'Rename CRT preset',
+    position: TooltipPosition.Top,
+  };
+
+  readonly deletePresetTooltip: TooltipConfig = {
+    body: 'Delete CRT preset',
+    position: TooltipPosition.Top,
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Slider Configurations (exposed for template)

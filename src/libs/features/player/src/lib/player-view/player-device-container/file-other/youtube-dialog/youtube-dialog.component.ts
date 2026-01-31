@@ -2,7 +2,7 @@ import { Component, Inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { ScalingCardComponent, IconButtonComponent } from '@teensyrom-nx/ui/components';
+import { ScalingCardComponent, IconButtonComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 import { YouTubeVideo } from '@teensyrom-nx/domain';
 
 export interface YouTubeDialogData {
@@ -19,6 +19,11 @@ export interface YouTubeDialogData {
 })
 export class YouTubeDialogComponent {
   youtubeEmbedUrl: SafeResourceUrl;
+
+  readonly closeTooltip: TooltipConfig = {
+    body: 'Close YouTube Video',
+    position: TooltipPosition.Top
+  };
 
   constructor(
     public dialogRef: MatDialogRef<YouTubeDialogComponent>,

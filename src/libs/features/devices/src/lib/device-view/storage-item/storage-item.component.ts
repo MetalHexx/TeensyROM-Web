@@ -3,7 +3,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
-import { IconLabelComponent, IconButtonComponent } from '@teensyrom-nx/ui/components';
+import { IconLabelComponent, IconButtonComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 import { MatButtonModule } from '@angular/material/button';
 
 @Component({
@@ -27,9 +27,13 @@ export class StorageStatusComponent {
   index = output<void>();
 
   // Computed tooltip message
-  tooltipMessage = computed(() => {
+  tooltipMessage = computed<TooltipConfig>(() => {
     const storageType = this.icon() === 'usb' ? 'USB device' : 'SD card';
-    return `Indexes the ${storageType} to make files available for search and random launch.`;
+    return {
+      title: `Index ${storageType}`,
+      body: `Indexes the ${storageType} to make files available for search and random launch.`,
+      position: TooltipPosition.Top
+    };
   });
 
   onIndex() {

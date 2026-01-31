@@ -19,7 +19,7 @@
         <lib-icon-button
           icon="skip_previous"
           ariaLabel="In shuffle mode, It will launch the previous file in your launch history. Otherwise, it will launch the previous file in the file listing."
-          tooltip="In shuffle mode, It will launch the previous file in your launch history. Otherwise, it will launch the previous file in the file listing."
+          [tooltip]="previousTooltip()"
           size="large"
           variant="rounded-transparent"
           color="normal"
@@ -33,7 +33,7 @@
         <lib-icon-button
           [icon]="getPlayPauseIconComputed()"
           [ariaLabel]="getPlayPauseLabelComputed()"
-          [tooltip]="getPlayPauseLabelComputed()"
+          [tooltip]="playPauseTooltip()"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
@@ -45,7 +45,7 @@
         <lib-icon-button
           icon="stop"
           ariaLabel="Stops the current file with a TeensyROM reset."
-          tooltip="Stops the current file with a TeensyROM reset."
+          [tooltip]="stopTooltip"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
@@ -58,7 +58,7 @@
         <lib-icon-button
           icon="skip_next"
           ariaLabel="In shuffle mode, It will launch the next random file or next file in your launch history. Otherwise, it will launch the next file in the file listing."
-          tooltip="In shuffle mode, It will launch the next random file or next file in your launch history. Otherwise, it will launch the next file in the file listing."
+          [tooltip]="nextTooltip()"
           size="large"
           variant="rounded-transparent"
           color="normal"
@@ -92,7 +92,7 @@
         <lib-icon-button
           icon="skip_previous"
           ariaLabel="In shuffle mode, It will launch the previous file in your launch history. Otherwise, it will launch the previous file in the file listing."
-          tooltip="In shuffle mode, It will launch the previous file in your launch history. Otherwise, it will launch the previous file in the file listing."
+          [tooltip]="previousTooltip()"
           size="large"
           variant="rounded-transparent"
           color="normal"
@@ -106,7 +106,7 @@
         <lib-icon-button
           [icon]="getPlayPauseIconComputed()"
           [ariaLabel]="getPlayPauseLabelComputed()"
-          [tooltip]="getPlayPauseLabelComputed()"
+          [tooltip]="playPauseTooltip()"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
@@ -118,7 +118,7 @@
         <lib-icon-button
           icon="stop"
           ariaLabel="Stop Playback"
-          tooltip="Stop Playback"
+          [tooltip]="stopTooltip"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
@@ -131,7 +131,7 @@
         <lib-icon-button
           icon="skip_next"
           ariaLabel="In shuffle mode, It will launch the next random file or next file in your launch history. Otherwise, it will launch the next file in the file listing."
-          tooltip="In shuffle mode, It will launch the next random file or next file in your launch history. Otherwise, it will launch the next file in the file listing."
+          [tooltip]="nextTooltip()"
           size="large"
           variant="rounded-transparent"
           color="normal"
@@ -165,7 +165,7 @@
         <lib-icon-button
           icon="skip_previous"
           ariaLabel="In shuffle mode, It will launch the previous file in your launch history. Otherwise, it will launch the previous file in the file listing."
-          tooltip="In shuffle mode, It will launch the previous file in your launch history. Otherwise, it will launch the previous file in the file listing."
+          [tooltip]="previousTooltip()"
           size="large"
           variant="rounded-transparent"
           color="normal"
@@ -179,7 +179,7 @@
         <lib-icon-button
           [icon]="getPlayPauseIconComputed()"
           [ariaLabel]="getPlayPauseLabelComputed()"
-          [tooltip]="getPlayPauseLabelComputed()"
+          [tooltip]="playPauseTooltip()"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
@@ -191,7 +191,7 @@
         <lib-icon-button
           icon="stop"
           ariaLabel="Stops the current file with a TeensyROM reset."
-          tooltip="Stops the current file with a TeensyROM reset."
+          [tooltip]="stopTooltip"
           size="large"
           variant="rounded-primary"
           class="playback-icon-filled"
@@ -204,7 +204,7 @@
         <lib-icon-button
           icon="skip_next"
           ariaLabel="In shuffle mode, It will launch the next random file or next file in your launch history. Otherwise, it will launch the next file in the file listing."
-          tooltip="In shuffle mode, It will launch the next random file or next file in your launch history. Otherwise, it will launch the next file in the file listing."
+          [tooltip]="nextTooltip()"
           size="large"
           variant="rounded-transparent"
           color="normal"

@@ -52,7 +52,7 @@
                       size="medium"
                       color="highlight"
                       ariaLabel="Rename CRT preset'"
-                      tooltip="Rename CRT preset"
+                      [tooltip]="renamePresetTooltip"
                       (buttonClick)="onRenamePreset(preset.name)">
                     </lib-icon-button>
                     <lib-icon-button
@@ -60,7 +60,7 @@
                       size="medium"
                       color="error"
                       ariaLabel="Delete CRT preset"
-                      tooltip="Delete CRT preset"
+                      [tooltip]="deletePresetTooltip"
                       (buttonClick)="onDeletePreset(preset.name)">
                     </lib-icon-button>
                   </div>

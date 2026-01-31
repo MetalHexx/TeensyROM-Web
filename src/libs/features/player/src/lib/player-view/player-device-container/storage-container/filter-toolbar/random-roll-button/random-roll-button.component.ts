@@ -1,5 +1,5 @@
 import { Component, output, input } from '@angular/core';
-import { IconButtonComponent, IconButtonColor } from '@teensyrom-nx/ui/components';
+import { IconButtonComponent, IconButtonColor, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 
 const COMPONENT_CONSTANTS = {
   CSS_CLASSES: {
@@ -26,6 +26,15 @@ const COMPONENT_CONSTANTS = {
 export class RandomRollButtonComponent {
   getButtonColor = input<IconButtonColor>(COMPONENT_CONSTANTS.COLORS.NORMAL as IconButtonColor);
   buttonClick = output<void>();
+
+  // Tooltip configuration
+  readonly randomTooltip: TooltipConfig = {
+    title: 'Launch a random file',
+    body: `Launches a random file from your TeensyROM storage.\n
+● Selection based on the active filter.
+● Automatically enables shuffle mode.`,
+    position: TooltipPosition.Top,
+  };
 
   onButtonClick(): void {
     this.buttonClick.emit();

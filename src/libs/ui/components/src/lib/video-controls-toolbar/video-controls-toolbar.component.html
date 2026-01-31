@@ -5,7 +5,7 @@
       <lib-icon-button
         [icon]="crtIcon"
         ariaLabel="isCrtEnabled() ? 'Turn off CRT effect' : 'Turn on CRT effect'"
-        [tooltip]="isCrtEnabled() ? 'Turn off CRT effect' : 'Turn on CRT effect'"
+        [tooltip]="crtTooltip()"
         variant="rounded-transparent"
         [class.active]="isCrtEnabled()"
         (buttonClick)="crtToggleClick.emit()">
@@ -17,7 +17,7 @@
       <lib-icon-button
         icon="tune"
         ariaLabel="Open CRT settings"
-        tooltip="Open CRT settings"
+        [tooltip]="crtSettingsTooltip"
         variant="rounded-transparent"
         [class.active]="showCrtControls()"
         (buttonClick)="crtSettingsClick.emit()">
@@ -29,7 +29,7 @@
       <lib-icon-button
         icon="videocam"
         ariaLabel="Select the source video capture device that is connected to your TeensyROM."
-        tooltip="Select the source video capture device that is connected to your TeensyROM."
+        [tooltip]="deviceSelectorTooltip"
         variant="rounded-transparent"
         [class.active]="isDeviceSelectorActive()"
         (buttonClick)="deviceSelectorClick.emit()">
@@ -41,7 +41,7 @@
       <lib-icon-button
         [icon]="fullscreenIcon"
         [ariaLabel]="isFullscreen() ? 'Exit fullscreen' : 'Enter fullscreen'"
-        [tooltip]="isFullscreen() ? 'Exit fullscreen' : 'Enter fullscreen'"
+        [tooltip]="fullscreenTooltip()"
         variant="rounded-transparent"
         (buttonClick)="fullscreenClick.emit()">
       </lib-icon-button>
@@ -52,7 +52,7 @@
       <lib-icon-button
         icon="close"
         ariaLabel="Close"
-        tooltip="Close"
+        [tooltip]="closeTooltip"
         variant="rounded-transparent"
         (buttonClick)="closeClick.emit()">
       </lib-icon-button>

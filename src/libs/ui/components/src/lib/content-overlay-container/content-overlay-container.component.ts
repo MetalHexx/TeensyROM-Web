@@ -111,10 +111,10 @@ export class ContentOverlayContainerComponent {
   readonly overlayLockCount = signal<number>(0);
 
   /**
-   * Tracks if a mouse leave event occurred while a tooltip was active.
-   * Used to properly hide overlays once the tooltip closes.
+   * Tracks if mouse left the container while a dropdown was open.
+   * When the dropdown closes, we'll hide overlays if this flag is set.
    */
-  private pendingMouseLeave = false;
+  private mouseLeftWhileOverlayOpen = false;
 
   /**
    * Whether overlays should be visible based on all factors:
@@ -195,8 +195,10 @@ export class ContentOverlayContainerComponent {
    * Uses scoped detection to only count overlays triggered from within this container,
    * preventing false positives from parent dialogs or other components' overlays.
    * 
-   * Note: Only transient overlays (tooltips, dropdowns) are counted. Persistent overlays
+   * Note: Only transient overlays (dropdowns) are counted. Persistent overlays
    * like CRT settings panel are not included because they should not prevent auto-hide behavior.
+   * Custom tooltips (see docs/projects/CUSTOM-TOOLTIP/) don't use CDK overlays and thus don't
+   * trigger this detection.
    */
   private checkForOpenOverlays(): void {
     if (!this.containerElement) {
@@ -212,9 +214,9 @@ export class ContentOverlayContainerComponent {
     const hasOverlays = ownedOverlays.length > 0;
     this.hasCdkOverlayOpen.set(hasOverlays);
 
-    // If overlays just closed and we had a pending mouse leave, apply it now
-    if (!hasOverlays && this.pendingMouseLeave) {
-      this.pendingMouseLeave = false;
+    // If overlays just closed and mouse had left while they were open, hide now
+    if (!hasOverlays && this.mouseLeftWhileOverlayOpen) {
+      this.mouseLeftWhileOverlayOpen = false;
       this.isMouseOver.set(false);
     }
   }
@@ -222,54 +224,33 @@ export class ContentOverlayContainerComponent {
   /**
    * Determines if a CDK overlay pane is owned by (triggered from within) this container.
    * 
-   * Uses spatial proximity detection to prevent cross-component contamination:
-   * 1. Exclude parent overlays that contain our container (e.g., parent dialog)
-   * 2. For tooltips, check if positioned near this container (tight tolerance)
-   * 3. For dropdowns, check if positioned near this container (moderate tolerance)
+   * Uses spatial proximity checking to detect dropdowns that originated from within this container.
+   * 
+   * Note: Material tooltips are no longer used - we now use custom tooltips that don't use CDK overlays.
+   * See docs/projects/CUSTOM-TOOLTIP/ for details on the custom tooltip implementation.
    * 
    * Note: CRT panel overlays are intentionally NOT detected here. They're persistent
    * user-controlled panels that should not prevent auto-hide behavior, so we don't
    * count them as "open overlays" that keep the overlay layer visible.
-   * 
-   * This approach is necessary because:
-   * - We can't reliably check trigger elements (they may be hidden when overlays appear)
-   * - Multiple component instances may exist on same page (file-image, video-capture, etc.)
-   * - Components outside containers (player toolbar) can trigger overlays
-   * - Spatial proximity is the most reliable way to determine ownership
    *
    * @param overlayPane The CDK overlay pane element to check
-   * @returns True if the overlay is a transient overlay owned by this container
+   * @returns True if the overlay is a transient overlay (dropdown) owned by this container
    */
   private isOverlayOwnedByContainer(overlayPane: Element): boolean {
     if (!this.containerElement) return false;
 
-    // Strategy 0: Exclude parent overlays that contain our container
+    // Exclude parent overlays that contain our container
     // This handles the case where we're inside a dialog
     if (overlayPane.contains(this.containerElement)) {
       return false;
     }
 
-    const containerRect = this.containerElement.getBoundingClientRect();
-    const overlayRect = overlayPane.getBoundingClientRect();
-
-    // Strategy 1: Tooltips - check if tooltip is within or very close to container bounds
-    // Tooltips appear near their trigger elements, which are inside the container
-    const isTooltip = overlayPane.classList.contains('mat-mdc-tooltip-panel');
-    if (isTooltip) {
-      // Check if tooltip is within expanded container bounds (100px padding for positioning)
-      const tolerance = 100;
-      const isNearContainer = 
-        overlayRect.left < containerRect.right + tolerance &&
-        overlayRect.right > containerRect.left - tolerance &&
-        overlayRect.top < containerRect.bottom + tolerance &&
-        overlayRect.bottom > containerRect.top - tolerance;
-      return isNearContainer;
-    }
-
-    // Strategy 2: Dropdowns - check if dropdown is within or very close to container bounds
-    // Dropdowns can be positioned further from trigger but still within general area
+    // Detect dropdowns - use spatial proximity (trigger is the dropdown wrapper itself)
+    // Dropdowns are attached to elements within the container, so proximity is reliable
     const isDropdown = overlayPane.querySelector('.dropdown-menu-wrapper') !== null;
     if (isDropdown) {
+      const containerRect = this.containerElement.getBoundingClientRect();
+      const overlayRect = overlayPane.getBoundingClientRect();
       // Check if dropdown is within expanded container bounds (150px padding for positioning)
       const tolerance = 150;
       const isNearContainer = 
@@ -292,7 +273,7 @@ export class ContentOverlayContainerComponent {
    */
   onMouseEnter(): void {
     this.isMouseOver.set(true);
-    this.pendingMouseLeave = false; // Clear any pending leave state
+    this.mouseLeftWhileOverlayOpen = false; // Clear any pending state
     this.resetInactivityTimer();
   }
 
@@ -317,22 +298,23 @@ export class ContentOverlayContainerComponent {
 
   /**
    * Handle mouse leaving the container - hide overlays (unless locked).
-   * Uses microtask delay to ensure MutationObserver has processed any tooltip
-   * overlay changes before checking hasCdkOverlayOpen signal.
+   * When dropdowns are open, we defer hiding until they close.
    */
   onMouseLeave(): void {
+    // Immediately clear the timer
+    this.clearInactivityTimer();
+    
     // Defer the check to next event loop tick to ensure MutationObserver has run
     setTimeout(() => {
-      // Don't hide overlays if user moved to a tooltip/dropdown owned by this container
+      // Don't hide overlays if user moved to a dropdown owned by this container
       if (!this.hasCdkOverlayOpen()) {
         this.isMouseOver.set(false);
-        this.pendingMouseLeave = false;
+        this.mouseLeftWhileOverlayOpen = false;
       } else {
-        // Mark that we should hide when the overlay closes
-        this.pendingMouseLeave = true;
+        // Mark that we should hide when the dropdown closes
+        this.mouseLeftWhileOverlayOpen = true;
       }
     }, 0);
-    this.clearInactivityTimer();
   }
 
   /**

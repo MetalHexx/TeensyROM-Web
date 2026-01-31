@@ -5,6 +5,8 @@ import {
   IconButtonComponent,
   IconButtonColor,
   SlidingContainerComponent,
+  TooltipConfig,
+  TooltipPosition,
 } from '@teensyrom-nx/ui/components';
 import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
@@ -33,6 +35,41 @@ export class PlayerToolbarComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
 
   deviceId = input.required<string>();
+
+  // Computed shuffle mode state
+  isShuffleEnabled = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+    return this.playerContext.getLaunchMode(deviceId)() === LaunchMode.Shuffle;
+  });
+
+  // Tooltip configurations
+  previousTooltip = computed<TooltipConfig>(() => ({
+    title: 'Previous',
+    body: `Navigate to the previous file based on shuffle mode.\n
+● Shuffle enabled: Launches previous file from launch history.
+● Shuffle disabled: Launches previous file in directory order.`,
+    position: TooltipPosition.Top,
+  }));
+
+  nextTooltip = computed<TooltipConfig>(() => ({
+    title: 'Next',
+    body: `Navigate to the next file based on shuffle mode.\n
+● Shuffle enabled: Launches next random file or from history.
+● Shuffle disabled: Launches next file in directory order.`,
+    position: TooltipPosition.Top,
+  }));
+
+  readonly stopTooltip: TooltipConfig = {
+    title: 'Stop',
+    body: 'Stops the currently launched file by resetting TeensyROM.',
+    position: TooltipPosition.Top,
+  };
+
+  readonly playPauseTooltip = computed<TooltipConfig>(() => ({
+    title: this.getPlayPauseLabelComputed(),
+    position: TooltipPosition.Top,
+  }));
 
   timerState = computed(() => {
     const deviceId = this.deviceId();

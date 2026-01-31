@@ -2,6 +2,7 @@
   <div class="search-toolbar-content">
     <lib-input-field
       label="Search"
+      [tooltip]="searchTooltip"
       placeholder='Ex: +iron +maiden +"Aces High"'
       prefixIcon="search"
       class="search-field"
@@ -14,7 +15,7 @@
     <lib-icon-button
       icon="close"
       ariaLabel="Clear search results and return to current directory view"
-      tooltip="Clear search results and return to current directory view"
+      [tooltip]="clearSearchTooltip"
       color="normal"
       size="medium"
       (buttonClick)="clearSearch()"

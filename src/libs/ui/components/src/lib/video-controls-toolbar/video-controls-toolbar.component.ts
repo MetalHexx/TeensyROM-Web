@@ -1,7 +1,8 @@
-import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-layout.component';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
+import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 
 /**
  * Video Controls Toolbar Component
@@ -132,8 +133,58 @@ export class VideoControlsToolbarComponent {
   readonly closeClick = output<void>();
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Tooltip Configurations
+  // ─────────────────────────────────────────────────────────────────────────
+
+  readonly crtOnTooltip: TooltipConfig = {
+    title: 'Turn off CRT effect',
+    position: TooltipPosition.Left,
+  };
+
+  readonly crtOffTooltip: TooltipConfig = {
+    title: 'Turn on CRT effect',
+    position: TooltipPosition.Left,
+  };
+
+  readonly crtSettingsTooltip: TooltipConfig = {
+    title: 'Open CRT settings',
+    position: TooltipPosition.Left,
+  };
+
+  readonly deviceSelectorTooltip: TooltipConfig = {
+    title: 'Select Video Device',
+    body: `Select the source video capture device that is connected to your TeensyROM.\n 
+    ● Should work with most USB video capture devices.
+    ● Ensure no other application is using the device.`,
+    position: TooltipPosition.Left,
+  };
+
+  readonly enterFullscreenTooltip: TooltipConfig = {
+    title: 'Enter fullscreen',
+    position: TooltipPosition.Left,
+  };
+
+  readonly exitFullscreenTooltip: TooltipConfig = {
+    title: 'Exit fullscreen',
+    position: TooltipPosition.Left,
+  };
+
+  readonly closeTooltip: TooltipConfig = {
+    title: 'Close',
+    position: TooltipPosition.Left,
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Computed Properties
   // ─────────────────────────────────────────────────────────────────────────
+
+  readonly crtTooltip = computed(() => 
+    this.isCrtEnabled() ? this.crtOnTooltip : this.crtOffTooltip
+  );
+
+  readonly fullscreenTooltip = computed(() =>
+    this.isFullscreen() ? this.exitFullscreenTooltip : this.enterFullscreenTooltip
+  );
 
   /**
    * Icon for CRT toggle button based on enabled state

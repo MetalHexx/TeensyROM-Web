@@ -16,28 +16,28 @@
           icon="play_circle"
           label="Player"
           ariaLabel="Navigate to player settings"
-          tooltip="Navigate to player settings"
+          [tooltip]="playerNavigateTooltip"
           [color]="activeSection() === 'player' ? 'highlight' : 'normal'"
           (buttonClick)="setActiveSection('player')" />
         <lib-action-button
           icon="devices"
           label="Devices"
           ariaLabel="Navigate to device settings"
-          tooltip="Navigate to device settings"
+          [tooltip]="devicesNavigateTooltip"
           [color]="activeSection() === 'devices' ? 'highlight' : 'normal'"
           (buttonClick)="setActiveSection('devices')" />
         <lib-action-button
           icon="folder"
           label="File Transfer"
           ariaLabel="Navigate to file transfer settings"
-          tooltip="Navigate to file transfer settings"
+          [tooltip]="fileTransferNavigateTooltip"
           [color]="activeSection() === 'fileTransfer' ? 'highlight' : 'normal'"
           (buttonClick)="setActiveSection('fileTransfer')" />
         <lib-action-button
           icon="search"
           label="Search"
           ariaLabel="Navigate to search settings"
-          tooltip="Navigate to search settings"
+          [tooltip]="searchNavigateTooltip"
           [color]="activeSection() === 'search' ? 'highlight' : 'normal'"
           (buttonClick)="setActiveSection('search')" />
       </div>
@@ -95,7 +95,7 @@
               icon="save"
               label="Save"
               ariaLabel="Save all changes"
-              tooltip="Save all changes"
+              [tooltip]="saveTooltip"
               [disabled]="!canSave()"
               (buttonClick)="saveSettings()"
             >
@@ -106,7 +106,7 @@
               icon="undo"
               label="Undo"
               ariaLabel="Undo the last saved change"
-              tooltip="Undo the last saved change"
+              [tooltip]="undoTooltip"
               [disabled]="!canUndo()"
               (buttonClick)="undo()"
             >
@@ -117,7 +117,7 @@
               icon="redo"
               label="Redo"
               ariaLabel="Redo the last undone change"
-              tooltip="Redo the last undone change"
+              [tooltip]="redoTooltip"
               [disabled]="!canRedo()"
               (buttonClick)="redo()"
             >
