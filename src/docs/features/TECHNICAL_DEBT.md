@@ -99,6 +99,48 @@ Migrate to MSW (Mock Service Worker) for all integration tests:
 
 **Breaking Changes**: None - tests will continue to work the same way
 
+---
+
+### SCSS Mixin Consolidation
+
+**Priority**: Low  
+**Effort**: 1-2 hours  
+**Created**: 2026-01-30  
+**Discovered During**: CUSTOM-TOOLTIP Phase 3 polish
+
+**Issue**: Interactive element mixins (`bounce-hover`, `selectable-item`, `pulsing-highlight`) are still defined in `styles.scss` instead of the extracted `_mixins.scss` file. This creates inconsistency with the glassy mixin refactoring and prevents components from importing these reusable patterns.
+
+**Affected Files**:
+- `libs/ui/styles/src/lib/theme/styles.scss` (lines ~156-216)
+- `libs/ui/components/src/lib/nav-rail/nav-rail-item.component.scss` (manual glassy effect)
+- `libs/ui/components/src/lib/menu-item/menu-item.component.scss` (manual border-radius)
+- `libs/ui/components/src/lib/dropdown-menu/dropdown-menu-item.component.scss` (should use selectable-item)
+
+**Current Problems**:
+- Mixins split across two files (glassy in `_mixins.scss`, interactive in `styles.scss`)
+- Components implement hover/active patterns inconsistently
+- Cannot import interactive mixins without side effects
+- nav-rail-item uses manual `rgba(var(--glassy-color), 0.15)` instead of mixin
+- Missing `@keyframes pulsing-highlight` in component-importable location
+
+**Recommended Solution**:
+1. Move `bounce-hover`, `selectable-item`, `pulsing-highlight` mixins to `_mixins.scss`
+2. Move `@keyframes pulsing-highlight` to `_mixins.scss`
+3. Update `styles.scss` to use namespaced mixin imports
+4. Refactor nav-rail-item, menu-item, dropdown-menu-item to use standard mixins
+5. Update STYLE_GUIDE.md with interactive mixin usage examples
+
+**Benefits**:
+- Consistent architecture (all mixins in one place)
+- Reusable interactive patterns across components
+- Smaller CSS bundle (shared mixin code)
+- Enforced design token compliance
+- Easier to maintain interactive behavior globally
+
+**Blockers**: None
+
+---
+
 ### Angular TestBed Initialization Timing in Domain Library Tests
 
 **Priority**: Low  
