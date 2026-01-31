@@ -1,6 +1,18 @@
 <div class="nav-rail-wrapper">
   <lib-scaling-compact-card>
     <nav class="nav-rail" [class.expanded]="isExpanded()" role="navigation" aria-label="Main navigation">
+      <div class="nav-rail__pin-button">
+        <lib-icon-button
+          [icon]="isPinned() ? 'push_pin' : 'push_pin'"
+          ariaLabel="Pin navigation rail"
+          [tooltip]="pinTooltip"
+          size="small"
+          variant="rounded-transparent"
+          [color]="isPinned() ? 'highlight' : 'normal'"
+          (buttonClick)="onPinClick()"
+        />
+      </div>
+      
       <ul class="nav-rail__list" role="menubar">
         @for (item of items(); track item.route) {
           <li role="menuitem">

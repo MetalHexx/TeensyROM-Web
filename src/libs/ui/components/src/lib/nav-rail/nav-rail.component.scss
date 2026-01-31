@@ -31,6 +31,7 @@
   width: var(--nav-rail-collapsed-width, 56px);
   transition: width var(--nav-rail-transition-duration) var(--nav-rail-transition-easing);
   overflow: hidden;
+  position: relative;
 
   &.expanded {
     width: var(--nav-rail-expanded-width, 200px);
@@ -45,4 +46,17 @@
   padding: 8px 0;
   list-style: none;
   flex: 1;
+}
+
+.nav-rail__pin-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  width: var(--nav-rail-collapsed-width, 56px);
+  flex-shrink: 0;
 }

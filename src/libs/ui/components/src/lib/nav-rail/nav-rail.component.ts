@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { ScalingCompactCardComponent } from '../scaling-compact-card/scaling-compact-card.component';
 import { NavRailItem } from './nav-rail.model';
 import { NavRailItemComponent } from './nav-rail-item.component';
+import { IconButtonComponent } from '../icon-button/icon-button.component';
+import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 
 /**
  * A reusable navigation rail component that displays a vertical list of navigation items.
@@ -23,7 +25,7 @@ import { NavRailItemComponent } from './nav-rail-item.component';
 @Component({
   selector: 'lib-nav-rail',
   standalone: true,
-  imports: [CommonModule, ScalingCompactCardComponent, NavRailItemComponent],
+  imports: [CommonModule, ScalingCompactCardComponent, NavRailItemComponent, IconButtonComponent],
   templateUrl: './nav-rail.component.html',
   styleUrl: './nav-rail.component.scss',
   host: {
@@ -69,6 +71,9 @@ export class NavRailComponent {
   /** Emitted when a navigation item is clicked */
   itemClick = output<NavRailItem>();
 
+  /** Emitted when the pin button is clicked */
+  pinClick = output<boolean>();
+
   // --- Internal State ---
 
   /** Current expansion state of the rail */
@@ -76,6 +81,15 @@ export class NavRailComponent {
 
   /** Whether the mouse is currently hovering over the rail */
   isHovering = signal<boolean>(false);
+
+  /** Whether the rail is pinned open */
+  isPinned = signal<boolean>(false);
+
+  /** Tooltip configuration for pin button */
+  pinTooltip: TooltipConfig = {
+    body: 'Pin navigation',
+    position: TooltipPosition.Right,
+  };
 
   // --- Methods ---
 
@@ -106,31 +120,61 @@ export class NavRailComponent {
 
   /**
    * Handles mouse entering the rail.
-   * Starts delayed expansion if not already expanded.
+   * Starts delayed expansion if not already expanded and not pinned.
    */
   onMouseEnter(): void {
     this.isHovering.set(true);
     this.clearCollapseTimer();
 
-    if (!this.isExpanded()) {
+    if (!this.isExpanded() && !this.isPinned()) {
       this.startExpandTimer();
     }
   }
 
   /**
    * Handles mouse leaving the rail.
-   * Starts delayed collapse if currently expanded.
+   * Starts delayed collapse if currently expanded and not pinned.
    */
   onMouseLeave(): void {
     this.isHovering.set(false);
     this.clearExpandTimer();
 
-    if (this.isExpanded()) {
+    if (this.isExpanded() && !this.isPinned()) {
       this.startCollapseTimer();
     }
   }
 
   // --- Timer Helpers ---
+
+  /**
+   * Handles pin button click.
+   * Toggles pinned state and expands/collapses accordingly.
+   */
+  onPinClick(): void {
+    const newPinnedState = !this.isPinned();
+    this.isPinned.set(newPinnedState);
+    
+    if (newPinnedState) {
+      // When pinning, expand immediately
+      this.clearCollapseTimer();
+      this.isExpanded.set(true);
+      this.pinTooltip = {
+        body: 'Unpin navigation',
+        position: TooltipPosition.Right,
+      };
+    } else {
+      // When unpinning, collapse if not hovering
+      if (!this.isHovering()) {
+        this.isExpanded.set(false);
+      }
+      this.pinTooltip = {
+        body: 'Pin navigation',
+        position: TooltipPosition.Right,
+      };
+    }
+    
+    this.pinClick.emit(newPinnedState);
+  }
 
   private startExpandTimer(): void {
     this.expandTimer = setTimeout(() => {

@@ -14,6 +14,7 @@ import { NavRailItem } from './nav-rail.model';
       [items]="items()"
       [activeRoute]="activeRoute()"
       (itemClick)="onItemClick($event)"
+      (pinClick)="onPinClick($event)"
     />
   `,
 })
@@ -21,9 +22,14 @@ class TestHostComponent {
   items = signal<NavRailItem[]>([]);
   activeRoute = signal<string>('');
   clickedItem: NavRailItem | null = null;
+  pinnedState: boolean | null = null;
 
   onItemClick(item: NavRailItem): void {
     this.clickedItem = item;
+  }
+
+  onPinClick(isPinned: boolean): void {
+    this.pinnedState = isPinned;
   }
 }
 
@@ -475,6 +481,267 @@ describe('NavRailComponent', () => {
 
       // No remaining timers should cause issues
       tick(200);
+    }));
+  });
+
+  describe('Pin Button Functionality', () => {
+    let component: NavRailComponent;
+
+    beforeEach(() => {
+      hostComponent.items.set(mockItems);
+      hostFixture.detectChanges();
+
+      const navRailDebug = hostFixture.debugElement.query(By.directive(NavRailComponent));
+      component = navRailDebug.componentInstance;
+    });
+
+    it('should render the pin button in the template', () => {
+      const pinButton = hostFixture.debugElement.query(By.css('.nav-rail__pin-button'));
+      expect(pinButton).toBeTruthy();
+    });
+
+    it('should render lib-icon-button component for pin', () => {
+      const iconButton = hostFixture.debugElement.query(By.css('.nav-rail__pin-button lib-icon-button'));
+      expect(iconButton).toBeTruthy();
+    });
+
+    it('should toggle isPinned state from false to true', fakeAsync(() => {
+      expect(component.isPinned()).toBe(false);
+
+      component.onPinClick();
+      hostFixture.detectChanges();
+
+      expect(component.isPinned()).toBe(true);
+
+      // Clean up
+      component.onMouseLeave();
+      tick(150);
+    }));
+
+    it('should toggle isPinned state from true to false', fakeAsync(() => {
+      // First pin it
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(component.isPinned()).toBe(true);
+
+      // Then unpin it
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(component.isPinned()).toBe(false);
+    }));
+
+    it('should emit pinClick output event with correct boolean value on first click', fakeAsync(() => {
+      component.onPinClick();
+      hostFixture.detectChanges();
+
+      expect(hostComponent.pinnedState).toBe(true);
+
+      // Clean up
+      component.onMouseLeave();
+      tick(150);
+    }));
+
+    it('should emit pinClick output event with correct boolean value on second click', fakeAsync(() => {
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(hostComponent.pinnedState).toBe(true);
+
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(hostComponent.pinnedState).toBe(false);
+    }));
+
+    it('should expand rail immediately when pinned', fakeAsync(() => {
+      expect(component.isExpanded()).toBe(false);
+
+      component.onPinClick();
+      hostFixture.detectChanges();
+
+      expect(component.isPinned()).toBe(true);
+      expect(component.isExpanded()).toBe(true);
+
+      // Clean up
+      component.onMouseLeave();
+      tick(150);
+    }));
+
+    it('should not collapse rail on mouse leave when pinned', fakeAsync(() => {
+      // Pin the rail
+      component.onPinClick();
+      tick(0);
+      hostFixture.detectChanges();
+      expect(component.isExpanded()).toBe(true);
+
+      // Leave
+      component.onMouseLeave();
+      tick(200); // Wait longer than collapse delay
+      hostFixture.detectChanges();
+
+      // Should still be expanded since it's pinned
+      expect(component.isExpanded()).toBe(true);
+      expect(component.isPinned()).toBe(true);
+    }));
+
+    it('should collapse rail on mouse leave when unpinned', fakeAsync(() => {
+      // Pin first to expand
+      component.onPinClick();
+      tick(0);
+      expect(component.isExpanded()).toBe(true);
+
+      // Unpin
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(component.isPinned()).toBe(false);
+
+      // Leave with delay
+      component.onMouseLeave();
+      tick(150);
+      hostFixture.detectChanges();
+
+      // Should be collapsed
+      expect(component.isExpanded()).toBe(false);
+    }));
+
+    it('should update pin button color to highlight when pinned', fakeAsync(() => {
+      const navRailDebug = hostFixture.debugElement.query(By.directive(NavRailComponent));
+      const iconButton = hostFixture.debugElement.query(By.css('.nav-rail__pin-button lib-icon-button'));
+
+      // Initial color should be 'normal'
+      expect(iconButton.componentInstance.color()).toBe('normal');
+
+      component.onPinClick();
+      hostFixture.detectChanges();
+
+      // After pinning, color should be 'highlight'
+      expect(iconButton.componentInstance.color()).toBe('highlight');
+
+      // Clean up
+      component.onMouseLeave();
+      tick(150);
+    }));
+
+    it('should update pin button color back to normal when unpinned', fakeAsync(() => {
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(component.isPinned()).toBe(true);
+
+      const iconButton = hostFixture.debugElement.query(By.css('.nav-rail__pin-button lib-icon-button'));
+      expect(iconButton.componentInstance.color()).toBe('highlight');
+
+      component.onPinClick();
+      hostFixture.detectChanges();
+
+      expect(iconButton.componentInstance.color()).toBe('normal');
+    }));
+
+    it('should update tooltip to "Unpin navigation" when pinned', fakeAsync(() => {
+      component.onPinClick();
+      hostFixture.detectChanges();
+
+      expect(component.pinTooltip.body).toBe('Unpin navigation');
+
+      // Clean up
+      component.onMouseLeave();
+      tick(150);
+    }));
+
+    it('should update tooltip to "Pin navigation" when unpinned', fakeAsync(() => {
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(component.pinTooltip.body).toBe('Unpin navigation');
+
+      component.onPinClick();
+      hostFixture.detectChanges();
+
+      expect(component.pinTooltip.body).toBe('Pin navigation');
+    }));
+
+    it('should not expand on mouse enter when already pinned', fakeAsync(() => {
+      // Pin first
+      component.onPinClick();
+      tick(0);
+      hostFixture.detectChanges();
+      expect(component.isExpanded()).toBe(true);
+
+      // Leave and wait for collapse attempt
+      component.onMouseLeave();
+      tick(150);
+      expect(component.isExpanded()).toBe(true);
+
+      // Enter again - should not trigger unnecessary expansion since already expanded and pinned
+      component.onMouseEnter();
+      tick(150);
+      expect(component.isExpanded()).toBe(true);
+    }));
+
+    it('should allow hover expansion when unpinned even after being pinned', fakeAsync(() => {
+      // Pin
+      component.onPinClick();
+      tick(0);
+      expect(component.isExpanded()).toBe(true);
+
+      // Unpin with hover to stay expanded
+      component.onMouseEnter();
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(component.isPinned()).toBe(false);
+      expect(component.isExpanded()).toBe(true);
+
+      // Leave should collapse
+      component.onMouseLeave();
+      tick(150);
+      expect(component.isExpanded()).toBe(false);
+
+      // Re-enter should expand via hover delay
+      component.onMouseEnter();
+      tick(150);
+      expect(component.isExpanded()).toBe(true);
+    }));
+
+    it('should keep rail expanded when unpinning while hovering', fakeAsync(() => {
+      // Pin first
+      component.onPinClick();
+      tick(0);
+      expect(component.isExpanded()).toBe(true);
+
+      // Enter (start hovering)
+      component.onMouseEnter();
+      hostFixture.detectChanges();
+      expect(component.isHovering()).toBe(true);
+
+      // Unpin while hovering - should stay expanded
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(component.isExpanded()).toBe(true);
+      expect(component.isPinned()).toBe(false);
+    }));
+
+    it('should collapse rail when unpinning without hover', fakeAsync(() => {
+      // Pin first
+      component.onPinClick();
+      tick(0);
+      expect(component.isExpanded()).toBe(true);
+      expect(component.isHovering()).toBe(false);
+
+      // Unpin without hovering - should collapse
+      component.onPinClick();
+      hostFixture.detectChanges();
+      expect(component.isExpanded()).toBe(false);
+      expect(component.isPinned()).toBe(false);
+    }));
+
+    it('should trigger pin click by clicking the icon button', fakeAsync(() => {
+      const iconButton = hostFixture.debugElement.query(By.css('.nav-rail__pin-button lib-icon-button'));
+      expect(component.isPinned()).toBe(false);
+
+      iconButton.componentInstance.buttonClick.emit();
+      hostFixture.detectChanges();
+
+      expect(component.isPinned()).toBe(true);
+
+      // Clean up
+      component.onMouseLeave();
+      tick(150);
     }));
   });
 });
