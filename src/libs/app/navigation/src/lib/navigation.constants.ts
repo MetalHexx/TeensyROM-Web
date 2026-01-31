@@ -24,11 +24,11 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'play_arrow',
     route: ROUTES.PLAYER,
   },
-  {
-    name: ROUTE_TITLES[ROUTES.MIXER],
-    icon: 'tune',
-    route: ROUTES.MIXER,
-  },
+  // {
+  //   name: ROUTE_TITLES[ROUTES.MIXER],
+  //   icon: 'tune',
+  //   route: ROUTES.MIXER,
+  // },
   {
     name: ROUTE_TITLES[ROUTES.DEVICES],
     icon: 'devices',
@@ -39,9 +39,9 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'settings',
     route: ROUTES.SETTINGS,
   },
-  {
-    name: ROUTE_TITLES[ROUTES.THEME_TESTER],
-    icon: 'palette',
-    route: ROUTES.THEME_TESTER,
-  },
+  // {
+  //   name: ROUTE_TITLES[ROUTES.THEME_TESTER],
+  //   icon: 'palette',
+  //   route: ROUTES.THEME_TESTER,
+  // },
 ] as const;
