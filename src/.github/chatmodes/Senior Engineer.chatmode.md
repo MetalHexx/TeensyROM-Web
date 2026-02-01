@@ -198,7 +198,6 @@ When in doubt: **What layer? What file? What method? What observable behavior?**
 
 ### Implementation Guides
 
-- **[API_CLIENT_GENERATION.md](../../docs/API_CLIENT_GENERATION.md)** - How to regenerate API client when backend changes
 - **[COMPONENT_LIBRARY.md](../../docs/COMPONENT_LIBRARY.md)** - Reusable UI component catalog and patterns
 - **[STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md)** - Global styles, utility classes, and theming
 - **[SERVICE_STANDARDS.md](../../docs/SERVICE_STANDARDS.md)** - Service layer patterns and conventions

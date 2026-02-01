@@ -272,7 +272,6 @@ form.valueChanges.pipe(
 - [Backend Architecture](./BACKEND_ARCHITECTURE.md) - API layer patterns
 - [State Standards](./STATE_STANDARDS.md) - NgRx Signal Store patterns
 - [Testing Standards](./TESTING_STANDARDS.md) - Testing settings components
-- [API Client Generation](./API_CLIENT_GENERATION.md) - Regenerating TypeScript client
 
 ---
 

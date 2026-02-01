@@ -621,7 +621,6 @@ Detailed implementation guides for each testing phase:
 ### Related Guides
 
 - **Test Data Generators**: [E2E_TEST_GENERATORS.md](./src/support/test-data/generators/E2E_TEST_GENERATORS.md)
-- **API Client Generation**: `../../docs/API_CLIENT_GENERATION.md`
 - **Testing Standards**: `../../docs/TESTING_STANDARDS.md`
 
 ---

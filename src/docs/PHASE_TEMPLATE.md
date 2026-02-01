@@ -28,7 +28,6 @@
 - [ ] [Store Testing Guide](./STORE_TESTING.md) - **ONLY if this phase includes store testing**
 - [ ] [Smart Component Testing](./SMART_COMPONENT_TESTING.md) - **ONLY if testing smart components**
 - [ ] [Style Guide](./STYLE_GUIDE.md) - **ONLY if this phase includes components or styling**
-- [ ] [API Client Generation](./API_CLIENT_GENERATION.md) - **ONLY if this phase requires API client regeneration**
 
 ---
 

@@ -98,18 +98,6 @@ pnpm nx lint                    # ESLint (enforces architecture)
 pnpm run format                 # Prettier formatting
 ```
 
-### API Client Regeneration
-
-When backend API changes (build-time generation - no server needed):
-
-```bash
-# From ClientApp/teensyrom-nx/
-dotnet build ../../TeensyRom.Api.csproj    # Generates OpenAPI spec
-pnpm run generate:api-client               # Generates TypeScript client
-```
-
-**Critical**: Generated API clients live in `libs/data-access/api-client` and are consumed ONLY by infrastructure layer. Services renamed to `*ApiService` (e.g., `DevicesApiService`) by post-processing script.
-
 ### Backend Development
 
 ```bash
@@ -217,19 +205,9 @@ TestBed.configureTestingModule({
    import { DeviceStore } from '@teensyrom-nx/application';
    ```
 
-2. **API Client Direct Usage**: Never import API clients outside infrastructure
+2. **API Client Direct Usage**: Never import API clients outside infrastructure - use domain contracts instead
 
-   ```typescript
-   // ❌ Don't do this
-   import { DevicesApiService } from '@teensyrom-nx/data-access/api-client';  // In features
-
-   // ✅ Use domain contracts
-   private deviceService = inject(DEVICE_SERVICE);
-   ```
-
-3. **Editing Generated Code**: Never edit files in `libs/data-access/api-client` - regenerate instead
-
-4. **Forgetting Mappers**: Always map between API DTOs and domain models in infrastructure layer
+3. **Forgetting Mappers**: Always map between API DTOs and domain models in infrastructure layer
 
 ## UI Component System
 
@@ -285,7 +263,6 @@ Infrastructure services manage hub lifecycle and reconnection logic.
 ## References
 
 - **Architecture Deep Dive**: `docs/OVERVIEW_CONTEXT.md`
-- **API Client Guide**: `docs/API_CLIENT_GENERATION.md`
 - **Testing Approach**: `docs/TESTING_STANDARDS.md`
 - **Component Catalog**: `docs/COMPONENT_LIBRARY.md`
 - **Style System**: `docs/STYLE_GUIDE.md`

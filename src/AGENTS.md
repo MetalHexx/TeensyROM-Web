@@ -17,7 +17,6 @@
 - Build: `pnpm nx build teensyrom-ui`; static preview: `pnpm nx run teensyrom-ui:serve-static`.
 - Unit tests (Vitest): `pnpm nx test <project>`.
 - Lint/format: `pnpm nx lint`; `pnpm run format`.
-- API client: `dotnet build ../../TeensyRom.Api.csproj` then `pnpm run generate:api-client` (details in `docs/API_CLIENT_GENERATION.md`).
 - Backend: run `dotnet build`, `dotnet run`, `dotnet test` from `TeensyRom.Api`.
 
 ## Angular Standards & Style
@@ -47,13 +46,11 @@
 
 ## Security & Configuration Tips
 
-- Do not edit generated API clients; regenerate via the script and review `openapitools.json`.
 - Keep secrets out of the repo; prefer backend configuration or environment-specific providers.
 
 ## Reference Docs
 
 - `docs/OVERVIEW_CONTEXT.md`
-- `docs/API_CLIENT_GENERATION.md`
 - `docs/COMPONENT_LIBRARY.md`
 - `docs/STYLE_GUIDE.md`
 

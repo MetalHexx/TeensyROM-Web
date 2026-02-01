@@ -176,19 +176,14 @@ This ensures all device operations are scoped to the correct physical device in 
 |-----------|---------|-----------|
 | **OpenAPI Spec** | Auto-generated JSON spec on API build via `Microsoft.AspNetCore.OpenApi` | #file:apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json |
 | **Scalar UI** | Interactive API documentation at `/scalar/v1` (replaces Swagger) | #file:apps/api/src/TeensyRom.Api/Startup/ApiDocStartupExtensions.cs |
-| **Client Generator** | Node script invoking `openapi-generator-cli` with TypeScript Fetch template | #file:libs/data-access/api-client/scripts/generate-client.js |
+| **Client Generator** | Node script (see `.github/skills/api-client-generation/SKILL.md` for details) | #file:.github/skills/api-client-generation/scripts/generate-client.js |
 | **Generated Client** | TypeScript models + `*ApiService` classes consumed by infrastructure | #file:libs/data-access/api-client/src/lib/apis/<br/>#file:libs/data-access/api-client/src/lib/models/ |
 | **Infrastructure Services** | Implement domain contracts, map DTOs Γåö models, handle errors | #file:libs/infrastructure/src/lib/device/device.service.ts<br/>#file:libs/infrastructure/src/lib/storage/storage.service.ts |
 
-**Generation Pipeline**:
+**Generation Pipeline**: See `.github/skills/api-client-generation/SKILL.md` for detailed workflow.
+
 ```bash
-# Backend: On dotnet build, OpenAPI spec is generated to api-spec/
-dotnet build TeensyRom.Api.csproj
-
-# Frontend: Nx task reads spec, generates TypeScript client
-pnpm run generate:api-client  # Runs generate-client.js
-
-# Post-processing: Renames *Api ΓåÆ *ApiService for consistency
+pnpm run generate:api-client  # Regenerates TypeScript client from OpenAPI spec
 ```
 
 **Frontend Integration**: Infrastructure layer injects generated `*ApiService` classes, calls async methods returning Promises, maps responses to domain models via `DomainMapper`, and exposes Observables to application/feature layers.
@@ -528,110 +523,6 @@ Storage operations are **tightly coupled** to serial commands:
 
 All commands flow through MediatR pipeline with serial behaviors.
 
----
-
-## OpenAPI & Client Generation
-
-### OpenAPI Production
-
-**Build-time Generation**:
-- `Microsoft.AspNetCore.OpenApi` package generates spec on `dotnet build`
-- Output path: `apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json`
-- Configuration in `.csproj`:
-  ```xml
-  <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
-  <OpenApiDocumentsDirectory>$(OutputPath)api-spec</OpenApiDocumentsDirectory>
-  ```
-
-**Endpoint Metadata**:
-- RadEndpoints fluent API defines OpenAPI metadata:
-  ```csharp
-  Get("/devices/{deviceId}/storage/{storageType}/directories")
-      .WithName("GetDirectory")
-      .WithTags("Files")
-      .WithSummary("Get Directory")
-      .Produces<GetDirectoryResponse>(200)
-      .ProducesProblem(400);
-  ```
-
-**Scalar UI**:
-- Interactive docs at `/scalar/v1` (not `/swagger`)
-- Laserwave theme configured in `ApiDocStartupExtensions`
-
-### Client Generation Pipeline
-
-**Workflow**:
-```
-1. Backend build ΓåÆ OpenAPI spec generated
-2. Frontend: pnpm run generate:api-client
-   Γåô
-3. generate-client.js script executes:
-   - Cleans output directory
-   - Invokes openapi-generator-cli with typescript-fetch template
-   - Post-processes: renames *Api ΓåÆ *ApiService
-   - Patches barrel exports (index.ts)
-   Γåô
-4. Generated client in libs/data-access/api-client/src/lib/
-   - apis/DevicesApiService.ts
-   - models/FindDevicesRequest.ts
-```
-
-**Post-Processing** (#file:libs/data-access/api-client/scripts/generate-client.js):
-- **Renaming**: `DevicesApi` ΓåÆ `DevicesApiService` (consistency with infrastructure naming)
-- **Barrel Export Patching**: Updates `apis/index.ts` to export renamed services
-- **Why**: Frontend architecture uses `*Service` suffix for all injectable services
-
-### Frontend Integration
-
-**Architecture Layers**:
-```
-API Client (data-access/api-client)       ΓåÉ Generated TypeScript client
-    Γåô Injected into
-Infrastructure (libs/infrastructure)      ΓåÉ Implements domain contracts
-    Γåô Injected into  
-Application (libs/application)            ΓåÉ Signal stores
-    Γåô Injected into
-Features (libs/features)                  ΓåÉ Smart components
-```
-
-**Example Integration**:
-```typescript
-// Domain Contract (libs/domain/contracts/)
-export interface IDeviceService {
-  findDevices(autoConnect: boolean): Observable<Device[]>;
-}
-export const DEVICE_SERVICE = new InjectionToken<IDeviceService>('IDeviceService');
-
-// Infrastructure Implementation (libs/infrastructure/)
-@Injectable()
-export class DeviceService implements IDeviceService {
-  constructor(private apiService: DevicesApiService) {} // Generated client
-
-  findDevices(autoConnect: boolean): Observable<Device[]> {
-    return from(this.apiService.findDevices({ autoConnectNew: autoConnect }))
-      .pipe(map(response => DomainMapper.toDeviceList(response.devices)));
-  }
-}
-
-// Provider Binding (libs/infrastructure/providers.ts)
-export const DEVICE_PROVIDERS = [
-  { provide: DEVICE_SERVICE, useClass: DeviceService }
-];
-
-// Application Store (libs/application/)
-export class DeviceStore {
-  private deviceService = inject(DEVICE_SERVICE); // Via contract!
-  
-  loadDevices = rxMethod<boolean>(
-    pipe(switchMap(autoConnect => this.deviceService.findDevices(autoConnect)))
-  );
-}
-```
-
-**Key Insight**: Frontend **never imports generated client directly** outside infrastructure layer. All access via domain contracts ensures clean architecture boundaries.
-
----
-
 ## Dependencies
 
 ### Major Frameworks & Libraries
@@ -811,7 +702,7 @@ TeensyRom.Api
 - **State Machine**: Reactive serial state transitions with Rx observables
 - **Multi-Device Support**: Connection manager orchestrates multiple TeensyROMs concurrently
 - **Real-Time Streaming**: SignalR hubs push logs/events to frontend
-- **OpenAPI Integration**: Build-time spec generation ΓåÆ TypeScript client ΓåÆ frontend infrastructure
+
 
 ### Future Enhancements
 
@@ -824,7 +715,6 @@ TeensyRom.Api
 ### Related Documentation
 
 - **Frontend Architecture**: #file:docs/OVERVIEW_CONTEXT.md
-- **API Client Generation**: #file:docs/API_CLIENT_GENERATION.md
 - **Testing Standards**: #file:docs/TESTING_STANDARDS.md
 - **Clean Architecture Enforcement**: #file:docs/features/CLEAN_ARCHITECTURE.md
 

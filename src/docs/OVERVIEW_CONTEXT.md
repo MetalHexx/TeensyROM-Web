@@ -327,8 +327,7 @@ libs/
         │   └── PlayerApiService.ts             # [file] Player API client
         ├── models/                             # [folder] Generated DTO models and types
         ├── scripts/                            # [folder] OpenAPI generation and post-processing scripts
-        ├── runtime.ts                          # [file] Generated runtime configuration
-        └── 📖 See: [API_CLIENT_GENERATION.md](API_CLIENT_GENERATION.md) - Client regeneration guide
+        └── runtime.ts                          # [file] Generated runtime configuration
 ```
 
 ---
@@ -398,8 +397,6 @@ libs/
 - **Infrastructure Wrapped**: Promise-based TypeScript client wrapped with RxJS in infrastructure
 - **Domain Mapping**: Always map through infrastructure mappers, never import API types directly
 - **Clean Architecture Compliance**: API clients consumed only by infrastructure layer services
-
-**📖 Documentation**: See [API_CLIENT_GENERATION.md](API_CLIENT_GENERATION.md) for complete client regeneration guide
 
 **Integration Pattern**:
 

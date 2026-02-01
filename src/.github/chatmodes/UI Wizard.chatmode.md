@@ -300,7 +300,6 @@ When in doubt: **Test first. Follow standards. Choose quality over speed. Ask qu
 
 ### Implementation Guides
 
-- [API_CLIENT_GENERATION.md](../../docs/API_CLIENT_GENERATION.md) - API client regeneration
 - [COMPONENT_LIBRARY.md](../../docs/COMPONENT_LIBRARY.md) - Reusable UI components (keep updated)
 - [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md) - Global styles and utilities (keep updated)
 - [SERVICE_STANDARDS.md](../../docs/SERVICE_STANDARDS.md) - Service layer patterns

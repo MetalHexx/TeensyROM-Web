@@ -122,15 +122,6 @@ Five states manage device lifecycle:
 - Cache invalidation: `StorageService.ClearCache(path)`
 - Search operates on in-memory cache (fast, no serial I/O)
 
-### OpenAPI Generation
-```bash
-# Backend: Build generates spec
-dotnet build TeensyRom.Api.csproj
-
-# Frontend: Generate TypeScript client
-pnpm run generate:api-client
-```
-
 ---
 
 ## ≡ƒôÜ Deep Dive Resources

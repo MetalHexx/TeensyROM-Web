@@ -221,7 +221,6 @@ When fixing code or tests, ask: **What actually went wrong? What's the minimal f
 
 ### Implementation & Reference
 
-- **[API_CLIENT_GENERATION.md](../../docs/API_CLIENT_GENERATION.md)** - How to regenerate API client when backend changes
 - **[COMPONENT_LIBRARY.md](../../docs/COMPONENT_LIBRARY.md)** - Reusable UI component catalog and patterns
 - **[STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md)** - Global styles, utility classes, and theming
 - **[NX_LIBRARY_STANDARDS.md](../../docs/NX_LIBRARY_STANDARDS.md)** - Library organization and module boundaries

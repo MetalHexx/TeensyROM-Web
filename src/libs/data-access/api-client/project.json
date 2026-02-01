@@ -8,7 +8,7 @@
     "generate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node libs/data-access/api-client/scripts/generate-client.js"
+        "command": "node .github/skills/api-client-generation/scripts/generate-client.js"
       }
     },
     "vite:test": {

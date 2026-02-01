@@ -706,7 +706,6 @@ https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-We
 
 - **Backend Architecture**: [BACKEND_ARCHITECTURE.md](./BACKEND_ARCHITECTURE.md) - API design and serial communication
 - **Frontend Architecture**: [OVERVIEW_CONTEXT.md](./OVERVIEW_CONTEXT.md) - Angular architecture and Clean Architecture layers
-- **API Client Generation**: [API_CLIENT_GENERATION.md](./API_CLIENT_GENERATION.md) - Regenerating TypeScript client from OpenAPI spec
 - **Testing Standards**: [TESTING_STANDARDS.md](./TESTING_STANDARDS.md) - Unit, integration, and E2E testing approaches
 - **Component Library**: [COMPONENT_LIBRARY.md](./COMPONENT_LIBRARY.md) - Reusable UI components
 
