@@ -52,6 +52,12 @@ namespace TeensyRom.Api.Endpoints.Files.Search
                 allResults.AddRange(device.UsbStorage.Search(r.SearchText, filterType));
             }
             
+            // Exclude favorites and playlist directories to avoid duplicates from copying
+            allResults = allResults
+                .Where(file => !file.Path.Value.Contains("/favorites/") && 
+                               !file.Path.Value.Contains("/playlist/"))
+                .ToList();
+            
             // Score, sort, and paginate combined results
             var searchTerms = ParseSearchTerms(r.SearchText);
             var weights = new SearchWeights();
