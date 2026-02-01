@@ -73,10 +73,9 @@ namespace TeensyRom.Core.Commands
                 catch (Exception ex)
                 {
                     retry++;
-                    var response = _communicationPort.ReadSerialAsString(500);
                     var fileExistsParseMessage = "File already exists";
 
-                    var fileExists = response.Contains(fileExistsParseMessage, StringComparison.OrdinalIgnoreCase)
+                    var fileExists = ex.Message.Contains(fileExistsParseMessage, StringComparison.OrdinalIgnoreCase)
                         || ex.Message.Contains(fileExistsParseMessage, StringComparison.OrdinalIgnoreCase);
 
                     if (fileExists)

@@ -153,59 +153,53 @@ namespace TeensyRom.Core.Device
 					});
 				}
 
-				log.Internal($"Checking for SD storage on Port {endpoint.Address}");
-				var sdStorage = await tagger.EnsureTag(communicationPort, TeensyStorageType.SD);
-				log.Internal($"SD storage {(sdStorage.Available ? sdStorage.DeviceId : "not")} found");
+			log.Internal($"Checking storage tags for device on Port {endpoint.Address}");
+			var tagResult = await tagger.EnsureTagsForDevice(communicationPort);
+			var sdStorage = tagResult.SdStorage;
+			var usbStorage = tagResult.UsbStorage;
 
-				log.Internal($"Checking for USB storage on Port {endpoint.Address}");
-				var usbStorage = await tagger.EnsureTag(communicationPort, TeensyStorageType.USB);
-				log.Internal($"USB storage {(usbStorage.Available ? sdStorage.DeviceId : "not")} found");
+			log.Internal($"SD storage {(sdStorage.Available ? "available" : "unavailable")}");
+			log.Internal($"USB storage {(usbStorage.Available ? "available" : "unavailable")}");
+			log.Internal($"Device ID: {tagResult.DeviceId}");
 
-				var deviceId = string.IsNullOrWhiteSpace(sdStorage.DeviceId)
-					? usbStorage.DeviceId
-					: sdStorage.DeviceId;
+			cart.DeviceId = tagResult.DeviceId;
+			cart.SdStorage = sdStorage;
+			cart.UsbStorage = usbStorage;
 
-				cart.DeviceId = deviceId ?? string.Empty;
-				sdStorage.DeviceId = deviceId ?? string.Empty;
-				usbStorage.DeviceId = deviceId ?? string.Empty;
+			var device = new TeensyRomDevice(
+				cart,
+				communicationPort,
+			storageFactory.Create(sdStorage, communicationPort),
+			storageFactory.Create(usbStorage, communicationPort)
+		);
 
-				cart.SdStorage = sdStorage;
-				cart.UsbStorage = usbStorage;
+		log.InternalSuccess($"{methodName} Validated and created device {cart.DeviceId} at {endpoint.Display}");
 
-				var device = new TeensyRomDevice(
-					cart,
-					communicationPort,
-					storageFactory.Create(sdStorage, communicationPort),
-					storageFactory.Create(usbStorage, communicationPort)
-				);
+		return device;
+	}
+	catch (Exception ex)
+	{
+		log.ExternalError($"{methodName} Error creating device: {ex.Message}");
+		return null;
+	}
+}
 
-				log.InternalSuccess($"{methodName} Validated and created device {cart.DeviceId} at {endpoint.Display}");
+/// <summary>
+/// Ensures a discovered device is saved to settings.
+/// Skips unidentified devices (no stable DeviceId).
+/// </summary>
+private void EnsureDeviceInSettings(string deviceId)
+{
+	if (string.IsNullOrWhiteSpace(deviceId) || deviceId.StartsWith(_undefinedDeviceIdBase))
+	{
+		log.Internal($"CartFinder.EnsureDeviceInSettings: Skipping unidentified device {deviceId}");
+		return;
+	}
 
-				return device;
-			}
-			catch (Exception ex)
-			{
-				log.ExternalError($"{methodName} Error creating device: {ex.Message}");
-				return null;
-			}
-		}
-
-		/// <summary>
-		/// Ensures a discovered device is saved to settings.
-		/// Skips unidentified devices (no stable DeviceId).
-		/// </summary>
-		private void EnsureDeviceInSettings(string deviceId)
-		{
-			if (string.IsNullOrWhiteSpace(deviceId) || deviceId.StartsWith(_undefinedDeviceIdBase))
-			{
-				log.Internal($"CartFinder.EnsureDeviceInSettings: Skipping unidentified device {deviceId}");
-				return;
-			}
-
-			try
-			{
-				_settingsProvider.GetOrCreateDeviceSettings(deviceId);
-				log.Internal($"CartFinder.EnsureDeviceInSettings: Ensured device {deviceId} exists in settings");
+	try
+	{
+		_settingsProvider.GetOrCreateDeviceSettings(deviceId);
+		log.Internal($"CartFinder.EnsureDeviceInSettings: Ensured device {deviceId} exists in settings");
 			}
 			catch (Exception ex)
 			{
