@@ -131,18 +131,15 @@ export class SearchResultsComponent {
   async onFileDoubleClick(file: FileItem): Promise<void> {
     const searchState = this.searchState();
     const deviceId = this.deviceId();
-    const storageType = this.currentStorageType();
 
-    // Validate search state exists (should always be true if displaying results)
-    if (!searchState || !storageType) {
+    if (!searchState) {
       return;
     }
 
-    // Launch file with Search mode
     void this.playerContext.launchFileWithContext({
       deviceId: deviceId,
-      storageType: storageType,
       file: file,
+      storageType: file.storageType,
       directoryPath: file.parentPath,
       files: searchState.results,
       launchMode: LaunchMode.Search,

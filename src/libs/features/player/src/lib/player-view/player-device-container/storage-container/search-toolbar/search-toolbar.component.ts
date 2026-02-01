@@ -15,7 +15,7 @@ import { PlayerFilterType } from '@teensyrom-nx/domain';
 
 @Component({
   selector: 'lib-search-toolbar',
-  imports: [CommonModule, ScalingCompactCardComponent, InputFieldComponent, IconButtonComponent, TooltipDirective],
+  imports: [CommonModule, ScalingCompactCardComponent, InputFieldComponent, IconButtonComponent],
   templateUrl: './search-toolbar.component.html',
   styleUrl: './search-toolbar.component.scss',
 })

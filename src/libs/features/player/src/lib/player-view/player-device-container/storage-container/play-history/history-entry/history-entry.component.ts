@@ -35,6 +35,8 @@ export class HistoryEntryComponent {
 
   readonly formattedSize = computed(() => formatFileSize(this.entry().file.size));
 
+  readonly storageType = computed(() => this.entry().file.storageType);
+
   // Event handlers
   onEntryClick(): void {
     this.entrySelected.emit(this.entry());

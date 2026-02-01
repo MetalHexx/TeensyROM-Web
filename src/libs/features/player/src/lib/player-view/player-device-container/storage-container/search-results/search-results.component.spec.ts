@@ -64,6 +64,7 @@ describe('SearchResultsComponent', () => {
     youTubeVideos: [],
     competitions: [],
     ratingCount: 0,
+    storageType: StorageType.Usb,
   };
 
   const mockFileItem2: FileItem = {

@@ -18,6 +18,7 @@ export class FileItemComponent {
 
   readonly fileIcon = computed(() => getFileIcon(this.fileItem().type));
   readonly formattedSize = computed(() => formatFileSize(this.fileItem().size));
+  readonly storageType = computed(() => this.fileItem().storageType);
 
   onItemClick(): void {
     this.itemSelected.emit(this.fileItem());
