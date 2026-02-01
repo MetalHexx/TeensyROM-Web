@@ -6,7 +6,7 @@ import { TooltipDirective, TooltipConfig, TooltipPosition } from '../tooltip/too
 
 export type IconButtonSize = 'small' | 'medium' | 'large';
 export type IconButtonVariant = 'standard' | 'rounded-primary' | 'rounded-transparent';
-export type IconButtonColor = 'normal' | 'highlight' | 'success' | 'error' | 'dimmed';
+export type IconButtonColor = 'normal' | 'highlight' | 'success' | 'error' | 'dimmed' | 'dimmed-light';
 
 @Component({
   selector: 'lib-icon-button',

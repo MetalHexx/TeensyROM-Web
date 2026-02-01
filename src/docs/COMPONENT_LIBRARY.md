@@ -3594,6 +3594,7 @@ export interface TooltipConfig {
   body?: string;                   // Optional body text
   position?: TooltipPosition;      // Tooltip position (default: Top)
   delay?: number;                  // Delay in ms before showing (default: 500)
+  alwaysShow?: boolean;            // Always show, ignoring preferences (default: false)
 }
 ```
 
@@ -3604,6 +3605,7 @@ export interface TooltipConfig {
 - `body` (optional): Body text content. Smaller font size (12px). Omit for title-only tooltips.
 - `position` (optional): Tooltip position relative to trigger element. Defaults to `TooltipPosition.Top`. Tooltip automatically adjusts to stay within viewport bounds.
 - `delay` (optional): Milliseconds to wait after mouseenter before showing tooltip. Defaults to 500ms (industry standard). Set to 0 for instant display.
+- `alwaysShow` (optional): When `true`, tooltip displays even if user has disabled tooltips via preferences. Use sparingly for critical UI hints (e.g., the tooltip toggle button itself). Defaults to `false`.
 
 **Note:** At least one of `title` or `body` must be provided for tooltip to render.
 
@@ -3720,6 +3722,24 @@ export class MyComponent {
     body: 'Click for documentation',
     position: TooltipPosition.Bottom,
     delay: 0 // Shows immediately on hover
+  });
+}
+```
+
+**Always-show tooltip (bypasses user preferences):**
+
+```typescript
+@Component({
+  template: `<button [libTooltip]="criticalTooltip()">?</button>`
+})
+export class MyComponent {
+  // This tooltip always shows, even if user disables tooltips globally
+  // Use sparingly for critical UI affordances (e.g., the tooltip toggle itself)
+  criticalTooltip = signal<TooltipConfig>({
+    title: 'Tooltips',
+    body: 'Toggle tooltips on/off',
+    position: TooltipPosition.Bottom,
+    alwaysShow: true // Ignores preference setting
   });
 }
 ```

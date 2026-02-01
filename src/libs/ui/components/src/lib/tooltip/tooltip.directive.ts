@@ -1,5 +1,6 @@
 import { Directive, ElementRef, HostListener, OnDestroy, inject, input } from '@angular/core';
 import { TooltipRendererService } from './tooltip-renderer.service';
+import { PreferencesService } from '@teensyrom-nx/ui/styles';
 
 /**
  * Tooltip positioning options
@@ -52,6 +53,13 @@ export interface TooltipConfig {
    * @default 500
    */
   delay?: number;
+
+  /**
+   * Whether to always show this tooltip, ignoring user preferences.
+   * Use sparingly for critical UI hints (e.g., tooltip toggle button).
+   * @default false
+   */
+  alwaysShow?: boolean;
 }
 
 /**
@@ -73,6 +81,7 @@ export interface TooltipConfig {
 export class TooltipDirective implements OnDestroy {
   private tooltipRendererService = inject(TooltipRendererService);
   private elementRef = inject(ElementRef);
+  private preferencesService = inject(PreferencesService);
   private currentTooltip: HTMLElement | null = null;
   private showTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -87,6 +96,11 @@ export class TooltipDirective implements OnDestroy {
   @HostListener('mouseenter')
   showTooltip(): void {
     const config = this.libTooltip();
+
+    // Don't show if tooltips are globally disabled (unless alwaysShow is true)
+    if (!config?.alwaysShow && !this.preferencesService.tooltipsEnabled()) {
+      return;
+    }
 
     // Don't show if no title and no body
     if (!config?.title && !config?.body) {

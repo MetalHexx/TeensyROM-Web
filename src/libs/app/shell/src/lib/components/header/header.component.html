@@ -8,11 +8,19 @@
   <span class="version-text">{{ appVersion() }}</span>
 
   <!-- Dark/Light Toggle -->
-  <button mat-icon-button aria-label="Toggle dark/light theme" (click)="themeService.toggleTheme()">
-    @if (currentTheme() === 'dark') {
-    <mat-icon>dark_mode</mat-icon>
-    } @else {
-    <mat-icon>light_mode</mat-icon>
-    }
-  </button>
+  <lib-icon-button
+    [icon]="themeIcon()"
+    ariaLabel="Toggle dark/light theme"
+    [tooltip]="themeToggleTooltip"
+    (buttonClick)="themeService.toggleTheme()"
+  ></lib-icon-button>
+
+  <!-- Tooltip Toggle -->
+  <lib-icon-button
+    icon="question_mark"
+    ariaLabel="Toggle tooltips"
+    [tooltip]="tooltipToggleTooltip"
+    [color]="tooltipsEnabled() ? 'normal' : 'dimmed-light'"
+    (buttonClick)="preferencesService.toggleTooltips()"
+  ></lib-icon-button>
 </mat-toolbar>
