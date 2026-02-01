@@ -3781,8 +3781,9 @@ export class MyComponent {
 
 - [`action-button.component.ts`](../libs/ui/components/src/lib/action-button/action-button.component.ts) - All 4 button variants (stroked, flat, raised, fab)
 - [`icon-button.component.ts`](../libs/ui/components/src/lib/icon-button/icon-button.component.ts) - Icon button component
+- [`storage-item-actions.component.ts`](../libs/ui/components/src/lib/storage-item/storage-item-actions.component.ts) - Storage type icon (SD Card/USB Storage)
 
-**Pattern:** Both components accept string `tooltip` input and internally transform it to `TooltipConfig` using computed signals, maintaining backward-compatible external APIs.
+**Pattern:** Components accept simple string inputs and internally transform them to `TooltipConfig` using computed signals, maintaining backward-compatible external APIs.
 
 ---
 
