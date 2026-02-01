@@ -68,7 +68,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
 			            
 			var result = await mediator.Send(new LaunchFileCommand
 			{
-				StorageType = TeensyStorageType.SD,
+				StorageType = r.StorageType,
 				LaunchItem = launchItem,
 				DeviceId = r.DeviceId,
 				CommunicationPort = device.CommunicationPort

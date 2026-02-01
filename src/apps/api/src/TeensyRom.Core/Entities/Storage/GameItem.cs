@@ -48,6 +48,7 @@
             Meta1 = Meta1,
             Meta2 = Meta2,
             MetadataSourcePath = MetadataSourcePath,
+            StorageType = StorageType,
             Images = Images.Select(x => x.Clone()).ToList(),
             Custom = Custom?.Clone()
         };

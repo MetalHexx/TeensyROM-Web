@@ -127,7 +127,7 @@ namespace TeensyRom.Core.Commands
             }
             ct.ThrowIfCancellationRequested();
 
-            directoryContent = ReceiveDirectoryContent(path, ct);
+            directoryContent = ReceiveDirectoryContent(path, storageType, ct);
 
             if (directoryContent is null)
             {
@@ -149,13 +149,13 @@ namespace TeensyRom.Core.Commands
             }
         }
 
-        public DirectoryContent? ReceiveDirectoryContent(DirectoryPath path, CancellationToken ct = default)
+        public DirectoryContent? ReceiveDirectoryContent(DirectoryPath path, TeensyStorageType storageType, CancellationToken ct = default)
         {
             var receivedBytes = GetRawDirectoryData(ct);
-            return MapDirectoryContent(receivedBytes, path);
+            return MapDirectoryContent(receivedBytes, path, storageType);
         }
 
-        private DirectoryContent MapDirectoryContent(List<byte> receivedBytes, DirectoryPath basePath)
+        private DirectoryContent MapDirectoryContent(List<byte> receivedBytes, DirectoryPath basePath, TeensyStorageType storageType)
         {
             var directoryContent = new DirectoryContent();
 
@@ -203,7 +203,8 @@ namespace TeensyRom.Core.Commands
                             {
                                 Name = name,
                                 Size = size,
-                                Path = basePath.Combine(new FilePath(name))
+                                Path = basePath.Combine(new FilePath(name)),
+                                StorageType = storageType
                             };
                             directoryContent.Files.Add(fileItem);
                             break;

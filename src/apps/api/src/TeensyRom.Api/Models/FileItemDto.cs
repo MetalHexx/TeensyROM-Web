@@ -25,6 +25,11 @@ namespace TeensyRom.Api.Models
         [Required] public long Size { get; set; }
 
         /// <summary>
+        /// The storage type (SD or USB) where this file resides.
+        /// </summary>
+        [Required] public TeensyStorageType StorageType { get; set; }
+
+        /// <summary>
         /// Indicates whether the file is marked as a favorite.
         /// </summary>
         [Required] public bool IsFavorite { get; set; }
@@ -149,6 +154,7 @@ namespace TeensyRom.Api.Models
                 Name = item.Name,
                 Path = item.Path.Value,
                 Size = item.Size,
+                StorageType = item.StorageType,
                 IsFavorite = item.IsFavorite,
                 IsCompatible = item.IsCompatible,
                 Title = item.Title,

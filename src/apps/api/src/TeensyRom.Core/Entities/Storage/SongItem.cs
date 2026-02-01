@@ -32,6 +32,7 @@
             Meta1 = Meta1,
             Meta2 = Meta2,
             MetadataSourcePath = MetadataSourcePath,
+            StorageType = StorageType,
             PlayLength = PlayLength,
             Images = Images.Select(x => x.Clone()).ToList(),
             Custom = Custom?.Clone()

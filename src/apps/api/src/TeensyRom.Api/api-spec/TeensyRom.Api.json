@@ -359,7 +359,7 @@
         }
       }
     },
-    "/api/devices/{deviceId}/storage/{storageType}/random-launch": {
+    "/api/devices/{deviceId}/launch-random": {
       "post": {
         "tags": [
           "Player"
@@ -377,8 +377,8 @@
             }
           },
           {
-            "name": "storageType",
-            "in": "path",
+            "name": "StorageType",
+            "in": "query",
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/TeensyStorageType"
@@ -1078,6 +1078,7 @@
           "name",
           "path",
           "size",
+          "storageType",
           "isFavorite",
           "isCompatible",
           "title",
@@ -1112,6 +1113,9 @@
           "size": {
             "type": "integer",
             "format": "int64"
+          },
+          "storageType": {
+            "$ref": "#/components/schemas/TeensyStorageType"
           },
           "isFavorite": {
             "type": "boolean"

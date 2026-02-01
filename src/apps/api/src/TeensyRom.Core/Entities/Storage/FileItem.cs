@@ -24,12 +24,13 @@ namespace TeensyRom.Core.Entities.Storage
         public List<YouTubeVideo> YouTubeVideos { get; set; } = [];
         public List<Competition> Competitions { get; set; } = [];
         public decimal? AvgRating { get; set; }
-        public int RatingCount { get; set; }
+        public int RatingCount { get; set; }        
 
         public FilePath MetadataSourcePath { get; set; } = new FilePath(string.Empty);
         public DirectoryPath ParentPath => Path.Directory;
         public PlaylistItem? Custom { get; set; } = null;
         public FilePath Path { get; set; } = new FilePath(string.Empty);
+        public TeensyStorageType StorageType { get; set; } = TeensyStorageType.SD;
         public string Id => $"{Size}{Path.FileName}";
         public TeensyFileType FileType => Path.Extension.GetFileType();
         public bool IsCompatible { get; set; } = true;
@@ -53,6 +54,7 @@ namespace TeensyRom.Core.Entities.Storage
                 Meta1 = Meta1,
                 Meta2 = Meta2,
                 MetadataSourcePath = MetadataSourcePath,
+                StorageType = StorageType,
                 Links = Links.Select(l => new FileLink { Name = l.Name, Url = l.Url }).ToList(),
                 Tags = Tags.Select(t => new FileTag { Name = t.Name, Type = t.Type }).ToList(),
                 YouTubeVideos = YouTubeVideos.Select(v => new YouTubeVideo { VideoId = v.VideoId, Url = v.Url, Channel = v.Channel, Subtune = v.Subtune }).ToList(),

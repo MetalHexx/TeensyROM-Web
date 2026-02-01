@@ -22,6 +22,7 @@ namespace TeensyRom.Core.Entities.Storage
             ShareUrl = ShareUrl,
             MetadataSource = MetadataSource,
             MetadataSourcePath = MetadataSourcePath,
+            StorageType = StorageType,
             Images = Images.Select(x => x.Clone()).ToList(),
             Custom = Custom?.Clone()
         };

@@ -1,8 +1,4 @@
-using FluentValidation;
-using Microsoft.AspNetCore.Mvc;
-using RadEndpoints;
 using System.ComponentModel.DataAnnotations;
-using System.Text.RegularExpressions;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 
@@ -21,15 +17,15 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
 
         /// <summary>
         /// The storage type to launch the file from (SD or USB).
-        /// </summary>
-        [FromRoute]
+        /// </summary>        
+		[FromRoute]
         public TeensyStorageType StorageType { get; set; } = TeensyStorageType.SD;
 
         /// <summary>
         /// The path to the file to launch. Must be a valid Unix-style file path.
-        /// </summary>
-        [FromQuery]
-        public string FilePath { get; set; } = string.Empty;
+        /// </summary>        
+		[FromQuery]
+		public string FilePath { get; set; } = string.Empty;
     }
 
     public class LaunchFileRequestValidator : AbstractValidator<LaunchFileRequest>

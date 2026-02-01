@@ -52,6 +52,7 @@ namespace TeensyRom.Core.Entities.Storage
             MetadataSource = MetadataSource,
             Meta2 = Meta2,
             MetadataSourcePath = MetadataSourcePath,
+            StorageType = StorageType,
             Custom = Custom?.Clone()
         };
     }
