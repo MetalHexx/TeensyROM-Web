@@ -29,13 +29,14 @@ export class PlayerService implements IPlayerService {
     this.alertService = alertService; 
   }
 
-  launchFile(deviceId: string, storageType: StorageType, filePath: string): Observable<FileItem> {
+  launchFile(deviceId: string, file: FileItem): Observable<FileItem> {
+    const storageType = file.storageType ?? StorageType.Sd;
     const apiStorageType = DomainMapper.toApiStorageType(storageType);
     return from(
       this.apiService.launchFile({
         deviceId,
         storageType: apiStorageType,
-        filePath,
+        filePath: file.path,
       })
     ).pipe(
       map((response) => {

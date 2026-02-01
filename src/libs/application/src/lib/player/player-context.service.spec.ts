@@ -211,7 +211,6 @@ describe('PlayerContextService', () => {
 
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: testFile,
         directoryPath: '/music',
         files: testFiles,
@@ -220,11 +219,7 @@ describe('PlayerContextService', () => {
 
       await nextTick();
 
-      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(
-        deviceId,
-        StorageType.Sd,
-        testFile.path
-      );
+      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(deviceId, testFile);
 
       const currentFile = service.getCurrentFile(deviceId)();
       expect(currentFile).toBeTruthy();
@@ -246,7 +241,6 @@ describe('PlayerContextService', () => {
 
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: testFile,
         directoryPath: '/music',
         files: testFiles,
@@ -268,7 +262,6 @@ describe('PlayerContextService', () => {
 
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: testFile,
         directoryPath: '/music',
         files: testFiles,
@@ -296,7 +289,6 @@ describe('PlayerContextService', () => {
 
       const launchPromise = service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: testFile,
         directoryPath: '/music',
         files: testFiles,
@@ -315,6 +307,7 @@ describe('PlayerContextService', () => {
   });
 
   describe('Phase 2: Random File Launching & Shuffle Mode', () => {
+    const storageType = StorageType.Sd; // Default storage type for tests
     const deviceId = 'device-456';
     const randomFile = createTestFileItem({
       name: 'random-song.sid',
@@ -362,11 +355,8 @@ describe('PlayerContextService', () => {
       await service.launchRandomFile(deviceId);
       await nextTick();
 
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
-        deviceId,
-        storageType: StorageType.Sd,
-        path: randomFile.parentPath,
-      });
+      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: randomFile.parentPath,
+       });
     });
 
     it('should handle directory context loading failure silently', async () => {
@@ -463,7 +453,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(musicFile));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: musicFile,
           directoryPath: '/music',
           files: [musicFile],
@@ -487,7 +476,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(musicFile));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: musicFile,
           directoryPath: '/music',
           files: [musicFile],
@@ -511,7 +499,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(musicFile));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: musicFile,
           directoryPath: '/music',
           files: [musicFile],
@@ -536,7 +523,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(musicFile));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: musicFile,
           directoryPath: '/music',
           files: [musicFile],
@@ -568,7 +554,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(musicFile));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: musicFile,
           directoryPath: '/music',
           files: [musicFile],
@@ -650,7 +635,6 @@ describe('PlayerContextService', () => {
         );
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: incompatibleFile,
           directoryPath: '/music',
           files: [incompatibleFile],
@@ -681,7 +665,6 @@ describe('PlayerContextService', () => {
         );
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: incompatibleFile,
           directoryPath: '/music',
           files: [incompatibleFile],
@@ -712,7 +695,6 @@ describe('PlayerContextService', () => {
         );
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: incompatibleFile,
           directoryPath: '/music',
           files: [incompatibleFile],
@@ -754,6 +736,7 @@ describe('PlayerContextService', () => {
   });
 
   describe('Phase 3: File Navigation', () => {
+    const storageType = StorageType.Sd; // Default storage type for tests
     const deviceId = 'device-nav';
     const testFiles = createTestDirectoryFiles();
     const [file1, file2, file3] = testFiles;
@@ -765,7 +748,6 @@ describe('PlayerContextService', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file1));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file1,
         directoryPath: '/music',
         files: testFiles,
@@ -781,11 +763,7 @@ describe('PlayerContextService', () => {
         await service.next(deviceId);
         await nextTick();
 
-        expect(mockPlayerService.launchFile).toHaveBeenCalledWith(
-          deviceId,
-          StorageType.Sd,
-          file2.path
-        );
+        expect(mockPlayerService.launchFile).toHaveBeenCalledWith(deviceId, file2);
 
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.file).toEqual(file2);
@@ -802,11 +780,7 @@ describe('PlayerContextService', () => {
         await service.previous(deviceId);
         await nextTick();
 
-        expect(mockPlayerService.launchFile).toHaveBeenLastCalledWith(
-          deviceId,
-          StorageType.Sd,
-          file1.path
-        );
+        expect(mockPlayerService.launchFile).toHaveBeenLastCalledWith(deviceId, file1);
 
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.file).toEqual(file1);
@@ -819,11 +793,7 @@ describe('PlayerContextService', () => {
         await service.previous(deviceId);
         await nextTick();
 
-        expect(mockPlayerService.launchFile).toHaveBeenCalledWith(
-          deviceId,
-          StorageType.Sd,
-          file3.path
-        );
+        expect(mockPlayerService.launchFile).toHaveBeenCalledWith(deviceId, file3);
 
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.file).toEqual(file3);
@@ -841,11 +811,7 @@ describe('PlayerContextService', () => {
         await service.next(deviceId);
         await nextTick();
 
-        expect(mockPlayerService.launchFile).toHaveBeenLastCalledWith(
-          deviceId,
-          StorageType.Sd,
-          file1.path
-        );
+        expect(mockPlayerService.launchFile).toHaveBeenLastCalledWith(deviceId, file1);
       });
     });
 
@@ -907,11 +873,8 @@ describe('PlayerContextService', () => {
         expect(mockPlayerService.launchRandom).toHaveBeenCalled();
 
         // Should load directory context
-        expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
-          deviceId,
-          storageType: StorageType.Sd,
-          path: '/music',
-        });
+        expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: '/music',
+         });
 
         // Should have loaded file context with the directory files
         const fileContext = service.getFileContext(deviceId)();
@@ -939,11 +902,8 @@ describe('PlayerContextService', () => {
         expect(mockPlayerService.launchRandom).toHaveBeenCalled();
 
         // Should load directory context
-        expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
-          deviceId,
-          storageType: StorageType.Sd,
-          path: '/sounds',
-        });
+        expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: '/sounds',
+         });
 
         // Should have loaded file context with the directory files
         const fileContext = service.getFileContext(deviceId)();
@@ -1064,7 +1024,6 @@ describe('PlayerContextService', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file1));
       await service.launchFileWithContext({
         deviceId: device1,
-        storageType: StorageType.Sd,
         file: file1,
         directoryPath: '/music',
         files: [file1],
@@ -1073,7 +1032,6 @@ describe('PlayerContextService', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file2));
       await service.launchFileWithContext({
         deviceId: device2,
-        storageType: StorageType.Usb,
         file: file2,
         directoryPath: '/games',
         files: [file2],
@@ -1117,7 +1075,6 @@ describe('PlayerContextService', () => {
       try {
         await service.launchFileWithContext({
           deviceId: device1,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: [file1],
@@ -1130,7 +1087,6 @@ describe('PlayerContextService', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file2));
       await service.launchFileWithContext({
         deviceId: device2,
-        storageType: StorageType.Sd,
         file: file2,
         directoryPath: '/music',
         files: [file2],
@@ -1157,7 +1113,6 @@ describe('PlayerContextService', () => {
       try {
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: testFile,
           directoryPath: '/music',
           files: [testFile],
@@ -1173,7 +1128,6 @@ describe('PlayerContextService', () => {
       mockPlayerService.launchFile.mockReturnValue(of(testFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: testFile,
         directoryPath: '/music',
         files: [testFile],
@@ -1203,7 +1157,6 @@ describe('PlayerContextService', () => {
       // Start operation
       const operationPromise = service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: testFile,
         directoryPath: '/music',
         files: [testFile],
@@ -1228,7 +1181,6 @@ describe('PlayerContextService', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file1));
       const promise1 = service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file1,
         directoryPath: '/music',
         files: [file1],
@@ -1237,7 +1189,6 @@ describe('PlayerContextService', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file2));
       const promise2 = service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file2,
         directoryPath: '/music',
         files: [file2],
@@ -1277,7 +1228,6 @@ describe('PlayerContextService', () => {
         // Launch a music file
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: createTestFileItem({ type: FileItemType.Song }),
           directoryPath: '/music',
           files: [createTestFileItem()],
@@ -1291,7 +1241,6 @@ describe('PlayerContextService', () => {
         // Launch a game file
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: createTestFileItem({ type: FileItemType.Game }),
           directoryPath: '/games',
           files: [createTestFileItem({ type: FileItemType.Game })],
@@ -1307,7 +1256,6 @@ describe('PlayerContextService', () => {
         // Start with a playing music file
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: createTestFileItem({ type: FileItemType.Song }),
           directoryPath: '/music',
           files: [createTestFileItem()],
@@ -1343,7 +1291,6 @@ describe('PlayerContextService', () => {
         // Start with a playing music file
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: createTestFileItem({ type: FileItemType.Song }),
           directoryPath: '/music',
           files: [createTestFileItem()],
@@ -1373,7 +1320,6 @@ describe('PlayerContextService', () => {
         const files = createTestDirectoryFiles();
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: files[0], // Start with first song
           directoryPath: '/music',
           files,
@@ -1413,7 +1359,6 @@ describe('PlayerContextService', () => {
         // 1. Launch → Playing
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: musicFile,
           directoryPath: '/music',
           files,
@@ -1444,7 +1389,6 @@ describe('PlayerContextService', () => {
         // Start with music file (Playing)
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: musicFile,
           directoryPath: '/music',
           files: [musicFile],
@@ -1454,7 +1398,6 @@ describe('PlayerContextService', () => {
         // Launch game file (all file launches result in Playing state)
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: gameFile,
           directoryPath: '/games',
           files: [gameFile],
@@ -1469,7 +1412,6 @@ describe('PlayerContextService', () => {
         // Start with playing music
         await service.launchFileWithContext({
           deviceId: testDeviceId,
-          storageType: StorageType.Sd,
           file: createTestFileItem({ type: FileItemType.Song }),
           directoryPath: '/music',
           files: [createTestFileItem()],
@@ -1645,7 +1587,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1669,7 +1610,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: imageFile,
           files: [imageFile],
           directoryPath: '/images',
@@ -1693,7 +1633,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1724,7 +1663,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1754,7 +1692,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1785,7 +1722,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1812,7 +1748,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1841,7 +1776,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1871,7 +1805,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1904,7 +1837,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -1939,7 +1871,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: imageFile,
           files: [imageFile],
           directoryPath: '/images',
@@ -1980,7 +1911,6 @@ describe('PlayerContextService', () => {
         // Launch first file
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2],
           directoryPath: '/music',
@@ -2020,7 +1950,6 @@ describe('PlayerContextService', () => {
         // Launch music file
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile, imageFile],
           directoryPath: '/music',
@@ -2059,7 +1988,6 @@ describe('PlayerContextService', () => {
         // Launch image file
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: imageFile,
           files: [imageFile, musicFile],
           directoryPath: '/images',
@@ -2108,7 +2036,6 @@ describe('PlayerContextService', () => {
         // Launch first file
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2],
           launchMode: LaunchMode.Directory,
@@ -2148,7 +2075,6 @@ describe('PlayerContextService', () => {
         // Launch first file in shuffle mode
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1],
           launchMode: LaunchMode.Shuffle,
@@ -2192,7 +2118,6 @@ describe('PlayerContextService', () => {
         // Launch first file
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2],
           directoryPath: '/music',
@@ -2245,7 +2170,6 @@ describe('PlayerContextService', () => {
         // Launch first file
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2, musicFile3],
           directoryPath: '/music',
@@ -2278,7 +2202,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -2318,7 +2241,6 @@ describe('PlayerContextService', () => {
         // Start first launch
         void service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           files: [file1, file2],
           directoryPath: '/games',
@@ -2332,7 +2254,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValueOnce(of(file2));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file2,
           files: [file1, file2],
           directoryPath: '/games',
@@ -2367,7 +2288,6 @@ describe('PlayerContextService', () => {
         // Attempt to launch file (will set error state, not throw)
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -2437,7 +2357,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1, musicFile2],
           directoryPath: '/music',
@@ -2483,7 +2402,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile2, musicFile1],
           directoryPath: '/music',
@@ -2528,7 +2446,6 @@ describe('PlayerContextService', () => {
         // Attempt to launch file (will set error state, not throw)
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: musicFile,
           directoryPath: '/music',
           files: directoryFiles,
@@ -2567,7 +2484,6 @@ describe('PlayerContextService', () => {
         // Attempt to launch file (will set error state, not throw)
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           directoryPath: '/music',
           files: directoryFiles,
@@ -2601,7 +2517,6 @@ describe('PlayerContextService', () => {
         // First successful launch
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: musicFile1,
           files: [musicFile1],
           directoryPath: '/music',
@@ -2614,7 +2529,6 @@ describe('PlayerContextService', () => {
         // Second launch fails (will set error state, not throw)
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: musicFile2,
           files: [musicFile2],
           directoryPath: '/music',
@@ -2646,7 +2560,6 @@ describe('PlayerContextService', () => {
         // First launch fails (will set error state, not throw)
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: badFile,
           directoryPath: '/music',
           files: [badFile],
@@ -2660,7 +2573,6 @@ describe('PlayerContextService', () => {
         // Second launch succeeds
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: goodFile,
           files: [goodFile],
           directoryPath: '/music',
@@ -2698,7 +2610,6 @@ describe('PlayerContextService', () => {
         // First launch fails (will set error state, not throw)
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: badFile,
           directoryPath: '/music',
           files: directoryFiles,
@@ -2744,7 +2655,6 @@ describe('PlayerContextService', () => {
         // Launch file on device 1
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile1,
           files: [musicFile1],
           directoryPath: '/music',
@@ -2753,7 +2663,6 @@ describe('PlayerContextService', () => {
         // Launch different file on device 2
         await service.launchFileWithContext({
           deviceId: deviceId2,
-          storageType: StorageType.Usb,
           file: musicFile2,
           files: [musicFile2],
           directoryPath: '/music',
@@ -2781,7 +2690,6 @@ describe('PlayerContextService', () => {
         // Launch on both devices
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -2789,7 +2697,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId: deviceId2,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -2822,7 +2729,6 @@ describe('PlayerContextService', () => {
         // Launch on both devices
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -2830,7 +2736,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId: deviceId2,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -2865,7 +2770,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -2911,7 +2815,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: imageFile,
           files: [imageFile],
           directoryPath: '/images',
@@ -2938,7 +2841,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -2966,7 +2868,6 @@ describe('PlayerContextService', () => {
         // Launch
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Usb,
           file: musicFile,
           files: [musicFile],
           directoryPath: '/music',
@@ -3012,7 +2913,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: incompatibleFile,
           files: [incompatibleFile],
           directoryPath: '/music',
@@ -3099,7 +2999,6 @@ describe('PlayerContextService', () => {
         // Launch first file
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: compatibleFile,
           files: [compatibleFile, incompatibleFile],
           directoryPath: '/music',
@@ -3149,7 +3048,6 @@ describe('PlayerContextService', () => {
         // Launch compatible file (index 1)
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: compatibleFile,
           files: [incompatibleFile, compatibleFile],
           directoryPath: '/music',
@@ -3195,7 +3093,6 @@ describe('PlayerContextService', () => {
         // Launch incompatible file
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: incompatibleFile,
           files: [incompatibleFile, compatibleFile],
           directoryPath: '/music',
@@ -3258,7 +3155,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3291,7 +3187,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3309,7 +3204,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: incompatibleFile,
           directoryPath: '/music',
           files: [incompatibleFile],
@@ -3328,7 +3222,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(file1));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3379,7 +3272,6 @@ describe('PlayerContextService', () => {
         // Launch same file twice
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3388,7 +3280,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3408,7 +3299,6 @@ describe('PlayerContextService', () => {
         // Launch file1, file2, then file1 again
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3417,7 +3307,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file2,
           directoryPath: '/music',
           files: testFiles,
@@ -3426,7 +3315,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3453,7 +3341,6 @@ describe('PlayerContextService', () => {
         for (const file of [file1, file2, file3]) {
           await service.launchFileWithContext({
             deviceId,
-            storageType: StorageType.Sd,
             file,
             directoryPath: '/music',
             files: testFiles,
@@ -3473,7 +3360,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3497,7 +3383,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3521,14 +3406,12 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
         });
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file2,
           directoryPath: '/music',
           files: testFiles,
@@ -3552,7 +3435,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(file3));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file3,
           directoryPath: '/music',
           files: testFiles,
@@ -3583,7 +3465,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(file1));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3605,7 +3486,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(file1));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3619,7 +3499,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(file2));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file2,
           directoryPath: '/music',
           files: testFiles,
@@ -3645,7 +3524,6 @@ describe('PlayerContextService', () => {
         // Launch file1 on device1
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3655,7 +3533,6 @@ describe('PlayerContextService', () => {
         // Launch file2 on device2
         await service.launchFileWithContext({
           deviceId: device2,
-          storageType: StorageType.Usb,
           file: file2,
           directoryPath: '/games',
           files: testFiles,
@@ -3678,7 +3555,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3686,7 +3562,6 @@ describe('PlayerContextService', () => {
 
         await service.launchFileWithContext({
           deviceId: device2,
-          storageType: StorageType.Sd,
           file: file2,
           directoryPath: '/music',
           files: testFiles,
@@ -3708,7 +3583,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(file1));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3723,7 +3597,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(file1));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,
@@ -3740,7 +3613,6 @@ describe('PlayerContextService', () => {
         mockPlayerService.launchFile.mockReturnValue(of(file1));
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file: file1,
           directoryPath: '/music',
           files: testFiles,

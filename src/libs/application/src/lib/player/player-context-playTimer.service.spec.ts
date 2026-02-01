@@ -177,7 +177,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
     mockStorageStore.getSelectedDirectoryState.mockReturnValue(
       of({
         deviceId: 'test-device',
-        storageType: StorageType.Sd,
         currentPath: '/music',
         directory: {
           name: 'music',
@@ -210,7 +209,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file1));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file1,
         directoryPath: '/music',
         files: testFiles,
@@ -283,7 +281,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file1));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file1,
         directoryPath: '/music',
         files: testFiles,
@@ -317,7 +314,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file1));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file1,
         directoryPath: '/music',
         files: testFiles,
@@ -338,7 +334,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(gameFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: gameFile,
         directoryPath: '/games',
         files: [gameFile],
@@ -359,7 +354,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(imageFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: imageFile,
         directoryPath: '/images',
         files: [imageFile],
@@ -380,7 +374,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(hexFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: hexFile,
         directoryPath: '/hex',
         files: [hexFile],
@@ -406,7 +399,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(file1));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file1,
         directoryPath: '/music',
         files: testFiles,
@@ -427,7 +419,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(gameFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: gameFile,
         directoryPath: '/games',
         files: [gameFile],
@@ -447,7 +438,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(imageFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: imageFile,
         directoryPath: '/images',
         files: [imageFile],
@@ -469,7 +459,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(gameFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: gameFile,
         directoryPath: '/games',
         files: [gameFile],
@@ -487,7 +476,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(imageFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: imageFile,
         directoryPath: '/images',
         files: [imageFile],
@@ -508,7 +496,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(gameFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: gameFile,
         directoryPath: '/games',
         files: [gameFile],
@@ -526,7 +513,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(gameFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: gameFile,
         directoryPath: '/games',
         files: [gameFile],
@@ -552,7 +538,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(gameFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: gameFile,
         directoryPath: '/games',
         files: [gameFile, imageFile],
@@ -566,7 +551,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(imageFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: imageFile,
         directoryPath: '/images',
         files: [imageFile],
@@ -586,7 +570,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(gameFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: gameFile,
         directoryPath: '/games',
         files: [gameFile, imageFile],
@@ -604,7 +587,6 @@ describe('PlayerContextService - Custom Play Timer', () => {
       mockPlayerService.launchFile.mockReturnValue(of(imageFile));
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: imageFile,
         directoryPath: '/images',
         files: [imageFile],

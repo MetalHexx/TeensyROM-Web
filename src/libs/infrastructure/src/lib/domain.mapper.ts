@@ -152,6 +152,7 @@ export class DomainMapper {
       competitions: fileItemDto.competitions?.map(DomainMapper.toCompetition) ?? [],
       avgRating: fileItemDto.avgRating ?? undefined,
       ratingCount: fileItemDto.ratingCount ?? 0,
+      storageType: DomainMapper.toDomainStorageType(fileItemDto.storageType),
     };
   }
 

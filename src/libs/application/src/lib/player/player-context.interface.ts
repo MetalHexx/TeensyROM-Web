@@ -3,17 +3,17 @@ import {
   FileItem,
   LaunchMode,
   PlayerStatus,
-  StorageType,
   PlayerFilterType,
   PlayerScope,
+  StorageType,
 } from '@teensyrom-nx/domain';
 import { LaunchedFile, PlayerFileContext, ShuffleSettings, PlayHistory, PlayTimerConfig } from './player-store';
 import { TimerState } from './timer-state.interface';
 
 export interface LaunchFileContextRequest {
   deviceId: string;
-  storageType: StorageType;
   file: FileItem;
+  storageType?: StorageType;
   directoryPath: string;
   files: FileItem[];
   launchMode?: LaunchMode;

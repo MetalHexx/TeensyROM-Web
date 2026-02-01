@@ -347,7 +347,6 @@ describe('PlayerContextService - isSlowLoading', () => {
         // Start launch (don't await yet)
         const launchPromise = service.launchFileWithContext({
           deviceId: 'device1',
-          storageType: StorageType.Sd,
           file: testFile,
           directoryPath: '/music',
           files: [testFile],
@@ -387,7 +386,6 @@ describe('PlayerContextService - isSlowLoading', () => {
         // Launch and wait
         await service.launchFileWithContext({
           deviceId: 'device1',
-          storageType: StorageType.Sd,
           file: testFile,
           directoryPath: '/music',
           files: [testFile],

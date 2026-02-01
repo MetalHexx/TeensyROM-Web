@@ -104,11 +104,8 @@ export function navigatePrevious(store: WritableStore<PlayerState>, playerServic
             { previousFile: previousFile.name }
           );
 
-          const { storageType } = StorageKeyUtil.parse(storageKey);
-
-          // Launch the file via API
           const launchedFile = await firstValueFrom(
-            playerService.launchFile(deviceId, storageType, previousFile.path)
+            playerService.launchFile(deviceId, previousFile)
           );
 
           const isCompatible = launchedFile.isCompatible;

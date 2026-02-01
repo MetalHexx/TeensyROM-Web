@@ -21,6 +21,11 @@ import {
   IAlertService,
   API_CONFIG,
   IApiConfig,
+  ViewableItemImage,
+  FileLink,
+  FileTag,
+  YouTubeVideo,
+  Competition,
 } from '@teensyrom-nx/domain';
 
 const createMockApiConfig = (): IApiConfig => ({
@@ -55,7 +60,46 @@ const createFileItemDto = (): FileItemDto => ({
   youTubeVideos: [],
   competitions: [],
   ratingCount: 0,
+  storageType: TeensyStorageType.Sd,
 });
+
+const createFileItem = (overrides?: Partial<FileItem>): FileItem => {
+  const images: ViewableItemImage[] = [];
+  const links: FileLink[] = [];
+  const tags: FileTag[] = [];
+  const youTubeVideos: YouTubeVideo[] = [];
+  const competitions: Competition[] = [];
+
+  const base: FileItem = {
+    name: 'Test File',
+    path: '/test/file.sid',
+    size: 4096,
+    isFavorite: false,
+    isCompatible: true,
+    title: 'Test File',
+    creator: 'Test Creator',
+    releaseInfo: '2025',
+    description: 'Test description',
+    shareUrl: '',
+    metadataSource: '',
+    meta1: '',
+    meta2: '',
+    metadataSourcePath: '',
+    parentPath: '/test',
+    playLength: '',
+    subtuneLengths: [],
+    startSubtuneNum: 0,
+    images,
+    type: FileItemType.Song,
+    links,
+    tags,
+    youTubeVideos,
+    competitions,
+    ratingCount: 0,
+    storageType: StorageType.Sd,
+  };
+  return Object.assign({}, base, overrides) as FileItem;
+};
 
 describe('PlayerService', () => {
   let service: PlayerService;
@@ -113,8 +157,13 @@ describe('PlayerService', () => {
 
       mockPlayerApi.launchFile.mockResolvedValue(response);
 
+      const fileItem: FileItem = createFileItem({
+        path: filePath,
+        storageType: storageType,
+      });
+
       const result = await new Promise<FileItem>((resolve, reject) => {
-        service.launchFile(deviceId, storageType, filePath).subscribe({
+        service.launchFile(deviceId, fileItem).subscribe({
           next: resolve,
           error: reject,
         });
@@ -135,9 +184,10 @@ describe('PlayerService', () => {
         launchedFile: null as unknown as FileItemDto,
       });
 
+      const fileItem: FileItem = createFileItem({ path: '/path', storageType: StorageType.Sd });
       await expect(
         new Promise((resolve, reject) => {
-          service.launchFile('device-1', StorageType.Sd, '/path').subscribe({
+          service.launchFile('device-1', fileItem).subscribe({
             next: resolve,
             error: reject,
           });
@@ -150,9 +200,10 @@ describe('PlayerService', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       mockPlayerApi.launchFile.mockRejectedValue(error);
 
+      const fileItem: FileItem = createFileItem({ path: '/path', storageType: StorageType.Sd });
       await expect(
         new Promise((resolve, reject) => {
-          service.launchFile('device-1', StorageType.Sd, '/path').subscribe({
+          service.launchFile('device-1', fileItem).subscribe({
             next: resolve,
             error: reject,
           });
@@ -176,8 +227,9 @@ describe('PlayerService', () => {
       mockPlayerApi.launchFile.mockResolvedValue(response);
       mockAlertService.warning = vi.fn();
 
+      const fileItem: FileItem = createFileItem({ path: '/test/file.prg', storageType: StorageType.Sd });
       const result = await new Promise<FileItem>((resolve, reject) => {
-        service.launchFile('device-123', StorageType.Sd, '/test/file.prg').subscribe({
+        service.launchFile('device-123', fileItem).subscribe({
           next: resolve,
           error: reject,
         });
@@ -206,8 +258,9 @@ describe('PlayerService', () => {
       mockPlayerApi.launchFile.mockResolvedValue(response);
       mockAlertService.warning = vi.fn();
 
+      const fileItem: FileItem = createFileItem({ path: '/test/file.prg', storageType: StorageType.Sd });
       await new Promise<FileItem>((resolve, reject) => {
-        service.launchFile('device-123', StorageType.Sd, '/test/file.prg').subscribe({
+        service.launchFile('device-123', fileItem).subscribe({
           next: resolve,
           error: reject,
         });
@@ -482,8 +535,9 @@ describe('PlayerService', () => {
 
       mockPlayerApi.launchFile.mockResolvedValue(response);
 
+      const fileItem: FileItem = createFileItem({ path: '/test/incompatible.sid', name: 'incompatible.sid', isCompatible: false, storageType: StorageType.Sd });
       const result = await new Promise<FileItem>((resolve, reject) => {
-        service.launchFile(deviceId, StorageType.Sd, '/test/incompatible.sid').subscribe({
+        service.launchFile(deviceId, fileItem).subscribe({
           next: resolve,
           error: reject,
         });
@@ -509,8 +563,9 @@ describe('PlayerService', () => {
 
       mockPlayerApi.launchFile.mockResolvedValue(response);
 
+      const fileItem: FileItem = createFileItem({ path: '/test/compatible.sid', name: 'compatible.sid', isCompatible: true, storageType: StorageType.Sd });
       const result = await new Promise<FileItem>((resolve, reject) => {
-        service.launchFile(deviceId, StorageType.Sd, '/test/compatible.sid').subscribe({
+        service.launchFile(deviceId, fileItem).subscribe({
           next: resolve,
           error: reject,
         });
@@ -575,9 +630,10 @@ describe('PlayerService', () => {
         mockPlayerApi.launchFile.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
+        const fileItem: FileItem = createFileItem({ path: '/path', storageType: StorageType.Sd });
         await expect(
           new Promise((resolve, reject) => {
-            service.launchFile('device-1', StorageType.Sd, '/path').subscribe({
+            service.launchFile('device-1', fileItem).subscribe({
               next: resolve,
               error: reject,
             });
@@ -593,9 +649,10 @@ describe('PlayerService', () => {
         mockPlayerApi.launchFile.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
+        const fileItem: FileItem = createFileItem({ path: '/path', storageType: StorageType.Sd });
         await expect(
           new Promise((resolve, reject) => {
-            service.launchFile('device-1', StorageType.Sd, '/path').subscribe({
+            service.launchFile('device-1', fileItem).subscribe({
               next: resolve,
               error: reject,
             });
@@ -612,9 +669,10 @@ describe('PlayerService', () => {
         mockPlayerApi.launchFile.mockRejectedValue(error);
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
+        const fileItem: FileItem = createFileItem({ path: '/path', storageType: StorageType.Sd });
         await expect(
           new Promise((resolve, reject) => {
-            service.launchFile('device-1', StorageType.Sd, '/path').subscribe({
+            service.launchFile('device-1', fileItem).subscribe({
               next: resolve,
               error: reject,
             });
@@ -629,9 +687,10 @@ describe('PlayerService', () => {
         mockPlayerApi.launchFile.mockRejectedValue(new Error('Test'));
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
+        const fileItem: FileItem = createFileItem({ path: '/path', storageType: StorageType.Sd });
         await expect(
           new Promise((resolve, reject) => {
-            service.launchFile('device-1', StorageType.Sd, '/path').subscribe({
+            service.launchFile('device-1', fileItem).subscribe({
               next: resolve,
               error: reject,
             });

@@ -5,6 +5,7 @@ import {
   FileItemDto,
   ViewableItemImageDto,
   FileItemType as ApiFileItemType,
+  TeensyStorageType as ApiStorageType,
 } from '@teensyrom-nx/data-access/api-client';
 import { DomainMapper } from '../domain.mapper';
 import { FileItemType } from '@teensyrom-nx/domain';
@@ -24,6 +25,7 @@ describe('DomainMapper (Storage)', () => {
             path: '/test.prg',
             size: 1024,
             isFavorite: true,
+            isCompatible: true,
             title: 'Test Game',
             creator: 'Test Creator',
             releaseInfo: '2023',
@@ -41,17 +43,24 @@ describe('DomainMapper (Storage)', () => {
               {
                 fileName: 'image.png',
                 path: '/images/image.png',
+                baseAssetPath: '/assets/image.png',
                 source: 'local',
               },
             ],
             type: ApiFileItemType.Game,
+            storageType: ApiStorageType.Sd,
+            links: [],
+            tags: [],
+            youTubeVideos: [],
+            competitions: [],
+            ratingCount: 0,
           },
         ],
         path: '/root',
       };
 
       // Act
-      const result = DomainMapper.toStorageDirectory(storageCacheDto);
+      const result = DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:5000');
 
       // Assert
       expect(result).toBeDefined();
@@ -73,7 +82,7 @@ describe('DomainMapper (Storage)', () => {
       };
 
       // Act
-      const result = DomainMapper.toStorageDirectory(storageCacheDto);
+      const result = DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:5000');
 
       // Assert
       expect(result.directories).toEqual([]);
@@ -86,7 +95,7 @@ describe('DomainMapper (Storage)', () => {
       const storageCacheDto = null as unknown as StorageCacheDto;
 
       // Act & Assert
-      expect(() => DomainMapper.toStorageDirectory(storageCacheDto)).toThrow(
+      expect(() => DomainMapper.toStorageDirectory(storageCacheDto, 'http://localhost:5000')).toThrow(
         'StorageCacheDto is required for transformation'
       );
     });
@@ -152,6 +161,7 @@ describe('DomainMapper (Storage)', () => {
         path: '/music/test.sid',
         size: 2048,
         isFavorite: false,
+        isCompatible: true,
         title: 'Test Song',
         creator: 'Test Musician',
         releaseInfo: '1985',
@@ -167,10 +177,16 @@ describe('DomainMapper (Storage)', () => {
         startSubtuneNum: 0,
         images: [],
         type: ApiFileItemType.Song,
+        storageType: ApiStorageType.Sd,
+        links: [],
+        tags: [],
+        youTubeVideos: [],
+        competitions: [],
+        ratingCount: 0,
       };
 
       // Act
-      const result = DomainMapper.toFileItem(dto);
+      const result = DomainMapper.toFileItem(dto, 'http://localhost:5000');
 
       // Assert
       expect(result.name).toBe('test.sid');
@@ -188,7 +204,7 @@ describe('DomainMapper (Storage)', () => {
       const dto = null as unknown as FileItemDto;
 
       // Act & Assert
-      expect(() => DomainMapper.toFileItem(dto)).toThrow(
+      expect(() => DomainMapper.toFileItem(dto, 'http://localhost:5000')).toThrow(
         'FileItemDto is required for transformation'
       );
     });
@@ -200,11 +216,12 @@ describe('DomainMapper (Storage)', () => {
       const dto: ViewableItemImageDto = {
         fileName: 'screenshot.png',
         path: '/images/screenshot.png',
+        baseAssetPath: '/assets/screenshot.png',
         source: 'embedded',
       };
 
       // Act
-      const result = DomainMapper.toViewableItemImage(dto);
+      const result = DomainMapper.toViewableItemImage(dto, 'http://localhost:5000');
 
       // Assert
       expect(result.fileName).toBe('screenshot.png');
@@ -217,7 +234,7 @@ describe('DomainMapper (Storage)', () => {
       const dto = null as unknown as ViewableItemImageDto;
 
       // Act & Assert
-      expect(() => DomainMapper.toViewableItemImage(dto)).toThrow(
+      expect(() => DomainMapper.toViewableItemImage(dto, 'http://localhost:5000')).toThrow(
         'ViewableItemImageDto is required for transformation'
       );
     });

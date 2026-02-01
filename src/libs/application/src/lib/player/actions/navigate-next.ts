@@ -101,11 +101,8 @@ export function navigateNext(store: WritableStore<PlayerState>, playerService: I
             { nextFile: nextFile.name }
           );
 
-          const { storageType } = StorageKeyUtil.parse(storageKey);
-
-          // Launch the file via API
           const launchedFile = await firstValueFrom(
-            playerService.launchFile(deviceId, storageType, nextFile.path)
+            playerService.launchFile(deviceId, nextFile)
           );
 
           const isCompatible = launchedFile.isCompatible;

@@ -15,7 +15,6 @@ import {
 
 export interface LaunchFileWithContextParams {
   deviceId: string;
-  storageType: StorageType;
   file: FileItem;
   directoryPath: string;
   files: FileItem[];
@@ -30,13 +29,14 @@ export function launchFileWithContext(
   return {
     launchFileWithContext: async ({
       deviceId,
-      storageType,
       file,
       directoryPath,
       files,
       launchMode = LaunchMode.Directory,
     }: LaunchFileWithContextParams): Promise<void> => {
-      logInfo(LogType.Start, `PlayerAction: Launching file ${file.name} for device ${deviceId}`);
+      const storageType = file.storageType ?? StorageType.Sd;
+      
+      logInfo(LogType.Start, `PlayerAction: Launching file ${file.name} for device ${deviceId} Storage ${storageType}`);
 
       const actionMessage = createAction('launch-file-with-context');
       ensurePlayerState(store, deviceId, actionMessage);
@@ -46,7 +46,7 @@ export function launchFileWithContext(
         logInfo(LogType.NetworkRequest, `PlayerAction: Requesting file launch from player service`);
 
         const launchedFile = await firstValueFrom(
-          playerService.launchFile(deviceId, storageType, file.path)
+          playerService.launchFile(deviceId, file)
         );
 
         const resolvedFile = launchedFile ?? file;

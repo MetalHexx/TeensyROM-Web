@@ -206,7 +206,6 @@ async function initializePlayer(
 
             await playerContextService.launchFileWithContext({
               deviceId: currentDevice.deviceId,
-              storageType: storageToNavigate,
               file: fileToLaunch,
               directoryPath: pathToNavigate,
               files: directoryState.directory.files,              

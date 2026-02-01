@@ -142,7 +142,6 @@ export class PlayerContextService implements IPlayerContext {
 
     await this.store.launchFileWithContext({
       deviceId: request.deviceId,
-      storageType: request.storageType,
       file: request.file,
       directoryPath,
       files,
@@ -925,7 +924,6 @@ export class PlayerContextService implements IPlayerContext {
     try {
       await this.launchFileWithContext({
         deviceId,
-        storageType,
         file: targetFile,
         directoryPath,
         files: directoryFiles,

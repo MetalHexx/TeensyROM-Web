@@ -97,6 +97,7 @@ describe('DomainMapper (Storage)', () => {
             avgRating: 4.5,
             ratingCount: 10,
             type: ApiFileItemType.Game,
+            storageType: ApiStorageType.Sd,
           },
         ],
         path: '/root',
@@ -240,6 +241,7 @@ describe('DomainMapper (Storage)', () => {
         avgRating: undefined,
         ratingCount: 0,
         type: ApiFileItemType.Song,
+        storageType: ApiStorageType.Sd,
       };
 
       // Act
@@ -286,6 +288,7 @@ describe('DomainMapper (Storage)', () => {
         avgRating: undefined,
         ratingCount: 0,
         type: ApiFileItemType.Song,
+        storageType: ApiStorageType.Sd,
       };
 
       // Act
@@ -337,6 +340,7 @@ describe('DomainMapper (Storage)', () => {
         avgRating: undefined,
         ratingCount: 0,
         type: ApiFileItemType.Song,
+        storageType: ApiStorageType.Sd,
       } as unknown as FileItemDto;
 
       // Act
@@ -388,6 +392,7 @@ describe('DomainMapper (Storage)', () => {
           },
         ],
         type: ApiFileItemType.Game,
+        storageType: ApiStorageType.Sd,
       };
 
       // Act
@@ -548,6 +553,9 @@ describe('DomainMapper (Device)', () => {
           type: ApiStorageType.Usb,
           available: false,
         },
+        connectionType: 'Serial',
+        ipAddress: '',
+        tcpPort: 0,
       };
 
       // Act
@@ -652,6 +660,9 @@ describe('DomainMapper (Device)', () => {
             type: ApiStorageType.Usb,
             available: true,
           },
+          connectionType: 'Serial',
+          ipAddress: '',
+          tcpPort: 0,
         },
         {
           deviceId: 'device-2',
@@ -671,6 +682,9 @@ describe('DomainMapper (Device)', () => {
             type: ApiStorageType.Usb,
             available: true,
           },
+          connectionType: 'Serial',
+          ipAddress: '',
+          tcpPort: 0,
         },
       ];
 
@@ -995,6 +1009,9 @@ interface MockSettingsOverrides {
   enableVideo?: boolean;
   videoDeviceId?: string;
   autoConnectEnabled?: boolean;
+  connectionType?: string;
+  ipAddress?: string;
+  tcpPort?: number;
   knownDevices?: Array<{
     deviceId: string;
     videoSettings: { enableVideo: boolean; videoDeviceId: string };

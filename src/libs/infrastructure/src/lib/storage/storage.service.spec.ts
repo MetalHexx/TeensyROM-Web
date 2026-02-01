@@ -111,6 +111,7 @@ describe('StorageService', () => {
               youTubeVideos: [],
               competitions: [],
               ratingCount: 0,
+              storageType: TeensyStorageType.Sd,
             },
           ],
           path: '/games',
@@ -290,6 +291,7 @@ describe('StorageService', () => {
     youTubeVideos: [],
     competitions: [],
     ratingCount: 0,
+    storageType: TeensyStorageType.Sd,
     ...overrides,
   });
 

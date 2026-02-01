@@ -172,7 +172,7 @@ describe('StorageStatusComponent', () => {
       fixture.componentRef.setInput('status', true);
       fixture.detectChanges();
 
-      expect(component.tooltipMessage()).toBe('Indexes the USB device to make files available for search and random launch.');
+      expect(component.tooltipMessage().body).toBe('Indexes the USB device to make files available for search and random launch.');
     });
 
     it('should have tooltip for SD card', () => {
@@ -181,7 +181,7 @@ describe('StorageStatusComponent', () => {
       fixture.componentRef.setInput('status', true);
       fixture.detectChanges();
 
-      expect(component.tooltipMessage()).toBe('Indexes the SD card to make files available for search and random launch.');
+      expect(component.tooltipMessage().body).toBe('Indexes the SD card to make files available for search and random launch.');
     });
   });
 

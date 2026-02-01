@@ -121,6 +121,7 @@ describe('StorageService Integration Tests', () => {
             avgRating: undefined,
             ratingCount: 0,
             type: ApiFileItemType.Game,
+            storageType: 'SD',
           },
         ],
         path: '/games',

@@ -66,6 +66,7 @@ type GetSelectedDirectoryStateFn = (
 ) => () => Partial<StorageDirectoryState> | null;
 
 describe('PlayerContextService - Phase 2: History Navigation', () => {
+  const storageType = StorageType.Sd; // Default storage type for tests
   let service: PlayerContextService;
   let mockStorageStore: {
     navigateToDirectory: MockedFunction<NavigateToDirectoryFn>;
@@ -78,9 +79,6 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
   };
   let mockDeviceService: {
     findDevices: MockedFunction<IDeviceService['findDevices']>;
-    getConnectedDevices: MockedFunction<IDeviceService['getConnectedDevices']>;
-    connectDevice: MockedFunction<IDeviceService['connectDevice']>;
-    disconnectDevice: MockedFunction<IDeviceService['disconnectDevice']>;
     resetDevice: MockedFunction<IDeviceService['resetDevice']>;
     pingDevice: MockedFunction<IDeviceService['pingDevice']>;
   };
@@ -111,9 +109,6 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
 
     mockDeviceService = {
       findDevices: vi.fn(),
-      getConnectedDevices: vi.fn(),
-      connectDevice: vi.fn(),
-      disconnectDevice: vi.fn(),
       resetDevice: vi.fn(),
       pingDevice: vi.fn(),
     };
@@ -223,11 +218,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       expect(position).toBe(2);
 
       // Should have launched file3 again via launchFile (not launchRandom)
-      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(
-        deviceId,
-        StorageType.Sd,
-        file3.path
-      );
+      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(deviceId, file3);
       expect(mockPlayerService.launchRandom).not.toHaveBeenCalled();
 
       // Current file should be file3
@@ -286,11 +277,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       expect(newPosition).toBe(2);
 
       // Should have launched file3
-      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(
-        deviceId,
-        StorageType.Sd,
-        file3.path
-      );
+      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(deviceId, file3);
 
       // Verify current file is file3
       const currentFile = service.getCurrentFile(deviceId)();
@@ -355,7 +342,6 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       // Set up file context for directory navigation
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file2, // Start at middle file
         directoryPath: '/music',
         files: testFiles,
@@ -370,11 +356,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       await nextTick();
 
       // Should use file context navigation (launch file1, which is previous in directory)
-      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(
-        deviceId,
-        StorageType.Sd,
-        file1.path
-      );
+      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(deviceId, file1);
 
       // Should NOT use history navigation
       const currentFile = service.getCurrentFile(deviceId)();
@@ -389,11 +371,8 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       await nextTick();
 
       // Should have called navigateToDirectory to load context
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
-        deviceId,
-        storageType: StorageType.Sd,
-        path: '/music',
-      });
+      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: '/music',
+       });
 
       // Should have loaded file context
       const fileContext = service.getFileContext(deviceId)();
@@ -502,11 +481,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       await nextTick();
 
       // Should use forward history navigation
-      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(
-        deviceId,
-        StorageType.Sd,
-        file3.path
-      );
+      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(deviceId, file3);
 
       // Should NOT use launchRandom
       expect(mockPlayerService.launchRandom).not.toHaveBeenCalled();
@@ -651,7 +626,6 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       // Set up file context for directory navigation
       await service.launchFileWithContext({
         deviceId,
-        storageType: StorageType.Sd,
         file: file2, // Start at middle file
         directoryPath: '/music',
         files: testFiles,
@@ -667,11 +641,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       await nextTick();
 
       // Should use file context navigation (launch file3, which is next in directory)
-      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(
-        deviceId,
-        StorageType.Sd,
-        file3.path
-      );
+      expect(mockPlayerService.launchFile).toHaveBeenCalledWith(deviceId, file3);
 
       // Should NOT be using forward history navigation
       const currentFile = service.getCurrentFile(deviceId)();
@@ -689,11 +659,8 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       await nextTick();
 
       // Should have called navigateToDirectory to load context
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
-        deviceId,
-        storageType: StorageType.Sd,
-        path: '/music',
-      });
+      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: '/music',
+       });
 
       // Should have loaded file context
       const fileContext = service.getFileContext(deviceId)();
@@ -1557,7 +1524,6 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
 
         await service.launchFileWithContext({
           deviceId,
-          storageType: StorageType.Sd,
           file,
           directoryPath: '/music',
           files: testFiles,

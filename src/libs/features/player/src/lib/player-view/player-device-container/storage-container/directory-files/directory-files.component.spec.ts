@@ -64,6 +64,7 @@ describe('DirectoryFilesComponent', () => {
     youTubeVideos: [],
     competitions: [],
     ratingCount: 0,
+    storageType: StorageType.Sd,
   };
 
   const mockStorageService: Partial<IStorageService> = {

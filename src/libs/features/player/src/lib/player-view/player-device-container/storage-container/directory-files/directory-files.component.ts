@@ -217,15 +217,16 @@ export class DirectoryFilesComponent {
 
   onFileDoubleClick(file: FileItem): void {
     const contents = this.directoryContents();
-    if (!contents.storageType || !contents.deviceId) {
+    if (!contents.deviceId) {
       return;
     }
 
     this.selectedItem.set(file);
+    // storageType derived from file object
     void this.playerContext.launchFileWithContext({
       deviceId: contents.deviceId,
-      storageType: contents.storageType,
       file,
+      storageType: file.storageType,
       directoryPath: contents.currentPath ?? '/',
       files: contents.files,
       launchMode: LaunchMode.Directory,

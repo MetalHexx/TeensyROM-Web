@@ -84,16 +84,13 @@ export function navigateBackwardInHistory(
         `NavigateBackwardInHistory: Navigating to file ${historyEntry.file.name} from history`
       );
 
-      // Extract storage type from storage key
-      const { storageType } = StorageKeyUtil.parse(historyEntry.storageKey);
-
       // Set loading state
       setPlayerLoading(store, deviceId, actionMessage);
 
       try {
-        // Launch the file from history
+        // Launch the file from history - storageType derived from file object
         const launchedFile = await firstValueFrom(
-          playerService.launchFile(deviceId, storageType, historyEntry.file.path)
+          playerService.launchFile(deviceId, historyEntry.file)
         );
 
         logInfo(

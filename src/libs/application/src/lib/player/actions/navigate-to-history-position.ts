@@ -4,7 +4,6 @@ import { IPlayerService, PlayerStatus } from '@teensyrom-nx/domain';
 import { createAction, logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { PlayerState } from '../player-store';
 import { WritableStore, getPlayerState, setPlayerLoading, setPlayerError } from '../player-helpers';
-import { StorageKeyUtil } from '../../storage/storage-key.util';
 import { IPlayerStorage } from '../player-storage.interface';
 
 export interface NavigateToHistoryPositionParams {
@@ -58,7 +57,6 @@ export function navigateToHistoryPosition(
       }
 
       const entry = history.entries[position];
-      const storageType = StorageKeyUtil.parse(entry.storageKey).storageType;
 
       logInfo(
         LogType.Info,
@@ -69,9 +67,8 @@ export function navigateToHistoryPosition(
       setPlayerLoading(store, deviceId, actionMessage);
 
       try {
-        // Launch the file from history
         const launchedFile = await firstValueFrom(
-          playerService.launchFile(deviceId, storageType, entry.file.path)
+          playerService.launchFile(deviceId, entry.file)
         );
 
         logInfo(
