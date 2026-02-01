@@ -359,7 +359,7 @@
         }
       }
     },
-    "/api/devices/{deviceId}/launch-random": {
+    "/api/devices/{deviceId}/storage/{storageType}/random-launch": {
       "post": {
         "tags": [
           "Player"
@@ -377,8 +377,8 @@
             }
           },
           {
-            "name": "StorageType",
-            "in": "query",
+            "name": "storageType",
+            "in": "path",
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/TeensyStorageType"

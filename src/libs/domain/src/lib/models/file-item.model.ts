@@ -4,6 +4,7 @@ import { FileLink } from './file-link.model';
 import { FileTag } from './file-tag.model';
 import { YouTubeVideo } from './youtube-video.model';
 import { Competition } from './competition.model';
+import { StorageType } from './storage-type.enum';
 
 export interface FileItem {
   name: string;
@@ -32,4 +33,5 @@ export interface FileItem {
   competitions: Competition[];
   avgRating?: number;
   ratingCount: number;
+  storageType?: StorageType;
 }

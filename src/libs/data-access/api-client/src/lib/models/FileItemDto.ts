@@ -20,6 +20,13 @@ import {
     CompetitionDtoToJSON,
     CompetitionDtoToJSONTyped,
 } from './CompetitionDto';
+import type { TeensyStorageType } from './TeensyStorageType';
+import {
+    TeensyStorageTypeFromJSON,
+    TeensyStorageTypeFromJSONTyped,
+    TeensyStorageTypeToJSON,
+    TeensyStorageTypeToJSONTyped,
+} from './TeensyStorageType';
 import type { ViewableItemImageDto } from './ViewableItemImageDto';
 import {
     ViewableItemImageDtoFromJSON,
@@ -80,6 +87,12 @@ export interface FileItemDto {
      * @memberof FileItemDto
      */
     size: number;
+    /**
+     * 
+     * @type {TeensyStorageType}
+     * @memberof FileItemDto
+     */
+    storageType: TeensyStorageType;
     /**
      * 
      * @type {boolean}
@@ -229,6 +242,7 @@ export function instanceOfFileItemDto(value: object): value is FileItemDto {
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('path' in value) || value['path'] === undefined) return false;
     if (!('size' in value) || value['size'] === undefined) return false;
+    if (!('storageType' in value) || value['storageType'] === undefined) return false;
     if (!('isFavorite' in value) || value['isFavorite'] === undefined) return false;
     if (!('isCompatible' in value) || value['isCompatible'] === undefined) return false;
     if (!('title' in value) || value['title'] === undefined) return false;
@@ -267,6 +281,7 @@ export function FileItemDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'name': json['name'],
         'path': json['path'],
         'size': json['size'],
+        'storageType': TeensyStorageTypeFromJSON(json['storageType']),
         'isFavorite': json['isFavorite'],
         'isCompatible': json['isCompatible'],
         'title': json['title'],
@@ -307,6 +322,7 @@ export function FileItemDtoToJSONTyped(value?: FileItemDto | null, ignoreDiscrim
         'name': value['name'],
         'path': value['path'],
         'size': value['size'],
+        'storageType': TeensyStorageTypeToJSON(value['storageType']),
         'isFavorite': value['isFavorite'],
         'isCompatible': value['isCompatible'],
         'title': value['title'],

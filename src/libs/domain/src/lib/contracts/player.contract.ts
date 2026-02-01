@@ -5,8 +5,9 @@ import { FileItem, PlayerFilterType, PlayerScope, StorageType } from '../models'
 export interface IPlayerService {
   /**
    * Launch a specific file on the TeensyROM device.
+   * StorageType is derived from the file object (defaults to SD if not set).
    */
-  launchFile(deviceId: string, storageType: StorageType, filePath: string): Observable<FileItem>;
+  launchFile(deviceId: string, file: FileItem): Observable<FileItem>;
 
   /**
    * Launch a random file with scope and filter configuration.
