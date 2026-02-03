@@ -153,11 +153,11 @@ body {
 
 @mixin bounce-hover($scale: 1.05, $duration: 0.2s) {
   transition: transform $duration cubic-bezier(0.34, 1.56, 0.64, 1);
-  
+
   &:hover {
     transform: scale($scale);
   }
-  
+
   &:active {
     transform: scale(0.95);
   }
@@ -171,14 +171,14 @@ body {
   cursor: pointer;
   padding: 8px 8px;
   border-radius: 10px;
-  transition: background-color 0.2s ease-in-out, backdrop-filter 0.2s ease-in-out;
+  transition: background-color 0.2s ease-out;
 
   &:hover {
-    @include mixins.glassy-subtle-effect;
+    background-color: rgba(var(--glassy-color), 0.08);
   }
 
   &.selected {
-    @include mixins.glassy-strong-effect;
+    background-color: rgba(var(--glassy-color), 0.15);
   }
 
   &.active {
@@ -233,7 +233,6 @@ body {
 
 .list-item-highlight {
   background-color: transparent;
-  transition: background-color 0.2s ease;
 
   // Style for currently playing file with error (failed launch)
   &[data-is-playing='true'][data-has-error='true'] {
@@ -317,13 +316,13 @@ mat-slide-toggle {
 mat-hint {
   font-size: 0.8rem;
   opacity: 0.7;
-  margin-left: -0.9rem
+  margin-left: -0.9rem;
 }
 
 mat-error {
   font-size: 0.875rem;
   margin-top: 0.25rem;
-  margin-left: -0.9rem
+  margin-left: -0.9rem;
 }
 
 // Style all Material input placeholders with dimmed color
@@ -357,7 +356,7 @@ mat-card-title {
   width: 327px;
   min-width: 327px;
   max-width: 327px;
-  
+
   @media (max-width: 500px) {
     width: 100%;
     min-width: 0;
