@@ -982,7 +982,8 @@
         "required": [
           "deviceId",
           "type",
-          "available"
+          "available",
+          "indexExists"
         ],
         "type": "object",
         "properties": {
@@ -993,6 +994,9 @@
             "$ref": "#/components/schemas/TeensyStorageType"
           },
           "available": {
+            "type": "boolean"
+          },
+          "indexExists": {
             "type": "boolean"
           }
         }
@@ -1034,7 +1038,8 @@
         "required": [
           "deviceId",
           "videoSettings",
-          "connectionSettings"
+          "connectionSettings",
+          "indexingStatus"
         ],
         "type": "object",
         "properties": {
@@ -1046,6 +1051,9 @@
           },
           "connectionSettings": {
             "$ref": "#/components/schemas/ConnectionSettingsDto"
+          },
+          "indexingStatus": {
+            "$ref": "#/components/schemas/IndexingStatusDto"
           }
         }
       },
@@ -1399,6 +1407,21 @@
         "properties": {
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "IndexingStatusDto": {
+        "type": "object",
+        "properties": {
+          "sdLastIndexed": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "usbLastIndexed": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },

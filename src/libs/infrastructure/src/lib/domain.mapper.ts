@@ -80,10 +80,14 @@ export class DomainMapper {
   }
 
   static toDeviceStorage(storageDto: CartStorageDto): DeviceStorage {
+    if (!storageDto) {
+      throw new Error('CartStorageDto is required for transformation');
+    }
     return {
       deviceId: storageDto.deviceId,
       type: this.toDomainStorageType(storageDto.type),
       available: storageDto.available,
+      indexExists: storageDto.indexExists,
     };
   }
 
@@ -103,7 +107,10 @@ export class DomainMapper {
 
     return {
       directories: storageCacheDto.directories?.map(DomainMapper.toDirectoryItem) ?? [],
-      files: storageCacheDto.files?.map((file) => DomainMapper.toFileItem(file, baseApiUrl)) ?? [],
+      files:
+        storageCacheDto.files?.map((file: FileItemDto) =>
+          DomainMapper.toFileItem(file, baseApiUrl)
+        ) ?? [],
       path: storageCacheDto.path ?? '',
     };
   }
@@ -144,7 +151,9 @@ export class DomainMapper {
       subtuneLengths: fileItemDto.subtuneLengths ?? [],
       startSubtuneNum: fileItemDto.startSubtuneNum ?? 0,
       images:
-        fileItemDto.images?.map((img) => DomainMapper.toViewableItemImage(img, baseApiUrl)) ?? [],
+        fileItemDto.images?.map((img: ViewableItemImageDto) =>
+          DomainMapper.toViewableItemImage(img, baseApiUrl)
+        ) ?? [],
       type: DomainMapper.toFileItemType(fileItemDto.type),
       links: fileItemDto.links?.map(DomainMapper.toFileLink) ?? [],
       tags: fileItemDto.tags?.map(DomainMapper.toFileTag) ?? [],
@@ -396,6 +405,10 @@ export class DomainMapper {
       deviceId: settings.deviceId,
       videoSettings: this.toVideoSettingsDto(settings.videoSettings),
       connectionSettings: this.toConnectionSettingsDto(settings.connectionSettings),
+      indexingStatus: {
+        sdLastIndexed: null,
+        usbLastIndexed: null,
+      },
     };
   }
 

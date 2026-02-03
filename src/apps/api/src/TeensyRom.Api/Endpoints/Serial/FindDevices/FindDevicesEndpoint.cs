@@ -37,7 +37,7 @@ namespace TeensyRom.Api.Endpoints.FindCarts
                 return;
             }
 
-            List<CartDto> deviceDtos = [.. await Task.WhenAll(devices.Select(CartDto.FromDevice))];
+            List<CartDto> deviceDtos = [.. await Task.WhenAll(devices.Select(d => CartDto.FromDevice(d, deviceSettingsProvider)))];
 
             Response = new()
             {

@@ -6,8 +6,9 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Files.Index
 {
-    public class IndexEndpoint(IDeviceConnectionManager deviceManager) : RadEndpoint<IndexRequest, IndexResponse>
+    public class IndexEndpoint(IDeviceConnectionManager deviceManager, IDeviceSettingsProvider settingsProvider) : RadEndpoint<IndexRequest, IndexResponse>
     {
+        private readonly IDeviceSettingsProvider _settingsProvider = settingsProvider;
         public override void Configure()
         {
             Post("/api/devices/{deviceId}/storage/{storageType}/index")
@@ -25,44 +26,74 @@ namespace TeensyRom.Api.Endpoints.Files.Index
         }
 
         public override async Task Handle(IndexRequest r, CancellationToken ct)
-        {
-            var device = deviceManager.GetAvailableDevice(r.DeviceId);
+		{
+			var device = deviceManager.GetAvailableDevice(r.DeviceId);
 
-            if (device is null) 
-            {
-                SendNotFound("Device not found.");
-                return;
-            }
+			if (device is null)
+			{
+				SendNotFound("Device not found.");
+				return;
+			}
 
-            var result = true;
+			// Determine if this is a full index operation
+			var isFullIndex = string.IsNullOrWhiteSpace(r.StartingPath) || r.StartingPath == StorageHelper.Remote_Path_Root;
 
-            if (r.StorageType is TeensyStorageType.SD) 
-            {
-                result = await HandleCaching(r, device.SdStorage, ct);
-            }
-            else
-            {
-                result = await HandleCaching(r, device.UsbStorage, ct);
-            }
-            if(!result)
-            {
-                SendInternalError("There was an error indexing.");
-                return;
-            }
-            Response = new();
-            Send();
-        }
+			var result = r.StorageType is TeensyStorageType.SD
+				? await HandleCaching(r, device.SdStorage, isFullIndex, ct)
+				: await HandleCaching(r, device.UsbStorage, isFullIndex, ct);
 
-        private async Task<bool> HandleCaching(IndexRequest r, IStorageService s, CancellationToken ct) 
+			if (!result)
+			{
+				SendInternalError("There was an error indexing.");
+				return;
+			}
+			if (isFullIndex)
+			{
+				SaveIndexStatus(r);
+			}
+			Response = new();
+			Send();
+		}
+
+		/// <summary>
+		/// Updates the last indexed timestamp for full index operations.
+		/// </summary>
+		private void SaveIndexStatus(IndexRequest r)
+		{				
+			var deviceSettings = _settingsProvider.GetOrCreateDeviceSettings(r.DeviceId);
+
+			if (r.StorageType == TeensyStorageType.SD)
+			{
+				deviceSettings = deviceSettings with
+				{
+					IndexingStatus = deviceSettings.IndexingStatus with
+					{
+						SdLastIndexed = DateTime.UtcNow
+					}
+				};
+			}
+			else // USB
+			{
+				deviceSettings = deviceSettings with
+				{
+					IndexingStatus = deviceSettings.IndexingStatus with
+					{
+						UsbLastIndexed = DateTime.UtcNow
+					}
+				};
+			}
+			
+			_settingsProvider.SaveDeviceSettings(deviceSettings);
+		}
+
+		private async Task<bool> HandleCaching(IndexRequest r, IStorageService s, bool isFullIndex, CancellationToken ct) 
         {
             if (!string.IsNullOrWhiteSpace(r.StartingPath))
             {
                 return await s.Cache(new DirectoryPath(r.StartingPath), ct);
             }
-            else
-            {
-                return await s.CacheAll(ct);
-            }
+            
+            return await s.CacheAll(ct);
         }
     }
 }

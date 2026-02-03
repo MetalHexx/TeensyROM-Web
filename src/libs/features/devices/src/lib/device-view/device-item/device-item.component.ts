@@ -42,9 +42,19 @@ export class DeviceItemComponent {
   readonly isEnabled = computed(() => this.device()?.isEnabled ?? true);
   readonly usbStatus = computed(() => this.device()?.usbStorage?.available);
   readonly sdStatus = computed(() => this.device()?.sdStorage?.available);
+  
+  /** USB storage index status (defaults to true for backward compatibility). */
+  readonly usbIndexExists = computed(() => 
+    this.device()?.usbStorage?.indexExists ?? true
+  );
+
+  /** SD storage index status (defaults to true for backward compatibility). */
+  readonly sdIndexExists = computed(() => 
+    this.device()?.sdStorage?.indexExists ?? true
+  );
+  
   readonly StorageType = StorageType;
 
-  // Tooltip configurations
   readonly enabledTooltip: TooltipConfig = {
     title: 'Disable Device',
     body: 'Device will be unavailable in other parts of the application like the player view.',

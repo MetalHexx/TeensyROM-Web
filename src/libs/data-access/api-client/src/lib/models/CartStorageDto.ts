@@ -45,6 +45,12 @@ export interface CartStorageDto {
      * @memberof CartStorageDto
      */
     available: boolean;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof CartStorageDto
+     */
+    indexExists: boolean;
 }
 
 
@@ -56,6 +62,7 @@ export function instanceOfCartStorageDto(value: object): value is CartStorageDto
     if (!('deviceId' in value) || value['deviceId'] === undefined) return false;
     if (!('type' in value) || value['type'] === undefined) return false;
     if (!('available' in value) || value['available'] === undefined) return false;
+    if (!('indexExists' in value) || value['indexExists'] === undefined) return false;
     return true;
 }
 
@@ -72,6 +79,7 @@ export function CartStorageDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'deviceId': json['deviceId'],
         'type': TeensyStorageTypeFromJSON(json['type']),
         'available': json['available'],
+        'indexExists': json['indexExists'],
     };
 }
 
@@ -89,6 +97,7 @@ export function CartStorageDtoToJSONTyped(value?: CartStorageDto | null, ignoreD
         'deviceId': value['deviceId'],
         'type': TeensyStorageTypeToJSON(value['type']),
         'available': value['available'],
+        'indexExists': value['indexExists'],
     };
 }
 

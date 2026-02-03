@@ -4,8 +4,8 @@
       <lib-icon-label
         [icon]="icon()"
         [label]="label()"
-        [secondaryLabel]="status() ? 'Available' : 'Unavailable'"
-        [secondaryLabelClass]="status() ? 'success' : 'error'"
+        [secondaryLabel]="subtitle()"
+        [secondaryLabelClass]="subtitleClass()"
         size="large"
       ></lib-icon-label>
 

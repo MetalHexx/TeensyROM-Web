@@ -1122,6 +1122,174 @@ public class SettingsServiceTests : IDisposable
 
     #endregion
 
+    #region DeviceSettings IndexingStatus Tests
+
+    [Fact]
+    public void DeviceSettings_ShouldInitializeWithNullTimestamps()
+    {
+        // Arrange & Act
+        var deviceSettings = new DeviceSettings();
+
+        // Assert
+        deviceSettings.IndexingStatus.Should().NotBeNull();
+        deviceSettings.IndexingStatus.SdLastIndexed.Should().BeNull();
+        deviceSettings.IndexingStatus.UsbLastIndexed.Should().BeNull();
+    }
+
+    [Fact]
+    public void DeviceSettings_ShouldSerializeIndexingStatusWithTimestamps()
+    {
+        // Arrange
+        var sdTime = DateTime.UtcNow.AddHours(-2);
+        var usbTime = DateTime.UtcNow.AddHours(-1);
+        var deviceSettings = new DeviceSettings
+        {
+            DeviceId = "test-device",
+            IndexingStatus = new IndexingStatus
+            {
+                SdLastIndexed = sdTime,
+                UsbLastIndexed = usbTime
+            }
+        };
+
+        // Act
+        var json = System.Text.Json.JsonSerializer.Serialize(deviceSettings,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+        var deserialized = System.Text.Json.JsonSerializer.Deserialize<DeviceSettings>(json,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+
+        // Assert
+        deserialized.Should().NotBeNull();
+        deserialized!.IndexingStatus.Should().NotBeNull();
+        deserialized.IndexingStatus.SdLastIndexed.Should().BeCloseTo(sdTime, TimeSpan.FromMilliseconds(1));
+        deserialized.IndexingStatus.UsbLastIndexed.Should().BeCloseTo(usbTime, TimeSpan.FromMilliseconds(1));
+    }
+
+    [Fact]
+    public void DeviceSettings_ShouldSerializeIndexingStatusWithNullTimestamps()
+    {
+        // Arrange
+        var deviceSettings = new DeviceSettings
+        {
+            DeviceId = "test-device",
+            IndexingStatus = new IndexingStatus
+            {
+                SdLastIndexed = null,
+                UsbLastIndexed = null
+            }
+        };
+
+        // Act
+        var json = System.Text.Json.JsonSerializer.Serialize(deviceSettings,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+        var deserialized = System.Text.Json.JsonSerializer.Deserialize<DeviceSettings>(json,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+
+        // Assert
+        deserialized.Should().NotBeNull();
+        deserialized!.IndexingStatus.Should().NotBeNull();
+        deserialized.IndexingStatus.SdLastIndexed.Should().BeNull();
+        deserialized.IndexingStatus.UsbLastIndexed.Should().BeNull();
+    }
+
+    [Fact]
+    public void DeviceSettings_ShouldSerializeIndexingStatusWithMixedTimestamps()
+    {
+        // Arrange
+        var sdTime = DateTime.UtcNow;
+        var deviceSettings = new DeviceSettings
+        {
+            DeviceId = "test-device",
+            IndexingStatus = new IndexingStatus
+            {
+                SdLastIndexed = sdTime,
+                UsbLastIndexed = null
+            }
+        };
+
+        // Act
+        var json = System.Text.Json.JsonSerializer.Serialize(deviceSettings,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+        var deserialized = System.Text.Json.JsonSerializer.Deserialize<DeviceSettings>(json,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+
+        // Assert
+        deserialized.Should().NotBeNull();
+        deserialized!.IndexingStatus.Should().NotBeNull();
+        deserialized.IndexingStatus.SdLastIndexed.Should().BeCloseTo(sdTime, TimeSpan.FromMilliseconds(1));
+        deserialized.IndexingStatus.UsbLastIndexed.Should().BeNull();
+    }
+
+    [Fact]
+    public void DeviceSettings_ShouldDeserializeOldJsonWithoutIndexingStatus()
+    {
+        // Arrange - JSON from old format without IndexingStatus
+        var oldJson = @"{
+            ""deviceId"": ""old-device"",
+            ""videoSettings"": {
+                ""enableVideo"": false,
+                ""videoDeviceId"": """"
+            },
+            ""connectionSettings"": {
+                ""autoConnectEnabled"": true
+            }
+        }";
+
+        // Act
+        var deserialized = System.Text.Json.JsonSerializer.Deserialize<DeviceSettings>(oldJson,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+
+        // Assert - Should deserialize with default IndexingStatus
+        deserialized.Should().NotBeNull();
+        deserialized!.DeviceId.Should().Be("old-device");
+        deserialized.IndexingStatus.Should().NotBeNull();
+        deserialized.IndexingStatus.SdLastIndexed.Should().BeNull();
+        deserialized.IndexingStatus.UsbLastIndexed.Should().BeNull();
+    }
+
+    [Fact]
+    public void DeviceSettings_ShouldRoundTripSerializeCompleteSettings()
+    {
+        // Arrange
+        var sdTime = DateTime.UtcNow.AddDays(-1);
+        var usbTime = DateTime.UtcNow.AddHours(-3);
+        var original = new DeviceSettings
+        {
+            DeviceId = "round-trip-test",
+            VideoSettings = new VideoSettings
+            {
+                EnableVideo = true,
+                VideoDeviceId = "video123"
+            },
+            ConnectionSettings = new ConnectionSettings
+            {
+                AutoConnectEnabled = false
+            },
+            IndexingStatus = new IndexingStatus
+            {
+                SdLastIndexed = sdTime,
+                UsbLastIndexed = usbTime
+            }
+        };
+
+        // Act - Serialize and deserialize
+        var json = System.Text.Json.JsonSerializer.Serialize(original,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+        var deserialized = System.Text.Json.JsonSerializer.Deserialize<DeviceSettings>(json,
+            TeensyRom.Core.Entities.Storage.LaunchableItemSerializer.Options);
+
+        // Assert - All properties should match
+        deserialized.Should().NotBeNull();
+        deserialized!.DeviceId.Should().Be(original.DeviceId);
+        deserialized.VideoSettings.EnableVideo.Should().Be(original.VideoSettings.EnableVideo);
+        deserialized.VideoSettings.VideoDeviceId.Should().Be(original.VideoSettings.VideoDeviceId);
+        deserialized.ConnectionSettings.AutoConnectEnabled.Should().Be(original.ConnectionSettings.AutoConnectEnabled);
+        deserialized.IndexingStatus.SdLastIndexed.Should().BeCloseTo(sdTime, TimeSpan.FromMilliseconds(1));
+        deserialized.IndexingStatus.UsbLastIndexed.Should().BeCloseTo(usbTime, TimeSpan.FromMilliseconds(1));
+    }
+
+    #endregion
+
     #region Utility Method Tests
 
     [Fact]

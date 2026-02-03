@@ -29,6 +29,7 @@ Available color variables for semantic styling:
 - `--color-error`: Red variants for error states
 - `--color-highlight`: Cyan accent color
 - `--color-dimmed`: Gray for secondary content
+- `--color-dimmed-light`: Light gray (rgba(255, 255, 255, 0.6)) for unavailable/disabled states with subtle appearance
 
 **Usage Example:**
 

@@ -79,24 +79,24 @@ describe('StorageStatusComponent', () => {
       expect(fixture.nativeElement.textContent).toContain('Unavailable');
     });
 
-    it('should apply success class when status is true', () => {
+    it('should apply highlight class when status is true', () => {
       fixture.componentRef.setInput('icon', 'usb');
       fixture.componentRef.setInput('label', 'USB Stick');
       fixture.componentRef.setInput('status', true);
       fixture.detectChanges();
 
-      const successText = fixture.nativeElement.querySelector('.success');
-      expect(successText).toBeTruthy();
+      const highlightText = fixture.nativeElement.querySelector('.highlight');
+      expect(highlightText).toBeTruthy();
     });
 
-    it('should apply error class when status is false', () => {
+    it('should apply dimmed class when status is false', () => {
       fixture.componentRef.setInput('icon', 'usb');
       fixture.componentRef.setInput('label', 'USB Stick');
       fixture.componentRef.setInput('status', false);
       fixture.detectChanges();
 
-      const errorText = fixture.nativeElement.querySelector('.error');
-      expect(errorText).toBeTruthy();
+      const dimmedText = fixture.nativeElement.querySelector('.dimmed');
+      expect(dimmedText).toBeTruthy();
     });
   });
 
@@ -210,6 +210,137 @@ describe('StorageStatusComponent', () => {
       const rightContainer = fixture.nativeElement.querySelector('.right-container');
       expect(leftContainer).toBeFalsy();
       expect(rightContainer).toBeFalsy();
+    });
+  });
+
+  describe('Index Status Display', () => {
+    describe('subtitle computed property', () => {
+      it('should display "Available" when status is true and indexExists is true', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', true);
+        fixture.componentRef.setInput('indexExists', true);
+        fixture.detectChanges();
+
+        expect(component.subtitle()).toBe('Available');
+        expect(fixture.nativeElement.textContent).toContain('Available');
+      });
+
+      it('should display "Requires Indexing" when status is true but indexExists is false', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', true);
+        fixture.componentRef.setInput('indexExists', false);
+        fixture.detectChanges();
+
+        expect(component.subtitle()).toBe('Requires Indexing');
+        expect(fixture.nativeElement.textContent).toContain('Requires Indexing');
+      });
+
+      it('should display "Unavailable" when status is false regardless of indexExists true', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', false);
+        fixture.componentRef.setInput('indexExists', true);
+        fixture.detectChanges();
+
+        expect(component.subtitle()).toBe('Unavailable');
+        expect(fixture.nativeElement.textContent).toContain('Unavailable');
+      });
+
+      it('should display "Unavailable" when status is false regardless of indexExists false', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', false);
+        fixture.componentRef.setInput('indexExists', false);
+        fixture.detectChanges();
+
+        expect(component.subtitle()).toBe('Unavailable');
+        expect(fixture.nativeElement.textContent).toContain('Unavailable');
+      });
+
+      it('should default to "Available" when indexExists is not provided (defaults to true)', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', true);
+        // indexExists not set, should default to true
+        fixture.detectChanges();
+
+        expect(component.indexExists()).toBe(true);
+        expect(component.subtitle()).toBe('Available');
+      });
+    });
+
+    describe('subtitleClass computed property', () => {
+      it('should apply "highlight" class when status is true and indexExists is true', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', true);
+        fixture.componentRef.setInput('indexExists', true);
+        fixture.detectChanges();
+
+        expect(component.subtitleClass()).toBe('highlight');
+        const highlightText = fixture.nativeElement.querySelector('.highlight');
+        expect(highlightText).toBeTruthy();
+      });
+
+      it('should apply "error" class when status is true but indexExists is false', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', true);
+        fixture.componentRef.setInput('indexExists', false);
+        fixture.detectChanges();
+
+        expect(component.subtitleClass()).toBe('error');
+        const errorText = fixture.nativeElement.querySelector('.error');
+        expect(errorText).toBeTruthy();
+      });
+
+      it('should apply "error" class when status is false regardless of indexExists', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', false);
+        fixture.componentRef.setInput('indexExists', true);
+        fixture.detectChanges();
+
+        expect(component.subtitleClass()).toBe('error');
+        const errorText = fixture.nativeElement.querySelector('.error');
+        expect(errorText).toBeTruthy();
+      });
+    });
+
+    describe('Visual states', () => {
+      it('should show cyan/highlight color for indexed available storage', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', true);
+        fixture.componentRef.setInput('indexExists', true);
+        fixture.detectChanges();
+
+        expect(component.subtitle()).toBe('Available');
+        expect(component.subtitleClass()).toBe('highlight');
+      });
+
+      it('should show red/error color for non-indexed available storage', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', true);
+        fixture.componentRef.setInput('indexExists', false);
+        fixture.detectChanges();
+
+        expect(component.subtitle()).toBe('Requires Indexing');
+        expect(component.subtitleClass()).toBe('error');
+      });
+
+      it('should show red/error color for unavailable storage', () => {
+        fixture.componentRef.setInput('icon', 'usb');
+        fixture.componentRef.setInput('label', 'USB Stick');
+        fixture.componentRef.setInput('status', false);
+        fixture.detectChanges();
+
+        expect(component.subtitle()).toBe('Unavailable');
+        expect(component.subtitleClass()).toBe('error');
+      });
     });
   });
 });

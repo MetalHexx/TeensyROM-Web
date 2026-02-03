@@ -59,6 +59,7 @@
         label="USB Stick"
         data-testid="usb-storage-status"
         [status]="usbStatus()"
+        [indexExists]="usbIndexExists()"
         (index)="onIndex(StorageType.Usb)"
       ></lib-storage-status>
       <lib-storage-status
@@ -66,6 +67,7 @@
         label="SD Card"
         data-testid="sd-storage-status"
         [status]="sdStatus()"
+        [indexExists]="sdIndexExists()"
         (index)="onIndex(StorageType.Sd)"
       ></lib-storage-status>
     </div>

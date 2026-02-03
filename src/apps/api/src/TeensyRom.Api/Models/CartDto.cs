@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Settings;
@@ -70,8 +71,12 @@ namespace TeensyRom.Api.Models
         /// <summary>
         /// Creates a <see cref="CartDto"/> from a <see cref="Cart"/> entity.
         /// </summary>
-        public static async Task<CartDto> FromDevice(TeensyRomDevice device)
+        public static async Task<CartDto> FromDevice(TeensyRomDevice device, IDeviceSettingsProvider settingsProvider)
         {
+            // Get device settings to check indexing status
+            var deviceSettings = settingsProvider.GetDeviceSettings(device.DeviceId ?? string.Empty);
+            var indexingStatus = deviceSettings?.IndexingStatus;
+
             return new CartDto
             {
                 DeviceId = device.DeviceId ?? string.Empty,
@@ -82,8 +87,8 @@ namespace TeensyRom.Api.Models
                 Name = device.Cart.Name,
                 FwVersion = device.Cart.FwVersion,
                 IsCompatible = device.Cart.IsCompatible,
-                SdStorage = CartStorageDto.FromStorage(device.Cart.SdStorage),
-                UsbStorage = CartStorageDto.FromStorage(device.Cart.UsbStorage)
+                SdStorage = CartStorageDto.FromStorage(device.Cart.SdStorage, indexingStatus?.SdLastIndexed),
+                UsbStorage = CartStorageDto.FromStorage(device.Cart.UsbStorage, indexingStatus?.UsbLastIndexed)
             };
         }
     }
@@ -109,15 +114,25 @@ namespace TeensyRom.Api.Models
         [Required] public bool Available { get; set; }
 
         /// <summary>
+        /// Indicates whether this storage has been fully indexed.
+        /// True = full index completed, False = requires indexing (default).
+        /// Based on DeviceSettings.IndexingStatus timestamps.
+        /// </summary>
+        [Required] public bool IndexExists { get; set; }
+
+        /// <summary>
         /// Creates a <see cref="CartStorageDto"/> from a <see cref="CartStorage"/> entity.
         /// </summary>
-        public static CartStorageDto FromStorage(CartStorage storage)
+        /// <param name="storage">The cart storage entity.</param>
+        /// <param name="lastIndexedTimestamp">The timestamp when this storage was last fully indexed. Null indicates never indexed.</param>
+        public static CartStorageDto FromStorage(CartStorage storage, DateTime? lastIndexedTimestamp)
         {
             return new ()
             {
                 DeviceId = storage.DeviceId,
                 Type = storage.Type,
-                Available = storage.Available
+                Available = storage.Available,
+                IndexExists = lastIndexedTimestamp != null
             };
         }
     }

@@ -21,6 +21,7 @@ export * from './GetVersionResponse';
 export * from './HttpValidationProblemDetails';
 export * from './IndexAllResponse';
 export * from './IndexResponse';
+export * from './IndexingStatusDto';
 export * from './LaunchFileResponse';
 export * from './LaunchRandomResponse';
 export * from './NullableOfTeensyFilterType';

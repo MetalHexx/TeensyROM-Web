@@ -4,4 +4,5 @@ export interface DeviceStorage {
   deviceId: string;
   type: StorageType;
   available: boolean;
+  indexExists: boolean;
 }

@@ -20,7 +20,11 @@ export class DeviceService implements IDeviceService {
 
   findDevices(fullScan = false): Observable<Device[]> {
     return from(this.apiService.findDevices({ fullScan })).pipe(
-      map((response: FindDevicesResponse) => DomainMapper.toDeviceList(response.devices)),
+      map((response: FindDevicesResponse) => {
+        const devices = DomainMapper.toDeviceList(response.devices);
+        this.checkIndexStatus(devices);
+        return devices;
+      }),
       catchError((error) => this.handleError(error, 'findDevices', 'Failed to find devices'))
     );
   }
@@ -47,5 +51,16 @@ export class DeviceService implements IDeviceService {
     logError(`DeviceService.${methodName} error:`, error);
     this.alertService.error(friendlyMessage);
     return throwError(() => error);
+  }
+
+  private checkIndexStatus(devices: Device[]): void {
+    devices.forEach((device) => {
+      if (device.sdStorage.available && device.sdStorage.indexExists === false) {
+        this.alertService.warning(`${device.name} SD storage needs indexing`);
+      }
+      if (device.usbStorage.available && device.usbStorage.indexExists === false) {
+        this.alertService.warning(`${device.name} USB storage needs indexing`);
+      }
+    });
   }
 }

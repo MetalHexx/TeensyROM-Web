@@ -547,11 +547,13 @@ describe('DomainMapper (Device)', () => {
           deviceId: 'device-123',
           type: ApiStorageType.Sd,
           available: true,
+          indexExists: false,
         },
         usbStorage: {
           deviceId: 'device-123',
           type: ApiStorageType.Usb,
           available: false,
+          indexExists: false,
         },
         connectionType: 'Serial',
         ipAddress: '',
@@ -608,6 +610,7 @@ describe('DomainMapper (Device)', () => {
         deviceId: 'device-456',
         type: ApiStorageType.Sd,
         available: true,
+        indexExists: true,
       };
 
       // Act
@@ -626,6 +629,7 @@ describe('DomainMapper (Device)', () => {
         deviceId: 'device-789',
         type: ApiStorageType.Usb,
         available: false,
+        indexExists: false,
       };
 
       // Act
@@ -654,11 +658,13 @@ describe('DomainMapper (Device)', () => {
             deviceId: 'device-1',
             type: ApiStorageType.Sd,
             available: true,
+            indexExists: true,
           },
           usbStorage: {
             deviceId: 'device-1',
             type: ApiStorageType.Usb,
             available: true,
+            indexExists: false,
           },
           connectionType: 'Serial',
           ipAddress: '',
@@ -676,11 +682,13 @@ describe('DomainMapper (Device)', () => {
             deviceId: 'device-2',
             type: ApiStorageType.Sd,
             available: false,
+            indexExists: false,
           },
           usbStorage: {
             deviceId: 'device-2',
             type: ApiStorageType.Usb,
             available: true,
+            indexExists: true,
           },
           connectionType: 'Serial',
           ipAddress: '',
@@ -908,11 +916,13 @@ describe('DomainMapper (Settings)', () => {
             deviceId: 'device-1',
             videoSettings: { enableVideo: true, videoDeviceId: 'cam-1' },
             connectionSettings: { autoConnectEnabled: true },
+            indexingStatus: { sdLastIndexed: null, usbLastIndexed: null },
           },
           {
             deviceId: 'device-2',
             videoSettings: { enableVideo: false, videoDeviceId: '' },
             connectionSettings: { autoConnectEnabled: false },
+            indexingStatus: { sdLastIndexed: null, usbLastIndexed: null },
           },
         ],
       });
@@ -1016,6 +1026,7 @@ interface MockSettingsOverrides {
     deviceId: string;
     videoSettings: { enableVideo: boolean; videoDeviceId: string };
     connectionSettings: { autoConnectEnabled: boolean };
+    indexingStatus: { sdLastIndexed: Date | null; usbLastIndexed: Date | null };
   }>;
 }
 
@@ -1068,6 +1079,10 @@ function createMockGetSettingsResponse(overrides: MockSettingsOverrides = {}): G
       },
       connectionSettings: {
         autoConnectEnabled: overrides.autoConnectEnabled ?? false,
+      },
+      indexingStatus: {
+        sdLastIndexed: null,
+        usbLastIndexed: null,
       },
     },
   ];

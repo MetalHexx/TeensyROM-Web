@@ -20,6 +20,13 @@ import {
     ConnectionSettingsDtoToJSON,
     ConnectionSettingsDtoToJSONTyped,
 } from './ConnectionSettingsDto';
+import type { IndexingStatusDto } from './IndexingStatusDto';
+import {
+    IndexingStatusDtoFromJSON,
+    IndexingStatusDtoFromJSONTyped,
+    IndexingStatusDtoToJSON,
+    IndexingStatusDtoToJSONTyped,
+} from './IndexingStatusDto';
 import type { VideoSettingsDto } from './VideoSettingsDto';
 import {
     VideoSettingsDtoFromJSON,
@@ -52,6 +59,12 @@ export interface DeviceSettingsDto {
      * @memberof DeviceSettingsDto
      */
     connectionSettings: ConnectionSettingsDto;
+    /**
+     * 
+     * @type {IndexingStatusDto}
+     * @memberof DeviceSettingsDto
+     */
+    indexingStatus: IndexingStatusDto;
 }
 
 /**
@@ -61,6 +74,7 @@ export function instanceOfDeviceSettingsDto(value: object): value is DeviceSetti
     if (!('deviceId' in value) || value['deviceId'] === undefined) return false;
     if (!('videoSettings' in value) || value['videoSettings'] === undefined) return false;
     if (!('connectionSettings' in value) || value['connectionSettings'] === undefined) return false;
+    if (!('indexingStatus' in value) || value['indexingStatus'] === undefined) return false;
     return true;
 }
 
@@ -77,6 +91,7 @@ export function DeviceSettingsDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'deviceId': json['deviceId'],
         'videoSettings': VideoSettingsDtoFromJSON(json['videoSettings']),
         'connectionSettings': ConnectionSettingsDtoFromJSON(json['connectionSettings']),
+        'indexingStatus': IndexingStatusDtoFromJSON(json['indexingStatus']),
     };
 }
 
@@ -94,6 +109,7 @@ export function DeviceSettingsDtoToJSONTyped(value?: DeviceSettingsDto | null, i
         'deviceId': value['deviceId'],
         'videoSettings': VideoSettingsDtoToJSON(value['videoSettings']),
         'connectionSettings': ConnectionSettingsDtoToJSON(value['connectionSettings']),
+        'indexingStatus': IndexingStatusDtoToJSON(value['indexingStatus']),
     };
 }
 

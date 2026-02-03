@@ -8,8 +8,10 @@ using TeensyRom.Core.Entities.Storage;
 
 namespace TeensyRom.Api.Endpoints.Files.IndexAll
 {
-    public class IndexAllEndpoint(IDeviceConnectionManager deviceManager) : RadEndpointWithoutRequest<IndexAllResponse>
+    public class IndexAllEndpoint(IDeviceConnectionManager deviceManager, IDeviceSettingsProvider settingsProvider) : RadEndpointWithoutRequest<IndexAllResponse>
     {
+        private readonly IDeviceSettingsProvider _settingsProvider = settingsProvider;
+        
         public override void Configure()
         {
             Post("/api/files/index/all")
@@ -45,9 +47,21 @@ namespace TeensyRom.Api.Endpoints.Files.IndexAll
                     StorageType = "SD",
                     Task = d.SdStorage.CacheAll(ct)
                 })
-                .ToList();            
+                .ToList();
 
             await Task.WhenAll(sdTasks.Select(t => t.Task));
+            foreach (var task in sdTasks.Where(t => t.Task.Result))
+            {
+                var deviceSettings = _settingsProvider.GetOrCreateDeviceSettings(task.DeviceId);
+                deviceSettings = deviceSettings with
+                {
+                    IndexingStatus = deviceSettings.IndexingStatus with
+                    {
+                        SdLastIndexed = DateTime.UtcNow
+                    }
+                };
+                _settingsProvider.SaveDeviceSettings(deviceSettings);
+            }
 
             var usbTasks = devices
                 .Where(d => d.Cart.UsbStorage.Available)
@@ -60,6 +74,18 @@ namespace TeensyRom.Api.Endpoints.Files.IndexAll
                 .ToList();
 
             await Task.WhenAll(usbTasks.Select(t => t.Task));
+            foreach (var task in usbTasks.Where(t => t.Task.Result))
+            {
+                var deviceSettings = _settingsProvider.GetOrCreateDeviceSettings(task.DeviceId);
+                deviceSettings = deviceSettings with
+                {
+                    IndexingStatus = deviceSettings.IndexingStatus with
+                    {
+                        UsbLastIndexed = DateTime.UtcNow
+                    }
+                };
+                _settingsProvider.SaveDeviceSettings(deviceSettings);
+            }
 
             var failedItems = sdTasks
                 .Where(t => !t.Task.Result)

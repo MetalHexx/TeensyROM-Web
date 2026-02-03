@@ -24,7 +24,8 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
             {
                 DeviceId = entity.DeviceId,
                 VideoSettings = MapVideoSettings(entity.VideoSettings),
-                ConnectionSettings = MapConnectionSettings(entity.ConnectionSettings)
+                ConnectionSettings = MapConnectionSettings(entity.ConnectionSettings),
+                IndexingStatus = MapIndexingStatus(entity.IndexingStatus)
             };
         }
 
@@ -32,20 +33,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
         {
             return new ConnectionSettingsDto
             {
-                AutoConnectEnabled = entity.AutoConnectEnabled,
-                //Serial = new SerialConnectionSettingsDto
-                //{
-                //    Port = entity.Serial.Port,
-                //    BaudRate = entity.Serial.BaudRate
-                //},
-                //Tcp = new TcpConnectionSettingsDto
-                //{
-                //    HostAddress = entity.Tcp.HostAddress,
-                //    Port = entity.Tcp.Port,
-                //    ConnectionTimeoutMs = entity.Tcp.ConnectionTimeoutMs,
-                //    ReadTimeoutMs = entity.Tcp.ReadTimeoutMs,
-                //    WriteTimeoutMs = entity.Tcp.WriteTimeoutMs
-                //}
+                AutoConnectEnabled = entity.AutoConnectEnabled
             };
         }
 
@@ -69,6 +57,15 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
             {
                 EnableVideo = entity.EnableVideo,
                 VideoDeviceId = entity.VideoDeviceId
+            };
+        }
+
+        private static IndexingStatusDto MapIndexingStatus(IndexingStatus entity)
+        {
+            return new IndexingStatusDto
+            {
+                SdLastIndexed = entity.SdLastIndexed,
+                UsbLastIndexed = entity.UsbLastIndexed
             };
         }
 

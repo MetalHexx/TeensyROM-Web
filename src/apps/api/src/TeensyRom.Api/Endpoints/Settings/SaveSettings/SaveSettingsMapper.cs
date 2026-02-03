@@ -26,14 +26,14 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             };
         }
 
-        // DTO to Entity mappings
         private static DeviceSettings MapDeviceSettings(DeviceSettingsDto dto)
         {
             return new DeviceSettings
             {
                 DeviceId = dto.DeviceId,
                 VideoSettings = MapVideoSettings(dto.VideoSettings),
-                ConnectionSettings = MapConnectionSettings(dto.ConnectionSettings)
+                ConnectionSettings = MapConnectionSettings(dto.ConnectionSettings),
+                IndexingStatus = MapIndexingStatus(dto.IndexingStatus)
             };
         }
 
@@ -78,6 +78,15 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             {
                 EnableVideo = dto.EnableVideo,
                 VideoDeviceId = dto.VideoDeviceId
+            };
+        }
+
+        private static IndexingStatus MapIndexingStatus(IndexingStatusDto dto)
+        {
+            return new IndexingStatus
+            {
+                SdLastIndexed = dto.SdLastIndexed,
+                UsbLastIndexed = dto.UsbLastIndexed
             };
         }
 

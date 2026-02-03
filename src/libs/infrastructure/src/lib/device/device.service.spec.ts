@@ -4,6 +4,14 @@ import { DevicesApiService } from '@teensyrom-nx/data-access/api-client';
 import { DeviceService } from './device.service';
 import { ALERT_SERVICE } from '@teensyrom-nx/domain';
 
+// Helper to create unavailable storage (backend always returns an object, never null)
+const unavailableStorage = (deviceId: string, type: 'SD' | 'USB') => ({
+  deviceId,
+  type,
+  available: false,
+  indexExists: false,
+});
+
 describe('DeviceService - Alert Integration', () => {
   let service: DeviceService;
   let mockApiService: {
@@ -13,6 +21,7 @@ describe('DeviceService - Alert Integration', () => {
   };
   let mockAlertService: {
     error: ReturnType<typeof vi.fn>;
+    warning: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -24,6 +33,7 @@ describe('DeviceService - Alert Integration', () => {
 
     mockAlertService = {
       error: vi.fn(),
+      warning: vi.fn(),
     };
 
     TestBed.resetTestingModule();
@@ -192,6 +202,483 @@ describe('DeviceService - Alert Integration', () => {
 
       expect(mockAlertService.error).toHaveBeenCalledTimes(1);
       logSpy.mockRestore();
+    });
+  });
+
+  describe('index status alerts', () => {
+    describe('Single Device Scenarios', () => {
+      it('should alert when SD storage index missing', async () => {
+        const mockResponse = {
+          devices: [
+            {
+              deviceId: 'device-1',
+              name: 'TeensyROM Device #1',
+              comPort: 'COM3',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+              sdStorage: {
+                deviceId: 'device-1',
+                type: 'SD',
+                available: true,
+                indexExists: false,
+              },
+              usbStorage: unavailableStorage('device-1', 'USB'),
+            },
+          ],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).toHaveBeenCalledTimes(1);
+        expect(mockAlertService.warning).toHaveBeenCalledWith('TeensyROM Device #1 SD storage needs indexing');
+        });
+
+      it('should alert when USB storage index missing', async () => {
+        const mockResponse = {
+          devices: [
+            {
+              deviceId: 'device-1',
+              name: 'TeensyROM Device #1',
+              comPort: 'COM3',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+              sdStorage: unavailableStorage('device-1', 'SD'),
+              usbStorage: {
+                deviceId: 'device-1',
+                type: 'USB',
+                available: true,
+                indexExists: false,
+              },
+            },
+          ],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).toHaveBeenCalledTimes(1);
+        expect(mockAlertService.warning).toHaveBeenCalledWith('TeensyROM Device #1 USB storage needs indexing');
+        });
+
+      it('should alert for both SD and USB when both missing on same device', async () => {
+        const mockResponse = {
+          devices: [
+            {
+              deviceId: 'device-1',
+              name: 'TeensyROM Device #1',
+              comPort: 'COM3',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+              sdStorage: {
+                deviceId: 'device-1',
+                type: 'SD',
+                available: true,
+                indexExists: false,
+              },
+              usbStorage: {
+                deviceId: 'device-1',
+                type: 'USB',
+                available: true,
+                indexExists: false,
+              },
+            },
+          ],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).toHaveBeenCalledTimes(2);
+        expect(mockAlertService.warning).toHaveBeenCalledWith('TeensyROM Device #1 SD storage needs indexing');
+        expect(mockAlertService.warning).toHaveBeenCalledWith('TeensyROM Device #1 USB storage needs indexing');
+      });
+
+      it('should not alert when all indexes present', async () => {
+        const mockResponse = {
+        devices: [
+          {
+            deviceId: 'device-1',
+            name: 'TeensyROM Device #1',
+            comPort: 'COM3',
+            fwVersion: '1.0.0',
+            isCompatible: true,
+            isConnected: true,
+            deviceState: 'Online',
+            ipAddress: null,
+            tcpPort: null,
+            sdStorage: {
+              deviceId: 'device-1',
+              type: 'SD',
+              available: true,
+              indexExists: true,
+            },
+            usbStorage: {
+              deviceId: 'device-1',
+              type: 'USB',
+              available: true,
+              indexExists: true,
+            },
+          },
+        ],
+      };
+
+      mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+      await new Promise<void>((resolve) => {
+        service.findDevices().subscribe({
+          next: () => resolve(),
+          error: () => resolve(),
+        });
+      });
+
+      expect(mockAlertService.warning).not.toHaveBeenCalled();
+    });
+    });
+
+    describe('Multiple Device Scenarios', () => {
+      it('should handle multiple devices with mixed states', async () => {
+      const mockResponse = {
+        devices: [
+          {
+            deviceId: 'device-1',
+            name: 'TeensyROM Device #1',
+            comPort: 'COM3',
+            fwVersion: '1.0.0',
+            isCompatible: true,
+            isConnected: true,
+            deviceState: 'Online',
+            ipAddress: null,
+            tcpPort: null,
+            sdStorage: {
+              deviceId: 'device-1',
+              type: 'SD',
+              available: true,
+              indexExists: false,
+            },
+            usbStorage: unavailableStorage('device-1', 'USB'),
+          },
+          {
+            deviceId: 'device-2',
+            name: 'TeensyROM Device #2',
+            comPort: 'COM4',
+            fwVersion: '1.0.0',
+            isCompatible: true,
+            isConnected: true,
+            deviceState: 'Online',
+            ipAddress: null,
+            tcpPort: null,
+            sdStorage: {
+              deviceId: 'device-2',
+              type: 'SD',
+              available: true,
+              indexExists: true,
+            },
+            usbStorage: {
+              deviceId: 'device-2',
+              type: 'USB',
+              available: true,
+              indexExists: true,
+            },
+          },
+          {
+            deviceId: 'device-3',
+            name: 'TeensyROM Device #3',
+            comPort: 'COM5',
+            fwVersion: '1.0.0',
+            isCompatible: true,
+            isConnected: true,
+            deviceState: 'Online',
+            ipAddress: null,
+            tcpPort: null,
+            sdStorage: unavailableStorage('device-3', 'SD'),
+            usbStorage: {
+              deviceId: 'device-3',
+              type: 'USB',
+              available: true,
+              indexExists: false,
+            },
+          },
+        ],
+      };
+
+      mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+      await new Promise<void>((resolve) => {
+        service.findDevices().subscribe({
+          next: () => resolve(),
+          error: () => resolve(),
+        });
+      });
+
+      expect(mockAlertService.warning).toHaveBeenCalledTimes(2);
+      expect(mockAlertService.warning).toHaveBeenCalledWith('TeensyROM Device #1 SD storage needs indexing');
+      expect(mockAlertService.warning).toHaveBeenCalledWith('TeensyROM Device #3 USB storage needs indexing');
+    });
+
+      it('should trigger correct number of alerts for multiple missing indexes', async () => {
+        const mockResponse = {
+          devices: [
+            {
+              deviceId: 'device-1',
+              name: 'Device A',
+              comPort: 'COM3',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+              sdStorage: {
+                deviceId: 'device-1',
+                type: 'SD',
+                available: true,
+                indexExists: false,
+              },
+              usbStorage: {
+                deviceId: 'device-1',
+                type: 'USB',
+                available: true,
+                indexExists: false,
+              },
+            },
+            {
+              deviceId: 'device-2',
+              name: 'Device B',
+              comPort: 'COM4',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+              sdStorage: {
+                deviceId: 'device-2',
+                type: 'SD',
+                available: true,
+                indexExists: false,
+              },
+              usbStorage: unavailableStorage('device-1', 'USB'),
+            },
+          ],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).toHaveBeenCalledTimes(3);
+        expect(mockAlertService.warning).toHaveBeenCalledWith('Device A SD storage needs indexing');
+        expect(mockAlertService.warning).toHaveBeenCalledWith('Device A USB storage needs indexing');
+        expect(mockAlertService.warning).toHaveBeenCalledWith('Device B SD storage needs indexing');
+      });
+    });
+
+    describe('Edge Cases', () => {
+      it('should handle empty device list without errors', async () => {
+        const mockResponse = {
+          devices: [],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).not.toHaveBeenCalled();
+      });
+
+      it('should handle device with no storage (both null)', async () => {
+        const mockResponse = {
+          devices: [
+            {
+              deviceId: 'device-1',
+              name: 'TeensyROM Device #1',
+              comPort: 'COM3',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+sdStorage: unavailableStorage('device-1', 'SD'),
+            usbStorage: unavailableStorage('device-1', 'USB'),
+            },
+          ],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).not.toHaveBeenCalled();
+      });
+  });
+
+    describe('Alert Message Format', () => {
+      it('should include device name in alert message', async () => {
+        const mockResponse = {
+          devices: [
+            {
+              deviceId: 'device-1',
+              name: 'Custom Device Name',
+              comPort: 'COM3',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+              sdStorage: {
+                deviceId: 'device-1',
+                type: 'SD',
+                available: true,
+                indexExists: false,
+              },
+              usbStorage: unavailableStorage('device-1', 'USB'),
+            },
+          ],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).toHaveBeenCalledWith(
+          expect.stringContaining('Custom Device Name')
+        );
+      });
+
+      it('should specify SD storage type in message', async () => {
+        const mockResponse = {
+          devices: [
+            {
+              deviceId: 'device-1',
+              name: 'Test Device',
+              comPort: 'COM3',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+              sdStorage: {
+                deviceId: 'device-1',
+                type: 'SD',
+                available: true,
+                indexExists: false,
+              },
+              usbStorage: unavailableStorage('device-1', 'USB'),
+            },
+          ],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).toHaveBeenCalledWith(
+          expect.stringContaining('SD storage')
+        );
+        expect(mockAlertService.warning).toHaveBeenCalledWith(
+          expect.stringContaining('needs indexing')
+        );
+      });
+
+      it('should specify USB storage type in message', async () => {
+        const mockResponse = {
+          devices: [
+            {
+              deviceId: 'device-1',
+              name: 'Test Device',
+              comPort: 'COM3',
+              fwVersion: '1.0.0',
+              isCompatible: true,
+              isConnected: true,
+              deviceState: 'Online',
+              ipAddress: null,
+              tcpPort: null,
+              sdStorage: unavailableStorage('device-1', 'SD'),
+              usbStorage: {
+                deviceId: 'device-1',
+                type: 'USB',
+                available: true,
+                indexExists: false,
+              },
+            },
+          ],
+        };
+
+        mockApiService.findDevices.mockResolvedValue(mockResponse);
+
+        await new Promise<void>((resolve) => {
+          service.findDevices().subscribe({
+            next: () => resolve(),
+            error: () => resolve(),
+          });
+        });
+
+        expect(mockAlertService.warning).toHaveBeenCalledWith(
+          expect.stringContaining('USB storage')
+        );
+        expect(mockAlertService.warning).toHaveBeenCalledWith(
+          expect.stringContaining('needs indexing')
+        );
+      });
     });
   });
 });

@@ -24,9 +24,28 @@ export class StorageStatusComponent {
   icon = input<string>('');
   label = input<string>('');
   status = input<boolean | undefined>(undefined);
+  /** Whether storage has been indexed */
+  indexExists = input<boolean>(true);
+  
   index = output<void>();
 
-  // Computed tooltip message
+  /** Subtitle text based on storage state */
+  readonly subtitle = computed(() => {
+    if (!this.status()) {
+      return 'Unavailable';
+    }
+    return this.indexExists() ? 'Available' : 'Requires Indexing';
+  });
+
+  /** CSS class for subtitle color */
+  readonly subtitleClass = computed(() => {
+    if (!this.status()) {
+      return 'dimmed';
+    }
+    return this.indexExists() ? 'highlight' : 'error';
+  });
+
+  /** Tooltip configuration */
   tooltipMessage = computed<TooltipConfig>(() => {
     const storageType = this.icon() === 'usb' ? 'USB device' : 'SD card';
     return {

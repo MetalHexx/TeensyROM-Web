@@ -23,6 +23,27 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// Connection preferences for this device.
         /// </summary>
         [Required] public ConnectionSettingsDto ConnectionSettings { get; set; } = null!;
+
+        /// <summary>
+        /// Tracks full indexing completion timestamps per storage type.
+        /// </summary>
+        [Required] public IndexingStatusDto IndexingStatus { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Tracks when full indexing operations were completed for device storage.
+    /// </summary>
+    public record IndexingStatusDto
+    {
+        /// <summary>
+        /// UTC timestamp when SD storage was last fully indexed. Null indicates never indexed.
+        /// </summary>
+        public DateTime? SdLastIndexed { get; set; }
+
+        /// <summary>
+        /// UTC timestamp when USB storage was last fully indexed. Null indicates never indexed.
+        /// </summary>
+        public DateTime? UsbLastIndexed { get; set; }
     }
 
     /// <summary>
@@ -30,12 +51,10 @@ namespace TeensyRom.Api.Endpoints.Settings
     /// </summary>
     public record ConnectionSettingsDto
     {
-
         /// <summary>
         /// Automatically attempt to connect to this device on startup.
         /// </summary>
         [Required] public bool AutoConnectEnabled { get; set; }
-
     }
 
     /// <summary>

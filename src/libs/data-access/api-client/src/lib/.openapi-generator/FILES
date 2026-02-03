@@ -27,6 +27,7 @@ models/GetVersionResponse.ts
 models/HttpValidationProblemDetails.ts
 models/IndexAllResponse.ts
 models/IndexResponse.ts
+models/IndexingStatusDto.ts
 models/LaunchFileResponse.ts
 models/LaunchRandomResponse.ts
 models/NullableOfTeensyFilterType.ts

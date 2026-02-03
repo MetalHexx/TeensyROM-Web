@@ -17,7 +17,27 @@ export function indexStorage(
       patchState(store, { isIndexing: true, error: null });
       try {
         await firstValueFrom(storageService.index(deviceId, storageType, startingPath));
-        patchState(store, { isIndexing: false });
+        
+        const devices = store.devices();
+        const updatedDevices = devices.map(device => {
+          if (device.deviceId !== deviceId) {
+            return device;
+          }
+          
+          if (storageType === StorageType.Sd) {
+            return {
+              ...device,
+              sdStorage: device.sdStorage ? { ...device.sdStorage, indexExists: true } as typeof device.sdStorage : device.sdStorage
+            };
+          } else {
+            return {
+              ...device,
+              usbStorage: device.usbStorage ? { ...device.usbStorage, indexExists: true } as typeof device.usbStorage : device.usbStorage
+            };
+          }
+        });
+        
+        patchState(store, { devices: updatedDevices, isIndexing: false });
       } catch (error) {
         patchState(store, { isIndexing: false, error: String(error) });
       }
