@@ -93,26 +93,23 @@
       flex-direction: column;
       align-items: stretch;
       justify-content: flex-start;
-      flex: 0 1 auto;
+      flex: 0 0 auto; // No grow or shrink
       height: 100%;
       min-height: 0;
-      min-width: 250px;
-      max-width: 500px;
-      overflow: hidden;
-
-      // Intermediate breakpoint - limit growth to prevent squeezing files view
-      @media (max-width: 1400px) {
-        max-width: 350px;
-      }
+      width: fit-content; // Size to content width
+      min-width: 327px; // Match filter-toolbar's typical rendered width
+      max-width: 60%; // Prevent taking too much space
+      overflow-x: auto; // Scroll when content exceeds max-width
+      overflow-y: hidden;
 
       // Responsive adjustments for stacked layout
       @media (max-width: 1200px) {
         flex: none;
         min-width: 0;
-        max-width: none;
+        max-width: none; // Mobile: use full available width
         height: auto;
         min-height: 300px;
-        overflow-x: auto;
+        overflow-x: auto; // Maintain horizontal scroll on mobile
       }
     }
 
@@ -121,16 +118,18 @@
       flex-direction: column;
       align-items: stretch;
       justify-content: flex-start;
-      flex: 1;
+      flex: 1 1 0; // Grow and shrink, start from zero basis
       height: 100%;
       min-height: 0;
       min-width: 350px;
       overflow: hidden;
       position: relative; // Enable absolute positioning for children
 
-      // Make both search-results and directory-files fill the container
+      // Make components fill container with absolute positioning for animations
+      // Only the active one will be visible (controlled by component logic)
       lib-search-results,
-      lib-directory-files {
+      lib-directory-files,
+      lib-play-history {
         position: absolute;
         top: 0;
         left: 0;
