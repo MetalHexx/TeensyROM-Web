@@ -15,7 +15,7 @@
         <span class="placeholder-text">{{ node.name }}</span>
       </mat-tree-node>
 
-      <!-- Regular leaf nodes -->
+      <!-- Leaf nodes without children -->
       <mat-tree-node
         *matTreeNodeDef="let node"
         matTreeNodePadding
@@ -26,6 +26,7 @@
         (click)="onDirectoryClick(node)"
         (keydown)="onNodeKeyDown($event, node)"
       >
+        <div class="tree-node-spacer" aria-hidden="true"></div>
         <lib-directory-tree-node
           [icon]="node.icon"
           [text]="node.name"
@@ -38,6 +39,7 @@
         <mat-icon class="error-icon" color="warn">error</mat-icon>
         }
       </mat-tree-node>
+      <!-- Expandable nodes with children -->
       <mat-tree-node
         *matTreeNodeDef="let node; when: hasChild"
         matTreeNodePadding
@@ -50,6 +52,7 @@
         (click)="onDirectoryClick(node)"
         (keydown)="onNodeKeyDown($event, node)"
       >
+        @if (shouldShowExpansionButton(node)) {
         <button
           mat-icon-button
           matTreeNodeToggle
@@ -60,6 +63,9 @@
             {{ tree.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
           </mat-icon>
         </button>
+        } @else {
+        <div class="tree-node-spacer" aria-hidden="true"></div>
+        }
         <lib-directory-tree-node
           [icon]="node.icon"
           [text]="node.name"

@@ -36,3 +36,10 @@ mat-tree {
   margin-left: 8px;
   font-size: 16px;
 }
+
+.tree-node-spacer {
+  width: 40px;
+  min-width: 40px;
+  display: inline-block;
+  pointer-events: none;
+}

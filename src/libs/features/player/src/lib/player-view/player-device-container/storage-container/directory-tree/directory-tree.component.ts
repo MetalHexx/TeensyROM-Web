@@ -81,6 +81,10 @@ export class DirectoryTreeComponent implements AfterViewInit {
   trackByFn = (_: number, node: DirectoryTreeNode) => node.id;
   expansionKeyFn = (node: DirectoryTreeNode) => node.id;
 
+  shouldShowExpansionButton(node: DirectoryTreeNode): boolean {
+    return !!node.children && node.children.length > 0;
+  }
+
   ngAfterViewInit() {
     this.autoExpandDirectoryNode();
   }
