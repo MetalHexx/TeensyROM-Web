@@ -2,3 +2,16 @@
   display: block;
   width: 100%;
 }
+
+.incompatible-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  margin-left: var(--spacing-inline-sm, 8px);
+  color: var(--color-error);
+  cursor: help;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}

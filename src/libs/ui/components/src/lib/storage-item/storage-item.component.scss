@@ -20,7 +20,7 @@
   gap: 0.25rem;
   flex: 1;
   min-width: 0;
-}
+  min-height: 24px; 
 
 // Actions container will be positioned at the end
 lib-storage-item-actions {

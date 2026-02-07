@@ -6,6 +6,16 @@
   (selectedChange)="onItemClick()"
   (activated)="onItemDoubleClick()"
 >
+  @if (isIncompatible()) {
+    <mat-icon 
+      storageItemIncompatibleIcon
+      class="incompatible-icon"
+      [libTooltip]="incompatibleTooltip"
+    >
+      sentiment_very_dissatisfied
+    </mat-icon>
+  }
+  
   <lib-storage-item-actions [label]="formattedSize()" [storageType]="storageType()">
   </lib-storage-item-actions>
 </lib-storage-item>

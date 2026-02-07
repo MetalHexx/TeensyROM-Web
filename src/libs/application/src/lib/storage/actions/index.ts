@@ -16,6 +16,7 @@ import { searchFiles } from './search-files';
 import { clearSearch } from './clear-search';
 import { saveFavorite } from './save-favorite';
 import { removeFavorite } from './remove-favorite';
+import { updateFileCompatibility } from './update-file-compatibility';
 import { WritableStore } from '../storage-helpers';
 
 export function withStorageActions() {
@@ -34,6 +35,7 @@ export function withStorageActions() {
       ...clearSearch(writableStore),
       ...saveFavorite(writableStore, storageService),
       ...removeFavorite(writableStore, storageService),
+      ...updateFileCompatibility(writableStore),
     };
   });
 }

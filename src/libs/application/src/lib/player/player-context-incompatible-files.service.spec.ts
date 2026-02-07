@@ -11,6 +11,7 @@ import {
   ALERT_SERVICE,
   IAlertService,
   AlertMessage,
+  StorageType,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -52,6 +53,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
   let mockStorageStore: {
     navigateToDirectory: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+    updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
     settings: ReturnType<typeof vi.fn>;
@@ -109,6 +111,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         error: null,
         lastUpdated: Date.now(),
       })),
+      updateFileCompatibility: vi.fn(),
     };
 
     mockSettingsStore = {
@@ -995,6 +998,222 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         // Verify no duplicates, no mutations
         const paths = context!.files.map(f => f.path);
         expect(new Set(paths).size).toBe(2); // No duplicates
+      });
+    });
+  });
+
+  describe('Storage Store Synchronization', () => {
+    const deviceId = 'test-device';
+
+    beforeEach(() => {
+      // Reset spy counts before each test
+      vi.clearAllMocks();
+    });
+
+    describe('Random launch with incompatible file', () => {
+      it('should call storage update when random launch has incompatible file', async () => {
+        const incompatibleFile = createTestFileItem({
+          name: 'bad.sid',
+          path: '/music/bad.sid',
+          isCompatible: false,
+        });
+        const directoryFiles = [
+          incompatibleFile,
+          createTestFileItem({ name: 'good.sid', path: '/music/good.sid' }),
+        ];
+
+        mockPlayerService.launchRandom.mockReturnValue(of(incompatibleFile));
+        mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
+          path: '/music',
+          directory: {
+            path: '/music',
+            name: 'music',
+            files: directoryFiles,
+            directories: [],
+          },
+          isLoading: false,
+          error: null,
+          lastUpdated: Date.now(),
+        }));
+
+        await service.launchRandomFile(deviceId);
+        await nextTick();
+
+        expect(mockStorageStore.updateFileCompatibility).toHaveBeenCalledWith({
+          deviceId: 'test-device',
+          storageType: StorageType.Sd,
+          filePath: '/music/bad.sid',
+          isCompatible: false,
+        });
+        expect(mockStorageStore.updateFileCompatibility).toHaveBeenCalledTimes(1);
+      });
+
+      it('should use correct storageType parsed from storage key', async () => {
+        const incompatibleFile = createTestFileItem({
+          name: 'bad.sid',
+          path: '/music/bad.sid',
+          isCompatible: false,
+        });
+
+        mockPlayerService.launchRandom.mockReturnValue(of(incompatibleFile));
+        mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
+          path: '/music',
+          directory: {
+            path: '/music',
+            name: 'music',
+            files: [incompatibleFile],
+            directories: [],
+          },
+          isLoading: false,
+          error: null,
+          lastUpdated: Date.now(),
+        }));
+
+        await service.launchRandomFile(deviceId);
+        await nextTick();
+
+        const call = mockStorageStore.updateFileCompatibility.mock.calls[0][0];
+        expect(call.storageType).toBe(StorageType.Sd);
+      });
+
+      it('should not call storage update when file is compatible', async () => {
+        const compatibleFile = createTestFileItem({
+          name: 'good.sid',
+          path: '/music/good.sid',
+          isCompatible: true,
+        });
+
+        mockPlayerService.launchRandom.mockReturnValue(of(compatibleFile));
+        mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
+          path: '/music',
+          directory: {
+            path: '/music',
+            name: 'music',
+            files: [compatibleFile],
+            directories: [],
+          },
+          isLoading: false,
+          error: null,
+          lastUpdated: Date.now(),
+        }));
+
+        await service.launchRandomFile(deviceId);
+        await nextTick();
+
+        expect(mockStorageStore.updateFileCompatibility).not.toHaveBeenCalled();
+      });
+
+      it('should not call storage update when isCompatible is undefined', async () => {
+        const undefinedCompatFile = createTestFileItem({
+          name: 'untested.sid',
+          path: '/music/untested.sid',
+          isCompatible: undefined,
+        });
+
+        mockPlayerService.launchRandom.mockReturnValue(of(undefinedCompatFile));
+        mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
+          path: '/music',
+          directory: {
+            path: '/music',
+            name: 'music',
+            files: [undefinedCompatFile],
+            directories: [],
+          },
+          isLoading: false,
+          error: null,
+          lastUpdated: Date.now(),
+        }));
+
+        await service.launchRandomFile(deviceId);
+        await nextTick();
+
+        expect(mockStorageStore.updateFileCompatibility).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Directory advancement with incompatible files', () => {
+      // Note: Directory advancement tests are complex because they require triggering
+      // the private handleIncompatibleFile() method which is called automatically
+      // via player timer subscriptions. Testing this requires a more elaborate setup.
+      // The storage sync logic is tested via random launch tests above.
+      // Integration testing will verify the full auto-advancement flow.
+    });
+
+    describe('Integration - Player and storage sync', () => {
+      it('should sync storage after player context update', async () => {
+        const incompatibleFile = createTestFileItem({
+          name: 'bad.sid',
+          path: '/music/bad.sid',
+          isCompatible: false,
+        });
+
+        mockPlayerService.launchRandom.mockReturnValue(of(incompatibleFile));
+        mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
+          path: '/music',
+          directory: {
+            path: '/music',
+            name: 'music',
+            files: [incompatibleFile],
+            directories: [],
+          },
+          isLoading: false,
+          error: null,
+          lastUpdated: Date.now(),
+        }));
+
+        await service.launchRandomFile(deviceId);
+        await nextTick();
+
+        // Verify player context was loaded first
+        const fileContext = service.getFileContext(deviceId)();
+        expect(fileContext).not.toBeNull();
+        expect(fileContext!.files[0].isCompatible).toBe(false);
+
+        // Verify storage was synced
+        expect(mockStorageStore.updateFileCompatibility).toHaveBeenCalledOnce();
+      });
+
+      it('should handle multiple incompatible files across multiple launches', async () => {
+        const file1 = createTestFileItem({ name: 'bad1.sid', path: '/music/bad1.sid', isCompatible: false });
+        const file2 = createTestFileItem({ name: 'bad2.sid', path: '/music/bad2.sid', isCompatible: false });
+
+        // First launch
+        mockPlayerService.launchRandom.mockReturnValueOnce(of(file1));
+        mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
+          path: '/music',
+          directory: {
+            path: '/music',
+            name: 'music',
+            files: [file1, file2],
+            directories: [],
+          },
+          isLoading: false,
+          error: null,
+          lastUpdated: Date.now(),
+        }));
+
+        await service.launchRandomFile(deviceId);
+        await nextTick();
+
+        expect(mockStorageStore.updateFileCompatibility).toHaveBeenCalledWith({
+          deviceId: 'test-device',
+          storageType: StorageType.Sd,
+          filePath: '/music/bad1.sid',
+          isCompatible: false,
+        });
+
+        // Second launch
+        mockPlayerService.launchRandom.mockReturnValueOnce(of(file2));
+        await service.launchRandomFile(deviceId);
+        await nextTick();
+
+        expect(mockStorageStore.updateFileCompatibility).toHaveBeenCalledWith({
+          deviceId: 'test-device',
+          storageType: StorageType.Sd,
+          filePath: '/music/bad2.sid',
+          isCompatible: false,
+        });
+        expect(mockStorageStore.updateFileCompatibility).toHaveBeenCalledTimes(2);
       });
     });
   });

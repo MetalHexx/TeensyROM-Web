@@ -1,13 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { SearchItemComponent } from './search-item.component';
 import { FileItem, FileItemType } from '@teensyrom-nx/domain';
+import { TooltipDirective, TooltipPosition } from '@teensyrom-nx/ui/components';
 
 describe('SearchItemComponent', () => {
   let component: SearchItemComponent;
   let fixture: ComponentFixture<SearchItemComponent>;
 
-  const createMockFileItem = (type: FileItemType, size: number): FileItem => ({
+  const createMockFileItem = (
+    type: FileItemType,
+    size: number,
+    options?: Partial<FileItem>
+  ): FileItem => ({
     name: 'test-file',
     path: '/test/path',
     size,
@@ -27,6 +33,7 @@ describe('SearchItemComponent', () => {
     subtuneLengths: [],
     startSubtuneNum: 0,
     images: [],
+    ...options,
   });
 
   beforeEach(async () => {
@@ -170,5 +177,115 @@ describe('SearchItemComponent', () => {
 
     const compiled = fixture.nativeElement;
     expect(compiled.textContent).toContain('1.5 KB');
+  });
+
+  describe('Incompatibility Indicator', () => {
+    it('should show icon when file is incompatible', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: false });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      const icon = fixture.nativeElement.querySelector('.incompatible-icon');
+      expect(icon).toBeTruthy();
+    });
+
+    it('should hide icon when file is compatible', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: true });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      const icon = fixture.nativeElement.querySelector('.incompatible-icon');
+      expect(icon).toBeNull();
+    });
+
+    it('should hide icon when isCompatible is undefined', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: undefined });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      const icon = fixture.nativeElement.querySelector('.incompatible-icon');
+      expect(icon).toBeNull();
+    });
+
+    it('should use correct Material icon name', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: false });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      const icon = fixture.nativeElement.querySelector('.incompatible-icon');
+      expect(icon.textContent?.trim()).toBe('sentiment_very_dissatisfied');
+    });
+
+    it('should have tooltip directive applied', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: false });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      const iconElement = fixture.debugElement.query(By.css('.incompatible-icon'));
+      const tooltipDirective = iconElement.injector.get(TooltipDirective, null);
+      expect(tooltipDirective).toBeTruthy();
+    });
+
+    it('should have correct tooltip body text', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: false });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      const iconElement = fixture.debugElement.query(By.css('.incompatible-icon'));
+      const tooltipDirective = iconElement.injector.get(TooltipDirective);
+      expect(tooltipDirective.libTooltip().body).toBe(
+        'File is incompatible with TeensyROM hardware'
+      );
+    });
+
+    it('should have tooltip position set to Top', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: false });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      const iconElement = fixture.debugElement.query(By.css('.incompatible-icon'));
+      const tooltipDirective = iconElement.injector.get(TooltipDirective);
+      expect(tooltipDirective.libTooltip().position).toBe(TooltipPosition.Top);
+    });
+
+    it('should reactively show icon when file becomes incompatible', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: true });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      // Initially no icon
+      let icon = fixture.nativeElement.querySelector('.incompatible-icon');
+      expect(icon).toBeNull();
+
+      // Update to incompatible
+      const incompatibleFile = createMockFileItem(FileItemType.Song, 1024, {
+        isCompatible: false,
+      });
+      fixture.componentRef.setInput('fileItem', incompatibleFile);
+      fixture.detectChanges();
+
+      // Icon should now be visible
+      icon = fixture.nativeElement.querySelector('.incompatible-icon');
+      expect(icon).toBeTruthy();
+    });
+
+    it('should reactively hide icon when file becomes compatible', () => {
+      const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: false });
+      fixture.componentRef.setInput('fileItem', mockFile);
+      fixture.detectChanges();
+
+      // Initially icon is shown
+      let icon = fixture.nativeElement.querySelector('.incompatible-icon');
+      expect(icon).toBeTruthy();
+
+      // Update to compatible
+      const compatibleFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: true });
+      fixture.componentRef.setInput('fileItem', compatibleFile);
+      fixture.detectChanges();
+
+      // Icon should now be hidden
+      icon = fixture.nativeElement.querySelector('.incompatible-icon');
+      expect(icon).toBeNull();
+    });
   });
 });

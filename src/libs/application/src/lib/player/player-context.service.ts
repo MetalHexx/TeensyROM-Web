@@ -301,6 +301,11 @@ export class PlayerContextService implements IPlayerContext {
             currentFileIndex: currentIndex,
             launchMode: this.store.getLaunchMode(deviceId)(),
           });
+
+          // Sync incompatible file to storage store
+          if (launchedFile?.isCompatible === false) {
+            this.markFileInStorageAsIncompatible(deviceId, storageType, launchedFile.file.path);
+          }
         }
       }
     } catch {
@@ -1032,6 +1037,10 @@ export class PlayerContextService implements IPlayerContext {
       }
     );
 
+    // Sync the incompatible file to storage store immediately
+    const { storageType } = StorageKeyUtil.parse(player.currentFile.storageKey);
+    this.markFileInStorageAsIncompatible(deviceId, storageType, player.currentFile.file.path);
+
     // Route based on launch mode (with 1 second delay for user feedback)
     if (player.launchMode === LaunchMode.Shuffle) {
       logInfo(
@@ -1095,7 +1104,8 @@ export class PlayerContextService implements IPlayerContext {
       return;
     }
 
-    const { files, currentIndex } = fileContext;
+    const { files, currentIndex, storageKey } = fileContext;
+    const { storageType } = StorageKeyUtil.parse(storageKey);
     const maxAttempts = files.length; // Prevent infinite loops
 
     // Search for next compatible file starting from currentIndex + 1
@@ -1122,6 +1132,9 @@ export class PlayerContextService implements IPlayerContext {
         });
         
         return;
+      } else {
+        // Sync incompatible file to storage store
+        this.markFileInStorageAsIncompatible(deviceId, storageType, candidateFile.path);
       }
     }
 
@@ -1131,5 +1144,23 @@ export class PlayerContextService implements IPlayerContext {
     );
     this.alertService.warning('All files in directory are incompatible');
     void this.launchRandomFile(deviceId);
+  }
+
+  /**
+   * Helper method to mark a file as incompatible in storage store.
+   * Synchronizes incompatibility state from player context to storage listings.
+   * Fire-and-forget - does not await or handle errors.
+   */
+  private markFileInStorageAsIncompatible(
+    deviceId: string,
+    storageType: StorageType,
+    filePath: string
+  ): void {
+    this.storageStore.updateFileCompatibility({
+      deviceId,
+      storageType,
+      filePath,
+      isCompatible: false,
+    });
   }
 }

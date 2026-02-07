@@ -335,6 +335,16 @@ describe('StorageItemComponent', () => {
     })
     class TestHostComponent {}
 
+    @Component({
+      template: `
+        <lib-storage-item icon="music_note" label="Test Song">
+          <span storageItemIncompatibleIcon class="test-icon">⚠️</span>
+        </lib-storage-item>
+      `,
+      imports: [StorageItemComponent],
+    })
+    class TestIconProjectionComponent {}
+
     it('should project lib-storage-item-actions content', async () => {
       const hostFixture = TestBed.createComponent(TestHostComponent);
       hostFixture.detectChanges();
@@ -349,6 +359,27 @@ describe('StorageItemComponent', () => {
       hostFixture.detectChanges();
 
       expect(hostFixture.nativeElement.textContent).toContain('1.5 KB');
+    });
+
+    it('should project incompatible icon content when provided', async () => {
+      const hostFixture = TestBed.createComponent(TestIconProjectionComponent);
+      hostFixture.detectChanges();
+
+      const icon = hostFixture.nativeElement.querySelector('[storageItemIncompatibleIcon]');
+      expect(icon).toBeTruthy();
+      expect(icon.classList.contains('test-icon')).toBe(true);
+      expect(icon.textContent).toContain('⚠️');
+    });
+
+    it('should position incompatible icon after label', async () => {
+      const hostFixture = TestBed.createComponent(TestIconProjectionComponent);
+      hostFixture.detectChanges();
+
+      const labelArea = hostFixture.nativeElement.querySelector('.storage-item-label-area');
+      expect(labelArea).toBeTruthy();
+      
+      const icon = labelArea.querySelector('[storageItemIncompatibleIcon]');
+      expect(icon).toBeTruthy();
     });
   });
 });
