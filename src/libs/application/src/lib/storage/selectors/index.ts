@@ -5,6 +5,7 @@ import { getDeviceStorageEntries } from './get-device-storage-entries';
 import { getDeviceDirectories } from './get-device-directories';
 import { getSearchState } from './get-search-state';
 import { isSlowFavoriteOperation } from './is-slow-favorite-operation';
+import { isDeviceLevelView } from './is-device-level-view';
 import { StorageState } from '../storage-store';
 import { WritableStore } from '../storage-helpers';
 
@@ -18,6 +19,7 @@ export function withStorageSelectors() {
       ...getDeviceDirectories(writableStore),
       ...getSearchState(writableStore),
       ...isSlowFavoriteOperation(writableStore),
+      ...isDeviceLevelView(writableStore),
     };
   });
 }

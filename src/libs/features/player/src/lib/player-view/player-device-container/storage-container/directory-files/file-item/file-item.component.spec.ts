@@ -245,14 +245,14 @@ describe('FileItemComponent', () => {
       );
     });
 
-    it('should have tooltip position set to Top', () => {
+    it('should have tooltip position set to Right', () => {
       const mockFile = createMockFileItem(FileItemType.Song, 1024, { isCompatible: false });
       fixture.componentRef.setInput('fileItem', mockFile);
       fixture.detectChanges();
 
       const iconElement = fixture.debugElement.query(By.css('.incompatible-icon'));
       const tooltipDirective = iconElement.injector.get(TooltipDirective);
-      expect(tooltipDirective.libTooltip().position).toBe(TooltipPosition.Top);
+      expect(tooltipDirective.libTooltip().position).toBe(TooltipPosition.Right);
     });
 
     it('should reactively show icon when file becomes incompatible', () => {

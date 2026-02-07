@@ -63,12 +63,16 @@ export function navigateDirectoryForward(
         LogType.Info,
         `Updated history index to ${newIndex} for device: ${deviceId}, target path: ${targetPath}, storageType: ${storageType}`
       );
-      const key = StorageKeyUtil.create(deviceId, storageType);
-
-      // Clear any active search when navigating (search is device-level, not storage-specific)
       clearSearchState(store, deviceId, actionMessage);
-
       setDeviceSelectedDirectory(store, deviceId, storageType, targetPath, actionMessage);
+
+      if (storageType === null) {
+        logInfo(LogType.Info, `Navigated forward to device-level view for device: ${deviceId}`);
+        logInfo(LogType.Finish, `Forward navigation to device-level completed for device: ${deviceId}`);
+        return;
+      }
+
+      const key = StorageKeyUtil.create(deviceId, storageType);
 
       const existingEntry = getStorage(store, key);
       if (isDirectoryLoadedAtPath(existingEntry, targetPath)) {

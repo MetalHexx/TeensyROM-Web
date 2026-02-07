@@ -1,0 +1,9 @@
+<lib-storage-item
+  [icon]="storageDevice().icon"
+  iconColor="highlight"
+  [label]="storageDevice().name"
+  [selected]="selected()"
+  (selectedChange)="onItemClick()"
+  (activated)="onItemDoubleClick()"
+>
+</lib-storage-item>

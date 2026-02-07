@@ -12,9 +12,16 @@ import { CommonModule } from '@angular/common';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
 import { ScalingCardComponent, LoadingTextComponent } from '@teensyrom-nx/ui/components';
 import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
-import { DirectoryItem, FileItem, LaunchMode } from '@teensyrom-nx/domain';
+import {
+  DirectoryItem,
+  FileItem,
+  LaunchMode,
+  StorageDeviceItem,
+  StorageType,
+} from '@teensyrom-nx/domain';
 import { DirectoryItemComponent } from './directory-item/directory-item.component';
 import { FileItemComponent } from './file-item/file-item.component';
+import { StorageDeviceItemComponent } from './storage-device-item/storage-device-item.component';
 
 /**
  * Smart container component for displaying and managing directory contents (folders and files).
@@ -52,6 +59,7 @@ import { FileItemComponent } from './file-item/file-item.component';
     LoadingTextComponent,
     DirectoryItemComponent,
     FileItemComponent,
+    StorageDeviceItemComponent,
     ScrollingModule,
   ],
   templateUrl: './directory-files.component.html',
@@ -70,6 +78,32 @@ export class DirectoryFilesComponent {
 
   private readonly storageStore = inject(StorageStore);
   private readonly playerContext: IPlayerContext = inject(PLAYER_CONTEXT);
+
+  /**
+   * Computed signal to detect if we're at device level (showing storage devices)
+   * vs storage level (showing directory contents).
+   */
+  readonly isDeviceLevelView = computed(() =>
+    this.storageStore.isDeviceLevelView(this.deviceId())()
+  );
+
+  /**
+   * Computed signal that builds the list of available storage devices for this device.
+   * Only populated when at device level for performance.
+   */
+  readonly storageDevices = computed<StorageDeviceItem[]>(() => {
+    if (!this.isDeviceLevelView()) return [];
+
+    const entries = Object.values(this.storageStore.getDeviceStorageEntries(this.deviceId())());
+    return entries.map((entry) => ({
+      name: entry.storageType === StorageType.Sd ? 'SD Storage' : 'USB Storage',
+      storageType: entry.storageType,
+      // Icons match directory-tree-node component for consistency
+      icon: entry.storageType === StorageType.Sd ? 'sd_storage' : 'usb',
+      deviceId: this.deviceId(),
+      itemType: 'storage-device' as const,
+    }));
+  });
 
   readonly selectedDirectoryState = computed(() =>
     this.storageStore.getSelectedDirectoryState(this.deviceId())()
@@ -187,6 +221,13 @@ export class DirectoryFilesComponent {
     return item.path;
   }
 
+  /**
+   * Track storage devices by storage type for Angular change detection.
+   * Used in device-level view with virtual scrolling.
+   */
+  trackByStorageType = (_index: number, item: StorageDeviceItem): StorageType =>
+    item.storageType;
+
   isSelected(item: DirectoryItem | FileItem): boolean {
     const selected = this.selectedItem();
     return selected !== null && selected.path === item.path;
@@ -231,5 +272,36 @@ export class DirectoryFilesComponent {
       files: contents.files,
       launchMode: LaunchMode.Directory,
     });
+  }
+
+  /**
+   * Handler for selecting a storage device (single click).
+   * Uses type assertion as selectedItem handles multiple item types.
+   */
+  onStorageDeviceSelected(device: StorageDeviceItem): void {
+    this.selectedItem.set(device as unknown as DirectoryItem);
+  }
+
+  /**
+   * Handler for navigating into a storage device (double click).
+   * Navigates to the root directory of the selected storage.
+   */
+  onStorageDeviceDoubleClick(device: StorageDeviceItem): void {
+    this.storageStore.navigateToDirectory({
+      deviceId: device.deviceId,
+      storageType: device.storageType,
+      path: '/',
+    });
+    this.selectedItem.set(null);
+  }
+
+  /**
+   * Check if a storage device is currently selected.
+   * Uses type guard to safely check storageType property.
+   */
+  isStorageDeviceSelected(device: StorageDeviceItem): boolean {
+    const selected = this.selectedItem();
+    if (!selected || !('itemType' in selected)) return false;
+    return (selected as { storageType?: StorageType }).storageType === device.storageType;
   }
 }

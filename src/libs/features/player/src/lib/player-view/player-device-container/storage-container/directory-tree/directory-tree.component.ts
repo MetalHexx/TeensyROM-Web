@@ -285,6 +285,12 @@ export class DirectoryTreeComponent implements AfterViewInit {
   }
 
   isNodeSelected(node: DirectoryTreeNode): boolean {
+    // Check device node selection first (doesn't require selectedDirectoryState)
+    if (node.type === DirectoryTreeNodeType.Device && node.deviceId) {
+      return this.storageStore.isDeviceLevelView(node.deviceId)();
+    }
+
+    // For other node types, we need selectedDirectoryState
     const selectedState = this.selectedDirectoryState();
     if (!selectedState || !node.deviceId || !node.storageType || !node.path) {
       return false;
@@ -299,6 +305,12 @@ export class DirectoryTreeComponent implements AfterViewInit {
 
   onDirectoryClick(node: DirectoryTreeNode) {
     logInfo(LogType.Select, `Directory selected: ${node.name}`, node);
+
+    // Handle device node click - navigate to device level
+    if (node.type === DirectoryTreeNodeType.Device && node.deviceId) {
+      this.storageStore.navigateToDeviceLevel({ deviceId: node.deviceId });
+      return;
+    }
 
     // Only trigger navigation for directories and storage types
     if (

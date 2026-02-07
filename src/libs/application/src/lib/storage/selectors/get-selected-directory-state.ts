@@ -8,7 +8,7 @@ export function getSelectedDirectoryState(store: WritableStore<StorageState>) {
     getSelectedDirectoryState: (deviceId: string) =>
       computed<StorageDirectoryState | null>(() => {
         const selected = store.selectedDirectories()[deviceId];
-        if (!selected) return null;
+        if (!selected || selected.storageType === null) return null;
         const key = StorageKeyUtil.create(selected.deviceId, selected.storageType);
         return store.storageEntries()[key] ?? null;
       }),

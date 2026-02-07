@@ -27,13 +27,13 @@ export interface SearchState {
 
 export interface SelectedDirectory {
   deviceId: string;
-  storageType: StorageType;
+  storageType: StorageType | null;
   path: string;
 }
 
 export interface NavigationHistoryItem {
   path: string;
-  storageType: StorageType;
+  storageType: StorageType | null;
 }
 
 export class NavigationHistory {

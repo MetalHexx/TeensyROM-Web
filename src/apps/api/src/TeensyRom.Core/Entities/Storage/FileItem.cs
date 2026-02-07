@@ -33,7 +33,6 @@ namespace TeensyRom.Core.Entities.Storage
         public TeensyStorageType StorageType { get; set; } = TeensyStorageType.SD;
         public string Id => $"{Size}{Path.FileName}";
         public TeensyFileType FileType => Path.Extension.GetFileType();
-        public bool IsCompatible { get; set; } = true;
 
 
 

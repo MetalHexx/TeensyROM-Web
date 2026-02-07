@@ -26,16 +26,12 @@ export function navigateDirectoryBackward(
 
       logInfo(LogType.Navigate, `Navigating backward for device: ${deviceId}`);
 
-      // Get current NavigationHistory for device
       const currentHistory = store.navigationHistory()[deviceId] || new NavigationHistory();
 
-      // Check if backward navigation is possible
       if (currentHistory.currentIndex <= 0) {
         logInfo(LogType.Info, `Already at beginning of history for device: ${deviceId}`);
         return;
       }
-
-      // Calculate new index and get target item with storage type
       const newIndex = currentHistory.currentIndex - 1;
       const targetItem = currentHistory.history[newIndex];
 
@@ -46,7 +42,6 @@ export function navigateDirectoryBackward(
 
       const { path: targetPath, storageType } = targetItem;
 
-      // Update NavigationHistory state
       const updatedHistory = new NavigationHistory(currentHistory.maxHistorySize);
       updatedHistory.history = [...currentHistory.history];
       updatedHistory.currentIndex = newIndex;
@@ -63,12 +58,18 @@ export function navigateDirectoryBackward(
         LogType.Info,
         `Updated history index to ${newIndex} for device: ${deviceId}, target path: ${targetPath}, storageType: ${storageType}`
       );
-      const key = StorageKeyUtil.create(deviceId, storageType);
 
-      // Clear any active search when navigating (search is device-level, not storage-specific)
       clearSearchState(store, deviceId, actionMessage);
 
       setDeviceSelectedDirectory(store, deviceId, storageType, targetPath, actionMessage);
+
+      if (storageType === null) {
+        logInfo(LogType.Info, `Navigated backward to device-level view for device: ${deviceId}`);
+        logInfo(LogType.Finish, `Backward navigation to device-level completed for device: ${deviceId}`);
+        return;
+      }
+
+      const key = StorageKeyUtil.create(deviceId, storageType);
 
       const existingEntry = getStorage(store, key);
       if (isDirectoryLoadedAtPath(existingEntry, targetPath)) {

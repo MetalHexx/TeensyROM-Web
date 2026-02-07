@@ -21,6 +21,12 @@
   flex: 1;
   min-width: 0;
   min-height: 24px;
+
+  // Ensure icon aligns perfectly with text
+  lib-icon-label {
+    display: flex;
+    align-items: center;
+  }
 }
 
 lib-storage-item-actions {

@@ -224,7 +224,7 @@ export { LogType, logInfo, logError, logWarn } from '@teensyrom-nx/utils';
 export function setDeviceSelectedDirectory(
   store: WritableStore<StorageState>,
   deviceId: string,
-  storageType: StorageType,
+  storageType: StorageType | null,
   path: string,
   actionMessage: string
 ): void {

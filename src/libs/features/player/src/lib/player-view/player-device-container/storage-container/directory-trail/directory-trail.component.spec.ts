@@ -416,8 +416,70 @@ describe('DirectoryTrailComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should not allow navigate up from root path', () => {
+    it('should allow navigate up from root path to device level', () => {
+      expect(component.canNavigateUp()).toBe(true);
+    });
+
+    it('should call navigateUpOneDirectory when up clicked from root', () => {
+      component.onUpClick();
+
+      expect(mockStorageStore.navigateUpOneDirectory).toHaveBeenCalledWith({
+        deviceId: 'test-device',
+        storageType: 'SD',
+      });
+    });
+  });
+
+  describe('Device Level Navigation', () => {
+    let mockStorageStore: Partial<StorageStore>;
+
+    beforeEach(async () => {
+      // Mock device level view (no storage type selected)
+      mockStorageStore = {
+        getSelectedDirectoryState: () => () => null,
+        getSelectedDirectoryForDevice: () => null,
+        navigationHistory: () => ({
+          'test-device': { history: [], currentIndex: -1, maxHistorySize: 50 },
+        }),
+        navigateUpOneDirectory: vi.fn(),
+        refreshDirectory: vi.fn(),
+        navigateToDirectory: vi.fn(),
+        navigateDirectoryBackward: vi.fn(),
+        navigateDirectoryForward: vi.fn(),
+      };
+
+      await TestBed.configureTestingModule({
+        imports: [
+          DirectoryTrailComponent,
+          CompactCardLayoutComponent,
+          DirectoryNavigateComponent,
+          DirectoryBreadcrumbComponent,
+        ],
+        providers: [
+          provideNoopAnimations(),
+          { provide: StorageStore, useValue: mockStorageStore },
+          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
+        ],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(DirectoryTrailComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'test-device');
+      fixture.detectChanges();
+    });
+
+    it('should not allow navigate up from device level', () => {
       expect(component.canNavigateUp()).toBe(false);
+    });
+
+    it('should detect device level view correctly', () => {
+      expect(component.isDeviceLevelView()).toBe(true);
+    });
+
+    it('should not call navigateUpOneDirectory when up clicked from device level', () => {
+      component.onUpClick();
+
+      expect(mockStorageStore.navigateUpOneDirectory).not.toHaveBeenCalled();
     });
   });
 

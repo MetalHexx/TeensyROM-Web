@@ -9,6 +9,8 @@ import { StorageType } from '@teensyrom-nx/domain';
 interface MockStorageStore {
   getDeviceDirectories: ReturnType<typeof vi.fn>;
   navigateToDirectory: ReturnType<typeof vi.fn>;
+  navigateToDeviceLevel: ReturnType<typeof vi.fn>;
+  isDeviceLevelView: ReturnType<typeof vi.fn>;
   getDeviceStorageEntries: ReturnType<typeof vi.fn>;
   getSelectedDirectoryState: ReturnType<typeof vi.fn>;
 }
@@ -27,6 +29,8 @@ describe('DirectoryTreeComponent', () => {
     mockStorageStore = {
       getDeviceDirectories: vi.fn().mockReturnValue(() => []), // Return empty array, not object
       navigateToDirectory: vi.fn(),
+      navigateToDeviceLevel: vi.fn(),
+      isDeviceLevelView: vi.fn().mockReturnValue(() => false), // Default: not at device level
       getDeviceStorageEntries: vi.fn().mockReturnValue(() => ({
         'test-device-123-SD': {
           deviceId: 'test-device-123',
@@ -132,6 +136,211 @@ describe('DirectoryTreeComponent', () => {
     component.onDirectoryClick(deviceNode);
 
     expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
+  });
+
+  // Device-Level Navigation Tests
+  describe('Device-Level Navigation', () => {
+    it('should call navigateToDeviceLevel when clicking device node with deviceId', () => {
+      const deviceNode = {
+        id: 'device-test-123',
+        name: 'Test Device',
+        type: DirectoryTreeNodeType.Device,
+        icon: 'desktop_windows',
+        deviceId: 'test-device-123',
+      };
+
+      component.onDirectoryClick(deviceNode);
+
+      expect(mockStorageStore.navigateToDeviceLevel).toHaveBeenCalledWith({
+        deviceId: 'test-device-123',
+      });
+      expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
+    });
+
+    it('should not call navigateToDeviceLevel when device node lacks deviceId', () => {
+      const deviceNode = {
+        id: 'device-test',
+        name: 'Test Device',
+        type: DirectoryTreeNodeType.Device,
+        icon: 'desktop_windows',
+      };
+
+      component.onDirectoryClick(deviceNode);
+
+      expect(mockStorageStore.navigateToDeviceLevel).not.toHaveBeenCalled();
+      expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
+    });
+
+    it('should not mark device node as selected when not at device level', () => {
+      // Mock remains false from setup
+      const deviceNode = {
+        id: 'device-test-123',
+        name: 'Test Device',
+        type: DirectoryTreeNodeType.Device,
+        icon: 'desktop_windows',
+        deviceId: 'test-device-123',
+      };
+
+      const isSelected = component.isNodeSelected(deviceNode);
+
+      expect(isSelected).toBeFalsy();
+    });
+
+    it('should not mark device node as selected when deviceId is missing', () => {
+      const deviceNode = {
+        id: 'device-test',
+        name: 'Test Device',
+        type: DirectoryTreeNodeType.Device,
+        icon: 'desktop_windows',
+      };
+
+      const isSelected = component.isNodeSelected(deviceNode);
+
+      expect(isSelected).toBeFalsy();
+      // Don't check if isDeviceLevelView was called - it may be called during tree rendering
+      // The important thing is that isNodeSelected returns false
+    });
+  });
+
+  // Test device node selection with device-level view
+  describe('Device-Level Navigation - Selection at Device Level', () => {
+    let component2: DirectoryTreeComponent;
+    let fixture2: ComponentFixture<DirectoryTreeComponent>;
+    let componentRef2: ComponentRef<DirectoryTreeComponent>;
+    let mockStore2: MockStorageStore;
+
+    beforeEach(async () => {
+      TestBed.resetTestingModule(); // Reset before configuring again
+      
+      // Create mock with isDeviceLevelView returning true
+      mockStore2 = {
+        getDeviceDirectories: vi.fn().mockReturnValue(() => []),
+        navigateToDirectory: vi.fn(),
+        navigateToDeviceLevel: vi.fn(),
+        isDeviceLevelView: vi.fn().mockReturnValue(() => true), // At device level
+        getDeviceStorageEntries: vi.fn().mockReturnValue(() => ({
+          'test-device-123-SD': {
+            deviceId: 'test-device-123',
+            storageType: StorageType.Sd,
+            currentPath: '/',
+            directory: null,
+            isLoaded: false,
+            isLoading: false,
+            error: null,
+            lastLoadTime: null,
+          },
+        })),
+        getSelectedDirectoryState: vi.fn().mockReturnValue(() => null),
+      };
+
+      await TestBed.configureTestingModule({
+        imports: [DirectoryTreeComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStore2 }],
+      }).compileComponents();
+
+      fixture2 = TestBed.createComponent(DirectoryTreeComponent);
+      component2 = fixture2.componentInstance;
+      componentRef2 = fixture2.componentRef;
+
+      componentRef2.setInput('deviceId', 'test-device-123');
+      fixture2.detectChanges();
+    });
+
+    it('should mark device node as selected when at device level', () => {
+      const deviceNode = {
+        id: 'device-test-123',
+        name: 'Test Device',
+        type: DirectoryTreeNodeType.Device,
+        icon: 'desktop_windows',
+        deviceId: 'test-device-123',
+      };
+
+      const isSelected = component2.isNodeSelected(deviceNode);
+
+      expect(isSelected).toBeTruthy();
+      expect(mockStore2.isDeviceLevelView).toHaveBeenCalledWith('test-device-123');
+    });
+  });
+
+  // Test directory node selection logic
+  describe('Device-Level Navigation - Directory Selection', () => {
+    let component3: DirectoryTreeComponent;
+    let fixture3: ComponentFixture<DirectoryTreeComponent>;
+    let componentRef3: ComponentRef<DirectoryTreeComponent>;
+    let mockStore3: MockStorageStore;
+
+    beforeEach(async () => {
+      TestBed.resetTestingModule(); // Reset before configuring again
+      
+      // Create mock with selected directory set
+      mockStore3 = {
+        getDeviceDirectories: vi.fn().mockReturnValue(() => []),
+        navigateToDirectory: vi.fn(),
+        navigateToDeviceLevel: vi.fn(),
+        isDeviceLevelView: vi.fn().mockReturnValue(() => false),
+        getDeviceStorageEntries: vi.fn().mockReturnValue(() => ({
+          'test-device-123-SD': {
+            deviceId: 'test-device-123',
+            storageType: StorageType.Sd,
+            currentPath: '/',
+            directory: null,
+            isLoaded: false,
+            isLoading: false,
+            error: null,
+            lastLoadTime: null,
+          },
+        })),
+        getSelectedDirectoryState: vi.fn().mockReturnValue(() => ({
+          deviceId: 'test-device-123',
+          storageType: StorageType.Sd,
+          currentPath: '/games',
+        })),
+      };
+
+      await TestBed.configureTestingModule({
+        imports: [DirectoryTreeComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStore3 }],
+      }).compileComponents();
+
+      fixture3 = TestBed.createComponent(DirectoryTreeComponent);
+      component3 = fixture3.componentInstance;
+      componentRef3 = fixture3.componentRef;
+
+      componentRef3.setInput('deviceId', 'test-device-123');
+      fixture3.detectChanges();
+    });
+
+    it('should maintain existing selection logic for directory nodes', () => {
+      const directoryNode = {
+        id: 'dir-test',
+        name: 'Games',
+        type: DirectoryTreeNodeType.Directory,
+        icon: 'folder',
+        deviceId: 'test-device-123',
+        storageType: StorageType.Sd,
+        path: '/games',
+      };
+
+      const isSelected = component3.isNodeSelected(directoryNode);
+
+      expect(isSelected).toBeTruthy();
+    });
+
+    it('should not mark directory node as selected when path differs', () => {
+      const directoryNode = {
+        id: 'dir-test',
+        name: 'Music',
+        type: DirectoryTreeNodeType.Directory,
+        icon: 'folder',
+        deviceId: 'test-device-123',
+        storageType: StorageType.Sd,
+        path: '/music',
+      };
+
+      const isSelected = component3.isNodeSelected(directoryNode);
+
+      expect(isSelected).toBeFalsy();
+    });
   });
 
   it('should expand storage node with directories when store has data', () => {
@@ -472,6 +681,8 @@ describe('DirectoryTreeComponent - Single Storage', () => {
     mockStorageStore = {
       getDeviceDirectories: vi.fn().mockReturnValue(() => []),
       navigateToDirectory: vi.fn(),
+      navigateToDeviceLevel: vi.fn(),
+      isDeviceLevelView: vi.fn().mockReturnValue(() => false),
       getDeviceStorageEntries: vi.fn().mockReturnValue(() => ({
         'test-device-123-SD': {
           deviceId: 'test-device-123',

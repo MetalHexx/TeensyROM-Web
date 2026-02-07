@@ -50,9 +50,18 @@ export class DirectoryTrailComponent {
     }
   });
 
+  isDeviceLevelView = computed(() => {
+    const selected = this.selectedDirectory();
+    return !selected || selected.storageType === null;
+  });
+
   canNavigateUp = computed(() => {
-    const path = this.currentPath();
-    return path !== '/' && path !== '';
+    // Cannot navigate up from device level (nowhere higher to go)
+    if (this.isDeviceLevelView()) return false;
+
+    // Can navigate up from any storage directory (including root)
+    // When at root (/), navigating up goes to device level
+    return true;
   });
 
   canNavigateBack = computed(() => {
@@ -95,6 +104,12 @@ export class DirectoryTrailComponent {
     const selected = this.selectedDirectory();
     if (!selected) return;
 
+    // If at device level, can't go up (nowhere higher)
+    if (selected.storageType === null) return;
+
+    // navigateUpOneDirectory handles both:
+    // - Regular directory navigation (goes to parent directory)
+    // - Root directory navigation (goes to device level by setting storageType to null)
     this.storageStore.navigateUpOneDirectory({
       deviceId: selected.deviceId,
       storageType: selected.storageType,
@@ -103,7 +118,7 @@ export class DirectoryTrailComponent {
 
   onRefreshClick(): void {
     const selected = this.selectedDirectory();
-    if (!selected) return;
+    if (!selected || selected.storageType === null) return;
 
     this.storageStore.refreshDirectory({
       deviceId: selected.deviceId,
@@ -113,7 +128,7 @@ export class DirectoryTrailComponent {
 
   onNavigationRequested(path: string): void {
     const selected = this.selectedDirectory();
-    if (!selected) return;
+    if (!selected || selected.storageType === null) return;
 
     this.storageStore.navigateToDirectory({
       deviceId: selected.deviceId,

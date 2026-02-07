@@ -1,6 +1,6 @@
 <div class="directory-files">
   <lib-scaling-card
-    title="Current Directory"
+    [title]="isDeviceLevelView() ? 'Storage Devices' : 'Current Directory'"
     [animationTrigger]="animationTrigger()"
     [animationEntry]="'from-left'"
     [animationExit]="'from-right'"
@@ -10,8 +10,35 @@
 
     @if (directoryContents().error) {
     <p class="error">Error: {{ directoryContents().error }}</p>
-    } @else if (directoryContents().hasContent && (directoryContents().directories.length > 0 ||
+    } @else if (isDeviceLevelView()) {
+    <!-- Device-level view: show storage devices -->
+    @if (storageDevices().length > 0) {
+    <div class="viewport-wrapper">
+      <cdk-virtual-scroll-viewport
+        #viewport
+        itemSize="42"
+        class="files-viewport"
+        minBufferPx="200"
+        maxBufferPx="400"
+      >
+        <div
+          *cdkVirtualFor="let device of storageDevices(); trackBy: trackByStorageType"
+          class="file-list-item list-item-highlight"
+        >
+          <lib-storage-device-item
+            [storageDevice]="device"
+            [selected]="isStorageDeviceSelected(device)"
+            (itemSelected)="onStorageDeviceSelected($event)"
+            (itemDoubleClicked)="onStorageDeviceDoubleClick($event)"
+          />
+        </div>
+      </cdk-virtual-scroll-viewport>
+    </div>
+    } @else {
+    <p>No storage devices available.</p>
+    } } @else if (directoryContents().hasContent && (directoryContents().directories.length > 0 ||
     directoryContents().files.length > 0)) {
+    <!-- Storage-level view: show directory contents -->
     <div class="viewport-wrapper">
       <cdk-virtual-scroll-viewport
         #viewport

@@ -100,6 +100,8 @@ describe('DirectoryFilesComponent', () => {
     mockStorageStore = {
       getSelectedDirectoryState: vi.fn(() => directoryStateSignal.asReadonly()),
       navigateToDirectory: vi.fn(),
+      isDeviceLevelView: vi.fn(() => signal(false).asReadonly()),
+      getDeviceStorageEntries: vi.fn(() => signal({}).asReadonly()),
     };
 
     mockPlayerContext = {
@@ -426,5 +428,137 @@ describe('DirectoryFilesComponent', () => {
     // which is difficult in the current test structure. Virtual scrolling behavior
     // is validated through manual testing and the integration tests above confirm
     // the viewport is properly configured and functional.
+  });
+
+  describe('Device-Level View', () => {
+    beforeEach(() => {
+      // Mock isDeviceLevelView to return true
+      mockStorageStore.isDeviceLevelView = vi.fn(() => signal(true).asReadonly());
+
+      // Mock getDeviceStorageEntries to return storage entries
+      mockStorageStore.getDeviceStorageEntries = vi.fn(() =>
+        signal({
+          'device-1-Sd': {
+            deviceId: 'device-1',
+            storageType: StorageType.Sd,
+            currentPath: null,
+            directory: null,
+            isLoading: false,
+            isLoaded: false,
+            error: null,
+            lastLoadTime: null,
+          },
+          'device-1-Usb': {
+            deviceId: 'device-1',
+            storageType: StorageType.Usb,
+            currentPath: null,
+            directory: null,
+            isLoading: false,
+            isLoaded: false,
+            error: null,
+            lastLoadTime: null,
+          },
+        }).asReadonly()
+      );
+    });
+
+    it('should detect device-level view', () => {
+      // Re-create component with device-level view mocks
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      expect(component.isDeviceLevelView()).toBe(true);
+    });
+
+    it('should build storage devices list at device level', () => {
+      // Re-create component with device-level view mocks
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const devices = component.storageDevices();
+      expect(devices).toHaveLength(2);
+      expect(devices[0]).toMatchObject({
+        name: 'SD Storage',
+        storageType: StorageType.Sd,
+        icon: 'sd_storage',
+        deviceId: 'device-1',
+        itemType: 'storage-device',
+      });
+      expect(devices[1]).toMatchObject({
+        name: 'USB Storage',
+        storageType: StorageType.Usb,
+        icon: 'usb',
+        deviceId: 'device-1',
+        itemType: 'storage-device',
+      });
+    });
+
+    it('should return empty array when not at device level', () => {
+      mockStorageStore.isDeviceLevelView = vi.fn(() => signal(false).asReadonly());
+
+      // Re-create component
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const devices = component.storageDevices();
+      expect(devices).toHaveLength(0);
+    });
+
+    it('should handle storage device selection', () => {
+      // Re-create component with device-level view mocks
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const device = component.storageDevices()[0];
+      component.onStorageDeviceSelected(device);
+
+      const selected = component.selectedItem();
+      expect(selected).toBeTruthy();
+      // Type assertion used in component - check storageType property exists
+      expect('storageType' in (selected ?? {})).toBe(true);
+      expect((selected as unknown as { storageType: StorageType }).storageType).toBe(
+        StorageType.Sd
+      );
+    });
+
+    it('should navigate to storage root on double-click', () => {
+      // Re-create component with device-level view mocks
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const device = component.storageDevices()[0];
+      component.onStorageDeviceDoubleClick(device);
+
+      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+        deviceId: 'device-1',
+        storageType: StorageType.Sd,
+        path: '/',
+      });
+      expect(component.selectedItem()).toBeNull();
+    });
+
+    it('should correctly identify selected storage device', () => {
+      // Re-create component with device-level view mocks
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const devices = component.storageDevices();
+      component.onStorageDeviceSelected(devices[0]);
+
+      expect(component.isStorageDeviceSelected(devices[0])).toBe(true);
+      expect(component.isStorageDeviceSelected(devices[1])).toBe(false);
+    });
   });
 });

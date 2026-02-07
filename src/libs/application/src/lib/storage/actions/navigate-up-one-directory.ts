@@ -36,6 +36,48 @@ export function navigateUpOneDirectory(
       }
 
       const currentPath = entry.currentPath;
+
+      const isAtRoot = currentPath === '/' || currentPath === '';
+      if (isAtRoot) {
+        logInfo(
+          LogType.Navigate,
+          `Navigating up from storage root to device level for device: ${deviceId}`
+        );
+
+        clearSearchState(store, deviceId, actionMessage);
+        setDeviceSelectedDirectory(store, deviceId, null, '/', actionMessage);
+
+        const currentHistory = store.navigationHistory()[deviceId] || new NavigationHistory();
+        const updatedHistory = new NavigationHistory(currentHistory.maxHistorySize);
+
+        updatedHistory.history = [
+          ...currentHistory.history.slice(0, currentHistory.currentIndex + 1),
+          { path: '/', storageType: null },
+        ];
+        updatedHistory.currentIndex = updatedHistory.history.length - 1;
+        updatedHistory.maxHistorySize = currentHistory.maxHistorySize;
+
+        if (updatedHistory.history.length > updatedHistory.maxHistorySize) {
+          const excess = updatedHistory.history.length - updatedHistory.maxHistorySize;
+          updatedHistory.history = updatedHistory.history.slice(excess);
+          updatedHistory.currentIndex -= excess;
+        }
+
+        updateState(store, actionMessage, (state) => ({
+          navigationHistory: {
+            ...state.navigationHistory,
+            [deviceId]: updatedHistory,
+          },
+        }));
+
+        logInfo(
+          LogType.Info,
+          `Transitioned to device-level view for device: ${deviceId}`
+        );
+        logInfo(LogType.Finish, `Navigate up to device level completed for device: ${deviceId}`);
+        return;
+      }
+
       const parentPath = calculateParentPath(currentPath);
 
       if (currentPath === parentPath) {
