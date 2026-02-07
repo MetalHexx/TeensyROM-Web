@@ -4,6 +4,7 @@
   height: 100%;
   width: 100%;
   min-height: 0;
+  min-width: 0; // Allow shrinking to phone sizes
 }
 
 .device-container {
@@ -25,6 +26,7 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 1rem;
+    min-width: 0; // Allow shrinking without forcing width on parent
 
     // Stack header components vertically on smaller screens
     @media (max-width: 768px) {
@@ -49,21 +51,11 @@
     flex: 1;
     min-height: 0;
     overflow: hidden;
-
-    // Stack storage components vertically on smaller screens
-    @media (max-width: 900px) {
-      flex-direction: column;
-      overflow-y: auto;
-      height: auto;
-      min-height: 400px;
-    }
   }
 
   // Responsive adjustments for when device containers are stacked
   @media (max-width: 1200px) {
-    height: auto;
     min-height: 600px;
-    flex: none;
   }
 }
 

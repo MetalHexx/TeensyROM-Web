@@ -4,6 +4,7 @@
   height: 100%;
   width: 100%;
   min-height: 0;
+  min-width: 0; // Allow shrinking to phone sizes
 }
 
 .storage-container {
@@ -12,6 +13,7 @@
   gap: 1rem;
   height: 100%;
   flex: 1;
+  min-width: 0; // Allow shrinking to phone sizes
 
     .top-row {
     display: flex;
@@ -42,8 +44,13 @@
       }
 
       @media (max-width: 1200px) {
-        flex: 0 0 300px;
-        max-width: 300px;
+        flex: 1 1 auto; // Allow flexible sizing
+        max-width: none; // Remove constraint
+        min-width: 200px; // Minimum for usability
+      }
+
+      @media (max-width: 480px) {
+        min-width: 0; // Remove all constraints on small phones
       }
     }
 
@@ -81,11 +88,10 @@
     flex: 1;
     min-height: 0;
 
-    // Stack left and right containers vertically on smaller screens
+    // No layout changes needed at mobile — left-container is hidden,
+    // so right-container fills space naturally via row flex layout
     @media (max-width: 1200px) {
-      flex-direction: column;
-      height: auto;
-      overflow-y: auto;
+      gap: 0;
     }
 
     .left-container {
@@ -97,19 +103,14 @@
       height: 100%;
       min-height: 0;
       width: fit-content; // Size to content width
-      min-width: 327px; // Match filter-toolbar's typical rendered width
+      min-width: 0; // Allow shrinking when hidden
       max-width: 60%; // Prevent taking too much space
       overflow-x: auto; // Scroll when content exceeds max-width
       overflow-y: hidden;
 
-      // Responsive adjustments for stacked layout
+      // Hide directory tree at smaller breakpoints
       @media (max-width: 1200px) {
-        flex: none;
-        min-width: 0;
-        max-width: none; // Mobile: use full available width
-        height: auto;
-        min-height: 300px;
-        overflow-x: auto; // Maintain horizontal scroll on mobile
+        display: none;
       }
     }
 
@@ -121,8 +122,7 @@
       flex: 1 1 0; // Grow and shrink, start from zero basis
       height: 100%;
       min-height: 0;
-      min-width: 350px;
-      overflow: hidden;
+      min-width: 0; // Allow shrinking without limit for phone displays
       position: relative; // Enable absolute positioning for children
 
       // Make components fill container with absolute positioning for animations
@@ -135,14 +135,6 @@
         left: 0;
         width: 100%;
         height: 100%;
-      }
-
-      // Responsive adjustments for stacked layout
-      @media (max-width: 1200px) {
-        flex: none;
-        min-width: 0;
-        height: auto;
-        min-height: 400px;
       }
     }
   }

@@ -100,6 +100,11 @@ lib-header {
   position: relative;
   padding: 1rem; // Equal padding on all sides
   gap: 1rem; // Space between nav rail and content
+
+  @media (max-width: 768px) {
+    padding: 0.5rem; // Reduce padding on tablets and phones
+    gap: 0.5rem;
+  }
 }
 
 lib-nav-rail {

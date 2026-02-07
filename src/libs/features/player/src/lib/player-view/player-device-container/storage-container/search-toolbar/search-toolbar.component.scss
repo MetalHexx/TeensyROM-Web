@@ -14,5 +14,9 @@
   .search-field {
     flex: 1;
     min-width: 200px;
+
+    @media (max-width: 480px) {
+      min-width: 120px; // Shrink to essential size on small phones
+    }
   }
 }

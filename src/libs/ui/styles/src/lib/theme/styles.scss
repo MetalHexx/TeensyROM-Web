@@ -357,7 +357,8 @@ mat-card-title {
   min-width: 327px;
   max-width: 327px;
 
-  @media (max-width: 500px) {
+  // Allow shrinking on tablets and below to prevent width lock
+  @media (max-width: 1200px) {
     width: 100%;
     min-width: 0;
     max-width: 100%;

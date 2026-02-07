@@ -19,15 +19,14 @@
   margin: 0;
   padding: 0;
 
-  // Auto-fit grid columns with minimum width
+  // Auto-fit grid columns with minimum width that shrinks to phone sizes
   // Single device will take full width, multiple devices will share evenly
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  // Use min() function to allow shrinking below 320px if needed
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 
   // Responsive breakpoints for stacking device containers
   @media (max-width: 1200px) {
     grid-template-columns: 1fr; // Stack vertically on smaller screens
-    height: auto;
-    min-height: 100%;
   }
 }
 
@@ -39,11 +38,6 @@
   margin: 0;
   padding: 0;
   min-height: 600px; // Ensure minimum height for content
-
-  // Responsive adjustments for stacked layout
-  @media (max-width: 1200px) {
-    height: auto;
-  }
 }
 
 .device-item {
