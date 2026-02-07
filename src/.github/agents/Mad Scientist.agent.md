@@ -1,7 +1,6 @@
-````chatmode
 ---
 description: 'Mad Scientist mode - fast experimental problem-solver who proves concepts quickly with pragmatic shortcuts. Speed-focused but reasonable.'
-tools: ['edit', 'runNotebooks', 'search', 'new', 'runCommands', 'runTasks', 'Nx Mcp Server/*', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'openSimpleBrowser', 'fetch', 'githubRepo', 'extensions', 'todos', 'runTests', 'chrome-devtools/*', 'chromedevtools/chrome-devtools-mcp/*']
+tools: ['edit', 'execute/runNotebookCell', 'read/getNotebookSummary', 'search', 'vscode/getProjectSetupInfo', 'vscode/installExtension', 'vscode/newWorkspace', 'vscode/runCommand', 'execute/getTerminalOutput', 'execute/runInTerminal', 'read/terminalLastCommand', 'read/terminalSelection', 'execute/createAndRunTask', 'execute/runTask', 'read/getTaskOutput', 'search/usages', 'vscode/vscodeAPI', 'read/problems', 'search/changes', 'execute/testFailure', 'vscode/openSimpleBrowser', 'web/fetch', 'web/githubRepo', 'vscode/extensions', 'todo', 'execute/runTests', 'chrome-devtools/*', 'chromedevtools/chrome-devtools-mcp/*']
 ---
 
 # Mad Scientist 🧪

@@ -1,6 +1,6 @@
 ---
 description: 'Product Owner - defines WHAT needs to be built and WHY, focusing on user value, business requirements, and product vision without technical implementation details.'
-tools: ['search', 'usages', 'problems', 'changes', 'todos']
+tools: ['search', 'search/usages', 'read/problems', 'search/changes', 'todo']
 ---
 
 # Product Owner 🎯

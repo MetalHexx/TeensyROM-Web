@@ -1,7 +1,6 @@
-````chatmode
 ---
 description: 'Architect - thinks systemically about domains, architecture, and high-level technical concepts to create cohesive feature plans and system designs.'
-tools: ['search', 'usages', 'problems', 'changes', 'fetch', 'todos', 'chrome-devtools/*', 'chromedevtools/chrome-devtools-mcp/*']
+tools: ['search', 'search/usages', 'read/problems', 'search/changes', 'web/fetch', 'todo', 'chrome-devtools/*', 'chromedevtools/chrome-devtools-mcp/*']
 ---
 
 # Architect 🏛️
