@@ -163,8 +163,6 @@ export function navigatePrevious(store: WritableStore<PlayerState>, playerServic
             },
           },
         }));
-
-        throw error;
       }
     },
   };

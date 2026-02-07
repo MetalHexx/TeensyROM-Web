@@ -624,7 +624,10 @@ describe('PlayerContextService', () => {
 
     describe('Incompatible File Playback Prevention', () => {
       it('should prevent play() when current file is incompatible', async () => {
-        // Launch an incompatible file where launchFile fails
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
+        // Launch an incompatible file (backend returns file with isCompatible: false)
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.sid',
           path: '/music/incompatible.sid',
@@ -636,18 +639,10 @@ describe('PlayerContextService', () => {
           isCompatible: true,
         });
 
-        // First call (incompatible file) returns error
-        // Then when advancing to next compatible, launchFile succeeds
-        let callCount = 0;
-        mockPlayerService.launchFile.mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) {
-            // First call for the incompatible file fails
-            return throwError(() => new Error('Incompatible file'));
-          }
-          // Subsequent calls (advancing to compatible) succeed
-          return of(compatibleFile);
-        });
+        // First call returns the incompatible file, then auto-advancement launches compatible
+        mockPlayerService.launchFile
+          .mockReturnValueOnce(of(incompatibleFile))
+          .mockReturnValueOnce(of(compatibleFile));
 
         await service.launchFileWithContext({
           deviceId,
@@ -655,6 +650,10 @@ describe('PlayerContextService', () => {
           directoryPath: '/music',
           files: [incompatibleFile, compatibleFile],
         });
+        await nextTick();
+
+        // Advance timers past the setTimeout(1000) delay for auto-advancement
+        vi.advanceTimersByTime(1000);
         await nextTick();
 
         // At this point, the service should have auto-advanced to the compatible file
@@ -669,10 +668,15 @@ describe('PlayerContextService', () => {
 
         // Should call toggleMusic since file is now compatible
         expect(mockPlayerService.toggleMusic).toHaveBeenCalledWith(deviceId);
+
+        vi.useRealTimers();
       });
 
       it('should prevent pause() when current file is incompatible', async () => {
-        // Launch an incompatible file where launchFile fails
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
+        // Launch an incompatible file (backend returns file with isCompatible: false)
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.sid',
           path: '/music/incompatible.sid',
@@ -684,18 +688,10 @@ describe('PlayerContextService', () => {
           isCompatible: true,
         });
 
-        // First call (incompatible file) returns error
-        // Then when advancing to next compatible, launchFile succeeds
-        let callCount = 0;
-        mockPlayerService.launchFile.mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) {
-            // First call for the incompatible file fails
-            return throwError(() => new Error('Incompatible file'));
-          }
-          // Subsequent calls (advancing to compatible) succeed
-          return of(compatibleFile);
-        });
+        // First call returns the incompatible file, then auto-advancement launches compatible
+        mockPlayerService.launchFile
+          .mockReturnValueOnce(of(incompatibleFile))
+          .mockReturnValueOnce(of(compatibleFile));
 
         await service.launchFileWithContext({
           deviceId,
@@ -703,6 +699,10 @@ describe('PlayerContextService', () => {
           directoryPath: '/music',
           files: [incompatibleFile, compatibleFile],
         });
+        await nextTick();
+
+        // Advance timers past the setTimeout(1000) delay for auto-advancement
+        vi.advanceTimersByTime(1000);
         await nextTick();
 
         // At this point, the service should have auto-advanced to the compatible file
@@ -717,10 +717,15 @@ describe('PlayerContextService', () => {
 
         // Should call toggleMusic since file is now compatible
         expect(mockPlayerService.toggleMusic).toHaveBeenCalledWith(deviceId);
+
+        vi.useRealTimers();
       });
 
       it('should allow stop() even when current file is incompatible', async () => {
-        // Launch an incompatible file where launchFile fails
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
+        // Launch an incompatible file (backend returns file with isCompatible: false)
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.sid',
           path: '/music/incompatible.sid',
@@ -732,18 +737,10 @@ describe('PlayerContextService', () => {
           isCompatible: true,
         });
 
-        // First call (incompatible file) returns error
-        // Then when advancing to next compatible, launchFile succeeds
-        let callCount = 0;
-        mockPlayerService.launchFile.mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) {
-            // First call for the incompatible file fails
-            return throwError(() => new Error('Incompatible file'));
-          }
-          // Subsequent calls (advancing to compatible) succeed
-          return of(compatibleFile);
-        });
+        // First call returns the incompatible file, then auto-advancement launches compatible
+        mockPlayerService.launchFile
+          .mockReturnValueOnce(of(incompatibleFile))
+          .mockReturnValueOnce(of(compatibleFile));
 
         await service.launchFileWithContext({
           deviceId,
@@ -751,6 +748,10 @@ describe('PlayerContextService', () => {
           directoryPath: '/music',
           files: [incompatibleFile, compatibleFile],
         });
+        await nextTick();
+
+        // Advance timers past the setTimeout(1000) delay for auto-advancement
+        vi.advanceTimersByTime(1000);
         await nextTick();
 
         // At this point, the service should have auto-advanced to the compatible file
@@ -765,6 +766,8 @@ describe('PlayerContextService', () => {
 
         // Should call the API
         expect(mockDeviceService.resetDevice).toHaveBeenCalledWith(deviceId);
+
+        vi.useRealTimers();
       });
     });
 

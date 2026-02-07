@@ -11,6 +11,7 @@ import {
   DEVICE_SERVICE,
   ALERT_SERVICE,
   IAlertService,
+  PLAYER_LAUNCH_DELAY_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore, PlayerState } from './player-store';
@@ -158,6 +159,7 @@ describe('PlayerContextService - isSlowLoading', () => {
         { provide: PLAYER_SERVICE, useValue: mockPlayerService },
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
+        { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 }, // Instant timing for tests
         {
           provide: PLAYER_STORAGE,
           useValue: {
@@ -194,21 +196,19 @@ describe('PlayerContextService - isSlowLoading', () => {
   });
 
   describe('2-Second Delay Threshold', () => {
-    it(
-      'should return true after 2 seconds when device is loading',
-      async () => {
-        service.initializePlayer('device1');
-        const slowLoadingSignal = service.isSlowLoading();
+    it('should return true after 2 seconds when device is loading', async () => {
+      service.initializePlayer('device1');
+      const slowLoadingSignal = service.isSlowLoading();
 
-        setDeviceLoading('device1', true);
-        expect(slowLoadingSignal()).toBe(false);
-
-        // Wait 2+ seconds for the delay to trigger
-        await wait(2100);
-        expect(slowLoadingSignal()).toBe(true);
-      },
-      { timeout: 5000 }
-    );
+      setDeviceLoading('device1', true);
+      TestBed.flushEffects(); // Flush signal updates
+      
+      // Wait for RxJS observable to complete (even 0ms timer is async)
+      await wait(10);
+      TestBed.flushEffects();
+      
+      expect(slowLoadingSignal()).toBe(true);
+    });
 
     it(
       'should stay false for fast launches that complete before 2 seconds',
@@ -217,105 +217,108 @@ describe('PlayerContextService - isSlowLoading', () => {
         const slowLoadingSignal = service.isSlowLoading();
 
         setDeviceLoading('device1', true);
+        TestBed.flushEffects();
         expect(slowLoadingSignal()).toBe(false);
 
         // Complete before 2 seconds
         await wait(1000);
         setDeviceLoading('device1', false);
+        TestBed.flushEffects();
 
         // Wait past the 2-second mark
         await wait(1500);
+        TestBed.flushEffects();
         expect(slowLoadingSignal()).toBe(false);
       },
       { timeout: 5000 }
     );
 
-    it(
-      'should return false immediately when slow launch completes',
-      async () => {
-        service.initializePlayer('device1');
-        const slowLoadingSignal = service.isSlowLoading();
+    it('should return false immediately when slow launch completes', async () => {
+      service.initializePlayer('device1');
+      const slowLoadingSignal = service.isSlowLoading();
 
-        setDeviceLoading('device1', true);
+      setDeviceLoading('device1', true);
+      TestBed.flushEffects();
+      
+      // Wait for RxJS observable to complete
+      await wait(10);
+      TestBed.flushEffects();
+      expect(slowLoadingSignal()).toBe(true);
 
-        // Wait for slow loading to trigger
-        await wait(2100);
-        expect(slowLoadingSignal()).toBe(true);
-
-        // Complete loading - should immediately go false
-        setDeviceLoading('device1', false);
-        await wait(50);
-        expect(slowLoadingSignal()).toBe(false);
-      },
-      { timeout: 5000 }
-    );
+      // Complete loading - should immediately go false
+      setDeviceLoading('device1', false);
+      TestBed.flushEffects();
+      expect(slowLoadingSignal()).toBe(false);
+    });
   });
 
   describe('Multiple Devices', () => {
-    it(
-      'should trigger slow loading when any device exceeds 2 seconds',
-      async () => {
-        service.initializePlayer('device1');
-        service.initializePlayer('device2');
-        const slowLoadingSignal = service.isSlowLoading();
+    it('should trigger slow loading when any device exceeds 2 seconds', async () => {
+      service.initializePlayer('device1');
+      service.initializePlayer('device2');
+      const slowLoadingSignal = service.isSlowLoading();
+      slowLoadingSignal(); // Prime the signal to ensure observable subscription
 
-        setDeviceLoading('device2', true);
-        await wait(2100);
+      setDeviceLoading('device2', true);
+      TestBed.flushEffects();
+      
+      // Wait for RxJS observable to complete
+      await wait(10);
+      TestBed.flushEffects();
+      
+      expect(slowLoadingSignal()).toBe(true);
+    });
 
-        expect(slowLoadingSignal()).toBe(true);
-      },
-      { timeout: 5000 }
-    );
+    it('should return false when all devices complete', async () => {
+      service.initializePlayer('device1');
+      service.initializePlayer('device2');
+      const slowLoadingSignal = service.isSlowLoading();
+      slowLoadingSignal(); // Prime the signal
 
-    it(
-      'should return false when all devices complete',
-      async () => {
-        service.initializePlayer('device1');
-        service.initializePlayer('device2');
-        const slowLoadingSignal = service.isSlowLoading();
+      setDeviceLoading('device1', true);
+      setDeviceLoading('device2', true);
+      TestBed.flushEffects();
+      
+      // Wait for RxJS observable to complete
+      await wait(10);
+      TestBed.flushEffects();
+      expect(slowLoadingSignal()).toBe(true);
 
-        setDeviceLoading('device1', true);
-        setDeviceLoading('device2', true);
+      // Both complete
+      setDeviceLoading('device1', false);
+      setDeviceLoading('device2', false);
+      TestBed.flushEffects();
 
-        await wait(2100);
-        expect(slowLoadingSignal()).toBe(true);
-
-        // Both complete
-        setDeviceLoading('device1', false);
-        setDeviceLoading('device2', false);
-        await wait(50);
-
-        expect(slowLoadingSignal()).toBe(false);
-      },
-      { timeout: 5000 }
-    );
+      expect(slowLoadingSignal()).toBe(false);
+    });
   });
 
   describe('Dynamic Device Management', () => {
-    it(
-      'should handle device removal',
-      async () => {
-        service.initializePlayer('device1');
-        service.initializePlayer('device2');
-        setDeviceLoading('device1', true);
-        setDeviceLoading('device2', true);
+    it('should handle device removal', async () => {
+      service.initializePlayer('device1');
+      service.initializePlayer('device2');
+      setDeviceLoading('device1', true);
+      setDeviceLoading('device2', true);
+      TestBed.flushEffects();
 
-        const slowLoadingSignal = service.isSlowLoading();
-        await wait(2100);
-        expect(slowLoadingSignal()).toBe(true);
+      const slowLoadingSignal = service.isSlowLoading();
+      slowLoadingSignal(); // Prime the signal
+      
+      // Wait for RxJS observable to complete
+      await wait(10);
+      TestBed.flushEffects();
+      expect(slowLoadingSignal()).toBe(true);
 
-        // Remove device1 - should still be true due to device2
-        service.removePlayer('device1');
-        await wait(50);
-        expect(slowLoadingSignal()).toBe(true);
+      // Remove device1 - should still be true due to device2
+      service.removePlayer('device1');
+      TestBed.flushEffects();
+      expect(slowLoadingSignal()).toBe(true);
 
-        // Stop device2
-        setDeviceLoading('device2', false);
-        await wait(50);
-        expect(slowLoadingSignal()).toBe(false);
-      },
-      { timeout: 5000 }
-    );
+      // Stop device2
+      setDeviceLoading('device2', false);
+      TestBed.flushEffects();
+      expect(slowLoadingSignal()).toBe(false);
+    });
   });
 
   describe('Edge Cases', () => {
@@ -348,44 +351,42 @@ describe('PlayerContextService - isSlowLoading', () => {
   });
 
   describe('Integration with File Launch', () => {
-    it(
-      'should trigger slow loading during actual file launch',
-      async () => {
-        service.initializePlayer('device1');
-        const slowLoadingSignal = service.isSlowLoading();
-        const testFile = createTestFileItem();
+    it('should trigger slow loading during actual file launch', async () => {
+      service.initializePlayer('device1');
+      const slowLoadingSignal = service.isSlowLoading();
+      slowLoadingSignal(); // Prime the signal
+      const testFile = createTestFileItem();
 
-        // Mock slow launch - must return Observable
-        mockPlayerService.launchFile.mockImplementation(
-          () =>
-            new Observable((subscriber) => {
-              setTimeout(() => {
-                subscriber.next(testFile);
-                subscriber.complete();
-              }, 2500);
-            })
-        );
+      // Mock slow launch - must return Observable
+      mockPlayerService.launchFile.mockImplementation(
+        () =>
+          new Observable((subscriber) => {
+            setTimeout(() => {
+              subscriber.next(testFile);
+              subscriber.complete();
+            }, 100); // Small real delay for async test
+          })
+     );
 
-        // Start launch (don't await yet)
-        const launchPromise = service.launchFileWithContext({
-          deviceId: 'device1',
-          file: testFile,
-          directoryPath: '/music',
-          files: [testFile],
-          launchMode: LaunchMode.Directory,
-        });
+      // Start launch
+      const launchPromise = service.launchFileWithContext({
+        deviceId: 'device1',
+        file: testFile,
+        directoryPath: '/music',
+        files: [testFile],
+        launchMode: LaunchMode.Directory,
+      });
 
-        // Wait for slow loading threshold
-        await wait(2100);
-        expect(slowLoadingSignal()).toBe(true);
+      // Wait for RxJS observable to complete
+      await wait(10);
+      TestBed.flushEffects();
+      expect(slowLoadingSignal()).toBe(true);
 
-        // Complete launch
-        await launchPromise;
-        await wait(50);
-        expect(slowLoadingSignal()).toBe(false);
-      },
-      { timeout: 6000 }
-    );
+      // Wait for launch to complete
+      await launchPromise;
+      TestBed.flushEffects();
+      expect(slowLoadingSignal()).toBe(false);
+    });
 
     it(
       'should not trigger slow loading for fast file launches',

@@ -11,6 +11,7 @@ import {
   StorageTypeUtil,
   ALERT_SERVICE,
   IAlertService,
+  PLAYER_LAUNCH_DELAY_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerStore, LaunchedFile, HistoryEntry } from './player-store';
 import { StorageStore } from '../storage/storage-store';
@@ -28,12 +29,6 @@ import { map, distinctUntilChanged, switchMap, mapTo, take } from 'rxjs/operator
 
 @Injectable({ providedIn: 'root' })
 export class PlayerContextService implements IPlayerContext {
-  /**
-   * Delay in milliseconds before showing busy dialog for slow file launches.
-   * Prevents dialog flashing for fast operations while providing feedback for large games/programs.
-   */
-  private readonly LAUNCH_DELAY_MS = 2000;
-
   private readonly store = inject(PlayerStore);
   private readonly storageStore = inject(StorageStore);
   private readonly settingsStore = inject(SettingsStore);
@@ -42,6 +37,7 @@ export class PlayerContextService implements IPlayerContext {
   private readonly alertService: IAlertService = inject(ALERT_SERVICE);
   private readonly playerStorage = inject(PLAYER_STORAGE);
   private readonly injector = inject(Injector);
+  private readonly launchDelayMs = inject(PLAYER_LAUNCH_DELAY_MS);
 
   // Constant null signal to return when no timer exists (avoids NG0602 in reactive contexts)
   private readonly nullTimerSignal: Signal<TimerState | null> = signal<TimerState | null>(null).asReadonly();
@@ -54,8 +50,6 @@ export class PlayerContextService implements IPlayerContext {
   private readonly completionSubscriptions = new Map<string, Subscription>();
   private popstateListener: ((event: PopStateEvent) => void) | null = null;
   private isHandlingPopState = false;
-  // Track random retry attempts per device (for shuffle mode incompatible file handling)
-  private readonly randomRetryAttempts = new Map<string, number>();
 
   initializePlayer(deviceId: string): void {
     // Get default filter and timer settings from settings before initializing player
@@ -213,8 +207,8 @@ export class PlayerContextService implements IPlayerContext {
         // 1. Timer completing (slow load - emit true)
         // 2. Loading finishing (fast load - emit false via switchMap cancellation)
         return race(
-          // Timer: wait LAUNCH_DELAY_MS, then emit true
-          timer(this.LAUNCH_DELAY_MS).pipe(mapTo(true)),
+          // Timer: wait for configured delay, then emit true
+          timer(this.launchDelayMs).pipe(mapTo(true)),
           // Monitor for loading to finish: if loading becomes false before timer,
           // the switchMap cancels this inner observable
           isLoadingChanges$.pipe(
@@ -416,6 +410,9 @@ export class PlayerContextService implements IPlayerContext {
         // Important: DO NOT record history when navigating through existing history
       }
 
+      // Check for incompatible file and handle auto-advancement
+      this.handleIncompatibleFile(deviceId);
+
       return; // Early exit - don't fall through to default behavior
     }
 
@@ -439,6 +436,9 @@ export class PlayerContextService implements IPlayerContext {
       this.setupTimerForFile(deviceId, currentFile.file);
       this.updateUrlForLaunchedFile(deviceId);
     }
+
+    // Check for incompatible file and handle auto-advancement
+    this.handleIncompatibleFile(deviceId);
   }
 
   async previous(deviceId: string): Promise<void> {
@@ -471,6 +471,9 @@ export class PlayerContextService implements IPlayerContext {
         this.updateUrlForLaunchedFile(deviceId);
       }
 
+      // Check for incompatible file and handle auto-advancement
+      this.handleIncompatibleFile(deviceId);
+
       return; // Exit early - don't continue to default behavior
     }
 
@@ -493,6 +496,9 @@ export class PlayerContextService implements IPlayerContext {
       this.setupTimerForFile(deviceId, currentFile.file);
       this.updateUrlForLaunchedFile(deviceId);
     }
+
+    // Check for incompatible file and handle auto-advancement
+    this.handleIncompatibleFile(deviceId);
   }
 
   getPlayerStatus(deviceId: string) {
@@ -1013,8 +1019,6 @@ export class PlayerContextService implements IPlayerContext {
 
     // Guard: File is compatible (treat undefined as compatible)
     if (player.currentFile.isCompatible !== false) {
-      // Clear retry counter on success (file is compatible)
-      this.randomRetryAttempts.delete(deviceId);
       return;
     }
 
@@ -1032,10 +1036,10 @@ export class PlayerContextService implements IPlayerContext {
     if (player.launchMode === LaunchMode.Shuffle) {
       logInfo(
         LogType.Info,
-        `handleIncompatibleFile: Routing to retryRandomLaunch for device ${deviceId} (1s delay)`
+        `handleIncompatibleFile: Launching random file for device ${deviceId} (1s delay)`
       );
       setTimeout(() => {
-        void this.retryRandomLaunch(deviceId);
+        void this.launchRandomFile(deviceId);
       }, 1000);
     } else {
       // Directory or Search modes
@@ -1047,44 +1051,6 @@ export class PlayerContextService implements IPlayerContext {
         void this.advanceToNextCompatibleFileInDirectory(deviceId);
       }, 1000);
     }
-  }
-
-  /**
-   * Retry random file launch when incompatible file encountered in shuffle mode.
-   * Attempts up to 9 times per device before showing alert and stopping.
-   * Counters are cleared when a compatible file is successfully launched.
-   * 
-   * @param deviceId - The device identifier
-   */
-  private async retryRandomLaunch(deviceId: string): Promise<void> {
-    // Get current attempt count (default to 0 if not present)
-    const currentAttempts = this.randomRetryAttempts.get(deviceId) ?? 0;
-
-    // Calculate what the next attempt number would be
-    const nextAttempt = currentAttempts + 1;
-
-    // Check if next attempt would exceed max (allow attempts 1-9, block 10+)
-    if (nextAttempt > 9) {
-      logWarn(
-        `Unable to find compatible file after 10 attempts for device ${deviceId}`
-      );
-      this.alertService.warning('Unable to find compatible file after 10 attempts');
-      // Clear counter to avoid stale data
-      this.randomRetryAttempts.delete(deviceId);
-      return;
-    }
-
-    // Increment counter for this retry attempt
-    this.randomRetryAttempts.set(deviceId, nextAttempt);
-
-    // Log retry attempt
-    logInfo(
-      LogType.Info,
-      `Retrying random file launch (attempt ${nextAttempt}/9) for device ${deviceId}`
-    );
-
-    // Trigger new random file selection (await to ensure completion)
-    await this.launchRandomFile(deviceId);
   }
 
   /**

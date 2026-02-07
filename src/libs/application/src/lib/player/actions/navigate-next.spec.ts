@@ -298,7 +298,7 @@ describe('navigateNext', () => {
       expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(1);
     });
 
-    it('E: should throw error when all files are incompatible', async () => {
+    it('E: should set error state when all files are incompatible', async () => {
       // Arrange: All files incompatible
       const files = [
         createTestFileItem({ name: 'song1.sid', isCompatible: false }),
@@ -321,12 +321,15 @@ describe('navigateNext', () => {
         },
       }));
 
-      // Act & Assert
+      // Act
       const action = navigateNext(store, mockPlayerService, mockPlayerStorage);
-      await expect(action.navigateNext({ deviceId })).rejects.toThrow(
-        'All files in context are incompatible'
-      );
+      await action.navigateNext({ deviceId });
 
+      // Assert: Error state should be set, no throw
+      const playerState = store.players()[deviceId];
+      expect(playerState.error).toBe('All files in context are incompatible');
+      expect(playerState.status).toBe(PlayerStatus.Stopped);
+      
       // Verify launchFile was never called
       expect(mockPlayerService.launchFile).not.toHaveBeenCalled();
     });
@@ -356,11 +359,14 @@ describe('navigateNext', () => {
         },
       }));
 
-      // Act & Assert: Should throw after checking all 5 files once
+      // Act: Should set error state after checking all 5 files once
       const action = navigateNext(store, mockPlayerService, mockPlayerStorage);
-      await expect(action.navigateNext({ deviceId })).rejects.toThrow(
-        'All files in context are incompatible'
-      );
+      await action.navigateNext({ deviceId });
+
+      // Assert: Error state should be set
+      const playerState = store.players()[deviceId];
+      expect(playerState.error).toBe('All files in context are incompatible');
+      expect(playerState.status).toBe(PlayerStatus.Stopped);
 
       // Verify the loop terminated after files.length attempts
       expect(mockPlayerService.launchFile).not.toHaveBeenCalled();
@@ -562,7 +568,7 @@ describe('navigateNext', () => {
       expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(1);
     });
 
-    it('E: should throw error when all files are incompatible', async () => {
+    it('E: should set error state when all files are incompatible', async () => {
       // Arrange: All files incompatible
       const files = [
         createTestFileItem({ name: 'result1.sid', isCompatible: false }),
@@ -585,11 +591,14 @@ describe('navigateNext', () => {
         },
       }));
 
-      // Act & Assert
+      // Act
       const action = navigateNext(store, mockPlayerService, mockPlayerStorage);
-      await expect(action.navigateNext({ deviceId })).rejects.toThrow(
-        'All files in context are incompatible'
-      );
+      await action.navigateNext({ deviceId });
+
+      // Assert: Error state should be set, no throw
+      const playerState = store.players()[deviceId];
+      expect(playerState.error).toBe('All files in context are incompatible');
+      expect(playerState.status).toBe(PlayerStatus.Stopped);
 
       // Verify launchFile was never called
       expect(mockPlayerService.launchFile).not.toHaveBeenCalled();
@@ -620,11 +629,14 @@ describe('navigateNext', () => {
         },
       }));
 
-      // Act & Assert: Should throw after checking all 5 files once
+      // Act: Should set error state after checking all 5 files once
       const action = navigateNext(store, mockPlayerService, mockPlayerStorage);
-      await expect(action.navigateNext({ deviceId })).rejects.toThrow(
-        'All files in context are incompatible'
-      );
+      await action.navigateNext({ deviceId });
+
+      // Assert: Error state should be set
+      const playerState = store.players()[deviceId];
+      expect(playerState.error).toBe('All files in context are incompatible');
+      expect(playerState.status).toBe(PlayerStatus.Stopped);
 
       // Verify the loop terminated after files.length attempts
       expect(mockPlayerService.launchFile).not.toHaveBeenCalled();

@@ -11,6 +11,7 @@ export * from './device-storage.token';
 
 // Player contracts
 export * from './player.contract';
+export * from './player-config.token';
 
 // Alert contracts
 export * from './alert.contract';

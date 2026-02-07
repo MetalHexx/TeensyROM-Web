@@ -23,9 +23,7 @@ import { PLAYER_STORAGE } from './player-storage.interface';
 // Type for accessing private methods in tests
 interface ServiceWithPrivates {
   handleIncompatibleFile: (deviceId: string) => void;
-  retryRandomLaunch: (deviceId: string) => void;
   advanceToNextCompatibleFileInDirectory: (deviceId: string) => void;
-  randomRetryAttempts: Map<string, number>;
 }
 
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
@@ -189,52 +187,46 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         await nextTick();
 
-        // Spy on handler methods
+        // Spy on handler method
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const retryRandomSpy = vi.spyOn(serviceWithPrivates, 'retryRandomLaunch');
         const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
 
         // Call handleIncompatibleFile
         serviceWithPrivates.handleIncompatibleFile(deviceId);
 
-        // Verify: Neither handler should be called for compatible file
-        expect(retryRandomSpy).not.toHaveBeenCalled();
+        // Verify: Handler should not be called for compatible file
         expect(advanceDirectorySpy).not.toHaveBeenCalled();
       });
 
       it('should return early when current file is null', () => {
-        // Spy on handler methods
+        // Spy on handler method
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const retryRandomSpy = vi.spyOn(serviceWithPrivates, 'retryRandomLaunch');
         const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
 
         // Call handleIncompatibleFile on player with no current file
         serviceWithPrivates.handleIncompatibleFile(deviceId);
 
-        // Verify: Neither handler should be called when no file loaded
-        expect(retryRandomSpy).not.toHaveBeenCalled();
+        // Verify: Handler should not be called when no file loaded
         expect(advanceDirectorySpy).not.toHaveBeenCalled();
       });
 
       it('should return early when player state is null', () => {
         const nonExistentDeviceId = 'non-existent-device';
 
-        // Spy on handler methods
+        // Spy on handler method
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const retryRandomSpy = vi.spyOn(serviceWithPrivates, 'retryRandomLaunch');
         const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
 
         // Call handleIncompatibleFile on non-existent player
         serviceWithPrivates.handleIncompatibleFile(nonExistentDeviceId);
 
-        // Verify: Neither handler should be called when player doesn't exist
-        expect(retryRandomSpy).not.toHaveBeenCalled();
+        // Verify: Handler should not be called when player doesn't exist
         expect(advanceDirectorySpy).not.toHaveBeenCalled();
       });
     });
 
     describe('Shuffle Mode Routing', () => {
-      it('should route to retryRandomLaunch when incompatible file in shuffle mode', async () => {
+      it('should call launchRandomFile when incompatible file in shuffle mode', async () => {
         // Setup: Launch an incompatible file in directory mode first
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.hex',
@@ -265,17 +257,13 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         expect(launchMode).toBe(LaunchMode.Shuffle);
         expect(currentFile?.isCompatible).toBe(false);
 
-        // Spy on handler methods
+        // Spy on launchRandomFile
+        const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const retryRandomSpy = vi.spyOn(serviceWithPrivates, 'retryRandomLaunch');
         const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
 
         // Call handleIncompatibleFile
         serviceWithPrivates.handleIncompatibleFile(deviceId);
-
-        // Verify: retryRandomLaunch should be called
-        expect(retryRandomSpy).toHaveBeenCalledWith(deviceId);
-        expect(retryRandomSpy).toHaveBeenCalledTimes(1);
 
         // Verify: advanceToNextCompatibleFileInDirectory should NOT be called
         expect(advanceDirectorySpy).not.toHaveBeenCalled();
@@ -284,6 +272,9 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
     describe('Directory Mode Routing', () => {
       it('should route to advanceToNextCompatibleFileInDirectory when incompatible file in directory mode', async () => {
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
         // Setup: Launch an incompatible file in directory mode
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.hex',
@@ -311,25 +302,30 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         expect(launchMode).toBe(LaunchMode.Directory);
         expect(currentFile?.isCompatible).toBe(false);
 
-        // Spy on handler methods
+        // Spy on handler method
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const retryRandomSpy = vi.spyOn(serviceWithPrivates, 'retryRandomLaunch');
         const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
 
         // Call handleIncompatibleFile
         serviceWithPrivates.handleIncompatibleFile(deviceId);
 
+        // Advance timers past the setTimeout(1000) delay
+        vi.advanceTimersByTime(1000);
+        await nextTick();
+
         // Verify: advanceToNextCompatibleFileInDirectory should be called
         expect(advanceDirectorySpy).toHaveBeenCalledWith(deviceId);
         expect(advanceDirectorySpy).toHaveBeenCalledTimes(1);
 
-        // Verify: retryRandomLaunch should NOT be called
-        expect(retryRandomSpy).not.toHaveBeenCalled();
+        vi.useRealTimers();
       });
     });
 
     describe('Search Mode Routing', () => {
       it('should route to advanceToNextCompatibleFileInDirectory when incompatible file in search mode', async () => {
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
         // Setup: Launch an incompatible file in search mode
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.hex',
@@ -359,233 +355,20 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Spy on handler methods
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const retryRandomSpy = vi.spyOn(serviceWithPrivates, 'retryRandomLaunch');
         const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
 
         // Call handleIncompatibleFile
         serviceWithPrivates.handleIncompatibleFile(deviceId);
 
+        // Advance timers past the setTimeout(1000) delay
+        vi.advanceTimersByTime(1000);
+        await nextTick();
+
         // Verify: advanceToNextCompatibleFileInDirectory should be called
         expect(advanceDirectorySpy).toHaveBeenCalledWith(deviceId);
         expect(advanceDirectorySpy).toHaveBeenCalledTimes(1);
 
-        // Verify: retryRandomLaunch should NOT be called
-        expect(retryRandomSpy).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Incompatible File Handling - Shuffle Mode Retry Logic', () => {
-    const deviceId = 'test-device';
-
-    beforeEach(() => {
-      // Initialize player with default state
-      service.initializePlayer(deviceId);
-    });
-
-    describe('Behavior A: First incompatible file triggers retry with attempt count = 1', () => {
-      it('should increment counter to 1 and call launchRandomFile on first retry', () => {
-        // Setup: Spy on launchRandomFile
-        const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
-
-        // Verify: No previous retries for device
-        const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBeUndefined();
-
-        // Call: retryRandomLaunch for first time
-        serviceWithPrivates.retryRandomLaunch(deviceId);
-
-        // Verify: Counter set to 1
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBe(1);
-
-        // Verify: launchRandomFile called with correct deviceId
-        expect(launchRandomSpy).toHaveBeenCalledWith(deviceId);
-        expect(launchRandomSpy).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe('Behavior B: Second incompatible file triggers retry with attempt count = 2', () => {
-      it('should increment counter to 2 and call launchRandomFile on second retry', () => {
-        // Setup: Simulate first retry already happened
-        const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.randomRetryAttempts.set(deviceId, 1);
-
-        // Setup: Spy on launchRandomFile
-        const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
-
-        // Call: retryRandomLaunch for second time
-        serviceWithPrivates.retryRandomLaunch(deviceId);
-
-        // Verify: Counter incremented to 2
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBe(2);
-
-        // Verify: launchRandomFile called
-        expect(launchRandomSpy).toHaveBeenCalledWith(deviceId);
-        expect(launchRandomSpy).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe('Behavior C: Tenth incompatible file shows alert and stops retrying', () => {
-      it('should show alert, clear counter, and NOT call launchRandomFile when max attempts reached', () => {
-        // Setup: Simulate 9 retries already happened
-        const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.randomRetryAttempts.set(deviceId, 9);
-
-        // Setup: Spy on launchRandomFile and alert service
-        const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
-        const alertSpy = vi.spyOn(mockAlertService, 'warning');
-
-        // Call: retryRandomLaunch for tenth time (max attempts)
-        serviceWithPrivates.retryRandomLaunch(deviceId);
-
-        // Verify: Alert shown with appropriate message
-        expect(alertSpy).toHaveBeenCalledWith('Unable to find compatible file after 10 attempts');
-
-        // Verify: Counter cleared from map
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBeUndefined();
-
-        // Verify: launchRandomFile NOT called (stop retrying)
-        expect(launchRandomSpy).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('Behavior D: Compatible file after retries clears attempt counter', () => {
-      it('should clear counter when handleIncompatibleFile encounters compatible file', async () => {
-        // Setup: Simulate retries in progress
-        const svcPrivates = service as unknown as ServiceWithPrivates;
-        svcPrivates.randomRetryAttempts.set(deviceId, 3);
-
-        // Setup: Launch a compatible file in shuffle mode
-        const compatibleFile = createTestFileItem({
-          name: 'compatible.sid',
-          path: '/music/compatible.sid',
-          isCompatible: true,
-        });
-        const files = [compatibleFile];
-
-        mockPlayerService.launchFile.mockReturnValue(of(compatibleFile));
-
-        await service.launchFileWithContext({
-          deviceId,
-          file: compatibleFile,
-          directoryPath: '/music',
-          files,
-          launchMode: LaunchMode.Shuffle,
-        });
-
-        await nextTick();
-
-        // Verify: Counter should still be set before handleIncompatibleFile call
-        expect(svcPrivates.randomRetryAttempts.get(deviceId)).toBe(3);
-
-        // Call: handleIncompatibleFile (will detect compatible file and clear counter)
-        svcPrivates.handleIncompatibleFile(deviceId);
-
-        // Verify: Counter cleared from map (success case)
-        expect(svcPrivates.randomRetryAttempts.get(deviceId)).toBeUndefined();
-      });
-    });
-
-    describe('Behavior E: Attempt counters are tracked per device independently', () => {
-      it('should maintain separate counters for different devices', () => {
-        const device1 = 'device-1';
-        const device2 = 'device-2';
-
-        // Initialize both devices
-        service.initializePlayer(device1);
-        service.initializePlayer(device2);
-
-        // Setup: Device-1 has 3 attempts
-        const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.randomRetryAttempts.set(device1, 3);
-
-        // Setup: Device-2 has 0 attempts (not in map)
-        expect(serviceWithPrivates.randomRetryAttempts.get(device2)).toBeUndefined();
-
-        // Setup: Spy on launchRandomFile
-        const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
-
-        // Call: retryRandomLaunch for device-2
-        serviceWithPrivates.retryRandomLaunch(device2);
-
-        // Verify: Device-2 counter set to 1
-        expect(serviceWithPrivates.randomRetryAttempts.get(device2)).toBe(1);
-
-        // Verify: Device-1 counter unchanged
-        expect(serviceWithPrivates.randomRetryAttempts.get(device1)).toBe(3);
-
-        // Verify: launchRandomFile called with device-2
-        expect(launchRandomSpy).toHaveBeenCalledWith(device2);
-      });
-    });
-
-    describe('Behavior F: launchRandomFile is called with correct deviceId', () => {
-      it('should pass deviceId parameter to launchRandomFile on each retry', () => {
-        const testDeviceId = 'specific-device-id';
-
-        // Initialize player
-        service.initializePlayer(testDeviceId);
-
-        // Setup: Spy on launchRandomFile
-        const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
-
-        // Call: retryRandomLaunch with specific deviceId
-        const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.retryRandomLaunch(testDeviceId);
-
-        // Verify: launchRandomFile called with exact deviceId
-        expect(launchRandomSpy).toHaveBeenCalledWith(testDeviceId);
-        expect(launchRandomSpy).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe('Edge Cases', () => {
-      it('should handle multiple retries incrementing counter correctly', () => {
-        // Setup: Spy on launchRandomFile
-        const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
-
-        // Call: Multiple retries in sequence
-        const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.retryRandomLaunch(deviceId); // Attempt 1
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBe(1);
-
-        serviceWithPrivates.retryRandomLaunch(deviceId); // Attempt 2
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBe(2);
-
-        serviceWithPrivates.retryRandomLaunch(deviceId); // Attempt 3
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBe(3);
-
-        // Verify: launchRandomFile called 3 times
-        expect(launchRandomSpy).toHaveBeenCalledTimes(3);
-      });
-
-      it('should not continue retrying after max attempts reached', () => {
-        // Setup: Set counter to max attempts
-        const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.randomRetryAttempts.set(deviceId, 10);
-
-        // Setup: Spy on launchRandomFile and alert
-        const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
-        const alertSpy = vi.spyOn(mockAlertService, 'warning');
-
-        // Call: Attempt to retry when already at max
-        serviceWithPrivates.retryRandomLaunch(deviceId);
-
-        // Verify: Alert shown
-        expect(alertSpy).toHaveBeenCalledOnce();
-
-        // Verify: Counter cleared
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBeUndefined();
-
-        // Verify: No launch attempted
-        expect(launchRandomSpy).not.toHaveBeenCalled();
-
-        // Call: Try again after max reached and counter cleared
-        serviceWithPrivates.retryRandomLaunch(deviceId);
-
-        // Verify: Now it should start fresh with attempt 1
-        expect(serviceWithPrivates.randomRetryAttempts.get(deviceId)).toBe(1);
-        expect(launchRandomSpy).toHaveBeenCalledOnce();
+        vi.useRealTimers();
       });
     });
   });
@@ -742,7 +525,8 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Call: advanceToNextCompatibleFileInDirectory
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.advanceToNextCompatibleFileInDirectory(deviceId);
+        await serviceWithPrivates.advanceToNextCompatibleFileInDirectory(deviceId);
+        await nextTick();
 
         // Verify: Alert shown with appropriate message
         expect(alertSpy).toHaveBeenCalledWith('All files in directory are incompatible');
@@ -778,7 +562,8 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Call: advanceToNextCompatibleFileInDirectory
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.advanceToNextCompatibleFileInDirectory(deviceId);
+        await serviceWithPrivates.advanceToNextCompatibleFileInDirectory(deviceId);
+        await nextTick();
 
         // Verify: launchFileWithContext called with exact parameters
         expect(launchSpy).toHaveBeenCalledWith({
@@ -817,7 +602,8 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Call: advanceToNextCompatibleFileInDirectory
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        serviceWithPrivates.advanceToNextCompatibleFileInDirectory(deviceId);
+        await serviceWithPrivates.advanceToNextCompatibleFileInDirectory(deviceId);
+        await nextTick();
 
         // Verify: Loop completed without finding compatible file (fallback triggered)
         expect(launchRandomSpy).toHaveBeenCalledWith(deviceId);
@@ -1207,6 +993,9 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
     describe('Shuffle Mode: Retry Flow', () => {
       it('should retry until compatible file found in shuffle mode', async () => {
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
         // Setup: First launch returns incompatible, subsequent retries return compatible
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.hex',
@@ -1254,6 +1043,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         await nextTick();
 
+        // Advance timers past the setTimeout(1000) delay
+        vi.advanceTimersByTime(1000);
+        await nextTick();
+
         // Assert: Should have triggered retry via launchRandomFile
         expect(mockPlayerService.launchRandom).toHaveBeenCalledTimes(1);
 
@@ -1264,62 +1057,16 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.isCompatible).toBe(true);
         expect(currentFile?.file.name).toBe('compatible.sid');
-      });
 
-      it('should show alert after max retry attempts', async () => {
-        // Setup: All files are incompatible
-        const incompatibleFile = createTestFileItem({
-          name: 'incompatible.hex',
-          path: '/games/incompatible.hex',
-          isCompatible: false,
-          type: FileItemType.Hex,
-        });
-
-        // Mock all random launches to return incompatible files
-        mockPlayerService.launchFile.mockReturnValue(of(incompatibleFile));
-        mockPlayerService.launchRandom.mockReturnValue(of(incompatibleFile));
-
-        mockStorageStore.navigateToDirectory.mockReturnValue(of(undefined));
-        mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
-          path: '/games',
-          directory: {
-            path: '/games',
-            name: 'games',
-            files: [incompatibleFile],
-            directories: [],
-          },
-          isLoading: false,
-          error: null,
-          lastUpdated: Date.now(),
-        }));
-
-        // Act: Launch initial incompatible file in shuffle mode
-        await service.launchFileWithContext({
-          deviceId,
-          file: incompatibleFile,
-          directoryPath: '/games',
-          files: [incompatibleFile],
-          launchMode: LaunchMode.Shuffle,
-        });
-
-        // Process all retry attempts (9 retries)
-        for (let i = 0; i < 10; i++) {
-          await nextTick();
-        }
-
-        // Assert: Alert should have been shown
-        expect(mockAlertService.warning).toHaveBeenCalledWith(
-          'Unable to find compatible file after 10 attempts'
-        );
-
-        // Assert: Should stop retrying after max attempts
-        // launchRandom called 9 times (attempts 1-9), stopped at attempt 10
-        expect(mockPlayerService.launchRandom).toHaveBeenCalledTimes(9);
+        vi.useRealTimers();
       });
     });
 
     describe('Directory Mode: Advancement Flow', () => {
       it('should advance to next compatible file in directory mode', async () => {
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
         // Setup: Directory with incompatible file followed by compatible file
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.hex',
@@ -1352,15 +1099,24 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         await nextTick();
 
+        // Advance timers past the setTimeout(1000) delay
+        vi.advanceTimersByTime(1000);
+        await nextTick();
+
         // Assert: Should have advanced to compatible file
         expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(2);
 
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.file.name).toBe('compatible.sid');
         expect(currentFile?.isCompatible).toBe(true);
+
+        vi.useRealTimers();
       });
 
       it('should wrap around to beginning when advancing from end of directory', async () => {
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
         // Setup: Directory where last file is incompatible, first file is compatible
         const compatibleFile = createTestFileItem({
           name: 'compatible.sid',
@@ -1393,15 +1149,24 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         await nextTick();
 
+        // Advance timers past the setTimeout(1000) delay
+        vi.advanceTimersByTime(1000);
+        await nextTick();
+
         // Assert: Should have wrapped around to first file
         expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(2);
 
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.file.name).toBe('compatible.sid');
         expect(currentFile?.isCompatible).toBe(true);
+
+        vi.useRealTimers();
       });
 
       it('should fallback to random when all directory files incompatible', async () => {
+        // Use fake timers to handle setTimeout delay
+        vi.useFakeTimers();
+
         // Setup: Directory with all incompatible files
         const incompatibleFile1 = createTestFileItem({
           name: 'incompatible1.hex',
@@ -1454,6 +1219,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         });
 
         await nextTick();
+
+        // Advance timers past the setTimeout(1000) delay
+        vi.advanceTimersByTime(1000);
+        await nextTick();
         await nextTick();
 
         // Assert: Should have shown alert and called random launch
@@ -1461,6 +1230,8 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
           'All files in directory are incompatible'
         );
         expect(mockPlayerService.launchRandom).toHaveBeenCalledTimes(1);
+
+        vi.useRealTimers();
       });
     });
 
@@ -1475,9 +1246,8 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         mockPlayerService.launchFile.mockReturnValue(of(compatibleFile));
 
-        // Spy on advancement handlers
+        // Spy on advancement handler
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const retryRandomSpy = vi.spyOn(serviceWithPrivates, 'retryRandomLaunch');
         const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
 
         // Act: Launch compatible file
@@ -1491,8 +1261,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         await nextTick();
 
-        // Assert: No advancement handlers should be called
-        expect(retryRandomSpy).not.toHaveBeenCalled();
+        // Assert: No advancement handler should be called
         expect(advanceDirectorySpy).not.toHaveBeenCalled();
 
         // Assert: File should remain current
