@@ -10,9 +10,7 @@ import {
   setShuffleNavigationSuccess,
   setShuffleNavigationFailure,
   setDirectoryNavigationSuccess,
-  setDirectoryNavigationFailure,
 } from '../player-helpers';
-import { StorageKeyUtil } from '../../storage/storage-key.util';
 
 export function navigatePrevious(store: WritableStore<PlayerState>, playerService: IPlayerService, playerStorage: IPlayerStorage) {
   return {
@@ -92,13 +90,32 @@ export function navigatePrevious(store: WritableStore<PlayerState>, playerServic
           fileContext
         ) {
           const modeLabel = launchMode === LaunchMode.Search ? 'Search' : 'Directory';
-          const { files, currentIndex, storageKey } = fileContext;
-          const previousIndex = currentIndex === 0 ? files.length - 1 : currentIndex - 1; // Wraparound
-          const previousFile = files[previousIndex];
+          const { files, currentIndex } = fileContext;
+
+          // Find previous compatible file
+          let candidateIndex = (currentIndex - 1 + files.length) % files.length;
+          let attempts = 0;
+          const maxAttempts = files.length;
+
+          while (attempts < maxAttempts) {
+            const candidate = files[candidateIndex];
+            if (candidate.isCompatible !== false) {
+              // Found compatible file - use candidateIndex
+              break;
+            }
+            candidateIndex = (candidateIndex - 1 + files.length) % files.length;
+            attempts++;
+          }
+
+          if (attempts >= maxAttempts) {
+            throw new Error('All files in context are incompatible');
+          }
+
+          const previousFile = files[candidateIndex];
 
           logInfo(
             LogType.Info,
-            `${modeLabel} mode: going to previous file (${previousIndex + 1}/${
+            `${modeLabel} mode: going to previous file (${candidateIndex + 1}/${
               files.length
             }) for ${deviceId}`,
             { previousFile: previousFile.name }
@@ -108,31 +125,12 @@ export function navigatePrevious(store: WritableStore<PlayerState>, playerServic
             playerService.launchFile(deviceId, previousFile)
           );
 
-          const isCompatible = launchedFile.isCompatible;
-
-          if (!isCompatible) {
-            const errorMessage = 'File is not compatible with TeensyROM hardware';
-            logError(
-              `Navigate previous: File ${launchedFile.name} is incompatible with device ${deviceId}: ${errorMessage}`
-            );
-            setDirectoryNavigationFailure(
-              store,
-              deviceId,
-              launchedFile,
-              fileContext,
-              previousIndex,
-              errorMessage,
-              actionMessage
-            );
-            return;
-          }
-
           setDirectoryNavigationSuccess(
             store,
             deviceId,
             launchedFile,
             fileContext,
-            previousIndex,
+            candidateIndex,
             actionMessage
           );
 
@@ -165,6 +163,8 @@ export function navigatePrevious(store: WritableStore<PlayerState>, playerServic
             },
           },
         }));
+
+        throw error;
       }
     },
   };

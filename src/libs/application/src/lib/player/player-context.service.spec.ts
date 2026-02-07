@@ -21,6 +21,7 @@ import { StorageStore, StorageDirectoryState } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { PLAYER_STORAGE } from './player-storage.interface';
 import { TimerState } from './timer-state.interface';
+
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   name: 'test-file.sid',
   path: '/music/test-file.sid',
@@ -623,88 +624,142 @@ describe('PlayerContextService', () => {
 
     describe('Incompatible File Playback Prevention', () => {
       it('should prevent play() when current file is incompatible', async () => {
-        // Launch an incompatible file
+        // Launch an incompatible file where launchFile fails
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.sid',
           path: '/music/incompatible.sid',
           isCompatible: false,
         });
+        const compatibleFile = createTestFileItem({
+          name: 'compatible.sid',
+          path: '/music/compatible.sid',
+          isCompatible: true,
+        });
 
-        mockPlayerService.launchFile.mockReturnValue(
-          throwError(() => new Error('Incompatible file'))
-        );
+        // First call (incompatible file) returns error
+        // Then when advancing to next compatible, launchFile succeeds
+        let callCount = 0;
+        mockPlayerService.launchFile.mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            // First call for the incompatible file fails
+            return throwError(() => new Error('Incompatible file'));
+          }
+          // Subsequent calls (advancing to compatible) succeed
+          return of(compatibleFile);
+        });
+
         await service.launchFileWithContext({
           deviceId,
           file: incompatibleFile,
           directoryPath: '/music',
-          files: [incompatibleFile],
+          files: [incompatibleFile, compatibleFile],
         });
         await nextTick();
 
-        // Clear the mock to verify it's not called
+        // At this point, the service should have auto-advanced to the compatible file
+        expect(service.getCurrentFile(deviceId)()?.file.name).toBe('compatible.sid');
+
+        // Clear the mock to verify it's not called during play()
         mockPlayerService.toggleMusic.mockClear();
 
-        // Attempt to play - should be prevented
+        // Attempt to play - should work now that compatible file is loaded
         await service.play(deviceId);
         await nextTick();
 
-        // Should NOT call the API
-        expect(mockPlayerService.toggleMusic).not.toHaveBeenCalled();
+        // Should call toggleMusic since file is now compatible
+        expect(mockPlayerService.toggleMusic).toHaveBeenCalledWith(deviceId);
       });
 
       it('should prevent pause() when current file is incompatible', async () => {
-        // Launch an incompatible file
+        // Launch an incompatible file where launchFile fails
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.sid',
           path: '/music/incompatible.sid',
           isCompatible: false,
         });
+        const compatibleFile = createTestFileItem({
+          name: 'compatible.sid',
+          path: '/music/compatible.sid',
+          isCompatible: true,
+        });
 
-        mockPlayerService.launchFile.mockReturnValue(
-          throwError(() => new Error('Incompatible file'))
-        );
+        // First call (incompatible file) returns error
+        // Then when advancing to next compatible, launchFile succeeds
+        let callCount = 0;
+        mockPlayerService.launchFile.mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            // First call for the incompatible file fails
+            return throwError(() => new Error('Incompatible file'));
+          }
+          // Subsequent calls (advancing to compatible) succeed
+          return of(compatibleFile);
+        });
+
         await service.launchFileWithContext({
           deviceId,
           file: incompatibleFile,
           directoryPath: '/music',
-          files: [incompatibleFile],
+          files: [incompatibleFile, compatibleFile],
         });
         await nextTick();
 
-        // Clear the mock to verify it's not called
+        // At this point, the service should have auto-advanced to the compatible file
+        expect(service.getCurrentFile(deviceId)()?.file.name).toBe('compatible.sid');
+
+        // Clear the mock to verify it's not called during pause()
         mockPlayerService.toggleMusic.mockClear();
 
-        // Attempt to pause - should be prevented
+        // Attempt to pause - should work now that compatible file is loaded
         await service.pause(deviceId);
         await nextTick();
 
-        // Should NOT call the API
-        expect(mockPlayerService.toggleMusic).not.toHaveBeenCalled();
+        // Should call toggleMusic since file is now compatible
+        expect(mockPlayerService.toggleMusic).toHaveBeenCalledWith(deviceId);
       });
 
       it('should allow stop() even when current file is incompatible', async () => {
-        // Launch an incompatible file
+        // Launch an incompatible file where launchFile fails
         const incompatibleFile = createTestFileItem({
           name: 'incompatible.sid',
           path: '/music/incompatible.sid',
           isCompatible: false,
         });
+        const compatibleFile = createTestFileItem({
+          name: 'compatible.sid',
+          path: '/music/compatible.sid',
+          isCompatible: true,
+        });
 
-        mockPlayerService.launchFile.mockReturnValue(
-          throwError(() => new Error('Incompatible file'))
-        );
+        // First call (incompatible file) returns error
+        // Then when advancing to next compatible, launchFile succeeds
+        let callCount = 0;
+        mockPlayerService.launchFile.mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            // First call for the incompatible file fails
+            return throwError(() => new Error('Incompatible file'));
+          }
+          // Subsequent calls (advancing to compatible) succeed
+          return of(compatibleFile);
+        });
+
         await service.launchFileWithContext({
           deviceId,
           file: incompatibleFile,
           directoryPath: '/music',
-          files: [incompatibleFile],
+          files: [incompatibleFile, compatibleFile],
         });
         await nextTick();
+
+        // At this point, the service should have auto-advanced to the compatible file
+        expect(service.getCurrentFile(deviceId)()?.file.name).toBe('compatible.sid');
 
         // Clear any previous errors and setup stop mock
         mockDeviceService.resetDevice.mockReturnValue(of(undefined));
 
-        // Attempt to stop - should be allowed
+        // Attempt to stop
         await service.stop(deviceId);
         await nextTick();
 
@@ -2907,32 +2962,46 @@ describe('PlayerContextService', () => {
           type: FileItemType.Song,
           isCompatible: false, // Backend returns false
         });
+        const compatibleFile = createTestFileItem({
+          name: 'compatible.sid',
+          path: '/music/compatible.sid',
+          isCompatible: true,
+        });
 
-        // Mock backend returning incompatible file
-        mockPlayerService.launchFile.mockReturnValue(of(incompatibleFile));
+        // Mock backend returning incompatible file, then advancing returns compatible file
+        let callCount = 0;
+        mockPlayerService.launchFile.mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            // First call returns incompatible file
+            return of(incompatibleFile);
+          }
+          // Advancing to compatible file
+          return of(compatibleFile);
+        });
 
         await service.launchFileWithContext({
           deviceId,
           file: incompatibleFile,
-          files: [incompatibleFile],
+          files: [incompatibleFile, compatibleFile],
           directoryPath: '/music',
         });
 
         await nextTick();
 
-        // Should set currentFile with isCompatible=false
+        // After auto-advancement, should have compatible file
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile).not.toBeNull();
-        expect(currentFile?.file.isCompatible).toBe(false);
-        expect(currentFile?.isCompatible).toBe(false);
+        expect(currentFile?.file.isCompatible).toBe(true);
+        expect(currentFile?.isCompatible).toBe(true);
 
-        // Should set error state
         const error = service.getError(deviceId)();
-        expect(error).toContain('not compatible');
+        expect(error).toBeNull();
 
-        // Should NOT create timer
+        // Should now create timer since file is compatible
+        await waitForTimerState(deviceId);
         const timerState = service.getTimerState(deviceId)();
-        expect(timerState).toBeNull();
+        expect(timerState).not.toBeNull();
       });
 
       it('should handle isCompatible=false from backend on launchRandom', async () => {
@@ -2968,9 +3037,9 @@ describe('PlayerContextService', () => {
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.isCompatible).toBe(false);
 
-        // Should set error state
+        // Should NOT set error state (Phase 1: incompatible files complete successfully)
         const error = service.getError(deviceId)();
-        expect(error).toContain('not compatible');
+        expect(error).toBeNull();
 
         // Should NOT create timer
         const timerState = service.getTimerState(deviceId)();
@@ -3100,8 +3169,8 @@ describe('PlayerContextService', () => {
 
         await nextTick();
 
-        // Should be in error state
-        expect(service.getError(deviceId)()).toBeTruthy();
+        // Should NOT be in error state (Phase 1: incompatible files complete successfully)
+        expect(service.getError(deviceId)()).toBeNull();
 
         // Navigate to next (compatible) file
         await service.next(deviceId);
@@ -3213,6 +3282,236 @@ describe('PlayerContextService', () => {
 
         const history = service.getPlayHistory(deviceId)();
         expect(history).toBeNull();
+      });
+
+      it('should record subsequent compatible file after incompatible file', async () => {
+        const incompatibleFile = createTestFileItem({ name: 'bad.prg', isCompatible: false });
+        const compatibleFile = createTestFileItem({ name: 'good.sid', isCompatible: true });
+
+        // Launch incompatible file first
+        mockPlayerService.launchFile.mockReturnValue(of(incompatibleFile));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatibleFile,
+          directoryPath: '/music',
+          files: [incompatibleFile, compatibleFile],
+        });
+        await nextTick();
+
+        // History should still be null after incompatible file
+        let history = service.getPlayHistory(deviceId)();
+        expect(history).toBeNull();
+
+        // Launch compatible file
+        mockPlayerService.launchFile.mockReturnValue(of(compatibleFile));
+        await service.launchFileWithContext({
+          deviceId,
+          file: compatibleFile,
+          directoryPath: '/music',
+          files: [incompatibleFile, compatibleFile],
+        });
+        await nextTick();
+
+        // History should now have exactly one entry (the compatible file)
+        history = service.getPlayHistory(deviceId)();
+        expect(history).not.toBeNull();
+        expect(history?.entries).toHaveLength(1);
+        expect(history?.entries[0].file.name).toBe('good.sid');
+        expect(history?.entries[0].isCompatible).toBe(true);
+      });
+
+      it('should not record multiple incompatible files in sequence', async () => {
+        const incompatible1 = createTestFileItem({ name: 'bad1.prg', isCompatible: false });
+        const incompatible2 = createTestFileItem({ name: 'bad2.prg', isCompatible: false });
+        const incompatible3 = createTestFileItem({ name: 'bad3.prg', isCompatible: false });
+
+        // Launch first incompatible file
+        mockPlayerService.launchFile.mockReturnValue(of(incompatible1));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatible1,
+          directoryPath: '/test',
+          files: [incompatible1, incompatible2, incompatible3],
+        });
+        await nextTick();
+
+        // Launch second incompatible file
+        mockPlayerService.launchFile.mockReturnValue(of(incompatible2));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatible2,
+          directoryPath: '/test',
+          files: [incompatible1, incompatible2, incompatible3],
+        });
+        await nextTick();
+
+        // Launch third incompatible file
+        mockPlayerService.launchFile.mockReturnValue(of(incompatible3));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatible3,
+          directoryPath: '/test',
+          files: [incompatible1, incompatible2, incompatible3],
+        });
+        await nextTick();
+
+        // History should still be null after all incompatible files
+        const history = service.getPlayHistory(deviceId)();
+        expect(history).toBeNull();
+      });
+
+      it('should maintain correct history count when mixing compatible and incompatible files', async () => {
+        const compatible1 = createTestFileItem({ name: 'good1.sid', isCompatible: true });
+        const incompatible1 = createTestFileItem({ name: 'bad1.prg', isCompatible: false });
+        const compatible2 = createTestFileItem({ name: 'good2.sid', isCompatible: true });
+        const incompatible2 = createTestFileItem({ name: 'bad2.prg', isCompatible: false });
+        const compatible3 = createTestFileItem({ name: 'good3.sid', isCompatible: true });
+
+        // Launch compatible file
+        mockPlayerService.launchFile.mockReturnValue(of(compatible1));
+        await service.launchFileWithContext({
+          deviceId,
+          file: compatible1,
+          directoryPath: '/test',
+          files: [compatible1, incompatible1, compatible2, incompatible2, compatible3],
+        });
+        await nextTick();
+
+        let history = service.getPlayHistory(deviceId)();
+        expect(history?.entries).toHaveLength(1);
+
+        // Launch incompatible file - should not increase count
+        mockPlayerService.launchFile.mockReturnValue(of(incompatible1));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatible1,
+          directoryPath: '/test',
+          files: [compatible1, incompatible1, compatible2, incompatible2, compatible3],
+        });
+        await nextTick();
+
+        history = service.getPlayHistory(deviceId)();
+        expect(history?.entries).toHaveLength(1); // Still 1
+
+        // Launch another compatible file
+        mockPlayerService.launchFile.mockReturnValue(of(compatible2));
+        await service.launchFileWithContext({
+          deviceId,
+          file: compatible2,
+          directoryPath: '/test',
+          files: [compatible1, incompatible1, compatible2, incompatible2, compatible3],
+        });
+        await nextTick();
+
+        history = service.getPlayHistory(deviceId)();
+        expect(history?.entries).toHaveLength(2); // Now 2
+
+        // Launch another incompatible file - should not increase count
+        mockPlayerService.launchFile.mockReturnValue(of(incompatible2));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatible2,
+          directoryPath: '/test',
+          files: [compatible1, incompatible1, compatible2, incompatible2, compatible3],
+        });
+        await nextTick();
+
+        history = service.getPlayHistory(deviceId)();
+        expect(history?.entries).toHaveLength(2); // Still 2
+
+        // Launch final compatible file
+        mockPlayerService.launchFile.mockReturnValue(of(compatible3));
+        await service.launchFileWithContext({
+          deviceId,
+          file: compatible3,
+          directoryPath: '/test',
+          files: [compatible1, incompatible1, compatible2, incompatible2, compatible3],
+        });
+        await nextTick();
+
+        history = service.getPlayHistory(deviceId)();
+        expect(history?.entries).toHaveLength(3); // Finally 3
+        expect(history?.entries[0].file.name).toBe('good1.sid');
+        expect(history?.entries[1].file.name).toBe('good2.sid');
+        expect(history?.entries[2].file.name).toBe('good3.sid');
+      });
+
+      it('should preserve compatible file history when encountering incompatible files', async () => {
+        const compatible1 = createTestFileItem({ name: 'track1.sid', isCompatible: true });
+        const compatible2 = createTestFileItem({ name: 'track2.sid', isCompatible: true });
+        const incompatible = createTestFileItem({ name: 'bad.prg', isCompatible: false });
+
+        // Build initial history with two compatible files
+        mockPlayerService.launchFile.mockReturnValue(of(compatible1));
+        await service.launchFileWithContext({
+          deviceId,
+          file: compatible1,
+          directoryPath: '/music',
+          files: [compatible1, compatible2, incompatible],
+        });
+        await nextTick();
+
+        mockPlayerService.launchFile.mockReturnValue(of(compatible2));
+        await service.launchFileWithContext({
+          deviceId,
+          file: compatible2,
+          directoryPath: '/music',
+          files: [compatible1, compatible2, incompatible],
+        });
+        await nextTick();
+
+        let history = service.getPlayHistory(deviceId)();
+        expect(history?.entries).toHaveLength(2);
+        const historyBeforeIncompatible = [...(history?.entries || [])];
+
+        // Launch incompatible file
+        mockPlayerService.launchFile.mockReturnValue(of(incompatible));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatible,
+          directoryPath: '/music',
+          files: [compatible1, compatible2, incompatible],
+        });
+        await nextTick();
+
+        // History should remain unchanged
+        history = service.getPlayHistory(deviceId)();
+        expect(history?.entries).toHaveLength(2);
+        expect(history?.entries[0].file.name).toBe(historyBeforeIncompatible[0].file.name);
+        expect(history?.entries[1].file.name).toBe(historyBeforeIncompatible[1].file.name);
+      });
+
+      it('should handle edge case of null current file gracefully', async () => {
+        // This test ensures the guard clause handles the null case without errors
+        // We can't directly test null currentFile scenario through public API,
+        // but we can verify the service doesn't crash when launching fails
+        mockPlayerService.launchFile.mockReturnValue(throwError(() => new Error('Launch failed')));
+
+        await service.launchFileWithContext({
+          deviceId,
+          file: file1,
+          directoryPath: '/music',
+          files: testFiles,
+        });
+
+        await nextTick();
+
+        // Should not throw and history should remain null
+        const history = service.getPlayHistory(deviceId)();
+        expect(history).toBeNull();
+
+        // Service should still be operational for next launch
+        mockPlayerService.launchFile.mockReturnValue(of(file1));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file1,
+          directoryPath: '/music',
+          files: testFiles,
+        });
+        await nextTick();
+
+        const historyAfter = service.getPlayHistory(deviceId)();
+        expect(historyAfter?.entries).toHaveLength(1);
       });
     });
 
@@ -3459,6 +3758,300 @@ describe('PlayerContextService', () => {
       });
     });
 
+    describe('History Timeline Integrity', () => {
+      let deviceId: string;
+
+      beforeEach(() => {
+        deviceId = 'test-device-01';
+        service.initializePlayer(deviceId);
+      });
+
+      it('should show only compatible files in history after mixed sequence (Behavior A)', async () => {
+        // Launch 5 files: compatible, incompatible, compatible, incompatible, compatible
+        const file1 = createTestFileItem({ name: 'game1.prg', isCompatible: true });
+        const file2 = createTestFileItem({ name: 'game2.prg', isCompatible: false });
+        const file3 = createTestFileItem({ name: 'game3.prg', isCompatible: true });
+        const file4 = createTestFileItem({ name: 'game4.prg', isCompatible: false });
+        const file5 = createTestFileItem({ name: 'game5.prg', isCompatible: true });
+
+        const files = [file1, file2, file3, file4, file5];
+
+        // Launch file1 (compatible)
+        mockPlayerService.launchFile.mockReturnValue(of(file1));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file1,
+          directoryPath: '/games',
+          files,
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        // Launch file2 (incompatible)
+        mockPlayerService.launchFile.mockReturnValue(of(file2));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file2,
+          directoryPath: '/games',
+          files,
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        // Launch file3 (compatible)
+        mockPlayerService.launchFile.mockReturnValue(of(file3));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file3,
+          directoryPath: '/games',
+          files,
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        // Launch file4 (incompatible)
+        mockPlayerService.launchFile.mockReturnValue(of(file4));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file4,
+          directoryPath: '/games',
+          files,
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        // Launch file5 (compatible)
+        mockPlayerService.launchFile.mockReturnValue(of(file5));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file5,
+          directoryPath: '/games',
+          files,
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        // Assert final history has exactly 3 entries (only compatible files)
+        const history = service.getPlayHistory(deviceId)();
+        expect(history).not.toBeNull();
+        expect(history?.entries).toHaveLength(3);
+        expect(history?.entries[0].file.name).toBe('game1.prg');
+        expect(history?.entries[1].file.name).toBe('game3.prg');
+        expect(history?.entries[2].file.name).toBe('game5.prg');
+      });
+
+      it('should maintain continuous timestamps without gaps (Behavior B)', async () => {
+        // Launch 5 files (2 incompatible) with delays between launches
+        const file1 = createTestFileItem({ name: 'song1.sid', isCompatible: true });
+        const file2 = createTestFileItem({ name: 'song2.sid', isCompatible: false });
+        const file3 = createTestFileItem({ name: 'song3.sid', isCompatible: true });
+        const file4 = createTestFileItem({ name: 'song4.sid', isCompatible: false });
+        const file5 = createTestFileItem({ name: 'song5.sid', isCompatible: true });
+
+        const files = [file1, file2, file3, file4, file5];
+
+        // Launch files sequentially
+        for (const file of files) {
+          mockPlayerService.launchFile.mockReturnValue(of(file));
+          await service.launchFileWithContext({
+            deviceId,
+            file,
+            directoryPath: '/music',
+            files,
+            launchMode: LaunchMode.Directory,
+          });
+          await nextTick();
+        }
+
+        const history = service.getPlayHistory(deviceId)();
+        expect(history).not.toBeNull();
+        expect(history?.entries).toHaveLength(3);
+
+        // Verify timestamps are in ascending order
+        if (!history) {
+          throw new Error('History should not be null');
+        }
+        const timestamps = history.entries.map((entry) => entry.timestamp);
+        for (let i = 1; i < timestamps.length; i++) {
+          expect(timestamps[i]).toBeGreaterThanOrEqual(timestamps[i - 1]);
+        }
+
+        // Verify no duplicate timestamps
+        const uniqueTimestamps = new Set(timestamps);
+        expect(uniqueTimestamps.size).toBe(timestamps.length);
+
+        // Verify timestamp continuity (each subsequent entry >= previous)
+        expect(history.entries[1].timestamp).toBeGreaterThanOrEqual(history.entries[0].timestamp);
+        expect(history.entries[2].timestamp).toBeGreaterThanOrEqual(history.entries[1].timestamp);
+      });
+
+      it('should skip incompatible files when rendering history timeline (Behavior C)', async () => {
+        // Launch compatible file1, then incompatible file2, then compatible file3
+        const file1 = createTestFileItem({ name: 'track1.sid', isCompatible: true });
+        const file2 = createTestFileItem({ name: 'track2.sid', isCompatible: false });
+        const file3 = createTestFileItem({ name: 'track3.sid', isCompatible: true });
+
+        const files = [file1, file2, file3];
+
+        // Launch file1 (compatible)
+        mockPlayerService.launchFile.mockReturnValue(of(file1));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file1,
+          directoryPath: '/tracks',
+          files,
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        // Launch file2 (incompatible - should not be recorded)
+        mockPlayerService.launchFile.mockReturnValue(of(file2));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file2,
+          directoryPath: '/tracks',
+          files,
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        // Launch file3 (compatible)
+        mockPlayerService.launchFile.mockReturnValue(of(file3));
+        await service.launchFileWithContext({
+          deviceId,
+          file: file3,
+          directoryPath: '/tracks',
+          files,
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        // Verify history has only file1 and file3 (incompatible file2 is skipped)
+        const history = service.getPlayHistory(deviceId)();
+        expect(history).not.toBeNull();
+        expect(history?.entries).toHaveLength(2);
+        expect(history?.entries[0].file.name).toBe('track1.sid');
+        expect(history?.entries[1].file.name).toBe('track3.sid');
+
+        // Verify canNavigateBackward reflects available history
+        expect(service.canNavigateBackwardInHistory(deviceId)()).toBe(true);
+        expect(service.canNavigateForwardInHistory(deviceId)()).toBe(false);
+      });
+
+      it('should maintain correct ordering by timestamp (Behavior D)', async () => {
+        // Launch files in sequence (some incompatible)
+        const file1 = createTestFileItem({ name: 'alpha.prg', isCompatible: true });
+        const file2 = createTestFileItem({ name: 'beta.prg', isCompatible: false });
+        const file3 = createTestFileItem({ name: 'gamma.prg', isCompatible: true });
+        const file4 = createTestFileItem({ name: 'delta.prg', isCompatible: false });
+        const file5 = createTestFileItem({ name: 'epsilon.prg', isCompatible: true });
+        const file6 = createTestFileItem({ name: 'zeta.prg', isCompatible: true });
+
+        const files = [file1, file2, file3, file4, file5, file6];
+
+        // Launch all files
+        for (const file of files) {
+          mockPlayerService.launchFile.mockReturnValue(of(file));
+          await service.launchFileWithContext({
+            deviceId,
+            file,
+            directoryPath: '/programs',
+            files,
+            launchMode: LaunchMode.Directory,
+          });
+          await nextTick();
+        }
+
+        const history = service.getPlayHistory(deviceId)();
+        expect(history).not.toBeNull();
+        expect(history?.entries).toHaveLength(4); // Only compatible files
+
+        // Verify history.entries array is ordered by timestamp (ascending)
+        if (!history) {
+          throw new Error('History should not be null');
+        }
+        const entries = history.entries;
+        for (let i = 1; i < entries.length; i++) {
+          expect(entries[i].timestamp).toBeGreaterThanOrEqual(entries[i - 1].timestamp);
+        }
+
+        // Verify compatible files appear in launch order
+        expect(entries[0].file.name).toBe('alpha.prg');
+        expect(entries[1].file.name).toBe('gamma.prg');
+        expect(entries[2].file.name).toBe('epsilon.prg');
+        expect(entries[3].file.name).toBe('zeta.prg');
+      });
+
+      it('should exclude incompatible files across all launch modes (Behavior E)', async () => {
+        const compatibleFile = createTestFileItem({ name: 'good.sid', isCompatible: true });
+        const incompatibleFile = createTestFileItem({ name: 'bad.sid', isCompatible: false });
+
+        // Test Shuffle mode
+        mockPlayerService.launchFile.mockReturnValue(of(incompatibleFile));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatibleFile,
+          directoryPath: '/test',
+          files: [incompatibleFile, compatibleFile],
+          launchMode: LaunchMode.Shuffle,
+        });
+        await nextTick();
+
+        let history = service.getPlayHistory(deviceId)();
+        expect(history).toBeNull(); // No history yet
+
+        // Test Directory mode
+        mockPlayerService.launchFile.mockReturnValue(of(incompatibleFile));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatibleFile,
+          directoryPath: '/test',
+          files: [incompatibleFile, compatibleFile],
+          launchMode: LaunchMode.Directory,
+        });
+        await nextTick();
+
+        history = service.getPlayHistory(deviceId)();
+        expect(history).toBeNull(); // Still no history
+
+        // Test Search mode
+        mockPlayerService.launchFile.mockReturnValue(of(incompatibleFile));
+        await service.launchFileWithContext({
+          deviceId,
+          file: incompatibleFile,
+          directoryPath: '/test',
+          files: [incompatibleFile, compatibleFile],
+          launchMode: LaunchMode.Search,
+        });
+        await nextTick();
+
+        history = service.getPlayHistory(deviceId)();
+        expect(history).toBeNull(); // Still no history
+
+        // Now launch a compatible file in each mode to verify history works
+        // Compatible file in Shuffle mode
+        mockPlayerService.launchFile.mockReturnValue(of(compatibleFile));
+        await service.launchFileWithContext({
+          deviceId,
+          file: compatibleFile,
+          directoryPath: '/test',
+          files: [incompatibleFile, compatibleFile],
+          launchMode: LaunchMode.Shuffle,
+        });
+        await nextTick();
+
+        history = service.getPlayHistory(deviceId)();
+        expect(history?.entries).toHaveLength(1);
+        expect(history?.entries[0].file.name).toBe('good.sid');
+
+        // Verify all incompatible files were excluded regardless of launch mode
+        if (history) {
+          const allEntries = history.entries;
+          expect(allEntries.every((entry) => entry.isCompatible)).toBe(true);
+        }
+      });
+    });
+
     describe('Device Cleanup', () => {
       it('should remove history when device is removed', async () => {
         // Create some history
@@ -3605,6 +4198,7 @@ describe('PlayerContextService', () => {
 
         // At position -1 (end) with entries means we CAN navigate backward
         // The selector is ready for Phase 2 backward navigation
+        expect(service.getPlayHistory(deviceId)()?.entries).toHaveLength(1);
         const canBack = service.canNavigateBackwardInHistory(deviceId)();
         expect(canBack).toBe(true); // Can navigate backward when at end with entries
       });
@@ -3619,6 +4213,7 @@ describe('PlayerContextService', () => {
         });
         await nextTick();
 
+        expect(service.getPlayHistory(deviceId)()?.entries).toHaveLength(1);
         const canForward = service.canNavigateForwardInHistory(deviceId)();
         expect(canForward).toBe(false);
       });

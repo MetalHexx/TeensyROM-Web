@@ -323,6 +323,28 @@ describe('PlayerContextService - isSlowLoading', () => {
       const slowLoadingSignal = service.isSlowLoading();
       expect(slowLoadingSignal()).toBe(false);
     });
+
+    it(
+      'should not trigger slow loading for rapid-fire launches (incompatible file scenario)',
+      async () => {
+        service.initializePlayer('device1');
+        const slowLoadingSignal = service.isSlowLoading();
+
+        // Simulate 10 rapid launches (like advancing through incompatible files)
+        // Each launch takes 150ms (fast), but total time > 2 seconds
+        for (let i = 0; i < 10; i++) {
+          setDeviceLoading('device1', true);
+          await wait(150); // Each launch completes quickly
+          setDeviceLoading('device1', false);
+          await wait(50); // Small gap between launches
+        }
+
+        // Total elapsed: ~2 seconds (10 * 200ms)
+        // Signal should remain false because each individual launch was fast
+        expect(slowLoadingSignal()).toBe(false);
+      },
+      { timeout: 5000 }
+    );
   });
 
   describe('Integration with File Launch', () => {

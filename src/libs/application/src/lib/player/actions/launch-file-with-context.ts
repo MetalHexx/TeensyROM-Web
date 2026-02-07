@@ -63,32 +63,21 @@ export function launchFileWithContext(
           resolvedFile,
           isCompatible
         );
+
+        // Mark the current file as incompatible in context files if backend indicates so
+        const updatedContextFiles = contextFiles.map(f => 
+          f.path === file.path ? { ...f, isCompatible } : f
+        );
+
         const fileContext = createPlayerFileContext(
           deviceId,
           storageType,
           resolvedDirectoryPath,
-          contextFiles,
+          updatedContextFiles,
           safeIndex
         );
 
-        // If file is incompatible, treat as failure but with file context preserved
-        if (!isCompatible) {
-          const errorMessage = 'File is not compatible with TeensyROM hardware';
-          logError(
-            `PlayerAction: File ${resolvedFile.name} is incompatible with device ${deviceId}: ${errorMessage}`
-          );
-          setPlayerLaunchFailure(
-            store,
-            deviceId,
-            launchedFileObj,
-            fileContext,
-            launchMode,
-            errorMessage,
-            actionMessage
-          );
-          return;
-        }
-
+        // Update state with success (incompatible files are allowed to complete launch cycle)
         setPlayerLaunchSuccess(
           store,
           deviceId,

@@ -14,6 +14,14 @@
   gap: 0.5rem;
 }
 
+.storage-item-label-area {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
 // Actions container will be positioned at the end
 lib-storage-item-actions {
   display: flex;

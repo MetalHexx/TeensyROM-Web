@@ -23,8 +23,8 @@ import { TimerState } from './timer-state.interface';
 import { parsePlayLength } from './timer-utils';
 import { DEFAULT_TIMER_MS } from './player.constants';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
-import { Subscription, of, timer } from 'rxjs';
-import { map, distinctUntilChanged, switchMap, mapTo } from 'rxjs/operators';
+import { Subscription, of, timer, concat, race } from 'rxjs';
+import { map, distinctUntilChanged, switchMap, mapTo, take } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerContextService implements IPlayerContext {
@@ -54,6 +54,8 @@ export class PlayerContextService implements IPlayerContext {
   private readonly completionSubscriptions = new Map<string, Subscription>();
   private popstateListener: ((event: PopStateEvent) => void) | null = null;
   private isHandlingPopState = false;
+  // Track random retry attempts per device (for shuffle mode incompatible file handling)
+  private readonly randomRetryAttempts = new Map<string, number>();
 
   initializePlayer(deviceId: string): void {
     // Get default filter and timer settings from settings before initializing player
@@ -156,6 +158,9 @@ export class PlayerContextService implements IPlayerContext {
       this.setupTimerForFile(request.deviceId, request.file);
       this.updateUrlForLaunchedFile(request.deviceId);
     }
+
+    // Check for incompatible file and handle auto-advancement
+    this.handleIncompatibleFile(request.deviceId);
   }
 
   updateCurrentFileFavoriteStatus(deviceId: string, filePath: string, isFavorite: boolean): void {
@@ -177,12 +182,12 @@ export class PlayerContextService implements IPlayerContext {
   /**
    * Returns a global signal indicating if ANY device is slow loading (loading for more than 2 seconds).
    * Uses a delayed emission strategy to avoid showing busy dialogs for fast operations:
-   * - When ANY device starts loading, waits LAUNCH_DELAY_MS before emitting true
-   * - If loading completes before delay, signal stays false (no dialog flash)
-   * - When ALL devices finish loading, immediately emits false (instant feedback)
+   * - Only shows dialog if a SINGLE load operation takes > LAUNCH_DELAY_MS continuously
+   * - Rapid-fire loads (< 2s each) never trigger the dialog, even if total time > 2s
+   * - Resets immediately when loading completes (instant feedback)
    * 
    * Signal is cached on first call for performance.
-   * @returns Signal<boolean> - true if any device has been loading for more than 2 seconds
+   * @returns Signal<boolean> - true if any single device load has been running continuously for > 2 seconds
    */
   isSlowLoading(): Signal<boolean> {
     // Return cached signal if it exists
@@ -190,18 +195,36 @@ export class PlayerContextService implements IPlayerContext {
       return this.slowLoadingSignal;
     }
 
-    // Create observable pipeline that tracks ANY device loading
-    const slowLoading$ = toObservable(this.store.players, { injector: this.injector }).pipe(
-      // Check if ANY device is currently loading
+    // Track the loading state changes
+    const isLoadingChanges$ = toObservable(this.store.players, { injector: this.injector }).pipe(
       map((players) => Object.values(players).some((player) => player.isLoading)),
-      // Only emit when loading state changes
-      distinctUntilChanged(),
-      // Apply delay only when transitioning to loading state
-      switchMap((isLoading) =>
-        isLoading
-          ? timer(this.LAUNCH_DELAY_MS).pipe(mapTo(true)) // Delay showing busy dialog
-          : of(false) // Immediate feedback when done
-      )
+      distinctUntilChanged()
+    );
+
+    // Create observable that only emits true after continuous loading for LAUNCH_DELAY_MS
+    const slowLoading$ = isLoadingChanges$.pipe(
+      switchMap((isLoading) => {
+        if (!isLoading) {
+          // Not loading - emit false immediately
+          return of(false);
+        }
+
+        // Loading started - race between:
+        // 1. Timer completing (slow load - emit true)
+        // 2. Loading finishing (fast load - emit false via switchMap cancellation)
+        return race(
+          // Timer: wait LAUNCH_DELAY_MS, then emit true
+          timer(this.LAUNCH_DELAY_MS).pipe(mapTo(true)),
+          // Monitor for loading to finish: if loading becomes false before timer,
+          // the switchMap cancels this inner observable
+          isLoadingChanges$.pipe(
+            // Skip the current true value, wait for next change (should be false)
+            take(1),
+            // If it's false, we completed fast - emit false
+            map(() => false)
+          )
+        );
+      })
     );
 
     // Convert to signal and cache the result
@@ -239,6 +262,9 @@ export class PlayerContextService implements IPlayerContext {
         this.recordHistoryIfSuccessful(deviceId);
         this.updateUrlForLaunchedFile(deviceId);
       }
+
+      // Check for incompatible file and handle auto-advancement
+      this.handleIncompatibleFile(deviceId);
     }
   }
 
@@ -256,7 +282,19 @@ export class PlayerContextService implements IPlayerContext {
       const directoryState = this.storageStore.getSelectedDirectoryState(deviceId)();
 
       if (directoryState?.directory?.files) {
-        const currentIndex = directoryState.directory.files.findIndex(
+        let directoryFiles = directoryState.directory.files;
+
+        // Mark the current file as incompatible if backend indicates so
+        const launchedFile = this.store.getCurrentFile(deviceId)();
+        if (launchedFile?.isCompatible === false) {
+          directoryFiles = directoryFiles.map(file =>
+            file.path === launchedFile.file.path
+              ? { ...file, isCompatible: false }
+              : file
+          );
+        }
+
+        const currentIndex = directoryFiles.findIndex(
           (file) => file.path === currentFile.file.path
         );
 
@@ -265,7 +303,7 @@ export class PlayerContextService implements IPlayerContext {
             deviceId,
             storageType,
             directoryPath: currentFile.parentPath,
-            files: directoryState.directory.files,
+            files: directoryFiles,
             currentFileIndex: currentIndex,
             launchMode: this.store.getLaunchMode(deviceId)(),
           });
@@ -513,6 +551,12 @@ export class PlayerContextService implements IPlayerContext {
    * Returns duration in milliseconds, or null if no timer should be created
    */
   private determineTimerDuration(deviceId: string, file: FileItem): number | null {
+
+    if (file.isCompatible === false) {
+      logInfo(LogType.Info, `Incompatible file excluded from timer: ${file.name}`);
+      return null;
+    }
+
     // Hex files never get timers
     if (file.type === FileItemType.Hex) {
       logInfo(LogType.Info, `Hex file excluded from timer: ${file.name}`);
@@ -936,5 +980,190 @@ export class PlayerContextService implements IPlayerContext {
     } finally {
       this.isHandlingPopState = false;
     }
+  }
+
+  /**
+   * Handle incompatible file by routing to appropriate advancement strategy.
+   * Entry point for auto-advancement logic - detects incompatible files and delegates
+   * to mode-specific handlers (shuffle retry vs directory advancement).
+   * 
+   * @param deviceId - The device identifier
+   */
+  private handleIncompatibleFile(deviceId: string): void {
+    // Query store for current player state
+    const player = this.store.getDevicePlayer(deviceId)();
+
+    // Guard: No player state
+    if (!player) {
+      logInfo(
+        LogType.Info,
+        `handleIncompatibleFile: No player state for device ${deviceId}`
+      );
+      return;
+    }
+
+    // Guard: No current file
+    if (!player.currentFile) {
+      logInfo(
+        LogType.Info,
+        `handleIncompatibleFile: No current file for device ${deviceId}`
+      );
+      return;
+    }
+
+    // Guard: File is compatible (treat undefined as compatible)
+    if (player.currentFile.isCompatible !== false) {
+      // Clear retry counter on success (file is compatible)
+      this.randomRetryAttempts.delete(deviceId);
+      return;
+    }
+
+    // Incompatible file detected - log and route to appropriate handler
+    logInfo(
+      LogType.Info,
+      `handleIncompatibleFile: Incompatible file detected for device ${deviceId}`,
+      {
+        file: player.currentFile.file.name,
+        launchMode: player.launchMode,
+      }
+    );
+
+    // Route based on launch mode (with 1 second delay for user feedback)
+    if (player.launchMode === LaunchMode.Shuffle) {
+      logInfo(
+        LogType.Info,
+        `handleIncompatibleFile: Routing to retryRandomLaunch for device ${deviceId} (1s delay)`
+      );
+      setTimeout(() => {
+        void this.retryRandomLaunch(deviceId);
+      }, 1000);
+    } else {
+      // Directory or Search modes
+      logInfo(
+        LogType.Info,
+        `handleIncompatibleFile: Routing to advanceToNextCompatibleFileInDirectory for device ${deviceId} (1s delay)`
+      );
+      setTimeout(() => {
+        void this.advanceToNextCompatibleFileInDirectory(deviceId);
+      }, 1000);
+    }
+  }
+
+  /**
+   * Retry random file launch when incompatible file encountered in shuffle mode.
+   * Attempts up to 9 times per device before showing alert and stopping.
+   * Counters are cleared when a compatible file is successfully launched.
+   * 
+   * @param deviceId - The device identifier
+   */
+  private async retryRandomLaunch(deviceId: string): Promise<void> {
+    // Get current attempt count (default to 0 if not present)
+    const currentAttempts = this.randomRetryAttempts.get(deviceId) ?? 0;
+
+    // Calculate what the next attempt number would be
+    const nextAttempt = currentAttempts + 1;
+
+    // Check if next attempt would exceed max (allow attempts 1-9, block 10+)
+    if (nextAttempt > 9) {
+      logWarn(
+        `Unable to find compatible file after 10 attempts for device ${deviceId}`
+      );
+      this.alertService.warning('Unable to find compatible file after 10 attempts');
+      // Clear counter to avoid stale data
+      this.randomRetryAttempts.delete(deviceId);
+      return;
+    }
+
+    // Increment counter for this retry attempt
+    this.randomRetryAttempts.set(deviceId, nextAttempt);
+
+    // Log retry attempt
+    logInfo(
+      LogType.Info,
+      `Retrying random file launch (attempt ${nextAttempt}/9) for device ${deviceId}`
+    );
+
+    // Trigger new random file selection (await to ensure completion)
+    await this.launchRandomFile(deviceId);
+  }
+
+  /**
+   * Advance to next compatible file in current directory context.
+   * Used for directory and search launch modes when incompatible file encountered.
+   * Searches forward from current index with wrap-around, launching first compatible file found.
+   * Falls back to random launch if all files are incompatible.
+   * 
+   * @param deviceId - The device identifier
+   */
+  private async advanceToNextCompatibleFileInDirectory(deviceId: string): Promise<void> {
+    // Query store for current file context
+    const fileContext = this.store.getPlayerFileContext(deviceId)();
+
+    // Guard: No file context
+    if (!fileContext) {
+      logInfo(
+        LogType.Info,
+        `advanceToNextCompatibleFileInDirectory: No file context for device ${deviceId}`
+      );
+      return;
+    }
+
+    // Guard: Empty files array
+    if (!fileContext.files || fileContext.files.length === 0) {
+      logInfo(
+        LogType.Info,
+        `advanceToNextCompatibleFileInDirectory: Empty files array for device ${deviceId}`
+      );
+      return;
+    }
+
+    // Guard: Invalid current index
+    if (
+      fileContext.currentIndex < 0 ||
+      fileContext.currentIndex >= fileContext.files.length
+    ) {
+      logInfo(
+        LogType.Info,
+        `advanceToNextCompatibleFileInDirectory: Invalid currentIndex ${fileContext.currentIndex} for device ${deviceId}`
+      );
+      return;
+    }
+
+    const { files, currentIndex } = fileContext;
+    const maxAttempts = files.length; // Prevent infinite loops
+
+    // Search for next compatible file starting from currentIndex + 1
+    for (let i = 0; i < maxAttempts; i++) {
+      // Calculate next index with wrap-around using modulo arithmetic
+      const nextIndex = (currentIndex + 1 + i) % files.length;
+      const candidateFile = files[nextIndex];
+
+      // Check if file is compatible (undefined treated as compatible)
+      if (candidateFile.isCompatible !== false) {
+        logInfo(
+          LogType.Info,
+          `advanceToNextCompatibleFileInDirectory: Found compatible file at index ${nextIndex} for device ${deviceId}`,
+          { file: candidateFile.name }
+        );
+
+        // Launch candidate file directly (await to ensure completion)
+        await this.launchFileWithContext({
+          deviceId,
+          file: candidateFile,
+          directoryPath: fileContext.directoryPath,
+          files: fileContext.files,
+          launchMode: this.store.getLaunchMode(deviceId)(),
+        });
+        
+        return;
+      }
+    }
+
+    // All files incompatible - show alert and fallback to random launch
+    logWarn(
+      `advanceToNextCompatibleFileInDirectory: All files in directory are incompatible for device ${deviceId}`
+    );
+    this.alertService.warning('All files in directory are incompatible');
+    void this.launchRandomFile(deviceId);
   }
 }

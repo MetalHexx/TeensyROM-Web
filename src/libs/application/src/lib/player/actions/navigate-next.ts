@@ -90,12 +90,31 @@ export function navigateNext(store: WritableStore<PlayerState>, playerService: I
         ) {
           const modeLabel = launchMode === LaunchMode.Search ? 'Search' : 'Directory';
           const { files, currentIndex, storageKey } = fileContext;
-          const nextIndex = (currentIndex + 1) % files.length; // Wraparound
-          const nextFile = files[nextIndex];
+
+          // Find next compatible file
+          let candidateIndex = (currentIndex + 1) % files.length;
+          let attempts = 0;
+          const maxAttempts = files.length;
+
+          while (attempts < maxAttempts) {
+            const candidate = files[candidateIndex];
+            if (candidate.isCompatible !== false) {
+              // Found compatible file - use candidateIndex
+              break;
+            }
+            candidateIndex = (candidateIndex + 1) % files.length;
+            attempts++;
+          }
+
+          if (attempts >= maxAttempts) {
+            throw new Error('All files in context are incompatible');
+          }
+
+          const nextFile = files[candidateIndex];
 
           logInfo(
             LogType.Info,
-            `${modeLabel} mode: advancing to next file (${nextIndex + 1}/${
+            `${modeLabel} mode: advancing to next file (${candidateIndex + 1}/${
               files.length
             }) for ${deviceId}`,
             { nextFile: nextFile.name }
@@ -105,31 +124,12 @@ export function navigateNext(store: WritableStore<PlayerState>, playerService: I
             playerService.launchFile(deviceId, nextFile)
           );
 
-          const isCompatible = launchedFile.isCompatible;
-
-          if (!isCompatible) {
-            const errorMessage = 'File is not compatible with TeensyROM hardware';
-            logError(
-              `Navigate next: File ${launchedFile.name} is incompatible with device ${deviceId}: ${errorMessage}`
-            );
-            setDirectoryNavigationFailure(
-              store,
-              deviceId,
-              launchedFile,
-              fileContext,
-              nextIndex,
-              errorMessage,
-              actionMessage
-            );
-            return;
-          }
-
           setDirectoryNavigationSuccess(
             store,
             deviceId,
             launchedFile,
             fileContext,
-            nextIndex,
+            candidateIndex,
             actionMessage
           );
 

@@ -82,25 +82,7 @@ export function launchRandomFile(store: WritableStore<PlayerState>, playerServic
           -1
         );
 
-        // If file is incompatible, treat as failure but with file context preserved
-        if (!isCompatible) {
-          const errorMessage = 'File is not compatible with TeensyROM hardware';
-          logError(
-            `PlayerAction: Random file ${launchedFile.name} is incompatible with device ${deviceId}: ${errorMessage}`
-          );
-          setPlayerLaunchFailure(
-            store,
-            deviceId,
-            launchedFileObj,
-            emptyFileContext,
-            LaunchMode.Shuffle,
-            errorMessage,
-            actionMessage
-          );
-          return;
-        }
-
-        // Update state with success
+        // Update state with success (incompatible files are allowed to complete launch cycle)
         setPlayerLaunchSuccess(
           store,
           deviceId,
