@@ -1,13 +1,19 @@
+@use '../../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: block;
-  width: 327px;
-  height: 390px; // Adjusted to accommodate square images + header/footer (327 + 63)
-  flex-shrink: 0;
+  min-width: 0; // Allow shrinking below content size
+  aspect-ratio: 327 / 390; // Height derives from width based on aspect ratio
+  flex: 0 1 327px; // Don't grow, can shrink, prefer 327px width
+
+  // Cap at ideal width on desktop to prevent growing too large
+  @include styles.screen-desktop {
+    max-width: 327px;
+  }
 
   // Take full width at smallest breakpoint
-  @media (max-width: 500px) {
+  @include styles.below-tablet {
     width: 100%;
-    flex-shrink: 1;
   }
 }
 
@@ -16,12 +22,13 @@
 }
 
 mat-card {
-  width: 327px;
-  height: 390px; // Match host height
+  width: 100%;
+  min-width: 0; // Allow shrinking below content size
+  height: 100%; // Fill host height (which is controlled by aspect-ratio)
   overflow: hidden;
 
   // Match host width at smallest breakpoint
-  @media (max-width: 500px) {
+  @include styles.below-tablet {
     width: 100%;
   }
 }

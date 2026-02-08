@@ -24,11 +24,10 @@
   .device-header {
     display: flex;
     flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    align-items: flex-start;
+    align-items: stretch; // Force all children to match the tallest component's height
     gap: 1rem;
     min-width: 0; // Allow shrinking without forcing width on parent
+    min-height: 0; // Allow flex shrinking
 
     // Stack header components vertically at phone size ONLY (not tablet)
     @include styles.below-phone {

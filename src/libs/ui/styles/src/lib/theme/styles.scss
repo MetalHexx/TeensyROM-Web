@@ -370,7 +370,7 @@ mat-card-title {
   max-width: 327px;
 
   // Allow shrinking on tablets and below to prevent width lock
-  @media (max-width: 1200px) {
+  @include mixins.below-desktop {
     width: 100%;
     min-width: 0;
     max-width: 100%;

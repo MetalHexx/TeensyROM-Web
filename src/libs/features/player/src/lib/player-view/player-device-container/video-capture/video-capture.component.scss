@@ -1,13 +1,19 @@
+@use '../../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: block;
-  width: 520px; // 4:3 aspect ratio: 390px * 4/3 = 520px
-  height: 390px; // Match file-image height
-  flex-shrink: 0;
+  min-width: 0; // Allow shrinking below content size
+  aspect-ratio: 4 / 3; // Maintain video proportions - height derives from width
+  flex: 0 1 520px; // Don't grow, can shrink, prefer 520px width
+
+  // Cap at ideal width on desktop to prevent growing too large
+  @include styles.screen-desktop {
+    max-width: 520px;
+  }
 
   // Take full width at smallest breakpoint
-  @media (max-width: 500px) {
+  @include styles.below-tablet {
     width: 100%;
-    flex-shrink: 1;
   }
 }
 
