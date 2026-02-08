@@ -1,9 +1,10 @@
 import { Component, DebugElement, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TooltipDirective, TooltipConfig, TooltipPosition, TooltipTitleColor } from './tooltip.directive';
 import { TooltipRendererService } from './tooltip-renderer.service';
+import { PreferencesService } from '@teensyrom-nx/ui/styles';
 
 /**
  * Test host component for TooltipDirective
@@ -36,8 +37,13 @@ describe('TooltipDirective', () => {
     destroyTooltip: ReturnType<typeof vi.fn>;
   };
   let mockTooltipElement: HTMLElement;
+  let mockPreferencesService: {
+    tooltipsEnabled: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
+    vi.useFakeTimers();
+
     // Create mock tooltip element
     mockTooltipElement = document.createElement('div');
     mockTooltipElement.textContent = 'Mock tooltip';
@@ -48,15 +54,27 @@ describe('TooltipDirective', () => {
       destroyTooltip: vi.fn(),
     };
 
+    // Create mock preferences service
+    mockPreferencesService = {
+      tooltipsEnabled: vi.fn().mockReturnValue(true),
+    };
+
     await TestBed.configureTestingModule({
       imports: [TestHostComponent],
-      providers: [{ provide: TooltipRendererService, useValue: mockTooltipService }],
+      providers: [
+        { provide: TooltipRendererService, useValue: mockTooltipService },
+        { provide: PreferencesService, useValue: mockPreferencesService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(TestHostComponent);
     component = fixture.componentInstance;
     hostElement = fixture.debugElement.query(By.css('[data-testid="tooltip-host"]'));
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('should create directive and attach to host element', () => {
@@ -68,6 +86,7 @@ describe('TooltipDirective', () => {
   describe('mouseenter behavior', () => {
     it('should call createTooltip on service when mouse enters', () => {
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
@@ -85,6 +104,7 @@ describe('TooltipDirective', () => {
       fixture.detectChanges();
 
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         { body: 'Test tooltip', position: TooltipPosition.Bottom },
@@ -115,6 +135,7 @@ describe('TooltipDirective', () => {
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
     });
@@ -124,6 +145,7 @@ describe('TooltipDirective', () => {
     it('should call destroyTooltip on service when mouse leaves', () => {
       // Show tooltip first
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
       mockTooltipService.createTooltip.mockClear();
 
       // Hide tooltip
@@ -145,6 +167,7 @@ describe('TooltipDirective', () => {
     it('should allow re-showing tooltip after hiding', () => {
       // Show
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
       expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
 
       // Hide
@@ -153,6 +176,7 @@ describe('TooltipDirective', () => {
 
       // Show again
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
       expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(2);
     });
   });
@@ -161,6 +185,7 @@ describe('TooltipDirective', () => {
     it('should destroy tooltip when directive is destroyed while tooltip is visible', () => {
       // Show tooltip
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       // Destroy directive (component destruction)
       fixture.destroy();
@@ -182,6 +207,7 @@ describe('TooltipDirective', () => {
     it('should not error when destroying after manually hiding tooltip', () => {
       // Show and hide tooltip
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
       hostElement.nativeElement.dispatchEvent(new Event('mouseleave'));
       mockTooltipService.destroyTooltip.mockClear();
 
@@ -195,6 +221,7 @@ describe('TooltipDirective', () => {
     it('should handle complete hover cycle correctly', () => {
       // Hover in
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
       expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
 
       // Hover out
@@ -205,6 +232,7 @@ describe('TooltipDirective', () => {
     it('should handle tooltip config changes', () => {
       // Show initial tooltip
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         { body: 'Test tooltip', position: TooltipPosition.Top },
         expect.any(HTMLElement),
@@ -222,6 +250,7 @@ describe('TooltipDirective', () => {
       });
       fixture.detectChanges();
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         { title: 'New Title', body: 'New tooltip text', position: TooltipPosition.Bottom },
@@ -238,6 +267,7 @@ describe('TooltipDirective', () => {
       });
       fixture.detectChanges();
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         { body: 'Test tooltip', position: TooltipPosition.Top },
@@ -255,6 +285,7 @@ describe('TooltipDirective', () => {
 
       // Show again with new position
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         { body: 'Test tooltip', position: TooltipPosition.Bottom },
@@ -273,6 +304,7 @@ describe('TooltipDirective', () => {
       fixture.detectChanges();
 
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         { title: 'Save', position: TooltipPosition.Top },
@@ -289,6 +321,7 @@ describe('TooltipDirective', () => {
       fixture.detectChanges();
 
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         { body: 'Click to save', position: TooltipPosition.Bottom },
@@ -306,6 +339,7 @@ describe('TooltipDirective', () => {
       fixture.detectChanges();
 
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         { title: 'Save', body: 'Click to save changes', position: TooltipPosition.Left },
@@ -330,6 +364,7 @@ describe('TooltipDirective', () => {
         fixture.detectChanges();
 
         hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+        vi.advanceTimersByTime(500); // Advance past the default delay
 
         expect(mockTooltipService.createTooltip).toHaveBeenNthCalledWith(
           index + 1,
@@ -353,6 +388,7 @@ describe('TooltipDirective', () => {
       fixture.detectChanges();
 
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(
         {
@@ -373,6 +409,7 @@ describe('TooltipDirective', () => {
       fixture.detectChanges();
 
       hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+      vi.advanceTimersByTime(500); // Advance past the default delay
 
       // Should default to TooltipPosition.Top
       expect(mockTooltipService.createTooltip).toHaveBeenCalledWith(

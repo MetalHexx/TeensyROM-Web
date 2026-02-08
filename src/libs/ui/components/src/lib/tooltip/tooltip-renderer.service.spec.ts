@@ -53,8 +53,31 @@ describe('TooltipRendererService', () => {
     mockTooltipElement = document.createElement('div');
 
     // Setup default mock behaviors
-    mockRenderer.createElement.mockReturnValue(mockTooltipElement);
+    // createElement should return a new element each time
+    let elementCount = 0;
+    mockRenderer.createElement.mockImplementation(() => {
+      const el = document.createElement('div');
+      // Store reference to first element (the tooltip container) for tests
+      if (elementCount === 0) {
+        mockTooltipElement = el;
+      }
+      elementCount++;
+      return el;
+    });
     mockRenderer.createText.mockReturnValue(document.createTextNode(''));
+    
+    // Make appendChild track the parent without actually modifying DOM
+    // This allows destroyTooltip to find parentElement
+    mockRenderer.appendChild.mockImplementation((parent: HTMLElement, child: unknown) => {
+      // Set parentElement so destroyTooltip can find it
+      if (child && typeof child === 'object') {
+        Object.defineProperty(child, 'parentElement', {
+          value: parent,
+          writable: true,
+          configurable: true
+        });
+      }
+    });
   });
 
   afterEach(() => {
