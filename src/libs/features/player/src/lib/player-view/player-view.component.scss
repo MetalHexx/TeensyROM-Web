@@ -1,3 +1,5 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: flex;
   flex-direction: column;
@@ -5,7 +7,7 @@
   width: 100%;
   min-height: 0;
 
-  @media (max-width: 1200px) {
+  @include styles.below-tablet {
     height: 100%;
     min-height: 0;
   }
@@ -25,7 +27,7 @@
   grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 
   // Responsive breakpoints for stacking device containers
-  @media (max-width: 1200px) {
+  @include styles.below-tablet {
     grid-template-columns: 1fr; // Stack vertically on smaller screens
   }
 }
