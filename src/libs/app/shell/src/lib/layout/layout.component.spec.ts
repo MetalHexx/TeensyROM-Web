@@ -6,6 +6,7 @@ import {
   DEVICE_STORAGE_SERVICE,
   VERSION_SERVICE,
   ALERT_SERVICE,
+  STORAGE_SERVICE,
   IDeviceService,
   IStorageService,
   IVersionService,
@@ -13,11 +14,14 @@ import {
   Device,
   StorageDirectory,
   AppVersion,
+  PlayerStatus,
+  LaunchMode,
 } from '@teensyrom-nx/domain';
+import { PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router } from '@angular/router';
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { NAV_ITEMS } from '@teensyrom-nx/app/navigation';
 import { By } from '@angular/platform-browser';
 import '../../test-setup';
@@ -60,6 +64,46 @@ describe('LayoutComponent', () => {
       dismiss: vi.fn(),
     };
 
+    const mockSignal = <T>(value: T) => signal(value).asReadonly();
+    const mockPlayerContext: Partial<IPlayerContext> = {
+      initializePlayer: vi.fn(),
+      removePlayer: vi.fn(),
+      startListeningToPopState: vi.fn(),
+      stopListeningToPopState: vi.fn(),
+      launchFileWithContext: vi.fn().mockResolvedValue(undefined),
+      launchRandomFile: vi.fn().mockResolvedValue(undefined),
+      updateCurrentFileFavoriteStatus: vi.fn(),
+      getCurrentFile: vi.fn().mockReturnValue(mockSignal(null)),
+      getFileContext: vi.fn().mockReturnValue(mockSignal(null)),
+      getPlayerStatus: vi.fn().mockReturnValue(mockSignal(PlayerStatus.Stopped)),
+      getStatus: vi.fn().mockReturnValue(mockSignal(PlayerStatus.Stopped)),
+      isLoading: vi.fn().mockReturnValue(mockSignal(false)),
+      isSlowLoading: vi.fn().mockReturnValue(mockSignal(false)),
+      getError: vi.fn().mockReturnValue(mockSignal(null)),
+      toggleShuffleMode: vi.fn(),
+      setShuffleScope: vi.fn(),
+      setFilterMode: vi.fn(),
+      getLaunchMode: vi.fn().mockReturnValue(mockSignal(LaunchMode.Directory)),
+      getShuffleSettings: vi.fn().mockReturnValue(mockSignal(null)),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
+      next: vi.fn().mockResolvedValue(undefined),
+      previous: vi.fn().mockResolvedValue(undefined),
+      getTimerState: vi.fn().mockReturnValue(mockSignal(null)),
+      getPlayTimerConfig: vi.fn().mockReturnValue(mockSignal(null)),
+      setCustomTimer: vi.fn(),
+      isCurrentFileCompatible: vi.fn().mockReturnValue(mockSignal(true)),
+      getPlayHistory: vi.fn().mockReturnValue(mockSignal(null)),
+      getCurrentHistoryPosition: vi.fn().mockReturnValue(mockSignal(0)),
+      canNavigateBackwardInHistory: vi.fn().mockReturnValue(mockSignal(false)),
+      canNavigateForwardInHistory: vi.fn().mockReturnValue(mockSignal(false)),
+      clearHistory: vi.fn(),
+      toggleHistoryView: vi.fn(),
+      isHistoryViewVisible: vi.fn().mockReturnValue(mockSignal(false)),
+      navigateToHistoryPosition: vi.fn().mockResolvedValue(undefined),
+    };
+
     await TestBed.configureTestingModule({
       imports: [LayoutComponent],
       providers: [
@@ -72,8 +116,10 @@ describe('LayoutComponent', () => {
         ]),
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: DEVICE_STORAGE_SERVICE, useValue: mockStorageService },
+        { provide: STORAGE_SERVICE, useValue: mockStorageService },
         { provide: VERSION_SERVICE, useValue: mockVersionService },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
+        { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
       ],
     }).compileComponents();
 

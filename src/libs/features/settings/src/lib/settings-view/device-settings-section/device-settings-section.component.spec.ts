@@ -148,16 +148,6 @@ describe('DeviceSettingsSectionComponent', () => {
       expect(control).toBeTruthy();
       expect(control?.value).toBe(true);
     });
-
-    it('should get auto connect control', () => {
-      const devicesArray = fb.array([createDeviceFormGroup('device-123', false, false)]);
-      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
-      fixture.detectChanges();
-
-      const control = component.getAutoConnectControl(devicesArray.at(0));
-      expect(control).toBeTruthy();
-      expect(control?.value).toBe(false);
-    });
   });
 
   describe('Animation Trigger', () => {

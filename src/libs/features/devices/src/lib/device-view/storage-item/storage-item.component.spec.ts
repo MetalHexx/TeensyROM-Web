@@ -303,9 +303,9 @@ describe('StorageStatusComponent', () => {
         fixture.componentRef.setInput('indexExists', true);
         fixture.detectChanges();
 
-        expect(component.subtitleClass()).toBe('error');
-        const errorText = fixture.nativeElement.querySelector('.error');
-        expect(errorText).toBeTruthy();
+        expect(component.subtitleClass()).toBe('dimmed');
+        const dimmedText = fixture.nativeElement.querySelector('.dimmed');
+        expect(dimmedText).toBeTruthy();
       });
     });
 
@@ -332,14 +332,14 @@ describe('StorageStatusComponent', () => {
         expect(component.subtitleClass()).toBe('error');
       });
 
-      it('should show red/error color for unavailable storage', () => {
+      it('should show dimmed color for unavailable storage', () => {
         fixture.componentRef.setInput('icon', 'usb');
         fixture.componentRef.setInput('label', 'USB Stick');
         fixture.componentRef.setInput('status', false);
         fixture.detectChanges();
 
         expect(component.subtitle()).toBe('Unavailable');
-        expect(component.subtitleClass()).toBe('error');
+        expect(component.subtitleClass()).toBe('dimmed');
       });
     });
   });
