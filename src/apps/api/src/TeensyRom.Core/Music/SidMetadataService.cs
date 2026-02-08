@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Music.Hvsc;
@@ -64,7 +64,7 @@ namespace TeensyRom.Core.Music
             song.ReleaseInfo = sidRecord.Released;
             song.Meta1 = sidRecord.Clock;
             song.Meta2 = sidRecord.SidModel;
-            song.IsCompatible = sidRecord.Format != MusicConstants.RSID;
+            //song.IsCompatible = sidRecord.Format != MusicConstants.RSID;
 
             song.MetadataSourcePath = song.MetadataSourcePath.Value.Contains(sidRecord.Filepath)
                 ? song.MetadataSourcePath
