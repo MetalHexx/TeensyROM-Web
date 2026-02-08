@@ -1,9 +1,16 @@
+@use '../../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 390px;
   min-height: 0;
+
+  // Hide at tablet size to conserve viewport space
+  @include styles.below-tablet {
+    display: none;
+  }
 }
 
 lib-scaling-card {

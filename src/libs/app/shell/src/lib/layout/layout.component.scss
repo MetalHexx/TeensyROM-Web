@@ -105,7 +105,7 @@ lib-header {
 
 
   // Add bottom padding for fixed bottom bar on phone
-  @media (max-width: 639px) {
+  @include styles.below-phone {
     padding-bottom: 95px; // Account for bottom bar height + spacing
   }
 }
@@ -115,7 +115,7 @@ lib-nav-rail {
   z-index: 100; // Above content, below modals (1000+)
 
   // At phone size, nav-rail is fixed-positioned, remove from flex layout
-  @media (max-width: 639px) {
+  @include styles.below-phone {
     position: absolute; // Remove from document flow
     pointer-events: auto; // Ensure clicks work
   }

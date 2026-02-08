@@ -1,3 +1,5 @@
+@use '../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: flex;
   flex-direction: column;
@@ -28,8 +30,8 @@
     gap: 1rem;
     min-width: 0; // Allow shrinking without forcing width on parent
 
-    // Stack header components vertically on smaller screens
-    @media (max-width: 768px) {
+    // Stack header components vertically at phone size ONLY (not tablet)
+    @include styles.below-phone {
       flex-direction: column;
       align-items: stretch;
     }
@@ -54,8 +56,21 @@
   }
 
   // Responsive adjustments for when device containers are stacked
-  @media (max-width: 1200px) {
+  @include styles.below-tablet {
     min-height: 600px;
+  }
+}
+
+// Hide video-capture and file-other components at phone size only to conserve viewport space
+lib-video-capture {
+  @include styles.below-phone {
+    display: none;
+  }
+}
+
+lib-file-other {
+  @include styles.below-phone {
+    display: none;
   }
 }
 

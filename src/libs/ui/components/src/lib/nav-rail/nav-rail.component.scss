@@ -1,3 +1,5 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 // CSS custom properties are set via style bindings from component inputs
 :host {
   --nav-rail-transition-duration: 250ms;
@@ -7,7 +9,7 @@
   height: 100%;
 
   // At phone size, remove height constraint for fixed positioning
-  @media (max-width: 639px) {
+  @include styles.below-phone {
     height: auto;
   }
 }
@@ -19,7 +21,7 @@
   flex-direction: column;
 
   // At phone size, allow wrapper to collapse for fixed positioning
-  @media (max-width: 639px) {
+  @include styles.below-phone {
     height: auto;
     position: fixed;
     bottom: 0;
@@ -44,7 +46,7 @@
     flex-direction: column;
 
     // At phone size, remove flex constraints and make background transparent
-    @media (max-width: 639px) {
+    @include styles.below-phone {
       flex: none;
       height: auto;
       background: transparent !important;
@@ -72,7 +74,7 @@
   }
 
   // Transform to horizontal bottom bar on phone
-  @media (max-width: 639px) {
+  @include styles.below-phone {
     position: static; // Let wrapper handle fixed positioning
     width: 100%;
     height: 60px;
@@ -107,7 +109,7 @@
   flex: 1;
 
   // Horizontal layout on phone
-  @media (max-width: 639px) {
+  @include styles.below-phone {
     flex-direction: row;
     justify-content: space-around;
     align-items: center;
@@ -134,7 +136,7 @@
   }
 
   // Hide pin button on phone
-  @media (max-width: 639px) {
+  @include styles.below-phone {
     display: none;
   }
 }

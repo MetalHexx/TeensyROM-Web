@@ -1,3 +1,5 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 // Inherit transition timing from parent nav-rail
 $transition-duration: var(--nav-rail-transition-duration, 250ms);
 $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
@@ -31,7 +33,7 @@ $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 
   }
 
   // Vertical stacking layout on phone (icon above label)
-  @media (max-width: 639px) {
+  @include styles.below-phone {
     flex-direction: column;
     justify-content: center;
     height: 60px;
@@ -76,7 +78,7 @@ $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 
     }
 
     // Always show labels on phone (smaller font)
-    @media (max-width: 639px) {
+    @include styles.below-phone {
       margin-left: 0;
       font-size: 11px;
       max-width: none;

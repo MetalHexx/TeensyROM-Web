@@ -33,6 +33,13 @@ $bp-desktop: 1600px; // At and above: full desktop layout (≥ 1280px)
   }
 }
 
+// Phone-first: styles apply at phone sizes and up
+@mixin below-phone {
+  @media (max-width: ($bp-phone - 1px)) {
+    @content;
+  }
+}
+
 // Range mixin for targeting specific tier only
 @mixin screen-between($min, $max) {
   @media (min-width: $min) and (max-width: ($max - 1px)) {
