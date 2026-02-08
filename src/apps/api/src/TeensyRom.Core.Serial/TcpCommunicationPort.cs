@@ -4,8 +4,8 @@ using System.Reactive;
 using System.Text;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial
 {

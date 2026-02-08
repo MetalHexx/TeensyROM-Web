@@ -6,14 +6,6 @@ import { PlayerFilterType } from './player-filter-type.enum';
 export type RepeatMode = 'Off' | 'Single' | 'All';
 
 /**
- * Connection settings for device communication
- */
-export interface ConnectionSettings {
-  /** Whether to automatically connect on startup */
-  autoConnectEnabled: boolean;
-}
-
-/**
  * Search weight configuration for content search
  */
 export interface SearchWeights {
@@ -100,15 +92,13 @@ export interface AppSettings {
 }
 
 /**
- * Per-device settings containing video and connection configuration
+ * Per-device settings containing video configuration
  */
 export interface DeviceSettings {
   /** Unique device identifier */
   deviceId: string;
   /** Video settings for this device */
   videoSettings: VideoSettings;
-  /** Connection settings for this device */
-  connectionSettings: ConnectionSettings;
 }
 
 /**

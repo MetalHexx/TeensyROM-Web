@@ -1,5 +1,5 @@
 using TeensyRom.Core.Abstractions;
-using TeensyRom.Core.Settings;
+using TeensyRom.Core.Entities.Serial;
 
 namespace TeensyRom.Core.Device;
 

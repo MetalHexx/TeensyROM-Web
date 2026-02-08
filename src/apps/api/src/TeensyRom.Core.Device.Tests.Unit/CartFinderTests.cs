@@ -1,8 +1,8 @@
 using MediatR;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Device;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Serial;
-using TeensyRom.Core.Settings;
 using TeensyRom.Core.Storage;
 
 namespace TeensyRom.Core.Device.Tests.Unit;

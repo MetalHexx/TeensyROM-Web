@@ -24,16 +24,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
             {
                 DeviceId = entity.DeviceId,
                 VideoSettings = MapVideoSettings(entity.VideoSettings),
-                ConnectionSettings = MapConnectionSettings(entity.ConnectionSettings),
                 IndexingStatus = MapIndexingStatus(entity.IndexingStatus)
-            };
-        }
-
-        private static ConnectionSettingsDto MapConnectionSettings(ConnectionSettings entity)
-        {
-            return new ConnectionSettingsDto
-            {
-                AutoConnectEnabled = entity.AutoConnectEnabled
             };
         }
 

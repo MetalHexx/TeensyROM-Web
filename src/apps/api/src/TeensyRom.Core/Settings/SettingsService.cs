@@ -102,11 +102,7 @@ namespace TeensyRom.Core.Settings
                 var newDevice = new DeviceSettings
                 {
                     DeviceId = deviceId,
-                    VideoSettings = new VideoSettings { EnableVideo = false },
-                    ConnectionSettings = new ConnectionSettings
-                    {
-                        AutoConnectEnabled = true                        
-                    }
+                    VideoSettings = new VideoSettings { EnableVideo = false }
                 };
 
                 if (_currentSettings is null)

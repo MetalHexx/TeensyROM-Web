@@ -4,7 +4,7 @@ using TeensyRom.Core.Settings;
 namespace TeensyRom.Api.Endpoints.Settings
 {
     /// <summary>
-    /// Per-device settings including video and connection preferences.
+    /// Per-device settings including video preferences.
     /// Each TeensyROM device has its own settings entry in the KnownDevices list.
     /// </summary>
     public record DeviceSettingsDto
@@ -18,11 +18,6 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// Video capture and display preferences for this device.
         /// </summary>
         [Required] public VideoSettingsDto VideoSettings { get; set; } = null!;
-
-        /// <summary>
-        /// Connection preferences for this device.
-        /// </summary>
-        [Required] public ConnectionSettingsDto ConnectionSettings { get; set; } = null!;
 
         /// <summary>
         /// Tracks full indexing completion timestamps per storage type.
@@ -44,64 +39,6 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// UTC timestamp when USB storage was last fully indexed. Null indicates never indexed.
         /// </summary>
         public DateTime? UsbLastIndexed { get; set; }
-    }
-
-    /// <summary>
-    /// Device connectivity preferences - supports both Serial and TCP/Ethernet connections.
-    /// </summary>
-    public record ConnectionSettingsDto
-    {
-        /// <summary>
-        /// Automatically attempt to connect to this device on startup.
-        /// </summary>
-        [Required] public bool AutoConnectEnabled { get; set; }
-    }
-
-    /// <summary>
-    /// Serial port specific connection settings.
-    /// </summary>
-    public record SerialConnectionSettingsDto
-    {
-        /// <summary>
-        /// Serial port name (e.g., COM3). Empty string means auto-detect.
-        /// </summary>
-        [Required] public string Port { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Baud rate for serial communication (typically 115200).
-        /// </summary>
-        [Required] public int BaudRate { get; set; }
-    }
-
-    /// <summary>
-    /// TCP/Ethernet connection settings.
-    /// </summary>
-    public record TcpConnectionSettingsDto
-    {
-        /// <summary>
-        /// Host address (IP or hostname). Empty string means not configured.
-        /// </summary>
-        [Required] public string HostAddress { get; set; } = string.Empty;
-
-        /// <summary>
-        /// TCP port number (1-65535).
-        /// </summary>
-        [Required] public int Port { get; set; }
-
-        /// <summary>
-        /// Connection timeout in milliseconds.
-        /// </summary>
-        [Required] public int ConnectionTimeoutMs { get; set; }
-
-        /// <summary>
-        /// Read timeout in milliseconds.
-        /// </summary>
-        [Required] public int ReadTimeoutMs { get; set; }
-
-        /// <summary>
-        /// Write timeout in milliseconds.
-        /// </summary>
-        [Required] public int WriteTimeoutMs { get; set; }
     }
 
     /// <summary>

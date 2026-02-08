@@ -2,6 +2,7 @@ using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Common;
+using TeensyRom.Core.Entities.Serial;
 
 namespace TeensyRom.Core.Entities.Device
 {

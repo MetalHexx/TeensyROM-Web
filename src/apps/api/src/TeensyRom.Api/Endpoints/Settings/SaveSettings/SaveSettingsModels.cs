@@ -84,56 +84,6 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             RuleFor(x => x.VideoSettings)
                 .NotNull().WithMessage("Video settings are required for each device.")
                 .SetValidator(new VideoSettingsValidator());
-
-            RuleFor(x => x.ConnectionSettings)
-                .NotNull().WithMessage("Connection settings are required for each device.")
-                .SetValidator(new ConnectionSettingsValidator());
-        }
-    }
-
-    public class ConnectionSettingsValidator : AbstractValidator<ConnectionSettingsDto>
-    {
-        public ConnectionSettingsValidator()
-        {
-            //RuleFor(x => x.ConnectionType)
-            //    .IsInEnum().WithMessage("Connection type must be a valid enum value (Serial or Tcp).");
-
-            //RuleFor(x => x.Serial)
-            //    .NotNull().WithMessage("Serial connection settings are required.")
-            //    .SetValidator(new SerialConnectionSettingsValidator());
-
-            //RuleFor(x => x.Tcp)
-            //    .NotNull().WithMessage("TCP connection settings are required.")
-            //    .SetValidator(new TcpConnectionSettingsValidator());
-        }
-    }
-
-    public class SerialConnectionSettingsValidator : AbstractValidator<SerialConnectionSettingsDto>
-    {
-        public SerialConnectionSettingsValidator()
-        {
-            RuleFor(x => x.BaudRate)
-                .GreaterThan(0).WithMessage("Baud rate must be a positive integer.")
-                .Must(rate => rate is 9600 or 19200 or 38400 or 57600 or 115200)
-                .WithMessage("Baud rate should be one of: 9600, 19200, 38400, 57600, or 115200.");
-        }
-    }
-
-    public class TcpConnectionSettingsValidator : AbstractValidator<TcpConnectionSettingsDto>
-    {
-        public TcpConnectionSettingsValidator()
-        {
-            RuleFor(x => x.Port)
-                .InclusiveBetween(1, 65535).WithMessage("TCP port must be between 1 and 65535.");
-
-            RuleFor(x => x.ConnectionTimeoutMs)
-                .GreaterThan(0).WithMessage("Connection timeout must be a positive integer (milliseconds).");
-
-            RuleFor(x => x.ReadTimeoutMs)
-                .GreaterThan(0).WithMessage("Read timeout must be a positive integer (milliseconds).");
-
-            RuleFor(x => x.WriteTimeoutMs)
-                .GreaterThan(0).WithMessage("Write timeout must be a positive integer (milliseconds).");
         }
     }
 

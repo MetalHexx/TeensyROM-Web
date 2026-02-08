@@ -1,4 +1,5 @@
 using System.Reactive;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Abstractions

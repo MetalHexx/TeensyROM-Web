@@ -10,7 +10,6 @@ models/AppSettingsDto.ts
 models/CartDto.ts
 models/CartStorageDto.ts
 models/CompetitionDto.ts
-models/ConnectionSettingsDto.ts
 models/ConnectionType.ts
 models/DeviceSettingsDto.ts
 models/DeviceState.ts

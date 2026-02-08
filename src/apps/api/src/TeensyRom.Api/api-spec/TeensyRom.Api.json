@@ -1017,17 +1017,6 @@
           }
         }
       },
-      "ConnectionSettingsDto": {
-        "required": [
-          "autoConnectEnabled"
-        ],
-        "type": "object",
-        "properties": {
-          "autoConnectEnabled": {
-            "type": "boolean"
-          }
-        }
-      },
       "ConnectionType": {
         "enum": [
           "Serial",
@@ -1038,7 +1027,6 @@
         "required": [
           "deviceId",
           "videoSettings",
-          "connectionSettings",
           "indexingStatus"
         ],
         "type": "object",
@@ -1048,9 +1036,6 @@
           },
           "videoSettings": {
             "$ref": "#/components/schemas/VideoSettingsDto"
-          },
-          "connectionSettings": {
-            "$ref": "#/components/schemas/ConnectionSettingsDto"
           },
           "indexingStatus": {
             "$ref": "#/components/schemas/IndexingStatusDto"

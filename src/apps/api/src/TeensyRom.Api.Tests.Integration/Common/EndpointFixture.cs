@@ -187,11 +187,8 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public TestSettingsService(ILoggingService log) : base(log)
         {
             // After base constructor runs (which calls GetSettings and loads/creates settings),
-            // we can simply use the default settings since auto-connect is now per-device
+            // we can simply use the default settings
             _testSettings = base.GetSettings();
-            
-            // No need to modify global ConnectionSettings - it's now per-device
-            // Devices will be created with AutoConnectEnabled based on their settings
         }
     }    
 }

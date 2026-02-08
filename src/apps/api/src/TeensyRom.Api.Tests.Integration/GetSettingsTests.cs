@@ -47,7 +47,6 @@ namespace TeensyRom.Api.Tests.Integration
                 var device = settings.KnownDevices.First();
                 device.DeviceId.Should().NotBeNullOrEmpty();
                 device.VideoSettings.Should().NotBeNull();
-                device.ConnectionSettings.Should().NotBeNull();
             }
 
             // Verify PlayerSettings structure

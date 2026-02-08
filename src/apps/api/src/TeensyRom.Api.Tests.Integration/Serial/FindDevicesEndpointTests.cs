@@ -3,6 +3,7 @@ using NSubstitute;
 using TeensyRom.Api.Endpoints.FindCarts;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Settings;
 using Xunit;

@@ -15,7 +15,6 @@ import {
   FileTagDto,
   GetSettingsResponse,
   SaveSettingsRequest,
-  ConnectionSettingsDto,
   PlayerSettingsDto,
   VideoSettingsDto,
   FileTransferSettingsDto,
@@ -41,7 +40,6 @@ import {
   YouTubeVideo,
   Competition,
   Settings,
-  ConnectionSettings,
   PlayerSettings,
   VideoSettings,
   FileTransferSettings,
@@ -373,7 +371,6 @@ export class DomainMapper {
     return {
       deviceId: dto.deviceId,
       videoSettings: this.toVideoSettings(dto.videoSettings),
-      connectionSettings: this.toConnectionSettings(dto.connectionSettings),
     };
   }
 
@@ -404,23 +401,10 @@ export class DomainMapper {
     return {
       deviceId: settings.deviceId,
       videoSettings: this.toVideoSettingsDto(settings.videoSettings),
-      connectionSettings: this.toConnectionSettingsDto(settings.connectionSettings),
       indexingStatus: {
         sdLastIndexed: null,
         usbLastIndexed: null,
       },
-    };
-  }
-
-  private static toConnectionSettings(dto: ConnectionSettingsDto): ConnectionSettings {
-    return {
-      autoConnectEnabled: dto.autoConnectEnabled,
-    };
-  }
-
-  private static toConnectionSettingsDto(settings: ConnectionSettings): ConnectionSettingsDto {
-    return {
-      autoConnectEnabled: settings.autoConnectEnabled,
     };
   }
 

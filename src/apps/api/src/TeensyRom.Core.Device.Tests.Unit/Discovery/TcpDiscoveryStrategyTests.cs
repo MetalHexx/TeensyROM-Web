@@ -3,8 +3,8 @@ using System.Text.Json;
 using NSubstitute;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Device;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Device.Tests.Unit.Discovery;
 

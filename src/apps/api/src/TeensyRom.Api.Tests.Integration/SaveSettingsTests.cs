@@ -24,10 +24,6 @@ namespace TeensyRom.Api.Tests.Integration
                         {
                             EnableVideo = false,
                             VideoDeviceId = string.Empty
-                        },
-                        ConnectionSettings = new ConnectionSettingsDto
-                        {
-                            AutoConnectEnabled = true
                         }
                     }
                 },
@@ -141,24 +137,6 @@ namespace TeensyRom.Api.Tests.Integration
                 .WithKeyAndValue("SearchSettings.SearchWeights", "At least one search weight must be greater than 0 for meaningful search.");
         }
 
-        //[Fact]
-        //public async Task SaveSettings_SettingsPersist_BetweenRequests()
-        //{
-        //    // Arrange - Save settings with unique value
-        //    var saveRequest = CreateValidRequest();
-        //    saveRequest.ConnectionSettings.Serial.Port = "COM7";
-
-        //    // Act - Save
-        //    var saveResponse = await f.Client.PostAsync<SaveSettingsEndpoint, SaveSettingsRequest, SaveSettingsResponse>(saveRequest);
-        //    saveResponse.Should().BeSuccessful<SaveSettingsResponse>();
-
-        //    // Act - Retrieve
-        //    var getResponse = await f.Client.GetAsync<GetSettingsEndpoint, GetSettingsResponse>();
-
-        //    // Assert - Verify persisted
-        //    getResponse.Should().BeSuccessful<GetSettingsResponse>();
-        //    //getResponse.Content.ConnectionSettings.Serial.Port.Should().Be("COM7");
-        //}
 
         [Fact]
         public async Task SaveSettings_UpdatesOnlyChangedSection_OtherSectionsUnchanged()

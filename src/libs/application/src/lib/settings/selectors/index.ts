@@ -9,7 +9,6 @@ import { isNavigatingHistory } from './is-navigating-history';
 import { historyPositionDisplay } from './history-position-display';
 import { selectDeviceSettings } from './select-device-settings';
 import { selectEnableVideoForDevice } from './select-enable-video-for-device';
-import { selectAutoConnectForDevice } from './select-auto-connect-for-device';
 import { selectKnownDevices } from './select-known-devices';
 import { selectVideoDeviceForDevice } from './select-video-device-for-device';
 
@@ -27,7 +26,6 @@ export function withSettingsSelectors() {
       ...historyPositionDisplay(writableStore),
       ...selectDeviceSettings(writableStore),
       ...selectEnableVideoForDevice(writableStore),
-      ...selectAutoConnectForDevice(writableStore),
       ...selectKnownDevices(writableStore),
       ...selectVideoDeviceForDevice(writableStore),
     };

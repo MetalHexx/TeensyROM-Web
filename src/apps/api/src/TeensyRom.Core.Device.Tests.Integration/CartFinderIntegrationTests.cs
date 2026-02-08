@@ -7,6 +7,7 @@ using TeensyRom.Core.Commands.GetFile;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.ValueObjects;
+using TeensyRom.Core.Entities.Serial;
 
 namespace TeensyRom.Core.Device.Tests.Integration;
 

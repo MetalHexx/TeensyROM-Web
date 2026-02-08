@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
-using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Api.Models
 {

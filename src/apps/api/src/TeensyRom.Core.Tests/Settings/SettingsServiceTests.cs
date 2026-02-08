@@ -501,8 +501,6 @@ public class SettingsServiceTests : IDisposable
         deviceSettings.DeviceId.Should().Be(newDeviceId);
         deviceSettings.VideoSettings.Should().NotBeNull();
         deviceSettings.VideoSettings.EnableVideo.Should().BeFalse();
-        deviceSettings.ConnectionSettings.Should().NotBeNull();
-        deviceSettings.ConnectionSettings.AutoConnectEnabled.Should().BeTrue();
     }
 
     [Fact]
@@ -557,8 +555,7 @@ public class SettingsServiceTests : IDisposable
         
         var updated = original with
         {
-            VideoSettings = original.VideoSettings with { EnableVideo = true },
-            ConnectionSettings = original.ConnectionSettings with { AutoConnectEnabled = false }
+            VideoSettings = original.VideoSettings with { EnableVideo = true }
         };
 
         // Act
@@ -568,7 +565,6 @@ public class SettingsServiceTests : IDisposable
         // Assert
         retrieved.Should().NotBeNull();
         retrieved!.VideoSettings.EnableVideo.Should().BeTrue();
-        retrieved.ConnectionSettings.AutoConnectEnabled.Should().BeFalse();
     }
 
     [Fact]
@@ -580,11 +576,7 @@ public class SettingsServiceTests : IDisposable
         var newDevice = new DeviceSettings
         {
             DeviceId = deviceId,
-            VideoSettings = new VideoSettings { EnableVideo = true },
-            ConnectionSettings = new ConnectionSettings 
-            { 
-                AutoConnectEnabled = false
-            }
+            VideoSettings = new VideoSettings { EnableVideo = true }
         };
 
         // Act
@@ -1229,9 +1221,6 @@ public class SettingsServiceTests : IDisposable
             ""videoSettings"": {
                 ""enableVideo"": false,
                 ""videoDeviceId"": """"
-            },
-            ""connectionSettings"": {
-                ""autoConnectEnabled"": true
             }
         }";
 
@@ -1261,10 +1250,6 @@ public class SettingsServiceTests : IDisposable
                 EnableVideo = true,
                 VideoDeviceId = "video123"
             },
-            ConnectionSettings = new ConnectionSettings
-            {
-                AutoConnectEnabled = false
-            },
             IndexingStatus = new IndexingStatus
             {
                 SdLastIndexed = sdTime,
@@ -1283,7 +1268,6 @@ public class SettingsServiceTests : IDisposable
         deserialized!.DeviceId.Should().Be(original.DeviceId);
         deserialized.VideoSettings.EnableVideo.Should().Be(original.VideoSettings.EnableVideo);
         deserialized.VideoSettings.VideoDeviceId.Should().Be(original.VideoSettings.VideoDeviceId);
-        deserialized.ConnectionSettings.AutoConnectEnabled.Should().Be(original.ConnectionSettings.AutoConnectEnabled);
         deserialized.IndexingStatus.SdLastIndexed.Should().BeCloseTo(sdTime, TimeSpan.FromMilliseconds(1));
         deserialized.IndexingStatus.UsbLastIndexed.Should().BeCloseTo(usbTime, TimeSpan.FromMilliseconds(1));
     }

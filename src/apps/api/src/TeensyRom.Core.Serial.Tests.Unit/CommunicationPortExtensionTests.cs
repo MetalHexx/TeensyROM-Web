@@ -1,7 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Settings;
 using Xunit;
 
 namespace TeensyRom.Core.Serial.Tests.Unit

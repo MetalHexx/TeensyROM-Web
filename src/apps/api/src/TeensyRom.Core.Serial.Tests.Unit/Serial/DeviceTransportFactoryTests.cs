@@ -1,7 +1,7 @@
 using FluentAssertions;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
-using TeensyRom.Core.Settings;
+using TeensyRom.Core.Entities.Serial;
 
 namespace TeensyRom.Core.Serial.Tests.Unit;
 

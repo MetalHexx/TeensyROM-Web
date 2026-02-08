@@ -4,7 +4,6 @@ export * from './AppSettingsDto';
 export * from './CartDto';
 export * from './CartStorageDto';
 export * from './CompetitionDto';
-export * from './ConnectionSettingsDto';
 export * from './ConnectionType';
 export * from './DeviceSettingsDto';
 export * from './DeviceState';

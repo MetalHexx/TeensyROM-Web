@@ -5,10 +5,10 @@ using System.Reflection;
 using System.Text.Json;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Common;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Serial.Routines;
-using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Device;
 

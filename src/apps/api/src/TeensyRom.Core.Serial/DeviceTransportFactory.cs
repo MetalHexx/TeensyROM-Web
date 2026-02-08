@@ -1,7 +1,7 @@
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Logging;
-using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial
 {

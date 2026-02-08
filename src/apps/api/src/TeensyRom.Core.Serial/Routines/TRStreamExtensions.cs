@@ -3,6 +3,7 @@ using System.IO.Ports;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands.MuteSidVoices;
 using TeensyRom.Core.Common;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Music;
@@ -427,7 +428,7 @@ namespace TeensyRom.Core.Serial.Routines
 
 		public static bool ConnectToMinimalFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{
-			if (communicationPort.GetConnectionType() is Settings.ConnectionType.Serial)
+			if (communicationPort.GetConnectionType() is ConnectionType.Serial)
 			{
 				return communicationPort.ConnectToMinimalFWSerial(log);
 			}

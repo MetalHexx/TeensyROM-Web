@@ -23,7 +23,6 @@ namespace TeensyRom.Core.Settings
   {
     public string DeviceId { get; set; } = string.Empty;
     public VideoSettings VideoSettings { get; set; } = new();
-    public ConnectionSettings ConnectionSettings { get; set; } = new();
     
     /// <summary>
     /// Tracks full indexing completion timestamps per storage type.

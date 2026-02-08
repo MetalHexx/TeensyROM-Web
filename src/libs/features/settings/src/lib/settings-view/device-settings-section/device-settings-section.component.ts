@@ -103,13 +103,6 @@ export class DeviceSettingsSectionComponent {
   }
 
   /**
-   * Gets the autoConnectEnabled form control from a device FormGroup.
-   */
-  getAutoConnectControl(deviceGroup: AbstractControl): AbstractControl | null {
-    return deviceGroup.get('connectionSettings.autoConnectEnabled');
-  }
-
-  /**
    * Gets the Device object for a given device FormGroup.
    */
   getDevice(deviceGroup: AbstractControl): Device | undefined {

@@ -4,7 +4,8 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 {
-    public class SaveSettingsMapper : IRadMapper<SaveSettingsRequest, SaveSettingsResponse, TeensySettings>
+    public class SaveSettingsMapper(ISettingsService settingsService) 
+        : IRadMapper<SaveSettingsRequest, SaveSettingsResponse, TeensySettings>
     {
         public SaveSettingsResponse FromEntity(TeensySettings entity)
         {
@@ -14,11 +15,18 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             };
         }
 
+        /// <summary>
+        /// Maps request to entity while preserving backend-managed fields from existing settings.
+        /// Retrieves current settings to preserve IndexingStatus and other backend-managed data.
+        /// </summary>
         public TeensySettings ToEntity(SaveSettingsRequest request)
         {
+            var existingSettings = settingsService.GetSettings();
+            
             return new TeensySettings
             {
-                KnownDevices = request.KnownDevices.Select(MapDeviceSettings).ToList(),
+                KnownDevices = request.KnownDevices.Select(dto => 
+                    MapDeviceSettings(dto, existingSettings.KnownDevices)).ToList(),
                 PlayerSettings = MapPlayerSettings(request.PlayerSettings),
                 FileTransferSettings = MapFileTransferSettings(request.FileTransferSettings),
                 SearchSettings = MapSearchSettings(request.SearchSettings),
@@ -26,35 +34,19 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             };
         }
 
-        private static DeviceSettings MapDeviceSettings(DeviceSettingsDto dto)
+        /// <summary>
+        /// Maps device settings DTO to entity while preserving IndexingStatus from existing settings.
+        /// IndexingStatus is backend-managed and should not be overwritten by frontend requests.
+        /// </summary>
+        private static DeviceSettings MapDeviceSettings(DeviceSettingsDto dto, List<DeviceSettings> existingDevices)
         {
+            var existingDevice = existingDevices.FirstOrDefault(d => d.DeviceId == dto.DeviceId);
+            
             return new DeviceSettings
             {
                 DeviceId = dto.DeviceId,
-                VideoSettings = MapVideoSettings(dto.VideoSettings),
-                ConnectionSettings = MapConnectionSettings(dto.ConnectionSettings),
-                IndexingStatus = MapIndexingStatus(dto.IndexingStatus)
-            };
-        }
-
-        private static ConnectionSettings MapConnectionSettings(ConnectionSettingsDto dto)
-        {
-            return new ConnectionSettings
-            {
-                AutoConnectEnabled = dto.AutoConnectEnabled,
-                //Serial = new SerialConnectionSettings
-                //{
-                //    Port = dto.Serial.Port,
-                //    BaudRate = dto.Serial.BaudRate
-                //},
-                //Tcp = new TcpConnectionSettings
-                //{
-                //    HostAddress = dto.Tcp.HostAddress,
-                //    Port = dto.Tcp.Port,
-                //    ConnectionTimeoutMs = dto.Tcp.ConnectionTimeoutMs,
-                //    ReadTimeoutMs = dto.Tcp.ReadTimeoutMs,
-                //    WriteTimeoutMs = dto.Tcp.WriteTimeoutMs
-                //}
+                VideoSettings = MapVideoSettings(dto.VideoSettings),                
+                IndexingStatus = existingDevice?.IndexingStatus ?? new IndexingStatus()
             };
         }
 
@@ -78,15 +70,6 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             {
                 EnableVideo = dto.EnableVideo,
                 VideoDeviceId = dto.VideoDeviceId
-            };
-        }
-
-        private static IndexingStatus MapIndexingStatus(IndexingStatusDto dto)
-        {
-            return new IndexingStatus
-            {
-                SdLastIndexed = dto.SdLastIndexed,
-                UsbLastIndexed = dto.UsbLastIndexed
             };
         }
 
