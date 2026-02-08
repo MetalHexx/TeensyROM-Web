@@ -834,17 +834,6 @@ describe('DomainMapper (Settings)', () => {
   });
 
   describe('toSettings - Full Settings Mapping', () => {
-    it('should map all connection settings correctly via knownDevices', () => {
-      const dto = createMockGetSettingsResponse({
-        connectionType: 'Serial',
-        autoConnectEnabled: true,
-      });
-      const result = DomainMapper.toSettings(dto);
-
-      expect(result.knownDevices.length).toBe(1);
-      expect(result.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(true);
-    });
-
     it('should map all player settings correctly', () => {
       const dto = createMockGetSettingsResponse({
         repeatModeOnStartup: true,
@@ -915,13 +904,11 @@ describe('DomainMapper (Settings)', () => {
           {
             deviceId: 'device-1',
             videoSettings: { enableVideo: true, videoDeviceId: 'cam-1' },
-            connectionSettings: { autoConnectEnabled: true },
             indexingStatus: { sdLastIndexed: null, usbLastIndexed: null },
           },
           {
             deviceId: 'device-2',
             videoSettings: { enableVideo: false, videoDeviceId: '' },
-            connectionSettings: { autoConnectEnabled: false },
             indexingStatus: { sdLastIndexed: null, usbLastIndexed: null },
           },
         ],
@@ -932,7 +919,6 @@ describe('DomainMapper (Settings)', () => {
       expect(result.knownDevices[0].deviceId).toBe('device-1');
       expect(result.knownDevices[0].videoSettings.enableVideo).toBe(true);
       expect(result.knownDevices[1].deviceId).toBe('device-2');
-      expect(result.knownDevices[1].connectionSettings.autoConnectEnabled).toBe(false);
     });
   });
 
@@ -1025,7 +1011,6 @@ interface MockSettingsOverrides {
   knownDevices?: Array<{
     deviceId: string;
     videoSettings: { enableVideo: boolean; videoDeviceId: string };
-    connectionSettings: { autoConnectEnabled: boolean };
     indexingStatus: { sdLastIndexed: Date | null; usbLastIndexed: Date | null };
   }>;
 }
@@ -1076,9 +1061,6 @@ function createMockGetSettingsResponse(overrides: MockSettingsOverrides = {}): G
       videoSettings: {
         enableVideo: overrides.enableVideo ?? false,
         videoDeviceId: overrides.videoDeviceId ?? '',
-      },
-      connectionSettings: {
-        autoConnectEnabled: overrides.autoConnectEnabled ?? false,
       },
       indexingStatus: {
         sdLastIndexed: null,

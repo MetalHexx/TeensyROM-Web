@@ -22,10 +22,11 @@ const createGetSettingsResponseDto = (): GetSettingsResponse => ({
       deviceId: 'test-device-1',
       videoSettings: {
         enableVideo: false,
-        videoDeviceId: '',
+        videoDeviceId: ''
       },
-      connectionSettings: {
-        autoConnectEnabled: false,
+      indexingStatus: {
+        sdLastIndexed: null,
+        usbLastIndexed: null,
       },
     },
   ],
@@ -106,9 +107,6 @@ const createDomainSettings = (): Settings => ({
         enableVideo: false,
         videoDeviceId: '',
       },
-      connectionSettings: {
-        autoConnectEnabled: false,
-      },
     },
   ],
 });
@@ -158,7 +156,6 @@ describe('SettingsService', () => {
 
       expect(mockSettingsApi.getSettings).toHaveBeenCalledWith();
       expect(result.knownDevices.length).toBe(1);
-      expect(result.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(false);
       expect(result.playerSettings.repeatModeOnStartup).toBe(true);
       expect(result.playerSettings.playTimerEnabled).toBe(true);
       expect(result.playerSettings.startupLaunchEnabled).toBe(true);
@@ -273,7 +270,6 @@ describe('SettingsService', () => {
       // Verify knownDevices mapping
       expect(requestDto.knownDevices).toBeDefined();
       expect(requestDto.knownDevices.length).toBe(1);
-      expect(requestDto.knownDevices[0].connectionSettings.autoConnectEnabled).toBe(false);
 
       // Verify player settings mapping
       expect(requestDto.playerSettings.repeatModeOnStartup).toBe(true);
