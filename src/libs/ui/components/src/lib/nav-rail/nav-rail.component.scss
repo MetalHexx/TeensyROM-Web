@@ -5,6 +5,11 @@
 
   display: block;
   height: 100%;
+
+  // At phone size, remove height constraint for fixed positioning
+  @media (max-width: 639px) {
+    height: auto;
+  }
 }
 
 // Wrapper forces the card to stretch to full height
@@ -12,6 +17,22 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+
+  // At phone size, allow wrapper to collapse for fixed positioning
+  @media (max-width: 639px) {
+    height: auto;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: 0; // No margin pushing it up from bottom edge
+    padding: 0; // Padding handled by inner elements
+    z-index: 1100; // Above content (z-index: 100), below modals (2000+)
+    background: rgba(var(--glassy-color, 255, 255, 255), 0.05);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(var(--glassy-color, 255, 255, 255), 0.1);
+  }
 
   // Force all nested card components to stretch
   lib-scaling-compact-card,
@@ -21,6 +42,14 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+
+    // At phone size, remove flex constraints and make background transparent
+    @media (max-width: 639px) {
+      flex: none;
+      height: auto;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
   }
 }
 
@@ -36,6 +65,36 @@
   &.expanded {
     width: var(--nav-rail-expanded-width, 200px);
   }
+
+  // Force collapsed width on tablet (no expansion allowed)
+  @media (min-width: 640px) and (max-width: 1279px) {
+    width: var(--nav-rail-collapsed-width, 56px) !important;
+  }
+
+  // Transform to horizontal bottom bar on phone
+  @media (max-width: 639px) {
+    position: static; // Let wrapper handle fixed positioning
+    width: 100%;
+    height: 60px;
+    flex-direction: row;
+    background: transparent; // Let wrapper handle background
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-top: none;
+    z-index: auto;
+    padding-bottom: env(safe-area-inset-bottom); // iOS notch/home indicator support
+
+    // Explicitly disable expansion on hover (CSS safety net)
+    &.expanded {
+      width: 100% !important;
+      height: 60px !important;
+    }
+
+    // Prevent any hover effects
+    &:hover {
+      width: 100%;
+    }
+  }
 }
 
 .nav-rail__list {
@@ -46,6 +105,15 @@
   padding: 8px 0;
   list-style: none;
   flex: 1;
+
+  // Horizontal layout on phone
+  @media (max-width: 639px) {
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0;
+    gap: 0;
+  }
 }
 
 .nav-rail__pin-button {
@@ -55,8 +123,18 @@
   position: absolute;
   bottom: 0;
   left: 0;
-  right: 0;
+  right: 0;  
   height: 48px;
   width: var(--nav-rail-collapsed-width, 56px);
   flex-shrink: 0;
+
+  // Hide pin button on tablet (collapsed only, no expansion)
+  @media (min-width: 640px) and (max-width: 1279px) {
+    display: none;
+  }
+
+  // Hide pin button on phone
+  @media (max-width: 639px) {
+    display: none;
+  }
 }

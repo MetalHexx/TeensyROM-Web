@@ -175,6 +175,263 @@ Design tokens are used by reusable components like [IconLabelComponent](COMPONEN
 
 ---
 
+## Responsive Breakpoints
+
+The TeensyROM UI uses a **3-tier breakpoint system** (Phone, Tablet, Desktop) with shared SCSS mixins for consistent responsive behavior across all components.
+
+**Breakpoint values are defined in**: `libs/ui/styles/src/lib/theme/_mixins.scss`
+
+### 3-Tier System
+
+The breakpoint system provides three distinct layout tiers:
+
+| Tier | Target Devices | Layout Description |
+|------|----------------|---------------------|
+| **Phone** | Small phones, large phones | Single column, bottom navigation, minimal chrome |
+| **Tablet** | Tablets, small laptops | Collapsed nav-rail, simplified layouts, some content hidden |
+| **Desktop** | Desktop monitors, large laptops | Full layout with all features visible, expanded nav-rail |
+
+**For exact pixel breakpoint values**, see `$bp-phone`, `$bp-tablet`, and `$bp-desktop` variables in [`_mixins.scss`](../libs/ui/styles/src/lib/theme/_mixins.scss).
+
+### How to Import
+
+Import the mixins in your component SCSS file:
+
+```scss
+@use '../../../../ui/styles/src/lib/theme/mixins' as breakpoints;
+
+// Or use a relative path from your component location:
+@use 'path/to/libs/ui/styles/src/lib/theme/mixins' as breakpoints;
+```
+
+**Tip**: The `as breakpoints` alias makes the code more readable when using mixins.
+
+### Mobile-First Mixins (Building UP)
+
+Use mobile-first patterns for progressive enhancement, starting with the mobile layout as the default and layering in complexity at larger viewports.
+
+**`screen-tablet`** - Applies styles at tablet breakpoint and above:
+
+```scss
+.my-component {
+  flex-direction: column; // Phone default
+  gap: 0.5rem;
+  
+  @include breakpoints.screen-tablet {
+    flex-direction: row; // Tablet and Desktop
+    gap: 1rem;
+  }
+}
+```
+
+**`screen-desktop`** - Applies styles at desktop breakpoint and above:
+
+```scss
+.sidebar {
+  display: none; // Phone and Tablet hide sidebar
+  
+  @include breakpoints.screen-desktop {
+    display: flex; // Desktop shows sidebar
+    width: 300px;
+  }
+}
+```
+
+### Desktop-First Mixins (Overriding DOWN)
+
+Use desktop-first patterns when your default styles target desktop and you need to override for smaller viewports.
+
+**`below-desktop`** - Applies styles below desktop breakpoint (Tablet and Phone):
+
+```scss
+.grid-layout {
+  grid-template-columns: repeat(3, 1fr); // Desktop default: 3 columns
+  
+  @include breakpoints.below-desktop {
+    grid-template-columns: repeat(2, 1fr); // Tablet and Phone: 2 columns
+  }
+}
+```
+
+**`below-tablet`** - Applies styles below tablet breakpoint (Phone only):
+
+```scss
+.header-title {
+  font-size: var(--font-size-xl); // Desktop and Tablet default
+  
+  @include breakpoints.below-tablet {
+    font-size: var(--font-size-lg); // Phone: smaller title
+  }
+}
+```
+
+### Range Mixin (Targeting Specific Tier)
+
+Use `screen-between($min, $max)` to target a specific viewport range:
+
+```scss
+.tablet-only-layout {
+  // Only applies to tablet tier
+  @include breakpoints.screen-between(breakpoints.$bp-tablet, breakpoints.$bp-desktop) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+```
+
+**⚠️ Use Sparingly**: Most responsive designs don't need tier-specific rules. Prefer mobile-first or desktop-first patterns.
+
+### Migration Guide
+
+TeensyROM previously had 32 ad-hoc `@media` queries using 13 different pixel values across 18 files. The new system consolidates these into 3 breakpoints defined in [`_mixins.scss`](../libs/ui/styles/src/lib/theme/_mixins.scss).
+
+**Migration Pattern:**
+
+Replace all raw pixel `@media` queries with the shared breakpoint mixins. The breakpoint values may be adjusted in the future, but the mixin names remain stable for backward compatibility.
+
+**Before (Ad-hoc media query):**
+
+```scss
+.storage-container {
+  display: flex;
+  
+  @media (max-width: 1200px) {
+    flex-direction: column;
+  }
+}
+```
+
+**After (Using breakpoint mixin):**
+
+```scss
+@use 'path/to/theme/mixins' as breakpoints;
+
+.storage-container {
+  display: flex;
+  
+  @include breakpoints.below-desktop {
+    flex-direction: column;
+  }
+}
+```
+
+**Multiple breakpoint example:**
+
+Before (Multiple different pixel values):
+```scss
+.toolbar {
+  gap: 1rem;
+  
+  @media (max-width: 1300px) {
+    gap: 0.5rem;
+  }
+  
+  @media (max-width: 768px) {
+    flex-wrap: wrap;
+  }
+}
+```
+
+After (Consolidated with semantic mixin names):
+```scss
+@use 'path/to/theme/mixins' as breakpoints;
+
+.toolbar {
+  gap: 1rem;
+  
+  @include breakpoints.below-desktop {
+    gap: 0.5rem;
+  }
+  
+  @include breakpoints.below-tablet {
+    flex-wrap: wrap;
+  }
+}
+```
+
+**Benefits of migration:**
+- Single source of truth for breakpoint values in `_mixins.scss`
+- Semantic mixin names (`below-tablet`, `screen-desktop`) are self-documenting
+- Easier to adjust breakpoints globally without updating dozens of files
+- Consistent responsive behavior across all components
+
+### Best Practices & Guidelines
+
+**✅ DO:**
+
+1. **Prefer mobile-first for new code**: Build layouts starting with phone as the baseline, adding complexity at larger viewports
+2. **Use semantic tier names**: `screen-tablet` and `screen-desktop` are more maintainable than raw pixel values
+3. **Always import the mixins**: Never duplicate breakpoint values in component files
+4. **Test at all breakpoints**: Verify layouts at 640px, 1024px, and 1280px during development
+5. **Use CSS custom properties for JavaScript**: Access breakpoint values via `var(--bp-phone)`, `var(--bp-tablet)`, `var(--bp-desktop)` if needed in templates or TypeScript
+
+**❌ DON'T:**
+
+1. **Never use raw pixel media queries**: All responsive code MUST use the shared mixins
+   ```scss
+   // ❌ BANNED - Raw pixel media query
+   @media (max-width: 768px) { ... }
+   
+   // ✅ CORRECT - Use mixin
+   @include breakpoints.below-tablet { ... }
+   ```
+
+2. **Don't create intermediate breakpoints**: The 3-tier system is intentionally simple. If you need more granular control, discuss with the team first.
+
+3. **Don't use CSS custom properties in @media queries**: CSS spec limitation - `@media` cannot use CSS custom properties. Always use SCSS variables via mixins.
+
+4. **Don't nest breakpoint mixins unnecessarily**: Flatten where possible for readability:
+   ```scss
+   // ❌ Avoid deep nesting
+   .component {
+     @include breakpoints.screen-tablet {
+       .child {
+         @include breakpoints.screen-desktop {
+           color: blue;
+         }
+       }
+     }
+   }
+   
+   // ✅ Better - flatten selectors
+   .component {
+     @include breakpoints.screen-tablet {
+       .child {
+         color: red;
+       }
+     }
+   }
+   
+   .component {
+     @include breakpoints.screen-desktop {
+       .child {
+         color: blue;
+       }
+     }
+   }
+   ```
+
+**When to Use Which Mixin:**
+
+- **Building a new component?** → Start with mobile-first (`screen-tablet`, `screen-desktop`)
+- **Hiding desktop features on mobile?** → Use desktop-first (`below-tablet`, `below-desktop`)
+- **Migrating existing code?** → Match the existing pattern (if it's `max-width`, use `below-*`)
+- **Targeting tablet ONLY?** → Use `screen-between()` (rare, but supported)
+
+### CSS Custom Properties (Reference Only)
+
+Breakpoint values are also exposed as CSS custom properties for JavaScript access:
+
+```typescript
+// Access breakpoint values in TypeScript
+const phoneBreakpoint = getComputedStyle(document.documentElement)
+  .getPropertyValue('--bp-phone'); // "640px"
+```
+
+**⚠️ Important**: These CSS custom properties are for **JavaScript access and documentation only**. You **CANNOT** use them in `@media` queries due to CSS spec limitations. Always use the SCSS mixins for responsive styles.
+
+---
+
 ## Utility Classes
 
 ### `.dimmed`

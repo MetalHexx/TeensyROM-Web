@@ -67,6 +67,13 @@ html {
   --border-radius-lg: 16px; // cards, dialogs, panels
   --border-radius-xl: 24px; // large cards, hero sections
 
+  // Design Tokens - Breakpoints
+  // Note: @media queries cannot use CSS custom properties. Use SCSS mixins from _mixins.scss instead.
+  // These are exposed for JavaScript access (getComputedStyle) and documentation purposes only.
+  --bp-phone: 640px; // Phone layout breakpoint
+  --bp-tablet: 1280px; // Tablet layout breakpoint
+  --bp-desktop: 1600px; // Desktop layout breakpoint
+
   @include mat.theme(
     (
       color: mat.$azure-palette,
@@ -115,6 +122,11 @@ html.dark-mode {
   --border-radius-md: 10px;
   --border-radius-lg: 16px;
   --border-radius-xl: 24px;
+
+  // Design Tokens - Breakpoints (same values as light mode)
+  --bp-phone: 640px; // Phone layout breakpoint
+  --bp-tablet: 1280px; // Tablet layout breakpoint
+  --bp-desktop: 1600px; // Desktop layout breakpoint
 
   @include mat.theme(
     (

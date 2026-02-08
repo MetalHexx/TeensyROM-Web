@@ -1,3 +1,5 @@
+@use '../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: block;
 }

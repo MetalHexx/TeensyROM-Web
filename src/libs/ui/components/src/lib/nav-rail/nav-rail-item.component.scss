@@ -30,6 +30,23 @@ $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 
     }
   }
 
+  // Vertical stacking layout on phone (icon above label)
+  @media (max-width: 639px) {
+    flex-direction: column;
+    justify-content: center;
+    height: 60px;
+    padding: 4px 8px;
+    flex: 1;
+    min-width: 64px;
+    gap: 2px;
+
+    &.active {
+      // Top border indicator instead of left border
+      border-top: 2px solid var(--color-highlight, #00f7ff);
+      border-radius: 0;
+    }
+  }
+
   .item-icon {
     flex-shrink: 0;
     display: flex;
@@ -51,10 +68,31 @@ $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 
     transition:
       max-width $transition-duration $transition-easing,
       opacity $transition-duration $transition-easing;
+
+    // Force hidden labels on tablet (collapsed only)
+    @media (min-width: 640px) and (max-width: 1279px) {
+      max-width: 0 !important;
+      opacity: 0 !important;
+    }
+
+    // Always show labels on phone (smaller font)
+    @media (max-width: 639px) {
+      margin-left: 0;
+      font-size: 11px;
+      max-width: none;
+      opacity: 1;
+      text-align: center;
+    }
   }
 
   &.expanded .item-label {
     max-width: 150px;
     opacity: 1;
+
+    // Override expansion on tablet (force collapsed)
+    @media (min-width: 640px) and (max-width: 1279px) {
+      max-width: 0 !important;
+      opacity: 0 !important;
+    }
   }
 }

@@ -1,4 +1,5 @@
 @use '@angular/material' as mat;
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
 
 :host {
   display: flex;
@@ -101,15 +102,23 @@ lib-header {
   padding: 1rem; // Equal padding on all sides
   gap: 1rem; // Space between nav rail and content
 
-  @media (max-width: 768px) {
-    padding: 0.5rem; // Reduce padding on tablets and phones
-    gap: 0.5rem;
+
+
+  // Add bottom padding for fixed bottom bar on phone
+  @media (max-width: 639px) {
+    padding-bottom: 95px; // Account for bottom bar height + spacing
   }
 }
 
 lib-nav-rail {
   flex-shrink: 0;
   z-index: 100; // Above content, below modals (1000+)
+
+  // At phone size, nav-rail is fixed-positioned, remove from flex layout
+  @media (max-width: 639px) {
+    position: absolute; // Remove from document flow
+    pointer-events: auto; // Ensure clicks work
+  }
 }
 
 .router-container {
@@ -128,7 +137,7 @@ lib-nav-rail {
     min-height: 0;
     background: transparent; // Let synthwave show through
 
-    @media (max-width: 1200px) {
+    @include styles.below-desktop {
       overflow-y: auto;
     }
 

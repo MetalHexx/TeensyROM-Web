@@ -121,8 +121,14 @@ export class NavRailComponent {
   /**
    * Handles mouse entering the rail.
    * Starts delayed expansion if not already expanded and not pinned.
+   * Disabled at phone size (< 640px) where rail is always collapsed as bottom bar.
    */
   onMouseEnter(): void {
+    // Disable hover expansion at phone size
+    if (this.isPhoneSize()) {
+      return;
+    }
+
     this.isHovering.set(true);
     this.clearCollapseTimer();
 
@@ -134,14 +140,31 @@ export class NavRailComponent {
   /**
    * Handles mouse leaving the rail.
    * Starts delayed collapse if currently expanded and not pinned.
+   * Disabled at phone size (< 640px) where rail is always collapsed as bottom bar.
    */
   onMouseLeave(): void {
+    // Disable hover collapse at phone size
+    if (this.isPhoneSize()) {
+      return;
+    }
+
     this.isHovering.set(false);
     this.clearExpandTimer();
 
     if (this.isExpanded() && !this.isPinned()) {
       this.startCollapseTimer();
     }
+  }
+
+  /**
+   * Checks if the current viewport is phone size (< 640px).
+   * Used to disable hover expansion at mobile breakpoint.
+   */
+  private isPhoneSize(): boolean {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+    return window.matchMedia('(max-width: 639px)').matches;
   }
 
   // --- Timer Helpers ---

@@ -1,4 +1,46 @@
 // ─────────────────────────────────────────────
+//  Responsive Breakpoints
+// ─────────────────────────────────────────────
+
+// Breakpoint variables
+$bp-phone: 640px; // Below this: phone layout (< 640px)
+$bp-tablet: 1280px; // Below this: tablet layout (640px - 1023px)
+$bp-desktop: 1600px; // At and above: full desktop layout (≥ 1280px)
+
+// Mobile-first mixins (min-width, for building UP from mobile)
+@mixin screen-tablet {
+  @media (min-width: $bp-tablet) {
+    @content;
+  }
+}
+
+@mixin screen-desktop {
+  @media (min-width: $bp-desktop) {
+    @content;
+  }
+}
+
+// Desktop-first mixins (max-width, for progressive enhancement DOWN from desktop)
+@mixin below-tablet {
+  @media (max-width: ($bp-tablet - 1px)) {
+    @content;
+  }
+}
+
+@mixin below-desktop {
+  @media (max-width: ($bp-desktop - 1px)) {
+    @content;
+  }
+}
+
+// Range mixin for targeting specific tier only
+@mixin screen-between($min, $max) {
+  @media (min-width: $min) and (max-width: ($max - 1px)) {
+    @content;
+  }
+}
+
+// ─────────────────────────────────────────────
 //  Glassy Effect Mixins
 // ─────────────────────────────────────────────
 
