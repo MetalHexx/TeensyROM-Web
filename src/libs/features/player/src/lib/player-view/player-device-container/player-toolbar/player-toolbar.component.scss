@@ -31,12 +31,11 @@ mat-card {
   flex-shrink: 0;
 }
 
-// Desktop Layout (>900px): Absolute centered file-info
 .desktop-layout {
   display: none;
   position: relative;
 
-  @media (min-width: 901px) {
+  @include styles.screen-tablet {
     display: flex;
   }
 
@@ -63,11 +62,10 @@ mat-card {
   }
 }
 
-// Tablet Layout (641px-900px): Flexbox with file-info using remaining space
 .tablet-layout {
   display: none;
 
-  @media (min-width: 641px) and (max-width: 900px) {
+  @include styles.screen-between(styles.$bp-phone, styles.$bp-tablet) {
     display: flex;
   }
 
