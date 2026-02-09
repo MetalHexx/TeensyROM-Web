@@ -1,3 +1,5 @@
+@use '../../../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: flex;
 }
@@ -15,8 +17,8 @@
     flex: 1;
     min-width: 200px;
 
-    @media (max-width: 480px) {
-      min-width: 120px; // Shrink to essential size on small phones
+    @include styles.below-tablet {
+      min-width: 120px;
     }
   }
 }
