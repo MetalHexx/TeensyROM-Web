@@ -4,6 +4,7 @@
   min-height: 0;
   width: 100%;
   min-width: 250px;
+  overflow-x: hidden;
 }
 
 :host-context(.compact-section-width) {
@@ -15,12 +16,14 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
+  overflow-x: hidden;
 }
 
 mat-tree {
   background-color: transparent;
   height: 100%;
   width: 100%;
+  overflow-x: hidden;
 }
 
 // Force tree nodes to not wrap and expand naturally

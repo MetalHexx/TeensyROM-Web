@@ -18,7 +18,7 @@ lib-scaling-card {
   width: 100%;
   flex: 1 1 0; // Fill available height in flex column (not height: 100%)
   min-height: 0; // Allow shrinking below content size
-  overflow: auto; // Scroll if content overflows when squeezed
+  overflow-x: hidden;
 }
 
 .no-metadata {
