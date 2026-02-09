@@ -41,9 +41,32 @@
     width: 100%;
   }
 
-  .player-toolbar {
+  .combined-toolbar {
     display: flex;
+    gap: 1rem;
     width: 100%;
+    align-items: stretch;
+
+    .player-toolbar-wrapper {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .filter-toolbar-wrapper {
+      flex: 0 0 auto;
+      min-width: fit-content;
+    }
+
+    // Stack toolbars vertically only on phone sizes
+    @include styles.below-tablet {
+      flex-direction: column;
+      
+      .player-toolbar-wrapper,
+      .filter-toolbar-wrapper {
+        flex: 1 1 auto;
+        width: 100%;
+      }
+    }
   }
 
   .storage-container {

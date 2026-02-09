@@ -15,8 +15,13 @@
     </div>
   } -->
   @if (isPlayerLoaded()) {
-  <div class="player-toolbar">
-    <lib-player-toolbar [deviceId]="deviceId()"></lib-player-toolbar>
+  <div class="combined-toolbar">
+    <div class="player-toolbar-wrapper">
+      <lib-player-toolbar [deviceId]="deviceId()"></lib-player-toolbar>
+    </div>
+    <div class="filter-toolbar-wrapper">
+      <lib-filter-toolbar [deviceId]="deviceId()"></lib-filter-toolbar>
+    </div>
   </div>
   }
   <div class="storage-container">

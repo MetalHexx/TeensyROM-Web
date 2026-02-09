@@ -6,6 +6,7 @@ import { FileOtherComponent } from './file-other/file-other.component';
 import { FileImageComponent } from './file-image/file-image.component';
 import { VideoCaptureComponent } from './video-capture/video-capture.component';
 import { PlayerToolbarComponent } from './player-toolbar/player-toolbar.component';
+import { FilterToolbarComponent } from './storage-container/filter-toolbar/filter-toolbar.component';
 import { StorageContainerComponent } from './storage-container/storage-container.component';
 import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 
@@ -18,6 +19,7 @@ import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
     VideoCaptureComponent,
     FileOtherComponent,
     PlayerToolbarComponent,
+    FilterToolbarComponent,
     StorageContainerComponent,
   ],
   templateUrl: './player-device-container.component.html',
