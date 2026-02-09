@@ -10,20 +10,46 @@
       overflow: hidden !important;
     }
   }
-
-  mat-card-content {
-    margin-top: 16px;
-  }
 }
 
-.corner-content {
+// Material card content spacing
+lib-card-layout mat-card-content {
+  margin-top: 16px;
+}
+
+// Corner content positioning
+lib-card-layout .corner-content {
   position: absolute;
   top: 16px;
   right: 16px;
   z-index: 1;
 }
 
-.metadata-source {
+// Header slot styling - proper spacing when header slot content exists
+// Note: ViewEncapsulation.None allows styling Material internals without ::ng-deep
+lib-card-layout mat-card-header {
+  // Stack title and subtitle vertically instead of side-by-side
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  
+  // Hide header when completely empty (no title, no header slot content)
+  &:empty {
+    display: none;
+  }
+  
+  [slot='header'] {
+    display: block;
+    margin-bottom: 12px; // Space between header slot and title (if both present)
+    
+    // Remove margin if header slot is the only content (no title follows)
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+// Metadata source styling
+lib-card-layout .metadata-source {
   margin: 0;
   font-size: 0.75rem;
   opacity: 0.7;
@@ -31,7 +57,8 @@
 }
 
 // Rounded corners for glassy cards (when not using .glassy-card which includes this)
-::ng-deep .rounded-card {
+// Note: ViewEncapsulation.None allows this without ::ng-deep
+lib-card-layout .rounded-card {
   border-radius: var(--mat-sys-corner-large) !important;
   box-shadow: var(--mat-sys-level4) !important;
 }

@@ -4,14 +4,21 @@
     <ng-content select="[slot=corner]"></ng-content>
   </div>
 
-  @if (title()) {
+  <!-- Header section - use CSS :empty to hide when no content -->
   <mat-card-header>
-    <mat-card-title>{{ title() }}</mat-card-title>
-    @if (subtitle()) {
-    <mat-card-subtitle>{{ subtitle() }}</mat-card-subtitle>
-    }
+    <!-- Header slot projection - appears above title/subtitle -->
+    <ng-content select="[slot=header]"></ng-content>
+    
+    <ng-container>
+      @if (title()) {
+        <mat-card-title>{{ title() }}</mat-card-title>
+      }
+      @if (subtitle()) {
+        <mat-card-subtitle>{{ subtitle() }}</mat-card-subtitle>
+      }
+    </ng-container>
   </mat-card-header>
-  }
+  
   <mat-card-content>
     <ng-content></ng-content>
   </mat-card-content>
