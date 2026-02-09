@@ -1,6 +1,6 @@
 ---
 description: Run all unit and integration tests and generate a comprehensive baseline report
-tools: ['runCommands', 'runTests', 'problems']
+tools: ['vscode', 'execute', 'read', 'agent', 'edit', 'search', 'web', 'todo']
 ---
 
 # Run Unit Tests - Baseline Report
