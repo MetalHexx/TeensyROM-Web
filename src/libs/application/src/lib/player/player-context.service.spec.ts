@@ -2991,6 +2991,9 @@ describe('PlayerContextService', () => {
         });
 
         await nextTick();
+        // Wait for 1-second auto-advancement delay to complete
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        await nextTick();
 
         // After auto-advancement, should have compatible file
         const currentFile = service.getCurrentFile(deviceId)();
@@ -3091,8 +3094,8 @@ describe('PlayerContextService', () => {
         expect(currentFile?.file.name).toBe('bad.sid');
         expect(currentFile?.isCompatible).toBe(false);
 
-        // Should have error
-        expect(service.getError(deviceId)()).toContain('not compatible');
+        // Error handling is done via auto-advancement, no error state set
+        expect(service.getError(deviceId)()).toBeNull();
 
         // Timer should be cleaned up
         expect(service.getTimerState(deviceId)()).toBeNull();
@@ -3137,8 +3140,8 @@ describe('PlayerContextService', () => {
         expect(currentFile?.file.name).toBe('bad.sid');
         expect(currentFile?.isCompatible).toBe(false);
 
-        // Should have error
-        expect(service.getError(deviceId)()).toContain('not compatible');
+        // Error handling is done via auto-advancement, no error state set
+        expect(service.getError(deviceId)()).toBeNull();
 
         // Timer should be cleaned up
         expect(service.getTimerState(deviceId)()).toBeNull();
