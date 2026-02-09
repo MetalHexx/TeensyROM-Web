@@ -82,11 +82,13 @@
     flex-direction: row;
     align-items: flex-start;
     gap: 1rem;
-    flex: 1 1 210px; // Grow, can shrink, base 210px for ~4 items visibility (4 * 42px + 60px header + padding)
+    flex: 1;
+    min-height: 0;
 
-    // Remove gap on phones where directory tree is hidden
-    @include styles.below-tablet {
-      gap: 0;
+    @include styles.below-desktop {
+      flex-direction: column;
+      height: auto;
+      overflow-y: auto;
     }
 
     .left-container {
@@ -94,16 +96,23 @@
       flex-direction: column;
       align-items: stretch;
       justify-content: flex-start;
-      flex: 0 0 auto; // No grow or shrink
+      flex: 0 1 auto;
       height: 100%;
       min-height: 0;
-      width: fit-content; // Size to content width
-      min-width: 0; // Allow shrinking when hidden
-      max-width: 60%; // Prevent taking too much space
-      overflow-x: auto; // Scroll when content exceeds max-width
-      overflow-y: hidden;
+      min-width: 250px;
+      max-width: 500px;
+      overflow: hidden;
 
-      // Hide directory tree at smaller breakpoints (tablet and below)
+      @include styles.below-desktop {
+        flex: none;
+        min-width: 0;
+        max-width: none;
+        height: auto;
+        min-height: 300px;
+        overflow-x: auto;
+      }
+
+      // Hide directory tree at smallest breakpoint (phone only)
       @include styles.below-tablet {
         display: none;
       }
