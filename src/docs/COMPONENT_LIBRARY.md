@@ -70,7 +70,54 @@ All cards include glassy backdrop effect by default with a dark semi-transparent
 </lib-card-layout>
 ```
 
-**Content Slots**: Default slot for content, `[slot=corner]` for upper-right corner
+**Content Slots**: 
+- Default slot for body content
+- `[slot=corner]` for upper-right corner (e.g., close button, status indicator)
+- `[slot=header]` for custom header content above title (e.g., navigation controls, action buttons)
+
+**Header Slot** (optional):
+
+Use `slot="header"` to project custom component content into the card header area. Header slot content appears **above** the title/subtitle when both are provided. This enables rich, interactive headers with navigation controls, toolbars, or complex layouts.
+
+**Header Slot Usage Examples**:
+
+```html
+<!-- Header slot with title (header content appears above title) -->
+<lib-card-layout [title]="cardTitle">
+  <div slot="header" class="custom-navigation">
+    <button mat-icon-button><mat-icon>arrow_back</mat-icon></button>
+    <button mat-icon-button><mat-icon>refresh</mat-icon></button>
+  </div>
+  <div>Card content here</div>
+</lib-card-layout>
+
+<!-- Header slot without title (only custom header content) -->
+<lib-card-layout>
+  <my-breadcrumb-component slot="header"></my-breadcrumb-component>
+  <p>Body content...</p>
+</lib-card-layout>
+
+<!-- Header slot with title, subtitle, and corner -->
+<lib-card-layout title="Main Title" subtitle="Description">
+  <custom-toolbar slot="header"></custom-toolbar>
+  <button mat-icon-button slot="corner"><mat-icon>more_vert</mat-icon></button>
+  <div>Content...</div>
+</lib-card-layout>
+```
+
+**Header Slot Styling**:
+- **Spacing**: 12px margin-bottom between header slot content and title (when both present)
+- **No spacing**: Margin removed when header slot is the only content (no title follows)
+- **Auto-hide**: Header section automatically hidden via CSS `:empty` when no title or header slot content exists
+
+**Typical Use Cases**:
+- Navigation breadcrumbs in file browsers
+- Action toolbars with back/forward/refresh controls
+- Complex header layouts with filters and search
+- Custom navigation controls integrated into card headers
+
+**Used In**:
+- Directory-files component (Phase 3 - pending integration)
 
 **See Also**: [ScalingCardComponent](#scalingcardcomponent) for animated version
 
