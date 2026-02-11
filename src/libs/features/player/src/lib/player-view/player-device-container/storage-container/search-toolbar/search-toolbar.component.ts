@@ -9,13 +9,13 @@ import {
   viewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ScalingCompactCardComponent, InputFieldComponent, IconButtonComponent, TooltipConfig, TooltipPosition, TooltipDirective } from '@teensyrom-nx/ui/components';
+import { InputFieldComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 import { StorageStore, PLAYER_CONTEXT } from '@teensyrom-nx/application';
 import { PlayerFilterType } from '@teensyrom-nx/domain';
 
 @Component({
   selector: 'lib-search-toolbar',
-  imports: [CommonModule, ScalingCompactCardComponent, InputFieldComponent, IconButtonComponent],
+  imports: [CommonModule, InputFieldComponent],
   templateUrl: './search-toolbar.component.html',
   styleUrl: './search-toolbar.component.scss',
 })
@@ -42,10 +42,9 @@ export class SearchToolbarComponent {
     position: TooltipPosition.Top,
   };
 
-  // Tooltip configuration
-  readonly clearSearchTooltip: TooltipConfig = {
+  readonly clearTooltip: TooltipConfig = {
     title: 'Clear Search',
-    body: 'Clear search results and return to current directory view',
+    body: 'Clears the search and returns back to the previous list view you were on (Current Directory or Play History).',
     position: TooltipPosition.Top,
   };
 
@@ -74,21 +73,17 @@ export class SearchToolbarComponent {
   // Computed signal for search button enabled state
   readonly canSearch = computed(() => this.searchText().trim().length > 0 && !this.isSearching());
 
-  // Computed signal for clear button visibility
-  readonly showClearButton = computed(() => {
-    const state = this.searchState();
-    return this.hasActiveSearch() && state?.results !== undefined && state.results.length > 0;
-  });
-
   // Debounce timeout for auto-search
   private searchTimeout?: ReturnType<typeof setTimeout>;
 
   constructor() {
-    // Reactive effect: Clear input field when search state is cleared from store
+    // Reactive effect: Bidirectionally sync input field with search state from store
     effect(() => {
       const searchState = this.searchState();
 
       untracked(() => {
+        const inputField = this.searchInput();
+
         // If search state is null or undefined, it means search was cleared
         // This can happen from:
         // - clearSearch() action
@@ -98,9 +93,25 @@ export class SearchToolbarComponent {
           this.searchText.set('');
 
           // Clear the input field component
-          const inputField = this.searchInput();
           if (inputField) {
             inputField.writeValue('');
+          }
+        } else if (searchState.searchText) {
+          // Hydrate input field from store when search state exists
+          // This happens when:
+          // - Viewing search results (navigating to search-results component)
+          // - Store has active search state that needs to be displayed
+          const storeSearchText = searchState.searchText;
+          const localSearchText = this.searchText();
+
+          // Only update if different to avoid unnecessary updates
+          if (storeSearchText !== localSearchText) {
+            this.searchText.set(storeSearchText);
+
+            // Update the input field component
+            if (inputField) {
+              inputField.writeValue(storeSearchText);
+            }
           }
         }
       });

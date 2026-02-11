@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
-import { ScalingCardComponent, LoadingTextComponent } from '@teensyrom-nx/ui/components';
+import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
 import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
 import {
   DirectoryItem,
@@ -22,6 +22,8 @@ import {
 import { DirectoryItemComponent } from './directory-item/directory-item.component';
 import { FileItemComponent } from './file-item/file-item.component';
 import { StorageDeviceItemComponent } from './storage-device-item/storage-device-item.component';
+import { DirectoryTrailComponent } from '../directory-trail/directory-trail.component';
+import { SearchToolbarComponent } from '../search-toolbar/search-toolbar.component';
 
 /**
  * Smart container component for displaying and managing directory contents (folders and files).
@@ -56,11 +58,12 @@ import { StorageDeviceItemComponent } from './storage-device-item/storage-device
   imports: [
     CommonModule,
     ScalingCardComponent,
-    LoadingTextComponent,
     DirectoryItemComponent,
     FileItemComponent,
     StorageDeviceItemComponent,
     ScrollingModule,
+    DirectoryTrailComponent,
+    SearchToolbarComponent,
   ],
   templateUrl: './directory-files.component.html',
   styleUrls: ['./directory-files.component.scss'],
@@ -143,8 +146,6 @@ export class DirectoryFilesComponent {
       ...contents.files.map((item) => ({ ...item, itemType: 'file' as const })),
     ];
   });
-
-  readonly isLoading = computed(() => this.directoryContents().isLoading ?? false);
 
   readonly selectedItem = signal<DirectoryItem | FileItem | null>(null);
 

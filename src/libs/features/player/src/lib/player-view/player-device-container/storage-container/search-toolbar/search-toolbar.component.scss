@@ -14,11 +14,11 @@
   gap: 0.5rem;
 
   .search-field {
-    flex: 1;
-    min-width: 200px;
-
+    padding-top: 4px;
+    max-width: 240px;
+    
     @include styles.below-tablet {
-      min-width: 120px;
+      max-width: none;
     }
   }
 }

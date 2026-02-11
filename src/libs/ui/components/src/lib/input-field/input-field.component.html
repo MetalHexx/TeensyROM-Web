@@ -1,22 +1,29 @@
-<mat-form-field appearance="outline" [libTooltip]="tooltip()">
-  <mat-label>{{ label() }}</mat-label>
-
-  @if (prefixIcon()) {
-  <mat-icon matPrefix>{{ prefixIcon() }}</mat-icon>
+<div class="input-wrapper">
+  <div class="input-area" [libTooltip]="tooltip()">
+    @if (!value) {
+    <mat-icon class="search-icon">search</mat-icon>
+    }
+    <input
+      class="input-field"
+      [type]="inputType()"
+      [placeholder]="placeholder()"
+      [disabled]="disabled()"
+      [value]="value"
+      [attr.aria-label]="placeholder()"
+      (input)="onInput($event)"
+      (focus)="onFocus()"
+      (blur)="onBlur()"
+    />
+  </div>
+  @if (clearable() && value) {
+  <button 
+    type="button"
+    class="clear-button" 
+    (click)="onClear()"
+    [attr.aria-label]="'Clear search'"
+    [libTooltip]="clearTooltip()"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
   }
-
-  <input
-    matInput
-    [type]="inputType()"
-    [placeholder]="placeholder()"
-    [disabled]="disabled()"
-    [value]="value"
-    (input)="onInput($event)"
-    (focus)="onFocus()"
-    (blur)="onBlur()"
-  />
-
-  @if (suffixIcon()) {
-  <mat-icon matSuffix>{{ suffixIcon() }}</mat-icon>
-  }
-</mat-form-field>
+</div>

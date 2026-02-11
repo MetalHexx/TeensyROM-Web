@@ -14,14 +14,12 @@ export class DirectoryNavigateComponent {
   canNavigateBack = input<boolean>(false);
   canNavigateForward = input<boolean>(false);
   isLoading = input<boolean>(false);
-  historyViewVisible = input<boolean>(false);
 
   // Outputs
   backClicked = output<void>();
   forwardClicked = output<void>();
   upClicked = output<void>();
   refreshClicked = output<void>();
-  historyToggleClicked = output<void>();
 
   // Tooltip configurations
   readonly backTooltip: TooltipConfig = {
@@ -48,22 +46,6 @@ export class DirectoryNavigateComponent {
     position: TooltipPosition.Top,
   };
 
-  readonly showHistoryTooltip: TooltipConfig = {
-    title: 'Show Navigation History',
-    body: 'Takes you to the navigation history view',
-    position: TooltipPosition.Top,
-  };
-
-  readonly hideHistoryTooltip: TooltipConfig = {
-    title: 'Hide Navigation History',
-    body: 'Hides the navigation history view and returns to the directory view',
-    position: TooltipPosition.Top,
-  };
-
-  readonly historyTooltip = computed(() =>
-    this.historyViewVisible() ? this.hideHistoryTooltip : this.showHistoryTooltip
-  );
-
   // Event handlers
   onBackClick(): void {
     this.backClicked.emit();
@@ -79,9 +61,5 @@ export class DirectoryNavigateComponent {
 
   onRefreshClick(): void {
     this.refreshClicked.emit();
-  }
-
-  onHistoryToggleClick(): void {
-    this.historyToggleClicked.emit();
   }
 }

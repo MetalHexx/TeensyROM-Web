@@ -21,56 +21,22 @@ describe('InputFieldComponent', () => {
 
   it('should create', () => {
     // Set required inputs
-    componentRef.setInput('label', 'Test Label');
     componentRef.setInput('placeholder', 'Test Placeholder');
     fixture.detectChanges();
 
     expect(component).toBeTruthy();
   });
 
-  it('should display label and placeholder', () => {
-    componentRef.setInput('label', 'Username');
-    componentRef.setInput('placeholder', 'Enter your username');
-    fixture.detectChanges();
-
-    const compiled = fixture.nativeElement;
-    expect(compiled.querySelector('mat-label').textContent).toContain('Username');
-    expect(compiled.querySelector('input').placeholder).toBe('Enter your username');
-  });
-
-  it('should display prefix icon when provided', () => {
-    componentRef.setInput('label', 'Email');
-    componentRef.setInput('placeholder', 'Enter email');
-    componentRef.setInput('prefixIcon', 'email');
-    fixture.detectChanges();
-
-    const prefixIcon = fixture.nativeElement.querySelector('mat-icon[matPrefix]');
-    expect(prefixIcon).toBeTruthy();
-    expect(prefixIcon.textContent).toContain('email');
-  });
-
-  it('should display suffix icon when provided', () => {
-    componentRef.setInput('label', 'Search');
-    componentRef.setInput('placeholder', 'Search files');
-    componentRef.setInput('suffixIcon', 'search');
-    fixture.detectChanges();
-
-    const suffixIcon = fixture.nativeElement.querySelector('mat-icon[matSuffix]');
-    expect(suffixIcon).toBeTruthy();
-    expect(suffixIcon.textContent).toContain('search');
-  });
-
-  it('should not display icons when not provided', () => {
-    componentRef.setInput('label', 'Simple Input');
+  it('should display search icon when empty', () => {
     componentRef.setInput('placeholder', 'Enter text');
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('mat-icon[matPrefix]')).toBeFalsy();
-    expect(fixture.nativeElement.querySelector('mat-icon[matSuffix]')).toBeFalsy();
+    const searchIcon = fixture.nativeElement.querySelector('.search-icon');
+    expect(searchIcon).toBeTruthy();
+    expect(searchIcon.textContent).toContain('search');
   });
 
   it('should handle input type correctly', () => {
-    componentRef.setInput('label', 'Password');
     componentRef.setInput('placeholder', 'Enter password');
     componentRef.setInput('inputType', 'password');
     fixture.detectChanges();
@@ -80,7 +46,6 @@ describe('InputFieldComponent', () => {
   });
 
   it('should handle disabled state', () => {
-    componentRef.setInput('label', 'Disabled Input');
     componentRef.setInput('placeholder', 'This is disabled');
     componentRef.setInput('disabled', true);
     fixture.detectChanges();
@@ -90,7 +55,6 @@ describe('InputFieldComponent', () => {
   });
 
   it('should emit inputFocus and inputBlur events', () => {
-    componentRef.setInput('label', 'Test Input');
     componentRef.setInput('placeholder', 'Test');
     fixture.detectChanges();
 
@@ -106,7 +70,6 @@ describe('InputFieldComponent', () => {
   });
 
   it('should emit valueChange event on input', () => {
-    componentRef.setInput('label', 'Test Input');
     componentRef.setInput('placeholder', 'Test');
     fixture.detectChanges();
 
@@ -120,7 +83,6 @@ describe('InputFieldComponent', () => {
   });
 
   it('should handle multiple input changes', () => {
-    componentRef.setInput('label', 'Search');
     componentRef.setInput('placeholder', 'Type to search...');
     fixture.detectChanges();
 
@@ -136,5 +98,105 @@ describe('InputFieldComponent', () => {
 
     expect(valueChangeSpy).toHaveBeenCalledTimes(5);
     expect(valueChangeSpy).toHaveBeenLastCalledWith('hello');
+  });
+
+it('should hide search icon when value is present', () => {
+    componentRef.setInput('placeholder', 'Enter text');
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('input');
+    input.value = 'test';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const searchIcon = fixture.nativeElement.querySelector('.search-icon');
+    expect(searchIcon).toBeFalsy();
+  });
+
+  describe('Clear button functionality', () => {
+    it('should not show clear button when clearable is false', () => {
+      componentRef.setInput('placeholder', 'Test');
+      componentRef.setInput('clearable', false);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('input');
+      input.value = 'test value';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      const clearButton = fixture.nativeElement.querySelector('.clear-button');
+      expect(clearButton).toBeFalsy();
+    });
+
+    it('should not show clear button when value is empty', () => {
+      componentRef.setInput('placeholder', 'Test');
+      componentRef.setInput('clearable', true);
+      fixture.detectChanges();
+
+      const clearButton = fixture.nativeElement.querySelector('.clear-button');
+      expect(clearButton).toBeFalsy();
+    });
+
+    it('should show clear button when clearable is true and value is present', () => {
+      componentRef.setInput('placeholder', 'Test');
+      componentRef.setInput('clearable', true);
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector('input');
+      input.value = 'test value';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      const clearButton = fixture.nativeElement.querySelector('.clear-button');
+      expect(clearButton).toBeTruthy();
+    });
+
+    it('should emit cleared event and clear value when clear button is clicked', () => {
+      componentRef.setInput('placeholder', 'Test');
+      componentRef.setInput('clearable', true);
+      fixture.detectChanges();
+
+      const clearedSpy = vi.spyOn(component.cleared, 'emit');
+      const valueChangeSpy = vi.spyOn(component.valueChange, 'emit');
+
+      // Set a value
+      const input = fixture.nativeElement.querySelector('input');
+      input.value = 'test value';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      // Click clear button
+      const clearButton = fixture.nativeElement.querySelector('.clear-button');
+      clearButton.click();
+      fixture.detectChanges();
+
+      expect(clearedSpy).toHaveBeenCalled();
+      expect(valueChangeSpy).toHaveBeenCalledWith('');
+      expect(component.value).toBe('');
+    });
+
+    it('should hide clear button after clearing', () => {
+      componentRef.setInput('placeholder', 'Test');
+      componentRef.setInput('clearable', true);
+      fixture.detectChanges();
+
+      // Set a value
+      const input = fixture.nativeElement.querySelector('input');
+      input.value = 'test value';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      // Verify clear button is visible
+      let clearButton = fixture.nativeElement.querySelector('.clear-button');
+      expect(clearButton).toBeTruthy();
+
+      // Click clear button
+      clearButton.click();
+      fixture.detectChanges();
+
+      // Verify clear button is hidden
+      clearButton = fixture.nativeElement.querySelector('.clear-button');
+      expect(clearButton).toBeFalsy();
+    });
   });
 });

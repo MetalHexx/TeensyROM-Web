@@ -42,6 +42,17 @@
   </lib-dropdown-menu>
 
   <lib-icon-button
+    icon="history"
+    ariaLabel="Toggle Play History"
+    [tooltip]="historyTooltip()"
+    size="large"
+    variant="rounded-transparent"
+    [color]="historyViewVisible() ? 'highlight' : 'normal'"
+    (buttonClick)="toggleHistory()"
+  >
+  </lib-icon-button>
+
+  <lib-icon-button
     icon="shuffle"
     ariaLabel="Toggle Shuffle Mode"
     [tooltip]="shuffleTooltip()"

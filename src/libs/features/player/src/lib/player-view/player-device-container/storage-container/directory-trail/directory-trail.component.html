@@ -1,22 +1,18 @@
-<lib-scaling-compact-card>
-  <div class="directory-trail-container">
-    <lib-directory-navigate
-      [canNavigateUp]="canNavigateUp()"
-      [canNavigateBack]="canNavigateBack()"
-      [canNavigateForward]="canNavigateForward()"
-      [isLoading]="isLoading()"
-      [historyViewVisible]="historyViewVisible()"
-      (backClicked)="onBackClick()"
-      (forwardClicked)="onForwardClick()"
-      (upClicked)="onUpClick()"
-      (refreshClicked)="onRefreshClick()"
-      (historyToggleClicked)="onHistoryToggleClick()"
-    ></lib-directory-navigate>
+<div class="directory-trail-container">
+  <lib-directory-navigate
+    [canNavigateUp]="canNavigateUp()"
+    [canNavigateBack]="canNavigateBack()"
+    [canNavigateForward]="canNavigateForward()"
+    [isLoading]="isLoading()"
+    (backClicked)="onBackClick()"
+    (forwardClicked)="onForwardClick()"
+    (upClicked)="onUpClick()"
+    (refreshClicked)="onRefreshClick()"
+  ></lib-directory-navigate>
 
-    <lib-directory-breadcrumb
-      [currentPath]="currentPath()"
-      [storageType]="storageTypeLabel()"
-      (navigationRequested)="onNavigationRequested($event)"
-    ></lib-directory-breadcrumb>
-  </div>
-</lib-scaling-compact-card>
+  <lib-directory-breadcrumb
+    [currentPath]="currentPath()"
+    [storageType]="storageTypeLabel()"
+    (navigationRequested)="onNavigationRequested($event)"
+  ></lib-directory-breadcrumb>
+</div>

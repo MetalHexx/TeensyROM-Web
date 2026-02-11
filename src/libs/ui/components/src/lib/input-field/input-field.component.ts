@@ -1,14 +1,12 @@
 import { Component, input, output, forwardRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { TooltipDirective, TooltipConfig } from '../tooltip/tooltip.directive';
 
 @Component({
   selector: 'lib-input-field',
-  imports: [CommonModule, MatInputModule, MatFormFieldModule, MatIconModule, TooltipDirective],
+  imports: [CommonModule, MatIconModule, TooltipDirective],
   templateUrl: './input-field.component.html',
   styleUrl: './input-field.component.scss',
   providers: [
@@ -21,23 +19,24 @@ import { TooltipDirective, TooltipConfig } from '../tooltip/tooltip.directive';
 })
 export class InputFieldComponent implements ControlValueAccessor {
   // Required inputs
-  label = input.required<string>();
   placeholder = input.required<string>();
 
   // Optional inputs
   tooltip = input<TooltipConfig | undefined>();
-  prefixIcon = input<string>();
-  suffixIcon = input<string>();
+  clearTooltip = input<TooltipConfig | undefined>();
   inputType = input<string>('text');
   disabled = input<boolean>(false);
+  clearable = input<boolean>(false);
 
   // Events
   valueChange = output<string>();
   inputFocus = output<void>();
   inputBlur = output<void>();
+  cleared = output<void>();
 
   // Internal state
   value = '';
+  
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private onChange = (_value: string) => {
     // Callback function for form control changes
@@ -79,5 +78,12 @@ export class InputFieldComponent implements ControlValueAccessor {
   onBlur(): void {
     this.onTouched();
     this.inputBlur.emit();
+  }
+
+  onClear(): void {
+    this.value = '';
+    this.onChange(this.value);
+    this.valueChange.emit(this.value);
+    this.cleared.emit();
   }
 }

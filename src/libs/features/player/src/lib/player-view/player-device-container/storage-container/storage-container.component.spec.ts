@@ -42,6 +42,7 @@ describe('StorageContainerComponent', () => {
     getPlayHistory: vi.fn(() => playHistorySignal.asReadonly()),
     getShuffleSettings: vi.fn().mockReturnValue(signal(null).asReadonly()),
     getLaunchMode: vi.fn().mockReturnValue(signal(LaunchMode.Directory).asReadonly()),
+    toggleHistoryView: vi.fn(),
   });
 
   beforeEach(async () => {
@@ -150,6 +151,38 @@ describe('StorageContainerComponent', () => {
       fixture.detectChanges();
 
       expect(component.shouldShowHistory()).toBe(false);
+    });
+  });
+
+  describe('Directory Navigation Handler', () => {
+    it('should call toggleHistoryView when history is visible', () => {
+      const mockPlayerContext = TestBed.inject(PLAYER_CONTEXT) as unknown as {
+        toggleHistoryView: ReturnType<typeof vi.fn>;
+        isHistoryViewVisible: ReturnType<typeof vi.fn>;
+      };
+      
+      historyVisibleSignal.set(true);
+      mockPlayerContext.toggleHistoryView = vi.fn();
+      fixture.detectChanges();
+
+      component.onDirectoryNavigated();
+
+      expect(mockPlayerContext.toggleHistoryView).toHaveBeenCalledWith('test-device');
+    });
+
+    it('should not call toggleHistoryView when history is not visible', () => {
+      const mockPlayerContext = TestBed.inject(PLAYER_CONTEXT) as unknown as {
+        toggleHistoryView: ReturnType<typeof vi.fn>;
+        isHistoryViewVisible: ReturnType<typeof vi.fn>;
+      };
+      
+      historyVisibleSignal.set(false);
+      mockPlayerContext.toggleHistoryView = vi.fn();
+      fixture.detectChanges();
+
+      component.onDirectoryNavigated();
+
+      expect(mockPlayerContext.toggleHistoryView).not.toHaveBeenCalled();
     });
   });
 });

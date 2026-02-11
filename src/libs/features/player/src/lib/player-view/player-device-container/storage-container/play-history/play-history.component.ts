@@ -11,10 +11,17 @@ import { CommonModule } from '@angular/common';
 import { PLAYER_CONTEXT, IPlayerContext, HistoryEntry } from '@teensyrom-nx/application';
 import { ScalingCardComponent, EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
 import { HistoryEntryComponent } from './history-entry/history-entry.component';
+import { SearchToolbarComponent } from '../search-toolbar/search-toolbar.component';
 
 @Component({
   selector: 'lib-play-history',
-  imports: [CommonModule, HistoryEntryComponent, ScalingCardComponent, EmptyStateMessageComponent],
+  imports: [
+    CommonModule,
+    HistoryEntryComponent,
+    ScalingCardComponent,
+    EmptyStateMessageComponent,
+    SearchToolbarComponent,
+  ],
   templateUrl: './play-history.component.html',
   styleUrls: ['./play-history.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,

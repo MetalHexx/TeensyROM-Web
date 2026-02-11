@@ -1,13 +1,12 @@
 import { Component, input, inject, computed } from '@angular/core';
 import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
-import { ScalingCompactCardComponent } from '@teensyrom-nx/ui/components';
 import { DirectoryNavigateComponent } from './directory-navigate/directory-navigate.component';
 import { DirectoryBreadcrumbComponent } from './directory-breadcrumb/directory-breadcrumb.component';
 
 @Component({
   selector: 'lib-directory-trail',
   standalone: true,
-  imports: [ScalingCompactCardComponent, DirectoryNavigateComponent, DirectoryBreadcrumbComponent],
+  imports: [DirectoryNavigateComponent, DirectoryBreadcrumbComponent],
   templateUrl: './directory-trail.component.html',
   styleUrl: './directory-trail.component.scss',
 })
@@ -81,11 +80,6 @@ export class DirectoryTrailComponent {
     return state?.isLoading ?? false;
   });
 
-  historyViewVisible = computed(() => {
-    const deviceId = this.deviceId();
-    return this.playerContext.isHistoryViewVisible(deviceId)();
-  });
-
   onBackClick(): void {
     const deviceId = this.deviceId();
     if (this.canNavigateBack()) {
@@ -135,10 +129,5 @@ export class DirectoryTrailComponent {
       storageType: selected.storageType,
       path: path,
     });
-  }
-
-  onHistoryToggleClick(): void {
-    const deviceId = this.deviceId();
-    this.playerContext.toggleHistoryView(deviceId);
   }
 }

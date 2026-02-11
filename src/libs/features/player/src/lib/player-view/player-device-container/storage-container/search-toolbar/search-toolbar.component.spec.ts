@@ -127,10 +127,6 @@ describe('SearchToolbarComponent', () => {
     it('should have search button disabled initially', () => {
       expect(component.canSearch()).toBe(false);
     });
-
-    it('should not show clear button initially', () => {
-      expect(component.showClearButton()).toBe(false);
-    });
   });
 
   describe('Search Input Handling', () => {
@@ -322,76 +318,14 @@ describe('SearchToolbarComponent', () => {
   });
 
   describe('Clear Button Visibility', () => {
-    it('should show clear button when search has results', () => {
-      // Mock search state with results
-      (mockStorageStore.getSearchState as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          hasSearched: true,
-          isSearching: false,
-          searchText: 'test',
-          results: [{ name: 'result1' }],
-          error: null,
-        })
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
-
-      expect(component.showClearButton()).toBe(true);
-    });
-
-    it('should not show clear button when no search has been performed', () => {
-      expect(component.showClearButton()).toBe(false);
-    });
-
-    it('should not show clear button when search has no results', () => {
-      // Mock search state with no results
-      (mockStorageStore.getSearchState as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          hasSearched: true,
-          isSearching: false,
-          searchText: 'test',
-          results: [],
-          error: null,
-        })
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
-
-      expect(component.showClearButton()).toBe(false);
-    });
-
-    it('should render clear button in DOM when visible', () => {
-      // Mock search state with results
-      (mockStorageStore.getSearchState as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          hasSearched: true,
-          isSearching: false,
-          searchText: 'test',
-          results: [{ name: 'result1' }],
-          error: null,
-        })
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
-
-      const clearButton = fixture.debugElement.query(By.css('lib-icon-button'));
-      expect(clearButton).toBeTruthy();
+    it('should render input field with clearable property', () => {
+      const inputField = fixture.debugElement.query(By.css('lib-input-field'));
+      expect(inputField.componentInstance.clearable()).toBe(true);
     });
 
     it('should not render clear button in DOM when not visible', () => {
-      const clearButton = fixture.debugElement.query(By.css('lib-icon-button'));
+      const inputField = fixture.debugElement.query(By.css('lib-input-field'));
+      const clearButton = inputField.query(By.css('.clear-button'));
       expect(clearButton).toBeFalsy();
     });
   });
@@ -483,6 +417,17 @@ describe('SearchToolbarComponent', () => {
   });
 
   describe('Template Rendering', () => {
+    it('should render .search-toolbar-content as root element', () => {
+      const content = fixture.nativeElement.querySelector('.search-toolbar-content');
+      expect(content).toBeTruthy();
+      expect(fixture.nativeElement.firstElementChild.classList.contains('search-toolbar-content')).toBe(true);
+    });
+
+    it('should not render card wrapper component', () => {
+      const card = fixture.debugElement.query(By.css('lib-scaling-compact-card'));
+      expect(card).toBeFalsy();
+    });
+
     it('should render search input field', () => {
       const inputField = fixture.debugElement.query(By.css('lib-input-field'));
       expect(inputField).toBeTruthy();
@@ -490,18 +435,8 @@ describe('SearchToolbarComponent', () => {
 
     it('should render search field with correct properties', () => {
       const inputField = fixture.debugElement.query(By.css('lib-input-field'));
-      expect(inputField.componentInstance.label()).toBe('Search');
-      expect(inputField.componentInstance.prefixIcon()).toBe('search');
-    });
-
-    it('should wrap content in scaling compact card', () => {
-      const card = fixture.debugElement.query(By.css('lib-scaling-compact-card'));
-      expect(card).toBeTruthy();
-    });
-
-    it('should have proper CSS class structure', () => {
-      const content = fixture.nativeElement.querySelector('.search-toolbar-content');
-      expect(content).toBeTruthy();
+      expect(inputField.componentInstance.placeholder()).toBe('Search');
+      expect(inputField.componentInstance.clearable()).toBe(true);
     });
   });
 });

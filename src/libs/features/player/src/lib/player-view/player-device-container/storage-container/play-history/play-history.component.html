@@ -1,15 +1,16 @@
 <div class="play-history">
   <lib-scaling-card
-    title="Play History"
+    title="Launch History"
     [animationTrigger]="animationTrigger()"
     [animationEntry]="'from-left'"
     [animationExit]="'from-right'"
   >
+    <lib-search-toolbar slot="corner" [deviceId]="deviceId()"></lib-search-toolbar>
     @if (historyEntries().length === 0) {
     <lib-empty-state-message
       icon="history"
-      title="No Play History"
-      message="Files you play will appear here."
+      title="No Launch History"
+      message="Files you launch will appear here."
       size="small"
     >
     </lib-empty-state-message>

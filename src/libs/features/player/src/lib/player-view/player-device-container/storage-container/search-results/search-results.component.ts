@@ -11,11 +11,18 @@ import { CommonModule } from '@angular/common';
 import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
 import { FileItem, LaunchMode, PlayerFilterType } from '@teensyrom-nx/domain';
 import { SearchItemComponent } from './search-item/search-item.component';
+import { SearchToolbarComponent } from '../search-toolbar/search-toolbar.component';
 import { ScalingCardComponent, EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
 
 @Component({
   selector: 'lib-search-results',
-  imports: [CommonModule, SearchItemComponent, ScalingCardComponent, EmptyStateMessageComponent],
+  imports: [
+    CommonModule,
+    SearchItemComponent,
+    SearchToolbarComponent,
+    ScalingCardComponent,
+    EmptyStateMessageComponent,
+  ],
   templateUrl: './search-results.component.html',
   styleUrls: ['./search-results.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,

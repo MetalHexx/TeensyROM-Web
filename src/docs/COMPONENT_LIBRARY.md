@@ -117,7 +117,7 @@ Use `slot="header"` to project custom component content into the card header are
 - Custom navigation controls integrated into card headers
 
 **Used In**:
-- Directory-files component (Phase 3 - pending integration)
+- [directory-files.component.html](../libs/features/player/src/lib/player-view/player-device-container/storage-container/directory-files/directory-files.component.html) - Embeds directory-trail component in header slot when showing directory contents (storage-level view)
 
 **See Also**: [ScalingCardComponent](#scalingcardcomponent) for animated version
 
@@ -1029,186 +1029,147 @@ export class FileListComponent {
 
 ### `InputFieldComponent`
 
-**Purpose**: A reusable input field component that provides consistent Material Design form field styling with configurable icons and accessibility features.
+**Purpose**: A lightweight, versatile input field component with built-in search icon, optional clear button, and tooltip support. Implements `ControlValueAccessor` for seamless form integration.
 
 **Selector**: `lib-input-field`
 
 **Properties**:
 
-- `label` (required): `string` - The label text displayed above the input field for accessibility and visual clarity
-- `placeholder` (required): `string` - Placeholder text displayed inside the input field as a watermark
-- `tooltip` (optional): `TooltipConfig | undefined` - Tooltip configuration object. Can be a simple string (`'Tooltip text'`) or full config object with `text`, `position`, and `delay` properties
-- `prefixIcon` (optional): `string` - Material Design icon name to display at the beginning of the input field
-- `suffixIcon` (optional): `string` - Material Design icon name to display at the end of the input field
-- `inputType` (optional): `string` - HTML input type (text, search, email, number, password, etc.) - defaults to 'text'
-- `disabled` (optional): `boolean` - Whether the input field is disabled - defaults to false
+- `placeholder` (required): `string` - Placeholder text displayed in the input field
+- `tooltip` (optional): `TooltipConfig | undefined` - Tooltip configuration for the input wrapper (shows on hover over entire input area)
+- `clearTooltip` (optional): `TooltipConfig | undefined` - Tooltip configuration for the clear button (shows when hovering clear button)
+- `inputType` (optional): `string` - HTML input type (text, search, email, number, password, etc.) - defaults to `'text'`
+- `disabled` (optional): `boolean` - Whether the input is disabled - defaults to `false`
+- `clearable` (optional): `boolean` - Whether to show clear button when input has value - defaults to `false`
 
 **Events**:
 
-- `valueChange`: Emitted on every keystroke with the current input value - ideal for real-time search functionality
-- `inputFocus`: Emitted when the input field receives focus
-- `inputBlur`: Emitted when the input field loses focus
+- `valueChange`: Emitted on every keystroke with current input value
+- `inputFocus`: Emitted when input receives focus
+- `inputBlur`: Emitted when input loses focus
+- `cleared`: Emitted when clear button is clicked
+
+**Visual Behavior**:
+
+- **Search Icon**: Displays `search` icon on left when input is empty
+- **Clear Button**: Displays `close` icon button on right when `clearable` is `true` and input has value
+- **Tooltips**: Supports separate tooltips for input area and clear button
 
 **Usage Examples**:
 
 ```html
-<!-- Search input with suffix icon -->
-<lib-input-field label="Search" suffixIcon="search"> </lib-input-field>
+<!-- Basic search input -->
+<lib-input-field placeholder="Search files..." [clearable]="true"> </lib-input-field>
 
-<!-- Search input with tooltip -->
+<!-- Search with input tooltip -->
 <lib-input-field
-  label="Search"
-  placeholder='Ex: +iron +maiden +"Aces High"'
-  prefixIcon="search"
-  [tooltip]="'Use + for required terms, - to exclude terms, and quotes for exact phrases'"
+  placeholder="Search"
+  [clearable]="true"
+  [tooltip]="{ body: 'Enter search terms', position: TooltipPosition.Top }"
 >
 </lib-input-field>
 
-<!-- Email input with prefix icon -->
+<!-- Search with both tooltips -->
 <lib-input-field
-  label="Email Address"
-  placeholder="Enter your email"
-  prefixIcon="email"
-  inputType="email"
+  placeholder="Search"
+  [clearable]="true"
+  [tooltip]="searchHintTooltip"
+  [clearTooltip]="{ body: 'Clear search', position: TooltipPosition.Top }"
+  (valueChange)="onSearch($event)"
+  (cleared)="onClearSearch()"
 >
 </lib-input-field>
 
-<!-- Simple text input without icons -->
-<lib-input-field label="Username" placeholder="Enter your username"> </lib-input-field>
+<!-- Email input -->
+<lib-input-field placeholder="Enter email" inputType="email"> </lib-input-field>
 
 <!-- Password input -->
-<lib-input-field
-  label="Password"
-  placeholder="Enter your password"
-  inputType="password"
-  suffixIcon="visibility"
->
-</lib-input-field>
+<lib-input-field placeholder="Password" inputType="password"> </lib-input-field>
 
 <!-- Disabled input -->
-<lib-input-field label="Read Only Field" placeholder="This field is disabled" [disabled]="true">
-</lib-input-field>
-
-<!-- Real-time search with event handling -->
-<lib-input-field
-  label="Search"
-  placeholder="Type to search..."
-  suffixIcon="search"
-  (valueChange)="onSearchChange($event)"
-  (inputFocus)="onSearchFocus()"
-  (inputBlur)="onSearchBlur()"
->
-</lib-input-field>
+<lib-input-field placeholder="Read-only" [disabled]="true"> </lib-input-field>
 ```
 
-**Advanced Usage Patterns**:
+**Component Integration Example**:
 
 ```typescript
-// Component class for different integration approaches
+import { Component } from '@angular/core';
+import { InputFieldComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
 
-export class ExampleComponent {
-  // 1. Event-driven approach (real-time search)
-  onSearchChange(searchTerm: string): void {
-    console.log('Search term:', searchTerm);
-    this.performSearch(searchTerm);
+@Component({
+  selector: 'app-search',
+  imports: [InputFieldComponent],
+  template: `
+    <lib-input-field
+      placeholder="Search"
+      [clearable]="true"
+      [tooltip]="searchTooltip"
+      [clearTooltip]="clearTooltip"
+      (valueChange)="onSearchChange($event)"
+      (cleared)="onClearSearch()"
+    >
+    </lib-input-field>
+  `,
+})
+export class SearchComponent {
+  readonly searchTooltip: TooltipConfig = {
+    title: 'Search Files',
+    body: 'Enter search terms. Use + for required, - to exclude.',
+    position: TooltipPosition.Top,
+  };
+
+  readonly clearTooltip: TooltipConfig = {
+    body: 'Clear search',
+    position: TooltipPosition.Top,
+  };
+
+  onSearchChange(searchText: string): void {
+    console.log('Search:', searchText);
   }
 
-  // 2. Two-way binding approach
-  searchValue = '';
-
-  ngOnInit() {
-    // Watch for changes using signals or effects
-    effect(() => {
-      console.log('Search value changed:', this.searchValue);
-      this.performSearch(this.searchValue);
-    });
+  onClearSearch(): void {
+    console.log('Search cleared');
   }
+}
+```
 
-  // 3. Reactive forms approach
+**Form Integration**:
+
+Implements `ControlValueAccessor` for full reactive forms support:
+
+```typescript
+import { FormControl } from '@angular/forms';
+
+export class MyFormComponent {
   searchControl = new FormControl('');
 
   ngOnInit() {
-    this.searchControl.valueChanges
-      .pipe(debounceTime(300), distinctUntilChanged())
-      .subscribe((value) => {
-        this.performSearch(value);
-      });
-  }
-
-  private performSearch(term: string): void {
-    // Your search logic here
+    // Reactive forms integration
+    this.searchControl.valueChanges.subscribe(value => {
+      console.log('Form value:', value);
+    });
   }
 }
 ```
 
 ```html
-<!-- Different binding approaches -->
-
-<!-- Event-driven (immediate response) -->
+<!-- Reactive forms usage -->
 <lib-input-field
-  label="Live Search"
-  placeholder="Results update on every keystroke"
-  (valueChange)="onSearchChange($event)"
->
-</lib-input-field>
-
-<!-- Two-way binding -->
-<lib-input-field
-  label="Bound Search"
-  placeholder="Bound to component property"
-  [(ngModel)]="searchValue"
->
-</lib-input-field>
-
-<!-- Reactive forms -->
-<lib-input-field
-  label="Form Search"
-  placeholder="Integrated with reactive forms"
+  placeholder="Search"
+  [clearable]="true"
   [formControl]="searchControl"
 >
 </lib-input-field>
 ```
 
-**Form Integration & Data Binding**:
-
-The component provides **three flexible approaches** for handling user input:
-
-1. **Event-Driven Approach** (Real-time):
-
-   - Use `(valueChange)` event for immediate response to every keystroke
-   - Perfect for live search, real-time validation, or instant feedback
-   - No debouncing built-in - handle in parent component if needed
-
-2. **Two-Way Binding** (ngModel):
-
-   - Use `[(ngModel)]="property"` for automatic synchronization
-   - Ideal for simple form scenarios and data binding
-   - Updates component property on every keystroke
-
-3. **Reactive Forms** (FormControl):
-   - Use `[formControl]="control"` for full reactive forms integration
-   - Implements `ControlValueAccessor` for seamless integration
-   - Supports validation, async validators, and form state management
-   - Can be combined with RxJS operators for debouncing and filtering
-
-**Integration Benefits**:
-
-- Full TypeScript type safety with all approaches
-- Consistent behavior across all binding methods
-- Proper form validation state handling
-- Accessibility features maintained regardless of binding approach
-
 **Accessibility Features**:
 
-- Always includes `mat-label` for screen reader compatibility
-- Proper ARIA attributes automatically applied by Material Design
-- Keyboard navigation support
-- High contrast mode compatibility
-- Focus management for optimal user experience
+- Proper `aria-label` attributes on input and clear button
+- Keyboard navigation support (Tab, Enter)
+- Clear button has `aria-label="Clear search"` for screen readers
+- Focus management for optimal accessibility
 
-**Styling**: Automatically applies Material Design outline appearance with full-width behavior for consistent form layouts.
-
-**Best Practice**: Use for all input fields throughout the application to maintain consistent styling, accessibility, and behavior patterns.
+**Best Practice**: Use for search inputs, filters, and simple text fields. For complex form layouts with labels and validation messages, consider using Material form fields directly.
 
 **Used In**:
 

@@ -80,6 +80,18 @@ export class PlayerToolbarActionsComponent {
     return baseText;
   });
 
+  historyViewVisible = computed(() =>
+    this.playerContext.isHistoryViewVisible(this.deviceId())()
+  );
+
+  historyTooltip = computed<TooltipConfig>(() => ({
+    title: this.historyViewVisible() ? 'Hide Launch History' : 'Show Launch History',
+    body: this.historyViewVisible() 
+      ? 'Exit launch history and return to current directory' 
+      : 'Shows a history of all the files you have launched.',
+    position: TooltipPosition.Top
+  }));
+
   shuffleTooltip = computed<TooltipConfig>(() => ({
     title: 'Shuffle Mode',
     body: `Shuffle mode randomizes file launches and affects the behavior of the Next/Previous buttons.\n
@@ -130,6 +142,13 @@ export class PlayerToolbarActionsComponent {
     } else {
       // Duration selected - enable timer with selected duration
       this.playerContext.setCustomTimer(deviceId, true, durationMs);
+    }
+  }
+
+  toggleHistory(): void {
+    const deviceId = this.deviceId();
+    if (deviceId) {
+      this.playerContext.toggleHistoryView(deviceId);
     }
   }
 

@@ -5,6 +5,7 @@
     [animationEntry]="'from-left'"
     [animationExit]="'from-right'"
   >
+    <lib-search-toolbar slot="corner" [deviceId]="deviceId()"></lib-search-toolbar>
     @if (searchError()) {
     <div class="error-state">{{ searchError() }}</div>
     } @if (!hasSearched()) {

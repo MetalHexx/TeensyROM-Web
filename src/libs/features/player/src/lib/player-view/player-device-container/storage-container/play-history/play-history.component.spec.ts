@@ -10,6 +10,8 @@ import {
   HistoryEntry,
   LaunchedFile,
   StorageKeyUtil,
+  StorageStore,
+  StorageDirectoryState,
 } from '@teensyrom-nx/application';
 import { FileItemType, StorageType, LaunchMode } from '@teensyrom-nx/domain';
 
@@ -17,10 +19,22 @@ describe('PlayHistoryComponent', () => {
   let component: PlayHistoryComponent;
   let fixture: ComponentFixture<PlayHistoryComponent>;
   let mockPlayerContext: Partial<IPlayerContext>;
+  let mockStorageStore: {
+    getSearchState: ReturnType<typeof vi.fn>;
+    getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+    getSelectedDirectoryForDevice: ReturnType<typeof vi.fn>;
+    navigationHistory: ReturnType<typeof vi.fn>;
+    navigateDirectoryBackward: ReturnType<typeof vi.fn>;
+    navigateDirectoryForward: ReturnType<typeof vi.fn>;
+    navigateUpOneDirectory: ReturnType<typeof vi.fn>;
+    refreshDirectory: ReturnType<typeof vi.fn>;
+    navigateToDirectory: ReturnType<typeof vi.fn>;
+  };
 
   let playHistorySignal: WritableSignal<PlayHistory | null>;
   let currentFileSignal: WritableSignal<LaunchedFile | null>;
   let errorSignal: WritableSignal<string | null>;
+  let selectedDirectorySignal: WritableSignal<StorageDirectoryState | null>;
 
   const createMockHistoryEntry = (name: string, timestamp: number): HistoryEntry => ({
     file: {
@@ -57,6 +71,20 @@ describe('PlayHistoryComponent', () => {
     playHistorySignal = signal<PlayHistory | null>(null);
     currentFileSignal = signal<LaunchedFile | null>(null);
     errorSignal = signal<string | null>(null);
+    selectedDirectorySignal = signal<StorageDirectoryState | null>(null);
+
+    // Create mock StorageStore for SearchToolbarComponent and DirectoryTrailComponent
+    mockStorageStore = {
+      getSearchState: vi.fn(() => signal(null).asReadonly()),
+      getSelectedDirectoryState: vi.fn(() => selectedDirectorySignal.asReadonly()),
+      getSelectedDirectoryForDevice: vi.fn(() => null),
+      navigationHistory: vi.fn(() => signal({}).asReadonly()),
+      navigateDirectoryBackward: vi.fn(),
+      navigateDirectoryForward: vi.fn(),
+      navigateUpOneDirectory: vi.fn(),
+      refreshDirectory: vi.fn(),
+      navigateToDirectory: vi.fn(),
+    };
 
     // Create mock PlayerContext using IPlayerContext interface
     mockPlayerContext = {
@@ -64,6 +92,8 @@ describe('PlayHistoryComponent', () => {
       getCurrentFile: () => currentFileSignal.asReadonly(),
       getError: () => errorSignal.asReadonly(),
       navigateToHistoryPosition: vi.fn(),
+      isHistoryViewVisible: () => signal(false).asReadonly(),
+      toggleHistoryView: vi.fn(),
     } as Partial<IPlayerContext>;
 
     await TestBed.configureTestingModule({
@@ -71,6 +101,7 @@ describe('PlayHistoryComponent', () => {
       providers: [
         provideNoopAnimations(),
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
+        { provide: StorageStore, useValue: mockStorageStore },
       ],
     }).compileComponents();
 

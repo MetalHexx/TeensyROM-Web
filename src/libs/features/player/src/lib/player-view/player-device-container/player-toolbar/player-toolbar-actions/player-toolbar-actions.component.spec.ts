@@ -56,8 +56,10 @@ describe('PlayerToolbarActionsComponent', () => {
     getLaunchMode: ReturnType<typeof vi.fn>;
     getCurrentFile: ReturnType<typeof vi.fn>;
     updateCurrentFileFavoriteStatus: ReturnType<typeof vi.fn>;
-    getCustomTimerConfig: ReturnType<typeof vi.fn>;
+    getPlayTimerConfig: ReturnType<typeof vi.fn>;
     setCustomTimer: ReturnType<typeof vi.fn>;
+    isHistoryViewVisible: ReturnType<typeof vi.fn>;
+    toggleHistoryView: ReturnType<typeof vi.fn>;
   };
   let mockStorageStore: {
     saveFavorite: ReturnType<typeof vi.fn>;
@@ -83,6 +85,8 @@ describe('PlayerToolbarActionsComponent', () => {
       updateCurrentFileFavoriteStatus: vi.fn(),
       getPlayTimerConfig: vi.fn(() => customTimerConfigSignal),
       setCustomTimer: vi.fn(),
+      isHistoryViewVisible: vi.fn(() => signal(false)),
+      toggleHistoryView: vi.fn(),
     };
 
     mockStorageStore = {
@@ -352,8 +356,8 @@ describe('PlayerToolbarActionsComponent', () => {
 
     it('should render favorite button', () => {
       const buttons = fixture.nativeElement.querySelectorAll('lib-icon-button');
-      // Should have timer, shuffle, and favorite buttons
-      expect(buttons.length).toBe(3);
+      // Should have timer, history, shuffle, and favorite buttons
+      expect(buttons.length).toBe(4);
     });
 
     it('should display favorite_border icon when file is not favorited', () => {

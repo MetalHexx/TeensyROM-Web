@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   input,
+  output,
   inject,
   computed,
   signal,
@@ -63,6 +64,7 @@ interface DirectoryCacheEntry {
 })
 export class DirectoryTreeComponent implements AfterViewInit {
   deviceId = input.required<string>();
+  directoryNavigated = output<void>();
 
   private readonly storageStore = inject(StorageStore);
   private readonly tree = viewChild<MatTree<DirectoryTreeNode>>('tree');
@@ -309,6 +311,7 @@ export class DirectoryTreeComponent implements AfterViewInit {
     // Handle device node click - navigate to device level
     if (node.type === DirectoryTreeNodeType.Device && node.deviceId) {
       this.storageStore.navigateToDeviceLevel({ deviceId: node.deviceId });
+      this.directoryNavigated.emit();
       return;
     }
 
@@ -325,6 +328,7 @@ export class DirectoryTreeComponent implements AfterViewInit {
         storageType: node.storageType,
         path: node.path,
       });
+      this.directoryNavigated.emit();
     }
   }
 

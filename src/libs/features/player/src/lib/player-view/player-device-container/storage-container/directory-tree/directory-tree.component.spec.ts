@@ -125,6 +125,59 @@ describe('DirectoryTreeComponent', () => {
     });
   });
 
+  it('should emit directoryNavigated when navigating to directory', () => {
+    const emitSpy = vi.fn();
+    componentRef.instance.directoryNavigated.subscribe(emitSpy);
+
+    const mockNode = {
+      id: 'test-node',
+      name: 'Test Directory',
+      type: DirectoryTreeNodeType.Directory,
+      icon: 'folder',
+      deviceId: 'test-device',
+      storageType: StorageType.Sd,
+      path: '/test/path',
+    };
+
+    component.onDirectoryClick(mockNode);
+
+    expect(emitSpy).toHaveBeenCalledOnce();
+  });
+
+  it('should emit directoryNavigated when navigating to device level', () => {
+    const emitSpy = vi.fn();
+    componentRef.instance.directoryNavigated.subscribe(emitSpy);
+
+    const deviceNode = {
+      id: 'device-test-123',
+      name: 'Test Device',
+      type: DirectoryTreeNodeType.Device,
+      icon: 'desktop_windows',
+      deviceId: 'test-device-123',
+    };
+
+    component.onDirectoryClick(deviceNode);
+
+    expect(emitSpy).toHaveBeenCalledOnce();
+  });
+
+  it('should not emit directoryNavigated for invalid nodes', () => {
+    const emitSpy = vi.fn();
+    componentRef.instance.directoryNavigated.subscribe(emitSpy);
+
+    const invalidNode = {
+      id: 'invalid-node',
+      name: 'Invalid',
+      type: DirectoryTreeNodeType.Directory,
+      icon: 'folder',
+      // Missing required properties
+    };
+
+    component.onDirectoryClick(invalidNode);
+
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
   it('should not call storage store for device nodes', () => {
     const deviceNode = {
       id: 'device-test',

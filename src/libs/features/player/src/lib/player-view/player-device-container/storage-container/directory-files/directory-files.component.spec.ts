@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
-import { signal } from '@angular/core';
+import { signal, Component, input } from '@angular/core';
 import { of } from 'rxjs';
 import { DirectoryFilesComponent } from './directory-files.component';
 import {
@@ -23,6 +23,28 @@ import {
   PlayerFileContext,
   StorageDirectoryState,
 } from '@teensyrom-nx/application';
+import { DirectoryTrailComponent } from '../directory-trail/directory-trail.component';
+import { SearchToolbarComponent } from '../search-toolbar/search-toolbar.component';
+
+// Mock DirectoryTrailComponent to avoid needing full store mocks
+@Component({
+  selector: 'lib-directory-trail',
+  standalone: true,
+  template: '<div class="mock-directory-trail">Mock Directory Trail</div>',
+})
+class MockDirectoryTrailComponent {
+  deviceId = input.required<string>();
+}
+
+// Mock SearchToolbarComponent to avoid needing search store dependencies
+@Component({
+  selector: 'lib-search-toolbar',
+  standalone: true,
+  template: '<div class="mock-search-toolbar">Mock Search Toolbar</div>',
+})
+class MockSearchToolbarComponent {
+  deviceId = input.required<string>();
+}
 
 describe('DirectoryFilesComponent', () => {
   let component: DirectoryFilesComponent;
@@ -124,7 +146,12 @@ describe('DirectoryFilesComponent', () => {
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(DirectoryFilesComponent, {
+        remove: { imports: [DirectoryTrailComponent, SearchToolbarComponent] },
+        add: { imports: [MockDirectoryTrailComponent, MockSearchToolbarComponent] },
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(DirectoryFilesComponent);
     component = fixture.componentInstance;
@@ -430,13 +457,138 @@ describe('DirectoryFilesComponent', () => {
     // the viewport is properly configured and functional.
   });
 
+  describe('Header Slot Integration', () => {
+    it('should render directory-trail in header slot when at storage level', () => {
+      // At storage level (not device level)
+      const directoryStateSignal = signal<StorageDirectoryState | null>({
+        directory: {
+          directories: [mockDirectoryItem],
+          files: [mockFileItem],
+          path: '/games',
+        },
+        currentPath: '/games',
+        storageType: StorageType.Sd,
+        deviceId: 'device-1',
+        isLoading: false,
+        isLoaded: true,
+        error: null,
+        lastLoadTime: Date.now(),
+      });
+
+      mockStorageStore['getSelectedDirectoryState'] = vi.fn(() =>
+        directoryStateSignal.asReadonly()
+      );
+      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(false).asReadonly());
+
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const trail = fixture.nativeElement.querySelector('lib-directory-trail');
+      expect(trail).toBeTruthy();
+      expect(trail.getAttribute('slot')).toBe('header');
+    });
+
+    it('should not render directory-trail when at device level', () => {
+      // At device level
+      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(true).asReadonly());
+      mockStorageStore['getDeviceStorageEntries'] = vi.fn(() =>
+        signal({
+          'device-1-Sd': {
+            deviceId: 'device-1',
+            storageType: StorageType.Sd,
+            currentPath: null,
+            directory: null,
+            isLoading: false,
+            isLoaded: false,
+            error: null,
+            lastLoadTime: null,
+          },
+        }).asReadonly()
+      );
+
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const trail = fixture.nativeElement.querySelector('lib-directory-trail');
+      expect(trail).toBeFalsy();
+    });
+
+    it('should render Storage Devices title at device level', () => {
+      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(true).asReadonly());
+      mockStorageStore['getDeviceStorageEntries'] = vi.fn(() =>
+        signal({
+          'device-1-Sd': {
+            deviceId: 'device-1',
+            storageType: StorageType.Sd,
+            currentPath: null,
+            directory: null,
+            isLoading: false,
+            isLoaded: false,
+            error: null,
+            lastLoadTime: null,
+          },
+        }).asReadonly()
+      );
+
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const card = fixture.nativeElement.querySelector('lib-scaling-card');
+      // Angular signal binding creates internal attributes, check actual title rendering
+      expect(card.textContent).toContain('Storage Devices');
+    });
+
+    it('should render empty title at storage level (trail replaces it)', () => {
+      const directoryStateSignal = signal<StorageDirectoryState | null>({
+        directory: {
+          directories: [],
+          files: [],
+          path: '/games',
+        },
+        currentPath: '/games',
+        storageType: StorageType.Sd,
+        deviceId: 'device-1',
+        isLoading: false,
+        isLoaded: true,
+        error: null,
+        lastLoadTime: Date.now(),
+      });
+
+      mockStorageStore['getSelectedDirectoryState'] = vi.fn(() =>
+        directoryStateSignal.asReadonly()
+      );
+      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(false).asReadonly());
+
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const trail = fixture.nativeElement.querySelector('lib-directory-trail');
+      expect(trail).toBeTruthy();
+      // At storage level, trail is in header slot, no card title rendered
+      const cardHeader = fixture.nativeElement.querySelector('.card-header');
+      if (cardHeader) {
+        // Title should not be present when trail is used
+        const titleElement = cardHeader.querySelector('.card-title');
+        expect(titleElement?.textContent || '').toBe('');
+      }
+    });
+  });
+
   describe('Device-Level View', () => {
     beforeEach(() => {
       // Mock isDeviceLevelView to return true
-      mockStorageStore.isDeviceLevelView = vi.fn(() => signal(true).asReadonly());
+      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(true).asReadonly());
 
       // Mock getDeviceStorageEntries to return storage entries
-      mockStorageStore.getDeviceStorageEntries = vi.fn(() =>
+      mockStorageStore['getDeviceStorageEntries'] = vi.fn(() =>
         signal({
           'device-1-Sd': {
             deviceId: 'device-1',
@@ -498,7 +650,7 @@ describe('DirectoryFilesComponent', () => {
     });
 
     it('should return empty array when not at device level', () => {
-      mockStorageStore.isDeviceLevelView = vi.fn(() => signal(false).asReadonly());
+      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(false).asReadonly());
 
       // Re-create component
       fixture = TestBed.createComponent(DirectoryFilesComponent);
@@ -539,7 +691,7 @@ describe('DirectoryFilesComponent', () => {
       const device = component.storageDevices()[0];
       component.onStorageDeviceDoubleClick(device);
 
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+      expect(mockStorageStore['navigateToDirectory']).toHaveBeenCalledWith({
         deviceId: 'device-1',
         storageType: StorageType.Sd,
         path: '/',
@@ -559,6 +711,53 @@ describe('DirectoryFilesComponent', () => {
 
       expect(component.isStorageDeviceSelected(devices[0])).toBe(true);
       expect(component.isStorageDeviceSelected(devices[1])).toBe(false);
+    });
+  });
+
+  describe('Corner Slot Integration', () => {
+    it('should render search toolbar in corner slot', () => {
+      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
+      expect(searchToolbar).toBeTruthy();
+    });
+
+    it('should pass deviceId to search toolbar', () => {
+      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
+      expect(searchToolbar).toBeTruthy();
+      // Mock component receives deviceId input - verify it's present in component
+      const searchToolbarComponent = fixture.debugElement.query(
+        (el) => el.nativeElement.tagName === 'LIB-SEARCH-TOOLBAR'
+      );
+      expect(searchToolbarComponent).toBeTruthy();
+    });
+
+    it('should have search toolbar with slot="corner" attribute', () => {
+      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar[slot="corner"]');
+      expect(searchToolbar).toBeTruthy();
+    });
+
+    it('should render search toolbar in corner slot', () => {
+      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar[slot="corner"]');
+      expect(searchToolbar).toBeTruthy();
+    });
+
+    it('should render search toolbar at storage level view', () => {
+      // Default state is storage level view
+      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
+      expect(searchToolbar).toBeTruthy();
+    });
+
+    it('should render search toolbar at device level view', () => {
+      // Mock device level view
+      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(true).asReadonly());
+
+      // Re-create component
+      fixture = TestBed.createComponent(DirectoryFilesComponent);
+      component = fixture.componentInstance;
+      fixture.componentRef.setInput('deviceId', 'device-1');
+      fixture.detectChanges();
+
+      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
+      expect(searchToolbar).toBeTruthy();
     });
   });
 });

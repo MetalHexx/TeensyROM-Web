@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
-import { signal, WritableSignal } from '@angular/core';
-import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
+import { signal } from '@angular/core';
+import { StorageStore, PLAYER_CONTEXT, IPlayerContext, NavigationHistoryItem } from '@teensyrom-nx/application';
+import { StorageType } from '@teensyrom-nx/domain';
 import { CompactCardLayoutComponent } from '@teensyrom-nx/ui/components';
 import { DirectoryTrailComponent } from './directory-trail.component';
 import { DirectoryNavigateComponent } from './directory-navigate/directory-navigate.component';
@@ -19,33 +20,37 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Basic Functionality', () => {
-    let mockStorageStore: Partial<StorageStore>;
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
       // Create mock storage store with all methods needed
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => ({
+        getSelectedDirectoryState: () => signal({
           currentPath: '/games/arcade',
           isLoading: false,
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           directory: null,
           isLoaded: true,
           error: null,
           lastLoadTime: Date.now(),
-        }),
+        }).asReadonly(),
         getSelectedDirectoryForDevice: () => ({
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           path: '/games/arcade',
         }),
-        navigationHistory: () => ({
+        navigationHistory: signal({
           'test-device': {
-            history: ['/', '/games', '/games/arcade'],
+            history: [
+              { path: '/', storageType: StorageType.Sd },
+              { path: '/games', storageType: StorageType.Sd },
+              { path: '/games/arcade', storageType: StorageType.Sd },
+            ] as NavigationHistoryItem[],
             currentIndex: 2,
             maxHistorySize: 50,
           },
-        }),
+        }).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
@@ -88,7 +93,7 @@ describe('DirectoryTrailComponent', () => {
         currentPath: '/games/arcade',
         isLoading: false,
         deviceId: 'test-device',
-        storageType: 'SD',
+        storageType: StorageType.Sd,
         directory: null,
         isLoaded: true,
         error: null,
@@ -125,7 +130,7 @@ describe('DirectoryTrailComponent', () => {
 
       expect(mockStorageStore.navigateUpOneDirectory).toHaveBeenCalledWith({
         deviceId: 'test-device',
-        storageType: 'SD',
+        storageType: StorageType.Sd,
       });
     });
 
@@ -134,7 +139,7 @@ describe('DirectoryTrailComponent', () => {
 
       expect(mockStorageStore.refreshDirectory).toHaveBeenCalledWith({
         deviceId: 'test-device',
-        storageType: 'SD',
+        storageType: StorageType.Sd,
       });
     });
 
@@ -143,7 +148,7 @@ describe('DirectoryTrailComponent', () => {
 
       expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
         deviceId: 'test-device',
-        storageType: 'SD',
+        storageType: StorageType.Sd,
         path: '/games',
       });
     });
@@ -158,33 +163,37 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Forward Navigation', () => {
-    let mockStorageStore: Partial<StorageStore>;
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
       // Create mock storage store with forward navigation enabled
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => ({
+        getSelectedDirectoryState: () => signal({
           currentPath: '/games',
           isLoading: false,
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           directory: null,
           isLoaded: true,
           error: null,
           lastLoadTime: Date.now(),
-        }),
+        }).asReadonly(),
         getSelectedDirectoryForDevice: () => ({
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           path: '/games',
         }),
-        navigationHistory: () => ({
+        navigationHistory: signal({
           'test-device': {
-            history: ['/', '/games', '/games/arcade'],
+            history: [
+              { path: '/', storageType: StorageType.Sd },
+              { path: '/games', storageType: StorageType.Sd },
+              { path: '/games/arcade', storageType: StorageType.Sd },
+            ] as NavigationHistoryItem[],
             currentIndex: 1, // Can go forward to /games/arcade
             maxHistorySize: 50,
           },
-        }),
+        }).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
@@ -226,13 +235,13 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Null State Handling', () => {
-    let mockStorageStore: Partial<StorageStore>;
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => null,
+        getSelectedDirectoryState: () => signal(null).asReadonly(),
         getSelectedDirectoryForDevice: () => null,
-        navigationHistory: () => ({}),
+        navigationHistory: signal({}).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
@@ -312,28 +321,32 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('USB Storage Type', () => {
-    let mockStorageStore: Partial<StorageStore>;
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => ({
+        getSelectedDirectoryState: () => signal({
           currentPath: '/files',
           isLoading: false,
           deviceId: 'test-device',
-          storageType: 'USB',
+          storageType: StorageType.Usb,
           directory: null,
           isLoaded: true,
           error: null,
           lastLoadTime: Date.now(),
-        }),
+        }).asReadonly(),
         getSelectedDirectoryForDevice: () => ({
           deviceId: 'test-device',
-          storageType: 'USB',
+          storageType: StorageType.Usb,
           path: '/files',
         }),
-        navigationHistory: () => ({
-          'test-device': { history: ['/files'], currentIndex: 0, maxHistorySize: 50 },
-        }),
+        navigationHistory: signal({
+          'test-device': {
+            history: [{ path: '/files', storageType: StorageType.Usb }] as NavigationHistoryItem[],
+            currentIndex: 0,
+            maxHistorySize: 50,
+          },
+        }).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
@@ -367,28 +380,32 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Root Path Navigation', () => {
-    let mockStorageStore: Partial<StorageStore>;
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => ({
+        getSelectedDirectoryState: () => signal({
           currentPath: '/',
           isLoading: false,
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           directory: null,
           isLoaded: true,
           error: null,
           lastLoadTime: Date.now(),
-        }),
+        }).asReadonly(),
         getSelectedDirectoryForDevice: () => ({
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           path: '/',
         }),
-        navigationHistory: () => ({
-          'test-device': { history: ['/'], currentIndex: 0, maxHistorySize: 50 },
-        }),
+        navigationHistory: signal({
+          'test-device': {
+            history: [{ path: '/', storageType: StorageType.Sd }] as NavigationHistoryItem[],
+            currentIndex: 0,
+            maxHistorySize: 50,
+          },
+        }).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
@@ -425,22 +442,22 @@ describe('DirectoryTrailComponent', () => {
 
       expect(mockStorageStore.navigateUpOneDirectory).toHaveBeenCalledWith({
         deviceId: 'test-device',
-        storageType: 'SD',
+        storageType: StorageType.Sd,
       });
     });
   });
 
   describe('Device Level Navigation', () => {
-    let mockStorageStore: Partial<StorageStore>;
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
       // Mock device level view (no storage type selected)
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => null,
+        getSelectedDirectoryState: () => signal(null).asReadonly(),
         getSelectedDirectoryForDevice: () => null,
-        navigationHistory: () => ({
-          'test-device': { history: [], currentIndex: -1, maxHistorySize: 50 },
-        }),
+        navigationHistory: signal({
+          'test-device': { history: [] as NavigationHistoryItem[], currentIndex: -1, maxHistorySize: 50 },
+        }).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
@@ -484,28 +501,32 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Loading State', () => {
-    let mockStorageStore: Partial<StorageStore>;
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => ({
+        getSelectedDirectoryState: () => signal({
           currentPath: '/games',
           isLoading: true,
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           directory: null,
           isLoaded: false,
           error: null,
           lastLoadTime: null,
-        }),
+        }).asReadonly(),
         getSelectedDirectoryForDevice: () => ({
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           path: '/games',
         }),
-        navigationHistory: () => ({
-          'test-device': { history: ['/games'], currentIndex: 0, maxHistorySize: 50 },
-        }),
+        navigationHistory: signal({
+          'test-device': {
+            history: [{ path: '/games', storageType: StorageType.Sd }] as NavigationHistoryItem[],
+            currentIndex: 0,
+            maxHistorySize: 50,
+          },
+        }).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
@@ -547,32 +568,36 @@ describe('DirectoryTrailComponent', () => {
   });
 
   describe('Child Component Integration', () => {
-    let mockStorageStore: Partial<StorageStore>;
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => ({
+        getSelectedDirectoryState: () => signal({
           currentPath: '/games/arcade',
           isLoading: false,
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           directory: null,
           isLoaded: true,
           error: null,
           lastLoadTime: Date.now(),
-        }),
+        }).asReadonly(),
         getSelectedDirectoryForDevice: () => ({
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           path: '/games/arcade',
         }),
-        navigationHistory: () => ({
+        navigationHistory: signal({
           'test-device': {
-            history: ['/', '/games', '/games/arcade'],
+            history: [
+              { path: '/', storageType: StorageType.Sd },
+              { path: '/games', storageType: StorageType.Sd },
+              { path: '/games/arcade', storageType: StorageType.Sd },
+            ] as NavigationHistoryItem[],
             currentIndex: 2,
             maxHistorySize: 50,
           },
-        }),
+        }).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
@@ -621,48 +646,39 @@ describe('DirectoryTrailComponent', () => {
     });
   });
 
-  describe('History Toggle Button', () => {
-    let mockStorageStore: Partial<StorageStore>;
-    let mockPlayerContext: Partial<IPlayerContext>;
-    let historyVisibleSignal: WritableSignal<boolean>;
+  describe('DOM Structure', () => {
+    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
 
     beforeEach(async () => {
-      historyVisibleSignal = signal(false);
-
       mockStorageStore = {
-        getSelectedDirectoryState: () => () => ({
+        getSelectedDirectoryState: () => signal({
           currentPath: '/games',
           isLoading: false,
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           directory: null,
           isLoaded: true,
           error: null,
           lastLoadTime: Date.now(),
-        }),
+        }).asReadonly(),
         getSelectedDirectoryForDevice: () => ({
           deviceId: 'test-device',
-          storageType: 'SD',
+          storageType: StorageType.Sd,
           path: '/games',
         }),
-        navigationHistory: () => ({
+        navigationHistory: signal({
           'test-device': {
-            history: ['/'],
+            history: [{ path: '/', storageType: StorageType.Sd }] as NavigationHistoryItem[],
             currentIndex: 0,
             maxHistorySize: 50,
           },
-        }),
+        }).asReadonly(),
         navigateUpOneDirectory: vi.fn(),
         refreshDirectory: vi.fn(),
         navigateToDirectory: vi.fn(),
         navigateDirectoryBackward: vi.fn(),
         navigateDirectoryForward: vi.fn(),
       };
-
-      mockPlayerContext = {
-        isHistoryViewVisible: () => historyVisibleSignal.asReadonly(),
-        toggleHistoryView: vi.fn(),
-      } as Partial<IPlayerContext>;
 
       await TestBed.configureTestingModule({
         imports: [
@@ -674,7 +690,7 @@ describe('DirectoryTrailComponent', () => {
         providers: [
           provideNoopAnimations(),
           { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
+          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
         ],
       }).compileComponents();
 
@@ -684,32 +700,24 @@ describe('DirectoryTrailComponent', () => {
       fixture.detectChanges();
     });
 
-    it('should display history toggle button', () => {
-      const navigateComponent = fixture.debugElement.query(
-        (el) => el.componentInstance instanceof DirectoryNavigateComponent
-      )?.componentInstance;
-
-      expect(navigateComponent).toBeTruthy();
+    it('should not render card wrapper', () => {
+      const compiled = fixture.nativeElement;
+      const card = compiled.querySelector('lib-scaling-compact-card');
+      expect(card).toBeFalsy();
     });
 
-    it('should show history button as not highlighted when history view is hidden', () => {
-      historyVisibleSignal.set(false);
-      fixture.detectChanges();
-
-      expect(component.historyViewVisible()).toBe(false);
+    it('should render directory-trail-container as root element', () => {
+      const compiled = fixture.nativeElement;
+      const container = compiled.querySelector('.directory-trail-container');
+      expect(container).toBeTruthy();
     });
 
-    it('should show history button as highlighted when history view is visible', () => {
-      historyVisibleSignal.set(true);
-      fixture.detectChanges();
-
-      expect(component.historyViewVisible()).toBe(true);
-    });
-
-    it('should call toggleHistoryView when history button is clicked', () => {
-      component.onHistoryToggleClick();
-
-      expect(mockPlayerContext.toggleHistoryView).toHaveBeenCalledWith('test-device');
+    it('should render child navigation components', () => {
+      const compiled = fixture.nativeElement;
+      const navigate = compiled.querySelector('lib-directory-navigate');
+      const breadcrumb = compiled.querySelector('lib-directory-breadcrumb');
+      expect(navigate).toBeTruthy();
+      expect(breadcrumb).toBeTruthy();
     });
   });
 });
