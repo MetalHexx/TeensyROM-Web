@@ -26,9 +26,8 @@
     min-height: 0;
 
     @include styles.below-desktop {
-      flex-direction: column;
-      height: auto;
-      overflow-y: auto;
+      // At below-desktop, tree is hidden so right-container fills fully.
+      // No column stacking needed — just let right-container take 100%.
     }
 
     .left-container {
@@ -43,17 +42,9 @@
       max-width: 500px;
       overflow: hidden;
 
+      // Hide directory tree below desktop — breadcrumb trail in
+      // directory-files provides equivalent navigation at this size.
       @include styles.below-desktop {
-        flex: none;
-        min-width: 0;
-        max-width: none;
-        height: auto;
-        min-height: 300px;
-        overflow-x: auto;
-      }
-
-      // Hide directory tree at smallest breakpoint (phone only)
-      @include styles.below-tablet {
         display: none;
       }
     }

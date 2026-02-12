@@ -20,6 +20,8 @@
   padding: 0;
   flex-direction: column;
   gap: 1rem;
+  container-type: size;
+  container-name: device-panel;
 
   .device-header {
     display: flex;
@@ -28,6 +30,7 @@
     gap: 1rem;
     min-width: 0; // Allow shrinking without forcing width on parent
     min-height: 0; // Allow flex shrinking
+    flex-shrink: 1; // Allow header to shrink when container is constrained
 
     // Stack header components vertically at phone size ONLY (not tablet)
     @include styles.below-phone {
@@ -79,7 +82,21 @@
 
   // Responsive adjustments for when device containers are stacked
   @include styles.below-tablet {
-    min-height: 600px;
+    min-height: min(600px, calc(100vh - 100px));
+  }
+}
+
+// Container query: cap device-header when container height is constrained
+// At 720p the container is ~638px, so 640px threshold catches that and below
+@container device-panel (max-height: 640px) {
+  .device-header {
+    height: 40cqh; // 40% of container height (~255px at 638px)
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .storage-container {
+    min-height: 25cqh; // Guarantee storage gets at least 25% of container
   }
 }
 
