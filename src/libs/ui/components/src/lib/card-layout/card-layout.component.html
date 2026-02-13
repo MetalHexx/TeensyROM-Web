@@ -1,6 +1,6 @@
 <mat-card [class]="computedCardClass()" class="stretch-card" style="position: relative">
   <!-- Corner content projection -->
-  <div class="corner-content">
+  <div #cornerContent class="corner-content">
     <ng-content select="[slot=corner]"></ng-content>
   </div>
 

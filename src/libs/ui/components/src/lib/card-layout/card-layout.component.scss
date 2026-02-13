@@ -31,10 +31,15 @@ lib-card-layout .corner-content {
 
 // Header slot styling - proper spacing when header slot content exists
 // Note: ViewEncapsulation.None allows styling Material internals without ::ng-deep
+// Note: !important needed to override Angular Material's .mat-mdc-card-header class styles
 lib-card-layout mat-card-header {
   // Stack title and subtitle vertically instead of side-by-side
   flex-direction: column !important;
   align-items: flex-start !important;
+  width: 100%;
+  box-sizing: border-box;
+  // Reserve space for corner content (e.g., search toolbar) to prevent overlap
+  padding-right: calc(16px + var(--card-layout-corner-reserve, 0px)) !important;
   
   // Hide header when completely empty (no title, no header slot content)
   &:empty {
@@ -43,6 +48,8 @@ lib-card-layout mat-card-header {
   
   [slot='header'] {
     display: block;
+    width: 100%;
+    align-self: stretch;
     margin-bottom: 12px; // Space between header slot and title (if both present)
     
     // Remove margin if header slot is the only content (no title follows)

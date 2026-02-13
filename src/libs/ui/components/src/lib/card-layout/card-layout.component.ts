@@ -1,4 +1,14 @@
-import { Component, input, computed, ViewEncapsulation } from '@angular/core';
+import {
+  Component,
+  input,
+  computed,
+  ViewEncapsulation,
+  ElementRef,
+  viewChild,
+  signal,
+  AfterViewInit,
+  OnDestroy,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import type { GlassyIntensity } from '../shared/glassy.types';
@@ -25,9 +35,10 @@ import type { GlassyIntensity } from '../shared/glassy.types';
   encapsulation: ViewEncapsulation.None,
   host: {
     '[class.no-overflow]': 'enableOverflow() === false',
+    '[style.--card-layout-corner-reserve.px]': 'cornerReservePx()',
   },
 })
-export class CardLayoutComponent {
+export class CardLayoutComponent implements AfterViewInit, OnDestroy {
   title = input<string>();
   subtitle = input<string>();
   metadataSource = input<string>();
@@ -46,6 +57,10 @@ export class CardLayoutComponent {
    * Only applies when glassy=true
    */
   glassyIntensity = input<GlassyIntensity>('dark');
+
+  private readonly cornerContent = viewChild<ElementRef<HTMLDivElement>>('cornerContent');
+  private cornerResizeObserver: ResizeObserver | null = null;
+  protected cornerReservePx = signal(0);
   
   /**
    * Computed CSS classes for the mat-card
@@ -71,4 +86,45 @@ export class CardLayoutComponent {
     
     return classes.join(' ');
   });
+
+  ngAfterViewInit(): void {
+    this.updateCornerReserve();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const cornerElement = this.cornerContent()?.nativeElement;
+    if (!cornerElement) {
+      return;
+    }
+
+    this.cornerResizeObserver = new ResizeObserver(() => {
+      this.updateCornerReserve();
+    });
+
+    this.cornerResizeObserver.observe(cornerElement);
+  }
+
+  ngOnDestroy(): void {
+    this.cornerResizeObserver?.disconnect();
+    this.cornerResizeObserver = null;
+  }
+
+  private updateCornerReserve(): void {
+    const cornerElement = this.cornerContent()?.nativeElement;
+    if (!cornerElement) {
+      this.cornerReservePx.set(0);
+      return;
+    }
+
+    const hasProjectedContent = cornerElement.childElementCount > 0;
+    if (!hasProjectedContent) {
+      this.cornerReservePx.set(0);
+      return;
+    }
+
+    const bufferPx = 8;
+    this.cornerReservePx.set(Math.ceil(cornerElement.offsetWidth + bufferPx));
+  }
 }

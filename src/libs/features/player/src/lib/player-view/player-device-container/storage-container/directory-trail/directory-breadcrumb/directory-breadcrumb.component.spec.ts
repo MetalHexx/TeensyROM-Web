@@ -2,6 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatChipsModule } from '@angular/material/chips';
 import { DirectoryBreadcrumbComponent } from './directory-breadcrumb.component';
+import { DropdownMenuComponent, DropdownMenuItemComponent } from '@teensyrom-nx/ui/components';
+import { IconButtonComponent } from '@teensyrom-nx/ui/components';
 
 describe('DirectoryBreadcrumbComponent', () => {
   let component: DirectoryBreadcrumbComponent;
@@ -10,7 +12,13 @@ describe('DirectoryBreadcrumbComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       providers: [provideNoopAnimations()],
-      imports: [DirectoryBreadcrumbComponent, MatChipsModule],
+      imports: [
+        DirectoryBreadcrumbComponent,
+        MatChipsModule,
+        DropdownMenuComponent,
+        DropdownMenuItemComponent,
+        IconButtonComponent,
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DirectoryBreadcrumbComponent);
@@ -113,6 +121,15 @@ describe('DirectoryBreadcrumbComponent', () => {
       expect(emittedPath).toBe('/test/path');
     });
 
+    it('should emit navigationRequested when onHiddenSegmentClick is called', () => {
+      let emittedPath = '';
+      component.navigationRequested.subscribe((path: string) => (emittedPath = path));
+
+      component.onHiddenSegmentClick('/hidden/path');
+
+      expect(emittedPath).toBe('/hidden/path');
+    });
+
     it('should emit correct path for root click', () => {
       let emittedPath = '';
       component.navigationRequested.subscribe((path: string) => (emittedPath = path));
@@ -120,6 +137,50 @@ describe('DirectoryBreadcrumbComponent', () => {
       component.onChipClick('/');
 
       expect(emittedPath).toBe('/');
+    });
+  });
+
+  describe('Responsive Breadcrumb Behavior', () => {
+    beforeEach(() => {
+      fixture.componentRef.setInput('currentPath', '/games/arcade/action/shooters/galaga');
+      fixture.componentRef.setInput('storageType', 'SD Card');
+      fixture.detectChanges();
+    });
+
+    it('should initially show all segments when space is available', () => {
+      const segments = component.pathSegments();
+      expect(segments.length).toBe(6); // SD Card + 5 directories
+    });
+
+    it('should calculate visible and hidden segments', () => {
+      // Initially visible/hidden signals should be set
+      const visible = component.visibleSegments();
+      const hidden = component.hiddenSegments();
+      expect(visible.length + hidden.length).toBe(component.pathSegments().length);
+    });
+
+    it('should indicate when hidden segments exist', () => {
+      // Simulate narrow container by manually setting segments
+      component.visibleSegments.set([{ label: 'galaga', path: '/games/arcade/action/shooters/galaga' }]);
+      component.hiddenSegments.set([
+        { label: 'SD Card', path: '/' },
+        { label: 'games', path: '/games' },
+      ]);
+
+      expect(component.hasHiddenSegments()).toBe(true);
+    });
+
+    it('should indicate no hidden segments when all are visible', () => {
+      component.visibleSegments.set(component.pathSegments());
+      component.hiddenSegments.set([]);
+
+      expect(component.hasHiddenSegments()).toBe(false);
+    });
+
+    it('should always show at least 1 segment', () => {
+      // After ResizeObserver calculation, visible should have at least 1
+      const visible = component.visibleSegments();
+      expect(visible.length).toBeGreaterThanOrEqual(1);
     });
   });
 

@@ -7,9 +7,18 @@
 .directory-trail-container {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
 
-  @include styles.below-tablet {
+  lib-directory-navigate {
+    flex: 0 0 auto;
+  }
+
+  lib-directory-breadcrumb {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  @include styles.below-phone {
     flex-direction: column;
     align-items: stretch;
     gap: 8px;

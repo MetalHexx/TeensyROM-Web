@@ -1,13 +1,56 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
 .breadcrumb-container {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.breadcrumb-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.breadcrumb-visible {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-width: 0;
+  padding: 2px 0;
+  width: 100%;
+}
+
+.breadcrumb-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+lib-dropdown-menu {
+  flex: 0 0 auto;
+  display: inline-flex;
   align-items: center;
 }
 
 .breadcrumb-chip {
   cursor: pointer;
   transition: background-color 0.2s ease;
+  flex-shrink: 0; // Prevent chips from shrinking
+  white-space: nowrap; // Keep chip text on one line
 
   &:hover {
     background-color: var(--mat-chip-hover-state-layer-color, rgba(0, 0, 0, 0.04));
@@ -23,6 +66,12 @@
   color: var(--color-dimmed, #666);
   font-weight: 600;
   font-size: 1.4em;
-  margin: 0;
   user-select: none;
+  flex-shrink: 0; // Prevent separator from shrinking
+  margin: 0 8px;
+}
+
+.hidden-segments-menu {
+  min-width: 200px;
+  max-width: 400px;
 }

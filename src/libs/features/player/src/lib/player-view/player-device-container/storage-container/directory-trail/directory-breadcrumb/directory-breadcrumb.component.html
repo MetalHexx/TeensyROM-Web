@@ -1,13 +1,54 @@
-<div class="breadcrumb-container">
-  @for (segment of pathSegments(); track segment.path; let isLast = $last) {
-  <mat-chip
-    class="breadcrumb-chip"
-    (click)="onChipClick(segment.path)"
-    [attr.aria-label]="'Navigate to ' + segment.label"
-  >
-    {{ segment.label }}
-  </mat-chip>
-  @if (!isLast) {
-  <span class="breadcrumb-separator" aria-hidden="true"> > </span>
-  } }
+<div class="breadcrumb-container" #breadcrumbContainer>
+  <!-- Hidden measuring row: always renders the full path so we can measure widths accurately -->
+  <div class="breadcrumb-measure" #measureContainer aria-hidden="true">
+    @for (segment of pathSegments(); track segment.path; let isLast = $last) {
+    <mat-chip class="breadcrumb-chip measure-chip">{{ segment.label }}</mat-chip>
+    @if (!isLast) {
+    <span class="breadcrumb-separator"> > </span>
+    } }
+  </div>
+
+  <!-- Visible row: shows a dropdown trigger when we hid leading segments, and shows only segments that fit -->
+  <div class="breadcrumb-visible">
+    @if (hasHiddenSegments()) {
+    <lib-dropdown-menu #menu>
+      <lib-icon-button
+        class="hidden-trigger"
+        icon="folder"
+        ariaLabel="Show hidden path segments"
+        size="medium"
+        color="highlight"
+        variant="standard"
+        (buttonClick)="menu.toggle()"
+      ></lib-icon-button>
+
+      <div dropdown-content class="hidden-segments-menu">
+        @for (segment of hiddenSegments(); track segment.path) {
+        <lib-dropdown-menu-item
+          (itemClick)="onHiddenSegmentClick(segment.path)"
+          [attr.aria-label]="'Navigate to ' + segment.label"
+        >
+          {{ segment.label }}
+        </lib-dropdown-menu-item>
+        }
+      </div>
+    </lib-dropdown-menu>
+
+    <span class="breadcrumb-separator" aria-hidden="true"> > </span>
+    }
+
+    <div class="breadcrumb-chips">
+      @for (segment of visibleSegments(); track segment.path; let isLast = $last) {
+      <mat-chip
+        class="breadcrumb-chip"
+        (click)="onChipClick(segment.path)"
+        [attr.aria-label]="'Navigate to ' + segment.label"
+      >
+        {{ segment.label }}
+      </mat-chip>
+      @if (!isLast) {
+      <span class="breadcrumb-separator" aria-hidden="true"> > </span>
+      } }
+    </div>
+  </div>
 </div>
