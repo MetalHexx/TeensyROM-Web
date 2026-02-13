@@ -20,3 +20,18 @@
   opacity: 0.6;
   margin: 0 0.5rem;
 }
+
+// When filter toolbar is full-width (stacked below player toolbar),
+// distribute buttons evenly and hide the separator
+:host-context(.filter-toolbar-wrapper) {
+  @media (max-width: 949px) {
+    .filter-buttons {
+      justify-content: space-evenly;
+      gap: 0;
+    }
+
+    .vertical-separator {
+      display: none;
+    }
+  }
+}

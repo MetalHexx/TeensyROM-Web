@@ -60,8 +60,8 @@
       min-width: fit-content;
     }
 
-    // Stack toolbars vertically only on phone sizes
-    @include styles.below-tablet {
+    // Stack toolbars vertically below 950px to ensure both fit comfortably
+    @media (max-width: 949px) {
       flex-direction: column;
       
       .player-toolbar-wrapper,

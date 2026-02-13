@@ -74,11 +74,7 @@ mat-card {
   }
 
   .file-info-section {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-width: 0;
+    display: none;
   }
 
   .toolbar-actions-section {
@@ -110,8 +106,7 @@ mat-card {
   }
 
   .file-info-section {
-    text-align: center;
-    width: 100%;
+    display: none;
   }
 
   .toolbar-actions-section {
