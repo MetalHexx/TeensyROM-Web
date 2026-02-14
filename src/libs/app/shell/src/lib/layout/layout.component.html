@@ -2,6 +2,7 @@
 
 <div class="layout-container">
   <lib-nav-rail
+    class="desktop-nav"
     [items]="menuItems"
     [activeRoute]="activeRoute()"
     [hoverDelayMs]="600"
@@ -14,5 +15,12 @@
     </div>
   </div>
 </div>
+
+<lib-bottom-bar
+  class="phone-nav"
+  [items]="menuItems"
+  [activeRoute]="activeRoute()"
+  (itemClick)="onNavItemClick($event)"
+/>
 
 <lib-alert-container></lib-alert-container>

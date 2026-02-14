@@ -8,7 +8,12 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { DeviceStore, PLAYER_CONTEXT, StorageStore } from '@teensyrom-nx/application';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BusyDialogComponent } from '../components/busy-dialog/busy-dialog.component';
-import { NavRailComponent, NavRailItem } from '@teensyrom-nx/ui/components';
+import {
+  NavRailComponent,
+  NavRailItem,
+  BottomBarComponent,
+  BottomBarItem,
+} from '@teensyrom-nx/ui/components';
 
 @Component({
   selector: 'lib-layout',
@@ -18,6 +23,7 @@ import { NavRailComponent, NavRailItem } from '@teensyrom-nx/ui/components';
     HeaderComponent,
     AlertContainerComponent,
     NavRailComponent,
+    BottomBarComponent,
   ],
   templateUrl: './layout.component.html',
   styleUrls: ['./layout.component.scss'],
@@ -156,8 +162,8 @@ export class LayoutComponent {
     });
   }
 
-  /** Handle nav rail item click - navigate to the item's route */
-  onNavItemClick(item: NavRailItem): void {
+  /** Handle nav rail or bottom bar item click - navigate to the item's route */
+  onNavItemClick(item: NavRailItem | BottomBarItem): void {
     this.router.navigate([item.route]);
   }
 }

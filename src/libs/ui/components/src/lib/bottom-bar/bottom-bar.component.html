@@ -1,0 +1,18 @@
+<nav class="bottom-bar" role="navigation" aria-label="Main navigation">
+  <ul class="bottom-bar__list" role="menubar">
+    @for (item of items(); track item.route) {
+      <li role="menuitem">
+        <button
+          class="bottom-bar__item"
+          [class.active]="isActive(item)"
+          (click)="onItemClick(item)"
+          [attr.aria-label]="item.name"
+          [attr.aria-current]="isActive(item) ? 'page' : null"
+        >
+          <mat-icon class="bottom-bar__icon">{{ item.icon }}</mat-icon>
+          <span class="bottom-bar__label">{{ item.name }}</span>
+        </button>
+      </li>
+    }
+  </ul>
+</nav>

@@ -41,6 +41,7 @@ export * from './lib/content-overlay-container/content-overlay-container.compone
 export * from './lib/video-device-selector/video-device-selector.component';
 export * from './lib/video-controls-toolbar/video-controls-toolbar.component';
 export * from './lib/nav-rail';
+export * from './lib/bottom-bar';
 export * from './lib/tooltip/tooltip.directive';
 export { TooltipConfig, TooltipPosition, TooltipTitleColor } from './lib/tooltip/tooltip.directive';
 export * from './lib/tooltip/tooltip-renderer.service';

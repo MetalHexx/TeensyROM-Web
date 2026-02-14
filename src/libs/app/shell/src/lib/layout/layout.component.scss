@@ -108,18 +108,26 @@ lib-header {
   // against the viewport edge. Content padding is handled by .router-content.
   @include styles.below-phone {
     padding-right: 0;
-    padding-bottom: 64px; // Account for bottom bar height (48px) + spacing
+    padding-bottom: 72px; // Account for bottom bar height (64px) + spacing
   }
 }
 
-lib-nav-rail {
+// Desktop/tablet: vertical nav rail (hidden on phone)
+.desktop-nav {
   flex-shrink: 0;
-  z-index: 100; // Above content, below modals (1000+)
+  z-index: 100;
 
-  // At phone size, nav-rail is fixed-positioned, remove from flex layout
   @include styles.below-phone {
-    position: absolute; // Remove from document flow
-    pointer-events: auto; // Ensure clicks work
+    display: none;
+  }
+}
+
+// Phone: bottom bar (hidden on tablet/desktop)
+.phone-nav {
+  display: none;
+
+  @include styles.below-phone {
+    display: block;
   }
 }
 

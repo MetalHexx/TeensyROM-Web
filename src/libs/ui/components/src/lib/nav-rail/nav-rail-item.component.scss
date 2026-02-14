@@ -1,5 +1,3 @@
-@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
-
 // Inherit transition timing from parent nav-rail
 $transition-duration: var(--nav-rail-transition-duration, 250ms);
 $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 1));
@@ -32,35 +30,6 @@ $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 
     }
   }
 
-  // Vertical stacking layout on phone (icon above label)
-  @include styles.below-phone {
-    flex-direction: column;
-    justify-content: center;
-    height: 48px;
-    padding: 2px 8px;
-    box-sizing: border-box;
-    flex: 1;
-    min-width: 64px;
-    gap: 0;
-    border-radius: 0;
-
-    &:hover {
-      // Hover fills from bottom edge upward
-      background: linear-gradient(
-        to top,
-        rgba(var(--glassy-color, 255, 255, 255), 0.15) 0%,
-        transparent 100%
-      );
-    }
-
-    &.active {
-      // Bottom border indicator for mobile bottom bar
-      border-top: none;
-      border-bottom: 2px solid var(--color-highlight, #00f7ff);
-      border-radius: 0;
-    }
-  }
-
   .item-icon {
     flex-shrink: 0;
     display: flex;
@@ -87,15 +56,6 @@ $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 
     @media (min-width: 640px) and (max-width: 1279px) {
       max-width: 0 !important;
       opacity: 0 !important;
-    }
-
-    // Always show labels on phone (smaller font)
-    @include styles.below-phone {
-      margin-left: 0;
-      font-size: 11px;
-      max-width: none;
-      opacity: 1;
-      text-align: center;
     }
   }
 

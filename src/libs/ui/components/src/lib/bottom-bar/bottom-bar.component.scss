@@ -1,0 +1,98 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: block;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+}
+
+.bottom-bar {
+  // Frosted glassy background — no rounded corners, square bar
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(var(--glassy-color, 255, 255, 255), 0.08);
+
+  height: 64px;
+  padding-bottom: env(safe-area-inset-bottom); // iOS notch/home indicator
+}
+
+.bottom-bar__list {
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bottom-bar__item {
+  // Reset button defaults
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  color: var(--color-dimmed-light, rgba(255, 255, 255, 0.6));
+
+  // Layout — full height, vertically centered content
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 64px;
+  height: 100%;
+  padding: 0 8px;
+  position: relative;
+  transition: color 0.2s ease;
+
+  // Hover — soft glow from bottom
+  &:hover {
+    color: rgba(255, 255, 255, 0.85);
+    background: linear-gradient(
+      to top,
+      rgba(var(--glassy-color, 255, 255, 255), 0.1) 0%,
+      transparent 100%
+    );
+  }
+
+  // Focus-visible for keyboard nav
+  &:focus-visible {
+    outline: 2px solid var(--color-highlight, #00f7ff);
+    outline-offset: -2px;
+  }
+
+  // Active state — highlighted icon + label, no underline
+  &.active {
+    color: var(--color-highlight, #00f7ff);
+
+    .bottom-bar__icon {
+      color: var(--color-highlight, #00f7ff);
+    }
+  }
+}
+
+.bottom-bar__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+  transition: color 0.15s ease;
+}
+
+.bottom-bar__label {
+  font-size: 11px;
+  font-weight: var(--font-weight-medium, 500);
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.2;
+}
