@@ -1,4 +1,5 @@
 @use '@angular/material' as mat;
+@use '../../../../ui/styles/src/lib/theme/mixins' as breakpoints;
 
 :host {
   // Half of container width minus half the gap (1rem / 2 = 0.5rem)
@@ -15,6 +16,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
+  margin-top: 1rem;
   padding: 0;
 }
 
@@ -35,19 +37,43 @@
   gap: 1.2rem;
 }
 
-@media (max-width: 500px) {
+// At tablet and below, stack device-content vertically for better readability
+@include breakpoints.below-tablet {
+  .device-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0;
+  }
+}
+
+// At phone, use full width
+@include breakpoints.below-phone {
   :host {
     width: 100%;
     max-width: 100%;
     min-width: 200px;
   }
+}
 
-  .device-content {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 0;
+// Ensure power button (corner slot) stays on the right at all breakpoints
+// This is device-item specific and doesn't affect other card uses
+:host ::ng-deep lib-card-layout .corner-content {
+  position: absolute !important;
+  right: 8px !important;
+  top: 8px !important; // Balanced with right spacing for snug corner placement
+}
+
+// At phone breakpoint, keep corner positioned absolutely on the right
+// instead of allowing global card-layout to make it static (which causes collision with title)
+@include breakpoints.below-phone {
+  :host ::ng-deep lib-card-layout .corner-content {
+    position: absolute !important;
+    right: 8px !important;
+    top: 8px !important; // Balanced with right spacing
+    width: auto !important;
+    padding: 0 !important;
   }
 }

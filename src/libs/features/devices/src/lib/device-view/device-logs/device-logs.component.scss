@@ -1,10 +1,15 @@
 @use '@angular/material' as mat;
+@use '../../../../ui/styles/src/lib/theme/mixins' as breakpoints;
 
 :host {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+
+  @include breakpoints.below-phone {
+    display: none;
+  }
 }
 
 .device-logs-card {
