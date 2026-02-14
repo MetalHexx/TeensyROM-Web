@@ -52,7 +52,7 @@
   position: absolute;
   top: 70px; // Card padding (16px) + header padding (32px) + trail height (~42px) = ~90px
   left: 16px;
-  right: 16px;
+  right: 0; // Flush with card edge so scrollbar sits at the edge (no gap)
   bottom: 16px;
   display: flex;
   flex-direction: column;

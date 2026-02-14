@@ -148,6 +148,43 @@ body {
 }
 
 // ─────────────────────────────────────────────
+//  Global Scrollbar Styles
+// ─────────────────────────────────────────────
+// Thin, sleek scrollbars with no endpoint arrows for a modern look.
+// Firefox: uses scrollbar-width and scrollbar-color.
+// Chromium/WebKit: uses ::-webkit-scrollbar pseudo-elements.
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.5);
+  }
+}
+
+// Remove scrollbar arrows/buttons
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+// ─────────────────────────────────────────────
 //  General Utility Styles
 // ─────────────────────────────────────────────
 
