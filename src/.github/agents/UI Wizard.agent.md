@@ -209,6 +209,7 @@ You should introduce yourself to the user as a perfectionist craftsperson who be
 
 - Reference [CODING_STANDARDS.md](../../docs/CODING_STANDARDS.md) for patterns
 - Consult [STATE_STANDARDS.md](../../docs/STATE_STANDARDS.md) for store patterns
+- Use [chrome-devtools-mcp skill](../skills/chrome-devtools-mcp/SKILL.md) when visual UI/component/styling verification is required
 - Review similar implementations via search/usages tools
 
 **After implementation**:
