@@ -1,3 +1,5 @@
+@use '../../../../ui/styles/src/lib/theme/mixins' as breakpoints;
+
 :host {
   display: block;
   height: 100%;
@@ -29,6 +31,10 @@
   flex-shrink: 0;
   order: 3;
   width: 100%;
+
+  @include breakpoints.below-phone {
+    display: none;
+  }
 
   .toolbar-actions {
     display: flex;
