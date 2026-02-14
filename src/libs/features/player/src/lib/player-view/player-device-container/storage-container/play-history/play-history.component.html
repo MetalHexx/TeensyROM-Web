@@ -1,11 +1,13 @@
 <div class="play-history">
   <lib-scaling-card
-    title="Launch History"
     [animationTrigger]="animationTrigger()"
     [animationEntry]="'from-left'"
     [animationExit]="'from-right'"
   >
-    <lib-search-toolbar slot="corner" [deviceId]="deviceId()"></lib-search-toolbar>
+    <div slot="header" class="header-toolbar">
+      <span class="mat-mdc-card-title header-title">Launch History</span>
+      <lib-search-toolbar [deviceId]="deviceId()"></lib-search-toolbar>
+    </div>
     @if (historyEntries().length === 0) {
     <lib-empty-state-message
       icon="history"

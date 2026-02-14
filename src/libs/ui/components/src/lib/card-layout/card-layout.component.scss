@@ -30,11 +30,15 @@ lib-card-layout .corner-content {
   align-items: center;
   gap: 0.75rem;
 
-  // At phone, flow inline above header slot instead of overlapping
   @include styles.below-phone {
     position: static;
     width: 100%;
-    margin-bottom: 8px;
+    padding: 16px 16px 0px 16px;
+    box-sizing: border-box;
+  }
+
+  &:empty {
+    display: none;
   }
 }
 
@@ -50,11 +54,10 @@ lib-card-layout mat-card-header {
   // Reserve space for corner content (e.g., search toolbar) to prevent overlap
   padding-right: calc(16px + var(--card-layout-corner-reserve, 0px)) !important;
 
-  // At phone, no need to reserve space since corner flows inline
   @include styles.below-phone {
     padding-right: 0 !important;
   }
-  
+
   // Hide header when completely empty (no title, no header slot content)
   &:empty {
     display: none;

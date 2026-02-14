@@ -1,11 +1,13 @@
 <div class="search-results">
   <lib-scaling-card
-    title="Search Results"
     [animationTrigger]="animationTrigger()"
     [animationEntry]="'from-left'"
     [animationExit]="'from-right'"
   >
-    <lib-search-toolbar slot="corner" [deviceId]="deviceId()"></lib-search-toolbar>
+    <div slot="header" class="header-toolbar">
+      <span class="mat-mdc-card-title header-title">Search Results</span>
+      <lib-search-toolbar [deviceId]="deviceId()"></lib-search-toolbar>
+    </div>
     @if (searchError()) {
     <div class="error-state">{{ searchError() }}</div>
     } @if (!hasSearched()) {

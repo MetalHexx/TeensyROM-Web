@@ -487,7 +487,10 @@ describe('DirectoryFilesComponent', () => {
 
       const trail = fixture.nativeElement.querySelector('lib-directory-trail');
       expect(trail).toBeTruthy();
-      expect(trail.getAttribute('slot')).toBe('header');
+      // Trail is now inside .header-toolbar wrapper which has slot="header"
+      const headerToolbar = trail.closest('.header-toolbar');
+      expect(headerToolbar).toBeTruthy();
+      expect(headerToolbar.getAttribute('slot')).toBe('header');
     });
 
     it('should not render directory-trail when at device level', () => {
@@ -714,8 +717,8 @@ describe('DirectoryFilesComponent', () => {
     });
   });
 
-  describe('Corner Slot Integration', () => {
-    it('should render search toolbar in corner slot', () => {
+  describe('Header Slot Integration', () => {
+    it('should render search toolbar inside header slot', () => {
       const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
       expect(searchToolbar).toBeTruthy();
     });
@@ -730,14 +733,16 @@ describe('DirectoryFilesComponent', () => {
       expect(searchToolbarComponent).toBeTruthy();
     });
 
-    it('should have search toolbar with slot="corner" attribute', () => {
-      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar[slot="corner"]');
+    it('should render search toolbar inside header-toolbar wrapper', () => {
+      const headerToolbar = fixture.nativeElement.querySelector('.header-toolbar');
+      expect(headerToolbar).toBeTruthy();
+      const searchToolbar = headerToolbar.querySelector('lib-search-toolbar');
       expect(searchToolbar).toBeTruthy();
     });
 
-    it('should render search toolbar in corner slot', () => {
-      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar[slot="corner"]');
-      expect(searchToolbar).toBeTruthy();
+    it('should have header-toolbar with slot="header" attribute', () => {
+      const headerToolbar = fixture.nativeElement.querySelector('.header-toolbar[slot="header"]');
+      expect(headerToolbar).toBeTruthy();
     });
 
     it('should render search toolbar at storage level view', () => {

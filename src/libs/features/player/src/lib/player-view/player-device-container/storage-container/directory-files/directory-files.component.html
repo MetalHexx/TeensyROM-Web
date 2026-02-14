@@ -6,11 +6,12 @@
     [animationExit]="'from-right'"
     [enableOverflow]="false"
   >
-    @if (!isDeviceLevelView()) {
-    <lib-directory-trail slot="header" [deviceId]="deviceId()"></lib-directory-trail>
-    }
-
-    <lib-search-toolbar slot="corner" [deviceId]="deviceId()"></lib-search-toolbar>
+    <div slot="header" class="header-toolbar">
+      @if (!isDeviceLevelView()) {
+        <lib-directory-trail [deviceId]="deviceId()"></lib-directory-trail>
+      }
+      <lib-search-toolbar [deviceId]="deviceId()"></lib-search-toolbar>
+    </div>
 
     @if (directoryContents().error) {
     <p class="error">Error: {{ directoryContents().error }}</p>

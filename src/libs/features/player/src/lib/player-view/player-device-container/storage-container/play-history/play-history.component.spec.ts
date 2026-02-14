@@ -121,7 +121,7 @@ describe('PlayHistoryComponent', () => {
 
       const emptyStateElement = fixture.nativeElement.querySelector('lib-empty-state-message');
       expect(emptyStateElement).toBeTruthy();
-      expect(fixture.nativeElement.textContent).toContain('No Play History');
+      expect(fixture.nativeElement.textContent).toContain('No Launch History');
     });
 
     it('should display history entries when history exists', () => {

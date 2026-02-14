@@ -1,4 +1,5 @@
 @use '../../../../../../../../ui/styles/src/lib/theme/styles.scss' as styles;
+@use '../../../../../../../../ui/styles/src/lib/theme/mixins' as mixins;
 
 :host {
   display: flex;
@@ -19,4 +20,30 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+}
+
+.header-toolbar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+
+  .header-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  lib-search-toolbar {
+    flex: 0 0 auto;
+  }
+
+  @include mixins.below-phone {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+    padding-right: 16px;
+    box-sizing: border-box;
+  }
 }
