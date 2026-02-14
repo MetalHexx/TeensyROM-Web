@@ -106,7 +106,7 @@ lib-header {
 
   // Add bottom padding for fixed bottom bar on phone
   @include styles.below-phone {
-    padding-bottom: 95px; // Account for bottom bar height + spacing
+    padding-bottom: 64px; // Account for bottom bar height (48px) + spacing
   }
 }
 

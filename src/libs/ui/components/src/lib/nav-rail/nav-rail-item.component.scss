@@ -36,15 +36,27 @@ $transition-easing: var(--nav-rail-transition-easing, cubic-bezier(0.4, 0, 0.2, 
   @include styles.below-phone {
     flex-direction: column;
     justify-content: center;
-    height: 60px;
-    padding: 4px 8px;
+    height: 48px;
+    padding: 2px 8px;
+    box-sizing: border-box;
     flex: 1;
     min-width: 64px;
-    gap: 2px;
+    gap: 0;
+    border-radius: 0;
+
+    &:hover {
+      // Hover fills from bottom edge upward
+      background: linear-gradient(
+        to top,
+        rgba(var(--glassy-color, 255, 255, 255), 0.15) 0%,
+        transparent 100%
+      );
+    }
 
     &.active {
-      // Top border indicator instead of left border
-      border-top: 2px solid var(--color-highlight, #00f7ff);
+      // Bottom border indicator for mobile bottom bar
+      border-top: none;
+      border-bottom: 2px solid var(--color-highlight, #00f7ff);
       border-radius: 0;
     }
   }

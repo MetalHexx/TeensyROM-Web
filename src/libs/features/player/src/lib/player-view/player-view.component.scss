@@ -11,6 +11,11 @@
     height: 100%;
     min-height: 0;
   }
+
+  // At phone, let content determine height so parent scrollbar works
+  @include styles.below-phone {
+    height: auto;
+  }
 }
 
 .device-list {
@@ -30,6 +35,10 @@
   @include styles.below-tablet {
     grid-template-columns: 1fr; // Stack vertically on smaller screens
   }
+
+  @include styles.below-phone {
+    height: auto;
+  }
 }
 
 .player-device-list-item {
@@ -40,6 +49,10 @@
   margin: 0;
   padding: 0;
   min-height: min(600px, calc(100vh - 100px)); // Scale down on small viewports (header + padding)
+
+  @include styles.below-phone {
+    min-height: auto; // Let content determine height on phone
+  }
 }
 
 .device-item {

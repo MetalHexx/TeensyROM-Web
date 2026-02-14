@@ -1,4 +1,5 @@
 @use '../../../../../../../../ui/styles/src/lib/theme/styles.scss' as styles;
+@use '../../../../../../../../ui/styles/src/lib/theme/mixins' as mixins;
 
 :host {
   display: flex;
@@ -6,6 +7,7 @@
   height: 100%;
   width: 100%;
   min-height: 0;
+  overflow-x: hidden;
 }
 
 .directory-files {
@@ -29,12 +31,19 @@
   bottom: 16px;
   display: flex;
   flex-direction: column;
+
+  // At phone breakpoint, corner content (search) flows inline above directory-trail,
+  // increasing the header height. Increase top offset to prevent overlap.
+  @include mixins.below-phone {
+    top: 160px;
+  }
 }
 
 .files-viewport {
   flex: 1;
   min-height: 0;
   width: 100%;
+  overflow-x: hidden;
 }
 
 // Fix for active highlight extending beyond normal selected style on the right
