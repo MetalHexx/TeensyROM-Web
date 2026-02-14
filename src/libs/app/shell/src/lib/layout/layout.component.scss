@@ -104,8 +104,10 @@ lib-header {
 
 
 
-  // Add bottom padding for fixed bottom bar on phone
+  // At phone breakpoint: remove right padding so the scrollbar sits flush
+  // against the viewport edge. Content padding is handled by .router-content.
   @include styles.below-phone {
+    padding-right: 0;
     padding-bottom: 64px; // Account for bottom bar height (48px) + spacing
   }
 }
@@ -139,6 +141,13 @@ lib-nav-rail {
 
     @include styles.below-desktop {
       overflow-y: auto;
+    }
+
+    // At phone breakpoint: add right padding inside the scrollable area
+    // so content has equal spacing on both sides while the scrollbar
+    // remains flush against the viewport edge.
+    @include styles.below-phone {
+      padding-right: 1rem;
     }
 
     .view-title {
