@@ -1,0 +1,274 @@
+@use '../../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 280px;
+  min-width: 180px;
+  min-height: 0;
+  overflow: hidden;
+
+  @include styles.below-phone {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+// Override card-layout corner positioning for mobile to keep chips in upper right
+:host ::ng-deep lib-card-layout .corner-content {
+  @include styles.below-phone {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    width: auto;
+    padding: 0;
+  }
+}
+
+lib-scaling-card {
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+
+  // At phone, size to content instead of trying to fill parent
+  // (parent has auto height, so flex: 1 1 0 would collapse to 0)
+  @include styles.below-phone {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: auto;
+  }
+}
+
+.description-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-inline-sm);
+  padding: var(--spacing-inline-xs) 0;
+
+  &.empty-state {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 80px;
+    color: var(--color-dimmed);
+
+    .empty-icon {
+      font-size: 2rem;
+      width: 2rem;
+      height: 2rem;
+      opacity: 0.5;
+    }
+
+    .empty-message {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      font-style: italic;
+    }
+  }
+}
+
+.description-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-inline-xs);
+
+  .section-label {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--mat-sys-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .description-text {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+// Composer and Release sections match HVSC section styling
+.composer-section,
+.release-section {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--spacing-inline-xs);
+  margin: 0;
+  align-items: baseline;
+
+  h4 {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--mat-sys-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+
+  p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    color: var(--mat-sys-on-surface-variant);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+// Extended metadata styles from file-other
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-top: 0;
+
+  > * {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+}
+
+.rating-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: var(--spacing-inline-sm) 0;
+
+  mat-icon {
+    color: gold;
+  }
+
+  .rating-count {
+    color: var(--mat-sys-outline);
+    font-size: 0.875rem;
+  }
+}
+
+.tags-section,
+.youtube-section,
+.competitions-section {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-inline-xs);
+
+  h4 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--mat-sys-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+
+  p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    color: var(--mat-sys-on-surface);
+  }
+}
+
+// Links section has tighter gap between title and content
+.links-section {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  h4 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--mat-sys-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+}
+
+.tags-section {
+  mat-chip-set {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  mat-chip {
+    &.tag-genre {
+      --mdc-chip-container-color: var(--mat-sys-primary-container);
+    }
+    &.tag-style {
+      --mdc-chip-container-color: var(--mat-sys-secondary-container);
+    }
+    &.tag-theme {
+      --mdc-chip-container-color: var(--mat-sys-tertiary-container);
+    }
+  }
+}
+
+.links-container,
+.videos-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.competition-item {
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  background-color: var(--mat-sys-surface-container-low);
+  border-radius: 0.5rem;
+  border-left: 3px solid var(--mat-sys-tertiary);
+
+  .year {
+    color: var(--mat-sys-on-surface-variant);
+    margin-left: 0.5rem;
+  }
+
+  .position {
+    color: var(--mat-sys-primary);
+    font-weight: 500;
+  }
+}
+
+
+// Phone-specific: remove excessive bottom padding from card layers
+:host ::ng-deep {
+  @include styles.below-phone {
+    mat-card.stretch-card {
+      padding-bottom: 0 !important;
+    }
+
+    mat-card-content {
+      padding-bottom: 15px !important;
+    }
+  }
+}
+
+// Hide non-essential content on phone
+@include styles.below-phone {
+  .description-layout {
+    padding-bottom: 0;
+  }
+
+  .release-section,
+  .description-section,
+  .rating-section,
+  .metadata-grid {
+    display: none !important;
+  }
+
+  .composer-section h4 {
+    display: none !important;
+  }
+}
+

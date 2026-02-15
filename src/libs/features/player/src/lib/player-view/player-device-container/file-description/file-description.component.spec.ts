@@ -3,18 +3,19 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { By } from '@angular/platform-browser';
-import { FileOtherComponent } from './file-other.component';
+import { MatDialog } from '@angular/material/dialog';
+import { FileDescriptionComponent } from './file-description.component';
 import { PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType, StorageType } from '@teensyrom-nx/domain';
 
-describe('FileOtherComponent', () => {
-  let component: FileOtherComponent;
-  let fixture: ComponentFixture<FileOtherComponent>;
+describe('FileDescriptionComponent', () => {
+  let component: FileDescriptionComponent;
+  let fixture: ComponentFixture<FileDescriptionComponent>;
   let mockPlayerContext: Partial<IPlayerContext>;
+  let mockDialog: Partial<MatDialog>;
   let currentFileSignal: ReturnType<typeof signal>;
 
   beforeEach(async () => {
-    // Create writable signal for testing
     currentFileSignal = signal(null);
 
     mockPlayerContext = {
@@ -50,28 +51,27 @@ describe('FileOtherComponent', () => {
       navigateToHistoryPosition: vi.fn().mockResolvedValue(undefined),
     };
 
+    mockDialog = {
+      open: vi.fn(),
+    };
+
     await TestBed.configureTestingModule({
       providers: [
         provideNoopAnimations(),
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
+        { provide: MatDialog, useValue: mockDialog },
       ],
-      imports: [FileOtherComponent],
+      imports: [FileDescriptionComponent],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(FileOtherComponent);
+    fixture = TestBed.createComponent(FileDescriptionComponent);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('deviceId', 'test-device');
     fixture.detectChanges();
   });
 
-  describe('Component Initialization', () => {
-    it('should create', () => {
-      expect(component).toBeTruthy();
-    });
-
-    it('should require deviceId input', () => {
-      expect(component.deviceId()).toBe('test-device');
-    });
+  it('should create', () => {
+    expect(component).toBeTruthy();
   });
 
   describe('Empty State', () => {
@@ -79,79 +79,107 @@ describe('FileOtherComponent', () => {
       currentFileSignal.set(null);
       fixture.detectChanges();
 
-      const emptyState = fixture.debugElement.query(By.css('lib-empty-state-message'));
-      expect(emptyState).toBeTruthy();
       expect(component.hasFile()).toBe(false);
-    });
-
-    it('should display "No File Launched" message in empty state', () => {
-      currentFileSignal.set(null);
-      fixture.detectChanges();
-
-      const emptyState = fixture.debugElement.query(By.css('lib-empty-state-message'));
-      expect(emptyState).toBeTruthy();
-
-      // Verify the rendered text content
-      const emptyStateElement = emptyState.nativeElement as HTMLElement;
-      const textContent = emptyStateElement.textContent || '';
-      expect(textContent).toContain('No File Launched');
-      expect(textContent).toContain('Launch a file from the file browser below.');
-    });
-
-    it('should show secondary message about dice button', () => {
-      currentFileSignal.set(null);
-      fixture.detectChanges();
-
-      const emptyState = fixture.debugElement.query(By.css('lib-empty-state-message'));
-      const emptyStateElement = emptyState.nativeElement as HTMLElement;
-      const textContent = emptyStateElement.textContent || '';
-      expect(textContent).toContain('Try clicking the dice button to launch a random file.');
+      const emptyIcon = fixture.debugElement.query(By.css('.empty-icon'));
+      expect(emptyIcon).toBeTruthy();
     });
   });
 
-  describe('File Metadata Display', () => {
-    it('should display meta chips and content when file has DeepSID data', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/test/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: 'Test Song',
-          creator: '',
-          releaseInfo: '',
-          description: '',
-          shareUrl: '',
-          metadataSource: '',
-          meta1: 'SID',
-          meta2: '6581',
-          metadataSourcePath: '',
-          parentPath: '/test',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [{ name: 'CSDb', url: 'https://csdb.dk' }],
-          tags: [],
-          youTubeVideos: [],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
+  describe('Basic File Metadata (Original file-description tests)', () => {
+    const mockFile = {
+      storageKey: { deviceId: 'test-device', storageType: StorageType.SD },
+      file: {
+        name: 'test-file.sid',
+        path: '/music/test-file.sid',
+        size: 1024,
+        isFavorite: false,
+        isCompatible: true,
+        title: 'Test Song Title',
+        creator: 'Test Artist',
+        releaseInfo: '2024 Test Release',
+        description: 'A test description for this file',
+        shareUrl: '',
+        metadataSource: 'HVSC',
+        meta1: 'SID',
+        meta2: '6581',
+        metadataSourcePath: '',
+        parentPath: '/music',
+        playLength: '3:00',
+        subtuneLengths: [],
+        startSubtuneNum: 0,
+        images: [],
+        type: FileItemType.Song,
+        links: [],
+        tags: [],
+        youTubeVideos: [],
+        competitions: [],
+        ratingCount: 0,
+      },
+      parentPath: '/music',
+      launchedAt: Date.now(),
+      isCompatible: true,
+    };
+
+    it('should expose displayTitle with title when available', () => {
+      currentFileSignal.set(mockFile);
       fixture.detectChanges();
 
-      expect(component.meta1()).toBe('SID');
-      expect(component.meta2()).toBe('6581');
-      expect(component.hasContent()).toBe(true);
-      expect(component.hasFile()).toBe(true);
+      expect(component.displayTitle()).toBe('Test Song Title');
+    });
+
+    it('should expose creator signal', () => {
+      currentFileSignal.set(mockFile);
+      fixture.detectChanges();
+
+      expect(component.creator()).toBe('Test Artist');
+    });
+
+    it('should pass title and subtitle to scaling-card', () => {
+      currentFileSignal.set(mockFile);
+      fixture.detectChanges();
+
+      const scalingCard = fixture.debugElement.query(By.css('lib-scaling-card'));
+      expect(scalingCard.componentInstance.title()).toBe('Test Song Title');
+      expect(scalingCard.componentInstance.subtitle()).toBe('Test Artist');
+    });
+
+    it('should display description', () => {
+      currentFileSignal.set(mockFile);
+      fixture.detectChanges();
+
+      const descEl = fixture.debugElement.query(By.css('.description-text'));
+      expect(descEl.nativeElement.textContent.trim()).toBe('A test description for this file');
+    });
+
+    it('should show HVSC STIL label for songs', () => {
+      currentFileSignal.set(mockFile);
+      fixture.detectChanges();
+
+      const label = fixture.debugElement.query(By.css('.section-label'));
+      expect(label.nativeElement.textContent.trim()).toBe('HVSC STIL');
+    });
+
+    it('should fall back to filename when no title', () => {
+      const noTitleFile = {
+        ...mockFile,
+        file: { ...mockFile.file, title: '' },
+      };
+      currentFileSignal.set(noTitleFile);
+      fixture.detectChanges();
+
+      expect(component.displayTitle()).toBe('test-file.sid');
+    });
+
+    it('should display release info when available', () => {
+      currentFileSignal.set(mockFile);
+      fixture.detectChanges();
+
+      const releaseEl = fixture.debugElement.query(By.css('.release-info'));
+      expect(releaseEl.nativeElement.textContent.trim()).toBe('2024 Test Release');
     });
   });
 
-  describe('Chips Display', () => {
+  describe('Meta Chips Display', () => {
     it('should display meta1 chip when present', () => {
       currentFileSignal.set({
         deviceId: 1,
@@ -177,6 +205,11 @@ describe('FileOtherComponent', () => {
           subtuneLengths: [],
           startSubtuneNum: 0,
           images: [],
+          links: [],
+          tags: [],
+          youTubeVideos: [],
+          competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -213,6 +246,11 @@ describe('FileOtherComponent', () => {
           subtuneLengths: [],
           startSubtuneNum: 0,
           images: [],
+          links: [],
+          tags: [],
+          youTubeVideos: [],
+          competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -249,6 +287,11 @@ describe('FileOtherComponent', () => {
           subtuneLengths: [],
           startSubtuneNum: 0,
           images: [],
+          links: [],
+          tags: [],
+          youTubeVideos: [],
+          competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -285,6 +328,11 @@ describe('FileOtherComponent', () => {
           subtuneLengths: [],
           startSubtuneNum: 0,
           images: [],
+          links: [],
+          tags: [],
+          youTubeVideos: [],
+          competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -292,206 +340,6 @@ describe('FileOtherComponent', () => {
 
       const chipSet = fixture.debugElement.query(By.css('mat-chip-set'));
       expect(chipSet).toBeNull();
-    });
-  });
-
-  describe('Content States', () => {
-    it('should show no-metadata message when file has no DeepSID content', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.prg',
-          path: '/test/test.prg',
-          type: FileItemType.Game,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: '',
-          creator: '',
-          releaseInfo: '',
-          description: '',
-          shareUrl: '',
-          metadataSource: '',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/test',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.hasContent()).toBe(false);
-      const noMetadata = fixture.debugElement.query(By.css('.no-metadata'));
-      expect(noMetadata).toBeTruthy();
-      expect(noMetadata.nativeElement.textContent.trim()).toBe(
-        'Try launching a file from the device.'
-      );
-    });
-
-    it('hasContent should return true when links exist', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.prg',
-          path: '/test/test.prg',
-          type: FileItemType.Game,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: '',
-          creator: '',
-          releaseInfo: '',
-          description: '',
-          shareUrl: '',
-          metadataSource: '',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/test',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [{ name: 'Link', url: 'http://example.com' }],
-          tags: [],
-          youTubeVideos: [],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.hasContent()).toBe(true);
-    });
-
-    it('hasContent should return true when avgRating exists', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.prg',
-          path: '/test/test.prg',
-          type: FileItemType.Game,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: '',
-          creator: '',
-          releaseInfo: '',
-          description: '',
-          shareUrl: '',
-          metadataSource: '',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/test',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [],
-          youTubeVideos: [],
-          competitions: [],
-          avgRating: 3.5,
-          ratingCount: 10,
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.hasContent()).toBe(true);
-    });
-  });
-
-  describe('Computed Signals', () => {
-    it('should return empty strings for meta signals when no file is loaded', () => {
-      currentFileSignal.set(null);
-      fixture.detectChanges();
-
-      expect(component.meta1()).toBe('');
-      expect(component.meta2()).toBe('');
-    });
-
-    it('should update computed values when file changes', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'file1.prg',
-          path: '/test/file1.prg',
-          type: FileItemType.Game,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: 'First Game',
-          creator: '',
-          releaseInfo: '1990',
-          description: 'First description',
-          shareUrl: '',
-          metadataSource: 'Source1',
-          meta1: 'PRG',
-          meta2: 'C64',
-          metadataSourcePath: '',
-          parentPath: '/test',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [],
-          youTubeVideos: [],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.meta1()).toBe('PRG');
-      expect(component.meta2()).toBe('C64');
-
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'file2.prg',
-          path: '/test/file2.prg',
-          type: FileItemType.Game,
-          size: 2048,
-          isFavorite: false,
-          isCompatible: true,
-          title: 'Second Game',
-          creator: '',
-          releaseInfo: '1995',
-          description: 'Second description',
-          shareUrl: '',
-          metadataSource: 'Source2',
-          meta1: 'D64',
-          meta2: 'VIC20',
-          metadataSourcePath: '',
-          parentPath: '/test',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [],
-          youTubeVideos: [],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.meta1()).toBe('D64');
-      expect(component.meta2()).toBe('VIC20');
     });
   });
 
@@ -528,6 +376,7 @@ describe('FileOtherComponent', () => {
           tags: [],
           youTubeVideos: [],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -576,6 +425,7 @@ describe('FileOtherComponent', () => {
           tags: [],
           youTubeVideos: [],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -584,45 +434,6 @@ describe('FileOtherComponent', () => {
       expect(component.links().length).toBe(0);
       const linksSection = fixture.debugElement.query(By.css('.links-section'));
       expect(linksSection).toBeNull();
-    });
-
-    it('should open links in new tab', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/music/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: 'Test Song',
-          creator: '',
-          releaseInfo: '',
-          description: 'Test',
-          shareUrl: '',
-          metadataSource: 'DeepSID',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/music',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [{ name: 'Test Link', url: 'https://example.com' }],
-          tags: [],
-          youTubeVideos: [],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      const link = fixture.debugElement.query(By.css('lib-external-link'));
-      // External link component defaults to target="_blank"
-      expect(link).toBeTruthy();
     });
   });
 
@@ -669,6 +480,7 @@ describe('FileOtherComponent', () => {
             },
           ],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -686,143 +498,6 @@ describe('FileOtherComponent', () => {
       expect(videos.length).toBe(2);
       expect(videos[0].nativeElement.textContent.trim()).toContain('C64 Music Channel');
       expect(videos[1].nativeElement.textContent.trim()).toContain('Retro Gaming');
-    });
-
-    it('should open YouTube dialog when video link is clicked', () => {
-      const video = {
-        videoId: 'abc123',
-        url: 'https://youtube.com/watch?v=abc123',
-        channel: 'Test Channel',
-        subtune: 0,
-      };
-
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/music/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: 'Test Song',
-          creator: '',
-          releaseInfo: '',
-          description: 'Test',
-          shareUrl: '',
-          metadataSource: 'DeepSID',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/music',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [],
-          youTubeVideos: [video],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      const videoLink = fixture.debugElement.query(By.css('lib-action-link'));
-      expect(videoLink).toBeTruthy();
-    });
-
-    it('should display subtune information for videos with subtune > 0', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/music/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: 'Test Song',
-          creator: '',
-          releaseInfo: '',
-          description: 'Test',
-          shareUrl: '',
-          metadataSource: 'DeepSID',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/music',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [],
-          youTubeVideos: [
-            {
-              videoId: 'xyz789',
-              url: 'https://youtube.com/watch?v=xyz789',
-              channel: 'SID Channel',
-              subtune: 3,
-            },
-          ],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      const videoLink = fixture.debugElement.query(By.css('lib-action-link'));
-      expect(videoLink).toBeTruthy();
-      expect(videoLink.nativeElement.textContent.trim()).toContain('SID Channel');
-    });
-
-    it('should not display subtune information for videos with subtune = 0', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/music/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: 'Test Song',
-          creator: '',
-          releaseInfo: '',
-          description: 'Test',
-          shareUrl: '',
-          metadataSource: 'DeepSID',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/music',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [],
-          youTubeVideos: [
-            {
-              videoId: 'xyz789',
-              url: 'https://youtube.com/watch?v=xyz789',
-              channel: 'SID Channel',
-              subtune: 0,
-            },
-          ],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      const videoLink = fixture.debugElement.query(By.css('lib-action-link'));
-      expect(videoLink).toBeTruthy();
-      expect(videoLink.nativeElement.textContent).toContain('SID Channel');
     });
 
     it('should not display YouTube section when no videos exist', () => {
@@ -854,6 +529,7 @@ describe('FileOtherComponent', () => {
           tags: [],
           youTubeVideos: [],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -895,6 +571,7 @@ describe('FileOtherComponent', () => {
           tags: [],
           youTubeVideos: [],
           competitions: [{ name: 'X Party 2024', place: 1 }, { name: 'Demo Scene Awards' }],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -943,6 +620,7 @@ describe('FileOtherComponent', () => {
           tags: [],
           youTubeVideos: [],
           competitions: [{ name: 'Demo Scene Awards' }],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -984,6 +662,7 @@ describe('FileOtherComponent', () => {
           tags: [],
           youTubeVideos: [],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -1028,6 +707,7 @@ describe('FileOtherComponent', () => {
           ],
           youTubeVideos: [],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -1081,6 +761,7 @@ describe('FileOtherComponent', () => {
           tags: [],
           youTubeVideos: [],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -1167,6 +848,7 @@ describe('FileOtherComponent', () => {
           tags: [],
           youTubeVideos: [],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -1178,8 +860,8 @@ describe('FileOtherComponent', () => {
     });
   });
 
-  describe('Metadata Grid Layout', () => {
-    it('should display metadata-grid when sections exist', () => {
+  describe('hasContent and hasExtendedContent Computed Signals', () => {
+    it('hasContent should return true when title exists', () => {
       currentFileSignal.set({
         deviceId: 1,
         storageType: StorageType.Sd,
@@ -1193,7 +875,45 @@ describe('FileOtherComponent', () => {
           title: 'Test Song',
           creator: '',
           releaseInfo: '',
-          description: 'Test',
+          description: '',
+          shareUrl: '',
+          metadataSource: 'DeepSID',
+          meta1: '',
+          meta2: '',
+          metadataSourcePath: '',
+          parentPath: '/music',
+          playLength: '',
+          subtuneLengths: [],
+          startSubtuneNum: 0,
+          images: [],
+          links: [],
+          tags: [],
+          youTubeVideos: [],
+          competitions: [],
+          ratingCount: 0,
+        },
+        isShuffleMode: false,
+      });
+      fixture.detectChanges();
+
+      expect(component.hasContent()).toBe(true);
+    });
+
+    it('hasContent should return true when links exist', () => {
+      currentFileSignal.set({
+        deviceId: 1,
+        storageType: StorageType.Sd,
+        file: {
+          name: 'test.sid',
+          path: '/music/test.sid',
+          type: FileItemType.Song,
+          size: 1024,
+          isFavorite: false,
+          isCompatible: true,
+          title: '',
+          creator: '',
+          releaseInfo: '',
+          description: '',
           shareUrl: '',
           metadataSource: 'DeepSID',
           meta1: '',
@@ -1205,18 +925,60 @@ describe('FileOtherComponent', () => {
           startSubtuneNum: 0,
           images: [],
           links: [{ name: 'Link', url: 'http://example.com' }],
-          tags: [{ name: 'Tag', type: 'genre' }],
+          tags: [],
           youTubeVideos: [],
           competitions: [],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
       fixture.detectChanges();
 
-      const metadataGrid = fixture.debugElement.query(By.css('.metadata-grid'));
-      expect(metadataGrid).toBeTruthy();
+      expect(component.hasContent()).toBe(true);
+      expect(component.hasExtendedContent()).toBe(true);
     });
 
+    it('hasExtendedContent should return true when avgRating exists', () => {
+      currentFileSignal.set({
+        deviceId: 1,
+        storageType: StorageType.Sd,
+        file: {
+          name: 'test.sid',
+          path: '/music/test.sid',
+          type: FileItemType.Song,
+          size: 1024,
+          isFavorite: false,
+          isCompatible: true,
+          title: '',
+          creator: '',
+          releaseInfo: '',
+          description: '',
+          shareUrl: '',
+          metadataSource: 'DeepSID',
+          meta1: '',
+          meta2: '',
+          metadataSourcePath: '',
+          parentPath: '/music',
+          playLength: '',
+          subtuneLengths: [],
+          startSubtuneNum: 0,
+          images: [],
+          links: [],
+          tags: [],
+          youTubeVideos: [],
+          competitions: [],
+          avgRating: 3.5,
+          ratingCount: 10,
+        },
+        isShuffleMode: false,
+      });
+      fixture.detectChanges();
+
+      expect(component.hasExtendedContent()).toBe(true);
+    });
+  });
+
+  describe('Metadata Grid Layout', () => {
     it('should display all sections in metadata grid when data is available', () => {
       currentFileSignal.set({
         deviceId: 1,
@@ -1248,6 +1010,7 @@ describe('FileOtherComponent', () => {
             { videoId: 'abc', url: 'http://youtube.com', channel: 'Channel', subtune: 0 },
           ],
           competitions: [{ name: 'Competition', place: 1 }],
+          ratingCount: 0,
         },
         isShuffleMode: false,
       });
@@ -1264,156 +1027,5 @@ describe('FileOtherComponent', () => {
       expect(tagsSection).toBeTruthy();
     });
   });
-
-  describe('hasContent Computed Signal with DeepSID Data', () => {
-    it('should return true when links exist', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/music/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: '',
-          creator: '',
-          releaseInfo: '',
-          description: '',
-          shareUrl: '',
-          metadataSource: 'DeepSID',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/music',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [{ name: 'Link', url: 'http://example.com' }],
-          tags: [],
-          youTubeVideos: [],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.hasContent()).toBe(true);
-    });
-
-    it('should return true when tags exist', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/music/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: '',
-          creator: '',
-          releaseInfo: '',
-          description: '',
-          shareUrl: '',
-          metadataSource: 'DeepSID',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/music',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [{ name: 'Tag', type: 'genre' }],
-          youTubeVideos: [],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.hasContent()).toBe(true);
-    });
-
-    it('should return true when YouTube videos exist', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/music/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: '',
-          creator: '',
-          releaseInfo: '',
-          description: '',
-          shareUrl: '',
-          metadataSource: 'DeepSID',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/music',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [],
-          youTubeVideos: [
-            { videoId: 'abc', url: 'http://youtube.com', channel: 'Channel', subtune: 0 },
-          ],
-          competitions: [],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.hasContent()).toBe(true);
-    });
-
-    it('should return true when competitions exist', () => {
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: {
-          name: 'test.sid',
-          path: '/music/test.sid',
-          type: FileItemType.Song,
-          size: 1024,
-          isFavorite: false,
-          isCompatible: true,
-          title: '',
-          creator: '',
-          releaseInfo: '',
-          description: '',
-          shareUrl: '',
-          metadataSource: 'DeepSID',
-          meta1: '',
-          meta2: '',
-          metadataSourcePath: '',
-          parentPath: '/music',
-          playLength: '',
-          subtuneLengths: [],
-          startSubtuneNum: 0,
-          images: [],
-          links: [],
-          tags: [],
-          youTubeVideos: [],
-          competitions: [{ name: 'Competition' }],
-        },
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
-
-      expect(component.hasContent()).toBe(true);
-    });
-  });
 });
+

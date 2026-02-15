@@ -1,16 +1,11 @@
-<lib-scaling-card
-  [title]="creatorName()"
-  [metadataSource]="metadataSource()"
-  [enableOverflow]="false"
->
+<lib-scaling-container>
   <lib-content-overlay-container [showOverlaysOnHover]="true">
     <!-- Content slot: CRT wrapper around cycling images -->
     <ng-container content>
       <lib-crt-effect-wrapper
         #crtWrapper
         [settings]="crtSettings()"
-        [enabled]="isCrtEnabled()"
-        [contentAspectRatio]="1">
+        [enabled]="isCrtEnabled()">
         <div class="image-wrapper">
           <lib-cycle-image
             [images]="imageUrls()"
@@ -52,4 +47,4 @@
       (crtSettingsClick)="toggleCrtControls()">
     </lib-video-controls-toolbar>
   </lib-content-overlay-container>
-</lib-scaling-card>
+</lib-scaling-container>

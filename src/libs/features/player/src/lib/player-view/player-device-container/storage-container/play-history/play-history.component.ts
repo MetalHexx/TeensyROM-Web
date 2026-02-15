@@ -114,6 +114,12 @@ export class PlayHistoryComponent {
   }
 
   private scrollToSelectedEntry(index: number): void {
+    // Skip scroll-into-view at phone breakpoint to prevent the page from
+    // jumping away from the player/file-image area to the file list.
+    if (window.matchMedia?.('(max-width: 639px)')?.matches) {
+      return;
+    }
+
     // Use setTimeout to ensure the DOM is updated after the selection change
     setTimeout(() => {
       // Find the DOM element for the selected entry using the data-index attribute

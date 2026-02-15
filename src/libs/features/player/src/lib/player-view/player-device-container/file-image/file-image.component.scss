@@ -2,28 +2,30 @@
 
 :host {
   display: block;
-  min-width: 0; // Allow shrinking below content size
-  aspect-ratio: 327 / 390; // Height derives from width based on aspect ratio
-  flex: 0 1 327px; // Don't grow, can shrink, prefer 327px width
+  min-width: 0;
+  flex: 0 1 390px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--mat-sys-corner-medium, 12px);
+  overflow: hidden;
 
-  // Cap at ideal width on desktop to prevent growing too large
-  @include styles.screen-desktop {
-    max-width: 327px;
-  }
+  // Ensure nested cycle-image stretches to fill the square
+  --carousel-image-fit: fill;
 
-  // Take full width at smallest breakpoint
-  @include styles.below-tablet {
+  @include styles.below-phone {
     width: 100%;
+    align-self: center;
+    flex: 0 0 auto;
   }
 }
 
-// Flip sizing axis when parent container is height-constrained:
-// Height drives width via aspect-ratio (instead of width driving height)
+// Height-constrained container: size from height, let aspect-ratio compute width
 @container device-panel (max-height: 640px) {
   :host {
-    height: 100%; // Resolves against parent's explicit 40cqh height
-    width: auto; // Let aspect-ratio compute width from height
-    flex: 0 0 auto; // Don't grow or shrink, size from content
+    height: 100%;
+    width: auto;
+    flex: 0 0 auto;
+    aspect-ratio: 1 / 1;
+    min-height: 0;
   }
 }
 
@@ -31,16 +33,10 @@
   width: 100%;
 }
 
-mat-card {
+lib-scaling-container {
   width: 100%;
-  min-width: 0; // Allow shrinking below content size
-  height: 100%; // Fill host height (which is controlled by aspect-ratio)
-  overflow: hidden;
-
-  // Match host width at smallest breakpoint
-  @include styles.below-tablet {
-    width: 100%;
-  }
+  min-width: 0;
+  height: 100%;
 }
 
 .image-wrapper {

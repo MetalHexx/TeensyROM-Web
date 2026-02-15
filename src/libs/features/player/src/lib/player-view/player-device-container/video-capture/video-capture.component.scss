@@ -2,19 +2,9 @@
 
 :host {
   display: block;
-  min-width: 0; // Allow shrinking below content size
-  aspect-ratio: 4 / 3; // Maintain video proportions - height derives from width
-  flex: 0 1 520px; // Don't grow, can shrink, prefer 520px width
-
-  // Cap at ideal width on desktop to prevent growing too large
-  @include styles.screen-desktop {
-    max-width: 520px;
-  }
-
-  // Take full width at smallest breakpoint
-  @include styles.below-tablet {
-    width: 100%;
-  }
+  min-width: 0;
+  aspect-ratio: 4 / 3;
+  flex: 0 1 520px;
 }
 
 // Flip sizing axis when parent container is height-constrained:

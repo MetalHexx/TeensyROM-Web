@@ -1,8 +1,4 @@
-<lib-scaling-card
-  [title]="title() || filename()"
-  [subtitle]="releaseInfo()"
-  [metadataSource]="metadataSource()"
->
+<lib-scaling-card>
   <!-- Corner content using slot -->
   @if (meta1() || meta2()) {
   <mat-chip-set slot="corner">
@@ -16,17 +12,8 @@
 
   <!-- Main content -->
   @if (hasFile()) { @if (hasContent()) {
-  <!-- Description Section with conditional HSVC STIL title for songs -->
-  @if (description()) {
-  <div class="description-section">
-    @if (isSong()) {
-    <h4 class="section-title">HVSC STIL</h4>
-    }
-    <p class="description">{{ description() }}</p>
-  </div>
-  }
 
-  <!-- NEW: Rating Display -->
+  <!-- Rating Display -->
   @if (avgRating()) {
   <div class="rating-section">
     <mat-icon>star</mat-icon>

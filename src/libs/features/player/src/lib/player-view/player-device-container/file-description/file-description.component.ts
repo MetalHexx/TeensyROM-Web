@@ -1,48 +1,56 @@
 import { Component, input, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { MatChipsModule } from '@angular/material/chips';
 import {
   ScalingCardComponent,
-  EmptyStateMessageComponent,
   ExternalLinkComponent,
   ActionLinkComponent,
 } from '@teensyrom-nx/ui/components';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatIconModule } from '@angular/material/icon';
 import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
-import { YouTubeVideo } from '@teensyrom-nx/domain';
+import { FileItemType, YouTubeVideo } from '@teensyrom-nx/domain';
 import { YouTubeDialogComponent } from './youtube-dialog/youtube-dialog.component';
 
 @Component({
-  selector: 'lib-file-other',
+  selector: 'lib-file-description',
   imports: [
     CommonModule,
     ScalingCardComponent,
-    MatChipsModule,
     MatIconModule,
-    EmptyStateMessageComponent,
+    MatChipsModule,
     ExternalLinkComponent,
     ActionLinkComponent,
   ],
-  templateUrl: './file-other.component.html',
-  styleUrl: './file-other.component.scss',
+  templateUrl: './file-description.component.html',
+  styleUrl: './file-description.component.scss',
 })
-export class FileOtherComponent {
+export class FileDescriptionComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
   private readonly dialog = inject(MatDialog);
 
-  // Required input for device identification
   deviceId = input.required<string>();
 
-  // Computed signals derived from current file
   private readonly currentFile = computed(() =>
     this.playerContext.getCurrentFile(this.deviceId())()
   );
 
+  readonly hasFile = computed(() => !!this.currentFile());
+  readonly creator = computed(() => this.currentFile()?.file.creator ?? '');
+  readonly title = computed(() => this.currentFile()?.file.title ?? '');
+  readonly filename = computed(() => this.currentFile()?.file.name ?? '');
+  readonly description = computed(() => this.currentFile()?.file.description ?? '');
+  readonly releaseInfo = computed(() => this.currentFile()?.file.releaseInfo ?? '');
+  readonly fileType = computed(() => this.currentFile()?.file.type);
+  readonly isSong = computed(() => this.fileType() === FileItemType.Song);
+
+  readonly displayTitle = computed(() => this.title() || this.filename());
+
+  // Meta chips
   readonly meta1 = computed(() => this.currentFile()?.file.meta1 ?? '');
   readonly meta2 = computed(() => this.currentFile()?.file.meta2 ?? '');
 
-  // NEW: DeepSID metadata computed signals
+  // DeepSID metadata computed signals
   readonly links = computed(() => this.currentFile()?.file.links ?? []);
   readonly tags = computed(() => this.currentFile()?.file.tags ?? []);
   readonly youTubeVideos = computed(() => this.currentFile()?.file.youTubeVideos ?? []);
@@ -50,9 +58,11 @@ export class FileOtherComponent {
   readonly avgRating = computed(() => this.currentFile()?.file.avgRating);
   readonly ratingCount = computed(() => this.currentFile()?.file.ratingCount ?? 0);
 
-  readonly hasContent = computed(() => {
+  readonly hasExtendedContent = computed(() => {
     const file = this.currentFile();
     return !!(
+      file?.file.creator ||
+      file?.file.releaseInfo ||
       file?.file.links?.length ||
       file?.file.tags?.length ||
       file?.file.youTubeVideos?.length ||
@@ -60,7 +70,19 @@ export class FileOtherComponent {
       file?.file.avgRating
     );
   });
-  readonly hasFile = computed(() => !!this.currentFile());
+
+  readonly hasContent = computed(() => {
+    const file = this.currentFile();
+    return !!(
+      file?.file.title ||
+      file?.file.description ||
+      file?.file.links?.length ||
+      file?.file.tags?.length ||
+      file?.file.youTubeVideos?.length ||
+      file?.file.competitions?.length ||
+      file?.file.avgRating
+    );
+  });
 
   openYouTubeDialog(video: YouTubeVideo): void {
     this.dialog.open(YouTubeDialogComponent, {
@@ -68,7 +90,7 @@ export class FileOtherComponent {
       width: '800px',
       maxWidth: '90vw',
       panelClass: 'youtube-dialog',
-      backdropClass: 'youtube-dialog-backdrop', // Slow animation timing
+      backdropClass: 'youtube-dialog-backdrop',
     });
   }
 }

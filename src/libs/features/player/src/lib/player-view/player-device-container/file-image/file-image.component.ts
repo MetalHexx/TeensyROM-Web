@@ -2,7 +2,7 @@ import { Component, computed, input, signal, inject, effect } from '@angular/cor
 import { CommonModule } from '@angular/common';
 import {
   CycleImageComponent,
-  ScalingCardComponent,
+  ScalingContainerComponent,
   ContentOverlayContainerComponent,
   CrtEffectWrapperComponent,
   CrtSettingsPanelOverlayComponent,
@@ -21,7 +21,7 @@ import type { LaunchedFile } from '@teensyrom-nx/application';
   selector: 'lib-file-image',
   imports: [
     CommonModule,
-    ScalingCardComponent,
+    ScalingContainerComponent,
     CycleImageComponent,
     ContentOverlayContainerComponent,
     CrtEffectWrapperComponent,
@@ -73,18 +73,7 @@ export class FileImageComponent {
     }, { allowSignalWrites: true });
   }
 
-  creatorName = computed(() => {
-    const creator = this.currentFile()?.file.creator;
-    return creator && creator.trim().length > 0 ? creator : 'Welcome to TeensyROM!';
-  });
-  metadataSource = computed(() => {
-    const images = this.currentFile()?.file.images;
-    if (images && images.length > 0) {
-      const source = images[0].source;
-      return source && source.trim().length > 0 ? source : 'hExx';
-    }
-    return 'hExx';
-  });
+
   imageUrls = computed(
     () =>
       this.currentFile()

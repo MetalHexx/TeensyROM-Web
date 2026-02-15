@@ -2,8 +2,8 @@ import { Component, input, computed, inject, effect, untracked } from '@angular/
 import { CommonModule } from '@angular/common';
 import { Device } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
-import { FileOtherComponent } from './file-other/file-other.component';
 import { FileImageComponent } from './file-image/file-image.component';
+import { FileDescriptionComponent } from './file-description/file-description.component';
 import { VideoCaptureComponent } from './video-capture/video-capture.component';
 import { PlayerToolbarComponent } from './player-toolbar/player-toolbar.component';
 import { FilterToolbarComponent } from './storage-container/filter-toolbar/filter-toolbar.component';
@@ -16,8 +16,8 @@ import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
     CommonModule,
     MatCardModule,
     FileImageComponent,
+    FileDescriptionComponent,
     VideoCaptureComponent,
-    FileOtherComponent,
     PlayerToolbarComponent,
     FilterToolbarComponent,
     StorageContainerComponent,

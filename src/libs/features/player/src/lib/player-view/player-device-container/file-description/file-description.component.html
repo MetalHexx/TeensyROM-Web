@@ -1,0 +1,127 @@
+<lib-scaling-card [title]="displayTitle()">
+  <!-- Corner content for meta chips -->
+  @if (meta1() || meta2()) {
+  <mat-chip-set slot="corner">
+    @if (meta1()) {
+    <mat-chip>{{ meta1() }}</mat-chip>
+    } @if (meta2()) {
+    <mat-chip>{{ meta2() }}</mat-chip>
+    }
+  </mat-chip-set>
+  }
+
+  @if (hasFile()) {
+    @if (hasContent()) {
+      <!-- Description Layout wraps all metadata content for consistent spacing -->
+      <div class="description-layout">
+        <!-- Composer Section - First after title -->
+        @if (creator()) {
+        <div class="composer-section">
+          <h4>Composer</h4>
+          <p>{{ creator() }}</p>
+        </div>
+        }
+
+        <!-- Release Section - Second after title -->
+        @if (releaseInfo()) {
+        <div class="release-section">
+          <h4>Release</h4>
+          <p>{{ releaseInfo() }}</p>
+        </div>
+        }
+
+        <!-- HVSC Description Section -->
+        @if (description()) {
+          <div class="description-section">
+            @if (isSong()) {
+              <h4 class="section-label">HVSC STIL</h4>
+            }
+            <p class="description-text">{{ description() }}</p>
+          </div>
+        }
+      </div>
+
+      <!-- Extended Metadata Sections -->
+      @if (hasExtendedContent()) {
+        <!-- Rating Display -->
+        @if (avgRating()) {
+        <div class="rating-section">
+          <mat-icon>star</mat-icon>
+          <span>{{ avgRating() | number : '1.1-1' }}/5.0</span>
+          <span class="rating-count">({{ ratingCount() }} ratings)</span>
+        </div>
+        }
+
+        <!-- Dynamic multi-column layout -->
+        <div class="metadata-grid">
+
+          <!-- Links Section -->
+          @if (links().length > 0) {
+          <div class="links-section">
+            <h4>Links</h4>
+            <div class="links-container">
+              @for (link of links(); track $index) {
+              <lib-external-link [href]="link.url" [label]="link.name"> </lib-external-link>
+              }
+            </div>
+          </div>
+          }
+
+          <!-- YouTube Videos Section -->
+          @if (youTubeVideos().length > 0) {
+          <div class="youtube-section">
+            <h4>Related Videos</h4>
+            <div class="videos-container">
+              @for (video of youTubeVideos(); track $index) {
+              <lib-action-link
+                [label]="video.channel"
+                icon="play_circle"
+                (linkClick)="openYouTubeDialog(video)"
+              >
+              </lib-action-link>
+              }
+            </div>
+          </div>
+          }
+
+          <!-- Competitions Section -->
+          @if (competitions().length > 0) {
+          <div class="competitions-section">
+            <h4>Competition Results</h4>
+            @for (comp of competitions(); track $index) {
+            <div class="competition-item">
+              <strong>{{ comp.name }}</strong>
+              @if (comp.place) {
+              <span class="position">- Place {{ comp.place }}</span>
+              }
+            </div>
+            }
+          </div>
+          }
+
+          <!-- Tags Section -->
+          @if (tags().length > 0) {
+          <div class="tags-section">
+            <h4>Tags</h4>
+            <mat-chip-set>
+              @for (tag of tags(); track $index) {
+              <mat-chip [class]="'tag-' + tag.type">{{ tag.name }}</mat-chip>
+              }
+            </mat-chip-set>
+          </div>
+          }
+        </div>
+      }
+    } @else {
+      <div class="description-layout empty-state">
+        <mat-icon class="empty-icon">music_note</mat-icon>
+        <p class="empty-message">No metadata available</p>
+      </div>
+    }
+  } @else {
+    <div class="description-layout empty-state">
+      <mat-icon class="empty-icon">album</mat-icon>
+      <p class="empty-message">Launch a file to see details</p>
+    </div>
+  }
+</lib-scaling-card>
