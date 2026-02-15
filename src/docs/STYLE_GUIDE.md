@@ -615,6 +615,22 @@ const phoneBreakpoint = getComputedStyle(document.documentElement)
 
 **Best Practice**: Use as the default for cards and prominent UI elements. The dark semi-transparent effect is sophisticated and modern, allowing background patterns to enhance the visual depth while maintaining excellent readability. Recommended for all primary card components.
 
+#### `.glassy-white`
+
+**Usage Example:**
+
+```html
+<button class="glassy-white">White glassy button</button>
+```
+
+**Implementation**: Uses [`@mixin glassy-white-effect`](#mixin-glassy-white-effect) (15% white opacity)
+
+**Used In:**
+
+- [`player-device-container.component.html`](../libs/features/player/src/lib/player-view/player-device-container/player-device-container.component.html) - Swipe navigation previous/next buttons
+
+**Best Practice**: Use for interactive elements like buttons that need a light, frosted appearance over dark backgrounds. The white tint provides visual affordance (indicating clickability) while maintaining the glassmorphism aesthetic. Ideal for overlay controls and navigation buttons.
+
 #### `.glassy-card`
 
 **Usage Example:**
@@ -766,6 +782,22 @@ const phoneBreakpoint = getComputedStyle(document.documentElement)
 - `.glassy-card` CSS class - Material card components with enhanced dark styling
 - `card-layout.component.ts` - Default glassy intensity for CardLayout components
 - `compact-card-layout.component.ts` - Default glassy intensity for CompactCardLayout components
+
+#### `@mixin glassy-white-effect`
+
+**Purpose**: White-tinted glassmorphism with 15% white opacity for interactive elements.
+
+**Parameters**: None
+
+**Usage Example:**
+
+```scss
+@use 'path/to/theme/mixins' as mixins;
+
+.nav-button {
+  @include mixins.glassy-white-effect;
+}
+```
 
 **Implementation Details:**
 
