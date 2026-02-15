@@ -1,15 +1,4 @@
 <lib-scaling-card [title]="displayTitle()">
-  <!-- Corner content for meta chips -->
-  @if (meta1() || meta2()) {
-  <mat-chip-set slot="corner">
-    @if (meta1()) {
-    <mat-chip>{{ meta1() }}</mat-chip>
-    } @if (meta2()) {
-    <mat-chip>{{ meta2() }}</mat-chip>
-    }
-  </mat-chip-set>
-  }
-
   @if (hasFile()) {
     @if (hasContent()) {
       <!-- Description Layout wraps all metadata content for consistent spacing -->
@@ -55,6 +44,24 @@
         <!-- Dynamic multi-column layout -->
         <div class="metadata-grid">
 
+          <!-- Tags Section -->
+          @if (meta1() || meta2() || tags().length > 0) {
+          <div class="tags-section">
+            <h4>Tags</h4>
+            <mat-chip-set>
+              @if (meta1()) {
+              <mat-chip>{{ meta1() }}</mat-chip>
+              }
+              @if (meta2()) {
+              <mat-chip>{{ meta2() }}</mat-chip>
+              }
+              @for (tag of tags(); track $index) {
+              <mat-chip [class]="'tag-' + tag.type">{{ tag.name }}</mat-chip>
+              }
+            </mat-chip-set>
+          </div>
+          }
+
           <!-- Links Section -->
           @if (links().length > 0) {
           <div class="links-section">
@@ -99,17 +106,6 @@
           </div>
           }
 
-          <!-- Tags Section -->
-          @if (tags().length > 0) {
-          <div class="tags-section">
-            <h4>Tags</h4>
-            <mat-chip-set>
-              @for (tag of tags(); track $index) {
-              <mat-chip [class]="'tag-' + tag.type">{{ tag.name }}</mat-chip>
-              }
-            </mat-chip-set>
-          </div>
-          }
         </div>
       }
     } @else {

@@ -116,12 +116,13 @@
 }
 
 // Container query: cap device-header when container height is constrained
-// At 720p the container is ~638px, so 640px threshold catches that and below
-@container device-panel (max-height: 640px) {
+// At 720p the container is ~638px; at 1280×800 it's ~750px.
+// Threshold of 768px covers both, preventing the header from dominating.
+@container device-panel (max-height: 768px) {
   .device-header {
-    height: 40cqh; // 40% of container height (~255px at 638px)
+    height: 40cqh; // 40% of container height (~300px at 750px)
     flex-shrink: 0;
-    overflow: hidden;
+    overflow: clip; // Contain overflow without creating scroll context
   }
 
   .storage-container {
@@ -141,29 +142,74 @@
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none; // Firefox
+    width: 100%; // Definite width so children's flex: 0 0 100% resolves correctly
+    min-width: 0; // Prevent flex item from expanding to intrinsic content width
+    // Fixed height = viewport width to match the 1:1 file-image aspect ratio
+    height: 100vw;
+    max-height: 70vh;
+    min-height: 250px;
+    flex-shrink: 0;
     &::-webkit-scrollbar {
       display: none; // Chrome/Safari
     }
 
     > * {
       scroll-snap-align: center;
+      scroll-snap-stop: always;
       flex: 0 0 100%;
       min-width: 100%;
+      height: 100%;
+      max-height: 100%;
+      overflow: hidden;
     }
   }
 }
 
-.swipe-indicators {
-  display: none; // Hidden by default (desktop)
+.swipe-nav {
+  display: none;
 
   &.phone-only {
     @include styles.below-phone {
       display: flex;
+      align-items: center;
       justify-content: center;
       gap: 8px;
-      padding: 8px 0 0;
+      padding: 4px 0;
     }
   }
+}
+
+.swipe-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  color: white;
+  transition: opacity 0.2s ease;
+
+  mat-icon, .mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+}
+
+.swipe-indicators {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
 
   .dot {
     width: 8px;
@@ -179,6 +225,18 @@
     }
   }
 }
+
+// Phone-specific pane styles inside swipe-container
+.storage-pane {
+  @include styles.below-phone {
+    height: 100%;
+    position: relative;
+    touch-action: pan-y;
+    overflow: hidden;
+  }
+}
+
+
 
 // file-description remains visible at phone size, shown under file-image
 lib-file-description {

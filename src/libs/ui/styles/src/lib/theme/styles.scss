@@ -334,6 +334,10 @@ body {
   @include mixins.glassy-dark-effect;
 }
 
+.glassy-white {
+  @include mixins.glassy-white-effect;
+}
+
 .glassy-card {
   @include mixins.glassy-dark-effect;
   border-radius: var(--mat-sys-corner-large) !important;

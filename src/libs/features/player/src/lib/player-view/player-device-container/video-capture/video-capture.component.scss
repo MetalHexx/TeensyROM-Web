@@ -15,7 +15,7 @@
 
 // Flip sizing axis when parent container is height-constrained:
 // Height drives width via aspect-ratio (instead of width driving height)
-@container device-panel (max-height: 640px) {
+@container device-panel (max-height: 768px) {
   :host {
     height: 100%; // Resolves against parent's explicit 40cqh height
     width: auto; // Let aspect-ratio compute width from height
@@ -39,8 +39,8 @@
   height: 100%;
 }
 
-.video-container-video {  
-  height: 300px;
+.video-container-video {
+  height: 100%; // Responsive to parent — avoids clipping when CQ constrains header
 }
 
 // CRT settings panel card - scrollable when constrained via passed cardClass

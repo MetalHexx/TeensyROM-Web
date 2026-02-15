@@ -19,7 +19,7 @@
 }
 
 // Height-constrained container: size from height, let aspect-ratio compute width
-@container device-panel (max-height: 640px) {
+@container device-panel (max-height: 768px) {
   :host {
     height: 100%;
     width: auto;

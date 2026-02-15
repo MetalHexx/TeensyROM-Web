@@ -2,8 +2,9 @@
 import { vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, signal } from '@angular/core';
-import { of } from 'rxjs';
+import { of, BehaviorSubject } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
 import { PlayerDeviceContainerComponent } from './player-device-container.component';
 import { PLAYER_CONTEXT, IPlayerContext, SettingsStore, PlayTimerConfig } from '@teensyrom-nx/application';
 import { 
@@ -14,7 +15,10 @@ import {
   STORAGE_SERVICE,
   IStorageService,
   CRT_STORAGE,
-  ICrtStorage
+  ICrtStorage,
+  CrtSettings,
+  CustomCrtPreset,
+  CustomPresetName
 } from '@teensyrom-nx/domain';
 
 /** Mock CRT storage for testing - stores nothing, returns null */
@@ -27,6 +31,24 @@ const mockCrtStorage: ICrtStorage = {
   clear: (): void => {
     // Mock implementation - intentionally does nothing for testing
   },
+  saveCustomPreset: function (name: string, settings: CrtSettings): void {
+    throw new Error('Function not implemented.');
+  },
+  updateCustomPreset: function (name: CustomPresetName, settings: CrtSettings): void {
+    throw new Error('Function not implemented.');
+  },
+  loadCustomPresets: function (): CustomCrtPreset[] {
+    throw new Error('Function not implemented.');
+  },
+  deleteCustomPreset: function (name: CustomPresetName): void {
+    throw new Error('Function not implemented.');
+  },
+  renameCustomPreset: function (oldName: CustomPresetName, newName: string): void {
+    throw new Error('Function not implemented.');
+  },
+  hasCustomPreset: function (name: CustomPresetName): boolean {
+    throw new Error('Function not implemented.');
+  }
 };
 
 describe('PlayerDeviceContainerComponent', () => {
@@ -34,6 +56,8 @@ describe('PlayerDeviceContainerComponent', () => {
   let fixture: ComponentFixture<PlayerDeviceContainerComponent>;
   let mockPlayerContext: IPlayerContext;
   let mockSettingsService: ISettingsService;
+  let phoneBreakpointSubject: BehaviorSubject<BreakpointState>;
+  let touchBreakpointSubject: BehaviorSubject<BreakpointState>;
 
   const createMockSettings = (enableVideo: boolean) => ({
     playerSettings: {
@@ -83,6 +107,17 @@ describe('PlayerDeviceContainerComponent', () => {
   });
 
   beforeEach(async () => {
+    // Create breakpoint mocks - default to desktop (not phone, not touch)
+    phoneBreakpointSubject = new BehaviorSubject<BreakpointState>({
+      matches: false,
+      breakpoints: { '(max-width: 639px)': false }
+    });
+
+    touchBreakpointSubject = new BehaviorSubject<BreakpointState>({
+      matches: false,
+      breakpoints: { '(hover: none)': false }
+    });
+
     // Create a mock settings service - default to enableVideo: false
     mockSettingsService = {
       getSettings: vi.fn().mockReturnValue(of(createMockSettings(false))),
@@ -122,6 +157,7 @@ describe('PlayerDeviceContainerComponent', () => {
       stopListeningToPopState: vi.fn(),
       updateCurrentFileFavoriteStatus: vi.fn(),
       getTimerState: vi.fn().mockReturnValue(signal(null).asReadonly()),
+      isSlowLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
 
       getPlayTimerConfig: function (deviceId: string): Signal<PlayTimerConfig | null> {
         throw new Error('Function not implemented.');
@@ -160,6 +196,16 @@ describe('PlayerDeviceContainerComponent', () => {
         { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
         { provide: STORAGE_SERVICE, useValue: mockStorageService },
         { provide: CRT_STORAGE, useValue: mockCrtStorage },
+        { provide: BreakpointObserver, useValue: {
+          observe: (query: string) => {
+            if (query === '(max-width: 639px)') {
+              return phoneBreakpointSubject.asObservable();
+            } else if (query === '(hover: none)') {
+              return touchBreakpointSubject.asObservable();
+            }
+            return of({ matches: false, breakpoints: {} });
+          }
+        } },
       ],
     }).compileComponents();
 
@@ -182,6 +228,11 @@ describe('PlayerDeviceContainerComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should have isPhone signal that returns false by default', () => {
+    expect(component['isPhone']).toBeDefined();
+    expect(component['isPhone']()).toBe(false);
   });
 
   /**
@@ -301,5 +352,69 @@ describe('PlayerDeviceContainerComponent', () => {
       expect(error).toBeNull();
     });
 
+  });
+
+  describe('Phone Breakpoint Detection', () => {
+    it('should return true when breakpoint matches phone size', () => {
+      phoneBreakpointSubject.next({
+        matches: true,
+        breakpoints: { '(max-width: 639px)': true }
+      });
+      fixture.detectChanges();
+      expect(component['isPhone']()).toBe(true);
+    });
+
+    it('should return false when breakpoint does not match', () => {
+      phoneBreakpointSubject.next({
+        matches: false,
+        breakpoints: { '(max-width: 639px)': false }
+      });
+      fixture.detectChanges();
+      expect(component['isPhone']()).toBe(false);
+    });
+  });
+
+  describe('Pane Indicators', () => {
+    it('should return empty array on desktop without video', () => {
+      expect(component['paneIndicators']()).toEqual([]);
+    });
+
+    it('should return image+video indicators on desktop with video', async () => {
+      await setEnableVideo(true);
+      const indicators = component['paneIndicators']();
+      expect(indicators).toEqual([
+        { label: 'Show image', index: 0 },
+        { label: 'Show video', index: 1 },
+      ]);
+    });
+
+    it('should return 3 panes on phone without video', () => {
+      phoneBreakpointSubject.next({
+        matches: true,
+        breakpoints: { '(max-width: 639px)': true }
+      });
+      fixture.detectChanges();
+      const indicators = component['paneIndicators']();
+      expect(indicators).toEqual([
+        { label: 'Show storage', index: 0 },
+        { label: 'Show image', index: 1 },
+        { label: 'Show description', index: 2 },
+      ]);
+    });
+
+    it('should return 4 panes on phone with video', async () => {
+      phoneBreakpointSubject.next({
+        matches: true,
+        breakpoints: { '(max-width: 639px)': true }
+      });
+      await setEnableVideo(true);
+      const indicators = component['paneIndicators']();
+      expect(indicators).toEqual([
+        { label: 'Show storage', index: 0 },
+        { label: 'Show image', index: 1 },
+        { label: 'Show description', index: 2 },
+        { label: 'Show video', index: 3 },
+      ]);
+    });
   });
 });

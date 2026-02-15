@@ -95,3 +95,9 @@ $bp-desktop: 1600px; // At and above: full desktop layout (≥ 1280px)
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+
+@mixin glassy-white-effect {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}

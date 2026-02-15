@@ -52,6 +52,7 @@
 
   @include styles.below-phone {
     min-height: auto; // Let content determine height on phone
+    min-width: 0; // Allow grid item to shrink below intrinsic content width
   }
 }
 

@@ -62,6 +62,8 @@ export class FileDescriptionComponent {
     const file = this.currentFile();
     return !!(
       file?.file.creator ||
+      file?.file.meta1 ||
+      file?.file.meta2 ||
       file?.file.releaseInfo ||
       file?.file.links?.length ||
       file?.file.tags?.length ||
@@ -75,6 +77,8 @@ export class FileDescriptionComponent {
     const file = this.currentFile();
     return !!(
       file?.file.title ||
+      file?.file.meta1 ||
+      file?.file.meta2 ||
       file?.file.description ||
       file?.file.links?.length ||
       file?.file.tags?.length ||

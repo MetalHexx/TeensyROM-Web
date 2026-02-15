@@ -216,7 +216,9 @@ describe('FileDescriptionComponent', () => {
       fixture.detectChanges();
 
       expect(component.meta1()).toBe('PRG');
-      const chips = fixture.debugElement.queryAll(By.css('mat-chip'));
+      const tagsSection = fixture.debugElement.query(By.css('.tags-section'));
+      expect(tagsSection).toBeTruthy();
+      const chips = tagsSection.queryAll(By.css('mat-chip'));
       expect(chips.length).toBe(1);
       expect(chips[0].nativeElement.textContent.trim()).toBe('PRG');
     });
@@ -257,7 +259,9 @@ describe('FileDescriptionComponent', () => {
       fixture.detectChanges();
 
       expect(component.meta2()).toBe('C64');
-      const chips = fixture.debugElement.queryAll(By.css('mat-chip'));
+      const tagsSection = fixture.debugElement.query(By.css('.tags-section'));
+      expect(tagsSection).toBeTruthy();
+      const chips = tagsSection.queryAll(By.css('mat-chip'));
       expect(chips.length).toBe(1);
       expect(chips[0].nativeElement.textContent.trim()).toBe('C64');
     });
@@ -297,13 +301,15 @@ describe('FileDescriptionComponent', () => {
       });
       fixture.detectChanges();
 
-      const chips = fixture.debugElement.queryAll(By.css('mat-chip'));
+      const tagsSection = fixture.debugElement.query(By.css('.tags-section'));
+      expect(tagsSection).toBeTruthy();
+      const chips = tagsSection.queryAll(By.css('mat-chip'));
       expect(chips.length).toBe(2);
       expect(chips[0].nativeElement.textContent.trim()).toBe('PRG');
       expect(chips[1].nativeElement.textContent.trim()).toBe('C64');
     });
 
-    it('should not display chip-set when meta1 and meta2 are empty', () => {
+    it('should not display tags section when meta1 and meta2 are empty and no tags exist', () => {
       currentFileSignal.set({
         deviceId: 1,
         storageType: StorageType.Sd,
@@ -338,8 +344,8 @@ describe('FileDescriptionComponent', () => {
       });
       fixture.detectChanges();
 
-      const chipSet = fixture.debugElement.query(By.css('mat-chip-set'));
-      expect(chipSet).toBeNull();
+      const tagsSection = fixture.debugElement.query(By.css('.tags-section'));
+      expect(tagsSection).toBeNull();
     });
   });
 

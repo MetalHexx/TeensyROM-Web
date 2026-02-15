@@ -1,0 +1,22 @@
+<lib-scaling-card [title]="displayTitle()">
+  @if (hasFile()) {
+    @if (creator()) {
+      <div class="description-layout">
+        <!-- Composer name only, no label -->
+        <div class="composer-section">
+          <p>{{ creator() }}</p>
+        </div>
+      </div>
+    } @else {
+      <div class="description-layout empty-state">
+        <mat-icon class="empty-icon">music_note</mat-icon>
+        <p class="empty-message">No metadata available</p>
+      </div>
+    }
+  } @else {
+    <div class="description-layout empty-state">
+      <mat-icon class="empty-icon">album</mat-icon>
+      <p class="empty-message">Launch a file to see details</p>
+    </div>
+  }
+</lib-scaling-card>
