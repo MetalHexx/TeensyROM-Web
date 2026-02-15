@@ -160,6 +160,14 @@
 
     <!-- Mobile Layout: Stacked vertical (≤640px) -->
     <div class="player-controls mobile-layout" data-testid="player-toolbar">
+      <div class="time-display-section">
+        <lib-file-time
+          [currentTime]="currentTime()"
+          [totalTime]="totalTime()"
+          [show]="showProgressBar()"
+        ></lib-file-time>
+      </div>
+
       <div class="playback-controls">
         <lib-icon-button
           icon="skip_previous"
@@ -214,17 +222,7 @@
         </lib-icon-button>
       </div>
 
-      <div class="time-display-section">
-        <lib-file-time
-          [currentTime]="currentTime()"
-          [totalTime]="totalTime()"
-          [show]="showProgressBar()"
-        ></lib-file-time>
-      </div>
-
-      <div class="file-info-section">
-        <lib-file-info [fileItem]="currentFile()?.file ?? null"></lib-file-info>
-      </div>
+      <div class="mobile-divider"></div>
 
       <div class="toolbar-actions-section">
         <lib-player-toolbar-actions [deviceId]="deviceId()"></lib-player-toolbar-actions>

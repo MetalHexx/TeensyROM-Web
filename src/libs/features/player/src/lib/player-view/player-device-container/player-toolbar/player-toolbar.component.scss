@@ -97,12 +97,29 @@ mat-card {
     display: flex;
   }
 
+  .time-display-section {
+    display: flex;
+    justify-content: center;
+
+    lib-file-time {
+      text-align: center;
+    }
+  }
+
   .playback-controls {
     justify-content: center;
   }
 
-  .time-display-section {
-    justify-content: center;
+  .mobile-divider {
+    width: 60%;
+    height: 1px;
+    margin: 2px auto;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgba(255, 255, 255, 0.12),
+      transparent
+    );
   }
 
   .file-info-section {
