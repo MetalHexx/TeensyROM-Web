@@ -130,9 +130,53 @@
 }
 
 // Hide video-capture component at phone size to conserve viewport space
-lib-video-capture {
+// Removed: video-capture is now swipeable at phone size
+
+.swipe-container {
+  display: contents; // At desktop, acts as if it doesn't exist in layout
+
   @include styles.below-phone {
-    display: none;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; // Firefox
+    &::-webkit-scrollbar {
+      display: none; // Chrome/Safari
+    }
+
+    > * {
+      scroll-snap-align: center;
+      flex: 0 0 100%;
+      min-width: 100%;
+    }
+  }
+}
+
+.swipe-indicators {
+  display: none; // Hidden by default (desktop)
+
+  &.phone-only {
+    @include styles.below-phone {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 0 0;
+    }
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+
+    &.active {
+      background: rgba(255, 255, 255, 0.8);
+      transform: scale(1.2);
+    }
   }
 }
 

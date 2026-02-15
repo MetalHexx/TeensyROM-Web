@@ -5,6 +5,12 @@
   min-width: 0;
   aspect-ratio: 4 / 3;
   flex: 0 1 520px;
+
+  @include styles.below-phone {
+    width: 100%;
+    aspect-ratio: 1 / 1; // Match file-image's square layout on phone
+    flex: 0 0 auto;
+  }
 }
 
 // Flip sizing axis when parent container is height-constrained:

@@ -1,4 +1,4 @@
-import { Component, input, computed, inject, effect, untracked } from '@angular/core';
+import { Component, input, computed, inject, effect, untracked, signal, viewChild, ElementRef, afterNextRender } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Device } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
@@ -28,6 +28,9 @@ import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 export class PlayerDeviceContainerComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
   private readonly settingsStore = inject(SettingsStore);
+
+  protected readonly activePane = signal(0);
+  protected readonly swipeContainer = viewChild<ElementRef<HTMLElement>>('swipeContainer');
 
   device = input<Device>();
 
@@ -59,6 +62,37 @@ export class PlayerDeviceContainerComponent {
           this.playerContext.initializePlayer(deviceId);
         });
       }
+    });
+
+    afterNextRender(() => {
+      this.setupSwipeTracking();
+    });
+  }
+
+  private setupSwipeTracking(): void {
+    const container = this.swipeContainer()?.nativeElement;
+    if (!container) return;
+
+    container.addEventListener(
+      'scroll',
+      () => {
+        const scrollLeft = container.scrollLeft;
+        const width = container.clientWidth;
+        const newPane = Math.round(scrollLeft / width);
+        if (this.activePane() !== newPane) {
+          this.activePane.set(newPane);
+        }
+      },
+      { passive: true }
+    );
+  }
+
+  scrollToPane(index: number): void {
+    const container = this.swipeContainer()?.nativeElement;
+    if (!container) return;
+    container.scrollTo({
+      left: index * container.clientWidth,
+      behavior: 'smooth',
     });
   }
 

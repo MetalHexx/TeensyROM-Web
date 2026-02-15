@@ -1,11 +1,19 @@
 @if (device()?.isEnabled) {
 <div class="device-container">
   <div class="device-header">
-    <lib-file-image [deviceId]="deviceId()" [currentFile]="currentFile()"></lib-file-image>
-    <lib-file-description [deviceId]="deviceId()"></lib-file-description>
+    <div class="swipe-container" #swipeContainer>
+      <lib-file-image [deviceId]="deviceId()" [currentFile]="currentFile()"></lib-file-image>
+      @if (enableVideo()) {
+        <lib-video-capture [deviceId]="deviceId()"></lib-video-capture>
+      }
+    </div>
     @if (enableVideo()) {
-      <lib-video-capture [deviceId]="deviceId()"></lib-video-capture>
+      <div class="swipe-indicators phone-only">
+        <span class="dot" role="button" tabindex="0" [attr.aria-label]="'Show image'" [class.active]="activePane() === 0" (click)="scrollToPane(0)" (keyup.enter)="scrollToPane(0)"></span>
+        <span class="dot" role="button" tabindex="0" [attr.aria-label]="'Show video'" [class.active]="activePane() === 1" (click)="scrollToPane(1)" (keyup.enter)="scrollToPane(1)"></span>
+      </div>
     }
+    <lib-file-description [deviceId]="deviceId()"></lib-file-description>
   </div>
   <!-- @if (isPlayerLoaded() && fileDescription()) {
     <div class="marquee-container">

@@ -6,10 +6,6 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-
-  @include breakpoints.below-phone {
-    display: none;
-  }
 }
 
 .device-logs-card {
