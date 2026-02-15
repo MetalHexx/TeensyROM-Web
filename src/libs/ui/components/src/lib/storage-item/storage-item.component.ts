@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { IconLabelComponent } from '../icon-label/icon-label.component';
 import { StyledIconColor } from '../styled-icon/styled-icon.component';
 
+const TAP_MOVEMENT_THRESHOLD_PX = 10;
+
 @Component({
   selector: 'lib-storage-item',
   imports: [CommonModule, IconLabelComponent],
@@ -28,11 +30,15 @@ export class StorageItemComponent {
   /** Whether the item is disabled */
   disabled = input<boolean>(false);
 
-  /** Emitted on double-click or Enter key press */
+  /** Emitted on double-click, single tap (touch), or Enter key press */
   activated = output<void>();
 
   /** Emitted on single click or Space key press */
   selectedChange = output<void>();
+
+  private suppressNextClick = false;
+  private touchStartX = 0;
+  private touchStartY = 0;
 
   @HostBinding('class.selected')
   get isSelected(): boolean {
@@ -71,6 +77,10 @@ export class StorageItemComponent {
 
   @HostListener('click')
   onClick(): void {
+    if (this.suppressNextClick) {
+      this.suppressNextClick = false;
+      return;
+    }
     if (!this.disabled()) {
       this.selectedChange.emit();
     }
@@ -79,6 +89,31 @@ export class StorageItemComponent {
   @HostListener('dblclick')
   onDoubleClick(): void {
     if (!this.disabled()) {
+      this.activated.emit();
+    }
+  }
+
+  @HostListener('touchstart', ['$event'])
+  onTouchStart(event: TouchEvent): void {
+    if (event.touches.length > 0) {
+      this.touchStartX = event.touches[0].clientX;
+      this.touchStartY = event.touches[0].clientY;
+    }
+  }
+
+  @HostListener('touchend', ['$event'])
+  onTouchEnd(event: TouchEvent): void {
+    if (this.disabled()) return;
+
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+
+    const moveX = Math.abs(touch.clientX - this.touchStartX);
+    const moveY = Math.abs(touch.clientY - this.touchStartY);
+
+    if (moveX < TAP_MOVEMENT_THRESHOLD_PX && moveY < TAP_MOVEMENT_THRESHOLD_PX) {
+      event.preventDefault();
+      this.suppressNextClick = true;
       this.activated.emit();
     }
   }
@@ -98,3 +133,4 @@ export class StorageItemComponent {
     }
   }
 }
+

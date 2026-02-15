@@ -311,6 +311,108 @@ describe('StorageItemComponent', () => {
       fixture.nativeElement.dispatchEvent(event);
       expect(emitted).toBe(false);
     });
+
+    it('should emit activated on single tap (small movement)', () => {
+      fixture.detectChanges();
+      let emitted = false;
+      component.activated.subscribe(() => {
+        emitted = true;
+      });
+
+      // Simulate touchstart at position (100, 100)
+      const touchStart = new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: [{ clientX: 100, clientY: 100 } as Touch],
+      });
+      fixture.nativeElement.dispatchEvent(touchStart);
+
+      // Simulate touchend at position (105, 105) - only 5px movement
+      const touchEnd = new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        changedTouches: [{ clientX: 105, clientY: 105 } as Touch],
+      });
+      fixture.nativeElement.dispatchEvent(touchEnd);
+
+      expect(emitted).toBe(true);
+    });
+
+    it('should not emit activated on swipe (large movement)', () => {
+      fixture.detectChanges();
+      let emitted = false;
+      component.activated.subscribe(() => {
+        emitted = true;
+      });
+
+      // Simulate touchstart at position (100, 100)
+      const touchStart = new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: [{ clientX: 100, clientY: 100 } as Touch],
+      });
+      fixture.nativeElement.dispatchEvent(touchStart);
+
+      // Simulate touchend at position (150, 100) - 50px movement (horizontal swipe)
+      const touchEnd = new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        changedTouches: [{ clientX: 150, clientY: 100 } as Touch],
+      });
+      fixture.nativeElement.dispatchEvent(touchEnd);
+
+      expect(emitted).toBe(false);
+    });
+
+    it('should not emit activated on tap when disabled', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      let emitted = false;
+      component.activated.subscribe(() => {
+        emitted = true;
+      });
+
+      const touchStart = new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: [{ clientX: 100, clientY: 100 } as Touch],
+      });
+      fixture.nativeElement.dispatchEvent(touchStart);
+
+      const touchEnd = new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        changedTouches: [{ clientX: 100, clientY: 100 } as Touch],
+      });
+      fixture.nativeElement.dispatchEvent(touchEnd);
+
+      expect(emitted).toBe(false);
+    });
+
+    it('should suppress click after tap to prevent duplicate selectedChange', () => {
+      fixture.detectChanges();
+      let selectedCount = 0;
+      component.selectedChange.subscribe(() => {
+        selectedCount++;
+      });
+
+      const touchStart = new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: [{ clientX: 100, clientY: 100 } as Touch],
+      });
+      fixture.nativeElement.dispatchEvent(touchStart);
+
+      const touchEnd = new TouchEvent('touchend', {
+        bubbles: true,
+        cancelable: true,
+        changedTouches: [{ clientX: 100, clientY: 100 } as Touch],
+      });
+      fixture.nativeElement.dispatchEvent(touchEnd);
+
+      fixture.nativeElement.click();
+      expect(selectedCount).toBe(0);
+    });
   });
 
   describe('Template Rendering', () => {
