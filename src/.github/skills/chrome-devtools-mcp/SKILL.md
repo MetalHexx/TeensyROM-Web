@@ -1,6 +1,6 @@
 ---
 name: chrome-devtools-mcp
-description: 'Visual UI verification workflow using Chrome DevTools MCP. Use when validating component rendering, CSS/styling changes, layout regressions, interactive UI behavior, screenshots, and post-change visual checks. Enforces user consent before DevTools usage, prefers subagent delegation for multi-step audits to save context, and includes wait/retry guidance for slow device reloads.'
+description: 'Visual UI verification workflow using Chrome DevTools MCP. Use when validating component rendering, CSS/styling changes, layout regressions, interactive UI behavior, screenshots, and post-change visual checks.  Use this skill when the user is having trouble with styling or UI work or is trying to change the visual appearance of the app.'
 ---
 
 # Chrome DevTools MCP Skill
@@ -37,10 +37,11 @@ Use this file as the deterministic source of truth for control discovery; avoid 
 Use this skill when the task includes any of the following:
 
 - Verify visual UI changes after implementation
+- Invesgate difficult styling/layout bugs with computed style inspection
+- Validate responsive behavior across breakpoints
 - Validate component styling, spacing, typography, or responsive behavior
 - Confirm interactive UI state changes (click, hover, form, dialogs)
 - Capture screenshots/snapshots for verification
-- Re-check device-driven views that may reload asynchronously
 
 ## Guardrails
 
@@ -61,13 +62,14 @@ If the user previously consented to DevTools MCP in this session, or explicitly 
 
 ### 2) Prefer Subagent for Context Efficiency
 
-Use `runSubagent` when visual validation is multi-step or broad scope, for example:
+Use `runSubagent` to make Chrome DevTools MCP tool calls when visual validation is multi-step or broad scope, for example:
 
 - Multiple pages/routes/components need verification
 - Baseline vs. after-change comparison across several states
 - Combined checks (snapshot, screenshot, console, network) in one run
+- Return results to calling agent for final reporting
 
-Keep work in the primary agent when only a single quick check is needed.
+Keep work in the primary agent when only a single quick check is needed and there is plenty of context window availability.
 
 ## Standard Execution Flow
 
@@ -85,8 +87,7 @@ Keep work in the primary agent when only a single quick check is needed.
 12. Report pass/fail with exact UI expectations checked.
 
 ## Device Reload Wait Strategy (Required)
-
-When validating views that reload devices or repopulate lists asynchronously:
+The when refreshing the browser or performing navigation, the application will re-discover devices which can take a few seconds.  To handle this:
 
 - Do not assert immediately after triggering reload
 - Wait a few seconds for reload to complete (typically 2-5s)
@@ -140,7 +141,6 @@ When finishing verification, include:
 
 - What changed was verified (component/style/state)
 - Which interactions were executed
-- Whether reload-wait logic was applied
 - Which computed-style findings explained the root cause (including cascade/inheritance source)
 - Result (`pass`/`fail`) and any remaining uncertainty
 
