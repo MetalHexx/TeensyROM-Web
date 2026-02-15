@@ -57,6 +57,8 @@ If user declines:
 - Continue with non-DevTools validation (code review, tests, lint, static checks)
 - Note what visual checks remain unverified
 
+If the user previously consented to DevTools MCP in this session, or explicitly prompted you to use it, you can skip asking for permission.
+
 ### 2) Prefer Subagent for Context Efficiency
 
 Use `runSubagent` when visual validation is multi-step or broad scope, for example:
