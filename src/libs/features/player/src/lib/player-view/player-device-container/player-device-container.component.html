@@ -48,9 +48,13 @@
   }
   @if (isPlayerLoaded()) {
   <div class="combined-toolbar">
-    <div class="player-toolbar-wrapper">
-      <lib-player-toolbar [deviceId]="deviceId()"></lib-player-toolbar>
-    </div>
+    @if (isPhone()) {
+      <lib-player-toolbar-mini [deviceId]="deviceId()"></lib-player-toolbar-mini>
+    } @else {
+      <div class="player-toolbar-wrapper">
+        <lib-player-toolbar [deviceId]="deviceId()"></lib-player-toolbar>
+      </div>
+    }
     <div class="filter-toolbar-wrapper">
       <lib-filter-toolbar [deviceId]="deviceId()"></lib-filter-toolbar>
     </div>

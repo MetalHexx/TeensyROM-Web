@@ -13,6 +13,7 @@ import { PlayerToolbarComponent } from './player-toolbar/player-toolbar.componen
 import { FilterToolbarComponent } from './storage-container/filter-toolbar/filter-toolbar.component';
 import { StorageContainerComponent } from './storage-container/storage-container.component';
 import { FileDescriptionMiniComponent } from './file-description-mini/file-description-mini.component';
+import { PlayerToolbarMiniComponent } from './player-toolbar-mini/player-toolbar-mini.component';
 import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 
 const PHONE_BREAKPOINT = '(max-width: 639px)';
@@ -31,6 +32,7 @@ const TOUCH_DEVICE_QUERY = '(hover: none)';
     FilterToolbarComponent,
     StorageContainerComponent,
     FileDescriptionMiniComponent,
+    PlayerToolbarMiniComponent,
   ],
   templateUrl: './player-device-container.component.html',
   styleUrl: './player-device-container.component.scss',

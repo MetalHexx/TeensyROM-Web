@@ -395,7 +395,7 @@ mat-card-title {
 }
 
 .compact-card {
-  padding: 16px;
+  padding: var(--compact-card-padding, 16px);
   margin: 0;
   overflow: hidden;
 

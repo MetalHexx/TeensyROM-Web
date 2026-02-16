@@ -1,3 +1,13 @@
 @if (show()) {
-<div class="file-time">{{ formattedTime() }}</div>
+  @switch (displayMode()) {
+    @case ('current') {
+      <div class="file-time">{{ formattedCurrentTime() }}</div>
+    }
+    @case ('total') {
+      <div class="file-time">{{ formattedTotalTime() }}</div>
+    }
+    @default {
+      <div class="file-time">{{ formattedTime() }}</div>
+    }
+  }
 }

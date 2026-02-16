@@ -1,0 +1,50 @@
+:host {
+  width: 100%;
+  display: block;
+  position: relative;
+  --compact-card-padding: 4px 8px 6px;
+}
+
+.mini-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 2px 0 4px;
+}
+
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 2px 0 0;
+  box-sizing: border-box;
+
+  lib-file-time {
+    font-size: 0.7rem;
+    line-height: 1;
+  }
+
+  lib-file-time:first-child {
+    text-align: left;
+  }
+
+  lib-file-time:last-child {
+    text-align: right;
+  }
+}
+
+.playback-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: -2px;
+}
+
+.actions-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: -4px;
+}
