@@ -30,31 +30,7 @@ import { TooltipDirective, TooltipConfig, TooltipPosition } from '../tooltip/too
     }
     <ng-content></ng-content>
   `,
-  styles: [
-    `
-      :host {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-
-      .actions-label {
-        color: var(--color-dimmed);
-        font-size: 0.875rem;
-        white-space: nowrap;
-      }
-
-      .storage-type-icon {
-        font-size: 1rem;
-        width: 1rem;
-        height: 1rem;
-        color: var(--color-dimmed);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-    `,
-  ],
+  styleUrl: './storage-item-actions.component.scss',
 })
 export class StorageItemActionsComponent {
   /** Optional text label to display before actions (e.g., file size, item count) */

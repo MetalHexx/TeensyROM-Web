@@ -1,0 +1,30 @@
+@use '../../../../styles/src/lib/theme/mixins' as breakpoints;
+
+:host {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.actions-label {
+  color: var(--color-dimmed);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.storage-type-icon {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-dimmed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@include breakpoints.below-phone {
+  .actions-label,
+  .storage-type-icon {
+    display: none;
+  }
+}
