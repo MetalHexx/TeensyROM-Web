@@ -46,6 +46,14 @@
 }
 
 @media (max-width: 600px) {
+  :host {
+    height: auto;
+  }
+
+  .device-wrapper {
+    height: auto;
+  }
+
   .device-list {
     flex-direction: column;
     align-items: flex-start;
