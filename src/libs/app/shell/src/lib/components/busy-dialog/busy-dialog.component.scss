@@ -1,31 +1,35 @@
-.mat-mdc-dialog-surface {
-  padding: 0;
-  background-color: red !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+@use '../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: block;
+  overflow: hidden;
 }
 
-.busy-progress-bar {
-  position: absolute;
-  bottom: 0rem;
-  width: 100%;
+.mat-mdc-dialog-surface {
+  padding: 0;
+}
+
+h2[mat-dialog-title] {
+  text-align: center;
 }
 
 .busy-dialog-content {
-  padding: 1rem 3rem 3rem 3rem;
+  padding: 0 2rem 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  width: 400px;
+  text-align: center;
+
+  @include styles.below-phone {
+    padding: 0 1.5rem 1.5rem;
+  }
 }
 
 .busy-dialog-message {
   font-size: 1.2rem;
 }
 
-.busy-dialog-panel .mat-dialog-container {
-  min-width: 400px;
-  max-width: 600px;
+.busy-progress-bar {
+  display: block;
   width: 100%;
 }
