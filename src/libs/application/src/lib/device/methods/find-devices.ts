@@ -26,7 +26,7 @@ export function findDevices(
         });
       } catch (error) {
         patchState(store, {
-          devices: [], // Clear devices on error (e.g., when API returns 404)
+          devices: [],
           error: String(error),
           isLoading: false,
           hasInitialised: true,
