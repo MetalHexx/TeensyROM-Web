@@ -44,6 +44,12 @@ describe('TooltipDirective', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
 
+    // Ensure touch device detection is false by explicitly removing ontouchstart
+    if ('ontouchstart' in window) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).ontouchstart;
+    }
+
     // Create mock tooltip element
     mockTooltipElement = document.createElement('div');
     mockTooltipElement.textContent = 'Mock tooltip';
@@ -431,5 +437,132 @@ describe('TooltipDirective', () => {
       // Should not create tooltip
       expect(mockTooltipService.createTooltip).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('TooltipDirective - Touch Device Behavior', () => {
+  let fixture: ComponentFixture<TestHostComponent>;
+  let hostElement: DebugElement;
+  let mockTooltipService: {
+    createTooltip: ReturnType<typeof vi.fn>;
+    destroyTooltip: ReturnType<typeof vi.fn>;
+  };
+  let mockTooltipElement: HTMLElement;
+  let mockPreferencesService: {
+    tooltipsEnabled: ReturnType<typeof vi.fn>;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let originalOntouchstart: any;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+
+    // Mock touch device detection BEFORE creating component
+    originalOntouchstart = window.ontouchstart;
+    Object.defineProperty(window, 'ontouchstart', {
+      configurable: true,
+      value: true,
+    });
+
+    // Create mock tooltip element
+    mockTooltipElement = document.createElement('div');
+    mockTooltipElement.textContent = 'Mock tooltip';
+
+    // Create mock service
+    mockTooltipService = {
+      createTooltip: vi.fn().mockReturnValue(mockTooltipElement),
+      destroyTooltip: vi.fn(),
+    };
+
+    // Create mock preferences service
+    mockPreferencesService = {
+      tooltipsEnabled: vi.fn().mockReturnValue(true),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [TestHostComponent],
+      providers: [
+        { provide: TooltipRendererService, useValue: mockTooltipService },
+        { provide: PreferencesService, useValue: mockPreferencesService },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(TestHostComponent);
+    hostElement = fixture.debugElement.query(By.css('[data-testid="tooltip-host"]'));
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+
+    // Restore original ontouchstart property
+    if (originalOntouchstart === undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).ontouchstart;
+    } else {
+      Object.defineProperty(window, 'ontouchstart', {
+        configurable: true,
+        value: originalOntouchstart,
+      });
+    }
+  });
+
+  it('should show tooltip after long-press (700ms) on touch devices', () => {
+    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
+    vi.advanceTimersByTime(700); // Long-press threshold
+
+    expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
+  });
+
+  it('should NOT show tooltip if touch ends before long-press threshold', () => {
+    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
+    vi.advanceTimersByTime(500); // Less than 700ms threshold
+    hostElement.nativeElement.dispatchEvent(new Event('touchend'));
+    vi.advanceTimersByTime(200); // Complete the 700ms
+
+    expect(mockTooltipService.createTooltip).not.toHaveBeenCalled();
+  });
+
+  it('should ignore mouseenter on touch devices', () => {
+    hostElement.nativeElement.dispatchEvent(new Event('mouseenter'));
+    vi.advanceTimersByTime(500);
+
+    expect(mockTooltipService.createTooltip).not.toHaveBeenCalled();
+  });
+
+  it('should ignore mouseleave on touch devices', () => {
+    // Show tooltip via long-press
+    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
+    vi.advanceTimersByTime(700);
+    expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
+
+    mockTooltipService.destroyTooltip.mockClear();
+
+    // Mouseleave should be ignored (tooltip stays visible)
+    hostElement.nativeElement.dispatchEvent(new Event('mouseleave'));
+    expect(mockTooltipService.destroyTooltip).not.toHaveBeenCalled();
+  });
+
+  it('should cancel long-press on touchcancel event', () => {
+    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
+    vi.advanceTimersByTime(500);
+    hostElement.nativeElement.dispatchEvent(new Event('touchcancel'));
+    vi.advanceTimersByTime(200); // Complete the 700ms
+
+    expect(mockTooltipService.createTooltip).not.toHaveBeenCalled();
+  });
+
+  it('should dismiss and recreate tooltip on subsequent long-press', () => {
+    // Show tooltip first
+    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
+    vi.advanceTimersByTime(700);
+    expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
+
+    // Second long-press dismisses current tooltip via document listener capture phase
+    // then creates new tooltip (expected UX - user gets fresh tooltip)
+    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
+    vi.advanceTimersByTime(700);
+    expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(2);
+    expect(mockTooltipService.destroyTooltip).toHaveBeenCalledTimes(1);
   });
 });

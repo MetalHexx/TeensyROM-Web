@@ -1,4 +1,13 @@
-import { Directive, ElementRef, HostListener, OnDestroy, inject, input } from '@angular/core';
+import {
+  Directive,
+  ElementRef,
+  HostListener,
+  OnDestroy,
+  inject,
+  input,
+  PLATFORM_ID,
+} from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { TooltipRendererService } from './tooltip-renderer.service';
 import { PreferencesService } from '@teensyrom-nx/ui/styles';
 
@@ -65,8 +74,12 @@ export interface TooltipConfig {
 /**
  * Tooltip Directive
  *
- * Provides tooltip functionality via attribute directive. Displays tooltip on mouse hover
- * and delegates rendering to TooltipRendererService.
+ * Provides tooltip functionality via attribute directive with intelligent device detection:
+ * - **Desktop**: Displays tooltip on mouse hover (500ms delay)
+ * - **Touch/Mobile**: Displays tooltip on long-press (700ms), dismisses on tap outside
+ *
+ * Touch behavior prevents "stuck" tooltips by requiring intentional long-press activation
+ * and providing clear dismissal via tap-outside, solving common mobile UX issues.
  *
  * @example
  * <button [libTooltip]="{ body: 'Click to save', position: TooltipPosition.Bottom }">Save</button>
@@ -82,19 +95,39 @@ export class TooltipDirective implements OnDestroy {
   private tooltipRendererService = inject(TooltipRendererService);
   private elementRef = inject(ElementRef);
   private preferencesService = inject(PreferencesService);
+  private platformId = inject(PLATFORM_ID);
   private currentTooltip: HTMLElement | null = null;
   private showTimeout: ReturnType<typeof setTimeout> | null = null;
+  private longPressTimeout: ReturnType<typeof setTimeout> | null = null;
+  private isTouchDevice = false;
+  private documentClickListener: (() => void) | null = null;
 
   /**
    * Tooltip configuration (optional - no tooltip shown if undefined)
    */
   libTooltip = input<TooltipConfig | undefined>();
 
+  constructor() {
+    // Detect touch capability (browser only)
+    if (isPlatformBrowser(this.platformId)) {
+      this.isTouchDevice =
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0 ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (navigator as any).msMaxTouchPoints > 0;
+    }
+  }
+
   /**
-   * Shows tooltip on mouse enter (with delay)
+   * Shows tooltip on mouse enter (with delay) - desktop only
    */
   @HostListener('mouseenter')
   showTooltip(): void {
+    // Skip mouse events on touch devices (they fire after touch events and cause conflicts)
+    if (this.isTouchDevice) {
+      return;
+    }
+
     const config = this.libTooltip();
 
     // Don't show if tooltips are globally disabled (unless alwaysShow is true)
@@ -131,14 +164,119 @@ export class TooltipDirective implements OnDestroy {
   }
 
   /**
-   * Hides tooltip on mouse leave and cancels pending display
+   * Hides tooltip on mouse leave and cancels pending display - desktop only
    */
   @HostListener('mouseleave')
   hideTooltip(): void {
-    // Cancel pending tooltip display
+    // Skip mouse events on touch devices
+    if (this.isTouchDevice) {
+      return;
+    }
+
+    this.cancelAndHide();
+  }
+
+  /**
+   * Touch handlers for mobile/touch devices
+   * Long-press (700ms) shows tooltip, tap anywhere dismisses it
+   */
+  @HostListener('touchstart')
+  onTouchStart(): void {
+    if (!this.isTouchDevice) {
+      return;
+    }
+
+    const config = this.libTooltip();
+
+    // Don't show if tooltips are globally disabled (unless alwaysShow is true)
+    if (!config?.alwaysShow && !this.preferencesService.tooltipsEnabled()) {
+      return;
+    }
+
+    // Don't show if no title and no body
+    if (!config?.title && !config?.body) {
+      return;
+    }
+
+    // Don't start new long-press if tooltip already showing
+    if (this.currentTooltip) {
+      return;
+    }
+
+    // Start long-press timer (700ms - native mobile standard)
+    this.longPressTimeout = setTimeout(() => {
+      this.currentTooltip = this.tooltipRendererService.createTooltip(
+        config,
+        this.elementRef.nativeElement,
+        config.position ?? TooltipPosition.Top
+      );
+      this.longPressTimeout = null;
+
+      // Add document listener to dismiss on tap outside
+      this.addDocumentClickListener();
+    }, 700);
+  }
+
+  /**
+   * Cancel long-press if finger lifted before threshold
+   */
+  @HostListener('touchend')
+  @HostListener('touchcancel')
+  onTouchEnd(): void {
+    if (!this.isTouchDevice) {
+      return;
+    }
+
+    // Cancel pending long-press
+    if (this.longPressTimeout) {
+      clearTimeout(this.longPressTimeout);
+      this.longPressTimeout = null;
+    }
+    // Note: Don't hide tooltip here - let document click handler manage dismissal
+  }
+
+  /**
+   * Adds document-level click listener to dismiss tooltip on tap outside
+   */
+  private addDocumentClickListener(): void {
+    if (this.documentClickListener || !isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
+    this.documentClickListener = () => {
+      this.cancelAndHide();
+    };
+
+    // Use capture phase to catch clicks before they bubble
+    document.addEventListener('touchstart', this.documentClickListener, { capture: true });
+  }
+
+  /**
+   * Removes document-level click listener
+   */
+  private removeDocumentClickListener(): void {
+    if (!this.documentClickListener || !isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
+    document.removeEventListener('touchstart', this.documentClickListener, { capture: true });
+    this.documentClickListener = null;
+  }
+
+  /**
+   * Cancels pending tooltip display and hides current tooltip
+   */
+  private cancelAndHide(): void {
+    // Cancel pending tooltip display (hover)
     if (this.showTimeout) {
       clearTimeout(this.showTimeout);
       this.showTimeout = null;
+    }
+
+    // Cancel pending long-press (touch)
+    if (this.longPressTimeout) {
+      clearTimeout(this.longPressTimeout);
+      this.longPressTimeout = null;
     }
 
     // Hide current tooltip if visible
@@ -151,17 +289,16 @@ export class TooltipDirective implements OnDestroy {
       this.elementRef.nativeElement
     );
     this.currentTooltip = null;
+
+    // Remove document listener
+    this.removeDocumentClickListener();
   }
 
   /**
-   * Cleanup: Ensures tooltip is destroyed and timeouts cleared
+   * Cleanup: Ensures tooltip is destroyed, timeouts cleared, and listeners removed
    */
   ngOnDestroy(): void {
-    if (this.showTimeout) {
-      clearTimeout(this.showTimeout);
-    }
-    if (this.currentTooltip) {
-      this.hideTooltip();
-    }
+    this.cancelAndHide();
+    this.removeDocumentClickListener();
   }
 }
