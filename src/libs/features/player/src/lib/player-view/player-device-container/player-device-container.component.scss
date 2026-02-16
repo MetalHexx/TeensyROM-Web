@@ -144,9 +144,10 @@
     scrollbar-width: none; // Firefox
     width: 100%; // Definite width so children's flex: 0 0 100% resolves correctly
     min-width: 0; // Prevent flex item from expanding to intrinsic content width
-    // Fixed height = viewport width to match the 1:1 file-image aspect ratio
-    height: 100vw;
-    max-height: 70vh;
+    // Perfect square: height matches actual width
+    aspect-ratio: 1;
+    max-height: 70vh; // Fallback
+    max-height: 70dvh; // Dynamic viewport height — accurate on mobile
     min-height: 250px;
     flex-shrink: 0;
     &::-webkit-scrollbar {
@@ -250,7 +251,8 @@ lib-file-description {
   top: 120px; // Below app header and some spacing
   left: 1rem;
   z-index: 9999;
-  max-height: calc(100vh - 140px);
+  max-height: calc(100vh - 140px); // Fallback
+  max-height: calc(100dvh - 140px); // Dynamic viewport height — accurate on mobile
   overflow-y: auto;
   
   // Remove any container constraints

@@ -38,6 +38,9 @@
       <lib-file-description [deviceId]="deviceId()"></lib-file-description>
     }
   </div>
+  @if (isPhone()) {
+    <lib-file-description-mini [deviceId]="deviceId()"></lib-file-description-mini>
+  }
   @if (isPlayerLoaded()) {
   <div class="combined-toolbar">
     <div class="player-toolbar-wrapper">
