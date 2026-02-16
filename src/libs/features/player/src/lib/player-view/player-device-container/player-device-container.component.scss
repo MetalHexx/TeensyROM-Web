@@ -289,12 +289,7 @@
 
 
 
-// file-description remains visible at phone size, shown under file-image
-lib-file-description {
-  @include styles.below-phone {
-    order: 1;
-  }
-}
+
 
 .crt-settings-overlay-fixed {
   position: fixed;

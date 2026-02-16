@@ -84,6 +84,16 @@ lib-card-layout .metadata-source {
   text-align: right;
 }
 
+// Flush bottom - removes bottom padding from card and card-content
+// Use via [cardClass]="'flush-bottom'" on lib-card-layout or lib-scaling-card
+lib-card-layout mat-card.flush-bottom {
+  padding-bottom: 0 !important;
+
+  mat-card-content {
+    padding-bottom: 0 !important;
+  }
+}
+
 // Rounded corners for glassy cards (when not using .glassy-card which includes this)
 // Note: ViewEncapsulation.None allows this without ::ng-deep
 lib-card-layout .rounded-card {

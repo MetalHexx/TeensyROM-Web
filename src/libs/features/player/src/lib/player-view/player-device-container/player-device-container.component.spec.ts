@@ -379,12 +379,13 @@ describe('PlayerDeviceContainerComponent', () => {
       expect(component['paneIndicators']()).toEqual([]);
     });
 
-    it('should return image+video indicators on desktop with video', async () => {
+    it('should return image+description+video indicators on desktop with video', async () => {
       await setEnableVideo(true);
       const indicators = component['paneIndicators']();
       expect(indicators).toEqual([
         { label: 'Show image', index: 0 },
-        { label: 'Show video', index: 1 },
+        { label: 'Show description', index: 1 },
+        { label: 'Show video', index: 2 },
       ]);
     });
 

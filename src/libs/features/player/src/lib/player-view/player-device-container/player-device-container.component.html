@@ -24,9 +24,7 @@
         </div>
       }
       <lib-file-image [deviceId]="deviceId()" [currentFile]="currentFile()"></lib-file-image>
-      @if (isPhone()) {
-        <lib-file-description [deviceId]="deviceId()"></lib-file-description>
-      }
+      <lib-file-description [deviceId]="deviceId()"></lib-file-description>
       @if (enableVideo()) {
         <lib-video-capture [deviceId]="deviceId()"></lib-video-capture>
       }
@@ -38,9 +36,6 @@
           <span class="dot" role="button" tabindex="0" [attr.aria-label]="pane.label" [class.active]="activePane() === pane.index" (click)="scrollToPane(pane.index)" (keyup.enter)="scrollToPane(pane.index)"></span>
         }
       </div>
-    }
-    @if (!isPhone()) {
-      <lib-file-description [deviceId]="deviceId()"></lib-file-description>
     }
   </div>
   @if (isPhone()) {

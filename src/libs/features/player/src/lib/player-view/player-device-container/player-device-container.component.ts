@@ -74,11 +74,12 @@ export class PlayerDeviceContainerComponent {
       }
       return panes;
     }
-    // Desktop: only show indicators when video is enabled (image + video)
+    // Desktop: only show indicators when video is enabled (image + description + video)
     if (this.enableVideo()) {
       return [
         { label: 'Show image', index: 0 },
-        { label: 'Show video', index: 1 },
+        { label: 'Show description', index: 1 },
+        { label: 'Show video', index: 2 },
       ];
     }
     return [];
