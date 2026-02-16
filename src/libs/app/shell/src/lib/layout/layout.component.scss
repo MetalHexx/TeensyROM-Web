@@ -92,6 +92,12 @@ lib-header {
   top: 0;
   z-index: 1000;
   flex-shrink: 0;
+
+  &.desktop-header {
+    @include styles.below-phone {
+      display: none;
+    }
+  }
 }
 
 .layout-container {
