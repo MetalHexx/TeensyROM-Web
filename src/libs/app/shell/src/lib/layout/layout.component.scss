@@ -4,7 +4,8 @@
 :host {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100vh; // Fallback for browsers without dvh support
+  height: 100dvh; // Dynamic viewport height — matches visible viewport on mobile
   overflow: hidden;
   position: relative;
 
@@ -108,7 +109,7 @@ lib-header {
   // against the viewport edge. Content padding is handled by .router-content.
   @include styles.below-phone {
     padding-right: 0;
-    padding-bottom: 72px; // Account for bottom bar height (64px) + spacing
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); // Bottom bar (64px) + spacing + safe area
   }
 }
 
