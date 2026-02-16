@@ -1,26 +1,23 @@
 @if (device()?.isEnabled) {
 <div class="device-container">
   <div class="device-header">
-    @if (enableVideo() || isPhone()) {
+    @if ((enableVideo() || isPhone()) && !isTouchDevice()) {
       <div class="swipe-nav phone-only">
-        @if (!isTouchDevice()) {
-          <button class="swipe-nav-btn glassy-white" (click)="scrollToPreviousPane()" [disabled]="activePane() === 0" aria-label="Previous pane">
-            <mat-icon>chevron_left</mat-icon>
-          </button>
-        }
+        <button class="swipe-nav-btn glassy-white" (click)="scrollToPreviousPane()" [disabled]="activePane() === 0" aria-label="Previous pane">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
         <div class="swipe-indicators">
           @for (pane of paneIndicators(); track pane.index) {
             <span class="dot" role="button" tabindex="0" [attr.aria-label]="pane.label" [class.active]="activePane() === pane.index" (click)="scrollToPane(pane.index)" (keyup.enter)="scrollToPane(pane.index)"></span>
           }
         </div>
-        @if (!isTouchDevice()) {
-          <button class="swipe-nav-btn glassy-white" (click)="scrollToNextPane()" [disabled]="activePane() === paneIndicators().length - 1" aria-label="Next pane">
-            <mat-icon>chevron_right</mat-icon>
-          </button>
-        }
+        <button class="swipe-nav-btn glassy-white" (click)="scrollToNextPane()" [disabled]="activePane() === paneIndicators().length - 1" aria-label="Next pane">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
       </div>
     }
-    <div class="swipe-container" #swipeContainer [style.visibility]="swipeReady() ? 'visible' : 'hidden'">
+    <div class="swipe-wrapper">
+      <div class="swipe-container" #swipeContainer [style.visibility]="swipeReady() ? 'visible' : 'hidden'">
       @if (isPhone()) {
         <div class="storage-pane">
           <lib-storage-container [deviceId]="deviceId()"></lib-storage-container>
@@ -33,7 +30,15 @@
       @if (enableVideo()) {
         <lib-video-capture [deviceId]="deviceId()"></lib-video-capture>
       }
+      </div>
     </div>
+    @if ((enableVideo() || isPhone()) && isTouchDevice()) {
+      <div class="swipe-indicators-overlay" [class.visible]="isSwiping()">
+        @for (pane of paneIndicators(); track pane.index) {
+          <span class="dot" role="button" tabindex="0" [attr.aria-label]="pane.label" [class.active]="activePane() === pane.index" (click)="scrollToPane(pane.index)" (keyup.enter)="scrollToPane(pane.index)"></span>
+        }
+      </div>
+    }
     @if (!isPhone()) {
       <lib-file-description [deviceId]="deviceId()"></lib-file-description>
     }

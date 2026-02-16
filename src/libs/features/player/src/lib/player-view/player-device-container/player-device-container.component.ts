@@ -57,6 +57,8 @@ export class PlayerDeviceContainerComponent {
   protected readonly activePane = signal(1);
   protected readonly swipeContainer = viewChild<ElementRef<HTMLElement>>('swipeContainer');
   protected readonly swipeReady = signal(false);
+  protected readonly isSwiping = signal(false);
+  private swipeTimeout: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly paneIndicators = computed(() => {
     if (this.isPhone()) {
@@ -145,6 +147,10 @@ export class PlayerDeviceContainerComponent {
         if (this.activePane() !== newPane) {
           this.activePane.set(newPane);
         }
+
+        this.isSwiping.set(true);
+        if (this.swipeTimeout) clearTimeout(this.swipeTimeout);
+        this.swipeTimeout = setTimeout(() => this.isSwiping.set(false), 1200);
       },
       { passive: true }
     );
