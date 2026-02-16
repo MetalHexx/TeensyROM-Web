@@ -141,6 +141,8 @@
   @include styles.below-phone {
     display: block;
     min-width: 0;
+    position: relative;
+    overflow: visible;
   }
 }
 
@@ -153,12 +155,86 @@
     align-items: center;
     gap: 8px;
     position: absolute;
-    top: 8px;
+    top: 20px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1001;
     pointer-events: none;
     opacity: 0;
+    transition: opacity 0.3s ease;
+
+    &.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+
+      &.active {
+        background: rgba(255, 255, 255, 0.9);
+        transform: scale(1.3);
+      }
+    }
+  }
+}
+
+// Desktop overlay nav: buttons that appear on hover in the upper corners
+.swipe-nav-btn.swipe-nav-prev,
+.swipe-nav-btn.swipe-nav-next {
+  display: none;
+
+  @include styles.below-phone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 8px;
+    z-index: 1002;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+
+    &.visible:not(:disabled) {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+}
+
+.swipe-nav-btn.swipe-nav-prev {
+  @include styles.below-phone {
+    left: 8px;
+  }
+}
+
+.swipe-nav-btn.swipe-nav-next {
+  @include styles.below-phone {
+    right: 8px;
+  }
+}
+
+.swipe-indicators-desktop {
+  display: none;
+
+  @include styles.below-phone {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1002;
+    opacity: 0;
+    pointer-events: none;
     transition: opacity 0.3s ease;
 
     &.visible {
@@ -218,20 +294,6 @@
   }
 }
 
-.swipe-nav {
-  display: none;
-
-  &.phone-only {
-    @include styles.below-phone {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 4px 0;
-    }
-  }
-}
-
 .swipe-nav-btn {
   display: flex;
   align-items: center;
@@ -250,32 +312,6 @@
     width: 20px;
     height: 20px;
     line-height: 20px;
-  }
-
-  &:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-}
-
-.swipe-indicators {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.2s ease;
-
-    &.active {
-      background: rgba(255, 255, 255, 0.8);
-      transform: scale(1.2);
-    }
   }
 }
 

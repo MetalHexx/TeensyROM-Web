@@ -118,7 +118,11 @@ lib-header {
 
   // At phone breakpoint: also remove right padding and add safe-area
   // bottom padding for the bottom navigation bar.
+  // Left padding also moved to .router-content so the overflow clip
+  // boundary sits at x=0, allowing overlay controls to bleed outside
+  // the content area without being clipped.
   @include styles.below-phone {
+    padding-left: 0;
     padding-right: 0;
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); // Bottom bar (64px) + spacing + safe area
   }
@@ -128,6 +132,11 @@ lib-header {
 .desktop-nav {
   flex-shrink: 0;
   z-index: 100;
+  box-sizing: border-box;
+
+  // Vertical padding matches .router-content so the nav-rail card
+  // aligns flush with the content area's top and bottom edges.
+  padding: 1.25rem 0;
 
   @include styles.below-phone {
     display: none;
@@ -163,12 +172,11 @@ lib-header {
       overflow-y: auto;
     }
 
-    // At phone breakpoint: reset padding — layout-container already provides
-    // left padding, and only right padding is needed so content has equal
-    // spacing while the scrollbar remains flush against the viewport edge.
+    // At phone breakpoint: layout-container padding is removed so that
+    // overflow clip boundaries sit at the viewport edge.  Horizontal
+    // padding is applied here instead for equal content spacing.
     @include styles.below-phone {
-      padding: 0;
-      padding-right: 1rem;
+      padding: 0 1rem;
     }
 
     .view-title {

@@ -60,7 +60,10 @@ export class PlayerDeviceContainerComponent {
   protected readonly swipeContainer = viewChild<ElementRef<HTMLElement>>('swipeContainer');
   protected readonly swipeReady = signal(false);
   protected readonly isSwiping = signal(false);
+  protected readonly showPaneNav = signal(false);
   private swipeTimeout: ReturnType<typeof setTimeout> | null = null;
+  private paneNavShowTimeout: ReturnType<typeof setTimeout> | null = null;
+  private paneNavHideTimeout: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly paneIndicators = computed(() => {
     if (this.isPhone()) {
@@ -179,6 +182,26 @@ export class PlayerDeviceContainerComponent {
     if (this.activePane() > 0) {
       this.scrollToPane(this.activePane() - 1);
     }
+  }
+
+  onSwipeAreaMouseEnter(): void {
+    if (this.paneNavHideTimeout) {
+      clearTimeout(this.paneNavHideTimeout);
+      this.paneNavHideTimeout = null;
+    }
+    this.paneNavShowTimeout = setTimeout(() => {
+      this.showPaneNav.set(true);
+    }, 400);
+  }
+
+  onSwipeAreaMouseLeave(): void {
+    if (this.paneNavShowTimeout) {
+      clearTimeout(this.paneNavShowTimeout);
+      this.paneNavShowTimeout = null;
+    }
+    this.paneNavHideTimeout = setTimeout(() => {
+      this.showPaneNav.set(false);
+    }, 300);
   }
 
   readonly currentFile = computed(() => {
