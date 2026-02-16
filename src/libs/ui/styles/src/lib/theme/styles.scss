@@ -346,6 +346,14 @@ body {
   transform: translateZ(0);
 }
 
+// Elevation utility class - provides Material Design elevation (box-shadow) and rounded corners
+// without glassmorphism effect. Use for cards that need elevation but have custom backgrounds.
+// Similar to .glassy-card but without backdrop blur and dark overlay.
+.elevated-card {
+  border-radius: var(--mat-sys-corner-large) !important;
+  box-shadow: var(--mat-sys-level4) !important;
+}
+
 // ─────────────────────────────────────────────
 //  MATERIAL COMPONENT SPECIFIC STYLES
 // ─────────────────────────────────────────────

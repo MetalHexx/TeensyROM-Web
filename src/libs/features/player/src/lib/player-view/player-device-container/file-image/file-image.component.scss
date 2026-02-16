@@ -5,8 +5,6 @@
   min-width: 0;
   flex: 0 1 390px;
   aspect-ratio: 1 / 1;
-  border-radius: var(--mat-sys-corner-medium, 12px);
-  overflow: hidden;
 
   // Ensure nested cycle-image stretches to fill the square
   --carousel-image-fit: fill;
@@ -37,6 +35,12 @@ lib-scaling-container {
   width: 100%;
   min-width: 0;
   height: 100%;
+  // Elevation lives here so it scales with the entrance animation.
+  // The element's own overflow:hidden clips children (image content)
+  // but does NOT clip its own box-shadow.
+  border-radius: var(--mat-sys-corner-large);
+  overflow: hidden;
+  box-shadow: var(--mat-sys-level4);
 }
 
 .image-wrapper {

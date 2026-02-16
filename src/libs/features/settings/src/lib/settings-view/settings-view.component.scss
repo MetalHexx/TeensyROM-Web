@@ -4,7 +4,6 @@
   display: block;
   height: 100%;
   width: 100%;
-  overflow: hidden;
 }
 
 .settings-wrapper {
@@ -12,7 +11,6 @@
   justify-content: flex-start;
   height: 100%;
   width: 100%;
-  overflow: hidden;
 }
 
 .settings-container {
@@ -21,7 +19,6 @@
   height: 100%;
   width: 100%;
   max-width: 1200px;
-  overflow: hidden;
 }
 
 .settings-toolbar {
@@ -68,7 +65,6 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   order: 2;
   min-height: 0;
 }
@@ -96,18 +92,17 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  padding: 0;
-  width: 100%;
   min-height: 0;
 }
 
-// Absolutely position all sections to prevent stacking during animations
+// Absolutely position all sections to prevent stacking during animations.
+// Inset by 0.5rem so card box-shadow has room to render before the
+// parent's overflow:hidden clip boundary.
 .section-content > * {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
   padding: 0;
-  overflow: hidden;
 }

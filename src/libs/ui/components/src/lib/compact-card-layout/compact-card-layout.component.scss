@@ -9,9 +9,3 @@
     }
   }
 }
-
-// Rounded corners for glassy cards (when not using .glassy-card which includes this)
-::ng-deep .rounded-card {
-  border-radius: var(--mat-sys-corner-large) !important;
-  box-shadow: var(--mat-sys-level4) !important;
-}

@@ -660,6 +660,41 @@ const phoneBreakpoint = getComputedStyle(document.documentElement)
 
 **Best Practice**: Use for cards that need a prominent glassmorphism effect, such as modal dialog content, overlay cards, or featured content cards. The dark semi-transparent effect provides a polished, modern appearance with proper Material Design integration while allowing the synthwave background to shine through. Apply via the `cardClass` input on card components to avoid wrapper elements.
 
+#### `.elevated-card`
+
+**Purpose**: Provides Material Design elevation (box-shadow) and rounded corners without glassmorphism effect. Use for cards that need elevation but have custom backgrounds.
+
+**Usage Example:**
+
+```html
+<mat-card class="elevated-card">Card with elevation</mat-card>
+
+<!-- Or via cardClass input on card components -->
+<lib-scaling-card cardClass="elevated-card" title="Elevated Card">
+  Content
+</lib-scaling-card>
+```
+
+**Visual Effects:**
+
+- Large rounded corners (`var(--mat-sys-corner-large)`)
+- Material elevation shadow (`var(--mat-sys-level4)`)
+- No backdrop blur or background overlay
+
+**When to Use:**
+
+- Cards with custom backgrounds (images, gradients, patterns)
+- Cards that need elevation but not glassmorphism
+- Any card that requires rounded corners and shadow without the frosted glass effect
+
+**Relationship to `.glassy-card`:**
+
+- `.glassy-card` = `.elevated-card` + glassmorphism (backdrop blur + dark overlay)
+- `.elevated-card` = elevation only (shadow + rounded corners)
+- Both use the same Material Design elevation level (`--mat-sys-level4`)
+
+**Best Practice**: Use `.elevated-card` when you want clean, elevated cards without the frosted glass aesthetic. It's complementary to `.glassy-card` - choose based on whether you want the glassmorphism effect or not. Apply via the `cardClass` input on card components for proper encapsulation.
+
 ---
 
 **For detailed opacity levels, theme support, and implementation details, see [Glassy Effect Mixins](#glassy-effect-mixins).**

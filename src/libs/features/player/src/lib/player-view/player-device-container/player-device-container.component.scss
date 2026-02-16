@@ -92,14 +92,12 @@
     gap: 1rem;
     flex: 1;
     min-height: 0;
-    overflow: hidden;
 
     // At phone size, give storage a fixed height so absolute-positioned
     // children (directory-files, search-results, play-history) remain visible
     // when the parent scrolls.
     @include styles.below-phone {
       min-height: 400px;
-      overflow: visible;
     }
   }
 
@@ -110,7 +108,8 @@
 
   // At phone sizes, allow vertical scrolling so all content is accessible
   @include styles.below-phone {
-    overflow-x: hidden;
+    overflow: clip;
+    overflow-clip-margin: 1.25rem; // Allow box-shadow to render beyond clip boundary
     min-height: auto;
     height: auto;
     flex: none;
@@ -125,6 +124,7 @@
     height: 40cqh; // 40% of container height (~300px at 750px)
     flex-shrink: 0;
     overflow: clip; // Contain overflow without creating scroll context
+    overflow-clip-margin: 1.25rem; // Allow box-shadow to render beyond clip boundary
   }
 
   .storage-container {
@@ -212,6 +212,8 @@
       height: 100%;
       max-height: 100%;
       overflow: hidden;
+      box-sizing: border-box;
+      padding: 0.75rem; // Shadow breathing room — overflow:hidden clips at padding-box edge
     }
   }
 }
@@ -278,12 +280,13 @@
 }
 
 // Phone-specific pane styles inside swipe-container
+// Storage pane containment handled by .swipe-container > * rule;
+// no additional overflow needed here.
 .storage-pane {
   @include styles.below-phone {
     height: 100%;
     position: relative;
     touch-action: pan-y;
-    overflow: hidden;
   }
 }
 

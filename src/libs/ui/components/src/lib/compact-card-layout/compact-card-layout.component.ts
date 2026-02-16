@@ -47,7 +47,7 @@ export class CompactCardLayoutComponent {
         classes.push('glassy-card');
       } else {
         classes.push(`glassy-${intensity}`);
-        classes.push('rounded-card');
+        classes.push('elevated-card');
       }
     }
     

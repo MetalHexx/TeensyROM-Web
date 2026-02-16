@@ -80,7 +80,7 @@ export class CardLayoutComponent implements AfterViewInit, OnDestroy {
         classes.push('glassy-card');
       } else {
         classes.push(`glassy-${intensity}`);
-        classes.push('rounded-card');
+        classes.push('elevated-card');
       }
     }
     

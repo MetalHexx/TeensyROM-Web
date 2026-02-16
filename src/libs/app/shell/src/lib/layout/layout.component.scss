@@ -109,10 +109,15 @@ lib-header {
   padding: 1rem; // Equal padding on all sides
   gap: 1rem; // Space between nav rail and content
 
+  // Below desktop: .router-content gains overflow-y: auto, producing a
+  // scrollbar.  Remove the outer right padding so that scrollbar sits
+  // near the viewport edge instead of floating 16px inward.
+  @include styles.below-desktop {
+    padding-right: 0;
+  }
 
-
-  // At phone breakpoint: remove right padding so the scrollbar sits flush
-  // against the viewport edge. Content padding is handled by .router-content.
+  // At phone breakpoint: also remove right padding and add safe-area
+  // bottom padding for the bottom navigation bar.
   @include styles.below-phone {
     padding-right: 0;
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); // Bottom bar (64px) + spacing + safe area
@@ -147,7 +152,7 @@ lib-header {
 
   .router-content {
     flex: 1;
-    padding: 0; // Views handle their own padding if needed
+    padding: 1.25rem; // Provides space for elevated-card box-shadow (max extent ~19px) within overflow clip boundary
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -158,10 +163,11 @@ lib-header {
       overflow-y: auto;
     }
 
-    // At phone breakpoint: add right padding inside the scrollable area
-    // so content has equal spacing on both sides while the scrollbar
-    // remains flush against the viewport edge.
+    // At phone breakpoint: reset padding — layout-container already provides
+    // left padding, and only right padding is needed so content has equal
+    // spacing while the scrollbar remains flush against the viewport edge.
     @include styles.below-phone {
+      padding: 0;
       padding-right: 1rem;
     }
 

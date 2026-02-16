@@ -5,6 +5,8 @@
   width: 100%;
   height: auto;
   overflow-y: auto;
+  box-sizing: border-box;
+  padding: 0.5rem; // Provides breathing room for box-shadow within overflow-y:auto clip boundary
 }
 
 lib-scaling-card {
