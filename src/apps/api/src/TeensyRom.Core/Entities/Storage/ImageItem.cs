@@ -5,8 +5,21 @@ namespace TeensyRom.Core.Entities.Storage
 {
     public class ImageItem : LaunchableItem
     {
-        public override string Creator => GetExtensionShortDescription();
-        public override string Description => GetExtensionLongDescription();
+        private string _creator = string.Empty;
+        private string _description = string.Empty;
+
+        public override string Creator
+        {
+            get => string.IsNullOrWhiteSpace(_creator) ? GetExtensionShortDescription() : _creator;
+            set => _creator = value;
+        }
+
+        public override string Description
+        {
+            get => string.IsNullOrWhiteSpace(_description) ? GetExtensionLongDescription() : _description;
+            set => _description = value;
+        }
+
         public override string Title => $"{Name[..Name.LastIndexOf('.')]}";
         public override string Meta1 => Name[(Name.LastIndexOf('.') + 1)..];
         public TimeSpan PlayLength { get; set; } = TimeSpan.FromMinutes(1);
@@ -47,6 +60,8 @@ namespace TeensyRom.Core.Entities.Storage
             Size = Size,
             PlayLength = PlayLength,
             IsFavorite = IsFavorite,
+            Creator = _creator,
+            Description = _description,
             ReleaseInfo = ReleaseInfo,
             ShareUrl = ShareUrl,
             MetadataSource = MetadataSource,

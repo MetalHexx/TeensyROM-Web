@@ -48,6 +48,10 @@ lib-scaling-card {
   flex-direction: row;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
+
+  p {
+    margin: 0;
+  }
   margin: 0;
   align-items: baseline;
 

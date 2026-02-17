@@ -2,8 +2,21 @@
 {
     public class GameItem : LaunchableItem, IViewableItem
     {
-        public override string Creator => "";
-        public override string Description => GetExtensionLongDescription();
+        private string _creator = string.Empty;
+        private string _description = string.Empty;
+
+        public override string Creator
+        {
+            get => string.IsNullOrWhiteSpace(_creator) ? GetExtensionShortDescription() : _creator;
+            set => _creator = value;
+        }
+
+        public override string Description
+        {
+            get => string.IsNullOrWhiteSpace(_description) ? GetExtensionLongDescription() : _description;
+            set => _description = value;
+        }
+
         public override string Title => $"{Name[..Name.LastIndexOf('.')]}";
         public override string Meta1 => Name[(Name.LastIndexOf('.') + 1)..];
         public List<ViewableItemImage> Images { get; init; } = [];
@@ -40,9 +53,9 @@
             Size = Size,
             IsFavorite = IsFavorite,
             Title = Title,
-            Creator = Creator,
+            Creator = _creator,
             ReleaseInfo = ReleaseInfo,
-            Description = Description,
+            Description = _description,
             ShareUrl = ShareUrl,
             MetadataSource = MetadataSource,
             Meta1 = Meta1,

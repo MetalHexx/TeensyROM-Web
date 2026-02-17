@@ -39,19 +39,174 @@ namespace TeensyRom.Core.Entities.Storage
         {
             return fileItem.FileType switch
             {
-                TeensyFileType.Sid => new SongItem  { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Crt => new GameItem  { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Prg => new GameItem  { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.P00 => new GameItem  { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Hex => new HexItem   { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Kla => new ImageItem { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Koa => new ImageItem { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Art => new ImageItem { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Aas => new ImageItem { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Hpi => new ImageItem { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Seq => new ImageItem { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                TeensyFileType.Txt => new ImageItem { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
-                _ =>                  new FileItem  { Name = fileItem.Name, Title = fileItem.Name, Path = fileItem.Path, Size = fileItem.Size, StorageType = fileItem.StorageType },
+                TeensyFileType.Sid => new SongItem  
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Crt => new GameItem  
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Prg => new GameItem  
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.P00 => new GameItem  
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Hex => new HexItem   
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType 
+                },
+                TeensyFileType.Kla => new ImageItem 
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Koa => new ImageItem 
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Art => new ImageItem 
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Aas => new ImageItem 
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Hpi => new ImageItem 
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Seq => new ImageItem 
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                TeensyFileType.Txt => new ImageItem 
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType,
+                    Creator = fileItem.Creator,
+                    Description = fileItem.Description,
+                    ReleaseInfo = fileItem.ReleaseInfo,
+                    IsFavorite = fileItem.IsFavorite,
+                    ShareUrl = fileItem.ShareUrl,
+                    MetadataSource = fileItem.MetadataSource,
+                    MetadataSourcePath = fileItem.MetadataSourcePath
+                },
+                _ =>                  new FileItem  
+                { 
+                    Name = fileItem.Name, 
+                    Path = fileItem.Path, 
+                    Size = fileItem.Size, 
+                    StorageType = fileItem.StorageType 
+                },
             };
         }
     }
