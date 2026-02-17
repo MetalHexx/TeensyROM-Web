@@ -52,11 +52,23 @@
       <div class="player-toolbar-wrapper">
         <lib-player-toolbar [deviceId]="deviceId()"></lib-player-toolbar>
       </div>
+      <div class="filter-toolbar-wrapper">
+        <lib-filter-toolbar [deviceId]="deviceId()"></lib-filter-toolbar>
+      </div>
     }
-    <div class="filter-toolbar-wrapper">
-      <lib-filter-toolbar [deviceId]="deviceId()"></lib-filter-toolbar>
-    </div>
   </div>
+  @if (isPhone()) {
+    <lib-scaling-compact-card animationEntry="from-bottom" animationParent="auto">
+      <lib-swipe-pane-container>
+        <ng-template libSwipePane label="Filters">
+          <lib-filter-toolbar [deviceId]="deviceId()" [showCard]="false"></lib-filter-toolbar>
+        </ng-template>
+        <ng-template libSwipePane label="Actions">
+          <lib-player-toolbar-actions [deviceId]="deviceId()"></lib-player-toolbar-actions>
+        </ng-template>
+      </lib-swipe-pane-container>
+    </lib-scaling-compact-card>
+  }
   }
   @if (!isPhone()) {
     <div class="storage-container">

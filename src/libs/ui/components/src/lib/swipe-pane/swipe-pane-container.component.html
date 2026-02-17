@@ -1,0 +1,72 @@
+<div
+  class="swipe-pane-wrapper"
+  (mouseenter)="onSwipeAreaMouseEnter()"
+  (mouseleave)="onSwipeAreaMouseLeave()"
+  (mousemove)="onSwipeAreaMouseMove()"
+>
+  @if (!isTouchDevice()) {
+    <button
+      class="swipe-nav-btn"
+      [class.visible]="showNav()"
+      [disabled]="activePane() === 0"
+      (mouseenter)="onNavControlEnter()"
+      (mouseleave)="onNavControlLeave()"
+      (click)="scrollToPreviousPane()"
+      aria-label="Previous pane"
+    >
+      <mat-icon>chevron_left</mat-icon>
+    </button>
+  }
+
+  <div class="swipe-scroll-container" #swipeContainer>
+    @for (pane of panes(); track $index) {
+      <div class="swipe-pane-item">
+        <ng-container [ngTemplateOutlet]="pane.templateRef"></ng-container>
+      </div>
+    }
+  </div>
+
+  @if (!isTouchDevice()) {
+    <button
+      class="swipe-nav-btn"
+      [class.visible]="showNav()"
+      [disabled]="activePane() === panes().length - 1"
+      (mouseenter)="onNavControlEnter()"
+      (mouseleave)="onNavControlLeave()"
+      (click)="scrollToNextPane()"
+      aria-label="Next pane"
+    >
+      <mat-icon>chevron_right</mat-icon>
+    </button>
+  }
+</div>
+
+@if (!isTouchDevice()) {
+  <div class="swipe-dots desktop-dots" [class.visible]="showNav()">
+    @for (pane of panes(); track $index) {
+      <span
+        class="dot"
+        role="button"
+        tabindex="0"
+        [attr.aria-label]="pane.label() || 'Pane ' + ($index + 1)"
+        [class.active]="activePane() === $index"
+        (click)="scrollToPane($index)"
+        (keyup.enter)="scrollToPane($index)"
+      ></span>
+    }
+  </div>
+} @else {
+  <div class="swipe-dots touch-dots" [class.visible]="isSwiping()">
+    @for (pane of panes(); track $index) {
+      <span
+        class="dot"
+        role="button"
+        tabindex="0"
+        [attr.aria-label]="pane.label() || 'Pane ' + ($index + 1)"
+        [class.active]="activePane() === $index"
+        (click)="scrollToPane($index)"
+        (keyup.enter)="scrollToPane($index)"
+      ></span>
+    }
+  </div>
+}

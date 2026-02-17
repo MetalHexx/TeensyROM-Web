@@ -119,6 +119,8 @@ Use `slot="header"` to project custom component content into the card header are
 **Used In**:
 - [directory-files.component.html](../libs/features/player/src/lib/player-view/player-device-container/storage-container/directory-files/directory-files.component.html) - Embeds directory-trail component in header slot when showing directory contents (storage-level view)
 
+**Spacing Tokens**: This component internally uses `--spacing-card-padding` (12px) for content margins, corner positioning, and header reservation. The `bufferPx = 8` named constant corresponds to `--spacing-sm`. See the [Style Guide](STYLE_GUIDE.md#spacing-tokens) for the full token reference.
+
 **See Also**: [ScalingCardComponent](#scalingcardcomponent) for animated version
 
 ### `CompactCardLayoutComponent`
@@ -179,6 +181,8 @@ All compact cards include glassy backdrop effect by default with a dark semi-tra
 </lib-compact-card-layout>
 ```
 
+**Spacing Tokens**: Defaults to `--spacing-card-padding-compact` (12px) via the `.compact-card` global class. Consumers can override via the `--compact-card-padding` CSS custom property. See the [Style Guide](STYLE_GUIDE.md#spacing-tokens) for the full token reference.
+
 **See Also**: [ScalingCompactCardComponent](#scalingcompactcardcomponent) for animated version
 
 ---
@@ -232,6 +236,8 @@ Inherits all glassy styling options from [CardLayoutComponent](#cardlayoutcompon
 </lib-scaling-card>
 ```
 
+**Consumer Note**: This is the **public-facing card wrapper** consumers should use for standard cards. It composes layout + animation in one component.
+
 **See Also**: [CardLayoutComponent](#cardlayoutcomponent), [ScalingContainerComponent](#scalingcontainercomponent), [Animation System](#animation-system)
 
 ### `ScalingCompactCardComponent`
@@ -281,6 +287,8 @@ Inherits all glassy styling options from [CompactCardLayoutComponent](#compactca
   <div>Explicitly passing glassy-card class</div>
 </lib-scaling-compact-card>
 ```
+
+**Consumer Note**: This is the **public-facing compact card wrapper** consumers should use for forms and toolbars. It composes layout + animation in one component.
 
 **See Also**: [CompactCardLayoutComponent](#compactcardlayoutcomponent), [ScalingContainerComponent](#scalingcontainercomponent), [Animation System](#animation-system)
 

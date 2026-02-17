@@ -31,6 +31,7 @@ export class FilterToolbarComponent {
   private readonly storageStore = inject(StorageStore);
 
   deviceId = input.required<string>();
+  readonly showCard = input<boolean>(true);
 
   // Expose PlayerFilterType enum for template access
   readonly PlayerFilterType = PlayerFilterType;

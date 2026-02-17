@@ -11,7 +11,6 @@ import {
 import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
 import { ProgressBarComponent } from '../player-toolbar/progress-bar/progress-bar.component';
-import { PlayerToolbarActionsComponent } from '../player-toolbar/player-toolbar-actions/player-toolbar-actions.component';
 import { FileTimeComponent } from '../player-toolbar/file-time/file-time.component';
 
 @Component({
@@ -22,7 +21,6 @@ import { FileTimeComponent } from '../player-toolbar/file-time/file-time.compone
     IconButtonComponent,
     SlidingContainerComponent,
     ProgressBarComponent,
-    PlayerToolbarActionsComponent,
     FileTimeComponent,
   ],
   templateUrl: './player-toolbar-mini.component.html',

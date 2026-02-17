@@ -14,6 +14,8 @@ describe('PlayerToolbarMiniComponent', () => {
     saveFavorite: ReturnType<typeof vi.fn>;
     removeFavorite: ReturnType<typeof vi.fn>;
     favoriteOperationsState: ReturnType<typeof vi.fn>;
+    getSearchState: ReturnType<typeof vi.fn>;
+    searchFiles: ReturnType<typeof vi.fn>;
   };
   let errorSignal: ReturnType<typeof signal<string | null>>;
   let currentFileSignal: ReturnType<typeof signal>;
@@ -56,6 +58,8 @@ describe('PlayerToolbarMiniComponent', () => {
       saveFavorite: vi.fn().mockResolvedValue(undefined),
       removeFavorite: vi.fn().mockResolvedValue(undefined),
       favoriteOperationsState: vi.fn(() => ({ isProcessing: false, error: null })),
+      getSearchState: vi.fn().mockReturnValue(signal(null).asReadonly()),
+      searchFiles: vi.fn().mockResolvedValue(undefined),
     };
 
     mockPlayerContext = {

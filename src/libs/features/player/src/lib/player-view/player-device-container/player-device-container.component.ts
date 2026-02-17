@@ -4,12 +4,14 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Device } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective } from '@teensyrom-nx/ui/components';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
 import { FileImageComponent } from './file-image/file-image.component';
 import { FileDescriptionComponent } from './file-description/file-description.component';
 import { VideoCaptureComponent } from './video-capture/video-capture.component';
 import { PlayerToolbarComponent } from './player-toolbar/player-toolbar.component';
+import { PlayerToolbarActionsComponent } from './player-toolbar/player-toolbar-actions/player-toolbar-actions.component';
 import { FilterToolbarComponent } from './storage-container/filter-toolbar/filter-toolbar.component';
 import { StorageContainerComponent } from './storage-container/storage-container.component';
 import { FileDescriptionMiniComponent } from './file-description-mini/file-description-mini.component';
@@ -33,6 +35,10 @@ const TOUCH_DEVICE_QUERY = '(hover: none)';
     StorageContainerComponent,
     FileDescriptionMiniComponent,
     PlayerToolbarMiniComponent,
+    ScalingCompactCardComponent,
+    SwipePaneContainerComponent,
+    SwipePaneDirective,
+    PlayerToolbarActionsComponent,
   ],
   templateUrl: './player-device-container.component.html',
   styleUrl: './player-device-container.component.scss',
