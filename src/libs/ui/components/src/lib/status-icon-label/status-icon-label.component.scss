@@ -3,9 +3,9 @@
   flex-direction: row;
   justify-content: flex-start;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
   max-width: 150px;
-  padding: 0.5rem;
+  padding: var(--spacing-sm);
 }
 
 .status-icon {

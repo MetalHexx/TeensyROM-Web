@@ -12,12 +12,12 @@
   justify-content: center;
   height: 100%;
   text-align: center;
-  gap: 1rem;
-  padding: 2rem;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-2xl);
 
   .empty-state-icon {
     color: var(--color-dimmed);
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--spacing-sm);
   }
 
   .empty-state-title {
@@ -27,12 +27,12 @@
   }
 
   .empty-state-message-text {
-    margin: 0.5rem 0;
+    margin: var(--spacing-sm) 0;
     color: var(--mat-sys-on-surface);
   }
 
   .empty-state-secondary-text {
-    margin: 0.5rem 0;
+    margin: var(--spacing-sm) 0;
     color: var(--color-dimmed);
 
     strong {
@@ -43,14 +43,14 @@
 
   // Small size variant
   &.size-small {
-    gap: 0.5rem;
-    padding: 1rem;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-lg);
 
     .empty-state-icon {
       font-size: 2rem;
       width: 2rem;
       height: 2rem;
-      margin-bottom: 0.25rem;
+      margin-bottom: var(--spacing-xs);
     }
 
     .empty-state-title {
@@ -68,14 +68,14 @@
 
   // Medium size variant (default)
   &.size-medium {
-    gap: 1rem;
-    padding: 2rem;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-2xl);
 
     .empty-state-icon {
       font-size: 4rem;
       width: 4rem;
       height: 4rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: var(--spacing-sm);
     }
 
     .empty-state-title {
@@ -93,14 +93,14 @@
 
   // Large size variant
   &.size-large {
-    gap: 1.5rem;
-    padding: 3rem;
+    gap: var(--spacing-xl);
+    padding: var(--spacing-3xl);
 
     .empty-state-icon {
       font-size: 6rem;
       width: 6rem;
       height: 6rem;
-      margin-bottom: 1rem;
+      margin-bottom: var(--spacing-lg);
     }
 
     .empty-state-title {

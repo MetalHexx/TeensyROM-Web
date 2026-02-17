@@ -27,7 +27,7 @@
 
   .spinner {
     display: inline-block;
-    margin-right: 0.25rem;
+    margin-right: var(--spacing-xs);
   }
 }
 

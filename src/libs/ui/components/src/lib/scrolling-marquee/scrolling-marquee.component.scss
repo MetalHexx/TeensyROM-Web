@@ -12,7 +12,7 @@
 .marquee-content {
   display: inline-block;
   white-space: nowrap;
-  padding: 8px 16px;
+  padding: var(--spacing-sm) var(--spacing-lg);
   letter-spacing: 0.1em; // Add extra space between characters for better readability
   word-spacing: 0.3em; // Add extra space between words
   will-change: transform; // Optimize for GPU acceleration

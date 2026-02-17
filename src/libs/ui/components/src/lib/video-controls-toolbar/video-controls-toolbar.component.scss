@@ -8,16 +8,16 @@
 .video-controls-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-sm);
 
   ::ng-deep lib-compact-card-layout {
     margin: 0;
 
     .compact-card.glassy-card {
-      padding: 8px;
+      padding: var(--spacing-sm);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: var(--spacing-sm);
     }
   }
 

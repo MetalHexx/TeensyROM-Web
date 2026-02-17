@@ -33,7 +33,7 @@
 
 // Card styling for the selector dropdown
 ::ng-deep .video-device-selector-card.compact-card {
-  padding: 12px 18px 35px !important;
+  padding: var(--spacing-md) var(--spacing-lg) 35px /* structural */ !important;
   margin: 0;
   min-width: 300px;
 }

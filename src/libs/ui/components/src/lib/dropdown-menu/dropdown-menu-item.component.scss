@@ -1,9 +1,9 @@
 .dropdown-menu-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-md);
   width: 100%;
-  padding: 12px 16px;
+  padding: var(--spacing-md) var(--spacing-lg);
   border: none;
   background: transparent;
   color: var(--mat-sys-on-surface);
@@ -39,7 +39,7 @@
   .item-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--spacing-xs);
     margin-left: auto;
 
     // Actions area doesn't trigger hover state on parent

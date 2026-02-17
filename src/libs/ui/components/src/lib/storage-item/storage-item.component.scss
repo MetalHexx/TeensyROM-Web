@@ -11,13 +11,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
 }
 
 .storage-item-label-area {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--spacing-xs);
   flex: 1;
   min-width: 0;
   min-height: 24px;
@@ -32,7 +32,7 @@
 lib-storage-item-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
   flex-shrink: 0;
   margin-left: auto;
 }
