@@ -42,12 +42,28 @@ html {
   --color-directory: #f5d76e;
   --glassy-color: 255, 255, 255;
 
-  // Design Tokens - Spacing
-  --spacing-form-control-gap: 0.75rem; // 12px - spacing between form controls and their labels
-  --spacing-inline-xs: 0.375rem; // 6px - extra small inline spacing
-  --spacing-inline-sm: 0.5rem; // 8px - small inline spacing
-  --spacing-inline-md: 0.625rem; // 10px - medium inline spacing
-  --spacing-inline-lg: 1rem; // 16px - large inline spacing
+  // Design Tokens - Spacing (4px grid)
+  --spacing-xs: 0.25rem; // 4px
+  --spacing-sm: 0.5rem; // 8px
+  --spacing-md: 0.75rem; // 12px
+  --spacing-lg: 1rem; // 16px
+  --spacing-xl: 1.5rem; // 24px
+  --spacing-2xl: 2rem; // 32px
+  --spacing-3xl: 3rem; // 48px
+
+  // Design Tokens - Spacing - Semantic Aliases
+  --spacing-page-gutter: var(--spacing-xl); // viewport-to-content distance
+  --spacing-card-padding: var(--spacing-lg); // standard card internal padding
+  --spacing-card-padding-compact: var(--spacing-sm); // compact card padding
+  --spacing-section-gap: var(--spacing-lg); // gap between sibling cards/sections
+  --spacing-content-gap: var(--spacing-md); // gap between elements within a card
+
+  // Design Tokens - Spacing - Legacy Aliases
+  --spacing-inline-xs: var(--spacing-xs); /* @deprecated: use --spacing-xs */
+  --spacing-inline-sm: var(--spacing-sm); /* @deprecated: use --spacing-sm */
+  --spacing-inline-md: var(--spacing-md); /* @deprecated: use --spacing-md */
+  --spacing-inline-lg: var(--spacing-lg); /* @deprecated: use --spacing-lg */
+  --spacing-form-control-gap: var(--spacing-md); /* @deprecated: use --spacing-md */
 
   // Design Tokens - Typography - Font Sizes
   --font-size-sm: 0.875rem; // 14px - small text, secondary content
@@ -101,11 +117,28 @@ html.dark-mode {
   --color-directory: #f5e29e;
   --glassy-color: 255, 255, 255;
 
-  // Design Tokens - Spacing (inherited from light mode, redeclared for completeness)
-  --spacing-inline-xs: 0.375rem;
-  --spacing-inline-sm: 0.5rem;
-  --spacing-inline-md: 0.625rem;
-  --spacing-inline-lg: 1rem;
+  // Design Tokens - Spacing (4px grid, inherited from light mode)
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 0.75rem;
+  --spacing-lg: 1rem;
+  --spacing-xl: 1.5rem;
+  --spacing-2xl: 2rem;
+  --spacing-3xl: 3rem;
+
+  // Design Tokens - Spacing - Semantic Aliases
+  --spacing-page-gutter: var(--spacing-xl);
+  --spacing-card-padding: var(--spacing-lg);
+  --spacing-card-padding-compact: var(--spacing-sm);
+  --spacing-section-gap: var(--spacing-lg);
+  --spacing-content-gap: var(--spacing-md);
+
+  // Design Tokens - Spacing - Legacy Aliases
+  --spacing-inline-xs: var(--spacing-xs); /* @deprecated: use --spacing-xs */
+  --spacing-inline-sm: var(--spacing-sm); /* @deprecated: use --spacing-sm */
+  --spacing-inline-md: var(--spacing-md); /* @deprecated: use --spacing-md */
+  --spacing-inline-lg: var(--spacing-lg); /* @deprecated: use --spacing-lg */
+  --spacing-form-control-gap: var(--spacing-md); /* @deprecated: use --spacing-md */
 
   // Design Tokens - Typography (same values as light mode)
   --font-size-sm: 0.875rem;
@@ -139,6 +172,21 @@ html.dark-mode {
   & {
     --mat-sys-surface-container-low: #231e22;
     --dialog-backdrop-color: rgba(0, 0, 0, 0.85);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Responsive Spacing Overrides
+// ─────────────────────────────────────────────
+html {
+  @include mixins.below-desktop {
+    --spacing-page-gutter: var(--spacing-lg);
+  }
+
+  @include mixins.below-phone {
+    --spacing-page-gutter: var(--spacing-sm);
+    --spacing-card-padding: var(--spacing-md);
+    --spacing-section-gap: var(--spacing-sm);
   }
 }
 

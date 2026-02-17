@@ -46,9 +46,9 @@
 .nav-rail__list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacing-xs);
   margin: 0;
-  padding: 8px 0;
+  padding: var(--spacing-sm) 0;
   list-style: none;
   flex: 1;
 }

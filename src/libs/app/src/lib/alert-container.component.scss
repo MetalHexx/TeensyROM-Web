@@ -10,11 +10,11 @@
   // Top-left position
   .position-top-left {
     position: fixed;
-    top: 16px;
-    left: 16px;
+    top: var(--spacing-lg);
+    left: var(--spacing-lg);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--spacing-sm);
     pointer-events: auto;
 
     lib-alert-display {
@@ -25,12 +25,12 @@
   // Top-center position
   .position-top-center {
     position: fixed;
-    top: 16px;
+    top: var(--spacing-lg);
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--spacing-sm);
     pointer-events: auto;
 
     lib-alert-display {
@@ -41,11 +41,11 @@
   // Top-right position
   .position-top-right {
     position: fixed;
-    top: 16px;
-    right: 16px;
+    top: var(--spacing-lg);
+    right: var(--spacing-lg);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--spacing-sm);
     pointer-events: auto;
 
     lib-alert-display {
@@ -56,11 +56,11 @@
   // Bottom-left position
   .position-bottom-left {
     position: fixed;
-    bottom: 16px;
-    left: 16px;
+    bottom: var(--spacing-lg);
+    left: var(--spacing-lg);
     display: flex;
     flex-direction: column-reverse;
-    gap: 8px;
+    gap: var(--spacing-sm);
     pointer-events: auto;
 
     lib-alert-display {
@@ -71,12 +71,12 @@
   // Bottom-center position
   .position-bottom-center {
     position: fixed;
-    bottom: 16px;
+    bottom: var(--spacing-lg);
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     flex-direction: column-reverse;
-    gap: 8px;
+    gap: var(--spacing-sm);
     pointer-events: auto;
 
     lib-alert-display {
@@ -87,11 +87,11 @@
   // Bottom-right position
   .position-bottom-right {
     position: fixed;
-    bottom: 16px;
-    right: 16px;
+    bottom: var(--spacing-lg);
+    right: var(--spacing-lg);
     display: flex;
     flex-direction: column-reverse;
-    gap: 8px;
+    gap: var(--spacing-sm);
     pointer-events: auto;
 
     lib-alert-display {

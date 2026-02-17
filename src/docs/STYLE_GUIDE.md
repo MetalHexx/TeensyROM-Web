@@ -53,23 +53,95 @@ Design tokens are CSS custom properties that provide consistent, reusable values
 
 ### Spacing Tokens
 
-Spacing tokens provide consistent inline spacing for gaps, margins, and padding:
+The spacing system is built on a **4px grid** (0.25rem base unit). All tokens are multiples of 4px for consistent visual rhythm.
+
+#### Spacing Scale
 
 | Token | Value | Pixels | Use Case |
 |-------|-------|--------|----------|
-| `--spacing-inline-xs` | 0.375rem | 6px | Tight spacing for compact layouts |
-| `--spacing-inline-sm` | 0.5rem | 8px | Default comfortable spacing |
-| `--spacing-inline-md` | 0.625rem | 10px | Breathing room for larger elements |
-| `--spacing-inline-lg` | 1rem | 16px | Generous spacing for prominent displays |
+| `--spacing-xs` | 0.25rem | 4px | Tight gaps: icon-to-text, inline elements |
+| `--spacing-sm` | 0.5rem | 8px | Small gaps: compact layouts, list item padding |
+| `--spacing-md` | 0.75rem | 12px | Medium gaps: form fields, content element spacing |
+| `--spacing-lg` | 1rem | 16px | Standard gaps: card padding, section spacing |
+| `--spacing-xl` | 1.5rem | 24px | Large gaps: page gutters (desktop) |
+| `--spacing-2xl` | 2rem | 32px | Extra-large spacing: major section separators |
+| `--spacing-3xl` | 3rem | 48px | Maximum spacing: hero areas, splash screens |
 
 **Usage Example:**
 
 ```scss
 .my-container {
-  gap: var(--spacing-inline-sm);
-  padding: var(--spacing-inline-md);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+}
+
+.icon-label {
+  gap: var(--spacing-xs);
 }
 ```
+
+#### Layout Spacing (Semantic Aliases)
+
+Semantic aliases map spacing scale tokens to specific layout roles. Use these instead of raw scale tokens for layout concerns — they automatically adapt across breakpoints.
+
+| Token | Default | Purpose |
+|-------|---------|---------|
+| `--spacing-page-gutter` | 24px | Viewport-to-content distance |
+| `--spacing-card-padding` | 16px | Standard card internal padding |
+| `--spacing-card-padding-compact` | 8px | Compact card internal padding |
+| `--spacing-section-gap` | 16px | Gap between sibling cards or sections |
+| `--spacing-content-gap` | 12px | Gap between elements within a card |
+
+**Usage Example:**
+
+```scss
+.page-layout {
+  padding: var(--spacing-page-gutter);
+  gap: var(--spacing-section-gap);
+}
+
+.card {
+  padding: var(--spacing-card-padding);
+  gap: var(--spacing-content-gap);
+}
+```
+
+#### Responsive Spacing
+
+Semantic tokens auto-scale at breakpoints defined in `styles.scss`. Components using semantic tokens get responsive spacing automatically — **no component-level media queries needed**.
+
+| Token | Desktop (≥1600px) | Tablet (640–1599px) | Phone (<640px) |
+|-------|-------------------|---------------------|----------------|
+| `--spacing-page-gutter` | 24px | 16px | 8px |
+| `--spacing-card-padding` | 16px | 16px | 12px |
+| `--spacing-section-gap` | 16px | 16px | 8px |
+| `--spacing-content-gap` | 12px | 12px | 12px |
+| `--spacing-card-padding-compact` | 8px | 8px | 8px |
+
+#### Spacing Decision Guide
+
+Quick reference for choosing the right token:
+
+| Scenario | Token |
+|----------|-------|
+| Card internal padding | `--spacing-card-padding` |
+| Gap between cards/sections | `--spacing-section-gap` |
+| Gap between elements in a card | `--spacing-content-gap` |
+| Edge of viewport to content | `--spacing-page-gutter` |
+| Small inline gaps (icon ↔ text) | `--spacing-xs` or `--spacing-sm` |
+| Form control gaps | `--spacing-md` |
+
+#### Deprecated Spacing Tokens
+
+The following tokens are deprecated. They still work but will be removed in a future release.
+
+| Deprecated Token | Replacement |
+|-----------------|-------------|
+| `--spacing-inline-xs` | `--spacing-xs` |
+| `--spacing-inline-sm` | `--spacing-sm` |
+| `--spacing-inline-md` | `--spacing-md` |
+| `--spacing-inline-lg` | `--spacing-lg` |
+| `--spacing-form-control-gap` | `--spacing-md` |
 
 ### Typography Tokens
 

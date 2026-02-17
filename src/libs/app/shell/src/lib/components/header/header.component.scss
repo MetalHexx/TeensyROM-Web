@@ -15,7 +15,7 @@ mat-toolbar {
   align-items: center;
 
   .app-title {
-    margin-left: 8px;
+    margin-left: var(--spacing-sm);
     font-weight: 500;
     font-size: 20px;
   }
@@ -27,7 +27,7 @@ mat-toolbar {
   .version-text {
     display: flex;
     align-items: center;
-    margin-right: 8px;
+    margin-right: var(--spacing-sm);
     font-size: 13px;
     opacity: 0.7;
     font-weight: 400;
@@ -38,7 +38,7 @@ mat-toolbar {
   .mat-menu-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--spacing-sm);
   }
 
   .theme-name {

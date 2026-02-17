@@ -106,25 +106,13 @@ lib-header {
   overflow: hidden;
   background: transparent; // Let synthwave show through
   position: relative;
-  padding: 1rem; // Equal padding on all sides
-  gap: 1rem; // Space between nav rail and content
+  padding: 0 var(--spacing-section-gap); // Horizontal edge gutters — matches inter-card gaps
+  gap: var(--spacing-section-gap); // Space between nav rail and content
 
-  // Below desktop: .router-content gains overflow-y: auto, producing a
-  // scrollbar.  Remove the outer right padding so that scrollbar sits
-  // near the viewport edge instead of floating 16px inward.
-  @include styles.below-desktop {
-    padding-right: 0;
-  }
-
-  // At phone breakpoint: also remove right padding and add safe-area
-  // bottom padding for the bottom navigation bar.
-  // Left padding also moved to .router-content so the overflow clip
-  // boundary sits at x=0, allowing overlay controls to bleed outside
-  // the content area without being clipped.
   @include styles.below-phone {
-    padding-left: 0;
-    padding-right: 0;
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); // Bottom bar (64px) + spacing + safe area
+    padding: 0; // Nav hidden — router-content takes over all edge spacing
+    /* structural: bottom bar clearance */
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -136,7 +124,7 @@ lib-header {
 
   // Vertical padding matches .router-content so the nav-rail card
   // aligns flush with the content area's top and bottom edges.
-  padding: 1.25rem 0;
+  padding: var(--spacing-section-gap) 0;
 
   @include styles.below-phone {
     display: none;
@@ -161,7 +149,7 @@ lib-header {
 
   .router-content {
     flex: 1;
-    padding: 1.25rem; // Provides space for elevated-card box-shadow (max extent ~19px) within overflow clip boundary
+    padding: var(--spacing-section-gap) 0; // Vertical gutters only — horizontal owned by layout-container
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -172,15 +160,13 @@ lib-header {
       overflow-y: auto;
     }
 
-    // At phone breakpoint: layout-container padding is removed so that
-    // overflow clip boundaries sit at the viewport edge.  Horizontal
-    // padding is applied here instead for equal content spacing.
+    // Phone: nav hidden, router-content takes over full edge spacing
     @include styles.below-phone {
-      padding: 0 1rem;
+      padding: var(--spacing-section-gap);
     }
 
     .view-title {
-      padding: 0 0 1rem 0 !important;
+      padding-bottom: var(--spacing-section-gap) !important;
       margin: 0 !important;
       flex-shrink: 0;
     }
