@@ -86,11 +86,11 @@ Semantic aliases map spacing scale tokens to specific layout roles. Use these in
 
 | Token | Default | Purpose |
 |-------|---------|---------|
-| `--spacing-page-gutter` | 24px | Viewport-to-content distance |
-| `--spacing-card-padding` | 16px | Standard card internal padding |
-| `--spacing-card-padding-compact` | 8px | Compact card internal padding |
-| `--spacing-section-gap` | 16px | Gap between sibling cards or sections |
-| `--spacing-content-gap` | 12px | Gap between elements within a card |
+| `--spacing-page-gutter` | 24px (`--spacing-xl`) | Viewport-to-content distance |
+| `--spacing-card-padding` | 12px (`--spacing-md`) | Standard card internal padding |
+| `--spacing-card-padding-compact` | 12px (`--spacing-md`) | Compact card internal padding |
+| `--spacing-section-gap` | 16px (`--spacing-lg`) | Gap between sibling cards or sections |
+| `--spacing-content-gap` | 12px (`--spacing-md`) | Gap between elements within a card |
 
 **Usage Example:**
 
@@ -110,13 +110,13 @@ Semantic aliases map spacing scale tokens to specific layout roles. Use these in
 
 Semantic tokens auto-scale at breakpoints defined in `styles.scss`. Components using semantic tokens get responsive spacing automatically — **no component-level media queries needed**.
 
-| Token | Desktop (≥1600px) | Tablet (640–1599px) | Phone (<640px) |
-|-------|-------------------|---------------------|----------------|
+| Token | Desktop (≥1600px) | Tablet (<1600px) | Phone (<640px) |
+|-------|-------------------|-------------------|----------------|
 | `--spacing-page-gutter` | 24px | 16px | 8px |
-| `--spacing-card-padding` | 16px | 16px | 12px |
 | `--spacing-section-gap` | 16px | 16px | 8px |
+| `--spacing-card-padding` | 12px | 12px | 12px |
+| `--spacing-card-padding-compact` | 12px | 12px | 12px |
 | `--spacing-content-gap` | 12px | 12px | 12px |
-| `--spacing-card-padding-compact` | 8px | 8px | 8px |
 
 #### Spacing Decision Guide
 
@@ -131,17 +131,18 @@ Quick reference for choosing the right token:
 | Small inline gaps (icon ↔ text) | `--spacing-xs` or `--spacing-sm` |
 | Form control gaps | `--spacing-md` |
 
-#### Deprecated Spacing Tokens
+#### Normalization Mapping
 
-The following tokens are deprecated. They still work but will be removed in a future release.
+During migration, hardcoded pixel values were normalized to the nearest 4px-grid token:
 
-| Deprecated Token | Replacement |
-|-----------------|-------------|
-| `--spacing-inline-xs` | `--spacing-xs` |
-| `--spacing-inline-sm` | `--spacing-sm` |
-| `--spacing-inline-md` | `--spacing-md` |
-| `--spacing-inline-lg` | `--spacing-lg` |
-| `--spacing-form-control-gap` | `--spacing-md` |
+| Original Value | Normalized To | Token |
+|---------------|---------------|-------|
+| 5px | 4px | `--spacing-xs` |
+| 6px | 8px | `--spacing-sm` |
+| 10px | 12px | `--spacing-md` |
+| 11px | 12px | `--spacing-md` |
+| 15px | 16px | `--spacing-lg` |
+| 18px | 16px | `--spacing-lg` |
 
 ### Typography Tokens
 
@@ -235,7 +236,7 @@ Border radius tokens provide consistent rounded corners across UI elements:
 .prominent-label {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-medium);
-  gap: var(--spacing-inline-md);
+  gap: var(--spacing-md);
 }
 ```
 
