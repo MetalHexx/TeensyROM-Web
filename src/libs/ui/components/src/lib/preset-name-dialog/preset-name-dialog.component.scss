@@ -15,9 +15,9 @@ lib-scaling-compact-card {
 .dialog-header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-inline-md);
-  margin-bottom: var(--spacing-inline-lg);
-  
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+
   mat-icon {
     color: var(--color-primary);
     font-size: 24px;
@@ -36,7 +36,7 @@ lib-scaling-compact-card {
 // Material form field overrides
 .preset-name-field {
   width: 100%;
-  margin-bottom: var(--spacing-inline-md);
+  margin-bottom: var(--spacing-md);
 }
 
 // Character counter error state
@@ -49,20 +49,20 @@ lib-scaling-compact-card {
 .button-row {
   display: flex;
   justify-content: flex-end;
-  gap: var(--spacing-inline-sm);
-  margin-top: var(--spacing-inline-md);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
 }
 
 // Mobile responsiveness
 @media (max-width: 600px) {
   lib-scaling-compact-card {
     max-width: 100%;
-    margin: var(--spacing-inline-sm);
+    margin: var(--spacing-sm);
   }
-  
+
   .button-row {
     flex-direction: column-reverse;
-    gap: var(--spacing-inline-xs);
+    gap: var(--spacing-xs);
     
     lib-icon-button {
       width: 100%;

@@ -12,8 +12,8 @@ lib-scaling-compact-card {
 .dialog-header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-inline-md); // 10px
-  margin-bottom: var(--spacing-inline-lg); // 16px
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
 
   .warning-icon {
     color: var(--color-error); // Red/pink error color
@@ -32,7 +32,7 @@ lib-scaling-compact-card {
 
 // Message text area
 .dialog-message {
-  margin-bottom: var(--spacing-inline-lg); // 16px
+  margin-bottom: var(--spacing-lg);
 
   p {
     margin: 0;
@@ -48,20 +48,20 @@ lib-scaling-compact-card {
 .button-row {
   display: flex;
   justify-content: flex-end; // Right-aligned buttons
-  gap: var(--spacing-inline-sm); // 8px between buttons
-  margin-top: var(--spacing-inline-md); // 10px top spacing
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
 }
 
 // Mobile responsiveness
 @media (max-width: 600px) {
   lib-scaling-compact-card {
     max-width: 100%;
-    margin: var(--spacing-inline-sm); // 8px margins
+    margin: var(--spacing-sm);
   }
 
   .button-row {
-    flex-direction: column-reverse; // Cancel on top, confirm on bottom
-    gap: var(--spacing-inline-xs); // 6px between stacked buttons
+    flex-direction: column-reverse;
+    gap: var(--spacing-xs);
 
     lib-icon-button {
       width: 100%; // Full-width touch targets

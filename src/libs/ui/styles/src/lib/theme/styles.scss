@@ -58,13 +58,6 @@ html {
   --spacing-section-gap: var(--spacing-lg); // gap between sibling cards/sections
   --spacing-content-gap: var(--spacing-md); // gap between elements within a card
 
-  // Design Tokens - Spacing - Legacy Aliases
-  --spacing-inline-xs: var(--spacing-xs); /* @deprecated: use --spacing-xs */
-  --spacing-inline-sm: var(--spacing-sm); /* @deprecated: use --spacing-sm */
-  --spacing-inline-md: var(--spacing-md); /* @deprecated: use --spacing-md */
-  --spacing-inline-lg: var(--spacing-lg); /* @deprecated: use --spacing-lg */
-  --spacing-form-control-gap: var(--spacing-md); /* @deprecated: use --spacing-md */
-
   // Design Tokens - Typography - Font Sizes
   --font-size-sm: 0.875rem; // 14px - small text, secondary content
   --font-size-md: 1rem; // 16px - base body text
@@ -132,13 +125,6 @@ html.dark-mode {
   --spacing-card-padding-compact: var(--spacing-md);
   --spacing-section-gap: var(--spacing-lg);
   --spacing-content-gap: var(--spacing-md);
-
-  // Design Tokens - Spacing - Legacy Aliases
-  --spacing-inline-xs: var(--spacing-xs); /* @deprecated: use --spacing-xs */
-  --spacing-inline-sm: var(--spacing-sm); /* @deprecated: use --spacing-sm */
-  --spacing-inline-md: var(--spacing-md); /* @deprecated: use --spacing-md */
-  --spacing-inline-lg: var(--spacing-lg); /* @deprecated: use --spacing-lg */
-  --spacing-form-control-gap: var(--spacing-md); /* @deprecated: use --spacing-md */
 
   // Design Tokens - Typography (same values as light mode)
   --font-size-sm: 0.875rem;
@@ -416,7 +402,7 @@ body {
 // Apply consistent spacing between toggles and their labels
 mat-slide-toggle {
   .mdc-form-field {
-    gap: var(--spacing-form-control-gap);
+    gap: var(--spacing-md);
   }
 }
 
@@ -424,13 +410,13 @@ mat-slide-toggle {
 mat-hint {
   font-size: 0.8rem;
   opacity: 0.7;
-  margin-left: -0.9rem;
+  margin-left: -0.9rem; /* structural - Material form field label indent compensation */
 }
 
 mat-error {
   font-size: 0.875rem;
-  margin-top: 0.25rem;
-  margin-left: -0.9rem;
+  margin-top: var(--spacing-xs);
+  margin-left: -0.9rem; /* structural - Material form field label indent compensation */
 }
 
 // Style all Material input placeholders with dimmed color
@@ -456,7 +442,7 @@ mat-card-title {
 
   mat-form-field {
     width: 100%;
-    margin-bottom: -20px;
+    margin-bottom: -20px; /* structural - compensates Material form field bottom spacing */
   }
 }
 
@@ -621,8 +607,8 @@ mat-card-title {
   height: 24px;
   display: block;
   text-align: center;
-  padding-left: 2px;
-  padding-top: 2px;
+  padding-left: 2px; /* structural - optical icon centering */
+  padding-top: 2px; /* structural - optical icon centering */
   &.highlight {
     color: var(--color-highlight);
   }
@@ -799,7 +785,7 @@ mat-card-title {
   .section-title {
     font-size: 1.2rem;
     font-weight: 400;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--spacing-sm);
     font-family: Roboto;
   }
 }
@@ -854,9 +840,9 @@ mat-card-title {
   font-style: italic;
   font-size: 0.8rem;
   margin: 0;
-  padding-bottom: 0px;
-  padding-top: 5px;
-  padding-right: 20px;
+  padding-bottom: 0;
+  padding-top: var(--spacing-xs);
+  padding-right: var(--spacing-xl);
 }
 
 // ─────────────────────────────────────────────

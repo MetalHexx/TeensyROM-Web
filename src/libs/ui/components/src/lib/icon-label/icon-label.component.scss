@@ -4,19 +4,19 @@
 
   // Gap spacing presets using design tokens
   &.gap-small {
-    gap: var(--spacing-inline-xs);
+    gap: var(--spacing-xs);
   }
 
   &.gap-medium {
-    gap: var(--spacing-inline-sm);
+    gap: var(--spacing-sm);
   }
 
   &.gap-large {
-    gap: var(--spacing-inline-md);
+    gap: var(--spacing-md);
   }
 
   &.gap-extra-large {
-    gap: var(--spacing-inline-lg);
+    gap: var(--spacing-lg);
   }
 }
 

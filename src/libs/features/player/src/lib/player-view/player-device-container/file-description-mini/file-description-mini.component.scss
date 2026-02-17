@@ -17,8 +17,8 @@ lib-scaling-card {
 .description-layout {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-inline-sm);
-  padding: var(--spacing-inline-xs) 0;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
   padding-bottom: 0;
 
   &.empty-state {
@@ -47,7 +47,7 @@ lib-scaling-card {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: var(--spacing-inline-xs);
+  gap: var(--spacing-xs);
   margin: 0;
   align-items: baseline;
 
