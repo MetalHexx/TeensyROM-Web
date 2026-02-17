@@ -53,8 +53,8 @@ html {
 
   // Design Tokens - Spacing - Semantic Aliases
   --spacing-page-gutter: var(--spacing-xl); // viewport-to-content distance
-  --spacing-card-padding: var(--spacing-lg); // standard card internal padding
-  --spacing-card-padding-compact: var(--spacing-sm); // compact card padding
+  --spacing-card-padding: var(--spacing-md); // standard card internal padding (12px)
+  --spacing-card-padding-compact: var(--spacing-md); // compact card padding (12px)
   --spacing-section-gap: var(--spacing-lg); // gap between sibling cards/sections
   --spacing-content-gap: var(--spacing-md); // gap between elements within a card
 
@@ -128,8 +128,8 @@ html.dark-mode {
 
   // Design Tokens - Spacing - Semantic Aliases
   --spacing-page-gutter: var(--spacing-xl);
-  --spacing-card-padding: var(--spacing-lg);
-  --spacing-card-padding-compact: var(--spacing-sm);
+  --spacing-card-padding: var(--spacing-md);
+  --spacing-card-padding-compact: var(--spacing-md);
   --spacing-section-gap: var(--spacing-lg);
   --spacing-content-gap: var(--spacing-md);
 
@@ -185,7 +185,6 @@ html {
 
   @include mixins.below-phone {
     --spacing-page-gutter: var(--spacing-sm);
-    --spacing-card-padding: var(--spacing-md);
     --spacing-section-gap: var(--spacing-sm);
   }
 }
@@ -266,7 +265,7 @@ body {
 
 @mixin selectable-item {
   cursor: pointer;
-  padding: 8px 8px;
+  padding: var(--spacing-sm);
   border-radius: 10px;
   transition: background-color 0.2s ease-out;
 
@@ -451,7 +450,7 @@ mat-card-title {
 }
 
 .compact-card {
-  padding: var(--compact-card-padding, 16px);
+  padding: var(--compact-card-padding, var(--spacing-card-padding-compact));
   margin: 0;
   overflow: hidden;
 
@@ -479,7 +478,7 @@ mat-card-title {
   display: flex;
   flex-direction: column;
   margin: 0;
-  padding-bottom: 16px;
+  padding-bottom: var(--spacing-card-padding);
 
   mat-card-header {
     flex-shrink: 0;

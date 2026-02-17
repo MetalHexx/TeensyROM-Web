@@ -16,24 +16,24 @@
 
 // Material card content spacing
 lib-card-layout mat-card-content {
-  margin-top: 16px;
+  margin-top: var(--spacing-card-padding);
 }
 
 // Corner content positioning
 lib-card-layout .corner-content {
   position: absolute;
-  top: 12px; // Reduced from 16px to align better with header content
-  right: 16px;
+  top: var(--spacing-md); // Reduced from 16px to align better with header content
+  right: var(--spacing-card-padding);
   z-index: 1;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--spacing-md);
 
   @include styles.below-phone {
     position: static;
     width: 100%;
-    padding: 16px 16px 0px 16px;
+    padding: var(--spacing-card-padding) var(--spacing-card-padding) 0 var(--spacing-card-padding);
     box-sizing: border-box;
   }
 
@@ -52,7 +52,7 @@ lib-card-layout mat-card-header {
   width: 100%;
   box-sizing: border-box;
   // Reserve space for corner content (e.g., search toolbar) to prevent overlap
-  padding-right: calc(16px + var(--card-layout-corner-reserve, 0px)) !important;
+  padding-right: calc(var(--spacing-card-padding) + var(--card-layout-corner-reserve, 0px)) !important;
 
   @include styles.below-phone {
     padding-right: 0 !important;
@@ -67,7 +67,7 @@ lib-card-layout mat-card-header {
     display: block;
     width: 100%;
     align-self: stretch;
-    margin-bottom: 12px; // Space between header slot and title (if both present)
+    margin-bottom: var(--spacing-md); // Space between header slot and title (if both present)
     
     // Remove margin if header slot is the only content (no title follows)
     &:last-child {

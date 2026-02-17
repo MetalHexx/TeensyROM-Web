@@ -44,11 +44,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: var(--spacing-xs);
   flex: 1;
   min-width: 64px;
   height: 100%;
-  padding: 0 8px;
+  padding: 0 var(--spacing-sm);
   position: relative;
   transition: color 0.2s ease;
 

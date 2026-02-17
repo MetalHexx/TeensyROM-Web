@@ -124,6 +124,7 @@ export class CardLayoutComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
+    // Corresponds to --spacing-sm (8px) — reserve buffer for corner content positioning
     const bufferPx = 8;
     this.cornerReservePx.set(Math.ceil(cornerElement.offsetWidth + bufferPx));
   }
