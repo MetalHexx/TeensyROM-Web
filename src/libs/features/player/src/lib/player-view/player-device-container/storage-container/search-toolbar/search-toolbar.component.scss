@@ -15,11 +15,11 @@
 .search-toolbar-content {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
   width: 100%;
 
   .search-field {
-    padding-top: 4px;
+    padding-top: var(--spacing-xs);
     max-width: 240px;
     
     @include styles.below-tablet {

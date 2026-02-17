@@ -41,7 +41,7 @@
 
 // Adjust filter toolbar top margin to match left/right controls
 ::ng-deep lib-filter-toolbar[topOverlay] {
-  margin-top: -8px;
+  margin-top: calc(-1 * var(--spacing-sm));
 }
 
 // Remove black background from video container to prevent visible gaps

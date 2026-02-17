@@ -22,8 +22,8 @@
   overflow-x: hidden;
   background: transparent;
   max-height: 100%;
-  margin-right: -16px;
-  padding-right: 16px;
+  margin-right: calc(-1 * var(--spacing-lg));
+  padding-right: var(--spacing-lg);
 }
 
 .logs-list {
@@ -44,7 +44,7 @@
   text-align: center;
   font-size: 1rem;
   color: var(--color-dimmed);
-  padding: 2rem 0;
+  padding: var(--spacing-2xl) 0;
 }
 
 @media (max-width: 500px) {

@@ -8,7 +8,7 @@
   @include styles.selectable-item;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--spacing-xs);
 
   lib-icon-label {
     flex-shrink: 0;

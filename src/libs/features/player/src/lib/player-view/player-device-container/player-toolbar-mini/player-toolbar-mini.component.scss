@@ -2,7 +2,7 @@
   width: 100%;
   display: block;
   position: relative;
-  --compact-card-padding: 4px 8px 6px;
+  --compact-card-padding: var(--spacing-xs) var(--spacing-sm) var(--spacing-sm);
 }
 
 .mini-toolbar {
@@ -10,14 +10,14 @@
   flex-direction: column;
   align-items: center;
   gap: 0;
-  padding: 2px 0 4px;
+  padding: var(--spacing-xs) 0 var(--spacing-xs);
 }
 
 .time-row {
   display: flex;
   justify-content: space-between;
   width: 100%;
-  padding: 2px 0 0;
+  padding: var(--spacing-xs) 0 0;
   box-sizing: border-box;
 
   lib-file-time {
@@ -38,13 +38,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-top: -2px;
+  gap: var(--spacing-sm);
+  margin-top: calc(-1 * var(--spacing-xs));
 }
 
 .actions-row {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: -4px;
+  margin-top: calc(-1 * var(--spacing-xs));
 }

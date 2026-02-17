@@ -68,6 +68,6 @@ lib-scaling-card {
   }
 
   mat-card-content {
-    padding-bottom: 15px !important;
+    padding-bottom: var(--spacing-lg) !important;
   }
 }

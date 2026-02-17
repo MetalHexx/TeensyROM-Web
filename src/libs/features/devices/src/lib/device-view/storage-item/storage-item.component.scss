@@ -19,8 +19,8 @@ mat-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem 0.75rem 1rem;
-  padding-right: 0.5rem;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-md) var(--spacing-lg);
+  padding-right: var(--spacing-sm);
   min-height: 65px;
 }

@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem;
+  padding: var(--spacing-2xl);
   text-align: center;
   opacity: 0.7;
 
@@ -14,11 +14,11 @@
     font-size: 3rem;
     width: 3rem;
     height: 3rem;
-    margin-bottom: 1rem;
+    margin-bottom: var(--spacing-lg);
   }
 
   p {
-    margin: 0.25rem 0;
+    margin: var(--spacing-xs) 0;
   }
 
   .hint {
@@ -28,13 +28,13 @@
 }
 
 .device-section {
-  padding: 1rem 0;
+  padding: var(--spacing-lg) 0;
 
   .device-header {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
 
     lib-icon-label {
       display: flex;
@@ -58,7 +58,7 @@
 .device-divider {
   border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin: 1.5rem 0;
+  margin: var(--spacing-xl) 0;
 }
 
 form {
@@ -74,7 +74,7 @@ form {
 // Responsive grid for settings groups - matches player-settings-section
 .settings-grid {
   display: grid;
-  gap: 1.5rem;
+  gap: var(--spacing-xl);
   grid-template-columns: 1fr;
 
   // Side-by-side on tablets and larger
@@ -86,11 +86,11 @@ form {
 .settings-group {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--spacing-lg);
   padding: 0;
 
   .group-title {
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 var(--spacing-sm) 0;
     font-size: 1rem;
     font-weight: 600;
     opacity: 0.9;
@@ -102,8 +102,8 @@ form {
 .connection-type-field {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding-left: 4.25rem; // Align with toggle item content
+  gap: var(--spacing-sm);
+  padding-left: 4.25rem; /* structural: toggle label width */
 
   .connection-type-label {
     font-size: 0.875rem;
@@ -114,5 +114,5 @@ form {
 
 .connection-type-group {
   display: flex;
-  gap: 1rem;
+  gap: var(--spacing-lg);
 }

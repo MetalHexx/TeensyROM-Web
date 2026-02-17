@@ -53,7 +53,7 @@
 
   // Add padding to all direct children to maintain spacing
   > * {
-    padding: 10px 16px 8px 12px;
+    padding: var(--spacing-md) var(--spacing-lg) var(--spacing-sm) var(--spacing-md);
   }
 
   // Scrollbar styles inherited from global styles.scss
@@ -93,11 +93,11 @@ lib-content-overlay-container {
   justify-content: center;
   height: 100%;
   text-align: center;
-  padding: 16px;
+  padding: var(--spacing-lg);
   color: var(--mdc-theme-on-surface, rgba(255, 255, 255, 0.87));
 
   p {
-    margin: 4px 0;
+    margin: var(--spacing-xs) 0;
   }
 
   .error-hint {

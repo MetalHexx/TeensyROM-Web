@@ -6,7 +6,7 @@
 .file-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-md);
   animation: fadeIn 0.3s ease-out;
   min-width: 0; // Allow container to shrink
 }
@@ -20,7 +20,7 @@ lib-cycle-image {
 .file-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-xs);
   min-width: 0; // Allow text to shrink and truncate
   flex: 1; // Take remaining space
 }

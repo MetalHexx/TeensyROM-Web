@@ -5,7 +5,7 @@
 form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--spacing-xl);
 }
 
 .full-width {
@@ -15,8 +15,8 @@ form {
 // Responsive grid for settings groups
 .settings-grid {
   display: grid;
-  gap: 1.5rem;
-  margin-top: -1rem;
+  gap: var(--spacing-xl);
+  margin-top: calc(-1 * var(--spacing-lg));
   grid-template-columns: 1fr;
 
   // 2 columns on tablets and larger (max 2 columns)
@@ -28,11 +28,11 @@ form {
 .settings-group {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem 0;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg) 0;
 
   .group-title {
-    margin: 0 0 -0.5rem 0;
+    margin: 0 0 calc(-1 * var(--spacing-sm)) 0;
     font-size: 1rem;
     font-weight: 600;
     opacity: 0.9;

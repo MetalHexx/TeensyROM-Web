@@ -7,7 +7,7 @@
 .directory-trail-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-sm);
 
   lib-directory-navigate {
     flex: 0 0 auto;
@@ -22,7 +22,7 @@
   @include styles.below-phone {
     flex-direction: row;
     align-items: center;
-    gap: 8px;
+    gap: var(--spacing-sm);
     padding-top: 0;
   }
 }

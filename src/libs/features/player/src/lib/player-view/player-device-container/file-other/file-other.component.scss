@@ -24,8 +24,8 @@ lib-scaling-card {
 .metadata-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-top: 1rem;
+  gap: var(--spacing-xl);
+  margin-top: var(--spacing-lg);
 
   > * {
     min-width: 0;
@@ -37,8 +37,8 @@ lib-scaling-card {
 .rating-section {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 1rem 0;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-lg) 0;
 
   mat-icon {
     color: gold;
@@ -57,7 +57,7 @@ lib-scaling-card {
   margin: 0; // Remove margin since spacing is handled by grid gap
   display: flex;
   flex-direction: column; // Keep title on top, content below
-  gap: 0.75rem;
+  gap: var(--spacing-md);
 
   h4 {
     margin: 0;
@@ -74,7 +74,7 @@ lib-scaling-card {
   mat-chip-set {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--spacing-sm);
   }
 
   mat-chip {
@@ -95,19 +95,19 @@ lib-scaling-card {
 .videos-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
 }
 
 .competition-item {
-  padding: 0.75rem;
-  margin: 0.5rem 0;
+  padding: var(--spacing-md);
+  margin: var(--spacing-sm) 0;
   background-color: var(--mat-sys-surface-container-low);
   border-radius: 0.5rem;
   border-left: 3px solid var(--mat-sys-tertiary);
 
   .year {
     color: var(--mat-sys-on-surface-variant);
-    margin-left: 0.5rem;
+    margin-left: var(--spacing-sm);
   }
 
   .position {

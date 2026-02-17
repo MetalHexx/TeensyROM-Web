@@ -27,7 +27,7 @@
   flex-wrap: nowrap;
   align-items: center;
   min-width: 0;
-  padding: 2px 0;
+  padding: var(--spacing-xs) 0;
   width: 100%;
 }
 
@@ -68,7 +68,7 @@ lib-dropdown-menu {
   font-size: 1.4em;
   user-select: none;
   flex-shrink: 0; // Prevent separator from shrinking
-  margin: 0 8px;
+  margin: 0 var(--spacing-sm);
 }
 
 .hidden-segments-menu {

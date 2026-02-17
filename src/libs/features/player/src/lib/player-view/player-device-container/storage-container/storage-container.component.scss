@@ -11,7 +11,7 @@
 .storage-container {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--spacing-lg);
   height: 100%;
   flex: 1;
   min-height: 50px; // Ensure minimum height for content visibility
@@ -21,7 +21,7 @@
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 1rem;
+    gap: var(--spacing-lg);
     flex: 1;
     min-height: 0;
 

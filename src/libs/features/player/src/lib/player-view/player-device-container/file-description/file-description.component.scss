@@ -15,8 +15,8 @@ lib-scaling-card {
 .description-layout {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-inline-sm);
-  padding: var(--spacing-inline-xs) 0;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) 0;
 
   &.empty-state {
     align-items: center;
@@ -43,7 +43,7 @@ lib-scaling-card {
 .description-section {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-inline-xs);
+  gap: var(--spacing-xs);
 
   .section-label {
     margin: 0;
@@ -68,7 +68,7 @@ lib-scaling-card {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: var(--spacing-inline-xs);
+  gap: var(--spacing-xs);
   margin: 0;
   align-items: baseline;
 
@@ -96,7 +96,7 @@ lib-scaling-card {
 .metadata-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--spacing-inline-sm);
+  gap: var(--spacing-sm);
   margin-top: 0;
 
   > * {
@@ -108,8 +108,8 @@ lib-scaling-card {
 .rating-section {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: var(--spacing-inline-sm) 0;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-sm) 0;
 
   mat-icon {
     color: gold;
@@ -127,7 +127,7 @@ lib-scaling-card {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-inline-xs);
+  gap: var(--spacing-xs);
 
   h4 {
     margin: 0;
@@ -152,7 +152,7 @@ lib-scaling-card {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--spacing-xs);
 
   h4 {
     margin: 0;
@@ -169,7 +169,7 @@ lib-scaling-card {
   mat-chip-set {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--spacing-sm);
     margin: 0;
     padding: 0;
   }
@@ -191,19 +191,19 @@ lib-scaling-card {
 .videos-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
 }
 
 .competition-item {
-  padding: 0.75rem;
-  margin: 0.5rem 0;
+  padding: var(--spacing-md);
+  margin: var(--spacing-sm) 0;
   background-color: var(--mat-sys-surface-container-low);
   border-radius: 0.5rem;
   border-left: 3px solid var(--mat-sys-tertiary);
 
   .year {
     color: var(--mat-sys-on-surface-variant);
-    margin-left: 0.5rem;
+    margin-left: var(--spacing-sm);
   }
 
   .position {

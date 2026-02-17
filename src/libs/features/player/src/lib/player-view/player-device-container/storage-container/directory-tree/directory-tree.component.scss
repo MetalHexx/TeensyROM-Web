@@ -27,13 +27,13 @@ mat-tree {
 }
 
 .loading-icon {
-  margin-left: 8px;
+  margin-left: var(--spacing-sm);
   font-size: 16px;
   animation: spin 2s linear infinite;
 }
 
 .error-icon {
-  margin-left: 8px;
+  margin-left: var(--spacing-sm);
   font-size: 16px;
 }
 
