@@ -64,6 +64,8 @@ export class PlayerDeviceContainerComponent {
   private swipeTimeout: ReturnType<typeof setTimeout> | null = null;
   private paneNavShowTimeout: ReturnType<typeof setTimeout> | null = null;
   private paneNavHideTimeout: ReturnType<typeof setTimeout> | null = null;
+  private paneNavAutoHideTimeout: ReturnType<typeof setTimeout> | null = null;
+  private hoveringNavControl = false;
 
   protected readonly paneIndicators = computed(() => {
     if (this.isPhone()) {
@@ -165,10 +167,29 @@ export class PlayerDeviceContainerComponent {
   scrollToPane(index: number): void {
     const container = this.swipeContainer()?.nativeElement;
     if (!container) return;
+
+    // Set activePane eagerly so button disabled states update immediately
+    this.activePane.set(index);
+
+    // Temporarily disable scroll-snap to prevent it from intercepting
+    // the smooth scroll animation and snapping back to the current pane.
+    container.style.scrollSnapType = 'none';
+
     container.scrollTo({
       left: index * container.clientWidth,
       behavior: 'smooth',
     });
+
+    // Re-enable scroll-snap after animation completes
+    const restoreSnap = () => {
+      container.style.scrollSnapType = '';
+      container.removeEventListener('scrollend', restoreSnap);
+      clearTimeout(fallback);
+    };
+    container.addEventListener('scrollend', restoreSnap, { once: true });
+
+    // Safety fallback for browsers without scrollend support
+    const fallback = setTimeout(restoreSnap, 600);
   }
 
   scrollToNextPane(): void {
@@ -191,6 +212,7 @@ export class PlayerDeviceContainerComponent {
     }
     this.paneNavShowTimeout = setTimeout(() => {
       this.showPaneNav.set(true);
+      this.startAutoHideTimer();
     }, 400);
   }
 
@@ -199,9 +221,52 @@ export class PlayerDeviceContainerComponent {
       clearTimeout(this.paneNavShowTimeout);
       this.paneNavShowTimeout = null;
     }
+    if (this.paneNavAutoHideTimeout) {
+      clearTimeout(this.paneNavAutoHideTimeout);
+      this.paneNavAutoHideTimeout = null;
+    }
+    // Don't hide if mouse moved to a nav control in the gutter
     this.paneNavHideTimeout = setTimeout(() => {
-      this.showPaneNav.set(false);
+      if (!this.hoveringNavControl) {
+        this.showPaneNav.set(false);
+      }
     }, 300);
+  }
+
+  onNavControlEnter(): void {
+    this.hoveringNavControl = true;
+    if (this.paneNavHideTimeout) {
+      clearTimeout(this.paneNavHideTimeout);
+      this.paneNavHideTimeout = null;
+    }
+    if (this.paneNavAutoHideTimeout) {
+      clearTimeout(this.paneNavAutoHideTimeout);
+      this.paneNavAutoHideTimeout = null;
+    }
+  }
+
+  onNavControlLeave(): void {
+    this.hoveringNavControl = false;
+    this.startAutoHideTimer();
+  }
+
+  onSwipeAreaMouseMove(): void {
+    // Show nav if hidden, or reset auto-hide timer if already visible
+    if (!this.showPaneNav()) {
+      this.showPaneNav.set(true);
+    }
+    this.startAutoHideTimer();
+  }
+
+  private startAutoHideTimer(): void {
+    if (this.paneNavAutoHideTimeout) {
+      clearTimeout(this.paneNavAutoHideTimeout);
+    }
+    // Don't start auto-hide while hovering over a nav control
+    if (this.hoveringNavControl) return;
+    this.paneNavAutoHideTimeout = setTimeout(() => {
+      this.showPaneNav.set(false);
+    }, 2500);
   }
 
   readonly currentFile = computed(() => {

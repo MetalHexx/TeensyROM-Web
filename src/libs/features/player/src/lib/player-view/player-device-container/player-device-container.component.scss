@@ -155,9 +155,9 @@
     align-items: center;
     gap: var(--spacing-sm);
     position: absolute;
-    top: var(--spacing-xl);
+    top: 0;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
     z-index: 1001;
     pointer-events: none;
     opacity: 0;
@@ -185,7 +185,26 @@
   }
 }
 
-// Desktop overlay nav: buttons that appear on hover in the upper corners
+// Phone nav: invisible trigger strip spanning the full gutter width
+// Contains buttons + dots as a single hover target
+.nav-gutter-strip {
+  display: none;
+
+  @include styles.below-phone {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: absolute;
+    top: 0;
+    left: calc(-1 * var(--spacing-section-gap));
+    right: calc(-1 * var(--spacing-section-gap));
+    transform: translateY(-50%);
+    z-index: 1002;
+    height: 32px; // Match button height for consistent hit area
+    pointer-events: auto;
+  }
+}
+
 .swipe-nav-btn.swipe-nav-prev,
 .swipe-nav-btn.swipe-nav-next {
   display: none;
@@ -194,9 +213,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    position: absolute;
-    top: var(--spacing-sm);
-    z-index: 1002;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
@@ -208,18 +224,6 @@
   }
 }
 
-.swipe-nav-btn.swipe-nav-prev {
-  @include styles.below-phone {
-    left: var(--spacing-sm);
-  }
-}
-
-.swipe-nav-btn.swipe-nav-next {
-  @include styles.below-phone {
-    right: var(--spacing-sm);
-  }
-}
-
 .swipe-indicators-desktop {
   display: none;
 
@@ -228,11 +232,8 @@
     justify-content: center;
     align-items: center;
     gap: var(--spacing-sm);
-    position: absolute;
-    top: var(--spacing-xl);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1002;
+    flex: 1;
+    z-index: 1001;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;

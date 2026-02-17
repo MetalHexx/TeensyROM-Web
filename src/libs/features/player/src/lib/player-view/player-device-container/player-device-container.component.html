@@ -1,22 +1,25 @@
 @if (device()?.isEnabled) {
 <div class="device-container">
-  <div class="device-header">
-    <div class="swipe-wrapper"
-      (mouseenter)="onSwipeAreaMouseEnter()"
-      (mouseleave)="onSwipeAreaMouseLeave()">
-      @if ((enableVideo() || isPhone()) && !isTouchDevice()) {
+  <div class="device-header"
+    (mouseenter)="onSwipeAreaMouseEnter()"
+    (mouseleave)="onSwipeAreaMouseLeave()"
+    (mousemove)="onSwipeAreaMouseMove()">
+    @if ((enableVideo() || isPhone()) && !isTouchDevice()) {
+      <div class="nav-gutter-strip" (mouseenter)="onNavControlEnter()" (mouseleave)="onNavControlLeave()">
         <button class="swipe-nav-btn swipe-nav-prev glassy-white" [class.visible]="showPaneNav()" (click)="scrollToPreviousPane()" [disabled]="activePane() === 0" aria-label="Previous pane">
           <mat-icon>chevron_left</mat-icon>
-        </button>
-        <button class="swipe-nav-btn swipe-nav-next glassy-white" [class.visible]="showPaneNav()" (click)="scrollToNextPane()" [disabled]="activePane() === paneIndicators().length - 1" aria-label="Next pane">
-          <mat-icon>chevron_right</mat-icon>
         </button>
         <div class="swipe-indicators-desktop" [class.visible]="showPaneNav()">
           @for (pane of paneIndicators(); track pane.index) {
             <span class="dot" role="button" tabindex="0" [attr.aria-label]="pane.label" [class.active]="activePane() === pane.index" (click)="scrollToPane(pane.index)" (keyup.enter)="scrollToPane(pane.index)"></span>
           }
         </div>
-      }
+        <button class="swipe-nav-btn swipe-nav-next glassy-white" [class.visible]="showPaneNav()" (click)="scrollToNextPane()" [disabled]="activePane() === paneIndicators().length - 1" aria-label="Next pane">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </div>
+    }
+    <div class="swipe-wrapper">
       <div class="swipe-container" #swipeContainer [style.visibility]="swipeReady() ? 'visible' : 'hidden'">
       @if (isPhone()) {
         <div class="storage-pane">
