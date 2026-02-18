@@ -110,9 +110,8 @@ lib-header {
   gap: var(--spacing-section-gap); // Space between nav rail and content
 
   @include styles.below-phone {
-    padding: 0; // Nav hidden — router-content takes over all edge spacing
-    /* structural: bottom bar clearance */
-    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    padding: 0;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 }
 

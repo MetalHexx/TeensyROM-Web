@@ -7,9 +7,8 @@
   flex: 0 1 520px;
 
   @include styles.below-phone {
-    width: 100%;
-    aspect-ratio: 1 / 1; // Match file-image's square layout on phone
-    flex: 0 0 auto;
+    // Host fills swipe slot; inner .video-container preserves aspect ratio
+    aspect-ratio: unset;
   }
 }
 
@@ -31,6 +30,14 @@
   position: relative;
   width: 100%;
   height: 100%;
+
+  // Phone: contain-fit 4:3 CRT proportions within swipe slot
+  // cqh = slot height; width = min(slot width, height * 4/3)
+  @include styles.below-phone {
+    height: auto;
+    width: min(100%, calc(100cqh * 4 / 3));
+    aspect-ratio: 4 / 3;
+  }
 }
 
 .video-with-settings-wrapper {

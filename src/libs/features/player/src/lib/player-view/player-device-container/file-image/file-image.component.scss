@@ -10,9 +10,8 @@
   --carousel-image-fit: fill;
 
   @include styles.below-phone {
-    width: 100%;
-    align-self: center;
-    flex: 0 0 auto;
+    // Host fills swipe slot; inner lib-scaling-container preserves aspect ratio
+    aspect-ratio: unset;
   }
 }
 
@@ -41,6 +40,15 @@ lib-scaling-container {
   border-radius: var(--mat-sys-corner-large);
   overflow: hidden;
   box-shadow: var(--mat-sys-level4);
+
+  // Phone: contain-fit square within swipe slot using container query units
+  // Parent slot has container-type:size so cqh = slot height.
+  // min(100%, 100cqh) picks the tighter dimension, aspect-ratio derives the other.
+  @include styles.below-phone {
+    height: auto;
+    width: min(100%, 100cqh);
+    aspect-ratio: 1 / 1;
+  }
 }
 
 .image-wrapper {

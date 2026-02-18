@@ -12,7 +12,6 @@
     min-height: 0;
   }
 
-  // At phone, let content determine height so parent scrollbar works
   @include styles.below-phone {
     height: auto;
   }
@@ -51,8 +50,9 @@
   min-height: min(600px, calc(100vh - 100px)); // Scale down on small viewports (header + padding)
 
   @include styles.below-phone {
-    min-height: auto; // Let content determine height on phone
-    min-width: 0; // Allow grid item to shrink below intrinsic content width
+    min-height: 0;
+    height: auto;
+    min-width: 0;
   }
 }
 

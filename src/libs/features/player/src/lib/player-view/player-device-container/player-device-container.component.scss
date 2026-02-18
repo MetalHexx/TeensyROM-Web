@@ -10,6 +10,7 @@
 
   @include styles.below-phone {
     height: auto;
+    margin-bottom: var(--spacing-section-gap);
   }
 }
 
@@ -32,6 +33,9 @@
   // constrain the header height causing overlaps.
   @include styles.below-phone {
     container-type: normal;
+    gap: var(--spacing-section-gap);
+    flex: 0 0 auto;
+    max-height: calc(100dvh - 64px - 2 * var(--spacing-section-gap));
   }
 
   .device-header {
@@ -47,9 +51,10 @@
     @include styles.below-phone {
       flex-direction: column;
       align-items: stretch;
-      height: auto;
+      flex: 0 1 calc(100vw - 2 * var(--spacing-section-gap));
+      min-height: 0;
+      max-height: calc(100vw - 2 * var(--spacing-section-gap));
       overflow: visible;
-      flex-shrink: 0;
     }
   }
 
@@ -63,6 +68,7 @@
     gap: var(--spacing-lg);
     width: 100%;
     align-items: stretch;
+    flex-shrink: 0; // Never shrink toolbar on phone
 
     .player-toolbar-wrapper {
       flex: 1 1 auto;
@@ -87,6 +93,13 @@
     }
   }
 
+  // Prevent secondary toolbars from shrinking when swipe area flexes
+  // Override lib-scaling-compact-card's height:100% so it auto-sizes to content
+  lib-scaling-compact-card {
+    flex-shrink: 0;
+    height: auto;
+  }
+
   .storage-container {
     display: flex;
     gap: var(--spacing-lg);
@@ -106,13 +119,12 @@
     min-height: min(600px, calc(100vh - 100px));
   }
 
-  // At phone sizes, allow vertical scrolling so all content is accessible
+  // At phone sizes, fill viewport and let flex distribute height
   @include styles.below-phone {
     overflow: clip;
-    overflow-clip-margin: 1.25rem; // Allow box-shadow to render beyond clip boundary
-    min-height: auto;
+    overflow-clip-margin: 1.25rem;
+    min-height: 0;
     height: auto;
-    flex: none;
   }
 }
 
@@ -139,8 +151,11 @@
   display: contents;
 
   @include styles.below-phone {
-    display: block;
+    display: flex;
+    flex-direction: column;
     min-width: 0;
+    min-height: 0;
+    height: 100%;
     position: relative;
     overflow: visible;
   }
@@ -271,12 +286,9 @@
     scrollbar-width: none; // Firefox
     width: 100%; // Definite width so children's flex: 0 0 100% resolves correctly
     min-width: 0; // Prevent flex item from expanding to intrinsic content width
-    // Perfect square: height matches actual width
-    aspect-ratio: 1;
-    max-height: 70vh; // Fallback
-    max-height: 70dvh; // Dynamic viewport height — accurate on mobile
-    min-height: 250px;
-    flex-shrink: 0;
+    flex: 1 1 0;
+    min-height: 200px;
+    max-height: calc(100vw - 2 * var(--spacing-section-gap));
     &::-webkit-scrollbar {
       display: none; // Chrome/Safari
     }
@@ -286,11 +298,20 @@
       scroll-snap-stop: always;
       flex: 0 0 100%;
       min-width: 100%;
-      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       max-height: 100%;
-      overflow: hidden;
+      overflow: clip;
+      overflow-clip-margin: var(--spacing-sm);
       box-sizing: border-box;
-      padding: var(--spacing-md); // Shadow breathing room — overflow:hidden clips at padding-box edge
+      padding: 0;
+      container-type: size;
+    }
+
+    // Content panes (storage, description) stretch to fill the entire slot
+    > lib-file-description {
+      align-items: stretch;
     }
   }
 }
@@ -317,10 +338,11 @@
 }
 
 // Phone-specific pane styles inside swipe-container
-// Storage pane containment handled by .swipe-container > * rule;
-// no additional overflow needed here.
+// Storage and description panes stretch to fill their slot (content views);
+// image/video panes center with preserved aspect ratio.
 .storage-pane {
   @include styles.below-phone {
+    align-self: stretch;
     height: 100%;
     position: relative;
     touch-action: pan-y;

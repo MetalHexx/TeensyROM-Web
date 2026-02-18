@@ -164,14 +164,13 @@ html.dark-mode {
 // ─────────────────────────────────────────────
 //  Responsive Spacing Overrides
 // ─────────────────────────────────────────────
-html {
+// Use html& inside each theme block to match specificity (0,1,1 for html.dark-mode).
+// Plain html selector (0,0,1) loses to html.dark-mode (0,1,1), so responsive
+// overrides on bare html never take effect in dark mode.
+html,
+html.dark-mode {
   @include mixins.below-desktop {
     --spacing-page-gutter: var(--spacing-lg);
-  }
-
-  @include mixins.below-phone {
-    --spacing-page-gutter: var(--spacing-sm);
-    --spacing-section-gap: var(--spacing-sm);
   }
 }
 
