@@ -29,6 +29,15 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
   </tr>
 </table>
 
+<br>
+
+<p align="center">
+  <a href="https://www.youtube.com/shorts/hcfaokI_lHw" target="_blank">
+    <img src="https://img.youtube.com/vi/hcfaokI_lHw/maxresdefault.jpg" alt="Watch TeensyROM Web Phone Demo" width="480" />
+  </a>
+  <br>
+  <em>▶ Watch the demo</em>
+</p>
 
 ## ✨ Features
 
