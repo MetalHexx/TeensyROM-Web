@@ -90,11 +90,10 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Multi-Device Views**: Simultaneous file browsing across multiple connected devices
 
 ### Mobile & Responsive Design
-- **Phone Layout**: Dedicated mobile layout with swipe navigation between player views
-- **Mini Player Toolbar**: Compact, touch-friendly playback controls for phone sizes
-- **Bottom Nav Rail**: Dedicated navigation bar at the bottom of the screen on phone layouts
-- **Swipeable Action Bar**: File actions accessible via swipe for small-screen efficiency
-- **Responsive Breakpoints**: Optimized layouts for phone, tablet, and desktop screen sizes
+- **Works on Any Device**: Fully usable on any screen from the smallest smartphones to large desktop monitors
+- **Touch-Optimized**: Swipe gestures, touch-friendly controls, and long-press interactions throughout
+- **Adaptive Layouts**: The UI intelligently reorganizes itself for phone, tablet, and desktop screen sizes
+- **No App Install Required**: Access from any device browser on your local network
 
 ### Tooltip System
 - **Custom Tooltips**: Touch-friendly tooltips with long-press activation on mobile
