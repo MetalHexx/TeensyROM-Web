@@ -1,10 +1,10 @@
 import { Component, input, computed, inject, effect, untracked, signal, viewChild, ElementRef, afterNextRender } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Device } from '@teensyrom-nx/domain';
+import { Device, StorageType } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { EmptyStateMessageComponent, ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective, ScalingContainerComponent } from '@teensyrom-nx/ui/components';
+import { EmptyStateMessageComponent, ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective, ScalingCardComponent, ScalingContainerComponent } from '@teensyrom-nx/ui/components';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
 import { FileImageComponent } from './file-image/file-image.component';
@@ -36,12 +36,12 @@ const TOUCH_DEVICE_QUERY = '(hover: none)';
     FileDescriptionMiniComponent,
     PlayerToolbarMiniComponent,
     ScalingContainerComponent,
+    ScalingCardComponent,
     ScalingCompactCardComponent,
     SwipePaneContainerComponent,
     SwipePaneDirective,
     PlayerToolbarActionsComponent,
     EmptyStateMessageComponent,
-    ScalingContainerComponent
 ],
   templateUrl: './player-device-container.component.html',
   styleUrl: './player-device-container.component.scss',
@@ -127,6 +127,22 @@ export class PlayerDeviceContainerComponent {
       if (deviceId) {
         untracked(() => {
           this.playerContext.initializePlayer(deviceId);
+        });
+      }
+    });
+
+    // Reset to file-image pane (index 1) whenever we enter the phone breakpoint.
+    // afterNextRender only handles the initial mount; subsequent transitions need this.
+    effect(() => {
+      if (this.isPhone()) {
+        untracked(() => {
+          this.activePane.set(1);
+          requestAnimationFrame(() => {
+            const container = this.swipeContainer()?.nativeElement;
+            if (container) {
+              container.scrollLeft = container.clientWidth;
+            }
+          });
         });
       }
     });
@@ -292,10 +308,29 @@ export class PlayerDeviceContainerComponent {
     return device.sdStorage?.indexExists || device.usbStorage?.indexExists || false;
   });
 
+  readonly availableStorageTypes = computed(() => {
+    const device = this.device();
+    if (!device) return [];
+    const types: StorageType[] = [];
+    if (device.sdStorage?.available) types.push(StorageType.Sd);
+    if (device.usbStorage?.available) types.push(StorageType.Usb);
+    return types;
+  });
+
   readonly fileDescription = computed(() => {
     const currentFile = this.currentFile();
     return currentFile?.file?.description ?? '';
   });
+
+  readonly swipePaneEmptyStateIcon = computed(() => 'info');
+
+  readonly swipePaneEmptyStateTitle = computed(() => 'Nothing Playing Yet');
+
+  readonly swipePaneEmptyStateMessage = computed(() =>
+    this.hasStorageIndex()
+      ? 'Select a file from the directory to see its details here.'
+      : 'Index your storage to browse and launch files.'
+  );
 
   readonly emptyStateIcon = computed(() => this.hasStorageIndex() ? 'play_circle' : 'sd_storage');
 
@@ -303,11 +338,15 @@ export class PlayerDeviceContainerComponent {
     this.hasStorageIndex() ? 'Ready to Play' : 'Index Your Storage'
   );
 
-  readonly emptyStateMessage = computed(() =>
-    this.hasStorageIndex()
-      ? 'Browse the directory listing below and select a file, or hit the dice button to launch something random!'
-      : 'Index your file system to browse and launch files from your TeensyROM.'
-  );
+  readonly emptyStateMessage = computed(() => {
+    if (!this.hasStorageIndex()) {
+      return 'Index your file system to browse and launch files from your TeensyROM.';
+    }
+    if (this.isPhone()) {
+      return 'Hit the dice button to launch something random!';
+    }
+    return 'Browse the directory listing below and select a file, or hit the dice button to launch something random!';
+  });
 
   readonly emptyStateSecondaryMessage = computed(() =>
     this.hasStorageIndex() ? '' : 'Visit <strong>Devices</strong> in the navigation to manage indexing.'

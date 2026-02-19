@@ -36,6 +36,11 @@
     gap: var(--spacing-section-gap);
     flex: 0 0 auto;
     max-height: calc(100dvh - 64px - 2 * var(--spacing-section-gap));
+
+    lib-scaling-container {
+      flex: 0 0 auto;
+      height: auto;
+    }
   }
 
   .device-header {

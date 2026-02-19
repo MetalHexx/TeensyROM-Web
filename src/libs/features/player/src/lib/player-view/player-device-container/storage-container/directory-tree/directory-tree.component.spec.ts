@@ -789,3 +789,57 @@ describe('DirectoryTreeComponent - Single Storage', () => {
     expect(deviceNode.children).toHaveLength(1);
   });
 });
+
+// Regression test: device node must always be expandable even before storage entries are loaded
+describe('DirectoryTreeComponent - Empty Storage Entries (Bug 2 Regression)', () => {
+  let component: DirectoryTreeComponent;
+  let fixture: ComponentFixture<DirectoryTreeComponent>;
+  let componentRef: ComponentRef<DirectoryTreeComponent>;
+  let mockStorageStore: MockStorageStore;
+
+  beforeEach(async () => {
+    mockStorageStore = {
+      getDeviceDirectories: vi.fn().mockReturnValue(() => []),
+      navigateToDirectory: vi.fn(),
+      navigateToDeviceLevel: vi.fn(),
+      isDeviceLevelView: vi.fn().mockReturnValue(() => false),
+      getDeviceStorageEntries: vi.fn().mockReturnValue(() => ({})), // No storage entries yet
+      getSelectedDirectoryState: vi.fn().mockReturnValue(() => null),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [DirectoryTreeComponent],
+      providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(DirectoryTreeComponent);
+    component = fixture.componentInstance;
+    componentRef = fixture.componentRef;
+    componentRef.setInput('deviceId', 'test-device-123');
+    fixture.detectChanges();
+  });
+
+  it('should render device node with a placeholder child when storage entries are empty', () => {
+    const tree = component.directoryTree();
+    const deviceNode = tree[0];
+
+    expect(deviceNode.type).toBe(DirectoryTreeNodeType.Device);
+    expect(deviceNode.children).toHaveLength(1);
+    expect(deviceNode.children?.[0].type).toBe(DirectoryTreeNodeType.Placeholder);
+    expect(deviceNode.children?.[0].name).toBe('Loading...');
+  });
+
+  it('should satisfy hasChild predicate for device node when storage entries are empty', () => {
+    const tree = component.directoryTree();
+    const deviceNode = tree[0];
+
+    expect(component.hasChild(0, deviceNode)).toBeTruthy();
+  });
+
+  it('should not satisfy isPlaceholder predicate for the device node itself', () => {
+    const tree = component.directoryTree();
+    const deviceNode = tree[0];
+
+    expect(component.isPlaceholder(0, deviceNode)).toBeFalsy();
+  });
+});

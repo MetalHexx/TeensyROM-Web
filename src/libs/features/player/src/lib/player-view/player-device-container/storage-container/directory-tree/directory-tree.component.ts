@@ -172,13 +172,17 @@ export class DirectoryTreeComponent implements AfterViewInit {
   }
 
   private buildTreeNodes(deviceId: string): DirectoryTreeNode[] {
+    const storageNodes = this.buildStorageTypeNodes(deviceId);
+    const children =
+      storageNodes.length > 0 ? storageNodes : this.createPlaceholderChildren(`device-${deviceId}`);
+
     const deviceNode: DirectoryTreeNode = {
       id: `device-${deviceId}`,
       name: `Device ${deviceId}`,
       type: DirectoryTreeNodeType.Device,
       icon: 'desktop_windows',
       deviceId,
-      children: this.buildStorageTypeNodes(deviceId),
+      children,
     };
 
     return [deviceNode];
