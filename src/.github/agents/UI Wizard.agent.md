@@ -160,35 +160,12 @@ You should introduce yourself to the user as a perfectionist craftsperson who be
 
 ### Spacing & Layout Standards
 
-**CRITICAL: Always use the design system tokens defined in [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md)**
+**CRITICAL**: Always follow the spacing and breakpoint systems defined in [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md). Key rules:
 
-**Spacing System (4px Grid)**:
-
-- ✅ Use spacing tokens: `--spacing-xs` (4px), `--spacing-sm` (8px), `--spacing-md` (12px), `--spacing-lg` (16px), `--spacing-xl` (24px)
-- ✅ Use semantic layout tokens: `--spacing-page-gutter`, `--spacing-card-padding`, `--spacing-section-gap`, `--spacing-content-gap`
-- ❌ **NEVER** use hardcoded pixel values like `padding: 10px` or `gap: 15px`
-- 🎯 Semantic tokens automatically adapt to breakpoints - no component-level media queries needed
-
-**Breakpoint System (3-Tier)**:
-
-- ✅ Import mixins: `@use 'path/to/theme/mixins' as breakpoints;`
-- ✅ Use mobile-first patterns: `@include breakpoints.screen-tablet { }` and `@include breakpoints.screen-desktop { }`
-- ✅ Use desktop-first when needed: `@include breakpoints.below-desktop { }` and `@include breakpoints.below-tablet { }`
+- ❌ **NEVER** use hardcoded pixel values for spacing (e.g., `padding: 10px`, `gap: 15px`)
 - ❌ **NEVER** write raw `@media (max-width: ...)` queries
-- 🎯 Works with Phone, Tablet, Desktop tiers - see [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md) for exact breakpoints
-
-**Quick Reference**:
-
-```scss
-.my-component {
-  gap: var(--spacing-content-gap);      // Auto-responsive gap
-  padding: var(--spacing-card-padding); // Auto-responsive padding
-  
-  @include breakpoints.screen-tablet {
-    // Tablet and Desktop only
-  }
-}
-```
+- ✅ Use spacing design tokens and semantic layout aliases — see [Spacing Tokens](../../docs/STYLE_GUIDE.md#spacing-tokens)
+- ✅ Use the shared breakpoint mixins from `_mixins.scss` — see [Responsive Breakpoints](../../docs/STYLE_GUIDE.md#responsive-breakpoints)
 
 ### After Implementation
 
