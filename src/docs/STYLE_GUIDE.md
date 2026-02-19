@@ -112,8 +112,8 @@ Semantic tokens auto-scale at breakpoints defined in `styles.scss`. Components u
 
 | Token | Desktop (≥1600px) | Tablet (<1600px) | Phone (<640px) |
 |-------|-------------------|-------------------|----------------|
-| `--spacing-page-gutter` | 24px | 16px | 8px |
-| `--spacing-section-gap` | 16px | 16px | 8px |
+| `--spacing-page-gutter` | 24px | 16px | 16px |
+| `--spacing-section-gap` | 16px | 16px | 16px |
 | `--spacing-card-padding` | 12px | 12px | 12px |
 | `--spacing-card-padding-compact` | 12px | 12px | 12px |
 | `--spacing-content-gap` | 12px | 12px | 12px |
