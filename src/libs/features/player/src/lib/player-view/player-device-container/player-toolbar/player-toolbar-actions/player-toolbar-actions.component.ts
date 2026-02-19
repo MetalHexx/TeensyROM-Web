@@ -1,4 +1,4 @@
-import { Component, inject, input, computed } from '@angular/core';
+import { Component, inject, input, computed, booleanAttribute } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatBadgeModule } from '@angular/material/badge';
@@ -38,6 +38,7 @@ export class PlayerToolbarActionsComponent {
   private readonly storageStore = inject(StorageStore);
 
   deviceId = input.required<string>();
+  disabled = input<boolean>(false);
 
   protected readonly durationOptions = DURATION_OPTIONS;
 

@@ -27,7 +27,20 @@
         </div>
       }
       <lib-file-image [deviceId]="deviceId()" [currentFile]="currentFile()"></lib-file-image>
-      <lib-file-description [deviceId]="deviceId()"></lib-file-description>
+      @if (isPlayerLoaded()) {
+        <lib-file-description [deviceId]="deviceId()"></lib-file-description>
+      } @else {
+        <lib-scaling-container>
+          <lib-empty-state-message
+            [icon]="emptyStateIcon()"
+            [title]="emptyStateTitle()"
+            [message]="emptyStateMessage()"
+            [secondaryMessage]="emptyStateSecondaryMessage()"
+            size="medium">
+          </lib-empty-state-message>
+        </lib-scaling-container>
+        
+      }
       @if (enableVideo()) {
         <lib-video-capture [deviceId]="deviceId()"></lib-video-capture>
       }
@@ -41,19 +54,28 @@
     }
     </div>
   </div>
-  @if (isPhone()) {
+  @if (isPhone() && isPlayerLoaded()) {
     <lib-file-description-mini [deviceId]="deviceId()"></lib-file-description-mini>
+  } @else if (isPhone() && !isPlayerLoaded()) {
+    <lib-scaling-container>
+      <lib-empty-state-message
+        [icon]="emptyStateIcon()"
+        [title]="emptyStateTitle()"
+        [message]="emptyStateMessage()"
+        [secondaryMessage]="emptyStateSecondaryMessage()"
+        size="medium">
+      </lib-empty-state-message>
+    </lib-scaling-container>
   }
-  @if (isPlayerLoaded()) {
   <div class="combined-toolbar">
     @if (isPhone()) {
-      <lib-player-toolbar-mini [deviceId]="deviceId()"></lib-player-toolbar-mini>
+      <lib-player-toolbar-mini [deviceId]="deviceId()" [disabled]="!isPlayerLoaded()"></lib-player-toolbar-mini>
     } @else {
       <div class="player-toolbar-wrapper">
-        <lib-player-toolbar [deviceId]="deviceId()"></lib-player-toolbar>
+        <lib-player-toolbar [deviceId]="deviceId()" [disabled]="!isPlayerLoaded()"></lib-player-toolbar>
       </div>
       <div class="filter-toolbar-wrapper">
-        <lib-filter-toolbar [deviceId]="deviceId()"></lib-filter-toolbar>
+        <lib-filter-toolbar [deviceId]="deviceId()" [disabled]="!hasStorageIndex()"></lib-filter-toolbar>
       </div>
     }
   </div>
@@ -61,14 +83,13 @@
     <lib-scaling-compact-card animationEntry="from-bottom" animationParent="auto">
       <lib-swipe-pane-container>
         <ng-template libSwipePane label="Filters">
-          <lib-filter-toolbar [deviceId]="deviceId()" [showCard]="false"></lib-filter-toolbar>
+          <lib-filter-toolbar [deviceId]="deviceId()" [showCard]="false" [disabled]="!hasStorageIndex()"></lib-filter-toolbar>
         </ng-template>
         <ng-template libSwipePane label="Actions">
-          <lib-player-toolbar-actions [deviceId]="deviceId()"></lib-player-toolbar-actions>
+          <lib-player-toolbar-actions [deviceId]="deviceId()" [disabled]="!isPlayerLoaded()"></lib-player-toolbar-actions>
         </ng-template>
       </lib-swipe-pane-container>
     </lib-scaling-compact-card>
-  }
   }
   @if (!isPhone()) {
     <div class="storage-container">

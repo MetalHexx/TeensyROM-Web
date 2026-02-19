@@ -25,6 +25,9 @@ import { RandomRollButtonComponent } from './random-roll-button';
   ],
   templateUrl: './filter-toolbar.component.html',
   styleUrl: './filter-toolbar.component.scss',
+  host: {
+    '[class.disabled-state]': 'disabled()',
+  },
 })
 export class FilterToolbarComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
@@ -32,6 +35,7 @@ export class FilterToolbarComponent {
 
   deviceId = input.required<string>();
   readonly showCard = input<boolean>(true);
+  disabled = input<boolean>(false);
 
   // Expose PlayerFilterType enum for template access
   readonly PlayerFilterType = PlayerFilterType;
@@ -104,22 +108,27 @@ export class FilterToolbarComponent {
   }
 
   onAllClick(): void {
+    if (this.disabled()) return;
     this.playerContext.setFilterMode(this.deviceId(), PlayerFilterType.All);
   }
 
   onGamesClick(): void {
+    if (this.disabled()) return;
     this.playerContext.setFilterMode(this.deviceId(), PlayerFilterType.Games);
   }
 
   onMusicClick(): void {
+    if (this.disabled()) return;
     this.playerContext.setFilterMode(this.deviceId(), PlayerFilterType.Music);
   }
 
   onImagesClick(): void {
+    if (this.disabled()) return;
     this.playerContext.setFilterMode(this.deviceId(), PlayerFilterType.Images);
   }
 
   async onRandomLaunchClick(): Promise<void> {
+    if (this.disabled()) return;
     console.log('🚀 LaunchRandomFile method called!');
     const deviceId = this.deviceId();
     console.log('📱 Device ID:', deviceId);

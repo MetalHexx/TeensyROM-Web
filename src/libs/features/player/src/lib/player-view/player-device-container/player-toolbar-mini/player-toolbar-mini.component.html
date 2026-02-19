@@ -1,6 +1,6 @@
 <lib-sliding-container
   animationDirection="from-top"
-  [animationTrigger]="isPlayerLoadedComputed()"
+  [animationTrigger]="true"
 >
   <lib-scaling-compact-card animationEntry="from-top" animationParent="auto" cardClass="glassy-card">
     <lib-progress-bar
@@ -24,11 +24,11 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigatePreviousComputed()"
+          [disabled]="disabled() || !canNavigatePreviousComputed()"
           (buttonClick)="previous()"
         ></lib-icon-button>
 
-        @if (isCurrentFileMusicTypeComputed()) {
+        @if (isCurrentFileMusicTypeComputed() || disabled()) {
           <lib-icon-button
             [icon]="getPlayPauseIconComputed()"
             [ariaLabel]="getPlayPauseLabelComputed()"
@@ -37,6 +37,7 @@
             variant="rounded-primary"
             class="playback-icon-filled"
             [color]="getPlayButtonColorComputed()"
+            [disabled]="disabled()"
             (buttonClick)="playPause()"
           ></lib-icon-button>
         } @else {
@@ -48,6 +49,7 @@
             variant="rounded-primary"
             class="playback-icon-filled"
             [color]="getPlayButtonColorComputed()"
+            [disabled]="disabled()"
             (buttonClick)="stop()"
           ></lib-icon-button>
         }
@@ -60,7 +62,7 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigateComputed()"
+          [disabled]="disabled() || !canNavigateComputed()"
           (buttonClick)="next()"
         ></lib-icon-button>
       </div>

@@ -8,7 +8,8 @@
       tool
       size="large"
       variant="rounded-transparent"
-      [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"      
+      [color]="isCustomTimerEnabled() ? 'highlight' : 'normal'"
+      [disabled]="disabled()"
       [matBadge]="timerBadgeText()"
       matBadgePosition="above after"
       matBadgeColor="primary"
@@ -48,6 +49,7 @@
     size="large"
     variant="rounded-transparent"
     [color]="historyViewVisible() ? 'highlight' : 'normal'"
+    [disabled]="disabled()"
     (buttonClick)="toggleHistory()"
   >
   </lib-icon-button>
@@ -59,6 +61,7 @@
     size="large"
     variant="rounded-transparent"
     [color]="isShuffleMode() ? 'highlight' : 'normal'"
+    [disabled]="disabled()"
     (buttonClick)="toggleShuffleMode()"
   >
   </lib-icon-button>
@@ -70,7 +73,7 @@
     size="large"
     variant="rounded-transparent"
     [color]="'normal'"
-    [disabled]="!currentFile() || isFavoriteOperationInProgress()"
+    [disabled]="disabled() || !currentFile() || isFavoriteOperationInProgress()"
     (buttonClick)="toggleFavorite()"
   >
     <mat-icon [class]="favoriteIconClass()">favorite</mat-icon>

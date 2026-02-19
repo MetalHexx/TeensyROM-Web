@@ -1,4 +1,4 @@
-import { Component, inject, input, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, input, computed, ChangeDetectionStrategy, booleanAttribute } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   ScalingCompactCardComponent,
@@ -30,11 +30,15 @@ import { PlayerToolbarActionsComponent } from './player-toolbar-actions/player-t
   templateUrl: './player-toolbar.component.html',
   styleUrl: './player-toolbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.disabled-state]': 'disabled()',
+  },
 })
 export class PlayerToolbarComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
 
   deviceId = input.required<string>();
+  disabled = input<boolean>(false);
 
   // Computed shuffle mode state
   isShuffleEnabled = computed(() => {
@@ -122,6 +126,7 @@ export class PlayerToolbarComponent {
   });
 
   getPlayButtonColorComputed = computed<IconButtonColor>(() => {
+    if (this.disabled()) return 'normal';
     return !this.isFileCompatible() ? 'error' : 'normal';
   });
 

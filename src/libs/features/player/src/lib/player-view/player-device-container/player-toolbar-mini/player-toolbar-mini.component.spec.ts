@@ -1,10 +1,12 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { DebugElement, signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { PlayerToolbarMiniComponent } from './player-toolbar-mini.component';
 import { PLAYER_CONTEXT, IPlayerContext, StorageStore } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
+import { IconButtonComponent } from '@teensyrom-nx/ui/components';
 
 describe('PlayerToolbarMiniComponent', () => {
   let component: PlayerToolbarMiniComponent;
@@ -243,6 +245,85 @@ describe('PlayerToolbarMiniComponent', () => {
       fileContextSignal.set({ files: [{ id: '1' }] });
       launchModeSignal.set(LaunchMode.Directory);
       expect(component.canNavigateComputed()).toBe(false);
+    });
+  });
+
+  describe('Disabled State', () => {
+    /**
+     * Helper to find icon button components by their ariaLabel property.
+     */
+    function findIconButtonByLabel(labelPattern: string | RegExp): DebugElement | null {
+      const iconButtons = fixture.debugElement.queryAll(By.directive(IconButtonComponent));
+      for (const buttonDebug of iconButtons) {
+        const buttonComponent = buttonDebug.componentInstance as IconButtonComponent;
+        const ariaLabel = buttonComponent.ariaLabel();
+        if (typeof labelPattern === 'string') {
+          if (ariaLabel === labelPattern) return buttonDebug;
+        } else {
+          if (labelPattern.test(ariaLabel)) return buttonDebug;
+        }
+      }
+      return null;
+    }
+
+    it('should have disabled input defaulting to false', () => {
+      expect(component.disabled()).toBe(false);
+    });
+
+    it('should accept disabled input as true', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      expect(component.disabled()).toBe(true);
+    });
+
+    it('should add disabled-state class to host when disabled', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(true);
+    });
+
+    it('should not add disabled-state class when not disabled', () => {
+      fixture.componentRef.setInput('disabled', false);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(false);
+    });
+
+    it('should disable all playback buttons when disabled is true', () => {
+      fixture.componentRef.setInput('disabled', true);
+
+      // Set up a non-music file to show stop button
+      currentFileSignal.set({
+        file: createFileMock(FileItemType.Game),
+      });
+      fixture.detectChanges();
+
+      const previousButton = findIconButtonByLabel('Previous');
+      const nextButton = findIconButtonByLabel('Next');
+      const stopButton = findIconButtonByLabel('Stop');
+
+      expect(previousButton?.componentInstance.disabled()).toBe(true);
+      expect(nextButton?.componentInstance.disabled()).toBe(true);
+      expect(stopButton?.componentInstance.disabled()).toBe(true);
+    });
+
+    it('should enable buttons when disabled is false and navigation is possible', () => {
+      fixture.componentRef.setInput('disabled', false);
+
+      currentFileSignal.set({
+        file: createFileMock(FileItemType.Song),
+      });
+      fileContextSignal.set({
+        files: [{ id: '1' }, { id: '2' }],
+      });
+      fixture.detectChanges();
+
+      const previousButton = findIconButtonByLabel('Previous');
+      const nextButton = findIconButtonByLabel('Next');
+      const playPauseButton = findIconButtonByLabel(/Play|Pause/);
+
+      expect(previousButton?.componentInstance.disabled()).toBe(false);
+      expect(nextButton?.componentInstance.disabled()).toBe(false);
+      expect(playPauseButton?.componentInstance.disabled()).toBe(false);
     });
   });
 });

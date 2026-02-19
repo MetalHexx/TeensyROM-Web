@@ -58,6 +58,7 @@ describe('PlayerDeviceContainerComponent', () => {
   let mockSettingsService: ISettingsService;
   let phoneBreakpointSubject: BehaviorSubject<BreakpointState>;
   let touchBreakpointSubject: BehaviorSubject<BreakpointState>;
+  let currentFileSignal: ReturnType<typeof signal>;
 
   const createMockSettings = (enableVideo: boolean) => ({
     playerSettings: {
@@ -130,6 +131,7 @@ describe('PlayerDeviceContainerComponent', () => {
     };
 
     // Create a mock player context
+    currentFileSignal = signal(null);
     mockPlayerContext = {
       initializePlayer: vi.fn(),
       removePlayer: vi.fn(),
@@ -140,7 +142,7 @@ describe('PlayerDeviceContainerComponent', () => {
       stop: vi.fn().mockResolvedValue(undefined),
       next: vi.fn().mockResolvedValue(undefined),
       previous: vi.fn().mockResolvedValue(undefined),
-      getCurrentFile: vi.fn().mockReturnValue(signal(null).asReadonly()),
+      getCurrentFile: vi.fn().mockReturnValue(currentFileSignal.asReadonly()),
       getFileContext: vi.fn().mockReturnValue(signal(null).asReadonly()),
       getPlayerStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),
       getStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),
@@ -151,7 +153,6 @@ describe('PlayerDeviceContainerComponent', () => {
       setFilterMode: vi.fn(),
       getLaunchMode: vi.fn().mockReturnValue(signal(LaunchMode.Directory).asReadonly()),
       getShuffleSettings: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      isHistoryViewVisible: vi.fn().mockReturnValue(() => signal(false).asReadonly()),
       getPlayHistory: vi.fn().mockReturnValue(() => ({ entries: [], currentIndex: -1 })),
       startListeningToPopState: vi.fn(),
       stopListeningToPopState: vi.fn(),
@@ -159,33 +160,16 @@ describe('PlayerDeviceContainerComponent', () => {
       getTimerState: vi.fn().mockReturnValue(signal(null).asReadonly()),
       isSlowLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
 
-      getPlayTimerConfig: function (deviceId: string): Signal<PlayTimerConfig | null> {
-        throw new Error('Function not implemented.');
-      },
-      setCustomTimer: function (deviceId: string, enabled: boolean, durationMs: number): void {
-        throw new Error('Function not implemented.');
-      },
-      isCurrentFileCompatible: function (deviceId: string): Signal<boolean> {
-        throw new Error('Function not implemented.');
-      },
-      getCurrentHistoryPosition: function (deviceId: string): Signal<number> {
-        throw new Error('Function not implemented.');
-      },
-      canNavigateBackwardInHistory: function (deviceId: string): Signal<boolean> {
-        throw new Error('Function not implemented.');
-      },
-      canNavigateForwardInHistory: function (deviceId: string): Signal<boolean> {
-        throw new Error('Function not implemented.');
-      },
-      clearHistory: function (deviceId: string): void {
-        throw new Error('Function not implemented.');
-      },
-      toggleHistoryView: function (deviceId: string): void {
-        throw new Error('Function not implemented.');
-      },
-      navigateToHistoryPosition: function (deviceId: string, position: number): Promise<void> {
-        throw new Error('Function not implemented.');
-      }
+      getPlayTimerConfig: vi.fn().mockReturnValue(signal(null).asReadonly()),
+      setCustomTimer: vi.fn(),
+      isCurrentFileCompatible: vi.fn().mockReturnValue(signal(true).asReadonly()),
+      getCurrentHistoryPosition: vi.fn().mockReturnValue(signal(0).asReadonly()),
+      canNavigateBackwardInHistory: vi.fn().mockReturnValue(signal(false).asReadonly()),
+      canNavigateForwardInHistory: vi.fn().mockReturnValue(signal(false).asReadonly()),
+      clearHistory: vi.fn(),
+      toggleHistoryView: vi.fn(),
+      isHistoryViewVisible: vi.fn().mockReturnValue(signal(false).asReadonly()),
+      navigateToHistoryPosition: vi.fn().mockResolvedValue(undefined),
     } satisfies IPlayerContext;
 
     await TestBed.configureTestingModule({
@@ -416,6 +400,238 @@ describe('PlayerDeviceContainerComponent', () => {
         { label: 'Show description', index: 2 },
         { label: 'Show video', index: 3 },
       ]);
+    });
+  });
+
+  describe('hasStorageIndex Signal', () => {
+    it('should return false when device is undefined', () => {
+      fixture.componentRef.setInput('device', undefined);
+      fixture.detectChanges();
+      expect(component['hasStorageIndex']()).toBe(false);
+    });
+
+    it('should return false when device has no storage properties', () => {
+      fixture.componentRef.setInput('device', {
+        deviceId: 'test-device',
+        name: 'Test',
+        isConnected: true,
+        isEnabled: true,
+      });
+      fixture.detectChanges();
+      expect(component['hasStorageIndex']()).toBe(false);
+    });
+
+    it('should return true when sdStorage has indexExists', () => {
+      fixture.componentRef.setInput('device', {
+        deviceId: 'test-device',
+        name: 'Test',
+        isConnected: true,
+        isEnabled: true,
+        sdStorage: { indexExists: true, available: true },
+        usbStorage: { indexExists: false, available: false },
+      });
+      fixture.detectChanges();
+      expect(component['hasStorageIndex']()).toBe(true);
+    });
+
+    it('should return true when usbStorage has indexExists', () => {
+      fixture.componentRef.setInput('device', {
+        deviceId: 'test-device',
+        name: 'Test',
+        isConnected: true,
+        isEnabled: true,
+        sdStorage: { indexExists: false, available: false },
+        usbStorage: { indexExists: true, available: true },
+      });
+      fixture.detectChanges();
+      expect(component['hasStorageIndex']()).toBe(true);
+    });
+
+    it('should return true when both storages have indexExists', () => {
+      fixture.componentRef.setInput('device', {
+        deviceId: 'test-device',
+        name: 'Test',
+        isConnected: true,
+        isEnabled: true,
+        sdStorage: { indexExists: true, available: true },
+        usbStorage: { indexExists: true, available: true },
+      });
+      fixture.detectChanges();
+      expect(component['hasStorageIndex']()).toBe(true);
+    });
+
+    it('should return false when both storages have indexExists false', () => {
+      fixture.componentRef.setInput('device', {
+        deviceId: 'test-device',
+        name: 'Test',
+        isConnected: true,
+        isEnabled: true,
+        sdStorage: { indexExists: false, available: true },
+        usbStorage: { indexExists: false, available: true },
+      });
+      fixture.detectChanges();
+      expect(component['hasStorageIndex']()).toBe(false);
+    });
+  });
+
+  describe('Always-Visible Toolbars', () => {
+    it('should render combined-toolbar when no file is launched (desktop)', () => {
+      // No file is launched (default state)
+      const toolbar = fixture.nativeElement.querySelector('.combined-toolbar');
+      expect(toolbar).toBeTruthy();
+    });
+
+    it('should render player-toolbar when no file is launched (desktop)', () => {
+      const toolbar = fixture.nativeElement.querySelector('lib-player-toolbar');
+      expect(toolbar).toBeTruthy();
+    });
+
+    it('should render filter-toolbar when no file is launched (desktop)', () => {
+      const toolbar = fixture.nativeElement.querySelector('lib-filter-toolbar');
+      expect(toolbar).toBeTruthy();
+    });
+
+    it('should pass disabled=true to player-toolbar when no file is launched', () => {
+      const toolbar = fixture.debugElement.query(
+        (el) => el.name === 'lib-player-toolbar'
+      );
+      expect(toolbar).toBeTruthy();
+      expect(toolbar.componentInstance.disabled()).toBe(true);
+    });
+
+    it('should pass disabled=false to player-toolbar when a file is launched', () => {
+      // Update the writable signal to simulate a file being launched
+      currentFileSignal.set({ file: { name: 'test.sid', path: '/test.sid', images: [] } });
+      fixture.detectChanges();
+
+      const toolbar = fixture.debugElement.query(
+        (el) => el.name === 'lib-player-toolbar'
+      );
+      expect(toolbar).toBeTruthy();
+      expect(toolbar.componentInstance.disabled()).toBe(false);
+    });
+
+    it('should pass disabled=true to filter-toolbar when no storage is indexed', () => {
+      // Device has no storage index (default test device)
+      const toolbar = fixture.debugElement.query(
+        (el) => el.name === 'lib-filter-toolbar'
+      );
+      expect(toolbar).toBeTruthy();
+      expect(toolbar.componentInstance.disabled()).toBe(true);
+    });
+
+    it('should pass disabled=false to filter-toolbar when storage is indexed', () => {
+      fixture.componentRef.setInput('device', {
+        deviceId: 'test-device',
+        name: 'Test Device',
+        isConnected: true,
+        isEnabled: true,
+        sdStorage: { indexExists: true, available: true },
+        usbStorage: { indexExists: false, available: false },
+      });
+      fixture.detectChanges();
+
+      const toolbar = fixture.debugElement.query(
+        (el) => el.name === 'lib-filter-toolbar'
+      );
+      expect(toolbar).toBeTruthy();
+      expect(toolbar.componentInstance.disabled()).toBe(false);
+    });
+
+    it('should pass disabled=false to filter-toolbar when storage is indexed even with no file launched', () => {
+      // No file launched, but storage is indexed
+      fixture.componentRef.setInput('device', {
+        deviceId: 'test-device',
+        name: 'Test Device',
+        isConnected: true,
+        isEnabled: true,
+        sdStorage: { indexExists: true, available: true },
+      });
+      fixture.detectChanges();
+
+      const toolbar = fixture.debugElement.query(
+        (el) => el.name === 'lib-filter-toolbar'
+      );
+      expect(toolbar).toBeTruthy();
+      expect(toolbar.componentInstance.disabled()).toBe(false);
+      // Player toolbar should still be disabled (no file launched)
+      const playerToolbar = fixture.debugElement.query(
+        (el) => el.name === 'lib-player-toolbar'
+      );
+      expect(playerToolbar.componentInstance.disabled()).toBe(true);
+    });
+
+    it('should render phone toolbars when on phone layout', () => {
+      phoneBreakpointSubject.next({
+        matches: true,
+        breakpoints: { '(max-width: 639px)': true }
+      });
+      fixture.detectChanges();
+
+      const miniToolbar = fixture.nativeElement.querySelector('lib-player-toolbar-mini');
+      expect(miniToolbar).toBeTruthy();
+    });
+  });
+
+  describe('Empty-State Messaging', () => {
+    it('should render empty-state-message with sd_storage icon when storage is not indexed', () => {
+      // Default device has no storage index
+      fixture.detectChanges();
+
+      const emptyState = fixture.nativeElement.querySelector('lib-empty-state-message');
+      expect(emptyState).toBeTruthy();
+      expect(component['emptyStateIcon']()).toBe('sd_storage');
+      expect(component['emptyStateTitle']()).toBe('Index Your Storage');
+    });
+
+    it('should render empty-state-message with play_circle icon when storage is indexed but no file launched', () => {
+      fixture.componentRef.setInput('device', {
+        deviceId: 'test-device',
+        name: 'Test Device',
+        isConnected: true,
+        isEnabled: true,
+        sdStorage: { indexExists: true, available: true },
+      });
+      fixture.detectChanges();
+
+      const emptyState = fixture.nativeElement.querySelector('lib-empty-state-message');
+      expect(emptyState).toBeTruthy();
+      expect(component['emptyStateIcon']()).toBe('play_circle');
+      expect(component['emptyStateTitle']()).toBe('Ready to Play');
+    });
+
+    it('should render lib-file-description when a file is launched (not empty-state-message)', () => {
+      currentFileSignal.set({ file: { name: 'test.sid', path: '/test.sid', images: [] } });
+      fixture.detectChanges();
+
+      const emptyState = fixture.nativeElement.querySelector('lib-empty-state-message');
+      expect(emptyState).toBeNull();
+
+      const fileDescription = fixture.nativeElement.querySelector('lib-file-description');
+      expect(fileDescription).toBeTruthy();
+    });
+
+    it('should hide file-description-mini when no file is launched on phone', () => {
+      phoneBreakpointSubject.next({
+        matches: true,
+        breakpoints: { '(max-width: 639px)': true }
+      });
+      fixture.detectChanges();
+
+      const mini = fixture.nativeElement.querySelector('lib-file-description-mini');
+      expect(mini).toBeNull();
+    });
+
+    it('should show file-description-mini on phone when a file is launched', () => {
+      phoneBreakpointSubject.next({
+        matches: true,
+        breakpoints: { '(max-width: 639px)': true }
+      });
+      currentFileSignal.set({ file: { name: 'test.sid', path: '/test.sid', images: [] } });
+      fixture.detectChanges();
+
+      const mini = fixture.nativeElement.querySelector('lib-file-description-mini');
+      expect(mini).toBeTruthy();
     });
   });
 });

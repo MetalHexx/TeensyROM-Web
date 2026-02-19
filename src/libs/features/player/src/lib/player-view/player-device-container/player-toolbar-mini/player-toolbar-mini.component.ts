@@ -1,4 +1,4 @@
-import { Component, inject, input, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, input, computed, ChangeDetectionStrategy, booleanAttribute } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   ScalingCompactCardComponent,
@@ -26,11 +26,15 @@ import { FileTimeComponent } from '../player-toolbar/file-time/file-time.compone
   templateUrl: './player-toolbar-mini.component.html',
   styleUrl: './player-toolbar-mini.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.disabled-state]': 'disabled()',
+  },
 })
 export class PlayerToolbarMiniComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
 
   deviceId = input.required<string>();
+  disabled = input<boolean>(false);
 
   previousTooltip = computed<TooltipConfig>(() => ({
     title: 'Previous',
@@ -109,6 +113,7 @@ export class PlayerToolbarMiniComponent {
   });
 
   getPlayButtonColorComputed = computed<IconButtonColor>(() => {
+    if (this.disabled()) return 'normal';
     return !this.isFileCompatible() ? 'error' : 'normal';
   });
 

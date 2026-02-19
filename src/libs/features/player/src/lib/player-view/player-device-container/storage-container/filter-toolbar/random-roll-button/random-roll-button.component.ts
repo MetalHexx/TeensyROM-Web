@@ -25,6 +25,7 @@ const COMPONENT_CONSTANTS = {
 })
 export class RandomRollButtonComponent {
   getButtonColor = input<IconButtonColor>(COMPONENT_CONSTANTS.COLORS.NORMAL as IconButtonColor);
+  disabled = input<boolean>(false);
   buttonClick = output<void>();
 
   // Tooltip configuration

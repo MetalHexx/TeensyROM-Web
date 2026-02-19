@@ -4,7 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Device } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective } from '@teensyrom-nx/ui/components';
+import { EmptyStateMessageComponent, ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective, ScalingContainerComponent } from '@teensyrom-nx/ui/components';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
 import { FileImageComponent } from './file-image/file-image.component';
@@ -35,11 +35,14 @@ const TOUCH_DEVICE_QUERY = '(hover: none)';
     StorageContainerComponent,
     FileDescriptionMiniComponent,
     PlayerToolbarMiniComponent,
+    ScalingContainerComponent,
     ScalingCompactCardComponent,
     SwipePaneContainerComponent,
     SwipePaneDirective,
     PlayerToolbarActionsComponent,
-  ],
+    EmptyStateMessageComponent,
+    ScalingContainerComponent
+],
   templateUrl: './player-device-container.component.html',
   styleUrl: './player-device-container.component.scss',
 })
@@ -283,8 +286,30 @@ export class PlayerDeviceContainerComponent {
 
   readonly isPlayerLoaded = computed(() => this.currentFile() !== null);
 
+  readonly hasStorageIndex = computed(() => {
+    const device = this.device();
+    if (!device) return false;
+    return device.sdStorage?.indexExists || device.usbStorage?.indexExists || false;
+  });
+
   readonly fileDescription = computed(() => {
     const currentFile = this.currentFile();
     return currentFile?.file?.description ?? '';
   });
+
+  readonly emptyStateIcon = computed(() => this.hasStorageIndex() ? 'play_circle' : 'sd_storage');
+
+  readonly emptyStateTitle = computed(() =>
+    this.hasStorageIndex() ? 'Ready to Play' : 'Index Your Storage'
+  );
+
+  readonly emptyStateMessage = computed(() =>
+    this.hasStorageIndex()
+      ? 'Browse the directory listing below and select a file, or hit the dice button to launch something random!'
+      : 'Index your file system to browse and launch files from your TeensyROM.'
+  );
+
+  readonly emptyStateSecondaryMessage = computed(() =>
+    this.hasStorageIndex() ? '' : 'Visit <strong>Devices</strong> in the navigation to manage indexing.'
+  );
 }

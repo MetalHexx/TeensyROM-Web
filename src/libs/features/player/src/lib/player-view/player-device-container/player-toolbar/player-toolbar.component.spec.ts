@@ -659,6 +659,14 @@ describe('PlayerToolbarComponent', () => {
       expect(component.getPlayButtonColorComputed()).toBe('normal');
     });
 
+    it('should show normal color when disabled even if file is incompatible', () => {
+      fileCompatibleSignal.set(false);
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+
+      expect(component.getPlayButtonColorComputed()).toBe('normal');
+    });
+
     it('should detect errors with hasError computed property', () => {
       errorSignal.set('Test error');
       fixture.detectChanges();
@@ -671,6 +679,80 @@ describe('PlayerToolbarComponent', () => {
       fixture.detectChanges();
 
       expect(component.hasError()).toBe(false);
+    });
+  });
+
+  describe('Disabled State', () => {
+    it('should have disabled input defaulting to false', () => {
+      expect(component.disabled()).toBe(false);
+    });
+
+    it('should accept disabled input as true', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      expect(component.disabled()).toBe(true);
+    });
+
+    it('should add disabled-state class to host when disabled', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(true);
+    });
+
+    it('should not add disabled-state class when not disabled', () => {
+      fixture.componentRef.setInput('disabled', false);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(false);
+    });
+
+    it('should disable all playback buttons when disabled is true', () => {
+      fixture.componentRef.setInput('disabled', true);
+
+      // Set up a music file to ensure play/pause is shown
+      const musicFile = createFileMock(FileItemType.Song);
+      currentFileSignal.set({
+        deviceId: 'test-device-id',
+        storageType: StorageType.Sd,
+        file: musicFile,
+        isShuffleMode: false,
+      });
+      fixture.detectChanges();
+
+      const previousButton = findIconButtonByLabel(/launch the previous/);
+      const nextButton = findIconButtonByLabel(/launch the next/);
+      const playPauseButton = findIconButtonByLabel(/Play|Pause/);
+
+      expect(previousButton?.componentInstance.disabled()).toBe(true);
+      expect(nextButton?.componentInstance.disabled()).toBe(true);
+      expect(playPauseButton?.componentInstance.disabled()).toBe(true);
+    });
+
+    it('should enable buttons when disabled is false and navigation is possible', () => {
+      fixture.componentRef.setInput('disabled', false);
+
+      const musicFile = createFileMock(FileItemType.Song);
+      currentFileSignal.set({
+        deviceId: 'test-device-id',
+        storageType: StorageType.Sd,
+        file: musicFile,
+        isShuffleMode: false,
+      });
+      fileContextSignal.set({
+        storageKey: 'test-key',
+        directoryPath: '/test',
+        files: [createFileMock(FileItemType.Song), createFileMock(FileItemType.Song)],
+        currentIndex: 0,
+        launchMode: LaunchMode.Directory,
+      });
+      fixture.detectChanges();
+
+      const previousButton = findIconButtonByLabel(/launch the previous/);
+      const nextButton = findIconButtonByLabel(/launch the next/);
+      const playPauseButton = findIconButtonByLabel(/Play|Pause/);
+
+      expect(previousButton?.componentInstance.disabled()).toBe(false);
+      expect(nextButton?.componentInstance.disabled()).toBe(false);
+      expect(playPauseButton?.componentInstance.disabled()).toBe(false);
     });
   });
 });

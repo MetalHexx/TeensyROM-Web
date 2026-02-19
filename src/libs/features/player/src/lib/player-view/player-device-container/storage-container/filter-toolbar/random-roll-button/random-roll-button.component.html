@@ -4,6 +4,7 @@
   [tooltip]="randomTooltip"
   size="large"
   [color]="getButtonColor()"
+  [disabled]="disabled()"
   (buttonClick)="onButtonClick()"
   (click)="animateDiceRoll($event)"
   class="dice-icon-filled"

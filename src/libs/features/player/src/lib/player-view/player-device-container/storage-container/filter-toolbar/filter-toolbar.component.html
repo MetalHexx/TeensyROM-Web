@@ -14,6 +14,7 @@
       [tooltip]="allFilterTooltip"
       size="large"
       [color]="getButtonColor(PlayerFilterType.All)"
+      [disabled]="disabled()"
       (buttonClick)="onAllClick()"
       data-testid="filter-all-button"
     />
@@ -23,6 +24,7 @@
       [tooltip]="gamesFilterTooltip"
       size="large"
       [color]="getButtonColor(PlayerFilterType.Games)"
+      [disabled]="disabled()"
       (buttonClick)="onGamesClick()"
       data-testid="filter-games-button"
     >
@@ -35,6 +37,7 @@
       [tooltip]="musicFilterTooltip"
       size="large"
       [color]="getButtonColor(PlayerFilterType.Music)"
+      [disabled]="disabled()"
       (buttonClick)="onMusicClick()"
       data-testid="filter-music-button"
     />
@@ -44,6 +47,7 @@
       [tooltip]="imagesFilterTooltip"
       size="large"
       [color]="getButtonColor(PlayerFilterType.Images)"
+      [disabled]="disabled()"
       (buttonClick)="onImagesClick()"
       data-testid="filter-images-button"
     >
@@ -54,6 +58,7 @@
 
     <lib-random-roll-button
       [getButtonColor]="'normal'"
+      [disabled]="disabled()"
       (buttonClick)="onRandomLaunchClick()"
       data-testid="random-launch-button"
     />

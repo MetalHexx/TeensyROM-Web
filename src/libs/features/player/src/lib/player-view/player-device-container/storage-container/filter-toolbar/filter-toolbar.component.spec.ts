@@ -534,4 +534,87 @@ describe('FilterToolbarComponent', () => {
       expect(component.isDiceRolling()).toBe(true); // State still gets set
     });
   });
+
+  describe('Disabled State', () => {
+    it('should have disabled input defaulting to false', () => {
+      expect(component.disabled()).toBe(false);
+    });
+
+    it('should accept disabled input as true', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      expect(component.disabled()).toBe(true);
+    });
+
+    it('should add disabled-state class to host when disabled', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(true);
+    });
+
+    it('should not add disabled-state class when not disabled', () => {
+      fixture.componentRef.setInput('disabled', false);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(false);
+    });
+
+    it('should disable all filter buttons when disabled is true', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+
+      const allButton = fixture.debugElement.query(By.css(SELECTORS.filterAllButton));
+      const gamesButton = fixture.debugElement.query(By.css(SELECTORS.filterGamesButton));
+      const musicButton = fixture.debugElement.query(By.css(SELECTORS.filterMusicButton));
+      const imagesButton = fixture.debugElement.query(By.css(SELECTORS.filterImagesButton));
+
+      expect(allButton.componentInstance.disabled()).toBe(true);
+      expect(gamesButton.componentInstance.disabled()).toBe(true);
+      expect(musicButton.componentInstance.disabled()).toBe(true);
+      expect(imagesButton.componentInstance.disabled()).toBe(true);
+    });
+
+    it('should disable dice (random) button when disabled is true', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+
+      const randomButton = fixture.debugElement.query(By.css(SELECTORS.randomLaunchButton));
+      expect(randomButton.componentInstance.disabled()).toBe(true);
+    });
+
+    it('should not call setFilterMode when disabled and handler is invoked', () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+
+      component.onAllClick();
+      component.onGamesClick();
+      component.onMusicClick();
+      component.onImagesClick();
+
+      expect(mockPlayerContext.setFilterMode).not.toHaveBeenCalled();
+    });
+
+    it('should not call launchRandomFile when disabled and handler is invoked', async () => {
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+
+      await component.onRandomLaunchClick();
+
+      expect(mockPlayerContext.launchRandomFile).not.toHaveBeenCalled();
+    });
+
+    it('should enable all buttons when disabled is false', () => {
+      fixture.componentRef.setInput('disabled', false);
+      fixture.detectChanges();
+
+      const allButton = fixture.debugElement.query(By.css(SELECTORS.filterAllButton));
+      const gamesButton = fixture.debugElement.query(By.css(SELECTORS.filterGamesButton));
+      const musicButton = fixture.debugElement.query(By.css(SELECTORS.filterMusicButton));
+      const imagesButton = fixture.debugElement.query(By.css(SELECTORS.filterImagesButton));
+
+      expect(allButton.componentInstance.disabled()).toBe(false);
+      expect(gamesButton.componentInstance.disabled()).toBe(false);
+      expect(musicButton.componentInstance.disabled()).toBe(false);
+      expect(imagesButton.componentInstance.disabled()).toBe(false);
+    });
+  });
 });

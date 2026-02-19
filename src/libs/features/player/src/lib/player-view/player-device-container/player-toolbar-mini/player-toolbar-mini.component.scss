@@ -5,6 +5,13 @@
   --compact-card-padding: var(--spacing-xs) var(--spacing-sm) var(--spacing-sm);
 }
 
+:host(.disabled-state) {
+  .mini-toolbar {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
 .mini-toolbar {
   display: flex;
   flex-direction: column;

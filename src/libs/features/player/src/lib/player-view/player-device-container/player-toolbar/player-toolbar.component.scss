@@ -6,6 +6,13 @@
   position: relative; // Positioning context for absolute progress bar
 }
 
+:host(.disabled-state) {
+  .player-controls {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
 mat-card {
   width: 100%;
   margin: 0;

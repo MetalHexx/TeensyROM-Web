@@ -1,7 +1,7 @@
 <!-- Sliding Container with Auto-Chaining Animation -->
 <lib-sliding-container
   animationDirection="from-top"
-  [animationTrigger]="isPlayerLoadedComputed()"
+  [animationTrigger]="true"
 >
   <lib-scaling-compact-card animationEntry="from-top" animationParent="auto" cardClass="glassy-card">
     <!-- Progress Bar (flush to top inside card) -->
@@ -23,12 +23,12 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigatePreviousComputed()"
+          [disabled]="disabled() || !canNavigatePreviousComputed()"
           (buttonClick)="previous()"
         >
         </lib-icon-button>
 
-        @if (isCurrentFileMusicTypeComputed()) {
+        @if (isCurrentFileMusicTypeComputed() || disabled()) {
         <lib-icon-button
           [icon]="getPlayPauseIconComputed()"
           [ariaLabel]="getPlayPauseLabelComputed()"
@@ -37,6 +37,7 @@
           variant="rounded-primary"
           class="playback-icon-filled"
           [color]="getPlayButtonColorComputed()"
+          [disabled]="disabled()"
           (buttonClick)="playPause()"
         >
         </lib-icon-button>
@@ -49,6 +50,7 @@
           variant="rounded-primary"
           class="playback-icon-filled"
           [color]="getPlayButtonColorComputed()"
+          [disabled]="disabled()"
           (buttonClick)="stop()"
         >
         </lib-icon-button>
@@ -62,7 +64,7 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigateComputed()"
+          [disabled]="disabled() || !canNavigateComputed()"
           (buttonClick)="next()"
         >
         </lib-icon-button>
@@ -81,7 +83,7 @@
       </div>
 
       <div class="toolbar-actions-section">
-        <lib-player-toolbar-actions [deviceId]="deviceId()"></lib-player-toolbar-actions>
+        <lib-player-toolbar-actions [deviceId]="deviceId()" [disabled]="disabled()"></lib-player-toolbar-actions>
       </div>
     </div>
 
@@ -96,12 +98,12 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigatePreviousComputed()"
+          [disabled]="disabled() || !canNavigatePreviousComputed()"
           (buttonClick)="previous()"
         >
         </lib-icon-button>
 
-        @if (isCurrentFileMusicTypeComputed()) {
+        @if (isCurrentFileMusicTypeComputed() || disabled()) {
         <lib-icon-button
           [icon]="getPlayPauseIconComputed()"
           [ariaLabel]="getPlayPauseLabelComputed()"
@@ -110,6 +112,7 @@
           variant="rounded-primary"
           class="playback-icon-filled"
           [color]="getPlayButtonColorComputed()"
+          [disabled]="disabled()"
           (buttonClick)="playPause()"
         >
         </lib-icon-button>
@@ -122,6 +125,7 @@
           variant="rounded-primary"
           class="playback-icon-filled"
           [color]="getPlayButtonColorComputed()"
+          [disabled]="disabled()"
           (buttonClick)="stop()"
         >
         </lib-icon-button>
@@ -135,7 +139,7 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigateComputed()"
+          [disabled]="disabled() || !canNavigateComputed()"
           (buttonClick)="next()"
         >
         </lib-icon-button>
@@ -154,7 +158,7 @@
       </div>
 
       <div class="toolbar-actions-section">
-        <lib-player-toolbar-actions [deviceId]="deviceId()"></lib-player-toolbar-actions>
+        <lib-player-toolbar-actions [deviceId]="deviceId()" [disabled]="disabled()"></lib-player-toolbar-actions>
       </div>
     </div>
 
@@ -177,12 +181,12 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigatePreviousComputed()"
+          [disabled]="disabled() || !canNavigatePreviousComputed()"
           (buttonClick)="previous()"
         >
         </lib-icon-button>
 
-        @if (isCurrentFileMusicTypeComputed()) {
+        @if (isCurrentFileMusicTypeComputed() || disabled()) {
         <lib-icon-button
           [icon]="getPlayPauseIconComputed()"
           [ariaLabel]="getPlayPauseLabelComputed()"
@@ -191,6 +195,7 @@
           variant="rounded-primary"
           class="playback-icon-filled"
           [color]="getPlayButtonColorComputed()"
+          [disabled]="disabled()"
           (buttonClick)="playPause()"
         >
         </lib-icon-button>
@@ -203,6 +208,7 @@
           variant="rounded-primary"
           class="playback-icon-filled"
           [color]="getPlayButtonColorComputed()"
+          [disabled]="disabled()"
           (buttonClick)="stop()"
         >
         </lib-icon-button>
@@ -216,7 +222,7 @@
           variant="rounded-transparent"
           color="normal"
           class="playback-icon-filled"
-          [disabled]="!canNavigateComputed()"
+          [disabled]="disabled() || !canNavigateComputed()"
           (buttonClick)="next()"
         >
         </lib-icon-button>
@@ -225,7 +231,7 @@
       <div class="mobile-divider"></div>
 
       <div class="toolbar-actions-section">
-        <lib-player-toolbar-actions [deviceId]="deviceId()"></lib-player-toolbar-actions>
+        <lib-player-toolbar-actions [deviceId]="deviceId()" [disabled]="disabled()"></lib-player-toolbar-actions>
       </div>
     </div>
   </lib-scaling-compact-card>
