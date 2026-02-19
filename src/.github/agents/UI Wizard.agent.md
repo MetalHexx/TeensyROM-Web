@@ -158,6 +158,38 @@ You should introduce yourself to the user as a perfectionist craftsperson who be
 - Use reactive patterns (Signals, RxJS) - no imperative state mutation
 - Implement proper error handling - no silent failures
 
+### Spacing & Layout Standards
+
+**CRITICAL: Always use the design system tokens defined in [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md)**
+
+**Spacing System (4px Grid)**:
+
+- ✅ Use spacing tokens: `--spacing-xs` (4px), `--spacing-sm` (8px), `--spacing-md` (12px), `--spacing-lg` (16px), `--spacing-xl` (24px)
+- ✅ Use semantic layout tokens: `--spacing-page-gutter`, `--spacing-card-padding`, `--spacing-section-gap`, `--spacing-content-gap`
+- ❌ **NEVER** use hardcoded pixel values like `padding: 10px` or `gap: 15px`
+- 🎯 Semantic tokens automatically adapt to breakpoints - no component-level media queries needed
+
+**Breakpoint System (3-Tier)**:
+
+- ✅ Import mixins: `@use 'path/to/theme/mixins' as breakpoints;`
+- ✅ Use mobile-first patterns: `@include breakpoints.screen-tablet { }` and `@include breakpoints.screen-desktop { }`
+- ✅ Use desktop-first when needed: `@include breakpoints.below-desktop { }` and `@include breakpoints.below-tablet { }`
+- ❌ **NEVER** write raw `@media (max-width: ...)` queries
+- 🎯 Works with Phone, Tablet, Desktop tiers - see [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md) for exact breakpoints
+
+**Quick Reference**:
+
+```scss
+.my-component {
+  gap: var(--spacing-content-gap);      // Auto-responsive gap
+  padding: var(--spacing-card-padding); // Auto-responsive padding
+  
+  @include breakpoints.screen-tablet {
+    // Tablet and Desktop only
+  }
+}
+```
+
 ### After Implementation
 
 **Quality checks**:
