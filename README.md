@@ -42,6 +42,8 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Progress Bar**: Visual playback progress with elapsed/total time
 - **Auto-Play**: Continuous playback through directories or shuffle queues
 - **File Compatibility**: Real-time validation and error feedback for incompatible files
+- **Incompatible File Auto-Advance**: Automatically skips incompatible files and advances to the next one
+- **Custom Play Timer**: Custom auto-advance timer for continuous streaming of games, demos and images.
 - **Current File Info**: Display file metadata, creator, release info, and status
 
 ### Video Integration & CRT Emulation
@@ -68,7 +70,7 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Auto Black Bar/Border Cropping**: GPU-accelerated detection removes black bars/borders with smooth animated transitions, PAL/NTSC aware
 
 ### Search & Filter
-- **Full-Text Search**: Search across all indexed files on SD or USB storage (per storage type)
+- **Global Cross-Device Search**: Search across all indexed files on both SD and USB storage simultaneously, returning unified results from your entire library
 - **Boolean / Phrase Search**: Group phrases in quotes or add a plus for required terms/phrases E.g., `Iron +Maiden +"Aces High"`
 - **Search Results View**: Dedicated view for browsing and launching search results
 - **File Type Filters**: Filter by All, Games, Music, Images, or Demos
@@ -83,9 +85,21 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Dual Storage**: Navigate both SD and USB storage with independent directory trees
 - **Directory Tree**: Collapsible tree view for hierarchical folder navigation
 - **File Listings**: Virtual scrolling file lists optimized for large directories (2000+ items)
-- **Breadcrumb Navigation**: Directory breadcrumb with quick navigation to parent folders
-- **Browser-like Directory Nav:**: Backtrack backward or forward through your directory navigation history
+- **Breadcrumb Navigation**: Collapsible directory breadcrumb with quick navigation to parent folders
+- **Browser-like Directory Nav**: Backtrack backward or forward through your directory navigation history
 - **Multi-Device Views**: Simultaneous file browsing across multiple connected devices
+
+### Mobile & Responsive Design
+- **Phone Layout**: Dedicated mobile layout with swipe navigation between player views
+- **Mini Player Toolbar**: Compact, touch-friendly playback controls for phone sizes
+- **Bottom Nav Rail**: Dedicated navigation bar at the bottom of the screen on phone layouts
+- **Swipeable Action Bar**: File actions accessible via swipe for small-screen efficiency
+- **Responsive Breakpoints**: Optimized layouts for phone, tablet, and desktop screen sizes
+
+### Tooltip System
+- **Custom Tooltips**: Touch-friendly tooltips with long-press activation on mobile
+- **Global Toggle**: Enable/disable tooltips from the header
+- **CRT Overlay Compatible**: Works correctly alongside the CRT effect overlay
 
 ### Device Management
 - **Auto-Discovery**: Automatic detection of TeensyROM devices via TCP (Ethernet/Wireless) and Serial (COM port)
@@ -106,17 +120,12 @@ Features planned for future releases:
 
 - **SID DJ Controls**: Advanced controls for live SID music mixing and performance
 - **MIDI Integration**: Full application control from MIDI devices
-- **Cross-Storage Random Launch**:  Random selection across both SD and USB storage
-- **Cross-Storage Search**: Search across both SD and USB storage simultaneously
+- **Cross-Storage Random Launch**: Random selection across both SD and USB storage simultaneously
 - **Playlists**: Create, manage, and play custom playlists of games, music, and images
 - **File Transfer**: Drag-and-drop file uploads to device storage with progress tracking
-- **Settings Management**: User preferences, default behaviors, and application configuration
 - **Theme System**: Light/dark mode with custom color schemes and Material theme customization
 - **Keyboard Controls**: Keyboard shortcuts for playback, navigation, and common operations
-- **Cross Storage Scope Selection**: Search/shuffle across all connected device storage (per device, per storage type)
-- **Scope Selection**: 
-  - **Storage Scope**: Search/shuffle across all storage devices SD or USB storage
-  - **Directory Pinning**: Search/shuffle scoped to a specific directory and children.
+- **Directory Pinning**: Search/shuffle scoped to a specific directory and children.
 
 ## 🏗️ Architecture
 
@@ -140,9 +149,7 @@ This application can be deployed in two ways:
 ### Prerequisites
 
 - **TeensyROM Hardware**: You'll need a [TeensyROM cartridge](https://github.com/SensoriumEmbedded/TeensyROM) connected to your computer
-- **Firmware**: 
-  - **Serial (COM Port) Support**: TeensyROM firmware v0.7 or higher
-  - **TCP/Ethernet Support**: Currently requires a special firmware build. Please inquire on the [TeensyROM Discord Server](https://discord.com/invite/ubSAb74S5U) until an official firmware release with TCP support is available
+- **Firmware**: TeensyROM firmware **v0.7.1** or higher (required for both Serial and TCP connectivity)
 
 ### Installation & Setup
 
@@ -155,6 +162,8 @@ This application can be deployed in two ways:
 ```
 TeensyRom.Api.exe
 ```
+
+4. Open your browser to `http://localhost:213`
 
 > **Note**: Windows may show a security warning. Click "More info" then "Run anyway".
 
@@ -174,6 +183,8 @@ brew install teensyrom-web
 teensyrom-web
 ```
 
+4. Open your browser to `http://localhost:213`
+
 > **Note**: macOS may block the app on first run. Go to System Settings > Privacy & Security and click "Open Anyway".
 
 #### Linux
@@ -187,6 +198,8 @@ cd TeensyROM-Web
 chmod +x TeensyRom.Api
 ./TeensyRom.Api
 ```
+
+3. Open your browser to `http://localhost:213`
 
 ## 🔌 Device Discovery & Connectivity
 
