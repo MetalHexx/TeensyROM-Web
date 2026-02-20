@@ -35,6 +35,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
+    <PackageReference Include="PortAudioSharp2" Version="0.*" />
     <PackageReference Include="RadEndpoints" Version="1.0.0-alpha.21" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.4.3" />
   </ItemGroup>
