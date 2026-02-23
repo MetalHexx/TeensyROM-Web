@@ -17,6 +17,7 @@ import {
   SaveSettingsRequest,
   PlayerSettingsDto,
   VideoSettingsDto,
+  AudioSettingsDto,
   FileTransferSettingsDto,
   SearchSettingsDto,
   SearchWeightsDto,
@@ -42,6 +43,7 @@ import {
   Settings,
   PlayerSettings,
   VideoSettings,
+  AudioSettings,
   FileTransferSettings,
   SearchSettings,
   SearchWeights,
@@ -371,6 +373,7 @@ export class DomainMapper {
     return {
       deviceId: dto.deviceId,
       videoSettings: this.toVideoSettings(dto.videoSettings),
+      audioSettings: this.toAudioSettings(dto.audioSettings),
     };
   }
 
@@ -401,6 +404,7 @@ export class DomainMapper {
     return {
       deviceId: settings.deviceId,
       videoSettings: this.toVideoSettingsDto(settings.videoSettings),
+      audioSettings: this.toAudioSettingsDto(settings.audioSettings),
       indexingStatus: {
         sdLastIndexed: null,
         usbLastIndexed: null,
@@ -462,6 +466,54 @@ export class DomainMapper {
     return {
       enableVideo: settings.enableVideo,
       videoDeviceId: settings.videoDeviceId ?? '',
+    };
+  }
+
+  /**
+   * Maps AudioSettingsDto from API to domain AudioSettings model
+   */
+  private static toAudioSettings(dto: AudioSettingsDto | undefined): AudioSettings {
+    if (!dto) {
+      return {
+        enableAudioStream: false,
+        audioDeviceIndex: -1,
+        audioDeviceName: '',
+        captureChannelCount: 1,
+        sampleRate: 48000,
+        channels: [],
+      };
+    }
+    return {
+      enableAudioStream: dto.enableAudioStream ?? false,
+      audioDeviceIndex: dto.audioDeviceIndex ?? -1,
+      audioDeviceName: dto.audioDeviceName ?? '',
+      captureChannelCount: dto.captureChannelCount ?? 1,
+      sampleRate: dto.sampleRate ?? 48000,
+      channels: dto.channels ?? [],
+    };
+  }
+
+  /**
+   * Maps AudioSettings domain model to AudioSettingsDto for API request
+   */
+  private static toAudioSettingsDto(settings: AudioSettings | undefined): AudioSettingsDto {
+    if (!settings) {
+      return {
+        enableAudioStream: false,
+        audioDeviceIndex: -1,
+        audioDeviceName: '',
+        captureChannelCount: 1,
+        sampleRate: 48000,
+        channels: [],
+      };
+    }
+    return {
+      enableAudioStream: settings.enableAudioStream,
+      audioDeviceIndex: settings.audioDeviceIndex,
+      audioDeviceName: settings.audioDeviceName,
+      captureChannelCount: settings.captureChannelCount,
+      sampleRate: settings.sampleRate,
+      channels: settings.channels,
     };
   }
 
