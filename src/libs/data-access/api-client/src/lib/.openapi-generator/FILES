@@ -1,4 +1,5 @@
 .openapi-generator-ignore
+apis/AudioApi.ts
 apis/DevicesApi.ts
 apis/FilesApi.ts
 apis/PlayerApi.ts
@@ -7,8 +8,11 @@ apis/VersionApi.ts
 apis/index.ts
 index.ts
 models/AppSettingsDto.ts
+models/AudioDeviceDto.ts
+models/AudioSettingsDto.ts
 models/CartDto.ts
 models/CartStorageDto.ts
+models/ChannelConfigDto.ts
 models/CompetitionDto.ts
 models/ConnectionType.ts
 models/DeviceSettingsDto.ts
@@ -29,6 +33,7 @@ models/IndexResponse.ts
 models/IndexingStatusDto.ts
 models/LaunchFileResponse.ts
 models/LaunchRandomResponse.ts
+models/ListDevicesResponse.ts
 models/NullableOfTeensyFilterType.ts
 models/PingDeviceResponse.ts
 models/PlayerSettingsDto.ts
