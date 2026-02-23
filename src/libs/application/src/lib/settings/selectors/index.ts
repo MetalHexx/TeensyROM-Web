@@ -8,6 +8,7 @@ import { getHistoryPosition } from './get-history-position';
 import { isNavigatingHistory } from './is-navigating-history';
 import { historyPositionDisplay } from './history-position-display';
 import { selectDeviceSettings } from './select-device-settings';
+import { selectEnableAudioStreamForDevice } from './select-enable-audio-stream-for-device';
 import { selectEnableVideoForDevice } from './select-enable-video-for-device';
 import { selectKnownDevices } from './select-known-devices';
 import { selectVideoDeviceForDevice } from './select-video-device-for-device';
@@ -25,6 +26,7 @@ export function withSettingsSelectors() {
       ...isNavigatingHistory(writableStore),
       ...historyPositionDisplay(writableStore),
       ...selectDeviceSettings(writableStore),
+      ...selectEnableAudioStreamForDevice(writableStore),
       ...selectEnableVideoForDevice(writableStore),
       ...selectKnownDevices(writableStore),
       ...selectVideoDeviceForDevice(writableStore),
