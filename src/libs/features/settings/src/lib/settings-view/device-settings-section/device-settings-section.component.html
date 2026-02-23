@@ -36,6 +36,25 @@
                   [control]="enableVideoCtrl" />
               }
             </div>
+
+            <!-- Audio Settings Group -->
+            <div class="settings-group audio-settings-group">
+              <h4 class="group-title">Audio Settings</h4>
+
+              @if (getEnableAudioStreamControl(deviceGroup); as enableAudioCtrl) {
+                <lib-settings-toggle-item
+                  label="Enable Audio Streaming"
+                  description="Automatically stream audio from this device when connected. Requires an audio input device configured below."
+                  [control]="enableAudioCtrl" />
+              }
+
+              <lib-audio-settings-section
+                [audioFormGroup]="getAudioSettings(deviceGroup)"
+                [savedDeviceIndex]="getAudioDeviceIndex(deviceGroup)"
+                [deviceId]="getDeviceId(deviceGroup)"
+                [deviceIndex]="getDeviceIndex(deviceGroup)"
+                [loadOnInit]="i === 0" />
+            </div>
           </div>
         </form>
       </div>

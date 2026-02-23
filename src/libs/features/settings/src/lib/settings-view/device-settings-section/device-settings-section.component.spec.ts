@@ -1,14 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { signal } from '@angular/core';
+import { Subject } from 'rxjs';
 import { DeviceSettingsSectionComponent } from './device-settings-section.component';
+import { AudioStore } from '@teensyrom-nx/application';
+import { AUDIO_STREAM_SERVICE, IAudioStreamService } from '@teensyrom-nx/domain';
 
 describe('DeviceSettingsSectionComponent', () => {
   let component: DeviceSettingsSectionComponent;
   let fixture: ComponentFixture<DeviceSettingsSectionComponent>;
   let fb: FormBuilder;
 
-  const createDeviceFormGroup = (deviceId: string, enableVideo = false, autoConnect = true): FormGroup => {
+  const createDeviceFormGroup = (deviceId: string, enableVideo = false, autoConnect = true, audioDeviceIndex = -1): FormGroup => {
     return fb.group({
       deviceId: [deviceId],
       videoSettings: fb.group({
@@ -18,7 +22,31 @@ describe('DeviceSettingsSectionComponent', () => {
       connectionSettings: fb.group({
         autoConnectEnabled: [autoConnect],
       }),
+      audioSettings: fb.group({
+        audioDeviceIndex: [audioDeviceIndex],
+        enableAudioStream: [false],
+        audioDeviceName: [''],
+        channelCount: [0],
+        sampleRate: [0],
+      }),
     });
+  };
+
+  const mockAudioStore = {
+    devices: signal([]),
+    selectedDeviceIndex: signal<number | null>(null),
+    isLoading: signal(false),
+    error: signal<string | null>(null),
+    isStreaming: signal(false),
+    isConnecting: signal(false),
+    loadDevices: vi.fn(),
+    selectDevice: vi.fn(),
+    startStream: vi.fn(),
+    stopStream: vi.fn(),
+  };
+
+  const mockAudioStreamService: Partial<IAudioStreamService> = {
+    volumeLevel$: new Subject<number>().asObservable(),
   };
 
   beforeEach(async () => {
@@ -26,7 +54,11 @@ describe('DeviceSettingsSectionComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [DeviceSettingsSectionComponent, ReactiveFormsModule],
-      providers: [provideNoopAnimations()],
+      providers: [
+        provideNoopAnimations(),
+        { provide: AudioStore, useValue: mockAudioStore },
+        { provide: AUDIO_STREAM_SERVICE, useValue: mockAudioStreamService },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DeviceSettingsSectionComponent);
@@ -73,8 +105,11 @@ describe('DeviceSettingsSectionComponent', () => {
       fixture.componentRef.setInput('knownDevicesArray', devicesArray);
       fixture.detectChanges();
 
-      const emptyState = fixture.nativeElement.querySelector('.empty-state');
-      expect(emptyState).toBeNull();
+      // The top-level empty state (outside device sections) should not exist
+      // Note: audio-settings-section may show its own empty state if no audio devices loaded
+      const scalingCard = fixture.nativeElement.querySelector('lib-scaling-card');
+      const topLevelEmptyState = scalingCard.querySelector(':scope > .empty-state');
+      expect(topLevelEmptyState).toBeNull();
     });
 
     it('should display video toggle for each device', () => {
@@ -128,6 +163,7 @@ describe('DeviceSettingsSectionComponent', () => {
       const deviceGroup = fb.group({
         videoSettings: fb.group({ enableVideo: [false] }),
         connectionSettings: fb.group({ autoConnectEnabled: [true] }),
+        audioSettings: fb.group({ audioDeviceIndex: [-1] }),
       });
       const devicesArray = fb.array([deviceGroup]);
       fixture.componentRef.setInput('knownDevicesArray', devicesArray);
@@ -147,6 +183,101 @@ describe('DeviceSettingsSectionComponent', () => {
       const control = component.getEnableVideoControl(devicesArray.at(0));
       expect(control).toBeTruthy();
       expect(control?.value).toBe(true);
+    });
+  });
+
+  describe('Audio Settings Helpers', () => {
+    it('should get audio settings FormGroup', () => {
+      const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      const audioSettings = component.getAudioSettings(devicesArray.at(0));
+      expect(audioSettings).toBeTruthy();
+      expect(audioSettings?.get('audioDeviceIndex')).toBeTruthy();
+    });
+
+    it('should get audio device index', () => {
+      const devicesArray = fb.array([createDeviceFormGroup('device-123', false, true, 2)]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      const index = component.getAudioDeviceIndex(devicesArray.at(0));
+      expect(index).toBe(2);
+    });
+
+    it('should return -1 for audio device index when not set', () => {
+      const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      const index = component.getAudioDeviceIndex(devicesArray.at(0));
+      expect(index).toBe(-1);
+    });
+
+    it('should get device ID', () => {
+      const devicesArray = fb.array([createDeviceFormGroup('test-device-456')]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      const deviceId = component.getDeviceId(devicesArray.at(0));
+      expect(deviceId).toBe('test-device-456');
+    });
+
+    it('should get device index in FormArray', () => {
+      const devicesArray = fb.array([
+        createDeviceFormGroup('device-1'),
+        createDeviceFormGroup('device-2'),
+        createDeviceFormGroup('device-3'),
+      ]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      expect(component.getDeviceIndex(devicesArray.at(0))).toBe(0);
+      expect(component.getDeviceIndex(devicesArray.at(1))).toBe(1);
+      expect(component.getDeviceIndex(devicesArray.at(2))).toBe(2);
+    });
+  });
+
+  describe('Audio Settings Section Embedding', () => {
+    it('should render audio settings section for each device', () => {
+      const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      const audioSections = fixture.nativeElement.querySelectorAll('lib-audio-settings-section');
+      expect(audioSections.length).toBe(1);
+    });
+
+    it('should render audio settings section for multiple devices', () => {
+      const devicesArray = fb.array([
+        createDeviceFormGroup('device-1'),
+        createDeviceFormGroup('device-2'),
+      ]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      const audioSections = fixture.nativeElement.querySelectorAll('lib-audio-settings-section');
+      expect(audioSections.length).toBe(2);
+    });
+
+    it('should render audio settings group with separator', () => {
+      const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      const audioGroup = fixture.nativeElement.querySelector('.audio-settings-group');
+      expect(audioGroup).toBeTruthy();
+    });
+
+    it('should render Audio Settings group title', () => {
+      const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
+      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
+      fixture.detectChanges();
+
+      const audioGroupTitle = fixture.nativeElement.querySelector('.audio-settings-group .group-title');
+      expect(audioGroupTitle).toBeTruthy();
+      expect(audioGroupTitle.textContent).toContain('Audio Settings');
     });
   });
 

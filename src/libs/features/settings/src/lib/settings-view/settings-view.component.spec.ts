@@ -4,9 +4,10 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal, WritableSignal } from '@angular/core';
 import { FormGroup, FormBuilder, Validators, FormArray } from '@angular/forms';
 import { SettingsViewComponent } from './settings-view.component';
-import { Settings, SETTINGS_SERVICE, ISettingsService, Device } from '@teensyrom-nx/domain';
+import { Settings, SETTINGS_SERVICE, ISettingsService, Device, AUDIO_STREAM_SERVICE, PlayerFilterType, DeviceState, StorageType } from '@teensyrom-nx/domain';
 import { SettingsFormService } from './settings-form.service';
 import { DeviceStore } from '@teensyrom-nx/application';
+import { EMPTY } from 'rxjs';
 
 /**
  * Custom validator to ensure at least one weight is greater than 0
@@ -34,7 +35,7 @@ describe('SettingsViewComponent', () => {
   let fixture: ComponentFixture<SettingsViewComponent>;
   let mockFormService: Partial<SettingsFormService>;
   let mockSettingsService: ISettingsService;
-  let mockDeviceStore: Partial<DeviceStore>;
+  let mockDeviceStore: Partial<InstanceType<typeof DeviceStore>>;
 
   // Mock signals
   let settingsSignal: WritableSignal<Settings | null>;
@@ -57,7 +58,7 @@ describe('SettingsViewComponent', () => {
       playTimerEnabled: true,
       muteFastForward: false,
       muteRandomSeek: false,
-      startupFilter: 'All',
+      startupFilter: 'All' as PlayerFilterType,
       startupLaunchEnabled: false,
       startupLaunchRandom: false,
     },
@@ -91,9 +92,13 @@ describe('SettingsViewComponent', () => {
           enableVideo: false,
           videoDeviceId: '',
         },
-        connectionSettings: {
-          autoConnectEnabled: true,
-        },
+        audioSettings: {
+          audioDeviceIndex: -1,
+          enableAudioStream: false,
+          audioDeviceName: '',
+          channelCount: 0,
+          sampleRate: 0
+        }
       },
     ],
   };
@@ -120,18 +125,32 @@ describe('SettingsViewComponent', () => {
     devicesSignal = signal<Device[]>([
       {
         deviceId: 'test-device-123',
-        deviceName: 'Test Device',
         isConnected: true,
         isEnabled: true,
-        isPrimary: true,
-        lastSeen: new Date(),
+        comPort: '',
+        name: '',
+        fwVersion: '',
+        isCompatible: false,
+        deviceState: DeviceState.Connected,
+        sdStorage: {
+          deviceId: '',
+          type: StorageType.Sd,
+          available: false,
+          indexExists: false
+        },
+        usbStorage: {
+          deviceId: '',
+          type: StorageType.Sd,
+          available: false,
+          indexExists: false
+        },
       },
     ]);
 
     // Create mock device store
     mockDeviceStore = {
       devices: devicesSignal.asReadonly(),
-    } as Partial<DeviceStore>;
+    } as Partial<InstanceType<typeof DeviceStore>>;
 
     // Build a real form for testing
     const fb = new FormBuilder();
@@ -191,7 +210,7 @@ describe('SettingsViewComponent', () => {
               videoDeviceId: [device.videoSettings.videoDeviceId],
             }),
             connectionSettings: fb.group({
-              autoConnectEnabled: [device.connectionSettings.autoConnectEnabled],
+              autoConnectEnabled: [true],
             }),
           })
         )
@@ -205,9 +224,9 @@ describe('SettingsViewComponent', () => {
       isLoading: isLoadingSignal.asReadonly(),
       isSaving: isSavingSignal.asReadonly(),
       error: errorSignal.asReadonly(),
-      settingsForm: settingsFormSignal.asReadonly(),
+      settingsForm: settingsFormSignal,
       autoSaveEnabled: autoSaveEnabledSignal,
-      showSaving: showSavingSignal.asReadonly(),
+      showSaving: showSavingSignal,
       canSave: canSaveSignal.asReadonly(),
       canUndo: canUndoSignal.asReadonly(),
       canRedo: canRedoSignal.asReadonly(),
@@ -229,6 +248,15 @@ describe('SettingsViewComponent', () => {
         provideNoopAnimations(),
         { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
         { provide: DeviceStore, useValue: mockDeviceStore },
+        {
+          provide: AUDIO_STREAM_SERVICE,
+          useValue: {
+            streamState$: EMPTY,
+            getDevices: vi.fn().mockResolvedValue([]),
+            connect: vi.fn().mockResolvedValue(undefined),
+            disconnect: vi.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     })
       .overrideComponent(SettingsViewComponent, {
@@ -340,6 +368,7 @@ describe('SettingsViewComponent', () => {
       if (!form) return;
       // Make form invalid by clearing required field
       const control = form.get('fileTransferSettings.autoTransferPath');
+      if (!control) return;
       control.setValue('');
       control.markAsTouched();
       control.updateValueAndValidity();
@@ -422,6 +451,7 @@ describe('SettingsViewComponent', () => {
 
       const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
       // File transfer button is currently commented out in the template
+      // Audio button removed - audio settings now embedded in device settings
       expect(buttons.length).toBe(3);
     });
 
@@ -571,7 +601,7 @@ describe('SettingsViewComponent', () => {
       fixture.detectChanges();
 
       const saveButton = Array.from(
-        fixture.nativeElement.querySelectorAll('lib-action-button')
+        fixture.nativeElement.querySelectorAll('lib-action-button') as NodeListOf<Element>
       ).find((btn: Element) => btn.textContent?.includes('Save'));
 
       expect(saveButton).toBeTruthy();

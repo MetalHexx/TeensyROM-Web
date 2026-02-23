@@ -1,0 +1,21 @@
+:host {
+  display: block;
+}
+
+.vu-meter-track {
+  height: var(--spacing-lg);
+  background: linear-gradient(to right, #2d7a3e 0%, #d4a574 60%, #cc3333 100%);
+  border-radius: var(--spacing-xs);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vu-meter-cover {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  background: var(--surface-darker, rgba(10, 10, 20, 0.85));
+  transition: width 60ms ease-out;
+}

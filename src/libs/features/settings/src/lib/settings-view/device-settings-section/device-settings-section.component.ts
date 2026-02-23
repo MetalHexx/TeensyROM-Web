@@ -1,10 +1,12 @@
-import { Component, input, computed } from '@angular/core';
+import { Component, input, computed, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormGroup, AbstractControl, ReactiveFormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ScalingCardComponent, IconLabelComponent } from '@teensyrom-nx/ui/components';
 import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
+import { AudioSettingsSectionComponent } from '../audio-settings-section/audio-settings-section.component';
 import { Device } from '@teensyrom-nx/domain';
+import { AudioStore } from '@teensyrom-nx/application';
 
 /**
  * Presentational component for per-device settings section.
@@ -28,11 +30,14 @@ import { Device } from '@teensyrom-nx/domain';
     ScalingCardComponent,
     IconLabelComponent,
     SettingsToggleItemComponent,
+    AudioSettingsSectionComponent,
   ],
   templateUrl: './device-settings-section.component.html',
   styleUrl: './device-settings-section.component.scss',
 })
 export class DeviceSettingsSectionComponent {
+  readonly audioStore = inject(AudioStore);
+
   /**
    * FormArray containing device settings FormGroups.
    * Each FormGroup contains:
@@ -125,5 +130,41 @@ export class DeviceSettingsSectionComponent {
   isDeviceOnline(deviceGroup: AbstractControl): boolean {
     const device = this.getDevice(deviceGroup);
     return device?.deviceState === 'Connected';
+  }
+
+  /**
+   * Gets the audio settings FormGroup from a device FormGroup.
+   */
+  getAudioSettings(deviceGroup: AbstractControl): FormGroup | null {
+    return deviceGroup.get('audioSettings') as FormGroup | null;
+  }
+
+  /**
+   * Gets the saved audio device index from a device FormGroup.
+   * Returns -1 if no audio settings or no device configured.
+   */
+  getAudioDeviceIndex(deviceGroup: AbstractControl): number {
+    return deviceGroup.get('audioSettings.audioDeviceIndex')?.value ?? -1;
+  }
+
+  /**
+   * Gets the enableAudioStream form control from a device FormGroup.
+   */
+  getEnableAudioStreamControl(deviceGroup: AbstractControl): AbstractControl | null {
+    return deviceGroup.get('audioSettings.enableAudioStream');
+  }
+
+  /**
+   * Gets the TeensyROM device ID from a device FormGroup.
+   */
+  getDeviceId(deviceGroup: AbstractControl): string {
+    return deviceGroup.get('deviceId')?.value ?? '';
+  }
+
+  /**
+   * Gets the numeric index of a device in the FormArray.
+   */
+  getDeviceIndex(deviceGroup: AbstractControl): number {
+    return this.knownDevicesArray().controls.indexOf(deviceGroup);
   }
 }

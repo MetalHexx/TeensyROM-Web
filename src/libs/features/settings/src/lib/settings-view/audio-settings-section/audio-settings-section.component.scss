@@ -1,0 +1,186 @@
+@use '../../../../../../ui/styles/src/lib/theme/styles.scss' as styles;
+@use '../../../../../../ui/styles/src/lib/theme/mixins' as mixins;
+
+:host {
+  display: block;
+}
+
+.audio-settings-embedded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.loading-state,
+.error-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-2xl);
+  text-align: center;
+  opacity: 0.7;
+
+  mat-icon {
+    font-size: 3rem;
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  p {
+    margin: var(--spacing-xs) 0;
+  }
+
+  .hint {
+    font-size: 0.875rem;
+    opacity: 0.7;
+  }
+}
+
+.error-state {
+  mat-icon {
+    color: var(--color-error);
+  }
+}
+
+.audio-settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: 0;
+
+  .group-title {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: 1rem;
+    font-weight: 600;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.device-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.device-item {
+  @include styles.selectable-item;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+
+  .device-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: break-word;
+    word-break: break-word;
+
+    @include mixins.below-phone {
+      ::ng-deep .label {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+
+  .device-details {
+    font-size: 0.8125rem;
+    opacity: 0.6;
+    padding-left: var(--spacing-xl);
+  }
+
+  .selected-indicator {
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+}
+
+.sample-rate-group {
+  margin-top: var(--spacing-sm);
+}
+
+.sample-rate-display {
+  padding: var(--spacing-sm) 0;
+}
+
+// ── Test Audio Section ────────────────────────────────────────────────
+.test-audio-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.test-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.vu-meter-container {
+  padding: var(--spacing-xs) 0;
+}
+
+// ── Latency Tuning Section ────────────────────────────────────────────
+.latency-tuning-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: var(--spacing-lg);
+
+  .hint {
+    font-size: 0.8125rem;
+    opacity: 0.6;
+    margin: 0 0 var(--spacing-md) 0;
+  }
+}
+
+.latency-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-lg);
+
+  .slider-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .control-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    opacity: 0.9;
+  }
+
+  .control-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    min-width: 4.5rem;
+    text-align: right;
+    color: var(--color-primary);
+  }
+
+  mat-slider {
+    width: 100%;
+  }
+
+  .slider-hint {
+    font-size: 0.75rem;
+    opacity: 0.5;
+  }
+}
