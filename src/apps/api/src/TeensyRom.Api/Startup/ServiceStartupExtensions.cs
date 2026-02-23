@@ -10,6 +10,7 @@ using TeensyRom.Api.Endpoints.Serial.GetLogs;
 using TeensyRom.Core.Music;
 using TeensyRom.Core.Music.Hvsc;
 using TeensyRom.Core.Music.DeepSid;
+using TeensyRom.Core.Audio;
 
 namespace TeensyRom.Api.Startup
 {
@@ -44,6 +45,8 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IHvscDatabase, HvscDatabase>();
             services.AddSingleton<IDeepSidDatabase, DeepSidDatabase>();
             services.AddSingleton<ISidMetadataService, SidMetadataService>();
+            services.AddSingleton<IAudioCaptureService, PortAudioCaptureService>();
+            services.AddSingleton<IAudioStreamManager, AudioStreamManager>();
 
             // Register application bootstrap hosted service
             services.AddHostedService<ApplicationBootstrapService>();

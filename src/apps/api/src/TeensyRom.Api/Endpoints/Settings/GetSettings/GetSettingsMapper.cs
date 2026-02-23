@@ -24,6 +24,7 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
             {
                 DeviceId = entity.DeviceId,
                 VideoSettings = MapVideoSettings(entity.VideoSettings),
+                AudioSettings = MapAudioSettings(entity.AudioSettings),
                 IndexingStatus = MapIndexingStatus(entity.IndexingStatus)
             };
         }
@@ -48,6 +49,28 @@ namespace TeensyRom.Api.Endpoints.Settings.GetSettings
             {
                 EnableVideo = entity.EnableVideo,
                 VideoDeviceId = entity.VideoDeviceId
+            };
+        }
+
+        private static AudioSettingsDto MapAudioSettings(AudioSettings entity)
+        {
+            return new AudioSettingsDto
+            {
+                EnableAudioStream = entity.EnableAudioStream,
+                AudioDeviceIndex = entity.AudioDeviceIndex,
+                AudioDeviceName = entity.AudioDeviceName,
+                CaptureChannelCount = entity.CaptureChannelCount,
+                SampleRate = entity.SampleRate,
+                Channels = entity.Channels.Select(MapChannelConfig).ToList()
+            };
+        }
+
+        private static ChannelConfigDto MapChannelConfig(ChannelConfig entity)
+        {
+            return new ChannelConfigDto
+            {
+                SourceChannel = entity.SourceChannel,
+                Enabled = entity.Enabled
             };
         }
 
