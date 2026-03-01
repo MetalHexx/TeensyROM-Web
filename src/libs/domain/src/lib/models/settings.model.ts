@@ -110,6 +110,8 @@ export interface AudioSettings {
   sampleRate: number;
   /** Per-channel configuration for multi-channel audio streaming */
   channels: ChannelConfig[];
+  /** When true, audio is compressed using Opus codec (~16 KB/s per channel). When false, raw PCM is sent for lowest latency (~188 KB/s per channel). Default: true */
+  useOpusEncoding: boolean;
 }
 
 /**

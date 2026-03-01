@@ -14,6 +14,7 @@ import {
   IDeviceLogsService,
 } from '@teensyrom-nx/domain';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
+import { AudioBootstrapService } from './audio-bootstrap.service';
 
 @Injectable({ providedIn: 'root' })
 export class AppBootstrapService {
@@ -22,6 +23,7 @@ export class AppBootstrapService {
   private readonly deviceLogsService: IDeviceLogsService = inject(DEVICE_LOGS_SERVICE);
   private readonly injector = inject(Injector);
   private readonly alertService: IAlertService = inject(ALERT_SERVICE);
+  private readonly audioBootstrapService = inject(AudioBootstrapService);
 
   async init(): Promise<void> {
     logInfo(LogType.Start, 'AppBootstrap: Application bootstrap started');
@@ -47,6 +49,7 @@ export class AppBootstrapService {
       this.deviceLogsService.connect();
       // Quick scan on bootstrap - don't do full network scan
       this.deviceStore.findDevices(false);
+      this.audioBootstrapService.init();
     });
   }
 

@@ -61,6 +61,8 @@ const mockAudioContext = {
   sampleRate: 48000,
   resume: vi.fn().mockResolvedValue(undefined),
   close: vi.fn().mockResolvedValue(undefined),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
   createBuffer: vi.fn().mockReturnValue({
     getChannelData: vi.fn().mockReturnValue(new Float32Array(960)),
     duration: 0.02, // 960 samples / 48000 Hz = 0.02 seconds
@@ -170,6 +172,8 @@ describe('AudioStreamService', () => {
     mockAudioContext.state = 'running';
     mockAudioContext.resume.mockClear();
     mockAudioContext.close.mockClear();
+    mockAudioContext.addEventListener.mockClear();
+    mockAudioContext.removeEventListener.mockClear();
     mockAudioContext.createBuffer.mockClear();
     mockAudioContext.createBufferSource.mockClear();
     mockAudioContext.createChannelMerger.mockClear();
@@ -504,6 +508,7 @@ describe('AudioStreamService', () => {
 
   describe('Web Audio playback', () => {
     it('should create AudioContext with 48kHz sample rate on connect', async () => {
+      mockAudioContext.state = 'suspended';
       await service.connect('test-device-id');
 
       expect(AudioContext).toHaveBeenCalledWith({ sampleRate: 48000 });
@@ -718,19 +723,19 @@ describe('AudioStreamService', () => {
       streamCallback(new Uint8Array([0, 1, 2, 3]));
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      // First frame should start at currentTime + preBuffer
-      // nextPlayTime = 1.0 + 0.2 = 1.2
+      // First frame should start at currentTime + preBuffer (DEFAULT_PRE_BUFFER_DURATION = 0.005)
+      // nextPlayTime = 1.0 + 0.005 = 1.005
       const firstStartCall = mockSource.start.mock.calls[0];
-      expect(firstStartCall[0]).toBeCloseTo(1.2, 1);
+      expect(firstStartCall[0]).toBeCloseTo(1.005, 3);
 
       // Simulate receiving second frame
       streamCallback(new Uint8Array([4, 5, 6, 7]));
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       // Second frame should start after first frame duration
-      // nextPlayTime = 1.2 + 0.02 = 1.22
+      // nextPlayTime = 1.005 + 0.02 = 1.025
       const secondStartCall = mockSource.start.mock.calls[1];
-      expect(secondStartCall[0]).toBeCloseTo(1.22, 2);
+      expect(secondStartCall[0]).toBeCloseTo(1.025, 3);
     });
 
     it('should skip ahead if nextPlayTime falls behind currentTime', async () => {

@@ -40,6 +40,12 @@ export interface IAudioStreamService {
 
   /** Gets the current catch-up padding in seconds */
   getCatchUpPadding(): number;
+
+  /** Sets whether Opus encoding is enabled. When false, raw PCM is used for lowest latency. */
+  setUseOpusEncoding(enabled: boolean): void;
+
+  /** Gets whether Opus encoding is currently enabled */
+  getUseOpusEncoding(): boolean;
 }
 
 /** Injection token for the audio stream service */

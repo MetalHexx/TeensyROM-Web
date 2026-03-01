@@ -49,5 +49,12 @@ namespace TeensyRom.Core.Settings
     /// Empty list indicates single-channel capture or not yet configured.
     /// </summary>
     public List<ChannelConfig> Channels { get; set; } = [];
+
+    /// <summary>
+    /// When true, audio is compressed using Opus codec (~16 KB/s per channel).
+    /// When false, raw PCM is sent for lowest latency (~188 KB/s per channel).
+    /// Default is true for backward compatibility. Disable for DJ/performance use cases.
+    /// </summary>
+    public bool UseOpusEncoding { get; set; } = true;
   }
 }

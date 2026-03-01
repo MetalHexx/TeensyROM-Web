@@ -481,6 +481,7 @@ export class DomainMapper {
         captureChannelCount: 1,
         sampleRate: 48000,
         channels: [],
+        useOpusEncoding: true,
       };
     }
     return {
@@ -490,6 +491,7 @@ export class DomainMapper {
       captureChannelCount: dto.captureChannelCount ?? 1,
       sampleRate: dto.sampleRate ?? 48000,
       channels: dto.channels ?? [],
+      useOpusEncoding: dto.useOpusEncoding ?? true,
     };
   }
 
@@ -505,6 +507,7 @@ export class DomainMapper {
         captureChannelCount: 1,
         sampleRate: 48000,
         channels: [],
+        useOpusEncoding: true,
       };
     }
     return {
@@ -514,6 +517,7 @@ export class DomainMapper {
       captureChannelCount: settings.captureChannelCount,
       sampleRate: settings.sampleRate,
       channels: settings.channels,
+      useOpusEncoding: settings.useOpusEncoding,
     };
   }
 

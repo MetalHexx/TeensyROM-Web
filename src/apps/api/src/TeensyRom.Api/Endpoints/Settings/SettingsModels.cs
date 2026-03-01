@@ -137,6 +137,13 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// Per-channel configuration for multi-channel audio streaming.
         /// </summary>
         [Required] public List<ChannelConfigDto> Channels { get; set; } = [];
+
+        /// <summary>
+        /// When true, audio is compressed using Opus codec (~16 KB/s per channel).
+        /// When false, raw PCM is sent for lowest latency (~188 KB/s per channel).
+        /// Default is true. Disable for DJ/performance use cases where latency is critical.
+        /// </summary>
+        [Required] public bool UseOpusEncoding { get; set; } = true;
     }
 
     /// <summary>

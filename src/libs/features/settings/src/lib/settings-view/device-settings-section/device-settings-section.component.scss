@@ -64,22 +64,10 @@
 form {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: var(--spacing-xl);
 
   &.disabled {
     pointer-events: none;
-  }
-}
-
-// Responsive grid for settings groups - matches player-settings-section
-.settings-grid {
-  display: grid;
-  gap: var(--spacing-xl);
-  grid-template-columns: 1fr;
-
-  // Side-by-side on tablets and larger
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -99,10 +87,9 @@ form {
   }
 }
 
-.audio-settings-group {
-  margin-top: var(--spacing-sm);
+.audio-section {
   padding-top: var(--spacing-lg);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .connection-type-field {
@@ -122,3 +109,5 @@ form {
   display: flex;
   gap: var(--spacing-lg);
 }
+
+

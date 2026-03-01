@@ -81,7 +81,8 @@ public sealed class AudioHub(
             ChannelCount = captureChannelCount,
             SampleRate = 48000, // Opus requires 48kHz; PortAudio resamples from device native rate
             OpusBitrate = 128000, // 128 kbps
-            Channels = audioSettings.Channels
+            Channels = audioSettings.Channels,
+            UseOpusEncoding = audioSettings.UseOpusEncoding
         };
 
         streamManager.StartStream(deviceId, config);

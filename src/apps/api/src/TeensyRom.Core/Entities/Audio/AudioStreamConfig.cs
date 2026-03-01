@@ -40,4 +40,10 @@ public record AudioStreamConfig
     /// Defines which channels to encode, their names, and enable/disable state.
     /// </summary>
     public List<ChannelConfig> Channels { get; init; } = [];
+
+    /// <summary>
+    /// When true, audio is compressed using Opus codec (~16 KB/s per channel).
+    /// When false, raw PCM is sent for lowest latency (~188 KB/s per channel).
+    /// </summary>
+    public bool UseOpusEncoding { get; init; } = true;
 }

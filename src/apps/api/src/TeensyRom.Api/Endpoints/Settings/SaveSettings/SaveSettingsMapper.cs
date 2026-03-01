@@ -83,7 +83,8 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
                 AudioDeviceName = dto.AudioDeviceName,
                 CaptureChannelCount = dto.CaptureChannelCount > 0 ? dto.CaptureChannelCount : 1,
                 SampleRate = dto.SampleRate,
-                Channels = dto.Channels?.Select(MapChannelConfig).ToList() ?? []
+                Channels = dto.Channels?.Select(MapChannelConfig).ToList() ?? [],
+                UseOpusEncoding = dto.UseOpusEncoding
             };
         }
 

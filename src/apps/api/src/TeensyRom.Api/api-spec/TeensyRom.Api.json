@@ -987,7 +987,8 @@
           "audioDeviceName",
           "captureChannelCount",
           "sampleRate",
-          "channels"
+          "channels",
+          "useOpusEncoding"
         ],
         "type": "object",
         "properties": {
@@ -1014,6 +1015,9 @@
             "items": {
               "$ref": "#/components/schemas/ChannelConfigDto"
             }
+          },
+          "useOpusEncoding": {
+            "type": "boolean"
           }
         }
       },

@@ -250,6 +250,7 @@ export class SettingsFormService {
           captureChannelCount: [device.audioSettings?.captureChannelCount ?? 1],
           sampleRate: [device.audioSettings?.sampleRate ?? 48000],
           channels: [device.audioSettings?.channels ?? []],
+          useOpusEncoding: [device.audioSettings?.useOpusEncoding ?? true],
         },
         { validators: this.audioSettingsValidator }
       ),
@@ -338,6 +339,7 @@ export class SettingsFormService {
           captureChannelCount: device.audioSettings?.captureChannelCount ?? 1,
           sampleRate: device.audioSettings?.sampleRate ?? 48000,
           channels: device.audioSettings?.channels ?? [],
+          useOpusEncoding: device.audioSettings?.useOpusEncoding ?? true,
         },
       })),
     };
@@ -393,6 +395,7 @@ export class SettingsFormService {
           captureChannelCount: device.audioSettings?.captureChannelCount ?? 1,
           sampleRate: device.audioSettings?.sampleRate ?? 48000,
           channels: device.audioSettings?.channels ?? [],
+          useOpusEncoding: device.audioSettings?.useOpusEncoding ?? true,
         },
       })),
     };

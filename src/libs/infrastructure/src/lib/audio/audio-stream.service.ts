@@ -10,6 +10,7 @@ import {
   IApiConfig,
   ChannelAudioFrame,
 } from '@teensyrom-nx/domain';
+import { LogType, logInfo } from '@teensyrom-nx/utils';
 import { OpusDecoder } from 'opus-decoder';
 
 /** Sample rate for Opus audio (48kHz) */
@@ -64,10 +65,15 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
   private readonly nextPlayTimes = new Map<number, number>();
   private readonly gainNodes = new Map<number, GainNode>();
   private levelDecayTimer: ReturnType<typeof setInterval> | null = null;
+  private audioUnlockCleanup: (() => void) | null = null;
+  private readonly loggedChannelConnectionInfo = new Set<number>();
 
   // Configurable latency tuning parameters
   private preBufferDuration = DEFAULT_PRE_BUFFER_DURATION;
   private catchUpPadding = DEFAULT_CATCH_UP_PADDING;
+
+  // Opus encoding toggle - when false, raw PCM is used for lowest latency
+  private useOpusEncoding = true;
 
   /** Observable stream of connection state changes */
   get streamState$(): Observable<AudioStreamState> {
@@ -155,6 +161,21 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
   }
 
   /**
+   * Sets whether Opus encoding is enabled.
+   * When true (default), audio is compressed via Opus (~16 KB/s per channel).
+   * When false, raw PCM is used for lowest latency (~188 KB/s per channel).
+   * @param enabled - Whether to use Opus encoding
+   */
+  setUseOpusEncoding(enabled: boolean): void {
+    this.useOpusEncoding = enabled;
+  }
+
+  /** Gets whether Opus encoding is currently enabled */
+  getUseOpusEncoding(): boolean {
+    return this.useOpusEncoding;
+  }
+
+  /**
    * Gets the list of available audio input devices from the host system.
    * @returns Promise resolving to array of AudioDevice domain models
    */
@@ -190,6 +211,13 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
     this._streamState$.next(AudioStreamState.Connecting);
 
     try {
+      this.loggedChannelConnectionInfo.clear();
+      logInfo(LogType.Info, 'AudioStream: Connecting', {
+        deviceId,
+        codec: this.useOpusEncoding ? 'opus' : 'raw-pcm',
+        sampleRate: SAMPLE_RATE,
+      });
+
       // Initialize Web Audio playback pipeline
       await this.initAudioPlayback();
 
@@ -213,6 +241,10 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
       this.setupReconnectionHandlers();
 
       await this.hubConnection.start();
+      logInfo(LogType.Info, 'AudioStream: SignalR hub connected', {
+        deviceId,
+        hubUrl,
+      });
 
       // Subscribe to the audio stream
       await this.subscribeToStream(deviceId);
@@ -372,6 +404,44 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
   }
 
   /**
+   * Converts raw PCM bytes directly to Float32Array.
+   * Used when Opus encoding is disabled for lowest latency.
+   * @param bytes - Raw PCM bytes (3840 bytes = 960 float samples at 48kHz/20ms)
+   * @returns Float32Array of PCM samples
+   * @private
+   */
+  private bytesToFloat32(bytes: Uint8Array): Float32Array {
+    // Create a view of the bytes as Float32 values
+    return new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
+  }
+
+  /**
+   * Processes an incoming audio frame - either decodes Opus or converts raw PCM.
+   * @param channelIndex - The channel index
+   * @param frameData - Frame data (either Opus encoded or raw PCM)
+   * @returns Decoded channel frame or null if processing failed
+   * @private
+   */
+  private async processFrame(
+    channelIndex: number,
+    frameData: Uint8Array
+  ): Promise<DecodedChannelFrame | null> {
+    if (this.useOpusEncoding) {
+      // Opus decoding path (default) - ~320 bytes per frame
+      return this.decodeFrame(channelIndex, frameData);
+    } else {
+      // Raw PCM path - ~3840 bytes per frame (960 samples * 4 bytes)
+      const channelData = this.bytesToFloat32(frameData);
+      return {
+        channelIndex,
+        channelData,
+        samplesDecoded: channelData.length,
+        sampleRate: SAMPLE_RATE,
+      };
+    }
+  }
+
+  /**
    * Cleans up all decoder resources and releases WASM memory.
    * @private
    */
@@ -410,9 +480,11 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
     // Create AudioContext with 48kHz sample rate (matches Opus decoder output)
     this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
 
-    // Resume AudioContext - required for mobile browsers where it starts suspended
-    // The user gesture (clicking connect button) satisfies this requirement
-    await this.audioContext.resume();
+    this.installAudioUnlockHandlers();
+
+    // Try to resume immediately when connect() was triggered by a user gesture.
+    // If the browser blocks autoplay, keep streaming alive and resume on the next gesture.
+    await this.tryResumeAudioContext();
 
     // Start volume level decay timer for VU meter
     this.startLevelDecayTimer();
@@ -433,6 +505,12 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
   private scheduleFrame(frame: DecodedChannelFrame): void {
     if (!this.audioContext) {
       console.warn('[AudioStreamService] AudioContext not initialized');
+      return;
+    }
+
+    // Chrome may keep the context suspended until a user gesture. Drop frames while
+    // suspended so we don't queue an ever-growing backlog that plays late after unlock.
+    if (this.audioContext.state !== 'running') {
       return;
     }
 
@@ -565,6 +643,11 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
    * @private
    */
   private cleanupAudioPlayback(): void {
+    if (this.audioUnlockCleanup) {
+      this.audioUnlockCleanup();
+      this.audioUnlockCleanup = null;
+    }
+
     // Clear level decay timer
     if (this.levelDecayTimer !== null) {
       clearInterval(this.levelDecayTimer);
@@ -590,6 +673,80 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
 
     // Reset per-channel timing
     this.nextPlayTimes.clear();
+    this.loggedChannelConnectionInfo.clear();
+  }
+
+  /**
+   * Attempts to resume the AudioContext. Autoplay policy may block this until a user gesture.
+   * Returns true when audio is running, false when still blocked/suspended.
+   */
+  private async tryResumeAudioContext(): Promise<boolean> {
+    if (!this.audioContext) return false;
+
+    if (this.audioContext.state === 'running') {
+      return true;
+    }
+
+    try {
+      await this.audioContext.resume();
+
+      // Reset scheduling after unlock so playback starts from "now" without stale timing.
+      this.nextPlayTimes.clear();
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[AudioStreamService] AudioContext resume blocked: ${message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Registers one-time user gesture handlers that resume the AudioContext after autoplay blocking.
+   */
+  private installAudioUnlockHandlers(): void {
+    if (this.audioUnlockCleanup) {
+      this.audioUnlockCleanup();
+      this.audioUnlockCleanup = null;
+    }
+
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    const handler = () => {
+      if (!this.audioContext || this.audioContext.state === 'running') return;
+      this.audioContext.resume().then(() => {
+        this.nextPlayTimes.clear();
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      }).catch(() => {});
+    };
+
+    const events: Array<keyof DocumentEventMap> = ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'];
+    for (const eventName of events) {
+      document.addEventListener(eventName, handler, { passive: true });
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void this.tryResumeAudioContext();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    const onStateChange = () => {
+      if (this.audioContext?.state === 'running') {
+        this.audioContext.removeEventListener('statechange', onStateChange);
+      }
+    };
+    this.audioContext?.addEventListener('statechange', onStateChange);
+
+    this.audioUnlockCleanup = () => {
+      for (const eventName of events) {
+        document.removeEventListener(eventName, handler);
+      }
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      this.audioContext?.removeEventListener('statechange', onStateChange);
+    };
   }
 
   /**
@@ -678,6 +835,10 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
     }
 
     this.activeDeviceId = deviceId;
+    logInfo(LogType.Info, 'AudioStream: Starting capture subscription', {
+      deviceId,
+      codec: this.useOpusEncoding ? 'opus' : 'raw-pcm',
+    });
 
     // Start audio capture on the server (uses saved audio settings for this device)
     await this.hubConnection.invoke('StartCapture', deviceId);
@@ -689,8 +850,18 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
       next: (chunk: unknown) => {
         const frame = this.parseChannelAudioFrame(chunk);
         if (frame) {
-          // Decode the frame asynchronously
-          this.decodeFrame(frame.channelIndex, frame.opusFrame).then((decoded) => {
+          if (!this.loggedChannelConnectionInfo.has(frame.channelIndex)) {
+            this.loggedChannelConnectionInfo.add(frame.channelIndex);
+            logInfo(LogType.Info, 'AudioStream: First channel frame received', {
+              deviceId,
+              channelIndex: frame.channelIndex,
+              codec: this.useOpusEncoding ? 'opus' : 'raw-pcm',
+              payloadBytes: frame.opusFrame.length,
+            });
+          }
+
+          // Process the frame (decode Opus or convert raw PCM based on setting)
+          this.processFrame(frame.channelIndex, frame.opusFrame).then((decoded) => {
             if (decoded) {
               this._decodedChannelFrame$.next(decoded);
             }

@@ -148,13 +148,6 @@ export class DeviceSettingsSectionComponent {
   }
 
   /**
-   * Gets the enableAudioStream form control from a device FormGroup.
-   */
-  getEnableAudioStreamControl(deviceGroup: AbstractControl): AbstractControl | null {
-    return deviceGroup.get('audioSettings.enableAudioStream');
-  }
-
-  /**
    * Gets the TeensyROM device ID from a device FormGroup.
    */
   getDeviceId(deviceGroup: AbstractControl): string {

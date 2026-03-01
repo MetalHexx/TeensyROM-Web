@@ -22,47 +22,54 @@ import {
 } from './ChannelConfigDto';
 
 /**
- * 
+ *
  * @export
  * @interface AudioSettingsDto
  */
 export interface AudioSettingsDto {
     /**
-     * 
+     *
      * @type {boolean}
      * @memberof AudioSettingsDto
      */
     enableAudioStream: boolean;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AudioSettingsDto
      */
     audioDeviceIndex: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof AudioSettingsDto
      */
     audioDeviceName: string;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AudioSettingsDto
      */
     captureChannelCount: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AudioSettingsDto
      */
     sampleRate: number;
     /**
-     * 
+     *
      * @type {Array<ChannelConfigDto>}
      * @memberof AudioSettingsDto
      */
     channels: Array<ChannelConfigDto>;
+    /**
+     * When true, audio is compressed using Opus codec (~16 KB/s per channel).
+     * When false, raw PCM is sent for lowest latency (~188 KB/s per channel).
+     * @type {boolean}
+     * @memberof AudioSettingsDto
+     */
+    useOpusEncoding: boolean;
 }
 
 /**
@@ -75,6 +82,7 @@ export function instanceOfAudioSettingsDto(value: object): value is AudioSetting
     if (!('captureChannelCount' in value) || value['captureChannelCount'] === undefined) return false;
     if (!('sampleRate' in value) || value['sampleRate'] === undefined) return false;
     if (!('channels' in value) || value['channels'] === undefined) return false;
+    // useOpusEncoding is optional with default true, so we don't require it
     return true;
 }
 
@@ -87,13 +95,14 @@ export function AudioSettingsDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         return json;
     }
     return {
-        
+
         'enableAudioStream': json['enableAudioStream'],
         'audioDeviceIndex': json['audioDeviceIndex'],
         'audioDeviceName': json['audioDeviceName'],
         'captureChannelCount': json['captureChannelCount'],
         'sampleRate': json['sampleRate'],
         'channels': ((json['channels'] as Array<any>).map(ChannelConfigDtoFromJSON)),
+        'useOpusEncoding': json['useOpusEncoding'] ?? true,
     };
 }
 
@@ -107,13 +116,14 @@ export function AudioSettingsDtoToJSONTyped(value?: AudioSettingsDto | null, ign
     }
 
     return {
-        
+
         'enableAudioStream': value['enableAudioStream'],
         'audioDeviceIndex': value['audioDeviceIndex'],
         'audioDeviceName': value['audioDeviceName'],
         'captureChannelCount': value['captureChannelCount'],
         'sampleRate': value['sampleRate'],
         'channels': ((value['channels'] as Array<any>).map(ChannelConfigDtoToJSON)),
+        'useOpusEncoding': value['useOpusEncoding'],
     };
 }
 

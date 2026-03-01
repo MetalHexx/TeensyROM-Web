@@ -1,146 +1,113 @@
 <div class="audio-settings-embedded">
-  @if (audioStore.isLoading()) {
-    <div class="loading-state">
-      <mat-icon>hourglass_empty</mat-icon>
-      <p>Loading audio devices...</p>
-    </div>
-  } @else if (audioStore.error() && audioStore.devices().length === 0) {
-    <div class="error-state">
-      <mat-icon>error_outline</mat-icon>
-      <p>{{ audioStore.error() }}</p>
-    </div>
-  } @else if (audioStore.devices().length === 0) {
-    <div class="empty-state">
-      <mat-icon>mic_off</mat-icon>
-      <p>No audio input devices found.</p>
-      <p class="hint">Connect an audio input device and refresh.</p>
-    </div>
-  } @else {
-    <div class="audio-settings-content">
-      <!-- Device List -->
-      <div class="settings-group">
-        <h4 class="group-title">Audio Input Device</h4>
-        <div class="device-list">
-          @for (device of audioStore.devices(); track device.index) {
-            <div
-              class="device-item"
-              [class.selected]="isSelected(device)"
-              (click)="onSelectDevice(device)"
-              (keydown.enter)="onSelectDevice(device)"
-              (keydown.space)="onSelectDevice(device)"
-              tabindex="0"
-              role="option"
-              [attr.aria-selected]="isSelected(device)">
-              <div class="device-info">
-                <lib-icon-label
-                  icon="mic"
-                  [label]="device.name"
-                  size="large"
-                  [color]="isSelected(device) ? 'primary' : 'normal'"
-                  [truncate]="false" />
-                <span class="device-details">
-                  {{ device.maxInputChannels }} ch · {{ device.defaultSampleRate | number }} Hz
-                </span>
-              </div>
-              @if (isSelected(device)) {
-                <mat-icon class="selected-indicator">check_circle</mat-icon>
+  <!-- Enable Audio Streaming toggle (always visible) -->
+  @if (getEnableAudioStreamControl(); as enableAudioCtrl) {
+    <lib-settings-toggle-item
+      label="Enable Audio Streaming"
+      description="Automatically stream audio from this device when connected. Requires an audio input device configured below."
+      [control]="enableAudioCtrl" />
+  }
+
+  <div class="audio-options-wrapper" [class.audio-disabled]="!isAudioStreamEnabled()">
+    @if (audioStore.isLoading()) {
+      <div class="loading-state">
+        <mat-icon>hourglass_empty</mat-icon>
+        <p>Loading audio devices...</p>
+      </div>
+    } @else if (audioStore.error() && audioStore.devices().length === 0) {
+      <div class="error-state">
+        <mat-icon>error_outline</mat-icon>
+        <p>{{ audioStore.error() }}</p>
+      </div>
+    } @else if (audioStore.devices().length === 0) {
+      <div class="empty-state">
+        <mat-icon>mic_off</mat-icon>
+        <p>No audio input devices found.</p>
+        <p class="hint">Connect an audio input device and refresh.</p>
+      </div>
+    } @else {
+      <div class="audio-settings-content">
+        <div class="audio-columns">
+          <!-- Left Column: Controls -->
+          <div class="audio-column-left">
+            <div class="settings-group">
+              <!-- Opus Encoding Toggle -->
+              @if (selectedDevice() && getUseOpusEncodingControl()) {
+                <div class="opus-encoding-inline">
+                  <lib-settings-toggle-item
+                    label="Use Opus Compression"
+                    description="Enabled: lower bandwidth, slight quality loss. Disabled: lossless audio, higher bandwidth. Disable for DJ/performance use cases."
+                    [control]="getUseOpusEncodingControl()!" />
+                  @if (!useOpusEncoding()) {
+                    <p class="hint warning-hint">
+                      Raw PCM mode active: Lowest latency, higher bandwidth usage.
+                    </p>
+                  }
+                </div>
+              }
+
+              <!-- Channel Configuration (for multi-channel devices) -->
+              @if (isMultiChannel() && channelConfigs().length > 0) {
+                <div class="settings-group channel-config-group">
+                  <h4 class="group-title">Channel Configuration</h4>
+                  <p class="hint">Enable specific audio channels to stream. Each channel captures audio independently from your input device.</p>
+                  <div class="channel-list">
+                    @for (channel of channelConfigs(); track channel.sourceChannel; let i = $index) {
+                      <lib-channel-config
+                        [channelConfig]="channel"
+                        [vuLevel]="getChannelVuLevel(channel.sourceChannel)"
+                        [isTestActive]="showVuMeters()"
+                        (configChanged)="onChannelConfigChanged(i, $event)" />
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (showVuMeters() && !isMultiChannel()) {
+                <div class="test-audio-section">
+                  <h4 class="group-title">Audio Level</h4>
+                  <div class="vu-meter-container">
+                    <lib-vu-meter [level]="volumeLevel()" />
+                  </div>
+                </div>
               }
             </div>
-          }
+          </div>
+
+          <!-- Right Column: Device List -->
+          <div class="audio-column-right">
+            <h4 class="group-title">Audio Input Device</h4>
+            <p class="section-description">Select an audio input device from which to stream audio.</p>
+            <div class="device-list" role="listbox" aria-label="Audio input devices">
+              @for (device of audioStore.devices(); track device.index) {
+                <div
+                  class="device-item"
+                  [class.selected]="isSelected(device)"
+                  (click)="onSelectDevice(device)"
+                  (keydown.enter)="onSelectDevice(device)"
+                  (keydown.space)="onSelectDevice(device)"
+                  tabindex="0"
+                  role="option"
+                  [attr.aria-selected]="isSelected(device)">
+                  <div class="device-info">
+                    <lib-icon-label
+                      icon="mic"
+                      [label]="device.name"
+                      size="large"
+                      [color]="isSelected(device) ? 'primary' : 'normal'"
+                      [truncate]="false" />
+                    <span class="device-details">
+                      {{ device.maxInputChannels }} ch · {{ device.defaultSampleRate | number }} Hz
+                    </span>
+                  </div>
+                  @if (isSelected(device)) {
+                    <mat-icon class="selected-indicator">check_circle</mat-icon>
+                  }
+                </div>
+              }
+            </div>
+          </div>
         </div>
       </div>
-
-      <!-- Sample Rate Display -->
-      @if (selectedDevice()) {
-        <div class="settings-group sample-rate-group">
-          <h4 class="group-title">Sample Rate</h4>
-          <div class="sample-rate-display">
-            <lib-icon-label
-              icon="speed"
-              [label]="formattedSampleRate()"
-              size="large"
-              color="normal" />
-          </div>
-        </div>
-      }
-
-      <!-- Channel Configuration (for multi-channel devices) -->
-      @if (isMultiChannel() && channelConfigs().length > 0) {
-        <div class="settings-group channel-config-group">
-          <h4 class="group-title">Channel Configuration</h4>
-          <p class="hint">Enable specific audio channels to stream. Each channel captures audio independently from your input device.</p>
-          <div class="channel-list">
-            @for (channel of channelConfigs(); track channel.sourceChannel; let i = $index) {
-              <lib-channel-config
-                [channelConfig]="channel"
-                [vuLevel]="getChannelVuLevel(channel.sourceChannel)"
-                [isTestActive]="isTesting()"
-                (configChanged)="onChannelConfigChanged(i, $event)" />
-            }
-          </div>
-        </div>
-      }
-
-      <!-- Test Audio Section -->
-      <div class="test-audio-section">
-        <h4 class="group-title">Test Audio</h4>
-        <div class="test-audio-controls">
-          <lib-action-button
-            [icon]="testButtonIcon()"
-            [label]="testButtonLabel()"
-            [disabled]="isTestButtonDisabled()"
-            variant="stroked"
-            [color]="isTesting() ? 'error' : 'primary'"
-            (buttonClick)="onToggleTest()" />
-        </div>
-        @if (isTesting() && !isMultiChannel()) {
-          <div class="vu-meter-container">
-            <lib-vu-meter [level]="volumeLevel()" />
-          </div>
-        }
-      </div>
-
-      <!-- Latency Tuning Section -->
-      <!-- <div class="settings-group latency-tuning-group">
-        <h4 class="group-title">Latency Tuning</h4>
-        <p class="hint">Adjust in real-time while streaming to find the sweet spot. Lower values = less latency but higher risk of audio gaps.</p>
-
-        <div class="latency-slider-group">
-          <div class="slider-label-row">
-            <span class="control-label">Pre-Buffer</span>
-            <span class="control-value">{{ preBufferMs() | number:'1.0-0' }} ms</span>
-          </div>
-          <mat-slider
-            [min]="5"
-            [max]="500"
-            [step]="5"
-            discrete>
-            <input
-              matSliderThumb
-              [ngModel]="preBufferMs()"
-              (ngModelChange)="onPreBufferChange($event)" />
-          </mat-slider>
-          <span class="slider-hint">Initial delay before playback starts. Default: 200ms</span>
-        </div>
-
-        <div class="latency-slider-group">
-          <div class="slider-label-row">
-            <span class="control-label">Catch-Up Padding</span>
-            <span class="control-value">{{ catchUpPaddingMs() | number:'1.0-0' }} ms</span>
-          </div>
-          <mat-slider
-            [min]="1"
-            [max]="100"
-            [step]="1"
-            discrete>
-            <input
-              matSliderThumb
-              [ngModel]="catchUpPaddingMs()"
-              (ngModelChange)="onCatchUpPaddingChange($event)" />
-          </mat-slider>
-          <span class="slider-hint">Buffer added when playback falls behind. Default: 50ms</span>
-        </div>
-      </div> -->
-    </div>
-  }
+    }
+  </div>
 </div>

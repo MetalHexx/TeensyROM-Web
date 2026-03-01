@@ -4,7 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Device, StorageType } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { EmptyStateMessageComponent, ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective, ScalingCardComponent, ScalingContainerComponent } from '@teensyrom-nx/ui/components';
+import { EmptyStateMessageComponent, ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective, ScalingCardComponent } from '@teensyrom-nx/ui/components';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
 import { FileImageComponent } from './file-image/file-image.component';
@@ -16,8 +16,7 @@ import { FilterToolbarComponent } from './storage-container/filter-toolbar/filte
 import { StorageContainerComponent } from './storage-container/storage-container.component';
 import { FileDescriptionMiniComponent } from './file-description-mini/file-description-mini.component';
 import { PlayerToolbarMiniComponent } from './player-toolbar-mini/player-toolbar-mini.component';
-import { PLAYER_CONTEXT, SettingsStore, AudioStore } from '@teensyrom-nx/application';
-import { AudioStreamState } from '@teensyrom-nx/domain';
+import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 
 const PHONE_BREAKPOINT = '(max-width: 639px)';
 const TOUCH_DEVICE_QUERY = '(hover: none)';
@@ -36,7 +35,6 @@ const TOUCH_DEVICE_QUERY = '(hover: none)';
     StorageContainerComponent,
     FileDescriptionMiniComponent,
     PlayerToolbarMiniComponent,
-    ScalingContainerComponent,
     ScalingCardComponent,
     ScalingCompactCardComponent,
     SwipePaneContainerComponent,
@@ -50,7 +48,6 @@ const TOUCH_DEVICE_QUERY = '(hover: none)';
 export class PlayerDeviceContainerComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
   private readonly settingsStore = inject(SettingsStore);
-  private readonly audioStore = inject(AudioStore);
   private readonly breakpointObserver = inject(BreakpointObserver);
 
   protected readonly isPhone = toSignal(
@@ -116,19 +113,6 @@ export class PlayerDeviceContainerComponent {
     return this.settingsStore.enableVideoForDevice(deviceId)();
   });
 
-  /**
-   * Whether audio streaming is enabled for this device.
-   * Controls automatic audio stream connection.
-   * Uses per-device settings - returns false if device not found (safe default).
-   */
-  readonly enableAudioStream = computed(() => {
-    const deviceId = this.deviceId();
-    if (!deviceId) return false;
-    const settings = this.settingsStore.getSettings()();
-    if (!settings?.knownDevices) return false;
-    const device = settings.knownDevices.find((d) => d.deviceId === deviceId);
-    return device?.audioSettings?.enableAudioStream ?? false;
-  });
 
   constructor() {
     // Initialize player state when device container mounts
@@ -159,37 +143,6 @@ export class PlayerDeviceContainerComponent {
               container.scrollLeft = container.clientWidth;
             }
           });
-        });
-      }
-    });
-
-    // Auto-start audio stream when:
-    // 1. Device exists and is connected
-    // 2. Audio streaming is enabled for this device
-    // 3. Audio stream is not already connected/connecting
-    effect(() => {
-      const device = this.device();
-      const deviceId = this.deviceId();
-      const enabled = this.enableAudioStream();
-      const streamState = this.audioStore.streamState();
-
-      if (device && device.deviceState === 'Connected' && enabled && deviceId) {
-        if (streamState === AudioStreamState.Disconnected || streamState === AudioStreamState.Error) {
-          untracked(() => {
-            this.initializeAndStartAudioStream(deviceId);
-          });
-        }
-      }
-    });
-
-    // Stop audio stream when disabled
-    effect(() => {
-      const enabled = this.enableAudioStream();
-      const streamState = this.audioStore.streamState();
-
-      if (!enabled && (streamState === AudioStreamState.Streaming || streamState === AudioStreamState.Connecting)) {
-        untracked(() => {
-          this.audioStore.stopStream();
         });
       }
     });
@@ -399,43 +352,4 @@ export class PlayerDeviceContainerComponent {
     this.hasStorageIndex() ? '' : 'Visit <strong>Devices</strong> in the navigation to manage indexing.'
   );
 
-  /**
-   * Initializes audio streaming by loading devices, selecting the saved device,
-   * and starting the stream. Handles the full auto-start sequence.
-   */
-  private async initializeAndStartAudioStream(teensyDeviceId: string): Promise<void> {
-    // Get audio settings for this device
-    const settings = this.settingsStore.getSettings()();
-    if (!settings?.knownDevices) return;
-
-    const deviceId = this.deviceId();
-    const deviceSettings = settings.knownDevices.find((d) => d.deviceId === deviceId);
-    if (!deviceSettings?.audioSettings) return;
-
-    const audioSettings = deviceSettings.audioSettings;
-
-    // Load devices if not already loaded
-    if (this.audioStore.devices().length === 0) {
-      await this.audioStore.loadDevices();
-    }
-
-    // Select the saved audio device if specified
-    const savedDeviceIndex = audioSettings.audioDeviceIndex;
-    if (savedDeviceIndex !== null && savedDeviceIndex >= 0) {
-      // Verify the device exists in the loaded list
-      const devices = this.audioStore.devices();
-      const deviceExists = devices.some((d) => d.index === savedDeviceIndex);
-      if (deviceExists) {
-        this.audioStore.selectDevice(savedDeviceIndex);
-      }
-    }
-
-    // Load channel configs from settings
-    if (audioSettings.channels && audioSettings.channels.length > 0) {
-      this.audioStore.loadChannelConfigs(audioSettings.channels);
-    }
-
-    // Start the stream
-    await this.audioStore.startStream(teensyDeviceId);
-  }
 }
