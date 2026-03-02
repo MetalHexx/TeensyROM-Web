@@ -4,26 +4,51 @@
 
 ---
 
+## 📍 Repository Location
+
+**All project planning documents are stored in the `docs/projects/` folder within this repository.**
+
+- **Base Path**: `docs/projects/` (relative from workspace root)
+- **Structure**: All projects live under `docs/projects/<PROJECT-NAME>/`
+
+**Example paths:**
+```
+docs/projects/USER-AUTH/USER-AUTH-MASTER-PLAN.md
+docs/projects/USER-AUTH/phases/USER-AUTH-PHASE-01-FOUNDATION.md
+docs/projects/USER-AUTH/tasks/USER-AUTH-TASK-01-001-DOMAIN-MODELS.md
+docs/projects/USER-AUTH/reports/USER-AUTH-TASK-01-001-REPORT.md
+```
+
+---
+
 ## 🚨 Path Discovery Required
 
-**All agents MUST discover the actual path by finding existing files before writing.**
+**All agents MUST use the `docs/projects/` folder.**
 
 ```bash
 # Find existing reports to determine correct path:
-find . -type f -name "*-REPORT.md" | grep <PROJECT-NAME>
+find docs/projects -type f -name "*-REPORT.md" | grep <PROJECT-NAME>
 ```
 
-- Paths may be `docs/projects/` OR `src/docs/projects/` depending on repo structure
-- Always match existing file locations - NEVER assume from current directory
+```powershell
+# PowerShell equivalent:
+Get-ChildItem -Path docs/projects -Recurse -Filter "*-REPORT.md" | Where-Object { $_.Name -match "<PROJECT-NAME>" }
+```
+
+- All project documents are stored in `docs/projects/<PROJECT-NAME>/`
+- Always use workspace-relative paths
 - Use discovered path in task handoff OUTPUT_DOC section
 
 ---
 
 ## 📁 Required Project Structure
 
+**All project documents are stored in `docs/projects/`.**
+
 ```
-docs/projects/<PROJECT-NAME>/  (or src/docs/projects/<PROJECT-NAME>/)
+docs/projects/<PROJECT-NAME>/
 ├── <PROJECT-NAME>-MASTER-PLAN.md
+├── STATUS.md                                    (optional)
 ├── phases/
 │   └── <PROJECT-NAME>-PHASE-##-<NAME>.md
 ├── tasks/
@@ -31,6 +56,23 @@ docs/projects/<PROJECT-NAME>/  (or src/docs/projects/<PROJECT-NAME>/)
 └── reports/
     └── <PROJECT-NAME>-TASK-##-###-REPORT.md
 ```
+
+### STATUS.md (Optional)
+
+A lightweight progress tracker at the project root for instant status visibility. Recommended for projects with 5+ tasks.
+
+```markdown
+# Project Status
+
+| Task ID | Status | Agent | Completed |
+|---------|--------|-------|-----------|
+| PROJ-TASK-01-001-SETUP | ✅ Complete | Backend Agent | 2026-02-15 |
+| PROJ-TASK-01-002-MODELS | 🔄 In Progress | Backend Agent | — |
+| PROJ-TASK-01-003-TESTS | ⏳ Not Started | Test Agent | — |
+| PROJ-TASK-02-001-UI | ⏳ Not Started | UI Agent | — |
+```
+
+Update this file after each task completion. The orchestrator or worker agent can maintain it.
 
 ---
 
@@ -65,7 +107,7 @@ docs/projects/<PROJECT-NAME>/  (or src/docs/projects/<PROJECT-NAME>/)
 
 - **Pattern**: `<PROJECT-NAME>-MASTER-PLAN.md`
 - **Location**: `docs/projects/<PROJECT-NAME>/<PROJECT-NAME>-MASTER-PLAN.md`
-- **Template**: Use [PLANNING_TEMPLATE.md](../PLANNING_TEMPLATE.md)
+- **Template**: Use [SUBAGENT_FEATURE_TEMPLATE.md](./SUBAGENT_FEATURE_TEMPLATE.md)
 - ✅ Valid: `USER-AUTH-MASTER-PLAN.md`, `DEVICE-MANAGER-MASTER-PLAN.md`
 - ❌ Invalid: `master-plan.md`, `MASTER-PLAN.md`, `UserAuth-Master-Plan.md`
 
@@ -76,7 +118,7 @@ docs/projects/<PROJECT-NAME>/  (or src/docs/projects/<PROJECT-NAME>/)
   - `<##>` = 2-digit phase number, zero-padded (`01`, `02`, `10`)
   - `<NAME>` = UPPER-KEBAB-CASE descriptive name (2-4 words)
 - **Location**: `docs/projects/<PROJECT-NAME>/phases/`
-- **Template**: Use [PHASE_TEMPLATE.md](../PHASE_TEMPLATE.md)
+- **Template**: Use [SUBAGENT_PHASE_TEMPLATE.md](./SUBAGENT_PHASE_TEMPLATE.md)
 - ✅ Valid: `USER-AUTH-PHASE-01-FOUNDATION.md`, `USER-AUTH-PHASE-02-STATE-MANAGEMENT.md`
 - ❌ Invalid: `PHASE-01-FOUNDATION.md`, `phase-01-foundation.md`, `USER-AUTH-Phase-01-Foundation.md`
 
@@ -103,7 +145,8 @@ docs/projects/<PROJECT-NAME>/  (or src/docs/projects/<PROJECT-NAME>/)
 ### Report Files
 
 - **Pattern**: `<PROJECT-NAME>-TASK-<##>-<###>-REPORT.md`
-- **Location**: Discover via `find . -type f -name "*-REPORT.md"` first
+- **Location**: `docs/projects/<PROJECT-NAME>/reports/`
+- **Discovery**: `find docs/projects -type f -name "*-REPORT.md"`
 - **Template**: [SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md)
 - ✅ Valid: `USER-AUTH-TASK-01-001-REPORT.md`
 - ❌ Invalid: `task-01-001-report.md`, `report.md`
@@ -144,6 +187,24 @@ Phase 10 Tasks:
   USER-AUTH-TASK-10-002-DOCUMENTATION.md
 ```
 
+### Phase Insertion (Mid-Project)
+
+When new phases need to be added between existing phases, use **decimal sub-phase numbering** to avoid renumbering all subsequent phases and their cross-references.
+
+- **Use decimal notation**: Insert phases as `02.1`, `02.2`, etc. between Phase 02 and Phase 03
+- **Filename pattern**: `<PROJECT-NAME>-PHASE-02.1-<NAME>.md`
+- **Task numbering**: Tasks in sub-phases use the sub-phase number — e.g., `<PROJECT-NAME>-TASK-02.1-001-<NAME>.md`
+- **No renumbering required**: Phase 03 and beyond remain unchanged, preserving all existing cross-references
+- **Ordering**: Sub-phases execute after their parent number and before the next whole number (`02` → `02.1` → `02.2` → `03`)
+
+**Example**: After completing Phase 02, you discover additional work needed before Phase 03:
+```
+USER-AUTH-PHASE-02-STATE-MANAGEMENT.md      ← original (complete)
+USER-AUTH-PHASE-02.1-AUTH-REFRESH.md         ← inserted
+USER-AUTH-PHASE-02.2-TOKEN-VALIDATION.md     ← inserted
+USER-AUTH-PHASE-03-UI-COMPONENTS.md          ← unchanged
+```
+
 ---
 
 ## 📋 Validation Checklist
@@ -164,27 +225,28 @@ Before creating any project artifact, verify:
 
 ## 🔗 Cross-Reference Examples
 
-When referencing files in documents, use consistent relative paths:
+When referencing files in documents, use consistent relative paths within the `docs/projects/` folder.  These are examples, not real file paths:
 
 ```markdown
-<!-- From a task file to other artifacts -->
 [Master Plan](../USER-AUTH-MASTER-PLAN.md)
 [Phase 1 Plan](../phases/USER-AUTH-PHASE-01-FOUNDATION.md)
 [Previous Task](./USER-AUTH-TASK-01-001-DOMAIN-MODELS.md)
 [Task Report](../reports/USER-AUTH-TASK-01-001-REPORT.md)
 
-<!-- From master plan to phases -->
 [Phase 1: Foundation](./phases/USER-AUTH-PHASE-01-FOUNDATION.md)
 [Phase 2: State Management](./phases/USER-AUTH-PHASE-02-STATE-MANAGEMENT.md)
+
+[Master Plan](docs/projects/USER-AUTH/USER-AUTH-MASTER-PLAN.md)
+[Task](docs/projects/USER-AUTH/tasks/USER-AUTH-TASK-01-001-DOMAIN-MODELS.md)
 ```
 
 ---
 
 ## 📚 Related Documents
 
-- [SUBAGENT_ORCHESTRATOR_GUIDE.md](./SUBAGENT_ORCHESTRATOR_GUIDE.md) - How to plan and decompose projects
-- [SUBAGENT_HANDOFF.md](./SUBAGENT_HANDOFF.md) - Task handoff protocol
+- [SUBAGENT_ORCHESTRATOR_GUIDE.md](./SUBAGENT_ORCHESTRATOR_GUIDE.md) - System overview
+- [SUBAGENT_HANDOFF.md](./SUBAGENT_HANDOFF.md) - Task file schema
 - [SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md) - Worker report template
 - [SUBAGENT_USER_GUIDE.md](./SUBAGENT_USER_GUIDE.md) - Quick start for users
-- [PLANNING_TEMPLATE.md](../PLANNING_TEMPLATE.md) - Master plan template
-- [PHASE_TEMPLATE.md](../PHASE_TEMPLATE.md) - Phase plan template
+- [SUBAGENT_FEATURE_TEMPLATE.md](./SUBAGENT_FEATURE_TEMPLATE.md) - Master plan template
+- [SUBAGENT_PHASE_TEMPLATE.md](./SUBAGENT_PHASE_TEMPLATE.md) - Phase plan template

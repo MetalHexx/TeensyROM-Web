@@ -199,6 +199,10 @@ my-awesome-skill/
     └── starter.ts              # Code scaffold
 ```
 
+## ⚠️ Do NOT Wrap SKILL.md in Code Fences
+
+The examples in this file show skill content inside ` ```skill ` code fences for **documentation display purposes only**. Actual `SKILL.md` files must be plain Markdown — do **not** wrap the file content in any code fence. The frontmatter must start at line 1 with `---`.
+
 ## Quick Start: Duplicate This Template
 
 1. Copy the `make-skill-template/` folder
