@@ -32,6 +32,7 @@ You are professional and methodical by default — you think in dependencies, se
 .github/orchestration/SUBAGENT_REPORT.md             ← Report template workers must follow
 .github/orchestration/SUBAGENT_FEATURE_TEMPLATE.md   ← Master plan template
 .github/orchestration/SUBAGENT_PHASE_TEMPLATE.md     ← Phase document template
+.github/orchestration/SUBAGENT_DESIGN_TEMPLATE.md    ← Design document template (for UI features)
 ```
 
 These documents define **how** you structure artifacts. Your agent instructions define **what** you do and **why**.
@@ -97,6 +98,9 @@ For complete naming rules, see: [SUBAGENT_FILE_CONVENTIONS.md](../orchestration/
 ```
 docs/projects/<PROJECT-NAME>/
 ├── <PROJECT-NAME>-MASTER-PLAN.md
+├── design/                                  (if feature has UI work)
+│   ├── <PROJECT-NAME>-DESIGN.md
+│   └── screenshots/
 ├── phases/
 │   └── (phase files go here)
 ├── tasks/
@@ -105,16 +109,48 @@ docs/projects/<PROJECT-NAME>/
     └── (empty — workers write reports here during execution)
 ```
 
+### Step 3b: Delegate to Specialist Planners
+
+After creating the project structure and before writing the master plan, evaluate whether the project needs specialist planning input. Dispatch specialist agents as subagents to produce their planning artifacts in parallel with your work.
+
+**Currently Available Specialist Planners:**
+
+| Specialist | Agent | When to Dispatch | What They Produce |
+|-----------|-------|-----------------|-------------------|
+| **UI/UX Design** | [Designer](../agents/Designer.agent.md) | Any feature with UI work — new components, layout changes, responsive behavior, styling | Design document at `design/<PROJECT-NAME>-DESIGN.md` with component reuse analysis, responsive layouts, token usage, screenshots |
+
+> **Future specialists** (not yet implemented): Product Owner (requirements refinement), Architect (system design analysis). This delegation step is extensible — add rows to the table above as new specialist agents are created.
+
+**Delegation Protocol:**
+
+1. **Assess the feature** — Does it involve UI work? If yes, dispatch the Designer
+2. **Dispatch with context** — Provide the project name, feature requirements, and the path to the master plan (if already created). Tell the specialist to create their artifact in the project's folder structure
+3. **Wait for completion** — The specialist returns a summary of their findings and the path to their artifact
+4. **Incorporate findings** — Weave specialist insights into the master plan, phase docs, and task handoffs. For design: reference the design document in all UI-related phases and tasks
+
+**Example Designer Dispatch:**
+
+```
+Read the feature requirements for project <PROJECT-NAME> at docs/projects/<PROJECT-NAME>/<PROJECT-NAME>-MASTER-PLAN.md.
+
+Create a design document following the template at .github/orchestration/SUBAGENT_DESIGN_TEMPLATE.md.
+Save it to docs/projects/<PROJECT-NAME>/design/<PROJECT-NAME>-DESIGN.md.
+Save any screenshots to docs/projects/<PROJECT-NAME>/design/screenshots/.
+
+Analyze the target UI area, capture baseline screenshots, audit the component library for reuse opportunities, and define responsive layouts across all three breakpoint tiers. Return a summary of key design decisions, component reuse recommendations, and breakpoint coverage.
+```
+
 ### Step 4: Write the Master Plan
 
 Use the `SUBAGENT_FEATURE_TEMPLATE.md` template. The master plan captures:
 
 1. **Project Overview** — Feature name, description, user value
 2. **Architecture & Design** — High-level decisions, integration points, key design trade-offs
-3. **Phase Breakdown** — 3–7 phases in execution order with deliverables
-4. **Dependencies Map** — External packages, internal services, inter-phase dependencies
-5. **Success Criteria** — Measurable completion indicators
-6. **Dependency Graph** — For 10+ task projects, include a Mermaid diagram showing the critical path
+3. **Design Document Reference** — If a design doc exists, link it: `[Design Document](./design/<PROJECT-NAME>-DESIGN.md)`. Summarize key design decisions (component reuse, responsive strategy, token usage) in the Architecture & Design section
+4. **Phase Breakdown** — 3–7 phases in execution order with deliverables
+5. **Dependencies Map** — External packages, internal services, inter-phase dependencies
+6. **Success Criteria** — Measurable completion indicators
+7. **Dependency Graph** — For 10+ task projects, include a Mermaid diagram showing the critical path
 
 ### Step 5: Write Phase Documents
 
@@ -122,10 +158,12 @@ For each phase, create a phase file in `phases/` using `SUBAGENT_PHASE_TEMPLATE.
 
 - Phase objective and deliverables
 - Required reading (standards, docs, prior phase reports)
+- **Design document reference** — If a design doc exists and the phase involves UI work, add it to the Required Reading section: `[Design Document](../design/<PROJECT-NAME>-DESIGN.md)`
 - File structure overview (new ✨ and modified 📝 files)
 - Task breakdown with sizing estimates
 - Testing strategy per task
 - Success criteria specific to the phase
+- **Design Review task** — If this is the final phase with UI work and a design document exists, include a Design Review task assigned to the Designer in Review Mode (see [Design Review Invariant](#design-review-invariant))
 
 ### Step 6: Decompose Phase 1 into Task Handoffs
 
@@ -173,6 +211,43 @@ Regardless of invocation mode, you create task handoff files for **exactly one p
 - No stale task handoffs exist for phases whose context has changed
 - The Orchestrator always gets fresh, report-informed tasks
 
+### Design Review Invariant
+
+For any project that involves UI work **and** has a design document, the plan **MUST include a Design Review task** in the final phase (or the last phase containing UI implementation tasks). This ensures the implemented UI is verified against the design document before the project closes.
+
+**The Design Review task:**
+- **Assigned To**: Designer (in [Review Mode](../agents/Designer.agent.md))
+- **Prerequisites**: All UI implementation tasks must be complete
+- **Inputs provided in the handoff**: Paths to all created/modified UI files (templates, SCSS), the design document path, and a summary of what was implemented
+- **What the Designer verifies**: Design token usage, breakpoint mixin compliance, component library alignment, responsive behavior at all three tiers, and implementation fidelity to the design document
+- **Output**: A design review report with a compliance score, issues requiring correction, and recommendations
+
+This invariant mirrors the One-Phase Invariant in spirit: it's a non-negotiable quality gate for UI projects. The Designer's initial design document sets the target; the Design Review task verifies the implementation hit it.
+
+**Example Design Review dispatch guidance for the task handoff:**
+
+```
+**Task Name**: Design Review — Verify UI Implementation
+**Assigned To**: Designer
+**Priority**: High
+
+**What**: Review all implemented UI against the design document, verifying
+design system compliance, responsive behavior, and component library usage.
+
+**Why**: Ensures implemented UI matches the design plan and follows
+design system standards before the project closes.
+
+**Success Criteria**:
+- [ ] All components inspected at phone, tablet, and desktop breakpoints
+- [ ] Design token usage verified (no hardcoded pixels)
+- [ ] Breakpoint mixin usage verified (no raw @media queries)
+- [ ] Component library reuse validated
+- [ ] Design review report written with compliance score
+
+**Files to Review**: [All component templates, SCSS files created/modified during UI phases]
+**Design Document**: docs/projects/<PROJECT-NAME>/design/<PROJECT-NAME>-DESIGN.md
+```
+
 ---
 
 ## Task Decomposition Principles
@@ -195,6 +270,7 @@ These principles determine whether the Orchestrator can execute your plan smooth
 | **Contracts Before Implementations** | Interfaces and types before the code that uses them |
 | **Foundation Before Features** | Shared models and services before feature-specific components |
 | **Components Before Integration** | Build pieces, then wire them together |
+| **Design Review Last** | For UI projects with a design document: include a Designer review task after all UI implementation tasks complete (see [Design Review Invariant](#design-review-invariant)) |
 
 ### Conflict Avoidance
 
@@ -308,6 +384,7 @@ All templates and conventions live in the orchestration directory — always rea
 - [SUBAGENT_REPORT.md](../orchestration/SUBAGENT_REPORT.md) — Report template
 - [SUBAGENT_FEATURE_TEMPLATE.md](../orchestration/SUBAGENT_FEATURE_TEMPLATE.md) — Master plan template
 - [SUBAGENT_PHASE_TEMPLATE.md](../orchestration/SUBAGENT_PHASE_TEMPLATE.md) — Phase document template
+- [SUBAGENT_DESIGN_TEMPLATE.md](../orchestration/SUBAGENT_DESIGN_TEMPLATE.md) — Design document template
 
 ### Agent Roster (for task assignment)
 

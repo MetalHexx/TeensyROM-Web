@@ -15,6 +15,7 @@ For detailed instructions, each agent reads its own `.agent.md` file and the tem
 | [SUBAGENT_FILE_CONVENTIONS.md](./SUBAGENT_FILE_CONVENTIONS.md) | **Read first** — Naming rules and file structure | All agents |
 | [SUBAGENT_FEATURE_TEMPLATE.md](./SUBAGENT_FEATURE_TEMPLATE.md) | Master plan template | Project Planner |
 | [SUBAGENT_PHASE_TEMPLATE.md](./SUBAGENT_PHASE_TEMPLATE.md) | Phase document template | Project Planner |
+| [SUBAGENT_DESIGN_TEMPLATE.md](./SUBAGENT_DESIGN_TEMPLATE.md) | Design document template | Designer |
 | [SUBAGENT_HANDOFF.md](./SUBAGENT_HANDOFF.md) | Task handoff file schema | Project Planner (writes), Workers (reads) |
 | [SUBAGENT_REPORT.md](./SUBAGENT_REPORT.md) | Completion report template | Worker agents |
 | This document | System overview and reference map | Anyone new to the system |
@@ -28,7 +29,7 @@ The orchestration system uses three coordinating agents and multiple worker agen
 | Role | Agent | What It Does | What It Creates |
 |------|-------|--------------|-----------------|
 | **Plan** | [Project Planner](../agents/Project%20Planner.agent.md) | Decomposes features into phases and tasks | Master plans, phase docs, task handoff files |
-| **Execute** | [Orchestrator](../agents/Orchestrator.agent.md) | Dispatches workers, monitors reports, adapts plan | Nothing (read-only) — dispatches only |
+| **Design** | [Designer](../agents/Designer.agent.md) | Analyzes UI patterns, creates design documents | Design docs with responsive layouts, component reuse, screenshots || **Execute** | [Orchestrator](../agents/Orchestrator.agent.md) | Dispatches workers, monitors reports, adapts plan | Nothing (read-only) — dispatches only |
 | **Track** | [Progress Tracker](../agents/Progress%20Tracker.agent.md) | Updates project docs as tasks complete | STATUS.md updates, checkbox edits |
 | **Work** | Worker agents (see `.github/agents/`) | Implements code, writes tests | Source code, tests, completion reports |
 
@@ -38,6 +39,8 @@ The orchestration system uses three coordinating agents and multiple worker agen
 Feature Request
       ↓
  Project Planner ──→ Master plan + phase docs + Phase 1 task handoffs
+      │
+      ├── Designer (subagent) ──→ Design doc with responsive layouts, screenshots
       ↓
    Orchestrator ──→ Dispatches Phase 1 tasks to workers
       ↓                          ↓
@@ -51,7 +54,8 @@ Feature Request
    Orchestrator ──→ Dispatches Phase N+1... loop until complete
 ```
 
-**Key insight**: The Planner reads all prior task reports before creating next-phase tasks, so each phase's handoffs incorporate every discovery, decision, and issue from previous phases.
+**Key insights**:
+- The Planner reads all prior task reports before creating next-phase tasks, so each phase’s handoffs incorporate every discovery, decision, and issue from previous phases.
 
 ---
 
@@ -63,6 +67,9 @@ Feature Request
 docs/projects/<PROJECT-NAME>/
 ├── <PROJECT-NAME>-MASTER-PLAN.md          ← Feature overview, phases, success criteria
 ├── STATUS.md                               ← Optional progress tracker (5+ task projects)
+├── design/                                 ← Optional: UI/UX design artifacts
+│   ├── <PROJECT-NAME>-DESIGN.md             ← Design doc (responsive layouts, components, tokens)
+│   └── screenshots/                         ← Captured UI reference images
 ├── phases/
 │   └── <PROJECT-NAME>-PHASE-##-<NAME>.md  ← Phase objectives, file structure, tasks
 ├── tasks/
