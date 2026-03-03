@@ -57,12 +57,55 @@ Question 3 — "Description"
   Provide a short description for this agent. This text appears as placeholder text in the chat input when the agent is selected. Keep it concise (1-2 sentences).
   (Free text input — suggest a description based on the purpose)
 
-Question 4 — "Argument Hint"
-  Optional hint text shown in the chat input field to guide users on how to interact with this agent. For example: "Describe the feature to plan..." or "Paste the code to review...". Leave blank for no hint.
-  (Free text input — suggest a hint based on the purpose)
+Question 4 — "Orchestration Role"
+  Is this agent part of the orchestration system (`.github/orchestration/`)? Orchestration agents follow specific protocols for task handoffs and completion reports.
+  Options:
+    - "No, standalone agent" [recommended] — Standard agent, no orchestration protocol
+    - "Yes, subagent worker" — Dispatched by the Orchestrator to execute task handoffs (uses subagent-template.md)
+    - "Yes, coordinator/planner" — Manages or plans orchestrated projects (custom setup)
+  Note: Selecting "subagent worker" will use the specialized subagent template at templates/subagent-template.md, which enforces orchestration compliance (mandatory task reports, scope discipline, prerequisite verification). Batches 2-4 will be auto-configured with orchestration defaults — only domain-specific questions will be asked.
 ```
 
-#### Batch 2: Visibility & Invocation
+#### Batch 1b: Subagent Specialization (Only if "subagent worker" selected above)
+
+If the user selected "subagent worker" in the Orchestration Role question, skip Batches 2-4 and ask these domain questions instead:
+
+```
+Question 1 — "Argument Hint"
+  Optional hint text shown in the chat input field. For subagents, something like "Task handoff path..." works well. Leave blank for no hint.
+  (Free text input)
+
+Question 2 — "Domain Expertise"  
+  What is this subagent's area of expertise? This determines the Domain Expertise section and relevant standards references.
+  Options:
+    - "Frontend Components" — Angular components, templates, SCSS
+    - "Backend API" — .NET endpoints, MediatR handlers, domain services
+    - "State Management" — NgRx Signal Stores, reactive patterns
+    - "Testing" — Unit tests, integration tests, E2E tests
+    - "Styling/CSS" — SCSS, design tokens, responsive layouts
+  (Allow free text for custom domain)
+
+Question 3 — "Model"
+  Which model for this subagent worker?
+  Options:
+    - "Claude Sonnet 4.6 (copilot)" [recommended] — Best balance of speed and capability for implementation
+    - "Claude Opus 4.6 (copilot)" — For complex multi-concern tasks
+    - "Claude Haiku 4.5 (copilot)" — For simple, repetitive file edits
+    - "GPT-5.3-Codex (copilot)" — Optimized for code generation
+  (Allow free text for other models)
+
+Question 4 — "Personality"
+  What personality should this subagent have?
+  Options:
+    - "Professional & methodical" [recommended] — Structured, standards-focused
+    - "Terse & efficient" — Minimal words, maximum action
+    - "Careful & thorough" — Double-checks everything, explains rationale
+  (Allow free text for custom personality)
+```
+
+After collecting answers, **read the subagent template** at [templates/subagent-template.md](templates/subagent-template.md) and fill in the `{{PLACEHOLDER}}` values. Then proceed directly to **Step 4b** (Orchestration Subagent path) to generate the agent file.
+
+#### Batch 2: Visibility & Invocation (Skip if subagent worker)
 
 ```
 Question 1 — "Visibility"
@@ -201,6 +244,24 @@ Use `create_file` to write the agent to the chosen location. The filename should
 - `<Agent Name>.agent.md` for `.github/agents/` (spaces allowed in filename)
 - `<agent-name>.md` for `.claude/agents/` (use kebab-case, no `.agent` suffix)
 
+### Step 4b: Orchestration Subagent (Specialized Path)
+
+If the user wants a **subagent worker** for the orchestration system (dispatched by the Orchestrator to execute task handoffs), use the dedicated subagent template instead of the generic agent template:
+
+1. **Read the template**: [templates/subagent-template.md](templates/subagent-template.md)
+2. **Fill in placeholders**: Replace all `{{PLACEHOLDER}}` values based on the user's answers
+3. **Customize domain expertise**: Write the `{{DOMAIN_EXPERTISE_SECTION}}` based on the agent's specialization
+4. **Adjust tools**: Follow the Frontmatter Customization Guide in the template to add/remove tools for the domain
+5. **Set visibility**: Subagent workers use `agents: []` and `disable-model-invocation: true` — only the Orchestrator dispatches them
+
+The subagent template enforces orchestration system compliance:
+- Mandatory first actions (read handoff → read report template → read standards → verify prerequisites)
+- Strict scope discipline (only touch files listed in the handoff)
+- Non-negotiable completion reports following `SUBAGENT_REPORT.md`
+- Anti-patterns table to prevent common mistakes
+
+For details on the orchestration system, see `.github/orchestration/SUBAGENT_ORCHESTRATOR_GUIDE.md`.
+
 ### Step 5: Confirm & Test
 
 After creating the file:
@@ -226,6 +287,7 @@ Use these as starting-point recommendations. Adjust based on what the user descr
 | **Reviewer / Auditor** | Read-only: `search` + `search/changes` + `read/problems` + `search/usages` + `todo` | `Claude Opus 4.6` or `GPT-5.1` | Critical, detailed feedback |
 | **Debugger / Fixer** | `edit` + `search` + `execute/runInTerminal` + `execute/testFailure` + `execute/runTests` + `todo` | `Claude Sonnet 4.6` | Systematic, hypothesis-driven |
 | **Orchestrator** | Read-only: `search` + `read/readFile` + `web/fetch` + `agent` + `todo` | `Claude Opus 4.6` | Professional, status-driven |
+| **Subagent Worker** | Full: `edit` + `search` + `execute/runInTerminal` + `execute/runTests` + `read/readFile` + `read/problems` + `todo` | `Claude Sonnet 4.6` | Task-focused, diligent reporting |
 | **Documentation Writer** | `search/codebase` + `read/readFile` + `edit/editFiles` + `edit/createFile` + `web/fetch` + `search/usages` + `todo` | Any capable model | Clear, thorough, well-structured |
 
 ## Troubleshooting
