@@ -10,6 +10,8 @@ import { stopStream } from './stop-stream';
 import { clearError } from './clear-error';
 import { loadChannelConfigs } from './load-channel-configs';
 import { setChannelVolume } from './set-channel-volume';
+import { toggleMute } from './toggle-mute';
+import { setMasterVolume } from './set-master-volume';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -24,6 +26,8 @@ export function withAudioActions() {
       ...clearError(writableStore),
       ...loadChannelConfigs(writableStore),
       ...setChannelVolume(writableStore, audioService),
+      ...toggleMute(writableStore, audioService),
+      ...setMasterVolume(writableStore, audioService),
     };
   });
 }

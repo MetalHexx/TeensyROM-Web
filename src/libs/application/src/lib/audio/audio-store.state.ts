@@ -18,6 +18,12 @@ export interface AudioState {
   channelConfigs: ChannelConfig[];
   /** Per-channel volume levels (0.0 to 1.0), keyed by channel index */
   channelVolumes: Map<number, number>;
+  /** Whether audio output is currently muted */
+  isMuted: boolean;
+  /** Current master volume level (0–1) */
+  masterVolume: number;
+  /** Volume level to restore when unmuting */
+  preMuteVolume: number;
 }
 
 /**
@@ -31,4 +37,7 @@ export const initialAudioState: AudioState = {
   isLoading: false,
   channelConfigs: [],
   channelVolumes: new Map(),
+  isMuted: true,
+  masterVolume: 0.75,
+  preMuteVolume: 0.75,
 };

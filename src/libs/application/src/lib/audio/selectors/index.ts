@@ -7,6 +7,8 @@ import { hasDevices } from './has-devices';
 import { selectedDevice } from './selected-device';
 import { channels } from './channels';
 import { hasChannels } from './has-channels';
+import { isMuted } from './is-muted';
+import { masterVolume } from './master-volume';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -20,6 +22,8 @@ export function withAudioSelectors() {
       ...selectedDevice(writableStore),
       ...channels(writableStore),
       ...hasChannels(writableStore),
+      ...isMuted(writableStore),
+      ...masterVolume(writableStore),
     };
   });
 }

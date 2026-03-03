@@ -1,0 +1,104 @@
+@use '../../../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: flex;
+  align-items: center;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+
+  &.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
+// Volume slider — native range input with custom styling
+.volume-slider {
+  appearance: none;
+  width: 5rem; // Base width (overridden at desktop via screen-tablet below)
+  height: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+
+  @include styles.screen-tablet {
+    width: 5rem; // ~80px desktop
+  }
+
+  // Accessible focus ring on the input itself
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-bright);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
+
+  // Subtle brightness boost on hover
+  &:hover:not(:disabled) {
+    filter: brightness(1.2);
+  }
+
+  // WebKit track
+  &::-webkit-slider-runnable-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    transition: background 0.15s ease;
+  }
+
+  &:hover:not(:disabled)::-webkit-slider-runnable-track {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  // WebKit thumb
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-primary-bright);
+    margin-top: -5px; // Center thumb on track: (14 - 4) / 2
+    border: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  &:hover:not(:disabled)::-webkit-slider-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 0 6px rgba(179, 51, 179, 0.5);
+  }
+
+  // Firefox track
+  &::-moz-range-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    border: none;
+    transition: background 0.15s ease;
+  }
+
+  &:hover:not(:disabled)::-moz-range-track {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  // Firefox thumb
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-primary-bright);
+    border: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  &:hover:not(:disabled)::-moz-range-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 0 6px rgba(179, 51, 179, 0.5);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}

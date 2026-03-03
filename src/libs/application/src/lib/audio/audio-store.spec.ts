@@ -34,6 +34,8 @@ describe('AudioStore', () => {
       getDevices: vi.fn().mockResolvedValue([]),
       connect: vi.fn().mockResolvedValue(undefined),
       disconnect: vi.fn().mockResolvedValue(undefined),
+      setMasterVolume: vi.fn(),
+      getMasterVolume: vi.fn().mockReturnValue(0.75),
     };
 
     TestBed.configureTestingModule({
@@ -543,6 +545,140 @@ describe('AudioStore', () => {
       expect(store.streamState()).toBe(AudioStreamState.Disconnected);
       expect(mockAudioService.connect).toHaveBeenCalledTimes(2);
       expect(mockAudioService.disconnect).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('Mute/Volume State', () => {
+    describe('Initial State', () => {
+      it('should initialize isMuted to true', () => {
+        expect(store.isMuted()).toBe(true);
+      });
+
+      it('should initialize masterVolume to 0.75', () => {
+        expect(store.masterVolume()).toBe(0.75);
+      });
+
+      it('should initialize preMuteVolume to 0.75', () => {
+        expect(store.preMuteVolume()).toBe(0.75);
+      });
+    });
+
+    describe('toggleMute', () => {
+      it('should unmute when currently muted, restoring preMuteVolume', () => {
+        expect(store.isMuted()).toBe(true);
+
+        store.toggleMute();
+
+        expect(store.isMuted()).toBe(false);
+        expect(store.masterVolume()).toBe(0.75);
+      });
+
+      it('should mute when currently unmuted, saving volume and setting to 0', () => {
+        // Start unmuted
+        store.toggleMute();
+        expect(store.isMuted()).toBe(false);
+        expect(store.masterVolume()).toBe(0.75);
+
+        // Now mute
+        store.toggleMute();
+
+        expect(store.isMuted()).toBe(true);
+        expect(store.masterVolume()).toBe(0);
+        expect(store.preMuteVolume()).toBe(0.75);
+      });
+
+      it('should round-trip: mute then unmute restores original volume', () => {
+        // Set a specific volume first
+        store.setMasterVolume(0.6);
+        expect(store.masterVolume()).toBe(0.6);
+
+        // Mute
+        store.toggleMute();
+        expect(store.isMuted()).toBe(true);
+        expect(store.masterVolume()).toBe(0);
+
+        // Unmute - should restore 0.6
+        store.toggleMute();
+        expect(store.isMuted()).toBe(false);
+        expect(store.masterVolume()).toBe(0.6);
+      });
+
+      it('should call audioService.setMasterVolume(0) when muting', () => {
+        store.toggleMute(); // unmute first
+        (mockAudioService.setMasterVolume as ReturnType<typeof vi.fn>).mockClear();
+
+        store.toggleMute(); // mute
+
+        expect(mockAudioService.setMasterVolume).toHaveBeenCalledWith(0);
+      });
+
+      it('should call audioService.setMasterVolume with preMuteVolume when unmuting', () => {
+        (mockAudioService.setMasterVolume as ReturnType<typeof vi.fn>).mockClear();
+
+        store.toggleMute(); // unmute from initial muted state
+
+        expect(mockAudioService.setMasterVolume).toHaveBeenCalledWith(0.75);
+      });
+    });
+
+    describe('setMasterVolume', () => {
+      it('should auto-unmute when setting volume > 0 while muted', () => {
+        expect(store.isMuted()).toBe(true);
+
+        store.setMasterVolume(0.5);
+
+        expect(store.isMuted()).toBe(false);
+        expect(store.masterVolume()).toBe(0.5);
+        expect(store.preMuteVolume()).toBe(0.5);
+      });
+
+      it('should auto-mute when setting volume to 0', () => {
+        store.setMasterVolume(0.5); // unmute first
+        expect(store.isMuted()).toBe(false);
+
+        store.setMasterVolume(0);
+
+        expect(store.isMuted()).toBe(true);
+        expect(store.masterVolume()).toBe(0);
+      });
+
+      it('should not overwrite preMuteVolume when setting volume to 0', () => {
+        store.setMasterVolume(0.5);
+        expect(store.preMuteVolume()).toBe(0.5);
+
+        store.setMasterVolume(0);
+
+        expect(store.preMuteVolume()).toBe(0.5);
+      });
+
+      it('should clamp volume above 1.0 to 1.0', () => {
+        store.setMasterVolume(1.5);
+
+        expect(store.masterVolume()).toBe(1.0);
+      });
+
+      it('should clamp negative volume to 0', () => {
+        store.setMasterVolume(-0.5);
+
+        expect(store.masterVolume()).toBe(0);
+        expect(store.isMuted()).toBe(true);
+      });
+
+      it('should call audioService.setMasterVolume with clamped value', () => {
+        (mockAudioService.setMasterVolume as ReturnType<typeof vi.fn>).mockClear();
+
+        store.setMasterVolume(0.5);
+
+        expect(mockAudioService.setMasterVolume).toHaveBeenCalledWith(0.5);
+      });
+
+      it('should call audioService.setMasterVolume with clamped value for out-of-range input', () => {
+        (mockAudioService.setMasterVolume as ReturnType<typeof vi.fn>).mockClear();
+
+        store.setMasterVolume(1.5);
+
+        expect(mockAudioService.setMasterVolume).toHaveBeenCalledWith(1.0);
+      });
     });
   });
 });

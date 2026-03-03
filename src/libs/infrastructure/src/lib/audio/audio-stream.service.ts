@@ -62,6 +62,8 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
 
   // Web Audio API resources
   private audioContext: AudioContext | null = null;
+  private masterGainNode: GainNode | null = null;
+  private _masterVolume = 0;
   private readonly nextPlayTimes = new Map<number, number>();
   private readonly gainNodes = new Map<number, GainNode>();
   private levelDecayTimer: ReturnType<typeof setInterval> | null = null;
@@ -119,6 +121,34 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
     const currentVolumes = new Map(this._channelVolumes$.getValue());
     currentVolumes.set(channelIndex, clampedVolume);
     this._channelVolumes$.next(currentVolumes);
+  }
+
+  /**
+   * Sets the master output volume (0-1).
+   * Controls the master GainNode that sits between per-channel gain nodes
+   * and the audio destination. Attempts to resume the AudioContext when
+   * volume is set above 0 to handle browser autoplay unlock.
+   * @param volume - Volume level from 0 (muted) to 1 (full)
+   */
+  setMasterVolume(volume: number): void {
+    const clampedVolume = Math.max(0, Math.min(1, volume));
+    this._masterVolume = clampedVolume;
+
+    if (this.masterGainNode && this.audioContext) {
+      this.masterGainNode.gain.setValueAtTime(clampedVolume, this.audioContext.currentTime);
+    }
+
+    if (clampedVolume > 0) {
+      this.tryResumeAudioContext();
+    }
+  }
+
+  /**
+   * Gets the current master output volume (0-1).
+   * @returns The stored master volume value
+   */
+  getMasterVolume(): number {
+    return this._masterVolume;
   }
 
   constructor(
@@ -342,7 +372,8 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
     if (!gainNode) {
       gainNode = this.audioContext.createGain();
       gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
-      gainNode.connect(this.audioContext.destination);
+      const destination = this.masterGainNode ?? this.audioContext.destination;
+      gainNode.connect(destination);
       this.gainNodes.set(channelIndex, gainNode);
     }
     return gainNode;
@@ -469,6 +500,15 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
       }
     }
     this.gainNodes.clear();
+
+    if (this.masterGainNode) {
+      try {
+        this.masterGainNode.disconnect();
+      } catch {
+        // Ignore errors during cleanup
+      }
+      this.masterGainNode = null;
+    }
   }
 
   /**
@@ -479,6 +519,12 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
   private async initAudioPlayback(): Promise<void> {
     // Create AudioContext with 48kHz sample rate (matches Opus decoder output)
     this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+
+    // Create master GainNode for global output volume control.
+    // Initialized to 0 (muted) to match the store's isMuted: true initial state.
+    this.masterGainNode = this.audioContext.createGain();
+    this.masterGainNode.gain.setValueAtTime(this._masterVolume, this.audioContext.currentTime);
+    this.masterGainNode.connect(this.audioContext.destination);
 
     this.installAudioUnlockHandlers();
 

@@ -1,4 +1,4 @@
-import { Component, output, signal, TemplateRef, viewChild, ElementRef, ViewContainerRef } from '@angular/core';
+import { Component, input, output, signal, TemplateRef, viewChild, ElementRef, ViewContainerRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Overlay, OverlayModule, OverlayRef } from '@angular/cdk/overlay';
 import { TemplatePortal } from '@angular/cdk/portal';
@@ -33,6 +33,7 @@ export class DropdownDialogComponent {
   private dialogTemplate = viewChild<TemplateRef<unknown>>('dialogTemplate');
   private trigger = viewChild<ElementRef>('trigger');
 
+  centered = input<boolean>(false);
   isOpen = signal<boolean>(false);
   opened = output<void>();
   closed = output<void>();
@@ -50,39 +51,22 @@ export class DropdownDialogComponent {
 
     if (!triggerEl || !template || !overlay) return;
 
+    const centeredPositions = [
+      { originX: 'center' as const, originY: 'top' as const, overlayX: 'center' as const, overlayY: 'bottom' as const, offsetY: -8 },
+      { originX: 'center' as const, originY: 'bottom' as const, overlayX: 'center' as const, overlayY: 'top' as const, offsetY: 8 },
+    ];
+    const startEndPositions = [
+      { originX: 'start' as const, originY: 'bottom' as const, overlayX: 'start' as const, overlayY: 'top' as const, offsetY: 8 },
+      { originX: 'end' as const, originY: 'bottom' as const, overlayX: 'end' as const, overlayY: 'top' as const, offsetY: 8 },
+      { originX: 'start' as const, originY: 'top' as const, overlayX: 'start' as const, overlayY: 'bottom' as const, offsetY: -8 },
+      { originX: 'end' as const, originY: 'top' as const, overlayX: 'end' as const, overlayY: 'bottom' as const, offsetY: -8 },
+    ];
+    const positions = this.centered() ? centeredPositions : startEndPositions;
+
     const positionStrategy = overlay
       .position()
       .flexibleConnectedTo(triggerEl)
-      .withPositions([
-        {
-          originX: 'start',
-          originY: 'bottom',
-          overlayX: 'start',
-          overlayY: 'top',
-          offsetY: 8
-        },
-        {
-          originX: 'end',
-          originY: 'bottom',
-          overlayX: 'end',
-          overlayY: 'top',
-          offsetY: 8
-        },
-        {
-          originX: 'start',
-          originY: 'top',
-          overlayX: 'start',
-          overlayY: 'bottom',
-          offsetY: -8
-        },
-        {
-          originX: 'end',
-          originY: 'top',
-          overlayX: 'end',
-          overlayY: 'bottom',
-          offsetY: -8
-        }
-      ]);
+      .withPositions(positions);
 
     const fullscreenElement = document.fullscreenElement as HTMLElement | null;
     
@@ -96,36 +80,7 @@ export class DropdownDialogComponent {
         positionStrategy: overlay
           .position()
           .flexibleConnectedTo(triggerEl)
-          .withPositions([
-            {
-              originX: 'start',
-              originY: 'bottom',
-              overlayX: 'start',
-              overlayY: 'top',
-              offsetY: 8
-            },
-            {
-              originX: 'end',
-              originY: 'bottom',
-              overlayX: 'end',
-              overlayY: 'top',
-              offsetY: 8
-            },
-            {
-              originX: 'start',
-              originY: 'top',
-              overlayX: 'start',
-              overlayY: 'bottom',
-              offsetY: -8
-            },
-            {
-              originX: 'end',
-              originY: 'top',
-              overlayX: 'end',
-              overlayY: 'bottom',
-              offsetY: -8
-            }
-          ])
+          .withPositions(positions)
           .withViewportMargin(0)
           .withPush(false)
       })

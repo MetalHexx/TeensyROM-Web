@@ -1,0 +1,116 @@
+@use '../../../../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: flex;
+  align-items: center;
+}
+
+.volume-popup-content {
+  @include styles.glassy-dark-effect;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  width: 56px;
+}
+
+.popup-mute-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+.popup-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: var(--spacing-xs) 0;
+}
+
+.popup-slider-container {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-xs) 0;
+}
+
+// Vertical range slider — uses writing-mode for cross-browser vertical orientation
+.vertical-slider {
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl; // Top = max, bottom = min
+  height: 120px;
+  width: 4px;
+  background: transparent;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-bright);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.2);
+  }
+
+  // WebKit track
+  &::-webkit-slider-runnable-track {
+    width: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    transition: background 0.15s ease;
+  }
+
+  &:hover:not(:disabled)::-webkit-slider-runnable-track {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  // WebKit thumb
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-primary-bright);
+    border: none;
+    margin-left: -5px; // Center 14px thumb on 4px track in vertical mode
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  &:hover:not(:disabled)::-webkit-slider-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 0 6px rgba(179, 51, 179, 0.5);
+  }
+
+  // Firefox track
+  &::-moz-range-track {
+    width: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    border: none;
+    transition: background 0.15s ease;
+  }
+
+  &:hover:not(:disabled)::-moz-range-track {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  // Firefox thumb
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-primary-bright);
+    border: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  &:hover:not(:disabled)::-moz-range-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 0 6px rgba(179, 51, 179, 0.5);
+  }
+}

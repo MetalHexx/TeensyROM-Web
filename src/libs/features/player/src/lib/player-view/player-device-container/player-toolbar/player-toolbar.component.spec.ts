@@ -5,7 +5,7 @@ import { By } from '@angular/platform-browser';
 import { signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { PlayerToolbarComponent } from './player-toolbar.component';
-import { PLAYER_CONTEXT, IPlayerContext, StorageStore } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT, IPlayerContext, StorageStore, SettingsStore, AudioStore } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType, StorageType } from '@teensyrom-nx/domain';
 import { IconButtonComponent } from '@teensyrom-nx/ui/components';
 
@@ -18,6 +18,16 @@ describe('PlayerToolbarComponent', () => {
     removeFavorite: ReturnType<typeof vi.fn>;
     favoriteOperationsState: ReturnType<typeof vi.fn>;
   };
+  let mockSettingsStore: {
+    enableAudioStreamForDevice: ReturnType<typeof vi.fn>;
+  };
+  let mockAudioStore: {
+    isMuted: ReturnType<typeof signal<boolean>>;
+    masterVolume: ReturnType<typeof signal<number>>;
+    toggleMute: ReturnType<typeof vi.fn>;
+    setMasterVolume: ReturnType<typeof vi.fn>;
+  };
+  let audioStreamEnabledSignal: ReturnType<typeof signal<boolean>>;
   let errorSignal: ReturnType<typeof signal<string | null>>;
   let currentFileSignal: ReturnType<typeof signal>;
   let playerStatusSignal: ReturnType<typeof signal<PlayerStatus>>;
@@ -61,6 +71,19 @@ describe('PlayerToolbarComponent', () => {
       saveFavorite: vi.fn().mockResolvedValue(undefined),
       removeFavorite: vi.fn().mockResolvedValue(undefined),
       favoriteOperationsState: vi.fn(() => ({ isProcessing: false, error: null })),
+    };
+
+    audioStreamEnabledSignal = signal(false);
+
+    mockSettingsStore = {
+      enableAudioStreamForDevice: vi.fn().mockReturnValue(audioStreamEnabledSignal.asReadonly()),
+    };
+
+    mockAudioStore = {
+      isMuted: signal(false),
+      masterVolume: signal(0.75),
+      toggleMute: vi.fn(),
+      setMasterVolume: vi.fn(),
     };
 
     // Create a proper interface-based mock that implements all IPlayerContext methods
@@ -126,6 +149,8 @@ describe('PlayerToolbarComponent', () => {
         provideNoopAnimations(),
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
         { provide: StorageStore, useValue: mockStorageStore },
+        { provide: SettingsStore, useValue: mockSettingsStore },
+        { provide: AudioStore, useValue: mockAudioStore },
       ],
     }).compileComponents();
 
@@ -753,6 +778,78 @@ describe('PlayerToolbarComponent', () => {
       expect(previousButton?.componentInstance.disabled()).toBe(false);
       expect(nextButton?.componentInstance.disabled()).toBe(false);
       expect(playPauseButton?.componentInstance.disabled()).toBe(false);
+    });
+  });
+
+  describe('Volume Control Integration', () => {
+    it('should render volume control when enableAudioStreamForDevice returns true', () => {
+      audioStreamEnabledSignal.set(true);
+      fixture.detectChanges();
+
+      const volumeControls = fixture.nativeElement.querySelectorAll('lib-volume-control');
+      expect(volumeControls.length).toBeGreaterThan(0);
+    });
+
+    it('should NOT render volume control when enableAudioStreamForDevice returns false', () => {
+      audioStreamEnabledSignal.set(false);
+      fixture.detectChanges();
+
+      const volumeControls = fixture.nativeElement.querySelectorAll('lib-volume-control');
+      expect(volumeControls.length).toBe(0);
+    });
+
+    it('should pass disabled input to volume control matching toolbar disabled state', () => {
+      audioStreamEnabledSignal.set(true);
+      fixture.componentRef.setInput('disabled', true);
+      fixture.detectChanges();
+
+      const volumeControl = fixture.debugElement.query(
+        By.css('lib-volume-control')
+      );
+      expect(volumeControl).toBeTruthy();
+      expect(volumeControl.componentInstance.disabled()).toBe(true);
+    });
+
+    it('should not pass disabled when toolbar is enabled', () => {
+      audioStreamEnabledSignal.set(true);
+      fixture.componentRef.setInput('disabled', false);
+      fixture.detectChanges();
+
+      const volumeControl = fixture.debugElement.query(
+        By.css('lib-volume-control')
+      );
+      expect(volumeControl).toBeTruthy();
+      expect(volumeControl.componentInstance.disabled()).toBe(false);
+    });
+
+    it('should call enableAudioStreamForDevice with the correct deviceId', () => {
+      fixture.detectChanges();
+      expect(mockSettingsStore.enableAudioStreamForDevice).toHaveBeenCalledWith('test-device-id');
+    });
+
+    it('should reactively show/hide volume control when audio stream setting changes', () => {
+      audioStreamEnabledSignal.set(false);
+      fixture.detectChanges();
+
+      let volumeControls = fixture.nativeElement.querySelectorAll('lib-volume-control');
+      expect(volumeControls.length).toBe(0);
+
+      audioStreamEnabledSignal.set(true);
+      fixture.detectChanges();
+
+      volumeControls = fixture.nativeElement.querySelectorAll('lib-volume-control');
+      expect(volumeControls.length).toBeGreaterThan(0);
+    });
+
+    it('should wrap volume control in volume-control-section container', () => {
+      audioStreamEnabledSignal.set(true);
+      fixture.detectChanges();
+
+      const sections = fixture.nativeElement.querySelectorAll('.volume-control-section');
+      expect(sections.length).toBeGreaterThan(0);
+
+      const firstSection = sections[0];
+      expect(firstSection.querySelector('lib-volume-control')).toBeTruthy();
     });
   });
 });

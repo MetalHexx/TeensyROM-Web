@@ -8,12 +8,13 @@ import {
   TooltipConfig,
   TooltipPosition,
 } from '@teensyrom-nx/ui/components';
-import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
 import { ProgressBarComponent } from './progress-bar/progress-bar.component';
 import { FileInfoComponent } from './file-info/file-info.component';
 import { FileTimeComponent } from './file-time/file-time.component';
 import { PlayerToolbarActionsComponent } from './player-toolbar-actions/player-toolbar-actions.component';
+import { VolumeControlComponent } from './volume-control/volume-control.component';
 
 @Component({
   selector: 'lib-player-toolbar',
@@ -26,6 +27,7 @@ import { PlayerToolbarActionsComponent } from './player-toolbar-actions/player-t
     FileInfoComponent,
     FileTimeComponent,
     PlayerToolbarActionsComponent,
+    VolumeControlComponent,
   ],
   templateUrl: './player-toolbar.component.html',
   styleUrl: './player-toolbar.component.scss',
@@ -36,9 +38,16 @@ import { PlayerToolbarActionsComponent } from './player-toolbar-actions/player-t
 })
 export class PlayerToolbarComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
+  private readonly settingsStore = inject(SettingsStore);
 
   deviceId = input.required<string>();
   disabled = input<boolean>(false);
+
+  isAudioStreamEnabled = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+    return this.settingsStore.enableAudioStreamForDevice(deviceId)();
+  });
 
   // Computed shuffle mode state
   isShuffleEnabled = computed(() => {

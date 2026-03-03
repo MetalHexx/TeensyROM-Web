@@ -38,9 +38,14 @@ mat-card {
   flex-shrink: 0;
 }
 
+.volume-control-section {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .desktop-layout {
   display: none;
-  position: relative;
 
   @include styles.screen-tablet {
     display: flex;
@@ -51,14 +56,11 @@ mat-card {
   }
 
   .file-info-section {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    pointer-events: none;
-
-    > * {
-      pointer-events: auto;
-    }
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
   }
 
   .toolbar-actions-section {
@@ -71,6 +73,7 @@ mat-card {
 
 .tablet-layout {
   display: none;
+  gap: var(--spacing-md);
 
   @include styles.screen-between(styles.$bp-phone, styles.$bp-tablet) {
     display: flex;
@@ -89,53 +92,5 @@ mat-card {
     display: flex;
     align-items: center;
     flex-shrink: 0;
-  }
-}
-
-// Mobile Layout (≤640px): Stacked vertical
-.mobile-layout {
-  display: none;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--spacing-md);
-  min-height: auto;
-
-  @include styles.below-phone {
-    display: flex;
-  }
-
-  .time-display-section {
-    display: flex;
-    justify-content: center;
-
-    lib-file-time {
-      text-align: center;
-    }
-  }
-
-  .playback-controls {
-    justify-content: center;
-  }
-
-  .mobile-divider {
-    width: 60%;
-    height: 1px;
-    margin: var(--spacing-xs) auto;
-    background: linear-gradient(
-      to right,
-      transparent,
-      rgba(255, 255, 255, 0.12),
-      transparent
-    );
-  }
-
-  .file-info-section {
-    display: none;
-  }
-
-  .toolbar-actions-section {
-    display: flex;
-    justify-content: center;
-    align-items: center;
   }
 }

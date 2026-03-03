@@ -46,6 +46,12 @@ export interface IAudioStreamService {
 
   /** Gets whether Opus encoding is currently enabled */
   getUseOpusEncoding(): boolean;
+
+  /** Sets the master output volume (0–1) */
+  setMasterVolume(volume: number): void;
+
+  /** Gets the current master output volume (0–1) */
+  getMasterVolume(): number;
 }
 
 /** Injection token for the audio stream service */
