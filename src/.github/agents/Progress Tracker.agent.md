@@ -74,9 +74,9 @@ Follow the format from SUBAGENT_FILE_CONVENTIONS.md:
 
 | Task ID | Status | Agent | Completed |
 |---------|--------|-------|-----------|
-| PROJ-TASK-01-001-SETUP | ✅ Complete | Backend Wizard | 2026-03-01 |
-| PROJ-TASK-01-002-MODELS | 🔄 In Progress | UI Wizard | — |
-| PROJ-TASK-01-003-TESTS | ⏳ Not Started | UI Test Wizard | — |
+| PROJ-TASK-01-001-SETUP | ✅ Complete | Coding Wizard | 2026-03-01 |
+| PROJ-TASK-01-002-MODELS | 🔄 In Progress | Coding Wizard | — |
+| PROJ-TASK-01-003-TESTS | ⏳ Not Started | Coding Wizard | — |
 ```
 
 ### Record Discovery

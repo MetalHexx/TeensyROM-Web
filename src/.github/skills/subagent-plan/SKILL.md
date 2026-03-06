@@ -161,7 +161,7 @@ Create task handoff files for Phase 1 only (not all phases upfront — plans evo
 - One `.md` file per task in `tasks/` folder
 - Include all context the worker needs
 - Reference prior tasks' output reports where relevant
-- Specify which agent type is best suited (e.g., Backend Wizard, UI Wizard)
+- Specify the Coding Wizard as the assigned agent for implementation tasks
 
 ---
 
@@ -192,9 +192,9 @@ End every planning session with a summary:
 | 03 | Integration | 2 | Pending Phase 02 |
 
 ### Phase 1 Tasks (Ready to Execute)
-1. `<PROJECT-NAME>-TASK-01-001-<NAME>` — [description] → **Backend Wizard**
-2. `<PROJECT-NAME>-TASK-01-002-<NAME>` — [description] → **Backend Wizard**
-3. `<PROJECT-NAME>-TASK-01-003-<NAME>` — [description] → **UI Wizard**
+1. `<PROJECT-NAME>-TASK-01-001-<NAME>` — [description] → **Coding Wizard**
+2. `<PROJECT-NAME>-TASK-01-002-<NAME>` — [description] → **Coding Wizard**
+3. `<PROJECT-NAME>-TASK-01-003-<NAME>` — [description] → **Coding Wizard**
 
 ### Next Step
 Run `/subagent-execute` and reference the Phase 1 task files to begin execution.

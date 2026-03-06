@@ -78,7 +78,7 @@ Present the task handoff to the user for execution:
 ## 🎯 Task Ready for Execution
 
 **Task**: <PROJECT-NAME>-TASK-<##>-<###>-<NAME>
-**Assigned Agent**: [Backend Wizard | UI Wizard | UI Test Wizard]
+**Assigned Agent**: Coding Wizard
 **Priority**: [High/Medium/Low]
 
 ### Task Handoff Document
@@ -187,8 +187,8 @@ When workers report problems, create dedicated fix tasks:
 
 | Issue | Task Name Pattern | Assign To |
 |-------|------------------|-----------|
-| Bug found | `<PROJECT-NAME>-TASK-XX-XXX-BUG-FIX` | Original agent or Repair Dude |
-| Tests failing | `<PROJECT-NAME>-TASK-XX-XXX-TEST-FIX` | UI Test Wizard |
+| Bug found | `<PROJECT-NAME>-TASK-XX-XXX-BUG-FIX` | Coding Wizard |
+| Tests failing | `<PROJECT-NAME>-TASK-XX-XXX-TEST-FIX` | Coding Wizard |
 | Refactoring needed | `<PROJECT-NAME>-TASK-XX-XXX-REFACTOR` | Appropriate specialist |
 
 ---

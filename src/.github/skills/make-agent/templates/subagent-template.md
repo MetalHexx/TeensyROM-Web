@@ -277,7 +277,7 @@ Use this table when filling in the template:
 
 | Placeholder | Description | Example |
 |-------------|-------------|---------|
-| `{{AGENT_NAME}}` | Display name for the agent | `Frontend Builder`, `Backend Wizard`, `Test Runner` |
+| `{{AGENT_NAME}}` | Display name for the agent | `Coding Wizard`, `Frontend Builder`, `Test Runner` |
 | `{{EMOJI}}` | Single emoji for personality | `🏗️`, `🧙‍♂️`, `🧪` |
 | `{{AGENT_DESCRIPTION}}` | 1-sentence description for frontmatter | `Builds Angular components following Clean Architecture patterns` |
 | `{{PERSONALITY_TAGLINE}}` | Bold tagline (3-6 words) | `The Meticulous Component Craftsman` |

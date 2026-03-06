@@ -4,7 +4,7 @@
 
 The subagent system breaks large features into manageable tasks executed across multiple AI contexts to avoid context overflow and maintain quality.
 
-**Key Concept**: Use specialized AI agents (Backend Wizard, UI Wizard) in **fresh contexts** for each phase or task, with planning artifacts saved to disk as the state bridge.
+**Key Concept**: Use the Coding Wizard agent in **fresh contexts** for each phase or task, with planning artifacts saved to disk as the state bridge.
 
 ---
 

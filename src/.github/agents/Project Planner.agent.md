@@ -348,9 +348,9 @@ Follow the task file schema in [SUBAGENT_HANDOFF.md](../orchestration/SUBAGENT_H
 ### Phase 1 Tasks (Ready to Execute)
 | Task ID | Description | Agent | Dependencies |
 |---------|-------------|-------|--------------|
-| <TASK-01-001> | [description] | Backend Wizard | None |
-| <TASK-01-002> | [description] | Backend Wizard | None |
-| <TASK-01-003> | [description] | UI Wizard | TASK-01-001 |
+| <TASK-01-001> | [description] | Coding Wizard | None |
+| <TASK-01-002> | [description] | Coding Wizard | None |
+| <TASK-01-003> | [description] | Coding Wizard | TASK-01-001 |
 
 ### Parallelization Opportunities
 - Tasks 01-001 and 01-002 can run concurrently (no shared files)

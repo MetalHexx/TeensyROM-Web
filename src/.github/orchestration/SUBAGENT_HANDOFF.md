@@ -125,7 +125,7 @@ Handoffs provide **architectural guidance**, not implementations. The worker is 
 ```markdown
 **Task ID**: FEATURE-X-TASK-02-003-DOMAIN-HANDLERS
 **Task Name**: Implement MediatR Command and Query Handlers
-**Assigned To**: Backend Wizard
+**Assigned To**: Coding Wizard
 **Priority**: High | **Context Size**: Medium
 
 **What**: Create MediatR handlers for CRUD domain operations.
