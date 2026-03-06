@@ -248,7 +248,7 @@ When in doubt, think about layer responsibilities and clean separation of concer
 
 - **[OVERVIEW_CONTEXT.md](../../docs/OVERVIEW_CONTEXT.md)** - Complete architecture guide with layer definitions and design patterns
 - **[PLANNING_TEMPLATE.md](../../docs/PLANNING_TEMPLATE.md)** - Template for high-level feature planning with phases and success criteria
-- **[PHASE_TEMPLATE.md](../../docs/PHASE_TEMPLATE.md)** - Template for detailed phase implementation (use in Senior Engineer mode)
+- **[PHASE_TEMPLATE.md](../../docs/PHASE_TEMPLATE.md)** - Template for detailed phase implementation
 
 ### Standards & Guidelines
 
