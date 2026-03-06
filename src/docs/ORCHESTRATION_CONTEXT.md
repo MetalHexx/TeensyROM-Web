@@ -228,14 +228,8 @@ The orchestration docs and agents were originally written for a single-orchestra
 | Agent File | Role | Can Code? | Can Call Subagents? |
 |-----------|------|-----------|---------------------|
 | `Architect.agent.md` | System design, feature planning | ❌ | ❌ |
-| `Senior Engineer.agent.md` | Phase implementation planning | ❌ | — |
 | `Product Owner.agent.md` | Requirements and user value | ❌ | — |
-| `UI Wizard.agent.md` | Frontend implementation | ✅ | ✅ |
-| `UI Test Wizard.agent.md` | Frontend testing | ✅ | — |
-| `Backend Wizard.agent.md` | Backend implementation | ✅ | ✅ |
-| `Repair Dude.agent.md` | Bug fixing and cleanup | ✅ | — |
-| `Doctor Hacker.agent.md` | Fast pragmatic problem-solving | ✅ | — |
-| `Mad Scientist.agent.md` | Experimental rapid prototyping | ✅ | — |
+| `Coding Wizard.agent.md` | Full-stack implementation (Angular, .NET, cross-cutting) | ✅ | ✅ |
 | **`Project Planner.agent.md`** | **Project decomposition & planning** | **❌ (docs only)** | **✅ (all)** |
 | **`Orchestrator.agent.md`** | **Project execution coordination** | **❌** | **✅ (all)** |
 | **`Progress Tracker.agent.md`** | **Project doc updates** | **❌** | **❌** |
