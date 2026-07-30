@@ -1,4 +1,4 @@
-# TeensyROM UI Coding Standards
+# TeensyROM UI Angular Component Coding Standards
 
 ## Overview
 
