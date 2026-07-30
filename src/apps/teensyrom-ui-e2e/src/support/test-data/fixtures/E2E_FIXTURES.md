@@ -133,7 +133,6 @@ Run validation tests regularly to ensure fixture integrity.
 ## 📚 Related Documentation
 
 - **[E2E Interceptors](./E2E_INTERCEPTORS.md)** - How interceptors work with fixtures
-- **[Testing Standards](../../docs/TESTING_STANDARDS.md)** - General testing best practices
 - **[Phase 1: Generators](../FAKE_TEST_DATA.md)** - How test data is generated
 
 ---
