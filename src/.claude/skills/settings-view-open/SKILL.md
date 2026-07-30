@@ -58,4 +58,3 @@ If the page doesn't load:
 ## Reference
 
 - [Settings Feature Documentation](../../../docs/features/settings/)
-- [Component Library](../../../docs/COMPONENT_LIBRARY.md)

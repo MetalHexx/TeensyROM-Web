@@ -58,4 +58,3 @@ If the page doesn't load:
 ## Reference
 
 - [Device Feature Documentation](../../../docs/features/devices/)
-- [Component Library](../../../docs/COMPONENT_LIBRARY.md)

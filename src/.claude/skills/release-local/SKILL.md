@@ -297,6 +297,3 @@ Use the `release` skill to version bump, tag, and create GitHub Release with all
 ## References
 
 - **Full Release Process**: `release` skill (`.claude/skills/release/SKILL.md`)
-- **Distribution Guide**: [docs/DISTRIBUTION.md](../../../docs/DISTRIBUTION.md)
-- **Backend Architecture**: [docs/BACKEND_ARCHITECTURE.md](../../../docs/BACKEND_ARCHITECTURE.md)
-- **Build Pipeline**: [docs/DISTRIBUTION.md](../../../docs/DISTRIBUTION.md#local-testing-before-release)

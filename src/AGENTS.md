@@ -99,7 +99,7 @@ export class DeviceStore {
 - Application state: `libs/application/[domain]/*-store.ts` — NgRx Signal Stores
 - Infrastructure: `libs/infrastructure/[domain]/*.service.ts` (implements domain contract) + `*.mapper.ts` (DTO ↔ domain model) + `providers.ts` (DI bindings)
 - Feature components: `libs/features/[feature]/`
-- Shared UI: `libs/ui/components/` — consult `docs/COMPONENT_LIBRARY.md` before adding new ones
+- Shared UI: `libs/ui/components/` — consult the component library before adding new ones
 
 ## Angular Standards & Style
 
@@ -120,7 +120,7 @@ export class DeviceStore {
 
 Mock only at infrastructure boundaries — application and features tests should use real stores/services integrating together.
 
-- Unit: colocate `*.spec.ts`, prefer MSW for HTTP mocking (`docs/OVERVIEW_CONTEXT.md`).
+- Unit: colocate `*.spec.ts`, prefer MSW for HTTP mocking.
 - E2E: Cypress specs under `apps/teensyrom-ui-e2e/src`.
 - Backend: `dotnet test` for API/Core projects (`*.Tests.Unit`, `*.Tests.Integration`).
 
@@ -161,9 +161,7 @@ Mock only at infrastructure boundaries — application and features tests should
 
 ## UI & Styling Resources
 
-- Component catalog (selectors, inputs, animation wrappers): `docs/COMPONENT_LIBRARY.md`.
-- Global styles, utility classes (`.dimmed`, `.glassy`), and Material overrides: `docs/STYLE_GUIDE.md`.
-- Presentation components stay logic-free and compose application stores (see `docs/OVERVIEW_CONTEXT.md`).
+- Presentation components stay logic-free and compose application stores.
 
 ## Documentation Standards
 
@@ -184,14 +182,6 @@ Mock only at infrastructure boundaries — application and features tests should
 ## Security & Configuration Tips
 
 - Keep secrets out of the repo; prefer backend configuration or environment-specific providers.
-
-## Reference Docs
-
-- `docs/OVERVIEW_CONTEXT.md`
-- `docs/COMPONENT_LIBRARY.md`
-- `docs/STYLE_GUIDE.md`
-- `docs/TESTING_STANDARDS.md`
-
 
 <!-- nx configuration start-->
 <!-- Leave the start & end comments to automatically receive updates. -->

@@ -254,9 +254,6 @@ When analyzing test failures, categorize them into these common patterns:
 
 ## Reference Documentation
 
-- [Testing Standards](../../../docs/TESTING_STANDARDS.md) - Layer-specific testing patterns
-- [Store Testing](../../../docs/STORE_TESTING.md) - NgRx Signal Store testing
-- [Smart Component Testing](../../../docs/SMART_COMPONENT_TESTING.md) - Feature component testing
 - [Test Repair Master Plan](../../../docs/projects/TEST-REPAIR/TEST-REPAIR-MASTER-PLAN.md) - Previous repair project reference
 
 ## Notes

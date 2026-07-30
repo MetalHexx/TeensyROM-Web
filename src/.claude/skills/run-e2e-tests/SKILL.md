@@ -117,5 +117,4 @@ Provide specific recommendations for fixing failed tests based on:
 ## Reference Documentation
 
 - [E2E Test Architecture](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md)
-- [Testing Standards](../../../docs/TESTING_STANDARDS.md)
 - [Test Fixtures and Helpers](../../../apps/teensyrom-ui-e2e/src/support/)

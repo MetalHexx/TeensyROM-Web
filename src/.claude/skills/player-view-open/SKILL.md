@@ -58,4 +58,3 @@ If the page doesn't load:
 ## Reference
 
 - [Player Feature Documentation](../../../docs/features/player/)
-- [Component Library](../../../docs/COMPONENT_LIBRARY.md)
