@@ -145,7 +145,7 @@ If the original documentation file had many external links, consider leaving a r
 
 **This documentation has moved to a specialized skill.**
 
-See: `.github/skills/<skill-name>/SKILL.md`
+See: `.claude/skills/<skill-name>/SKILL.md`
 
 This skill is auto-discovered by agents when needed.
 ```

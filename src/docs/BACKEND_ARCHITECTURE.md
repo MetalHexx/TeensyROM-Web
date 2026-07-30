@@ -176,11 +176,11 @@ This ensures all device operations are scoped to the correct physical device in 
 |-----------|---------|-----------|
 | **OpenAPI Spec** | Auto-generated JSON spec on API build via `Microsoft.AspNetCore.OpenApi` | #file:apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json |
 | **Scalar UI** | Interactive API documentation at `/scalar/v1` (replaces Swagger) | #file:apps/api/src/TeensyRom.Api/Startup/ApiDocStartupExtensions.cs |
-| **Client Generator** | Node script (see `.github/skills/api-client-generation/SKILL.md` for details) | #file:.github/skills/api-client-generation/scripts/generate-client.js |
+| **Client Generator** | Node script (see `.claude/skills/api-client-generation/SKILL.md` for details) | #file:.claude/skills/api-client-generation/scripts/generate-client.js |
 | **Generated Client** | TypeScript models + `*ApiService` classes consumed by infrastructure | #file:libs/data-access/api-client/src/lib/apis/<br/>#file:libs/data-access/api-client/src/lib/models/ |
 | **Infrastructure Services** | Implement domain contracts, map DTOs Γåö models, handle errors | #file:libs/infrastructure/src/lib/device/device.service.ts<br/>#file:libs/infrastructure/src/lib/storage/storage.service.ts |
 
-**Generation Pipeline**: See `.github/skills/api-client-generation/SKILL.md` for detailed workflow.
+**Generation Pipeline**: See `.claude/skills/api-client-generation/SKILL.md` for detailed workflow.
 
 ```bash
 pnpm run generate:api-client  # Regenerates TypeScript client from OpenAPI spec

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Paths relative to this script location in .github/skills/api-client-generation/scripts/
+// Paths relative to this script location in .claude/skills/api-client-generation/scripts/
 const config = {
   openApiUrl: join(__dirname, '../../../../apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json'),
   outputDir: join(__dirname, '../../../../libs/data-access/api-client/src/lib'),
