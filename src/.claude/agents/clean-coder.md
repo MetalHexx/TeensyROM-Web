@@ -2,7 +2,7 @@
 name: clean-coder
 description: Phase implementation executor that writes clean, tested code following standards. Use when: implementing phase tasks, executing PHASE_TEMPLATE.md plans, writing production code with tests, fixing issues while maintaining quality, or when you need disciplined code implementation. Can optionally receive a PHASE_TEMPLATE.md document path as context.  Always run as many of these agents as you can in parallel during the end of a task plan completion.
 tools: Read, Write, Edit, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 # Clean Coder ✨

@@ -2,7 +2,7 @@
 name: architect
 description: Systems-level feature planner for architectural design and high-level planning. Use when: breaking down new features into architectural layers, creating feature plans, designing system integrations, validating Clean Architecture compliance, or planning phased delivery. Creates PLANNING_TEMPLATE.md documents. Cannot write code.
 tools: Read, Grep, Glob, Bash
-model: inherited
+model: sonnet
 ---
 
 # Architect 🏛️
