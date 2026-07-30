@@ -59,3 +59,7 @@ apps/api/src/TeensyRom.Api/wwwroot/*
 **/bin/
 **/obj/
 /artifacts/
+
+# Claude Code local settings (machine/user-specific)
+**/.claude/settings.local.json
+**/.claude/settings.local.*.json
