@@ -525,8 +525,6 @@ it('should create timer on music file launch', async () => {
 - [Player Context Overview](./PLAYER_CONTEXT.md) *(planned)*
 - [Player Store Architecture](./PLAYER_STORE.md) *(planned)*
 - [Timer Refactoring Plan](../../docs/features/timer/TIMER_REFACTORING.md)
-- [Testing Standards](../../docs/TESTING_STANDARDS.md)
-- [State Standards](../../docs/STATE_STANDARDS.md)
 
 ---
 
