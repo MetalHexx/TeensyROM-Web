@@ -1,6 +1,8 @@
 ---
+name: run-e2e-tests
 description: Execute Cypress E2E tests with detailed JSON reporting and analysis
-tools: ['runCommands', 'runTests']
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Run E2E Tests
@@ -114,6 +116,6 @@ Provide specific recommendations for fixing failed tests based on:
 
 ## Reference Documentation
 
-- [E2E Test Architecture](../../apps/teensyrom-ui-e2e/E2E_TESTS.md)
-- [Testing Standards](../../docs/TESTING_STANDARDS.md)
-- [Test Fixtures and Helpers](../../apps/teensyrom-ui-e2e/src/support/)
+- [E2E Test Architecture](../../../apps/teensyrom-ui-e2e/E2E_TESTS.md)
+- [Testing Standards](../../../docs/TESTING_STANDARDS.md)
+- [Test Fixtures and Helpers](../../../apps/teensyrom-ui-e2e/src/support/)

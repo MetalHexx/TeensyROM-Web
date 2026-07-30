@@ -1,6 +1,8 @@
 ---
+name: settings-view-open
 description: Open the Settings view in the browser
-tools: ['runCommands', 'openSimpleBrowser']
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Open Settings View
@@ -11,11 +13,13 @@ Opens the TeensyROM Settings view at http://localhost:4200/settings. If the fron
 
 ### Step 1: Open Settings View
 
-Eagerly attempt to open the Settings view in the browser:
+Eagerly attempt to open the Settings view in the default browser:
 
 **URL**: http://localhost:4200/settings
 
-Use the Simple Browser to open the URL within VS Code for quick access.
+```powershell
+Start-Process "http://localhost:4200/settings"
+```
 
 ### Step 2: Start Frontend (if Step 1 fails)
 
@@ -31,7 +35,9 @@ Wait for the dev server to be ready (typically shows "Application bundle generat
 
 After the dev server starts, open the Settings view again:
 
-**URL**: http://localhost:4200/settings
+```powershell
+Start-Process "http://localhost:4200/settings"
+```
 
 ## Expected Outcome
 
@@ -51,5 +57,5 @@ If the page doesn't load:
 
 ## Reference
 
-- [Settings Feature Documentation](../../docs/features/settings/)
-- [Component Library](../../docs/COMPONENT_LIBRARY.md)
+- [Settings Feature Documentation](../../../docs/features/settings/)
+- [Component Library](../../../docs/COMPONENT_LIBRARY.md)

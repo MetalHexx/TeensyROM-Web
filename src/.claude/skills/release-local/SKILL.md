@@ -1,10 +1,13 @@
 ---
+name: release-local
 description: Create a local test release of TeensyROM Web for quick validation before official release
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Local Test Release
 
-This slash command creates a **local test release** of TeensyROM Web without version bumping, git tagging, or triggering CI/CD. Use this for quick validation and testing before creating an official GitHub release.
+This skill creates a **local test release** of TeensyROM Web without version bumping, git tagging, or triggering CI/CD. Use this for quick validation and testing before creating an official GitHub release.
 
 ## When to Use This
 
@@ -12,7 +15,7 @@ This slash command creates a **local test release** of TeensyROM Web without ver
 - ✅ Validating build process changes
 - ✅ Creating test executables for manual QA
 - ✅ Verifying frontend/backend integration in production mode
-- ❌ NOT for official releases (use `/release` instead)
+- ❌ NOT for official releases (use the `release` skill instead)
 
 ## Prerequisites
 
@@ -289,11 +292,11 @@ After successful local testing:
 5. Confirm SignalR real-time updates work
 
 **When ready for official release:**
-Use `/release` prompt to version bump, tag, and create GitHub Release with all 4 platforms.
+Use the `release` skill to version bump, tag, and create GitHub Release with all 4 platforms.
 
 ## References
 
-- **Full Release Process**: [release.prompt.md](.github/prompts/release.prompt.md)
-- **Distribution Guide**: [docs/DISTRIBUTION.md](../../docs/DISTRIBUTION.md)
-- **Backend Architecture**: [docs/BACKEND_ARCHITECTURE.md](../../docs/BACKEND_ARCHITECTURE.md)
-- **Build Pipeline**: [docs/DISTRIBUTION.md](../../docs/DISTRIBUTION.md#local-testing-before-release)
+- **Full Release Process**: `release` skill (`.claude/skills/release/SKILL.md`)
+- **Distribution Guide**: [docs/DISTRIBUTION.md](../../../docs/DISTRIBUTION.md)
+- **Backend Architecture**: [docs/BACKEND_ARCHITECTURE.md](../../../docs/BACKEND_ARCHITECTURE.md)
+- **Build Pipeline**: [docs/DISTRIBUTION.md](../../../docs/DISTRIBUTION.md#local-testing-before-release)

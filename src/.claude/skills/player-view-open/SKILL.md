@@ -1,6 +1,8 @@
 ---
+name: player-view-open
 description: Open the Player view in the browser
-tools: ['runCommands', 'openSimpleBrowser']
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Open Player View
@@ -11,11 +13,13 @@ Opens the TeensyROM Player view at http://localhost:4200/player. If the frontend
 
 ### Step 1: Open Player View
 
-Eagerly attempt to open the Player view in the browser:
+Eagerly attempt to open the Player view in the default browser:
 
 **URL**: http://localhost:4200/player
 
-Use the Simple Browser to open the URL within VS Code for quick access.
+```powershell
+Start-Process "http://localhost:4200/player"
+```
 
 ### Step 2: Start Frontend (if Step 1 fails)
 
@@ -31,7 +35,9 @@ Wait for the dev server to be ready (typically shows "Application bundle generat
 
 After the dev server starts, open the Player view again:
 
-**URL**: http://localhost:4200/player
+```powershell
+Start-Process "http://localhost:4200/player"
+```
 
 ## Expected Outcome
 
@@ -51,5 +57,5 @@ If the page doesn't load:
 
 ## Reference
 
-- [Player Feature Documentation](../../docs/features/player/)
-- [Component Library](../../docs/COMPONENT_LIBRARY.md)
+- [Player Feature Documentation](../../../docs/features/player/)
+- [Component Library](../../../docs/COMPONENT_LIBRARY.md)

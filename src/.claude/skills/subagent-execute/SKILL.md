@@ -1,5 +1,8 @@
 ---
+name: subagent-execute
 description: Execute a subagent orchestration plan by handing off tasks to specialized worker agents
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Subagent Plan Execution
@@ -10,8 +13,8 @@ You are an expert orchestrator agent executing a pre-planned project using speci
 
 > **🔴 MANDATORY**: Before executing, understand the system:
 >
-> 1. **[SUBAGENT_FILE_CONVENTIONS.md](../../docs/subagent-planning/SUBAGENT_FILE_CONVENTIONS.md)** - File structure and naming rules
-> 2. **[SUBAGENT_ORCHESTRATOR_GUIDE.md](../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md)** - Complete orchestration methodology
+> 1. **[SUBAGENT_FILE_CONVENTIONS.md](../../../docs/subagent-planning/SUBAGENT_FILE_CONVENTIONS.md)** - File structure and naming rules
+> 2. **[SUBAGENT_ORCHESTRATOR_GUIDE.md](../../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md)** - Complete orchestration methodology
 >
 > These define how the system works. Reference them when uncertain.
 
@@ -19,9 +22,9 @@ You are an expert orchestrator agent executing a pre-planned project using speci
 
 ## Your Task
 
-Read the **project name** provided as the parameter to this command (e.g., `user-authentication`).
+Read the **project name** provided as the argument to this skill (e.g., `user-authentication`).
 
-Then execute the **orchestration workflow** from the [Orchestrator Guide](../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md):
+Then execute the **orchestration workflow** from the [Orchestrator Guide](../../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md):
 
 ### Step 1: Load the Project Plan
 
@@ -80,7 +83,7 @@ Read the task handoff document from the `tasks/` folder.
 1. Switch to the assigned agent chatmode
 2. Read the complete task handoff document
 3. Execute all task requirements
-4. Write completion report following [SUBAGENT_REPORT.md](../../docs/subagent-planning/SUBAGENT_REPORT.md)
+4. Write completion report following [SUBAGENT_REPORT.md](../../../docs/subagent-planning/SUBAGENT_REPORT.md)
 5. Return report file path when complete
 
 ---
@@ -251,9 +254,9 @@ Priority: Medium (future phase)
 ## Reference
 
 Follow all guidance from:
-- [SUBAGENT_ORCHESTRATOR_GUIDE.md](../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md) - Complete methodology
-- [SUBAGENT_HANDOFF.md](../../docs/subagent-planning/SUBAGENT_HANDOFF.md) - Handoff protocol
-- [SUBAGENT_REPORT.md](../../docs/subagent-planning/SUBAGENT_REPORT.md) - Report template
+- [SUBAGENT_ORCHESTRATOR_GUIDE.md](../../../docs/subagent-planning/SUBAGENT_ORCHESTRATOR_GUIDE.md) - Complete methodology
+- [SUBAGENT_HANDOFF.md](../../../docs/subagent-planning/SUBAGENT_HANDOFF.md) - Handoff protocol
+- [SUBAGENT_REPORT.md](../../../docs/subagent-planning/SUBAGENT_REPORT.md) - Report template
 
 ## Example Execution Flow
 
