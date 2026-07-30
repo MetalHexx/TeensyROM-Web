@@ -75,9 +75,20 @@
       "Bash(dotnet test:*)",
       "Bash(uuidgen:*)",
       "Bash(powershell:*)",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Read(//c/Users/Metal/.claude/skills/rad-project/**)",
+      "Bash(node -e \"console.log\\('Testing project CLI'\\)\")",
+      "Bash(cd /d \"C:\\\\dev\\\\orchestration\\\\v3\")",
+      "Bash(node harness-installers/standard/build-scripts/build.js)",
+      "PowerShell(npx file:C:\\\\dev\\\\orchestration\\\\v3\\\\rad-orc-1.0.0-alpha.9.tgz uninstall --yes --harness claude)",
+      "PowerShell(npx file:C:\\\\dev\\\\orchestration\\\\v3\\\\rad-orc-1.0.0-alpha.9.tgz --yes --harness claude)",
+      "PowerShell(node \"C:\\\\Users\\\\Metal\\\\.claude/skills/rad-orchestration/scripts/radorch.mjs\" ui start)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "nx-mcp"
+  ],
+  "enableAllProjectMcpServers": true
 }
