@@ -5,6 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ScalingCardComponent, IconLabelComponent } from '@teensyrom-nx/ui/components';
 import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
 import { AudioSettingsSectionComponent } from '../audio-settings-section/audio-settings-section.component';
+import { AudioInputDeviceListComponent } from '../audio-settings-section/audio-input-device-list/audio-input-device-list.component';
 import { Device } from '@teensyrom-nx/domain';
 import { AudioStore } from '@teensyrom-nx/application';
 
@@ -31,6 +32,7 @@ import { AudioStore } from '@teensyrom-nx/application';
     IconLabelComponent,
     SettingsToggleItemComponent,
     AudioSettingsSectionComponent,
+    AudioInputDeviceListComponent,
   ],
   templateUrl: './device-settings-section.component.html',
   styleUrl: './device-settings-section.component.scss',

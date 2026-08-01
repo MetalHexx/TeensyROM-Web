@@ -24,28 +24,39 @@
         </div>
 
         <form [formGroup]="asFormGroup(deviceGroup)" [class.disabled]="isDeviceDisabled(deviceGroup)">
-          <!-- Video Settings Group - Full Width -->
-          <div class="settings-group">
-            <h4 class="group-title">Video Settings</h4>
+          <div class="device-settings-grid">
+            <div class="device-settings-column">
+              <!-- Video Settings Group -->
+              <div class="settings-group">
+                <h4 class="group-title">Video Settings</h4>
 
-            @if (getEnableVideoControl(deviceGroup); as enableVideoCtrl) {
-              <lib-settings-toggle-item
-                label="Enable Video Overlay"
-                description="Show video capture overlay for this device. Requires a video capture device connected to your C64 video output."
-                [control]="enableVideoCtrl" />
-            }
-          </div>
+                @if (getEnableVideoControl(deviceGroup); as enableVideoCtrl) {
+                  <lib-settings-toggle-item
+                    label="Enable Video Overlay"
+                    description="Show video capture overlay for this device. Requires a video capture device connected to your C64 video output."
+                    [control]="enableVideoCtrl" />
+                }
+              </div>
 
-          <!-- Audio Settings Group - Full Width -->
-          <div class="settings-group audio-section">
-            <h4 class="group-title">Audio Settings</h4>
+              <!-- Audio Settings Group -->
+              <div class="settings-group audio-section">
+                <h4 class="group-title">Audio Settings</h4>
 
-            <lib-audio-settings-section
-              [audioFormGroup]="getAudioSettings(deviceGroup)"
-              [savedDeviceIndex]="getAudioDeviceIndex(deviceGroup)"
-              [deviceId]="getDeviceId(deviceGroup)"
-              [deviceIndex]="getDeviceIndex(deviceGroup)"
-              [loadOnInit]="i === 0" />
+                <lib-audio-settings-section
+                  #audioSection
+                  [audioFormGroup]="getAudioSettings(deviceGroup)"
+                  [savedDeviceIndex]="getAudioDeviceIndex(deviceGroup)"
+                  [deviceId]="getDeviceId(deviceGroup)"
+                  [deviceIndex]="getDeviceIndex(deviceGroup)"
+                  [loadOnInit]="i === 0" />
+              </div>
+            </div>
+
+            <div class="device-settings-column device-list-column">
+              <lib-audio-input-device-list
+                [disabled]="!audioSection.isAudioStreamEnabled()"
+                (deviceSelected)="audioSection.onSelectDevice($event)" />
+            </div>
           </div>
         </form>
       </div>

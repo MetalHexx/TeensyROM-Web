@@ -1,11 +1,9 @@
 import { Component, input, effect, inject, signal, computed, ChangeDetectionStrategy, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatIconModule } from '@angular/material/icon';
 import { MatSliderModule } from '@angular/material/slider';
 import { AbstractControl, FormGroup, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
-import { IconLabelComponent } from '@teensyrom-nx/ui/components';
 import { AudioStore } from '@teensyrom-nx/application';
 import { AudioDevice, AUDIO_STREAM_SERVICE, ChannelConfig } from '@teensyrom-nx/domain';
 import { VuMeterComponent } from './vu-meter/vu-meter.component';
@@ -35,11 +33,9 @@ import { SettingsFormService } from '../settings-form.service';
   standalone: true,
   imports: [
     CommonModule,
-    MatIconModule,
     MatSliderModule,
     ReactiveFormsModule,
     FormsModule,
-    IconLabelComponent,
     VuMeterComponent,
     ChannelConfigComponent,
     SettingsToggleItemComponent,

@@ -8,106 +8,47 @@
   }
 
   <div class="audio-options-wrapper" [class.audio-disabled]="!isAudioStreamEnabled()">
-    @if (audioStore.isLoading()) {
-      <div class="loading-state">
-        <mat-icon>hourglass_empty</mat-icon>
-        <p>Loading audio devices...</p>
-      </div>
-    } @else if (audioStore.error() && audioStore.devices().length === 0) {
-      <div class="error-state">
-        <mat-icon>error_outline</mat-icon>
-        <p>{{ audioStore.error() }}</p>
-      </div>
-    } @else if (audioStore.devices().length === 0) {
-      <div class="empty-state">
-        <mat-icon>mic_off</mat-icon>
-        <p>No audio input devices found.</p>
-        <p class="hint">Connect an audio input device and refresh.</p>
-      </div>
-    } @else {
-      <div class="audio-settings-content">
-        <div class="audio-columns">
-          <!-- Left Column: Controls -->
-          <div class="audio-column-left">
-            <div class="settings-group">
-              <!-- Opus Encoding Toggle -->
-              @if (selectedDevice() && getUseOpusEncodingControl()) {
-                <div class="opus-encoding-inline">
-                  <lib-settings-toggle-item
-                    label="Use Opus Compression"
-                    description="Enabled: lower bandwidth, slight quality loss. Disabled: lossless audio, higher bandwidth. Disable for DJ/performance use cases."
-                    [control]="getUseOpusEncodingControl()!" />
-                  @if (!useOpusEncoding()) {
-                    <p class="hint warning-hint">
-                      Raw PCM mode active: Lowest latency, higher bandwidth usage.
-                    </p>
-                  }
-                </div>
-              }
+    <div class="settings-group">
+      <!-- Opus Encoding Toggle -->
+      @if (selectedDevice() && getUseOpusEncodingControl()) {
+        <div class="opus-encoding-inline">
+          <lib-settings-toggle-item
+            label="Use Opus Compression"
+            description="Enabled: lower bandwidth, slight quality loss. Disabled: lossless audio, higher bandwidth. Disable for DJ/performance use cases."
+            [control]="getUseOpusEncodingControl()!" />
+          @if (!useOpusEncoding()) {
+            <p class="hint warning-hint">
+              Raw PCM mode active: Lowest latency, higher bandwidth usage.
+            </p>
+          }
+        </div>
+      }
 
-              <!-- Channel Configuration (for multi-channel devices) -->
-              @if (isMultiChannel() && channelConfigs().length > 0) {
-                <div class="settings-group channel-config-group">
-                  <h4 class="group-title">Channel Configuration</h4>
-                  <p class="hint">Enable specific audio channels to stream. Each channel captures audio independently from your input device.</p>
-                  <div class="channel-list">
-                    @for (channel of channelConfigs(); track channel.sourceChannel; let i = $index) {
-                      <lib-channel-config
-                        [channelConfig]="channel"
-                        [vuLevel]="getChannelVuLevel(channel.sourceChannel)"
-                        [isTestActive]="showVuMeters()"
-                        (configChanged)="onChannelConfigChanged(i, $event)" />
-                    }
-                  </div>
-                </div>
-              }
-
-              @if (showVuMeters() && !isMultiChannel()) {
-                <div class="test-audio-section">
-                  <h4 class="group-title">Audio Level</h4>
-                  <div class="vu-meter-container">
-                    <lib-vu-meter [level]="volumeLevel()" />
-                  </div>
-                </div>
-              }
-            </div>
-          </div>
-
-          <!-- Right Column: Device List -->
-          <div class="audio-column-right">
-            <h4 class="group-title">Audio Input Device</h4>
-            <p class="section-description">Select an audio input device from which to stream audio.</p>
-            <div class="device-list" role="listbox" aria-label="Audio input devices">
-              @for (device of audioStore.devices(); track device.index) {
-                <div
-                  class="device-item"
-                  [class.selected]="isSelected(device)"
-                  (click)="onSelectDevice(device)"
-                  (keydown.enter)="onSelectDevice(device)"
-                  (keydown.space)="onSelectDevice(device)"
-                  tabindex="0"
-                  role="option"
-                  [attr.aria-selected]="isSelected(device)">
-                  <div class="device-info">
-                    <lib-icon-label
-                      icon="mic"
-                      [label]="device.name"
-                      size="large"
-                      [color]="isSelected(device) ? 'primary' : 'normal'"
-                      [truncate]="false" />
-                    <span class="device-details">
-                      {{ device.maxInputChannels }} ch · {{ device.defaultSampleRate | number }} Hz
-                    </span>
-                  </div>
-                  @if (isSelected(device)) {
-                    <mat-icon class="selected-indicator">check_circle</mat-icon>
-                  }
-                </div>
-              }
-            </div>
+      <!-- Channel Configuration (for multi-channel devices) -->
+      @if (isMultiChannel() && channelConfigs().length > 0) {
+        <div class="settings-group channel-config-group">
+          <h4 class="group-title">Channel Configuration</h4>
+          <p class="hint">Enable specific audio channels to stream. Each channel captures audio independently from your input device.</p>
+          <div class="channel-list">
+            @for (channel of channelConfigs(); track channel.sourceChannel; let i = $index) {
+              <lib-channel-config
+                [channelConfig]="channel"
+                [vuLevel]="getChannelVuLevel(channel.sourceChannel)"
+                [isTestActive]="showVuMeters()"
+                (configChanged)="onChannelConfigChanged(i, $event)" />
+            }
           </div>
         </div>
-      </div>
-    }
+      }
+
+      @if (showVuMeters() && !isMultiChannel()) {
+        <div class="test-audio-section">
+          <h4 class="group-title">Audio Level</h4>
+          <div class="vu-meter-container">
+            <lib-vu-meter [level]="volumeLevel()" />
+          </div>
+        </div>
+      }
+    </div>
   </div>
 </div>

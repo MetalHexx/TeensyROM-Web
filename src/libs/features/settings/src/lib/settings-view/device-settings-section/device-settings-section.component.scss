@@ -71,6 +71,45 @@ form {
   }
 }
 
+.device-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-xl);
+  align-items: stretch;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.device-settings-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.device-list-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  // Grid rows auto-size to the tallest item's natural content height, so without
+  // this the device list (which can be arbitrarily long) would dictate the row
+  // height instead of being capped by it. `contain: size` makes this column
+  // contribute zero intrinsic height to that calculation, so the row is sized by
+  // the left column alone, then `align-items: stretch` stretches this column back
+  // down/up to match it, and the inner list scrolls instead of growing past it.
+  @media (min-width: 900px) {
+    contain: size;
+    overflow: hidden;
+  }
+
+  > lib-audio-input-device-list {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
 .settings-group {
   display: flex;
   flex-direction: column;
