@@ -928,13 +928,17 @@ describe('AudioStreamService', () => {
     });
 
     it('should handle multiple channels independently', async () => {
+      const mockMasterGainNode = { gain: { setValueAtTime: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() };
       const mockGainNode0 = { gain: { setValueAtTime: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() };
       const mockGainNode1 = { gain: { setValueAtTime: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() };
       let createGainCallCount = 0;
 
+      // First createGain() call is the master GainNode created during connect(); the
+      // per-channel GainNodes are created lazily afterward as frames for each channel arrive.
       (mockAudioContext as unknown as Record<string, unknown>).createGain = vi.fn(() => {
         createGainCallCount++;
-        return createGainCallCount === 1 ? mockGainNode0 : mockGainNode1;
+        if (createGainCallCount === 1) return mockMasterGainNode;
+        return createGainCallCount === 2 ? mockGainNode0 : mockGainNode1;
       });
 
       let streamCallback: (chunk: unknown) => void = () => {};
