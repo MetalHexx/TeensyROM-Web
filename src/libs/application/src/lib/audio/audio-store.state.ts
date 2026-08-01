@@ -38,6 +38,6 @@ export const initialAudioState: AudioState = {
   channelConfigs: [],
   channelVolumes: new Map(),
   isMuted: true,
-  masterVolume: 0.75,
+  masterVolume: 0,
   preMuteVolume: 0.75,
 };

@@ -96,8 +96,10 @@ describe('SettingsViewComponent', () => {
           audioDeviceIndex: -1,
           enableAudioStream: false,
           audioDeviceName: '',
-          channelCount: 0,
-          sampleRate: 0
+          captureChannelCount: 0,
+          sampleRate: 0,
+          channels: [],
+          useOpusEncoding: true,
         }
       },
     ],

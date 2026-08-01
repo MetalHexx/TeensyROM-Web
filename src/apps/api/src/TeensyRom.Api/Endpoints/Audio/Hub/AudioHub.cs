@@ -49,6 +49,11 @@ public sealed class AudioHub(
 
         var audioSettings = deviceSettings.AudioSettings;
 
+        if (!audioSettings.EnableAudioStream)
+        {
+            throw new HubException($"Audio streaming is disabled for device {deviceId}. Enable it in settings first.");
+        }
+
         // Resolve device by name first, fall back to index if name not available
         AudioDeviceInfo? deviceInfo = null;
         if (!string.IsNullOrWhiteSpace(audioSettings.AudioDeviceName))

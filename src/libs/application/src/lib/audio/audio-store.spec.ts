@@ -554,8 +554,8 @@ describe('AudioStore', () => {
         expect(store.isMuted()).toBe(true);
       });
 
-      it('should initialize masterVolume to 0.75', () => {
-        expect(store.masterVolume()).toBe(0.75);
+      it('should initialize masterVolume to 0', () => {
+        expect(store.masterVolume()).toBe(0);
       });
 
       it('should initialize preMuteVolume to 0.75', () => {

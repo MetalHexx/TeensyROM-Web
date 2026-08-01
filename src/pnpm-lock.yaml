@@ -44,9 +44,6 @@ importers:
       '@microsoft/signalr':
         specifier: ^8.0.7
         version: 8.0.17(encoding@0.1.13)
-      '@microsoft/signalr-protocol-msgpack':
-        specifier: ^10.0.0
-        version: 10.0.0(encoding@0.1.13)
       '@ngrx/signals':
         specifier: ^19.2.0
         version: 19.2.1(@angular/core@19.2.15(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
@@ -2142,12 +2139,6 @@ packages:
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
     engines: {node: '>=8'}
 
-  '@microsoft/signalr-protocol-msgpack@10.0.0':
-    resolution: {integrity: sha512-N4h4BD+y9kw/iszpDaDaIRJpxaRSA5uBtveM6HUIwmwkeJIPOoMrPNvmj77UrjZHAsbVwa/acLiWnPDfffO3yQ==}
-
-  '@microsoft/signalr@10.0.0':
-    resolution: {integrity: sha512-0BRqz/uCx3JdrOqiqgFhih/+hfTERaUfCZXFB52uMaZJrKaPRzHzMuqVsJC/V3pt7NozcNXGspjKiQEK+X7P2w==}
-
   '@microsoft/signalr@8.0.17':
     resolution: {integrity: sha512-5pM6xPtKZNJLO0Tq5nQasVyPFwi/WBY3QB5uc/v3dIPTpS1JXQbaXAQAPxFoQ5rTBFE094w8bbqkp17F9ReQvA==}
 
@@ -2353,10 +2344,6 @@ packages:
 
   '@module-federation/webpack-bundler-runtime@0.21.3':
     resolution: {integrity: sha512-8TDrp7dF4JqEgNvvvSRqW3kZGNb52r0xf0eDg1muSH5kI2acPRQ4TT4ZJY+2527tMOUu9qPqwGD3tnnpN2xLUA==}
-
-  '@msgpack/msgpack@2.8.0':
-    resolution: {integrity: sha512-h9u4u/jiIRKbq25PM+zymTyW6bhTzELvOoUd+AvYriWOAKpLGnIamaET3pnHYoI5iYphAHBI4ayx0MehR+VVPQ==}
-    engines: {node: '>= 10'}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
     resolution: {integrity: sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw==}
@@ -11680,27 +11667,6 @@ snapshots:
 
   '@lukeed/csprng@1.1.0': {}
 
-  '@microsoft/signalr-protocol-msgpack@10.0.0(encoding@0.1.13)':
-    dependencies:
-      '@microsoft/signalr': 10.0.0(encoding@0.1.13)
-      '@msgpack/msgpack': 2.8.0
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - utf-8-validate
-
-  '@microsoft/signalr@10.0.0(encoding@0.1.13)':
-    dependencies:
-      abort-controller: 3.0.0
-      eventsource: 2.0.2
-      fetch-cookie: 2.2.0
-      node-fetch: 2.7.0(encoding@0.1.13)
-      ws: 7.5.10
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - utf-8-validate
-
   '@microsoft/signalr@8.0.17(encoding@0.1.13)':
     dependencies:
       abort-controller: 3.0.0
@@ -12085,8 +12051,6 @@ snapshots:
     dependencies:
       '@module-federation/runtime': 0.21.3
       '@module-federation/sdk': 0.21.3
-
-  '@msgpack/msgpack@2.8.0': {}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
     optional: true

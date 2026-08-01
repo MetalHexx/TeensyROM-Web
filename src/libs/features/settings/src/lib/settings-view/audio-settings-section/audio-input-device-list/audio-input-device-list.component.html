@@ -25,7 +25,7 @@
           [class.selected]="isSelected(device)"
           (click)="selectDevice(device)"
           (keydown.enter)="selectDevice(device)"
-          (keydown.space)="selectDevice(device)"
+          (keydown.space)="$event.preventDefault(); selectDevice(device)"
           tabindex="0"
           role="option"
           [attr.aria-selected]="isSelected(device)">

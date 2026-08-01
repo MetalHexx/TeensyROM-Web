@@ -31,12 +31,6 @@ export const appRoutes: Route[] = [
         loadComponent: () =>
           import('@teensyrom-nx/features/settings').then((m) => m.SettingsViewComponent),
       },
-      {
-        path: 'audio-spike',
-        data: { title: 'Audio Spike' },
-        loadComponent: () =>
-          import('./audio-spike/audio-spike.component').then((m) => m.AudioSpikeComponent),
-      },
     ],
   },
 ];

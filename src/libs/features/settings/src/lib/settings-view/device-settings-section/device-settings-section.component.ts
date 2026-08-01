@@ -1,4 +1,4 @@
-import { Component, input, computed, effect, inject } from '@angular/core';
+import { Component, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormGroup, AbstractControl, ReactiveFormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -6,8 +6,7 @@ import { ScalingCardComponent, IconLabelComponent } from '@teensyrom-nx/ui/compo
 import { SettingsToggleItemComponent } from '../settings-toggle-item/settings-toggle-item.component';
 import { AudioSettingsSectionComponent } from '../audio-settings-section/audio-settings-section.component';
 import { AudioInputDeviceListComponent } from '../audio-settings-section/audio-input-device-list/audio-input-device-list.component';
-import { Device } from '@teensyrom-nx/domain';
-import { AudioStore } from '@teensyrom-nx/application';
+import { Device, DeviceState } from '@teensyrom-nx/domain';
 
 /**
  * Presentational component for per-device settings section.
@@ -38,8 +37,6 @@ import { AudioStore } from '@teensyrom-nx/application';
   styleUrl: './device-settings-section.component.scss',
 })
 export class DeviceSettingsSectionComponent {
-  readonly audioStore = inject(AudioStore);
-
   /**
    * FormArray containing device settings FormGroups.
    * Each FormGroup contains:
@@ -73,8 +70,8 @@ export class DeviceSettingsSectionComponent {
       const deviceA = deviceMap.get(deviceIdA);
       const deviceB = deviceMap.get(deviceIdB);
       
-      const isOnlineA = deviceA?.deviceState === 'Connected';
-      const isOnlineB = deviceB?.deviceState === 'Connected';
+      const isOnlineA = deviceA?.deviceState === DeviceState.Connected;
+      const isOnlineB = deviceB?.deviceState === DeviceState.Connected;
       
       // Online devices first
       if (isOnlineA && !isOnlineB) return -1;
@@ -131,7 +128,7 @@ export class DeviceSettingsSectionComponent {
    */
   isDeviceOnline(deviceGroup: AbstractControl): boolean {
     const device = this.getDevice(deviceGroup);
-    return device?.deviceState === 'Connected';
+    return device?.deviceState === DeviceState.Connected;
   }
 
   /**
