@@ -60,6 +60,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
   let mockStorageStore: {
     navigateToDirectory: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+    updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
     settings: ReturnType<typeof vi.fn>;
@@ -118,6 +119,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         error: null,
         lastUpdated: Date.now(),
       })),
+      updateFileCompatibility: vi.fn(),
     };
 
     mockSettingsStore = {
