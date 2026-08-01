@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { signal } from '@angular/core';
+import { computed, signal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { DeviceSettingsSectionComponent } from './device-settings-section.component';
 import { AudioStore } from '@teensyrom-nx/application';
@@ -43,10 +43,28 @@ describe('DeviceSettingsSectionComponent', () => {
     selectDevice: vi.fn(),
     startStream: vi.fn(),
     stopStream: vi.fn(),
+    clearError: vi.fn(),
+    loadChannelConfigs: vi.fn(),
+    setChannelVolume: vi.fn(),
+    toggleMute: vi.fn(),
+    setMasterVolume: vi.fn(),
+    hasDevices: computed(() => false),
+    selectedDevice: computed(() => null),
+    channels: computed(() => []),
+    hasChannels: computed(() => false),
+    isMuted: signal(false),
+    masterVolume: signal(0.75),
   };
 
   const mockAudioStreamService: Partial<IAudioStreamService> = {
     volumeLevel$: new Subject<number>().asObservable(),
+    channelVolumes$: new Subject<Map<number, number>>().asObservable(),
+    getPreBufferDuration: vi.fn(() => 0.005),
+    getCatchUpPadding: vi.fn(() => 0.001),
+    setPreBufferDuration: vi.fn(),
+    setCatchUpPadding: vi.fn(),
+    setUseOpusEncoding: vi.fn(),
+    getUseOpusEncoding: vi.fn(() => true),
   };
 
   beforeEach(async () => {
@@ -266,7 +284,7 @@ describe('DeviceSettingsSectionComponent', () => {
       fixture.componentRef.setInput('knownDevicesArray', devicesArray);
       fixture.detectChanges();
 
-      const audioGroup = fixture.nativeElement.querySelector('.audio-settings-group');
+      const audioGroup = fixture.nativeElement.querySelector('.audio-section');
       expect(audioGroup).toBeTruthy();
     });
 
@@ -275,7 +293,7 @@ describe('DeviceSettingsSectionComponent', () => {
       fixture.componentRef.setInput('knownDevicesArray', devicesArray);
       fixture.detectChanges();
 
-      const audioGroupTitle = fixture.nativeElement.querySelector('.audio-settings-group .group-title');
+      const audioGroupTitle = fixture.nativeElement.querySelector('.audio-section .group-title');
       expect(audioGroupTitle).toBeTruthy();
       expect(audioGroupTitle.textContent).toContain('Audio Settings');
     });

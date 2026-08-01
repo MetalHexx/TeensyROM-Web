@@ -1,12 +1,12 @@
 import '@analogjs/vitest-angular/setup-zone';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { signal, WritableSignal } from '@angular/core';
+import { computed, signal, WritableSignal } from '@angular/core';
 import { FormGroup, FormBuilder, Validators, FormArray } from '@angular/forms';
 import { SettingsViewComponent } from './settings-view.component';
 import { Settings, SETTINGS_SERVICE, ISettingsService, Device, AUDIO_STREAM_SERVICE, PlayerFilterType, DeviceState, StorageType } from '@teensyrom-nx/domain';
 import { SettingsFormService } from './settings-form.service';
-import { DeviceStore } from '@teensyrom-nx/application';
+import { AudioStore, DeviceStore } from '@teensyrom-nx/application';
 import { EMPTY } from 'rxjs';
 
 /**
@@ -255,6 +255,40 @@ describe('SettingsViewComponent', () => {
             getDevices: vi.fn().mockResolvedValue([]),
             connect: vi.fn().mockResolvedValue(undefined),
             disconnect: vi.fn().mockResolvedValue(undefined),
+            volumeLevel$: EMPTY,
+            channelVolumes$: EMPTY,
+            getPreBufferDuration: vi.fn(() => 0.005),
+            getCatchUpPadding: vi.fn(() => 0.001),
+            setPreBufferDuration: vi.fn(),
+            setCatchUpPadding: vi.fn(),
+            setUseOpusEncoding: vi.fn(),
+            getUseOpusEncoding: vi.fn(() => true),
+          },
+        },
+        {
+          provide: AudioStore,
+          useValue: {
+            devices: signal([]),
+            selectedDeviceIndex: signal<number | null>(null),
+            isLoading: signal(false),
+            error: signal<string | null>(null),
+            isStreaming: signal(false),
+            isConnecting: signal(false),
+            loadDevices: vi.fn(),
+            selectDevice: vi.fn(),
+            startStream: vi.fn(),
+            stopStream: vi.fn(),
+            clearError: vi.fn(),
+            loadChannelConfigs: vi.fn(),
+            setChannelVolume: vi.fn(),
+            toggleMute: vi.fn(),
+            setMasterVolume: vi.fn(),
+            hasDevices: computed(() => false),
+            selectedDevice: computed(() => null),
+            channels: computed(() => []),
+            hasChannels: computed(() => false),
+            isMuted: signal(false),
+            masterVolume: signal(0.75),
           },
         },
       ],

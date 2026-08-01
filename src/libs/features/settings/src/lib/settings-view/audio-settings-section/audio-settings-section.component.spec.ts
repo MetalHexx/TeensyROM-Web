@@ -98,6 +98,11 @@ describe('AudioSettingsSectionComponent', () => {
       selectDevice: vi.fn((index: number) => mockSelectedDeviceIndex.set(index)),
       startStream: startStreamSpy,
       stopStream: stopStreamSpy,
+      clearError: vi.fn(),
+      loadChannelConfigs: vi.fn(),
+      setChannelVolume: vi.fn(),
+      toggleMute: vi.fn(),
+      setMasterVolume: vi.fn(),
       hasDevices: computed(() => mockDevices().length > 0),
       selectedDevice: computed(() => {
         const devices = mockDevices();
@@ -105,6 +110,10 @@ describe('AudioSettingsSectionComponent', () => {
         if (idx === null || idx < 0 || idx >= devices.length) return null;
         return devices[idx];
       }),
+      channels: computed(() => []),
+      hasChannels: computed(() => false),
+      isMuted: signal(false),
+      masterVolume: signal(0.75),
     };
 
     await TestBed.configureTestingModule({
