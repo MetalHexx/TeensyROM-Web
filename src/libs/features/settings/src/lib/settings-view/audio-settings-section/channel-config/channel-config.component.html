@@ -1,0 +1,23 @@
+<div class="channel-config">
+  <!-- Channel Number Label -->
+  <div class="channel-number">
+    <span class="number-label">Ch {{ channelConfig().sourceChannel + 1 }}</span>
+  </div>
+
+  <!-- Enabled Toggle -->
+  <div class="channel-enabled">
+    <mat-slide-toggle
+      [checked]="channelConfig().enabled"
+      (change)="onEnabledChange($event.checked)"
+      color="primary"
+      aria-label="Enable channel">
+    </mat-slide-toggle>
+  </div>
+
+  <!-- VU Meter (visible during test) -->
+  @if (isTestActive()) {
+    <div class="channel-vu">
+      <lib-vu-meter [level]="vuLevel()" />
+    </div>
+  }
+</div>

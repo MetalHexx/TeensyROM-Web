@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "TeensyRom.Api | v1.0.0-alpha.7",
-    "version": "1.0.0-alpha.7"
+    "title": "TeensyRom.Api | v1.0.0-alpha.8",
+    "version": "1.0.0-alpha.8"
   },
   "paths": {
     "/api/version": {
@@ -907,6 +907,38 @@
           }
         }
       }
+    },
+    "/api/audio/devices": {
+      "get": {
+        "tags": [
+          "Audio"
+        ],
+        "summary": "List Audio Input Devices",
+        "description": "Enumerates all available audio input devices on the host system.\n\n**Use Case:**\nCall this endpoint when configuring audio streaming settings to present the user with a list of audio devices to choose from.\n\n**Device Information:**\n- **Index**: Device identifier used to select the device for capture\n- **Name**: Human-readable device name for display in UI\n- **MaxInputChannels**: Number of audio channels the device supports\n- **DefaultSampleRate**: The device's preferred sample rate\n\nReturns an empty list if no audio input devices are available.",
+        "operationId": "ListAudioDevices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDevicesResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -918,6 +950,73 @@
         "type": "object",
         "properties": {
           "firstTimeSetup": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AudioDeviceDto": {
+        "required": [
+          "index",
+          "name",
+          "maxInputChannels",
+          "defaultSampleRate"
+        ],
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "maxInputChannels": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defaultSampleRate": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "AudioSettingsDto": {
+        "required": [
+          "enableAudioStream",
+          "audioDeviceIndex",
+          "audioDeviceName",
+          "captureChannelCount",
+          "sampleRate",
+          "channels",
+          "useOpusEncoding"
+        ],
+        "type": "object",
+        "properties": {
+          "enableAudioStream": {
+            "type": "boolean"
+          },
+          "audioDeviceIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "audioDeviceName": {
+            "type": "string"
+          },
+          "captureChannelCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sampleRate": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelConfigDto"
+            }
+          },
+          "useOpusEncoding": {
             "type": "boolean"
           }
         }
@@ -1001,6 +1100,22 @@
           }
         }
       },
+      "ChannelConfigDto": {
+        "required": [
+          "sourceChannel",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "sourceChannel": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "CompetitionDto": {
         "required": [
           "name"
@@ -1027,6 +1142,7 @@
         "required": [
           "deviceId",
           "videoSettings",
+          "audioSettings",
           "indexingStatus"
         ],
         "type": "object",
@@ -1036,6 +1152,9 @@
           },
           "videoSettings": {
             "$ref": "#/components/schemas/VideoSettingsDto"
+          },
+          "audioSettings": {
+            "$ref": "#/components/schemas/AudioSettingsDto"
           },
           "indexingStatus": {
             "$ref": "#/components/schemas/IndexingStatusDto"
@@ -1459,6 +1578,20 @@
           }
         }
       },
+      "ListDevicesResponse": {
+        "required": [
+          "devices"
+        ],
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AudioDeviceDto"
+            }
+          }
+        }
+      },
       "NullableOfTeensyFilterType": {
         "enum": [
           "All",
@@ -1879,6 +2012,9 @@
     },
     {
       "name": "Files"
+    },
+    {
+      "name": "Audio"
     }
   ]
 }

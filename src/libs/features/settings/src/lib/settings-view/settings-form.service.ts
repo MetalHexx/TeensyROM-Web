@@ -1,5 +1,5 @@
 import { Injectable, inject, signal, computed, effect, DestroyRef } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ValidationErrors, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { debounceTime, filter } from 'rxjs/operators';
 import { SettingsStore } from '@teensyrom-nx/application';
@@ -242,7 +242,31 @@ export class SettingsFormService {
         enableVideo: [device.videoSettings.enableVideo],
         videoDeviceId: [device.videoSettings.videoDeviceId],
       }),
+      audioSettings: this.fb.group(
+        {
+          enableAudioStream: [device.audioSettings?.enableAudioStream ?? false],
+          audioDeviceIndex: [device.audioSettings?.audioDeviceIndex ?? -1],
+          audioDeviceName: [device.audioSettings?.audioDeviceName ?? ''],
+          captureChannelCount: [device.audioSettings?.captureChannelCount ?? 1],
+          sampleRate: [device.audioSettings?.sampleRate ?? 48000],
+          channels: [device.audioSettings?.channels ?? []],
+          useOpusEncoding: [device.audioSettings?.useOpusEncoding ?? true],
+        },
+        { validators: this.audioSettingsValidator }
+      ),
     });
+  }
+
+  /**
+   * Custom validator: When audio streaming is enabled, a valid device must be selected (index >= 0)
+   */
+  private audioSettingsValidator(group: FormGroup): ValidationErrors | null {
+    const enabled = group.get('enableAudioStream')?.value;
+    const deviceIndex = group.get('audioDeviceIndex')?.value;
+    if (enabled && (deviceIndex === null || deviceIndex < 0)) {
+      return { audioDeviceRequired: true };
+    }
+    return null;
   }
 
   /**
@@ -308,6 +332,15 @@ export class SettingsFormService {
           enableVideo: device.videoSettings.enableVideo,
           videoDeviceId: device.videoSettings.videoDeviceId,
         },
+        audioSettings: {
+          enableAudioStream: device.audioSettings?.enableAudioStream ?? false,
+          audioDeviceIndex: device.audioSettings?.audioDeviceIndex ?? -1,
+          audioDeviceName: device.audioSettings?.audioDeviceName ?? '',
+          captureChannelCount: device.audioSettings?.captureChannelCount ?? 1,
+          sampleRate: device.audioSettings?.sampleRate ?? 48000,
+          channels: device.audioSettings?.channels ?? [],
+          useOpusEncoding: device.audioSettings?.useOpusEncoding ?? true,
+        },
       })),
     };
   }
@@ -354,6 +387,15 @@ export class SettingsFormService {
         videoSettings: {
           enableVideo: device.videoSettings.enableVideo,
           videoDeviceId: device.videoSettings.videoDeviceId,
+        },
+        audioSettings: {
+          enableAudioStream: device.audioSettings?.enableAudioStream ?? false,
+          audioDeviceIndex: device.audioSettings?.audioDeviceIndex ?? -1,
+          audioDeviceName: device.audioSettings?.audioDeviceName ?? '',
+          captureChannelCount: device.audioSettings?.captureChannelCount ?? 1,
+          sampleRate: device.audioSettings?.sampleRate ?? 48000,
+          channels: device.audioSettings?.channels ?? [],
+          useOpusEncoding: device.audioSettings?.useOpusEncoding ?? true,
         },
       })),
     };
@@ -454,5 +496,32 @@ export class SettingsFormService {
       throw new Error('Settings form not initialized');
     }
     return form.get('appSettings') as FormGroup;
+  }
+
+  /**
+   * Helper method to get the audio settings FormGroup for a specific device
+   */
+  getAudioSettings(deviceIndex: number): FormGroup {
+    const knownDevices = this.getKnownDevices();
+    const deviceGroup = knownDevices.at(deviceIndex) as FormGroup;
+    if (!deviceGroup) {
+      throw new Error(`Device at index ${deviceIndex} not found`);
+    }
+    return deviceGroup.get('audioSettings') as FormGroup;
+  }
+
+  /**
+   * Finds the index of a device in the knownDevices FormArray by its deviceId.
+   * Returns -1 if the device is not found.
+   */
+  getDeviceIndexById(deviceId: string): number {
+    const knownDevices = this.getKnownDevices();
+    const controls = knownDevices.controls;
+    for (let i = 0; i < controls.length; i++) {
+      if (controls[i].get('deviceId')?.value === deviceId) {
+        return i;
+      }
+    }
+    return -1;
   }
 }

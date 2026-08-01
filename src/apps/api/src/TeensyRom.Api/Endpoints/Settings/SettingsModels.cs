@@ -4,7 +4,7 @@ using TeensyRom.Core.Settings;
 namespace TeensyRom.Api.Endpoints.Settings
 {
     /// <summary>
-    /// Per-device settings including video preferences.
+    /// Per-device settings including video and audio preferences.
     /// Each TeensyROM device has its own settings entry in the KnownDevices list.
     /// </summary>
     public record DeviceSettingsDto
@@ -18,6 +18,11 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// Video capture and display preferences for this device.
         /// </summary>
         [Required] public VideoSettingsDto VideoSettings { get; set; } = null!;
+
+        /// <summary>
+        /// Audio streaming capture preferences for this device.
+        /// </summary>
+        [Required] public AudioSettingsDto AudioSettings { get; set; } = null!;
 
         /// <summary>
         /// Tracks full indexing completion timestamps per storage type.
@@ -96,6 +101,65 @@ namespace TeensyRom.Api.Endpoints.Settings
         /// Identifier of the video device to use for capture.
         /// </summary>
         [Required] public string VideoDeviceId { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Audio streaming capture and encoding preferences.
+    /// </summary>
+    public record AudioSettingsDto
+    {
+        /// <summary>
+        /// Enable audio streaming from the host audio device.
+        /// </summary>
+        [Required] public bool EnableAudioStream { get; set; }
+
+        /// <summary>
+        /// Index of the audio input device to capture from (-1 = auto-select).
+        /// </summary>
+        [Required] public int AudioDeviceIndex { get; set; }
+
+        /// <summary>
+        /// Name of the audio input device.
+        /// </summary>
+        [Required] public string AudioDeviceName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Number of audio channels to capture from hardware (1 = mono, 2 = stereo).
+        /// </summary>
+        [Required] public int CaptureChannelCount { get; set; }
+
+        /// <summary>
+        /// Sample rate for audio capture in Hz.
+        /// </summary>
+        [Required] public int SampleRate { get; set; }
+
+        /// <summary>
+        /// Per-channel configuration for multi-channel audio streaming.
+        /// </summary>
+        [Required] public List<ChannelConfigDto> Channels { get; set; } = [];
+
+        /// <summary>
+        /// When true, audio is compressed using Opus codec (~16 KB/s per channel).
+        /// When false, raw PCM is sent for lowest latency (~188 KB/s per channel).
+        /// Default is true. Disable for DJ/performance use cases where latency is critical.
+        /// </summary>
+        [Required] public bool UseOpusEncoding { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Configuration for a single audio channel in a multi-channel audio stream.
+    /// </summary>
+    public record ChannelConfigDto
+    {
+        /// <summary>
+        /// The 0-based index of the source channel in the interleaved PCM input.
+        /// </summary>
+        [Required] public int SourceChannel { get; set; }
+
+        /// <summary>
+        /// Whether this channel should be included in the audio stream.
+        /// </summary>
+        [Required] public bool Enabled { get; set; } = true;
     }
 
     /// <summary>

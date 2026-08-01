@@ -28,7 +28,7 @@
           (buttonClick)="previous()"
         ></lib-icon-button>
 
-        @if (isCurrentFileMusicTypeComputed() || disabled()) {
+        @if (isCurrentFileMusicTypeComputed()) {
           <lib-icon-button
             [icon]="getPlayPauseIconComputed()"
             [ariaLabel]="getPlayPauseLabelComputed()"
@@ -65,6 +65,10 @@
           [disabled]="disabled() || !canNavigateComputed()"
           (buttonClick)="next()"
         ></lib-icon-button>
+
+        @if (isAudioStreamEnabled()) {
+          <lib-volume-popup [disabled]="disabled()"></lib-volume-popup>
+        }
       </div>
     </div>
   </lib-scaling-compact-card>

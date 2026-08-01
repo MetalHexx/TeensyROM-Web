@@ -16,3 +16,6 @@ export * from './lib/player/providers';
 
 // Settings state management
 export * from './lib/settings/settings-store';
+
+// Audio state management
+export * from './lib/audio/audio-store';

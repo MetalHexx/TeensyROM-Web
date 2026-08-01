@@ -1,0 +1,13 @@
+<div
+  class="vu-meter-track"
+  role="meter"
+  aria-label="Audio volume level"
+  [attr.aria-valuenow]="level()"
+  aria-valuemin="0"
+  aria-valuemax="1"
+  [attr.aria-valuetext]="ariaValueText()">
+  <div
+    class="vu-meter-cover"
+    [style.width]="coverWidth()">
+  </div>
+</div>

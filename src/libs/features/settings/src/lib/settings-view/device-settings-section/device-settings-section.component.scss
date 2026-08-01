@@ -64,22 +64,49 @@
 form {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: var(--spacing-xl);
 
   &.disabled {
     pointer-events: none;
   }
 }
 
-// Responsive grid for settings groups - matches player-settings-section
-.settings-grid {
+.device-settings-grid {
   display: grid;
-  gap: var(--spacing-xl);
   grid-template-columns: 1fr;
+  gap: var(--spacing-xl);
+  align-items: stretch;
 
-  // Side-by-side on tablets and larger
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
+  @media (min-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.device-settings-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.device-list-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  // Grid rows auto-size to the tallest item's natural content height, so without
+  // this the device list (which can be arbitrarily long) would dictate the row
+  // height instead of being capped by it. `contain: size` makes this column
+  // contribute zero intrinsic height to that calculation, so the row is sized by
+  // the left column alone, then `align-items: stretch` stretches this column back
+  // down/up to match it, and the inner list scrolls instead of growing past it.
+  @media (min-width: 900px) {
+    contain: size;
+    overflow: hidden;
+  }
+
+  > lib-audio-input-device-list {
+    flex: 1;
+    min-height: 0;
   }
 }
 
@@ -99,6 +126,11 @@ form {
   }
 }
 
+.audio-section {
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .connection-type-field {
   display: flex;
   flex-direction: column;
@@ -116,3 +148,5 @@ form {
   display: flex;
   gap: var(--spacing-lg);
 }
+
+

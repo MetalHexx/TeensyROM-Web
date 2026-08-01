@@ -84,6 +84,37 @@ export interface VideoSettings {
 }
 
 /**
+ * Configuration for a single audio channel in a multi-channel audio stream.
+ * Each channel can be independently enabled/disabled and mapped to a source channel.
+ */
+export interface ChannelConfig {
+  /** The 0-based index of the source channel in the interleaved PCM input */
+  sourceChannel: number;
+  /** Whether this channel should be included in the audio stream */
+  enabled: boolean;
+}
+
+/**
+ * Audio streaming capture and encoding settings
+ */
+export interface AudioSettings {
+  /** Enable audio streaming from the host audio device */
+  enableAudioStream: boolean;
+  /** Audio input device index (-1 = auto-select) */
+  audioDeviceIndex: number;
+  /** Audio input device name */
+  audioDeviceName: string;
+  /** Number of channels to capture from hardware (1 = mono, 2 = stereo) */
+  captureChannelCount: number;
+  /** Sample rate for audio capture in Hz */
+  sampleRate: number;
+  /** Per-channel configuration for multi-channel audio streaming */
+  channels: ChannelConfig[];
+  /** When true, audio is compressed using Opus codec (~16 KB/s per channel). When false, raw PCM is sent for lowest latency (~188 KB/s per channel). Default: true */
+  useOpusEncoding: boolean;
+}
+
+/**
  * Application-level settings
  */
 export interface AppSettings {
@@ -92,13 +123,15 @@ export interface AppSettings {
 }
 
 /**
- * Per-device settings containing video configuration
+ * Per-device settings containing video and audio configuration
  */
 export interface DeviceSettings {
   /** Unique device identifier */
   deviceId: string;
   /** Video settings for this device */
   videoSettings: VideoSettings;
+  /** Audio streaming settings for this device */
+  audioSettings: AudioSettings;
 }
 
 /**

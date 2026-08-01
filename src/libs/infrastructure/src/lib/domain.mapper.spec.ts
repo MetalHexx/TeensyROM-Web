@@ -18,6 +18,7 @@ import {
   SearchWeightsDto,
   AppSettingsDto,
   TeensyFilterType as ApiFilterType,
+  AudioSettingsDto,
 } from '@teensyrom-nx/data-access/api-client';
 import { DomainMapper } from './domain.mapper';
 import {
@@ -27,6 +28,7 @@ import {
   PlayerFilterType,
   PlayerScope,
   Settings,
+  AudioSettings,
 } from '@teensyrom-nx/domain';
 
 describe('DomainMapper (Storage)', () => {
@@ -905,11 +907,25 @@ describe('DomainMapper (Settings)', () => {
             deviceId: 'device-1',
             videoSettings: { enableVideo: true, videoDeviceId: 'cam-1' },
             indexingStatus: { sdLastIndexed: null, usbLastIndexed: null },
+            audioSettings: {
+              enableAudioStream: false,
+              audioDeviceIndex: -1,
+              audioDeviceName: '',
+              channelCount: 1,
+              sampleRate: 48000,
+            },
           },
           {
             deviceId: 'device-2',
             videoSettings: { enableVideo: false, videoDeviceId: '' },
             indexingStatus: { sdLastIndexed: null, usbLastIndexed: null },
+            audioSettings: {
+              enableAudioStream: true,
+              audioDeviceIndex: 0,
+              audioDeviceName: 'Device 2 Mic',
+              channelCount: 2,
+              sampleRate: 44100,
+            },
           },
         ],
       });
@@ -977,8 +993,107 @@ describe('DomainMapper (Settings)', () => {
       };
       const result = DomainMapper.toSettings(response);
 
-      expect(result.knownDevices[0].videoSettings).toEqual(originalSettings.knownDevices[0].videoSettings);
+      expect(result.knownDevices[0].videoSettings).toEqual(
+        originalSettings.knownDevices[0].videoSettings
+      );
       expect(result.knownDevices[0].videoSettings.enableVideo).toBe(true);
+    });
+  });
+
+  describe('toSettings - AudioSettings Mapping', () => {
+    it('should map audioSettings from DTO to domain with all properties', () => {
+      const dto = createMockGetSettingsResponse({
+        audioSettings: {
+          enableAudioStream: true,
+          audioDeviceIndex: 2,
+          audioDeviceName: 'Microphone (USB)',
+          captureChannelCount: 2,
+          sampleRate: 44100,
+        },
+      });
+      const result = DomainMapper.toSettings(dto);
+
+      expect(result.knownDevices[0].audioSettings.enableAudioStream).toBe(true);
+      expect(result.knownDevices[0].audioSettings.audioDeviceIndex).toBe(2);
+      expect(result.knownDevices[0].audioSettings.audioDeviceName).toBe('Microphone (USB)');
+      expect(result.knownDevices[0].audioSettings.captureChannelCount).toBe(2);
+      expect(result.knownDevices[0].audioSettings.sampleRate).toBe(44100);
+    });
+
+    it('should use default values for missing audioSettings properties', () => {
+      const dto = createMockGetSettingsResponse({
+        audioSettings: {},
+      });
+      const result = DomainMapper.toSettings(dto);
+
+      expect(result.knownDevices[0].audioSettings.enableAudioStream).toBe(false);
+      expect(result.knownDevices[0].audioSettings.audioDeviceIndex).toBe(-1);
+      expect(result.knownDevices[0].audioSettings.audioDeviceName).toBe('');
+      expect(result.knownDevices[0].audioSettings.captureChannelCount).toBe(1);
+      expect(result.knownDevices[0].audioSettings.sampleRate).toBe(48000);
+    });
+
+    it('should handle undefined audioSettings with defaults', () => {
+      const dto = createMockGetSettingsResponse({
+        audioSettings: undefined,
+      });
+      const result = DomainMapper.toSettings(dto);
+
+      expect(result.knownDevices[0].audioSettings.enableAudioStream).toBe(false);
+      expect(result.knownDevices[0].audioSettings.audioDeviceIndex).toBe(-1);
+      expect(result.knownDevices[0].audioSettings.audioDeviceName).toBe('');
+      expect(result.knownDevices[0].audioSettings.captureChannelCount).toBe(1);
+      expect(result.knownDevices[0].audioSettings.sampleRate).toBe(48000);
+    });
+  });
+
+  describe('toSettingsDto - AudioSettings Mapping', () => {
+    it('should map audioSettings from domain to DTO', () => {
+      const domainSettings = createMockDomainSettings({
+        audioSettings: {
+          enableAudioStream: true,
+          audioDeviceIndex: 1,
+          audioDeviceName: 'Built-in Microphone',
+          captureChannelCount: 1,
+          sampleRate: 48000,
+        },
+      });
+      const result = DomainMapper.toSettingsDto(domainSettings);
+
+      expect(result.knownDevices[0].audioSettings.enableAudioStream).toBe(true);
+      expect(result.knownDevices[0].audioSettings.audioDeviceIndex).toBe(1);
+      expect(result.knownDevices[0].audioSettings.audioDeviceName).toBe('Built-in Microphone');
+      expect(result.knownDevices[0].audioSettings.captureChannelCount).toBe(1);
+      expect(result.knownDevices[0].audioSettings.sampleRate).toBe(48000);
+    });
+  });
+
+  describe('AudioSettings Round-Trip', () => {
+    it('should preserve audioSettings through round-trip transformation', () => {
+      const originalSettings = createMockDomainSettings({
+        audioSettings: {
+          enableAudioStream: true,
+          audioDeviceIndex: 3,
+          audioDeviceName: 'USB Audio Device',
+          captureChannelCount: 2,
+          sampleRate: 96000,
+        },
+      });
+      const dto = DomainMapper.toSettingsDto(originalSettings);
+      const response: GetSettingsResponse = {
+        knownDevices: dto.knownDevices,
+        playerSettings: dto.playerSettings,
+        fileTransferSettings: dto.fileTransferSettings,
+        searchSettings: dto.searchSettings,
+        appSettings: dto.appSettings,
+      };
+      const result = DomainMapper.toSettings(response);
+
+      expect(result.knownDevices[0].audioSettings.enableAudioStream).toBe(true);
+      expect(result.knownDevices[0].audioSettings.audioDeviceIndex).toBe(3);
+      expect(result.knownDevices[0].audioSettings.audioDeviceName).toBe('USB Audio Device');
+      expect(result.knownDevices[0].audioSettings.captureChannelCount).toBe(2);
+      expect(result.knownDevices[0].audioSettings.sampleRate).toBe(96000);
     });
   });
 });
@@ -1012,7 +1127,16 @@ interface MockSettingsOverrides {
     deviceId: string;
     videoSettings: { enableVideo: boolean; videoDeviceId: string };
     indexingStatus: { sdLastIndexed: Date | null; usbLastIndexed: Date | null };
+    audioSettings: {
+      enableAudioStream: boolean;
+      audioDeviceIndex: number;
+      audioDeviceName: string;
+      captureChannelCount: number;
+      sampleRate: number;
+      channels: Array<{ name: string; sourceChannel: number; enabled: boolean }>;
+    };
   }>;
+  audioSettings?: Partial<AudioSettingsDto>;
 }
 
 function createMockGetSettingsResponse(overrides: MockSettingsOverrides = {}): GetSettingsResponse {
@@ -1066,6 +1190,14 @@ function createMockGetSettingsResponse(overrides: MockSettingsOverrides = {}): G
         sdLastIndexed: null,
         usbLastIndexed: null,
       },
+      audioSettings: {
+        enableAudioStream: overrides.audioSettings?.enableAudioStream ?? false,
+        audioDeviceIndex: overrides.audioSettings?.audioDeviceIndex ?? -1,
+        audioDeviceName: overrides.audioSettings?.audioDeviceName ?? '',
+        captureChannelCount: overrides.audioSettings?.captureChannelCount ?? 1,
+        channels: overrides.audioSettings?.channels ?? [],
+        sampleRate: overrides.audioSettings?.sampleRate ?? 48000,
+      },
     },
   ];
 
@@ -1097,8 +1229,8 @@ interface MockDomainSettingsOverrides {
   deviceId?: string;
   enableVideo?: boolean;
   videoDeviceId?: string;
-  autoConnectEnabled?: boolean;
   knownDevices?: Settings['knownDevices'];
+  audioSettings?: AudioSettings;
 }
 
 function createMockDomainSettings(overrides: MockDomainSettingsOverrides = {}): Settings {
@@ -1142,8 +1274,13 @@ function createMockDomainSettings(overrides: MockDomainSettingsOverrides = {}): 
           enableVideo: overrides.enableVideo ?? false,
           videoDeviceId: overrides.videoDeviceId ?? '',
         },
-        connectionSettings: {
-          autoConnectEnabled: overrides.autoConnectEnabled ?? false,
+        audioSettings: overrides.audioSettings ?? {
+          enableAudioStream: false,
+          audioDeviceIndex: -1,
+          audioDeviceName: '',
+          captureChannelCount: 1,
+          channels: [],
+          sampleRate: 48000,
         },
       },
     ],

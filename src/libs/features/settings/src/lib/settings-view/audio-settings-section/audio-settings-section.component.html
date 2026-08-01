@@ -1,0 +1,54 @@
+<div class="audio-settings-embedded">
+  <!-- Enable Audio Streaming toggle (always visible) -->
+  @if (getEnableAudioStreamControl(); as enableAudioCtrl) {
+    <lib-settings-toggle-item
+      label="Enable Audio Streaming"
+      description="Automatically stream audio from this device when connected. Useful when accessing the application from mobile devices."
+      [control]="enableAudioCtrl" />
+  }
+
+  <div class="audio-options-wrapper" [class.audio-disabled]="!isAudioStreamEnabled()">
+    <div class="settings-group">
+      <!-- Opus Encoding Toggle -->
+      @if (selectedDevice() && getUseOpusEncodingControl()) {
+        <div class="opus-encoding-inline">
+          <lib-settings-toggle-item
+            label="Use Opus Compression"
+            description="Enabled: lower bandwidth, slight quality loss. Disabled: lossless audio, higher bandwidth. Disable for DJ/performance use cases."
+            [control]="getUseOpusEncodingControl()!" />
+          @if (!useOpusEncoding()) {
+            <p class="hint warning-hint">
+              Raw PCM mode active: Lowest latency, higher bandwidth usage.
+            </p>
+          }
+        </div>
+      }
+
+      <!-- Channel Configuration (for multi-channel devices) -->
+      @if (isMultiChannel() && channelConfigs().length > 0) {
+        <div class="settings-group channel-config-group">
+          <h4 class="group-title">Channel Configuration</h4>
+          <p class="hint">Enable specific audio channels to stream. Each channel captures audio independently from your input device.</p>
+          <div class="channel-list">
+            @for (channel of channelConfigs(); track channel.sourceChannel; let i = $index) {
+              <lib-channel-config
+                [channelConfig]="channel"
+                [vuLevel]="getChannelVuLevel(channel.sourceChannel)"
+                [isTestActive]="showVuMeters()"
+                (configChanged)="onChannelConfigChanged(i, $event)" />
+            }
+          </div>
+        </div>
+      }
+
+      @if (showVuMeters() && !isMultiChannel()) {
+        <div class="test-audio-section">
+          <h4 class="group-title">Audio Level</h4>
+          <div class="vu-meter-container">
+            <lib-vu-meter [level]="volumeLevel()" />
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

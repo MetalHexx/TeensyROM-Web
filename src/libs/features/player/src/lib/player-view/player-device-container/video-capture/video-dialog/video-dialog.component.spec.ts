@@ -5,7 +5,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { VideoDialogComponent, VideoDialogData } from './video-dialog.component';
 import { CRT_CONFIGS, DEFAULT_CRT_SETTINGS, CRT_PRESETS, CRT_PRESET_KEYS } from '@teensyrom-nx/ui/components';
 import { CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
-import { PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT, IPlayerContext, SettingsStore, AudioStore } from '@teensyrom-nx/application';
 import { STORAGE_SERVICE, PlayerStatus, LaunchMode, CRT_STORAGE, ICrtStorage, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 
 /** Mock custom presets for testing */
@@ -144,6 +144,21 @@ describe('VideoDialogComponent', () => {
           },
         },
         { provide: CRT_STORAGE, useValue: mockCrtStorage },
+        {
+          provide: SettingsStore,
+          useValue: {
+            enableAudioStreamForDevice: vi.fn().mockReturnValue(signal(false).asReadonly()),
+          },
+        },
+        {
+          provide: AudioStore,
+          useValue: {
+            isMuted: signal(false),
+            masterVolume: signal(0.75),
+            toggleMute: vi.fn(),
+            setMasterVolume: vi.fn(),
+          },
+        },
       ],
       // Use CUSTOM_ELEMENTS_SCHEMA for shallow testing to ignore child components
       schemas: [CUSTOM_ELEMENTS_SCHEMA],

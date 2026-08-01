@@ -41,11 +41,12 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         private static DeviceSettings MapDeviceSettings(DeviceSettingsDto dto, List<DeviceSettings> existingDevices)
         {
             var existingDevice = existingDevices.FirstOrDefault(d => d.DeviceId == dto.DeviceId);
-            
+
             return new DeviceSettings
             {
                 DeviceId = dto.DeviceId,
-                VideoSettings = MapVideoSettings(dto.VideoSettings),                
+                VideoSettings = MapVideoSettings(dto.VideoSettings),
+                AudioSettings = MapAudioSettings(dto.AudioSettings),
                 IndexingStatus = existingDevice?.IndexingStatus ?? new IndexingStatus()
             };
         }
@@ -70,6 +71,29 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
             {
                 EnableVideo = dto.EnableVideo,
                 VideoDeviceId = dto.VideoDeviceId
+            };
+        }
+
+        private static AudioSettings MapAudioSettings(AudioSettingsDto dto)
+        {
+            return new AudioSettings
+            {
+                EnableAudioStream = dto.EnableAudioStream,
+                AudioDeviceIndex = dto.AudioDeviceIndex,
+                AudioDeviceName = dto.AudioDeviceName,
+                CaptureChannelCount = dto.CaptureChannelCount > 0 ? dto.CaptureChannelCount : 1,
+                SampleRate = dto.SampleRate,
+                Channels = dto.Channels?.Select(MapChannelConfig).ToList() ?? [],
+                UseOpusEncoding = dto.UseOpusEncoding
+            };
+        }
+
+        private static ChannelConfig MapChannelConfig(ChannelConfigDto dto)
+        {
+            return new ChannelConfig
+            {
+                SourceChannel = dto.SourceChannel,
+                Enabled = dto.Enabled
             };
         }
 

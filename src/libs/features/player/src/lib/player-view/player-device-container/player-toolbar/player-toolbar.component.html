@@ -78,6 +78,12 @@
         ></lib-file-time>
       </div>
 
+      @if (isAudioStreamEnabled()) {
+        <div class="volume-control-section">
+          <lib-volume-control [disabled]="disabled()"></lib-volume-control>
+        </div>
+      }
+
       <div class="file-info-section">
         <lib-file-info [fileItem]="currentFile()?.file ?? null"></lib-file-info>
       </div>
@@ -87,7 +93,7 @@
       </div>
     </div>
 
-    <!-- Tablet Layout: Flexbox with file-info in remaining space (641px-900px) -->
+    <!-- Tablet Layout: Compact volume, no file-info (641px-900px) -->
     <div class="player-controls tablet-layout" data-testid="player-toolbar">
       <div class="playback-controls">
         <lib-icon-button
@@ -153,82 +159,15 @@
         ></lib-file-time>
       </div>
 
+      @if (isAudioStreamEnabled()) {
+        <div class="volume-control-section">
+          <lib-volume-control [disabled]="disabled()" [compact]="true"></lib-volume-control>
+        </div>
+      }
+
       <div class="file-info-section">
         <lib-file-info [fileItem]="currentFile()?.file ?? null"></lib-file-info>
       </div>
-
-      <div class="toolbar-actions-section">
-        <lib-player-toolbar-actions [deviceId]="deviceId()" [disabled]="disabled()"></lib-player-toolbar-actions>
-      </div>
-    </div>
-
-    <!-- Mobile Layout: Stacked vertical (≤640px) -->
-    <div class="player-controls mobile-layout" data-testid="player-toolbar">
-      <div class="time-display-section">
-        <lib-file-time
-          [currentTime]="currentTime()"
-          [totalTime]="totalTime()"
-          [show]="showProgressBar()"
-        ></lib-file-time>
-      </div>
-
-      <div class="playback-controls">
-        <lib-icon-button
-          icon="skip_previous"
-          ariaLabel="In shuffle mode, It will launch the previous file in your launch history. Otherwise, it will launch the previous file in the file listing."
-          [tooltip]="previousTooltip()"
-          size="large"
-          variant="rounded-transparent"
-          color="normal"
-          class="playback-icon-filled"
-          [disabled]="disabled() || !canNavigatePreviousComputed()"
-          (buttonClick)="previous()"
-        >
-        </lib-icon-button>
-
-        @if (isCurrentFileMusicTypeComputed() || disabled()) {
-        <lib-icon-button
-          [icon]="getPlayPauseIconComputed()"
-          [ariaLabel]="getPlayPauseLabelComputed()"
-          [tooltip]="playPauseTooltip()"
-          size="large"
-          variant="rounded-primary"
-          class="playback-icon-filled"
-          [color]="getPlayButtonColorComputed()"
-          [disabled]="disabled()"
-          (buttonClick)="playPause()"
-        >
-        </lib-icon-button>
-        } @else {
-        <lib-icon-button
-          icon="stop"
-          ariaLabel="Stops the current file with a TeensyROM reset."
-          [tooltip]="stopTooltip"
-          size="large"
-          variant="rounded-primary"
-          class="playback-icon-filled"
-          [color]="getPlayButtonColorComputed()"
-          [disabled]="disabled()"
-          (buttonClick)="stop()"
-        >
-        </lib-icon-button>
-        }
-
-        <lib-icon-button
-          icon="skip_next"
-          ariaLabel="In shuffle mode, It will launch the next random file or next file in your launch history. Otherwise, it will launch the next file in the file listing."
-          [tooltip]="nextTooltip()"
-          size="large"
-          variant="rounded-transparent"
-          color="normal"
-          class="playback-icon-filled"
-          [disabled]="disabled() || !canNavigateComputed()"
-          (buttonClick)="next()"
-        >
-        </lib-icon-button>
-      </div>
-
-      <div class="mobile-divider"></div>
 
       <div class="toolbar-actions-section">
         <lib-player-toolbar-actions [deviceId]="deviceId()" [disabled]="disabled()"></lib-player-toolbar-actions>

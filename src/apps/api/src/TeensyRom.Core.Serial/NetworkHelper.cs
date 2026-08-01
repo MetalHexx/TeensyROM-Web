@@ -1,57 +1,60 @@
 using System.Net;
-using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 namespace TeensyRom.Core.Serial;
 
 public static class NetworkHelper
 {
     /// <summary>
-    /// Gets the local subnet range for the first active non-loopback IPv4 network interface.
-    /// Returns a /24 subnet range (e.g., for 192.168.1.13, returns 192.168.1.1 to 192.168.1.254).
+    /// Gets the local subnet range for the network interface that carries the machine's real
+    /// outbound traffic. Returns a /24 subnet range (e.g., for 192.168.1.13, returns 192.168.1.1 to 192.168.1.254).
     /// </summary>
-    /// <returns>A tuple of start and end IP addresses, or null if no valid interface found.</returns>
+    /// <returns>A tuple of start and end IP addresses, or null if the local IP could not be determined.</returns>
     public static (IPAddress Start, IPAddress End)? GetLocalSubnetRange()
     {
         try
         {
-            var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+            var localIp = GetOutboundIpAddress();
 
-            foreach (var networkInterface in interfaces)
+            if (localIp == null)
             {
-                // Skip interfaces that are not up or are loopback
-                if (networkInterface.OperationalStatus != OperationalStatus.Up ||
-                    networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                {
-                    continue;
-                }
-
-                var ipProperties = networkInterface.GetIPProperties();
-                foreach (var unicastAddress in ipProperties.UnicastAddresses)
-                {
-                    // We only want IPv4 addresses
-                    if (unicastAddress.Address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
-                    {
-                        continue;
-                    }
-
-                    var localIp = unicastAddress.Address;
-
-                    // Generate the /24 subnet range
-                    var ipBytes = localIp.GetAddressBytes();
-
-                    // Create start address: x.x.x.1
-                    ipBytes[3] = 1;
-                    var startIp = new IPAddress(ipBytes);
-
-                    // Create end address: x.x.x.254
-                    ipBytes[3] = 254;
-                    var endIp = new IPAddress(ipBytes);
-
-                    return (startIp, endIp);
-                }
+                return null;
             }
 
+            // Generate the /24 subnet range
+            var ipBytes = localIp.GetAddressBytes();
+
+            // Create start address: x.x.x.1
+            ipBytes[3] = 1;
+            var startIp = new IPAddress(ipBytes);
+
+            // Create end address: x.x.x.254
+            ipBytes[3] = 254;
+            var endIp = new IPAddress(ipBytes);
+
+            return (startIp, endIp);
+        }
+        catch
+        {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Determines the local IPv4 address the OS would use to route outbound traffic, by opening
+    /// a UDP socket "connected" to an external address (no packets are actually sent for UDP
+    /// connect) and reading back the local endpoint the OS bound to. This reflects the real,
+    /// routable interface rather than whichever adapter happens to enumerate first (e.g. a
+    /// Hyper-V/WSL/Docker virtual switch).
+    /// </summary>
+    /// <returns>The local IPv4 address, or null if it could not be determined.</returns>
+    private static IPAddress? GetOutboundIpAddress()
+    {
+        try
+        {
+            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Connect("8.8.8.8", 65530);
+            return (socket.LocalEndPoint as IPEndPoint)?.Address;
         }
         catch
         {

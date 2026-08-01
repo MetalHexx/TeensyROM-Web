@@ -507,11 +507,12 @@ describe('TooltipDirective - Touch Device Behavior', () => {
     }
   });
 
-  it('should show tooltip after long-press (700ms) on touch devices', () => {
+  it('should NOT show tooltip after long-press (700ms) on touch devices', () => {
+    // Long-press support was removed; tooltips are disabled entirely on touch devices.
     hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
     vi.advanceTimersByTime(700); // Long-press threshold
 
-    expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
+    expect(mockTooltipService.createTooltip).not.toHaveBeenCalled();
   });
 
   it('should NOT show tooltip if touch ends before long-press threshold', () => {
@@ -531,14 +532,7 @@ describe('TooltipDirective - Touch Device Behavior', () => {
   });
 
   it('should ignore mouseleave on touch devices', () => {
-    // Show tooltip via long-press
-    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
-    vi.advanceTimersByTime(700);
-    expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
-
-    mockTooltipService.destroyTooltip.mockClear();
-
-    // Mouseleave should be ignored (tooltip stays visible)
+    // Mouseleave is a no-op on touch devices (no tooltip was ever shown to hide).
     hostElement.nativeElement.dispatchEvent(new Event('mouseleave'));
     expect(mockTooltipService.destroyTooltip).not.toHaveBeenCalled();
   });
@@ -552,17 +546,13 @@ describe('TooltipDirective - Touch Device Behavior', () => {
     expect(mockTooltipService.createTooltip).not.toHaveBeenCalled();
   });
 
-  it('should dismiss and recreate tooltip on subsequent long-press', () => {
-    // Show tooltip first
+  it('should never create a tooltip across repeated long-presses on touch devices', () => {
     hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
     vi.advanceTimersByTime(700);
-    expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(1);
+    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
+    vi.advanceTimersByTime(700);
 
-    // Second long-press dismisses current tooltip via document listener capture phase
-    // then creates new tooltip (expected UX - user gets fresh tooltip)
-    hostElement.nativeElement.dispatchEvent(new Event('touchstart'));
-    vi.advanceTimersByTime(700);
-    expect(mockTooltipService.createTooltip).toHaveBeenCalledTimes(2);
-    expect(mockTooltipService.destroyTooltip).toHaveBeenCalledTimes(1);
+    expect(mockTooltipService.createTooltip).not.toHaveBeenCalled();
+    expect(mockTooltipService.destroyTooltip).not.toHaveBeenCalled();
   });
 });

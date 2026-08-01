@@ -4,7 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Device, StorageType } from '@teensyrom-nx/domain';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { EmptyStateMessageComponent, ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective, ScalingCardComponent, ScalingContainerComponent } from '@teensyrom-nx/ui/components';
+import { EmptyStateMessageComponent, ScalingCompactCardComponent, SwipePaneContainerComponent, SwipePaneDirective, ScalingCardComponent } from '@teensyrom-nx/ui/components';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { map } from 'rxjs/operators';
 import { FileImageComponent } from './file-image/file-image.component';
@@ -35,7 +35,6 @@ const TOUCH_DEVICE_QUERY = '(hover: none)';
     StorageContainerComponent,
     FileDescriptionMiniComponent,
     PlayerToolbarMiniComponent,
-    ScalingContainerComponent,
     ScalingCardComponent,
     ScalingCompactCardComponent,
     SwipePaneContainerComponent,
@@ -113,6 +112,7 @@ export class PlayerDeviceContainerComponent {
     if (!deviceId) return false;
     return this.settingsStore.enableVideoForDevice(deviceId)();
   });
+
 
   constructor() {
     // Initialize player state when device container mounts
@@ -351,4 +351,5 @@ export class PlayerDeviceContainerComponent {
   readonly emptyStateSecondaryMessage = computed(() =>
     this.hasStorageIndex() ? '' : 'Visit <strong>Devices</strong> in the navigation to manage indexing.'
   );
+
 }

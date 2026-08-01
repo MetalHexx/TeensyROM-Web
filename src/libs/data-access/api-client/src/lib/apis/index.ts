@@ -1,5 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
+export * from './AudioApiService';
 export * from './DevicesApiService';
 export * from './FilesApiService';
 export * from './PlayerApiService';

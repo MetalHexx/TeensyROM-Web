@@ -106,6 +106,11 @@ A mashup of ancient hardware and modern technology, this cross-platform web app 
 - **Adaptive Layouts**: The UI intelligently reorganizes itself for phone, tablet, and desktop screen sizes
 - **No App Install Required**: Access from any device browser on your local network
 
+### Mobile Audio Streaming
+- **Wireless C64 Audio**: Stream your C64's audio straight to your phone or tablet, no cables needed
+- **Configurable Audio Source**: Pick which host audio input to stream from in Settings
+- **Low-Latency Playback**: Compressed streaming keeps sound in sync with what's happening on your device
+
 ### Tooltip System
 - **Custom Tooltips**: Touch-friendly tooltips with long-press activation on mobile
 - **Global Toggle**: Enable/disable tooltips from the header

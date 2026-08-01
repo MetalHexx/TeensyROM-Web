@@ -8,10 +8,11 @@ import {
   TooltipConfig,
   TooltipPosition,
 } from '@teensyrom-nx/ui/components';
-import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
 import { ProgressBarComponent } from '../player-toolbar/progress-bar/progress-bar.component';
 import { FileTimeComponent } from '../player-toolbar/file-time/file-time.component';
+import { VolumePopupComponent } from '../player-toolbar/volume-control/volume-popup/volume-popup.component';
 
 @Component({
   selector: 'lib-player-toolbar-mini',
@@ -22,6 +23,7 @@ import { FileTimeComponent } from '../player-toolbar/file-time/file-time.compone
     SlidingContainerComponent,
     ProgressBarComponent,
     FileTimeComponent,
+    VolumePopupComponent,
   ],
   templateUrl: './player-toolbar-mini.component.html',
   styleUrl: './player-toolbar-mini.component.scss',
@@ -32,6 +34,7 @@ import { FileTimeComponent } from '../player-toolbar/file-time/file-time.compone
 })
 export class PlayerToolbarMiniComponent {
   private readonly playerContext = inject(PLAYER_CONTEXT);
+  private readonly settingsStore = inject(SettingsStore);
 
   deviceId = input.required<string>();
   disabled = input<boolean>(false);
@@ -62,6 +65,12 @@ export class PlayerToolbarMiniComponent {
     title: this.getPlayPauseLabelComputed(),
     position: TooltipPosition.Top,
   }));
+
+  isAudioStreamEnabled = computed(() => {
+    const deviceId = this.deviceId();
+    if (!deviceId) return false;
+    return this.settingsStore.enableAudioStreamForDevice(deviceId)();
+  });
 
   timerState = computed(() => {
     const deviceId = this.deviceId();

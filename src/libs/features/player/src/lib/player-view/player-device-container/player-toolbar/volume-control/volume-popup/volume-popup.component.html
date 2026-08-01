@@ -1,0 +1,39 @@
+<lib-dropdown-dialog [centered]="true">
+  <lib-icon-button
+    [icon]="volumeIcon()"
+    [ariaLabel]="muteAriaLabel()"
+    size="medium"
+    variant="rounded-transparent"
+    [color]="isMuted() ? 'highlight' : 'normal'"
+    [disabled]="disabled()"
+    (buttonClick)="onTriggerClick()"
+  />
+
+  <div class="volume-popup-content" dialog-content>
+    <div class="popup-mute-row">
+      <lib-icon-button
+        [icon]="volumeIcon()"
+        [ariaLabel]="muteAriaLabel()"
+        size="medium"
+        variant="rounded-transparent"
+        [color]="isMuted() ? 'highlight' : 'normal'"
+        (buttonClick)="onToggleMute()"
+      />
+    </div>
+
+    <div class="popup-divider"></div>
+
+    <div class="popup-slider-container">
+      <input
+        type="range"
+        class="vertical-slider"
+        min="0"
+        max="1"
+        step="0.01"
+        aria-label="Volume"
+        [value]="currentVolume()"
+        (input)="onVolumeChange($event)"
+      />
+    </div>
+  </div>
+</lib-dropdown-dialog>

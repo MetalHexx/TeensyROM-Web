@@ -1,0 +1,50 @@
+<div class="device-list-wrapper" [class.audio-disabled]="disabled()">
+  @if (audioStore.isLoading()) {
+    <div class="loading-state">
+      <mat-icon>hourglass_empty</mat-icon>
+      <p>Loading audio devices...</p>
+    </div>
+  } @else if (audioStore.error() && audioStore.devices().length === 0) {
+    <div class="error-state">
+      <mat-icon>error_outline</mat-icon>
+      <p>{{ audioStore.error() }}</p>
+    </div>
+  } @else if (audioStore.devices().length === 0) {
+    <div class="empty-state">
+      <mat-icon>mic_off</mat-icon>
+      <p>No audio input devices found.</p>
+      <p class="hint">Connect an audio input device and refresh.</p>
+    </div>
+  } @else {
+    <h4 class="group-title">Audio Input Device</h4>
+    <p class="section-description">Select an audio input device from which to stream audio.</p>
+    <div class="device-list" role="listbox" aria-label="Audio input devices">
+      @for (device of audioStore.devices(); track device.index) {
+        <div
+          class="device-item"
+          [class.selected]="isSelected(device)"
+          (click)="selectDevice(device)"
+          (keydown.enter)="selectDevice(device)"
+          (keydown.space)="$event.preventDefault(); selectDevice(device)"
+          tabindex="0"
+          role="option"
+          [attr.aria-selected]="isSelected(device)">
+          <div class="device-info">
+            <lib-icon-label
+              icon="mic"
+              [label]="device.name"
+              size="large"
+              [color]="isSelected(device) ? 'primary' : 'normal'"
+              [truncate]="false" />
+            <span class="device-details">
+              {{ device.maxInputChannels }} ch · {{ device.defaultSampleRate | number }} Hz
+            </span>
+          </div>
+          @if (isSelected(device)) {
+            <mat-icon class="selected-indicator">check_circle</mat-icon>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

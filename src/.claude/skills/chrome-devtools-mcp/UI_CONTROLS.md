@@ -227,6 +227,55 @@ Per-device sections. Toggle: `"Enable Video Overlay"`. Empty: `"No devices have 
 
 Sliders (0-10): `"File Name"`, `"Title"`, `"Creator"`, `"Release Info"`, `"Description"`. Textareas: `"Stop Words"`, `"Banned Directories"`, `"Banned Files"`.
 
+### Audio Settings (`lib-audio-settings-section`, title `"Audio Settings"`)
+
+**Purpose**: Configure audio input device, capture sample rate, and test audio capture with real-time VU meter.
+
+#### States
+
+| State | Display |
+|-------|---------|
+| Loading | Icon `hourglass_empty`, text `"Loading audio devices..."` |
+| Error | Icon `error_outline`, error message text |
+| Empty | Icon `mic_off`, text `"No audio input devices found."` |
+| Ready | Device list visible |
+
+#### Device List
+
+Heading: `"Audio Input Device"` (uppercase, `.group-title`). Each device item (`.device-item`):
+- **Device Name** (`lib-icon-label`, icon `mic`): Full device name (wraps on all screens, truncates only on mobile via `@include mixins.below-phone`)
+- **Device Details** (`.device-details`): `"{channels} ch · {sampleRate} Hz"` (opacity 0.6)
+- **Selected Indicator** (icon `check_circle`, `.selected-indicator`): Shown only if selected (color `primary`)
+- **Click/Keyboard**: Click, Enter, or Space to select
+
+#### Sample Rate Display
+
+Heading: `"Sample Rate"` (uppercase, `.group-title`). Not shown until a device is selected.
+- **Icon Label** (`lib-icon-label`, icon `speed`): Formatted rate e.g. `"48,000 Hz"`
+
+#### Test Audio Section
+
+Heading: `"Test Audio"` (uppercase, `.group-title`).
+
+**Test Button** (`lib-action-button`, `.test-audio-controls`):
+- **Label** variations:
+  - `"Test Audio"` = idle/stopped
+  - `"Connecting..."` = connecting/streaming
+  - `"Stop Test"` = actively testing
+- **Icon** (`testButtonIcon()`): `play_arrow` (idle) or `stop` (testing)
+- **Color**: `primary` (idle) or `error` (testing)
+- **Disabled**: When no device selected OR no `deviceId` provided OR while connecting
+- **Click**: Toggles capture on/off
+
+**VU Meter** (`lib-vu-meter`, `.vu-meter-container`):
+- Visible only while `isTesting === true`
+- Real-time volume level (`[level]="volumeLevel()"`, range 0–1)
+- Resets to 0 when test stops
+
+#### Empty State
+
+When no devices: `"No audio input devices found."` with hint `"Connect an audio input device and refresh."`
+
 ### App Settings (`lib-app-settings-section`, title `"Application Settings"`)
 
 Toggle: `"Initial setup completed"`.
@@ -258,6 +307,18 @@ Toggle: `"Initial setup completed"`.
 1. Settings view → click section button (e.g., aria `"Navigate to player settings"`)
 2. Modify controls → Save (aria `"Save all changes"`) or enable Auto-save
 
+### Test Audio Capture
+1. Settings view → click section button aria `"Navigate to audio settings"` (or wait for nav to load)
+2. Find Audio Settings section (`lib-audio-settings-section`)
+3. If loading: wait for `"Loading audio devices..."` to clear (15-20s)
+4. Click a device in `.device-list` to select it
+5. Verify `.group-title` `"Sample Rate"` shows with formatted rate
+6. Find `lib-action-button` with label `"Test Audio"`
+7. Click → button label changes to `"Stop Test"`, color changes to `error`
+8. `lib-vu-meter` appears with real-time volume meter
+9. Wait 10-30s, observe volume level changing (0.0–1.0)
+10. Click again to stop → label reverts to `"Test Audio"`, VU meter disappears, volume resets to 0
+
 ---
 
 ## Component Selectors (Quick Ref)
@@ -288,10 +349,16 @@ Toggle: `"Initial setup completed"`.
 | `lib-search-results` | Search results |
 | `lib-play-history` | History list |
 | `lib-settings-view` | Settings page |
+| `lib-player-settings-section` | Player settings panel |
+| `lib-device-settings-section` | Device settings panel |
+| `lib-search-settings-section` | Search settings panel |
+| `lib-audio-settings-section` | Audio settings panel |
+| `lib-app-settings-section` | App settings panel |
 | `lib-scaling-card` | Card container |
 | `lib-icon-button` | Icon button |
 | `lib-action-button` | Labeled button |
 | `lib-input-field` | Text input |
 | `lib-empty-state-message` | Empty state |
+| `lib-vu-meter` | Audio volume meter |
 | `lib-crt-effect-wrapper` | CRT effect |
 | `lib-crt-settings-panel` | CRT controls |

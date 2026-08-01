@@ -19,6 +19,7 @@ import {
   SETTINGS_PROVIDERS,
   VERSION_PROVIDERS,
   CRT_PROVIDERS,
+  AUDIO_STREAM_PROVIDERS,
   API_CONFIG_PROVIDER,
 } from '@teensyrom-nx/infrastructure';
 
@@ -47,5 +48,6 @@ export const appConfig: ApplicationConfig = {
     SETTINGS_PROVIDERS,
     VERSION_PROVIDERS,
     CRT_PROVIDERS,
+    AUDIO_STREAM_PROVIDERS,
   ],
 };

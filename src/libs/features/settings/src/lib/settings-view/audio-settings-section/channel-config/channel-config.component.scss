@@ -1,0 +1,33 @@
+.channel-config {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .channel-number {
+    min-width: 2.5rem;
+
+    .number-label {
+      font-weight: 600;
+      opacity: 0.7;
+      font-size: 0.875rem;
+    }
+  }
+
+  .channel-enabled {
+    min-width: 3.5rem;
+    display: flex;
+    justify-content: center;
+  }
+
+  .channel-vu {
+    flex: 1;
+    min-width: 6rem;
+    max-width: 10rem;
+  }
+}

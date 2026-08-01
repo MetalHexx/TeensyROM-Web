@@ -1,8 +1,11 @@
 /* tslint:disable */
 /* eslint-disable */
 export * from './AppSettingsDto';
+export * from './AudioDeviceDto';
+export * from './AudioSettingsDto';
 export * from './CartDto';
 export * from './CartStorageDto';
+export * from './ChannelConfigDto';
 export * from './CompetitionDto';
 export * from './ConnectionType';
 export * from './DeviceSettingsDto';
@@ -23,6 +26,7 @@ export * from './IndexResponse';
 export * from './IndexingStatusDto';
 export * from './LaunchFileResponse';
 export * from './LaunchRandomResponse';
+export * from './ListDevicesResponse';
 export * from './NullableOfTeensyFilterType';
 export * from './PingDeviceResponse';
 export * from './PlayerSettingsDto';

@@ -1,0 +1,134 @@
+@use '../../../../../../ui/styles/src/lib/theme/mixins' as mixins;
+
+:host {
+  display: block;
+}
+
+.audio-settings-embedded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.audio-options-wrapper {
+  transition: opacity 0.2s ease;
+}
+
+.audio-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: 0;
+
+  .group-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
+
+.sample-rate-group {
+  margin-top: var(--spacing-sm);
+}
+
+.sample-rate-display {
+  padding: var(--spacing-sm) 0;
+}
+
+.opus-encoding-inline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+// ── Channel Configuration ─────────────────────────────────────────────
+.channel-config-group {
+  gap: var(--spacing-sm);
+
+  .hint {
+    font-size: 0.8125rem;
+    opacity: 0.6;
+    margin: 0;
+  }
+
+  .channel-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: var(--spacing-xs);
+  }
+}
+
+// ── Test Audio Section ────────────────────────────────────────────────
+.test-audio-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.test-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.vu-meter-container {
+  padding: var(--spacing-xs) 0;
+}
+
+// ── Latency Tuning Section ────────────────────────────────────────────
+.latency-tuning-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: var(--spacing-lg);
+
+  .hint {
+    font-size: 0.8125rem;
+    opacity: 0.6;
+    margin: 0 0 var(--spacing-md) 0;
+  }
+}
+
+.latency-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-lg);
+
+  .slider-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .control-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    opacity: 0.9;
+  }
+
+  .control-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    min-width: 4.5rem;
+    text-align: right;
+    color: var(--color-primary);
+  }
+
+  mat-slider {
+    width: 100%;
+  }
+
+  .slider-hint {
+    font-size: 0.75rem;
+    opacity: 0.5;
+  }
+}

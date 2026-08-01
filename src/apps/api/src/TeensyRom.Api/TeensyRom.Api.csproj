@@ -35,11 +35,13 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
+    <PackageReference Include="PortAudioSharp2" Version="1.*" />
     <PackageReference Include="RadEndpoints" Version="1.0.0-alpha.21" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.4.3" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TeensyRom.Core.Audio\TeensyRom.Core.Audio.csproj" />
     <ProjectReference Include="..\TeensyRom.Core.Device\TeensyRom.Core.Device.csproj" />
     <ProjectReference Include="..\TeensyRom.Core.Serial\TeensyRom.Core.Serial.csproj" />
     <ProjectReference Include="..\TeensyRom.Core.Storage\TeensyRom.Core.Storage.csproj" />

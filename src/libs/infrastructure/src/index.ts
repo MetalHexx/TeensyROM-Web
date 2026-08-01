@@ -27,3 +27,6 @@ export * from './lib/version/providers';
 // CRT implementations
 export * from './lib/crt/crt-storage.service';
 export * from './lib/crt/providers';
+
+// Audio implementations
+export * from './lib/audio';

@@ -36,6 +36,11 @@ export * from './alert-message.model';
 // Settings models
 export * from './settings.model';
 
+// Audio models
+export * from './audio-stream-state.enum';
+export * from './audio-device.model';
+export * from './channel-audio-frame.model';
+
 // Version models
 export * from './version.model';
 

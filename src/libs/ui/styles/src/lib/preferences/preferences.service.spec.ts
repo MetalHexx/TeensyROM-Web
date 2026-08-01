@@ -63,6 +63,7 @@ describe('PreferencesService', () => {
 
     it('should use defaults when localStorage contains invalid JSON', () => {
       localStorageSpy.getItem.mockReturnValue('invalid-json');
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       service = TestBed.inject(PreferencesService);
@@ -119,6 +120,7 @@ describe('PreferencesService', () => {
     });
 
     it('should handle localStorage write errors gracefully', () => {
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       localStorageSpy.setItem.mockImplementation(() => {
         throw new Error('QuotaExceededError');
