@@ -26,8 +26,8 @@ interface AudioDevice {
           <fieldset style="border:1px solid #444; padding:.5rem .75rem; margin-bottom:.75rem">
             <legend style="color:#aaa">Hub</legend>
             <div style="margin-bottom:.5rem">
-              <label style="display:block; font-size:.8rem; color:#aaa">Server URL:</label>
-              <input type="text" [(ngModel)]="baseUrl" [disabled]="hubState() !== 'disconnected'" style="width:100%; box-sizing:border-box; font-size:.85rem" placeholder="http://192.168.1.x:213" />
+              <label for="audio-spike-server-url" style="display:block; font-size:.8rem; color:#aaa">Server URL:</label>
+              <input id="audio-spike-server-url" type="text" [(ngModel)]="baseUrl" [disabled]="hubState() !== 'disconnected'" style="width:100%; box-sizing:border-box; font-size:.85rem" placeholder="http://192.168.1.x:213" />
             </div>
             <button (click)="connectHub()" [disabled]="hubState() !== 'disconnected'">Connect</button>
             <span style="margin-left:.75rem">{{ hubState() }}</span>
@@ -41,7 +41,10 @@ interface AudioDevice {
               @for (d of devices(); track d.index) {
                 <div [style.background]="d.index === selectedDeviceIndex() ? '#2a2a2a' : 'transparent'"
                      style="padding:0 .25rem; cursor:pointer; white-space:nowrap"
-                     (click)="selectDevice(d)">
+                     role="button"
+                     tabindex="0"
+                     (click)="selectDevice(d)"
+                     (keydown.enter)="selectDevice(d)">
                   [{{ d.index }}] {{ d.name }} — {{ d.maxInputChannels }}ch
                 </div>
               }
