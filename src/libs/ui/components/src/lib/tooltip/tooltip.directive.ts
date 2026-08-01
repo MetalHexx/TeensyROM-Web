@@ -76,10 +76,7 @@ export interface TooltipConfig {
  *
  * Provides tooltip functionality via attribute directive with intelligent device detection:
  * - **Desktop**: Displays tooltip on mouse hover (500ms delay)
- * - **Touch/Mobile**: Displays tooltip on long-press (700ms), dismisses on tap outside
- *
- * Touch behavior prevents "stuck" tooltips by requiring intentional long-press activation
- * and providing clear dismissal via tap-outside, solving common mobile UX issues.
+ * - **Touch/Mobile**: Tooltips are disabled entirely to avoid "stuck" tooltip UX issues
  *
  * @example
  * <button [libTooltip]="{ body: 'Click to save', position: TooltipPosition.Bottom }">Save</button>
