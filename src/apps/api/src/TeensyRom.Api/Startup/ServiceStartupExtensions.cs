@@ -50,6 +50,10 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IAudioStreamManager, AudioStreamManager>();
             services.AddSingleton<ITransferJobRegistry, TransferJobRegistry>();
             services.AddSingleton<IDeviceLeaseCoordinator, DeviceLeaseCoordinator>();
+            services.AddSingleton<TransferOptions>();
+            services.AddSingleton<ITransferStagingStore, TransferStagingStore>();
+            services.AddSingleton<ITransferCapacityGate, TransferCapacityGate>();
+            services.AddSingleton<ITransferQueue, TransferQueue>();
 
             // Register application bootstrap hosted service
             services.AddHostedService<ApplicationBootstrapService>();
