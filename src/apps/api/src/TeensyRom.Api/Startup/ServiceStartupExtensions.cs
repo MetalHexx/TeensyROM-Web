@@ -54,9 +54,13 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ITransferStagingStore, TransferStagingStore>();
             services.AddSingleton<ITransferCapacityGate, TransferCapacityGate>();
             services.AddSingleton<ITransferQueue, TransferQueue>();
+            services.AddSingleton<ITransferSubscriptionTracker, TransferSubscriptionTracker>();
+            services.AddSingleton<TransferProgressNotifier>();
+            services.AddSingleton<ITransferProgressNotifier>(sp => sp.GetRequiredService<TransferProgressNotifier>());
 
             // Register application bootstrap hosted service
             services.AddHostedService<ApplicationBootstrapService>();
+            services.AddHostedService(sp => sp.GetRequiredService<TransferProgressNotifier>());
 
             return services;
         }
