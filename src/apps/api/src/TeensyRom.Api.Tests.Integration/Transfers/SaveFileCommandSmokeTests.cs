@@ -14,9 +14,19 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
     /// P02 onward is built on this assumption holding.
     /// </summary>
     [Collection("Transfer")]
-    public class SaveFileCommandSmokeTests(TransferFixture f) : IDisposable
+    public class SaveFileCommandSmokeTests(TransferFixture f) : IDisposable, IAsyncLifetime
     {
         private readonly string _sourceFile = CreateSourceFile();
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        /// <summary>
+        /// This test never touches the job registry/capacity gate - it drives <see cref="SaveFileCommand"/>
+        /// directly - but still shares <see cref="TransferFixture"/> with every other class in the
+        /// "Transfer" collection, so it quiesces on the same terms they do rather than being a silent
+        /// exception to the contract.
+        /// </summary>
+        public Task DisposeAsync() => f.WaitForQuiescenceAsync();
 
         [Fact]
         public async Task Handle_SaveFileCommand_AgainstFakeDevice_DeliversFileWithNoHardware()

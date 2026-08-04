@@ -14,10 +14,19 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
     /// devices from <see cref="TransferFixture"/> stand in for it.
     /// </summary>
     [Collection("Transfer")]
-    public class TransferPumpTests(TransferFixture f)
+    public class TransferPumpTests(TransferFixture f) : IAsyncLifetime
     {
         private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        /// <summary>
+        /// Cancel/Seal return before the pump's background drain finishes releasing the gate/lease -
+        /// wait for that drain here so the next test in this shared collection starts from a clean
+        /// fixture.
+        /// </summary>
+        public Task DisposeAsync() => f.WaitForQuiescenceAsync();
 
         [Fact]
         public async Task Pump_EnqueuedFile_IsWrittenToDeviceBeforeJobIsSealed()
@@ -48,7 +57,13 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             // already-drained queue for a worker that will never wake again.
             pump.TryFinalize(job);
 
-            await WaitUntilAsync(() => job.State == TransferJobState.Completed);
+            // TransferJob's state flips to Completed a couple of statements before TransferPump releases
+            // the lease/gate - waiting on the state alone would let this poll return in that gap, so the
+            // condition covers every side effect the assertions below re-check.
+            await WaitUntilAsync(() =>
+                job.State == TransferJobState.Completed &&
+                leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                gate.Current == (0, 0));
 
             job.ToSnapshot().FilesSent.Should().Be(1);
             leaseCoordinator.GetHolder(device.DeviceId).Should().BeNull();
@@ -84,7 +99,12 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 job.TryTransitionTo(TransferJobState.Sealed);
                 pump.TryFinalize(job);
 
-                await WaitUntilAsync(() => job.State == TransferJobState.Completed);
+                // See Pump_EnqueuedFile_IsWrittenToDeviceBeforeJobIsSealed - the state transition is
+                // visible before the lease/gate release that follows it, so the wait covers both.
+                await WaitUntilAsync(() =>
+                    job.State == TransferJobState.Completed &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    gate.Current == (0, 0));
 
                 var snapshot = job.ToSnapshot();
                 snapshot.FilesFailed.Should().Be(1);
@@ -132,7 +152,13 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 // already empty by the time cancellation is requested.
                 pump.TryFinalize(job);
 
-                await WaitUntilAsync(() => job.State == TransferJobState.Cancelled, TimeSpan.FromSeconds(15));
+                // See Pump_EnqueuedFile_IsWrittenToDeviceBeforeJobIsSealed - the state transition is
+                // visible before the lease/gate release that follows it, so the wait covers both.
+                await WaitUntilAsync(() =>
+                    job.State == TransferJobState.Cancelled &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    gate.Current == (0, 0),
+                    TimeSpan.FromSeconds(15));
 
                 leaseCoordinator.GetHolder(device.DeviceId).Should().BeNull();
                 gate.Current.Should().Be((0, 0));
@@ -166,7 +192,12 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             {
                 await EnqueueFileAsync(job, device.DeviceId, "lost.prg", new FilePath("/games/lost.prg"), [1, 2, 3]);
 
-                await WaitUntilAsync(() => job.State == TransferJobState.Aborted);
+                // AbortJob flips the job to Aborted before the lease/gate release that follows it in
+                // ProcessStagedFileAsync, so the wait covers both instead of racing that gap.
+                await WaitUntilAsync(() =>
+                    job.State == TransferJobState.Aborted &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    gate.Current == (0, 0));
 
                 leaseCoordinator.GetHolder(device.DeviceId).Should().BeNull();
                 gate.Current.Should().Be((0, 0));

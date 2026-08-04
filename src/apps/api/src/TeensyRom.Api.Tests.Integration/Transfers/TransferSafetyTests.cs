@@ -14,7 +14,7 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
     /// capacity gate, and cannot recover debris left in the staging root by a prior crash.
     /// </summary>
     [Collection("Transfer")]
-    public class TransferSafetyTests(TransferFixture f)
+    public class TransferSafetyTests(TransferFixture f) : IAsyncLifetime
     {
         private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(10);
@@ -42,6 +42,16 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
 
         private async Task CancelAsync(string jobId) =>
             await f.Client.PostAsync<CancelJobEndpoint, CancelJobRequest, CancelJobResponse>(new() { JobId = jobId });
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        /// <summary>
+        /// Cancel returns before the pump's background drain finishes releasing the gate/lease - wait
+        /// for that drain here so the next test in this shared collection starts from a clean fixture.
+        /// The two tests that build their own unshared <see cref="TransferFixture"/> (below) are
+        /// unaffected - <c>f</c> here is always the collection's shared instance.
+        /// </summary>
+        public Task DisposeAsync() => f.WaitForQuiescenceAsync();
 
         private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan? timeout = null)
         {

@@ -133,6 +133,39 @@ namespace TeensyRom.Api.Tests.Integration.Common
             DeviceManager = (FakeDeviceConnectionManager)_factory.Services.GetRequiredService<IDeviceConnectionManager>();
         }
 
+        /// <summary>
+        /// Polls until every registered job is terminal and the capacity gate has released back to
+        /// <c>(0, 0)</c>. <see cref="TransferFixture"/> is one host - one capacity gate, one lease
+        /// coordinator, one job registry - shared by every test class in the "Transfer" collection, and
+        /// both Cancel and Seal return to the caller before the pump's background drain actually
+        /// finishes releasing that state. A test's own success is therefore not proof the fixture is
+        /// clean again; call this from each test class's teardown so the next test - in this class or
+        /// any sibling sharing the fixture - starts from a quiesced baseline instead of racing this
+        /// test's tail end.
+        /// </summary>
+        public async Task WaitForQuiescenceAsync(TimeSpan? timeout = null)
+        {
+            var gate = Services.GetRequiredService<ITransferCapacityGate>();
+            var registry = Services.GetRequiredService<ITransferJobRegistry>();
+            var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
+
+            while (gate.Current != (0, 0) || registry.All().Any(job => !TransferJob.IsTerminal(job.State)))
+            {
+                if (DateTime.UtcNow > deadline)
+                {
+                    var pendingJobIds = registry.All()
+                        .Where(job => !TransferJob.IsTerminal(job.State))
+                        .Select(job => job.JobId);
+
+                    throw new TimeoutException(
+                        $"Transfer fixture did not quiesce before the next test: gate={gate.Current}, " +
+                        $"non-terminal jobs=[{string.Join(", ", pendingJobIds)}].");
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(20));
+            }
+        }
+
         public void Dispose()
         {
             _factory.Dispose();

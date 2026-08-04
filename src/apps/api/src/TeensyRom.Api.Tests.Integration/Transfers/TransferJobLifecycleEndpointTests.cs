@@ -19,8 +19,17 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
     /// <see cref="GetActiveJobEndpoint"/>.
     /// </summary>
     [Collection("Transfer")]
-    public class TransferJobLifecycleEndpointTests(TransferFixture f)
+    public class TransferJobLifecycleEndpointTests(TransferFixture f) : IAsyncLifetime
     {
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        /// <summary>
+        /// Cancel/Seal return before the pump's background drain finishes releasing the gate/lease -
+        /// wait for that drain here so the next test in this shared collection starts from a clean
+        /// fixture.
+        /// </summary>
+        public Task DisposeAsync() => f.WaitForQuiescenceAsync();
+
         private static CreateJobRequest NewCreateRequest(string deviceId, string destination = "/music/incoming") => new()
         {
             DeviceId = deviceId,

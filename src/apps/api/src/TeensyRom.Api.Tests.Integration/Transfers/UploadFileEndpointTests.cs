@@ -19,7 +19,7 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
     /// the request by hand.
     /// </summary>
     [Collection("Transfer")]
-    public class UploadFileEndpointTests(TransferFixture f)
+    public class UploadFileEndpointTests(TransferFixture f) : IAsyncLifetime
     {
         private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
@@ -41,6 +41,14 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
 
         private async Task CancelAsync(string jobId) =>
             await f.Client.PostAsync<CancelJobEndpoint, CancelJobRequest, CancelJobResponse>(new CancelJobRequest { JobId = jobId });
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        /// <summary>
+        /// Cancel returns before the pump's background drain finishes releasing the gate/lease - wait
+        /// for that drain here so the next test in this shared collection starts from a clean fixture.
+        /// </summary>
+        public Task DisposeAsync() => f.WaitForQuiescenceAsync();
 
         [Fact]
         public async Task Upload_UnknownJobId_ReturnsNotFound()

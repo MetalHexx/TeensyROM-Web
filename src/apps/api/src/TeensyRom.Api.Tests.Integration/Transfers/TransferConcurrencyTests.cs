@@ -13,7 +13,7 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
     /// in isolation and still deadlock or serialize accidentally at the seams this test exercises.
     /// </summary>
     [Collection("Transfer")]
-    public class TransferConcurrencyTests(TransferFixture f)
+    public class TransferConcurrencyTests(TransferFixture f) : IAsyncLifetime
     {
         private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(20);
@@ -86,6 +86,14 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 await f.Client.PostAsync<CancelJobEndpoint, CancelJobRequest, CancelJobResponse>(new() { JobId = jobId });
             }
         }
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        /// <summary>
+        /// Cancel returns before the pump's background drain finishes releasing the gate/lease - wait
+        /// for that drain here so the next test in this shared collection starts from a clean fixture.
+        /// </summary>
+        public Task DisposeAsync() => f.WaitForQuiescenceAsync();
 
         private async Task<TransferJobSnapshotView> GetJobAsync(string jobId)
         {

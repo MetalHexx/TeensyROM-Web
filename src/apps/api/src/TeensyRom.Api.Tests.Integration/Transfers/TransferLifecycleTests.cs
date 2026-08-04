@@ -18,10 +18,19 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
     /// and fake connection manager built in P01-T01 - no hardware, no real serial port.
     /// </summary>
     [Collection("Transfer")]
-    public class TransferLifecycleTests(TransferFixture f)
+    public class TransferLifecycleTests(TransferFixture f) : IAsyncLifetime
     {
         private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(20);
+
+        public Task InitializeAsync() => Task.CompletedTask;
+
+        /// <summary>
+        /// Cancel/Seal return before the pump's background drain finishes releasing the gate/lease -
+        /// wait for that drain here so the next test in this shared collection starts from a clean
+        /// fixture.
+        /// </summary>
+        public Task DisposeAsync() => f.WaitForQuiescenceAsync();
 
         private static CreateJobRequest NewCreateRequest(string deviceId, string destination) => new()
         {

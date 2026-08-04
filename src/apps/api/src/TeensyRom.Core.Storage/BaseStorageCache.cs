@@ -408,7 +408,12 @@ namespace TeensyRom.Core.Storage
         /// </summary>
         public virtual void WriteToDisk()
         {
-            _ioLock.EnterReadLock();
+            // A write lock, not a read lock: two callers finalizing back-to-back jobs on the same
+            // device (e.g. TransferPump.TryFinalize racing its own next invocation) both reach this
+            // method concurrently. A read lock lets both of them through at once, so they both call
+            // File.WriteAllText against the same CacheFilePath at the same time - one loses with an
+            // IOException ("being used by another process"). A write lock serializes them instead.
+            _ioLock.EnterWriteLock();
             try
             {
                 var directory = Path.GetDirectoryName(CacheFilePath);
@@ -417,12 +422,12 @@ namespace TeensyRom.Core.Storage
                 {
                     Directory.CreateDirectory(directory!);
                 }
-                
+
                 File.WriteAllText(CacheFilePath, StorageCacheItemSerializer.Serialize(this as Dictionary<string, IStorageCacheItem>));
             }
             finally
             {
-                _ioLock.ExitReadLock();
+                _ioLock.ExitWriteLock();
             }
         }
 
