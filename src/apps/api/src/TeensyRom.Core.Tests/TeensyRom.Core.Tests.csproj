@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TeensyRom.Core\TeensyRom.Core.csproj" />
+    <ProjectReference Include="..\TeensyRom.Core.Serial\TeensyRom.Core.Serial.csproj" />
   </ItemGroup>
 
 </Project>
