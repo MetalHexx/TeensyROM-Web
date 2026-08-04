@@ -78,10 +78,23 @@ namespace TeensyRom.Api.Tests.Integration.Common
             set => Options.SweepInterval = value;
         }
 
-        public TransferFixture()
+        public TransferFixture() : this(null)
+        {
+        }
+
+        /// <summary>
+        /// Lets a derived fixture tune <see cref="TransferOptions"/> - or seed the staging directory -
+        /// before the host builds. The only window in which a value baked into a singleton at
+        /// construction time (the capacity gate's file semaphore, the staging root's initial contents)
+        /// can differ from this class's defaults; every collection fixture is constructed with no
+        /// arguments, so a suite that needs different tuning derives its own fixture and collection
+        /// instead of mutating <see cref="Options"/> on a host that already started.
+        /// </summary>
+        protected TransferFixture(Action<TransferOptions>? configureOptions)
         {
             _stagingRoot = Directory.CreateTempSubdirectory("teensyrom-transfer-tests-").FullName;
             Options = new TransferOptions { StagingRoot = _stagingRoot };
+            configureOptions?.Invoke(Options);
 
             _factory = new WebApplicationFactory<Program>()
                 .WithWebHostBuilder(builder =>
