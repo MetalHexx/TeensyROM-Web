@@ -1,6 +1,6 @@
 ---
 name: backend-architecture
-description: 'Backend architecture reference for the TeensyROM .NET 9 Web API. Use when working on the backend/API, understanding RadEndpoints structure, MediatR CQRS pipeline behaviors, serial device communication protocol, storage/caching (indexing, favorites, StorageCache), device connection management, or backend operational concerns (configuration, error handling, retries, observability, logging). Covers Clean Architecture layering, key components, endpoint patterns, MediatR flow diagrams, dependency map, and architecture patterns/anti-patterns to follow or avoid.'
+description: 'Backend architecture reference for the TeensyROM .NET 9 Web API. Use when working on the backend/API, understanding RadEndpoints structure, MediatR CQRS pipeline behaviors, serial device communication protocol, storage/caching (indexing, favorites, StorageCache), background file transfer to devices (staging, queue, transfer pump, SignalR progress), device connection management, or backend operational concerns (configuration, error handling, retries, observability, logging). Covers Clean Architecture layering, key components, endpoint patterns, MediatR flow diagrams, dependency map, and architecture patterns/anti-patterns to follow or avoid.'
 ---
 
 # Backend Architecture Skill
@@ -14,6 +14,7 @@ Reference for the TeensyROM .NET 9 backend: a layered Web API managing physical 
 - Tracing the MediatR pipeline (LoggingBehavior, ExceptionBehavior, SerialBehavior) or command/handler flow
 - Understanding serial device communication (state machine, ACK/NAK protocol, reconnection logic)
 - Working with storage/indexing/caching (`StorageService`, `StorageCache`, favorites, metadata enrichment)
+- Working on file transfer, upload endpoints, the transfer queue/pump, or the transfer hub
 - Investigating backend operational concerns: configuration, error handling, retries/timeouts, health checks, logging/observability
 - Reviewing architecture patterns to follow or anti-patterns to avoid in backend code
 
@@ -44,5 +45,7 @@ See [references/BACKEND_ARCHITECTURE.md](references/BACKEND_ARCHITECTURE.md) for
 - Operational concerns: configuration, error handling layers, retries/timeouts, health checks, logging/observability
 - Architecture patterns to embrace and anti-patterns to avoid
 - Integration seams (frontend↔backend, backend↔hardware, storage↔serial)
+
+See [references/FILE_TRANSFER.md](references/FILE_TRANSFER.md) for the file transfer subsystem: job lifecycle, capacity gating, staging-to-device queue, pump coordination, SignalR progress streaming, and abandonment handling.
 
 For OpenAPI spec generation and consuming the generated TypeScript client, see the `api-client-generation` skill.
