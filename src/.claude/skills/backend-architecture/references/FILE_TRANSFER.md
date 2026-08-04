@@ -166,7 +166,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | POST | `/api/transfers/{jobId}/files` | UploadTransferFile | Stream one file to staging |
 | POST | `/api/transfers/{jobId}/seal` | SealTransferJob | Stop accepting uploads; let pump drain |
 | GET | `/api/transfers/{jobId}` | GetTransferJob | Query job snapshot |
-| GET | `/api/devices/{deviceId}/storage/{storageType}/transfers/active` | GetActiveTransferJob | Get the job currently holding device lease |
+| GET | `/api/devices/{deviceId}/transfers/active` | GetActiveTransferJob | Get the job currently holding device lease |
 | POST | `/api/transfers/{jobId}/cancel` | CancelTransferJob | Transition to Cancelling; pump discards remaining files |
 
 ### SignalR Hub: TransferHub
