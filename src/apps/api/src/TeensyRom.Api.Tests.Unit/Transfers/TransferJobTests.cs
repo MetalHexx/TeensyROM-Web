@@ -1,0 +1,245 @@
+using TeensyRom.Api.Transfers;
+using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Entities.Transfers;
+using TeensyRom.Core.ValueObjects;
+
+namespace TeensyRom.Api.Tests.Unit.Transfers;
+
+public class TransferJobTests
+{
+    private static TransferJob NewJob() =>
+        new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"));
+
+    /// <summary>
+    /// Drives a fresh job to the requested state via a legal path, so the transition table test can
+    /// exercise every (from, to) pair using only the public API.
+    /// </summary>
+    private static TransferJob JobIn(TransferJobState state)
+    {
+        var job = NewJob();
+
+        switch (state)
+        {
+            case TransferJobState.Created:
+                break;
+            case TransferJobState.Receiving:
+                job.TryTransitionTo(TransferJobState.Receiving);
+                break;
+            case TransferJobState.Sealed:
+                job.TryTransitionTo(TransferJobState.Receiving);
+                job.TryTransitionTo(TransferJobState.Sealed);
+                break;
+            case TransferJobState.Completed:
+                job.TryTransitionTo(TransferJobState.Receiving);
+                job.TryTransitionTo(TransferJobState.Sealed);
+                job.TryTransitionTo(TransferJobState.Completed);
+                break;
+            case TransferJobState.Cancelling:
+                job.TryTransitionTo(TransferJobState.Cancelling);
+                break;
+            case TransferJobState.Cancelled:
+                job.TryTransitionTo(TransferJobState.Cancelling);
+                job.TryTransitionTo(TransferJobState.Cancelled);
+                break;
+            case TransferJobState.Abandoned:
+                job.TryTransitionTo(TransferJobState.Abandoned);
+                break;
+            case TransferJobState.Aborted:
+                job.TryTransitionTo(TransferJobState.Aborted);
+                break;
+        }
+
+        return job;
+    }
+
+    private static readonly HashSet<(TransferJobState From, TransferJobState To)> LegalEdges =
+    [
+        (TransferJobState.Created, TransferJobState.Receiving),
+        (TransferJobState.Created, TransferJobState.Cancelling),
+        (TransferJobState.Created, TransferJobState.Abandoned),
+        (TransferJobState.Created, TransferJobState.Aborted),
+        (TransferJobState.Receiving, TransferJobState.Sealed),
+        (TransferJobState.Receiving, TransferJobState.Cancelling),
+        (TransferJobState.Receiving, TransferJobState.Abandoned),
+        (TransferJobState.Receiving, TransferJobState.Aborted),
+        (TransferJobState.Sealed, TransferJobState.Completed),
+        (TransferJobState.Sealed, TransferJobState.Cancelling),
+        (TransferJobState.Sealed, TransferJobState.Aborted),
+        (TransferJobState.Cancelling, TransferJobState.Cancelled)
+    ];
+
+    public static IEnumerable<object[]> AllTransitionPairs()
+    {
+        foreach (var from in Enum.GetValues<TransferJobState>())
+        {
+            foreach (var to in Enum.GetValues<TransferJobState>())
+            {
+                yield return [from, to, LegalEdges.Contains((from, to))];
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(AllTransitionPairs))]
+    public void TryTransitionTo_EveryStatePair_MatchesLegalEdgeTable(TransferJobState from, TransferJobState to, bool expectedLegal)
+    {
+        var job = JobIn(from);
+
+        var result = job.TryTransitionTo(to);
+
+        result.Should().Be(expectedLegal);
+        job.State.Should().Be(expectedLegal ? to : from);
+    }
+
+    [Theory]
+    [InlineData(TransferJobState.Completed)]
+    [InlineData(TransferJobState.Cancelled)]
+    [InlineData(TransferJobState.Abandoned)]
+    [InlineData(TransferJobState.Aborted)]
+    public void IsTerminal_TerminalStates_ReturnsTrue(TransferJobState state) =>
+        TransferJob.IsTerminal(state).Should().BeTrue();
+
+    [Theory]
+    [InlineData(TransferJobState.Created)]
+    [InlineData(TransferJobState.Receiving)]
+    [InlineData(TransferJobState.Sealed)]
+    [InlineData(TransferJobState.Cancelling)]
+    public void IsTerminal_NonTerminalStates_ReturnsFalse(TransferJobState state) =>
+        TransferJob.IsTerminal(state).Should().BeFalse();
+
+    [Fact]
+    public void OnFileReceived_IncrementsReceivedAndPending()
+    {
+        var job = NewJob();
+
+        job.OnFileReceived(100);
+        job.OnFileReceived(200);
+
+        job.PendingCount.Should().Be(2);
+        job.ToSnapshot().FilesReceived.Should().Be(2);
+    }
+
+    [Fact]
+    public void OnFileSent_IncrementsSentAndBytesAndDecrementsPending()
+    {
+        var job = NewJob();
+        job.OnFileReceived(100);
+        job.OnFileReceived(200);
+
+        job.OnFileSent(100);
+
+        job.PendingCount.Should().Be(1);
+        var snapshot = job.ToSnapshot();
+        snapshot.FilesSent.Should().Be(1);
+        snapshot.BytesSent.Should().Be(100);
+    }
+
+    [Fact]
+    public void OnFileFailed_IncrementsFailedAndRecordsFailure_AndDecrementsPending()
+    {
+        var job = NewJob();
+        job.OnFileReceived(50);
+        var failure = new TransferFileCompleted(job.JobId, "a.prg", "/transfers/a.prg", false, "disk full", 50);
+
+        job.OnFileFailed(failure);
+
+        job.PendingCount.Should().Be(0);
+        var snapshot = job.ToSnapshot();
+        snapshot.FilesFailed.Should().Be(1);
+        snapshot.Failures.Should().ContainSingle().Which.Should().Be(failure);
+    }
+
+    [Fact]
+    public void OnFileDropped_DecrementsPendingOnly_WithoutTouchingActivity()
+    {
+        var job = NewJob();
+        job.OnFileReceived(10);
+        var beforeDrop = job.LastActivityUtc;
+
+        job.OnFileDropped();
+
+        job.PendingCount.Should().Be(0);
+        job.LastActivityUtc.Should().Be(beforeDrop);
+        var snapshot = job.ToSnapshot();
+        snapshot.FilesSent.Should().Be(0);
+        snapshot.FilesFailed.Should().Be(0);
+    }
+
+    [Fact]
+    public void PendingCount_ReachesZero_AfterEqualReceivedAndSent()
+    {
+        var job = NewJob();
+        job.OnFileReceived(10);
+        job.OnFileReceived(20);
+
+        job.OnFileSent(10);
+        job.OnFileSent(20);
+
+        job.PendingCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void Touch_AdvancesLastActivityUtc()
+    {
+        var job = NewJob();
+        var before = job.LastActivityUtc;
+
+        Thread.Sleep(5);
+        job.Touch();
+
+        job.LastActivityUtc.Should().BeAfter(before);
+    }
+
+    [Fact]
+    public void ToSnapshot_TotalFiles_IsNullBeforeSealing()
+    {
+        var job = NewJob();
+        job.OnFileReceived(10);
+
+        job.ToSnapshot().TotalFiles.Should().BeNull();
+    }
+
+    [Fact]
+    public void ToSnapshot_TotalFiles_IsFilesReceivedAfterSealing()
+    {
+        var job = NewJob();
+        job.OnFileReceived(10);
+        job.OnFileReceived(20);
+        job.TryTransitionTo(TransferJobState.Receiving);
+        job.TryTransitionTo(TransferJobState.Sealed);
+
+        job.ToSnapshot().TotalFiles.Should().Be(2);
+    }
+
+    [Fact]
+    public void Abort_LegalFromState_SetsAbortedAndError()
+    {
+        var job = NewJob();
+
+        job.Abort("device disconnected");
+
+        job.State.Should().Be(TransferJobState.Aborted);
+        job.ToSnapshot().Error.Should().Be("device disconnected");
+    }
+
+    [Fact]
+    public void Abort_FromTerminalState_IsNoOp()
+    {
+        var job = JobIn(TransferJobState.Cancelled);
+
+        job.Abort("too late");
+
+        job.State.Should().Be(TransferJobState.Cancelled);
+        job.ToSnapshot().Error.Should().BeNull();
+    }
+
+    [Fact]
+    public void SetCurrentFile_ReflectedInSnapshot()
+    {
+        var job = NewJob();
+
+        job.SetCurrentFile("games/foo.prg");
+
+        job.ToSnapshot().CurrentFile.Should().Be("games/foo.prg");
+    }
+}

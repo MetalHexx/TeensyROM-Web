@@ -1,4 +1,5 @@
 using TeensyRom.Api.Services;
+using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Device;
@@ -47,6 +48,8 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ISidMetadataService, SidMetadataService>();
             services.AddSingleton<IAudioCaptureService, PortAudioCaptureService>();
             services.AddSingleton<IAudioStreamManager, AudioStreamManager>();
+            services.AddSingleton<ITransferJobRegistry, TransferJobRegistry>();
+            services.AddSingleton<IDeviceLeaseCoordinator, DeviceLeaseCoordinator>();
 
             // Register application bootstrap hosted service
             services.AddHostedService<ApplicationBootstrapService>();
