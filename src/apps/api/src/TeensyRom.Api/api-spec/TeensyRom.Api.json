@@ -37,6 +37,66 @@
         }
       }
     },
+    "/api/transfers/{jobId}/files": {
+      "post": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Upload Transfer File",
+        "description": "Streams a single file's raw body (application/octet-stream) into a transfer job.\n\n- One file per request; the body is streamed straight to disk, never buffered.\n- Blocks until the capacity gate has a free slot instead of failing - a slow device shows up as a slower response, never as an error.\n- Rejected immediately (400) when the job cannot accept files, and before any file is staged when the relative path is unusable.",
+        "operationId": "UploadTransferFile",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/transfers/{jobId}/seal": {
       "post": {
         "tags": [
@@ -2464,6 +2524,26 @@
           "Abandoned",
           "Aborted"
         ]
+      },
+      "UploadFileResponse": {
+        "required": [
+          "relativePath",
+          "sizeBytes",
+          "queued"
+        ],
+        "type": "object",
+        "properties": {
+          "relativePath": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "queued": {
+            "type": "boolean"
+          }
+        }
       },
       "VideoSettingsDto": {
         "required": [
