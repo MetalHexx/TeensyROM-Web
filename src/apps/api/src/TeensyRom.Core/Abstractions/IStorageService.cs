@@ -17,5 +17,14 @@ namespace TeensyRom.Core.Abstractions
         IEnumerable<LaunchableItem> Search(string searchText, TeensyFilterType filterType = TeensyFilterType.All);
         Task<LaunchableItem?> SaveFavorite(LaunchableItem launchItem, TeensyStorageType storageType, CancellationToken ct);
         Task<bool> RemoveFavorite(LaunchableItem file, TeensyStorageType storageType, CancellationToken ct);
+
+        /// <summary>
+        /// Upserts a single freshly-transferred file into the in-memory cache so it is queryable
+        /// immediately, without re-indexing. Does not persist to disk - see <see cref="PersistCache"/>.
+        /// </summary>
+        void UpsertTransferredFile(FilePath targetPath, long sizeBytes);
+
+        /// <summary>Writes the current cache state to disk. Call once per terminal job, not per file.</summary>
+        void PersistCache();
     }
 }

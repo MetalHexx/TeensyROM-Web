@@ -188,7 +188,12 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public Unit ClosePort() => Unit.Default;
         public Unit SetPort(string port) => Unit.Default;
         public string GetEndpoint() => "FAKE0";
-        public ConnectionType GetConnectionType() => ConnectionType.Serial;
+
+        // Reports Tcp rather than Serial: TRStreamExtensions.ReconnectToFullFwSerial (used by
+        // ResetCommand's reconnect path) enumerates real OS SerialPort.GetPortNames() and loops for up
+        // to 30 seconds looking for actual hardware - nothing this fake can satisfy. The Tcp reconnect
+        // path only calls port lifecycle methods this fake already implements.
+        public ConnectionType GetConnectionType() => ConnectionType.Tcp;
 
         public void Dispose() { }
     }
