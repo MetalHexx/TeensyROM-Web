@@ -16,6 +16,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
     {
         private readonly List<TeensyRomDevice> _devices;
         private readonly Dictionary<string, FakeCommunicationPort> _portsByDeviceId;
+        private readonly HashSet<string> _lostDeviceIds = [];
 
         public FakeDeviceConnectionManager(IStorageFactory storageFactory, int deviceCount = 2)
         {
@@ -58,8 +59,20 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false)
             => Task.FromResult(_devices);
 
-        public List<TeensyRomDevice> GetAvailableDevices() => _devices;
+        public List<TeensyRomDevice> GetAvailableDevices() => _devices.Where(d => !_lostDeviceIds.Contains(d.DeviceId)).ToList();
 
-        public TeensyRomDevice? GetAvailableDevice(string deviceId) => _devices.FirstOrDefault(d => d.DeviceId == deviceId);
+        public TeensyRomDevice? GetAvailableDevice(string deviceId)
+            => _lostDeviceIds.Contains(deviceId) ? null : _devices.FirstOrDefault(d => d.DeviceId == deviceId);
+
+        /// <summary>
+        /// Makes <see cref="GetAvailableDevice"/> return null for this device, as if it vanished from the
+        /// connection manager mid-transfer - the only way the pump's device-null branch is reachable,
+        /// since <c>ExceptionBehavior</c> converts every communication-port exception into an ordinary
+        /// failed <c>SaveFileResult</c> before it ever reaches <see cref="TeensyRom.Api.Transfers.TransferPump"/>.
+        /// Reversible via <see cref="RestoreDevice"/> since the fixture is shared across a test collection.
+        /// </summary>
+        public void SimulateDeviceLoss(string deviceId) => _lostDeviceIds.Add(deviceId);
+
+        public void RestoreDevice(string deviceId) => _lostDeviceIds.Remove(deviceId);
     }
 }

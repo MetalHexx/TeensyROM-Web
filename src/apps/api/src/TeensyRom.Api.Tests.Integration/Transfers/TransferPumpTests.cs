@@ -143,6 +143,94 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             }
         }
 
+        [Fact]
+        public async Task Pump_LostDevice_JobIsAbortedAndReleasesLease()
+        {
+            var device = f.DeviceManager.Devices[0];
+            var registry = f.Services.GetRequiredService<ITransferJobRegistry>();
+            var leaseCoordinator = f.Services.GetRequiredService<IDeviceLeaseCoordinator>();
+            var gate = f.Services.GetRequiredService<ITransferCapacityGate>();
+
+            var job = registry.Create(device.DeviceId, TeensyStorageType.SD, new DirectoryPath("/games"));
+            leaseCoordinator.TryAcquire(device.DeviceId, job.JobId).Should().BeTrue();
+            job.TryTransitionTo(TransferJobState.Receiving);
+
+            // Simulates the device vanishing between the upload endpoint admitting the file and the
+            // pump's worker picking it up: GetAvailableDevice(device.DeviceId) starts returning null, the
+            // same as if the device disconnected. This is the only route into AbortJob a test can drive -
+            // ExceptionBehavior in the MediatR pipeline converts every communication failure into an
+            // ordinary failed SaveFileResult before it can reach the pump as an exception.
+            f.DeviceManager.SimulateDeviceLoss(device.DeviceId);
+
+            try
+            {
+                await EnqueueFileAsync(job, device.DeviceId, "lost.prg", new FilePath("/games/lost.prg"), [1, 2, 3]);
+
+                await WaitUntilAsync(() => job.State == TransferJobState.Aborted);
+
+                leaseCoordinator.GetHolder(device.DeviceId).Should().BeNull();
+                gate.Current.Should().Be((0, 0));
+            }
+            finally
+            {
+                f.DeviceManager.RestoreDevice(device.DeviceId);
+            }
+        }
+
+        [Fact]
+        public async Task Pump_TwoDevices_SlowDeviceDoesNotBlockFastDevice()
+        {
+            var slowDevice = f.DeviceManager.Devices[0];
+            var fastDevice = f.DeviceManager.Devices[1];
+            var slowPort = f.DeviceManager.PortFor(slowDevice.DeviceId);
+            var fastPort = f.DeviceManager.PortFor(fastDevice.DeviceId);
+            var registry = f.Services.GetRequiredService<ITransferJobRegistry>();
+            var leaseCoordinator = f.Services.GetRequiredService<IDeviceLeaseCoordinator>();
+            var pump = f.Services.GetRequiredService<TransferPump>();
+
+            var slowJob = registry.Create(slowDevice.DeviceId, TeensyStorageType.SD, new DirectoryPath("/games"));
+            leaseCoordinator.TryAcquire(slowDevice.DeviceId, slowJob.JobId).Should().BeTrue();
+            slowJob.TryTransitionTo(TransferJobState.Receiving);
+
+            var fastJob = registry.Create(fastDevice.DeviceId, TeensyStorageType.SD, new DirectoryPath("/games"));
+            leaseCoordinator.TryAcquire(fastDevice.DeviceId, fastJob.JobId).Should().BeTrue();
+            fastJob.TryTransitionTo(TransferJobState.Receiving);
+
+            var slowTarget = new FilePath("/games/slow.prg");
+            var fastTarget = new FilePath("/games/fast.prg");
+
+            // Slows only the first device's writes. If the pump serialized both devices through one
+            // worker, the fast device's file would sit behind this delay too.
+            slowPort.PerFileDelay = TimeSpan.FromSeconds(1);
+
+            try
+            {
+                await EnqueueFileAsync(slowJob, slowDevice.DeviceId, "slow.prg", slowTarget, [1, 2, 3]);
+                await EnqueueFileAsync(fastJob, fastDevice.DeviceId, "fast.prg", fastTarget, [4, 5, 6]);
+
+                await WaitUntilAsync(() => fastPort.Received.Any(r => r.Path == fastTarget.Value));
+
+                // The fast device's file landed while the slow device's write was still in flight -
+                // proof the two per-device workers ran concurrently rather than one blocking the other.
+                // (Not asserting slowPort.Received is empty: the port is shared with other tests in this
+                // collection and may already carry unrelated entries from earlier in the run.)
+                slowPort.Received.Should().NotContain(r => r.Path == slowTarget.Value);
+
+                fastJob.TryTransitionTo(TransferJobState.Sealed);
+                pump.TryFinalize(fastJob);
+                await WaitUntilAsync(() => fastJob.State == TransferJobState.Completed);
+
+                await WaitUntilAsync(() => slowPort.Received.Any(r => r.Path == slowTarget.Value));
+                slowJob.TryTransitionTo(TransferJobState.Sealed);
+                pump.TryFinalize(slowJob);
+                await WaitUntilAsync(() => slowJob.State == TransferJobState.Completed);
+            }
+            finally
+            {
+                slowPort.PerFileDelay = TimeSpan.Zero;
+            }
+        }
+
         private async Task EnqueueFileAsync(TransferJob job, string deviceId, string relativePath, FilePath targetPath, byte[] bytes)
         {
             var gate = f.Services.GetRequiredService<ITransferCapacityGate>();

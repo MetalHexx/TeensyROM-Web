@@ -186,6 +186,7 @@ namespace TeensyRom.Api.Transfers
             job.Abort(reason);
             leaseCoordinator.Release(job.DeviceId, job.JobId);
             staging.PurgeJob(job.JobId);
+            deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
             job.OnFileDropped();
             notifier.JobChanged(job);
         }
