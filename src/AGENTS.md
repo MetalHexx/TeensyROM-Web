@@ -83,7 +83,7 @@ export class DeviceStore {
 - Unit tests (Vitest): `pnpm nx test <project>`
 - Lint/format: `pnpm nx lint`; `pnpm run format`
 - Backend: `dotnet build` / `dotnet run` / `dotnet test` from `apps/api/src/TeensyRom.Api` (or the solution `apps/api/TeensyRom.Ui.sln`)
-- Regenerate OpenAPI spec (API must be running): `curl http://localhost:5000/openapi.json > openapi.json`, then regenerate the TypeScript client and update Angular services/state
+- Regenerate OpenAPI spec: `dotnet build apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj` (generated in `apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json`), then regenerate the TypeScript client and update Angular services/state
 
 ## Code Organization Patterns
 
@@ -156,7 +156,7 @@ Mock only at infrastructure boundaries — application and features tests should
 ## Backend Notes
 
 - CORS is configured for the Angular dev server via the `UiCors` extension.
-- Strict rate limiting is applied to all endpoints.
+- Rate limiting is opt-in per endpoint via a named policy (currently used only by the device discovery endpoint).
 - Assets are automatically unpacked on startup.
 
 ## UI & Styling Resources
