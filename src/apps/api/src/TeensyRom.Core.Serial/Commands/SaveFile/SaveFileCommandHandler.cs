@@ -17,7 +17,7 @@ namespace TeensyRom.Core.Commands
         private const int _retryLimit = 3;
         private const int _chunkSize = 16 * 1024;
 
-        public Task<SaveFileResult> Handle(SaveFileCommand command, CancellationToken ct)
+        public async Task<SaveFileResult> Handle(SaveFileCommand command, CancellationToken ct)
         {
             var port = command.CommunicationPort;
             var file = command.File;
@@ -53,7 +53,7 @@ namespace TeensyRom.Core.Commands
                     port.HandleAck();
 
                     logService.InternalSuccess($"Save Success: {file.TargetPath.Value}", command.DeviceId);
-                    return Task.FromResult(new SaveFileResult { Saved = true });
+                    return new SaveFileResult { Saved = true };
                 }
                 catch (Exception ex)
                 {
@@ -70,7 +70,11 @@ namespace TeensyRom.Core.Commands
                         continue;
                     }
                     logService.InternalError($"Save Retry: {retry} seconds to retry.", command.DeviceId);
-                    Thread.Sleep(1000 * retry);
+
+                    if (retry < _retryLimit)
+                    {
+                        await Task.Delay(1000 * retry, ct);
+                    }
                     logService.InternalError($"Save Retry: {retry} of {_retryLimit}", command.DeviceId);
                 }
             }
@@ -78,7 +82,7 @@ namespace TeensyRom.Core.Commands
             var error = $"Failed to copy {file.TargetPath.FileName} after {_retryLimit} attempts";
             logService.InternalError($"Save Failed: {error}", command.DeviceId);
 
-            return Task.FromResult(new SaveFileResult { IsSuccess = false, Error = error });
+            return new SaveFileResult { IsSuccess = false, Error = error };
         }
 
         private void TryDelete(ICommunicationPort port, StreamedFileTransfer file, string? deviceId)

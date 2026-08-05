@@ -89,8 +89,8 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             var registry = f.Services.GetRequiredService<ITransferJobRegistry>();
             var job = registry.Get(jobId)!;
 
-            // Simulates a file still in flight - the upload endpoint that would normally do this
-            // does not exist yet (P03 builds it in a later task).
+            // Simulates a file still in flight by incrementing the pending count directly, rather
+            // than driving an actual upload through UploadFileEndpoint.
             job.OnFileReceived(1);
 
             var sealResponse = await f.Client.PostAsync<SealJobEndpoint, SealJobRequest, SealJobResponse>(new SealJobRequest { JobId = jobId });
