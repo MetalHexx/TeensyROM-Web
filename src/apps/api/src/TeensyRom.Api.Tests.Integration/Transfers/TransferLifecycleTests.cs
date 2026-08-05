@@ -113,7 +113,13 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             var sealResponse = await f.Client.PostAsync<SealJobEndpoint, SealJobRequest, SealJobResponse>(new() { JobId = jobId });
             sealResponse.Should().BeSuccessful<SealJobResponse>().WithStatusCode(HttpStatusCode.OK);
 
-            await WaitUntilAsync(async () => (await GetJobAsync(jobId)).State == TransferJobState.Completed);
+            // TransferJob's state flips to Completed a couple of statements before TransferPump releases
+            // the lease and purges staging - waiting on the state alone would let this poll return in that
+            // gap, so the condition covers every side effect the assertions below re-check.
+            await WaitUntilAsync(async () =>
+                (await GetJobAsync(jobId)).State == TransferJobState.Completed &&
+                leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                !Directory.Exists(Path.Combine(f.Options.StagingRoot, jobId)));
 
             var finalSnapshot = await GetJobAsync(jobId);
             finalSnapshot.FilesSent.Should().Be(relativePaths.Length);
@@ -164,7 +170,15 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 var cancelResponse = await f.Client.PostAsync<CancelJobEndpoint, CancelJobRequest, CancelJobResponse>(new() { JobId = jobId });
                 cancelResponse.Should().BeSuccessful<CancelJobResponse>().WithStatusCode(HttpStatusCode.OK);
 
-                await WaitUntilAsync(async () => (await GetJobAsync(jobId)).State == TransferJobState.Cancelled, TimeSpan.FromSeconds(15));
+                // TransferJob's state flips to Cancelled a couple of statements before TransferPump
+                // releases the lease and purges staging - waiting on the state alone would let this poll
+                // return in that gap, so the condition covers every side effect the assertions below
+                // re-check.
+                await WaitUntilAsync(async () =>
+                    (await GetJobAsync(jobId)).State == TransferJobState.Cancelled &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    !Directory.Exists(Path.Combine(f.Options.StagingRoot, jobId)),
+                    TimeSpan.FromSeconds(15));
 
                 var snapshot = await GetJobAsync(jobId);
 
@@ -342,7 +356,13 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
 
                 await f.RawClient.PostAsync($"/api/transfers/{jobId}/files?path=second.prg", RawBody([4, 5, 6]));
 
-                await WaitUntilAsync(async () => (await GetJobAsync(jobId)).State == TransferJobState.Aborted);
+                // TransferJob's state flips to Aborted a couple of statements before TransferPump releases
+                // the lease and purges staging - waiting on the state alone would let this poll return in
+                // that gap, so the condition covers every side effect the assertions below re-check.
+                await WaitUntilAsync(async () =>
+                    (await GetJobAsync(jobId)).State == TransferJobState.Aborted &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    !Directory.Exists(Path.Combine(f.Options.StagingRoot, jobId)));
 
                 var snapshot = await GetJobAsync(jobId);
                 snapshot.Error.Should().NotBeNullOrEmpty();

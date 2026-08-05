@@ -124,7 +124,7 @@ A file transfer job must hold exclusive access to the device **across many seria
 
 The `DeviceLeaseCoordinator` solves this by being a **separate, timer-less construct** above the port lock:
 - When a job starts (CreateJobEndpoint), it acquires a lease: `leaseCoordinator.TryAcquire(deviceId, jobId)`.
-- The pump checks the lease before touching the device: if the lease holder is not the current job, the device is busy.
+- `CreateJobEndpoint` is the sole exclusivity gate: at job-creation time, `TryAcquire` atomically claims the lease only if the device is unheld, rejecting a second job for an already-leased device. The pump and sweeper never recheck the lease while a job runs — they only call `Release` on it.
 - When the job reaches a terminal state, the lease is released.
 - No stale-lock cleanup: the lease is held in-memory and released explicitly by the pump.
 
@@ -176,7 +176,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 - **OnDisconnectedAsync()** → Cleans up all subscriptions for the dropped connection.
 
 **Events** (broadcast to job's group):
-- **JobChanged** → Throttled (250ms) snapshot of job state, sent by pump as files complete and by sweeper on state transitions.
+- **JobSnapshot** → Throttled (250ms) snapshot of job state, sent by pump as files complete and by sweeper on state transitions.
 - **FileCompleted** → Per-file event with path, success/failure, size.
 
 **Snapshot Structure**: `TransferJobDto` is the single wire shape sent over both HTTP and SignalR:
