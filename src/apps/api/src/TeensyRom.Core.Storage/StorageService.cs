@@ -221,6 +221,22 @@ namespace TeensyRom.Core.Storage
             };
         }
 
+        public void UpsertTransferredFile(FilePath targetPath, long sizeBytes)
+        {
+            var item = new FileItem
+            {
+                Name = targetPath.FileName,
+                Path = targetPath,
+                Size = sizeBytes,
+                StorageType = settings.CartStorage.Type
+            };
+            var mapped = MapFile(item);
+            cache.EnsureParents(targetPath.Directory);
+            cache.UpsertFile(mapped);
+        }
+
+        public void PersistCache() => cache.WriteToDisk();
+
         public LaunchableItem? GetRandomFile(StorageScope scope, DirectoryPath scopePath, TeensyFilterType filterType)
         {
             var fileTypes = GetFileTypes(filterType);

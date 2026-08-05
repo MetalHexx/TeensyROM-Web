@@ -1,4 +1,5 @@
 using TeensyRom.Api.Services;
+using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Device;
@@ -47,9 +48,22 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ISidMetadataService, SidMetadataService>();
             services.AddSingleton<IAudioCaptureService, PortAudioCaptureService>();
             services.AddSingleton<IAudioStreamManager, AudioStreamManager>();
+            services.AddSingleton<ITransferJobRegistry, TransferJobRegistry>();
+            services.AddSingleton<IDeviceLeaseCoordinator, DeviceLeaseCoordinator>();
+            services.AddSingleton<TransferOptions>();
+            services.AddSingleton<ITransferStagingStore, TransferStagingStore>();
+            services.AddSingleton<ITransferCapacityGate, TransferCapacityGate>();
+            services.AddSingleton<ITransferQueue, TransferQueue>();
+            services.AddSingleton<ITransferSubscriptionTracker, TransferSubscriptionTracker>();
+            services.AddSingleton<TransferProgressNotifier>();
+            services.AddSingleton<ITransferProgressNotifier>(sp => sp.GetRequiredService<TransferProgressNotifier>());
+            services.AddSingleton<TransferPump>();
 
             // Register application bootstrap hosted service
             services.AddHostedService<ApplicationBootstrapService>();
+            services.AddHostedService(sp => sp.GetRequiredService<TransferProgressNotifier>());
+            services.AddHostedService(sp => sp.GetRequiredService<TransferPump>());
+            services.AddHostedService<TransferJobSweeper>();
 
             return services;
         }

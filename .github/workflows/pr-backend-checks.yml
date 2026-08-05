@@ -19,7 +19,7 @@ env:
 
 jobs:
   backend-checks:
-    name: .NET Unit Tests
+    name: .NET Tests
     runs-on: ubuntu-latest
 
     defaults:
@@ -56,10 +56,17 @@ jobs:
         uses: nrwl/nx-set-shas@v4
 
       - name: Restore .NET dependencies
-        run: pnpm exec nx run-many --target=restore --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests
+        run: pnpm exec nx run-many --target=restore --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api.Tests.Unit,TeensyRom.Api.Tests.Integration
 
       - name: Build .NET test projects
-        run: pnpm exec nx run-many --target=build --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests
+        run: pnpm exec nx run-many --target=build --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api.Tests.Unit,TeensyRom.Api.Tests.Integration
 
       - name: Run .NET Unit Tests
-        run: pnpm exec nx run-many --target=test --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests
+        run: pnpm exec nx run-many --target=test --projects=TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api.Tests.Unit
+
+      # TeensyRom.Api.Tests.Integration also contains pre-existing [Collection("Endpoint")] tests that
+      # require a physical TeensyROM device (real serial-port/subnet discovery via EndpointFixture).
+      # This filter runs only the new hardware-free FILE-TRANSFER-1 tests, which live under the
+      # TeensyRom.Api.Tests.Integration.Transfers namespace and use TransferFixture's fake device port.
+      - name: Run .NET Transfer Integration Tests
+        run: dotnet test apps/api/src/TeensyRom.Api.Tests.Integration/TeensyRom.Api.Tests.Integration.csproj --no-build --filter "FullyQualifiedName~TeensyRom.Api.Tests.Integration.Transfers"

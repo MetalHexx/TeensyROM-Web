@@ -37,6 +37,334 @@
         }
       }
     },
+    "/api/transfers/{jobId}/files": {
+      "post": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Upload Transfer File",
+        "description": "Streams a single file's raw body (application/octet-stream) into a transfer job.\n\n- One file per request; the body is streamed straight to disk, never buffered.\n- Blocks until the capacity gate has a free slot instead of failing - a slow device shows up as a slower response, never as an error.\n- Rejected immediately (400) when the job cannot accept files, and before any file is staged when the relative path is unusable.",
+        "operationId": "UploadTransferFile",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transfers/{jobId}/seal": {
+      "post": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Seal Transfer Job",
+        "description": "Marks a transfer job as sealed - no further files will be accepted.\n\n- Idempotent when the job is already sealed.\n- Rejected with a clear message when the job cannot reach Sealed from its current state.\n- A job sealed with an empty queue reaches Completed immediately - no upload required.",
+        "operationId": "SealTransferJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SealJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transfers/{jobId}": {
+      "get": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Get Transfer Job",
+        "description": "Gets the current snapshot of a transfer job - the same shape the transfer hub pushes over SignalR, so a client can poll this endpoint instead of subscribing.",
+        "operationId": "GetTransferJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{deviceId}/transfers/active": {
+      "get": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Get Active Transfer Job",
+        "description": "Gets the device's currently active transfer job.\n\n- Returns 200 with a null job when the device has no transfer in progress - an idle device is a normal answer, not a 404.",
+        "operationId": "GetActiveTransferJob",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetActiveJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{deviceId}/storage/{storageType}/transfers": {
+      "post": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Create Transfer Job",
+        "description": "Starts a new file transfer job for a device's storage.\n\n- Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time.\n- Issues no device traffic - the device reset happens on the first uploaded file.",
+        "operationId": "CreateTransferJob",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TeensyStorageType"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transfers/{jobId}/cancel": {
+      "post": {
+        "tags": [
+          "Transfers"
+        ],
+        "summary": "Cancel Transfer Job",
+        "description": "Requests cancellation of a transfer job.\n\n- Returns immediately - it does not wait for the drain. The pump finishes any in-flight write and drains the rest of the queue in the background.\n- Idempotent: cancelling an already-cancelling or already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.",
+        "operationId": "CancelTransferJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelJobResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "post": {
         "tags": [
@@ -1021,6 +1349,17 @@
           }
         }
       },
+      "CancelJobResponse": {
+        "required": [
+          "job"
+        ],
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/TransferJobDto"
+          }
+        }
+      },
       "CartDto": {
         "required": [
           "deviceId",
@@ -1137,6 +1476,29 @@
           "Serial",
           "Tcp"
         ]
+      },
+      "CreateJobBody": {
+        "type": "object",
+        "properties": {
+          "destinationDirectory": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateJobResponse": {
+        "required": [
+          "jobId",
+          "job"
+        ],
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "job": {
+            "$ref": "#/components/schemas/TransferJobDto"
+          }
+        }
       },
       "DeviceSettingsDto": {
         "required": [
@@ -1412,6 +1774,14 @@
           }
         }
       },
+      "GetActiveJobResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/TransferJobDto2"
+          }
+        }
+      },
       "GetDirectoryResponse": {
         "required": [
           "storageItem",
@@ -1424,6 +1794,17 @@
           },
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "GetJobResponse": {
+        "required": [
+          "job"
+        ],
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/TransferJobDto"
           }
         }
       },
@@ -1756,6 +2137,17 @@
           }
         }
       },
+      "SealJobResponse": {
+        "required": [
+          "job"
+        ],
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/TransferJobDto"
+          }
+        }
+      },
       "SearchResponse": {
         "required": [
           "files",
@@ -1933,6 +2325,226 @@
           }
         }
       },
+      "TransferFileCompleted": {
+        "required": [
+          "jobId",
+          "relativePath",
+          "targetPath",
+          "success",
+          "error",
+          "sizeBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "relativePath": {
+            "type": "string"
+          },
+          "targetPath": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "TransferJobDto": {
+        "required": [
+          "jobId",
+          "deviceId",
+          "storageType",
+          "destinationDirectory",
+          "state",
+          "filesReceived",
+          "filesSent",
+          "filesFailed",
+          "bytesSent",
+          "startedUtc",
+          "lastActivityUtc",
+          "failures"
+        ],
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "storageType": {
+            "$ref": "#/components/schemas/TeensyStorageType"
+          },
+          "destinationDirectory": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TransferJobState"
+          },
+          "filesReceived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filesSent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filesFailed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bytesSent": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalFiles": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "currentFile": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastActivityUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferFileCompleted"
+            }
+          }
+        }
+      },
+      "TransferJobDto2": {
+        "required": [
+          "jobId",
+          "deviceId",
+          "storageType",
+          "destinationDirectory",
+          "state",
+          "filesReceived",
+          "filesSent",
+          "filesFailed",
+          "bytesSent",
+          "startedUtc",
+          "lastActivityUtc",
+          "failures"
+        ],
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "storageType": {
+            "$ref": "#/components/schemas/TeensyStorageType"
+          },
+          "destinationDirectory": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TransferJobState"
+          },
+          "filesReceived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filesSent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filesFailed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bytesSent": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalFiles": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "currentFile": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastActivityUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferFileCompleted"
+            }
+          }
+        },
+        "nullable": true
+      },
+      "TransferJobState": {
+        "enum": [
+          "Created",
+          "Receiving",
+          "Sealed",
+          "Completed",
+          "Cancelling",
+          "Cancelled",
+          "Abandoned",
+          "Aborted"
+        ]
+      },
+      "UploadFileResponse": {
+        "required": [
+          "relativePath",
+          "sizeBytes",
+          "queued"
+        ],
+        "type": "object",
+        "properties": {
+          "relativePath": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "queued": {
+            "type": "boolean"
+          }
+        }
+      },
       "VideoSettingsDto": {
         "required": [
           "enableVideo",
@@ -2000,6 +2612,9 @@
   "tags": [
     {
       "name": "Version"
+    },
+    {
+      "name": "Transfers"
     },
     {
       "name": "Settings"

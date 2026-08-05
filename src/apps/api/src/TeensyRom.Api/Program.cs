@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using TeensyRom.Api.Endpoints.Audio.Hub;
 using TeensyRom.Api.Endpoints.Serial.GetLogs;
+using TeensyRom.Api.Endpoints.Transfers.Hub;
 using TeensyRom.Api.Http;
 using TeensyRom.Api.Middleware;
 using TeensyRom.Api.Services;
@@ -71,6 +72,7 @@ app.MapApiDocs();
 app.MapRadEndpoints();
 app.MapHub<LogsHub>("/api/logHub");
 app.MapHub<AudioHub>("/api/audioHub");
+app.MapHub<TransferHub>("/api/transferHub");
 
 // SPA fallback routing - must be AFTER all API routes and SignalR hubs
 // This allows Angular to handle client-side routing for unknown routes
