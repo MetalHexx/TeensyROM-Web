@@ -41,13 +41,17 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             {
                 for (var i = 0; i < fileCount - 1; i++)
                 {
-                    // Each upload takes a few milliseconds to stream - a loopback in-memory TestServer
+                    // Each upload takes tens of milliseconds to stream - a loopback in-memory TestServer
                     // would otherwise race through all of these uploads well inside a single
                     // PerFileDelay, leaving FilesSent pinned at 0 for the whole loop and no overlap to
                     // observe. This keeps the loop's total duration comparable to the device's own pace,
-                    // the way a real multi-file browser upload would.
+                    // the way a real multi-file browser upload would. TransferPump's supervisor only
+                    // notices a newly-active device on its ~200ms poll tick (TransferPump.cs), and that
+                    // gap can stretch further under a CI runner's constrained thread pool - the per-chunk
+                    // delay below is sized so the loop's ~1.5s total comfortably outlasts that startup
+                    // gap with room left over to observe overlap, not just clears it by a few ms.
                     var response = await f.RawClient.PostAsync(
-                        $"/api/transfers/{jobId}/files?path=file-{i}.prg", SlowBody(32 * 1024, TimeSpan.FromMilliseconds(4)));
+                        $"/api/transfers/{jobId}/files?path=file-{i}.prg", SlowBody(32 * 1024, TimeSpan.FromMilliseconds(20)));
                     response.StatusCode.Should().Be(HttpStatusCode.OK);
 
                     // Polled during the upload loop, in the API's own terms: the device is behind the
