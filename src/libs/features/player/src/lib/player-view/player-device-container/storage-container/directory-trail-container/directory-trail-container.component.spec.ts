@@ -2,22 +2,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
 import { signal } from '@angular/core';
-import { StorageStore, PLAYER_CONTEXT, IPlayerContext, NavigationHistoryItem } from '@teensyrom-nx/application';
+import { StorageStore, NavigationHistoryItem } from '@teensyrom-nx/application';
 import { StorageType } from '@teensyrom-nx/domain';
-import { CompactCardLayoutComponent } from '@teensyrom-nx/ui/components';
-import { DirectoryTrailComponent } from './directory-trail.component';
-import { DirectoryNavigateComponent } from './directory-navigate/directory-navigate.component';
-import { DirectoryBreadcrumbComponent } from './directory-breadcrumb/directory-breadcrumb.component';
+import { DirectoryTrailComponent } from '@teensyrom-nx/ui/components';
+import { DirectoryTrailContainerComponent } from './directory-trail-container.component';
 
-describe('DirectoryTrailComponent', () => {
-  let component: DirectoryTrailComponent;
-  let fixture: ComponentFixture<DirectoryTrailComponent>;
-
-  // Create a basic mock player context for all tests
-  const createMockPlayerContext = (): Partial<IPlayerContext> => ({
-    isHistoryViewVisible: () => signal(false).asReadonly(),
-    toggleHistoryView: vi.fn(),
-  });
+describe('DirectoryTrailContainerComponent', () => {
+  let component: DirectoryTrailContainerComponent;
+  let fixture: ComponentFixture<DirectoryTrailContainerComponent>;
 
   describe('Basic Functionality', () => {
     let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
@@ -59,20 +51,11 @@ describe('DirectoryTrailComponent', () => {
       };
 
       await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
+        imports: [DirectoryTrailContainerComponent, DirectoryTrailComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
       }).compileComponents();
 
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
+      fixture = TestBed.createComponent(DirectoryTrailContainerComponent);
       component = fixture.componentInstance;
       fixture.componentRef.setInput('deviceId', 'test-device');
       fixture.detectChanges();
@@ -80,10 +63,6 @@ describe('DirectoryTrailComponent', () => {
 
     it('should create', () => {
       expect(component).toBeTruthy();
-    });
-
-    it('should require deviceId input', () => {
-      expect(component.deviceId()).toBe('test-device');
     });
 
     it('should get selected directory state from store', () => {
@@ -202,20 +181,11 @@ describe('DirectoryTrailComponent', () => {
       };
 
       await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
+        imports: [DirectoryTrailContainerComponent, DirectoryTrailComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
       }).compileComponents();
 
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
+      fixture = TestBed.createComponent(DirectoryTrailContainerComponent);
       component = fixture.componentInstance;
       fixture.componentRef.setInput('deviceId', 'test-device');
       fixture.detectChanges();
@@ -250,20 +220,11 @@ describe('DirectoryTrailComponent', () => {
       };
 
       await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
+        imports: [DirectoryTrailContainerComponent, DirectoryTrailComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
       }).compileComponents();
 
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
+      fixture = TestBed.createComponent(DirectoryTrailContainerComponent);
       component = fixture.componentInstance;
       fixture.componentRef.setInput('deviceId', 'test-device');
       fixture.detectChanges();
@@ -355,20 +316,11 @@ describe('DirectoryTrailComponent', () => {
       };
 
       await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
+        imports: [DirectoryTrailContainerComponent, DirectoryTrailComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
       }).compileComponents();
 
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
+      fixture = TestBed.createComponent(DirectoryTrailContainerComponent);
       component = fixture.componentInstance;
       fixture.componentRef.setInput('deviceId', 'test-device');
       fixture.detectChanges();
@@ -414,20 +366,11 @@ describe('DirectoryTrailComponent', () => {
       };
 
       await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
+        imports: [DirectoryTrailContainerComponent, DirectoryTrailComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
       }).compileComponents();
 
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
+      fixture = TestBed.createComponent(DirectoryTrailContainerComponent);
       component = fixture.componentInstance;
       fixture.componentRef.setInput('deviceId', 'test-device');
       fixture.detectChanges();
@@ -466,20 +409,11 @@ describe('DirectoryTrailComponent', () => {
       };
 
       await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
+        imports: [DirectoryTrailContainerComponent, DirectoryTrailComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
       }).compileComponents();
 
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
+      fixture = TestBed.createComponent(DirectoryTrailContainerComponent);
       component = fixture.componentInstance;
       fixture.componentRef.setInput('deviceId', 'test-device');
       fixture.detectChanges();
@@ -535,20 +469,11 @@ describe('DirectoryTrailComponent', () => {
       };
 
       await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
+        imports: [DirectoryTrailContainerComponent, DirectoryTrailComponent],
+        providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
       }).compileComponents();
 
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
+      fixture = TestBed.createComponent(DirectoryTrailContainerComponent);
       component = fixture.componentInstance;
       fixture.componentRef.setInput('deviceId', 'test-device');
       fixture.detectChanges();
@@ -558,166 +483,12 @@ describe('DirectoryTrailComponent', () => {
       expect(component.isLoading()).toBe(true);
     });
 
-    it('should pass loading state to child components', () => {
-      const navigateComponent = fixture.debugElement.query(
-        (el) => el.componentInstance instanceof DirectoryNavigateComponent
+    it('should pass loading state to the trail component', () => {
+      const trailComponent = fixture.debugElement.query(
+        (el) => el.componentInstance instanceof DirectoryTrailComponent
       )?.componentInstance;
 
-      expect(navigateComponent?.isLoading()).toBe(true);
-    });
-  });
-
-  describe('Child Component Integration', () => {
-    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
-
-    beforeEach(async () => {
-      mockStorageStore = {
-        getSelectedDirectoryState: () => signal({
-          currentPath: '/games/arcade',
-          isLoading: false,
-          deviceId: 'test-device',
-          storageType: StorageType.Sd,
-          directory: null,
-          isLoaded: true,
-          error: null,
-          lastLoadTime: Date.now(),
-        }).asReadonly(),
-        getSelectedDirectoryForDevice: () => ({
-          deviceId: 'test-device',
-          storageType: StorageType.Sd,
-          path: '/games/arcade',
-        }),
-        navigationHistory: signal({
-          'test-device': {
-            history: [
-              { path: '/', storageType: StorageType.Sd },
-              { path: '/games', storageType: StorageType.Sd },
-              { path: '/games/arcade', storageType: StorageType.Sd },
-            ] as NavigationHistoryItem[],
-            currentIndex: 2,
-            maxHistorySize: 50,
-          },
-        }).asReadonly(),
-        navigateUpOneDirectory: vi.fn(),
-        refreshDirectory: vi.fn(),
-        navigateToDirectory: vi.fn(),
-        navigateDirectoryBackward: vi.fn(),
-        navigateDirectoryForward: vi.fn(),
-      };
-
-      await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
-      }).compileComponents();
-
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
-    });
-
-    it('should pass correct props to directory navigate component', () => {
-      const navigateComponent = fixture.debugElement.query(
-        (el) => el.componentInstance instanceof DirectoryNavigateComponent
-      )?.componentInstance;
-
-      expect(navigateComponent?.canNavigateUp()).toBe(true);
-      expect(navigateComponent?.canNavigateBack()).toBe(true);
-      expect(navigateComponent?.canNavigateForward()).toBe(false);
-      expect(navigateComponent?.isLoading()).toBe(false);
-    });
-
-    it('should pass correct props to directory breadcrumb component', () => {
-      const breadcrumbComponent = fixture.debugElement.query(
-        (el) => el.componentInstance instanceof DirectoryBreadcrumbComponent
-      )?.componentInstance;
-
-      expect(breadcrumbComponent?.currentPath()).toBe('/games/arcade');
-      expect(breadcrumbComponent?.storageType()).toBe('SD Card');
-    });
-  });
-
-  describe('DOM Structure', () => {
-    let mockStorageStore: Partial<InstanceType<typeof StorageStore>>;
-
-    beforeEach(async () => {
-      mockStorageStore = {
-        getSelectedDirectoryState: () => signal({
-          currentPath: '/games',
-          isLoading: false,
-          deviceId: 'test-device',
-          storageType: StorageType.Sd,
-          directory: null,
-          isLoaded: true,
-          error: null,
-          lastLoadTime: Date.now(),
-        }).asReadonly(),
-        getSelectedDirectoryForDevice: () => ({
-          deviceId: 'test-device',
-          storageType: StorageType.Sd,
-          path: '/games',
-        }),
-        navigationHistory: signal({
-          'test-device': {
-            history: [{ path: '/', storageType: StorageType.Sd }] as NavigationHistoryItem[],
-            currentIndex: 0,
-            maxHistorySize: 50,
-          },
-        }).asReadonly(),
-        navigateUpOneDirectory: vi.fn(),
-        refreshDirectory: vi.fn(),
-        navigateToDirectory: vi.fn(),
-        navigateDirectoryBackward: vi.fn(),
-        navigateDirectoryForward: vi.fn(),
-      };
-
-      await TestBed.configureTestingModule({
-        imports: [
-          DirectoryTrailComponent,
-          CompactCardLayoutComponent,
-          DirectoryNavigateComponent,
-          DirectoryBreadcrumbComponent,
-        ],
-        providers: [
-          provideNoopAnimations(),
-          { provide: StorageStore, useValue: mockStorageStore },
-          { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        ],
-      }).compileComponents();
-
-      fixture = TestBed.createComponent(DirectoryTrailComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
-    });
-
-    it('should not render card wrapper', () => {
-      const compiled = fixture.nativeElement;
-      const card = compiled.querySelector('lib-scaling-compact-card');
-      expect(card).toBeFalsy();
-    });
-
-    it('should render directory-trail-container as root element', () => {
-      const compiled = fixture.nativeElement;
-      const container = compiled.querySelector('.directory-trail-container');
-      expect(container).toBeTruthy();
-    });
-
-    it('should render child navigation components', () => {
-      const compiled = fixture.nativeElement;
-      const navigate = compiled.querySelector('lib-directory-navigate');
-      const breadcrumb = compiled.querySelector('lib-directory-breadcrumb');
-      expect(navigate).toBeTruthy();
-      expect(breadcrumb).toBeTruthy();
+      expect(trailComponent?.isLoading()).toBe(true);
     });
   });
 });

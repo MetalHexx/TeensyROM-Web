@@ -1,22 +1,20 @@
 import { Component, input, inject, computed } from '@angular/core';
-import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
-import { DirectoryNavigateComponent } from './directory-navigate/directory-navigate.component';
-import { DirectoryBreadcrumbComponent } from './directory-breadcrumb/directory-breadcrumb.component';
+import { StorageStore } from '@teensyrom-nx/application';
+import { DirectoryTrailComponent } from '@teensyrom-nx/ui/components';
 
+/** Smart container wiring the presentational directory trail to StorageStore. */
 @Component({
-  selector: 'lib-directory-trail',
+  selector: 'lib-directory-trail-container',
   standalone: true,
-  imports: [DirectoryNavigateComponent, DirectoryBreadcrumbComponent],
-  templateUrl: './directory-trail.component.html',
-  styleUrl: './directory-trail.component.scss',
+  imports: [DirectoryTrailComponent],
+  templateUrl: './directory-trail-container.component.html',
 })
-export class DirectoryTrailComponent {
+export class DirectoryTrailContainerComponent {
   // Inputs
   deviceId = input.required<string>();
 
   // Store injection
   private readonly storageStore = inject(StorageStore);
-  private readonly playerContext: IPlayerContext = inject(PLAYER_CONTEXT);
 
   // Computed state selectors
   selectedDirectoryState = computed(() => {
@@ -29,7 +27,7 @@ export class DirectoryTrailComponent {
     return this.storageStore.getSelectedDirectoryForDevice(deviceId);
   });
 
-  // Computed properties for child components
+  // Computed properties for child component
   currentPath = computed(() => {
     const state = this.selectedDirectoryState();
     return state?.currentPath || '/';

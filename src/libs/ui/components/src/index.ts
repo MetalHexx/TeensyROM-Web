@@ -53,3 +53,6 @@ export * from './lib/swipe-pane/swipe-pane-container.component';
 export * from './lib/directory-tree/directory-tree.model';
 export * from './lib/directory-tree/directory-tree.component';
 export * from './lib/directory-tree/directory-tree-node/directory-tree-node.component';
+export * from './lib/directory-trail/directory-trail.component';
+export * from './lib/directory-trail/directory-navigate/directory-navigate.component';
+export * from './lib/directory-trail/directory-breadcrumb/directory-breadcrumb.component';

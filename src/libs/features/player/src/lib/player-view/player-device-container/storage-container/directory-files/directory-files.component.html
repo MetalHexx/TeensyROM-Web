@@ -8,7 +8,7 @@
   >
     <div slot="header" class="header-toolbar">
       @if (!isDeviceLevelView()) {
-        <lib-directory-trail [deviceId]="deviceId()"></lib-directory-trail>
+        <lib-directory-trail-container [deviceId]="deviceId()"></lib-directory-trail-container>
       }
       <lib-search-toolbar [deviceId]="deviceId()"></lib-search-toolbar>
     </div>

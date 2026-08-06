@@ -2,8 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatChipsModule } from '@angular/material/chips';
 import { DirectoryBreadcrumbComponent } from './directory-breadcrumb.component';
-import { DropdownMenuComponent, DropdownMenuItemComponent } from '@teensyrom-nx/ui/components';
-import { IconButtonComponent } from '@teensyrom-nx/ui/components';
+import { DropdownMenuComponent } from '../../dropdown-menu/dropdown-menu.component';
+import { DropdownMenuItemComponent } from '../../dropdown-menu/dropdown-menu-item.component';
+import { IconButtonComponent } from '../../icon-button/icon-button.component';
 
 describe('DirectoryBreadcrumbComponent', () => {
   let component: DirectoryBreadcrumbComponent;
