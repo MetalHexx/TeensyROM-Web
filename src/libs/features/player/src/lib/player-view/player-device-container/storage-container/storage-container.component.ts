@@ -1,6 +1,6 @@
 import { Component, input, inject, computed, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DirectoryTreeComponent } from './directory-tree/directory-tree.component';
+import { DirectoryTreeContainerComponent } from './directory-tree-container/directory-tree-container.component';
 import { DirectoryFilesComponent } from './directory-files/directory-files.component';
 import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
 import { StorageType } from '@teensyrom-nx/domain';
@@ -11,7 +11,7 @@ import { PlayHistoryComponent } from './play-history/play-history.component';
   selector: 'lib-storage-container',
   imports: [
     CommonModule,
-    DirectoryTreeComponent,
+    DirectoryTreeContainerComponent,
     DirectoryFilesComponent,
     SearchResultsComponent,
     PlayHistoryComponent,
