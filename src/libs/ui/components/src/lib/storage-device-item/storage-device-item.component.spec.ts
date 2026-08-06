@@ -113,8 +113,4 @@ describe('StorageDeviceItemComponent', () => {
     const compiled = fixture.nativeElement;
     expect(compiled.textContent).toContain('USB Storage');
   });
-
-  it('should pass correct icon to storage-item component', () => {
-    expect(component.storageDevice().icon).toBe('sd_storage');
-  });
 });

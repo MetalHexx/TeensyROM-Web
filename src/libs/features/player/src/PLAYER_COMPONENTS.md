@@ -16,8 +16,10 @@ graph TD
     PDC --> |"device: Device"| FO[FileOtherComponent<br/>lib-file-other]
 
     SC --> ST[SearchToolbarComponent<br/>lib-search-toolbar]
-    SC --> DT[DirectoryTreeComponent<br/>lib-directory-tree]
+    SC --> DTC[DirectoryTreeContainerComponent<br/>lib-directory-tree-container]
     SC --> DF[DirectoryFilesComponent<br/>lib-directory-files]
+
+    DF --> DTRC[DirectoryTrailContainerComponent<br/>lib-directory-trail-container]
 
     classDef rootComponent fill:#1565c0,stroke:#0d47a1,stroke-width:3px,color:#ffffff
     classDef containerComponent fill:#7b1fa2,stroke:#4a148c,stroke-width:2px,color:#ffffff
@@ -27,8 +29,17 @@ graph TD
     class PV rootComponent
     class PDC containerComponent
     class SC,PT storageComponent
-    class FI,FO,ST,DT,DF leafComponent
+    class FI,FO,ST,DTC,DF,DTRC leafComponent
 ```
+
+`DirectoryTreeContainerComponent` and `DirectoryTrailContainerComponent` are thin containers: each wires `StorageStore` to a presentational component promoted to the shared library. `DirectoryFilesComponent` composes the shared `DirectoryItemComponent` and `StorageDeviceItemComponent` directly to render its rows, alongside `ScalingCardComponent`.
+
+Seven presentational row/navigation components now live in `@teensyrom-nx/ui/components` and are shared across features:
+
+- `DirectoryTreeComponent` (`lib-directory-tree`) + `DirectoryTreeNodeComponent` (`lib-directory-tree-node`)
+- `DirectoryTrailComponent` (`lib-directory-trail`) + `DirectoryNavigateComponent` (`lib-directory-navigate`) + `DirectoryBreadcrumbComponent` (`lib-directory-breadcrumb`)
+- `DirectoryItemComponent` (`lib-directory-item`)
+- `StorageDeviceItemComponent` (`lib-storage-device-item`)
 
 ## Data Flow
 
@@ -66,6 +77,8 @@ libs/features/player/src/lib/player-view/
 │   └── storage-container/                # Storage coordinator
 │       ├── storage-container.component.ts
 │       ├── search-toolbar/               # Search interface
-│       ├── directory-tree/               # Navigation tree
-│       └── directory-files/              # File listing
+│       ├── directory-tree-container/     # Navigation tree (store-wired)
+│       ├── directory-trail-container/    # Breadcrumb trail (store-wired)
+│       └── directory-files/              # File/directory/storage-device listing
+│           └── file-item/                # File row (not promoted)
 ```

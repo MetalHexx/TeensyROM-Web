@@ -56,3 +56,5 @@ export * from './lib/directory-tree/directory-tree-node/directory-tree-node.comp
 export * from './lib/directory-trail/directory-trail.component';
 export * from './lib/directory-trail/directory-navigate/directory-navigate.component';
 export * from './lib/directory-trail/directory-breadcrumb/directory-breadcrumb.component';
+export * from './lib/directory-item/directory-item.component';
+export * from './lib/storage-device-item/storage-device-item.component';

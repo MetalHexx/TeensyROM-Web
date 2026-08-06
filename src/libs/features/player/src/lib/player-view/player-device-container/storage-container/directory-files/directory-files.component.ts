@@ -10,7 +10,11 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
-import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
+import {
+  DirectoryItemComponent,
+  ScalingCardComponent,
+  StorageDeviceItemComponent,
+} from '@teensyrom-nx/ui/components';
 import { StorageStore, PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
 import {
   DirectoryItem,
@@ -19,9 +23,7 @@ import {
   StorageDeviceItem,
   StorageType,
 } from '@teensyrom-nx/domain';
-import { DirectoryItemComponent } from './directory-item/directory-item.component';
 import { FileItemComponent } from './file-item/file-item.component';
-import { StorageDeviceItemComponent } from './storage-device-item/storage-device-item.component';
 import { DirectoryTrailContainerComponent } from '../directory-trail-container/directory-trail-container.component';
 import { SearchToolbarComponent } from '../search-toolbar/search-toolbar.component';
 
