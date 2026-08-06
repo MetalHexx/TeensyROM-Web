@@ -29,6 +29,7 @@ import {
   selector: 'lib-directory-tree-container',
   imports: [DirectoryTreeComponent],
   templateUrl: './directory-tree-container.component.html',
+  styleUrl: './directory-tree-container.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DirectoryTreeContainerComponent {
