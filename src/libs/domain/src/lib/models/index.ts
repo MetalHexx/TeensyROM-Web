@@ -16,6 +16,7 @@ export * from './storage-type.enum';
 export * from './storage-type.util';
 export * from './storage-directory.model';
 export * from './storage-device-item.model';
+export * from './directory-tree-node.model';
 
 // Player models
 export * from './player-status.enum';

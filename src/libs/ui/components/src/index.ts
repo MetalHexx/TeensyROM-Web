@@ -50,3 +50,4 @@ export * from './lib/shared/animation-tokens';
 export * from './lib/shared/glassy.types';
 export * from './lib/swipe-pane/swipe-pane.directive';
 export * from './lib/swipe-pane/swipe-pane-container.component';
+export * from './lib/directory-tree/directory-tree.model';
