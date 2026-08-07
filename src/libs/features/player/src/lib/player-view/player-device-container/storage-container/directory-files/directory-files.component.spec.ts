@@ -23,16 +23,16 @@ import {
   PlayerFileContext,
   StorageDirectoryState,
 } from '@teensyrom-nx/application';
-import { DirectoryTrailComponent } from '../directory-trail/directory-trail.component';
+import { DirectoryTrailContainerComponent } from '../directory-trail-container/directory-trail-container.component';
 import { SearchToolbarComponent } from '../search-toolbar/search-toolbar.component';
 
-// Mock DirectoryTrailComponent to avoid needing full store mocks
+// Mock DirectoryTrailContainerComponent to avoid needing full store mocks
 @Component({
-  selector: 'lib-directory-trail',
+  selector: 'lib-directory-trail-container',
   standalone: true,
   template: '<div class="mock-directory-trail">Mock Directory Trail</div>',
 })
-class MockDirectoryTrailComponent {
+class MockDirectoryTrailContainerComponent {
   deviceId = input.required<string>();
 }
 
@@ -148,8 +148,8 @@ describe('DirectoryFilesComponent', () => {
       ],
     })
       .overrideComponent(DirectoryFilesComponent, {
-        remove: { imports: [DirectoryTrailComponent, SearchToolbarComponent] },
-        add: { imports: [MockDirectoryTrailComponent, MockSearchToolbarComponent] },
+        remove: { imports: [DirectoryTrailContainerComponent, SearchToolbarComponent] },
+        add: { imports: [MockDirectoryTrailContainerComponent, MockSearchToolbarComponent] },
       })
       .compileComponents();
 
@@ -485,7 +485,7 @@ describe('DirectoryFilesComponent', () => {
       fixture.componentRef.setInput('deviceId', 'device-1');
       fixture.detectChanges();
 
-      const trail = fixture.nativeElement.querySelector('lib-directory-trail');
+      const trail = fixture.nativeElement.querySelector('lib-directory-trail-container');
       expect(trail).toBeTruthy();
       // Trail is now inside .header-toolbar wrapper which has slot="header"
       const headerToolbar = trail.closest('.header-toolbar');
@@ -516,7 +516,7 @@ describe('DirectoryFilesComponent', () => {
       fixture.componentRef.setInput('deviceId', 'device-1');
       fixture.detectChanges();
 
-      const trail = fixture.nativeElement.querySelector('lib-directory-trail');
+      const trail = fixture.nativeElement.querySelector('lib-directory-trail-container');
       expect(trail).toBeFalsy();
     });
 
@@ -573,7 +573,7 @@ describe('DirectoryFilesComponent', () => {
       fixture.componentRef.setInput('deviceId', 'device-1');
       fixture.detectChanges();
 
-      const trail = fixture.nativeElement.querySelector('lib-directory-trail');
+      const trail = fixture.nativeElement.querySelector('lib-directory-trail-container');
       expect(trail).toBeTruthy();
       // At storage level, trail is in header slot, no card title rendered
       const cardHeader = fixture.nativeElement.querySelector('.card-header');

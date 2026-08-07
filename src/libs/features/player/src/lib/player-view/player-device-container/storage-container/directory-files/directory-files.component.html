@@ -1,14 +1,15 @@
 <div class="directory-files">
   <lib-scaling-card
-    [title]="isDeviceLevelView() ? 'Storage Devices' : ''"
     [animationTrigger]="animationTrigger()"
     [animationEntry]="'from-left'"
     [animationExit]="'from-right'"
     [enableOverflow]="false"
   >
     <div slot="header" class="header-toolbar">
-      @if (!isDeviceLevelView()) {
-        <lib-directory-trail [deviceId]="deviceId()"></lib-directory-trail>
+      @if (isDeviceLevelView()) {
+        <span class="mat-mdc-card-title header-title">Storage Devices</span>
+      } @else {
+        <lib-directory-trail-container [deviceId]="deviceId()"></lib-directory-trail-container>
       }
       <lib-search-toolbar [deviceId]="deviceId()"></lib-search-toolbar>
     </div>

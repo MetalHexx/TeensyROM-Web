@@ -1,10 +1,10 @@
 <div class="storage-container">
   <div class="content-row">
     <div class="left-container">
-      <lib-directory-tree 
+      <lib-directory-tree-container
         [deviceId]="deviceId()"
         (directoryNavigated)="onDirectoryNavigated()"
-      ></lib-directory-tree>
+      ></lib-directory-tree-container>
     </div>
     <div class="right-container">
       <lib-search-results [deviceId]="deviceId()" [animationTrigger]="hasActiveSearch()">

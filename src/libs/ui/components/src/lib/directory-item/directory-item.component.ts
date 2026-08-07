@@ -1,7 +1,7 @@
 import { Component, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { StorageItemComponent } from '@teensyrom-nx/ui/components';
 import { DirectoryItem } from '@teensyrom-nx/domain';
+import { StorageItemComponent } from '../storage-item/storage-item.component';
 
 @Component({
   selector: 'lib-directory-item',

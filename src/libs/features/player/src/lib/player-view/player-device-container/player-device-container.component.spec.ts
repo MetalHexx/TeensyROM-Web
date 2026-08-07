@@ -511,13 +511,14 @@ describe('PlayerDeviceContainerComponent', () => {
       expect(toolbar.componentInstance.disabled()).toBe(false);
     });
 
-    it('should pass disabled=true to filter-toolbar when no storage is indexed', () => {
-      // Device has no storage index (default test device)
+    it('should not disable filter-toolbar when no storage is indexed', () => {
+      // Device has no storage index (default test device) — filter-toolbar
+      // is no longer gated on index state, it should stay enabled.
       const toolbar = fixture.debugElement.query(
         (el) => el.name === 'lib-filter-toolbar'
       );
       expect(toolbar).toBeTruthy();
-      expect(toolbar.componentInstance.disabled()).toBe(true);
+      expect(toolbar.componentInstance.disabled()).toBe(false);
     });
 
     it('should pass disabled=false to filter-toolbar when storage is indexed', () => {

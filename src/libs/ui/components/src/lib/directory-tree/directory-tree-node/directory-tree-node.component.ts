@@ -1,7 +1,8 @@
 import { Component, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IconLabelComponent, StyledIconColor } from '@teensyrom-nx/ui/components';
-import { DirectoryTreeNodeType } from '../directory-tree.component';
+import { DirectoryTreeNodeType } from '@teensyrom-nx/domain';
+import { IconLabelComponent } from '../../icon-label/icon-label.component';
+import type { StyledIconColor } from '../../styled-icon/styled-icon.component';
 
 @Component({
   selector: 'lib-directory-tree-node',

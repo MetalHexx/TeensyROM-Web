@@ -22,13 +22,6 @@ describe('PlayHistoryComponent', () => {
   let mockStorageStore: {
     getSearchState: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
-    getSelectedDirectoryForDevice: ReturnType<typeof vi.fn>;
-    navigationHistory: ReturnType<typeof vi.fn>;
-    navigateDirectoryBackward: ReturnType<typeof vi.fn>;
-    navigateDirectoryForward: ReturnType<typeof vi.fn>;
-    navigateUpOneDirectory: ReturnType<typeof vi.fn>;
-    refreshDirectory: ReturnType<typeof vi.fn>;
-    navigateToDirectory: ReturnType<typeof vi.fn>;
   };
 
   let playHistorySignal: WritableSignal<PlayHistory | null>;
@@ -73,17 +66,10 @@ describe('PlayHistoryComponent', () => {
     errorSignal = signal<string | null>(null);
     selectedDirectorySignal = signal<StorageDirectoryState | null>(null);
 
-    // Create mock StorageStore for SearchToolbarComponent and DirectoryTrailComponent
+    // Create mock StorageStore for SearchToolbarComponent
     mockStorageStore = {
       getSearchState: vi.fn(() => signal(null).asReadonly()),
       getSelectedDirectoryState: vi.fn(() => selectedDirectorySignal.asReadonly()),
-      getSelectedDirectoryForDevice: vi.fn(() => null),
-      navigationHistory: vi.fn(() => signal({}).asReadonly()),
-      navigateDirectoryBackward: vi.fn(),
-      navigateDirectoryForward: vi.fn(),
-      navigateUpOneDirectory: vi.fn(),
-      refreshDirectory: vi.fn(),
-      navigateToDirectory: vi.fn(),
     };
 
     // Create mock PlayerContext using IPlayerContext interface

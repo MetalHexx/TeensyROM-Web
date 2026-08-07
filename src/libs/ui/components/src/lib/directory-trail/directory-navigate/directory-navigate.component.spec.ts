@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { DirectoryNavigateComponent } from './directory-navigate.component';
-import { IconButtonComponent } from '@teensyrom-nx/ui/components';
+import { IconButtonComponent } from '../../icon-button/icon-button.component';
 
 describe('DirectoryNavigateComponent', () => {
   let component: DirectoryNavigateComponent;

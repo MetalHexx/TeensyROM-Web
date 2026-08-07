@@ -1,5 +1,6 @@
 import { Component, input, output, computed } from '@angular/core';
-import { IconButtonComponent, TooltipConfig, TooltipPosition } from '@teensyrom-nx/ui/components';
+import { IconButtonComponent } from '../../icon-button/icon-button.component';
+import { TooltipConfig, TooltipPosition } from '../../tooltip/tooltip.directive';
 
 @Component({
   selector: 'lib-directory-navigate',

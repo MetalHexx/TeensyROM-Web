@@ -2,7 +2,7 @@
   <lib-scaling-card>
     <mat-tree
       #tree
-      [dataSource]="directoryTree()"
+      [dataSource]="nodes()"
       [childrenAccessor]="childrenAccessor"
       [trackBy]="trackByFn"
       [expansionKey]="expansionKeyFn"
@@ -79,11 +79,5 @@
         }
       </mat-tree-node>
     </mat-tree>
-
-    <!-- Debug JSON hidden for now -->
-    <!-- <details class="debug-section">
-      <summary>Debug: StorageStore Data</summary>
-      <pre class="json-debug">{{ directories() | json }}</pre>
-    </details> -->
   </lib-scaling-card>
 </div>

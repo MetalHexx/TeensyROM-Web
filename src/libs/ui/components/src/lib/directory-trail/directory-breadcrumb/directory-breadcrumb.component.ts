@@ -11,8 +11,9 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { MatChipsModule } from '@angular/material/chips';
-import { DropdownMenuComponent, DropdownMenuItemComponent } from '@teensyrom-nx/ui/components';
-import { IconButtonComponent } from '@teensyrom-nx/ui/components';
+import { DropdownMenuComponent } from '../../dropdown-menu/dropdown-menu.component';
+import { DropdownMenuItemComponent } from '../../dropdown-menu/dropdown-menu-item.component';
+import { IconButtonComponent } from '../../icon-button/icon-button.component';
 
 interface PathSegment {
   label: string;

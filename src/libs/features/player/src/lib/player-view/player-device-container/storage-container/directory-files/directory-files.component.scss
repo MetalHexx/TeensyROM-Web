@@ -26,10 +26,17 @@
   display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--spacing-md);
   width: 100%;
 
-  lib-directory-trail {
+  .header-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  lib-directory-trail-container {
     flex: 1;
     min-width: 0;
   }
@@ -48,19 +55,18 @@
 }
 
 .viewport-wrapper {
-  position: absolute;
-  top: 70px; // Card padding (16px) + header padding (32px) + trail height (~42px) = ~90px
-  left: 16px;
-  right: 0; // Flush with card edge so scrollbar sits at the edge (no gap)
-  bottom: 16px;
+  // mat-card-content already starts right after the header (whatever its height)
+  // and already has 16px left/bottom padding to match, so filling it at 100% height
+  // avoids hardcoding an offset that has to track the header's content-dependent height.
+  // box-sizing: border-box keeps padding-top inside that 100% instead of adding to it —
+  // without it, this wrapper overflows mat-card-content by padding-top's amount and
+  // triggers a second, outer scrollbar alongside the virtual-scroll-viewport's own.
+  box-sizing: border-box;
+  height: 100%;
   display: flex;
   flex-direction: column;
-
-  // At phone breakpoint, search and trail stack vertically inside header-toolbar,
-  // increasing the header height. Increase top offset to prevent overlap.
-  @include mixins.below-phone {
-    top: 106px;
-  }
+  padding-top: var(--spacing-lg); // match spacing below header used by .search-results-list
+  margin-right: -16px; // cancel mat-card-content's right padding so the scrollbar sits flush at the card edge
 }
 
 .files-viewport {
