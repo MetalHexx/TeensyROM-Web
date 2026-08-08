@@ -47,6 +47,7 @@ export * from './version.model';
 
 // Transfer models
 export * from './transfer-job-snapshot.model';
+export * from './transfer-manifest-entry.model';
 
 // CRT models
 export * from './crt-settings.model';
