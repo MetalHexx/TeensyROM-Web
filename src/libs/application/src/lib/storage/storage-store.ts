@@ -57,6 +57,8 @@ export interface StorageState {
   navigationHistory: Record<string, NavigationHistory>; // key: deviceId - Navigation history per device
   searchState: Record<string, SearchState>; // key: deviceId - Per-device unified search state (all storages)
   favoriteOperationsState: FavoriteOperationsState;
+  /** deviceId whose directory list is held against playback-driven moves; null when unpinned. */
+  navigationPin: string | null;
 }
 
 const initialState: StorageState = {
@@ -68,6 +70,7 @@ const initialState: StorageState = {
     isProcessing: false,
     error: null,
   },
+  navigationPin: null,
 };
 
 export const StorageStore = signalStore(

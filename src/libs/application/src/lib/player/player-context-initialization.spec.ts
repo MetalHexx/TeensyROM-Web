@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
-import {
-  ALERT_SERVICE,
-  IAlertService,
-  PlayerFilterType,
-  AlertMessage,
-} from '@teensyrom-nx/domain';
+import { ALERT_SERVICE, IAlertService, PlayerFilterType, AlertMessage } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore } from '../storage/storage-store';
@@ -21,7 +16,7 @@ describe('PlayerContextService - Initialization with Storage', () => {
     getDevicePlayer: ReturnType<typeof vi.fn>;
   };
   let mockStorageStore: {
-    navigateToDirectory: ReturnType<typeof vi.fn>;
+    alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
@@ -45,7 +40,7 @@ describe('PlayerContextService - Initialization with Storage', () => {
     };
 
     mockStorageStore = {
-      navigateToDirectory: vi.fn().mockResolvedValue(undefined),
+      alignToPlayingFile: vi.fn().mockResolvedValue(undefined),
       getSelectedDirectoryState: vi.fn(),
     };
 

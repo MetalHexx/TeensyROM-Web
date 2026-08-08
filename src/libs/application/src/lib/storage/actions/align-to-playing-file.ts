@@ -1,14 +1,18 @@
 import { StorageType, IStorageService } from '@teensyrom-nx/domain';
 import { StorageState } from '../storage-store';
 import { WritableStore, performDirectoryNavigation } from '../storage-helpers';
-import { createAction } from '@teensyrom-nx/utils';
+import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
 
-export function navigateToDirectory(
+/**
+ * Playback-driven directory alignment. Behaves exactly like `navigateToDirectory` for an
+ * unpinned device; a no-op when the device's pin is held by a mounted view other than playback.
+ */
+export function alignToPlayingFile(
   store: WritableStore<StorageState>,
   storageService: IStorageService
 ) {
   return {
-    navigateToDirectory: async ({
+    alignToPlayingFile: async ({
       deviceId,
       storageType,
       path,
@@ -17,7 +21,12 @@ export function navigateToDirectory(
       storageType: StorageType;
       path: string;
     }): Promise<void> => {
-      const actionMessage = createAction(`navigate-to-directory`);
+      if (store.navigationPin() === deviceId) {
+        logInfo(LogType.Info, `Skipping playback alignment for ${deviceId}: navigation pin held`);
+        return;
+      }
+
+      const actionMessage = createAction(`align-to-playing-file`);
 
       await performDirectoryNavigation(
         store,

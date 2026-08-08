@@ -6,6 +6,9 @@ import { StorageState } from '../storage-store';
 
 import { initializeStorage } from './initialize-storage';
 import { navigateToDirectory } from './navigate-to-directory';
+import { alignToPlayingFile } from './align-to-playing-file';
+import { setNavigationPin } from './set-navigation-pin';
+import { clearNavigationPin } from './clear-navigation-pin';
 import { navigateToDeviceLevel } from './navigate-to-device-level';
 import { navigateDirectoryBackward } from './navigate-directory-backward';
 import { navigateDirectoryForward } from './navigate-directory-forward';
@@ -26,6 +29,9 @@ export function withStorageActions() {
     return {
       ...initializeStorage(writableStore, storageService),
       ...navigateToDirectory(writableStore, storageService),
+      ...alignToPlayingFile(writableStore, storageService),
+      ...setNavigationPin(writableStore),
+      ...clearNavigationPin(writableStore),
       ...navigateToDeviceLevel(writableStore),
       ...navigateDirectoryBackward(writableStore, storageService),
       ...navigateDirectoryForward(writableStore, storageService),

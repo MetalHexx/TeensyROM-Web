@@ -40,8 +40,10 @@ export class PlayerContextService implements IPlayerContext {
   private readonly launchDelayMs = inject(PLAYER_LAUNCH_DELAY_MS);
 
   // Constant null signal to return when no timer exists (avoids NG0602 in reactive contexts)
-  private readonly nullTimerSignal: Signal<TimerState | null> = signal<TimerState | null>(null).asReadonly();
-  
+  private readonly nullTimerSignal: Signal<TimerState | null> = signal<TimerState | null>(
+    null
+  ).asReadonly();
+
   // Cache signals per device for reuse (eager creation in createTimerWithCompletion)
   private readonly timerSignals = new Map<string, Signal<TimerState | null>>();
   // Cached global signal for slow loading state across all devices
@@ -72,14 +74,14 @@ export class PlayerContextService implements IPlayerContext {
    * Guard method to prevent duplicate launch commands.
    * Checks if a launch operation is already in progress for the device.
    * Shows a warning alert to the user if a launch is blocked.
-   * 
+   *
    * @param deviceId - The device identifier
    * @param operation - Description of the operation being attempted (for logging/alerts)
    * @returns true if launch can proceed, false if blocked
    */
   private canLaunch(deviceId: string, operation: string): boolean {
     const isLoading = this.store.isPlayerLoading(deviceId)();
-    
+
     if (isLoading) {
       logWarn(
         `Launch blocked: ${operation} attempted while launch already in progress for device ${deviceId}`
@@ -87,7 +89,7 @@ export class PlayerContextService implements IPlayerContext {
       this.alertService.warning('Please wait - a file is currently loading');
       return false;
     }
-    
+
     return true;
   }
 
@@ -179,7 +181,7 @@ export class PlayerContextService implements IPlayerContext {
    * - Only shows dialog if a SINGLE load operation takes > LAUNCH_DELAY_MS continuously
    * - Rapid-fire loads (< 2s each) never trigger the dialog, even if total time > 2s
    * - Resets immediately when loading completes (instant feedback)
-   * 
+   *
    * Signal is cached on first call for performance.
    * @returns Signal<boolean> - true if any single device load has been running continuously for > 2 seconds
    */
@@ -247,7 +249,7 @@ export class PlayerContextService implements IPlayerContext {
     await this.store.launchRandomFile({ deviceId });
 
     const currentFile = this.store.getCurrentFile(deviceId)();
-    if (currentFile) {      
+    if (currentFile) {
       if (!this.hasErrorAndCleanup(deviceId)) {
         this.setupTimerForFile(deviceId, currentFile.file);
       }
@@ -267,7 +269,7 @@ export class PlayerContextService implements IPlayerContext {
     const { deviceId, storageType } = StorageKeyUtil.parse(storageKey);
 
     try {
-      await this.storageStore.navigateToDirectory({
+      await this.storageStore.alignToPlayingFile({
         deviceId,
         storageType,
         path: currentFile.parentPath,
@@ -281,10 +283,8 @@ export class PlayerContextService implements IPlayerContext {
         // Mark the current file as incompatible if backend indicates so
         const launchedFile = this.store.getCurrentFile(deviceId)();
         if (launchedFile?.isCompatible === false) {
-          directoryFiles = directoryFiles.map(file =>
-            file.path === launchedFile.file.path
-              ? { ...file, isCompatible: false }
-              : file
+          directoryFiles = directoryFiles.map((file) =>
+            file.path === launchedFile.file.path ? { ...file, isCompatible: false } : file
           );
         }
 
@@ -562,7 +562,6 @@ export class PlayerContextService implements IPlayerContext {
    * Returns duration in milliseconds, or null if no timer should be created
    */
   private determineTimerDuration(deviceId: string, file: FileItem): number | null {
-
     if (file.isCompatible === false) {
       logInfo(LogType.Info, `Incompatible file excluded from timer: ${file.name}`);
       return null;
@@ -615,10 +614,7 @@ export class PlayerContextService implements IPlayerContext {
       }
     }
 
-    logInfo(
-      LogType.Start,
-      `Setting up metadata timer for song ${file.name} (${totalTime}ms)`
-    );
+    logInfo(LogType.Start, `Setting up metadata timer for song ${file.name} (${totalTime}ms)`);
 
     return totalTime;
   }
@@ -630,16 +626,16 @@ export class PlayerContextService implements IPlayerContext {
   private createTimerWithCompletion(deviceId: string, durationMs: number): void {
     // Cleanup old timer/signal/subscriptions FIRST
     this.cleanupTimer(deviceId);
-    
+
     // Create NEW timer in manager (must happen before toSignal)
     this.timerManager.createTimer(deviceId, durationMs);
 
     // Immediately initialize the new signal (outside reactive context)
     // Get current state AFTER creating timer so we have valid initial value
     const currentState = this.timerManager.getTimerState(deviceId);
-    
+
     logInfo(LogType.Info, `Timer signal initialized for device ${deviceId}:`, currentState);
-    
+
     // Create signal with proper initialValue (currentState should always exist after createTimer)
     // Use type assertion since we know the observable will emit TimerState | null
     const signal = currentState
@@ -650,7 +646,7 @@ export class PlayerContextService implements IPlayerContext {
       : (toSignal(this.timerManager.onTimerUpdate$(deviceId), {
           injector: this.injector,
         }) as Signal<TimerState | null>);
-    
+
     // Cache the new signal
     this.timerSignals.set(deviceId, signal);
 
@@ -660,17 +656,15 @@ export class PlayerContextService implements IPlayerContext {
         LogType.Success,
         `Timer completed for device ${deviceId}, attempting auto-progression to next file`
       );
-      
+
       // Check if launch is already in progress before auto-progressing
       // Use store directly to avoid showing alert - this is auto-progression, not user action
       const isLoading = this.store.isPlayerLoading(deviceId)();
       if (isLoading) {
-        logWarn(
-          `Auto-progression skipped: Launch already in progress for device ${deviceId}`
-        );
+        logWarn(`Auto-progression skipped: Launch already in progress for device ${deviceId}`);
         return;
       }
-      
+
       void this.next(deviceId);
     });
 
@@ -702,7 +696,7 @@ export class PlayerContextService implements IPlayerContext {
    * Get current timer state for a device.
    * Returns a signal that emits timer updates from the observable stream.
    * Signals are cached per device for referential equality and performance.
-   * 
+   *
    * IMPORTANT: This method is safe to call from reactive contexts (computed, effect)
    * because it NEVER calls toSignal() - signals are pre-created in createTimerWithCompletion().
    * If no cached signal exists, returns a constant null signal.
@@ -753,10 +747,7 @@ export class PlayerContextService implements IPlayerContext {
     // Setup timer if file is currently loaded (creates new timer or recreates existing)
     // This ensures timer is created immediately when enabling custom timer on a running game
     if (currentFile?.file) {
-      logInfo(
-        LogType.Info,
-        `Setting up timer for device ${deviceId} with new custom timer config`
-      );
+      logInfo(LogType.Info, `Setting up timer for device ${deviceId} with new custom timer config`);
       this.setupTimerForFile(deviceId, currentFile.file);
     }
   }
@@ -968,9 +959,7 @@ export class PlayerContextService implements IPlayerContext {
     // Check if launch is already in progress before browser navigation
     const isLoading = this.store.isPlayerLoading(deviceId)();
     if (isLoading) {
-      logWarn(
-        `Browser navigation skipped: Launch already in progress for device ${deviceId}`
-      );
+      logWarn(`Browser navigation skipped: Launch already in progress for device ${deviceId}`);
       this.alertService.warning('Please wait - a file is currently loading');
       return;
     }
@@ -997,7 +986,7 @@ export class PlayerContextService implements IPlayerContext {
    * Handle incompatible file by routing to appropriate advancement strategy.
    * Entry point for auto-advancement logic - detects incompatible files and delegates
    * to mode-specific handlers (shuffle retry vs directory advancement).
-   * 
+   *
    * @param deviceId - The device identifier
    */
   private handleIncompatibleFile(deviceId: string): void {
@@ -1006,19 +995,13 @@ export class PlayerContextService implements IPlayerContext {
 
     // Guard: No player state
     if (!player) {
-      logInfo(
-        LogType.Info,
-        `handleIncompatibleFile: No player state for device ${deviceId}`
-      );
+      logInfo(LogType.Info, `handleIncompatibleFile: No player state for device ${deviceId}`);
       return;
     }
 
     // Guard: No current file
     if (!player.currentFile) {
-      logInfo(
-        LogType.Info,
-        `handleIncompatibleFile: No current file for device ${deviceId}`
-      );
+      logInfo(LogType.Info, `handleIncompatibleFile: No current file for device ${deviceId}`);
       return;
     }
 
@@ -1067,7 +1050,7 @@ export class PlayerContextService implements IPlayerContext {
    * Used for directory and search launch modes when incompatible file encountered.
    * Searches forward from current index with wrap-around, launching first compatible file found.
    * Falls back to random launch if all files are incompatible.
-   * 
+   *
    * @param deviceId - The device identifier
    */
   private async advanceToNextCompatibleFileInDirectory(deviceId: string): Promise<void> {
@@ -1093,10 +1076,7 @@ export class PlayerContextService implements IPlayerContext {
     }
 
     // Guard: Invalid current index
-    if (
-      fileContext.currentIndex < 0 ||
-      fileContext.currentIndex >= fileContext.files.length
-    ) {
+    if (fileContext.currentIndex < 0 || fileContext.currentIndex >= fileContext.files.length) {
       logInfo(
         LogType.Info,
         `advanceToNextCompatibleFileInDirectory: Invalid currentIndex ${fileContext.currentIndex} for device ${deviceId}`
@@ -1130,7 +1110,7 @@ export class PlayerContextService implements IPlayerContext {
           files: fileContext.files,
           launchMode: this.store.getLaunchMode(deviceId)(),
         });
-        
+
         return;
       } else {
         // Sync incompatible file to storage store

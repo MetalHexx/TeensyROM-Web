@@ -58,7 +58,7 @@ const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
 describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
   let service: PlayerContextService;
   let mockStorageStore: {
-    navigateToDirectory: ReturnType<typeof vi.fn>;
+    alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
     updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
@@ -91,8 +91,12 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
   beforeEach(() => {
     // Default mocks return compatible files that don't interfere with test logic
     mockPlayerService = {
-      launchFile: vi.fn().mockReturnValue(of(createTestFileItem({ name: 'default.sid', isCompatible: true }))),
-      launchRandom: vi.fn().mockReturnValue(of(createTestFileItem({ name: 'default.sid', isCompatible: true }))),
+      launchFile: vi
+        .fn()
+        .mockReturnValue(of(createTestFileItem({ name: 'default.sid', isCompatible: true }))),
+      launchRandom: vi
+        .fn()
+        .mockReturnValue(of(createTestFileItem({ name: 'default.sid', isCompatible: true }))),
       toggleMusic: vi.fn(),
     };
 
@@ -106,7 +110,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
     };
 
     mockStorageStore = {
-      navigateToDirectory: vi.fn().mockReturnValue(of(undefined)),
+      alignToPlayingFile: vi.fn().mockReturnValue(of(undefined)),
       getSelectedDirectoryState: vi.fn().mockReturnValue(() => ({
         path: '/default',
         directory: {
@@ -191,7 +195,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Spy on handler method
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
+        const advanceDirectorySpy = vi.spyOn(
+          serviceWithPrivates,
+          'advanceToNextCompatibleFileInDirectory'
+        );
 
         // Call handleIncompatibleFile
         serviceWithPrivates.handleIncompatibleFile(deviceId);
@@ -203,7 +210,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
       it('should return early when current file is null', () => {
         // Spy on handler method
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
+        const advanceDirectorySpy = vi.spyOn(
+          serviceWithPrivates,
+          'advanceToNextCompatibleFileInDirectory'
+        );
 
         // Call handleIncompatibleFile on player with no current file
         serviceWithPrivates.handleIncompatibleFile(deviceId);
@@ -217,7 +227,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Spy on handler method
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
+        const advanceDirectorySpy = vi.spyOn(
+          serviceWithPrivates,
+          'advanceToNextCompatibleFileInDirectory'
+        );
 
         // Call handleIncompatibleFile on non-existent player
         serviceWithPrivates.handleIncompatibleFile(nonExistentDeviceId);
@@ -262,7 +275,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         // Spy on launchRandomFile
         const launchRandomSpy = vi.spyOn(service, 'launchRandomFile');
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
+        const advanceDirectorySpy = vi.spyOn(
+          serviceWithPrivates,
+          'advanceToNextCompatibleFileInDirectory'
+        );
 
         // Call handleIncompatibleFile
         serviceWithPrivates.handleIncompatibleFile(deviceId);
@@ -306,7 +322,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Spy on handler method
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
+        const advanceDirectorySpy = vi.spyOn(
+          serviceWithPrivates,
+          'advanceToNextCompatibleFileInDirectory'
+        );
 
         // Call handleIncompatibleFile
         serviceWithPrivates.handleIncompatibleFile(deviceId);
@@ -357,7 +376,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Spy on handler methods
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
+        const advanceDirectorySpy = vi.spyOn(
+          serviceWithPrivates,
+          'advanceToNextCompatibleFileInDirectory'
+        );
 
         // Call handleIncompatibleFile
         serviceWithPrivates.handleIncompatibleFile(deviceId);
@@ -869,7 +891,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
           createTestFileItem({ name: 'other.sid', path: '/games/other.sid' }),
         ];
 
-        mockStorageStore.navigateToDirectory.mockReturnValue(of(undefined));
+        mockStorageStore.alignToPlayingFile.mockReturnValue(of(undefined));
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           path: '/games',
           directory: {
@@ -912,7 +934,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
           createTestFileItem({ name: 'other.sid', path: '/music/other.sid' }),
         ];
 
-        mockStorageStore.navigateToDirectory.mockReturnValue(of(undefined));
+        mockStorageStore.alignToPlayingFile.mockReturnValue(of(undefined));
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           path: '/music',
           directory: {
@@ -926,17 +948,17 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
           lastUpdated: Date.now(),
         }));
 
-        // Spy on both handler and navigateToDirectory
+        // Spy on both handler and alignToPlayingFile
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
         const handleIncompatibleSpy = vi.spyOn(serviceWithPrivates, 'handleIncompatibleFile');
-        const navigateSpy = mockStorageStore.navigateToDirectory;
+        const navigateSpy = mockStorageStore.alignToPlayingFile;
 
         // Act: Launch random file
         await service.launchRandomFile(deviceId);
 
         await nextTick();
 
-        // Assert: navigateToDirectory should complete before handler is called
+        // Assert: alignToPlayingFile should complete before handler is called
         expect(navigateSpy).toHaveBeenCalled();
         expect(handleIncompatibleSpy).toHaveBeenCalledWith(deviceId);
         // Handler should be called after navigation
@@ -957,7 +979,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         const directoryFiles = [randomFile];
 
-        mockStorageStore.navigateToDirectory.mockReturnValue(of(undefined));
+        mockStorageStore.alignToPlayingFile.mockReturnValue(of(undefined));
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           path: '/music',
           directory: {
@@ -1016,11 +1038,11 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // First launchFileWithContext call (initial)
         mockPlayerService.launchFile.mockReturnValueOnce(of(incompatibleFile));
-        
+
         // First launchRandomFile call (retry attempt 1)
         mockPlayerService.launchRandom.mockReturnValueOnce(of(compatibleFile));
 
-        mockStorageStore.navigateToDirectory.mockReturnValue(of(undefined));
+        mockStorageStore.alignToPlayingFile.mockReturnValue(of(undefined));
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           path: '/music',
           directory: {
@@ -1188,7 +1210,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Launch incompatible file
         mockPlayerService.launchFile.mockReturnValue(of(incompatibleFile1));
-        
+
         // Random fallback
         const randomCompatibleFile = createTestFileItem({
           name: 'random.sid',
@@ -1197,7 +1219,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         });
         mockPlayerService.launchRandom.mockReturnValue(of(randomCompatibleFile));
 
-        mockStorageStore.navigateToDirectory.mockReturnValue(of(undefined));
+        mockStorageStore.alignToPlayingFile.mockReturnValue(of(undefined));
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           path: '/music',
           directory: {
@@ -1250,7 +1272,10 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
 
         // Spy on advancement handler
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
-        const advanceDirectorySpy = vi.spyOn(serviceWithPrivates, 'advanceToNextCompatibleFileInDirectory');
+        const advanceDirectorySpy = vi.spyOn(
+          serviceWithPrivates,
+          'advanceToNextCompatibleFileInDirectory'
+        );
 
         // Act: Launch compatible file
         await service.launchFileWithContext({
@@ -1415,7 +1440,11 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         const testFiles = [
           createTestFileItem({ name: 'song1.sid', path: '/music/song1.sid' }),
           createTestFileItem({ name: 'song2.sid', path: '/music/song2.sid' }),
-          createTestFileItem({ name: 'game.prg', path: '/music/game.prg', type: FileItemType.Game }),
+          createTestFileItem({
+            name: 'game.prg',
+            path: '/music/game.prg',
+            type: FileItemType.Game,
+          }),
         ];
 
         mockPlayerService.launchFile.mockReturnValue(of(incompatibleFile));
@@ -1549,7 +1578,9 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         expect(file2?.isCompatible).toBe(true);
 
         // Verify existing incompatible file remains incompatible
-        const existingIncompatible = fileContext?.files.find((f) => f.path === incompatibleFile.path);
+        const existingIncompatible = fileContext?.files.find(
+          (f) => f.path === incompatibleFile.path
+        );
         expect(existingIncompatible?.isCompatible).toBe(false);
       });
 
@@ -1715,7 +1746,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
       // and encounter incompatible files, but skip them and return to compatible
       // Testing that error messages would be consistent in a fully incompatible scenario
 
-      // Next should wrap to incompatible2, skip it, wrap to incompatible1, skip it, 
+      // Next should wrap to incompatible2, skip it, wrap to incompatible1, skip it,
       // and return to compatible (the only compatible file)
       mockPlayerService.launchFile.mockReturnValue(of(compatible));
       await service.next(deviceId);

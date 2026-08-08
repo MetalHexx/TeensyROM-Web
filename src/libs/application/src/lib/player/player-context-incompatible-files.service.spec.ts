@@ -51,7 +51,7 @@ const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
 describe('PlayerContextService - Incompatible File Handling', () => {
   let service: PlayerContextService;
   let mockStorageStore: {
-    navigateToDirectory: ReturnType<typeof vi.fn>;
+    alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
     updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
@@ -83,8 +83,12 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
   beforeEach(() => {
     mockPlayerService = {
-      launchFile: vi.fn().mockReturnValue(of(createTestFileItem({ name: 'default.sid', isCompatible: true }))),
-      launchRandom: vi.fn().mockReturnValue(of(createTestFileItem({ name: 'default.sid', isCompatible: true }))),
+      launchFile: vi
+        .fn()
+        .mockReturnValue(of(createTestFileItem({ name: 'default.sid', isCompatible: true }))),
+      launchRandom: vi
+        .fn()
+        .mockReturnValue(of(createTestFileItem({ name: 'default.sid', isCompatible: true }))),
       toggleMusic: vi.fn(),
     };
 
@@ -98,7 +102,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
     };
 
     mockStorageStore = {
-      navigateToDirectory: vi.fn().mockReturnValue(of(undefined)),
+      alignToPlayingFile: vi.fn().mockReturnValue(of(undefined)),
       getSelectedDirectoryState: vi.fn().mockReturnValue(() => ({
         path: '/default',
         directory: {
@@ -170,7 +174,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
     beforeEach(() => {
       // Setup store with basic state
       service.initializePlayer(deviceId);
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
     });
 
     it('should not modify files array when launched file is compatible', async () => {
@@ -279,7 +283,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
       // Then: Other files retain original properties
       const passedFiles = loadFileContextSpy.mock.calls[0][0].files;
-      
+
       // Verify only target file changed
       const unchangedFiles = passedFiles.filter((f: FileItem) => f.path !== '/test/target.prg');
       expect(unchangedFiles).toHaveLength(4);
@@ -316,12 +320,14 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
       // When: loadDirectoryContextForRandomFile is called
       // Then: No error, and files array is still processed
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await expect((service as any).loadDirectoryContextForRandomFile({
-        file: { path: '/different/path.prg', name: 'path.prg' },
-        storageKey: `${deviceId}:sd:/different`,
-        parentPath: '/different',
-      })).resolves.not.toThrow();
+      await expect(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (service as any).loadDirectoryContextForRandomFile({
+          file: { path: '/different/path.prg', name: 'path.prg' },
+          storageKey: `${deviceId}:sd:/different`,
+          parentPath: '/different',
+        })
+      ).resolves.not.toThrow();
 
       // loadFileContext won't be called because file not in directory (currentIndex = -1)
       expect(loadFileContextSpy).not.toHaveBeenCalled();
@@ -331,8 +337,16 @@ describe('PlayerContextService - Incompatible File Handling', () => {
       // Given: Files with similar but different paths
       const directoryFiles: FileItem[] = [
         createTestFileItem({ path: '/test/target.prg', name: 'target.prg', isCompatible: true }),
-        createTestFileItem({ path: '/test/target-new.prg', name: 'target-new.prg', isCompatible: true }),
-        createTestFileItem({ path: '/test/target.prg.bak', name: 'target.prg.bak', isCompatible: true }),
+        createTestFileItem({
+          path: '/test/target-new.prg',
+          name: 'target-new.prg',
+          isCompatible: true,
+        }),
+        createTestFileItem({
+          path: '/test/target.prg.bak',
+          name: 'target.prg.bak',
+          isCompatible: true,
+        }),
       ];
 
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
@@ -358,10 +372,16 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
       // Then: Only exact match is marked
       const passedFiles = loadFileContextSpy.mock.calls[0][0].files;
-      
-      expect(passedFiles.find((f: FileItem) => f.path === '/test/target.prg')?.isCompatible).toBe(false);
-      expect(passedFiles.find((f: FileItem) => f.path === '/test/target-new.prg')?.isCompatible).toBe(true);
-      expect(passedFiles.find((f: FileItem) => f.path === '/test/target.prg.bak')?.isCompatible).toBe(true);
+
+      expect(passedFiles.find((f: FileItem) => f.path === '/test/target.prg')?.isCompatible).toBe(
+        false
+      );
+      expect(
+        passedFiles.find((f: FileItem) => f.path === '/test/target-new.prg')?.isCompatible
+      ).toBe(true);
+      expect(
+        passedFiles.find((f: FileItem) => f.path === '/test/target.prg.bak')?.isCompatible
+      ).toBe(true);
     });
 
     it('should not mark file when launched file has undefined isCompatible', async () => {
@@ -402,7 +422,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
     beforeEach(() => {
       service.initializePlayer(deviceId);
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
     });
 
     describe('Scenario A: Directory launch with incompatible file (Phase 1)', () => {
@@ -441,13 +461,13 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         expect(fileContext).not.toBeNull();
         expect(fileContext!.files).toHaveLength(3);
 
-        const markedFile = fileContext!.files.find(f => f.path === '/test/incompatible.prg');
+        const markedFile = fileContext!.files.find((f) => f.path === '/test/incompatible.prg');
         expect(markedFile).toBeDefined();
         expect(markedFile?.isCompatible).toBe(false);
 
         // Note: Auto-advancement launches file2.prg (next compatible file)
         // So file2 becomes the currently playing file and its state may change
-        const file1 = fileContext!.files.find(f => f.path === '/test/file1.prg');
+        const file1 = fileContext!.files.find((f) => f.path === '/test/file1.prg');
         expect(file1?.isCompatible).toBe(true); // Default value, unaffected
       });
 
@@ -498,7 +518,11 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
         const directoryFiles: FileItem[] = [
           createTestFileItem({ name: 'file1.prg', path: '/test/file1.prg' }),
-          createTestFileItem({ name: 'incompatible.prg', path: '/test/incompatible.prg', isCompatible: true }), // Initially compatible in directory
+          createTestFileItem({
+            name: 'incompatible.prg',
+            path: '/test/incompatible.prg',
+            isCompatible: true,
+          }), // Initially compatible in directory
           createTestFileItem({ name: 'file2.prg', path: '/test/file2.prg' }),
         ];
 
@@ -526,13 +550,13 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         expect(fileContext).not.toBeNull();
         expect(fileContext!.files).toHaveLength(3);
 
-        const markedFile = fileContext!.files.find(f => f.path === '/test/incompatible.prg');
+        const markedFile = fileContext!.files.find((f) => f.path === '/test/incompatible.prg');
         expect(markedFile).toBeDefined();
         expect(markedFile?.isCompatible).toBe(false);
 
         // Verify other files unchanged
-        const file1 = fileContext!.files.find(f => f.path === '/test/file1.prg');
-        const file2 = fileContext!.files.find(f => f.path === '/test/file2.prg');
+        const file1 = fileContext!.files.find((f) => f.path === '/test/file1.prg');
+        const file2 = fileContext!.files.find((f) => f.path === '/test/file2.prg');
         expect(file1?.isCompatible).toBe(true); // Default value
         expect(file2?.isCompatible).toBe(true); // Default value
       });
@@ -635,8 +659,12 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         expect(randomLaunchContext!.files).toHaveLength(3);
 
         // Verify marked file identical
-        const directoryMarkedFile = directoryLaunchContext!.files.find(f => f.path === '/test/test.prg');
-        const randomMarkedFile = randomLaunchContext!.files.find(f => f.path === '/test/test.prg');
+        const directoryMarkedFile = directoryLaunchContext!.files.find(
+          (f) => f.path === '/test/test.prg'
+        );
+        const randomMarkedFile = randomLaunchContext!.files.find(
+          (f) => f.path === '/test/test.prg'
+        );
 
         expect(directoryMarkedFile?.isCompatible).toBe(false);
         expect(randomMarkedFile?.isCompatible).toBe(false);
@@ -653,7 +681,11 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         });
 
         const directoryFiles: FileItem[] = [
-          createTestFileItem({ name: 'file (1).prg', path: '/test/dir with spaces/file (1).prg', isCompatible: true }),
+          createTestFileItem({
+            name: 'file (1).prg',
+            path: '/test/dir with spaces/file (1).prg',
+            isCompatible: true,
+          }),
           createTestFileItem({ name: 'file (2).prg', path: '/test/dir with spaces/file (2).prg' }),
         ];
 
@@ -695,16 +727,20 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         expect(context1).not.toBeNull();
         expect(context2).not.toBeNull();
 
-        const file1 = context1!.files.find(f => f.path === '/test/dir with spaces/file (1).prg');
-        const file2 = context2!.files.find(f => f.path === '/test/dir with spaces/file (1).prg');
+        const file1 = context1!.files.find((f) => f.path === '/test/dir with spaces/file (1).prg');
+        const file2 = context2!.files.find((f) => f.path === '/test/dir with spaces/file (1).prg');
 
         expect(file1?.isCompatible).toBe(false);
         expect(file2?.isCompatible).toBe(false);
 
         // Other file not marked
-        const otherFile1 = context1!.files.find(f => f.path === '/test/dir with spaces/file (2).prg');
-        const otherFile2 = context2!.files.find(f => f.path === '/test/dir with spaces/file (2).prg');
-        
+        const otherFile1 = context1!.files.find(
+          (f) => f.path === '/test/dir with spaces/file (2).prg'
+        );
+        const otherFile2 = context2!.files.find(
+          (f) => f.path === '/test/dir with spaces/file (2).prg'
+        );
+
         // Check that other files are compatible (could be explicitly marked or auto-advanced)
         expect(otherFile1).toBeDefined();
         expect(otherFile2).toBeDefined();
@@ -740,7 +776,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         const context1 = service.getFileContext('device-missing-1')();
         expect(context1).not.toBeNull();
         expect(context1!.files).toHaveLength(1);
-        expect(context1!.files.find(f => f.path === '/test/missing.prg')).toBeUndefined();
+        expect(context1!.files.find((f) => f.path === '/test/missing.prg')).toBeUndefined();
 
         // Scenario 2: Random launch (file not in directory response)
         service.initializePlayer('device-missing-2');
@@ -762,7 +798,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         await nextTick();
 
         const context2 = service.getFileContext('device-missing-2')();
-        
+
         // Random launch creates empty context when file not found in directory
         expect(context2).toBeDefined();
         expect(context2!.files).toHaveLength(0);
@@ -814,7 +850,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
           lastUpdated: Date.now(),
         }));
 
-       await service.launchRandomFile('device-undef-2');
+        await service.launchRandomFile('device-undef-2');
         await nextTick();
 
         const context2 = service.getFileContext('device-undef-2')();
@@ -833,7 +869,11 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         });
 
         const directoryFiles: FileItem[] = [
-          createTestFileItem({ name: 'compatible.prg', path: '/test/compatible.prg', isCompatible: false }), // Directory says incompatible
+          createTestFileItem({
+            name: 'compatible.prg',
+            path: '/test/compatible.prg',
+            isCompatible: false,
+          }), // Directory says incompatible
         ];
 
         // Scenario 1: Directory launch
@@ -890,7 +930,11 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
         const directoryFiles: FileItem[] = [
           createTestFileItem({ name: 'file1.prg', path: '/legacy/file1.prg', isCompatible: true }),
-          createTestFileItem({ name: 'legacy.prg', path: '/legacy/legacy.prg', isCompatible: true }),
+          createTestFileItem({
+            name: 'legacy.prg',
+            path: '/legacy/legacy.prg',
+            isCompatible: true,
+          }),
           createTestFileItem({ name: 'file2.prg', path: '/legacy/file2.prg', isCompatible: true }),
         ];
 
@@ -912,13 +956,13 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         expect(context).not.toBeNull();
         expect(context!.files).toHaveLength(3);
 
-        const markedFile = context!.files.find(f => f.path === '/legacy/legacy.prg');
+        const markedFile = context!.files.find((f) => f.path === '/legacy/legacy.prg');
         expect(markedFile?.isCompatible).toBe(false);
 
         // Other files - Note: auto-advancement may have occurred
-        expect(context!.files.find(f => f.path === '/legacy/file1.prg')?.isCompatible).toBe(true);
+        expect(context!.files.find((f) => f.path === '/legacy/file1.prg')?.isCompatible).toBe(true);
         // file2 auto-advanced to and may have isCompatible state changed
-        const file2 = context!.files.find(f => f.path === '/legacy/file2.prg');
+        const file2 = context!.files.find((f) => f.path === '/legacy/file2.prg');
         expect(file2).toBeDefined();
       });
 
@@ -954,7 +998,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         let context = service.getFileContext(deviceId)();
         expect(context).not.toBeNull();
         expect(context!.files).toHaveLength(2);
-        expect(context!.files.find(f => f.path === '/test/file1.prg')?.isCompatible).toBe(false);
+        expect(context!.files.find((f) => f.path === '/test/file1.prg')?.isCompatible).toBe(false);
 
         // Launch 2: Random launch (same directory)
         mockPlayerService.launchRandom.mockReturnValue(of(file2));
@@ -977,7 +1021,7 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         context = service.getFileContext(deviceId)();
         expect(context).not.toBeNull();
         expect(context!.files).toHaveLength(2);
-        expect(context!.files.find(f => f.path === '/test/file2.prg')?.isCompatible).toBe(false);
+        expect(context!.files.find((f) => f.path === '/test/file2.prg')?.isCompatible).toBe(false);
 
         // Launch 3: Directory launch again
         mockPlayerService.launchFile.mockReturnValue(of(file1));
@@ -993,10 +1037,10 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         context = service.getFileContext(deviceId)();
         expect(context).not.toBeNull();
         expect(context!.files).toHaveLength(2);
-        expect(context!.files.find(f => f.path === '/test/file1.prg')?.isCompatible).toBe(false);
+        expect(context!.files.find((f) => f.path === '/test/file1.prg')?.isCompatible).toBe(false);
 
         // Verify no duplicates, no mutations
-        const paths = context!.files.map(f => f.path);
+        const paths = context!.files.map((f) => f.path);
         expect(new Set(paths).size).toBe(2); // No duplicates
       });
     });
@@ -1174,8 +1218,16 @@ describe('PlayerContextService - Incompatible File Handling', () => {
       });
 
       it('should handle multiple incompatible files across multiple launches', async () => {
-        const file1 = createTestFileItem({ name: 'bad1.sid', path: '/music/bad1.sid', isCompatible: false });
-        const file2 = createTestFileItem({ name: 'bad2.sid', path: '/music/bad2.sid', isCompatible: false });
+        const file1 = createTestFileItem({
+          name: 'bad1.sid',
+          path: '/music/bad1.sid',
+          isCompatible: false,
+        });
+        const file2 = createTestFileItem({
+          name: 'bad2.sid',
+          path: '/music/bad2.sid',
+          isCompatible: false,
+        });
 
         // First launch
         mockPlayerService.launchRandom.mockReturnValueOnce(of(file1));
