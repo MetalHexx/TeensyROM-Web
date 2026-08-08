@@ -1,0 +1,32 @@
+<lib-dropdown-menu #menu class="device-selector" data-testid="device-selector">
+  <div class="device-selector-trigger" data-testid="device-selector-trigger">
+    <span class="device-selector-info">
+      <span class="device-selector-name" data-testid="device-selector-name">{{
+        targetDevice()?.name ?? 'Select device'
+      }}</span>
+      <span class="device-selector-id" data-testid="device-selector-id">{{
+        targetDevice()?.deviceId
+      }}</span>
+    </span>
+    <lib-icon-button
+      icon="expand_more"
+      ariaLabel="Choose target device"
+      variant="rounded-transparent"
+      size="small"
+      data-testid="device-selector-toggle"
+      (buttonClick)="menu.toggle()"
+    ></lib-icon-button>
+  </div>
+
+  <div dropdown-content class="device-selector-menu">
+    @for (device of enabledDevices(); track device.deviceId) {
+    <lib-dropdown-menu-item
+      [selected]="device.deviceId === targetDevice()?.deviceId"
+      [testId]="'device-selector-item-' + device.deviceId"
+      (itemClick)="onSelect(device)"
+    >
+      {{ device.name }} — {{ device.deviceId }}
+    </lib-dropdown-menu-item>
+    }
+  </div>
+</lib-dropdown-menu>
