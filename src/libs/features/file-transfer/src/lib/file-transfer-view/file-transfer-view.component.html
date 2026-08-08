@@ -20,7 +20,9 @@
       }
     </div>
     <div class="right-container" data-testid="right-container">
-      <!-- listing card, next phase -->
+      @if (targetDevice(); as device) {
+      <lib-transfer-directory-listing [deviceId]="device.deviceId" />
+      }
     </div>
   </div>
   }

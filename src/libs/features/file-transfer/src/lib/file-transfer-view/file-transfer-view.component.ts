@@ -13,6 +13,7 @@ import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
 import { TransferStatusCardComponent } from './transfer-status-card/transfer-status-card.component';
 import { DestinationCardComponent } from './destination-card/destination-card.component';
 import { DirectoryTreeContainerComponent } from './directory-tree-container/directory-tree-container.component';
+import { TransferDirectoryListingComponent } from './transfer-directory-listing/transfer-directory-listing.component';
 
 /**
  * Top-level view for the File Transfer feature. Resolves and persists the
@@ -21,7 +22,13 @@ import { DirectoryTreeContainerComponent } from './directory-tree-container/dire
  */
 @Component({
   selector: 'lib-file-transfer-view',
-  imports: [DestinationCardComponent, TransferStatusCardComponent, EmptyStateMessageComponent, DirectoryTreeContainerComponent],
+  imports: [
+    DestinationCardComponent,
+    TransferStatusCardComponent,
+    EmptyStateMessageComponent,
+    DirectoryTreeContainerComponent,
+    TransferDirectoryListingComponent,
+  ],
   templateUrl: './file-transfer-view.component.html',
   styleUrl: './file-transfer-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

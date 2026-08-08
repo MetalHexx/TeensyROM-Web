@@ -1,0 +1,55 @@
+<div class="transfer-directory-listing">
+  <lib-scaling-card [enableOverflow]="false">
+    <div slot="header" class="header-toolbar">
+      <lib-directory-trail-container [deviceId]="deviceId()" />
+      <span class="content-count">{{ folderCount() }} folders · {{ fileCount() }} files</span>
+    </div>
+
+    @if (isDeviceLevelView()) {
+    <lib-empty-state-message
+      icon="devices"
+      title="Select a Storage Location"
+      message="Choose SD or USB storage to browse its contents."
+      size="small"
+    ></lib-empty-state-message>
+    } @else if (!hasContent()) {
+    <lib-empty-state-message
+      icon="folder_open"
+      title="Empty Directory"
+      message="This directory has no folders or files."
+      size="small"
+    ></lib-empty-state-message>
+    } @else {
+    <div class="viewport-wrapper">
+      <cdk-virtual-scroll-viewport
+        itemSize="42"
+        class="listing-viewport"
+        minBufferPx="200"
+        maxBufferPx="400"
+      >
+        <div
+          *cdkVirtualFor="let row of rows(); trackBy: trackByPath; let i = index"
+          class="listing-row"
+          [class.divider-before]="showDivider() && i === folderCount()"
+          [attr.data-item-path]="row.path"
+        >
+          @if (isDirectoryRow(row)) {
+          <lib-directory-item
+            [directoryItem]="row"
+            [selected]="isSelected(row)"
+            (itemSelected)="onDirectorySelected($event)"
+            (itemDoubleClicked)="onDirectoryActivated($event)"
+          ></lib-directory-item>
+          } @else {
+          <lib-storage-item
+            [icon]="existingFileIcon"
+            [label]="row.name"
+            [disabled]="true"
+          ></lib-storage-item>
+          }
+        </div>
+      </cdk-virtual-scroll-viewport>
+    </div>
+    }
+  </lib-scaling-card>
+</div>
