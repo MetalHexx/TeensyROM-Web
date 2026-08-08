@@ -39,7 +39,8 @@ export class TransferDtoMapper {
     };
   }
 
-  private static toFileCompletion(dto: TransferFileCompleted): TransferFileCompletion {
+  /** Normalizes a single file-completion event, also used directly for the hub's `FileCompleted` push. */
+  static toFileCompletion(dto: TransferFileCompleted): TransferFileCompletion {
     return {
       jobId: dto.jobId,
       relativePath: dto.relativePath,

@@ -30,3 +30,4 @@ export * from './audio-stream.contract';
 
 // Transfer contracts
 export * from './transfer.contract';
+export * from './transfer-hub.contract';

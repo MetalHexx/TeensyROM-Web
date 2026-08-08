@@ -1,6 +1,7 @@
 import { Provider } from '@angular/core';
-import { TRANSFER_SERVICE, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
+import { TRANSFER_SERVICE, TRANSFER_HUB_SERVICE, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
 import { TransferService } from './transfer.service';
+import { TransferHubService } from './transfer-hub.service';
 import { TransfersApiService, Configuration } from '@teensyrom-nx/data-access/api-client';
 
 /**
@@ -28,5 +29,10 @@ export const TRANSFER_PROVIDERS: Provider[] = [
     provide: TRANSFER_SERVICE,
     useClass: TransferService,
     deps: [TransfersApiService, API_CONFIG],
+  },
+  {
+    provide: TRANSFER_HUB_SERVICE,
+    useClass: TransferHubService,
+    deps: [API_CONFIG],
   },
 ];
