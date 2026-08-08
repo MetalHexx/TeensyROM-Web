@@ -26,6 +26,12 @@ export const appRoutes: Route[] = [
           import('@teensyrom-nx/features/player').then((m) => m.PlayerViewComponent),
       },
       {
+        path: 'file-transfer',
+        data: { title: 'File Transfer' },
+        loadComponent: () =>
+          import('@teensyrom-nx/features/file-transfer').then((m) => m.FileTransferViewComponent),
+      },
+      {
         path: 'settings',
         data: { title: 'Settings' },
         loadComponent: () =>

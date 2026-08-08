@@ -1,0 +1,29 @@
+<div class="file-transfer-view">
+  @if (enabledDevices().length === 0) {
+  <lib-empty-state-message
+    icon="devices"
+    title="No Enabled Devices"
+    message="Enable a TeensyROM device to get started."
+    secondaryMessage="Visit the <strong>Device View</strong> to manage your devices."
+    data-testid="no-devices-empty-state"
+  >
+  </lib-empty-state-message>
+  } @else {
+  <div class="top-row" data-testid="top-row">
+    <lib-destination-card />
+    <lib-transfer-status-card />
+  </div>
+  <div class="content-row" data-testid="content-row">
+    <div class="left-container" data-testid="left-container">
+      @if (targetDevice(); as device) {
+      <lib-directory-tree-container [deviceId]="device.deviceId" />
+      }
+    </div>
+    <div class="right-container" data-testid="right-container">
+      @if (targetDevice(); as device) {
+      <lib-transfer-directory-listing [deviceId]="device.deviceId" />
+      }
+    </div>
+  </div>
+  }
+</div>

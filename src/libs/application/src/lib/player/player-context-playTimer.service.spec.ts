@@ -57,7 +57,7 @@ const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
 describe('PlayerContextService - Custom Play Timer', () => {
   let service: PlayerContextService;
   let mockStorageStore: {
-    navigateToDirectory: ReturnType<typeof vi.fn>;
+    alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
@@ -111,7 +111,7 @@ describe('PlayerContextService - Custom Play Timer', () => {
     };
 
     mockStorageStore = {
-      navigateToDirectory: vi.fn(),
+      alignToPlayingFile: vi.fn(),
       getSelectedDirectoryState: vi.fn(),
     };
 
@@ -144,7 +144,10 @@ describe('PlayerContextService - Custom Play Timer', () => {
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: SettingsStore, useValue: mockSettingsStore },
-        { provide: PLAYER_STORAGE, useValue: { load: vi.fn(), save: vi.fn(), hasSavedState: vi.fn(), clear: vi.fn() } },
+        {
+          provide: PLAYER_STORAGE,
+          useValue: { load: vi.fn(), save: vi.fn(), hasSavedState: vi.fn(), clear: vi.fn() },
+        },
       ],
     });
 
@@ -630,4 +633,3 @@ describe('PlayerContextService - Custom Play Timer', () => {
     });
   });
 });
-

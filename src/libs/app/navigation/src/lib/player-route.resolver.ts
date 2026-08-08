@@ -1,6 +1,15 @@
 import { inject } from '@angular/core';
 import { ResolveFn, ActivatedRouteSnapshot } from '@angular/router';
-import { StorageStore, PlayerContextService, DeviceStore, PLAYER_STORAGE, SettingsStore, StorageKeyUtil, IPlayerStorage, PlayerStore } from '@teensyrom-nx/application';
+import {
+  StorageStore,
+  PlayerContextService,
+  DeviceStore,
+  PLAYER_STORAGE,
+  SettingsStore,
+  StorageKeyUtil,
+  IPlayerStorage,
+  PlayerStore,
+} from '@teensyrom-nx/application';
 import { StorageType, LaunchMode, Settings } from '@teensyrom-nx/domain';
 import { logInfo, logError, LogType } from '@teensyrom-nx/utils';
 import { effect, runInInjectionContext, Injector, untracked } from '@angular/core';
@@ -63,7 +72,7 @@ export const playerRouteResolver: ResolveFn<void> = async (
   logInfo(LogType.Success, 'PlayerResolver: Returning immediately to render component');
 };
 
-/** 
+/**
  * Complete player initialization - runs entirely in background after component renders
  */
 async function initializePlayer(
@@ -97,17 +106,17 @@ async function initializePlayer(
 
   for (const currentDevice of devices) {
     try {
-      if (currentDevice.usbStorage?.available) {
-        await storageStore.initializeStorage({
-          deviceId: currentDevice.deviceId,
-          storageType: StorageType.Usb,
-        });
-      }
-
       if (currentDevice.sdStorage?.available) {
         await storageStore.initializeStorage({
           deviceId: currentDevice.deviceId,
           storageType: StorageType.Sd,
+        });
+      }
+
+      if (currentDevice.usbStorage?.available) {
+        await storageStore.initializeStorage({
+          deviceId: currentDevice.deviceId,
+          storageType: StorageType.Usb,
         });
       }
     } catch (error) {
@@ -183,8 +192,19 @@ async function initializePlayer(
         shouldLaunch = shouldLaunch && true;
       }
 
-      // Navigate to initial directory
-      if (!settings.playerSettings.startupLaunchRandom) {
+      // Navigate to initial directory, unless the device already has a held position and
+      // nothing needs to be launched or browsed from a different path.
+      const hasPosition =
+        storageStore.getSelectedDirectoryForDevice(currentDevice.deviceId)?.storageType != null;
+      const navigationNeededForLaunch = shouldLaunch && filenameToLaunch !== null;
+      // A saved file or deep link still identifies a folder to browse to even when auto-launch
+      // is disabled - only the launch itself is gated on shouldLaunch, not the browsing position.
+      const navigationNeededForSavedFolder = filenameToLaunch !== null && !shouldLaunch;
+
+      if (
+        !settings.playerSettings.startupLaunchRandom &&
+        (navigationNeededForLaunch || navigationNeededForSavedFolder || !hasPosition)
+      ) {
         await storageStore.navigateToDirectory({
           deviceId: currentDevice.deviceId,
           storageType: storageToNavigate,
@@ -195,11 +215,16 @@ async function initializePlayer(
       // Handle auto-launch or random launch
       if (settings.playerSettings.startupLaunchRandom && shouldLaunch) {
         await playerContextService.launchRandomFile(currentDevice.deviceId);
-        playerContextService.setFilterMode(currentDevice.deviceId, settings.playerSettings.startupFilter);
+        playerContextService.setFilterMode(
+          currentDevice.deviceId,
+          settings.playerSettings.startupFilter
+        );
       } else if (filenameToLaunch && shouldLaunch) {
         const directoryState = storageStore.getSelectedDirectoryState(currentDevice.deviceId)();
         if (directoryState?.directory?.files) {
-          const fileToLaunch = directoryState.directory.files.find((f: { name: string }) => f.name === filenameToLaunch);
+          const fileToLaunch = directoryState.directory.files.find(
+            (f: { name: string }) => f.name === filenameToLaunch
+          );
 
           if (fileToLaunch) {
             logInfo(LogType.Info, `PlayerInit: Found file: ${filenameToLaunch}, launching...`);
@@ -208,7 +233,7 @@ async function initializePlayer(
               deviceId: currentDevice.deviceId,
               file: fileToLaunch,
               directoryPath: pathToNavigate,
-              files: directoryState.directory.files,              
+              files: directoryState.directory.files,
               launchMode: savedState?.launchMode || LaunchMode.Directory,
             });
           }

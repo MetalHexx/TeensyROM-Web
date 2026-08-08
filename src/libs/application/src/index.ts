@@ -19,3 +19,6 @@ export * from './lib/settings/settings-store';
 
 // Audio state management
 export * from './lib/audio/audio-store';
+
+// Transfer state management
+export * from './lib/transfer/transfer-store';

@@ -6,7 +6,6 @@ import {
   WritableStore,
   setDeviceSelectedDirectory,
   getStorage,
-  isDirectoryLoadedAtPath,
   createStorage,
   updateStorage,
   setStorageLoaded,
@@ -32,11 +31,16 @@ export function initializeStorage(
 
       logInfo(LogType.Start, `Starting async initialization for ${key}`);
 
-      setDeviceSelectedDirectory(store, deviceId, storageType, '/', actionMessage);
+      if (!store.selectedDirectories()[deviceId]) {
+        setDeviceSelectedDirectory(store, deviceId, storageType, '/', actionMessage);
+      }
 
       const existingEntry = getStorage(store, key);
 
-      if (isDirectoryLoadedAtPath(existingEntry, '/')) {
+      // Any loaded listing is enough for this action's purpose: the entry exists, so the tree
+      // has a storage root to render and expand from. Re-seeding to root here is what discards
+      // the user's position, their loaded listing, and their navigation history.
+      if (existingEntry?.isLoaded) {
         logInfo(LogType.Info, `${key} already loaded, skipping initialization`);
         return;
       }

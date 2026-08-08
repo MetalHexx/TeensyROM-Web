@@ -79,7 +79,7 @@ describe('PlayerContextService - isSlowLoading', () => {
     pingDevice: ReturnType<typeof vi.fn>;
   };
   let mockStorageStore: {
-    navigateToDirectory: ReturnType<typeof vi.fn>;
+    alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
@@ -127,7 +127,7 @@ describe('PlayerContextService - isSlowLoading', () => {
     };
 
     mockStorageStore = {
-      navigateToDirectory: vi.fn(),
+      alignToPlayingFile: vi.fn(),
       getSelectedDirectoryState: vi.fn(),
     };
 
@@ -202,11 +202,11 @@ describe('PlayerContextService - isSlowLoading', () => {
 
       setDeviceLoading('device1', true);
       TestBed.flushEffects(); // Flush signal updates
-      
+
       // Wait for RxJS observable to complete (even 0ms timer is async)
       await wait(10);
       TestBed.flushEffects();
-      
+
       expect(slowLoadingSignal()).toBe(true);
     });
 
@@ -239,7 +239,7 @@ describe('PlayerContextService - isSlowLoading', () => {
 
       setDeviceLoading('device1', true);
       TestBed.flushEffects();
-      
+
       // Wait for RxJS observable to complete
       await wait(10);
       TestBed.flushEffects();
@@ -261,11 +261,11 @@ describe('PlayerContextService - isSlowLoading', () => {
 
       setDeviceLoading('device2', true);
       TestBed.flushEffects();
-      
+
       // Wait for RxJS observable to complete
       await wait(10);
       TestBed.flushEffects();
-      
+
       expect(slowLoadingSignal()).toBe(true);
     });
 
@@ -278,7 +278,7 @@ describe('PlayerContextService - isSlowLoading', () => {
       setDeviceLoading('device1', true);
       setDeviceLoading('device2', true);
       TestBed.flushEffects();
-      
+
       // Wait for RxJS observable to complete
       await wait(10);
       TestBed.flushEffects();
@@ -303,7 +303,7 @@ describe('PlayerContextService - isSlowLoading', () => {
 
       const slowLoadingSignal = service.isSlowLoading();
       slowLoadingSignal(); // Prime the signal
-      
+
       // Wait for RxJS observable to complete
       await wait(10);
       TestBed.flushEffects();
@@ -366,7 +366,7 @@ describe('PlayerContextService - isSlowLoading', () => {
               subscriber.complete();
             }, 100); // Small real delay for async test
           })
-     );
+      );
 
       // Start launch
       const launchPromise = service.launchFileWithContext({
@@ -425,5 +425,3 @@ describe('PlayerContextService - isSlowLoading', () => {
     );
   });
 });
-
-

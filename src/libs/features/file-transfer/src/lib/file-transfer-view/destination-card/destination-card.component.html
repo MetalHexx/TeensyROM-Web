@@ -1,0 +1,12 @@
+<lib-scaling-card title="Destination" data-testid="destination-card">
+  <div class="destination-card-body">
+    <lib-device-selector />
+    <lib-status-icon-label
+      icon="bolt"
+      label="Idle"
+      [status]="isIdle()"
+      data-testid="destination-status"
+    ></lib-status-icon-label>
+    <lib-dropzone-placeholder />
+  </div>
+</lib-scaling-card>

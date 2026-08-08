@@ -1,0 +1,83 @@
+@use '../../../../../../ui/styles/src/lib/theme/mixins' as mixins;
+
+:host {
+  display: block;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.transfer-directory-listing {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+
+  lib-scaling-card {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+}
+
+.header-toolbar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  width: 100%;
+
+  lib-directory-trail-container {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .content-count {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  @include mixins.below-phone {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+}
+
+.viewport-wrapper {
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--spacing-lg);
+}
+
+.listing-viewport {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.listing-row {
+  margin-right: var(--spacing-lg);
+
+  &.divider-before {
+    border-top: 1px solid var(--border-dimmed, rgba(255, 255, 255, 0.1));
+  }
+
+  &.disabled-row {
+    opacity: 0.5;
+
+    /* Suppress hover affordance for disabled existing-file rows */
+    lib-storage-item {
+      cursor: default;
+
+      &:hover {
+        background-color: transparent;
+      }
+    }
+  }
+}

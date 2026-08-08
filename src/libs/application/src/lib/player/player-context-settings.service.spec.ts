@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
-import {
-  ALERT_SERVICE,
-  IAlertService,
-  PlayerFilterType,
-  AlertMessage,
-} from '@teensyrom-nx/domain';
+import { ALERT_SERVICE, IAlertService, PlayerFilterType, AlertMessage } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore } from '../storage/storage-store';
@@ -22,7 +17,7 @@ describe('PlayerContextService - Settings Integration', () => {
     updatePlayerTimer: ReturnType<typeof vi.fn>;
   };
   let mockStorageStore: {
-    navigateToDirectory: ReturnType<typeof vi.fn>;
+    alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
@@ -52,7 +47,7 @@ describe('PlayerContextService - Settings Integration', () => {
     };
 
     mockStorageStore = {
-      navigateToDirectory: vi.fn().mockResolvedValue(undefined),
+      alignToPlayingFile: vi.fn().mockResolvedValue(undefined),
       getSelectedDirectoryState: vi.fn(),
     };
 
@@ -182,10 +177,10 @@ describe('PlayerContextService - Settings Integration', () => {
       service.initializePlayer(deviceId);
 
       // Assert
-      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({ 
+      expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
         defaultFilter: PlayerFilterType.Games,
-        playTimerEnabled: true
+        playTimerEnabled: true,
       });
     });
 
@@ -203,7 +198,7 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
         defaultFilter: PlayerFilterType.All,
-        playTimerEnabled: false
+        playTimerEnabled: false,
       });
     });
 
@@ -245,7 +240,7 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
         defaultFilter: PlayerFilterType.All,
-        playTimerEnabled: false
+        playTimerEnabled: false,
       });
     });
 
@@ -295,7 +290,7 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
         defaultFilter: PlayerFilterType.Music,
-        playTimerEnabled: true
+        playTimerEnabled: true,
       });
     });
 
@@ -345,7 +340,7 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
         defaultFilter: PlayerFilterType.Hex,
-        playTimerEnabled: true
+        playTimerEnabled: true,
       });
     });
 
@@ -395,7 +390,7 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
         defaultFilter: PlayerFilterType.Images,
-        playTimerEnabled: true
+        playTimerEnabled: true,
       });
     });
 
@@ -408,7 +403,7 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
         defaultFilter: PlayerFilterType.All,
-        playTimerEnabled: true
+        playTimerEnabled: true,
       });
     });
 
@@ -463,12 +458,12 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId: device1,
         defaultFilter: PlayerFilterType.Games,
-        playTimerEnabled: true
+        playTimerEnabled: true,
       });
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId: device2,
         defaultFilter: PlayerFilterType.Games,
-        playTimerEnabled: true
+        playTimerEnabled: true,
       });
     });
 
@@ -513,12 +508,12 @@ describe('PlayerContextService - Settings Integration', () => {
 
       // Act - Initialize player (creates state with Games filter)
       service.initializePlayer(deviceId);
-      
+
       // User manually changes filter to Music
       (mockPlayerStore.updateShuffleSettings as ReturnType<typeof vi.fn>).mockClear();
-      mockPlayerStore.updateShuffleSettings({ 
-        deviceId, 
-        shuffleSettings: { filter: PlayerFilterType.Music } 
+      mockPlayerStore.updateShuffleSettings({
+        deviceId,
+        shuffleSettings: { filter: PlayerFilterType.Music },
       });
 
       // Clear the initializePlayer mock to verify it's called again
@@ -532,9 +527,9 @@ describe('PlayerContextService - Settings Integration', () => {
       expect(mockPlayerStore.initializePlayer).toHaveBeenCalledWith({
         deviceId,
         defaultFilter: PlayerFilterType.Games,
-        playTimerEnabled: true
+        playTimerEnabled: true,
       });
-      
+
       // The key assertion: updateShuffleSettings should NOT have been called
       // because ensurePlayerState should have returned existing state without modifying it
       expect(mockPlayerStore.updateShuffleSettings).toHaveBeenCalledTimes(1); // Only the user's manual change

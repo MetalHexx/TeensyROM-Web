@@ -61,7 +61,9 @@ describe('PlayerContextService', () => {
   let service: PlayerContextService;
   let mockStorageStore: {
     navigateToDirectory: ReturnType<typeof vi.fn>;
+    alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+    updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
     settings: ReturnType<typeof vi.fn>;
@@ -121,7 +123,9 @@ describe('PlayerContextService', () => {
 
     mockStorageStore = {
       navigateToDirectory: vi.fn(),
+      alignToPlayingFile: vi.fn(),
       getSelectedDirectoryState: vi.fn(),
+      updateFileCompatibility: vi.fn(),
     };
 
     mockSettingsStore = {
@@ -350,25 +354,49 @@ describe('PlayerContextService', () => {
       };
 
       mockPlayerService.launchRandom.mockReturnValue(of(randomFile));
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => mockDirectoryState);
 
       await service.launchRandomFile(deviceId);
       await nextTick();
 
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: randomFile.parentPath,
-       });
+      expect(mockStorageStore.alignToPlayingFile).toHaveBeenCalledWith({
+        deviceId,
+        storageType,
+        path: randomFile.parentPath,
+      });
     });
 
     it('should handle directory context loading failure silently', async () => {
       mockPlayerService.launchRandom.mockReturnValue(of(randomFile));
-      mockStorageStore.navigateToDirectory.mockRejectedValue(new Error('Directory load failed'));
+      mockStorageStore.alignToPlayingFile.mockRejectedValue(new Error('Directory load failed'));
 
       await expect(service.launchRandomFile(deviceId)).resolves.not.toThrow();
       await nextTick();
 
       const currentFile = service.getCurrentFile(deviceId)();
       expect(currentFile?.file).toEqual(randomFile);
+    });
+
+    it('should still launch and set a new current file when playback alignment is skipped by a held navigation pin', async () => {
+      // A held pin makes alignToPlayingFile a no-op that leaves storage state untouched; here
+      // that is simulated by a resolved align with no directory state to read back.
+      mockPlayerService.launchRandom.mockReturnValue(of(randomFile));
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
+      mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => null);
+
+      await service.launchRandomFile(deviceId);
+      await nextTick();
+
+      expect(mockStorageStore.alignToPlayingFile).toHaveBeenCalledWith({
+        deviceId,
+        storageType,
+        path: randomFile.parentPath,
+      });
+
+      const currentFile = service.getCurrentFile(deviceId)();
+      expect(currentFile?.file).toEqual(randomFile);
+      expect(service.getLaunchMode(deviceId)()).toBe(LaunchMode.Shuffle);
     });
 
     it('should handle random launch API error', async () => {
@@ -919,7 +947,7 @@ describe('PlayerContextService', () => {
         ];
 
         mockPlayerService.launchRandom.mockReturnValue(of(randomFile));
-        mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+        mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           directory: { files: directoryFiles },
         }));
@@ -931,8 +959,11 @@ describe('PlayerContextService', () => {
         expect(mockPlayerService.launchRandom).toHaveBeenCalled();
 
         // Should load directory context
-        expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: '/music',
-         });
+        expect(mockStorageStore.alignToPlayingFile).toHaveBeenCalledWith({
+          deviceId,
+          storageType,
+          path: '/music',
+        });
 
         // Should have loaded file context with the directory files
         const fileContext = service.getFileContext(deviceId)();
@@ -948,7 +979,7 @@ describe('PlayerContextService', () => {
         ];
 
         mockPlayerService.launchRandom.mockReturnValue(of(randomFile));
-        mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+        mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           directory: { files: directoryFiles },
         }));
@@ -960,8 +991,11 @@ describe('PlayerContextService', () => {
         expect(mockPlayerService.launchRandom).toHaveBeenCalled();
 
         // Should load directory context
-        expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: '/sounds',
-         });
+        expect(mockStorageStore.alignToPlayingFile).toHaveBeenCalledWith({
+          deviceId,
+          storageType,
+          path: '/sounds',
+        });
 
         // Should have loaded file context with the directory files
         const fileContext = service.getFileContext(deviceId)();
@@ -973,7 +1007,7 @@ describe('PlayerContextService', () => {
         const randomFile = createTestFileItem({ name: 'random.sid', path: '/music/random.sid' });
 
         mockPlayerService.launchRandom.mockReturnValue(of(randomFile));
-        mockStorageStore.navigateToDirectory.mockRejectedValue(new Error('Directory load failed'));
+        mockStorageStore.alignToPlayingFile.mockRejectedValue(new Error('Directory load failed'));
 
         await service.next(deviceId);
         await nextTick();
@@ -1189,7 +1223,7 @@ describe('PlayerContextService', () => {
         file: testFile,
         directoryPath: '/music',
         files: [testFile],
-        });
+      });
       await nextTick();
 
       expect(service.getError(deviceId)()).toBeNull();
@@ -1260,9 +1294,11 @@ describe('PlayerContextService', () => {
       expect(currentFile?.file).toEqual(file1);
       expect(service.isLoading(deviceId)()).toBe(false);
       expect(service.getError(deviceId)()).toBeNull();
-      
+
       // Verify alert service was called to warn about blocked launch
-      expect(mockAlertService.warning).toHaveBeenCalledWith('Please wait - a file is currently loading');
+      expect(mockAlertService.warning).toHaveBeenCalledWith(
+        'Please wait - a file is currently loading'
+      );
     });
   });
 
@@ -2295,7 +2331,7 @@ describe('PlayerContextService', () => {
 
         // First launch starts but doesn't complete
         mockPlayerService.launchFile.mockReturnValueOnce(slowLaunch$);
-        
+
         // Start first launch
         void service.launchFileWithContext({
           deviceId,
@@ -2303,11 +2339,11 @@ describe('PlayerContextService', () => {
           files: [file1, file2],
           directoryPath: '/games',
         });
-        
+
         // Allow first launch to start (sets loading state)
         await nextTick();
         await nextTick();
-        
+
         // Second launch attempt should be blocked
         mockPlayerService.launchFile.mockReturnValueOnce(of(file2));
         await service.launchFileWithContext({
@@ -2316,17 +2352,19 @@ describe('PlayerContextService', () => {
           files: [file1, file2],
           directoryPath: '/games',
         });
-        
+
         // Verify warning was shown
-        expect(mockAlertService.warning).toHaveBeenCalledWith('Please wait - a file is currently loading');
-        
+        expect(mockAlertService.warning).toHaveBeenCalledWith(
+          'Please wait - a file is currently loading'
+        );
+
         // Verify only one launchFile call was made (second was blocked)
         expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(1);
-        
+
         // Complete the first launch
         resolveLaunch?.(file1);
         await nextTick();
-        
+
         // Now verify the first file was launched successfully
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.file.name).toBe('file1.prg');
@@ -2992,7 +3030,7 @@ describe('PlayerContextService', () => {
 
         await nextTick();
         // Wait for 1-second auto-advancement delay to complete
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        await new Promise((resolve) => setTimeout(resolve, 1200));
         await nextTick();
 
         // After auto-advancement, should have compatible file
@@ -3019,7 +3057,7 @@ describe('PlayerContextService', () => {
         });
 
         mockPlayerService.launchRandom.mockReturnValue(of(incompatibleFile));
-        mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+        mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           path: '/music',
           directory: {
@@ -3037,7 +3075,7 @@ describe('PlayerContextService', () => {
         await nextTick();
 
         // Should load directory context even when incompatible
-        expect(mockStorageStore.navigateToDirectory).toHaveBeenCalled();
+        expect(mockStorageStore.alignToPlayingFile).toHaveBeenCalled();
 
         // Should set currentFile with isCompatible=false
         const currentFile = service.getCurrentFile(deviceId)();

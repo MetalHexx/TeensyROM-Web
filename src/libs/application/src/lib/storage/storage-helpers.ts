@@ -1,8 +1,9 @@
 import { StateSignals, WritableStateSource } from '@ngrx/signals';
-import { StorageState, StorageDirectoryState } from './storage-store';
+import { firstValueFrom } from 'rxjs';
+import { StorageState, StorageDirectoryState, NavigationHistory } from './storage-store';
 import { StorageKey, StorageKeyUtil } from './storage-key.util';
-import { StorageType } from '@teensyrom-nx/domain';
-import { logError } from '@teensyrom-nx/utils';
+import { StorageType, IStorageService } from '@teensyrom-nx/domain';
+import { LogType, logInfo, logError } from '@teensyrom-nx/utils';
 import { updateState } from '@angular-architects/ngrx-toolkit';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
@@ -256,6 +257,103 @@ export function clearSearchState(
       searchState: updatedSearchState,
     };
   });
+}
+
+/**
+ * Shared body for a directory navigation: clears search, selects the path, short-circuits when
+ * already loaded there, loads via the service, marks loaded, and appends navigation history.
+ * Used by both user-intent navigation and playback-driven alignment.
+ */
+export async function performDirectoryNavigation(
+  store: WritableStore<StorageState>,
+  storageService: IStorageService,
+  args: { deviceId: string; storageType: StorageType; path: string },
+  actionMessage: string
+): Promise<void> {
+  const { deviceId, storageType, path } = args;
+  const key = StorageKeyUtil.create(deviceId, storageType);
+
+  logInfo(LogType.Navigate, `Navigating to ${key} at path: ${path}`);
+
+  // Clear any active search when navigating (search is device-level, not storage-specific)
+  clearSearchState(store, deviceId, actionMessage);
+
+  if (!isSelectedDirectory(store, deviceId, storageType, path)) {
+    setDeviceSelectedDirectory(store, deviceId, storageType, path, actionMessage);
+  }
+
+  const existingEntry = getStorage(store, key);
+
+  if (isDirectoryLoadedAtPath(existingEntry, path)) {
+    logInfo(LogType.Info, `Directory already loaded for ${key} at path: ${path}`);
+    return;
+  }
+
+  setLoadingStorage(store, key, actionMessage);
+
+  try {
+    logInfo(LogType.NetworkRequest, `Loading directory for ${key} at path: ${path}`);
+
+    const directory = await firstValueFrom(
+      storageService.getDirectory(deviceId, storageType, path)
+    );
+
+    logInfo(LogType.Success, `Directory navigation successful for ${key}:`, directory);
+
+    setStorageLoaded(
+      store,
+      key,
+      {
+        currentPath: path,
+        directory,
+      },
+      actionMessage
+    );
+
+    const currentHistory = store.navigationHistory()[deviceId] || new NavigationHistory();
+    const updatedHistory = new NavigationHistory(currentHistory.maxHistorySize);
+
+    updatedHistory.history = [
+      ...currentHistory.history.slice(0, currentHistory.currentIndex + 1),
+      { path, storageType },
+    ];
+    updatedHistory.currentIndex = updatedHistory.history.length - 1;
+    updatedHistory.maxHistorySize = currentHistory.maxHistorySize;
+
+    if (updatedHistory.history.length > updatedHistory.maxHistorySize) {
+      const excess = updatedHistory.history.length - updatedHistory.maxHistorySize;
+      updatedHistory.history = updatedHistory.history.slice(excess);
+      updatedHistory.currentIndex -= excess;
+    }
+
+    updateState(store, actionMessage, (state) => ({
+      navigationHistory: {
+        ...state.navigationHistory,
+        [deviceId]: updatedHistory,
+      },
+    }));
+
+    logInfo(
+      LogType.Info,
+      `Added directory to navigation history for device: ${deviceId}, path: ${path}`
+    );
+    logInfo(LogType.Finish, `Navigation completed for ${key} at path: ${path}`);
+  } catch (error) {
+    logError(`Directory navigation failed for ${key} at path ${path}:`, error);
+
+    updateStorage(
+      store,
+      key,
+      {
+        currentPath: path,
+        directory: null,
+        isLoaded: false,
+        isLoading: false,
+        error: 'Failed to navigate to directory',
+      },
+      actionMessage
+    );
+  }
 }
 
 /**

@@ -56,7 +56,7 @@ const createTestDirectoryFiles = (): FileItem[] => [
   createTestFileItem({ name: 'song3.sid', path: '/music/song3.sid' }),
 ];
 
-type NavigateToDirectoryFn = (params: {
+type AlignToPlayingFileFn = (params: {
   deviceId: string;
   storageType: StorageType;
   path: string;
@@ -69,8 +69,9 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
   const storageType = StorageType.Sd; // Default storage type for tests
   let service: PlayerContextService;
   let mockStorageStore: {
-    navigateToDirectory: MockedFunction<NavigateToDirectoryFn>;
+    alignToPlayingFile: MockedFunction<AlignToPlayingFileFn>;
     getSelectedDirectoryState: MockedFunction<GetSelectedDirectoryStateFn>;
+    updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
   let mockPlayerService: {
     launchFile: MockedFunction<IPlayerService['launchFile']>;
@@ -114,8 +115,9 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
     };
 
     mockStorageStore = {
-      navigateToDirectory: vi.fn(),
+      alignToPlayingFile: vi.fn(),
       getSelectedDirectoryState: vi.fn(),
+      updateFileCompatibility: vi.fn(),
     };
 
     mockAlertService = {
@@ -172,7 +174,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
           path: '/music',
         },
       };
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => mockDirectoryState);
 
       // Launch 3 files in shuffle mode to build history
@@ -370,9 +372,12 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       await service.previous(deviceId);
       await nextTick();
 
-      // Should have called navigateToDirectory to load context
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: '/music',
-       });
+      // Should have called alignToPlayingFile to load context
+      expect(mockStorageStore.alignToPlayingFile).toHaveBeenCalledWith({
+        deviceId,
+        storageType,
+        path: '/music',
+      });
 
       // Should have loaded file context
       const fileContext = service.getFileContext(deviceId)();
@@ -459,7 +464,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
 
       // Now at position 1 (file2), can navigate forward
       // Mock directory state for file context
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
         directory: testDirectory,
         files: testFiles,
@@ -470,7 +475,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       // Clear previous mock calls
       mockPlayerService.launchRandom.mockClear();
       mockPlayerService.launchFile.mockClear();
-      mockStorageStore.navigateToDirectory.mockClear();
+      mockStorageStore.alignToPlayingFile.mockClear();
     });
 
     it('should navigate forward in history when available (from middle position)', async () => {
@@ -658,9 +663,12 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       await service.next(deviceId);
       await nextTick();
 
-      // Should have called navigateToDirectory to load context
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({ deviceId, storageType, path: '/music',
-       });
+      // Should have called alignToPlayingFile to load context
+      expect(mockStorageStore.alignToPlayingFile).toHaveBeenCalledWith({
+        deviceId,
+        storageType,
+        path: '/music',
+      });
 
       // Should have loaded file context
       const fileContext = service.getFileContext(deviceId)();
@@ -882,8 +890,8 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       await service.next(deviceId);
       await nextTick();
 
-      // Mock navigateToDirectory to fail/reject
-      mockStorageStore.navigateToDirectory.mockRejectedValue(new Error('Directory load failed'));
+      // Mock alignToPlayingFile to fail/reject
+      mockStorageStore.alignToPlayingFile.mockRejectedValue(new Error('Directory load failed'));
 
       // Navigate backward - file should still launch successfully
       mockPlayerService.launchFile.mockReturnValue(of(file1));
@@ -1026,7 +1034,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
           path: '/music',
         },
       };
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => mockDirectoryState);
 
       // Launch 5 files using launchRandom (shuffle mode)
@@ -1115,7 +1123,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
           path: '/music',
         },
       };
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => mockDirectoryState);
 
       // Launch 4 files using launchRandom
@@ -1180,7 +1188,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
           path: '/music',
         },
       };
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => mockDirectoryState);
 
       // Scenario: Start in shuffle mode, launch files and build history
@@ -1246,7 +1254,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
           path: '/music',
         },
       };
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => mockDirectoryState);
 
       // Scenario: Launch music files (that create timers)
@@ -1319,7 +1327,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
           path: '/music',
         },
       };
-      mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+      mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
       mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => mockDirectoryState);
 
       // Launch all files using launchRandom
@@ -1468,7 +1476,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
             path: '/music',
           },
         };
-        mockStorageStore.navigateToDirectory.mockResolvedValue(undefined);
+        mockStorageStore.alignToPlayingFile.mockResolvedValue(undefined);
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => mockDirectoryState);
 
         // Launch 3 files to build history
