@@ -31,6 +31,7 @@
           *cdkVirtualFor="let row of rows(); trackBy: trackByPath; let i = index"
           class="listing-row"
           [class.divider-before]="showDivider() && i === folderCount()"
+          [class.disabled-row]="!isDirectoryRow(row)"
           [attr.data-item-path]="row.path"
         >
           @if (isDirectoryRow(row)) {

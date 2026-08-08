@@ -5,7 +5,6 @@ import {
   effect,
   inject,
   input,
-  output,
   signal,
 } from '@angular/core';
 import { StorageStore } from '@teensyrom-nx/application';
@@ -34,7 +33,6 @@ import {
 })
 export class DirectoryTreeContainerComponent {
   deviceId = input.required<string>();
-  directoryNavigated = output<void>();
 
   private readonly storageStore = inject(StorageStore);
 
@@ -88,7 +86,6 @@ export class DirectoryTreeContainerComponent {
     // Handle device node click - navigate to device level
     if (node.type === DirectoryTreeNodeType.Device && node.deviceId) {
       this.storageStore.navigateToDeviceLevel({ deviceId: node.deviceId });
-      this.directoryNavigated.emit();
       return;
     }
 
@@ -105,7 +102,6 @@ export class DirectoryTreeContainerComponent {
         storageType: node.storageType,
         path: node.path,
       });
-      this.directoryNavigated.emit();
     }
   }
 

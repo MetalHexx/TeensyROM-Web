@@ -67,4 +67,17 @@
   &.divider-before {
     border-top: 1px solid var(--border-dimmed, rgba(255, 255, 255, 0.1));
   }
+
+  &.disabled-row {
+    opacity: 0.5;
+
+    /* Suppress hover affordance for disabled existing-file rows */
+    lib-storage-item {
+      cursor: default;
+
+      &:hover {
+        background-color: transparent;
+      }
+    }
+  }
 }

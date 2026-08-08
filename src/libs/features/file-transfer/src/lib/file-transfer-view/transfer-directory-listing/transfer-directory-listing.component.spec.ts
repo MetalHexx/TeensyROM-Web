@@ -137,6 +137,14 @@ describe('TransferDirectoryListingComponent', () => {
       storageItem.componentInstance.selectedChange.emit();
       expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
     });
+
+    it('applies the disabled-row class to existing file rows for dimmed visual treatment', async () => {
+      await setup(stateWith({ directory: { directories: [], files: [mockFile], path: '/' } }));
+      fixture.detectChanges();
+
+      const fileRow = fixture.debugElement.query(By.css('.listing-row'));
+      expect(fileRow.nativeElement.classList.contains('disabled-row')).toBe(true);
+    });
   });
 
   describe('divider', () => {

@@ -52,10 +52,7 @@ describe('DirectoryTreeContainerComponent', () => {
   });
 
   describe('onNodeActivated', () => {
-    it('should navigate to device level and emit directoryNavigated for a device node with deviceId', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
-
+    it('should navigate to device level for a device node with deviceId', () => {
       component.onNodeActivated({
         id: 'device-test-device-123',
         name: 'Device test-device-123',
@@ -68,13 +65,9 @@ describe('DirectoryTreeContainerComponent', () => {
         deviceId: 'test-device-123',
       });
       expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
-      expect(emitSpy).toHaveBeenCalledOnce();
     });
 
     it('should not navigate when a device node lacks deviceId', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
-
       component.onNodeActivated({
         id: 'device-test',
         name: 'Test Device',
@@ -84,13 +77,9 @@ describe('DirectoryTreeContainerComponent', () => {
 
       expect(mockStorageStore.navigateToDeviceLevel).not.toHaveBeenCalled();
       expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
-      expect(emitSpy).not.toHaveBeenCalled();
     });
 
-    it('should navigate to directory and emit directoryNavigated for a directory node', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
-
+    it('should navigate to directory for a directory node', () => {
       component.onNodeActivated({
         id: 'test-node',
         name: 'Test Directory',
@@ -106,13 +95,9 @@ describe('DirectoryTreeContainerComponent', () => {
         storageType: StorageType.Sd,
         path: '/test/path',
       });
-      expect(emitSpy).toHaveBeenCalledOnce();
     });
 
-    it('should navigate to directory and emit directoryNavigated for a storage node', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
-
+    it('should navigate to directory for a storage node', () => {
       component.onNodeActivated({
         id: 'test-device-123-SD',
         name: 'SD Storage',
@@ -128,13 +113,9 @@ describe('DirectoryTreeContainerComponent', () => {
         storageType: StorageType.Sd,
         path: '/',
       });
-      expect(emitSpy).toHaveBeenCalledOnce();
     });
 
-    it('should not call the store or emit for a malformed node', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
-
+    it('should not call the store for a malformed node', () => {
       component.onNodeActivated({
         id: 'invalid-node',
         name: 'Invalid',
@@ -144,15 +125,11 @@ describe('DirectoryTreeContainerComponent', () => {
 
       expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
       expect(mockStorageStore.navigateToDeviceLevel).not.toHaveBeenCalled();
-      expect(emitSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('onNodeExpansionNeedsData', () => {
-    it('should navigate to directory without emitting directoryNavigated for a storage node', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
-
+    it('should navigate to directory for a storage node', () => {
       component.onNodeExpansionNeedsData({
         id: 'test-device-123-SD',
         name: 'SD Storage',
@@ -168,7 +145,6 @@ describe('DirectoryTreeContainerComponent', () => {
         storageType: StorageType.Sd,
         path: '/',
       });
-      expect(emitSpy).not.toHaveBeenCalled();
     });
 
     it('should not call the store for a malformed node', () => {
