@@ -1,0 +1,57 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: block;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+}
+
+.file-transfer-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.top-row {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: var(--spacing-lg);
+  flex-shrink: 0;
+
+  @include styles.below-tablet {
+    grid-template-columns: 1fr;
+  }
+}
+
+.content-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+  flex: 1;
+  min-height: 0;
+
+  .left-container {
+    flex: 0 1 auto;
+    min-width: 250px;
+    max-width: 500px;
+    height: 100%;
+    min-height: 0;
+
+    @include styles.below-desktop {
+      display: none;
+    }
+  }
+
+  .right-container {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+  }
+}

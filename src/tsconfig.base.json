@@ -23,6 +23,7 @@
       "@teensyrom-nx/data-access/api-client": ["libs/data-access/api-client/src/index.ts"],
       "@teensyrom-nx/domain": ["libs/domain/src/index.ts"],
       "@teensyrom-nx/features/device": ["libs/features/devices/src/index.ts"],
+      "@teensyrom-nx/features/file-transfer": ["libs/features/file-transfer/src/index.ts"],
       "@teensyrom-nx/features/player": ["libs/features/player/src/index.ts"],
       "@teensyrom-nx/features/settings": ["libs/features/settings/src/index.ts"],
       "@teensyrom-nx/infrastructure": ["libs/infrastructure/src/index.ts"],

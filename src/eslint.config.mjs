@@ -61,11 +61,15 @@ export default [
             // Prevent features from importing each other (feature isolation)
             {
               sourceTag: 'feature:device',
-              notDependOnLibsWithTags: ['feature:player'],
+              notDependOnLibsWithTags: ['feature:player', 'feature:file-transfer'],
             },
             {
               sourceTag: 'feature:player',
-              notDependOnLibsWithTags: ['feature:device'],
+              notDependOnLibsWithTags: ['feature:device', 'feature:file-transfer'],
+            },
+            {
+              sourceTag: 'feature:file-transfer',
+              notDependOnLibsWithTags: ['feature:player', 'feature:device'],
             },
           ],
         },
