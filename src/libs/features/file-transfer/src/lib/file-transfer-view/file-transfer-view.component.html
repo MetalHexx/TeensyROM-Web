@@ -14,7 +14,11 @@
     <lib-transfer-status-card />
   </div>
   <div class="content-row" data-testid="content-row">
-    <div class="left-container" data-testid="left-container"><!-- tree card, next phase --></div>
+    <div class="left-container" data-testid="left-container">
+      @if (targetDevice(); as device) {
+      <lib-directory-tree-container [deviceId]="device.deviceId" />
+      }
+    </div>
     <div class="right-container" data-testid="right-container">
       <!-- listing card, next phase -->
     </div>
