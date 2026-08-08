@@ -193,14 +193,17 @@ async function initializePlayer(
       }
 
       // Navigate to initial directory, unless the device already has a held position and
-      // nothing needs to be launched from a different path.
+      // nothing needs to be launched or browsed from a different path.
       const hasPosition =
         storageStore.getSelectedDirectoryForDevice(currentDevice.deviceId)?.storageType != null;
       const navigationNeededForLaunch = shouldLaunch && filenameToLaunch !== null;
+      // A saved file or deep link still identifies a folder to browse to even when auto-launch
+      // is disabled - only the launch itself is gated on shouldLaunch, not the browsing position.
+      const navigationNeededForSavedFolder = filenameToLaunch !== null && !shouldLaunch;
 
       if (
         !settings.playerSettings.startupLaunchRandom &&
-        (navigationNeededForLaunch || !hasPosition)
+        (navigationNeededForLaunch || navigationNeededForSavedFolder || !hasPosition)
       ) {
         await storageStore.navigateToDirectory({
           deviceId: currentDevice.deviceId,

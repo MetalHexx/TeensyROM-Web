@@ -282,4 +282,48 @@ describe('playerRouteResolver', () => {
       path: '/music',
     });
   });
+
+  it('restores the saved file folder as browsing position even when auto-launch is disabled', async () => {
+    const settings = createMockSettings({
+      playerSettings: {
+        repeatModeOnStartup: false,
+        playTimerEnabled: false,
+        muteFastForward: false,
+        muteRandomSeek: false,
+        startupFilter: PlayerFilterType.All,
+        startupLaunchEnabled: false,
+        startupLaunchRandom: false,
+      },
+    });
+    mockSettingsStore.getSettings.mockReturnValue(signal<Settings | null>(settings));
+    // The device already holds a position (as it would after storage initialization seeds one),
+    // but that seeded root position must not block restoring the saved file's own folder.
+    mockStorageStore.getSelectedDirectoryForDevice.mockReturnValue({
+      deviceId,
+      storageType: StorageType.Sd,
+      path: '/',
+    });
+
+    const savedFile = createMockFileItem({ name: 'saved.sid', parentPath: '/music' });
+    mockPlayerStorage.load.mockReturnValue({
+      currentFile: {
+        storageKey: `${deviceId}-${StorageType.Sd}`,
+        file: savedFile,
+        parentPath: '/music',
+        launchedAt: Date.now(),
+        isCompatible: true,
+      },
+      launchMode: undefined,
+    });
+
+    await runResolver(createRoute());
+    await waitUntil(() => mockStorageStore.getSelectedDirectoryForDevice.mock.calls.length > 0);
+
+    expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+      deviceId,
+      storageType: StorageType.Sd,
+      path: '/music',
+    });
+    expect(mockPlayerContextService.launchFileWithContext).not.toHaveBeenCalled();
+  });
 });
