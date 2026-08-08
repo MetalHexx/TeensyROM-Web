@@ -27,3 +27,6 @@ export * from './crt-storage.contract';
 
 // Audio contracts
 export * from './audio-stream.contract';
+
+// Transfer contracts
+export * from './transfer.contract';
