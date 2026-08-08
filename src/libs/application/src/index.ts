@@ -22,3 +22,6 @@ export * from './lib/audio/audio-store';
 
 // Transfer state management
 export * from './lib/transfer/transfer-store';
+export * from './lib/transfer/transfer-context.interface';
+export * from './lib/transfer/transfer-context.service';
+export * from './lib/transfer/providers';
