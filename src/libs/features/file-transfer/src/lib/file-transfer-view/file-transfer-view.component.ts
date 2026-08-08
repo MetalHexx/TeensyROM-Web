@@ -86,12 +86,11 @@ export class FileTransferViewComponent {
       this.pinnedDeviceId = deviceId;
     });
 
-    // Read the target live at destroy time — not a value captured when this callback was
-    // registered — so a target change right before teardown still releases the right pin.
+    // Release the pin this view instance actually holds, not the recomputed target — the two
+    // diverge when the target changes and the pin-take effect above has not re-run yet.
     this.destroyRef.onDestroy(() => {
-      const deviceId = this.targetDevice()?.deviceId;
-      if (deviceId) {
-        this.storageStore.clearNavigationPin({ deviceId });
+      if (this.pinnedDeviceId) {
+        this.storageStore.clearNavigationPin({ deviceId: this.pinnedDeviceId });
       }
     });
   }

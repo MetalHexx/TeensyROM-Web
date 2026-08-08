@@ -253,7 +253,7 @@ describe('FileTransferViewComponent', () => {
       expect(storageStore.navigationPin()).toBeNull();
     });
 
-    it('reads the current target live at destroy time, not a value captured at registration', async () => {
+    it('releases the pin it actually holds on destroy, not a recomputed target', async () => {
       const deviceA = createDevice({ deviceId: 'device-a' });
       const deviceB = createDevice({ deviceId: 'device-b' });
       await setup([deviceA]);
@@ -261,13 +261,15 @@ describe('FileTransferViewComponent', () => {
 
       const clearPinSpy = vi.spyOn(storageStore, 'clearNavigationPin');
 
-      // Change the enabled device list without an intervening change-detection cycle,
-      // so no pin effect has had a chance to run before destroy fires.
+      // Change the enabled device list without an intervening change-detection cycle, so the
+      // pin-take effect has not re-run before destroy fires: the view still holds device-a's pin
+      // even though the recomputed target is now device-b.
       devicesSignal.set([deviceB]);
       transferStore.setTargetDevice({ deviceId: 'device-b' });
       fixture.destroy();
 
-      expect(clearPinSpy).toHaveBeenCalledWith({ deviceId: 'device-b' });
+      expect(clearPinSpy).toHaveBeenCalledWith({ deviceId: 'device-a' });
+      expect(storageStore.navigationPin()).toBeNull();
     });
   });
 
