@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using TeensyRom.Api.Models;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Abstractions;
@@ -17,6 +19,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
                 .Produces<CreateJobResponse>(StatusCodes.Status200OK)
                 .ProducesProblem(StatusCodes.Status400BadRequest)
                 .ProducesProblem(StatusCodes.Status404NotFound)
+                .ProducesProblem(StatusCodes.Status409Conflict)
                 .WithName("CreateTransferJob")
                 .WithSummary("Create Transfer Job")
                 .WithDescription(
@@ -67,7 +70,12 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
             {
                 var holder = leases.GetHolder(r.DeviceId);
                 registry.Remove(job.JobId);
-                SendValidationError($"Device {r.DeviceId} already has an active transfer (job {holder}).");
+                SendProblem(TypedResults.Problem(
+                    title: "Device already has an active transfer.",
+                    statusCode: StatusCodes.Status409Conflict,
+                    detail: $"Device {r.DeviceId} already has an active transfer (job {holder}).",
+                    extensions: new Dictionary<string, object?> { ["activeJobId"] = holder }
+                ));
                 return Task.CompletedTask;
             }
 

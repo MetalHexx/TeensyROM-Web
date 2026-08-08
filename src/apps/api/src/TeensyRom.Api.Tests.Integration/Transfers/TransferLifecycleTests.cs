@@ -391,7 +391,7 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             {
                 var secondCreateSameDevice = await f.Client.PostAsync<CreateJobEndpoint, CreateJobRequest, ProblemDetails>(
                     NewCreateRequest(deviceA.DeviceId, "/music/exclusive-a-2"));
-                secondCreateSameDevice.Should().BeProblem().WithStatusCode(HttpStatusCode.BadRequest);
+                secondCreateSameDevice.Should().BeProblem().WithStatusCode(HttpStatusCode.Conflict);
 
                 var createDifferentDevice = await f.Client.PostAsync<CreateJobEndpoint, CreateJobRequest, CreateJobResponse>(
                     NewCreateRequest(deviceB.DeviceId, "/music/exclusive-b"));
