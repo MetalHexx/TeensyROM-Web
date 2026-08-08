@@ -9,7 +9,7 @@
   "targets": {
     "test": {
       "executor": "@nx/vite:test",
-      "outputs": ["{projectRoot}/coverage"]
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"]
     },
     "lint": {
       "executor": "@nx/eslint:lint"
