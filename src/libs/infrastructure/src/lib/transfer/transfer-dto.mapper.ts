@@ -33,7 +33,9 @@ export class TransferDtoMapper {
       filesFailed: dto.filesFailed,
       totalFiles: dto.totalFiles ?? null,
       currentFile: dto.currentFile ?? null,
-      startedUtc: dto.startedUtc,
+      // Re-wrapped in Date: SignalR-pushed dtos skip the generated fromJSON deserializer
+      // (that's REST-only), so startedUtc arrives as a raw ISO string over the hub.
+      startedUtc: new Date(dto.startedUtc),
       error: dto.error ?? null,
       failures: dto.failures.map((failure) => this.toFileCompletion(failure)),
     };

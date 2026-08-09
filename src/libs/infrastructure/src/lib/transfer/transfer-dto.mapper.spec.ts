@@ -91,6 +91,15 @@ describe('TransferDtoMapper', () => {
     expect(snapshot.failures).toEqual([]);
   });
 
+  it('coerces a raw ISO string startedUtc into a Date (SignalR pushes skip the REST fromJSON deserializer)', () => {
+    const dto = { ...baseFields, startedUtc: '2026-01-01T00:00:00.000Z' } as unknown as TransferJobDto;
+
+    const snapshot = TransferDtoMapper.toSnapshot(dto);
+
+    expect(snapshot.startedUtc).toEqual(new Date('2026-01-01T00:00:00.000Z'));
+    expect(snapshot.startedUtc.getTime()).toBe(new Date('2026-01-01T00:00:00.000Z').getTime());
+  });
+
   it('maps USB storage type', () => {
     const dto: TransferJobDto = { ...baseFields, storageType: TeensyStorageType.Usb };
 
