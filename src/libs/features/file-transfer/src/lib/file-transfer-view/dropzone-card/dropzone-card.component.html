@@ -1,0 +1,58 @@
+<lib-sliding-container animationDirection="from-top" [animationTrigger]="true">
+  <lib-scaling-compact-card animationEntry="from-top" animationParent="auto" cardClass="glassy-card">
+    <div
+      class="dropzone-card"
+      data-testid="dropzone-card"
+      [class.state-idle]="cardState() === 'idle'"
+      [class.state-drag-over]="cardState() === 'drag-over'"
+      [class.state-device-busy]="cardState() === 'device-busy'"
+      (dragenter)="onDragEnter($event)"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave($event)"
+      (drop)="onDrop($event)"
+    >
+      <lib-empty-state-message
+        [icon]="icon()"
+        [title]="title()"
+        [message]="message()"
+        [secondaryMessage]="secondaryMessage()"
+        size="small"
+        data-testid="dropzone-message"
+      ></lib-empty-state-message>
+
+      <div class="picker-actions">
+        <button
+          type="button"
+          class="picker-button"
+          data-testid="dropzone-choose-files"
+          [disabled]="cardState() === 'device-busy'"
+          (click)="fileInput.click()"
+        >
+          Choose Files…
+        </button>
+        <lib-action-link
+          label="Choose a folder…"
+          data-testid="dropzone-choose-folder"
+          [disabled]="cardState() === 'device-busy'"
+          (linkClick)="folderInput.click()"
+        ></lib-action-link>
+      </div>
+
+      <input
+        #fileInput
+        class="visually-hidden"
+        type="file"
+        multiple
+        (change)="onFilesSelected($event)"
+      />
+      <input
+        #folderInput
+        class="visually-hidden"
+        type="file"
+        webkitdirectory
+        multiple
+        (change)="onFolderSelected($event)"
+      />
+    </div>
+  </lib-scaling-compact-card>
+</lib-sliding-container>

@@ -9,6 +9,8 @@ import {
   PLAYER_CONTEXT,
   StorageStore,
   TransferStore,
+  TRANSFER_CONTEXT,
+  ITransferContext,
 } from '@teensyrom-nx/application';
 import {
   Device,
@@ -77,6 +79,14 @@ describe('FileTransferViewComponent', () => {
       launch: vi.fn(),
     };
 
+    const mockTransferContext: ITransferContext = {
+      startTransfer: vi.fn().mockResolvedValue(undefined),
+      retryCreate: vi.fn().mockResolvedValue(undefined),
+      cancelTransfer: vi.fn().mockResolvedValue(undefined),
+      closeTransfer: vi.fn().mockResolvedValue(undefined),
+      refreshDeviceBusyState: vi.fn().mockResolvedValue(undefined),
+    };
+
     await TestBed.configureTestingModule({
       imports: [FileTransferViewComponent],
       providers: [
@@ -86,6 +96,7 @@ describe('FileTransferViewComponent', () => {
         { provide: STORAGE_SERVICE, useValue: mockStorageService },
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
         { provide: PlayerStore, useValue: mockPlayerStore },
+        { provide: TRANSFER_CONTEXT, useValue: mockTransferContext },
       ],
     }).compileComponents();
 
@@ -109,17 +120,17 @@ describe('FileTransferViewComponent', () => {
       expect(fixture.componentInstance).toBeTruthy();
     });
 
-    it('should render the top row and content row when there are enabled devices', async () => {
+    it('should render the transfer header and content row when there are enabled devices', async () => {
       await setup([createDevice()]);
       createFixture();
       const native = fixture.nativeElement as HTMLElement;
 
-      expect(native.querySelector('[data-testid="top-row"]')).toBeTruthy();
+      expect(native.querySelector('[data-testid="transfer-header"]')).toBeTruthy();
       expect(native.querySelector('[data-testid="content-row"]')).toBeTruthy();
       expect(native.querySelector('[data-testid="left-container"]')).toBeTruthy();
       expect(native.querySelector('[data-testid="right-container"]')).toBeTruthy();
-      expect(native.querySelector('lib-destination-card')).toBeTruthy();
-      expect(native.querySelector('lib-transfer-status-card')).toBeTruthy();
+      expect(native.querySelector('lib-dropzone-card')).toBeTruthy();
+      expect(native.querySelector('lib-transfer-toolbar')).toBeTruthy();
     });
 
     it('should render the empty-state message instead of the rows when there are no enabled devices', async () => {
@@ -128,7 +139,7 @@ describe('FileTransferViewComponent', () => {
       const native = fixture.nativeElement as HTMLElement;
 
       expect(native.querySelector('[data-testid="no-devices-empty-state"]')).toBeTruthy();
-      expect(native.querySelector('[data-testid="top-row"]')).toBeFalsy();
+      expect(native.querySelector('[data-testid="transfer-header"]')).toBeFalsy();
       expect(native.querySelector('[data-testid="content-row"]')).toBeFalsy();
     });
   });

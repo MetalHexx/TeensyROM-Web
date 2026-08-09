@@ -10,8 +10,8 @@ import {
 import { DeviceStore, StorageStore, TransferStore } from '@teensyrom-nx/application';
 import { Device, StorageType } from '@teensyrom-nx/domain';
 import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
-import { TransferStatusCardComponent } from './transfer-status-card/transfer-status-card.component';
-import { DestinationCardComponent } from './destination-card/destination-card.component';
+import { DropzoneCardComponent } from './dropzone-card/dropzone-card.component';
+import { TransferToolbarComponent } from './transfer-toolbar/transfer-toolbar.component';
 import { DirectoryTreeContainerComponent } from './directory-tree-container/directory-tree-container.component';
 import { TransferDirectoryListingComponent } from './transfer-directory-listing/transfer-directory-listing.component';
 
@@ -23,8 +23,8 @@ import { TransferDirectoryListingComponent } from './transfer-directory-listing/
 @Component({
   selector: 'lib-file-transfer-view',
   imports: [
-    DestinationCardComponent,
-    TransferStatusCardComponent,
+    DropzoneCardComponent,
+    TransferToolbarComponent,
     EmptyStateMessageComponent,
     DirectoryTreeContainerComponent,
     TransferDirectoryListingComponent,

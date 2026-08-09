@@ -5,12 +5,12 @@ import {
   IconButtonComponent,
   IconButtonColor,
   SlidingContainerComponent,
+  ProgressBarComponent,
   TooltipConfig,
   TooltipPosition,
 } from '@teensyrom-nx/ui/components';
 import { PLAYER_CONTEXT, SettingsStore } from '@teensyrom-nx/application';
 import { LaunchMode, PlayerStatus, FileItemType } from '@teensyrom-nx/domain';
-import { ProgressBarComponent } from './progress-bar/progress-bar.component';
 import { FileInfoComponent } from './file-info/file-info.component';
 import { FileTimeComponent } from './file-time/file-time.component';
 import { PlayerToolbarActionsComponent } from './player-toolbar-actions/player-toolbar-actions.component';
