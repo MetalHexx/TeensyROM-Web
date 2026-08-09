@@ -295,6 +295,8 @@ describe('TransferContextService', () => {
 
       uploadGate.resolve();
       await startPromise;
+
+      expect(mockTransferService.sealJob).not.toHaveBeenCalled();
     });
   });
 

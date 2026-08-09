@@ -119,6 +119,7 @@ export class TransferContextService implements ITransferContext {
       return;
     }
 
+    pending.cancelled = true;
     pending.uploadAbort.abort();
     await this.transferService.cancelJob(pending.jobId);
   }
@@ -198,6 +199,12 @@ export class TransferContextService implements ITransferContext {
       },
       pending.uploadAbort.signal
     );
+
+    // Cancel may have aborted the upload pool while it was running; `run` resolves normally on
+    // abort rather than rejecting, so the seal must be skipped explicitly.
+    if (pending.cancelled) {
+      return;
+    }
 
     // Without the seal the server can't distinguish "still scanning" from "done".
     await this.transferService.sealJob(snapshot.jobId);

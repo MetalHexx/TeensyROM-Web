@@ -24,4 +24,5 @@ export * from './lib/audio/audio-store';
 export * from './lib/transfer/transfer-store';
 export * from './lib/transfer/transfer-context.interface';
 export * from './lib/transfer/transfer-context.service';
+export * from './lib/transfer/transfer-playback-guard';
 export * from './lib/transfer/providers';

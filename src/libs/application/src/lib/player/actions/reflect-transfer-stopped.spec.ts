@@ -9,6 +9,7 @@ import {
   PlayerFilterType,
   DEVICE_SERVICE,
 } from '@teensyrom-nx/domain';
+import { DEFAULT_TIMER_MS } from '../player.constants';
 import { PlayerStore, PlayerState } from '../player-store';
 import { WritableStore } from '../player-helpers';
 import { PLAYER_STORAGE } from '../player-storage.interface';
@@ -83,5 +84,36 @@ describe('reflectTransferStopped', () => {
     (store as unknown as InstanceType<typeof PlayerStore>).reflectTransferStopped({ deviceId });
 
     expect(mockDeviceService.resetDevice).not.toHaveBeenCalled();
+  });
+
+  it('creates a full default player entry when none existed for the device', () => {
+    const unseenDeviceId = 'device-with-no-player-entry';
+    expect(store.players()[unseenDeviceId]).toBeUndefined();
+
+    (store as unknown as InstanceType<typeof PlayerStore>).reflectTransferStopped({
+      deviceId: unseenDeviceId,
+    });
+
+    const playerState = store.players()[unseenDeviceId];
+    expect(playerState).toBeDefined();
+    expect(playerState.deviceId).toBe(unseenDeviceId);
+    expect(playerState.status).toBe(PlayerStatus.Stopped);
+    expect(playerState.error).toBeNull();
+    expect(playerState.lastUpdated).not.toBeNull();
+    expect(playerState.launchMode).toBe(LaunchMode.Directory);
+    expect(playerState.currentFile).toBeNull();
+    expect(playerState.fileContext).toBeNull();
+    expect(playerState.playHistory).toBeNull();
+    expect(playerState.historyViewVisible).toBe(false);
+    expect(playerState.isLoading).toBe(false);
+    expect(playerState.shuffleSettings).toEqual({
+      scope: PlayerScope.Storage,
+      filter: PlayerFilterType.All,
+      startingDirectory: undefined,
+    });
+    expect(playerState.playTimerConfig).toEqual({
+      enabled: false,
+      durationMs: DEFAULT_TIMER_MS,
+    });
   });
 });

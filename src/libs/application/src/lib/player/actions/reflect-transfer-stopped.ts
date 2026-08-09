@@ -2,7 +2,7 @@ import { updateState } from '@angular-architects/ngrx-toolkit';
 import { PlayerStatus } from '@teensyrom-nx/domain';
 import { createAction, logInfo, LogType } from '@teensyrom-nx/utils';
 import { PlayerState } from '../player-store';
-import { WritableStore } from '../player-helpers';
+import { WritableStore, ensurePlayerState } from '../player-helpers';
 
 /**
  * Local-only counterpart to `stopPlayback` for devices mid file transfer.
@@ -20,6 +20,8 @@ export function reflectTransferStopped(store: WritableStore<PlayerState>) {
         deviceId,
         actionMessage,
       });
+
+      ensurePlayerState(store, deviceId, actionMessage);
 
       updateState(store, actionMessage, (state) => ({
         players: {
