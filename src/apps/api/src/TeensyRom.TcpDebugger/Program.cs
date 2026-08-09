@@ -1,6 +1,8 @@
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
+using TeensyRom.Core.Commands;
+using TeensyRom.Core.ValueObjects;
 using System.Net.Sockets;
 using System.Diagnostics;
 
@@ -10,10 +12,18 @@ class Program
 {
 	static async Task Main(string[] args)
 	{
-		Console.WriteLine("=== TeensyROM TCP Debugger ===");
+    var apiBaseUrl = args.Length > 0 ? args[0] : "http://localhost:213";
+    var deviceId = args.Length > 1 ? args[1] : "YRTCPIRY";
+    await TransferApiBlackBoxHarness.RunAsync(apiBaseUrl, deviceId, fileCount: 5);
+    Console.WriteLine();
+    Console.WriteLine("Press any key to exit...");
+    Console.ReadKey();
+    return;
+
+    Console.WriteLine("=== TeensyROM TCP Debugger ===");
 		Console.WriteLine();
 
-		string endpoint = args.Length > 0 ? args[0] : "192.168.1.37:80";
+		string endpoint = args.Length > 0 ? args[0] : "192.168.1.37:2112";
 		Console.WriteLine($"Connecting to: {endpoint}");
 		Console.WriteLine();
 
@@ -69,7 +79,7 @@ class Program
 					Thread.Sleep(200);
 					TryReconnect(tcpPort);
 				}
-				ExecuteLaunchCommand(tcpPort, "/Games/180.crt");
+				//ExecuteLaunchCommand(tcpPort, "/Games/180.crt");
 
 
 				//Thread.Sleep(2000);
@@ -78,28 +88,32 @@ class Program
 				//ExecuteLaunchCommand(tcpPort, "/Games/180.crt");
 				//Thread.Sleep(2000);
 				//ExecutePingCommand(tcpPort, "Ping 2");
-				Thread.Sleep(200);
-				ExecuteLaunchCommand(tcpPort, "/music/MUSICIANS/L/LukHash/Alpha.sid");
-				Thread.Sleep(2000);
-				ExecutePingCommand(tcpPort, "Ping 3");
+				//Thread.Sleep(200);
+				//ExecuteLaunchCommand(tcpPort, "/music/MUSICIANS/L/LukHash/Alpha.sid");
+				//Thread.Sleep(2000);
+				//ExecutePingCommand(tcpPort, "Ping 3");
 
-				ExecuteLaunchCommand(tcpPort, "/games/Large/706k The Secret of Monkey Island (D42) [EasyFlash].crt");
-				Thread.Sleep(10000);
+				//ExecuteLaunchCommand(tcpPort, "/games/Large/706k The Secret of Monkey Island (D42) [EasyFlash].crt");
+				//Thread.Sleep(10000);
 
 				//ExecuteLaunchSidCommand(tcpPort, "/Games/180.crt");
 				//Thread.Sleep(2000);
 				//ExecuteLaunchCommand(tcpPort, "/music/MUSICIANS/L/LukHash/Alpha.sid");
 				//Thread.Sleep(2000);
-				ExecuteLaunchCommand(tcpPort, "/music/MUSICIANS/M/Manganoid/Le_Shagma.sid");
-				Thread.Sleep(2000);
+				//ExecuteLaunchCommand(tcpPort, "/music/MUSICIANS/M/Manganoid/Le_Shagma.sid");
+				//Thread.Sleep(2000);
 
 				//ExecuteLaunchSidCommand(tcpPort, "/games/Large/706k The Secret of Monkey Island (D42) [EasyFlash].crt");
 				//Thread.Sleep(2000);
 
 				//ExecuteGetDirectoryRecursiveCommand(tcpPort, "/", recursive: false);
 
+				//var runSuffix = Guid.NewGuid().ToString("N")[..5];
+				//await ExecuteSaveFileCommand(tcpPort, $"/ft-smoke-test/tcpdebug-test-{runSuffix}.txt");
+
+				await TransferPumpHarness.RunAsync(tcpPort, fileCount: 5);
+
 				tcpPort.ClosePort();
-				Thread.Sleep(6000);
 
 				//LogSuccess("=== All steps completed successfully ===");
 				//Console.WriteLine();
@@ -107,7 +121,7 @@ class Program
 				//Console.ReadKey();
 				//Console.WriteLine();
 
-
+				break;
 			}
 		}
 		catch (Exception ex)
@@ -138,7 +152,47 @@ class Program
 		}
 	}
 
-	private static void TryReconnect(TcpCommunicationPort tcpPort)
+  /// <summary>
+	/// Isolation harness for the FILE-TRANSFER-4 ack-timeout bug: drives the real
+	/// SaveFileCommandHandler (same code SavePump uses) directly against this TCP port, with none of
+	/// TransferPump's queue/reset/staging machinery around it - just the SendFile wire exchange for a
+	/// single file, with wall-clock timing around it.
+	/// </summary>
+	static async Task ExecuteSaveFileCommand(TcpCommunicationPort tcpPort, string targetPath)
+  {
+    LogHeader($"SaveFile Command (isolated) -> {targetPath}");
+
+    var sourcePath = Path.Combine(Path.GetTempPath(), "tcpdebug-test.txt");
+    File.WriteAllText(sourcePath, $"TeensyROM SendFile isolation test - {DateTime.Now:O}{Environment.NewLine}");
+
+    var transfer = StreamedFileTransfer.FromFile(sourcePath, new FilePath(targetPath), TeensyStorageType.SD);
+    LogDetail($"Source: {sourcePath}");
+    LogDetail($"StreamLength: {transfer.StreamLength}, Checksum: {transfer.Checksum}");
+
+    var handler = new SaveFileCommandHandler(new SimpleLoggingService());
+    var sw = Stopwatch.StartNew();
+
+    var result = await handler.Handle(new SaveFileCommand
+    {
+      File = transfer,
+      DeviceId = "TCP-DEBUG",
+      CommunicationPort = tcpPort
+    }, CancellationToken.None);
+
+    sw.Stop();
+
+    if (result.IsSuccess)
+    {
+      LogSuccess($"SaveFile succeeded in {sw.ElapsedMilliseconds}ms (Saved={result.Saved})");
+    }
+    else
+    {
+      LogError($"SaveFile FAILED in {sw.ElapsedMilliseconds}ms: {result.Error}");
+    }
+    Console.WriteLine();
+  }
+
+  private static void TryReconnect(TcpCommunicationPort tcpPort)
 	{
 		Stopwatch sw = Stopwatch.StartNew();
 		tcpPort.ClosePort();
@@ -728,7 +782,7 @@ class Program
 		throw new TeensyException($"Received unexpected ACK: {recU16} with data: {response}");
 	}
 
-	static void LogHeader(string message)
+	internal static void LogHeader(string message)
 	{
 		var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
 		Console.ForegroundColor = ConsoleColor.Cyan;
@@ -736,7 +790,7 @@ class Program
 		Console.ResetColor();
 	}
 
-	static void LogDetail(string message)
+	internal static void LogDetail(string message)
 	{
 		var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
 		Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -744,13 +798,13 @@ class Program
 		Console.ResetColor();
 	}
 
-	static void Log(string message)
+	internal static void Log(string message)
 	{
 		var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
 		Console.WriteLine($"[{timestamp}] {message}");
 	}
 
-	static void LogSuccess(string message)
+	internal static void LogSuccess(string message)
 	{
 		var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
 		Console.ForegroundColor = ConsoleColor.Green;
@@ -758,7 +812,7 @@ class Program
 		Console.ResetColor();
 	}
 
-	static void LogError(string message)
+	internal static void LogError(string message)
 	{
 		var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
 		Console.ForegroundColor = ConsoleColor.Red;
@@ -766,7 +820,7 @@ class Program
 		Console.ResetColor();
 	}
 
-	static void LogWarning(string message)
+	internal static void LogWarning(string message)
 	{
 		var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
 		Console.ForegroundColor = ConsoleColor.Yellow;
@@ -774,7 +828,7 @@ class Program
 		Console.ResetColor();
 	}
 
-	class SimpleLoggingService : TeensyRom.Core.Logging.ILoggingService
+	internal class SimpleLoggingService : TeensyRom.Core.Logging.ILoggingService
 	{
 		public void External(string message, string? deviceId = null) => Log(message);
 		public void ExternalError(string message, string? deviceId = null) => LogError(message);
