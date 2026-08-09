@@ -5,7 +5,7 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { appRoutes } from './app.routes';
 import { AppBootstrapService } from '@teensyrom-nx/app/bootstrap';
 import { ALERT_SERVICE_PROVIDER } from '@teensyrom-nx/app/alerts';
-import { PLAYER_CONTEXT_PROVIDER, TRANSFER_CONTEXT_PROVIDER } from '@teensyrom-nx/application';
+import { PLAYER_CONTEXT_PROVIDER, TRANSFER_CONTEXT_PROVIDERS } from '@teensyrom-nx/application';
 import {
   DEVICE_SERVICE_PROVIDER,
   DEVICE_LOGS_SERVICE_PROVIDER,
@@ -32,7 +32,7 @@ export const appConfig: ApplicationConfig = {
     provideAnimations(),
     AppBootstrapService,
     PLAYER_CONTEXT_PROVIDER,
-    TRANSFER_CONTEXT_PROVIDER,
+    TRANSFER_CONTEXT_PROVIDERS,
     // Alert system provider
     ALERT_SERVICE_PROVIDER,
     // API Configuration (environment-aware URLs)

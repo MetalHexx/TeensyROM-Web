@@ -7,6 +7,7 @@ import {
   VERSION_SERVICE,
   ALERT_SERVICE,
   STORAGE_SERVICE,
+  PLAYER_SERVICE,
   IDeviceService,
   IStorageService,
   IVersionService,
@@ -16,15 +17,43 @@ import {
   AppVersion,
   PlayerStatus,
   LaunchMode,
+  StorageType,
+  TransferJobSnapshot,
+  TransferJobState,
 } from '@teensyrom-nx/domain';
-import { PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
+import {
+  PLAYER_CONTEXT,
+  IPlayerContext,
+  TransferStore,
+  PlayerStore,
+  PLAYER_STORAGE,
+} from '@teensyrom-nx/application';
 import { of } from 'rxjs';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router } from '@angular/router';
 import { Component, signal } from '@angular/core';
 import { NAV_ITEMS } from '@teensyrom-nx/app/navigation';
 import { By } from '@angular/platform-browser';
+import { MatDialog } from '@angular/material/dialog';
+import { TransferModalComponent } from '@teensyrom-nx/features/file-transfer';
 import '../../test-setup';
+
+const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJobSnapshot => ({
+  jobId: 'job-1',
+  deviceId: 'device-1',
+  storageType: StorageType.Sd,
+  destinationDirectory: '/music/',
+  state: TransferJobState.Receiving,
+  filesReceived: 0,
+  filesSent: 0,
+  filesFailed: 0,
+  totalFiles: null,
+  currentFile: null,
+  startedUtc: new Date('2026-01-01T00:00:00Z'),
+  error: null,
+  failures: [],
+  ...overrides,
+});
 
 @Component({ standalone: true, template: '<p>Test</p>' })
 class TestComponent {}
@@ -33,8 +62,11 @@ describe('LayoutComponent', () => {
   let component: LayoutComponent;
   let fixture: ComponentFixture<LayoutComponent>;
   let router: Router;
+  let mockDialog: { open: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    mockDialog = { open: vi.fn().mockReturnValue({ close: vi.fn() }) };
+
     const mockDeviceService: Partial<IDeviceService> = {
       findDevices: () => of([]),
       getConnectedDevices: () => of([]),
@@ -120,6 +152,11 @@ describe('LayoutComponent', () => {
         { provide: VERSION_SERVICE, useValue: mockVersionService },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
+        { provide: MatDialog, useValue: mockDialog },
+        // PlayerStore's action factories inject these eagerly at construction. TransferPlaybackGuard
+        // forces that construction (it injects PlayerStore), so they must be satisfied here too.
+        { provide: PLAYER_SERVICE, useValue: {} },
+        { provide: PLAYER_STORAGE, useValue: { save: vi.fn(), load: vi.fn(), hasSavedState: vi.fn(), clear: vi.fn() } },
       ],
     }).compileComponents();
 
@@ -171,6 +208,71 @@ describe('LayoutComponent', () => {
 
       // Should only get 'player' from '/player/browse'
       expect(component.activeRoute()).toBe('player');
+    });
+  });
+
+  describe('transfer modal effect', () => {
+    let transferStore: InstanceType<typeof TransferStore>;
+    const deviceId = 'device-1';
+
+    beforeEach(() => {
+      transferStore = TestBed.inject(TransferStore);
+    });
+
+    const transferModalCalls = () =>
+      mockDialog.open.mock.calls.filter(([componentType]) => componentType === TransferModalComponent);
+
+    it('opens the transfer modal, disabling close, once store state says a transfer is live', () => {
+      transferStore.setTargetDevice({ deviceId });
+      transferStore.beginScan({ deviceId, droppedRootName: 'Games', destinationLabel: '/games' });
+      fixture.detectChanges();
+
+      const calls = transferModalCalls();
+      expect(calls.length).toBe(1);
+      const [, config] = calls[0];
+      expect(config.disableClose).toBe(true);
+      expect(config.restoreFocus).toBe(true);
+      expect(config.panelClass).toBe('glassy-dialog');
+      expect(config.backdropClass).toBe('busy-dialog-backdrop');
+      expect(config.ariaLabel).toContain('Transferring files to');
+    });
+
+    it('does not reopen the dialog while the transfer is still live', () => {
+      transferStore.setTargetDevice({ deviceId });
+      transferStore.beginScan({ deviceId, droppedRootName: 'Games', destinationLabel: '/games' });
+      fixture.detectChanges();
+      transferStore.completeScan({ deviceId, scanTotal: 3 });
+      fixture.detectChanges();
+
+      expect(transferModalCalls().length).toBe(1);
+    });
+
+    it('closes the dialog once the store clears the transfer', () => {
+      const dialogRef = { close: vi.fn() };
+      mockDialog.open.mockReturnValue(dialogRef);
+
+      transferStore.setTargetDevice({ deviceId });
+      transferStore.beginScan({ deviceId, droppedRootName: 'Games', destinationLabel: '/games' });
+      fixture.detectChanges();
+
+      transferStore.clearTransfer({ deviceId });
+      fixture.detectChanges();
+
+      expect(dialogRef.close).toHaveBeenCalled();
+    });
+  });
+
+  describe('transfer playback guard', () => {
+    it('is constructed at startup, reacting to a live transfer without being injected anywhere else', () => {
+      const transferStore = TestBed.inject(TransferStore);
+      const playerStore = TestBed.inject(PlayerStore);
+      const deviceId = 'device-1';
+
+      transferStore.applyJobSnapshot({ deviceId, snapshot: createSnapshot({ deviceId }) });
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      expect(playerStore.players()[deviceId]?.status).toBe(PlayerStatus.Stopped);
     });
   });
 });

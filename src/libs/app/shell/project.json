@@ -5,7 +5,7 @@
   "prefix": "lib",
   "projectType": "library",
   "tags": ["scope:app", "type:shell"],
-  "implicitDependencies": ["app-navigation", "ui-components"],
+  "implicitDependencies": ["app-navigation", "ui-components", "features-file-transfer"],
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint"
