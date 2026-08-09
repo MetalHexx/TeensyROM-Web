@@ -37,8 +37,8 @@ namespace TeensyRom.Core.Entities.Storage
                 throw new FileNotFoundException($"A file was not found at: {sourcePath}");
             }
 
-            var streamLength = (uint)new FileInfo(sourcePath).Length;
-            var checksum = ComputeChecksum(sourcePath);
+            var streamLength = ReadWithRetry(() => (uint)new FileInfo(sourcePath).Length);
+            var checksum = ReadWithRetry(() => ComputeChecksum(sourcePath));
 
             return new StreamedFileTransfer(sourcePath, targetPath, targetStorage, streamLength, checksum);
         }
@@ -76,6 +76,27 @@ namespace TeensyRom.Core.Entities.Storage
             }
 
             return (ushort)(sum & 0xFFFF);
+        }
+
+        private static T ReadWithRetry<T>(Func<T> operation)
+        {
+            const int maxRetries = 5;
+            const int delayMs = 200;
+
+            for (var attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    return operation();
+                }
+                catch (IOException)
+                {
+                    if (attempt == maxRetries - 1) throw;
+                    Thread.Sleep(delayMs);
+                }
+            }
+
+            throw new IOException("Failed to read file after multiple attempts.");
         }
     }
 }

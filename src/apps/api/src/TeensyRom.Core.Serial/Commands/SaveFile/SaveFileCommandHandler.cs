@@ -1,5 +1,6 @@
 using MediatR;
 using TeensyRom.Core.Abstractions;
+using TeensyRom.Core.Common;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial;
@@ -42,11 +43,23 @@ namespace TeensyRom.Core.Commands
 
                     using (var stream = file.OpenRead())
                     {
-                        int bytesRead;
+                        var bytesSent = 0u;
 
-                        while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+                        while (file.StreamLength > bytesSent)
                         {
+                            var bytesToRead = buffer.Length;
+                            if (file.StreamLength - bytesSent < bytesToRead) bytesToRead = (int)(file.StreamLength - bytesSent);
+
+                            var bytesRead = await ReadChunkWithRetry(stream, buffer, bytesToRead, ct);
+
+                            if (bytesRead == 0)
+                            {
+                                throw new TeensyException(
+                                    $"Unexpected end of file while sending {file.TargetPath.Value}: sent {bytesSent} of {file.StreamLength} declared bytes.");
+                            }
+
                             port.Write(buffer, 0, bytesRead);
+                            bytesSent += (uint)bytesRead;
                         }
                     }
 
@@ -101,6 +114,27 @@ namespace TeensyRom.Core.Commands
             {
                 logService.InternalError($"Delete Error: {file.TargetPath} \r\n => {ex.Message}", deviceId);
             }
+        }
+
+        private static async Task<int> ReadChunkWithRetry(Stream stream, byte[] buffer, int count, CancellationToken ct)
+        {
+            const int maxRetries = 5;
+            const int delayMs = 200;
+
+            for (var attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    return stream.Read(buffer, 0, count);
+                }
+                catch (IOException)
+                {
+                    if (attempt == maxRetries - 1) throw;
+                    await Task.Delay(delayMs, ct);
+                }
+            }
+
+            throw new IOException("Failed to read file after multiple attempts.");
         }
     }
 }

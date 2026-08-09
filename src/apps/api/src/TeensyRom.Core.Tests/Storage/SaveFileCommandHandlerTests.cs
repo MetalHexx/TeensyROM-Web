@@ -45,6 +45,28 @@ public class SaveFileCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_MultiChunkSave_SendsEveryChunkAndReturnsSaved()
+    {
+        var (path, bytes) = WriteTestFile(40_001);
+        var target = new FilePath("/games/multichunk.prg");
+        var transfer = StreamedFileTransfer.FromFile(path, target, TeensyStorageType.SD);
+        var port = new RecordingCommunicationPort();
+        var handler = new SaveFileCommandHandler(_log);
+
+        var result = await handler.Handle(new SaveFileCommand
+        {
+            File = transfer,
+            DeviceId = "DEVICEID",
+            CommunicationPort = port
+        }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Saved.Should().BeTrue();
+        port.AttemptCount.Should().Be(1);
+        port.ReceivedBody.Should().Equal(bytes);
+    }
+
+    [Fact]
     public async Task Handle_FileAlreadyExistsOnFirstAttempt_DeletesThenRetriesToSuccess()
     {
         var (path, _) = WriteTestFile(500);
