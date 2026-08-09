@@ -27,6 +27,15 @@ interface PendingTransfer {
   cancelled: boolean;
 }
 
+/** Minimum time a client-only transfer phase stays on screen before the next one replaces it. */
+const MIN_STATE_DISPLAY_MS = 1000;
+
+/** Resolves once `minMs` has elapsed since `startedAt`; resolves immediately if it already has. */
+function holdUntil(startedAt: number, minMs: number): Promise<void> {
+  const remaining = minMs - (Date.now() - startedAt);
+  return remaining > 0 ? new Promise((resolve) => setTimeout(resolve, remaining)) : Promise.resolve();
+}
+
 /**
  * Turns a drop into a completed transfer by sequencing its collaborators: `DropScanner` walks,
  * `TransferHubListener` folds the live job, `UploadPool` drives the HTTP uploads, and
@@ -71,6 +80,7 @@ export class TransferContextService implements ITransferContext {
       droppedRootName: peekRootName(input) ?? '',
       destinationLabel: destination.path,
     });
+    const scanningEnteredAt = Date.now();
 
     const scanResult = await this.dropScanner.scan(
       input,
@@ -79,6 +89,13 @@ export class TransferContextService implements ITransferContext {
     );
 
     // Cancel may have already cleared this device's state while the walk was in flight.
+    if (pending.cancelled) {
+      return;
+    }
+
+    await holdUntil(scanningEnteredAt, MIN_STATE_DISPLAY_MS);
+
+    // Cancel may have landed during the hold too.
     if (pending.cancelled) {
       return;
     }
@@ -137,6 +154,7 @@ export class TransferContextService implements ITransferContext {
 
   private async createAndRun(deviceId: string, pending: PendingTransfer): Promise<void> {
     this.store.beginJob({ deviceId });
+    const startingEnteredAt = Date.now();
 
     let snapshot: TransferJobSnapshot;
     try {
@@ -146,6 +164,10 @@ export class TransferContextService implements ITransferContext {
         pending.destinationDirectory
       );
     } catch (error) {
+      if (pending.cancelled) {
+        return;
+      }
+      await holdUntil(startingEnteredAt, MIN_STATE_DISPLAY_MS);
       if (pending.cancelled) {
         return;
       }
@@ -164,8 +186,11 @@ export class TransferContextService implements ITransferContext {
       throw error;
     }
 
-    // The create call can't be aborted mid-flight; if cancel arrived while it was in flight,
-    // undo it now — the cancel endpoint is idempotent even against a job this fresh.
+    await holdUntil(startingEnteredAt, MIN_STATE_DISPLAY_MS);
+
+    // The create call can't be aborted mid-flight; if cancel arrived while it was in flight (or
+    // during the hold above), undo it now — the cancel endpoint is idempotent even against a job
+    // this fresh.
     if (pending.cancelled) {
       try {
         await this.transferService.cancelJob(snapshot.jobId);

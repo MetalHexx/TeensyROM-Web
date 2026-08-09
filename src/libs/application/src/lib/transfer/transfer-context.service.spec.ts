@@ -65,6 +65,16 @@ async function flushMicrotasks(): Promise<void> {
   }
 }
 
+/** Matches the service's private `MIN_STATE_DISPLAY_MS`; there's no export to read it from. */
+const STATE_DISPLAY_FLOOR_MS = 1000;
+
+/** Waits past both real-time state-display floors (scanning, then starting) plus a safety margin. */
+async function advancePastStateFloors(): Promise<void> {
+  await flushMicrotasks();
+  await new Promise((resolve) => setTimeout(resolve, STATE_DISPLAY_FLOOR_MS * 2 + 150));
+  await flushMicrotasks();
+}
+
 describe('TransferContextService', () => {
   let service: TransferContextService;
   let store: InstanceType<typeof TransferStore>;
@@ -80,48 +90,55 @@ describe('TransferContextService', () => {
     getActiveJob: ReturnType<typeof vi.fn>;
   };
   let callOrder: string[];
+  let callTimes: Record<string, number>;
 
   const oneFileScan: DropScanResult = { entries: [createEntry('games/a.prg')], rootName: 'games' };
   const emptyScan: DropScanResult = { entries: [], rootName: null };
 
   beforeEach(() => {
     callOrder = [];
+    callTimes = {};
+
+    const record = (name: string) => {
+      callOrder.push(name);
+      callTimes[name] = Date.now();
+    };
 
     mockStorageStore = {
       getSelectedDirectoryForDevice: vi.fn(() => {
-        callOrder.push('capture-destination');
+        record('capture-destination');
         return createSelectedDirectory();
       }),
     };
 
     mockDropScanner = {
       scan: vi.fn(async () => {
-        callOrder.push('scan');
+        record('scan');
         return oneFileScan;
       }),
     };
 
     mockUploadPool = {
       run: vi.fn(async () => {
-        callOrder.push('upload');
+        record('upload');
       }),
     };
 
     mockHubListener = {
       start: vi.fn(async () => {
-        callOrder.push('hub-start');
+        record('hub-start');
       }),
       stop: vi.fn(async () => undefined),
     };
 
     mockTransferService = {
       createJob: vi.fn(async () => {
-        callOrder.push('create-job');
+        record('create-job');
         return createSnapshot();
       }),
       uploadFile: vi.fn(async () => undefined),
       sealJob: vi.fn(async () => {
-        callOrder.push('seal-job');
+        record('seal-job');
       }),
       cancelJob: vi.fn(async () => undefined),
       getActiveJob: vi.fn(async () => null),
@@ -286,7 +303,8 @@ describe('TransferContextService', () => {
       );
 
       const startPromise = service.startTransfer('device-1', asFileList([]));
-      await flushMicrotasks();
+      // Both state-display floors (scanning, starting) must clear before a job exists to cancel.
+      await advancePastStateFloors();
 
       await service.cancelTransfer('device-1');
 
@@ -296,6 +314,49 @@ describe('TransferContextService', () => {
       uploadGate.resolve();
       await startPromise;
 
+      expect(mockTransferService.sealJob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('state display floors', () => {
+    it('holds scanning and starting for the floor even when the scan and create resolve instantly', async () => {
+      await service.startTransfer('device-1', asFileList([]));
+
+      const scanAt = callTimes['scan'];
+      const createAt = callTimes['create-job'];
+      const hubStartAt = callTimes['hub-start'];
+
+      // 'scanning' must outlive the instantly-resolved scan by the floor before completeScan
+      // (and the resulting createJob call) fires.
+      expect(createAt - scanAt).toBeGreaterThanOrEqual(STATE_DISPLAY_FLOOR_MS - 50);
+      // 'starting' must outlive the instantly-resolved create by the floor before the success
+      // path (driven by hubListener.start) is allowed to proceed.
+      expect(hubStartAt - createAt).toBeGreaterThanOrEqual(STATE_DISPLAY_FLOOR_MS - 50);
+    });
+
+    it('cancelling during the scanning hold produces no createJob call', async () => {
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await flushMicrotasks();
+
+      // The scan itself has resolved, but the scanning floor is still holding.
+      await service.cancelTransfer('device-1');
+      await startPromise;
+
+      expect(mockTransferService.createJob).not.toHaveBeenCalled();
+      expect(store.transfers()['device-1'].phase).toBe('idle');
+    });
+
+    it('cancelling during the starting hold cancels the created job on the server and never seals', async () => {
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await flushMicrotasks();
+      // Clear the scanning floor and let createJob resolve, landing inside the starting floor.
+      await new Promise((resolve) => setTimeout(resolve, STATE_DISPLAY_FLOOR_MS + 150));
+      await flushMicrotasks();
+
+      await service.cancelTransfer('device-1');
+      await startPromise;
+
+      expect(mockTransferService.cancelJob).toHaveBeenCalledWith('job-1');
       expect(mockTransferService.sealJob).not.toHaveBeenCalled();
     });
   });
