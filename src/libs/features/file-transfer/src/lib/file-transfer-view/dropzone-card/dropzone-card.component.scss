@@ -1,0 +1,65 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.dropzone-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-lg);
+  border: 2px dashed var(--color-dimmed);
+  border-radius: var(--border-radius-lg);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+
+  &.state-drag-over {
+    border-color: var(--color-highlight);
+    background-color: color-mix(in srgb, var(--color-highlight) 12%, transparent);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--color-highlight) 45%, transparent);
+  }
+
+  &.state-device-busy {
+    border-color: var(--color-error);
+  }
+}
+
+.picker-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.picker-button {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary-bright);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

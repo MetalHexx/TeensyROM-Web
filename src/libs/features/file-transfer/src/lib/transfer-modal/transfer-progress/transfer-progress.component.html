@@ -1,0 +1,256 @@
+<div class="transfer-progress" data-testid="transfer-progress">
+  <h2 class="progress-title" data-testid="transfer-progress-title">{{ title() }}</h2>
+
+  @if (hasSubtitle()) {
+    <div class="progress-subtitle">
+      <lib-styled-icon icon="folder" size="small"></lib-styled-icon>
+      <span>{{ subtitle() }}</span>
+    </div>
+  }
+
+  <div class="progress-body">
+    @switch (renderShape()) {
+      @case ('scan') {
+        <div class="scan-center">
+          <div class="scan-count">{{ scanCenterValue() | number }}</div>
+          <div class="scan-sub">{{ scanCenterLabel() }}</div>
+        </div>
+      }
+
+      @case ('busy-refusal') {
+        @if (vm().state === 'device-busy') {
+          <div class="reason-banner error" data-testid="transfer-progress-banner">
+            <lib-styled-icon icon="warning" color="error" size="medium"></lib-styled-icon>
+            <span>{{ deviceBusyMessage() }}</span>
+          </div>
+          <div class="reason-banner neutral" data-testid="transfer-progress-banner-neutral">
+            <lib-styled-icon icon="hourglass_empty" size="medium"></lib-styled-icon>
+            <span>{{ queuedMessage() }}</span>
+          </div>
+        } @else {
+          <div class="reason-banner error" data-testid="transfer-progress-banner">
+            <lib-styled-icon icon="warning" color="error" size="medium"></lib-styled-icon>
+            <span>{{ vm().reason }}</span>
+          </div>
+        }
+      }
+
+      @case ('nothing-to-transfer') {
+        <div class="reason-banner neutral" data-testid="transfer-progress-banner">
+          <lib-styled-icon icon="folder_off" size="medium"></lib-styled-icon>
+          <span>No files valid for TeensyROM were found in what you dropped.</span>
+        </div>
+      }
+
+      @case ('active') {
+        <div class="metrics" data-testid="transfer-progress-metrics">
+          <div class="metric" data-testid="metric-uploaded" [class.metric-success]="uploadedTileSuccess()">
+            <span class="metric-label">Uploaded</span>
+            <span class="metric-value">{{ vm().uploaded | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+          </div>
+          <div class="metric" data-testid="metric-written">
+            <span class="metric-label">Written</span>
+            <span class="metric-value">{{ vm().written | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+          </div>
+          <div class="metric metric-staged" data-testid="metric-staged">
+            <span class="metric-label">Staged &amp; waiting</span>
+            <span class="metric-value">{{ vm().staged | number }}</span>
+          </div>
+          <div class="metric metric-failed" data-testid="metric-failed">
+            <span class="metric-label">Failed</span>
+            <span class="metric-value">{{ vm().failed | number }}</span>
+          </div>
+        </div>
+
+        <div class="write-bars">
+          <div class="write-bar">
+            <div class="write-bar-caption">
+              <span>Transferred to API</span>
+              <span class="write-bar-pct" data-testid="api-bar-pct" [class.write-bar-pct-success]="apiBarSuccess()">{{ vm().apiPercent }}%</span>
+            </div>
+            <mat-progress-bar
+              class="write-bar-track"
+              data-testid="api-bar"
+              [class.progress-success]="apiBarSuccess()"
+              mode="determinate"
+              [value]="vm().apiPercent"
+            ></mat-progress-bar>
+          </div>
+          <div class="write-bar">
+            <div class="write-bar-caption">
+              <span>Transferred to TR Device</span>
+              <span class="write-bar-pct" data-testid="device-bar-pct">{{ vm().devicePercent }}%</span>
+            </div>
+            <mat-progress-bar class="write-bar-track" data-testid="device-bar" mode="determinate" [value]="vm().devicePercent"></mat-progress-bar>
+          </div>
+        </div>
+
+        @if (vm().currentFile) {
+          <div class="current-file" data-testid="transfer-progress-current-file">
+            <span class="current-file-label">Current</span>
+            <lib-styled-icon icon="description" size="small"></lib-styled-icon>
+            <span class="current-file-path">{{ vm().currentFile }}</span>
+          </div>
+        }
+
+        <div class="feed" data-testid="transfer-progress-feed">
+          <div class="feed-header">
+            <span>Recent</span>
+            <span class="feed-cap-note">last 20</span>
+          </div>
+          <div class="feed-list">
+            @for (entry of vm().feed; track entry.relativePath) {
+              <div class="feed-row" [class.feed-row-fail]="!entry.success">
+                <lib-styled-icon
+                  [icon]="entry.success ? 'check_circle' : 'cancel'"
+                  [color]="entry.success ? 'success' : 'error'"
+                  size="small"
+                ></lib-styled-icon>
+                <span class="feed-row-name">{{ entry.fileName }}</span>
+                @if (!entry.success && entry.reason) {
+                  <span class="feed-row-reason">{{ entry.reason }}</span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      @case ('cancelling') {
+        <div class="metrics metrics-muted" data-testid="transfer-progress-metrics">
+          <div class="metric" data-testid="metric-uploaded">
+            <span class="metric-label">Uploaded</span>
+            <span class="metric-value">{{ vm().uploaded | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+          </div>
+          <div class="metric" data-testid="metric-written">
+            <span class="metric-label">Written</span>
+            <span class="metric-value">{{ vm().written | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+          </div>
+          <div class="metric metric-staged" data-testid="metric-staged">
+            <span class="metric-label">Staged &amp; waiting</span>
+            <span class="metric-value">{{ vm().staged | number }}</span>
+          </div>
+          <div class="metric metric-failed" data-testid="metric-failed">
+            <span class="metric-label">Failed</span>
+            <span class="metric-value">{{ vm().failed | number }}</span>
+          </div>
+        </div>
+
+        @if (vm().currentFile) {
+          <div class="current-file" data-testid="transfer-progress-current-file">
+            <span class="current-file-label">Current</span>
+            <lib-styled-icon icon="description" size="small"></lib-styled-icon>
+            <span class="current-file-path">{{ vm().currentFile }}</span>
+          </div>
+        }
+      }
+
+      @case ('terminal') {
+        @if (terminalBannerTreatment()) {
+          <div
+            class="reason-banner"
+            data-testid="transfer-progress-banner"
+            [class.neutral]="terminalBannerTreatment() === 'neutral'"
+            [class.error]="terminalBannerTreatment() === 'error'"
+          >
+            <lib-styled-icon
+              [icon]="terminalBannerIcon()"
+              [color]="terminalBannerTreatment() === 'error' ? 'error' : 'normal'"
+              size="medium"
+            ></lib-styled-icon>
+            <span>{{ vm().reason }}</span>
+          </div>
+        }
+
+        <div class="summary-hero" data-testid="transfer-progress-summary">
+          <div class="summary-cell summary-success">
+            <span class="summary-big">{{ vm().written | number }}</span>
+            <span class="summary-caption">
+              @if (isCompletedState()) {
+                Written
+              } @else {
+                Written of {{ vm().scanTotal | number }}
+              }
+            </span>
+          </div>
+          <div class="summary-divider"></div>
+          <div class="summary-cell summary-failed">
+            <span class="summary-big">{{ vm().failed | number }}</span>
+            <span class="summary-caption">Failed</span>
+          </div>
+          @if (vm().elapsedLabel) {
+            <div class="summary-elapsed">
+              <lib-styled-icon icon="schedule" size="small"></lib-styled-icon>
+              <span>{{ vm().elapsedLabel }}</span>
+            </div>
+          }
+        </div>
+
+        @if (vm().failures.length > 0) {
+          <div class="failures" data-testid="transfer-progress-failures">
+            <div class="failures-header"><span>Failures</span></div>
+            <div class="failures-list">
+              @for (entry of vm().failures; track entry.relativePath) {
+                <div class="failure-row">
+                  <lib-styled-icon icon="cancel" color="error" size="small"></lib-styled-icon>
+                  <span class="failure-row-name">{{ entry.relativePath }}</span>
+                  @if (entry.reason) {
+                    <span class="failure-row-reason">{{ entry.reason }}</span>
+                  }
+                </div>
+              }
+              @if (vm().failureOverflow > 0) {
+                <div class="failures-more" data-testid="transfer-progress-failures-overflow">
+                  and {{ vm().failureOverflow }} more
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+    }
+  </div>
+
+  <div class="progress-actions" [class.centered]="renderShape() === 'scan'">
+    @switch (renderShape()) {
+      @case ('scan') {
+        <lib-action-button icon="close" label="Cancel" color="error" (buttonClick)="onCancel()"></lib-action-button>
+      }
+      @case ('busy-refusal') {
+        <lib-action-button icon="close" label="Close" color="normal" (buttonClick)="onClose()"></lib-action-button>
+        @if (vm().state === 'device-busy') {
+          <lib-action-button icon="refresh" label="Retry" color="highlight" (buttonClick)="onRetry()"></lib-action-button>
+        }
+      }
+      @case ('nothing-to-transfer') {
+        <lib-action-button icon="close" label="Close" color="normal" (buttonClick)="onClose()"></lib-action-button>
+      }
+      @case ('active') {
+        <lib-action-button icon="close" label="Cancel transfer" color="error" (buttonClick)="onCancel()"></lib-action-button>
+      }
+      @case ('cancelling') {
+        <lib-action-button
+          icon="close"
+          label="Cancel transfer"
+          color="error"
+          [disabled]="true"
+          (buttonClick)="onCancel()"
+        ></lib-action-button>
+      }
+      @case ('terminal') {
+        <lib-action-button icon="close" label="Close" color="normal" (buttonClick)="onClose()"></lib-action-button>
+      }
+    }
+  </div>
+
+  @if (bottomBarMode(); as mode) {
+    <mat-progress-bar
+      class="bottom-bar"
+      data-testid="transfer-progress-bottom-bar"
+      [mode]="mode"
+      [value]="mode === 'determinate' ? vm().devicePercent : 0"
+    ></mat-progress-bar>
+  }
+
+  <div class="visually-hidden" aria-live="polite" data-testid="transfer-progress-live-region">{{ liveRegionText() }}</div>
+</div>

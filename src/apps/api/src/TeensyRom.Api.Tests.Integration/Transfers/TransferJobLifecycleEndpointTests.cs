@@ -127,8 +127,8 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             var secondCreate = await f.Client.PostAsync<CreateJobEndpoint, CreateJobRequest, ProblemDetails>(
                 NewCreateRequest(device.DeviceId, "/music/second"));
 
-            secondCreate.Should().BeProblem().WithStatusCode(HttpStatusCode.BadRequest);
-            secondCreate.Content.Title.Should().Contain(firstJobId);
+            secondCreate.Should().BeProblem().WithStatusCode(HttpStatusCode.Conflict);
+            secondCreate.Content.Extensions["activeJobId"]!.ToString().Should().Be(firstJobId);
 
             // Sealing the first job with an empty queue reaches Completed immediately, releasing its lease.
             await f.Client.PostAsync<SealJobEndpoint, SealJobRequest, SealJobResponse>(new SealJobRequest { JobId = firstJobId });

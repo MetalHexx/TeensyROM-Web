@@ -3,6 +3,7 @@ import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 import { runInInjectionContext, inject } from '@angular/core';
 import { AppBootstrapService } from '@teensyrom-nx/app/bootstrap';
+import { TransferPlaybackGuard } from '@teensyrom-nx/application';
 import { LogType, logInfo, logError } from '@teensyrom-nx/utils';
 
 async function bootstrap() {
@@ -17,6 +18,10 @@ async function bootstrap() {
     bootstrapService.init().catch((error) => {
       logError('Failed to initialize application:', error);
     });
+
+    // Constructing this forces its guarding effect() to run for the lifetime of the app,
+    // independent of whether the user ever visits the player route for the device.
+    inject(TransferPlaybackGuard);
   });
 }
 

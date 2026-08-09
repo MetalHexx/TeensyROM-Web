@@ -19,6 +19,7 @@ import { updatePlayerStatus } from './update-player-status';
 import { play } from './play';
 import { pauseMusic } from './pause-music';
 import { stopPlayback } from './stop-playback';
+import { reflectTransferStopped } from './reflect-transfer-stopped';
 import { updateFavoriteStatus } from './update-favorite-status';
 import { navigateNext } from './navigate-next';
 import { navigatePrevious } from './navigate-previous';
@@ -52,6 +53,7 @@ export function withPlayerActions() {
         ...play(writableStore, playerService),
         ...pauseMusic(writableStore, playerService),
         ...stopPlayback(writableStore, deviceService),
+        ...reflectTransferStopped(writableStore),
         ...updateFavoriteStatus(writableStore),
         ...navigateNext(writableStore, playerService, playerStorage),
         ...navigatePrevious(writableStore, playerService, playerStorage),

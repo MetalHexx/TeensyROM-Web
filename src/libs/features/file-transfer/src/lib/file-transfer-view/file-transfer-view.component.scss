@@ -17,15 +17,11 @@
   min-width: 0;
 }
 
-.top-row {
-  display: grid;
-  grid-template-columns: 1.15fr 1fr;
+.transfer-header {
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-lg);
   flex-shrink: 0;
-
-  @include styles.below-tablet {
-    grid-template-columns: 1fr;
-  }
 }
 
 .content-row {

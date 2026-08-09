@@ -124,7 +124,7 @@ A file transfer job must hold exclusive access to the device **across many seria
 
 The `DeviceLeaseCoordinator` solves this by being a **separate, timer-less construct** above the port lock:
 - When a job starts (CreateJobEndpoint), it acquires a lease: `leaseCoordinator.TryAcquire(deviceId, jobId)`.
-- `CreateJobEndpoint` is the sole exclusivity gate: at job-creation time, `TryAcquire` atomically claims the lease only if the device is unheld, rejecting a second job for an already-leased device. The pump and sweeper never recheck the lease while a job runs — they only call `Release` on it.
+- `CreateJobEndpoint` is the sole exclusivity gate: at job-creation time, `TryAcquire` atomically claims the lease only if the device is unheld, rejecting a second job for an already-leased device with a `409 Conflict` carrying the holding job's id as the `activeJobId` extension. The pump and sweeper never recheck the lease while a job runs — they only call `Release` on it.
 - When the job reaches a terminal state, the lease is released.
 - No stale-lock cleanup: the lease is held in-memory and released explicitly by the pump.
 

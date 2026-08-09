@@ -1,0 +1,15 @@
+<lib-sliding-container animationDirection="from-top" [animationTrigger]="true">
+  <lib-scaling-compact-card animationEntry="from-top" animationParent="auto" cardClass="glassy-card">
+    <lib-progress-bar [currentValue]="0" [totalValue]="0" [show]="false"></lib-progress-bar>
+
+    <div class="transfer-controls desktop-layout" data-testid="transfer-toolbar">
+      <div class="device-selector-section"><lib-device-selector /></div>
+      <div class="toolbar-actions-section"></div>
+    </div>
+
+    <div class="transfer-controls tablet-layout" data-testid="transfer-toolbar">
+      <div class="device-selector-section"><lib-device-selector /></div>
+      <div class="toolbar-actions-section"></div>
+    </div>
+  </lib-scaling-compact-card>
+</lib-sliding-container>

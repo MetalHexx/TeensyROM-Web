@@ -1,0 +1,59 @@
+@use '../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  width: 100%;
+  display: block;
+  position: relative; // Positioning context for absolute progress bar
+}
+
+// Base styles for all layouts
+.transfer-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.device-selector-section {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.desktop-layout {
+  display: none;
+
+  @include styles.screen-tablet {
+    display: flex;
+  }
+
+  .device-selector-section {
+    flex: 1 1 auto;
+  }
+
+  .toolbar-actions-section {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+}
+
+.tablet-layout {
+  display: none;
+  gap: var(--spacing-md);
+
+  @include styles.screen-between(styles.$bp-phone, styles.$bp-tablet) {
+    display: flex;
+  }
+
+  .device-selector-section {
+    flex: 1 1 auto;
+  }
+
+  .toolbar-actions-section {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+}

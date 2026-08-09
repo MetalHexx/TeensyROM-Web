@@ -1,13 +1,20 @@
-import { Component, computed, inject, Signal, effect } from '@angular/core';
+import { Component, computed, inject, Signal, effect, untracked } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { HeaderComponent } from '../components/header/header.component';
 import { NavigationService, NAV_ITEMS } from '@teensyrom-nx/app/navigation';
 import { AlertContainerComponent } from '@teensyrom-nx/app/alerts';
 import { filter, map, mergeMap } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { DeviceStore, PLAYER_CONTEXT, StorageStore } from '@teensyrom-nx/application';
+import {
+  DeviceStore,
+  PLAYER_CONTEXT,
+  StorageStore,
+  TransferStore,
+  TransferPlaybackGuard,
+} from '@teensyrom-nx/application';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { BusyDialogComponent } from '../components/busy-dialog/busy-dialog.component';
+import { TransferModalComponent } from '@teensyrom-nx/features/file-transfer';
 import {
   NavRailComponent,
   NavRailItem,
@@ -32,19 +39,28 @@ export class LayoutComponent {
   readonly deviceStore = inject(DeviceStore);
   readonly playerContext = inject(PLAYER_CONTEXT);
   readonly storageStore = inject(StorageStore);
+  readonly transferStore = inject(TransferStore);
   readonly navService = inject(NavigationService);
   readonly router = inject(Router);
   readonly route = inject(ActivatedRoute);
   readonly dialog = inject(MatDialog);
+  // Eager construction: nothing else injects this guard, and providedIn: 'root' alone never
+  // instantiates it — without this, the device-mid-transfer playback protection silently never runs.
+  private readonly transferPlaybackGuard = inject(TransferPlaybackGuard);
   pageTitle: Signal<string>;
   showIndexDialog = computed(() => this.deviceStore.isIndexing());
   showFindDeviceDialog = computed(() => this.deviceStore.isLoading());
   showSlowLoadingDialog: Signal<boolean>;
   showSlowFavoriteDialog: Signal<boolean>;
+  showTransferDialog = computed(() => {
+    const deviceId = this.transferStore.getTargetDeviceId()();
+    return deviceId !== null && this.transferStore.isTransferModalOpen(deviceId)();
+  });
   private indexDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
   private findDeviceDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
   private slowLoadingDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
   private slowFavoriteDialogRef: MatDialogRef<BusyDialogComponent> | null = null;
+  private transferDialogRef: MatDialogRef<TransferModalComponent> | null = null;
 
   /** Menu items for the nav rail */
   readonly menuItems: NavRailItem[] = NAV_ITEMS;
@@ -120,6 +136,28 @@ export class LayoutComponent {
       } else if (!isSlowFavorite && this.slowFavoriteDialogRef) {
         this.slowFavoriteDialogRef.close();
         this.slowFavoriteDialogRef = null;
+      }
+    });
+
+    // Transfer modal effect — driven by store state alone, never by a click handler, so a later
+    // iteration can re-raise it after a reload with no new machinery.
+    effect(() => {
+      const shouldShow = this.showTransferDialog();
+      if (shouldShow && !this.transferDialogRef) {
+        const deviceName = untracked(() => {
+          const deviceId = this.transferStore.getTargetDeviceId()();
+          return this.deviceStore.devices().find((d) => d.deviceId === deviceId)?.name || deviceId || 'the device';
+        });
+        this.transferDialogRef = this.dialog.open(TransferModalComponent, {
+          disableClose: true,
+          panelClass: 'glassy-dialog',
+          backdropClass: 'busy-dialog-backdrop',
+          ariaLabel: `Transferring files to ${deviceName}`,
+          restoreFocus: true,
+        });
+      } else if (!shouldShow && this.transferDialogRef) {
+        this.transferDialogRef.close();
+        this.transferDialogRef = null;
       }
     });
 

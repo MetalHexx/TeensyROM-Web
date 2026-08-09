@@ -1,0 +1,46 @@
+import { StorageType } from './storage-type.enum';
+
+/**
+ * Lifecycle states of a transfer job, mirroring the API's TransferJobState.
+ */
+export enum TransferJobState {
+  Created = 'Created',
+  Receiving = 'Receiving',
+  Sealed = 'Sealed',
+  Completed = 'Completed',
+  Cancelling = 'Cancelling',
+  Cancelled = 'Cancelled',
+  Abandoned = 'Abandoned',
+  Aborted = 'Aborted',
+}
+
+/** Outcome of a single file's upload within a transfer job. */
+export interface TransferFileCompletion {
+  jobId: string;
+  relativePath: string;
+  targetPath: string;
+  success: boolean;
+  error: string | null;
+  sizeBytes: number;
+}
+
+/**
+ * Normalized snapshot of a transfer job, hydrated from either generated job DTO
+ * (the HTTP response envelope or the bare SignalR hub push).
+ */
+export interface TransferJobSnapshot {
+  jobId: string;
+  deviceId: string;
+  storageType: StorageType;
+  /** Destination directory, trailing-slash normalized by the API - kept verbatim. */
+  destinationDirectory: string;
+  state: TransferJobState;
+  filesReceived: number;
+  filesSent: number;
+  filesFailed: number;
+  totalFiles: number | null;
+  currentFile: string | null;
+  startedUtc: Date;
+  error: string | null;
+  failures: TransferFileCompletion[];
+}
