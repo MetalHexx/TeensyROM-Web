@@ -127,13 +127,13 @@
             <span class="metric-label">Uploaded</span>
             <span class="metric-value">{{ vm().uploaded | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
           </div>
-          <div class="metric" data-testid="metric-written">
-            <span class="metric-label">Written</span>
-            <span class="metric-value">{{ vm().written | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
-          </div>
           <div class="metric metric-staged" data-testid="metric-staged">
-            <span class="metric-label">Staged &amp; waiting</span>
+            <span class="metric-label">Staged</span>
             <span class="metric-value">{{ vm().staged | number }}</span>
+          </div>
+          <div class="metric" data-testid="metric-written">
+            <span class="metric-label">Completed</span>
+            <span class="metric-value">{{ vm().written | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
             <span class="metric-label">Failed</span>
@@ -143,8 +143,7 @@
 
         @if (vm().currentFile) {
           <div class="current-file" data-testid="transfer-progress-current-file">
-            <span class="current-file-label">Current</span>
-            <lib-styled-icon icon="description" size="small"></lib-styled-icon>
+            <span class="current-file-label current-file-label-strong">Current File:</span>
             <span class="current-file-path">{{ vm().currentFile }}</span>
           </div>
         }

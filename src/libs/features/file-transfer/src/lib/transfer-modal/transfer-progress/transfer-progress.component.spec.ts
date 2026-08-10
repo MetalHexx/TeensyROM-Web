@@ -261,6 +261,22 @@ describe('TransferProgressComponent', () => {
       cancelButton?.click();
       expect(spy).not.toHaveBeenCalled();
     });
+
+    it('orders the tiles Uploaded, Staged, Completed, Failed, in step with the active shape', async () => {
+      await setup(baseVm({ state: 'cancelling' }));
+
+      const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
+      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+    });
+
+    it('renders the current file as a bold label with no icon, matching the active row', async () => {
+      await setup(baseVm({ state: 'cancelling', currentFile: 'HVSC/a/b/Current.sid' }));
+
+      const row = q('transfer-progress-current-file');
+      expect(row?.querySelector('.current-file-label')?.textContent?.trim()).toBe('Current File:');
+      expect(row?.textContent).toContain('Current.sid');
+      expect(row?.querySelector('lib-styled-icon')).toBeFalsy();
+    });
   });
 
   describe('terminal states', () => {

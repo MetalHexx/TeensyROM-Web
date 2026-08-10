@@ -312,6 +312,8 @@ describe('TransferModalComponent', () => {
       );
       expect(confirmRef.componentRef.setInput).toHaveBeenCalledWith('confirmLabel', 'Cancel transfer');
       expect(confirmRef.componentRef.setInput).toHaveBeenCalledWith('cancelLabel', 'Keep transferring');
+      expect(confirmRef.componentRef.setInput).toHaveBeenCalledWith('showLabels', true);
+      expect(confirmRef.componentRef.setInput).not.toHaveBeenCalledWith('confirmIcon', 'delete');
 
       confirmed.next();
 

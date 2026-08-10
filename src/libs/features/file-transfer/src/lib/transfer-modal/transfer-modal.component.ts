@@ -145,6 +145,8 @@ export class TransferModalComponent {
     );
     confirmRef.componentRef?.setInput('confirmLabel', 'Cancel transfer');
     confirmRef.componentRef?.setInput('cancelLabel', 'Keep transferring');
+    confirmRef.componentRef?.setInput('showLabels', true);
+    confirmRef.componentRef?.setInput('confirmIcon', 'close');
 
     confirmRef.componentInstance.confirmed.subscribe(() => {
       confirmRef.close();

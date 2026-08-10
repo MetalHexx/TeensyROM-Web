@@ -176,6 +176,62 @@ describe('ConfirmationDialogComponent', () => {
     });
   });
 
+  describe('Labelled action mode (showLabels)', () => {
+    it('renders icon-only buttons with today\'s icons when no new inputs are set', () => {
+      expect(fixture.nativeElement.querySelectorAll('lib-icon-button').length).toBe(2);
+      expect(fixture.nativeElement.querySelectorAll('lib-action-button').length).toBe(0);
+
+      const icons = Array.from(fixture.nativeElement.querySelectorAll('mat-icon')).map((el: Element) =>
+        el.textContent?.trim()
+      );
+      expect(icons).toContain('delete');
+      expect(icons).toContain('close');
+    });
+
+    it('renders two labelled buttons with no trash icon when showLabels is true', () => {
+      fixture.componentRef.setInput('confirmLabel', 'Cancel transfer');
+      fixture.componentRef.setInput('cancelLabel', 'Keep transferring');
+      fixture.componentRef.setInput('showLabels', true);
+      fixture.componentRef.setInput('confirmIcon', 'close');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelectorAll('lib-icon-button').length).toBe(0);
+
+      const actionButtons = fixture.nativeElement.querySelectorAll('lib-action-button');
+      expect(actionButtons.length).toBe(2);
+
+      const labels = Array.from(actionButtons).map(
+        (el: Element) => el.querySelector('.icon-label-text.primary')?.textContent?.trim()
+      );
+      expect(labels).toEqual(['Keep transferring', 'Cancel transfer']);
+
+      const icons = Array.from(fixture.nativeElement.querySelectorAll('mat-icon')).map((el: Element) =>
+        el.textContent?.trim()
+      );
+      expect(icons).not.toContain('delete');
+    });
+
+    it('still emits confirmed and cancelled from the labelled buttons', () => {
+      fixture.componentRef.setInput('showLabels', true);
+      fixture.detectChanges();
+
+      let confirmed = false;
+      let cancelled = false;
+      component.confirmed.subscribe(() => (confirmed = true));
+      component.cancelled.subscribe(() => (cancelled = true));
+
+      const buttons = fixture.nativeElement.querySelectorAll('lib-action-button button');
+      expect(buttons.length).toBe(2);
+
+      // Mockup order: Keep transferring (cancel) then Cancel transfer (confirm).
+      (buttons[0] as HTMLButtonElement).click();
+      expect(cancelled).toBe(true);
+
+      (buttons[1] as HTMLButtonElement).click();
+      expect(confirmed).toBe(true);
+    });
+  });
+
   describe('Message Text Wrapping', () => {
     it('should support multi-line messages', () => {
       const multiLineMessage = 'Line 1\nLine 2\nLine 3';

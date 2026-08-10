@@ -228,7 +228,7 @@
   flex: none;
 }
 
-// Scoped to the active shape's row only — the cancelling `@case` keeps its own untouched copy.
+// Shared by the active and cancelling shapes' current-file rows.
 .current-file-label-strong {
   font-weight: var(--font-weight-bold);
 }

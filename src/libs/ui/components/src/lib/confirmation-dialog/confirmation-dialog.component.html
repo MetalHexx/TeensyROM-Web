@@ -16,18 +16,33 @@
 
   <!-- Action Buttons -->
   <div class="button-row">
-    <lib-icon-button
-      [icon]="'delete'"
-      [ariaLabel]="confirmLabel()"
-      [tooltip]="confirmTooltip()"
-      [color]="'error'"
-      (buttonClick)="onConfirmClick()"
-    />
-    <lib-icon-button
-      [icon]="'close'"
-      [ariaLabel]="cancelLabel()"
-      [tooltip]="cancelTooltip()"
-      (buttonClick)="onCancelClick()"
-    />
+    @if (showLabels()) {
+      <lib-action-button
+        [icon]="cancelIcon()"
+        [label]="cancelLabel()"
+        [color]="'normal'"
+        (buttonClick)="onCancelClick()"
+      />
+      <lib-action-button
+        [icon]="confirmIcon()"
+        [label]="confirmLabel()"
+        [color]="'error'"
+        (buttonClick)="onConfirmClick()"
+      />
+    } @else {
+      <lib-icon-button
+        [icon]="confirmIcon()"
+        [ariaLabel]="confirmLabel()"
+        [tooltip]="confirmTooltip()"
+        [color]="'error'"
+        (buttonClick)="onConfirmClick()"
+      />
+      <lib-icon-button
+        [icon]="cancelIcon()"
+        [ariaLabel]="cancelLabel()"
+        [tooltip]="cancelTooltip()"
+        (buttonClick)="onCancelClick()"
+      />
+    }
   </div>
 </div>
