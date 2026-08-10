@@ -6,10 +6,13 @@ import { DirectoryItem, FileItem } from '@teensyrom-nx/domain';
 import {
   DirectoryItemComponent,
   EmptyStateMessageComponent,
+  IconButtonComponent,
   ScalingCardComponent,
+  StorageItemActionsComponent,
   StorageItemComponent,
 } from '@teensyrom-nx/ui/components';
 import { DirectoryTrailContainerComponent } from '../directory-trail-container/directory-trail-container.component';
+import { TransferSearchToolbarComponent } from './transfer-search-toolbar/transfer-search-toolbar.component';
 
 /** Generic icon for existing files — this view only needs a name and a path, not the file's type. */
 const EXISTING_FILE_ICON = 'insert_drive_file';
@@ -31,8 +34,11 @@ type ListingRow = DirectoryRow | FileRow;
     ScalingCardComponent,
     DirectoryItemComponent,
     StorageItemComponent,
+    StorageItemActionsComponent,
+    IconButtonComponent,
     EmptyStateMessageComponent,
     DirectoryTrailContainerComponent,
+    TransferSearchToolbarComponent,
   ],
   templateUrl: './transfer-directory-listing.component.html',
   styleUrl: './transfer-directory-listing.component.scss',
@@ -74,9 +80,18 @@ export class TransferDirectoryListingComponent {
 
   readonly existingFileIcon = EXISTING_FILE_ICON;
 
+  private readonly searchState = computed(() => this.storageStore.getSearchState(this.deviceId())());
+
+  readonly hasSearched = computed(() => this.searchState()?.hasSearched ?? false);
+  readonly isSearching = computed(() => this.searchState()?.isSearching ?? false);
+  readonly searchError = computed(() => this.searchState()?.error ?? null);
+  readonly searchResults = computed<FileItem[]>(() => this.searchState()?.results ?? []);
+
   private readonly selectedPath = signal<string | null>(null);
 
   trackByPath = (_index: number, row: ListingRow): string => row.path;
+
+  trackResultByPath = (_index: number, result: FileItem): string => result.path;
 
   isDirectoryRow(row: ListingRow): row is DirectoryRow {
     return row.itemType === 'directory';
@@ -100,5 +115,20 @@ export class TransferDirectoryListingComponent {
       path: directory.path,
     });
     this.selectedPath.set(null);
+  }
+
+  /**
+   * Jumps to the containing directory of a search result — the only interaction a result row
+   * offers. Navigating also clears the active search, landing the listing on that directory.
+   */
+  onJumpToDirectory(file: FileItem): void {
+    const state = this.selectedDirectoryState();
+    if (!state) return;
+
+    void this.storageStore.navigateToDirectory({
+      deviceId: this.deviceId(),
+      storageType: state.storageType,
+      path: file.parentPath,
+    });
   }
 }

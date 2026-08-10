@@ -3,11 +3,12 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Component, input, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
-import { StorageStore, StorageDirectoryState } from '@teensyrom-nx/application';
+import { StorageStore, StorageDirectoryState, SearchState } from '@teensyrom-nx/application';
 import { DirectoryItem, FileItem, StorageType } from '@teensyrom-nx/domain';
-import { DirectoryItemComponent, StorageItemComponent } from '@teensyrom-nx/ui/components';
+import { DirectoryItemComponent, StorageItemComponent, IconButtonComponent } from '@teensyrom-nx/ui/components';
 import { TransferDirectoryListingComponent } from './transfer-directory-listing.component';
 import { DirectoryTrailContainerComponent } from '../directory-trail-container/directory-trail-container.component';
+import { TransferSearchToolbarComponent } from './transfer-search-toolbar/transfer-search-toolbar.component';
 
 @Component({
   selector: 'lib-directory-trail-container',
@@ -18,8 +19,22 @@ class MockDirectoryTrailContainerComponent {
   deviceId = input.required<string>();
 }
 
+@Component({
+  selector: 'lib-transfer-search-toolbar',
+  standalone: true,
+  template: '<div class="mock-search-toolbar"></div>',
+})
+class MockTransferSearchToolbarComponent {
+  deviceId = input.required<string>();
+}
+
 const mockDirectory: DirectoryItem = { name: 'Games', path: '/games' };
 const mockFile: FileItem = { name: 'existing.sid', path: '/existing.sid' } as FileItem;
+const mockResult: FileItem = {
+  name: 'aces-high.sid',
+  path: '/music/iron-maiden/aces-high.sid',
+  parentPath: '/music/iron-maiden',
+} as FileItem;
 
 function stateWith(overrides: Partial<StorageDirectoryState>): StorageDirectoryState {
   return {
@@ -35,19 +50,37 @@ function stateWith(overrides: Partial<StorageDirectoryState>): StorageDirectoryS
   };
 }
 
+function searchStateWith(overrides: Partial<SearchState>): SearchState {
+  return {
+    searchText: 'aces high',
+    filterType: null,
+    results: [],
+    isSearching: false,
+    hasSearched: true,
+    error: null,
+    ...overrides,
+  };
+}
+
 describe('TransferDirectoryListingComponent', () => {
   let fixture: ComponentFixture<TransferDirectoryListingComponent>;
   let component: TransferDirectoryListingComponent;
   let mockStorageStore: {
     isDeviceLevelView: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+    getSearchState: ReturnType<typeof vi.fn>;
     navigateToDirectory: ReturnType<typeof vi.fn>;
   };
 
-  const setup = async (state: StorageDirectoryState | null, isDeviceLevel = false) => {
+  const setup = async (
+    state: StorageDirectoryState | null,
+    isDeviceLevel = false,
+    searchState: SearchState | null = null
+  ) => {
     mockStorageStore = {
       isDeviceLevelView: vi.fn(() => signal(isDeviceLevel).asReadonly()),
       getSelectedDirectoryState: vi.fn(() => signal(state).asReadonly()),
+      getSearchState: vi.fn(() => signal(searchState).asReadonly()),
       navigateToDirectory: vi.fn(),
     };
 
@@ -56,8 +89,8 @@ describe('TransferDirectoryListingComponent', () => {
       providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
     })
       .overrideComponent(TransferDirectoryListingComponent, {
-        remove: { imports: [DirectoryTrailContainerComponent] },
-        add: { imports: [MockDirectoryTrailContainerComponent] },
+        remove: { imports: [DirectoryTrailContainerComponent, TransferSearchToolbarComponent] },
+        add: { imports: [MockDirectoryTrailContainerComponent, MockTransferSearchToolbarComponent] },
       })
       .compileComponents();
 
@@ -191,6 +224,109 @@ describe('TransferDirectoryListingComponent', () => {
 
       expect(fixture.nativeElement.querySelector('lib-empty-state-message')).toBeFalsy();
       expect(fixture.nativeElement.querySelector('.listing-viewport')).toBeTruthy();
+    });
+  });
+
+  describe('search results', () => {
+    it('renders result rows instead of directory rows when hasSearched is true', async () => {
+      await setup(
+        stateWith({ directory: { directories: [mockDirectory], files: [], path: '/' } }),
+        false,
+        searchStateWith({ results: [mockResult] })
+      );
+      fixture.detectChanges();
+
+      expect(fixture.debugElement.query(By.directive(DirectoryItemComponent))).toBeFalsy();
+      const storageItem = fixture.debugElement.query(By.directive(StorageItemComponent));
+      expect(storageItem).toBeTruthy();
+      expect(storageItem.componentInstance.label()).toBe('aces-high.sid');
+      expect(storageItem.componentInstance.disabled()).toBe(true);
+    });
+
+    it('renders result rows dimmed and inert, with no activation wiring', async () => {
+      await setup(stateWith({}), false, searchStateWith({ results: [mockResult] }));
+      fixture.detectChanges();
+
+      const resultRow = fixture.debugElement.query(By.css('.listing-row'));
+      expect(resultRow.nativeElement.classList.contains('disabled-row')).toBe(true);
+
+      const storageItem = fixture.debugElement.query(By.directive(StorageItemComponent));
+      storageItem.componentInstance.activated.emit();
+      storageItem.componentInstance.selectedChange.emit();
+      expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
+    });
+
+    it("shows enough of the result's path to identify where it lives", async () => {
+      await setup(stateWith({}), false, searchStateWith({ results: [mockResult] }));
+      fixture.detectChanges();
+
+      const pathText = fixture.nativeElement.querySelector('.result-path');
+      expect(pathText.textContent).toContain('/music/iron-maiden');
+    });
+
+    it('the jump-to-directory affordance navigates using the parentPath and current storageType', async () => {
+      await setup(
+        stateWith({ storageType: StorageType.Usb }),
+        false,
+        searchStateWith({ results: [mockResult] })
+      );
+      fixture.detectChanges();
+
+      const jumpButton = fixture.debugElement.query(By.directive(IconButtonComponent));
+      expect(jumpButton).toBeTruthy();
+      jumpButton.componentInstance.buttonClick.emit();
+
+      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+        deviceId: 'device-1',
+        storageType: StorageType.Usb,
+        path: '/music/iron-maiden',
+      });
+    });
+
+    it('with no search active, directory rows still render and folders still navigate', async () => {
+      await setup(
+        stateWith({ directory: { directories: [mockDirectory], files: [], path: '/' } }),
+        false,
+        null
+      );
+      fixture.detectChanges();
+
+      const directoryItem = fixture.debugElement.query(By.directive(DirectoryItemComponent));
+      expect(directoryItem).toBeTruthy();
+
+      directoryItem.componentInstance.itemDoubleClicked.emit(mockDirectory);
+      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+        deviceId: 'device-1',
+        storageType: StorageType.Sd,
+        path: '/games',
+      });
+    });
+  });
+
+  describe('search states', () => {
+    it('shows an in-flight message while isSearching is true', async () => {
+      await setup(stateWith({}), false, searchStateWith({ isSearching: true, results: [] }));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('lib-empty-state-message')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('.listing-viewport')).toBeFalsy();
+    });
+
+    it('shows an error message when the search failed', async () => {
+      await setup(stateWith({}), false, searchStateWith({ error: 'Search failed', results: [] }));
+      fixture.detectChanges();
+
+      const emptyState = fixture.nativeElement.querySelector('lib-empty-state-message');
+      expect(emptyState).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('.listing-viewport')).toBeFalsy();
+    });
+
+    it('shows an empty-results message when hasSearched is true with zero results', async () => {
+      await setup(stateWith({}), false, searchStateWith({ results: [] }));
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('lib-empty-state-message')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('.listing-viewport')).toBeFalsy();
     });
   });
 });

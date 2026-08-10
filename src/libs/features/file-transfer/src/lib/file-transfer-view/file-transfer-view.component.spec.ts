@@ -53,16 +53,19 @@ describe('FileTransferViewComponent', () => {
   let getDirectoryMock: ReturnType<typeof vi.fn>;
   let mockPlayerContext: Record<string, ReturnType<typeof vi.fn>>;
   let mockPlayerStore: Record<string, ReturnType<typeof vi.fn>>;
+  let mockTransferContext: ITransferContext;
+  let searchMock: ReturnType<typeof vi.fn>;
 
   const setup = async (devices: Device[]) => {
     devicesSignal = signal(devices);
     getDirectoryMock = vi.fn().mockReturnValue(of(createMockDirectory()));
+    searchMock = vi.fn().mockReturnValue(of([]));
 
     const mockStorageService: Partial<IStorageService> = {
       getDirectory: getDirectoryMock,
       index: vi.fn().mockResolvedValue({}),
       indexAll: vi.fn().mockResolvedValue({}),
-      search: vi.fn(),
+      search: searchMock,
       saveFavorite: vi.fn(),
       removeFavorite: vi.fn(),
     };
@@ -79,7 +82,7 @@ describe('FileTransferViewComponent', () => {
       launch: vi.fn(),
     };
 
-    const mockTransferContext: ITransferContext = {
+    mockTransferContext = {
       startTransfer: vi.fn().mockResolvedValue(undefined),
       retryCreate: vi.fn().mockResolvedValue(undefined),
       cancelTransfer: vi.fn().mockResolvedValue(undefined),
@@ -296,6 +299,46 @@ describe('FileTransferViewComponent', () => {
 
       Object.values(mockPlayerContext).forEach((fn) => expect(fn).not.toHaveBeenCalled());
       Object.values(mockPlayerStore).forEach((fn) => expect(fn).not.toHaveBeenCalled());
+    });
+  });
+
+  describe('drop-target isolation', () => {
+    const makeDropEvent = (items: unknown[]): DragEvent => {
+      const event = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent;
+      Object.defineProperty(event, 'dataTransfer', { value: { items }, configurable: true });
+      return event;
+    };
+
+    it('registers no drop handler on the listing, and a drop with search active still reaches the dropzone card', async () => {
+      const device = createDevice({ deviceId: 'device-a' });
+      await setup([device]);
+      createFixture();
+
+      await vi.waitFor(() => expect(getDirectoryMock).toHaveBeenCalled());
+
+      await storageStore.searchFiles({ deviceId: device.deviceId, searchText: 'aces high' });
+      fixture.detectChanges();
+
+      expect(storageStore.getSearchState(device.deviceId)()?.hasSearched).toBe(true);
+
+      const native = fixture.nativeElement as HTMLElement;
+      const listingContainer = native.querySelector('[data-testid="right-container"]') as HTMLElement;
+      const dropzoneEl = native.querySelector('[data-testid="dropzone-card"]') as HTMLElement;
+      expect(listingContainer).toBeTruthy();
+      expect(dropzoneEl).toBeTruthy();
+
+      // The listing has no drop handler of its own; a drop over it starts no transfer.
+      listingContainer.dispatchEvent(makeDropEvent([{ webkitGetAsEntry: () => null }]));
+      fixture.detectChanges();
+      expect(mockTransferContext.startTransfer).not.toHaveBeenCalled();
+
+      // The dropzone card is still the only drop target, and search being active does not
+      // change the transfer's destination.
+      const items = [{ webkitGetAsEntry: () => null }];
+      dropzoneEl.dispatchEvent(makeDropEvent(items));
+      fixture.detectChanges();
+
+      expect(mockTransferContext.startTransfer).toHaveBeenCalledWith(device.deviceId, items);
     });
   });
 });
