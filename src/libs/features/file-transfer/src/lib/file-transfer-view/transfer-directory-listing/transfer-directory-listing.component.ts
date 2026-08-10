@@ -127,7 +127,7 @@ export class TransferDirectoryListingComponent {
 
     void this.storageStore.navigateToDirectory({
       deviceId: this.deviceId(),
-      storageType: state.storageType,
+      storageType: file.storageType ?? state.storageType,
       path: file.parentPath,
     });
   }

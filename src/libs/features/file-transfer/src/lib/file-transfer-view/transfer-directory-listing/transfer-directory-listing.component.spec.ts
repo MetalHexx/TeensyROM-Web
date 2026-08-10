@@ -283,6 +283,31 @@ describe('TransferDirectoryListingComponent', () => {
       });
     });
 
+    it('jump-to-directory uses the result\'s storageType when it differs from the currently-browsed storage', async () => {
+      const crossStorageResult: FileItem = {
+        name: 'aces-high.sid',
+        path: '/music/iron-maiden/aces-high.sid',
+        parentPath: '/music/iron-maiden',
+        storageType: StorageType.Usb,
+      } as FileItem;
+
+      await setup(
+        stateWith({ storageType: StorageType.Sd }),
+        false,
+        searchStateWith({ results: [crossStorageResult] })
+      );
+      fixture.detectChanges();
+
+      const jumpButton = fixture.debugElement.query(By.directive(IconButtonComponent));
+      jumpButton.componentInstance.buttonClick.emit();
+
+      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+        deviceId: 'device-1',
+        storageType: StorageType.Usb,
+        path: '/music/iron-maiden',
+      });
+    });
+
     it('with no search active, directory rows still render and folders still navigate', async () => {
       await setup(
         stateWith({ directory: { directories: [mockDirectory], files: [], path: '/' } }),
