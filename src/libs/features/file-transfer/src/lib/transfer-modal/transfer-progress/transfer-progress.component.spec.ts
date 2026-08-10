@@ -269,6 +269,15 @@ describe('TransferProgressComponent', () => {
       expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
     });
 
+    it('renders uploaded-of-total and completed-of-total as one unbroken run, matching the active shape', async () => {
+      await setup(baseVm({ state: 'cancelling', uploaded: 40000, scanTotal: 60000, written: 6977 }));
+
+      const uploaded = q('metric-uploaded')?.querySelector('.metric-value');
+      expect(uploaded?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40,000/ 60,000');
+      const written = q('metric-written')?.querySelector('.metric-value');
+      expect(written?.textContent?.replace(/\s+/g, ' ').trim()).toBe('6,977/ 60,000');
+    });
+
     it('renders the current file as a bold label with no icon, matching the active row', async () => {
       await setup(baseVm({ state: 'cancelling', currentFile: 'HVSC/a/b/Current.sid' }));
 
