@@ -76,9 +76,9 @@ describe('TransferProgressComponent', () => {
       ['nothing-to-transfer', 'Nothing to transfer'],
       ['failed', "Transfer couldn't start"],
       ['receiving', 'Transferring to Unnamed'],
-      ['draining', 'Writing to Unnamed'],
+      ['draining', 'Transferring to Unnamed'],
       ['cancelling', 'Cancelling — finishing current file'],
-      ['completed', 'Transfer complete'],
+      ['completed', 'Transfer Completed'],
       ['cancelled', 'Transfer cancelled'],
       ['aborted', 'Transfer stopped — device lost'],
       ['abandoned', 'Transfer wound up — connection lost'],
@@ -162,7 +162,45 @@ describe('TransferProgressComponent', () => {
       expect(q('device-bar-pct')?.textContent?.trim()).toBe('56%');
     });
 
-    it('renders the current file and the capped feed newest-first, as supplied', async () => {
+    it('orders the tiles Uploaded, Staged, Completed, Failed', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+
+      const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
+      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+    });
+
+    it('renders a large uploaded-of-total value as one unbroken run', async () => {
+      await setup(baseVm({ state: 'receiving', uploaded: 40000, scanTotal: 60000 }));
+
+      // The gap before "/" is CSS margin, not a text character — the DOM text is unbroken.
+      const value = q('metric-uploaded')?.querySelector('.metric-value');
+      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40,000/ 60,000');
+    });
+
+    it('captions the device bar "Transferred to TR"', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+
+      const deviceCaption = q('device-bar-pct')?.parentElement;
+      expect(deviceCaption?.textContent).toContain('Transferred to TR');
+      expect(deviceCaption?.textContent).not.toContain('Transferred to TR Device');
+    });
+
+    it('gives draining the same title format as receiving, not "Writing to"', async () => {
+      await setup(baseVm({ state: 'draining', deviceName: 'Widget' }));
+
+      expect(q('transfer-progress-title')?.textContent?.trim()).toBe('Transferring to Widget');
+    });
+
+    it('renders the current file as a bold label with no icon', async () => {
+      await setup(baseVm({ state: 'receiving', currentFile: 'HVSC/a/b/Current.sid' }));
+
+      const row = q('transfer-progress-current-file');
+      expect(row?.querySelector('.current-file-label')?.textContent?.trim()).toBe('Current File:');
+      expect(row?.textContent).toContain('Current.sid');
+      expect(row?.querySelector('lib-styled-icon')).toBeFalsy();
+    });
+
+    it('renders the current file and the feed newest-first, as supplied, with no cap caption', async () => {
       const feed = [feedEntry(1), feedEntry(2, false), feedEntry(3)];
       await setup(baseVm({ state: 'receiving', feed, currentFile: 'HVSC/a/b/Current.sid' }));
 
@@ -172,6 +210,21 @@ describe('TransferProgressComponent', () => {
       expect(rows[0].textContent).toContain('file-1.sid');
       expect(rows[1].textContent).toContain('file-2.sid');
       expect(rows[1].querySelector('.feed-row-reason')?.textContent).toContain('device write failed');
+      expect(native().querySelector('.feed-cap-note')).toBeFalsy();
+      expect(q('transfer-progress-feed')?.textContent).not.toContain('last 20');
+    });
+
+    it('shows at most 5 feed rows, the cap the store already applied', async () => {
+      const feed = Array.from({ length: 5 }, (_, i) => feedEntry(i + 1));
+      await setup(baseVm({ state: 'receiving', feed }));
+
+      expect(qAll('.feed-row').length).toBe(5);
+    });
+
+    it('shows the elapsed readout', async () => {
+      await setup(baseVm({ state: 'receiving', elapsedLabel: '3:07 elapsed' }));
+
+      expect(q('transfer-progress-elapsed')?.textContent).toContain('3:07 elapsed');
     });
 
     it('gives the Uploaded tile and the API bar the success treatment while draining', async () => {
@@ -224,13 +277,22 @@ describe('TransferProgressComponent', () => {
       }
     );
 
-    it('renders the summary hero from the supplied figures', async () => {
+    it('renders the active layout — tiles, bars, and elapsed — not the old summary hero', async () => {
       await setup(baseVm({ state: 'completed', written: 12474, failed: 6, elapsedLabel: '14:22 elapsed' }));
 
-      const summary = q('transfer-progress-summary');
-      expect(summary?.textContent).toContain('12,474');
-      expect(summary?.textContent).toContain('6');
-      expect(summary?.textContent).toContain('14:22 elapsed');
+      expect(q('transfer-progress-summary')).toBeFalsy();
+      const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
+      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+      expect(q('metric-written')?.textContent).toContain('12,474');
+      expect(q('metric-failed')?.textContent).toContain('6');
+      expect(q('api-bar')).toBeTruthy();
+      expect(q('device-bar')).toBeTruthy();
+      expect(q('transfer-progress-elapsed')?.textContent).toContain('14:22 elapsed');
+    });
+
+    it('omits the current-file row entirely — there is no current file in a terminal state', async () => {
+      await setup(baseVm({ state: 'completed', currentFile: null }));
+      expect(q('transfer-progress-current-file')).toBeFalsy();
     });
 
     it('caps the failure list and shows the overflow remainder', async () => {
@@ -243,6 +305,34 @@ describe('TransferProgressComponent', () => {
 
     it('omits the overflow line when nothing overflowed', async () => {
       await setup(baseVm({ state: 'completed', failures: [feedEntry(1, false)], failureOverflow: 0 }));
+      expect(q('transfer-progress-failures-overflow')).toBeFalsy();
+    });
+
+    it('renders a long path and its reason as two separate, unellipsised lines', async () => {
+      const relativePath = 'HVSC/'.repeat(15) + 'A_Very_Long_File_Name_That_Keeps_Going.sid'; // 90+ chars
+      const reason = 'device write failed — the connection timed out after multiple retries'; // 40+ chars
+      await setup(
+        baseVm({
+          state: 'completed',
+          failures: [{ relativePath, fileName: 'A_Very_Long_File_Name_That_Keeps_Going.sid', success: false, reason }],
+          failureOverflow: 0,
+        })
+      );
+
+      const row = native().querySelector('.failure-row');
+      const name = row?.querySelector('.failure-row-name');
+      const rowReason = row?.querySelector('.failure-row-reason');
+      expect(name?.textContent?.trim()).toBe(relativePath);
+      expect(rowReason?.textContent?.trim()).toBe(reason);
+      expect(name?.getAttribute('title')).toBeFalsy();
+    });
+
+    it('renders a compact success line when a completed job has no failures', async () => {
+      await setup(baseVm({ state: 'completed', failures: [], failureOverflow: 0 }));
+
+      expect(qAll('.failure-row').length).toBe(1);
+      const emptyRow = q('transfer-progress-no-failures');
+      expect(emptyRow?.textContent).toContain('No failures');
       expect(q('transfer-progress-failures-overflow')).toBeFalsy();
     });
 
@@ -295,6 +385,19 @@ describe('TransferProgressComponent', () => {
       fixture.detectChanges();
 
       expect(q('transfer-progress-live-region')?.textContent).not.toBe(firstAnnouncement);
+    });
+
+    // Regression guard: the terminal restructure (item 4) is a visual change only — the
+    // announcement text screen readers rely on must stay exactly as it was.
+    it.each<[TransferModalState, string]>([
+      ['completed', 'Transfer complete. 100 written, 2 failed.'],
+      ['cancelled', 'Transfer cancelled. 100 written, 2 failed.'],
+      ['aborted', 'Transfer stopped. Device lost. 100 written, 2 failed.'],
+      ['abandoned', 'Transfer wound up. Connection lost. 100 written, 2 failed.'],
+    ])('keeps the %s announcement text unchanged by the visual restructure', async (state, expected) => {
+      await setup(baseVm({ state, written: 100, failed: 2, reason: 'stopped at your request' }));
+
+      expect(q('transfer-progress-live-region')?.textContent).toBe(expected);
     });
   });
 });

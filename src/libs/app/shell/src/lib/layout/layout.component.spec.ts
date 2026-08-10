@@ -235,6 +235,10 @@ describe('LayoutComponent', () => {
       expect(config.panelClass).toBe('glassy-dialog');
       expect(config.backdropClass).toBe('busy-dialog-backdrop');
       expect(config.ariaLabel).toContain('Transferring files to');
+      // Material's default 80vw dialog cap would otherwise silently defeat the terminal shape's
+      // content-driven width; `width` itself stays unset so that width wins.
+      expect(config.maxWidth).toBe('95vw');
+      expect(config.width).toBeUndefined();
     });
 
     it('does not reopen the dialog while the transfer is still live', () => {

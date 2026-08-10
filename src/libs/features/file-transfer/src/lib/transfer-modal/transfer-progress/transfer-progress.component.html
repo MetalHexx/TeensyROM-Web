@@ -46,15 +46,15 @@
         <div class="metrics" data-testid="transfer-progress-metrics">
           <div class="metric" data-testid="metric-uploaded" [class.metric-success]="uploadedTileSuccess()">
             <span class="metric-label">Uploaded</span>
-            <span class="metric-value">{{ vm().uploaded | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
-          </div>
-          <div class="metric" data-testid="metric-written">
-            <span class="metric-label">Written</span>
-            <span class="metric-value">{{ vm().written | number }} <span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+            <span class="metric-value">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
           </div>
           <div class="metric metric-staged" data-testid="metric-staged">
-            <span class="metric-label">Staged &amp; waiting</span>
+            <span class="metric-label">Staged</span>
             <span class="metric-value">{{ vm().staged | number }}</span>
+          </div>
+          <div class="metric" data-testid="metric-written">
+            <span class="metric-label">Completed</span>
+            <span class="metric-value">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
             <span class="metric-label">Failed</span>
@@ -78,7 +78,7 @@
           </div>
           <div class="write-bar">
             <div class="write-bar-caption">
-              <span>Transferred to TR Device</span>
+              <span>Transferred to TR</span>
               <span class="write-bar-pct" data-testid="device-bar-pct">{{ vm().devicePercent }}%</span>
             </div>
             <mat-progress-bar class="write-bar-track" data-testid="device-bar" mode="determinate" [value]="vm().devicePercent"></mat-progress-bar>
@@ -87,16 +87,21 @@
 
         @if (vm().currentFile) {
           <div class="current-file" data-testid="transfer-progress-current-file">
-            <span class="current-file-label">Current</span>
-            <lib-styled-icon icon="description" size="small"></lib-styled-icon>
+            <span class="current-file-label current-file-label-strong">Current File:</span>
             <span class="current-file-path">{{ vm().currentFile }}</span>
+          </div>
+        }
+
+        @if (vm().elapsedLabel) {
+          <div class="elapsed-readout" data-testid="transfer-progress-elapsed">
+            <lib-styled-icon icon="schedule" size="small"></lib-styled-icon>
+            <span>{{ vm().elapsedLabel }}</span>
           </div>
         }
 
         <div class="feed" data-testid="transfer-progress-feed">
           <div class="feed-header">
             <span>Recent</span>
-            <span class="feed-cap-note">last 20</span>
           </div>
           <div class="feed-list">
             @for (entry of vm().feed; track entry.relativePath) {
@@ -162,41 +167,68 @@
           </div>
         }
 
-        <div class="summary-hero" data-testid="transfer-progress-summary">
-          <div class="summary-cell summary-success">
-            <span class="summary-big">{{ vm().written | number }}</span>
-            <span class="summary-caption">
-              @if (isCompletedState()) {
-                Written
-              } @else {
-                Written of {{ vm().scanTotal | number }}
-              }
-            </span>
+        <div class="metrics" data-testid="transfer-progress-metrics">
+          <div class="metric" data-testid="metric-uploaded" [class.metric-success]="uploadedTileSuccess()">
+            <span class="metric-label">Uploaded</span>
+            <span class="metric-value">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
           </div>
-          <div class="summary-divider"></div>
-          <div class="summary-cell summary-failed">
-            <span class="summary-big">{{ vm().failed | number }}</span>
-            <span class="summary-caption">Failed</span>
+          <div class="metric metric-staged" data-testid="metric-staged">
+            <span class="metric-label">Staged</span>
+            <span class="metric-value">{{ vm().staged | number }}</span>
           </div>
-          @if (vm().elapsedLabel) {
-            <div class="summary-elapsed">
-              <lib-styled-icon icon="schedule" size="small"></lib-styled-icon>
-              <span>{{ vm().elapsedLabel }}</span>
-            </div>
-          }
+          <div class="metric" data-testid="metric-written">
+            <span class="metric-label">Completed</span>
+            <span class="metric-value">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+          </div>
+          <div class="metric metric-failed" data-testid="metric-failed">
+            <span class="metric-label">Failed</span>
+            <span class="metric-value">{{ vm().failed | number }}</span>
+          </div>
         </div>
 
-        @if (vm().failures.length > 0) {
-          <div class="failures" data-testid="transfer-progress-failures">
-            <div class="failures-header"><span>Failures</span></div>
-            <div class="failures-list">
+        <div class="write-bars">
+          <div class="write-bar">
+            <div class="write-bar-caption">
+              <span>Transferred to API</span>
+              <span class="write-bar-pct" data-testid="api-bar-pct" [class.write-bar-pct-success]="apiBarSuccess()">{{ vm().apiPercent }}%</span>
+            </div>
+            <mat-progress-bar
+              class="write-bar-track"
+              data-testid="api-bar"
+              [class.progress-success]="apiBarSuccess()"
+              mode="determinate"
+              [value]="vm().apiPercent"
+            ></mat-progress-bar>
+          </div>
+          <div class="write-bar">
+            <div class="write-bar-caption">
+              <span>Transferred to TR</span>
+              <span class="write-bar-pct" data-testid="device-bar-pct">{{ vm().devicePercent }}%</span>
+            </div>
+            <mat-progress-bar class="write-bar-track" data-testid="device-bar" mode="determinate" [value]="vm().devicePercent"></mat-progress-bar>
+          </div>
+        </div>
+
+        @if (vm().elapsedLabel) {
+          <div class="elapsed-readout" data-testid="transfer-progress-elapsed">
+            <lib-styled-icon icon="schedule" size="small"></lib-styled-icon>
+            <span>{{ vm().elapsedLabel }}</span>
+          </div>
+        }
+
+        <div class="feed" data-testid="transfer-progress-failures">
+          <div class="feed-header"><span>Failures</span></div>
+          <div class="feed-list">
+            @if (vm().failures.length > 0) {
               @for (entry of vm().failures; track entry.relativePath) {
                 <div class="failure-row">
                   <lib-styled-icon icon="cancel" color="error" size="small"></lib-styled-icon>
-                  <span class="failure-row-name">{{ entry.relativePath }}</span>
-                  @if (entry.reason) {
-                    <span class="failure-row-reason">{{ entry.reason }}</span>
-                  }
+                  <div class="failure-row-text">
+                    <span class="failure-row-name">{{ entry.relativePath }}</span>
+                    @if (entry.reason) {
+                      <span class="failure-row-reason">{{ entry.reason }}</span>
+                    }
+                  </div>
                 </div>
               }
               @if (vm().failureOverflow > 0) {
@@ -204,9 +236,14 @@
                   and {{ vm().failureOverflow }} more
                 </div>
               }
-            </div>
+            } @else {
+              <div class="failure-row failure-row-empty" data-testid="transfer-progress-no-failures">
+                <lib-styled-icon icon="check_circle" color="success" size="small"></lib-styled-icon>
+                <span>No failures</span>
+              </div>
+            }
           </div>
-        }
+        </div>
       }
     }
   </div>

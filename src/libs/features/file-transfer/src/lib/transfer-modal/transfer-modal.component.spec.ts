@@ -222,10 +222,53 @@ describe('TransferModalComponent', () => {
       expect(vm.failed).toBe(metrics.failed);
       expect(vm.apiPercent).toBe(metrics.apiPct);
       expect(vm.devicePercent).toBe(metrics.devicePct);
-      expect(vm.elapsedLabel).toBe(summary.elapsedLabel);
       expect(vm.failureOverflow).toBe(summary.failureOverflow);
       expect(vm.reason).toBe(summary.reason);
       expect(vm.currentFile).toBe('music/song.sid');
+    });
+  });
+
+  describe('elapsed ticker', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('advances the elapsed label once per second while the transfer is running', async () => {
+      await setup();
+      transferStore.setTargetDevice({ deviceId });
+      driveToState(transferStore, deviceId, 'receiving');
+      createFixture();
+
+      const before = component.vm().elapsedLabel;
+      expect(before).not.toBeNull();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(component.vm().elapsedLabel).not.toBe(before);
+    });
+
+    it('freezes the elapsed label once a running transfer reaches a terminal state', async () => {
+      await setup();
+      transferStore.setTargetDevice({ deviceId });
+      driveToState(transferStore, deviceId, 'receiving');
+      createFixture();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      transferStore.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ deviceId, state: TransferJobState.Completed }),
+      });
+      fixture.detectChanges();
+
+      const frozen = component.vm().elapsedLabel;
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(component.vm().elapsedLabel).toBe(frozen);
     });
   });
 
