@@ -3,7 +3,7 @@ import { DeviceStore, StorageStore, TransferStore, TRANSFER_CONTEXT, ITransferCo
 import {
   SlidingContainerComponent,
   ScalingCompactCardComponent,
-  ActionLinkComponent,
+  ActionButtonComponent,
   EmptyStateMessageComponent,
 } from '@teensyrom-nx/ui/components';
 
@@ -22,7 +22,7 @@ const BUSY_SECONDARY_MESSAGE = 'Wait for it to finish, or pick another device';
   imports: [
     SlidingContainerComponent,
     ScalingCompactCardComponent,
-    ActionLinkComponent,
+    ActionButtonComponent,
     EmptyStateMessageComponent,
   ],
   templateUrl: './dropzone-card.component.html',

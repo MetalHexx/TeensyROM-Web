@@ -383,9 +383,11 @@ describe('TransferModalComponent', () => {
 
   describe('focus restoration', () => {
     it('focuses the dropzone picker button once the dialog closes', async () => {
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-testid', 'dropzone-choose-files');
       const button = document.createElement('button');
-      button.setAttribute('data-testid', 'dropzone-choose-files');
-      document.body.appendChild(button);
+      wrapper.appendChild(button);
+      document.body.appendChild(wrapper);
       const focusSpy = vi.spyOn(button, 'focus');
 
       await setup();

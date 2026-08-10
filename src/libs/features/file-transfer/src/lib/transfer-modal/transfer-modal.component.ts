@@ -15,7 +15,7 @@ import { TransferProgressComponent, TransferProgressVm } from './transfer-progre
  * The dropzone card's file picker button — the focus-return anchor for a drop, which is a
  * pointer gesture with no focused element of its own to return to.
  */
-const DROPZONE_PICKER_BUTTON_SELECTOR = '[data-testid="dropzone-choose-files"]';
+const DROPZONE_PICKER_BUTTON_SELECTOR = '[data-testid="dropzone-choose-files"] button';
 
 /** Once the modal reaches one of these, the elapsed ticker stops advancing. */
 const TERMINAL_MODAL_STATES = new Set<TransferModalState>(['completed', 'cancelled', 'aborted', 'abandoned']);

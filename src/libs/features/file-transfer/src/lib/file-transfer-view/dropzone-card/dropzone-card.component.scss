@@ -12,6 +12,7 @@
   padding: var(--spacing-lg);
   border: 2px dashed var(--color-dimmed);
   border-radius: var(--border-radius-lg);
+  box-sizing: border-box;
   transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 
   &.state-drag-over {
@@ -27,29 +28,11 @@
 
 .picker-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.picker-button {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-dimmed);
-  border-radius: var(--border-radius-md);
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    border-color: var(--color-primary-bright);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .visually-hidden {
