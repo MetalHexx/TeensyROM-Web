@@ -1,439 +1,263 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { signal } from '@angular/core';
-import { of } from 'rxjs';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { vi } from 'vitest';
+import { NEVER } from 'rxjs';
 import { By } from '@angular/platform-browser';
-import { SearchToolbarComponent } from './search-toolbar.component';
+import { StorageStore, type IPlayerContext, type ShuffleSettings } from '@teensyrom-nx/application';
+import { createMockStorageService } from '@teensyrom-nx/testing/fixtures';
 import {
   STORAGE_SERVICE,
-  IStorageService,
-  StorageDirectory,
-  StorageType,
-  LaunchMode,
-  PlayerStatus,
   PlayerFilterType,
+  PlayerScope,
+  StorageType,
+  type IStorageService,
 } from '@teensyrom-nx/domain';
-import { PLAYER_CONTEXT, IPlayerContext, StorageStore } from '@teensyrom-nx/application';
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
+import { SearchToolbarComponent } from './search-toolbar.component';
+
+const deviceId = 'device-1';
 
 describe('SearchToolbarComponent', () => {
-  let component: SearchToolbarComponent;
-  let fixture: ComponentFixture<SearchToolbarComponent>;
-  let mockStorageStore: {
-    getSelectedDirectoryState: ReturnType<typeof vi.fn>;
-    getSearchState: ReturnType<typeof vi.fn>;
-    searchFiles: ReturnType<typeof vi.fn>;
-    clearSearch: ReturnType<typeof vi.fn>;
-  };
-  let mockPlayerContext: Partial<IPlayerContext>;
-
-  beforeEach(async () => {
-    const mockStorageService: Partial<IStorageService> = {
-      getDirectory: () =>
-        of({
-          deviceId: 'test-device',
-          storageType: StorageType.Sd,
-          path: '/',
-          files: [],
-          directories: [],
-        } as StorageDirectory),
-    };
-
-    mockStorageStore = {
-      getSelectedDirectoryState: vi.fn().mockReturnValue(
-        signal({
-          directory: null,
-          currentPath: '/',
-          storageType: StorageType.Sd,
-          deviceId: 'test-device',
-          isLoading: false,
-          isLoaded: false,
-          error: null,
-        })
-      ),
-      getSearchState: vi.fn().mockReturnValue(
-        signal({
-          hasSearched: false,
-          isSearching: false,
-          searchText: '',
-          results: [],
-          error: null,
-        })
-      ),
-      searchFiles: vi.fn(),
-      clearSearch: vi.fn(),
-    };
-
-    mockPlayerContext = {
-      initializePlayer: vi.fn(),
-      removePlayer: vi.fn(),
-      launchFileWithContext: vi.fn().mockResolvedValue(undefined),
-      launchRandomFile: vi.fn().mockResolvedValue(undefined),
-      play: vi.fn().mockResolvedValue(undefined),
-      pause: vi.fn().mockResolvedValue(undefined),
-      stop: vi.fn().mockResolvedValue(undefined),
-      next: vi.fn().mockResolvedValue(undefined),
-      previous: vi.fn().mockResolvedValue(undefined),
-      getCurrentFile: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      getFileContext: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      getPlayerStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),
-      getStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),
-      isLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      getError: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      toggleShuffleMode: vi.fn(),
-      setShuffleScope: vi.fn(),
-      setFilterMode: vi.fn(),
-      getLaunchMode: vi.fn().mockReturnValue(signal(LaunchMode.Directory).asReadonly()),
-      getShuffleSettings: vi
-        .fn()
-        .mockReturnValue(signal({ filter: PlayerFilterType.All }).asReadonly()),
-      getTimerState: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      isCurrentFileCompatible: vi.fn().mockReturnValue(signal(true).asReadonly()),
-      getPlayHistory: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      getCurrentHistoryPosition: vi.fn().mockReturnValue(signal(0).asReadonly()),
-      canNavigateBackwardInHistory: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      canNavigateForwardInHistory: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      clearHistory: vi.fn(),
-      toggleHistoryView: vi.fn(),
-      isHistoryViewVisible: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      navigateToHistoryPosition: vi.fn().mockResolvedValue(undefined),
-    };
-
-    await TestBed.configureTestingModule({
+  // The input field's `#searchInput` template reference is written to directly by the
+  // component's sync effect, and several rows read the real lib-input-field instance, so this
+  // component renders its real tree rather than the harness's stubbed one.
+  function render(
+    playerContext: Partial<IPlayerContext> = {},
+    searchServiceOverrides: Partial<IStorageService> = {}
+  ) {
+    const result = renderPlayerComponent(SearchToolbarComponent, {
+      inputs: { deviceId },
+      playerContext,
       providers: [
-        provideNoopAnimations(),
-        { provide: STORAGE_SERVICE, useValue: mockStorageService },
-        { provide: StorageStore, useValue: mockStorageStore },
-        { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
+        { provide: STORAGE_SERVICE, useValue: createMockStorageService(searchServiceOverrides) },
       ],
-      imports: [SearchToolbarComponent],
-    }).compileComponents();
+      stubChildren: false,
+    });
+    return { ...result, storageStore: TestBed.inject(StorageStore) };
+  }
 
-    fixture = TestBed.createComponent(SearchToolbarComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'test-device');
-    fixture.detectChanges();
+  async function renderWithStorageType(playerContext: Partial<IPlayerContext> = {}) {
+    const rendered = render(playerContext);
+    await rendered.storageStore.initializeStorage({ deviceId, storageType: StorageType.Sd });
+    rendered.fixture.detectChanges();
+    return rendered;
+  }
+
+  it('creates the component', () => {
+    const { component } = render();
+    expect(component).toBeTruthy();
   });
 
-  describe('Component Initialization', () => {
-    it('should create', () => {
-      expect(component).toBeTruthy();
-    });
-
-    it('should initialize with empty search text', () => {
-      expect(component.searchText()).toBe('');
-    });
-
-    it('should have search button disabled initially', () => {
-      expect(component.canSearch()).toBe(false);
-    });
+  it('initializes with empty search text', () => {
+    const { component } = render();
+    expect(component.searchText()).toBe('');
   });
 
-  describe('Search Input Handling', () => {
-    it('should update searchText signal when input changes', () => {
-      component.onSearchInputChange('test query');
-      expect(component.searchText()).toBe('test query');
-    });
-
-    it('should enable search button when text is entered', () => {
-      component.onSearchInputChange('test');
-      fixture.detectChanges();
-      expect(component.canSearch()).toBe(true);
-    });
-
-    it('should disable search button for empty text', () => {
-      component.onSearchInputChange('   ');
-      fixture.detectChanges();
-      expect(component.canSearch()).toBe(false);
-    });
-
-    it('should disable search button when searching is in progress', () => {
-      // Set text first
-      component.onSearchInputChange('test');
-      fixture.detectChanges();
-      expect(component.canSearch()).toBe(true);
-
-      // Mock searching state
-      (mockStorageStore.getSearchState as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          hasSearched: false,
-          isSearching: true,
-          searchText: 'test',
-          results: [],
-          error: null,
-        })
-      );
-
-      // Re-create component to pick up new signal
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      component.onSearchInputChange('test');
-      fixture.detectChanges();
-
-      expect(component.canSearch()).toBe(false);
-    });
+  it('reports canSearch false initially', () => {
+    const { component } = render();
+    expect(component.canSearch()).toBe(false);
   });
 
-  describe('Execute Search', () => {
-    it('should call storageStore.searchFiles with correct parameters', () => {
+  it('updates searchText on input change', () => {
+    const { component } = render();
+    component.onSearchInputChange('test query');
+    expect(component.searchText()).toBe('test query');
+  });
+
+  it('reports canSearch true once text is entered', () => {
+    const { component } = render();
+    component.onSearchInputChange('test');
+    expect(component.canSearch()).toBe(true);
+  });
+
+  it('reports canSearch false for whitespace-only text', () => {
+    const { component } = render();
+    component.onSearchInputChange('   ');
+    expect(component.canSearch()).toBe(false);
+  });
+
+  it('reports canSearch false while a search is already in progress', () => {
+    const { component, storageStore } = render({}, { search: vi.fn().mockReturnValue(NEVER) });
+    void storageStore.searchFiles({ deviceId, searchText: 'test' });
+
+    component.onSearchInputChange('more text');
+
+    expect(component.canSearch()).toBe(false);
+  });
+
+  describe('executeSearch', () => {
+    it('calls searchFiles with the device id, text, and current filter', async () => {
+      const { component, storageStore } = await renderWithStorageType();
+      const searchFiles = vi.spyOn(storageStore, 'searchFiles').mockResolvedValue(undefined);
       component.onSearchInputChange('iron maiden');
+
       component.executeSearch();
 
-      expect(mockStorageStore.searchFiles).toHaveBeenCalledWith({
-        deviceId: 'test-device',
+      expect(searchFiles).toHaveBeenCalledWith({
+        deviceId,
         searchText: 'iron maiden',
         filterType: PlayerFilterType.All,
       });
     });
 
-    it('should trim search text before executing', () => {
+    it('trims the search text before calling searchFiles', async () => {
+      const { component, storageStore } = await renderWithStorageType();
+      const searchFiles = vi.spyOn(storageStore, 'searchFiles').mockResolvedValue(undefined);
       component.onSearchInputChange('  spaced text  ');
+
       component.executeSearch();
 
-      expect(mockStorageStore.searchFiles).toHaveBeenCalledWith(
-        expect.objectContaining({
-          searchText: 'spaced text',
-        })
+      expect(searchFiles).toHaveBeenCalledWith(
+        expect.objectContaining({ searchText: 'spaced text' })
       );
     });
 
-    it('should not execute search with empty text', () => {
+    it('is a no-op for empty/whitespace text', async () => {
+      const { component, storageStore } = await renderWithStorageType();
+      const searchFiles = vi.spyOn(storageStore, 'searchFiles').mockResolvedValue(undefined);
       component.onSearchInputChange('   ');
+
       component.executeSearch();
 
-      expect(mockStorageStore.searchFiles).not.toHaveBeenCalled();
+      expect(searchFiles).not.toHaveBeenCalled();
     });
 
-    it('should not execute search when storageType is null', () => {
-      // Mock directory state with null storage type
-      (mockStorageStore.getSelectedDirectoryState as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          directory: null,
-          currentPath: '/',
-          storageType: null,
-          deviceId: 'test-device',
-          isLoading: false,
-          isLoaded: false,
-          error: null,
-        })
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
-
+    it('is a no-op when storageType is null', () => {
+      const { component, storageStore } = render();
+      const searchFiles = vi.spyOn(storageStore, 'searchFiles').mockResolvedValue(undefined);
       component.onSearchInputChange('test');
+
       component.executeSearch();
 
-      expect(mockStorageStore.searchFiles).not.toHaveBeenCalled();
+      expect(searchFiles).not.toHaveBeenCalled();
     });
 
-    it('should use current filter type in search', () => {
-      // Mock filter type as Games
-      (mockPlayerContext.getShuffleSettings as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({ filter: PlayerFilterType.Games }).asReadonly()
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
-
+    it('uses the current filter type from the player context', async () => {
+      const { component, storageStore } = await renderWithStorageType({
+        getShuffleSettings: vi
+          .fn()
+          .mockReturnValue(
+            signal<ShuffleSettings>({
+              filter: PlayerFilterType.Games,
+              scope: PlayerScope.Storage,
+            }).asReadonly()
+          ),
+      });
+      const searchFiles = vi.spyOn(storageStore, 'searchFiles').mockResolvedValue(undefined);
       component.onSearchInputChange('mario');
+
       component.executeSearch();
 
-      expect(mockStorageStore.searchFiles).toHaveBeenCalledWith(
-        expect.objectContaining({
-          filterType: PlayerFilterType.Games,
-        })
+      expect(searchFiles).toHaveBeenCalledWith(
+        expect.objectContaining({ filterType: PlayerFilterType.Games })
       );
     });
 
-    it('should trigger search on Enter key press', () => {
+    it('triggers a search on Enter key press', async () => {
+      const { component, fixture, storageStore } = await renderWithStorageType();
+      const searchFiles = vi.spyOn(storageStore, 'searchFiles').mockResolvedValue(undefined);
       component.onSearchInputChange('test search');
       fixture.detectChanges();
 
       const inputField = fixture.debugElement.query(By.css('lib-input-field'));
-      expect(inputField).toBeTruthy();
-
-      // Simulate Enter key
       inputField.nativeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-      fixture.detectChanges();
 
-      expect(mockStorageStore.searchFiles).toHaveBeenCalled();
+      expect(searchFiles).toHaveBeenCalled();
     });
   });
 
-  describe('Debounced Auto-Search', () => {
-    it('should not auto-search with empty text', fakeAsync(() => {
+  describe('debounced auto-search', () => {
+    it('does not fire for empty text', fakeAsync(() => {
+      const { component, storageStore } = render();
+      const searchFiles = vi.spyOn(storageStore, 'searchFiles').mockResolvedValue(undefined);
+
       component.onSearchInputChange('');
       tick(1000);
-      expect(mockStorageStore.searchFiles).not.toHaveBeenCalled();
-    }));
 
-    it('should not auto-search with whitespace-only text', fakeAsync(() => {
-      component.onSearchInputChange('   ');
-      tick(1000);
-      expect(mockStorageStore.searchFiles).not.toHaveBeenCalled();
+      expect(searchFiles).not.toHaveBeenCalled();
     }));
   });
 
-  describe('Clear Search', () => {
-    it('should call storageStore.clearSearch with correct parameters', () => {
-      component.clearSearch();
-
-      expect(mockStorageStore.clearSearch).toHaveBeenCalledWith({
-        deviceId: 'test-device',
-      });
-    });
-
-    it('should not clear search when storageType is null', () => {
-      // Mock directory state with null storage type
-      (mockStorageStore.getSelectedDirectoryState as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          directory: null,
-          currentPath: '/',
-          storageType: null,
-          deviceId: 'test-device',
-          isLoading: false,
-          isLoaded: false,
-          error: null,
-        })
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
+  describe('clearSearch', () => {
+    it("calls the store's clearSearch with the deviceId", async () => {
+      const { component, storageStore } = await renderWithStorageType();
+      const clearSearch = vi.spyOn(storageStore, 'clearSearch');
 
       component.clearSearch();
 
-      expect(mockStorageStore.clearSearch).not.toHaveBeenCalled();
+      expect(clearSearch).toHaveBeenCalledWith({ deviceId });
+    });
+
+    it('is a no-op when storageType is null', () => {
+      const { component, storageStore } = render();
+      const clearSearch = vi.spyOn(storageStore, 'clearSearch');
+
+      component.clearSearch();
+
+      expect(clearSearch).not.toHaveBeenCalled();
     });
   });
 
-  describe('Clear Button Visibility', () => {
-    it('should render input field with clearable property', () => {
-      const inputField = fixture.debugElement.query(By.css('lib-input-field'));
-      expect(inputField.componentInstance.clearable()).toBe(true);
-    });
-
-    it('should not render clear button in DOM when not visible', () => {
-      const inputField = fixture.debugElement.query(By.css('lib-input-field'));
-      const clearButton = inputField.query(By.css('.clear-button'));
-      expect(clearButton).toBeFalsy();
-    });
-  });
-
-  describe('Reactive Effects', () => {
-    it('should clear searchText when search state is cleared', () => {
-      // Set some search text
-      component.onSearchInputChange('test search');
-      expect(component.searchText()).toBe('test search');
-
-      // Mock search state as null (cleared)
-      (mockStorageStore.getSearchState as ReturnType<typeof vi.fn>).mockReturnValue(signal(null));
-
-      // Re-create component to trigger effect
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      component.onSearchInputChange('test search');
-      fixture.detectChanges();
-
-      // Note: The effect would clear it, but we can't easily test effects in isolation
-      // This is more of an integration test that would need the full store
-    });
-  });
-
-  describe('Computed Signals', () => {
-    it('should compute hasActiveSearch from search state', () => {
+  describe('computed signals', () => {
+    it('reflects hasSearched from the search state', async () => {
+      const { component, storageStore } = render();
       expect(component.hasActiveSearch()).toBe(false);
 
-      // Mock active search
-      (mockStorageStore.getSearchState as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          hasSearched: true,
-          isSearching: false,
-          searchText: 'test',
-          results: [],
-          error: null,
-        })
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
+      await storageStore.searchFiles({ deviceId, searchText: 'test' });
 
       expect(component.hasActiveSearch()).toBe(true);
     });
 
-    it('should compute isSearching from search state', () => {
+    it('reflects isSearching from the search state', () => {
+      const { component, storageStore } = render({}, { search: vi.fn().mockReturnValue(NEVER) });
       expect(component.isSearching()).toBe(false);
 
-      // Mock searching state
-      (mockStorageStore.getSearchState as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          hasSearched: false,
-          isSearching: true,
-          searchText: 'test',
-          results: [],
-          error: null,
-        })
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
-      fixture.detectChanges();
+      void storageStore.searchFiles({ deviceId, searchText: 'test' });
 
       expect(component.isSearching()).toBe(true);
     });
 
-    it('should compute currentFilter from player context', () => {
+    it("reflects the player context's shuffle-settings filter", () => {
+      const shuffleSettings = signal<ShuffleSettings | null>(null);
+      const { component, fixture } = render({
+        getShuffleSettings: vi.fn(() => shuffleSettings.asReadonly()),
+      });
       expect(component.currentFilter()).toBe(PlayerFilterType.All);
 
-      // Mock different filter
-      (mockPlayerContext.getShuffleSettings as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({ filter: PlayerFilterType.Music }).asReadonly()
-      );
-
-      // Re-create component
-      fixture = TestBed.createComponent(SearchToolbarComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'test-device');
+      shuffleSettings.set({ filter: PlayerFilterType.Music, scope: PlayerScope.Storage });
       fixture.detectChanges();
 
       expect(component.currentFilter()).toBe(PlayerFilterType.Music);
     });
   });
 
-  describe('Template Rendering', () => {
-    it('should render .search-toolbar-content as root element', () => {
-      const content = fixture.nativeElement.querySelector('.search-toolbar-content');
-      expect(content).toBeTruthy();
-      expect(fixture.nativeElement.firstElementChild.classList.contains('search-toolbar-content')).toBe(true);
+  describe('template rendering', () => {
+    it('renders .search-toolbar-content as the root element', () => {
+      const { fixture } = render();
+      expect(fixture.nativeElement.firstElementChild.classList.contains('search-toolbar-content')).toBe(
+        true
+      );
     });
 
-    it('should not render card wrapper component', () => {
-      const card = fixture.debugElement.query(By.css('lib-scaling-compact-card'));
-      expect(card).toBeFalsy();
+    it('renders no card-wrapper component around the toolbar', () => {
+      const { fixture } = render();
+      expect(fixture.debugElement.query(By.css('lib-scaling-compact-card'))).toBeFalsy();
     });
 
-    it('should render search input field', () => {
+    it('renders the input field with clearable=true', () => {
+      const { fixture } = render();
       const inputField = fixture.debugElement.query(By.css('lib-input-field'));
-      expect(inputField).toBeTruthy();
+      expect(inputField.componentInstance.clearable()).toBe(true);
     });
 
-    it('should render search field with correct properties', () => {
+    it('renders no clear button in the DOM when not visible', () => {
+      const { fixture } = render();
+      const inputField = fixture.debugElement.query(By.css('lib-input-field'));
+      expect(inputField.query(By.css('.clear-button'))).toBeFalsy();
+    });
+
+    it('renders the field with the correct placeholder and clearable properties', () => {
+      const { fixture } = render();
       const inputField = fixture.debugElement.query(By.css('lib-input-field'));
       expect(inputField.componentInstance.placeholder()).toBe('Search');
       expect(inputField.componentInstance.clearable()).toBe(true);

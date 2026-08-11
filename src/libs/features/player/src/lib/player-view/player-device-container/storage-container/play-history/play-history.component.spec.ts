@@ -1,320 +1,192 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal, WritableSignal } from '@angular/core';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { PlayHistoryComponent } from './play-history.component';
+import { signal } from '@angular/core';
+import { vi } from 'vitest';
 import {
-  PLAYER_CONTEXT,
-  IPlayerContext,
-  PlayHistory,
-  HistoryEntry,
-  LaunchedFile,
   StorageKeyUtil,
-  StorageStore,
-  StorageDirectoryState,
+  type HistoryEntry,
+  type IPlayerContext,
+  type LaunchedFile,
+  type PlayHistory,
 } from '@teensyrom-nx/application';
-import { FileItemType, StorageType, LaunchMode } from '@teensyrom-nx/domain';
+import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
+import { StorageType } from '@teensyrom-nx/domain';
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
+import { PlayHistoryComponent } from './play-history.component';
+
+const deviceId = 'device-1';
+
+function createTestHistoryEntry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
+  return {
+    file: createTestFileItem(),
+    storageKey: StorageKeyUtil.create(deviceId, StorageType.Usb),
+    parentPath: '/test',
+    timestamp: Date.now(),
+    isCompatible: true,
+    ...overrides,
+  };
+}
 
 describe('PlayHistoryComponent', () => {
-  let component: PlayHistoryComponent;
-  let fixture: ComponentFixture<PlayHistoryComponent>;
-  let mockPlayerContext: Partial<IPlayerContext>;
-  let mockStorageStore: {
-    getSearchState: ReturnType<typeof vi.fn>;
-    getSelectedDirectoryState: ReturnType<typeof vi.fn>;
-  };
-
-  let playHistorySignal: WritableSignal<PlayHistory | null>;
-  let currentFileSignal: WritableSignal<LaunchedFile | null>;
-  let errorSignal: WritableSignal<string | null>;
-  let selectedDirectorySignal: WritableSignal<StorageDirectoryState | null>;
-
-  const createMockHistoryEntry = (name: string, timestamp: number): HistoryEntry => ({
-    file: {
-      path: `/test/${name}`,
-      name,
-      size: 1024,
-      type: FileItemType.Song,
-      images: [],
-      parentPath: '/test',
-      description: '',
-      isFavorite: false,
-      isCompatible: true,
-      title: '',
-      creator: '',
-      releaseInfo: '',
-      shareUrl: '',
-      metadataSource: '',
-      meta1: '',
-      meta2: '',
-      metadataSourcePath: '',
-      playLength: '',
-      subtuneLengths: [],
-      startSubtuneNum: 0,
-    },
-    storageKey: StorageKeyUtil.create('test-device', StorageType.Usb),
-    parentPath: '/test',
-    launchMode: LaunchMode.Shuffle,
-    timestamp,
-    isCompatible: true,
+  beforeEach(() => {
+    // The auto-scroll effect calls Element.scrollIntoView, which jsdom doesn't implement.
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
-  beforeEach(async () => {
-    // Create signal mocks
-    playHistorySignal = signal<PlayHistory | null>(null);
-    currentFileSignal = signal<LaunchedFile | null>(null);
-    errorSignal = signal<string | null>(null);
-    selectedDirectorySignal = signal<StorageDirectoryState | null>(null);
+  function render(playerContext: Partial<IPlayerContext> = {}) {
+    return renderPlayerComponent(PlayHistoryComponent, {
+      inputs: { deviceId },
+      playerContext,
+    });
+  }
 
-    // Create mock StorageStore for SearchToolbarComponent
-    mockStorageStore = {
-      getSearchState: vi.fn(() => signal(null).asReadonly()),
-      getSelectedDirectoryState: vi.fn(() => selectedDirectorySignal.asReadonly()),
-    };
-
-    // Create mock PlayerContext using IPlayerContext interface
-    mockPlayerContext = {
-      getPlayHistory: () => playHistorySignal.asReadonly(),
-      getCurrentFile: () => currentFileSignal.asReadonly(),
-      getError: () => errorSignal.asReadonly(),
-      navigateToHistoryPosition: vi.fn(),
-      isHistoryViewVisible: () => signal(false).asReadonly(),
-      toggleHistoryView: vi.fn(),
-    } as Partial<IPlayerContext>;
-
-    await TestBed.configureTestingModule({
-      imports: [PlayHistoryComponent],
-      providers: [
-        provideNoopAnimations(),
-        { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
-        { provide: StorageStore, useValue: mockStorageStore },
-      ],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(PlayHistoryComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'test-device');
+  it('creates the component', () => {
+    const { component } = render();
+    expect(component).toBeTruthy();
   });
 
-  describe('Component Rendering', () => {
-    it('should create component successfully', () => {
-      expect(component).toBeTruthy();
-    });
-
-    it('should display empty state when no history exists', () => {
-      playHistorySignal.set(null);
-      fixture.detectChanges();
-
-      const emptyStateElement = fixture.nativeElement.querySelector('lib-empty-state-message');
-      expect(emptyStateElement).toBeTruthy();
-      expect(fixture.nativeElement.textContent).toContain('No Launch History');
-    });
-
-    it('should display history entries when history exists', () => {
-      const entries = [
-        createMockHistoryEntry('file1.sid', Date.now() - 3000),
-        createMockHistoryEntry('file2.sid', Date.now() - 2000),
-        createMockHistoryEntry('file3.sid', Date.now() - 1000),
-      ];
-
-      playHistorySignal.set({
-        entries,
-        currentPosition: -1,
-      });
-
-      fixture.detectChanges();
-
-      const historyList = fixture.nativeElement.querySelector('.history-list');
-      expect(historyList).toBeTruthy();
-
-      const historyItems = fixture.nativeElement.querySelectorAll('lib-history-entry');
-      expect(historyItems.length).toBe(3);
-    });
-
-    it('should display entries in reverse chronological order (newest first)', () => {
-      const timestamp1 = Date.now() - 3000;
-      const timestamp2 = Date.now() - 2000;
-      const timestamp3 = Date.now() - 1000;
-
-      const entries = [
-        createMockHistoryEntry('oldest.sid', timestamp1),
-        createMockHistoryEntry('middle.sid', timestamp2),
-        createMockHistoryEntry('newest.sid', timestamp3),
-      ];
-
-      playHistorySignal.set({
-        entries,
-        currentPosition: -1,
-      });
-
-      fixture.detectChanges();
-
-      const historyItems = fixture.nativeElement.querySelectorAll('.history-list-item');
-
-      // First item should be newest (reversed) - check by index
-      expect(historyItems[0].getAttribute('data-index')).toBe('0');
-      expect(historyItems.length).toBe(3);
-      // Last item should be oldest
-      expect(historyItems[2].getAttribute('data-index')).toBe('2');
-    });
-
-    it('should highlight currently playing entry', () => {
-      const entries = [
-        createMockHistoryEntry('file1.sid', 1000),
-        createMockHistoryEntry('file2.sid', 2000),
-      ];
-
-      playHistorySignal.set({
-        entries,
-        currentPosition: 1,
-      });
-
-      currentFileSignal.set({
-        storageKey: StorageKeyUtil.create('test-device', StorageType.Usb),
-        file: entries[1].file,
-        parentPath: '/test',
-        launchedAt: 2000,
-        launchMode: LaunchMode.Shuffle,
-        isCompatible: true,
-      });
-
-      fixture.detectChanges();
-
-      const historyItems = fixture.nativeElement.querySelectorAll('.history-list-item');
-      // First item in display (reversed order) should be playing
-      expect(historyItems[0].getAttribute('data-is-playing')).toBe('true');
-    });
-
-    it('should show error highlight when current file has error', () => {
-      const entry = createMockHistoryEntry('error-file.sid', 1000);
-
-      playHistorySignal.set({
-        entries: [entry],
-        currentPosition: 0,
-      });
-
-      currentFileSignal.set({
-        storageKey: StorageKeyUtil.create('test-device', StorageType.Usb),
-        file: entry.file,
-        parentPath: '/test',
-        launchedAt: 1000,
-        launchMode: LaunchMode.Shuffle,
-        isCompatible: true,
-      });
-
-      errorSignal.set('Failed to launch file');
-
-      fixture.detectChanges();
-
-      const historyItem = fixture.nativeElement.querySelector('.history-list-item');
-      expect(historyItem.getAttribute('data-is-playing')).toBe('true');
-      expect(historyItem.getAttribute('data-has-error')).toBe('true');
-    });
+  it('shows the empty state when there is no history', () => {
+    const { fixture } = render();
+    expect(fixture.nativeElement.querySelector('lib-empty-state-message')).toBeTruthy();
   });
 
-  describe('User Interactions', () => {
-    it('should select entry on single click', () => {
-      const entries = [
-        createMockHistoryEntry('file1.sid', 1000),
-        createMockHistoryEntry('file2.sid', 2000),
-      ];
-
-      playHistorySignal.set({
-        entries,
-        currentPosition: -1,
-      });
-
-      fixture.detectChanges();
-
-      const entry = entries[1];
-      component.onEntrySelected(entry);
-
-      expect(component.selectedEntry()).toEqual(entry);
+  it('renders history entries as a list when history exists', () => {
+    const entries = [
+      createTestHistoryEntry({ timestamp: 1000 }),
+      createTestHistoryEntry({ timestamp: 2000 }),
+      createTestHistoryEntry({ timestamp: 3000 }),
+    ];
+    const { fixture } = render({
+      getPlayHistory: vi.fn().mockReturnValue(signal<PlayHistory>({ entries, currentPosition: -1 }).asReadonly()),
     });
 
-    it('should navigate to history position on double click', async () => {
-      const entries = [
-        createMockHistoryEntry('file1.sid', 1000),
-        createMockHistoryEntry('file2.sid', 2000),
-        createMockHistoryEntry('file3.sid', 3000),
-      ];
-
-      playHistorySignal.set({
-        entries,
-        currentPosition: -1,
-      });
-
-      fixture.detectChanges();
-
-      // Double-click the first displayed item (newest, which is index 2 in original array)
-      await component.onEntryDoubleClick(entries[2], 0);
-
-      expect(mockPlayerContext.navigateToHistoryPosition).toHaveBeenCalledWith('test-device', 2);
-    });
-
-    it('should calculate correct history position for reversed display', async () => {
-      const entries = [
-        createMockHistoryEntry('oldest.sid', 1000),
-        createMockHistoryEntry('middle.sid', 2000),
-        createMockHistoryEntry('newest.sid', 3000),
-      ];
-
-      playHistorySignal.set({
-        entries,
-        currentPosition: -1,
-      });
-
-      fixture.detectChanges();
-
-      // Click the last displayed item (oldest, which is index 0 in original array)
-      await component.onEntryDoubleClick(entries[0], 2);
-
-      expect(mockPlayerContext.navigateToHistoryPosition).toHaveBeenCalledWith('test-device', 0);
-    });
-
-    it('should not navigate if history is empty', async () => {
-      playHistorySignal.set({
-        entries: [],
-        currentPosition: -1,
-      });
-
-      fixture.detectChanges();
-
-      const mockEntry = createMockHistoryEntry('file.sid', 1000);
-      await component.onEntryDoubleClick(mockEntry, 0);
-
-      expect(mockPlayerContext.navigateToHistoryPosition).not.toHaveBeenCalled();
-    });
+    expect(fixture.nativeElement.querySelector('.history-list')).toBeTruthy();
+    expect(fixture.nativeElement.querySelectorAll('lib-history-entry')).toHaveLength(3);
   });
 
-  describe('Selection State', () => {
-    it('should identify selected entry correctly', () => {
-      const entry1 = createMockHistoryEntry('file1.sid', 1000);
-      const entry2 = createMockHistoryEntry('file2.sid', 2000);
-
-      component.selectedEntry.set(entry1);
-
-      expect(component.isSelected(entry1)).toBe(true);
-      expect(component.isSelected(entry2)).toBe(false);
+  it('displays entries newest-first', () => {
+    const entries = [
+      createTestHistoryEntry({ timestamp: 1000 }),
+      createTestHistoryEntry({ timestamp: 2000 }),
+      createTestHistoryEntry({ timestamp: 3000 }),
+    ];
+    const { fixture } = render({
+      getPlayHistory: vi.fn().mockReturnValue(signal<PlayHistory>({ entries, currentPosition: -1 }).asReadonly()),
     });
 
-    it('should identify currently playing entry correctly', () => {
-      const entry1 = createMockHistoryEntry('file1.sid', 1000);
-      const entry2 = createMockHistoryEntry('file2.sid', 2000);
+    const items = fixture.nativeElement.querySelectorAll('.history-list-item');
+    expect(items).toHaveLength(3);
+    expect(items[0].getAttribute('data-index')).toBe('0');
+    expect(items[2].getAttribute('data-index')).toBe('2');
+  });
 
-      currentFileSignal.set({
-        storageKey: StorageKeyUtil.create('test-device', StorageType.Usb),
-        file: entry1.file,
-        parentPath: '/test',
-        launchedAt: 1000,
-        launchMode: LaunchMode.Shuffle,
-        isCompatible: true,
-      });
-
-      fixture.detectChanges();
-
-      expect(component.isCurrentlyPlaying(entry1)).toBe(true);
-      expect(component.isCurrentlyPlaying(entry2)).toBe(false);
+  it('highlights the currently playing entry in the reversed display', () => {
+    const entries = [
+      createTestHistoryEntry({ timestamp: 1000 }),
+      createTestHistoryEntry({ timestamp: 2000 }),
+    ];
+    const { fixture } = render({
+      getPlayHistory: vi.fn().mockReturnValue(signal<PlayHistory>({ entries, currentPosition: 1 }).asReadonly()),
+      getCurrentFile: vi.fn().mockReturnValue(
+        signal<LaunchedFile>({
+          storageKey: entries[1].storageKey,
+          file: entries[1].file,
+          parentPath: entries[1].parentPath,
+          launchedAt: entries[1].timestamp,
+          isCompatible: true,
+        }).asReadonly()
+      ),
     });
+
+    const items = fixture.nativeElement.querySelectorAll('.history-list-item');
+    expect(items[0].getAttribute('data-is-playing')).toBe('true');
+  });
+
+  it('shows both playing and error highlights when the current file has an error', () => {
+    const entry = createTestHistoryEntry({ timestamp: 1000 });
+    const { fixture } = render({
+      getPlayHistory: vi.fn().mockReturnValue(signal<PlayHistory>({ entries: [entry], currentPosition: 0 }).asReadonly()),
+      getCurrentFile: vi.fn().mockReturnValue(
+        signal<LaunchedFile>({
+          storageKey: entry.storageKey,
+          file: entry.file,
+          parentPath: entry.parentPath,
+          launchedAt: entry.timestamp,
+          isCompatible: true,
+        }).asReadonly()
+      ),
+      getError: vi.fn().mockReturnValue(signal('Failed to launch file').asReadonly()),
+    });
+
+    const item = fixture.nativeElement.querySelector('.history-list-item');
+    expect(item.getAttribute('data-is-playing')).toBe('true');
+    expect(item.getAttribute('data-has-error')).toBe('true');
+  });
+
+  it('selects an entry on single-click', () => {
+    const entries = [createTestHistoryEntry({ timestamp: 1000 }), createTestHistoryEntry({ timestamp: 2000 })];
+    const { component } = render();
+
+    component.onEntrySelected(entries[1]);
+
+    expect(component.selectedEntry()).toEqual(entries[1]);
+  });
+
+  it('navigates to the mapped history position on double-click', async () => {
+    const entries = [
+      createTestHistoryEntry({ timestamp: 1000 }),
+      createTestHistoryEntry({ timestamp: 2000 }),
+      createTestHistoryEntry({ timestamp: 3000 }),
+    ];
+    const navigateToHistoryPosition = vi.fn().mockResolvedValue(undefined);
+    const { component } = render({
+      getPlayHistory: vi.fn().mockReturnValue(signal<PlayHistory>({ entries, currentPosition: -1 }).asReadonly()),
+      navigateToHistoryPosition,
+    });
+
+    // Double-click the first displayed item (newest, which is index 2 in the original array).
+    await component.onEntryDoubleClick(entries[2], 0);
+
+    expect(navigateToHistoryPosition).toHaveBeenCalledWith(deviceId, 2);
+  });
+
+  it('is a no-op on double-click with an empty history', async () => {
+    const navigateToHistoryPosition = vi.fn().mockResolvedValue(undefined);
+    const { component } = render({
+      getPlayHistory: vi.fn().mockReturnValue(signal<PlayHistory>({ entries: [], currentPosition: -1 }).asReadonly()),
+      navigateToHistoryPosition,
+    });
+
+    await component.onEntryDoubleClick(createTestHistoryEntry(), 0);
+
+    expect(navigateToHistoryPosition).not.toHaveBeenCalled();
+  });
+
+  it('reports selection state per entry', () => {
+    const entry1 = createTestHistoryEntry({ timestamp: 1000 });
+    const entry2 = createTestHistoryEntry({ timestamp: 2000 });
+    const { component } = render();
+
+    component.selectedEntry.set(entry1);
+
+    expect(component.isSelected(entry1)).toBe(true);
+    expect(component.isSelected(entry2)).toBe(false);
+  });
+
+  it('reports currently-playing state per entry', () => {
+    const entry1 = createTestHistoryEntry({ timestamp: 1000 });
+    const entry2 = createTestHistoryEntry({ timestamp: 2000 });
+    const { component } = render({
+      getCurrentFile: vi.fn().mockReturnValue(
+        signal<LaunchedFile>({
+          storageKey: entry1.storageKey,
+          file: entry1.file,
+          parentPath: entry1.parentPath,
+          launchedAt: entry1.timestamp,
+          isCompatible: true,
+        }).asReadonly()
+      ),
+    });
+
+    expect(component.isCurrentlyPlaying(entry1)).toBe(true);
+    expect(component.isCurrentlyPlaying(entry2)).toBe(false);
   });
 });

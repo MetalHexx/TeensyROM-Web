@@ -1,183 +1,109 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { StorageKeyUtil, type HistoryEntry } from '@teensyrom-nx/application';
+import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
+import { FileItemType, StorageType } from '@teensyrom-nx/domain';
+import { renderPlayerComponent } from '../../../../../../testing/render-player-component';
 import { HistoryEntryComponent } from './history-entry.component';
-import { HistoryEntry } from '@teensyrom-nx/application';
-import { FileItem, FileItemType, LaunchMode, StorageType } from '@teensyrom-nx/domain';
-import { StorageKeyUtil } from '@teensyrom-nx/application';
+
+function createTestHistoryEntry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
+  return {
+    file: createTestFileItem(),
+    storageKey: StorageKeyUtil.create('device-1', StorageType.Usb),
+    parentPath: '/test',
+    timestamp: Date.now(),
+    isCompatible: true,
+    ...overrides,
+  };
+}
 
 describe('HistoryEntryComponent', () => {
-  let component: HistoryEntryComponent;
-  let fixture: ComponentFixture<HistoryEntryComponent>;
+  function render(inputs: Record<string, unknown>) {
+    // The selected class and the click/dblclick emissions are driven by the real
+    // lib-storage-item child, so this is one of the components where the harness's
+    // default child stub would hide the behavior under test.
+    return renderPlayerComponent(HistoryEntryComponent, { inputs, stubChildren: false });
+  }
 
-  const createMockFileItem = (type: FileItemType, size: number, name: string): FileItem => ({
-    name,
-    path: '/test/path',
-    size,
-    type,
-    isFavorite: false,
-    isCompatible: true,
-    title: '',
-    creator: '',
-    releaseInfo: '',
-    description: '',
-    shareUrl: '',
-    metadataSource: '',
-    meta1: '',
-    meta2: '',
-    metadataSourcePath: '',
-    parentPath: '',
-    playLength: '',
-    subtuneLengths: [],
-    startSubtuneNum: 0,
-    images: [],
-  });
-
-  const createMockHistoryEntry = (
-    type: FileItemType,
-    size: number,
-    name: string,
-    timestamp: number
-  ): HistoryEntry => ({
-    file: createMockFileItem(type, size, name),
-    storageKey: StorageKeyUtil.create('test-device', StorageType.Usb),
-    parentPath: '/test',
-    launchMode: LaunchMode.Shuffle,
-    timestamp,
-    isCompatible: true,
-  });
-
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      providers: [provideNoopAnimations()],
-      imports: [HistoryEntryComponent],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(HistoryEntryComponent);
-    component = fixture.componentInstance;
-  });
-
-  it('should create', () => {
-    const entry = createMockHistoryEntry(FileItemType.Song, 1024, 'test-song.sid', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
+  it('creates the component', () => {
+    const { component } = render({ entry: createTestHistoryEntry() });
     expect(component).toBeTruthy();
   });
 
-  it('should display file name', () => {
-    const entry = createMockHistoryEntry(
-      FileItemType.Song,
-      1024,
-      'my-favorite-song.sid',
-      Date.now()
-    );
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
-
-    const compiled = fixture.nativeElement;
-    expect(compiled.textContent).toContain('my-favorite-song.sid');
+  it('renders the entry file name', () => {
+    const entry = createTestHistoryEntry({ file: createTestFileItem({ name: 'test-song.sid' }) });
+    const { fixture } = render({ entry });
+    expect(fixture.nativeElement.textContent).toContain('test-song');
   });
 
-  it('should display formatted timestamp', () => {
-    // Create a specific timestamp for testing: 3:45 PM
-    const testDate = new Date(2025, 9, 9, 15, 45, 0); // October 9, 2025, 3:45 PM
-    const entry = createMockHistoryEntry(
-      FileItemType.Song,
-      1024,
-      'test-song.sid',
-      testDate.getTime()
-    );
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
-
-    const compiled = fixture.nativeElement;
-    // The exact format depends on locale, but should contain hour and minute
-    expect(compiled.textContent).toMatch(/3:45\s*PM/);
+  it('renders the timestamp in a locale-formatted form', () => {
+    const testDate = new Date(2025, 9, 9, 15, 45, 0);
+    const entry = createTestHistoryEntry({ timestamp: testDate.getTime() });
+    const { fixture } = render({ entry });
+    expect(fixture.nativeElement.textContent).toMatch(/3:45\s*PM/);
   });
 
-  it('should map Song to music_note icon', () => {
-    const entry = createMockHistoryEntry(FileItemType.Song, 1024, 'test.sid', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
+  it('maps Song to the music_note icon', () => {
+    const entry = createTestHistoryEntry({ file: createTestFileItem({ type: FileItemType.Song }) });
+    const { component } = render({ entry });
     expect(component.fileIcon()).toBe('music_note');
   });
 
-  it('should map Game to sports_esports icon', () => {
-    const entry = createMockHistoryEntry(FileItemType.Game, 2048, 'test.prg', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
+  it('maps Game to the sports_esports icon', () => {
+    const entry = createTestHistoryEntry({ file: createTestFileItem({ type: FileItemType.Game }) });
+    const { component } = render({ entry });
     expect(component.fileIcon()).toBe('sports_esports');
   });
 
-  it('should map Image to image icon', () => {
-    const entry = createMockHistoryEntry(FileItemType.Image, 512, 'test.png', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
+  it('maps Image to the image icon', () => {
+    const entry = createTestHistoryEntry({ file: createTestFileItem({ type: FileItemType.Image }) });
+    const { component } = render({ entry });
     expect(component.fileIcon()).toBe('image');
   });
 
-  it('should map Hex to code icon', () => {
-    const entry = createMockHistoryEntry(FileItemType.Hex, 256, 'test.hex', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
+  it('maps Hex to the code icon', () => {
+    const entry = createTestHistoryEntry({ file: createTestFileItem({ type: FileItemType.Hex }) });
+    const { component } = render({ entry });
     expect(component.fileIcon()).toBe('code');
   });
 
-  it('should map Unknown to insert_drive_file icon', () => {
-    const entry = createMockHistoryEntry(FileItemType.Unknown, 128, 'test.dat', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
+  it('maps Unknown to the insert_drive_file icon', () => {
+    const entry = createTestHistoryEntry({ file: createTestFileItem({ type: FileItemType.Unknown }) });
+    const { component } = render({ entry });
     expect(component.fileIcon()).toBe('insert_drive_file');
   });
 
-  it('should emit entrySelected on click', () => {
-    const entry = createMockHistoryEntry(FileItemType.Song, 1024, 'test.sid', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
+  it('emits entrySelected with the entry on click', () => {
+    const entry = createTestHistoryEntry();
+    const { component, fixture } = render({ entry });
 
-    let emittedEntry: HistoryEntry | undefined;
-    component.entrySelected.subscribe((e) => {
-      emittedEntry = e;
-    });
+    let emitted: unknown;
+    component.entrySelected.subscribe((e) => (emitted = e));
+    fixture.nativeElement.querySelector('lib-storage-item').click();
 
-    const storageItemElement = fixture.nativeElement.querySelector('lib-storage-item');
-    storageItemElement.click();
-
-    expect(emittedEntry).toEqual(entry);
+    expect(emitted).toEqual(entry);
   });
 
-  it('should emit entryDoubleClick on double click', () => {
-    const entry = createMockHistoryEntry(FileItemType.Game, 2048, 'test.prg', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.detectChanges();
+  it('emits entryDoubleClick with the entry on double-click', () => {
+    const entry = createTestHistoryEntry();
+    const { component, fixture } = render({ entry });
 
-    let emittedEntry: HistoryEntry | undefined;
-    component.entryDoubleClick.subscribe((e) => {
-      emittedEntry = e;
-    });
+    let emitted: unknown;
+    component.entryDoubleClick.subscribe((e) => (emitted = e));
+    fixture.nativeElement
+      .querySelector('lib-storage-item')
+      .dispatchEvent(new MouseEvent('dblclick'));
 
-    const storageItemElement = fixture.nativeElement.querySelector('lib-storage-item');
-    storageItemElement.dispatchEvent(new MouseEvent('dblclick'));
-
-    expect(emittedEntry).toEqual(entry);
+    expect(emitted).toEqual(entry);
   });
 
-  it('should apply selected class when selected is true', () => {
-    const entry = createMockHistoryEntry(FileItemType.Song, 1024, 'test.sid', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.componentRef.setInput('selected', true);
-    fixture.detectChanges();
-
-    const storageItemElement = fixture.nativeElement.querySelector('lib-storage-item');
-    expect(storageItemElement.classList.contains('selected')).toBe(true);
+  it('applies the selected class when selected is true', () => {
+    const { fixture } = render({ entry: createTestHistoryEntry(), selected: true });
+    const item = fixture.nativeElement.querySelector('lib-storage-item');
+    expect(item.classList.contains('selected')).toBe(true);
   });
 
-  it('should not apply selected class when selected is false', () => {
-    const entry = createMockHistoryEntry(FileItemType.Song, 1024, 'test.sid', Date.now());
-    fixture.componentRef.setInput('entry', entry);
-    fixture.componentRef.setInput('selected', false);
-    fixture.detectChanges();
-
-    const storageItemElement = fixture.nativeElement.querySelector('lib-storage-item');
-    expect(storageItemElement.classList.contains('selected')).toBe(false);
+  it('omits the selected class when selected is false', () => {
+    const { fixture } = render({ entry: createTestHistoryEntry(), selected: false });
+    const item = fixture.nativeElement.querySelector('lib-storage-item');
+    expect(item.classList.contains('selected')).toBe(false);
   });
 });

@@ -1,620 +1,339 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { vi } from 'vitest';
 import { By } from '@angular/platform-browser';
-import { of } from 'rxjs';
+import type { IPlayerContext } from '@teensyrom-nx/application';
+import { createMockStorageService } from '@teensyrom-nx/testing/fixtures';
+import { STORAGE_SERVICE, PlayerFilterType } from '@teensyrom-nx/domain';
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { FilterToolbarComponent } from './filter-toolbar.component';
-import { PLAYER_CONTEXT, IPlayerContext } from '@teensyrom-nx/application';
-import {
-  STORAGE_SERVICE,
-  IStorageService,
-  StorageDirectory,
-  StorageType,
-  LaunchMode,
-  PlayerStatus,
-  PlayerFilterType,
-  PlayerScope,
-} from '@teensyrom-nx/domain';
 
-type MockedObject<T> = {
-  [K in keyof T]: T[K] extends (...args: unknown[]) => unknown ? ReturnType<typeof vi.fn> : T[K];
-};
+const deviceId = 'device-1';
 
-// Test constants
-const TEST_DEVICE_ID = 'test-device-id';
-const FILTER_BUTTON_COUNT = 4;
-const TOTAL_BUTTON_COUNT = 5; // 4 filter buttons + 1 random button
-
-// Test data selectors
 const SELECTORS = {
   filterAllButton: '[data-testid="filter-all-button"]',
   filterGamesButton: '[data-testid="filter-games-button"]',
   filterMusicButton: '[data-testid="filter-music-button"]',
   filterImagesButton: '[data-testid="filter-images-button"]',
   randomLaunchButton: '[data-testid="random-launch-button"]',
-  separator: '[data-testid="separator"]',
-  filterButtons: '[data-testid^="filter-"]',
-  iconButton: 'lib-icon-button',
-  innerButton: 'button',
-  joystickIcon: 'lib-joystick-icon',
-  imageIcon: 'lib-image-icon',
-  compactCardLayout: 'lib-compact-card-layout',
-  filterButtonsContainer: '.filter-buttons',
-  verticalSeparator: '.vertical-separator',
-} as const;
-
-// Expected labels for accessibility testing
-const EXPECTED_LABELS = {
-  filterAll: 'Filter: Allow All Files.  Random launches and search will include all file types.',
-  filterGames: 'Filter Games/Programs Only.  Random launches and search will only include games and programs.',
-  filterMusic: 'Filter: Music Only. Random launches and search will only include music files.',
-  filterImages: 'Filter: Images / Text files Only. Random launches and search will only include image and text files.',
-  randomLaunch: 'Launch a random file.  Will only launch files matching the current filter.',
 } as const;
 
 describe('FilterToolbarComponent', () => {
-  let component: FilterToolbarComponent;
-  let fixture: ComponentFixture<FilterToolbarComponent>;
-  let mockPlayerContext: MockedObject<IPlayerContext>;
-  let shuffleSettingsSignal: ReturnType<typeof signal>;
-  let errorSignal: ReturnType<typeof signal>;
-
-  beforeEach(async () => {
-    // Create signals for dynamic mocking
-    shuffleSettingsSignal = signal({
-      scope: PlayerScope.DeviceStorage,
-      filter: PlayerFilterType.All,
+  // The button-color, aria-label, and click-forwarding assertions all reach into the real
+  // lib-icon-button / lib-random-roll-button children, so this component renders its real tree.
+  function render(inputs: Record<string, unknown> = {}, playerContext: Partial<IPlayerContext> = {}) {
+    return renderPlayerComponent(FilterToolbarComponent, {
+      inputs: { deviceId, ...inputs },
+      playerContext,
+      providers: [{ provide: STORAGE_SERVICE, useValue: createMockStorageService() }],
+      stubChildren: false,
     });
-    errorSignal = signal(null);
+  }
 
-    // Create strongly typed mock for IPlayerContext
-    mockPlayerContext = {
-      // Core player lifecycle
-      initializePlayer: vi.fn(),
-      removePlayer: vi.fn(),
-
-      // File launching
-      launchFileWithContext: vi.fn().mockResolvedValue(undefined),
-      launchRandomFile: vi.fn().mockResolvedValue(undefined),
-
-      // Playback control methods
-      play: vi.fn().mockResolvedValue(undefined),
-      pause: vi.fn().mockResolvedValue(undefined),
-      stop: vi.fn().mockResolvedValue(undefined),
-      next: vi.fn().mockResolvedValue(undefined),
-      previous: vi.fn().mockResolvedValue(undefined),
-
-      // State queries
-      getCurrentFile: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      getFileContext: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      getPlayerStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),
-      getStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),
-      isLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      getError: vi.fn().mockReturnValue(errorSignal.asReadonly()),
-
-      // Shuffle functionality
-      toggleShuffleMode: vi.fn(),
-      setShuffleScope: vi.fn(),
-      setFilterMode: vi.fn(),
-      getLaunchMode: vi.fn().mockReturnValue(signal(LaunchMode.Directory).asReadonly()),
-      getShuffleSettings: vi.fn().mockReturnValue(shuffleSettingsSignal.asReadonly()),
-    };
-
-    const mockStorageService: Partial<IStorageService> = {
-      getDirectory: vi.fn().mockReturnValue(
-        of({
-          deviceId: TEST_DEVICE_ID,
-          storageType: StorageType.Sd,
-          path: '/',
-          files: [],
-          directories: [],
-        } as StorageDirectory)
-      ),
-    };
-
-    await TestBed.configureTestingModule({
-      imports: [FilterToolbarComponent],
-      providers: [
-        provideNoopAnimations(),
-        { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
-        { provide: STORAGE_SERVICE, useValue: mockStorageService },
-      ],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(FilterToolbarComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', TEST_DEVICE_ID);
-    fixture.detectChanges();
+  it('creates the component', () => {
+    const { component } = render();
+    expect(component).toBeTruthy();
   });
 
-  describe('Initialization', () => {
-    it('should create', () => {
-      expect(component).toBeTruthy();
-    });
-
-    it('should require deviceId input', () => {
-      expect(component.deviceId).toBeDefined();
-      expect(component.deviceId()).toBe(TEST_DEVICE_ID);
-    });
+  it('reflects the deviceId input', () => {
+    const { component } = render();
+    expect(component.deviceId()).toBe(deviceId);
   });
 
-  describe('Filter Button Actions', () => {
-    it('should call setFilterMode with All when All filter button is clicked', () => {
+  describe('filter actions', () => {
+    it('sets the filter to All on onAllClick', () => {
+      const setFilterMode = vi.fn();
+      const { component } = render({}, { setFilterMode });
       component.onAllClick();
-
-      expect(mockPlayerContext.setFilterMode).toHaveBeenCalledWith(
-        TEST_DEVICE_ID,
-        PlayerFilterType.All
-      );
+      expect(setFilterMode).toHaveBeenCalledWith(deviceId, PlayerFilterType.All);
     });
 
-    it('should call setFilterMode with Games when Games filter button is clicked', () => {
+    it('sets the filter to Games on onGamesClick', () => {
+      const setFilterMode = vi.fn();
+      const { component } = render({}, { setFilterMode });
       component.onGamesClick();
-
-      expect(mockPlayerContext.setFilterMode).toHaveBeenCalledWith(
-        TEST_DEVICE_ID,
-        PlayerFilterType.Games
-      );
+      expect(setFilterMode).toHaveBeenCalledWith(deviceId, PlayerFilterType.Games);
     });
 
-    it('should call setFilterMode with Music when Music filter button is clicked', () => {
+    it('sets the filter to Music on onMusicClick', () => {
+      const setFilterMode = vi.fn();
+      const { component } = render({}, { setFilterMode });
       component.onMusicClick();
-
-      expect(mockPlayerContext.setFilterMode).toHaveBeenCalledWith(
-        TEST_DEVICE_ID,
-        PlayerFilterType.Music
-      );
+      expect(setFilterMode).toHaveBeenCalledWith(deviceId, PlayerFilterType.Music);
     });
 
-    it('should call setFilterMode with Images when Images filter button is clicked', () => {
+    it('sets the filter to Images on onImagesClick', () => {
+      const setFilterMode = vi.fn();
+      const { component } = render({}, { setFilterMode });
       component.onImagesClick();
+      expect(setFilterMode).toHaveBeenCalledWith(deviceId, PlayerFilterType.Images);
+    });
+  });
 
-      expect(mockPlayerContext.setFilterMode).toHaveBeenCalledWith(
-        TEST_DEVICE_ID,
-        PlayerFilterType.Images
+  describe('active filter display', () => {
+    it.each([
+      [PlayerFilterType.All],
+      [PlayerFilterType.Games],
+      [PlayerFilterType.Music],
+      [PlayerFilterType.Images],
+    ])('highlights %s when it is the active filter', (filter) => {
+      const { component } = render(
+        {},
+        { getShuffleSettings: vi.fn().mockReturnValue(signal({ filter }).asReadonly()) }
       );
-    });
-  });
-
-  describe('Active Filter Display', () => {
-    it('should show All filter as highlighted when active', () => {
-      shuffleSettingsSignal.set({ scope: PlayerScope.Storage, filter: PlayerFilterType.All });
-      fixture.detectChanges();
-
-      const color = component.getButtonColor(PlayerFilterType.All);
-      expect(color).toBe('highlight');
+      expect(component.getButtonColor(filter)).toBe('highlight');
     });
 
-    it('should show Games filter as highlighted when active', () => {
-      shuffleSettingsSignal.set({ scope: PlayerScope.Storage, filter: PlayerFilterType.Games });
-      fixture.detectChanges();
-
-      const color = component.getButtonColor(PlayerFilterType.Games);
-      expect(color).toBe('highlight');
-    });
-
-    it('should show Music filter as highlighted when active', () => {
-      shuffleSettingsSignal.set({ scope: PlayerScope.Storage, filter: PlayerFilterType.Music });
-      fixture.detectChanges();
-
-      const color = component.getButtonColor(PlayerFilterType.Music);
-      expect(color).toBe('highlight');
-    });
-
-    it('should show Images filter as highlighted when active', () => {
-      shuffleSettingsSignal.set({ scope: PlayerScope.Storage, filter: PlayerFilterType.Images });
-      fixture.detectChanges();
-
-      const color = component.getButtonColor(PlayerFilterType.Images);
-      expect(color).toBe('highlight');
-    });
-
-    it('should show inactive filters as normal', () => {
-      shuffleSettingsSignal.set({ scope: PlayerScope.Storage, filter: PlayerFilterType.Music });
-      fixture.detectChanges();
-
+    it('reports normal for inactive filters', () => {
+      const { component } = render(
+        {},
+        {
+          getShuffleSettings: vi
+            .fn()
+            .mockReturnValue(signal({ filter: PlayerFilterType.Music }).asReadonly()),
+        }
+      );
       expect(component.getButtonColor(PlayerFilterType.All)).toBe('normal');
       expect(component.getButtonColor(PlayerFilterType.Games)).toBe('normal');
       expect(component.getButtonColor(PlayerFilterType.Images)).toBe('normal');
     });
   });
 
-  describe('Error State Display', () => {
-    it('should show active filter as highlighted when error exists', () => {
-      // Set Music as active filter
-      shuffleSettingsSignal.set({ scope: PlayerScope.Storage, filter: PlayerFilterType.Music });
-      errorSignal.set('Random launch failed');
-      fixture.detectChanges();
+  describe('error state', () => {
+    it('keeps the active filter highlighted when an error exists', () => {
+      const { component } = render(
+        {},
+        {
+          getShuffleSettings: vi
+            .fn()
+            .mockReturnValue(signal({ filter: PlayerFilterType.Music }).asReadonly()),
+          getError: vi.fn().mockReturnValue(signal('Random launch failed').asReadonly()),
+        }
+      );
 
-      // Component doesn't change button colors based on errors, it only uses active filter
       expect(component.getButtonColor(PlayerFilterType.Music)).toBe('highlight');
       expect(component.getButtonColor(PlayerFilterType.All)).toBe('normal');
-      expect(component.getButtonColor(PlayerFilterType.Games)).toBe('normal');
-      expect(component.getButtonColor(PlayerFilterType.Images)).toBe('normal');
     });
 
-    it('should show active filter highlight regardless of error state', () => {
-      shuffleSettingsSignal.set({ scope: PlayerScope.Storage, filter: PlayerFilterType.Music });
-      errorSignal.set('Failed to navigate');
-      fixture.detectChanges();
-
-      // Active filter is highlighted, error doesn't affect button color
-      expect(component.getButtonColor(PlayerFilterType.Music)).toBe('highlight');
-    });
-
-    it('should return to normal/highlight colors when error clears', () => {
-      shuffleSettingsSignal.set({ scope: PlayerScope.Storage, filter: PlayerFilterType.Games });
-      errorSignal.set(null);
-      fixture.detectChanges();
-
-      expect(component.getButtonColor(PlayerFilterType.Games)).toBe('highlight');
-      expect(component.getButtonColor(PlayerFilterType.All)).toBe('normal');
-    });
-
-    it('should show random roll button as normal regardless of error state', () => {
-      errorSignal.set('Random launch failed');
-      fixture.detectChanges();
-
-      const randomButton = fixture.debugElement.query(By.css('lib-random-roll-button'));
-      // Random roll button doesn't change color based on errors
-      expect(randomButton.componentInstance.getButtonColor()).toBe('normal');
-    });
-
-    it('should show random roll button as normal when no error exists', () => {
-      errorSignal.set(null);
-      fixture.detectChanges();
-
+    it('shows the random roll button as normal regardless of error state', () => {
+      const { fixture } = render(
+        {},
+        { getError: vi.fn().mockReturnValue(signal('Random launch failed').asReadonly()) }
+      );
       const randomButton = fixture.debugElement.query(By.css('lib-random-roll-button'));
       expect(randomButton.componentInstance.getButtonColor()).toBe('normal');
     });
   });
 
-  describe('Random Launch Functionality', () => {
-    it('should call playerContext.launchRandomFile with correct deviceId', async () => {
+  describe('random launch', () => {
+    it('launches a random file for the device', async () => {
+      const launchRandomFile = vi.fn().mockResolvedValue(undefined);
+      const { component } = render({}, { launchRandomFile });
+
       await component.onRandomLaunchClick();
 
-      expect(mockPlayerContext.launchRandomFile).toHaveBeenCalledWith(TEST_DEVICE_ID);
+      expect(launchRandomFile).toHaveBeenCalledWith(deviceId);
     });
 
-    it('should not call launchRandomFile when deviceId is empty', async () => {
-      fixture.componentRef.setInput('deviceId', '');
+    it('is a no-op with an empty deviceId', async () => {
+      const launchRandomFile = vi.fn().mockResolvedValue(undefined);
+      const { component } = render({ deviceId: '' }, { launchRandomFile });
 
       await component.onRandomLaunchClick();
 
-      expect(mockPlayerContext.launchRandomFile).not.toHaveBeenCalled();
+      expect(launchRandomFile).not.toHaveBeenCalled();
     });
 
-    it('should not call launchRandomFile when deviceId is null', async () => {
-      fixture.componentRef.setInput('deviceId', null);
+    it('catches and logs a rejected random launch', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const launchRandomFile = vi.fn().mockRejectedValue(new Error('launch failed'));
+      const { component } = render({}, { launchRandomFile });
 
-      await component.onRandomLaunchClick();
+      await expect(component.onRandomLaunchClick()).resolves.toBeUndefined();
 
-      expect(mockPlayerContext.launchRandomFile).not.toHaveBeenCalled();
-    });
-
-    it('should handle async errors gracefully', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
-        /* noop */
-      });
-      mockPlayerContext.launchRandomFile.mockRejectedValue(new Error('Test error'));
-
-      // Should not throw and should log error
-      await component.onRandomLaunchClick();
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
   });
 
-  describe('Template Rendering', () => {
-    it('should render all filter buttons', () => {
-      const filterButtons = fixture.debugElement.queryAll(By.css(SELECTORS.filterButtons));
-
-      expect(filterButtons).toHaveLength(FILTER_BUTTON_COUNT);
+  describe('rendering', () => {
+    it('renders all 4 filter buttons', () => {
+      const { fixture } = render();
       expect(fixture.debugElement.query(By.css(SELECTORS.filterAllButton))).toBeTruthy();
       expect(fixture.debugElement.query(By.css(SELECTORS.filterGamesButton))).toBeTruthy();
       expect(fixture.debugElement.query(By.css(SELECTORS.filterMusicButton))).toBeTruthy();
       expect(fixture.debugElement.query(By.css(SELECTORS.filterImagesButton))).toBeTruthy();
     });
 
-    it('should render vertical separator', () => {
-      const separator = fixture.debugElement.query(By.css(SELECTORS.separator));
-
+    it('renders the vertical separator', () => {
+      const { fixture } = render();
+      const separator = fixture.nativeElement.querySelector('.vertical-separator');
       expect(separator).toBeTruthy();
-      expect(separator.nativeElement.classList.contains('vertical-separator')).toBe(true);
     });
 
-    it('should render random launch button', () => {
-      const randomButton = fixture.debugElement.query(By.css(SELECTORS.randomLaunchButton));
-      const innerButton = randomButton.query(By.css(SELECTORS.innerButton));
-
-      expect(randomButton).toBeTruthy();
-      expect(innerButton).toBeTruthy();
-      expect(innerButton.nativeElement.getAttribute('aria-label')).toBe(
-        EXPECTED_LABELS.randomLaunch
-      );
-    });
-
-    it('should render custom joystick icon in games button', () => {
+    it('renders a joystick icon inside the Games button', () => {
+      const { fixture } = render();
       const gamesButton = fixture.debugElement.query(By.css(SELECTORS.filterGamesButton));
-      const joystickIcon = gamesButton.query(By.css(SELECTORS.joystickIcon));
-
-      expect(joystickIcon).toBeTruthy();
+      expect(gamesButton.query(By.css('lib-joystick-icon'))).toBeTruthy();
     });
 
-    it('should render custom image icon in images button', () => {
+    it('renders an image icon inside the Images button', () => {
+      const { fixture } = render();
       const imagesButton = fixture.debugElement.query(By.css(SELECTORS.filterImagesButton));
-      const imageIcon = imagesButton.query(By.css(SELECTORS.imageIcon));
-
-      expect(imageIcon).toBeTruthy();
-    });
-  });
-
-  describe('User Interactions', () => {
-    // Helper function to click a button and verify method call
-    const testButtonClick = (buttonSelector: string, methodName: keyof FilterToolbarComponent) => {
-      const spy = vi.spyOn(component, methodName);
-      const button = fixture.debugElement.query(By.css(buttonSelector));
-      const innerButton = button.query(By.css(SELECTORS.innerButton));
-
-      innerButton.nativeElement.click();
-
-      expect(spy).toHaveBeenCalled();
-    };
-
-    it('should trigger onAllClick when All filter button is clicked', () => {
-      testButtonClick(SELECTORS.filterAllButton, 'onAllClick');
+      expect(imagesButton.query(By.css('lib-image-icon'))).toBeTruthy();
     });
 
-    it('should trigger onGamesClick when Games filter button is clicked', () => {
-      testButtonClick(SELECTORS.filterGamesButton, 'onGamesClick');
+    it('wraps content in a compact card layout', () => {
+      const { fixture } = render();
+      expect(fixture.nativeElement.querySelector('lib-compact-card-layout')).toBeTruthy();
     });
 
-    it('should trigger onMusicClick when Music filter button is clicked', () => {
-      testButtonClick(SELECTORS.filterMusicButton, 'onMusicClick');
+    it('renders buttons in order, with the separator between the filters and the random button', () => {
+      const { fixture } = render();
+      const buttons = fixture.debugElement.queryAll(By.css('lib-icon-button'));
+      expect(buttons).toHaveLength(5);
+
+      const separator = fixture.nativeElement.querySelector('.vertical-separator');
+      const randomButton = fixture.debugElement.query(By.css(SELECTORS.randomLaunchButton))
+        .nativeElement;
+      expect(separator.nextElementSibling).toBe(randomButton);
     });
 
-    it('should trigger onImagesClick when Images filter button is clicked', () => {
-      testButtonClick(SELECTORS.filterImagesButton, 'onImagesClick');
-    });
+    it('carries the correct accessibility aria-label on every button', () => {
+      const expectedLabels: Record<string, string> = {
+        [SELECTORS.filterAllButton]:
+          'Filter: Allow All Files.  Random launches and search will include all file types.',
+        [SELECTORS.filterGamesButton]:
+          'Filter Games/Programs Only.  Random launches and search will only include games and programs.',
+        [SELECTORS.filterMusicButton]:
+          'Filter: Music Only. Random launches and search will only include music files.',
+        [SELECTORS.filterImagesButton]:
+          'Filter: Images / Text files Only. Random launches and search will only include image and text files.',
+        [SELECTORS.randomLaunchButton]:
+          'Launch a random file.  Will only launch files matching the current filter.',
+      };
+      const { fixture } = render();
 
-    // Note: Random launch button is now in RandomRollButtonComponent
-  });
-
-  describe('Component Layout', () => {
-    it('should have proper CSS classes for layout', () => {
-      const filterButtons = fixture.debugElement.query(By.css(SELECTORS.filterButtonsContainer));
-
-      expect(filterButtons).toBeTruthy();
-      expect(filterButtons.nativeElement.classList.contains('filter-buttons')).toBe(true);
-    });
-
-    it('should wrap content in compact card layout', () => {
-      const cardLayout = fixture.debugElement.query(By.css(SELECTORS.compactCardLayout));
-
-      expect(cardLayout).toBeTruthy();
-    });
-
-    it('should have buttons in correct order', () => {
-      const buttons = fixture.debugElement.queryAll(By.css(SELECTORS.iconButton));
-      const separator = fixture.debugElement.query(By.css(SELECTORS.verticalSeparator));
-
-      // Should have 5 buttons total (4 filters + 1 random)
-      expect(buttons).toHaveLength(TOTAL_BUTTON_COUNT);
-
-      // Separator should be between filter buttons and random button
-      const separatorElement = separator.nativeElement;
-      const randomButton = fixture.debugElement.query(
-        By.css(SELECTORS.randomLaunchButton)
-      ).nativeElement;
-
-      expect(separatorElement.nextElementSibling).toBe(randomButton);
-    });
-  });
-
-  describe('Accessibility', () => {
-    it('should have proper aria-labels for all buttons', () => {
-      const buttonTests = [
-        { selector: SELECTORS.filterAllButton, expectedLabel: EXPECTED_LABELS.filterAll },
-        { selector: SELECTORS.filterGamesButton, expectedLabel: EXPECTED_LABELS.filterGames },
-        { selector: SELECTORS.filterMusicButton, expectedLabel: EXPECTED_LABELS.filterMusic },
-        { selector: SELECTORS.filterImagesButton, expectedLabel: EXPECTED_LABELS.filterImages },
-        { selector: SELECTORS.randomLaunchButton, expectedLabel: EXPECTED_LABELS.randomLaunch },
-      ];
-
-      buttonTests.forEach(({ selector, expectedLabel }) => {
-        const iconButton = fixture.debugElement.query(By.css(selector));
-        const innerButton = iconButton.query(By.css(SELECTORS.innerButton));
+      for (const [selector, expectedLabel] of Object.entries(expectedLabels)) {
+        const button = fixture.debugElement.query(By.css(selector));
+        const innerButton = button.query(By.css('button'));
         expect(innerButton.nativeElement.getAttribute('aria-label')).toBe(expectedLabel);
-      });
+      }
     });
 
-    it('should have proper button size for touch targets', () => {
-      const buttons = fixture.debugElement.queryAll(By.css(SELECTORS.iconButton));
-
+    it('uses the large size on every button for touch targets', () => {
+      const { fixture } = render();
+      const buttons = fixture.debugElement.queryAll(By.css('lib-icon-button'));
       buttons.forEach((button) => {
         expect(button.nativeElement.getAttribute('size')).toBe('large');
       });
     });
   });
 
-  // Note: Dice roll animation moved to RandomRollButtonComponent
-  describe.skip('Dice Roll Animation', () => {
-    it('should initialize animation state correctly', () => {
-      expect(component.isDiceRolling()).toBe(false);
-    });
+  describe('user interactions', () => {
+    it.each([
+      [SELECTORS.filterAllButton, 'onAllClick'],
+      [SELECTORS.filterGamesButton, 'onGamesClick'],
+      [SELECTORS.filterMusicButton, 'onMusicClick'],
+      [SELECTORS.filterImagesButton, 'onImagesClick'],
+    ] as const)('clicking %s triggers %s', (selector, methodName) => {
+      const { component, fixture } = render();
+      const spy = vi.spyOn(component, methodName);
+      const button = fixture.debugElement.query(By.css(selector));
+      button.query(By.css('button')).nativeElement.click();
 
-    it('should have random button template reference', () => {
-      expect(component.randomButton).toBeDefined();
-    });
-
-    it('should trigger dice roll animation when launching random file', async () => {
-      const animateSpy = vi.spyOn(component, 'animateDiceRoll');
-
-      await component.launchRandomFile();
-
-      expect(animateSpy).toHaveBeenCalled();
-    });
-
-    it('should set animation state during dice roll', () => {
-      // Create a mock element for the random button
-      const mockElement = {
-        classList: {
-          add: vi.fn(),
-          remove: vi.fn(),
-        },
-      };
-
-      // Mock the randomButton signal to return our mock element
-      const mockButtonSignal = vi.fn().mockReturnValue({ nativeElement: mockElement });
-      component.randomButton = mockButtonSignal;
-
-      // Call the method
-      component.animateDiceRoll();
-
-      expect(component.isDiceRolling()).toBe(true);
-      expect(mockElement.classList.add).toHaveBeenCalledWith('dice-roll');
-    });
-
-    it('should prevent multiple simultaneous animations', () => {
-      // Set animation state to true
-      component.isDiceRolling.set(true);
-
-      const mockElement = {
-        classList: {
-          add: vi.fn(),
-          remove: vi.fn(),
-        },
-      };
-
-      const mockButtonSignal = vi.fn().mockReturnValue({ nativeElement: mockElement });
-      component.randomButton = mockButtonSignal;
-
-      // Try to animate again
-      component.animateDiceRoll();
-
-      // Should not add animation class
-      expect(mockElement.classList.add).not.toHaveBeenCalled();
+      expect(spy).toHaveBeenCalled();
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle missing deviceId gracefully', async () => {
-      fixture.componentRef.setInput('deviceId', undefined);
+  it('does not throw when handlers are invoked with a missing deviceId', async () => {
+    const { component } = render({ deviceId: undefined });
 
-      // Should not throw errors
-      expect(() => component.onAllClick()).not.toThrow();
-      expect(() => component.onGamesClick()).not.toThrow();
-      expect(() => component.onMusicClick()).not.toThrow();
-      expect(() => component.onImagesClick()).not.toThrow();
-      await expect(component.onRandomLaunchClick()).resolves.toBeUndefined();
-    });
-
-    it('should handle playerContext service errors gracefully', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
-        /* noop */
-      });
-      mockPlayerContext.launchRandomFile.mockRejectedValue(new Error('Service unavailable'));
-
-      // Should not throw unhandled errors and should log
-      await component.onRandomLaunchClick();
-      expect(mockPlayerContext.launchRandomFile).toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
-    // Note: Animation tests moved to RandomRollButtonComponent
-    it.skip('should handle animation gracefully when button element is not available', () => {
-      // Mock randomButton to return null
-      const mockButtonSignal = vi.fn().mockReturnValue(null);
-      component.randomButton = mockButtonSignal;
-
-      // Should not throw when element is not available
-      expect(() => component.animateDiceRoll()).not.toThrow();
-      expect(component.isDiceRolling()).toBe(true); // State still gets set
-    });
+    expect(() => component.onAllClick()).not.toThrow();
+    expect(() => component.onGamesClick()).not.toThrow();
+    expect(() => component.onMusicClick()).not.toThrow();
+    expect(() => component.onImagesClick()).not.toThrow();
+    await expect(component.onRandomLaunchClick()).resolves.toBeUndefined();
   });
 
-  describe('Disabled State', () => {
-    it('should have disabled input defaulting to false', () => {
+  // The dice-roll animation this file's `describe.skip('Dice Roll Animation', ...)` block once
+  // targeted no longer lives on FilterToolbarComponent — `isDiceRolling`, `animateDiceRoll`, and
+  // `randomButton` were relocated to RandomRollButtonComponent, which owns and tests that
+  // behavior directly (see random-roll-button.component.spec.ts). Restoring the skip here isn't
+  // possible: those members don't exist on this component anymore, so referencing them wouldn't
+  // compile. Recorded in ASSERTION-INVENTORY.md rows 514-518/527 as dropped-with-reason.
+
+  describe('disabled state', () => {
+    it('defaults to false', () => {
+      const { component } = render();
       expect(component.disabled()).toBe(false);
     });
 
-    it('should accept disabled input as true', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('accepts true', () => {
+      const { component } = render({ disabled: true });
       expect(component.disabled()).toBe(true);
     });
 
-    it('should add disabled-state class to host when disabled', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('adds the disabled-state class to the host when disabled', () => {
+      const { fixture } = render({ disabled: true });
       expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(true);
     });
 
-    it('should not add disabled-state class when not disabled', () => {
-      fixture.componentRef.setInput('disabled', false);
-      fixture.detectChanges();
+    it('omits the disabled-state class when not disabled', () => {
+      const { fixture } = render({ disabled: false });
       expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(false);
     });
 
-    it('should disable all filter buttons when disabled is true', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
-
-      const allButton = fixture.debugElement.query(By.css(SELECTORS.filterAllButton));
-      const gamesButton = fixture.debugElement.query(By.css(SELECTORS.filterGamesButton));
-      const musicButton = fixture.debugElement.query(By.css(SELECTORS.filterMusicButton));
-      const imagesButton = fixture.debugElement.query(By.css(SELECTORS.filterImagesButton));
-
-      expect(allButton.componentInstance.disabled()).toBe(true);
-      expect(gamesButton.componentInstance.disabled()).toBe(true);
-      expect(musicButton.componentInstance.disabled()).toBe(true);
-      expect(imagesButton.componentInstance.disabled()).toBe(true);
+    it('disables all 4 filter buttons when disabled', () => {
+      const { fixture } = render({ disabled: true });
+      for (const selector of [
+        SELECTORS.filterAllButton,
+        SELECTORS.filterGamesButton,
+        SELECTORS.filterMusicButton,
+        SELECTORS.filterImagesButton,
+      ]) {
+        const button = fixture.debugElement.query(By.css(selector));
+        expect(button.componentInstance.disabled()).toBe(true);
+      }
     });
 
-    it('should disable dice (random) button when disabled is true', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
-
+    it('disables the random/dice button when disabled', () => {
+      const { fixture } = render({ disabled: true });
       const randomButton = fixture.debugElement.query(By.css(SELECTORS.randomLaunchButton));
       expect(randomButton.componentInstance.disabled()).toBe(true);
     });
 
-    it('should not call setFilterMode when disabled and handler is invoked', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('does not call setFilterMode when disabled and a handler is invoked directly', () => {
+      const setFilterMode = vi.fn();
+      const { component } = render({ disabled: true }, { setFilterMode });
 
       component.onAllClick();
       component.onGamesClick();
       component.onMusicClick();
       component.onImagesClick();
 
-      expect(mockPlayerContext.setFilterMode).not.toHaveBeenCalled();
+      expect(setFilterMode).not.toHaveBeenCalled();
     });
 
-    it('should not call launchRandomFile when disabled and handler is invoked', async () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('does not call launchRandomFile when disabled and the handler is invoked directly', async () => {
+      const launchRandomFile = vi.fn().mockResolvedValue(undefined);
+      const { component } = render({ disabled: true }, { launchRandomFile });
 
       await component.onRandomLaunchClick();
 
-      expect(mockPlayerContext.launchRandomFile).not.toHaveBeenCalled();
+      expect(launchRandomFile).not.toHaveBeenCalled();
     });
 
-    it('should enable all buttons when disabled is false', () => {
-      fixture.componentRef.setInput('disabled', false);
-      fixture.detectChanges();
-
-      const allButton = fixture.debugElement.query(By.css(SELECTORS.filterAllButton));
-      const gamesButton = fixture.debugElement.query(By.css(SELECTORS.filterGamesButton));
-      const musicButton = fixture.debugElement.query(By.css(SELECTORS.filterMusicButton));
-      const imagesButton = fixture.debugElement.query(By.css(SELECTORS.filterImagesButton));
-
-      expect(allButton.componentInstance.disabled()).toBe(false);
-      expect(gamesButton.componentInstance.disabled()).toBe(false);
-      expect(musicButton.componentInstance.disabled()).toBe(false);
-      expect(imagesButton.componentInstance.disabled()).toBe(false);
+    it('enables all buttons when disabled is false', () => {
+      const { fixture } = render({ disabled: false });
+      for (const selector of [
+        SELECTORS.filterAllButton,
+        SELECTORS.filterGamesButton,
+        SELECTORS.filterMusicButton,
+        SELECTORS.filterImagesButton,
+      ]) {
+        const button = fixture.debugElement.query(By.css(selector));
+        expect(button.componentInstance.disabled()).toBe(false);
+      }
     });
   });
 });
