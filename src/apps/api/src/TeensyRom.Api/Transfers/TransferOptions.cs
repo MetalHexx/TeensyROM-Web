@@ -10,11 +10,21 @@ namespace TeensyRom.Api.Transfers
     /// </summary>
     public sealed class TransferOptions
     {
-        /// Maximum number of staged files admitted across all jobs at once.
-        public int MaxStagedFiles { get; set; } = 10_000;
+        /// Maximum total staged bytes across all jobs at once (4 GB) - the sole ceiling on staging disk
+        /// usage; there is no separate file-count cap.
+        public long MaxStagedBytes { get; set; } = 4L * 1024 * 1024 * 1024;
 
-        /// Maximum total staged bytes across all jobs at once (2 GB).
-        public long MaxStagedBytes { get; set; } = 2L * 1024 * 1024 * 1024;
+        /// Number of staged files the pump batches into a single device write command.
+        public int BatchSize { get; set; } = 25;
+
+        /// Number of most-recently completed files a job retains for progress reporting.
+        public int RecentCompletionsBound { get; set; } = 5;
+
+        /// Number of most-recent failures a job retains for progress reporting.
+        public int RetainedFailuresBound { get; set; } = 50;
+
+        /// Sliding time window used to compute transfer throughput.
+        public TimeSpan RateWindow { get; set; } = TimeSpan.FromSeconds(10);
 
         /// A job with no pending work and no activity for this long is Abandoned.
         public TimeSpan IdleAbandonmentThreshold { get; set; } = TimeSpan.FromMinutes(2);

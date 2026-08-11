@@ -3,8 +3,10 @@ using TeensyRom.Core.Entities.Transfers;
 namespace TeensyRom.Api.Transfers
 {
     /// <summary>
-    /// A bounded queue of staged files per device. Per device, not global: a job targeting a different
-    /// device must run concurrently and stay unaffected by a slow one, and a single shared channel with
+    /// An unbounded queue of staged files per device. Unbounded is safe here precisely because the
+    /// capacity gate admits nothing the byte ceiling does not allow, so the channel can never hold more
+    /// than the gate let in. Per device, not global: a job targeting a different device must run
+    /// concurrently and stay unaffected by a slow one, and a single shared channel with
     /// <c>SingleReader = true</c> would serialise writes across every device and head-of-line-block the
     /// rest. The capacity gate stays global — the resource it protects (host disk) is global — only the
     /// queues are per device.
@@ -12,7 +14,7 @@ namespace TeensyRom.Api.Transfers
     /// Deliberately not selectively purgeable. Cancelling a job does not walk the channel and remove its
     /// items; the pump drops items whose job is no longer active at dequeue time, deleting the staged
     /// file and releasing its capacity-gate slot. This will be the first thing a reader wants to change —
-    /// resist it, a bounded <c>Channel&lt;T&gt;</c> offers no cheap way to remove an arbitrary item.
+    /// resist it, a <c>Channel&lt;T&gt;</c> offers no cheap way to remove an arbitrary item.
     /// </summary>
     public interface ITransferQueue
     {

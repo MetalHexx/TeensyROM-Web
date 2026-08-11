@@ -23,11 +23,7 @@ namespace TeensyRom.Api.Transfers
             GetOrCreateChannel(deviceId).Reader.ReadAllAsync(ct);
 
         private Channel<StagedFile> GetOrCreateChannel(string deviceId) =>
-            _channels.GetOrAdd(deviceId, _ => Channel.CreateBounded<StagedFile>(
-                new BoundedChannelOptions(_options.MaxStagedFiles)
-                {
-                    SingleReader = true,
-                    FullMode = BoundedChannelFullMode.Wait
-                }));
+            _channels.GetOrAdd(deviceId, _ => Channel.CreateUnbounded<StagedFile>(
+                new UnboundedChannelOptions { SingleReader = true }));
     }
 }
