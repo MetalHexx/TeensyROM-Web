@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 import {
@@ -12,12 +12,21 @@ import {
   IAlertService,
   AlertMessage,
   StorageType,
+  PLAYER_LAUNCH_DELAY_MS,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
+  PLAYER_TIMER_TICK_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { PLAYER_STORAGE } from './player-storage.interface';
+
+// Captured at module load, before any test installs fake timers or the tracking wrapper
+// below, so the harness can always drive the real clock regardless of what a test does to it.
+const realSetTimeout = globalThis.setTimeout;
+const scheduleRealMacrotask = realSetTimeout.bind(globalThis);
+const cancelRealMacrotask = globalThis.clearTimeout.bind(globalThis);
 
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   name: 'test-file.sid',
@@ -79,9 +88,27 @@ describe('PlayerContextService - Incompatible File Handling', () => {
     clear: ReturnType<typeof vi.fn>;
   };
 
-  const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
+  const nextTick = () => new Promise<void>((r) => scheduleRealMacrotask(r, 0));
+
+  // The service schedules a real retry timer whenever it sees an incompatible file. Such a
+  // timer outliving its test fires against a destroyed TestBed injector (NG0205), so the
+  // harness records the timers a test schedules and cancels whatever is still pending.
+  const scheduledTimeouts = new Set<ReturnType<typeof scheduleRealMacrotask>>();
+
+  afterEach(() => {
+    vi.useRealTimers();
+    globalThis.setTimeout = realSetTimeout;
+    scheduledTimeouts.forEach((id) => cancelRealMacrotask(id));
+    scheduledTimeouts.clear();
+  });
 
   beforeEach(() => {
+    globalThis.setTimeout = ((...args: Parameters<typeof scheduleRealMacrotask>) => {
+      const id = scheduleRealMacrotask(...args);
+      scheduledTimeouts.add(id);
+      return id;
+    }) as typeof globalThis.setTimeout;
+
     mockPlayerService = {
       launchFile: vi
         .fn()
@@ -149,6 +176,9 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: SettingsStore, useValue: mockSettingsStore },
         { provide: PLAYER_STORAGE, useValue: mockPlayerStorage },
+        { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_INCOMPATIBLE_RETRY_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_TIMER_TICK_MS, useValue: 0 },
       ],
     });
 
@@ -1173,14 +1203,6 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
         expect(mockStorageStore.updateFileCompatibility).not.toHaveBeenCalled();
       });
-    });
-
-    describe('Directory advancement with incompatible files', () => {
-      // Note: Directory advancement tests are complex because they require triggering
-      // the private handleIncompatibleFile() method which is called automatically
-      // via player timer subscriptions. Testing this requires a more elaborate setup.
-      // The storage sync logic is tested via random launch tests above.
-      // Integration testing will verify the full auto-advancement flow.
     });
 
     describe('Integration - Player and storage sync', () => {

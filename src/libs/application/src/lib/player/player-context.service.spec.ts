@@ -14,6 +14,7 @@ import {
   ALERT_SERVICE,
   IAlertService,
   AlertMessage,
+  PLAYER_LAUNCH_DELAY_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -185,6 +186,7 @@ describe('PlayerContextService', () => {
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: SettingsStore, useValue: mockSettingsStore },
         { provide: PLAYER_STORAGE, useValue: mockPlayerStorage },
+        { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 },
       ],
     });
 

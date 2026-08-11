@@ -12,6 +12,8 @@ import {
   ALERT_SERVICE,
   IAlertService,
   PLAYER_LAUNCH_DELAY_MS,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
+  PLAYER_TIMER_TICK_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore, PlayerState } from './player-store';
@@ -81,6 +83,7 @@ describe('PlayerContextService - isSlowLoading', () => {
   let mockStorageStore: {
     alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+    updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
     settings: ReturnType<typeof vi.fn>;
@@ -129,6 +132,7 @@ describe('PlayerContextService - isSlowLoading', () => {
     mockStorageStore = {
       alignToPlayingFile: vi.fn(),
       getSelectedDirectoryState: vi.fn(),
+      updateFileCompatibility: vi.fn(),
     };
 
     mockSettingsStore = {
@@ -160,6 +164,8 @@ describe('PlayerContextService - isSlowLoading', () => {
         { provide: DEVICE_SERVICE, useValue: mockDeviceService },
         { provide: ALERT_SERVICE, useValue: mockAlertService },
         { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 }, // Instant timing for tests
+        { provide: PLAYER_INCOMPATIBLE_RETRY_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_TIMER_TICK_MS, useValue: 0 },
         {
           provide: PLAYER_STORAGE,
           useValue: {

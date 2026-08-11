@@ -13,6 +13,8 @@ import {
   LaunchMode,
   PLAYER_SERVICE,
   StorageType,
+  PLAYER_LAUNCH_DELAY_MS,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -22,7 +24,7 @@ import { PlayerTimerManager } from './player-timer-manager';
 import { PLAYER_STORAGE } from './player-storage.interface';
 import { TimerState } from './timer-state.interface';
 
-type StorageStoreContract = Partial<typeof StorageStore>;
+type StorageStoreContract = Partial<InstanceType<typeof StorageStore>>;
 
 const createTestFile = (overrides: Partial<FileItem> = {}): FileItem => ({
   name: 'test-file.sid',
@@ -95,7 +97,7 @@ describe('PlayerContextService - Favorite Synchronization', () => {
       dismiss: vi.fn(),
     };
 
-    mockStorageStore = {};
+    mockStorageStore = { updateFileCompatibility: vi.fn() };
 
     mockSettingsStore = {
       settings: vi.fn().mockReturnValue(null),
@@ -128,6 +130,8 @@ describe('PlayerContextService - Favorite Synchronization', () => {
         { provide: PlayerTimerManager, useValue: mockTimerManager },
         { provide: SettingsStore, useValue: mockSettingsStore },
         { provide: PLAYER_STORAGE, useValue: { load: vi.fn(), save: vi.fn(), hasSavedState: vi.fn(), clear: vi.fn() } },
+        { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_INCOMPATIBLE_RETRY_DELAY_MS, useValue: 0 },
       ],
     });
 

@@ -10,6 +10,9 @@ import {
   DEVICE_SERVICE,
   ALERT_SERVICE,
   IAlertService,
+  PLAYER_LAUNCH_DELAY_MS,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
+  PLAYER_TIMER_TICK_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -59,6 +62,7 @@ describe('PlayerContextService - Custom Play Timer', () => {
   let mockStorageStore: {
     alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+    updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
     settings: ReturnType<typeof vi.fn>;
@@ -113,6 +117,7 @@ describe('PlayerContextService - Custom Play Timer', () => {
     mockStorageStore = {
       alignToPlayingFile: vi.fn(),
       getSelectedDirectoryState: vi.fn(),
+      updateFileCompatibility: vi.fn(),
     };
 
     mockSettingsStore = {
@@ -148,6 +153,9 @@ describe('PlayerContextService - Custom Play Timer', () => {
           provide: PLAYER_STORAGE,
           useValue: { load: vi.fn(), save: vi.fn(), hasSavedState: vi.fn(), clear: vi.fn() },
         },
+        { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_INCOMPATIBLE_RETRY_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_TIMER_TICK_MS, useValue: 0 },
       ],
     });
 

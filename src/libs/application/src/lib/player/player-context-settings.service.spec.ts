@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
-import { ALERT_SERVICE, IAlertService, PlayerFilterType, AlertMessage } from '@teensyrom-nx/domain';
+import {
+  ALERT_SERVICE,
+  IAlertService,
+  PlayerFilterType,
+  AlertMessage,
+  PLAYER_LAUNCH_DELAY_MS,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
+} from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
 import { StorageStore } from '../storage/storage-store';
@@ -19,6 +26,7 @@ describe('PlayerContextService - Settings Integration', () => {
   let mockStorageStore: {
     alignToPlayingFile: ReturnType<typeof vi.fn>;
     getSelectedDirectoryState: ReturnType<typeof vi.fn>;
+    updateFileCompatibility: ReturnType<typeof vi.fn>;
   };
   let mockSettingsStore: {
     settings: ReturnType<typeof vi.fn>;
@@ -49,6 +57,7 @@ describe('PlayerContextService - Settings Integration', () => {
     mockStorageStore = {
       alignToPlayingFile: vi.fn().mockResolvedValue(undefined),
       getSelectedDirectoryState: vi.fn(),
+      updateFileCompatibility: vi.fn(),
     };
 
     mockSettingsStore = {
@@ -128,6 +137,8 @@ describe('PlayerContextService - Settings Integration', () => {
         { provide: SettingsStore, useValue: mockSettingsStore },
         { provide: PlayerTimerManager, useValue: mockTimerManager },
         { provide: PLAYER_STORAGE, useValue: mockPlayerStorage },
+        { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_INCOMPATIBLE_RETRY_DELAY_MS, useValue: 0 },
       ],
     });
 

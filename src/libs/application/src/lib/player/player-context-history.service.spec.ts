@@ -13,6 +13,9 @@ import {
   IDeviceService,
   IAlertService,
   AlertMessage,
+  PLAYER_LAUNCH_DELAY_MS,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
+  PLAYER_TIMER_TICK_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -148,6 +151,9 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
             clear: vi.fn(),
           },
         },
+        { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_INCOMPATIBLE_RETRY_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_TIMER_TICK_MS, useValue: 0 },
       ],
     });
 
@@ -342,6 +348,7 @@ describe('PlayerContextService - Phase 2: History Navigation', () => {
       expect(service.getLaunchMode(deviceId)()).toBe(LaunchMode.Directory);
 
       // Set up file context for directory navigation
+      mockPlayerService.launchFile.mockReturnValue(of(file2));
       await service.launchFileWithContext({
         deviceId,
         file: file2, // Start at middle file

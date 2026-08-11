@@ -13,7 +13,9 @@ import {
   ALERT_SERVICE,
   IAlertService,
   AlertMessage,
+  PLAYER_LAUNCH_DELAY_MS,
   PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
+  PLAYER_TIMER_TICK_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -182,6 +184,8 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         { provide: StorageStore, useValue: mockStorageStore },
         { provide: SettingsStore, useValue: mockSettingsStore },
         { provide: PLAYER_STORAGE, useValue: mockPlayerStorage },
+        { provide: PLAYER_LAUNCH_DELAY_MS, useValue: 0 },
+        { provide: PLAYER_TIMER_TICK_MS, useValue: 0 },
       ],
     });
 
