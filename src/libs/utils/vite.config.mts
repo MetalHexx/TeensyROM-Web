@@ -12,7 +12,7 @@ export default defineConfig(() => ({
     globals: true,
     environment: 'node',
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    reporters: ['default'],
+    reporters: ['default', ['json', { outputFile: '../../.test-timings/utils.json' }]],
     testTimeout: 2000,
     hookTimeout: 5000,
     onConsoleLog(log) {
