@@ -40,7 +40,13 @@ export default [
             // Features Layer - Can depend on application, domain, and shared UI
             {
               sourceTag: 'scope:features',
-              onlyDependOnLibsWithTags: ['scope:application', 'scope:domain', 'scope:shared', 'scope:testing'],
+              onlyDependOnLibsWithTags: [
+                'scope:application',
+                'scope:domain',
+                'scope:shared',
+                'scope:testing',
+                'scope:testing-app',
+              ],
             },
             // Shared libraries - Can depend on each other and domain
             {
@@ -53,6 +59,12 @@ export default [
               sourceTag: 'scope:testing',
               onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared'],
             },
+            // Testing-App Layer - Mocks for application-side contracts (e.g. IPlayerContext);
+            // consumed by features and app, never by application (that edge would cycle)
+            {
+              sourceTag: 'scope:testing-app',
+              onlyDependOnLibsWithTags: ['scope:domain', 'scope:application', 'scope:shared', 'scope:testing'],
+            },
             // App Layer - Composition root: can depend on everything
             {
               sourceTag: 'scope:app',
@@ -64,6 +76,7 @@ export default [
                 'scope:shared',
                 'scope:app',
                 'scope:testing',
+                'scope:testing-app',
               ],
             },
             // E2E Tests - Can depend on data-access for API DTOs
