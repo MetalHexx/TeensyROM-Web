@@ -394,23 +394,12 @@ describe('SettingsViewComponent', () => {
       expect(component.canSave()).toBe(true);
     });
 
-    it('should be disabled when form invalid', () => {
-      const form = component.settingsForm();
-      expect(form).toBeTruthy();
-      if (!form) return;
-
-      // Make form invalid by clearing required field
-      const control = form.get('fileTransferSettings.autoTransferPath');
-      if (!control) return;
-      control.setValue('');
-      control.markAsTouched();
-      control.updateValueAndValidity();
-      form.updateValueAndValidity();
-
-      // Verify form is actually invalid
-      expect(form.valid).toBe(false);
-
-      // Update the canSave signal to reflect invalid form state
+    // SettingsFormService is fully mocked in this spec, so `component.canSave` can only be
+    // driven by writing to `canSaveSignal` directly — it cannot exercise the real
+    // form-validity -> canSave reactivity. That coverage lives in
+    // settings-form.service.spec.ts ("canSave should react when the form itself transitions
+    // to invalid..."), against the real computed.
+    it('reflects the form service canSave signal turning false', () => {
       canSaveSignal.set(false);
       fixture.detectChanges();
 

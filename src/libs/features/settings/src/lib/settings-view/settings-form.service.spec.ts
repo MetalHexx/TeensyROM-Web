@@ -321,6 +321,21 @@ describe('SettingsFormService', () => {
       expect(service.canSave()).toBe(false);
     });
 
+    it('canSave should react when the form itself transitions to invalid, with no other signal changing', () => {
+      const form = service.settingsForm();
+      expect(form).toBeTruthy();
+      if (!form) return;
+
+      // Establish canSave's cached value while the form is still valid.
+      expect(service.canSave()).toBe(true);
+
+      // Flip the form invalid directly, without writing to isSavingSignal or settingsSignal.
+      form.get('fileTransferSettings.autoTransferPath')?.setValue('');
+      expect(form.valid).toBe(false);
+
+      expect(service.canSave()).toBe(false);
+    });
+
     it('canUndo should be true when history exists', () => {
       historySignal.set([mockSettings, mockSettings]);
       expect(service.canUndo()).toBe(true);
