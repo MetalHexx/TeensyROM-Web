@@ -7,7 +7,7 @@ namespace TeensyRom.Api.Tests.Unit.Transfers;
 
 public class TransferJobRegistryTests
 {
-    private static ITransferJobRegistry NewRegistry() => new TransferJobRegistry();
+    private static ITransferJobRegistry NewRegistry() => new TransferJobRegistry(new TransferOptions());
 
     [Fact]
     public void Create_AddsJob_RetrievableByGet()

@@ -29,7 +29,7 @@ public class TransferPumpTests
         _queue, _registry, _leaseCoordinator, _gate, _staging, _deviceManager, _scopeFactory, _notifier, _options, _log);
 
     private static TransferJob NewJob() =>
-        new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"));
+        new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
 
     private static TransferJob JobIn(TransferJobState state, int pendingCount)
     {

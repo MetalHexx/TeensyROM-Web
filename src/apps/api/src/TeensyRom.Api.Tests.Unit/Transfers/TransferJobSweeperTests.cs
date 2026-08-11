@@ -42,7 +42,7 @@ public class TransferJobSweeperTests
 
     private static TransferJob NewJob(TransferJobState state, int pendingCount, bool idle)
     {
-        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"));
+        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
 
         if (state is TransferJobState.Receiving or TransferJobState.Sealed)
         {
@@ -134,7 +134,7 @@ public class TransferJobSweeperTests
     [Fact]
     public void Sweep_CancellingJobWithEmptyQueue_FinalizesToCancelled()
     {
-        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"));
+        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
         job.TryTransitionTo(TransferJobState.Cancelling);
         _registry.All().Returns([job]);
 

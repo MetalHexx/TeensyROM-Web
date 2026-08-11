@@ -86,11 +86,10 @@ namespace TeensyRom.Api.Transfers
         /// <summary>
         /// Admits each staged file in order - dropping or aborting exactly as the pump did per file
         /// before batching existed - then sends every admitted file through one
-        /// <see cref="TransferFilesCommand"/> whose per-file callback still does the five things that
-        /// must stay per file: gate release, staging delete, cache upsert, job counters, and the
-        /// per-file hub event. <paramref name="resetJobIds"/> is shared across every batch this worker
-        /// ever processes, so a job's device reset still fires once, before its first file, never per
-        /// batch.
+        /// <see cref="TransferFilesCommand"/> whose per-file callback still does the four things that
+        /// must stay per file: gate release, staging delete, cache upsert, and job counters.
+        /// <paramref name="resetJobIds"/> is shared across every batch this worker ever processes, so a
+        /// job's device reset still fires once, before its first file, never per batch.
         /// </summary>
         private async Task ProcessBatchAsync(List<StagedFile> batch, HashSet<string> resetJobIds, CancellationToken ct)
         {
@@ -260,17 +259,15 @@ namespace TeensyRom.Api.Transfers
 
             job.SetCurrentFile(staged.RelativePath);
 
-            TransferFileCompleted completed;
-
             if (outcome.Saved)
             {
-                job.OnFileSent(staged.SizeBytes);
+                var completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, true, null, staged.SizeBytes);
+                job.OnFileSent(completed);
                 device.GetStorage(job.StorageType)?.UpsertTransferredFile(staged.TargetPath, staged.SizeBytes);
-                completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, true, null, staged.SizeBytes);
             }
             else
             {
-                completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, false, outcome.Error, staged.SizeBytes);
+                var completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, false, outcome.Error, staged.SizeBytes);
                 job.OnFileFailed(completed);
             }
 
@@ -279,7 +276,7 @@ namespace TeensyRom.Api.Transfers
             gate.ReleaseSlot(staged.ReservedBytes);
 
             notifier.JobChanged(job);
-            return notifier.FileCompletedAsync(completed);
+            return Task.CompletedTask;
         }
 
         /// <summary>

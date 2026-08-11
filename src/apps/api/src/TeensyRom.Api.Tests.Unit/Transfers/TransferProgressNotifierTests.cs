@@ -13,7 +13,7 @@ namespace TeensyRom.Api.Tests.Unit.Transfers;
 public class TransferProgressNotifierTests
 {
     private static TransferJob NewJob() =>
-        new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"));
+        new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
 
     private static (TransferProgressNotifier Notifier, IClientProxy GroupProxy, ITransferJobRegistry Registry) NewNotifier(TimeSpan throttle)
     {
@@ -87,17 +87,5 @@ public class TransferProgressNotifierTests
 
         await groupProxy.Received(1).SendCoreAsync(
             "JobSnapshot", Arg.Is<object?[]>(a => IsSnapshotFor(a, job.JobId)), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task FileCompletedAsync_SendsFileCompletedToJobGroup()
-    {
-        var (notifier, groupProxy, _) = NewNotifier(TimeSpan.FromMinutes(5));
-        var completed = new TransferFileCompleted("job-1", "a.prg", "/dest/a.prg", true, null, 100);
-
-        await notifier.FileCompletedAsync(completed);
-
-        await groupProxy.Received(1).SendCoreAsync(
-            "FileCompleted", Arg.Is<object?[]>(a => a.Length == 1 && Equals(a[0], completed)), Arg.Any<CancellationToken>());
     }
 }
