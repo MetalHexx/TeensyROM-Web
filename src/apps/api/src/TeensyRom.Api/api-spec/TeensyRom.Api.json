@@ -2448,7 +2448,9 @@
           },
           "recentCompletions": {
             "type": "array",
-            "items": { }
+            "items": {
+              "$ref": "#/components/schemas/TransferFileCompleted"
+            }
           },
           "bytesPerSecond": {
             "type": "number",
@@ -2540,7 +2542,9 @@
           },
           "recentCompletions": {
             "type": "array",
-            "items": { }
+            "items": {
+              "$ref": "#/components/schemas/TransferFileCompleted"
+            }
           },
           "bytesPerSecond": {
             "type": "number",
