@@ -716,6 +716,91 @@ Public surface: `StorageStore` (mocked), `selectedDirectoryState()`, `currentPat
 | 466 | isLoading reflects an in-progress load | isLoading() | true | state | port | directory-trail-container.component.spec.ts |
 | 467 | The loading state is passed to the DirectoryTrailComponent child | child componentInstance.isLoading() | true | state | port | directory-trail-container.component.spec.ts |
 
+## 21. storage-container/directory-tree-container/directory-tree-container.component.spec.ts (12 tests)
+
+Public surface: `onNodeActivated()`, `onNodeExpansionNeedsData()`, `selectedNodeId()`,
+`directoryNavigated` output, `StorageStore` (mocked).
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 468 | Component instantiates | component | truthy | state | port | directory-tree-container.component.spec.ts |
+| 469 | Activating a device node navigates to device level and emits directoryNavigated | onNodeActivated(), StorageStore.navigateToDeviceLevel, directoryNavigated | called with deviceId; navigateToDirectory not called; emitted once | state | port | directory-tree-container.component.spec.ts |
+| 470 | Activating a device node with no deviceId is a no-op | onNodeActivated(), navigateToDeviceLevel/navigateToDirectory, directoryNavigated | none called; not emitted | state | port | directory-tree-container.component.spec.ts |
+| 471 | Activating a directory node navigates to that directory and emits | onNodeActivated(), navigateToDirectory, directoryNavigated | called with deviceId/storageType/path; emitted once | state | port | directory-tree-container.component.spec.ts |
+| 472 | Activating a storage-type node navigates to its root and emits | onNodeActivated(), navigateToDirectory, directoryNavigated | called with deviceId/storageType/path; emitted once | state | port | directory-tree-container.component.spec.ts |
+| 473 | Activating a malformed node is a no-op | onNodeActivated(), navigateToDirectory/navigateToDeviceLevel, directoryNavigated | none called; not emitted | state | port | directory-tree-container.component.spec.ts |
+| 474 | Expanding a storage node lazy-loads its directory without emitting navigation | onNodeExpansionNeedsData(), navigateToDirectory, directoryNavigated | called with deviceId/storageType/path; not emitted | state | port | directory-tree-container.component.spec.ts |
+| 475 | Expanding a malformed node is a no-op | onNodeExpansionNeedsData(), navigateToDirectory | not called | state | port | directory-tree-container.component.spec.ts |
+| 476 | Expanding a device node is a no-op (devices don't lazy-load) | onNodeExpansionNeedsData(), navigateToDirectory | not called | state | port | directory-tree-container.component.spec.ts |
+| 477 | selectedNodeId resolves to the device node id at device level | selectedNodeId() | 'device-{deviceId}' | state | port | directory-tree-container.component.spec.ts |
+| 478 | selectedNodeId resolves to the storage node id for a storage-root selection | selectedNodeId() | '{deviceId}-SD' (no path segment) | state | port | directory-tree-container.component.spec.ts |
+| 479 | selectedNodeId resolves to the directory node id for a nested-directory selection | selectedNodeId() | '{deviceId}-SD-/games' | state | port | directory-tree-container.component.spec.ts |
+
+## 22. storage-container/filter-toolbar/filter-toolbar.component.spec.ts (50 tests)
+
+Public surface: `onAllClick()`/`onGamesClick()`/`onMusicClick()`/`onImagesClick()`,
+`getButtonColor()`, `onRandomLaunchClick()`, `disabled` input, rendered filter buttons,
+`lib-random-roll-button`. Contains a `describe.skip('Dice Roll Animation', ...)` block (5 tests,
+rows 514-518) — the dice-roll behavior it targets was relocated to
+`random-roll-button.component.spec.ts` (this inventory's rows 43-49); the block is disabled via
+`describe.skip` but its `it()` calls are still plain (non-`.skip`) syntax, so they count toward
+this file's measured 50 and are inventoried here as dead/skipped rows. One further test uses
+`it.skip(...)` directly (source line 527) and is excluded from both this file's 50-count and this
+inventory's 694-count (the grep pattern this inventory measures against doesn't match `it.skip(`).
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 480 | Component instantiates | component | truthy | state | port | filter-toolbar.component.spec.ts |
+| 481 | deviceId input is reflected on the component | deviceId() | test device id | state | port | filter-toolbar.component.spec.ts |
+| 482 | onAllClick() sets the filter to All | onAllClick(), IPlayerContext.setFilterMode | called with (deviceId, All) | state | port | filter-toolbar.component.spec.ts |
+| 483 | onGamesClick() sets the filter to Games | onGamesClick(), setFilterMode | called with (deviceId, Games) | state | port | filter-toolbar.component.spec.ts |
+| 484 | onMusicClick() sets the filter to Music | onMusicClick(), setFilterMode | called with (deviceId, Music) | state | port | filter-toolbar.component.spec.ts |
+| 485 | onImagesClick() sets the filter to Images | onImagesClick(), setFilterMode | called with (deviceId, Images) | state | port | filter-toolbar.component.spec.ts |
+| 486 | getButtonColor(All) is 'highlight' when All is active | getButtonColor() | 'highlight' | state | port | filter-toolbar.component.spec.ts |
+| 487 | getButtonColor(Games) is 'highlight' when Games is active | getButtonColor() | 'highlight' | state | port | filter-toolbar.component.spec.ts |
+| 488 | getButtonColor(Music) is 'highlight' when Music is active | getButtonColor() | 'highlight' | state | port | filter-toolbar.component.spec.ts |
+| 489 | getButtonColor(Images) is 'highlight' when Images is active | getButtonColor() | 'highlight' | state | port | filter-toolbar.component.spec.ts |
+| 490 | Inactive filters report 'normal' color | getButtonColor() for the 3 non-active filters | all 'normal' | state | port | filter-toolbar.component.spec.ts |
+| 491 | The active filter stays highlighted when an error exists | getButtonColor() with an error set | active 'highlight', others 'normal' | state | port | filter-toolbar.component.spec.ts |
+| 492 | The active filter's highlight is unaffected by a different error message | getButtonColor() | 'highlight' | state | drop — duplicate of row 491's error-doesn't-affect-color claim | — |
+| 493 | Colors return to normal/highlight once the error clears | getButtonColor() | 'highlight' for active, 'normal' for others | state | merge (see rows 486/490) — duplicate combination; clearing the error doesn't change the color-selection code path | — |
+| 494 | The random roll button color is 'normal' regardless of an active error | `lib-random-roll-button` componentInstance.getButtonColor() | 'normal' | state | port | filter-toolbar.component.spec.ts |
+| 495 | The random roll button color is 'normal' with no error | `lib-random-roll-button` componentInstance.getButtonColor() | 'normal' | state | drop — duplicate of row 494; the button's color isn't error-gated either way | — |
+| 496 | onRandomLaunchClick() launches a random file for the device | onRandomLaunchClick(), launchRandomFile | called with deviceId | state | port | filter-toolbar.component.spec.ts |
+| 497 | onRandomLaunchClick() is a no-op with an empty deviceId | onRandomLaunchClick(), launchRandomFile | not called | state | port | filter-toolbar.component.spec.ts |
+| 498 | onRandomLaunchClick() is a no-op with a null deviceId | onRandomLaunchClick(), launchRandomFile | not called | state | drop — duplicate of row 497's falsy-deviceId guard claim | — |
+| 499 | A rejected random launch is caught and logged, not thrown | onRandomLaunchClick(), console.error | logged; no throw | state | port | filter-toolbar.component.spec.ts |
+| 500 | All 4 filter buttons render with the correct selectors | filter button selectors | 4 buttons; each individually truthy | dom-structural | port | filter-toolbar.component.spec.ts |
+| 501 | The vertical separator renders with its class | separator element | truthy; has 'vertical-separator' class | dom-structural | port | filter-toolbar.component.spec.ts |
+| 502 | The random launch button renders with its aria-label | random button, inner button | truthy; aria-label matches | dom-structural | port (literal aria-label text dropped as redundant with the dedicated accessibility test, row 512) | filter-toolbar.component.spec.ts |
+| 503 | A joystick icon renders inside the Games button | Games button's `lib-joystick-icon` | truthy | dom-structural | port | filter-toolbar.component.spec.ts |
+| 504 | An image icon renders inside the Images button | Images button's `lib-image-icon` | truthy | dom-structural | port | filter-toolbar.component.spec.ts |
+| 505 | Clicking the All button triggers onAllClick | native click, onAllClick spy | called | state | port | filter-toolbar.component.spec.ts |
+| 506 | Clicking the Games button triggers onGamesClick | native click, onGamesClick spy | called | state | port | filter-toolbar.component.spec.ts |
+| 507 | Clicking the Music button triggers onMusicClick | native click, onMusicClick spy | called | state | port | filter-toolbar.component.spec.ts |
+| 508 | Clicking the Images button triggers onImagesClick | native click, onImagesClick spy | called | state | port | filter-toolbar.component.spec.ts |
+| 509 | The filter-buttons container carries its layout CSS class | `.filter-buttons` classList | contains 'filter-buttons' | dom-structural | drop — class-existence-for-layout carries no behavior; container presence already implied by row 500 | — |
+| 510 | Content is wrapped in a compact card layout | `lib-compact-card-layout` | truthy | dom-structural | port | filter-toolbar.component.spec.ts |
+| 511 | Buttons render in the correct order with the separator between filters and random | 5 icon-buttons, separator's nextElementSibling | count 5; separator immediately precedes the random button | dom-structural | port | filter-toolbar.component.spec.ts |
+| 512 | All 5 buttons carry their correct accessibility aria-labels | inner button aria-label, per button (table-driven) | each matches its expected label | dom-copy | port — accessibility labels are a functional a11y contract, not decorative copy | filter-toolbar.component.spec.ts |
+| 513 | All buttons use the 'large' size for touch targets | icon-button size attribute | 'large' for every button | dom-structural | port | filter-toolbar.component.spec.ts |
+| 514 | [dead — describe.skip] isDiceRolling defaults to false | isDiceRolling() | false | state | drop — test never runs (`describe.skip`); dice-roll behavior relocated to `random-roll-button.component.spec.ts` (this inventory's row 45) | — |
+| 515 | [dead — describe.skip] randomButton template reference is defined | randomButton | defined | state | drop — dead/skipped test, same relocation as row 514 | — |
+| 516 | [dead — describe.skip] Launching a random file triggers the dice-roll animation | animateDiceRoll spy | called | state | drop — dead/skipped test, same relocation as row 514 | — |
+| 517 | [dead — describe.skip] Animation state is set during a dice roll | isDiceRolling(), classList.add | true; 'dice-roll' added | state | drop — dead/skipped test, same relocation as row 514 | — |
+| 518 | [dead — describe.skip] Multiple simultaneous animations are prevented | classList.add | not called again while already rolling | state | drop — dead/skipped test, same relocation as row 514 | — |
+| 519 | Click handlers don't throw with a missing deviceId | onAllClick/onGamesClick/onMusicClick/onImagesClick/onRandomLaunchClick() | none throw | state | port | filter-toolbar.component.spec.ts |
+| 520 | A playerContext service error is caught and logged | onRandomLaunchClick(), launchRandomFile, console.error | called; logged | state | drop — duplicate of row 499's reject-and-log claim | — |
+| 521 | disabled input defaults to false | disabled() | false | state | port | filter-toolbar.component.spec.ts |
+| 522 | disabled input accepts true | disabled() | true | state | port | filter-toolbar.component.spec.ts |
+| 523 | disabled-state class is added to the host when disabled | nativeElement.classList | contains 'disabled-state' | dom-structural | port | filter-toolbar.component.spec.ts |
+| 524 | disabled-state class is absent when not disabled | nativeElement.classList | doesn't contain 'disabled-state' | dom-structural | port | filter-toolbar.component.spec.ts |
+| 525 | All 4 filter buttons are disabled when disabled=true | 4 filter buttons componentInstance.disabled() | all true | state | port | filter-toolbar.component.spec.ts |
+| 526 | The random/dice button is disabled when disabled=true | random button componentInstance.disabled() | true | state | port | filter-toolbar.component.spec.ts |
+| 527 | setFilterMode isn't called when disabled and a handler is invoked directly | onAllClick/onGamesClick/onMusicClick/onImagesClick(), setFilterMode | not called | state | port | filter-toolbar.component.spec.ts |
+| 528 | launchRandomFile isn't called when disabled and the handler is invoked directly | onRandomLaunchClick(), launchRandomFile | not called | state | port | filter-toolbar.component.spec.ts |
+| 529 | All buttons are enabled when disabled=false | 4 filter buttons componentInstance.disabled() | all false | state | port | filter-toolbar.component.spec.ts |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
