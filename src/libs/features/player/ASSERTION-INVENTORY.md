@@ -640,6 +640,82 @@ are noted per row.
 | 408 | The search toolbar renders at storage level (default state) | `lib-search-toolbar` | truthy | dom-structural | drop — duplicate of row 404's default-state precondition | — |
 | 409 | The search toolbar also renders at device level | `lib-search-toolbar` | truthy | dom-structural | port | directory-files.component.spec.ts |
 
+## 19. storage-container/directory-files/file-item/file-item.component.spec.ts (26 tests)
+
+Public surface: `fileIcon()`, `formattedSize()`, `itemSelected`/`itemDoubleClick` outputs,
+`selected` input, rendered `lib-storage-item`, `.incompatible-icon`, `TooltipDirective`.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 410 | Component instantiates | component | truthy | state | port | file-item.component.spec.ts |
+| 411 | Unknown file type maps to insert_drive_file | fileIcon() | 'insert_drive_file' | state | port | file-item.component.spec.ts |
+| 412 | Song maps to music_note | fileIcon() | 'music_note' | state | port | file-item.component.spec.ts |
+| 413 | Game maps to sports_esports | fileIcon() | 'sports_esports' | state | port | file-item.component.spec.ts |
+| 414 | Image maps to image | fileIcon() | 'image' | state | port | file-item.component.spec.ts |
+| 415 | Hex maps to code | fileIcon() | 'code' | state | port | file-item.component.spec.ts |
+| 416 | 0 bytes formats as '0 B' | formattedSize() | '0 B' | state | port | file-item.component.spec.ts |
+| 417 | Sub-KB sizes format with a 'B' suffix | formattedSize() | '512.0 B' | state | port | file-item.component.spec.ts |
+| 418 | KB-range sizes format with a 'KB' suffix | formattedSize() | '1.5 KB' | state | port | file-item.component.spec.ts |
+| 419 | MB-range sizes format with an 'MB' suffix | formattedSize() | '2.3 MB' | state | port | file-item.component.spec.ts |
+| 420 | GB-range sizes format with a 'GB' suffix | formattedSize() | '3.0 GB' | state | port | file-item.component.spec.ts |
+| 421 | Clicking the item emits itemSelected with the file | click, itemSelected output | emits the file | state | port | file-item.component.spec.ts |
+| 422 | Double-clicking the item emits itemDoubleClick with the file | dblclick, itemDoubleClick output | emits the file | state | port | file-item.component.spec.ts |
+| 423 | The selected class applies when selected=true | `lib-storage-item`.classList | contains 'selected' | dom-structural | port | file-item.component.spec.ts |
+| 424 | The selected class is absent when selected=false | `lib-storage-item`.classList | doesn't contain 'selected' | dom-structural | port | file-item.component.spec.ts |
+| 425 | The file name renders in the item's text | nativeElement textContent | contains 'test-file' | dom-copy | port (re-expressed as dom-structural) — assert the name text renders, not the literal string | file-item.component.spec.ts |
+| 426 | The formatted size renders in the item's text | nativeElement textContent | contains '1.5 KB' | dom-copy | merge (see row 418) — duplicate of the formattedSize() computed already verified at state level | — |
+| 427 | The incompatible icon shows for an incompatible file | `.incompatible-icon` | truthy | dom-structural | port | file-item.component.spec.ts |
+| 428 | The incompatible icon is absent for a compatible file | `.incompatible-icon` | null | dom-structural | port | file-item.component.spec.ts |
+| 429 | The incompatible icon is absent when isCompatible is undefined | `.incompatible-icon` | null | dom-structural | port | file-item.component.spec.ts |
+| 430 | The incompatible icon uses the correct Material icon name | `.incompatible-icon` textContent | 'sentiment_very_dissatisfied' | dom-copy | drop — duplicate of row 427's presence claim; the glyph name is a fixed, non-varying value (static content pin) | — |
+| 431 | The incompatible icon has the tooltip directive applied | icon element's injector | TooltipDirective instance truthy | dom-structural | port | file-item.component.spec.ts |
+| 432 | The tooltip body text is the incompatibility message | TooltipDirective.libTooltip().body | exact message string | dom-copy | drop — static UI copy, not a unit-test concern; tooltip presence already proven by row 431 | — |
+| 433 | The tooltip position is set to Right | TooltipDirective.libTooltip().position | TooltipPosition.Right | state | port | file-item.component.spec.ts |
+| 434 | The icon reactively appears when the file becomes incompatible | `.incompatible-icon` before/after | null then truthy | dom-structural | drop — duplicate of rows 427/428's static before/after states | — |
+| 435 | The icon reactively hides when the file becomes compatible | `.incompatible-icon` before/after | truthy then null | dom-structural | drop — duplicate of rows 427/428's static before/after states (mirror direction) | — |
+
+## 20. storage-container/directory-trail-container/directory-trail-container.component.spec.ts (32 tests)
+
+Public surface: `StorageStore` (mocked), `selectedDirectoryState()`, `currentPath()`,
+`storageTypeLabel()`, `canNavigateUp()`, `isLoading()`, `canNavigateBack()`/`canNavigateForward()`,
+`onUpClick()`/`onRefreshClick()`/`onNavigationRequested()`/`onBackClick()`/`onForwardClick()`,
+`isDeviceLevelView()`, the rendered `DirectoryTrailComponent` child.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 436 | Component instantiates | component | truthy | state | port | directory-trail-container.component.spec.ts |
+| 437 | selectedDirectoryState returns the store's state | selectedDirectoryState() | matches the mocked state | state | port | directory-trail-container.component.spec.ts |
+| 438 | currentPath is computed from the state | currentPath() | '/games/arcade' | state | port | directory-trail-container.component.spec.ts |
+| 439 | storageTypeLabel is 'SD Card' for SD storage | storageTypeLabel() | 'SD Card' | state | port | directory-trail-container.component.spec.ts |
+| 440 | canNavigateUp is true based on the current path | canNavigateUp() | true | state | port | directory-trail-container.component.spec.ts |
+| 441 | isLoading reflects the store's loading flag | isLoading() | false | state | port | directory-trail-container.component.spec.ts |
+| 442 | canNavigateBack is true mid-history | canNavigateBack() | true | state | port | directory-trail-container.component.spec.ts |
+| 443 | canNavigateForward is false at the end of history | canNavigateForward() | false | state | port | directory-trail-container.component.spec.ts |
+| 444 | onUpClick() calls navigateUpOneDirectory with device/storageType | onUpClick(), StorageStore.navigateUpOneDirectory | called with deviceId/storageType | state | port | directory-trail-container.component.spec.ts |
+| 445 | onRefreshClick() calls refreshDirectory | onRefreshClick(), StorageStore.refreshDirectory | called with deviceId/storageType | state | port | directory-trail-container.component.spec.ts |
+| 446 | onNavigationRequested() calls navigateToDirectory with the requested path | onNavigationRequested(), StorageStore.navigateToDirectory | called with deviceId/storageType/path | state | port | directory-trail-container.component.spec.ts |
+| 447 | onBackClick() calls navigateDirectoryBackward when back navigation is possible | onBackClick(), StorageStore.navigateDirectoryBackward | called with deviceId | state | port | directory-trail-container.component.spec.ts |
+| 448 | onForwardClick() calls navigateDirectoryForward when forward navigation is possible | onForwardClick(), StorageStore.navigateDirectoryForward | called with deviceId | state | port | directory-trail-container.component.spec.ts |
+| 449 | canNavigateForward is true mid-history | canNavigateForward() | true | state | port | directory-trail-container.component.spec.ts |
+| 450 | currentPath defaults to '/' when state is null | currentPath() | '/' | state | port | directory-trail-container.component.spec.ts |
+| 451 | storageTypeLabel defaults to 'Storage' when nothing is selected | storageTypeLabel() | 'Storage' | state | port | directory-trail-container.component.spec.ts |
+| 452 | isLoading is false when there's no directory state | isLoading() | false | state | port | directory-trail-container.component.spec.ts |
+| 453 | onUpClick() is a no-op with no selected directory | onUpClick(), navigateUpOneDirectory | not called | state | port | directory-trail-container.component.spec.ts |
+| 454 | onRefreshClick() is a no-op with no selected directory | onRefreshClick(), refreshDirectory | not called | state | port | directory-trail-container.component.spec.ts |
+| 455 | onNavigationRequested() is a no-op with no selected directory | onNavigationRequested(), navigateToDirectory | not called | state | port | directory-trail-container.component.spec.ts |
+| 456 | canNavigateBack is false with no navigation history | canNavigateBack() | false | state | port | directory-trail-container.component.spec.ts |
+| 457 | canNavigateForward is false with no navigation history | canNavigateForward() | false | state | port | directory-trail-container.component.spec.ts |
+| 458 | onBackClick() is a no-op when back navigation isn't possible | onBackClick(), navigateDirectoryBackward | not called | state | port | directory-trail-container.component.spec.ts |
+| 459 | onForwardClick() is a no-op when forward navigation isn't possible | onForwardClick(), navigateDirectoryForward | not called | state | port | directory-trail-container.component.spec.ts |
+| 460 | storageTypeLabel is 'USB Drive' for USB storage | storageTypeLabel() | 'USB Drive' | state | port | directory-trail-container.component.spec.ts |
+| 461 | canNavigateUp is true from the root path (root goes up to device level) | canNavigateUp() | true | state | port | directory-trail-container.component.spec.ts |
+| 462 | onUpClick() calls navigateUpOneDirectory from the root path | onUpClick(), navigateUpOneDirectory | called with deviceId/storageType | state | drop — duplicate of row 444's up-click wiring claim; the root-specific behavior is already the subject of row 461 | — |
+| 463 | canNavigateUp is false at device level | canNavigateUp() | false | state | port | directory-trail-container.component.spec.ts |
+| 464 | isDeviceLevelView correctly detects device level | isDeviceLevelView() | true | state | port | directory-trail-container.component.spec.ts |
+| 465 | onUpClick() is a no-op at device level | onUpClick(), navigateUpOneDirectory | not called | state | drop — duplicate of row 453's no-op claim; device level resolves to the same "no selected directory" internal state | — |
+| 466 | isLoading reflects an in-progress load | isLoading() | true | state | port | directory-trail-container.component.spec.ts |
+| 467 | The loading state is passed to the DirectoryTrailComponent child | child componentInstance.isLoading() | true | state | port | directory-trail-container.component.spec.ts |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
