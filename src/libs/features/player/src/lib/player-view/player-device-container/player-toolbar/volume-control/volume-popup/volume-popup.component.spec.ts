@@ -1,135 +1,110 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal, WritableSignal } from '@angular/core';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { VolumePopupComponent } from './volume-popup.component';
+import { describe, it, expect, vi } from 'vitest';
+import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { AudioStore } from '@teensyrom-nx/application';
+import { renderPlayerComponent } from '../../../../../../testing/render-player-component';
+import { VolumePopupComponent } from './volume-popup.component';
 
-function createMockAudioStore() {
-  return {
-    isMuted: signal(false) as WritableSignal<boolean>,
-    masterVolume: signal(0.75) as WritableSignal<number>,
+function render(inputs: Record<string, unknown> = {}, options: { stubChildren?: boolean } = {}) {
+  const isMuted = signal(false);
+  const masterVolume = signal(0.75);
+  const audioStore = {
+    isMuted,
+    masterVolume,
     toggleMute: vi.fn(),
     setMasterVolume: vi.fn(),
   };
+
+  const result = renderPlayerComponent(VolumePopupComponent, {
+    inputs,
+    stubChildren: options.stubChildren,
+    providers: [{ provide: AudioStore, useValue: audioStore }],
+  });
+
+  return { ...result, audioStore, isMuted, masterVolume };
 }
 
 describe('VolumePopupComponent', () => {
-  let component: VolumePopupComponent;
-  let fixture: ComponentFixture<VolumePopupComponent>;
-  let mockAudioStore: ReturnType<typeof createMockAudioStore>;
+  it('creates', () => {
+    const { component } = render();
 
-  beforeEach(async () => {
-    mockAudioStore = createMockAudioStore();
-
-    await TestBed.configureTestingModule({
-      imports: [VolumePopupComponent, NoopAnimationsModule],
-      providers: [{ provide: AudioStore, useValue: mockAudioStore }],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(VolumePopupComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-  });
-
-  it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  describe('trigger icon states', () => {
-    it('should show volume_off icon when muted', () => {
-      mockAudioStore.isMuted.set(true);
-      fixture.detectChanges();
+  describe('volumeIcon()', () => {
+    it('is volume_up when volume >= 0.5 and not muted', () => {
+      const { component, masterVolume } = render();
+      masterVolume.set(0.75);
 
-      const icons = fixture.nativeElement.querySelectorAll('lib-icon-button mat-icon');
-      // First icon-button is the trigger
-      expect(icons[0].textContent.trim()).toBe('volume_off');
+      expect(component.volumeIcon()).toBe('volume_up');
     });
 
-    it('should show volume_up icon when volume >= 0.5 and not muted', () => {
-      mockAudioStore.isMuted.set(false);
-      mockAudioStore.masterVolume.set(0.75);
-      fixture.detectChanges();
+    it('is volume_down when volume is between 0 and 0.5', () => {
+      const { component, masterVolume } = render();
+      masterVolume.set(0.3);
 
-      const icons = fixture.nativeElement.querySelectorAll('lib-icon-button mat-icon');
-      expect(icons[0].textContent.trim()).toBe('volume_up');
+      expect(component.volumeIcon()).toBe('volume_down');
     });
 
-    it('should show volume_down icon when volume < 0.5 and > 0', () => {
-      mockAudioStore.isMuted.set(false);
-      mockAudioStore.masterVolume.set(0.3);
-      fixture.detectChanges();
+    it('is volume_mute when volume is exactly 0 and unmuted', () => {
+      const { component, masterVolume } = render();
+      masterVolume.set(0);
 
-      const icons = fixture.nativeElement.querySelectorAll('lib-icon-button mat-icon');
-      expect(icons[0].textContent.trim()).toBe('volume_down');
-    });
-
-    it('should show volume_mute icon when volume is 0 and not muted', () => {
-      mockAudioStore.isMuted.set(false);
-      mockAudioStore.masterVolume.set(0);
-      fixture.detectChanges();
-
-      const icons = fixture.nativeElement.querySelectorAll('lib-icon-button mat-icon');
-      expect(icons[0].textContent.trim()).toBe('volume_mute');
+      expect(component.volumeIcon()).toBe('volume_mute');
     });
   });
 
-  describe('popup interactions', () => {
-    it('should open dropdown when trigger is clicked', () => {
-      const triggerButton = fixture.nativeElement.querySelector('lib-icon-button button');
-      triggerButton.click();
-      fixture.detectChanges();
+  it('opens the dropdown when the trigger is clicked', () => {
+    // Needs the real DropdownDialogComponent so the viewChild the trigger toggles resolves.
+    const { fixture, component } = render({}, { stubChildren: false });
 
-      expect(component['dropdown']()?.isOpen()).toBe(true);
-    });
+    const triggerButton: HTMLButtonElement = fixture.nativeElement.querySelector('button');
+    triggerButton.click();
+    fixture.detectChanges();
 
-    it('should call toggleMute when popup mute button is clicked', () => {
-      // Open popup first
-      component.onTriggerClick();
-      fixture.detectChanges();
-
-      // The popup content is rendered in the CDK overlay, not inside the component host.
-      // We test via the component method directly.
-      component.onToggleMute();
-
-      expect(mockAudioStore.toggleMute).toHaveBeenCalledOnce();
-    });
-
-    it('should call setMasterVolume with correct value when slider changes', () => {
-      component.onVolumeChange({ target: { value: '0.42' } } as unknown as Event);
-
-      expect(mockAudioStore.setMasterVolume).toHaveBeenCalledWith(0.42);
-    });
+    expect(component['dropdown']()?.isOpen()).toBe(true);
   });
 
-  describe('computed signals', () => {
-    it('should reflect current store state in computed signals', () => {
-      mockAudioStore.isMuted.set(true);
-      mockAudioStore.masterVolume.set(0);
+  it("calls the store's toggleMute when the mute toggle is used", () => {
+    const { component, audioStore } = render();
 
-      expect(component.isMuted()).toBe(true);
-      expect(component.currentVolume()).toBe(0);
-      expect(component.volumeIcon()).toBe('volume_off');
-      expect(component.muteAriaLabel()).toBe('Unmute audio');
-    });
+    component.onToggleMute();
 
-    it('should show Mute aria label when not muted', () => {
-      mockAudioStore.isMuted.set(false);
-      mockAudioStore.masterVolume.set(0.5);
-
-      expect(component.muteAriaLabel()).toBe('Mute audio');
-    });
+    expect(audioStore.toggleMute).toHaveBeenCalledOnce();
   });
 
-  describe('disabled state', () => {
-    it('should disable trigger button when disabled input is true', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+  it('forwards the slider value to the store', () => {
+    const { component, audioStore } = render();
 
-      const triggerButton: HTMLButtonElement = fixture.nativeElement.querySelector(
-        'lib-icon-button button'
-      );
-      expect(triggerButton.disabled).toBe(true);
-    });
+    component.onVolumeChange({ target: { value: '0.42' } } as unknown as Event);
+
+    expect(audioStore.setMasterVolume).toHaveBeenCalledWith(0.42);
+  });
+
+  it('reflects muted, zero-volume store state across computed signals', () => {
+    const { component, isMuted, masterVolume } = render();
+    isMuted.set(true);
+    masterVolume.set(0);
+
+    expect(component.isMuted()).toBe(true);
+    expect(component.currentVolume()).toBe(0);
+    expect(component.volumeIcon()).toBe('volume_off');
+    expect(component.muteAriaLabel()).toBe('Unmute audio');
+  });
+
+  it("uses the 'Mute audio' aria label when unmuted", () => {
+    const { component, isMuted, masterVolume } = render();
+    isMuted.set(false);
+    masterVolume.set(0.5);
+
+    expect(component.muteAriaLabel()).toBe('Mute audio');
+  });
+
+  it('disables the trigger button when the disabled input is true', () => {
+    const { fixture } = render({ disabled: true });
+
+    const trigger = fixture.debugElement.query(By.css('lib-icon-button'));
+
+    expect(trigger.properties['disabled']).toBe(true);
   });
 });

@@ -1,855 +1,599 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { DebugElement } from '@angular/core';
-import { By } from '@angular/platform-browser';
+import { describe, it, expect, vi } from 'vitest';
 import { signal } from '@angular/core';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { PlayerToolbarComponent } from './player-toolbar.component';
-import { PLAYER_CONTEXT, IPlayerContext, StorageStore, SettingsStore, AudioStore } from '@teensyrom-nx/application';
+import { By } from '@angular/platform-browser';
+import type { DebugElement } from '@angular/core';
+import type { ComponentFixture } from '@angular/core/testing';
+import { renderPlayerComponent } from '../../../../testing/render-player-component';
+import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { LaunchMode, PlayerStatus, FileItemType, StorageType } from '@teensyrom-nx/domain';
-import { IconButtonComponent } from '@teensyrom-nx/ui/components';
+import {
+  SettingsStore,
+  StorageKeyUtil,
+  type LaunchedFile,
+  type PlayerFileContext,
+} from '@teensyrom-nx/application';
+import { PlayerToolbarComponent } from './player-toolbar.component';
+
+function createLaunchedFile(
+  deviceId: string,
+  fileType: FileItemType,
+  overrides: Parameters<typeof createTestFileItem>[0] = {}
+): LaunchedFile {
+  return {
+    storageKey: StorageKeyUtil.create(deviceId, StorageType.Sd),
+    file: createTestFileItem({ type: fileType, ...overrides }),
+    parentPath: '/test',
+    launchedAt: Date.now(),
+    isCompatible: true,
+  };
+}
+
+function render(deviceId = 'test-device-id') {
+  const error = signal<string | null>(null);
+  const currentFile = signal<LaunchedFile | null>(null);
+  const playerStatus = signal<PlayerStatus>(PlayerStatus.Stopped);
+  const fileContext = signal<PlayerFileContext | null>(null);
+  const launchMode = signal<LaunchMode>(LaunchMode.Directory);
+  const fileCompatible = signal(true);
+  const audioStreamEnabled = signal(false);
+
+  const context = {
+    getError: vi.fn().mockReturnValue(error),
+    getCurrentFile: vi.fn().mockReturnValue(currentFile),
+    getPlayerStatus: vi.fn().mockReturnValue(playerStatus),
+    getFileContext: vi.fn().mockReturnValue(fileContext),
+    getLaunchMode: vi.fn().mockReturnValue(launchMode),
+    isCurrentFileCompatible: vi.fn().mockReturnValue(fileCompatible),
+    play: vi.fn().mockResolvedValue(undefined),
+    pause: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue(undefined),
+    next: vi.fn().mockResolvedValue(undefined),
+    previous: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const settingsStore = {
+    enableAudioStreamForDevice: vi.fn().mockReturnValue(audioStreamEnabled),
+  };
+
+  const result = renderPlayerComponent(PlayerToolbarComponent, {
+    inputs: { deviceId },
+    playerContext: context,
+    providers: [{ provide: SettingsStore, useValue: settingsStore }],
+  });
+
+  return {
+    ...result,
+    context,
+    settingsStore,
+    error,
+    currentFile,
+    playerStatus,
+    fileContext,
+    launchMode,
+    fileCompatible,
+    audioStreamEnabled,
+  };
+}
+
+/** The desktop-layout block's own icon-buttons, in template order: previous, play/pause-or-stop, next. */
+function desktopButtons(fixture: ComponentFixture<PlayerToolbarComponent>): DebugElement[] {
+  const desktopLayout = fixture.debugElement.query(By.css('.desktop-layout'));
+  return desktopLayout.queryAll(By.css('lib-icon-button'));
+}
+
+function prop(el: DebugElement, name: string): unknown {
+  return (el.nativeElement as Record<string, unknown>)[name];
+}
 
 describe('PlayerToolbarComponent', () => {
-  let component: PlayerToolbarComponent;
-  let fixture: ComponentFixture<PlayerToolbarComponent>;
-  let mockPlayerContext: IPlayerContext;
-  let mockStorageStore: {
-    saveFavorite: ReturnType<typeof vi.fn>;
-    removeFavorite: ReturnType<typeof vi.fn>;
-    favoriteOperationsState: ReturnType<typeof vi.fn>;
-  };
-  let mockSettingsStore: {
-    enableAudioStreamForDevice: ReturnType<typeof vi.fn>;
-  };
-  let mockAudioStore: {
-    isMuted: ReturnType<typeof signal<boolean>>;
-    masterVolume: ReturnType<typeof signal<number>>;
-    toggleMute: ReturnType<typeof vi.fn>;
-    setMasterVolume: ReturnType<typeof vi.fn>;
-  };
-  let audioStreamEnabledSignal: ReturnType<typeof signal<boolean>>;
-  let errorSignal: ReturnType<typeof signal<string | null>>;
-  let currentFileSignal: ReturnType<typeof signal>;
-  let playerStatusSignal: ReturnType<typeof signal<PlayerStatus>>;
-  let fileContextSignal: ReturnType<typeof signal>;
-  let launchModeSignal: ReturnType<typeof signal<LaunchMode>>;
-  let fileCompatibleSignal: ReturnType<typeof signal<boolean>>;
+  it('creates', () => {
+    const { component } = render();
 
-  // Helper to create file mock
-  const createFileMock = (type: FileItemType) => ({
-    name: 'test-file',
-    path: '/test/test-file',
-    type,
-    size: 1024,
-    isFavorite: false,
-    title: 'Test File',
-    creator: 'Test Creator',
-    releaseInfo: '',
-    description: '',
-    shareUrl: '',
-    metadataSource: '',
-    meta1: '',
-    meta2: '',
-    metadataSourcePath: '',
-    parentPath: '/test',
-    playLength: '',
-    subtuneLengths: [],
-    startSubtuneNum: 0,
-    images: [],
-  });
-
-  beforeEach(async () => {
-    // Create writable signals for testing
-    errorSignal = signal<string | null>(null);
-    currentFileSignal = signal(null);
-    playerStatusSignal = signal(PlayerStatus.Stopped);
-    fileContextSignal = signal(null);
-    launchModeSignal = signal(LaunchMode.Directory);
-    fileCompatibleSignal = signal(true);
-
-    mockStorageStore = {
-      saveFavorite: vi.fn().mockResolvedValue(undefined),
-      removeFavorite: vi.fn().mockResolvedValue(undefined),
-      favoriteOperationsState: vi.fn(() => ({ isProcessing: false, error: null })),
-    };
-
-    audioStreamEnabledSignal = signal(false);
-
-    mockSettingsStore = {
-      enableAudioStreamForDevice: vi.fn().mockReturnValue(audioStreamEnabledSignal.asReadonly()),
-    };
-
-    mockAudioStore = {
-      isMuted: signal(false),
-      masterVolume: signal(0.75),
-      toggleMute: vi.fn(),
-      setMasterVolume: vi.fn(),
-    };
-
-    // Create a proper interface-based mock that implements all IPlayerContext methods
-    mockPlayerContext = {
-      // Core player lifecycle
-      initializePlayer: vi.fn(),
-      removePlayer: vi.fn(),
-      startListeningToPopState: vi.fn(),
-      stopListeningToPopState: vi.fn(),
-
-      // File launching
-      launchFileWithContext: vi.fn().mockResolvedValue(undefined),
-      launchRandomFile: vi.fn().mockResolvedValue(undefined),
-      updateCurrentFileFavoriteStatus: vi.fn(),
-
-      // Phase 3: Playback control methods (tested in this component)
-      play: vi.fn().mockResolvedValue(undefined),
-      pause: vi.fn().mockResolvedValue(undefined),
-      stop: vi.fn().mockResolvedValue(undefined),
-      next: vi.fn().mockResolvedValue(undefined),
-      previous: vi.fn().mockResolvedValue(undefined),
-
-      // State queries
-      getCurrentFile: vi.fn().mockReturnValue(currentFileSignal.asReadonly()),
-      getFileContext: vi.fn().mockReturnValue(fileContextSignal.asReadonly()),
-      getPlayerStatus: vi.fn().mockReturnValue(playerStatusSignal.asReadonly()),
-      getStatus: vi.fn().mockReturnValue(playerStatusSignal.asReadonly()),
-      isLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      isSlowLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      getError: vi.fn().mockReturnValue(errorSignal.asReadonly()),
-
-      // Shuffle functionality
-      toggleShuffleMode: vi.fn(),
-      setShuffleScope: vi.fn(),
-      setFilterMode: vi.fn(),
-      getLaunchMode: vi.fn().mockReturnValue(launchModeSignal.asReadonly()),
-      getShuffleSettings: vi.fn().mockReturnValue(signal(null).asReadonly()),
-
-      // Phase 5: Timer state (for progress bar)
-      getTimerState: vi.fn().mockReturnValue(signal(null).asReadonly()),
-
-      // File compatibility
-      isCurrentFileCompatible: vi.fn().mockReturnValue(fileCompatibleSignal.asReadonly()),
-
-      // Custom timer (Phase 3 UI)
-      getPlayTimerConfig: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      setCustomTimer: vi.fn(),
-
-      // Play history
-      getPlayHistory: vi.fn().mockReturnValue(signal(null).asReadonly()),
-      getCurrentHistoryPosition: vi.fn().mockReturnValue(signal(0).asReadonly()),
-      canNavigateBackwardInHistory: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      canNavigateForwardInHistory: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      clearHistory: vi.fn(),
-      toggleHistoryView: vi.fn(),
-      isHistoryViewVisible: vi.fn().mockReturnValue(signal(false).asReadonly()),
-      navigateToHistoryPosition: vi.fn().mockResolvedValue(undefined),
-    } satisfies IPlayerContext;
-
-    await TestBed.configureTestingModule({
-      imports: [PlayerToolbarComponent],
-      providers: [
-        provideNoopAnimations(),
-        { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
-        { provide: StorageStore, useValue: mockStorageStore },
-        { provide: SettingsStore, useValue: mockSettingsStore },
-        { provide: AudioStore, useValue: mockAudioStore },
-      ],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(PlayerToolbarComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'test-device-id');
-    fixture.detectChanges();
-  });
-
-  /**
-   * Helper to find icon button components by their ariaLabel property.
-   * Uses Angular's DebugElement API to query through component boundaries.
-   */
-  function findIconButtonByLabel(labelPattern: string | RegExp): DebugElement | null {
-    const iconButtons = fixture.debugElement.queryAll(By.directive(IconButtonComponent));
-
-    // Debug: log how many buttons we found
-    if (iconButtons.length === 0) {
-      console.log('No IconButtonComponent instances found in DOM');
-      console.log('Full HTML:', fixture.nativeElement.innerHTML);
-    }
-
-    for (const buttonDebug of iconButtons) {
-      const buttonComponent = buttonDebug.componentInstance as IconButtonComponent;
-      const ariaLabel = buttonComponent.ariaLabel();
-
-      if (typeof labelPattern === 'string') {
-        if (ariaLabel === labelPattern) {
-          return buttonDebug;
-        }
-      } else {
-        if (labelPattern.test(ariaLabel)) {
-          return buttonDebug;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Helper to get the native button element from an icon button component.
-   */
-  function getNativeButton(iconButtonDebug: DebugElement): HTMLButtonElement | null {
-    return iconButtonDebug.nativeElement.querySelector('button');
-  }
-
-  it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  describe('Phase 3: Playback Control Integration', () => {
-    const testDeviceId = 'test-device-id';
+  describe('playPause()', () => {
+    it('calls pause while playing', async () => {
+      const { component, context, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Playing);
 
-    describe('playPause() method', () => {
-      it('should call pause when player is currently playing', async () => {
-        playerStatusSignal.set(PlayerStatus.Playing);
+      await component.playPause();
 
-        await component.playPause();
-
-        expect(mockPlayerContext.pause).toHaveBeenCalledWith(testDeviceId);
-        expect(mockPlayerContext.play).not.toHaveBeenCalled();
-      });
-
-      it('should call play when player is currently stopped', async () => {
-        playerStatusSignal.set(PlayerStatus.Stopped);
-
-        await component.playPause();
-
-        expect(mockPlayerContext.play).toHaveBeenCalledWith(testDeviceId);
-        expect(mockPlayerContext.pause).not.toHaveBeenCalled();
-      });
-
-      it('should call play when player is currently paused', async () => {
-        playerStatusSignal.set(PlayerStatus.Paused);
-
-        await component.playPause();
-
-        expect(mockPlayerContext.play).toHaveBeenCalledWith(testDeviceId);
-        expect(mockPlayerContext.pause).not.toHaveBeenCalled();
-      });
-
-      it('should not call play or pause when deviceId is empty', async () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        await component.playPause();
-
-        expect(mockPlayerContext.play).not.toHaveBeenCalled();
-        expect(mockPlayerContext.pause).not.toHaveBeenCalled();
-      });
+      expect(context.pause).toHaveBeenCalledWith('test-device-id');
+      expect(context.play).not.toHaveBeenCalled();
     });
 
-    describe('stop() method', () => {
-      it('should call playerContext.stop with correct deviceId', async () => {
-        await component.stop();
+    it('calls play while stopped', async () => {
+      const { component, context, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Stopped);
 
-        expect(mockPlayerContext.stop).toHaveBeenCalledWith(testDeviceId);
-      });
+      await component.playPause();
 
-      it('should not call stop when deviceId is empty', async () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        await component.stop();
-
-        expect(mockPlayerContext.stop).not.toHaveBeenCalled();
-      });
+      expect(context.play).toHaveBeenCalledWith('test-device-id');
+      expect(context.pause).not.toHaveBeenCalled();
     });
 
-    describe('next() method', () => {
-      it('should call playerContext.next with correct deviceId', async () => {
-        await component.next();
+    it('calls play while paused', async () => {
+      const { component, context, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Paused);
 
-        expect(mockPlayerContext.next).toHaveBeenCalledWith(testDeviceId);
-      });
+      await component.playPause();
 
-      it('should not call next when deviceId is empty', async () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        await component.next();
-
-        expect(mockPlayerContext.next).not.toHaveBeenCalled();
-      });
+      expect(context.play).toHaveBeenCalledWith('test-device-id');
+      expect(context.pause).not.toHaveBeenCalled();
     });
 
-    describe('previous() method', () => {
-      it('should call playerContext.previous with correct deviceId', async () => {
-        await component.previous();
+    it('is a no-op with an empty deviceId', async () => {
+      const { component, context, setInput } = render();
+      setInput('deviceId', '');
 
-        expect(mockPlayerContext.previous).toHaveBeenCalledWith(testDeviceId);
-      });
+      await component.playPause();
 
-      it('should not call previous when deviceId is empty', async () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        await component.previous();
-
-        expect(mockPlayerContext.previous).not.toHaveBeenCalled();
-      });
+      expect(context.play).not.toHaveBeenCalled();
+      expect(context.pause).not.toHaveBeenCalled();
     });
   });
 
-  describe('UI Helper Methods', () => {
-    describe('getPlayPauseIcon()', () => {
-      it('should return "play_arrow" when status is Stopped', () => {
-        playerStatusSignal.set(PlayerStatus.Stopped);
+  describe('stop()', () => {
+    it("calls the context's stop with the deviceId", async () => {
+      const { component, context } = render();
 
-        expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
-      });
+      await component.stop();
 
-      it('should return "play_arrow" when status is Paused', () => {
-        playerStatusSignal.set(PlayerStatus.Paused);
-
-        expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
-      });
-
-      it('should return "pause" when status is Playing', () => {
-        playerStatusSignal.set(PlayerStatus.Playing);
-
-        expect(component.getPlayPauseIconComputed()).toBe('pause');
-      });
-
-      it('should return "play_arrow" when deviceId is empty', () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
-      });
+      expect(context.stop).toHaveBeenCalledWith('test-device-id');
     });
 
-    describe('getPlayPauseLabel()', () => {
-      it('should return "Play" when status is Stopped', () => {
-        playerStatusSignal.set(PlayerStatus.Stopped);
+    it('is a no-op with an empty deviceId', async () => {
+      const { component, context, setInput } = render();
+      setInput('deviceId', '');
 
-        expect(component.getPlayPauseLabelComputed()).toBe('Play');
-      });
+      await component.stop();
 
-      it('should return "Play" when status is Paused', () => {
-        playerStatusSignal.set(PlayerStatus.Paused);
-
-        expect(component.getPlayPauseLabelComputed()).toBe('Play');
-      });
-
-      it('should return "Pause" when status is Playing', () => {
-        playerStatusSignal.set(PlayerStatus.Playing);
-
-        expect(component.getPlayPauseLabelComputed()).toBe('Pause');
-      });
-
-      it('should return "Play" when deviceId is empty', () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        expect(component.getPlayPauseLabelComputed()).toBe('Play');
-      });
-    });
-
-    describe('isCurrentFileMusicType()', () => {
-      it('should return true when current file is a Song', () => {
-        const musicFile = createFileMock(FileItemType.Song);
-        currentFileSignal.set({
-          deviceId: 'test-device-id',
-          storageType: 0,
-          file: musicFile,
-          isShuffleMode: false,
-        });
-
-        expect(component.isCurrentFileMusicTypeComputed()).toBe(true);
-      });
-
-      it('should return false when current file is a Game', () => {
-        const gameFile = createFileMock(FileItemType.Game);
-        currentFileSignal.set({
-          deviceId: 'test-device-id',
-          storageType: 0,
-          file: gameFile,
-          isShuffleMode: false,
-        });
-
-        expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
-      });
-
-      it('should return false when current file is an Image', () => {
-        const imageFile = createFileMock(FileItemType.Image);
-        currentFileSignal.set({
-          deviceId: 'test-device-id',
-          storageType: 0,
-          file: imageFile,
-          isShuffleMode: false,
-        });
-
-        expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
-      });
-
-      it('should return false when no current file', () => {
-        currentFileSignal.set(null);
-
-        expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
-      });
-
-      it('should return false when deviceId is empty', () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
-      });
-    });
-
-    describe('canNavigate()', () => {
-      it('should return true when file context has multiple files', () => {
-        const files = [createFileMock(FileItemType.Song), createFileMock(FileItemType.Song)];
-        fileContextSignal.set({
-          directoryPath: '/test',
-          files,
-          currentIndex: 0,
-        });
-
-        expect(component.canNavigateComputed()).toBe(true);
-      });
-
-      it('should return false when file context has only one file', () => {
-        const files = [createFileMock(FileItemType.Song)];
-        fileContextSignal.set({
-          directoryPath: '/test',
-          files,
-          currentIndex: 0,
-        });
-
-        expect(component.canNavigateComputed()).toBe(false);
-      });
-
-      it('should return true when in shuffle mode regardless of file context', () => {
-        launchModeSignal.set(LaunchMode.Shuffle);
-        fileContextSignal.set(null);
-
-        expect(component.canNavigateComputed()).toBe(true);
-      });
-
-      it('should return false when no file context and not in shuffle mode', () => {
-        launchModeSignal.set(LaunchMode.Directory);
-        fileContextSignal.set(null);
-
-        expect(component.canNavigateComputed()).toBe(false);
-      });
-
-      it('should return false when deviceId is empty', () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        expect(component.canNavigateComputed()).toBe(false);
-      });
-    });
-
-    describe('canNavigatePrevious()', () => {
-      it('should use same logic as canNavigate()', () => {
-        const files = [createFileMock(FileItemType.Song), createFileMock(FileItemType.Song)];
-        fileContextSignal.set({
-          directoryPath: '/test',
-          files,
-          currentIndex: 0,
-        });
-
-        expect(component.canNavigatePreviousComputed()).toBe(component.canNavigateComputed());
-        expect(component.canNavigatePreviousComputed()).toBe(true);
-      });
-    });
-
-    describe('getPlayerStatus()', () => {
-      it('should return current player status from context', () => {
-        playerStatusSignal.set(PlayerStatus.Playing);
-
-        expect(component.getPlayerStatus()).toBe(PlayerStatus.Playing);
-      });
-
-      it('should return Stopped when deviceId is empty', () => {
-        fixture.componentRef.setInput('deviceId', '');
-
-        expect(component.getPlayerStatus()).toBe(PlayerStatus.Stopped);
-      });
+      expect(context.stop).not.toHaveBeenCalled();
     });
   });
 
-  describe('Template Integration', () => {
-    beforeEach(() => {
-      // Set up a mock file context for button state tests
-      const musicFile = createFileMock(FileItemType.Song);
-      currentFileSignal.set({
-        deviceId: 'test-device-id',
-        storageType: 0,
-        file: musicFile,
-        isShuffleMode: false,
-      });
+  describe('next()', () => {
+    it("calls the context's next with the deviceId", async () => {
+      const { component, context } = render();
+
+      await component.next();
+
+      expect(context.next).toHaveBeenCalledWith('test-device-id');
     });
 
-    it('should show play/pause button for music files', () => {
-      fixture.detectChanges();
+    it('is a no-op with an empty deviceId', async () => {
+      const { component, context, setInput } = render();
+      setInput('deviceId', '');
 
-      const playPauseButton = findIconButtonByLabel(/Play|Pause/);
-      expect(playPauseButton).toBeTruthy();
-      expect(playPauseButton?.componentInstance.icon()).toMatch(/play_arrow|pause/);
+      await component.next();
+
+      expect(context.next).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('previous()', () => {
+    it("calls the context's previous with the deviceId", async () => {
+      const { component, context } = render();
+
+      await component.previous();
+
+      expect(context.previous).toHaveBeenCalledWith('test-device-id');
     });
 
-    it('should show stop button for non-music files', () => {
-      const gameFile = createFileMock(FileItemType.Game);
-      currentFileSignal.set({
-        deviceId: 'test-device-id',
-        storageType: 0,
-        file: gameFile,
-        isShuffleMode: false,
-      });
+    it('is a no-op with an empty deviceId', async () => {
+      const { component, context, setInput } = render();
+      setInput('deviceId', '');
 
-      fixture.detectChanges();
+      await component.previous();
 
-      const stopButton = findIconButtonByLabel('Stop Playback');
-      expect(stopButton).toBeTruthy();
-      expect(stopButton?.componentInstance.icon()).toBe('stop');
+      expect(context.previous).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPlayPauseIconComputed()', () => {
+    it('is play_arrow when Stopped', () => {
+      const { component, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Stopped);
+
+      expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
     });
 
-    it('should disable navigation buttons when canNavigate returns false', () => {
-      fileContextSignal.set(null);
-      launchModeSignal.set(LaunchMode.Directory);
+    it('is play_arrow when Paused', () => {
+      const { component, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Paused);
 
-      fixture.detectChanges();
-
-      const nextButton = findIconButtonByLabel(/launch the next/);
-      const previousButton = findIconButtonByLabel(/launch the previous/);
-
-      expect(nextButton).toBeTruthy();
-      expect(previousButton).toBeTruthy();
-      expect(nextButton?.componentInstance.disabled()).toBe(true);
-      expect(previousButton?.componentInstance.disabled()).toBe(true);
+      expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
     });
 
-    it('should enable navigation buttons when canNavigate returns true', () => {
-      const files = [createFileMock(FileItemType.Song), createFileMock(FileItemType.Song)];
-      fileContextSignal.set({
-        storageKey: 'test-key',
+    it('is pause when Playing', () => {
+      const { component, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Playing);
+
+      expect(component.getPlayPauseIconComputed()).toBe('pause');
+    });
+
+    it('is play_arrow with an empty deviceId', () => {
+      const { component, setInput } = render();
+      setInput('deviceId', '');
+
+      expect(component.getPlayPauseIconComputed()).toBe('play_arrow');
+    });
+  });
+
+  describe('getPlayPauseLabelComputed()', () => {
+    it("is 'Play' when Stopped", () => {
+      const { component, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Stopped);
+
+      expect(component.getPlayPauseLabelComputed()).toBe('Play');
+    });
+
+    it("is 'Play' when Paused", () => {
+      const { component, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Paused);
+
+      expect(component.getPlayPauseLabelComputed()).toBe('Play');
+    });
+
+    it("is 'Pause' when Playing", () => {
+      const { component, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Playing);
+
+      expect(component.getPlayPauseLabelComputed()).toBe('Pause');
+    });
+
+    it("is 'Play' with an empty deviceId", () => {
+      const { component, setInput } = render();
+      setInput('deviceId', '');
+
+      expect(component.getPlayPauseLabelComputed()).toBe('Play');
+    });
+  });
+
+  describe('isCurrentFileMusicTypeComputed()', () => {
+    it('is true for a Song', () => {
+      const { component, currentFile } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+
+      expect(component.isCurrentFileMusicTypeComputed()).toBe(true);
+    });
+
+    it('is false for a Game', () => {
+      const { component, currentFile } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+
+      expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
+    });
+
+    it('is false for an Image', () => {
+      const { component, currentFile } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Image));
+
+      expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
+    });
+
+    it('is false with no current file', () => {
+      const { component } = render();
+
+      expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
+    });
+
+    it('is false with an empty deviceId', () => {
+      const { component, setInput } = render();
+      setInput('deviceId', '');
+
+      expect(component.isCurrentFileMusicTypeComputed()).toBe(false);
+    });
+  });
+
+  describe('canNavigateComputed()', () => {
+    it('is true with multiple files in context', () => {
+      const { component, fileContext } = render();
+      fileContext.set({
+        storageKey: StorageKeyUtil.create('test-device-id', StorageType.Sd),
         directoryPath: '/test',
-        files,
+        files: [createTestFileItem(), createTestFileItem()],
         currentIndex: 0,
-        launchMode: LaunchMode.Directory,
       });
 
-      fixture.detectChanges();
-
-      const nextButton = findIconButtonByLabel(/launch the next/);
-      const previousButton = findIconButtonByLabel(/launch the previous/);
-
-      expect(nextButton).toBeTruthy();
-      expect(previousButton).toBeTruthy();
-      expect(nextButton?.componentInstance.disabled()).toBe(false);
-      expect(previousButton?.componentInstance.disabled()).toBe(false);
+      expect(component.canNavigateComputed()).toBe(true);
     });
 
-    // Note: Buttons are not currently disabled during loading state
-    // They maintain their normal enabled/disabled state based on canNavigate() etc.
-    // If loading state should disable buttons, add [disabled]="isLoading()" to template
+    it('is false with a single file in context', () => {
+      const { component, fileContext } = render();
+      fileContext.set({
+        storageKey: StorageKeyUtil.create('test-device-id', StorageType.Sd),
+        directoryPath: '/test',
+        files: [createTestFileItem()],
+        currentIndex: 0,
+      });
+
+      expect(component.canNavigateComputed()).toBe(false);
+    });
+
+    it('is true in shuffle mode regardless of context', () => {
+      const { component, launchMode, fileContext } = render();
+      launchMode.set(LaunchMode.Shuffle);
+      fileContext.set(null);
+
+      expect(component.canNavigateComputed()).toBe(true);
+    });
+
+    it('is false with no context outside shuffle mode', () => {
+      const { component, launchMode, fileContext } = render();
+      launchMode.set(LaunchMode.Directory);
+      fileContext.set(null);
+
+      expect(component.canNavigateComputed()).toBe(false);
+    });
+
+    it('is false with an empty deviceId', () => {
+      const { component, setInput } = render();
+      setInput('deviceId', '');
+
+      expect(component.canNavigateComputed()).toBe(false);
+    });
   });
 
-  describe('Button Click Integration', () => {
-    it('should trigger playPause when play/pause button is clicked', async () => {
+  describe('getPlayerStatus()', () => {
+    it("returns the context's status", () => {
+      const { component, playerStatus } = render();
+      playerStatus.set(PlayerStatus.Playing);
+
+      expect(component.getPlayerStatus()).toBe(PlayerStatus.Playing);
+    });
+
+    it('returns Stopped with an empty deviceId', () => {
+      const { component, setInput } = render();
+      setInput('deviceId', '');
+
+      expect(component.getPlayerStatus()).toBe(PlayerStatus.Stopped);
+    });
+  });
+
+  describe('template playback buttons', () => {
+    it('shows the play/pause button for music files', () => {
+      const { fixture, component, currentFile } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      fixture.detectChanges();
+
+      const [, playPause] = desktopButtons(fixture);
+
+      expect(playPause).toBeTruthy();
+      expect(prop(playPause, 'icon')).toBe(component.getPlayPauseIconComputed());
+    });
+
+    it('shows the stop button for non-music files', () => {
+      const { fixture, currentFile } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Game));
+      fixture.detectChanges();
+
+      const [, stopButton] = desktopButtons(fixture);
+
+      expect(stopButton).toBeTruthy();
+      expect(stopButton.nativeElement.getAttribute('icon')).toBe('stop');
+    });
+
+    it('disables the navigation buttons when canNavigate is false', () => {
+      const { fixture, fileContext, launchMode } = render();
+      fileContext.set(null);
+      launchMode.set(LaunchMode.Directory);
+      fixture.detectChanges();
+
+      const [previous, , next] = desktopButtons(fixture);
+
+      expect(prop(previous, 'disabled')).toBe(true);
+      expect(prop(next, 'disabled')).toBe(true);
+    });
+
+    it('enables the navigation buttons when canNavigate is true', () => {
+      const { fixture, fileContext } = render();
+      fileContext.set({
+        storageKey: StorageKeyUtil.create('test-device-id', StorageType.Sd),
+        directoryPath: '/test',
+        files: [createTestFileItem(), createTestFileItem()],
+        currentIndex: 0,
+      });
+      fixture.detectChanges();
+
+      const [previous, , next] = desktopButtons(fixture);
+
+      expect(prop(previous, 'disabled')).toBe(false);
+      expect(prop(next, 'disabled')).toBe(false);
+    });
+  });
+
+  describe('button click wiring', () => {
+    it('triggers playPause() when the play/pause button is clicked', () => {
+      const { fixture, component, currentFile } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      fixture.detectChanges();
       const spy = vi.spyOn(component, 'playPause');
 
-      // Set up music file to show play/pause button
-      const musicFile = createFileMock(FileItemType.Song);
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: musicFile,
-        isShuffleMode: false,
-      });
-
-      fixture.detectChanges();
-
-      const playPauseButton = findIconButtonByLabel(/Play|Pause/);
-      expect(playPauseButton).toBeTruthy();
-
-      if (playPauseButton) {
-        const nativeButton = getNativeButton(playPauseButton);
-        nativeButton?.click();
-      }
+      const [, playPause] = desktopButtons(fixture);
+      playPause.nativeElement.dispatchEvent(new Event('buttonClick'));
 
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should trigger next when next button is clicked', async () => {
+    it('triggers next() when the next button is clicked', () => {
+      const { fixture, component } = render();
       const spy = vi.spyOn(component, 'next');
 
-      // Need to have a file loaded for toolbar to be visible
-      const musicFile = createFileMock(FileItemType.Song);
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: musicFile,
-        isShuffleMode: false,
-      });
-
-      // Enable navigation
-      const files = [createFileMock(FileItemType.Song), createFileMock(FileItemType.Song)];
-      fileContextSignal.set({
-        storageKey: 'test-key',
-        directoryPath: '/test',
-        files,
-        currentIndex: 0,
-        launchMode: LaunchMode.Directory,
-      });
-
-      fixture.detectChanges();
-
-      const nextButton = findIconButtonByLabel(/launch the next/);
-      expect(nextButton).toBeTruthy();
-
-      if (nextButton) {
-        const nativeButton = getNativeButton(nextButton);
-        nativeButton?.click();
-      }
+      const [, , next] = desktopButtons(fixture);
+      next.nativeElement.dispatchEvent(new Event('buttonClick'));
 
       expect(spy).toHaveBeenCalled();
     });
 
-    it('should trigger previous when previous button is clicked', async () => {
+    it('triggers previous() when the previous button is clicked', () => {
+      const { fixture, component } = render();
       const spy = vi.spyOn(component, 'previous');
 
-      // Need to have a file loaded for toolbar to be visible
-      const musicFile = createFileMock(FileItemType.Song);
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: musicFile,
-        isShuffleMode: false,
-      });
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: musicFile,
-        isShuffleMode: false,
-      });
-
-      // Enable navigation
-      const files = [createFileMock(FileItemType.Song), createFileMock(FileItemType.Song)];
-      fileContextSignal.set({
-        storageKey: 'test-key',
-        directoryPath: '/test',
-        files,
-        currentIndex: 0,
-        launchMode: LaunchMode.Directory,
-      });
-
-      fixture.detectChanges();
-
-      const previousButton = findIconButtonByLabel(/launch the previous/);
-      expect(previousButton).toBeTruthy();
-
-      if (previousButton) {
-        const nativeButton = getNativeButton(previousButton);
-        nativeButton?.click();
-      }
+      const [previous] = desktopButtons(fixture);
+      previous.nativeElement.dispatchEvent(new Event('buttonClick'));
 
       expect(spy).toHaveBeenCalled();
     });
   });
 
-  describe('Phase 4: Error State Visual Feedback', () => {
-    it('should show error color on play button when file is incompatible', () => {
-      // Set file as incompatible
-      fileCompatibleSignal.set(false);
-
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: createFileMock(FileItemType.Song),
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
+  describe('getPlayButtonColorComputed()', () => {
+    it('is error when the file is incompatible', () => {
+      const { component, fileCompatible } = render();
+      fileCompatible.set(false);
 
       expect(component.getPlayButtonColorComputed()).toBe('error');
     });
 
-    it('should show normal color on play button when file is compatible', () => {
-      // File is compatible (already set up in beforeEach)
-      currentFileSignal.set({
-        deviceId: 1,
-        storageType: StorageType.Sd,
-        file: createFileMock(FileItemType.Song),
-        isShuffleMode: false,
-      });
-      fixture.detectChanges();
+    it('is normal when the file is compatible', () => {
+      const { component, fileCompatible } = render();
+      fileCompatible.set(true);
 
       expect(component.getPlayButtonColorComputed()).toBe('normal');
     });
 
-    it('should show normal color when no file is loaded', () => {
-      currentFileSignal.set(null);
-      fixture.detectChanges();
+    it('is normal when no file is loaded', () => {
+      const { component, currentFile } = render();
+      currentFile.set(null);
 
       expect(component.getPlayButtonColorComputed()).toBe('normal');
     });
 
-    it('should show normal color when disabled even if file is incompatible', () => {
-      fileCompatibleSignal.set(false);
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('is normal when disabled, even if the file is incompatible', () => {
+      const { component, fileCompatible, setInput } = render();
+      fileCompatible.set(false);
+      setInput('disabled', true);
 
       expect(component.getPlayButtonColorComputed()).toBe('normal');
     });
+  });
 
-    it('should detect errors with hasError computed property', () => {
-      errorSignal.set('Test error');
-      fixture.detectChanges();
+  describe('hasError()', () => {
+    it('is true when an error is set', () => {
+      const { component, error } = render();
+      error.set('Test error');
 
       expect(component.hasError()).toBe(true);
     });
 
-    it('should show no error when error is null', () => {
-      errorSignal.set(null);
-      fixture.detectChanges();
+    it('is false when the error is null', () => {
+      const { component, error } = render();
+      error.set(null);
 
       expect(component.hasError()).toBe(false);
     });
   });
 
-  describe('Disabled State', () => {
-    it('should have disabled input defaulting to false', () => {
+  describe('disabled input', () => {
+    it('defaults to false', () => {
+      const { component } = render();
+
       expect(component.disabled()).toBe(false);
     });
 
-    it('should accept disabled input as true', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('accepts true', () => {
+      const { component, setInput } = render();
+      setInput('disabled', true);
+
       expect(component.disabled()).toBe(true);
     });
 
-    it('should add disabled-state class to host when disabled', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('adds the disabled-state class to the host when disabled', () => {
+      const { fixture, setInput } = render();
+      setInput('disabled', true);
+
       expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(true);
     });
 
-    it('should not add disabled-state class when not disabled', () => {
-      fixture.componentRef.setInput('disabled', false);
-      fixture.detectChanges();
+    it('does not add the disabled-state class when not disabled', () => {
+      const { fixture, setInput } = render();
+      setInput('disabled', false);
+
       expect(fixture.nativeElement.classList.contains('disabled-state')).toBe(false);
     });
 
-    it('should disable all playback buttons when disabled is true', () => {
-      fixture.componentRef.setInput('disabled', true);
-
-      // Set up a music file to ensure play/pause is shown
-      const musicFile = createFileMock(FileItemType.Song);
-      currentFileSignal.set({
-        deviceId: 'test-device-id',
-        storageType: StorageType.Sd,
-        file: musicFile,
-        isShuffleMode: false,
-      });
+    it('disables all playback buttons when disabled=true', () => {
+      const { fixture, currentFile, setInput } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      setInput('disabled', true);
       fixture.detectChanges();
 
-      const previousButton = findIconButtonByLabel(/launch the previous/);
-      const nextButton = findIconButtonByLabel(/launch the next/);
-      const playPauseButton = findIconButtonByLabel(/Play|Pause/);
+      const [previous, playPause, next] = desktopButtons(fixture);
 
-      expect(previousButton?.componentInstance.disabled()).toBe(true);
-      expect(nextButton?.componentInstance.disabled()).toBe(true);
-      expect(playPauseButton?.componentInstance.disabled()).toBe(true);
+      expect(prop(previous, 'disabled')).toBe(true);
+      expect(prop(playPause, 'disabled')).toBe(true);
+      expect(prop(next, 'disabled')).toBe(true);
     });
 
-    it('should enable buttons when disabled is false and navigation is possible', () => {
-      fixture.componentRef.setInput('disabled', false);
-
-      const musicFile = createFileMock(FileItemType.Song);
-      currentFileSignal.set({
-        deviceId: 'test-device-id',
-        storageType: StorageType.Sd,
-        file: musicFile,
-        isShuffleMode: false,
-      });
-      fileContextSignal.set({
-        storageKey: 'test-key',
+    it('enables playback buttons when disabled=false and navigation is possible', () => {
+      const { fixture, currentFile, fileContext, setInput } = render();
+      currentFile.set(createLaunchedFile('test-device-id', FileItemType.Song));
+      fileContext.set({
+        storageKey: StorageKeyUtil.create('test-device-id', StorageType.Sd),
         directoryPath: '/test',
-        files: [createFileMock(FileItemType.Song), createFileMock(FileItemType.Song)],
+        files: [createTestFileItem(), createTestFileItem()],
         currentIndex: 0,
-        launchMode: LaunchMode.Directory,
       });
+      setInput('disabled', false);
       fixture.detectChanges();
 
-      const previousButton = findIconButtonByLabel(/launch the previous/);
-      const nextButton = findIconButtonByLabel(/launch the next/);
-      const playPauseButton = findIconButtonByLabel(/Play|Pause/);
+      const [previous, playPause, next] = desktopButtons(fixture);
 
-      expect(previousButton?.componentInstance.disabled()).toBe(false);
-      expect(nextButton?.componentInstance.disabled()).toBe(false);
-      expect(playPauseButton?.componentInstance.disabled()).toBe(false);
+      expect(prop(previous, 'disabled')).toBe(false);
+      expect(prop(playPause, 'disabled')).toBe(false);
+      expect(prop(next, 'disabled')).toBe(false);
     });
   });
 
-  describe('Volume Control Integration', () => {
-    it('should render volume control when enableAudioStreamForDevice returns true', () => {
-      audioStreamEnabledSignal.set(true);
+  describe('volume control integration', () => {
+    it('renders when audio streaming is enabled', () => {
+      const { fixture, audioStreamEnabled } = render();
+      audioStreamEnabled.set(true);
       fixture.detectChanges();
 
-      const volumeControls = fixture.nativeElement.querySelectorAll('lib-volume-control');
-      expect(volumeControls.length).toBeGreaterThan(0);
+      expect(fixture.nativeElement.querySelectorAll('lib-volume-control').length).toBeGreaterThan(0);
     });
 
-    it('should NOT render volume control when enableAudioStreamForDevice returns false', () => {
-      audioStreamEnabledSignal.set(false);
+    it('is absent when audio streaming is disabled', () => {
+      const { fixture, audioStreamEnabled } = render();
+      audioStreamEnabled.set(false);
       fixture.detectChanges();
 
-      const volumeControls = fixture.nativeElement.querySelectorAll('lib-volume-control');
-      expect(volumeControls.length).toBe(0);
+      expect(fixture.nativeElement.querySelectorAll('lib-volume-control').length).toBe(0);
     });
 
-    it('should pass disabled input to volume control matching toolbar disabled state', () => {
-      audioStreamEnabledSignal.set(true);
-      fixture.componentRef.setInput('disabled', true);
+    it("receives disabled=true matching the toolbar's disabled state", () => {
+      const { fixture, audioStreamEnabled, setInput } = render();
+      audioStreamEnabled.set(true);
+      setInput('disabled', true);
       fixture.detectChanges();
 
-      const volumeControl = fixture.debugElement.query(
-        By.css('lib-volume-control')
-      );
-      expect(volumeControl).toBeTruthy();
-      expect(volumeControl.componentInstance.disabled()).toBe(true);
+      const volumeControl = fixture.debugElement.query(By.css('lib-volume-control'));
+
+      expect(prop(volumeControl, 'disabled')).toBe(true);
     });
 
-    it('should not pass disabled when toolbar is enabled', () => {
-      audioStreamEnabledSignal.set(true);
-      fixture.componentRef.setInput('disabled', false);
+    it('receives disabled=false when the toolbar is enabled', () => {
+      const { fixture, audioStreamEnabled, setInput } = render();
+      audioStreamEnabled.set(true);
+      setInput('disabled', false);
       fixture.detectChanges();
 
-      const volumeControl = fixture.debugElement.query(
-        By.css('lib-volume-control')
-      );
-      expect(volumeControl).toBeTruthy();
-      expect(volumeControl.componentInstance.disabled()).toBe(false);
+      const volumeControl = fixture.debugElement.query(By.css('lib-volume-control'));
+
+      expect(prop(volumeControl, 'disabled')).toBe(false);
     });
 
-    it('should call enableAudioStreamForDevice with the correct deviceId', () => {
-      fixture.detectChanges();
-      expect(mockSettingsStore.enableAudioStreamForDevice).toHaveBeenCalledWith('test-device-id');
-    });
-
-    it('should reactively show/hide volume control when audio stream setting changes', () => {
-      audioStreamEnabledSignal.set(false);
+    it('renders inside a .volume-control-section wrapper', () => {
+      const { fixture, audioStreamEnabled } = render();
+      audioStreamEnabled.set(true);
       fixture.detectChanges();
 
-      let volumeControls = fixture.nativeElement.querySelectorAll('lib-volume-control');
-      expect(volumeControls.length).toBe(0);
+      const wrapper = fixture.nativeElement.querySelector('.volume-control-section');
 
-      audioStreamEnabledSignal.set(true);
-      fixture.detectChanges();
-
-      volumeControls = fixture.nativeElement.querySelectorAll('lib-volume-control');
-      expect(volumeControls.length).toBeGreaterThan(0);
-    });
-
-    it('should wrap volume control in volume-control-section container', () => {
-      audioStreamEnabledSignal.set(true);
-      fixture.detectChanges();
-
-      const sections = fixture.nativeElement.querySelectorAll('.volume-control-section');
-      expect(sections.length).toBeGreaterThan(0);
-
-      const firstSection = sections[0];
-      expect(firstSection.querySelector('lib-volume-control')).toBeTruthy();
+      expect(wrapper).toBeTruthy();
+      expect(wrapper.querySelector('lib-volume-control')).toBeTruthy();
     });
   });
 });

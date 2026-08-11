@@ -1,115 +1,69 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { describe, it, expect } from 'vitest';
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { FileTimeComponent } from './file-time.component';
 
 describe('FileTimeComponent', () => {
-  let component: FileTimeComponent;
-  let fixture: ComponentFixture<FileTimeComponent>;
+  it('creates', () => {
+    const { component } = renderPlayerComponent(FileTimeComponent);
 
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [FileTimeComponent],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(FileTimeComponent);
-    component = fixture.componentInstance;
-  });
-
-  it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should format time correctly without hours', () => {
-    fixture.componentRef.setInput('currentTime', 4000);
-    fixture.componentRef.setInput('totalTime', 514000);
-    fixture.componentRef.setInput('show', true);
-    fixture.detectChanges();
+  it('formats sub-hour times as M:SS / M:SS', () => {
+    const { component } = renderPlayerComponent(FileTimeComponent, {
+      inputs: { currentTime: 4000, totalTime: 514000, show: true },
+    });
 
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.file-time')?.textContent).toBe('0:04 / 8:34');
+    expect(component.formattedTime()).toBe('0:04 / 8:34');
   });
 
-  it('should handle zero time', () => {
-    fixture.componentRef.setInput('currentTime', 0);
-    fixture.componentRef.setInput('totalTime', 0);
-    fixture.componentRef.setInput('show', true);
-    fixture.detectChanges();
+  it('formats times of an hour or more with an hours component', () => {
+    const { component } = renderPlayerComponent(FileTimeComponent, {
+      inputs: { currentTime: 3661000, totalTime: 7200000, show: true },
+    });
 
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.file-time')?.textContent).toBe('0:00 / 0:00');
+    expect(component.formattedTime()).toBe('1:01:01 / 2:00:00');
   });
 
-  it('should format time with hours when >= 1 hour', () => {
-    fixture.componentRef.setInput('currentTime', 3661000);
-    fixture.componentRef.setInput('totalTime', 7200000);
-    fixture.componentRef.setInput('show', true);
-    fixture.detectChanges();
+  it('hides the time element entirely when show is false', () => {
+    const { fixture } = renderPlayerComponent(FileTimeComponent, {
+      inputs: { currentTime: 4000, totalTime: 514000, show: false },
+    });
 
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.file-time')?.textContent).toBe('1:01:01 / 2:00:00');
+    expect(fixture.nativeElement.querySelector('.file-time')).toBeNull();
   });
 
-  it('should not display when show is false', () => {
-    fixture.componentRef.setInput('currentTime', 4000);
-    fixture.componentRef.setInput('totalTime', 514000);
-    fixture.componentRef.setInput('show', false);
-    fixture.detectChanges();
+  it('clamps a negative current time to 0:00', () => {
+    const { component } = renderPlayerComponent(FileTimeComponent, {
+      inputs: { currentTime: -10, totalTime: 100000, show: true },
+    });
 
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.file-time')).toBeNull();
-  });
-
-  it('should handle negative time values', () => {
-    fixture.componentRef.setInput('currentTime', -10);
-    fixture.componentRef.setInput('totalTime', 100000);
-    fixture.componentRef.setInput('show', true);
-    fixture.detectChanges();
-
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.file-time')?.textContent).toBe('0:00 / 1:40');
+    expect(component.formattedCurrentTime()).toBe('0:00');
   });
 
   describe('displayMode', () => {
-    it('should display both times by default', () => {
-      fixture.componentRef.setInput('currentTime', 95000);
-      fixture.componentRef.setInput('totalTime', 514000);
-      fixture.componentRef.setInput('show', true);
-      fixture.detectChanges();
+    it('shows both times when displayMode is both', () => {
+      const { component } = renderPlayerComponent(FileTimeComponent, {
+        inputs: { currentTime: 95000, totalTime: 514000, show: true, displayMode: 'both' },
+      });
 
-      const compiled = fixture.nativeElement as HTMLElement;
-      expect(compiled.querySelector('.file-time')?.textContent).toBe('1:35 / 8:34');
+      expect(component.formattedTime()).toBe('1:35 / 8:34');
     });
 
-    it('should display both times when displayMode is both', () => {
-      fixture.componentRef.setInput('currentTime', 95000);
-      fixture.componentRef.setInput('totalTime', 514000);
-      fixture.componentRef.setInput('show', true);
-      fixture.componentRef.setInput('displayMode', 'both');
-      fixture.detectChanges();
+    it('shows only the current time when displayMode is current', () => {
+      const { component } = renderPlayerComponent(FileTimeComponent, {
+        inputs: { currentTime: 95000, totalTime: 514000, show: true, displayMode: 'current' },
+      });
 
-      const compiled = fixture.nativeElement as HTMLElement;
-      expect(compiled.querySelector('.file-time')?.textContent).toBe('1:35 / 8:34');
+      expect(component.formattedCurrentTime()).toBe('1:35');
     });
 
-    it('should display only current time when displayMode is current', () => {
-      fixture.componentRef.setInput('currentTime', 95000);
-      fixture.componentRef.setInput('totalTime', 514000);
-      fixture.componentRef.setInput('show', true);
-      fixture.componentRef.setInput('displayMode', 'current');
-      fixture.detectChanges();
+    it('shows only the total time when displayMode is total', () => {
+      const { component } = renderPlayerComponent(FileTimeComponent, {
+        inputs: { currentTime: 95000, totalTime: 514000, show: true, displayMode: 'total' },
+      });
 
-      const compiled = fixture.nativeElement as HTMLElement;
-      expect(compiled.querySelector('.file-time')?.textContent).toBe('1:35');
-    });
-
-    it('should display only total time when displayMode is total', () => {
-      fixture.componentRef.setInput('currentTime', 95000);
-      fixture.componentRef.setInput('totalTime', 514000);
-      fixture.componentRef.setInput('show', true);
-      fixture.componentRef.setInput('displayMode', 'total');
-      fixture.detectChanges();
-
-      const compiled = fixture.nativeElement as HTMLElement;
-      expect(compiled.querySelector('.file-time')?.textContent).toBe('8:34');
+      expect(component.formattedTotalTime()).toBe('8:34');
     });
   });
 });
