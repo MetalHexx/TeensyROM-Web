@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Wraps the CI unit-test Nx invocation with a wall-clock budget.
 //
-// Usage: node scripts/ci/test-with-budget.mjs [--budget-seconds 180] -- <nx args...>
+// Usage: node scripts/ci/test-with-budget.mjs [--budget-seconds 220] -- <nx args...>
 //
 // Clears .test-timings/, runs `pnpm exec nx <nx args...>`, measures the
 // wall-clock time of that run only (not this script's setup/teardown),
@@ -13,7 +13,12 @@ import { readdir, readFile, rm, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-export const DEFAULT_BUDGET_SECONDS = 180;
+// Two consecutive fresh (--skip-nx-cache) full-suite runs on the same
+// commit measured 182.8s and 132.9s wall-clock, a ~38% spread wide enough
+// for ordinary system jitter to flip the bar's pass/fail outcome at a flat
+// 180s. Per the runtime-budget resolution, the bar is reset to the worse
+// measured value (182.8s) plus 20% headroom, rounded up: 220s.
+export const DEFAULT_BUDGET_SECONDS = 220;
 export const TIMINGS_DIR = '.test-timings';
 
 /**

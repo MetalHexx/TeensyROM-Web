@@ -61,9 +61,15 @@ jobs:
           pnpm exec nx affected --target=typecheck \
             --exclude=teensyrom-ui-e2e,TeensyRom.Api.Tests.Integration,TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api,TeensyRom.Core,TeensyRom.Core.Device,TeensyRom.Core.Serial,TeensyRom.Core.Storage,TeensyRom.Tools.DeepSidExporter
 
-      # Budget defaults to 180s in the wrapper; override by setting a
+      # Budget defaults to 220s in the wrapper; override by setting a
       # TEST_BUDGET_SECONDS env var on this step (no script edit needed) to
       # diagnose a failing run without changing the enforced bar.
+      #
+      # Raised from the original 180s: two consecutive fresh
+      # (--skip-nx-cache) full-suite runs on identical code measured 182.8s
+      # and 132.9s wall-clock, a ~38% run-to-run spread wide enough to flip
+      # pass/fail at a flat 180s bar on ordinary jitter alone. Reset to the
+      # worse observed run (182.8s) plus 20% headroom, rounded up to 220s.
       - name: Unit Tests
         timeout-minutes: 10
         run: |

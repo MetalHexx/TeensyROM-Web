@@ -5,6 +5,7 @@ import {
   decideOutcome,
   resolveBudgetSeconds,
   parseArgs,
+  DEFAULT_BUDGET_SECONDS,
 } from './test-with-budget.mjs';
 
 test('decideOutcome propagates a non-zero exit code even when well under budget', () => {
@@ -94,7 +95,7 @@ test('resolveBudgetSeconds falls back to TEST_BUDGET_SECONDS when no CLI value i
 test('resolveBudgetSeconds falls back to the default when neither CLI nor env is set', () => {
   const budget = resolveBudgetSeconds({ cliValue: undefined, envValue: undefined });
 
-  assert.equal(budget, 180);
+  assert.equal(budget, DEFAULT_BUDGET_SECONDS);
 });
 
 test('resolveBudgetSeconds rejects an unparsable override instead of silently ignoring it', () => {
