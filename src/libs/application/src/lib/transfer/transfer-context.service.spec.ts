@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import {
   TRANSFER_SERVICE,
@@ -58,7 +58,7 @@ function asFileList(files: File[]): FileList {
   return files as unknown as FileList;
 }
 
-/** Lets pending microtasks settle without advancing real timers. */
+/** Lets pending microtasks settle without advancing the fake clock. */
 async function flushMicrotasks(): Promise<void> {
   for (let i = 0; i < 10; i++) {
     await Promise.resolve();
@@ -68,10 +68,10 @@ async function flushMicrotasks(): Promise<void> {
 /** Matches the service's private `MIN_STATE_DISPLAY_MS`; there's no export to read it from. */
 const STATE_DISPLAY_FLOOR_MS = 1000;
 
-/** Waits past both real-time state-display floors (scanning, then starting) plus a safety margin. */
+/** Advances the fake clock past both state-display floors (scanning, then starting). */
 async function advancePastStateFloors(): Promise<void> {
   await flushMicrotasks();
-  await new Promise((resolve) => setTimeout(resolve, STATE_DISPLAY_FLOOR_MS * 2 + 150));
+  await vi.advanceTimersByTimeAsync(STATE_DISPLAY_FLOOR_MS * 2);
   await flushMicrotasks();
 }
 
@@ -96,6 +96,8 @@ describe('TransferContextService', () => {
   const emptyScan: DropScanResult = { entries: [], rootName: null };
 
   beforeEach(() => {
+    vi.useFakeTimers();
+
     callOrder = [];
     callTimes = {};
 
@@ -160,9 +162,29 @@ describe('TransferContextService', () => {
     store = TestBed.inject(TransferStore);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Starts a transfer and advances the fake clock past its state-display floors so it settles. */
+  async function runStartTransfer(deviceId: string, input: DataTransferItemList | FileList): Promise<void> {
+    const promise = service.startTransfer(deviceId, input);
+    await advancePastStateFloors();
+    await promise;
+  }
+
+  /** Retries a retained transfer and advances the fake clock past its state-display floor. */
+  async function runRetryCreate(deviceId: string): Promise<void> {
+    const promise = service.retryCreate(deviceId);
+    await flushMicrotasks();
+    await vi.advanceTimersByTimeAsync(STATE_DISPLAY_FLOOR_MS);
+    await flushMicrotasks();
+    await promise;
+  }
+
   describe('happy path sequencing', () => {
     it('runs a drop end to end: destination, scan, job, hub, upload, seal', async () => {
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
 
       expect(mockStorageStore.getSelectedDirectoryForDevice).toHaveBeenCalledWith('device-1');
       expect(mockTransferService.createJob).toHaveBeenCalledWith('device-1', StorageType.Sd, '/games');
@@ -185,7 +207,7 @@ describe('TransferContextService', () => {
         callOrder.push('upload');
       });
 
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
 
       const hubIndex = callOrder.indexOf('hub-start');
       const uploadIndex = callOrder.indexOf('upload');
@@ -197,7 +219,7 @@ describe('TransferContextService', () => {
     });
 
     it('captures the destination before scanning starts', async () => {
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
 
       expect(callOrder.indexOf('capture-destination')).toBeLessThan(callOrder.indexOf('scan'));
     });
@@ -210,7 +232,7 @@ describe('TransferContextService', () => {
         }
       );
 
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
 
       const transfer = store.transfers()['device-1'];
       expect(transfer.uploadFailedCount).toBe(1);
@@ -223,7 +245,7 @@ describe('TransferContextService', () => {
     it('creates no job and stops', async () => {
       mockDropScanner.scan.mockResolvedValue(emptyScan);
 
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
 
       expect(mockTransferService.createJob).not.toHaveBeenCalled();
       expect(store.transfers()['device-1'].phase).toBe('nothing-to-transfer');
@@ -236,14 +258,14 @@ describe('TransferContextService', () => {
         new TransferDeviceBusyError('foreign-job', 'device busy')
       );
 
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
 
       expect(store.transfers()['device-1'].phase).toBe('device-busy');
       expect(mockDropScanner.scan).toHaveBeenCalledTimes(1);
 
       mockTransferService.createJob.mockResolvedValueOnce(createSnapshot());
 
-      await service.retryCreate('device-1');
+      await runRetryCreate('device-1');
 
       expect(mockDropScanner.scan).toHaveBeenCalledTimes(1);
       expect(mockTransferService.createJob).toHaveBeenCalledTimes(2);
@@ -258,7 +280,7 @@ describe('TransferContextService', () => {
         new TransferCreateRejectedError('destination rejected')
       );
 
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
 
       expect(store.transfers()['device-1'].phase).toBe('failed');
       expect(mockHubListener.start).not.toHaveBeenCalled();
@@ -320,7 +342,7 @@ describe('TransferContextService', () => {
 
   describe('state display floors', () => {
     it('holds scanning and starting for the floor even when the scan and create resolve instantly', async () => {
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
 
       const scanAt = callTimes['scan'];
       const createAt = callTimes['create-job'];
@@ -328,10 +350,10 @@ describe('TransferContextService', () => {
 
       // 'scanning' must outlive the instantly-resolved scan by the floor before completeScan
       // (and the resulting createJob call) fires.
-      expect(createAt - scanAt).toBeGreaterThanOrEqual(STATE_DISPLAY_FLOOR_MS - 50);
+      expect(createAt - scanAt).toBeGreaterThanOrEqual(STATE_DISPLAY_FLOOR_MS);
       // 'starting' must outlive the instantly-resolved create by the floor before the success
       // path (driven by hubListener.start) is allowed to proceed.
-      expect(hubStartAt - createAt).toBeGreaterThanOrEqual(STATE_DISPLAY_FLOOR_MS - 50);
+      expect(hubStartAt - createAt).toBeGreaterThanOrEqual(STATE_DISPLAY_FLOOR_MS);
     });
 
     it('cancelling during the scanning hold produces no createJob call', async () => {
@@ -340,6 +362,8 @@ describe('TransferContextService', () => {
 
       // The scan itself has resolved, but the scanning floor is still holding.
       await service.cancelTransfer('device-1');
+      // Let the scanning floor's own hold resolve so the cancelled startTransfer call can unwind.
+      await vi.advanceTimersByTimeAsync(STATE_DISPLAY_FLOOR_MS);
       await startPromise;
 
       expect(mockTransferService.createJob).not.toHaveBeenCalled();
@@ -350,10 +374,12 @@ describe('TransferContextService', () => {
       const startPromise = service.startTransfer('device-1', asFileList([]));
       await flushMicrotasks();
       // Clear the scanning floor and let createJob resolve, landing inside the starting floor.
-      await new Promise((resolve) => setTimeout(resolve, STATE_DISPLAY_FLOOR_MS + 150));
+      await vi.advanceTimersByTimeAsync(STATE_DISPLAY_FLOOR_MS);
       await flushMicrotasks();
 
       await service.cancelTransfer('device-1');
+      // Let the starting floor's own hold resolve so the cancelled createAndRun call can unwind.
+      await vi.advanceTimersByTimeAsync(STATE_DISPLAY_FLOOR_MS);
       await startPromise;
 
       expect(mockTransferService.cancelJob).toHaveBeenCalledWith('job-1');
@@ -366,7 +392,7 @@ describe('TransferContextService', () => {
       mockTransferService.createJob.mockRejectedValueOnce(
         new TransferDeviceBusyError('foreign-job', 'device busy')
       );
-      await service.startTransfer('device-1', asFileList([]));
+      await runStartTransfer('device-1', asFileList([]));
       expect(store.transfers()['device-1'].phase).toBe('device-busy');
 
       await service.closeTransfer('device-1');

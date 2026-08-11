@@ -129,6 +129,41 @@ describe('TransferSearchToolbarComponent', () => {
     });
   });
 
+  describe('debounce cleanup', () => {
+    it('does not fire a second search when the original debounce elapses after Enter', fakeAsync(() => {
+      component.onSearchInputChange('iron maiden');
+      tick(10);
+      component.executeSearch();
+
+      expect(mockStorageStore.searchFiles).toHaveBeenCalledTimes(1);
+
+      tick(5000);
+
+      expect(mockStorageStore.searchFiles).toHaveBeenCalledTimes(1);
+    }));
+
+    it('does not search when the original debounce elapses after clearing', fakeAsync(() => {
+      component.onSearchInputChange('iron maiden');
+      tick(10);
+      component.clearSearch();
+
+      tick(5000);
+
+      expect(mockStorageStore.searchFiles).not.toHaveBeenCalled();
+    }));
+
+    it('clears the pending debounce on destroy without throwing or calling searchFiles after destroy', fakeAsync(() => {
+      component.onSearchInputChange('iron maiden');
+      tick(10);
+
+      expect(() => fixture.destroy()).not.toThrow();
+
+      tick(5000);
+
+      expect(mockStorageStore.searchFiles).not.toHaveBeenCalled();
+    }));
+  });
+
   describe('store-sync effect', () => {
     it('empties the input when the store search state goes null', () => {
       const searchState: SearchState = {

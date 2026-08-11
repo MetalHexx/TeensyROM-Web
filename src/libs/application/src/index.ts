@@ -26,4 +26,4 @@ export * from './lib/transfer/transfer-context.interface';
 export * from './lib/transfer/transfer-context.service';
 export * from './lib/transfer/transfer-playback-guard';
 export * from './lib/transfer/providers';
-export * from './lib/transfer/selectors/get-transfer-summary';
+export { formatElapsedLabel } from './lib/transfer/selectors/get-transfer-summary';

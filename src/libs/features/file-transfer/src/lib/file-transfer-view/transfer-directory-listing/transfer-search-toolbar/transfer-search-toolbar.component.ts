@@ -5,6 +5,7 @@ import {
   effect,
   inject,
   input,
+  OnDestroy,
   signal,
   untracked,
   viewChild,
@@ -28,7 +29,7 @@ const SEARCH_DEBOUNCE_MS = 1000;
   styleUrl: './transfer-search-toolbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TransferSearchToolbarComponent {
+export class TransferSearchToolbarComponent implements OnDestroy {
   /** Device whose storages this toolbar searches. */
   deviceId = input.required<string>();
 
@@ -109,6 +110,10 @@ export class TransferSearchToolbarComponent {
   }
 
   executeSearch(): void {
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+    }
+
     const trimmedText = this.searchText().trim();
     if (trimmedText.length === 0) return;
     if (!this.currentStorageType()) return;
@@ -120,8 +125,16 @@ export class TransferSearchToolbarComponent {
   }
 
   clearSearch(): void {
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+    }
+
     if (!this.currentStorageType()) return;
 
     this.storageStore.clearSearch({ deviceId: this.deviceId() });
+  }
+
+  ngOnDestroy(): void {
+    clearTimeout(this.searchTimeout);
   }
 }
