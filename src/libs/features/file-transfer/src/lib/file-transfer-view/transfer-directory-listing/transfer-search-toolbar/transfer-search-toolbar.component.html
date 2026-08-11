@@ -1,0 +1,14 @@
+<div class="search-toolbar-content">
+  <lib-input-field
+    [tooltip]="searchTooltip"
+    [clearTooltip]="clearTooltip"
+    placeholder="Search"
+    [clearable]="true"
+    class="search-field"
+    #searchInput
+    (valueChange)="onSearchInputChange($event)"
+    (cleared)="clearSearch()"
+    (keydown.enter)="executeSearch()"
+  >
+  </lib-input-field>
+</div>

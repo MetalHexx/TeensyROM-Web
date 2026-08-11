@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { ActionButtonComponent, StyledIconComponent } from '@teensyrom-nx/ui/components';
+import { ActionButtonComponent, IconLabelComponent, StyledIconComponent } from '@teensyrom-nx/ui/components';
 import { TransferFeedEntry, TransferModalState } from '@teensyrom-nx/application';
 
 export interface TransferProgressVm {
@@ -45,19 +45,34 @@ const STATE_SHAPES: Record<TransferModalState, RenderShape> = {
   abandoned: 'terminal',
 };
 
+/**
+ * Target dialog width per render shape — the mockup's content-heavy vs. small-state widths, plus
+ * the terminal state's wider allowance for full failure paths. Every value clamps to the viewport
+ * in `frameWidth` below, so a narrow window never pushes the dialog off-screen.
+ */
+const SHAPE_WIDTH_PX: Record<RenderShape, number> = {
+  scan: 480,
+  'busy-refusal': 480,
+  'nothing-to-transfer': 480,
+  active: 760,
+  cancelling: 760,
+  terminal: 900,
+};
+
 const STATE_TITLES: Record<TransferModalState, (vm: TransferProgressVm) => string> = {
-  scanning: () => 'Scanning dropped folder',
+  scanning: () => 'Scanning Files',
   starting: () => 'Starting transfer',
-  'device-busy': () => 'Device is busy',
+  'device-busy': () => 'Device Busy',
   'nothing-to-transfer': () => 'Nothing to transfer',
   failed: () => "Transfer couldn't start",
   receiving: (vm) => `Transferring to ${vm.deviceName}`,
-  draining: (vm) => `Writing to ${vm.deviceName}`,
-  cancelling: () => 'Cancelling — finishing current file',
-  completed: () => 'Transfer complete',
+  // Same wording as `receiving` — the title must not change when the job seals.
+  draining: (vm) => `Transferring to ${vm.deviceName}`,
+  cancelling: () => 'Cancelling',
+  completed: () => 'Transfer Completed',
   cancelled: () => 'Transfer cancelled',
-  aborted: () => 'Transfer stopped — device lost',
-  abandoned: () => 'Transfer wound up — connection lost',
+  aborted: () => 'Transfer Stopped: Device Lost',
+  abandoned: () => 'Transfer Stopped: Connection Lost',
 };
 
 const STATE_BOTTOM_BAR: Record<TransferModalState, BottomBarMode> = {
@@ -66,8 +81,10 @@ const STATE_BOTTOM_BAR: Record<TransferModalState, BottomBarMode> = {
   'device-busy': null,
   'nothing-to-transfer': null,
   failed: null,
-  receiving: 'determinate',
-  draining: 'determinate',
+  // The write-bars (API/device) already cover progress for these states, so the modal-level
+  // bar underneath the actions would be redundant.
+  receiving: null,
+  draining: null,
   cancelling: 'indeterminate',
   completed: null,
   cancelled: null,
@@ -120,10 +137,15 @@ const ANNOUNCE_DELTA_PERCENT = 5;
  */
 @Component({
   selector: 'lib-transfer-progress',
-  imports: [DecimalPipe, MatProgressBarModule, ActionButtonComponent, StyledIconComponent],
+  imports: [DecimalPipe, MatProgressBarModule, ActionButtonComponent, IconLabelComponent, StyledIconComponent],
   templateUrl: './transfer-progress.component.html',
   styleUrl: './transfer-progress.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // The dialog has no width of its own (see layout.component.ts) — the host's width drives it,
+  // keyed off the render shape, so the shell stays dumb and each shape auto-sizes correctly.
+  host: {
+    '[style.width]': 'frameWidth()',
+  },
 })
 export class TransferProgressComponent {
   vm = input.required<TransferProgressVm>();
@@ -141,6 +163,9 @@ export class TransferProgressComponent {
   readonly renderShape = computed(() => STATE_SHAPES[this.vm().state]);
   readonly title = computed(() => STATE_TITLES[this.vm().state](this.vm()));
   readonly bottomBarMode = computed(() => STATE_BOTTOM_BAR[this.vm().state]);
+  readonly frameWidth = computed(
+    () => `min(${SHAPE_WIDTH_PX[this.renderShape()]}px, calc(100vw - 2 * var(--spacing-2xl)))`
+  );
 
   readonly hasSubtitle = computed(() => this.vm().state !== 'nothing-to-transfer');
   readonly subtitle = computed(() => {
@@ -166,7 +191,6 @@ export class TransferProgressComponent {
   readonly apiBarSuccess = computed(() => this.vm().state === 'draining');
   readonly metricsMuted = computed(() => this.vm().state === 'cancelling');
 
-  readonly isCompletedState = computed(() => this.vm().state === 'completed');
   readonly terminalBannerTreatment = computed(() => TERMINAL_BANNER_TREATMENT[this.vm().state] ?? null);
   readonly terminalBannerIcon = computed(() => TERMINAL_BANNER_ICON[this.vm().state] ?? 'warning');
 

@@ -5,7 +5,7 @@
   [attr.aria-label]="title()">
   <!-- Dialog Header with Warning Icon -->
   <div class="dialog-header">
-    <mat-icon class="warning-icon">warning</mat-icon>
+    <lib-styled-icon icon="warning" color="error" size="large"></lib-styled-icon>
     <h2>{{ title() }}</h2>
   </div>
 
@@ -16,18 +16,35 @@
 
   <!-- Action Buttons -->
   <div class="button-row">
-    <lib-icon-button
-      [icon]="'delete'"
-      [ariaLabel]="confirmLabel()"
-      [tooltip]="confirmTooltip()"
-      [color]="'error'"
-      (buttonClick)="onConfirmClick()"
-    />
-    <lib-icon-button
-      [icon]="'close'"
-      [ariaLabel]="cancelLabel()"
-      [tooltip]="cancelTooltip()"
-      (buttonClick)="onCancelClick()"
-    />
+    @if (showLabels()) {
+      <lib-action-button
+        [icon]="cancelIcon()"
+        [label]="cancelLabel()"
+        [color]="'normal'"
+        [fullWidth]="false"
+        (buttonClick)="onCancelClick()"
+      />
+      <lib-action-button
+        [icon]="confirmIcon()"
+        [label]="confirmLabel()"
+        [color]="'error'"
+        [fullWidth]="false"
+        (buttonClick)="onConfirmClick()"
+      />
+    } @else {
+      <lib-icon-button
+        [icon]="confirmIcon()"
+        [ariaLabel]="confirmLabel()"
+        [tooltip]="confirmTooltip()"
+        [color]="'error'"
+        (buttonClick)="onConfirmClick()"
+      />
+      <lib-icon-button
+        [icon]="cancelIcon()"
+        [ariaLabel]="cancelLabel()"
+        [tooltip]="cancelTooltip()"
+        (buttonClick)="onCancelClick()"
+      />
+    }
   </div>
 </div>

@@ -163,7 +163,7 @@ describe('DropzoneCardComponent', () => {
       const native = fixture.nativeElement as HTMLElement;
       expect(dropzoneEl().classList.contains('state-device-busy')).toBe(true);
       const chooseFilesButton = native.querySelector<HTMLButtonElement>(
-        '[data-testid="dropzone-choose-files"]'
+        '[data-testid="dropzone-choose-files"] button'
       );
       expect(chooseFilesButton?.disabled).toBe(true);
     });
@@ -246,6 +246,23 @@ describe('DropzoneCardComponent', () => {
       fixture.detectChanges();
 
       expect(transferContext.startTransfer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('focus anchor', () => {
+    it('renders the focus-return anchor as a focusable button element', async () => {
+      const device = createDevice();
+      await setup([device], { deviceId: device.deviceId, storageType: StorageType.Sd, path: '/games' });
+      transferStore.setTargetDevice({ deviceId: device.deviceId });
+      fixture.detectChanges();
+
+      const native = fixture.nativeElement as HTMLElement;
+      const focusAnchor = native.querySelector<HTMLButtonElement>(
+        '[data-testid="dropzone-choose-files"] button'
+      );
+
+      expect(focusAnchor).toBeTruthy();
+      expect(focusAnchor?.tagName).toBe('BUTTON');
     });
   });
 });

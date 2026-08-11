@@ -154,6 +154,10 @@ export class LayoutComponent {
           backdropClass: 'busy-dialog-backdrop',
           ariaLabel: `Transferring files to ${deviceName}`,
           restoreFocus: true,
+          // Material's dialog defaults to `max-width: 80vw`, which would silently cap the
+          // terminal shape's 900px width on smaller displays. `width` stays unset so the
+          // content-driven width from TransferProgressComponent's own root wins.
+          maxWidth: '95vw',
         });
       } else if (!shouldShow && this.transferDialogRef) {
         this.transferDialogRef.close();

@@ -4,3 +4,82 @@
   justify-content: center;
   flex-shrink: 0; // Prevent icon from being squished
 }
+
+// These must live here (component-scoped), not in the global stylesheet: Angular's view
+// encapsulation adds a scoping attribute to every selector in a component's own stylesheet,
+// which is what lets a single-class rule like `.styled-icon-small` reliably beat Angular
+// Material's own global `.mat-icon` base rule (same bare specificity otherwise, so the two
+// were tied and Material's box size — not ours — was winning in practice). Keeping the
+// box exactly matched to the glyph's font-size/line-height is what keeps these icons
+// vertically centered against sibling text.
+.styled-icon-small {
+  font-size: 16px;
+  line-height: 1;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.styled-icon-medium {
+  font-size: 24px;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.styled-icon-large {
+  font-size: 32px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.styled-icon-extra-large {
+  font-size: 48px;
+  line-height: 1;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.styled-icon-primary {
+  color: var(--color-primary-bright);
+}
+
+.styled-icon-highlight {
+  color: var(--color-highlight);
+}
+
+.styled-icon-success {
+  color: var(--color-success);
+}
+
+.styled-icon-error {
+  color: var(--color-error);
+}
+
+.styled-icon-dimmed {
+  color: var(--color-dimmed);
+}
+
+.styled-icon-directory {
+  color: var(--color-directory);
+}

@@ -12,15 +12,9 @@ lib-scaling-compact-card {
 .dialog-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-md);
   margin-bottom: var(--spacing-lg);
-
-  .warning-icon {
-    color: var(--color-error); // Red/pink error color
-    font-size: 32px; // Larger than standard 24px
-    width: 32px;
-    height: 32px;
-  }
 
   h2 {
     margin: 0;
@@ -46,10 +40,12 @@ lib-scaling-compact-card {
 
 // Button row
 .button-row {
-  display: flex;
-  justify-content: flex-end; // Right-aligned buttons
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-md);
+  width: fit-content;
+  margin: var(--spacing-md) auto 0;
 }
 
 // Mobile responsiveness
@@ -60,10 +56,17 @@ lib-scaling-compact-card {
   }
 
   .button-row {
+    display: flex;
     flex-direction: column-reverse;
+    width: 100%;
+    margin: var(--spacing-md) 0 0;
     gap: var(--spacing-xs);
 
     lib-icon-button {
+      width: 100%; // Full-width touch targets
+    }
+
+    lib-action-button {
       width: 100%; // Full-width touch targets
     }
   }

@@ -3,6 +3,14 @@
   width: 100%;
 }
 
+:host(.fit-content) {
+  width: auto;
+}
+
 button {
   width: 100%;
+}
+
+:host(.fit-content) button {
+  width: auto;
 }

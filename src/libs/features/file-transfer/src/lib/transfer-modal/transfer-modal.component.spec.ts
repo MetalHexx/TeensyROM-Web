@@ -222,10 +222,53 @@ describe('TransferModalComponent', () => {
       expect(vm.failed).toBe(metrics.failed);
       expect(vm.apiPercent).toBe(metrics.apiPct);
       expect(vm.devicePercent).toBe(metrics.devicePct);
-      expect(vm.elapsedLabel).toBe(summary.elapsedLabel);
       expect(vm.failureOverflow).toBe(summary.failureOverflow);
       expect(vm.reason).toBe(summary.reason);
       expect(vm.currentFile).toBe('music/song.sid');
+    });
+  });
+
+  describe('elapsed ticker', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('advances the elapsed label once per second while the transfer is running', async () => {
+      await setup();
+      transferStore.setTargetDevice({ deviceId });
+      driveToState(transferStore, deviceId, 'receiving');
+      createFixture();
+
+      const before = component.vm().elapsedLabel;
+      expect(before).not.toBeNull();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      expect(component.vm().elapsedLabel).not.toBe(before);
+    });
+
+    it('freezes the elapsed label once a running transfer reaches a terminal state', async () => {
+      await setup();
+      transferStore.setTargetDevice({ deviceId });
+      driveToState(transferStore, deviceId, 'receiving');
+      createFixture();
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      transferStore.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ deviceId, state: TransferJobState.Completed }),
+      });
+      fixture.detectChanges();
+
+      const frozen = component.vm().elapsedLabel;
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(component.vm().elapsedLabel).toBe(frozen);
     });
   });
 
@@ -269,6 +312,8 @@ describe('TransferModalComponent', () => {
       );
       expect(confirmRef.componentRef.setInput).toHaveBeenCalledWith('confirmLabel', 'Cancel transfer');
       expect(confirmRef.componentRef.setInput).toHaveBeenCalledWith('cancelLabel', 'Keep transferring');
+      expect(confirmRef.componentRef.setInput).toHaveBeenCalledWith('showLabels', true);
+      expect(confirmRef.componentRef.setInput).not.toHaveBeenCalledWith('confirmIcon', 'delete');
 
       confirmed.next();
 
@@ -338,9 +383,11 @@ describe('TransferModalComponent', () => {
 
   describe('focus restoration', () => {
     it('focuses the dropzone picker button once the dialog closes', async () => {
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-testid', 'dropzone-choose-files');
       const button = document.createElement('button');
-      button.setAttribute('data-testid', 'dropzone-choose-files');
-      document.body.appendChild(button);
+      wrapper.appendChild(button);
+      document.body.appendChild(wrapper);
       const focusSpy = vi.spyOn(button, 'focus');
 
       await setup();

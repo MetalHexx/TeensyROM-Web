@@ -34,9 +34,8 @@
     min-width: 0;
   }
 
-  .content-count {
+  lib-transfer-search-toolbar {
     flex: 0 0 auto;
-    white-space: nowrap;
   }
 
   @include mixins.below-phone {
@@ -80,4 +79,14 @@
       }
     }
   }
+}
+
+.result-path {
+  color: var(--color-dimmed-light);
+  font-size: 0.85em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  margin-left: var(--spacing-sm);
 }

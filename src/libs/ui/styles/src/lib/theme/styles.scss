@@ -625,77 +625,10 @@ mat-card-title {
   }
 }
 
-.styled-icon-small {
-  font-size: 16px;
-  line-height: 1;
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  min-height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.styled-icon-medium {
-  font-size: 24px;
-  line-height: 1;
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.styled-icon-large {
-  font-size: 32px;
-  line-height: 1;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.styled-icon-extra-large {
-  font-size: 48px;
-  line-height: 1;
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.styled-icon-primary {
-  color: var(--color-primary-bright);
-}
-
-.styled-icon-highlight {
-  color: var(--color-highlight);
-}
-
-.styled-icon-success {
-  color: var(--color-success);
-}
-
-.styled-icon-error {
-  color: var(--color-error);
-}
-
-.styled-icon-dimmed {
-  color: var(--color-dimmed);
-}
-
-.styled-icon-directory {
-  color: var(--color-directory);
-}
+// Sizing/color rules for lib-styled-icon's `.styled-icon-*` classes now live in
+// styled-icon.component.scss — see the comment there for why (they were losing a CSS
+// specificity tie against Angular Material's own global `.mat-icon` base rule when
+// declared as plain global classes here).
 
 .glassy-dialog {
   .mat-mdc-dialog-container {

@@ -4,6 +4,7 @@ import { createAction } from '@teensyrom-nx/utils';
 import { TransferJobSnapshot, TransferFileCompletion, TransferJobState, StorageType } from '@teensyrom-nx/domain';
 import { TransferStore, TransferModalState } from './transfer-store';
 import { TRANSFER_FEED_CAP, TRANSFER_FAILURE_CAP } from './transfer.constants';
+import { isTerminalJobState } from './transfer-helpers';
 
 vi.mock('@teensyrom-nx/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@teensyrom-nx/utils')>();
@@ -391,6 +392,72 @@ describe('TransferStore', () => {
       const metrics = store.getTransferMetrics(deviceId)();
       expect(metrics.apiPct).toBe(40);
       expect(metrics.devicePct).toBe(20);
+    });
+
+    it('floors devicePct below 100 on a near-miss, rather than rounding up while files remain', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 60000 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Receiving, filesReceived: 60000, filesSent: 59997 }),
+      });
+
+      expect(store.getTransferMetrics(deviceId)().devicePct).toBeLessThan(100);
+    });
+
+    it('pins devicePct to 100 only once the job is Completed', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 500 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Completed, filesReceived: 480, filesSent: 480 }),
+      });
+
+      expect(store.getTransferMetrics(deviceId)().devicePct).toBe(100);
+    });
+
+    it('does not pin devicePct for a Cancelled job that stopped early', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 12480 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Cancelled, filesReceived: 7003, filesSent: 7003 }),
+      });
+
+      expect(store.getTransferMetrics(deviceId)().devicePct).not.toBe(100);
+    });
+
+    it('does not pin devicePct for a merely Sealed job', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 100 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Sealed, filesReceived: 90, filesSent: 90 }),
+      });
+
+      expect(store.getTransferMetrics(deviceId)().devicePct).not.toBe(100);
+    });
+
+    it('yields 0 for both percentages when scanTotal is still 0', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Receiving, filesReceived: 3, filesSent: 1 }),
+      });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.apiPct).toBe(0);
+      expect(metrics.devicePct).toBe(0);
+    });
+  });
+
+  describe('isTerminalJobState', () => {
+    it('is true for the four terminal states and false for Sealed and the in-flight states', () => {
+      expect(isTerminalJobState(TransferJobState.Completed)).toBe(true);
+      expect(isTerminalJobState(TransferJobState.Cancelled)).toBe(true);
+      expect(isTerminalJobState(TransferJobState.Aborted)).toBe(true);
+      expect(isTerminalJobState(TransferJobState.Abandoned)).toBe(true);
+      expect(isTerminalJobState(TransferJobState.Sealed)).toBe(false);
+      expect(isTerminalJobState(TransferJobState.Receiving)).toBe(false);
     });
   });
 

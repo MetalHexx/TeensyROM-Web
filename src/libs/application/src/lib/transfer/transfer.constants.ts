@@ -5,7 +5,7 @@
  */
 
 /** Maximum number of entries retained in a device's activity feed, newest first. */
-export const TRANSFER_FEED_CAP = 20;
+export const TRANSFER_FEED_CAP = 5;
 
 /** Maximum number of entries retained in a device's end-of-job failure summary. */
 export const TRANSFER_FAILURE_CAP = 50;

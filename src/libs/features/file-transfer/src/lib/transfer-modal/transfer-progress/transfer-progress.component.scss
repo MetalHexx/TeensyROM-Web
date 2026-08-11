@@ -5,40 +5,57 @@
 .transfer-progress {
   display: flex;
   flex-direction: column;
+  // Caps the dialog so a 60,000-file job's feed/failure list scrolls internally instead of
+  // pushing the frame past the viewport — the header, tiles, bars, and actions stay put.
+  max-height: calc(100vh - 2 * var(--spacing-2xl));
+  min-height: 0;
 }
 
 .progress-title {
+  flex: none;
   text-align: center;
   font-size: 1.5rem;
   font-weight: 400;
-  margin: 0 0 4px;
+  margin: 0;
+  padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-xs);
 }
 
 .progress-subtitle {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
   font-size: 0.875rem;
   color: var(--color-dimmed-light);
-  margin: 0 0 var(--spacing-lg);
+  margin: 0;
+  padding: 0 var(--spacing-xl) var(--spacing-lg);
 }
 
 .progress-body {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+  padding: 0 var(--spacing-2xl) var(--spacing-xl);
+
+  // Every block keeps its natural size; only the feed/failure list (below) is allowed to shrink
+  // and scroll, so metrics, bars, and the current-file row never get clipped.
+  > * {
+    flex: none;
+  }
 }
 
 .progress-actions {
-  display: flex;
-  justify-content: flex-end;
+  flex: none;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: var(--spacing-md);
-  padding-top: var(--spacing-lg);
-
-  &.centered {
-    justify-content: center;
-  }
+  width: fit-content;
+  margin: 0 auto;
+  padding: 0 var(--spacing-2xl) var(--spacing-xl);
 }
 
 /* ── Scan / starting center block ───────────────────────── */
@@ -107,39 +124,21 @@
 }
 
 .metric-value {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+  // Keeps a value like "40,000 / 60,000" on one line rather than wrapping mid-tile.
+  white-space: nowrap;
 }
 
 .metric-of {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 400;
   color: var(--color-dimmed-light);
-}
-
-.metric-staged {
-  background: color-mix(in srgb, var(--color-highlight) 10%, transparent);
-
-  .metric-value {
-    color: var(--color-highlight);
-  }
-}
-
-.metric-failed .metric-value {
-  color: var(--color-error);
-}
-
-.metric-success .metric-value {
-  color: var(--color-success);
+  margin-left: 0.25em;
 }
 
 .metrics-muted {
-  .metric,
-  .metric-staged {
-    background: rgba(255, 255, 255, 0.05);
-  }
-
   .metric-value {
     color: var(--color-dimmed-light);
   }
@@ -207,6 +206,11 @@
   flex: none;
 }
 
+// Shared by the active and cancelling shapes' current-file rows.
+.current-file-label-strong {
+  font-weight: var(--font-weight-bold);
+}
+
 .current-file-path {
   flex: 1;
   min-width: 0;
@@ -220,9 +224,29 @@
   unicode-bidi: plaintext;
 }
 
-/* ── Feed ────────────────────────────────────────────────── */
+/* ── Elapsed readout ─────────────────────────────────────── */
+
+.elapsed-readout {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.875rem;
+  color: var(--color-dimmed-light);
+}
+
+/* ── Feed / failure list — shared "Recent" slot for active and terminal shapes ──── */
+
+.feed {
+  // The one section allowed to shrink below its content size and scroll, so the frame around it
+  // (title, tiles, bars, actions) never moves as the list grows.
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 .feed-header {
+  flex: none;
   display: flex;
   align-items: baseline;
   font-size: 0.75rem;
@@ -232,14 +256,10 @@
   margin-bottom: var(--spacing-xs);
 }
 
-.feed-cap-note {
-  margin-left: auto;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--color-dimmed-light);
-}
-
 .feed-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -260,111 +280,47 @@
   white-space: nowrap;
 }
 
-.feed-row-reason {
-  margin-left: auto;
-  color: var(--color-error);
-  font-size: 0.8125rem;
-  white-space: nowrap;
-  padding-left: var(--spacing-md);
-}
-
 .feed-row-fail .feed-row-name {
   color: var(--color-error);
 }
 
-/* ── Summary hero ────────────────────────────────────────── */
-
-.summary-hero {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-lg);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-lg);
-}
-
-.summary-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.summary-big {
-  font-size: 1.75rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
-.summary-caption {
-  font-size: 0.75rem;
-  color: var(--color-dimmed-light);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.summary-success .summary-big {
-  color: var(--color-success);
-}
-
-.summary-failed .summary-big {
-  color: var(--color-error);
-}
-
-.summary-divider {
-  width: 1px;
-  align-self: stretch;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.summary-elapsed {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--color-dimmed-light);
-}
-
-/* ── Failure list ────────────────────────────────────────── */
-
-.failures-header {
-  font-size: 0.75rem;
-  color: var(--color-dimmed-light);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: var(--spacing-xs);
-}
-
-.failures-list {
-  display: flex;
-  flex-direction: column;
-}
+/* ── Failure rows (terminal shape) ───────────────────────── */
 
 .failure-row {
   display: flex;
-  align-items: center;
+  // Two-line rows: the icon aligns to the first line (the path), not the row's vertical centre.
+  align-items: flex-start;
   gap: var(--spacing-sm);
   padding: 5px var(--spacing-sm);
   font-size: 0.875rem;
   min-width: 0;
+
+  &.failure-row-empty {
+    align-items: center;
+  }
+}
+
+.failure-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 .failure-row-name {
   color: var(--color-error);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .failure-row-reason {
-  margin-left: auto;
   color: var(--color-dimmed-light);
   font-size: 0.8125rem;
-  white-space: nowrap;
-  padding-left: var(--spacing-md);
 }
 
 .failures-more {
+  flex: none;
   padding: var(--spacing-sm);
   font-size: 0.875rem;
   color: var(--color-dimmed-light);
@@ -373,7 +329,7 @@
 /* ── Bottom bar ──────────────────────────────────────────── */
 
 .bottom-bar {
-  margin-top: var(--spacing-lg);
+  flex: none;
 }
 
 /* ── Live region ─────────────────────────────────────────── */

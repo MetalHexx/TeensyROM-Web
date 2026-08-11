@@ -1,0 +1,54 @@
+<div class="dev-fixtures-page">
+  <h1 class="page-heading">File Transfer — UI State Fixtures (dev only)</h1>
+  <p class="page-note">Not linked from any nav menu. Throwaway page — delete after UI refinement wraps.</p>
+
+  <section class="fixture-section">
+    <h2 class="section-heading">Dropzone</h2>
+
+    <div class="fixture-block dropzone-fixture-block">
+      <p class="fixture-label">idle — drag a real file over this card to see the live drag-over state</p>
+      <lib-dev-dropzone-fixture />
+    </div>
+
+    <div class="fixture-block dropzone-fixture-block">
+      <p class="fixture-label">device-busy (forced)</p>
+      <lib-dev-dropzone-fixture [forceBusy]="true" />
+    </div>
+  </section>
+
+  <section class="fixture-section">
+    <h2 class="section-heading">Transfer modal — active journey</h2>
+
+    @for (item of scanThroughCancelling; track item.label) {
+      <div class="fixture-block">
+        <p class="fixture-label">{{ item.label }}</p>
+        <lib-transfer-progress class="glassy-card" [vm]="item.vm" />
+      </div>
+    }
+
+    <div class="fixture-block confirm-fixture-block">
+      <p class="fixture-label">cancel-confirmation dialog</p>
+      <div class="glassy-card confirmation-fixture">
+        <lib-confirmation-dialog
+          [title]="confirmCancelFixture.title"
+          [message]="confirmCancelFixture.message"
+          [confirmLabel]="confirmCancelFixture.confirmLabel"
+          [cancelLabel]="confirmCancelFixture.cancelLabel"
+          [confirmIcon]="confirmCancelFixture.confirmIcon"
+          [showLabels]="confirmCancelFixture.showLabels"
+        />
+      </div>
+    </div>
+  </section>
+
+  <section class="fixture-section">
+    <h2 class="section-heading">Transfer modal — terminal states</h2>
+
+    @for (item of terminalStates; track item.label) {
+      <div class="fixture-block">
+        <p class="fixture-label">{{ item.label }}</p>
+        <lib-transfer-progress class="glassy-card" [vm]="item.vm" />
+      </div>
+    }
+  </section>
+</div>

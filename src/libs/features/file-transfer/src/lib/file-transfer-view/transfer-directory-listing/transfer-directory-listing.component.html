@@ -2,7 +2,7 @@
   <lib-scaling-card [enableOverflow]="false">
     <div slot="header" class="header-toolbar">
       <lib-directory-trail-container [deviceId]="deviceId()" />
-      <span class="content-count">{{ folderCount() }} folders · {{ fileCount() }} files</span>
+      <lib-transfer-search-toolbar [deviceId]="deviceId()" />
     </div>
 
     @if (isDeviceLevelView()) {
@@ -12,6 +12,57 @@
       message="Choose SD or USB storage to browse its contents."
       size="small"
     ></lib-empty-state-message>
+    } @else if (hasSearched()) {
+      @if (isSearching()) {
+      <lib-empty-state-message
+        icon="search"
+        title="Searching"
+        message="Looking for matching files…"
+        size="small"
+      ></lib-empty-state-message>
+      } @else if (searchError()) {
+      <lib-empty-state-message
+        icon="error_outline"
+        title="Search Failed"
+        [message]="searchError() ?? ''"
+        size="small"
+      ></lib-empty-state-message>
+      } @else if (searchResults().length === 0) {
+      <lib-empty-state-message
+        icon="search_off"
+        title="No Results"
+        message="No files matched your search."
+        size="small"
+      ></lib-empty-state-message>
+      } @else {
+      <div class="viewport-wrapper">
+        <cdk-virtual-scroll-viewport
+          itemSize="42"
+          class="listing-viewport"
+          minBufferPx="200"
+          maxBufferPx="400"
+        >
+          <div
+            *cdkVirtualFor="let result of searchResults(); trackBy: trackResultByPath"
+            class="listing-row disabled-row"
+            [attr.data-item-path]="result.path"
+          >
+            <lib-storage-item [icon]="existingFileIcon" [label]="result.name" [disabled]="true">
+              <span storageItemAfterLabel class="result-path">{{ result.parentPath }}</span>
+              <lib-storage-item-actions>
+                <lib-icon-button
+                  icon="folder_open"
+                  ariaLabel="Go to containing folder"
+                  variant="rounded-transparent"
+                  size="small"
+                  (buttonClick)="onJumpToDirectory(result)"
+                ></lib-icon-button>
+              </lib-storage-item-actions>
+            </lib-storage-item>
+          </div>
+        </cdk-virtual-scroll-viewport>
+      </div>
+      }
     } @else if (!hasContent()) {
     <lib-empty-state-message
       icon="folder_open"

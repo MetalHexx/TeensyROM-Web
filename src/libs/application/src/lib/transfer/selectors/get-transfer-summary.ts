@@ -8,8 +8,9 @@ export interface TransferSummary {
   reason: string | null; // the terminal banner text
 }
 
-function formatElapsed(startedAt: number): string {
-  const totalSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+/** 'm:ss elapsed' — `now` is injected so a UI ticker can drive it without re-reading the clock. */
+export function formatElapsedLabel(startedAt: number, now: number): string {
+  const totalSeconds = Math.max(0, Math.floor((now - startedAt) / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')} elapsed`;
@@ -28,7 +29,8 @@ export function getTransferSummary(store: WritableStore<TransferState>) {
         const metrics = computeTransferMetrics(transfer);
         const modalState = deriveTransferModalState(transfer);
 
-        const elapsedLabel = transfer?.startedAt != null ? formatElapsed(transfer.startedAt) : null;
+        const elapsedLabel =
+          transfer?.startedAt != null ? formatElapsedLabel(transfer.startedAt, Date.now()) : null;
         const failureOverflow = Math.max(0, metrics.failed - (transfer?.failures.length ?? 0));
 
         let reason: string | null;
