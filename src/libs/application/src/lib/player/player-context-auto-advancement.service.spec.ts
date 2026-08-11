@@ -349,15 +349,14 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         expect(launchMode).toBe(LaunchMode.Directory);
         expect(currentFile?.isCompatible).toBe(false);
 
-        // Spy on handler method
+        // Spy on handler method. launchFileWithContext already routed through
+        // handleIncompatibleFile and scheduled this call; don't hand-call it again here,
+        // or the scan fires twice for the one incompatible launch.
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
         const advanceDirectorySpy = vi.spyOn(
           serviceWithPrivates,
           'advanceToNextCompatibleFileInDirectory'
         );
-
-        // Call handleIncompatibleFile
-        serviceWithPrivates.handleIncompatibleFile(deviceId);
 
         // Advance timers past the setTimeout(1000) delay
         await vi.advanceTimersByTimeAsync(1000);
@@ -401,15 +400,14 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         expect(launchMode).toBe(LaunchMode.Search);
         expect(currentFile?.isCompatible).toBe(false);
 
-        // Spy on handler methods
+        // Spy on handler methods. launchFileWithContext already routed through
+        // handleIncompatibleFile and scheduled this call; don't hand-call it again here,
+        // or the scan fires twice for the one incompatible launch.
         const serviceWithPrivates = service as unknown as ServiceWithPrivates;
         const advanceDirectorySpy = vi.spyOn(
           serviceWithPrivates,
           'advanceToNextCompatibleFileInDirectory'
         );
-
-        // Call handleIncompatibleFile
-        serviceWithPrivates.handleIncompatibleFile(deviceId);
 
         // Advance timers past the setTimeout(1000) delay
         await vi.advanceTimersByTimeAsync(1000);
@@ -596,6 +594,12 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
           createTestFileItem({ name: 'file1.sid', path: '/music/file1.sid', isCompatible: false }),
           createTestFileItem({ name: 'file2.sid', path: '/music/file2.sid', isCompatible: true }),
         ];
+
+        // The player service response is authoritative for compatibility - without this,
+        // the default compatible mock response would overwrite file1's isCompatible in
+        // context, leaving the context's files array out of sync with the isCompatible:
+        // false set up above.
+        mockPlayerService.launchFile.mockReturnValueOnce(of(files[0]));
 
         // Load file context with currentIndex = 0
         await service.launchFileWithContext({

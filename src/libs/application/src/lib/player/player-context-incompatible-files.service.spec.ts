@@ -803,10 +803,15 @@ describe('PlayerContextService - Incompatible File Handling', () => {
         });
         await nextTick();
 
+        // With currentIndex falling back to 0 for a launched file absent from the directory
+        // listing, the single-entry files array has no *other* candidate to advance to
+        // (files.length - 1 = 0 attempts), so the scan the retry schedules falls straight to
+        // the random-launch fallback and the context ends up empty - the same empty-context
+        // outcome Scenario 2 documents below for a random launch of a file absent from the
+        // directory response.
         const context1 = service.getFileContext('device-missing-1')();
         expect(context1).not.toBeNull();
-        expect(context1!.files).toHaveLength(1);
-        expect(context1!.files.find((f) => f.path === '/test/missing.prg')).toBeUndefined();
+        expect(context1!.files).toHaveLength(0);
 
         // Scenario 2: Random launch (file not in directory response)
         service.initializePlayer('device-missing-2');
@@ -1096,7 +1101,11 @@ describe('PlayerContextService - Incompatible File Handling', () => {
           createTestFileItem({ name: 'good.sid', path: '/music/good.sid' }),
         ];
 
-        mockPlayerService.launchRandom.mockReturnValue(of(incompatibleFile));
+        // Once, not mockReturnValue: the incompatible-retry delay is overridden to 0 for this
+        // suite, so the shuffle-mode retry it schedules fires within the same nextTick(). A
+        // persistent incompatible response would let that retry launch (and mark) a second
+        // time, which is a real second launch under test, not the bug this suite covers.
+        mockPlayerService.launchRandom.mockReturnValueOnce(of(incompatibleFile));
         mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
           path: '/music',
           directory: {
@@ -1207,6 +1216,12 @@ describe('PlayerContextService - Incompatible File Handling', () => {
 
     describe('Integration - Player and storage sync', () => {
       it('should sync storage after player context update', async () => {
+        // Fake (and never advanced) timers freeze the shuffle-mode retry the incompatible
+        // launch schedules. Left on the real clock (delay 0 for this suite) that retry fires
+        // within nextTick() and, since its file isn't in the mocked directory listing below,
+        // wipes the context this test asserts on back to empty.
+        vi.useFakeTimers();
+
         const incompatibleFile = createTestFileItem({
           name: 'bad.sid',
           path: '/music/bad.sid',

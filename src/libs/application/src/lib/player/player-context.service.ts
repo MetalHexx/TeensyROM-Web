@@ -309,10 +309,10 @@ export class PlayerContextService implements IPlayerContext {
             launchMode: this.store.getLaunchMode(deviceId)(),
           });
 
-          // Sync incompatible file to storage store
-          if (launchedFile?.isCompatible === false) {
-            this.markFileInStorageAsIncompatible(deviceId, storageType, launchedFile.file.path);
-          }
+          // Storage sync for an incompatible launched file is left to handleIncompatibleFile,
+          // which every caller of this method invokes immediately afterward. Marking here too
+          // double-invokes updateFileCompatibility for the same path on every random/history
+          // launch of an incompatible file.
         }
       }
     } catch {
@@ -1093,7 +1093,13 @@ export class PlayerContextService implements IPlayerContext {
 
     const { files, currentIndex, storageKey } = fileContext;
     const { storageType } = StorageKeyUtil.parse(storageKey);
-    const maxAttempts = files.length; // Prevent infinite loops
+    // Bounded to files.length - 1: examine every *other* file exactly once. At
+    // files.length attempts the wrap-around (currentIndex + 1 + i) % files.length lands
+    // back on currentIndex itself for i = files.length - 1, which is the file
+    // handleIncompatibleFile already marked incompatible before scheduling this scan -
+    // re-examining it double-marks the same path. A single-file directory yields 0
+    // attempts here, falling straight through to the alert + random-launch fallback below.
+    const maxAttempts = files.length - 1;
 
     // Search for next compatible file starting from currentIndex + 1
     for (let i = 0; i < maxAttempts; i++) {
