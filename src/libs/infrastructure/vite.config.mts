@@ -16,6 +16,13 @@ export default defineConfig(() => ({
     exclude: [],
     setupFiles: ['src/test-setup.ts'],
     reporters: ['default'],
+    testTimeout: 2000,
+    hookTimeout: 5000,
+    onConsoleLog(log) {
+      if (log.includes('Could not parse CSS stylesheet')) {
+        return false;
+      }
+    },
     coverage: {
       reportsDirectory: '../../coverage/libs/infrastructure',
       provider: 'v8' as const,

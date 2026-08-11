@@ -19,6 +19,13 @@ export default defineConfig(() => ({
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     setupFiles: ['src/test-setup.ts'],
     reporters: ['default'],
+    testTimeout: 2000,
+    hookTimeout: 5000,
+    onConsoleLog(log) {
+      if (log.includes('Could not parse CSS stylesheet')) {
+        return false;
+      }
+    },
     coverage: {
       reportsDirectory: '../../coverage/apps/teensyrom-ui',
       provider: 'v8' as const,

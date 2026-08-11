@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   PNPM_VERSION: '9'
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
@@ -21,6 +21,7 @@ jobs:
   frontend-checks:
     name: Frontend Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     defaults:
       run:
@@ -61,7 +62,8 @@ jobs:
             --exclude=teensyrom-ui-e2e,TeensyRom.Api.Tests.Integration,TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api,TeensyRom.Core,TeensyRom.Core.Device,TeensyRom.Core.Serial,TeensyRom.Core.Storage,TeensyRom.Tools.DeepSidExporter
 
       - name: Unit Tests
+        timeout-minutes: 10
         run: |
-          pnpm exec nx affected --target=vite:test \
+          pnpm exec nx affected --target=test \
             --exclude=teensyrom-ui-e2e,TeensyRom.Api.Tests.Integration,TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api,TeensyRom.Core,TeensyRom.Core.Device,TeensyRom.Core.Serial,TeensyRom.Core.Storage,TeensyRom.Tools.DeepSidExporter
 

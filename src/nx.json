@@ -76,12 +76,6 @@
         "watchDepsTargetName": "watch-deps"
       }
     },
-    {
-      "plugin": "@nx/jest/plugin",
-      "options": {
-        "targetName": "test"
-      }
-    },
     "@nx/dotnet"
   ],
   "generators": {
