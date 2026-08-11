@@ -840,16 +840,13 @@ describe('SettingsStore (NgRx Signal Store)', () => {
   // --------------------------------------------------------------------------
   // VIDEO SETTINGS INTEGRATION TESTS
   // --------------------------------------------------------------------------
-  // NOTE: These tests are skipped because videoSettings moved to knownDevices array
-  // TODO: Add new tests for per-device video settings in knownDevices
 
-  describe.skip('Video Settings Integration (Obsolete - moved to knownDevices)', () => {
+  describe('Video Settings Integration', () => {
     it('should load video settings from API', async () => {
       const mockSettings = createMockSettings({
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -864,7 +861,6 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: false, videoDeviceId: '' },
-          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -875,8 +871,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
           knownDevices: [{
             deviceId: 'test-device',
             videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-            connectionSettings: { autoConnectEnabled: false },
-          }],
+            }],
         },
       });
 
@@ -901,7 +896,6 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: false, videoDeviceId: '' },
-          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -912,8 +906,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
           knownDevices: [{
             deviceId: 'test-device',
             videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-            connectionSettings: { autoConnectEnabled: false },
-          }],
+            }],
         },
       });
 
@@ -927,7 +920,6 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: false, videoDeviceId: '' },
-          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -938,8 +930,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
           knownDevices: [{
             deviceId: 'test-device',
             videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-            connectionSettings: { autoConnectEnabled: false },
-          }],
+            }],
         },
       });
       expect(store.settings()?.knownDevices[0].videoSettings.enableVideo).toBe(true);
@@ -953,7 +944,6 @@ describe('SettingsStore (NgRx Signal Store)', () => {
         knownDevices: [{
           deviceId: 'test-device',
           videoSettings: { enableVideo: false, videoDeviceId: '' },
-          connectionSettings: { autoConnectEnabled: false },
         }],
       });
       vi.mocked(mockSettingsService.getSettings).mockReturnValue(of(mockSettings));
@@ -964,8 +954,7 @@ describe('SettingsStore (NgRx Signal Store)', () => {
           knownDevices: [{
             deviceId: 'test-device',
             videoSettings: { enableVideo: true, videoDeviceId: 'test' },
-            connectionSettings: { autoConnectEnabled: false },
-          }],
+            }],
         },
       });
       store.undo();

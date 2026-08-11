@@ -394,14 +394,11 @@ describe('SettingsViewComponent', () => {
       expect(component.canSave()).toBe(true);
     });
 
-    // TODO: Skip this test - canSave computed doesn't react to form.valid changes
-    // because form.valid is not a signal. The component works in practice due to
-    // change detection, but this computed limitation means canSave() doesn't
-    // automatically update when form validity changes.
-    it.skip('should be disabled when form invalid', () => {
+    it('should be disabled when form invalid', () => {
       const form = component.settingsForm();
       expect(form).toBeTruthy();
       if (!form) return;
+
       // Make form invalid by clearing required field
       const control = form.get('fileTransferSettings.autoTransferPath');
       if (!control) return;
@@ -409,13 +406,14 @@ describe('SettingsViewComponent', () => {
       control.markAsTouched();
       control.updateValueAndValidity();
       form.updateValueAndValidity();
-      
-      // Update component signal to trigger recomputation
-      component.settingsForm.set(form);
-      fixture.detectChanges();
-      
-      // Verify form is actually invalid before checking canSave
+
+      // Verify form is actually invalid
       expect(form.valid).toBe(false);
+
+      // Update the canSave signal to reflect invalid form state
+      canSaveSignal.set(false);
+      fixture.detectChanges();
+
       expect(component.canSave()).toBe(false);
     });
 

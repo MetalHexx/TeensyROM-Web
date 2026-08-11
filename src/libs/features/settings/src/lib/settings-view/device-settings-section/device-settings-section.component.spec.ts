@@ -141,19 +141,6 @@ describe('DeviceSettingsSectionComponent', () => {
       );
       expect(videoToggle).toBeTruthy();
     });
-
-    // Auto-connect toggle is currently commented out in the template
-    it.skip('should display auto-connect toggle for each device', () => {
-      const devicesArray = fb.array([createDeviceFormGroup('device-123')]);
-      fixture.componentRef.setInput('knownDevicesArray', devicesArray);
-      fixture.detectChanges();
-
-      const toggles = fixture.nativeElement.querySelectorAll('lib-settings-toggle-item');
-      const autoConnectToggle = Array.from(toggles as Element[]).find((t: Element) =>
-        t.getAttribute('label')?.includes('Auto-connect')
-      );
-      expect(autoConnectToggle).toBeTruthy();
-    });
   });
 
   describe('Device Title', () => {
