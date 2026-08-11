@@ -84,6 +84,7 @@ export class DeviceStore {
 - Lint/format: `pnpm nx lint`; `pnpm run format`
 - Backend: `dotnet build` / `dotnet run` / `dotnet test` from `apps/api/src/TeensyRom.Api` (or the solution `apps/api/TeensyRom.Ui.sln`)
 - Regenerate OpenAPI spec: `dotnet build apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj` (generated in `apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json`), then regenerate the TypeScript client and update Angular services/state
+- Dev fixture page: `/dev/transfer-states` — renders every file-transfer modal/dropzone state (including hard-to-trigger ones like `device-busy`, `draining`, `aborted`) with no backend or device needed. Not linked from nav; source in `libs/features/file-transfer/src/lib/dev-transfer-fixtures/`.
 
 ## Code Organization Patterns
 
