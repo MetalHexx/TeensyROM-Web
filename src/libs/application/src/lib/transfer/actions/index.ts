@@ -8,7 +8,6 @@ import { reportScanProgress } from './report-scan-progress';
 import { completeScan } from './complete-scan';
 import { beginJob } from './begin-job';
 import { applyJobSnapshot } from './apply-job-snapshot';
-import { recordFileCompletion } from './record-file-completion';
 import { recordUploadFailure } from './record-upload-failure';
 import { setDeviceBusy } from './set-device-busy';
 import { setTransferError } from './set-transfer-error';
@@ -26,7 +25,6 @@ export function withTransferActions() {
       ...completeScan(writableStore),
       ...beginJob(writableStore),
       ...applyJobSnapshot(writableStore),
-      ...recordFileCompletion(writableStore),
       ...recordUploadFailure(writableStore),
       ...setDeviceBusy(writableStore),
       ...setTransferError(writableStore),

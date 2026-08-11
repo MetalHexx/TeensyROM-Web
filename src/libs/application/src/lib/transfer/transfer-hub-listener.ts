@@ -8,7 +8,7 @@ import { logInfo, logError, LogType } from '@teensyrom-nx/utils';
  * Live transfer-hub coordination for the single in-flight transfer.
  *
  * Joins a job's SignalR group, seeds the store from the server's current snapshot, and folds
- * every subsequent snapshot push and per-file completion into the `TransferStore` until stopped.
+ * every subsequent snapshot push into the `TransferStore` until stopped.
  */
 @Injectable({
   providedIn: 'root',
@@ -35,11 +35,7 @@ export class TransferHubListener {
       this.transferStore.applyJobSnapshot({ deviceId, snapshot });
     });
 
-    const completionSubscription = this.hubService.fileCompletions$.subscribe((completion) => {
-      this.transferStore.recordFileCompletion({ deviceId, completion });
-    });
-
-    this.subscriptions = [snapshotSubscription, completionSubscription];
+    this.subscriptions = [snapshotSubscription];
 
     logInfo(
       LogType.Success,

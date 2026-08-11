@@ -43,4 +43,7 @@ export interface TransferJobSnapshot {
   startedUtc: Date;
   error: string | null;
   failures: TransferFileCompletion[];
+  recentCompletions: TransferFileCompletion[]; // newest-first, server-bounded
+  bytesPerSecond: number; // rolling window; 0 when idle
+  filesPerSecond: number; // rolling window; 0 when idle
 }

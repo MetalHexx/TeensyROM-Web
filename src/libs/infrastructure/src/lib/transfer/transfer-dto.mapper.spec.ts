@@ -34,6 +34,18 @@ describe('TransferDtoMapper', () => {
         sizeBytes: 100,
       },
     ],
+    recentCompletions: [
+      {
+        jobId: 'job-1',
+        relativePath: 'games/good.prg',
+        targetPath: '/games/good.prg',
+        success: true,
+        error: null,
+        sizeBytes: 200,
+      },
+    ],
+    bytesPerSecond: 1024,
+    filesPerSecond: 2.5,
   };
 
   it('normalizes TransferJobDto (create/seal/cancel envelope) into the domain snapshot', () => {
@@ -64,6 +76,18 @@ describe('TransferDtoMapper', () => {
           sizeBytes: 100,
         },
       ],
+      recentCompletions: [
+        {
+          jobId: 'job-1',
+          relativePath: 'games/good.prg',
+          targetPath: '/games/good.prg',
+          success: true,
+          error: null,
+          sizeBytes: 200,
+        },
+      ],
+      bytesPerSecond: 1024,
+      filesPerSecond: 2.5,
     });
   });
 
