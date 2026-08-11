@@ -64,11 +64,25 @@ Directory Mode Navigation and Navigation Error Handling rows originally proposed
 future target file; the row-level table further down (`ported` disposition) is the source of
 truth for exactly which rows moved.
 
+**P03‑T04 update:** T04 executed a two-file split (`player-context-shuffle.spec.ts` +
+`player-context-filter.spec.ts`, plus a third file `player-context-navigation-url.spec.ts` with
+no inventory rows of its own — see below) instead of the single `navigation-shuffle.spec.ts`
+proposed below, per the task handoff's "Three files by behavior" instruction. The
+`player-context-lifecycle.spec.ts` file proposed below was never created: the handoff's own
+instruction ("fold multi-device isolation and error-recovery rows into whichever of the three
+owns the behavior rather than creating a fourth grab-bag file") is read as authorizing folding
+only the shuffle/filter-relevant rows into the two new files and dropping the rest — see rows
+43–53's dispositions and this task's Execution Notes for the reasoning per row. Rows 303–305
+(`player-context-initialization.spec.ts`) are untouched by T04 — that file is outside this
+task's scope (Files: Read only the rows this task owns) and remains for whichever task deletes
+`player-context-initialization.spec.ts`.
+
 | Target file | Tests | Sourced from |
 |---|---:|---|
 | `player-context-launch.spec.ts` | 12 (done — P03‑T03) | monolith: Init & Cleanup (rows 1–3), Phase 1 Launching (rows 4–7), Phase 2 plain `launchRandomFile` (rows 8–12) |
-| `player-context-lifecycle.spec.ts` | 14 remaining | monolith: Signal API, Multi-Device Isolation, Error Recovery (rows 43–53); `player-context-initialization.spec.ts` (whole, rows 303–305) |
-| `player-context-navigation-shuffle.spec.ts` | 17 remaining | monolith: Phase 2 Shuffle Toggle/Settings (rows 13–17), Phase 3 Shuffle Mode Navigation (rows 35–39), Phase 4 Filter System (rows 66–72) |
+| `player-context-shuffle.spec.ts` | 10 (done — P03‑T04) | monolith: Phase 2 Shuffle Toggle/Settings (rows 13–15, 17), Phase 3 Shuffle Mode Navigation (rows 35–39), Multi-Device Isolation (row 49), partial rows 45–46 |
+| `player-context-filter.spec.ts` | 8 (done — P03‑T04) | monolith: Phase 2 Shuffle Settings Management filter row (row 16), Phase 4 Filter System (rows 66–72) |
+| `player-context-navigation-url.spec.ts` | 13 (done — P03‑T04) | new coverage of `updateUrlForLaunchedFile`, `startListeningToPopState`/`stopListeningToPopState`, and browser popstate relaunch — no inventory rows existed for this behavior (see Execution Notes) |
 | `player-context-playback.spec.ts` | 29 (done — P03‑T03) | monolith: Phase 3 Play/Pause/Stop Control (rows 18–25, 29–30), Phase 3 Directory Mode Navigation + Navigation Error Handling (rows 31–34, 40–42), State Transitions (rows 54–65) |
 | `player-context-incompatible-marking.spec.ts` | 11 | `player-context-incompatible-files.service.spec.ts`: File marking consistency cross-scenario |
 | `player-context-incompatible-sync.spec.ts` | 14 | `player-context-incompatible-files.service.spec.ts`: Storage Store Synchronization; monolith: Incompatible File Playback Prevention, Timer's Incompatible File Handling |
@@ -112,11 +126,11 @@ truth for exactly which rows moved.
 | 10 | A failed directory alignment after random launch doesn't throw; current file still updates | launchRandomFile, getCurrentFile | resolves without throw; currentFile set | ported | player-context-launch.spec.ts |
 | 11 | When alignment resolves with no directory state available, launch still completes | launchRandomFile, getCurrentFile, getLaunchMode | alignToPlayingFile called; currentFile set; mode Shuffle | ported | player-context-launch.spec.ts |
 | 12 | A failed random launch sets error state and leaves no current file | launchRandomFile, getError, getCurrentFile, isLoading | error truthy; currentFile null; not loading | ported | player-context-launch.spec.ts |
-| 13 | Toggling shuffle mode switches launch mode and persists settings | toggleShuffleMode, getLaunchMode | mode becomes Shuffle; storage save called | port | player-context-navigation-shuffle.spec.ts |
-| 14 | Toggling twice returns to Directory mode | toggleShuffleMode, getLaunchMode | mode Shuffle then Directory | port | player-context-navigation-shuffle.spec.ts |
-| 15 | Setting shuffle scope updates shuffle settings and persists | setShuffleScope, getShuffleSettings | settings.scope updated; storage save called | port | player-context-navigation-shuffle.spec.ts |
-| 16 | Setting filter mode updates shuffle settings' filter | setFilterMode, getShuffleSettings | settings.filter updated | port | player-context-navigation-shuffle.spec.ts |
-| 17 | Scope/filter set on one device don't affect another device | setShuffleScope, setFilterMode, getShuffleSettings | each device's settings reflect only its own updates | port | player-context-navigation-shuffle.spec.ts |
+| 13 | Toggling shuffle mode switches launch mode and persists settings | toggleShuffleMode, getLaunchMode | mode becomes Shuffle; storage save called | ported (storage-save assertion dropped — see Execution Notes) | player-context-shuffle.spec.ts |
+| 14 | Toggling twice returns to Directory mode | toggleShuffleMode, getLaunchMode | mode Shuffle then Directory | ported | player-context-shuffle.spec.ts |
+| 15 | Setting shuffle scope updates shuffle settings and persists | setShuffleScope, getShuffleSettings | settings.scope updated; storage save called | ported (storage-save assertion dropped — see Execution Notes) | player-context-shuffle.spec.ts |
+| 16 | Setting filter mode updates shuffle settings' filter | setFilterMode, getShuffleSettings | settings.filter updated | ported | player-context-filter.spec.ts |
+| 17 | Scope/filter set on one device don't affect another device | setShuffleScope, setFilterMode, getShuffleSettings | each device's settings reflect only its own updates | ported | player-context-shuffle.spec.ts |
 | 18 | play() while stopped invokes toggleMusic and transitions to Playing | play, stop, getPlayerStatus, getError | toggleMusic called with deviceId; status Playing; error null | ported | player-context-playback.spec.ts |
 | 19 | play() while paused resumes to Playing | play, pause, getPlayerStatus | status Playing; error null | ported | player-context-playback.spec.ts |
 | 20 | play() while already playing is a no-op | play, getPlayerStatus | toggleMusic not called; status stays Playing; error null | ported | player-context-playback.spec.ts |
@@ -134,25 +148,25 @@ truth for exactly which rows moved.
 | 32 | previous() launches the preceding file in the context array | previous, getCurrentFile | launchFile called with file1; currentFile equals file1 | ported | player-context-playback.spec.ts |
 | 33 | previous() from the first file wraps to the last file | previous, getCurrentFile | launchFile called with file3 (last); currentFile equals file3 | ported | player-context-playback.spec.ts |
 | 34 | next() from the last file wraps to the first file | next, getCurrentFile | launchFile last called with file1 | ported | player-context-playback.spec.ts |
-| 35 | next() in shuffle mode launches a random file | next, getCurrentFile, getLaunchMode | launchRandom called; currentFile equals random file; mode Shuffle | port | player-context-navigation-shuffle.spec.ts |
-| 36 | previous() in shuffle mode also launches a random file | previous, getCurrentFile, getLaunchMode | launchRandom called; currentFile equals random file; mode Shuffle | port | player-context-navigation-shuffle.spec.ts |
-| 37 | A shuffle next() aligns and loads the containing directory as file context | next, getFileContext, StorageStore.alignToPlayingFile | alignToPlayingFile called with path; fileContext files/currentIndex reflect directory listing | port | player-context-navigation-shuffle.spec.ts |
-| 38 | Mirrors #37 for previous() | previous, getFileContext | alignToPlayingFile called with path; fileContext matches directory | port | player-context-navigation-shuffle.spec.ts |
-| 39 | A failed directory load during shuffle next() doesn't block the launch or set an error | next, getCurrentFile, getError | launchRandom still called; currentFile set; error null | port | player-context-navigation-shuffle.spec.ts |
+| 35 | next() in shuffle mode launches a random file | next, getCurrentFile, getLaunchMode | launchRandom called; currentFile equals random file; mode Shuffle | ported | player-context-shuffle.spec.ts |
+| 36 | previous() in shuffle mode also launches a random file | previous, getCurrentFile, getLaunchMode | launchRandom called; currentFile equals random file; mode Shuffle | ported | player-context-shuffle.spec.ts |
+| 37 | A shuffle next() aligns and loads the containing directory as file context | next, getFileContext, StorageStore.alignToPlayingFile | alignToPlayingFile called with path; fileContext files/currentIndex reflect directory listing | ported | player-context-shuffle.spec.ts |
+| 38 | Mirrors #37 for previous() | previous, getFileContext | alignToPlayingFile called with path; fileContext matches directory | ported | player-context-shuffle.spec.ts |
+| 39 | A failed directory load during shuffle next() doesn't block the launch or set an error | next, getCurrentFile, getError | launchRandom still called; currentFile set; error null | ported | player-context-shuffle.spec.ts |
 | 40 | A failed next() launch sets error state | next, getError | error truthy | ported | player-context-playback.spec.ts |
 | 41 | A failed previous() launch sets error state | previous, getError | error truthy | ported | player-context-playback.spec.ts |
 | 42 | next()/previous() on a freshly (re)initialized device with no context resolve without throwing | next, previous | both calls resolve, no throw | ported | player-context-playback.spec.ts |
-| 43 | All per-device state accessors return signal functions | getCurrentFile, getFileContext, isLoading, getError, getStatus, getShuffleSettings, getLaunchMode, getPlayerStatus | each accessor's return type is a function | port | player-context-lifecycle.spec.ts |
-| 44 | getStatus and getPlayerStatus expose the same underlying status | getStatus, getPlayerStatus | both equal Stopped initially | port | player-context-lifecycle.spec.ts |
-| 45 | Querying an uninitialized device returns null for file/context/error/shuffle-settings | getCurrentFile, getFileContext, getError, getShuffleSettings | each is null | port | player-context-lifecycle.spec.ts |
-| 46 | Uninitialized device reports not-loading, Stopped, Directory mode by default | isLoading, getStatus, getLaunchMode | false / Stopped / Directory | port | player-context-lifecycle.spec.ts |
-| 47 | Two devices launching different files keep separate current files | launchFileWithContext, getCurrentFile | each device's currentFile equals its own launched file | port | player-context-lifecycle.spec.ts |
-| 48 | Shuffle scope/filter set on one device don't affect another (service-level isolation) | setShuffleScope, setFilterMode, getShuffleSettings | each device keeps its own scope/filter | port | player-context-lifecycle.spec.ts |
-| 49 | Toggling shuffle on one device doesn't change another device's mode | toggleShuffleMode, getLaunchMode | device1 Shuffle, device2 stays Directory | port | player-context-lifecycle.spec.ts |
-| 50 | An error on one device doesn't leak to another device's error state | launchFileWithContext, getError | device1 error truthy, device2 error null | port | player-context-lifecycle.spec.ts |
-| 51 | A subsequent successful launch clears a prior error | launchFileWithContext, getError, getCurrentFile | error becomes null; currentFile set after the successful retry | port | player-context-lifecycle.spec.ts |
-| 52 | isLoading toggles true then false around a delayed launch | launchFileWithContext, isLoading | true mid-flight, false after completion | port | player-context-lifecycle.spec.ts |
-| 53 | A second concurrent launch is blocked with a warning while the first wins | launchFileWithContext, getCurrentFile, isLoading, getError, IAlertService.warning | currentFile is file1; not loading; error null; warning alert shown | port | player-context-lifecycle.spec.ts |
+| 43 | All per-device state accessors return signal functions | getCurrentFile, getFileContext, isLoading, getError, getStatus, getShuffleSettings, getLaunchMode, getPlayerStatus | each accessor's return type is a function | dropped — no `player-context-lifecycle.spec.ts` exists in the executed plan (T04's handoff folds this section into shuffle/filter/URL or drops it, per "The change"); this row spans mostly non-shuffle/filter/URL accessors and every accessor it names is already exercised as a live signal (`()()`) throughout `player-context-launch.spec.ts`, `player-context-playback.spec.ts` (T03), and this task's shuffle/filter/URL files — the standalone `typeof === 'function'` check adds nothing those call sites don't already prove | — |
+| 44 | getStatus and getPlayerStatus expose the same underlying status | getStatus, getPlayerStatus | both equal Stopped initially | dropped — playback-lifecycle behavior, not shuffle/filter/URL; equivalent status handling is exercised throughout `player-context-playback.spec.ts` (T03), which reads both accessors interchangeably | — |
+| 45 | Querying an uninitialized device returns null for file/context/error/shuffle-settings | getCurrentFile, getFileContext, getError, getShuffleSettings | each is null | ported (partial — shuffle-relevant assertion only, see Execution Notes); getCurrentFile/getFileContext/getError null-for-uninitialized dropped as out of scope for shuffle/filter/URL | player-context-shuffle.spec.ts |
+| 46 | Uninitialized device reports not-loading, Stopped, Directory mode by default | isLoading, getStatus, getLaunchMode | false / Stopped / Directory | ported (partial — getLaunchMode default only, see Execution Notes); isLoading/getStatus defaults dropped as out of scope for shuffle/filter/URL | player-context-shuffle.spec.ts |
+| 47 | Two devices launching different files keep separate current files | launchFileWithContext, getCurrentFile | each device's currentFile equals its own launched file | dropped — launch/lifecycle isolation, not shuffle/filter/URL; device isolation of launched state is already exercised by `player-context-launch.spec.ts`'s multi-device initialization/removal coverage (T03) | — |
+| 48 | Shuffle scope/filter set on one device don't affect another (service-level isolation) | setShuffleScope, setFilterMode, getShuffleSettings | each device keeps its own scope/filter | dropped — duplicate coverage of #17, which asserts the identical scope+filter per-device isolation through the same public surface | — |
+| 49 | Toggling shuffle on one device doesn't change another device's mode | toggleShuffleMode, getLaunchMode | device1 Shuffle, device2 stays Directory | ported | player-context-shuffle.spec.ts |
+| 50 | An error on one device doesn't leak to another device's error state | launchFileWithContext, getError | device1 error truthy, device2 error null | dropped — generic launch-error isolation, not shuffle/filter/URL; belongs with launch/lifecycle coverage owned by T03's `player-context-launch.spec.ts`, not a fourth grab-bag file in this task | — |
+| 51 | A subsequent successful launch clears a prior error | launchFileWithContext, getError, getCurrentFile | error becomes null; currentFile set after the successful retry | dropped — generic launch error-recovery, not shuffle/filter/URL; same reasoning as #50 | — |
+| 52 | isLoading toggles true then false around a delayed launch | launchFileWithContext, isLoading | true mid-flight, false after completion | dropped — duplicate of the equivalent isLoading true/false assertion already ported in `player-context-launch.spec.ts` (T03, "is loading while the launch is pending and stops loading once it resolves") | — |
+| 53 | A second concurrent launch is blocked with a warning while the first wins | launchFileWithContext, getCurrentFile, isLoading, getError, IAlertService.warning | currentFile is file1; not loading; error null; warning alert shown | dropped — generic launch-guard behavior, not shuffle/filter/URL; belongs with launch/lifecycle coverage, not a fourth grab-bag file in this task (flagging as a genuine coverage gap — see Execution Notes) | — |
 | 54 | Launching a music file moves status Stopped→Playing | launchFileWithContext, getPlayerStatus | status Playing after launch | ported | player-context-playback.spec.ts |
 | 55 | Launching a non-music (game) file also results in Playing status | launchFileWithContext, getPlayerStatus | status Playing regardless of file type | ported | player-context-playback.spec.ts |
 | 56 | pause() then play() round-trips status correctly | pause, play, getPlayerStatus | Paused after pause(), Playing after play() | ported | player-context-playback.spec.ts |
@@ -165,13 +179,13 @@ truth for exactly which rows moved.
 | 63 | A launch→pause→play→stop→previous sequence produces the expected status at each step | launchFileWithContext, pause, play, stop, previous, getPlayerStatus | status sequence Playing, Paused, Playing, Stopped, Playing | ported | player-context-playback.spec.ts |
 | 64 | Switching from a music file to a game file keeps status Playing | launchFileWithContext, getPlayerStatus | status Playing after both launches | ported | player-context-playback.spec.ts |
 | 65 | A pause() API failure leaves status in a valid value and records an error | pause, getPlayerStatus, getError | status is one of Playing/Paused/Stopped; error truthy | ported | player-context-playback.spec.ts |
-| 66 | The active filter is forwarded to the random-launch API call | setFilterMode, launchRandomFile | launchRandom called with Games filter | port | player-context-navigation-shuffle.spec.ts |
-| 67 | Filter is forwarded on shuffle next() | setFilterMode, next | launchRandom called with Music filter | port | player-context-navigation-shuffle.spec.ts |
-| 68 | Filter is forwarded on shuffle previous() | setFilterMode, previous | launchRandom called with Images filter | port | player-context-navigation-shuffle.spec.ts |
-| 69 | Changing the filter mid-session changes the filter used by the next random launch | setFilterMode, launchRandomFile | first call uses All, second uses Games after update | port | player-context-navigation-shuffle.spec.ts |
-| 70 | Filter set in Directory mode survives a switch into Shuffle | setFilterMode, toggleShuffleMode, getShuffleSettings | filter unchanged after toggling | port | player-context-navigation-shuffle.spec.ts |
-| 71 | Filter survives a Directory→Shuffle→Directory round-trip toggle | setFilterMode, toggleShuffleMode, getShuffleSettings | filter identical before and after round-trip | port | player-context-navigation-shuffle.spec.ts |
-| 72 | Two devices keep separate filters | setFilterMode, getShuffleSettings | each device's filter matches only its own setting | port | player-context-navigation-shuffle.spec.ts |
+| 66 | The active filter is forwarded to the random-launch API call | setFilterMode, launchRandomFile | launchRandom called with Games filter | ported | player-context-filter.spec.ts |
+| 67 | Filter is forwarded on shuffle next() | setFilterMode, next | launchRandom called with Music filter | ported | player-context-filter.spec.ts |
+| 68 | Filter is forwarded on shuffle previous() | setFilterMode, previous | launchRandom called with Images filter | ported | player-context-filter.spec.ts |
+| 69 | Changing the filter mid-session changes the filter used by the next random launch | setFilterMode, launchRandomFile | first call uses All, second uses Games after update | ported | player-context-filter.spec.ts |
+| 70 | Filter set in Directory mode survives a switch into Shuffle | setFilterMode, toggleShuffleMode, getShuffleSettings | filter unchanged after toggling | ported | player-context-filter.spec.ts |
+| 71 | Filter survives a Directory→Shuffle→Directory round-trip toggle | setFilterMode, toggleShuffleMode, getShuffleSettings | filter identical before and after round-trip | ported | player-context-filter.spec.ts |
+| 72 | Two devices keep separate filters | setFilterMode, getShuffleSettings | each device's filter matches only its own setting | ported | player-context-filter.spec.ts |
 | 73 | Launching a music file with a valid playLength creates a timer sized to that duration | launchFileWithContext, getTimerState | totalTime equals parsed ms (225000) | port | player-context-timer-lifecycle.spec.ts |
 | 74 | Non-music files never get a timer | launchFileWithContext, getTimerState | timerState null | port | player-context-timer-lifecycle.spec.ts |
 | 75 | An unparsable playLength falls back to a 3-minute timer and logs a warning | launchFileWithContext, getTimerState | totalTime 180000; console.warn mentions invalid format | port | player-context-timer-lifecycle.spec.ts |
