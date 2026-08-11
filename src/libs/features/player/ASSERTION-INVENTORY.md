@@ -801,6 +801,47 @@ inventory's 694-count (the grep pattern this inventory measures against doesn't 
 | 528 | launchRandomFile isn't called when disabled and the handler is invoked directly | onRandomLaunchClick(), launchRandomFile | not called | state | port | filter-toolbar.component.spec.ts |
 | 529 | All buttons are enabled when disabled=false | 4 filter buttons componentInstance.disabled() | all false | state | port | filter-toolbar.component.spec.ts |
 
+## 23. storage-container/play-history/history-entry/history-entry.component.spec.ts (12 tests)
+
+Public surface: `fileIcon()`, `entrySelected`/`entryDoubleClick` outputs, `selected` input,
+rendered `lib-storage-item`.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 530 | Component instantiates | component | truthy | state | port | history-entry.component.spec.ts |
+| 531 | The entry's file name renders in the item's text | nativeElement textContent | contains the file name | dom-copy | port (re-expressed as dom-structural) — assert the name text renders, not the literal string | history-entry.component.spec.ts |
+| 532 | The entry's timestamp renders in a locale-formatted form | nativeElement textContent | matches `/3:45\s*PM/` | dom-copy | port — genuine timestamp-formatting behavior, not decorative copy | history-entry.component.spec.ts |
+| 533 | Song maps to music_note | fileIcon() | 'music_note' | state | port | history-entry.component.spec.ts |
+| 534 | Game maps to sports_esports | fileIcon() | 'sports_esports' | state | port | history-entry.component.spec.ts |
+| 535 | Image maps to image | fileIcon() | 'image' | state | port | history-entry.component.spec.ts |
+| 536 | Hex maps to code | fileIcon() | 'code' | state | port | history-entry.component.spec.ts |
+| 537 | Unknown maps to insert_drive_file | fileIcon() | 'insert_drive_file' | state | port | history-entry.component.spec.ts |
+| 538 | Clicking the entry emits entrySelected with the entry | click, entrySelected output | emits the entry | state | port | history-entry.component.spec.ts |
+| 539 | Double-clicking the entry emits entryDoubleClick with the entry | dblclick, entryDoubleClick output | emits the entry | state | port | history-entry.component.spec.ts |
+| 540 | The selected class applies when selected=true | `lib-storage-item`.classList | contains 'selected' | dom-structural | port | history-entry.component.spec.ts |
+| 541 | The selected class is absent when selected=false | `lib-storage-item`.classList | doesn't contain 'selected' | dom-structural | port | history-entry.component.spec.ts |
+
+## 24. storage-container/play-history/play-history.component.spec.ts (12 tests)
+
+Public surface: `IPlayerContext`/`StorageStore` (mocked), `onEntrySelected()`/`selectedEntry()`,
+`onEntryDoubleClick()`, `isSelected()`, `isCurrentlyPlaying()`, rendered `lib-empty-state-message`,
+`.history-list`/`.history-list-item`, `lib-history-entry`.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 542 | Component instantiates | component | truthy | state | port | play-history.component.spec.ts |
+| 543 | Empty state renders when there's no history | `lib-empty-state-message`, nativeElement textContent | truthy; contains 'No Launch History' | dom-structural | port (re-expressed) — drop the literal message text, keep the empty-state presence | play-history.component.spec.ts |
+| 544 | History entries render as a list when history exists | `.history-list`, `lib-history-entry` count | truthy; 3 entries | dom-structural | port | play-history.component.spec.ts |
+| 545 | Entries display newest-first (reverse chronological) | `.history-list-item` data-index attributes | first item index '0', last item index '2' | dom-structural | port | play-history.component.spec.ts |
+| 546 | The currently playing entry is highlighted in the reversed display | `.history-list-item` data-is-playing | 'true' on the correct displayed item | dom-structural | port | play-history.component.spec.ts |
+| 547 | An error on the current file shows both playing and error highlights | `.history-list-item` data-is-playing/data-has-error | both 'true' | dom-structural | port | play-history.component.spec.ts |
+| 548 | Single-clicking an entry selects it | onEntrySelected(), selectedEntry() | equals the clicked entry | state | port | play-history.component.spec.ts |
+| 549 | Double-clicking an entry navigates to its history position, mapped from the reversed display index | onEntryDoubleClick(), navigateToHistoryPosition | called with (deviceId, originalIndex) | state | port | play-history.component.spec.ts |
+| 550 | The reversed-display index mapping is correct for a different display position | onEntryDoubleClick(), navigateToHistoryPosition | called with (deviceId, originalIndex) | state | drop — duplicate of row 549's index-mapping claim, same calculation with different index values | — |
+| 551 | Double-click navigation is a no-op with an empty history | onEntryDoubleClick(), navigateToHistoryPosition | not called | state | port | play-history.component.spec.ts |
+| 552 | isSelected correctly identifies the selected entry | selectedEntry.set(), isSelected() | true for selected, false for the other | state | port | play-history.component.spec.ts |
+| 553 | isCurrentlyPlaying correctly identifies the playing entry | getCurrentFile (mocked), isCurrentlyPlaying() | true for the playing entry, false for the other | state | port | play-history.component.spec.ts |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
