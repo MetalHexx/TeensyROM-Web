@@ -240,7 +240,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 
 ## Configuration & Tuning
 
-All constants are centralized in `TransferOptions` (a singleton, settable for testing):
+All constants are centralized in `TransferOptions` (a singleton, settable for testing), bound at startup from the `Transfer` section of `appsettings.json` via `TransferOptionsBinder`, which clamps out-of-range values back to the compiled defaults:
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
