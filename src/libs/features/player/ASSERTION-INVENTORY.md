@@ -905,6 +905,42 @@ Public surface: `StorageStore`/`IPlayerContext` (mocked), `onFileSelected()`/`se
 | 596 | A playing file missing from the current search results doesn't crash and isn't highlighted | isCurrentlyPlaying() for both results | false for both; no throw | state | port | search-results.component.spec.ts |
 | 597 | Double-clicking with no search state doesn't crash and doesn't launch | onFileDoubleClick(), launchFileWithContext | resolves; not called | state | port | search-results.component.spec.ts |
 
+## 27. storage-container/search-toolbar/search-toolbar.component.spec.ts (27 tests)
+
+Public surface: `StorageStore`/`IPlayerContext` (mocked), `searchText()`, `canSearch()`,
+`onSearchInputChange()`, `executeSearch()`, `clearSearch()`, `hasActiveSearch()`, `isSearching()`,
+`currentFilter()`, rendered `lib-input-field`, `.search-toolbar-content`.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 598 | Component instantiates | component | truthy | state | port | search-toolbar.component.spec.ts |
+| 599 | searchText initializes empty | searchText() | '' | state | port | search-toolbar.component.spec.ts |
+| 600 | canSearch is false initially | canSearch() | false | state | port | search-toolbar.component.spec.ts |
+| 601 | onSearchInputChange updates searchText | onSearchInputChange(), searchText() | 'test query' | state | port | search-toolbar.component.spec.ts |
+| 602 | canSearch becomes true once text is entered | onSearchInputChange(), canSearch() | true | state | port | search-toolbar.component.spec.ts |
+| 603 | canSearch stays false for whitespace-only text | onSearchInputChange('   '), canSearch() | false | state | port | search-toolbar.component.spec.ts |
+| 604 | canSearch is false while a search is already in progress | getSearchState (mocked isSearching=true), canSearch() | false | state | port | search-toolbar.component.spec.ts |
+| 605 | executeSearch() calls searchFiles with deviceId/searchText/filterType | executeSearch(), StorageStore.searchFiles | called with correct params | state | port | search-toolbar.component.spec.ts |
+| 606 | executeSearch() trims the search text before calling searchFiles | executeSearch(), searchFiles | called with trimmed text | state | port | search-toolbar.component.spec.ts |
+| 607 | executeSearch() is a no-op for empty/whitespace text | executeSearch(), searchFiles | not called | state | port | search-toolbar.component.spec.ts |
+| 608 | executeSearch() is a no-op when storageType is null | executeSearch(), searchFiles | not called | state | port | search-toolbar.component.spec.ts |
+| 609 | executeSearch() uses the current filter type from the player context | executeSearch(), searchFiles | called with filterType matching context | state | port | search-toolbar.component.spec.ts |
+| 610 | Pressing Enter in the input field triggers a search | keydown Enter dispatch, searchFiles | called | state | port | search-toolbar.component.spec.ts |
+| 611 | Debounced auto-search doesn't fire for empty text | fakeAsync tick, searchFiles | not called | state | port | search-toolbar.component.spec.ts |
+| 612 | Debounced auto-search doesn't fire for whitespace-only text | fakeAsync tick, searchFiles | not called | state | drop — duplicate of row 611's blank-text guard claim on the same debounce path | — |
+| 613 | clearSearch() calls the store's clearSearch with the deviceId | clearSearch(), StorageStore.clearSearch | called with deviceId | state | port | search-toolbar.component.spec.ts |
+| 614 | clearSearch() is a no-op when storageType is null | clearSearch(), clearSearch | not called | state | port | search-toolbar.component.spec.ts |
+| 615 | The input field renders with clearable=true | `lib-input-field` componentInstance.clearable() | true | state | port | search-toolbar.component.spec.ts |
+| 616 | No clear button renders in the DOM when not visible | `lib-input-field` `.clear-button` | falsy | dom-structural | port | search-toolbar.component.spec.ts |
+| 617 | searchText is claimed to clear when search state clears, but the test asserts nothing | (none — test body contains no assertion of the described effect) | — | state | drop — the test's own comment admits effects "can't easily [be] test[ed] in isolation"; it performs setup with no assertion, so it verifies nothing (see Execution Notes) | — |
+| 618 | hasActiveSearch reflects the search state's hasSearched flag | getSearchState (mocked), hasActiveSearch() | false then true | state | port | search-toolbar.component.spec.ts |
+| 619 | isSearching reflects the search state's isSearching flag | getSearchState (mocked), isSearching() | false then true | state | port | search-toolbar.component.spec.ts |
+| 620 | currentFilter reflects the player context's shuffle-settings filter | getShuffleSettings (mocked), currentFilter() | All then Music | state | port | search-toolbar.component.spec.ts |
+| 621 | `.search-toolbar-content` renders as the root element | nativeElement.firstElementChild | truthy; classList contains 'search-toolbar-content' | dom-structural | port | search-toolbar.component.spec.ts |
+| 622 | No card-wrapper component renders around the toolbar | `lib-scaling-compact-card` | falsy | dom-structural | port | search-toolbar.component.spec.ts |
+| 623 | The search input field renders | `lib-input-field` | truthy | dom-structural | drop — duplicate presence claim already proven transitively by row 615's property read | — |
+| 624 | The search field renders with the correct placeholder and clearable properties | `lib-input-field` componentInstance.placeholder()/clearable() | 'Search'; true | state | port | search-toolbar.component.spec.ts |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
