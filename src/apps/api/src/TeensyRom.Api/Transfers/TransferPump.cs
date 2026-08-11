@@ -190,7 +190,8 @@ namespace TeensyRom.Api.Transfers
                         Files = transfers,
                         DeviceId = firstEntry.Job.DeviceId,
                         CommunicationPort = firstEntry.Device.CommunicationPort,
-                        OnFileCompleted = (outcome, _) => HandleOutcome(outcome, stagedByTransfer, pending)
+                        OnFileCompleted = (outcome, _) => HandleOutcome(outcome, stagedByTransfer, pending),
+                        ShouldSkip = transfer => IsJobInactive(stagedByTransfer, pending, transfer)
                     }, ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -212,6 +213,20 @@ namespace TeensyRom.Api.Transfers
         }
 
         /// <summary>
+        /// Rechecked by the handler before every file's handshake, including files whose job was still
+        /// active when this batch was composed - the seam that lets a cancel or abort landing mid-batch
+        /// stop a job's remaining files within one file rather than waiting for the whole batch to drain.
+        /// </summary>
+        private static bool IsJobInactive(
+            Dictionary<StreamedFileTransfer, StagedFile> stagedByTransfer,
+            Dictionary<StagedFile, (StagedFile Staged, TransferJob Job, TeensyRomDevice Device)> pending,
+            StreamedFileTransfer transfer)
+        {
+            var job = pending[stagedByTransfer[transfer]].Job;
+            return job.State is TransferJobState.Cancelling || TransferJob.IsTerminal(job.State);
+        }
+
+        /// <summary>
         /// The per-file callback <see cref="TransferFilesCommand.OnFileCompleted"/> invokes once per
         /// file, in send order - the seam that keeps backpressure, staging cleanup, cache freshness, and
         /// progress at per-file granularity while the MediatR handshake covers the whole batch.
@@ -227,9 +242,19 @@ namespace TeensyRom.Api.Transfers
 
             if (!outcome.Attempted)
             {
-                // The handler skips every file after the one that discovered the device was gone -
-                // never attempted, so it is dropped rather than counted as a failure.
-                AbortPendingFile(job, staged, "Device is no longer available");
+                if (outcome.DeviceLost)
+                {
+                    // The handler skips every file after the one that discovered the device was gone -
+                    // never attempted, so it is dropped rather than counted as a failure.
+                    AbortPendingFile(job, staged, "Device is no longer available");
+                }
+                else
+                {
+                    // IsJobInactive said skip this one - the job itself, not the device, so only this
+                    // file is dropped; the batch still carries on for any other job's files.
+                    DropPendingFile(job, staged);
+                }
+
                 return Task.CompletedTask;
             }
 

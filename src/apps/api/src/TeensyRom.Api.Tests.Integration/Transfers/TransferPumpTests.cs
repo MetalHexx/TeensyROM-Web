@@ -386,6 +386,71 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
         }
 
         [Fact]
+        public async Task Pump_JobCancelledMidBatch_StopsWithinOneFileInsteadOfFinishingWholeBatch()
+        {
+            var device = f.DeviceManager.Devices[1];
+            var port = f.DeviceManager.PortFor(device.DeviceId);
+            var registry = f.Services.GetRequiredService<ITransferJobRegistry>();
+            var leaseCoordinator = f.Services.GetRequiredService<IDeviceLeaseCoordinator>();
+            var gate = f.Services.GetRequiredService<ITransferCapacityGate>();
+            var queue = f.Services.GetRequiredService<ITransferQueue>();
+
+            var job = registry.Create(device.DeviceId, TeensyStorageType.SD, new DirectoryPath("/games"));
+            leaseCoordinator.TryAcquire(device.DeviceId, job.JobId).Should().BeTrue();
+            job.TryTransitionTo(TransferJobState.Receiving);
+
+            const int fileCount = 5;
+            const string pathPrefix = "/games/cancel-mid-batch-";
+
+            // Slow enough that the batch's single TransferFilesCommand is still working through the
+            // backlog when the cancel below lands, but short enough the test stays fast.
+            port.PerFileDelay = TimeSpan.FromMilliseconds(200);
+
+            try
+            {
+                // Stage everything up front, then enqueue in a tight loop with no other awaits, so every
+                // file is already queued by the time the pump's worker wakes - one TransferFilesCommand
+                // for the whole backlog, exactly the condition batching exists to help with.
+                var stagedFiles = new List<StagedFile>();
+
+                for (var i = 0; i < fileCount; i++)
+                {
+                    stagedFiles.Add(await StageFileAsync(job, $"cancel-mid-batch-{i}.prg", new FilePath($"{pathPrefix}{i}.prg"), [1, 2, 3]));
+                }
+
+                foreach (var staged in stagedFiles)
+                {
+                    await queue.EnqueueAsync(device.DeviceId, staged, CancellationToken.None);
+                }
+
+                // Cancel as soon as the first file of the batch has landed - the batch's single
+                // TransferFilesCommand is still in flight for the remaining four.
+                await WaitUntilAsync(() => port.Received.Any(r => r.Path == $"{pathPrefix}0.prg"));
+                job.TryTransitionTo(TransferJobState.Cancelling).Should().BeTrue();
+
+                await WaitUntilAsync(() =>
+                    job.State == TransferJobState.Cancelled &&
+                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
+                    gate.Current == (0, 0),
+                    TimeSpan.FromSeconds(15));
+
+                var landed = port.Received.Count(r => r.Path.StartsWith(pathPrefix, StringComparison.Ordinal));
+
+                // Cancellation must interrupt the batch within one file, not let the whole in-flight
+                // batch finish - if the pump only stopped composing further batches, every one of the
+                // fileCount files already admitted into this one would still land.
+                landed.Should().BeLessThan(fileCount);
+
+                leaseCoordinator.GetHolder(device.DeviceId).Should().BeNull();
+                gate.Current.Should().Be((0, 0));
+            }
+            finally
+            {
+                port.PerFileDelay = TimeSpan.Zero;
+            }
+        }
+
+        [Fact]
         public async Task Pump_LostDeviceMidBatch_AbortsJobAndReleasesEveryAdmittedFile()
         {
             var device = f.DeviceManager.Devices[0];

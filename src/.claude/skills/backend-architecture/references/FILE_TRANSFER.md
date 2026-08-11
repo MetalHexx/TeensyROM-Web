@@ -136,7 +136,7 @@ This design allows long-running transfers to span multiple short-lived serial co
 
 `TransferCapacityGate` looks simple at first — it's a semaphore for disk quota — but it serves three distinct purposes, and removing any one creates a correctness bug:
 
-**1. Disk Quota**: The gate tracks staged bytes in use and blocks uploads when `bytesInUse >= MaxStagedBytes` (default 2 GB). Without it, a pathological client uploading faster than the device drains could fill the server's disk.
+**1. Disk Quota**: The gate tracks staged bytes in use and blocks uploads when `bytesInUse >= MaxStagedBytes` (default 4 GB). Without it, a pathological client uploading faster than the device drains could fill the server's disk.
 
 **2. Flow Control**: The gate paces uploads by making `UploadFileEndpoint.Handle()` await `gate.WaitForSlotAsync()`. This is the system's **only pacing mechanism** — there is no HTTP connection pooling, no back-pressure, no rejection. A slow device means uploads simply take longer to return; they never fail.
 
@@ -219,7 +219,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | **Job Sweeper** | `apps/api/src/TeensyRom.Api/Transfers/TransferJobSweeper.cs` |
 | **Endpoints** | `apps/api/src/TeensyRom.Api/Endpoints/Transfers/` |
 | **SignalR Hub** | `apps/api/src/TeensyRom.Api/Endpoints/Transfers/Hub/TransferHub.cs` |
-| **Serial Command** | `apps/api/src/TeensyRom.Core.Serial/Commands/SaveFile/SaveFileCommand.cs`<br/>`apps/api/src/TeensyRom.Core.Serial/Commands/SaveFile/SaveFileCommandHandler.cs` |
+| **Serial Command** | `apps/api/src/TeensyRom.Core.Serial/Commands/TransferFiles/TransferFilesCommand.cs`<br/>`apps/api/src/TeensyRom.Core.Serial/Commands/TransferFiles/TransferFilesCommandHandler.cs` |
 | **DTO** | `apps/api/src/TeensyRom.Api/Models/TransferJobDto.cs` |
 | **Options** | `apps/api/src/TeensyRom.Api/Transfers/TransferOptions.cs` |
 
@@ -231,8 +231,7 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| `MaxStagedFiles` | 10,000 | Maximum concurrent uploads in flight |
-| `MaxStagedBytes` | 2 GB | Disk quota for staged files |
+| `MaxStagedBytes` | 4 GB | Disk quota for staged files |
 | `IdleAbandonmentThreshold` | 2 minutes | Idle time before job is abandoned |
 | `SweepInterval` | 30 seconds | How often sweeper checks for abandoned/evictable jobs |
 | `SnapshotThrottle` | 250 ms | Min interval between progress broadcasts |

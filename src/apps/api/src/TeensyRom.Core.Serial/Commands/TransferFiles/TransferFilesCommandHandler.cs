@@ -12,6 +12,9 @@ namespace TeensyRom.Core.Commands
     /// protocol once per staged <see cref="StreamedFileTransfer"/> in <see cref="TransferFilesCommand.Files"/>,
     /// reporting each file's outcome through <see cref="TransferFilesCommand.OnFileCompleted"/> before
     /// moving to the next so a caller can update per-file state as the batch progresses.
+    /// <see cref="TransferFilesCommand.ShouldSkip"/> is rechecked before every file, so a caller can stop
+    /// sending a file whose owning context went away since the batch was composed without waiting for
+    /// the whole batch to finish.
     /// </summary>
     public class TransferFilesCommandHandler(ILoggingService logService) : IRequestHandler<TransferFilesCommand, TransferFilesResult>
     {
@@ -28,6 +31,15 @@ namespace TeensyRom.Core.Commands
                 ct.ThrowIfCancellationRequested();
 
                 var file = command.Files[i];
+
+                if (command.ShouldSkip?.Invoke(file) == true)
+                {
+                    var skipped = new TransferFileOutcome(file, false, null, false);
+                    result.Outcomes.Add(skipped);
+                    await command.OnFileCompleted(skipped, ct);
+                    continue;
+                }
+
                 var (outcome, deviceLost) = await SendFileAsync(port, file, command.DeviceId, ct);
 
                 result.Outcomes.Add(outcome);
@@ -37,7 +49,7 @@ namespace TeensyRom.Core.Commands
 
                 for (var remaining = i + 1; remaining < command.Files.Count; remaining++)
                 {
-                    var skipped = new TransferFileOutcome(command.Files[remaining], false, null, false);
+                    var skipped = new TransferFileOutcome(command.Files[remaining], false, null, false, DeviceLost: true);
                     result.Outcomes.Add(skipped);
                     await command.OnFileCompleted(skipped, ct);
                 }

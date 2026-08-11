@@ -253,8 +253,49 @@ public class TransferFilesCommandHandlerTests : IDisposable
 
         result.Outcomes[2].Saved.Should().BeFalse();
         result.Outcomes[2].Attempted.Should().BeFalse();
+        result.Outcomes[2].DeviceLost.Should().BeTrue();
 
         port.Received.Should().ContainSingle(f => f.Path == file1.TargetPath.Value);
+    }
+
+    [Fact]
+    public async Task Handle_ShouldSkipReturnsTrueForOneFile_SkipsItWithoutSendingAndContinuesTheRestOfTheBatch()
+    {
+        var file1 = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/keep-1.prg"), TeensyStorageType.SD);
+        var file2 = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/skip.prg"), TeensyStorageType.SD);
+        var file3 = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/keep-2.prg"), TeensyStorageType.SD);
+
+        var port = new RecordingCommunicationPort();
+        var handler = new TransferFilesCommandHandler(_log);
+        var outcomes = new List<TransferFileOutcome>();
+
+        var result = await handler.Handle(new TransferFilesCommand
+        {
+            Files = [file1, file2, file3],
+            DeviceId = "DEVICEID",
+            CommunicationPort = port,
+            ShouldSkip = file => file == file2,
+            OnFileCompleted = (outcome, _) =>
+            {
+                outcomes.Add(outcome);
+                return Task.CompletedTask;
+            }
+        }, CancellationToken.None);
+
+        // A ShouldSkip skip is not a device loss - the batch keeps going for the files after it,
+        // unlike the device-vanished cascade that abandons everything remaining.
+        result.IsSuccess.Should().BeTrue();
+        result.Outcomes.Should().HaveCount(3);
+        outcomes.Should().Equal(result.Outcomes);
+
+        result.Outcomes[0].Saved.Should().BeTrue();
+
+        result.Outcomes[1].Attempted.Should().BeFalse();
+        result.Outcomes[1].DeviceLost.Should().BeFalse();
+
+        result.Outcomes[2].Saved.Should().BeTrue();
+
+        port.Received.Select(f => f.Path).Should().Equal(file1.TargetPath.Value, file3.TargetPath.Value);
     }
 
     [Fact]
