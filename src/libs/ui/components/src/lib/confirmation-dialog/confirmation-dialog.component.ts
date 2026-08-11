@@ -1,9 +1,9 @@
 import { Component, input, output, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
 import { ActionButtonComponent } from '../action-button/action-button.component';
+import { StyledIconComponent } from '../styled-icon/styled-icon.component';
 import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 
 @Component({
@@ -12,9 +12,9 @@ import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
   imports: [
     CommonModule,
     MatButtonModule,
-    MatIconModule,
     IconButtonComponent,
     ActionButtonComponent,
+    StyledIconComponent,
   ],
   templateUrl: './confirmation-dialog.component.html',
   styleUrl: './confirmation-dialog.component.scss',

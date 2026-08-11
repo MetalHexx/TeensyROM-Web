@@ -3,8 +3,7 @@
 
   @if (hasSubtitle()) {
     <div class="progress-subtitle">
-      <lib-styled-icon icon="folder" size="small"></lib-styled-icon>
-      <span>{{ subtitle() }}</span>
+      <lib-icon-label icon="folder" [label]="subtitle()" size="small" [truncate]="false"></lib-icon-label>
     </div>
   }
 
@@ -94,8 +93,7 @@
 
         @if (vm().elapsedLabel) {
           <div class="elapsed-readout" data-testid="transfer-progress-elapsed">
-            <lib-styled-icon icon="schedule" size="small"></lib-styled-icon>
-            <span>{{ vm().elapsedLabel }}</span>
+            <lib-icon-label icon="schedule" [label]="vm().elapsedLabel ?? ''" size="small"></lib-icon-label>
           </div>
         }
 
@@ -112,9 +110,6 @@
                   size="small"
                 ></lib-styled-icon>
                 <span class="feed-row-name">{{ entry.fileName }}</span>
-                @if (!entry.success && entry.reason) {
-                  <span class="feed-row-reason">{{ entry.reason }}</span>
-                }
               </div>
             }
           </div>
@@ -210,8 +205,7 @@
 
         @if (vm().elapsedLabel) {
           <div class="elapsed-readout" data-testid="transfer-progress-elapsed">
-            <lib-styled-icon icon="schedule" size="small"></lib-styled-icon>
-            <span>{{ vm().elapsedLabel }}</span>
+            <lib-icon-label icon="schedule" [label]="vm().elapsedLabel ?? ''" size="small"></lib-icon-label>
           </div>
         }
 
@@ -237,8 +231,7 @@
               }
             } @else {
               <div class="failure-row failure-row-empty" data-testid="transfer-progress-no-failures">
-                <lib-styled-icon icon="check_circle" color="success" size="small"></lib-styled-icon>
-                <span>No failures</span>
+                <lib-icon-label icon="check_circle" color="success" label="No failures" size="small"></lib-icon-label>
               </div>
             }
           </div>
@@ -247,22 +240,22 @@
     }
   </div>
 
-  <div class="progress-actions" [class.centered]="renderShape() === 'scan'">
+  <div class="progress-actions">
     @switch (renderShape()) {
       @case ('scan') {
-        <lib-action-button icon="close" label="Cancel" color="error" (buttonClick)="onCancel()"></lib-action-button>
+        <lib-action-button icon="close" label="Cancel" color="error" [fullWidth]="false" (buttonClick)="onCancel()"></lib-action-button>
       }
       @case ('busy-refusal') {
-        <lib-action-button icon="close" label="Close" color="normal" (buttonClick)="onClose()"></lib-action-button>
+        <lib-action-button icon="close" label="Close" color="normal" [fullWidth]="false" (buttonClick)="onClose()"></lib-action-button>
         @if (vm().state === 'device-busy') {
-          <lib-action-button icon="refresh" label="Retry" color="highlight" (buttonClick)="onRetry()"></lib-action-button>
+          <lib-action-button icon="refresh" label="Retry" color="highlight" [fullWidth]="false" (buttonClick)="onRetry()"></lib-action-button>
         }
       }
       @case ('nothing-to-transfer') {
-        <lib-action-button icon="close" label="Close" color="normal" (buttonClick)="onClose()"></lib-action-button>
+        <lib-action-button icon="close" label="Close" color="normal" [fullWidth]="false" (buttonClick)="onClose()"></lib-action-button>
       }
       @case ('active') {
-        <lib-action-button icon="close" label="Cancel transfer" color="error" (buttonClick)="onCancel()"></lib-action-button>
+        <lib-action-button icon="close" label="Cancel transfer" color="error" [fullWidth]="false" (buttonClick)="onCancel()"></lib-action-button>
       }
       @case ('cancelling') {
         <lib-action-button
@@ -270,11 +263,12 @@
           label="Cancel transfer"
           color="error"
           [disabled]="true"
+          [fullWidth]="false"
           (buttonClick)="onCancel()"
         ></lib-action-button>
       }
       @case ('terminal') {
-        <lib-action-button icon="close" label="Close" color="normal" (buttonClick)="onClose()"></lib-action-button>
+        <lib-action-button icon="close" label="Close" color="normal" [fullWidth]="false" (buttonClick)="onClose()"></lib-action-button>
       }
     }
   </div>

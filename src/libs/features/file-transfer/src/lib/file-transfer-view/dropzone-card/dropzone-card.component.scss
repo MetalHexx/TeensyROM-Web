@@ -27,12 +27,10 @@
 }
 
 .picker-actions {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: var(--spacing-md);
-  flex-wrap: wrap;
-  justify-content: center;
 }
 
 .visually-hidden {

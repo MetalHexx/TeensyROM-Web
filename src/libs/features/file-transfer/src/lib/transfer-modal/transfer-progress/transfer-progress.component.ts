@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { ActionButtonComponent, StyledIconComponent } from '@teensyrom-nx/ui/components';
+import { ActionButtonComponent, IconLabelComponent, StyledIconComponent } from '@teensyrom-nx/ui/components';
 import { TransferFeedEntry, TransferModalState } from '@teensyrom-nx/application';
 
 export interface TransferProgressVm {
@@ -60,19 +60,19 @@ const SHAPE_WIDTH_PX: Record<RenderShape, number> = {
 };
 
 const STATE_TITLES: Record<TransferModalState, (vm: TransferProgressVm) => string> = {
-  scanning: () => 'Scanning dropped folder',
+  scanning: () => 'Scanning Files',
   starting: () => 'Starting transfer',
-  'device-busy': () => 'Device is busy',
+  'device-busy': () => 'Device Busy',
   'nothing-to-transfer': () => 'Nothing to transfer',
   failed: () => "Transfer couldn't start",
   receiving: (vm) => `Transferring to ${vm.deviceName}`,
   // Same wording as `receiving` — the title must not change when the job seals.
   draining: (vm) => `Transferring to ${vm.deviceName}`,
-  cancelling: () => 'Cancelling — finishing current file',
+  cancelling: () => 'Cancelling',
   completed: () => 'Transfer Completed',
   cancelled: () => 'Transfer cancelled',
-  aborted: () => 'Transfer stopped — device lost',
-  abandoned: () => 'Transfer wound up — connection lost',
+  aborted: () => 'Transfer Stopped: Device Lost',
+  abandoned: () => 'Transfer Stopped: Connection Lost',
 };
 
 const STATE_BOTTOM_BAR: Record<TransferModalState, BottomBarMode> = {
@@ -81,8 +81,10 @@ const STATE_BOTTOM_BAR: Record<TransferModalState, BottomBarMode> = {
   'device-busy': null,
   'nothing-to-transfer': null,
   failed: null,
-  receiving: 'determinate',
-  draining: 'determinate',
+  // The write-bars (API/device) already cover progress for these states, so the modal-level
+  // bar underneath the actions would be redundant.
+  receiving: null,
+  draining: null,
   cancelling: 'indeterminate',
   completed: null,
   cancelled: null,
@@ -135,7 +137,7 @@ const ANNOUNCE_DELTA_PERCENT = 5;
  */
 @Component({
   selector: 'lib-transfer-progress',
-  imports: [DecimalPipe, MatProgressBarModule, ActionButtonComponent, StyledIconComponent],
+  imports: [DecimalPipe, MatProgressBarModule, ActionButtonComponent, IconLabelComponent, StyledIconComponent],
   templateUrl: './transfer-progress.component.html',
   styleUrl: './transfer-progress.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

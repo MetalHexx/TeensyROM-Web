@@ -5,7 +5,7 @@
   [attr.aria-label]="title()">
   <!-- Dialog Header with Warning Icon -->
   <div class="dialog-header">
-    <mat-icon class="warning-icon">warning</mat-icon>
+    <lib-styled-icon icon="warning" color="error" size="large"></lib-styled-icon>
     <h2>{{ title() }}</h2>
   </div>
 
@@ -21,12 +21,14 @@
         [icon]="cancelIcon()"
         [label]="cancelLabel()"
         [color]="'normal'"
+        [fullWidth]="false"
         (buttonClick)="onCancelClick()"
       />
       <lib-action-button
         [icon]="confirmIcon()"
         [label]="confirmLabel()"
         [color]="'error'"
+        [fullWidth]="false"
         (buttonClick)="onConfirmClick()"
       />
     } @else {

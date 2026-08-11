@@ -80,14 +80,14 @@ describe('ConfirmationDialogComponent', () => {
 
   describe('Icon Display', () => {
     it('should display warning icon in header', () => {
-      const warningIcon = fixture.nativeElement.querySelector('.warning-icon');
+      const warningIcon = fixture.nativeElement.querySelector('.dialog-header mat-icon');
       expect(warningIcon).toBeTruthy();
       expect(warningIcon?.textContent?.trim()).toBe('warning');
     });
 
     it('should apply error color styling to warning icon', () => {
-      const warningIcon = fixture.nativeElement.querySelector('.warning-icon');
-      expect(warningIcon?.classList.contains('warning-icon')).toBe(true);
+      const warningIcon = fixture.nativeElement.querySelector('.dialog-header mat-icon');
+      expect(warningIcon?.classList.contains('styled-icon-error')).toBe(true);
     });
   });
 

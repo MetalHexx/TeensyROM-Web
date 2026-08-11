@@ -49,14 +49,13 @@
 
 .progress-actions {
   flex: none;
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: var(--spacing-md);
+  width: fit-content;
+  margin: 0 auto;
   padding: 0 var(--spacing-2xl) var(--spacing-xl);
-
-  &.centered {
-    justify-content: center;
-  }
 }
 
 /* ── Scan / starting center block ───────────────────────── */
@@ -139,28 +138,7 @@
   margin-left: 0.25em;
 }
 
-.metric-staged {
-  background: color-mix(in srgb, var(--color-highlight) 10%, transparent);
-
-  .metric-value {
-    color: var(--color-highlight);
-  }
-}
-
-.metric-failed .metric-value {
-  color: var(--color-error);
-}
-
-.metric-success .metric-value {
-  color: var(--color-success);
-}
-
 .metrics-muted {
-  .metric,
-  .metric-staged {
-    background: rgba(255, 255, 255, 0.05);
-  }
-
   .metric-value {
     color: var(--color-dimmed-light);
   }
@@ -300,14 +278,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.feed-row-reason {
-  margin-left: auto;
-  color: var(--color-error);
-  font-size: 0.8125rem;
-  white-space: nowrap;
-  padding-left: var(--spacing-md);
 }
 
 .feed-row-fail .feed-row-name {

@@ -21,8 +21,8 @@
       ></lib-empty-state-message>
 
       <div class="picker-actions">
-        <lib-action-button icon="upload_file" label="Choose Files…"    data-testid="dropzone-choose-files"  [disabled]="cardState() === 'device-busy'" (buttonClick)="fileInput.click()" />
-        <lib-action-button icon="folder_open" label="Choose a folder…" data-testid="dropzone-choose-folder" [disabled]="cardState() === 'device-busy'" (buttonClick)="folderInput.click()" />
+        <lib-action-button icon="upload_file" label="Choose Files…"   [fullWidth]="false" data-testid="dropzone-choose-files"  [disabled]="cardState() === 'device-busy'" (buttonClick)="fileInput.click()" />
+        <lib-action-button icon="folder_open" label="Choose Folder…" [fullWidth]="false" data-testid="dropzone-choose-folder" [disabled]="cardState() === 'device-busy'" (buttonClick)="folderInput.click()" />
       </div>
 
       <input

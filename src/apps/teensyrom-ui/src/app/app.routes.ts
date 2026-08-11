@@ -4,6 +4,13 @@ import { playerRouteResolver } from '@teensyrom-nx/app/navigation';
 
 export const appRoutes: Route[] = [
   {
+    // Dev-only fixture page for the file-transfer UI states. Unlinked from any nav — reachable
+    // only by typing the URL. Throwaway; delete once the current UI refinement pass wraps.
+    path: 'dev/transfer-states',
+    loadComponent: () =>
+      import('@teensyrom-nx/features/file-transfer').then((m) => m.DevTransferFixturesComponent),
+  },
+  {
     path: '',
     component: LayoutComponent,
     children: [

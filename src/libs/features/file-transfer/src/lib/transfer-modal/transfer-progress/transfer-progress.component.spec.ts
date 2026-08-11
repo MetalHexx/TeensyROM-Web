@@ -70,18 +70,18 @@ describe('TransferProgressComponent', () => {
 
   describe('state coverage', () => {
     it.each<[TransferModalState, string]>([
-      ['scanning', 'Scanning dropped folder'],
+      ['scanning', 'Scanning Files'],
       ['starting', 'Starting transfer'],
-      ['device-busy', 'Device is busy'],
+      ['device-busy', 'Device Busy'],
       ['nothing-to-transfer', 'Nothing to transfer'],
       ['failed', "Transfer couldn't start"],
       ['receiving', 'Transferring to Unnamed'],
       ['draining', 'Transferring to Unnamed'],
-      ['cancelling', 'Cancelling — finishing current file'],
+      ['cancelling', 'Cancelling'],
       ['completed', 'Transfer Completed'],
       ['cancelled', 'Transfer cancelled'],
-      ['aborted', 'Transfer stopped — device lost'],
-      ['abandoned', 'Transfer wound up — connection lost'],
+      ['aborted', 'Transfer Stopped: Device Lost'],
+      ['abandoned', 'Transfer Stopped: Connection Lost'],
     ])('renders its frame for %s', async (state, expectedTitle) => {
       await setup(baseVm({ state, reason: 'the destination directory was rejected' }));
 
@@ -209,7 +209,8 @@ describe('TransferProgressComponent', () => {
       expect(rows.length).toBe(feed.length);
       expect(rows[0].textContent).toContain('file-1.sid');
       expect(rows[1].textContent).toContain('file-2.sid');
-      expect(rows[1].querySelector('.feed-row-reason')?.textContent).toContain('device write failed');
+      expect(rows[1].classList.contains('feed-row-fail')).toBe(true);
+      expect(rows[1].querySelector('.feed-row-reason')).toBeFalsy();
       expect(native().querySelector('.feed-cap-note')).toBeFalsy();
       expect(q('transfer-progress-feed')?.textContent).not.toContain('last 20');
     });

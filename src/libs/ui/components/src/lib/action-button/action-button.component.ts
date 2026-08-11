@@ -12,6 +12,9 @@ export type ActionButtonColor = 'primary' | 'success' | 'error' | 'highlight' | 
   imports: [CommonModule, MatButtonModule, TooltipDirective, IconLabelComponent],
   templateUrl: './action-button.component.html',
   styleUrl: './action-button.component.scss',
+  host: {
+    '[class.fit-content]': '!fullWidth()',
+  },
 })
 export class ActionButtonComponent {
   // Required inputs
@@ -22,6 +25,7 @@ export class ActionButtonComponent {
   variant = input<ActionButtonVariant>('stroked');
   color = input<ActionButtonColor>('primary');
   disabled = input<boolean>(false);
+  fullWidth = input<boolean>(true);
   ariaLabel = input<string>();
   tooltip = input<TooltipConfig | undefined>();
 

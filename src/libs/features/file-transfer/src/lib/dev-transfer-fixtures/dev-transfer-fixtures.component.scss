@@ -1,0 +1,80 @@
+// The global `html, body` rule sets `overflow: hidden` (LayoutComponent normally owns its own
+// scrollable content area) — this route bypasses that, so the host must scroll itself.
+:host {
+  display: block;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  background: linear-gradient(
+    180deg,
+    var(--mat-sys-surface-container-low) 0%,
+    color-mix(in srgb, var(--mat-sys-surface-container-low) 90%, var(--color-primary) 10%) 100%
+  );
+  color: var(--mat-sys-on-surface);
+}
+
+.dev-fixtures-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+  padding: var(--spacing-2xl);
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.page-heading {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.page-note {
+  margin: 0;
+  color: var(--color-dimmed);
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.fixture-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.section-heading {
+  margin: 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid rgba(var(--glassy-color), 0.2);
+  font-size: 1.1rem;
+}
+
+.fixture-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.fixture-label {
+  margin: 0;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--color-dimmed);
+}
+
+.dropzone-fixture-block {
+  max-width: 480px;
+  width: 100%;
+}
+
+.confirm-fixture-block {
+  align-items: flex-start;
+}
+
+.confirmation-fixture {
+  // Matches the nothing-to-transfer shape's dialog width (SHAPE_WIDTH_PX.nothing-to-transfer in
+  // transfer-progress.component.ts) — the confirmation dialog has no width of its own in
+  // production (MatDialog default), so this fixture-only wrapper just needs to be wide enough
+  // for the two-button row to fit without overflowing.
+  max-width: 480px;
+  padding: var(--spacing-xl);
+}
