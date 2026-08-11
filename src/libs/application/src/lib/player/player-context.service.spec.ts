@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
 import {
@@ -21,6 +21,12 @@ import { StorageStore, StorageDirectoryState } from '../storage/storage-store';
 import { SettingsStore } from '../settings/settings-store';
 import { PLAYER_STORAGE } from './player-storage.interface';
 import { TimerState } from './timer-state.interface';
+
+// Captured at module load, before any test installs fake timers or the tracking wrapper
+// below, so the harness can always drive the real clock regardless of what a test does to it.
+const realSetTimeout = globalThis.setTimeout;
+const scheduleRealMacrotask = realSetTimeout.bind(globalThis);
+const cancelRealMacrotask = globalThis.clearTimeout.bind(globalThis);
 
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   name: 'test-file.sid',
@@ -89,7 +95,27 @@ describe('PlayerContextService', () => {
     clear: ReturnType<typeof vi.fn>;
   };
 
-  const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
+  const nextTick = () => new Promise<void>((r) => scheduleRealMacrotask(r, 0));
+
+  // The service schedules a real retry timer whenever it sees an incompatible file. Such a
+  // timer outliving its test fires against a destroyed TestBed injector (NG0205), so the
+  // harness records the timers a test schedules and cancels whatever is still pending.
+  const scheduledTimeouts = new Set<ReturnType<typeof scheduleRealMacrotask>>();
+
+  beforeEach(() => {
+    globalThis.setTimeout = ((...args: Parameters<typeof scheduleRealMacrotask>) => {
+      const id = scheduleRealMacrotask(...args);
+      scheduledTimeouts.add(id);
+      return id;
+    }) as typeof globalThis.setTimeout;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    globalThis.setTimeout = realSetTimeout;
+    scheduledTimeouts.forEach((id) => cancelRealMacrotask(id));
+    scheduledTimeouts.clear();
+  });
 
   const waitForTimerState = async (
     deviceId: string,
@@ -681,7 +707,7 @@ describe('PlayerContextService', () => {
         await nextTick();
 
         // Advance timers past the setTimeout(1000) delay for auto-advancement
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
 
         // At this point, the service should have auto-advanced to the compatible file
@@ -696,8 +722,6 @@ describe('PlayerContextService', () => {
 
         // Should call toggleMusic since file is now compatible
         expect(mockPlayerService.toggleMusic).toHaveBeenCalledWith(deviceId);
-
-        vi.useRealTimers();
       });
 
       it('should prevent pause() when current file is incompatible', async () => {
@@ -730,7 +754,7 @@ describe('PlayerContextService', () => {
         await nextTick();
 
         // Advance timers past the setTimeout(1000) delay for auto-advancement
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
 
         // At this point, the service should have auto-advanced to the compatible file
@@ -745,8 +769,6 @@ describe('PlayerContextService', () => {
 
         // Should call toggleMusic since file is now compatible
         expect(mockPlayerService.toggleMusic).toHaveBeenCalledWith(deviceId);
-
-        vi.useRealTimers();
       });
 
       it('should allow stop() even when current file is incompatible', async () => {
@@ -779,7 +801,7 @@ describe('PlayerContextService', () => {
         await nextTick();
 
         // Advance timers past the setTimeout(1000) delay for auto-advancement
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
 
         // At this point, the service should have auto-advanced to the compatible file
@@ -794,8 +816,6 @@ describe('PlayerContextService', () => {
 
         // Should call the API
         expect(mockDeviceService.resetDevice).toHaveBeenCalledWith(deviceId);
-
-        vi.useRealTimers();
       });
     });
 

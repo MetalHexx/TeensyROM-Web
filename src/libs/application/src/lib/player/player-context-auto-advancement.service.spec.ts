@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 import {
@@ -26,6 +26,12 @@ interface ServiceWithPrivates {
   handleIncompatibleFile: (deviceId: string) => void;
   advanceToNextCompatibleFileInDirectory: (deviceId: string) => void;
 }
+
+// Captured at module load, before any test installs fake timers or the tracking wrapper
+// below, so the harness can always drive the real clock regardless of what a test does to it.
+const realSetTimeout = globalThis.setTimeout;
+const scheduleRealMacrotask = realSetTimeout.bind(globalThis);
+const cancelRealMacrotask = globalThis.clearTimeout.bind(globalThis);
 
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   name: 'test-file.sid',
@@ -87,9 +93,27 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
     clear: ReturnType<typeof vi.fn>;
   };
 
-  const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
+  const nextTick = () => new Promise<void>((r) => scheduleRealMacrotask(r, 0));
+
+  // The service schedules a real retry timer whenever it sees an incompatible file. Such a
+  // timer outliving its test fires against a destroyed TestBed injector (NG0205), so the
+  // harness records the timers a test schedules and cancels whatever is still pending.
+  const scheduledTimeouts = new Set<ReturnType<typeof scheduleRealMacrotask>>();
+
+  afterEach(() => {
+    vi.useRealTimers();
+    globalThis.setTimeout = realSetTimeout;
+    scheduledTimeouts.forEach((id) => cancelRealMacrotask(id));
+    scheduledTimeouts.clear();
+  });
 
   beforeEach(() => {
+    globalThis.setTimeout = ((...args: Parameters<typeof scheduleRealMacrotask>) => {
+      const id = scheduleRealMacrotask(...args);
+      scheduledTimeouts.add(id);
+      return id;
+    }) as typeof globalThis.setTimeout;
+
     // Default mocks return compatible files that don't interfere with test logic
     mockPlayerService = {
       launchFile: vi
@@ -332,14 +356,12 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         serviceWithPrivates.handleIncompatibleFile(deviceId);
 
         // Advance timers past the setTimeout(1000) delay
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
 
         // Verify: advanceToNextCompatibleFileInDirectory should be called
         expect(advanceDirectorySpy).toHaveBeenCalledWith(deviceId);
         expect(advanceDirectorySpy).toHaveBeenCalledTimes(1);
-
-        vi.useRealTimers();
       });
     });
 
@@ -386,14 +408,12 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         serviceWithPrivates.handleIncompatibleFile(deviceId);
 
         // Advance timers past the setTimeout(1000) delay
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
 
         // Verify: advanceToNextCompatibleFileInDirectory should be called
         expect(advanceDirectorySpy).toHaveBeenCalledWith(deviceId);
         expect(advanceDirectorySpy).toHaveBeenCalledTimes(1);
-
-        vi.useRealTimers();
       });
     });
   });
@@ -1069,7 +1089,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         await nextTick();
 
         // Advance timers past the setTimeout(1000) delay
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
 
         // Assert: Should have triggered retry via launchRandomFile
@@ -1082,8 +1102,6 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.isCompatible).toBe(true);
         expect(currentFile?.file.name).toBe('compatible.sid');
-
-        vi.useRealTimers();
       });
     });
 
@@ -1125,7 +1143,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         await nextTick();
 
         // Advance timers past the setTimeout(1000) delay
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
 
         // Assert: Should have advanced to compatible file
@@ -1134,8 +1152,6 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.file.name).toBe('compatible.sid');
         expect(currentFile?.isCompatible).toBe(true);
-
-        vi.useRealTimers();
       });
 
       it('should wrap around to beginning when advancing from end of directory', async () => {
@@ -1175,7 +1191,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         await nextTick();
 
         // Advance timers past the setTimeout(1000) delay
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
 
         // Assert: Should have wrapped around to first file
@@ -1184,8 +1200,6 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         const currentFile = service.getCurrentFile(deviceId)();
         expect(currentFile?.file.name).toBe('compatible.sid');
         expect(currentFile?.isCompatible).toBe(true);
-
-        vi.useRealTimers();
       });
 
       it('should fallback to random when all directory files incompatible', async () => {
@@ -1246,7 +1260,7 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
         await nextTick();
 
         // Advance timers past the setTimeout(1000) delay
-        vi.advanceTimersByTime(1000);
+        await vi.advanceTimersByTimeAsync(1000);
         await nextTick();
         await nextTick();
 
@@ -1255,8 +1269,6 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
           'All files in directory are incompatible'
         );
         expect(mockPlayerService.launchRandom).toHaveBeenCalledTimes(1);
-
-        vi.useRealTimers();
       });
     });
 
