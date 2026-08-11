@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using TeensyRom.Core.Entities.Transfers;
 
 namespace TeensyRom.Api.Transfers
@@ -20,6 +21,15 @@ namespace TeensyRom.Api.Transfers
     {
         ValueTask EnqueueAsync(string deviceId, StagedFile file, CancellationToken ct);
         IAsyncEnumerable<StagedFile> ReadAllAsync(string deviceId, CancellationToken ct);
+
+        /// <summary>
+        /// Non-blocking drain of whatever is already waiting, against the same single reader
+        /// <see cref="ReadAllAsync"/> uses — the mechanism the pump uses to fill a batch beyond the one
+        /// item it already waited for, without standing up a second consumer on a channel that is
+        /// <c>SingleReader = true</c>.
+        /// </summary>
+        bool TryRead(string deviceId, [MaybeNullWhen(false)] out StagedFile file);
+
         IReadOnlyCollection<string> ActiveDeviceIds { get; }
     }
 }

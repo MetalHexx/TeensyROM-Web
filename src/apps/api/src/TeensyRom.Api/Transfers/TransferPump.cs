@@ -25,6 +25,7 @@ namespace TeensyRom.Api.Transfers
         IDeviceConnectionManager deviceManager,
         IServiceScopeFactory scopeFactory,
         ITransferProgressNotifier notifier,
+        TransferOptions options,
         ILoggingService log) : BackgroundService
     {
         private static readonly TimeSpan SupervisorPollInterval = TimeSpan.FromMilliseconds(200);
@@ -56,15 +57,24 @@ namespace TeensyRom.Api.Transfers
 
             try
             {
-                await foreach (var staged in queue.ReadAllAsync(deviceId, ct))
+                await foreach (var first in queue.ReadAllAsync(deviceId, ct))
                 {
+                    var batch = new List<StagedFile> { first };
+
+                    // The first item already paid a blocking wait above; take whatever else is
+                    // immediately available, up to the ceiling, without waiting for more of it.
+                    while (batch.Count < options.BatchSize && queue.TryRead(deviceId, out var more))
+                    {
+                        batch.Add(more);
+                    }
+
                     try
                     {
-                        await ProcessStagedFileAsync(staged, resetJobIds, ct);
+                        await ProcessBatchAsync(batch, resetJobIds, ct);
                     }
                     catch (Exception ex)
                     {
-                        log.InternalError($"TransferPump: unhandled error processing staged file for job '{staged.JobId}': {ex.Message}");
+                        log.InternalError($"TransferPump: unhandled error processing staged file for job '{first.JobId}': {ex.Message}");
                     }
                 }
             }
@@ -73,91 +83,210 @@ namespace TeensyRom.Api.Transfers
             }
         }
 
-        private async Task ProcessStagedFileAsync(StagedFile staged, HashSet<string> resetJobIds, CancellationToken ct)
+        /// <summary>
+        /// Admits each staged file in order - dropping or aborting exactly as the pump did per file
+        /// before batching existed - then sends every admitted file through one
+        /// <see cref="TransferFilesCommand"/> whose per-file callback still does the five things that
+        /// must stay per file: gate release, staging delete, cache upsert, job counters, and the
+        /// per-file hub event. <paramref name="resetJobIds"/> is shared across every batch this worker
+        /// ever processes, so a job's device reset still fires once, before its first file, never per
+        /// batch.
+        /// </summary>
+        private async Task ProcessBatchAsync(List<StagedFile> batch, HashSet<string> resetJobIds, CancellationToken ct)
         {
-            var job = registry.Get(staged.JobId);
+            var admitted = new List<(StagedFile Staged, TransferJob Job, TeensyRomDevice Device)>();
+            var touchedJobs = new HashSet<TransferJob>();
 
-            if (job is null || job.State is TransferJobState.Cancelling || TransferJob.IsTerminal(job.State))
+            foreach (var staged in batch)
             {
-                staging.DeleteStagedFile(staged.StagingPath);
-                gate.ReleaseSlot(staged.ReservedBytes);
-                job?.OnFileDropped();
+                var job = registry.Get(staged.JobId);
 
-                if (job is not null)
+                if (job is null || job.State is TransferJobState.Cancelling || TransferJob.IsTerminal(job.State))
                 {
-                    TryFinalize(job);
+                    staging.DeleteStagedFile(staged.StagingPath);
+                    gate.ReleaseSlot(staged.ReservedBytes);
+                    job?.OnFileDropped();
+
+                    if (job is not null)
+                    {
+                        touchedJobs.Add(job);
+                    }
+
+                    continue;
                 }
 
-                return;
+                var device = deviceManager.GetAvailableDevice(job.DeviceId);
+
+                if (device is null)
+                {
+                    AbortPendingFile(job, staged, "Device is no longer available");
+                    touchedJobs.Add(job);
+                    continue;
+                }
+
+                if (resetJobIds.Add(job.JobId))
+                {
+                    await ResetDeviceAsync(job, device, ct);
+                }
+
+                touchedJobs.Add(job);
+                admitted.Add((staged, job, device));
             }
-
-            var device = deviceManager.GetAvailableDevice(job.DeviceId);
-
-            if (device is null)
-            {
-                AbortJob(job, "Device is no longer available");
-                staging.DeleteStagedFile(staged.StagingPath);
-                gate.ReleaseSlot(staged.ReservedBytes);
-                return;
-            }
-
-            if (resetJobIds.Add(job.JobId))
-            {
-                await ResetDeviceAsync(job, device, ct);
-            }
-
-            job.SetCurrentFile(staged.RelativePath);
 
             try
             {
+                if (admitted.Count > 0)
+                {
+                    await SendBatchAsync(admitted, ct);
+                }
+            }
+            finally
+            {
+                // Runs even if SendBatchAsync let a composition exception propagate for the caller's
+                // log-only catch - a job must still reach its terminal state once every one of its
+                // files in this batch has been accounted for, exception or not.
+                foreach (var job in touchedJobs)
+                {
+                    TryFinalize(job);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Composes and sends every admitted file as one command. The invariant that replaces the old
+        /// per-file <c>finally</c>: whatever the per-file callback below has not already released and
+        /// deleted by the time this returns - a batch that threw while composing, or a result the
+        /// pipeline rejected before the handler ever ran - is swept here exactly once, driven by the
+        /// admitted set rather than by what the result happens to report.
+        /// </summary>
+        private async Task SendBatchAsync(List<(StagedFile Staged, TransferJob Job, TeensyRomDevice Device)> admitted, CancellationToken ct)
+        {
+            // Seeded with every admitted file before composing even starts, so a file whose
+            // StreamedFileTransfer.FromFile throws - never reaching the callback at all - is still
+            // covered by the finally sweep below, exactly like every other file that never gets a
+            // result.
+            var pending = admitted.ToDictionary(entry => entry.Staged, entry => entry);
+
+            try
+            {
+                var transfers = new List<StreamedFileTransfer>(admitted.Count);
+                var stagedByTransfer = new Dictionary<StreamedFileTransfer, StagedFile>();
+
+                foreach (var entry in admitted)
+                {
+                    var transfer = StreamedFileTransfer.FromFile(entry.Staged.StagingPath, entry.Staged.TargetPath, entry.Staged.TargetStorage);
+                    transfers.Add(transfer);
+                    stagedByTransfer[transfer] = entry.Staged;
+                }
+
                 using var scope = scopeFactory.CreateScope();
                 var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-                var transfer = StreamedFileTransfer.FromFile(staged.StagingPath, staged.TargetPath, staged.TargetStorage);
-
-                Task OnFileCompleted(TransferFileOutcome outcome, CancellationToken _)
-                {
-                    TransferFileCompleted completed;
-
-                    if (outcome.Saved)
-                    {
-                        job.OnFileSent(staged.SizeBytes);
-                        device.GetStorage(job.StorageType)?.UpsertTransferredFile(staged.TargetPath, staged.SizeBytes);
-                        completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, true, null, staged.SizeBytes);
-                    }
-                    else
-                    {
-                        completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, false, outcome.Error, staged.SizeBytes);
-                        job.OnFileFailed(completed);
-                    }
-
-                    notifier.JobChanged(job);
-                    return notifier.FileCompletedAsync(completed);
-                }
+                var firstEntry = admitted[0];
 
                 try
                 {
                     await mediator.Send(new TransferFilesCommand
                     {
-                        Files = [transfer],
-                        DeviceId = job.DeviceId,
-                        CommunicationPort = device.CommunicationPort,
-                        OnFileCompleted = OnFileCompleted
+                        Files = transfers,
+                        DeviceId = firstEntry.Job.DeviceId,
+                        CommunicationPort = firstEntry.Device.CommunicationPort,
+                        OnFileCompleted = (outcome, _) => HandleOutcome(outcome, stagedByTransfer, pending)
                     }, ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    AbortJob(job, $"Device write failed: {ex.Message}");
-                    return;
+                    foreach (var entry in pending.Values.ToArray())
+                    {
+                        pending.Remove(entry.Staged);
+                        AbortPendingFile(entry.Job, entry.Staged, $"Device write failed: {ex.Message}");
+                    }
                 }
             }
             finally
             {
-                job.SetCurrentFile(null);
-                staging.DeleteStagedFile(staged.StagingPath);
-                gate.ReleaseSlot(staged.ReservedBytes);
+                foreach (var entry in pending.Values)
+                {
+                    DropPendingFile(entry.Job, entry.Staged);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The per-file callback <see cref="TransferFilesCommand.OnFileCompleted"/> invokes once per
+        /// file, in send order - the seam that keeps backpressure, staging cleanup, cache freshness, and
+        /// progress at per-file granularity while the MediatR handshake covers the whole batch.
+        /// </summary>
+        private Task HandleOutcome(
+            TransferFileOutcome outcome,
+            Dictionary<StreamedFileTransfer, StagedFile> stagedByTransfer,
+            Dictionary<StagedFile, (StagedFile Staged, TransferJob Job, TeensyRomDevice Device)> pending)
+        {
+            var staged = stagedByTransfer[outcome.File];
+            var (_, job, device) = pending[staged];
+            pending.Remove(staged);
+
+            if (!outcome.Attempted)
+            {
+                // The handler skips every file after the one that discovered the device was gone -
+                // never attempted, so it is dropped rather than counted as a failure.
+                AbortPendingFile(job, staged, "Device is no longer available");
+                return Task.CompletedTask;
             }
 
-            TryFinalize(job);
+            job.SetCurrentFile(staged.RelativePath);
+
+            TransferFileCompleted completed;
+
+            if (outcome.Saved)
+            {
+                job.OnFileSent(staged.SizeBytes);
+                device.GetStorage(job.StorageType)?.UpsertTransferredFile(staged.TargetPath, staged.SizeBytes);
+                completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, true, null, staged.SizeBytes);
+            }
+            else
+            {
+                completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, false, outcome.Error, staged.SizeBytes);
+                job.OnFileFailed(completed);
+            }
+
+            job.SetCurrentFile(null);
+            staging.DeleteStagedFile(staged.StagingPath);
+            gate.ReleaseSlot(staged.ReservedBytes);
+
+            notifier.JobChanged(job);
+            return notifier.FileCompletedAsync(completed);
+        }
+
+        /// <summary>
+        /// Aborts <paramref name="job"/> the first time it is seen and always releases and deletes this
+        /// one file. Every later call for the same job (another file of a batch that lost the same
+        /// device) takes the already-aborted branch instead, since <see cref="AbortJob"/> only accounts
+        /// for the one file that triggers it and must not run its lease/notify side effects twice.
+        /// </summary>
+        private void AbortPendingFile(TransferJob job, StagedFile staged, string reason)
+        {
+            if (job.State is not TransferJobState.Aborted)
+            {
+                AbortJob(job, reason);
+            }
+            else
+            {
+                job.OnFileDropped();
+            }
+
+            staging.DeleteStagedFile(staged.StagingPath);
+            gate.ReleaseSlot(staged.ReservedBytes);
+        }
+
+        /// <summary>
+        /// A file that never reached the per-file callback and does not need the job aborted - just
+        /// released, deleted, and counted as dropped rather than sent or failed.
+        /// </summary>
+        private void DropPendingFile(TransferJob job, StagedFile staged)
+        {
+            staging.DeleteStagedFile(staged.StagingPath);
+            gate.ReleaseSlot(staged.ReservedBytes);
+            job.OnFileDropped();
         }
 
         private async Task ResetDeviceAsync(TransferJob job, TeensyRomDevice device, CancellationToken ct)

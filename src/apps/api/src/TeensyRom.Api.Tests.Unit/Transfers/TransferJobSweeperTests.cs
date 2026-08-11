@@ -35,7 +35,7 @@ public class TransferJobSweeperTests
 
     private TransferPump NewPump() => new(
         Substitute.For<ITransferQueue>(), _registry, _leaseCoordinator, Substitute.For<ITransferCapacityGate>(),
-        _staging, _deviceManager, Substitute.For<IServiceScopeFactory>(), _notifier, _log);
+        _staging, _deviceManager, Substitute.For<IServiceScopeFactory>(), _notifier, _options, _log);
 
     private TransferJobSweeper NewSweeper() => new(
         _registry, _leaseCoordinator, _staging, _tracker, _deviceManager, _notifier, _options, NewPump(), _log);
