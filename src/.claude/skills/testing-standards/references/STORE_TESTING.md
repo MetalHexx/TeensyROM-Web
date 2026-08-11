@@ -44,6 +44,8 @@ Infrastructure services are defined as interface contracts in the domain layer. 
 - **Real**: Shared utilities and helper functions
 - **Mocked**: Infrastructure services implementing domain contracts (IDeviceService, IPlayerService, IStorageService)
 
+**Why This Boundary Matters**: The application layer exists to coordinate stores, services, and utilities into cohesive behaviors. Unit-testing individual store actions or selectors misses integration bugs — when two stores' changes must happen atomically, when timing matters, or when a workflow requires specific state sequences. Behavioral tests through the facade catch these bugs because they test the actual contract components see. Refactoring the store's internal state shape is safe because tests only assert on observable outcomes, not on whether specific actions fired or selectors computed particular values.
+
 **Mock Setup**:
 
 Define typed mock functions matching interface signatures. Provide mocks via injection tokens in TestBed. Control mock return values to simulate various infrastructure responses.
@@ -55,6 +57,63 @@ Define typed mock functions matching interface signatures. Provide mocks via inj
 **Async Handling**: Use helper function to flush microtask queue after invoking asynchronous facade methods. This ensures all reactive updates complete before assertions.
 
 **State Assertions**: Read state through facade signal getters. Never access store internals directly. Assert on observable outcomes visible to consuming components.
+
+## Fixture Libraries
+
+The project provides two complementary libraries for building mocks and test data:
+
+### `@teensyrom-nx/testing/fixtures`
+
+**Scope**: Low-level domain model factories and infrastructure-service mocks.
+
+**What belongs here**: 
+- Test data builders (e.g., `createTestFileItem`, `createTestStorageDirectory`) — complete, realistic domain models with sensible defaults and overridable fields
+- Infrastructure service mocks (e.g., `createMockPlayerService`, `createMockStorageService`) — `Partial<IInfrastructureService>` stubs matching domain contracts
+- These are reusable across layers and test files
+
+**Examples**: `createTestFileItem`, `createMockDeviceService`, `createMockPlayerService`
+
+### `@teensyrom-nx/testing/app-mocks`
+
+**Scope**: Application layer mocks — facades and context services the feature layer depends on.
+
+**What belongs here**:
+- Application-layer mocks (e.g., `createMockPlayerContext`) — `Partial<IApplicationFacade>` stubs with all members stubbed to safe defaults
+- Used only in feature layer tests to mock the application layer
+- Kept separate from fixtures because application-layer mocks depend on application interfaces, creating a cycle if mixed with fixtures (which infrastructure and domain layers import)
+
+**Examples**: `createMockPlayerContext`
+
+**Important**: Never import `app-mocks` into application-layer tests — the application layer's own tests (using harnesses like `createPlayerHarness`) provide real application layer services, mocking only infrastructure. The separation enforces this: attempting to import `app-mocks` in application tests will fail the module-boundary lint rule.
+
+## Timing Rules
+
+**No test waits on a real wall-clock delay** — Every production delay has an injection token, and specs override it to zero. Named timing tokens in this codebase:
+
+- `PLAYER_LAUNCH_DELAY_MS` — delay before device launch completes
+- `PLAYER_INCOMPATIBLE_RETRY_DELAY_MS` — delay before retrying incompatible files
+- `PLAYER_TIMER_TICK_MS` — interval for timer updates
+
+These are injected via TestBed in harnesses (e.g., `createPlayerHarness`) and default to `0` so tests run instantly. If a test legitimately needs to exercise timing logic, override the token to the desired value.
+
+**Fake-Timer Pattern** — When a spec uses `vi.useFakeTimers()`:
+
+1. **Always** include `afterEach(() => vi.useRealTimers())` — unconditionally, even if the test passes. A hung spec that never restores the clock poisons every test after it in the same file because `vi.useFakeTimers()` is global.
+2. **Always** use `vi.advanceTimersByTimeAsync(ms)` instead of `await somePromise`. This advances the fake clock synchronously and lets async code run, ensuring the test doesn't deadlock and cleanup runs.
+
+```typescript
+describe('RetryLogic', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers()); // Unconditional — critical
+
+  it('retries with exponential backoff', async () => {
+    const promise = service.retry();
+    
+    await vi.advanceTimersByTimeAsync(100); // Advance fake time
+    // ... assertions ...
+  });
+});
+```
 
 ## Behaviors to Test
 
@@ -140,8 +199,10 @@ Structure tests by user-facing feature behaviors:
 - [ ] Edge cases and concurrent operation handling
 - [ ] All assertions via facade signals, never accessing store internals
 
-## Reference Example
+## Reference Examples
 
-For a comprehensive example of behavioral application layer testing following this methodology:
+For comprehensive examples of behavioral application layer testing following this methodology:
 
-- [`player-context.service.spec.ts`](../../../../libs/application/src/lib/player/player-context.service.spec.ts) - Full facade testing with real store integration
+- [`player-context-launch.spec.ts`](../../../../libs/application/src/lib/player/player-context-launch.spec.ts) - Full facade testing with real store integration, using the `createPlayerHarness` helper
+- [`player-context-harness.spec.ts`](../../../../libs/application/src/lib/player/testing/player-context-harness.spec.ts) - Demonstrates the harness setup and multi-context isolation patterns
+- [`player-context-timer.spec.ts`](../../../../libs/application/src/lib/player/player-context-timer.spec.ts) - Shows fake-timer patterns and injection token overrides for timing delays

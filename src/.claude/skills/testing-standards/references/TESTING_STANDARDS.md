@@ -73,7 +73,7 @@ libs/infrastructure/device/
 **Behavioral testing** - Integrate real stores, context services, and application logic. Mock infrastructure only.
 
 ```typescript
-// libs/application/player/player-context.service.spec.ts
+// libs/application/player/player-context-launch.spec.ts
 TestBed.configureTestingModule({
   providers: [
     PlayerContextService, // Real context service
@@ -92,7 +92,7 @@ TestBed.configureTestingModule({
 - Complex business logic paths
 - Do not test individual store actions nor selectors.
 
-**Example**: [`player-context.service.spec.ts`](../../../../libs/application/src/lib/player/player-context.service.spec.ts)
+**Example**: [`player-context-launch.spec.ts`](../../../../libs/application/src/lib/player/player-context-launch.spec.ts)
 
 **Detailed Methodology**: See [STORE_TESTING.md](./STORE_TESTING.md)
 
@@ -101,7 +101,9 @@ TestBed.configureTestingModule({
 ```
 libs/application/player/
 ├── player-context.service.ts
-├── player-context.service.spec.ts       # Behavioral test
+├── player-context-launch.spec.ts        # Behavioral test (split by feature)
+├── player-context-playback.spec.ts      # Behavioral test (split by feature)
+├── player-context-*.spec.ts             # One spec per behavioral area
 └── player.store.ts
 ```
 

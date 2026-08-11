@@ -32,8 +32,14 @@ Testing philosophy, standards, and methodology for the teensyrom-nx Angular work
 ## Choosing the Right Reference
 
 - **General layer-by-layer philosophy, mock contract standards, test commands, test description naming** → [references/TESTING_STANDARDS.md](references/TESTING_STANDARDS.md)
-- **NgRx Signal Store, facade, or application-layer context service** (behavioral testing methodology) → [references/STORE_TESTING.md](references/STORE_TESTING.md)
-- **Angular smart/feature component** (`libs/features`) → [references/SMART_COMPONENT_TESTING.md](references/SMART_COMPONENT_TESTING.md)
+- **NgRx Signal Store, facade, or application-layer context service** (behavioral testing methodology, fixture libraries, timing and fake-timer rules) → [references/STORE_TESTING.md](references/STORE_TESTING.md)
+- **Angular smart/feature component** (`libs/features`) — unit testing with mocked application dependencies, child-component stubbing strategy → [references/SMART_COMPONENT_TESTING.md](references/SMART_COMPONENT_TESTING.md)
+
+## Fixture Libraries and Harnesses
+
+- **Test data and infrastructure mocks**: `@teensyrom-nx/testing/fixtures` — domain model factories and infrastructure-service mocks (e.g., `createTestFileItem`, `createMockPlayerService`)
+- **Application-layer mocks**: `@teensyrom-nx/testing/app-mocks` — facades and context services used in feature layer tests (e.g., `createMockPlayerContext`)
+- **Behavioral test harnesses**: Feature-specific helpers (e.g., `createPlayerHarness`) provide configured TestBed with real application services and infrastructure mocks. See [references/STORE_TESTING.md](references/STORE_TESTING.md) for details and examples.
 
 ## Mock Contract Standards (Quick Reference)
 
