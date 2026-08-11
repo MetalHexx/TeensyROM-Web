@@ -8,24 +8,61 @@ using TeensyRom.Core.Serial;
 namespace TeensyRom.Core.Commands
 {
     /// <summary>
-    /// Streaming, single-file sibling of <see cref="SaveFilesCommandHandler"/> - carries the same wire
-    /// protocol across against a <see cref="StreamedFileTransfer"/> instead of an in-memory
-    /// <see cref="FileTransferItem"/>, so the handler's own allocation stays fixed at one chunk buffer
-    /// regardless of file size.
+    /// Streaming, batched sibling of <see cref="SaveFilesCommandHandler"/> - loops the same wire
+    /// protocol once per staged <see cref="StreamedFileTransfer"/> in <see cref="TransferFilesCommand.Files"/>,
+    /// reporting each file's outcome through <see cref="TransferFilesCommand.OnFileCompleted"/> before
+    /// moving to the next so a caller can update per-file state as the batch progresses.
     /// </summary>
-    public class SaveFileCommandHandler(ILoggingService logService) : IRequestHandler<SaveFileCommand, SaveFileResult>
+    public class TransferFilesCommandHandler(ILoggingService logService) : IRequestHandler<TransferFilesCommand, TransferFilesResult>
     {
         private const int _retryLimit = 3;
         private const int _chunkSize = 16 * 1024;
 
-        public async Task<SaveFileResult> Handle(SaveFileCommand command, CancellationToken ct)
+        public async Task<TransferFilesResult> Handle(TransferFilesCommand command, CancellationToken ct)
         {
             var port = command.CommunicationPort;
-            var file = command.File;
+            var result = new TransferFilesResult();
+
+            for (var i = 0; i < command.Files.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var file = command.Files[i];
+                var (outcome, deviceLost) = await SendFileAsync(port, file, command.DeviceId, ct);
+
+                result.Outcomes.Add(outcome);
+                await command.OnFileCompleted(outcome, ct);
+
+                if (!deviceLost) continue;
+
+                for (var remaining = i + 1; remaining < command.Files.Count; remaining++)
+                {
+                    var skipped = new TransferFileOutcome(command.Files[remaining], false, null, false);
+                    result.Outcomes.Add(skipped);
+                    await command.OnFileCompleted(skipped, ct);
+                }
+
+                result.IsSuccess = false;
+                return result;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Runs the SendFile handshake and chunked body write for a single file, retrying up to
+        /// <see cref="_retryLimit"/> times. The second tuple element is true only when the port itself
+        /// appears to have gone away (<see cref="ICommunicationPort.IsOpen"/> is false after an
+        /// exception) rather than the file simply being bad - the caller stops the batch in that case
+        /// instead of moving on to the next file.
+        /// </summary>
+        private async Task<(TransferFileOutcome Outcome, bool DeviceLost)> SendFileAsync(
+            ICommunicationPort port, StreamedFileTransfer file, string? deviceId, CancellationToken ct)
+        {
             var buffer = new byte[_chunkSize];
             var retry = 0;
 
-            logService.Internal($"Saving File: {file.TargetPath.Value}", command.DeviceId);
+            logService.Internal($"Saving File: {file.TargetPath.Value}", deviceId);
 
             while (retry < _retryLimit)
             {
@@ -65,37 +102,45 @@ namespace TeensyRom.Core.Commands
 
                     port.HandleAck();
 
-                    logService.InternalSuccess($"Save Success: {file.TargetPath.Value}", command.DeviceId);
-                    return new SaveFileResult { Saved = true };
+                    logService.InternalSuccess($"Save Success: {file.TargetPath.Value}", deviceId);
+                    return (new TransferFileOutcome(file, true, null, true), false);
                 }
                 catch (Exception ex)
                 {
                     retry++;
+
+                    if (!port.IsOpen)
+                    {
+                        var lostError = $"Device connection lost while sending {file.TargetPath.FileName}: {ex.Message}";
+                        logService.InternalError($"Save Failed: {lostError}", deviceId);
+                        return (new TransferFileOutcome(file, false, lostError, true), true);
+                    }
+
                     var fileExistsParseMessage = "File already exists";
 
                     var fileExists = ex.Message.Contains(fileExistsParseMessage, StringComparison.OrdinalIgnoreCase);
 
                     if (fileExists)
                     {
-                        logService.InternalError($"Save Error: {file.TargetPath.Value} already exists on TR.", command.DeviceId);
-                        logService.Internal($"Delete Attempt: {file.TargetPath.Value}", command.DeviceId);
-                        TryDelete(port, file, command.DeviceId);
+                        logService.InternalError($"Save Error: {file.TargetPath.Value} already exists on TR.", deviceId);
+                        logService.Internal($"Delete Attempt: {file.TargetPath.Value}", deviceId);
+                        TryDelete(port, file, deviceId);
                         continue;
                     }
-                    logService.InternalError($"Save Retry: {retry} seconds to retry.", command.DeviceId);
+                    logService.InternalError($"Save Retry: {retry} seconds to retry.", deviceId);
 
                     if (retry < _retryLimit)
                     {
                         await Task.Delay(1000 * retry, ct);
                     }
-                    logService.InternalError($"Save Retry: {retry} of {_retryLimit}", command.DeviceId);
+                    logService.InternalError($"Save Retry: {retry} of {_retryLimit}", deviceId);
                 }
             }
 
             var error = $"Failed to copy {file.TargetPath.FileName} after {_retryLimit} attempts";
-            logService.InternalError($"Save Failed: {error}", command.DeviceId);
+            logService.InternalError($"Save Failed: {error}", deviceId);
 
-            return new SaveFileResult { IsSuccess = false, Error = error };
+            return (new TransferFileOutcome(file, false, error, true), false);
         }
 
         private void TryDelete(ICommunicationPort port, StreamedFileTransfer file, string? deviceId)

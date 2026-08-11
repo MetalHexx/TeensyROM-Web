@@ -8,13 +8,14 @@ namespace TeensyRom.TcpDebugger;
 
 /// <summary>
 /// Isolation harness for the FILE-TRANSFER-4 ack-timeout bug, one level up from
-/// Program.ExecuteSaveFileCommand: mirrors TransferPump's actual per-job sequence - one
-/// unconditional device reset via ResetCommandHandler, then N sequential SaveFileCommandHandler
-/// calls against the same connection - with none of TransferPump's queue/staging/registry/DI
-/// machinery around it. TransferPump always resets before the first file of a job regardless of
-/// current firmware state, unlike Program's single-file harness which only resets when the FW
-/// check reports minimal - this class exists to cover that gap, and to exercise several
-/// sequential SendFile calls back-to-back the way a real batch drop does.
+/// Program.ExecuteTransferFilesCommand: mirrors TransferPump's actual per-job sequence - one
+/// unconditional device reset via ResetCommandHandler, then N sequential
+/// TransferFilesCommandHandler calls (one file per batch) against the same connection - with
+/// none of TransferPump's queue/staging/registry/DI machinery around it. TransferPump always
+/// resets before the first file of a job regardless of current firmware state, unlike Program's
+/// single-file harness which only resets when the FW check reports minimal - this class exists to
+/// cover that gap, and to exercise several sequential SendFile calls back-to-back the way a real
+/// batch drop does.
 /// </summary>
 internal static class TransferPumpHarness
 {
@@ -84,21 +85,24 @@ internal static class TransferPumpHarness
         Program.LogDetail($"Source: {sourcePath}");
         Program.LogDetail($"StreamLength: {transfer.StreamLength}, Checksum: {transfer.Checksum}");
 
-        var handler = new SaveFileCommandHandler(log);
+        var handler = new TransferFilesCommandHandler(log);
         var sw = Stopwatch.StartNew();
 
-        var result = await handler.Handle(new SaveFileCommand
+        var result = await handler.Handle(new TransferFilesCommand
         {
-            File = transfer,
+            Files = [transfer],
             DeviceId = "TCP-DEBUG",
-            CommunicationPort = tcpPort
+            CommunicationPort = tcpPort,
+            OnFileCompleted = (_, _) => Task.CompletedTask
         }, CancellationToken.None);
 
         sw.Stop();
 
+        var saved = result.Outcomes.Count == 1 && result.Outcomes[0].Saved;
+
         if (result.IsSuccess)
         {
-            Program.LogSuccess($"SaveFile {index} succeeded in {sw.ElapsedMilliseconds}ms (Saved={result.Saved})");
+            Program.LogSuccess($"SaveFile {index} succeeded in {sw.ElapsedMilliseconds}ms (Saved={saved})");
         }
         else
         {
@@ -106,6 +110,6 @@ internal static class TransferPumpHarness
         }
         Console.WriteLine();
 
-        return result.IsSuccess;
+        return result.IsSuccess && saved;
     }
 }

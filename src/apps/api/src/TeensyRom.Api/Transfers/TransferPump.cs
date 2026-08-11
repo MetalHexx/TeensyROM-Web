@@ -114,15 +114,34 @@ namespace TeensyRom.Api.Transfers
                 var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
                 var transfer = StreamedFileTransfer.FromFile(staged.StagingPath, staged.TargetPath, staged.TargetStorage);
 
-                SaveFileResult result;
+                Task OnFileCompleted(TransferFileOutcome outcome, CancellationToken _)
+                {
+                    TransferFileCompleted completed;
+
+                    if (outcome.Saved)
+                    {
+                        job.OnFileSent(staged.SizeBytes);
+                        device.GetStorage(job.StorageType)?.UpsertTransferredFile(staged.TargetPath, staged.SizeBytes);
+                        completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, true, null, staged.SizeBytes);
+                    }
+                    else
+                    {
+                        completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, false, outcome.Error, staged.SizeBytes);
+                        job.OnFileFailed(completed);
+                    }
+
+                    notifier.JobChanged(job);
+                    return notifier.FileCompletedAsync(completed);
+                }
 
                 try
                 {
-                    result = await mediator.Send(new SaveFileCommand
+                    await mediator.Send(new TransferFilesCommand
                     {
-                        File = transfer,
+                        Files = [transfer],
                         DeviceId = job.DeviceId,
-                        CommunicationPort = device.CommunicationPort
+                        CommunicationPort = device.CommunicationPort,
+                        OnFileCompleted = OnFileCompleted
                     }, ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -130,23 +149,6 @@ namespace TeensyRom.Api.Transfers
                     AbortJob(job, $"Device write failed: {ex.Message}");
                     return;
                 }
-
-                TransferFileCompleted completed;
-
-                if (result.IsSuccess)
-                {
-                    job.OnFileSent(staged.SizeBytes);
-                    device.GetStorage(job.StorageType)?.UpsertTransferredFile(staged.TargetPath, staged.SizeBytes);
-                    completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, true, null, staged.SizeBytes);
-                }
-                else
-                {
-                    completed = new TransferFileCompleted(job.JobId, staged.RelativePath, staged.TargetPath.Value, false, result.Error, staged.SizeBytes);
-                    job.OnFileFailed(completed);
-                }
-
-                notifier.JobChanged(job);
-                await notifier.FileCompletedAsync(completed);
             }
             finally
             {

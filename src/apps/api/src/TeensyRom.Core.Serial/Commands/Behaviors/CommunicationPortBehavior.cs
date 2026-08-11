@@ -22,7 +22,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 		where TResponse : TeensyCommandResult, new()
 	{
 		private static readonly ConcurrentDictionary<string, (SemaphoreSlim Lock, DateTime LastUsed)> _locks = new();
-		private const int _staleLockMinutes = 5;
+		private static TimeSpan _staleLockMinutes = TimeSpan.FromMinutes(5);
 
 		public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
 		{
@@ -32,6 +32,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 			var semaphore = GetOrCreateLock(lockKey);
 
 			await semaphore.WaitAsync(cancellationToken);
+			RefreshLock(lockKey);
 
 			try
 			{
@@ -117,15 +118,18 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 		/// Clears out all stale locks.
 		///
 		/// <remarks>
-		///   This is just a stability safety net in case we get orphaned locks.
+		///   This is just a stability safety net in case we get orphaned locks. An entry whose semaphore
+		///   is currently held (<c>CurrentCount == 0</c>) is never eligible, no matter how stale its
+		///   last-used timestamp - a command legitimately running longer than the cutoff must not have
+		///   its own lock disposed out from under it.
 		/// </remarks>
 		/// </summary>
 		private void CleanupStaleLocks()
 		{
-			var cutoff = DateTime.UtcNow.AddMinutes(-_staleLockMinutes);
+			var cutoff = DateTime.UtcNow - _staleLockMinutes;
 
 			_locks
-			  .Where(kvp => kvp.Value.LastUsed < cutoff)
+			  .Where(kvp => kvp.Value.Lock.CurrentCount != 0 && kvp.Value.LastUsed < cutoff)
 			  .ToList()
 			  .ForEach(kvp =>
 			  {
