@@ -559,6 +559,87 @@ states (paused, error-color, click-triggers-method).
 | 356 | Volume control shows/hides reactively as the audio-stream setting changes | `lib-volume-control` count | 0 then > 0 | dom-structural | drop — duplicate of rows 351/352's static before/after states | — |
 | 357 | Volume control renders inside a `.volume-control-section` wrapper | `.volume-control-section`, nested `lib-volume-control` | both truthy | dom-structural | port | player-toolbar.component.spec.ts |
 
+## 17. player-toolbar/volume-control/volume-control.component.spec.ts (18 tests)
+
+Public surface: `AudioStore` (mocked), rendered mute icon-button/`.volume-slider`, `compact`/
+`disabled` inputs. Sibling of `volume-popup.component.spec.ts` (rows 32-42) but this spec never
+asserts a computed icon/aria signal directly — every icon claim is read from DOM textContent only,
+unlike volume-popup's `volumeIcon()`/`muteAriaLabel()` tests. Flagged in Execution Notes as a
+candidate to gain the same computed-signal coverage during the rebuild if the component exposes
+(or can expose) an equivalent internal computed.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 358 | Component instantiates | component | truthy | state | port | volume-control.component.spec.ts |
+| 359 | Muted state shows the volume_off icon | mat-icon textContent | 'volume_off' | dom-copy | port (re-expressed as state if an icon-selection computed exists; otherwise dom-structural presence) | volume-control.component.spec.ts |
+| 360 | Volume >= 0.5 unmuted shows volume_up | mat-icon textContent | 'volume_up' | dom-copy | port (re-expressed as state, see row 359's note) | volume-control.component.spec.ts |
+| 361 | Volume < 0.5 and > 0 unmuted shows volume_down | mat-icon textContent | 'volume_down' | dom-copy | port (re-expressed as state, see row 359's note) | volume-control.component.spec.ts |
+| 362 | Volume exactly 0 unmuted shows volume_mute | mat-icon textContent | 'volume_mute' | dom-copy | port (re-expressed as state, see row 359's note) | volume-control.component.spec.ts |
+| 363 | Volume exactly 0.5 (boundary) shows volume_up | mat-icon textContent | 'volume_up' | dom-copy | port (re-expressed as state, see row 359's note) | volume-control.component.spec.ts |
+| 364 | Clicking the mute button calls toggleMute | native button click, AudioStore.toggleMute | called once | state | port | volume-control.component.spec.ts |
+| 365 | Changing the slider calls setMasterVolume with the new value | slider input event, AudioStore.setMasterVolume | called with 0.42 | state | port | volume-control.component.spec.ts |
+| 366 | The slider's value reflects the masterVolume signal | `.volume-slider` value | ~0.6 | dom-structural | port | volume-control.component.spec.ts |
+| 367 | Slider shows by default (compact not provided) | `.volume-slider` | truthy | dom-structural | port | volume-control.component.spec.ts |
+| 368 | Slider shows when compact is explicitly false | `.volume-slider` | truthy | dom-structural | drop — duplicate of row 367's default-false claim | — |
+| 369 | Slider is hidden when compact is true | `.volume-slider` | null | dom-structural | port | volume-control.component.spec.ts |
+| 370 | Mute icon-button still shows in compact mode | `lib-icon-button` | truthy | dom-structural | port | volume-control.component.spec.ts |
+| 371 | Clicking the mute button calls toggleMute in compact mode | native button click, AudioStore.toggleMute | called once | state | drop — duplicate of row 364's click-wiring claim; compact mode doesn't affect this handler | — |
+| 372 | Muted state shows volume_off in compact mode | mat-icon textContent | 'volume_off' | dom-copy | drop — duplicate of row 359's muted-icon claim; compact mode doesn't affect icon-selection logic | — |
+| 373 | Mute button is disabled when the disabled input is true | native button.disabled | true | dom-structural | port | volume-control.component.spec.ts |
+| 374 | Slider is disabled when the disabled input is true | `.volume-slider`.disabled | true | dom-structural | port | volume-control.component.spec.ts |
+| 375 | The container carries a disabled CSS class when disabled | `.volume-control`.classList | contains 'disabled' | dom-structural | port | volume-control.component.spec.ts |
+
+## 18. storage-container/directory-files/directory-files.component.spec.ts (34 tests)
+
+Public surface: `directoriesAndFiles()`, `isDirectory()`, `onItemSelected()`/`selectedItem()`,
+`onDirectoryDoubleClick()`/`onFileDoubleClick()`, `isSelected()`, `isCurrentlyPlaying()`,
+`hasCurrentFileError()`, `isDeviceLevelView()`, `storageDevices()`,
+`onStorageDeviceSelected()`/`onStorageDeviceDoubleClick()`/`isStorageDeviceSelected()`,
+rendered `cdk-virtual-scroll-viewport`, `lib-directory-trail-container` (mocked),
+`lib-search-toolbar` (mocked). The one file in this corpus using `NO_ERRORS_SCHEMA`-style
+`overrideComponent` (stub replacements for `DirectoryTrailContainerComponent`/
+`SearchToolbarComponent` to avoid their store dependencies) — noted per the handoff's measured
+baseline. Several tests explicitly comment that virtual-scroll DOM rendering can't be relied on in
+the test environment and fall back to asserting component state instead; those DOM-title claims
+are noted per row.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 376 | Component instantiates | component | truthy | state | port | directory-files.component.spec.ts |
+| 377 | Directories and files combine into one tagged data source | directoriesAndFiles() | 2 items; itemType 'directory' then 'file' | state | port | directory-files.component.spec.ts |
+| 378 | The directory type guard correctly discriminates entries | isDirectory() | true for the directory entry, false for the file entry | state | port | directory-files.component.spec.ts |
+| 379 | Clicking an item updates the selection | onItemSelected(), selectedItem() | equals the clicked item | state | port | directory-files.component.spec.ts |
+| 380 | Double-clicking a directory navigates into it | onDirectoryDoubleClick(), StorageStore.navigateToDirectory | called with deviceId/storageType/path | state | port | directory-files.component.spec.ts |
+| 381 | Navigating into a directory clears the current selection | onItemSelected(), onDirectoryDoubleClick(), selectedItem() | truthy then null | state | port | directory-files.component.spec.ts |
+| 382 | Double-clicking a file launches it via the player context | onFileDoubleClick(), IPlayerContext.launchFileWithContext | called with deviceId/storageType/file/directoryPath/files/launchMode | state | port | directory-files.component.spec.ts |
+| 383 | A real dblclick DOM event on the rendered file item triggers the launch | dblclick dispatch on `lib-storage-item`, launchFileWithContext | called | state | port | directory-files.component.spec.ts |
+| 384 | Items render inside the virtual scroll viewport | `.file-list-item` count | between 0 and 2 (inclusive) | dom-structural | drop — the asserted range is satisfied even by zero rendered items, so the test's own comment admits it proves nothing in this environment | — |
+| 385 | isSelected correctly reports selection state per item | onItemSelected(), isSelected() | true for the selected item, false for others | state | port | directory-files.component.spec.ts |
+| 386 | isCurrentlyPlaying reflects the context's current file | getCurrentFile (mocked), isCurrentlyPlaying() | false before, true after the mock updates | state | port | directory-files.component.spec.ts |
+| 387 | The currently playing file is auto-selected when directory context is available | getCurrentFile, getFileContext (mocked), selectedItem() | path matches the playing file | state | port | directory-files.component.spec.ts |
+| 388 | hasCurrentFileError is false with no error | hasCurrentFileError() | false | state | port | directory-files.component.spec.ts |
+| 389 | hasCurrentFileError is true when the context reports an error | getError (mocked), hasCurrentFileError() | true | state | port | directory-files.component.spec.ts |
+| 390 | The playing file's data-is-playing attribute reflects its state | isCurrentlyPlaying() (DOM attribute check explicitly skipped per the test's own comment) | true | state | drop — duplicate of row 386; the test's title claims a DOM attribute it never actually reads | — |
+| 391 | The erroring file's data-has-error attribute reflects its state | hasCurrentFileError(), isCurrentlyPlaying() (DOM attribute check explicitly skipped per the test's own comment) | true; true | state | drop — duplicate combination of rows 386/389; doesn't verify the DOM attribute its title claims | — |
+| 392 | The virtual scroll viewport initializes with the correct item size | `cdk-virtual-scroll-viewport` itemsize attribute | '42' | dom-structural | port | directory-files.component.spec.ts |
+| 393 | The viewport automatically scrolls to the playing file | rendered `.file-list-item[data-item-path]` OR selectedItem() fallback | either branch | dom-structural | drop — the assertion branches on an environment-dependent rendering condition, and its fallback duplicates row 387's selectedItem() claim | — |
+| 394 | The directory trail renders in the header slot at storage level | `lib-directory-trail-container`, `.header-toolbar[slot="header"]` | both truthy | dom-structural | port | directory-files.component.spec.ts |
+| 395 | The directory trail is absent at device level | `lib-directory-trail-container` | falsy | dom-structural | port | directory-files.component.spec.ts |
+| 396 | A 'Storage Devices' title renders at device level | `lib-scaling-card` textContent | contains 'Storage Devices' | dom-copy | port (re-expressed as dom-structural) — assert the card title area renders in the device-level state | directory-files.component.spec.ts |
+| 397 | No card title renders at storage level since the trail replaces it | `.card-header .card-title` | empty/absent | dom-structural | port | directory-files.component.spec.ts |
+| 398 | isDeviceLevelView reflects the store's device-level flag | StorageStore.isDeviceLevelView, isDeviceLevelView() | true | state | port | directory-files.component.spec.ts |
+| 399 | storageDevices lists SD/USB entries at device level | storageDevices() | 2 entries with correct name/icon/deviceId/itemType | state | port | directory-files.component.spec.ts |
+| 400 | storageDevices is empty when not at device level | storageDevices() | [] | state | port | directory-files.component.spec.ts |
+| 401 | Selecting a storage device sets it as the selected item | onStorageDeviceSelected(), selectedItem() | storageType matches selected device | state | port | directory-files.component.spec.ts |
+| 402 | Double-clicking a storage device navigates to its root | onStorageDeviceDoubleClick(), StorageStore.navigateToDirectory, selectedItem() | called with path '/'; selection cleared | state | port | directory-files.component.spec.ts |
+| 403 | isStorageDeviceSelected correctly identifies the selected device | onStorageDeviceSelected(), isStorageDeviceSelected() | true for selected, false for the other | state | port | directory-files.component.spec.ts |
+| 404 | The search toolbar renders in the header slot | `lib-search-toolbar` | truthy | dom-structural | port | directory-files.component.spec.ts |
+| 405 | The deviceId is passed to the search toolbar | `lib-search-toolbar` presence (mocked component's input value never read) | truthy | dom-structural | drop — duplicate of row 404; despite its title, never reads the mock's `deviceId` input | — |
+| 406 | The search toolbar renders inside the header-toolbar wrapper | `.header-toolbar`, nested `lib-search-toolbar` | both truthy | dom-structural | drop — duplicate combination of rows 394/404 | — |
+| 407 | The header-toolbar wrapper carries slot="header" | `.header-toolbar[slot="header"]` | truthy | dom-structural | port | directory-files.component.spec.ts |
+| 408 | The search toolbar renders at storage level (default state) | `lib-search-toolbar` | truthy | dom-structural | drop — duplicate of row 404's default-state precondition | — |
+| 409 | The search toolbar also renders at device level | `lib-search-toolbar` | truthy | dom-structural | port | directory-files.component.spec.ts |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
