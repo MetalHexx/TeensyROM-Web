@@ -273,6 +273,140 @@ Byte-identical `.ts` and `.spec.ts` to `file-description/youtube-dialog/youtube-
 | 125 | Clicking close invokes the dialog's close | onClose(), MatDialogRef.close spy | called | state | port | youtube-dialog.component.spec.ts |
 | 126 | The iframe carries required security/functionality attributes | `iframe` attributes | allow/referrerpolicy/allowfullscreen values | dom-structural | port | youtube-dialog.component.spec.ts |
 
+## 12. player-device-container.component.spec.ts (43 tests)
+
+Public surface: `IPlayerContext`/`SettingsStore`/`BreakpointObserver` (mocked), `enableVideo()`,
+`isPhone`, `paneIndicators()`, `hasStorageIndex()`, `emptyStateIcon()`/`emptyStateTitle()`,
+rendered child components (`lib-video-capture`, `lib-file-image`, `lib-file-description`,
+`lib-player-toolbar`, `lib-filter-toolbar`, `lib-player-toolbar-mini`, `lib-empty-state-message`,
+`lib-file-description-mini`).
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 127 | Component instantiates | component | truthy | state | port | player-device-container.component.spec.ts |
+| 128 | isPhone defaults to false | isPhone() | false | state | port | player-device-container.component.spec.ts |
+| 129 | enableVideo signal is defined as a function | enableVideo | defined; typeof function | state | drop — weak type-of check subsumed by every value-level enableVideo() assertion that follows | — |
+| 130 | enableVideo defaults to false before settings load | enableVideo() | false | state | port | player-device-container.component.spec.ts |
+| 131 | enableVideo reflects true from settings | enableVideo() | true | state | port | player-device-container.component.spec.ts |
+| 132 | enableVideo reflects false from settings | enableVideo() | false | state | drop — duplicate of row 130's default-false claim | — |
+| 133 | enableVideo updates reactively across true/false/true | enableVideo() | tracks each setting change | state | port | player-device-container.component.spec.ts |
+| 134 | video-capture renders when enableVideo is true | `lib-video-capture` | truthy | dom-structural | port | player-device-container.component.spec.ts |
+| 135 | video-capture is absent when enableVideo is false | `lib-video-capture` | null | dom-structural | port | player-device-container.component.spec.ts |
+| 136 | video-capture is added to the DOM when toggled false→true | `lib-video-capture` | null then truthy | dom-structural | drop — duplicate of rows 134/135's static before/after states | — |
+| 137 | video-capture is removed from the DOM when toggled true→false | `lib-video-capture` | truthy then null | dom-structural | drop — duplicate of rows 134/135's static before/after states | — |
+| 138 | file-image still renders when video-capture is hidden | `lib-file-image` | truthy | dom-structural | port | player-device-container.component.spec.ts |
+| 139 | file-description still renders when video-capture is hidden | `lib-file-description` | truthy | dom-structural | port | player-device-container.component.spec.ts |
+| 140 | device-header layout is maintained when video-capture is hidden | `.device-header`, nested `lib-file-image`/`lib-file-description` | all truthy | dom-structural | drop — duplicate combination of rows 138/139 | — |
+| 141 | SettingsStore injects successfully | TestBed.inject(SettingsStore) | defined | state | drop — trivial DI-truthy check, no behavior claim | — |
+| 142 | enableVideo reflects the store value across changes | enableVideo() | true then false | state | drop — duplicate of row 133's reactive-update claim | — |
+| 143 | Rapid setting toggling doesn't throw | 5x setEnableVideo() | no throw | state | drop — resilience smoke test with no new observable claim beyond row 133 | — |
+| 144 | isPhone is true when the phone breakpoint matches | BreakpointObserver, isPhone() | true | state | port | player-device-container.component.spec.ts |
+| 145 | isPhone is false when the breakpoint doesn't match | BreakpointObserver, isPhone() | false | state | drop — duplicate of row 128's default-false claim | — |
+| 146 | paneIndicators is empty on desktop without video | paneIndicators() | [] | state | port | player-device-container.component.spec.ts |
+| 147 | paneIndicators lists image/description/video on desktop with video | paneIndicators() | 3-entry array with expected labels/indices | state | port | player-device-container.component.spec.ts |
+| 148 | paneIndicators lists 3 panes on phone without video | paneIndicators() | storage/image/description | state | port | player-device-container.component.spec.ts |
+| 149 | paneIndicators lists 4 panes on phone with video | paneIndicators() | storage/image/description/video | state | port | player-device-container.component.spec.ts |
+| 150 | hasStorageIndex is false when device is undefined | device input, hasStorageIndex() | false | state | port | player-device-container.component.spec.ts |
+| 151 | hasStorageIndex is false when device has no storage properties | device input, hasStorageIndex() | false | state | port | player-device-container.component.spec.ts |
+| 152 | hasStorageIndex is true when sdStorage has indexExists | device input, hasStorageIndex() | true | state | port | player-device-container.component.spec.ts |
+| 153 | hasStorageIndex is true when usbStorage has indexExists | device input, hasStorageIndex() | true | state | port | player-device-container.component.spec.ts |
+| 154 | hasStorageIndex is true when both storages have indexExists | device input, hasStorageIndex() | true | state | drop — duplicate OR-combination of rows 152/153, no new code path | — |
+| 155 | hasStorageIndex is false when both storages have indexExists false | device input, hasStorageIndex() | false | state | port | player-device-container.component.spec.ts |
+| 156 | combined-toolbar renders when no file is launched | `.combined-toolbar` | truthy | dom-structural | port | player-device-container.component.spec.ts |
+| 157 | player-toolbar renders when no file is launched | `lib-player-toolbar` | truthy | dom-structural | port | player-device-container.component.spec.ts |
+| 158 | filter-toolbar renders when no file is launched | `lib-filter-toolbar` | truthy | dom-structural | port | player-device-container.component.spec.ts |
+| 159 | player-toolbar receives disabled=true when no file is launched | `lib-player-toolbar` componentInstance.disabled() | true | state | port | player-device-container.component.spec.ts |
+| 160 | player-toolbar receives disabled=false when a file is launched | `lib-player-toolbar` componentInstance.disabled() | false | state | port | player-device-container.component.spec.ts |
+| 161 | filter-toolbar isn't disabled when storage isn't indexed | `lib-filter-toolbar` componentInstance.disabled() | false | state | port | player-device-container.component.spec.ts |
+| 162 | filter-toolbar disabled=false when storage is indexed | `lib-filter-toolbar` componentInstance.disabled() | false | state | merge (see row 161) — same "filter-toolbar always enabled regardless of index state" claim under a different device config | — |
+| 163 | filter-toolbar stays enabled with an indexed device and no file launched, while player-toolbar stays disabled | both toolbars' componentInstance.disabled() | filter false; player true | state | port | player-device-container.component.spec.ts |
+| 164 | Phone-layout toolbars render on the phone breakpoint | `lib-player-toolbar-mini` | truthy | dom-structural | port | player-device-container.component.spec.ts |
+| 165 | Empty-state shows the storage-not-indexed icon/title | `lib-empty-state-message`, emptyStateIcon(), emptyStateTitle() | truthy; 'sd_storage'; 'Index Your Storage' | state | port | player-device-container.component.spec.ts |
+| 166 | Empty-state shows the ready-to-play icon/title when indexed with no file | `lib-empty-state-message`, emptyStateIcon(), emptyStateTitle() | truthy; 'play_circle'; 'Ready to Play' | state | port | player-device-container.component.spec.ts |
+| 167 | file-description replaces the empty-state once a file is launched | `lib-empty-state-message`, `lib-file-description` | null; truthy | dom-structural | port | player-device-container.component.spec.ts |
+| 168 | file-description-mini is hidden on phone when no file is launched | `lib-file-description-mini` | null | dom-structural | port | player-device-container.component.spec.ts |
+| 169 | file-description-mini shows on phone once a file is launched | `lib-file-description-mini` | truthy | dom-structural | port | player-device-container.component.spec.ts |
+
+## 13. player-toolbar-mini/player-toolbar-mini.component.spec.ts (32 tests)
+
+Public surface: `playPause()`, `stop()`, `next()`, `previous()`, `getPlayPauseIconComputed()`,
+`getPlayPauseLabelComputed()`, `isCurrentFileMusicTypeComputed()`, `isPlayerLoadedComputed()`,
+`canNavigateComputed()`, `disabled` input, rendered playback buttons, `lib-volume-popup`.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 170 | Component instantiates | component | truthy | state | port | player-toolbar-mini.component.spec.ts |
+| 171 | playPause() calls pause while playing | playPause(), IPlayerContext.pause/play | pause called with deviceId; play not called | state | port | player-toolbar-mini.component.spec.ts |
+| 172 | playPause() calls play while stopped | playPause(), IPlayerContext.play/pause | play called with deviceId; pause not called | state | port | player-toolbar-mini.component.spec.ts |
+| 173 | playPause() is a no-op with an empty deviceId | playPause(), IPlayerContext.play/pause | neither called | state | port | player-toolbar-mini.component.spec.ts |
+| 174 | stop() calls the context's stop with the deviceId | stop(), IPlayerContext.stop | called with deviceId | state | port | player-toolbar-mini.component.spec.ts |
+| 175 | stop() is a no-op with an empty deviceId | stop(), IPlayerContext.stop | not called | state | port | player-toolbar-mini.component.spec.ts |
+| 176 | next() calls the context's next with the deviceId | next(), IPlayerContext.next | called with deviceId | state | port | player-toolbar-mini.component.spec.ts |
+| 177 | previous() calls the context's previous with the deviceId | previous(), IPlayerContext.previous | called with deviceId | state | port | player-toolbar-mini.component.spec.ts |
+| 178 | Play/pause icon is play_arrow when stopped | getPlayPauseIconComputed() | 'play_arrow' | state | port | player-toolbar-mini.component.spec.ts |
+| 179 | Play/pause icon is pause when playing | getPlayPauseIconComputed() | 'pause' | state | port | player-toolbar-mini.component.spec.ts |
+| 180 | Play/pause label is 'Play' when stopped | getPlayPauseLabelComputed() | 'Play' | state | port | player-toolbar-mini.component.spec.ts |
+| 181 | Play/pause label is 'Pause' when playing | getPlayPauseLabelComputed() | 'Pause' | state | port | player-toolbar-mini.component.spec.ts |
+| 182 | Detects a music-type current file | isCurrentFileMusicTypeComputed() | true | state | port | player-toolbar-mini.component.spec.ts |
+| 183 | Detects a non-music-type current file | isCurrentFileMusicTypeComputed() | false | state | port | player-toolbar-mini.component.spec.ts |
+| 184 | isPlayerLoaded is true when a current file exists | isPlayerLoadedComputed() | true | state | port | player-toolbar-mini.component.spec.ts |
+| 185 | isPlayerLoaded is false when there's no current file | isPlayerLoadedComputed() | false | state | port | player-toolbar-mini.component.spec.ts |
+| 186 | Navigation is allowed with multiple files in context | canNavigateComputed() | true | state | port | player-toolbar-mini.component.spec.ts |
+| 187 | Navigation is allowed in shuffle mode regardless of file count | canNavigateComputed() | true | state | port | player-toolbar-mini.component.spec.ts |
+| 188 | Navigation is disallowed with a single file in directory mode | canNavigateComputed() | false | state | port | player-toolbar-mini.component.spec.ts |
+| 189 | disabled input defaults to false | disabled() | false | state | port | player-toolbar-mini.component.spec.ts |
+| 190 | disabled input accepts true | disabled() | true | state | port | player-toolbar-mini.component.spec.ts |
+| 191 | disabled-state class is added to the host when disabled | nativeElement.classList | contains 'disabled-state' | dom-structural | port | player-toolbar-mini.component.spec.ts |
+| 192 | disabled-state class is absent when not disabled | nativeElement.classList | doesn't contain 'disabled-state' | dom-structural | port | player-toolbar-mini.component.spec.ts |
+| 193 | All playback buttons are disabled when disabled=true | Previous/Next/Stop icon-button componentInstance.disabled() | all true | state | port | player-toolbar-mini.component.spec.ts |
+| 194 | Playback buttons are enabled when disabled=false and navigation is possible | Previous/Next/Play-Pause componentInstance.disabled() | all false | state | port | player-toolbar-mini.component.spec.ts |
+| 195 | Volume popup renders when audio streaming is enabled for the device | SettingsStore.enableAudioStreamForDevice, `lib-volume-popup` | truthy | dom-structural | port | player-toolbar-mini.component.spec.ts |
+| 196 | Volume popup is absent when audio streaming is disabled | `lib-volume-popup` | null | dom-structural | port | player-toolbar-mini.component.spec.ts |
+| 197 | Volume popup receives disabled=true matching the toolbar's disabled state | `lib-volume-popup` componentInstance.disabled() | true | state | port | player-toolbar-mini.component.spec.ts |
+| 198 | Volume popup receives disabled=false when the toolbar is enabled | `lib-volume-popup` componentInstance.disabled() | false | state | port | player-toolbar-mini.component.spec.ts |
+| 199 | Audio-stream-enabled lookup uses the component's deviceId | SettingsStore.enableAudioStreamForDevice | called with 'test-device-id' | state | drop — asserts a mocked collaborator called with exactly the input the test set; the resulting show/hide behavior is already proven by rows 195/196 | — |
+| 200 | Volume popup shows/hides reactively as the audio-stream setting changes | `lib-volume-popup` | null then truthy | dom-structural | drop — duplicate of rows 195/196's static before/after states | — |
+| 201 | Volume popup renders inside the playback-controls container | `.playback-controls` containing `lib-volume-popup` | both truthy | dom-structural | port | player-toolbar-mini.component.spec.ts |
+
+## 14. player-toolbar/file-info/file-info.component.spec.ts (29 tests)
+
+Public surface: `fileItem` input, `fileTypeName()`, `imageUrls()`, rendered `.file-title`/
+`.file-creator`/`.file-info`/`.file-text`, `lib-cycle-image` child. Row 211 collapses a 16-case
+`typeTestCases.forEach(...)` table into a single row (one textual `it()` in source, matching this
+inventory's grep-based `it()` count) — note its span explicitly.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 202 | Component instantiates | component | truthy | state | port | file-info.component.spec.ts |
+| 203 | Accepts a null fileItem input | fileItem() | null | state | port | file-info.component.spec.ts |
+| 204 | Title and creator render from the file item | `.file-title`/`.file-creator` textContent | 'Test Song'; 'Test Artist' | dom-copy | port (re-expressed as dom-structural) — assert the title/creator elements render when the input has data, not the literal strings | file-info.component.spec.ts |
+| 205 | The file-info block is absent with a null fileItem | `.file-info` | null | dom-structural | port | file-info.component.spec.ts |
+| 206 | The file-info container renders when fileItem exists | `.file-info` | truthy | dom-structural | port | file-info.component.spec.ts |
+| 207 | Title renders empty when the title field is empty | `.file-title` textContent | '' | dom-structural | port (re-expressed) — the element still renders with an empty title; literal empty-string equality is trivial | file-info.component.spec.ts |
+| 208 | Creator renders when provided | `.file-creator` textContent | 'Rob Hubbard' | dom-copy | drop — duplicate of row 204's "creator renders when provided" claim with different fixture data | — |
+| 209 | Creator falls back to the file-type name when creator is empty | meta1, `.file-creator` textContent | 'Program' | dom-copy | port (re-expressed as dom-structural) — assert the creator div falls back to rendering `fileTypeName()`'s value rather than re-checking the exact mapped string, which row 211 already covers | file-info.component.spec.ts |
+| 210 | Neither creator nor fileTypeName renders a creator div when both are empty | `.file-creator` | null | dom-structural | port | file-info.component.spec.ts |
+| 211 | meta1 extension maps to its display type name across 16 known extensions (sid, crt, prg, p00, hex, kla, koa, art, aas, hpi, d64, seq, txt, zip, nfo, unknown) | fileTypeName() | each extension's expected label | state | port | file-info.component.spec.ts |
+| 212 | Uppercase meta1 is normalized to lowercase before mapping | fileTypeName() | 'Music' for 'SID' | state | port | file-info.component.spec.ts |
+| 213 | Mixed-case meta1 is normalized before mapping | fileTypeName() | 'Program' for 'PrG' | state | drop — duplicate of row 212's case-normalization claim | — |
+| 214 | An unmapped extension returns its uppercased form | fileTypeName() | 'XYZ' for 'xyz' | state | port | file-info.component.spec.ts |
+| 215 | Empty meta1 returns an empty type name | fileTypeName() | '' | state | port | file-info.component.spec.ts |
+| 216 | Undefined meta1 returns an empty type name | fileTypeName() | '' | state | merge (see row 215) — same falsy-meta1 empty-result claim | — |
+| 217 | imageUrls is empty when fileItem is null | imageUrls() | [] | state | port | file-info.component.spec.ts |
+| 218 | imageUrls is empty when the images array is empty | imageUrls() | [] | state | port | file-info.component.spec.ts |
+| 219 | imageUrls is empty when images is undefined | imageUrls() | [] | state | merge (see row 218) — same empty-result claim, different falsy input shape | — |
+| 220 | imageUrls extracts the URL from a single image | imageUrls() | one-element array | state | port | file-info.component.spec.ts |
+| 221 | imageUrls extracts URLs from multiple images, in order | imageUrls() | three-element array in order | state | merge (see row 220) — same extraction logic, no new code path | — |
+| 222 | imageUrls is forwarded to the CycleImageComponent child | `lib-cycle-image` componentInstance.images() | matches imageUrls() | state | port | file-info.component.spec.ts |
+| 223 | CycleImageComponent receives a fixed 4000ms interval | `lib-cycle-image` componentInstance.intervalMs() | 4000 | state | port | file-info.component.spec.ts |
+| 224 | CycleImageComponent receives the 'thumbnail' size | `lib-cycle-image` componentInstance.size() | 'thumbnail' | state | port | file-info.component.spec.ts |
+| 225 | imageUrls updates reactively when fileItem changes | imageUrls() before/after | tracks the new file's images | state | port | file-info.component.spec.ts |
+| 226 | fileTypeName updates reactively when fileItem changes | fileTypeName() before/after | tracks the new file's meta1 | state | drop — duplicate reactivity claim of row 225 (same input-change-drives-computed-update pattern) | — |
+| 227 | DOM re-renders title/creator when fileItem changes | `.file-title`/`.file-creator` textContent before/after | tracks the new file's title/creator | dom-copy | drop — duplicate of row 225's reactivity claim plus row 204's text-copy concern | — |
+| 228 | CycleImageComponent renders when the file has images | `lib-cycle-image` | truthy | dom-structural | merge (see row 222) — same child-presence precondition as the passthrough test | — |
+| 229 | CycleImageComponent still renders with an empty images array | `lib-cycle-image`, componentInstance.images() | truthy; [] | dom-structural | port | file-info.component.spec.ts |
+| 230 | file-info/file-text/file-title carry their styling CSS classes | `.file-info`/`.file-text`/`.file-title` | all truthy | dom-structural | drop — duplicate of rows 205/206's structural presence; class-existence-for-styling carries no behavior | — |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
