@@ -108,6 +108,14 @@ describe('PlayerDeviceContainerComponent', () => {
     expect(component['isPhone']()).toBe(false);
   });
 
+  it('isPhone is true when the phone breakpoint matches', () => {
+    const { component, fixture, phoneBreakpoint } = render();
+    setPhone(phoneBreakpoint, true);
+    fixture.detectChanges();
+
+    expect(component['isPhone']()).toBe(true);
+  });
+
   describe('enableVideo', () => {
     it('defaults to false', () => {
       const { component } = render();
@@ -298,6 +306,24 @@ describe('PlayerDeviceContainerComponent', () => {
 
       const toolbar = fixture.nativeElement.querySelector('lib-player-toolbar');
       expect(prop(toolbar, 'disabled')).toBe(false);
+    });
+
+    it("doesn't disable filter-toolbar when no file is launched, unlike player-toolbar", () => {
+      const { fixture } = render();
+
+      const filterToolbar = fixture.nativeElement.querySelector('lib-filter-toolbar');
+      const playerToolbar = fixture.nativeElement.querySelector('lib-player-toolbar');
+      expect(prop(filterToolbar, 'disabled')).toBeFalsy();
+      expect(prop(playerToolbar, 'disabled')).toBe(true);
+    });
+
+    it('keeps filter-toolbar enabled once a file is launched, same as with no file launched', () => {
+      const { fixture, currentFile } = render();
+      currentFile.set(createLaunchedFile());
+      fixture.detectChanges();
+
+      const filterToolbar = fixture.nativeElement.querySelector('lib-filter-toolbar');
+      expect(prop(filterToolbar, 'disabled')).toBeFalsy();
     });
 
     it('renders the phone toolbar-mini on the phone breakpoint', () => {

@@ -86,4 +86,14 @@ describe('renderPlayerComponent', () => {
 
     expect(fixture.debugElement.query(By.directive(StorageContainerComponent))).toBeNull();
   });
+
+  it('instantiates only the named realChildren, leaving the rest stubbed', () => {
+    const { fixture } = renderPlayerComponent(PlayerDeviceContainerComponent, {
+      providers,
+      inputs: { device },
+      realChildren: [StorageContainerComponent],
+    });
+
+    expect(fixture.debugElement.query(By.directive(StorageContainerComponent))).not.toBeNull();
+  });
 });

@@ -4,8 +4,10 @@ import { By } from '@angular/platform-browser';
 import type { IPlayerContext } from '@teensyrom-nx/application';
 import { createMockStorageService } from '@teensyrom-nx/testing/fixtures';
 import { STORAGE_SERVICE, PlayerFilterType } from '@teensyrom-nx/domain';
+import { IconButtonComponent, ScalingCompactCardComponent } from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { FilterToolbarComponent } from './filter-toolbar.component';
+import { RandomRollButtonComponent } from './random-roll-button/random-roll-button.component';
 
 const deviceId = 'device-1';
 
@@ -18,14 +20,14 @@ const SELECTORS = {
 } as const;
 
 describe('FilterToolbarComponent', () => {
-  // The button-color, aria-label, and click-forwarding assertions all reach into the real
-  // lib-icon-button / lib-random-roll-button children, so this component renders its real tree.
+  // The button-color and disabled-state assertions reach the real lib-icon-button /
+  // lib-random-roll-button children's own inputs to prove they're forwarded correctly.
   function render(inputs: Record<string, unknown> = {}, playerContext: Partial<IPlayerContext> = {}) {
     return renderPlayerComponent(FilterToolbarComponent, {
       inputs: { deviceId, ...inputs },
       playerContext,
       providers: [{ provide: STORAGE_SERVICE, useValue: createMockStorageService() }],
-      stubChildren: false,
+      realChildren: [IconButtonComponent, RandomRollButtonComponent, ScalingCompactCardComponent],
     });
   }
 
@@ -168,6 +170,11 @@ describe('FilterToolbarComponent', () => {
       const { fixture } = render();
       const separator = fixture.nativeElement.querySelector('.vertical-separator');
       expect(separator).toBeTruthy();
+    });
+
+    it('renders the random launch button', () => {
+      const { fixture } = render();
+      expect(fixture.debugElement.query(By.css(SELECTORS.randomLaunchButton))).toBeTruthy();
     });
 
     it('renders a joystick icon inside the Games button', () => {

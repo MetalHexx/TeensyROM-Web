@@ -2,15 +2,17 @@ import { By } from '@angular/platform-browser';
 import { renderPlayerComponent } from '../../../../../../testing/render-player-component';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { FileItemType } from '@teensyrom-nx/domain';
-import { TooltipDirective, TooltipPosition } from '@teensyrom-nx/ui/components';
+import { StorageItemComponent, TooltipDirective, TooltipPosition } from '@teensyrom-nx/ui/components';
 import { FileItemComponent } from './file-item.component';
 
 describe('FileItemComponent', () => {
   function render(inputs: Record<string, unknown>) {
-    // The selected class, incompatible icon, and tooltip are all applied by the real
-    // lib-storage-item child, so this is one of the components where the harness's
-    // default child stub would hide the behavior under test.
-    return renderPlayerComponent(FileItemComponent, { inputs, stubChildren: false });
+    // The selected class (a @HostBinding on StorageItemComponent) and the tooltip (a directive
+    // that must actually be attached) are facts only the real children can produce.
+    return renderPlayerComponent(FileItemComponent, {
+      inputs,
+      realChildren: [StorageItemComponent, TooltipDirective],
+    });
   }
 
   it('creates the component', () => {

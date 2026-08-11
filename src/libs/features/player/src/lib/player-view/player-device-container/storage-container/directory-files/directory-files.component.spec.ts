@@ -1,7 +1,8 @@
 import { vi } from 'vitest';
 import { of } from 'rxjs';
-import { signal } from '@angular/core';
+import { signal, type Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { StorageStore } from '@teensyrom-nx/application';
 import type { IPlayerContext, LaunchedFile, PlayerFileContext } from '@teensyrom-nx/application';
 import {
@@ -11,9 +12,11 @@ import {
   type DirectoryItem,
   type FileItem,
 } from '@teensyrom-nx/domain';
+import { StorageItemComponent } from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { createMockStorageService, createTestFileItem, createTestStorageDirectory } from '@teensyrom-nx/testing/fixtures';
 import { DirectoryFilesComponent } from './directory-files.component';
+import { FileItemComponent } from './file-item/file-item.component';
 
 describe('DirectoryFilesComponent', () => {
   const deviceId = 'device-1';
@@ -29,11 +32,23 @@ describe('DirectoryFilesComponent', () => {
     Element.prototype.scrollTo = vi.fn();
   });
 
-  function render(playerContext: Partial<IPlayerContext> = {}, stubChildren = true) {
+  interface RenderOverrides {
+    realChildren?: Type<unknown>[];
+    /**
+     * Full real-tree escape hatch, needed only for the auto-select-playing-file effect: it
+     * gates on `this.viewport()`, a viewChild query for the real CdkVirtualScrollViewport, and
+     * that directive needs its full real `*cdkVirtualFor` wiring (not just the class present)
+     * to avoid throwing on its own internal scroll-position timers.
+     */
+    stubChildren?: boolean;
+  }
+
+  function render(playerContext: Partial<IPlayerContext> = {}, overrides: RenderOverrides = {}) {
     const result = renderPlayerComponent(DirectoryFilesComponent, {
       inputs: { deviceId },
       playerContext,
-      stubChildren,
+      realChildren: overrides.realChildren,
+      stubChildren: overrides.stubChildren,
       providers: [
         {
           provide: STORAGE_SERVICE,
@@ -53,9 +68,9 @@ describe('DirectoryFilesComponent', () => {
 
   async function renderWithStorageLevelContent(
     playerContext: Partial<IPlayerContext> = {},
-    stubChildren = true
+    overrides: RenderOverrides = {}
   ) {
-    const rendered = render(playerContext, stubChildren);
+    const rendered = render(playerContext, overrides);
     await rendered.storageStore.initializeStorage({ deviceId, storageType: StorageType.Sd });
     rendered.fixture.detectChanges();
     return rendered;
@@ -146,6 +161,26 @@ describe('DirectoryFilesComponent', () => {
     });
   });
 
+  it('launches a file when a real dblclick DOM event fires on the rendered file item', async () => {
+    const launchFileWithContext = vi.fn().mockResolvedValue(undefined);
+    const { fixture } = await renderWithStorageLevelContent(
+      { launchFileWithContext },
+      // Files are only rendered via the real `*cdkVirtualFor` directive.
+      { realChildren: [ScrollingModule, FileItemComponent, StorageItemComponent] }
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    fixture.nativeElement
+      .querySelector('lib-storage-item')
+      .dispatchEvent(new MouseEvent('dblclick'));
+
+    expect(launchFileWithContext).toHaveBeenCalledWith(
+      expect.objectContaining({ deviceId, file: expect.objectContaining({ path: fileItem.path }) })
+    );
+  });
+
   it('reports selection state per item', async () => {
     const { component } = await renderWithStorageLevelContent();
     const [directory, file] = component.directoriesAndFiles();
@@ -157,10 +192,9 @@ describe('DirectoryFilesComponent', () => {
 
   it('reflects the currently playing file from the player context', async () => {
     const currentFile = signal<LaunchedFile | null>(null);
-    const { component, fixture } = await renderWithStorageLevelContent(
-      { getCurrentFile: vi.fn(() => currentFile.asReadonly()) },
-      false
-    );
+    const { component, fixture } = await renderWithStorageLevelContent({
+      getCurrentFile: vi.fn(() => currentFile.asReadonly()),
+    });
     const [, file] = component.directoriesAndFiles() as [unknown, FileItem];
 
     expect(component.isCurrentlyPlaying(file)).toBe(false);
@@ -186,7 +220,7 @@ describe('DirectoryFilesComponent', () => {
         getCurrentFile: vi.fn(() => currentFile.asReadonly()),
         getFileContext: vi.fn(() => fileContext.asReadonly()),
       },
-      false
+      { stubChildren: false }
     );
     const [, file] = component.directoriesAndFiles() as [unknown, FileItem];
 

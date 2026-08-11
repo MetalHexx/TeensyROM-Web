@@ -1,11 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { signal } from '@angular/core';
+import { signal, type Type } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { AudioStore } from '@teensyrom-nx/application';
+import { DropdownDialogComponent, IconButtonComponent } from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../../../testing/render-player-component';
 import { VolumePopupComponent } from './volume-popup.component';
 
-function render(inputs: Record<string, unknown> = {}, options: { stubChildren?: boolean } = {}) {
+function render(inputs: Record<string, unknown> = {}, options: { realChildren?: Type<unknown>[] } = {}) {
   const isMuted = signal(false);
   const masterVolume = signal(0.75);
   const audioStore = {
@@ -17,7 +18,7 @@ function render(inputs: Record<string, unknown> = {}, options: { stubChildren?: 
 
   const result = renderPlayerComponent(VolumePopupComponent, {
     inputs,
-    stubChildren: options.stubChildren,
+    realChildren: options.realChildren,
     providers: [{ provide: AudioStore, useValue: audioStore }],
   });
 
@@ -56,7 +57,10 @@ describe('VolumePopupComponent', () => {
 
   it('opens the dropdown when the trigger is clicked', () => {
     // Needs the real DropdownDialogComponent so the viewChild the trigger toggles resolves.
-    const { fixture, component } = render({}, { stubChildren: false });
+    const { fixture, component } = render(
+      {},
+      { realChildren: [DropdownDialogComponent, IconButtonComponent] }
+    );
 
     const triggerButton: HTMLButtonElement = fixture.nativeElement.querySelector('button');
     triggerButton.click();

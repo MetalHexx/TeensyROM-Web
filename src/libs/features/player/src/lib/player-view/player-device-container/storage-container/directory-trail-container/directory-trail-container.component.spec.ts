@@ -10,11 +10,11 @@ import { DirectoryTrailContainerComponent } from './directory-trail-container.co
 describe('DirectoryTrailContainerComponent', () => {
   const deviceId = 'test-device';
 
-  function render(options: { stubChildren?: boolean } = {}) {
+  function render(options: { realChildren?: (typeof DirectoryTrailComponent)[] } = {}) {
     const result = renderPlayerComponent(DirectoryTrailContainerComponent, {
       inputs: { deviceId },
       providers: [{ provide: STORAGE_SERVICE, useValue: createMockStorageService() }],
-      stubChildren: options.stubChildren ?? true,
+      realChildren: options.realChildren,
     });
     const storageStore = TestBed.inject(StorageStore);
     return { ...result, storageStore };
@@ -94,7 +94,7 @@ describe('DirectoryTrailContainerComponent', () => {
   });
 
   it('passes the loading state through to the trail component', async () => {
-    const { fixture, storageStore } = render({ stubChildren: false });
+    const { fixture, storageStore } = render({ realChildren: [DirectoryTrailComponent] });
     await storageStore.navigateToDirectory({ deviceId, storageType: StorageType.Sd, path: '/games' });
     fixture.detectChanges();
 

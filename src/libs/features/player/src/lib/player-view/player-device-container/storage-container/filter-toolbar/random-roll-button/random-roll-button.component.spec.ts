@@ -1,13 +1,16 @@
 import { By } from '@angular/platform-browser';
+import { IconButtonComponent } from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../../../testing/render-player-component';
 import { RandomRollButtonComponent } from './random-roll-button.component';
 
 describe('RandomRollButtonComponent', () => {
   function render(inputs: Record<string, unknown> = {}) {
-    // The color round-trip and click behaviors are proven by reaching into the real
-    // lib-icon-button child, so this is one of the components where the harness's
-    // default child stub would hide the behavior under test.
-    return renderPlayerComponent(RandomRollButtonComponent, { inputs, stubChildren: false });
+    // The color round-trip assertion reaches the real lib-icon-button child's own `color`
+    // input to prove it's forwarded correctly.
+    return renderPlayerComponent(RandomRollButtonComponent, {
+      inputs,
+      realChildren: [IconButtonComponent],
+    });
   }
 
   it('creates the component', () => {

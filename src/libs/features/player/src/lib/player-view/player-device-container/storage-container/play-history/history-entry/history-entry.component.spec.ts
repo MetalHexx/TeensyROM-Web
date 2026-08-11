@@ -1,6 +1,7 @@
 import { StorageKeyUtil, type HistoryEntry } from '@teensyrom-nx/application';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { FileItemType, StorageType } from '@teensyrom-nx/domain';
+import { StorageItemActionsComponent, StorageItemComponent } from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../../../testing/render-player-component';
 import { HistoryEntryComponent } from './history-entry.component';
 
@@ -17,10 +18,14 @@ function createTestHistoryEntry(overrides: Partial<HistoryEntry> = {}): HistoryE
 
 describe('HistoryEntryComponent', () => {
   function render(inputs: Record<string, unknown>) {
-    // The selected class and the click/dblclick emissions are driven by the real
-    // lib-storage-item child, so this is one of the components where the harness's
-    // default child stub would hide the behavior under test.
-    return renderPlayerComponent(HistoryEntryComponent, { inputs, stubChildren: false });
+    // The selected class (a @HostBinding on StorageItemComponent), the click/dblclick
+    // emissions (re-emitted from StorageItemComponent's own host listeners), and the
+    // locale-formatted timestamp (rendered by StorageItemActionsComponent's own template)
+    // are facts only the real children can produce.
+    return renderPlayerComponent(HistoryEntryComponent, {
+      inputs,
+      realChildren: [StorageItemComponent, StorageItemActionsComponent],
+    });
   }
 
   it('creates the component', () => {

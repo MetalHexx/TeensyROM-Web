@@ -4,7 +4,14 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { SettingsStore, AudioStore } from '@teensyrom-nx/application';
 import { STORAGE_SERVICE, CRT_STORAGE, ICrtStorage, CrtSettings, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 import { createMockStorageService } from '@teensyrom-nx/testing/fixtures';
-import { CRT_CONFIGS, CRT_PRESETS, CRT_PRESET_KEYS, DEFAULT_CRT_SETTINGS } from '@teensyrom-nx/ui/components';
+import {
+  ContentOverlayContainerComponent,
+  CRT_CONFIGS,
+  CRT_PRESETS,
+  CRT_PRESET_KEYS,
+  DEFAULT_CRT_SETTINGS,
+  VideoControlsToolbarComponent,
+} from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { VideoDialogComponent, VideoDialogData } from './video-dialog.component';
 
@@ -78,7 +85,13 @@ function render(crtStorage: ICrtStorage = createMockCrtStorage()) {
   const dialogRef = { close: vi.fn() } as unknown as MatDialogRef<VideoDialogComponent>;
 
   const result = renderPlayerComponent(VideoDialogComponent, {
-    stubChildren: false,
+    // The template calls `overlayContainer.isFullscreen()` directly on the #overlayContainer
+    // template-ref variable, so ContentOverlayContainerComponent must be real for the template
+    // to render at all. The settings (tune) button assertions read the toolbar's own internal
+    // template, so VideoControlsToolbarComponent is real too. Neither has WebGL/canvas children
+    // of its own, so this doesn't drag in the CRT/WebGL subtree that caused the flake under
+    // stubChildren: false.
+    realChildren: [ContentOverlayContainerComponent, VideoControlsToolbarComponent],
     providers: [
       { provide: MatDialogRef, useValue: dialogRef },
       { provide: MAT_DIALOG_DATA, useValue: dialogData },

@@ -12,15 +12,15 @@ import {
   StorageType,
   type IStorageService,
 } from '@teensyrom-nx/domain';
+import { InputFieldComponent } from '@teensyrom-nx/ui/components';
 import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { SearchToolbarComponent } from './search-toolbar.component';
 
 const deviceId = 'device-1';
 
 describe('SearchToolbarComponent', () => {
-  // The input field's `#searchInput` template reference is written to directly by the
-  // component's sync effect, and several rows read the real lib-input-field instance, so this
-  // component renders its real tree rather than the harness's stubbed one.
+  // The component's `#searchInput` viewChild calls real InputFieldComponent methods
+  // (`writeValue`) from a sync effect, and several rows read its own inputs directly.
   function render(
     playerContext: Partial<IPlayerContext> = {},
     searchServiceOverrides: Partial<IStorageService> = {}
@@ -31,7 +31,7 @@ describe('SearchToolbarComponent', () => {
       providers: [
         { provide: STORAGE_SERVICE, useValue: createMockStorageService(searchServiceOverrides) },
       ],
-      stubChildren: false,
+      realChildren: [InputFieldComponent],
     });
     return { ...result, storageStore: TestBed.inject(StorageStore) };
   }
