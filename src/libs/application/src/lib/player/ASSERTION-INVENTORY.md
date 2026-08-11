@@ -77,6 +77,24 @@ only the shuffle/filter-relevant rows into the two new files and dropping the re
 task's scope (Files: Read only the rows this task owns) and remains for whichever task deletes
 `player-context-initialization.spec.ts`.
 
+**P03‑T06 update:** T06 executed a single four-file split (`player-context-history.spec.ts`,
+`player-context-favorite.spec.ts`, `player-context-settings.spec.ts`, `player-context-timer.spec.ts`)
+instead of the many-file per-behavior split proposed below, per the task handoff's "Four files by
+behavior" instruction. `player-context-timer.spec.ts` absorbs everything the rows below proposed
+splitting across `-timer-lifecycle`, `-timer-progression`, `-custom-play-timer`, and `-loading`,
+plus the play()/pause()/stop() compatibility-gate rows (26–28) and the timer↔incompatibility
+interplay rows (111–115) left over from the monolith's Phase 3/5 sections — neither had a home in
+T03–T05's playback/compatibility files, and both are timer-adjacent in the actual source
+(`player-context.service.ts`'s "Phase 5" comments on the play()/pause() guards). Likewise,
+`player-context-history.spec.ts` absorbs everything proposed below across `-history-recording`,
+`-history-timeline`, `-history-back-forward`, `-history-edge-cases`, and `-history-view`. Rows
+303–305 (`player-context-initialization.spec.ts`) are dropped as duplicates of rows 248–250,
+which now exercise the identical `initializePlayer`/settings-fallback behavior against the real
+`SettingsStore`. Achieving ~800-line-or-less files at this consolidation required materially more
+aggressive row-folding than T03–T05's splits (parameterized `it.each` cases, multi-assertion flow
+tests, and a number of duplicate-coverage drops beyond what the rows below anticipated) — every
+row's disposition below reflects the actual test it landed in, not the original per-row estimate.
+
 | Target file | Tests | Sourced from |
 |---|---:|---|
 | `player-context-launch.spec.ts` | 12 (done — P03‑T03) | monolith: Init & Cleanup (rows 1–3), Phase 1 Launching (rows 4–7), Phase 2 plain `launchRandomFile` (rows 8–12) |
@@ -87,21 +105,14 @@ task's scope (Files: Read only the rows this task owns) and remains for whicheve
 | `player-context-auto-advance.spec.ts` | 7 (done — P03‑T05) | `player-context-auto-advancement.service.spec.ts`: End-to-End Auto-Advancement Scenarios (routing by launch mode, wrap-around scan, all-incompatible fallback) — see P03‑T05's Execution Notes for the two-file consolidation that superseded this row and the `-behavior`/`-navigation` split below |
 | `player-context-compatibility.spec.ts` | 6 (done — P03‑T05) | `player-context-incompatible-files.service.spec.ts`: Storage Store Synchronization, plus new directory-launch coverage of the same `markFileInStorageAsIncompatible` call site — see P03‑T05's Execution Notes; supersedes the `-marking`/`-sync` split below |
 | ~~`player-context-incompatible-marking.spec.ts`~~ | ~~11~~ | superseded — P03‑T05 found these rows test fileContext-level marking (`launch-file-with-context.ts`'s own mapping), out of scope for the storage-store-sync behavior the task's two consolidated files were chartered to cover; see rows 231–241's dispositions |
-| ~~`player-context-incompatible-sync.spec.ts`~~ | ~~14~~ | superseded by `player-context-compatibility.spec.ts` (done — P03‑T05); monolith rows (Incompatible File Playback Prevention, Timer's Incompatible File Handling) remain for whichever task ports the monolith |
-| `player-context-timer-lifecycle.spec.ts` | 20 | monolith: Timer Creation & Lifecycle, Playback Control Integration, Navigation Timer Tests, Store Integration, Edge Cases & Error Handling |
-| `player-context-timer-progression.spec.ts` | 18 | monolith: Auto-Progression Tests, Timer Error Handling Tests, Multi-Device Timer Tests |
-| `player-context-custom-play-timer.spec.ts` | 21 | `player-context-playTimer.service.spec.ts` (whole) |
-| `player-context-history-recording.spec.ts` | 31 | monolith: Phase 1 Play History Tracking minus Timeline Integrity |
-| `player-context-history-timeline.spec.ts` | 5 | monolith: History Timeline Integrity (Behaviors A–E) |
-| `player-context-history-back-forward.spec.ts` | 14 | `player-context-history.service.spec.ts`: Previous/Next Button with History |
-| `player-context-history-edge-cases.spec.ts` | 13 | `player-context-history.service.spec.ts`: Edge Cases & Error Handling, Complete Workflow Scenarios |
-| `player-context-history-view.spec.ts` | 6 | `player-context-history.service.spec.ts`: History View Visibility |
+| ~~`player-context-incompatible-sync.spec.ts`~~ | ~~14~~ | superseded by `player-context-compatibility.spec.ts` (done — P03‑T05) plus `player-context-timer.spec.ts` (done — P03‑T06); rows 26–28, 111–115 landed in the latter — see the P03‑T06 update note above |
+| `player-context-timer.spec.ts` | 33 net (done — P03‑T06) | monolith: Timer Creation & Lifecycle, Playback Control Integration, Navigation Timer Tests, Auto-Progression, Timer Error Handling, Multi-Device Timer Tests, Incompatible File Handling, plus rows 26–28; `player-context-playTimer.service.spec.ts` (whole); `player-context-loading.service.spec.ts` (whole) — see rows 26–28, 73–115, 262–295 for the exact per-row disposition and fold structure |
+| `player-context-history.spec.ts` | 38 net (done — P03‑T06) | monolith: Phase 1 Play History Tracking (Recording + Timeline Integrity); `player-context-history.service.spec.ts` (whole, Previous/Next Button, Edge Cases, History View Visibility); plus a new real 1000-entry-cap test (row 134's replacement) — see rows 116–224 for the exact per-row disposition and fold structure |
 | ~~`player-context-auto-advancement-behavior.spec.ts`~~ | ~~8~~ | superseded by `player-context-auto-advance.spec.ts` (done — P03‑T05); see rows 171–191's dispositions |
 | ~~`player-context-auto-advancement-navigation.spec.ts`~~ | ~~11~~ | superseded — P03‑T05 dropped these rows as out of scope (fileContext-level marking and next()/previous()'s own skip loop, neither reached through `player-context.service.ts:992–1145`); see rows 180–190's dispositions |
-| `player-context-favorite.spec.ts` | 7 | `player-context-favorite.service.spec.ts` (whole) |
-| `player-context-loading.spec.ts` | 13 | `player-context-loading.service.spec.ts` (whole) |
-| `player-context-settings.spec.ts` | 14 (12 physical after merge) | `player-context-settings.service.spec.ts` (whole) |
-| **Total** | **278** rows (276 port + 2 merge) | |
+| `player-context-favorite.spec.ts` | 5 net (done — P03‑T06) | `player-context-favorite.service.spec.ts` (whole) — see rows 296–302 |
+| `player-context-settings.spec.ts` | 6 net (done — P03‑T06) | `player-context-settings.service.spec.ts` (whole), rewritten against the real `SettingsStore`; supersedes `player-context-initialization.spec.ts` (rows 303–305, dropped as duplicates) — see rows 248–261 |
+| **Total** | **278** rows (276 port + 2 merge), original pre-execution estimate — see per-task update notes and per-row dispositions for what each task actually landed | |
 
 ---
 
@@ -141,9 +152,9 @@ task's scope (Files: Read only the rows this task owns) and remains for whicheve
 | 23 | pause() while already paused is a no-op | pause, getPlayerStatus | toggleMusic not called; status stays Paused | ported | player-context-playback.spec.ts |
 | 24 | pause() while stopped is a no-op | pause, getPlayerStatus | toggleMusic not called; status stays Stopped | ported | player-context-playback.spec.ts |
 | 25 | A pause() API failure sets error state | pause, getError | error truthy | ported | player-context-playback.spec.ts |
-| 26 | play() is inert on an incompatible file but works once auto-advancement lands on a compatible one | launchFileWithContext, play, pause, getCurrentFile | after auto-advance, toggleMusic called on play() | port | player-context-incompatible-sync.spec.ts |
-| 27 | pause() mirrors the play() case after auto-advancement to a compatible file | launchFileWithContext, pause, getCurrentFile | toggleMusic called on pause() once compatible file is current | port | player-context-incompatible-sync.spec.ts |
-| 28 | stop() is always allowed regardless of compatibility | stop, getCurrentFile | resetDevice called | port | player-context-incompatible-sync.spec.ts |
+| 26 | play() is inert on an incompatible file but works once auto-advancement lands on a compatible one | launchFileWithContext, play, pause, getCurrentFile | after auto-advance, toggleMusic called on play() | ported (folded) — P03‑T06: the play()/pause() compatibility guard (`player-context.service.ts` "Do not allow play/pause if current file is incompatible") is exercised directly against a still-incompatible file rather than round-tripped through an auto-advance retry, since that retry's own "lands on a compatible file" claim is already covered by `player-context-auto-advance.spec.ts` (T05) | player-context-timer.spec.ts |
+| 27 | pause() mirrors the play() case after auto-advancement to a compatible file | launchFileWithContext, pause, getCurrentFile | toggleMusic called on pause() once compatible file is current | ported (folded) — P03‑T06: same test as row 26 (both play() and pause() gated in one assertion) | player-context-timer.spec.ts |
+| 28 | stop() is always allowed regardless of compatibility | stop, getCurrentFile | resetDevice called | ported (folded) — P03‑T06: same test as row 26 | player-context-timer.spec.ts |
 | 29 | stop() resets the device and clears error | stop, getError | resetDevice called with deviceId; error null | ported | player-context-playback.spec.ts |
 | 30 | A failed device reset sets error state | stop, getError | error truthy | ported | player-context-playback.spec.ts |
 | 31 | next() in directory mode launches the following file in the context array | next, getCurrentFile | launchFile called with file2; currentFile equals file2 | ported | player-context-playback.spec.ts |
@@ -188,85 +199,85 @@ task's scope (Files: Read only the rows this task owns) and remains for whicheve
 | 70 | Filter set in Directory mode survives a switch into Shuffle | setFilterMode, toggleShuffleMode, getShuffleSettings | filter unchanged after toggling | ported | player-context-filter.spec.ts |
 | 71 | Filter survives a Directory→Shuffle→Directory round-trip toggle | setFilterMode, toggleShuffleMode, getShuffleSettings | filter identical before and after round-trip | ported | player-context-filter.spec.ts |
 | 72 | Two devices keep separate filters | setFilterMode, getShuffleSettings | each device's filter matches only its own setting | ported | player-context-filter.spec.ts |
-| 73 | Launching a music file with a valid playLength creates a timer sized to that duration | launchFileWithContext, getTimerState | totalTime equals parsed ms (225000) | port | player-context-timer-lifecycle.spec.ts |
-| 74 | Non-music files never get a timer | launchFileWithContext, getTimerState | timerState null | port | player-context-timer-lifecycle.spec.ts |
-| 75 | An unparsable playLength falls back to a 3-minute timer and logs a warning | launchFileWithContext, getTimerState | totalTime 180000; console.warn mentions invalid format | port | player-context-timer-lifecycle.spec.ts |
-| 76 | An empty playLength also falls back to 3 minutes with a warning | launchFileWithContext, getTimerState | totalTime 180000; warning mentions empty playLength | port | player-context-timer-lifecycle.spec.ts |
-| 77 | The running timer's currentTime advances over real elapsed time | getTimerState | currentTime increases between two reads a second apart | port | player-context-timer-lifecycle.spec.ts |
-| 78 | An H:MM:SS playLength parses into the correct millisecond duration | launchFileWithContext, getTimerState | totalTime 5025000 for '1:23:45' | port | player-context-timer-lifecycle.spec.ts |
-| 79 | pause() stops the running timer | pause, getTimerState | isRunning false | port | player-context-timer-lifecycle.spec.ts |
-| 80 | play() after pause resumes the timer | pause, play, getTimerState | isRunning true | port | player-context-timer-lifecycle.spec.ts |
-| 81 | stop() resets the timer's currentTime to 0 and stops it | stop, getTimerState | currentTime 0; isRunning false | port | player-context-timer-lifecycle.spec.ts |
-| 82 | currentTime is frozen while paused | pause, getTimerState | currentTime unchanged across a wait while paused | port | player-context-timer-lifecycle.spec.ts |
-| 83 | Playback controls on a non-music file leave the (nonexistent) timer null | pause, play, stop, getTimerState | timerState stays null | port | player-context-timer-lifecycle.spec.ts |
-| 84 | next() into another music file creates a fresh timer sized to the new file | next, getTimerState | totalTime updates to new file's duration; currentTime near 0 | port | player-context-timer-lifecycle.spec.ts |
-| 85 | Navigating from music to a non-music file destroys the timer | next, getTimerState | timerState becomes null | port | player-context-timer-lifecycle.spec.ts |
-| 86 | Navigating from non-music to music creates a timer for the destination | next, getTimerState | timerState non-null with correct totalTime | port | player-context-timer-lifecycle.spec.ts |
-| 87 | When the timer completes in Directory mode, the service auto-launches the next file | launchFileWithContext, getCurrentFile | launchFile called twice; currentFile becomes the second file | port | player-context-timer-progression.spec.ts |
-| 88 | Timer completion in Shuffle mode triggers a random launch instead | launchFileWithContext, getCurrentFile | launchRandom called once; currentFile becomes the random file | port | player-context-timer-progression.spec.ts |
-| 89 | The file that auto-progression lands on gets its own timer | getTimerState | totalTime reflects the second file's duration; currentTime reset | port | player-context-timer-progression.spec.ts |
-| 90 | Timer completion chains across three consecutive files | getCurrentFile | current file advances music1→music2→music3; launchFile called 3 times | port | player-context-timer-progression.spec.ts |
-| 91 | A paused timer never triggers auto-progression | pause, getCurrentFile | launchFile called only once even after the completion window passes | port | player-context-timer-progression.spec.ts |
-| 92 | A launch attempt made while one is still in flight is rejected with a warning | launchFileWithContext, getCurrentFile, IAlertService.warning | warning shown; only one launchFile call; first file wins once it resolves | port | player-context-timer-progression.spec.ts |
-| 93 | A failed launch never creates a timer | launchFileWithContext, getTimerState | timerState null | port | player-context-timer-progression.spec.ts |
-| 94 | A failed random launch never creates a timer and sets error | launchRandomFile, getTimerState, getError | timerState null; error truthy | port | player-context-timer-progression.spec.ts |
-| 95 | A failed next() leaves the prior file's timer untouched and sets error | next, getTimerState, getError | timer (if present) still shows first file's totalTime; error truthy | port | player-context-timer-progression.spec.ts |
-| 96 | Mirrors #95 for previous() | previous, getTimerState, getError | timer unchanged from first file; error truthy | port | player-context-timer-progression.spec.ts |
-| 97 | A failed launch still records the attempted file as current, with the error message | launchFileWithContext, getCurrentFile, getError | currentFile matches attempted file; error contains failure message | port | player-context-timer-progression.spec.ts |
-| 98 | A failed launch still populates the file context from the given directory | launchFileWithContext, getFileContext | fileContext.files length/currentIndex/directoryPath correct | port | player-context-timer-progression.spec.ts |
-| 99 | A second, failing launch tears down the timer left by the first successful one | launchFileWithContext, getTimerState | timerState null after the failing launch | port | player-context-timer-progression.spec.ts |
-| 100 | A subsequent successful launch after a failure clears the error and creates a new timer | launchFileWithContext, getCurrentFile, getError, getTimerState | currentFile updates; error null; timer created with new totalTime | port | player-context-timer-progression.spec.ts |
-| 101 | A failed shuffle-mode launch keeps the directory context available for the next attempt | launchFileWithContext, getFileContext, launchRandomFile, getCurrentFile | fileContext retains files/path after failure; subsequent random launch succeeds | port | player-context-timer-progression.spec.ts |
-| 102 | Two devices' timers reflect their own file durations | getTimerState | device1 totalTime 180000, device2 300000 | port | player-context-timer-progression.spec.ts |
-| 103 | Removing one device clears only its timer | removePlayer, getTimerState | removed device's timer null; other device's timer intact | port | player-context-timer-progression.spec.ts |
-| 104 | Pausing one device's timer doesn't pause another's | pause, getTimerState | device1 isRunning false, device2 isRunning true | port | player-context-timer-progression.spec.ts |
-| 105 | Rapid pause/play/pause/play/stop leaves the timer in a clean stopped state | pause, play, stop, getTimerState | currentTime 0; isRunning false | port | player-context-timer-lifecycle.spec.ts |
-| 106 | Timer query for an unknown device returns null | getTimerState | null | port | player-context-timer-lifecycle.spec.ts |
-| 107 | A freshly initialized device has no timer | getTimerState | null | port | player-context-timer-lifecycle.spec.ts |
-| 108 | pause/play/stop never throw on a non-music file | pause, play, stop | all three resolve without throwing | port | player-context-timer-lifecycle.spec.ts |
-| 109 | getTimerState reflects the underlying store's timer state after creation | getTimerState | non-null with correct totalTime | port | player-context-timer-lifecycle.spec.ts |
-| 110 | getTimerState tracks isRunning/currentTime correctly across launch→pause→stop | pause, stop, getTimerState | isRunning true→false; currentTime 0 and isRunning false after stop | port | player-context-timer-lifecycle.spec.ts |
-| 111 | An incompatible launchFile result auto-advances to the next compatible file, then times it | launchFileWithContext, getCurrentFile, getError, getTimerState | currentFile.isCompatible true after auto-advance; error null; timer created | port | player-context-incompatible-sync.spec.ts |
-| 112 | An incompatible random-launch result still loads directory context, no timer/error | launchRandomFile, getCurrentFile, getError, getTimerState | alignToPlayingFile called; currentFile.isCompatible false; error null; timer null | port | player-context-incompatible-sync.spec.ts |
-| 113 | Navigating next() onto an incompatible file clears the timer without setting an error | next, getCurrentFile, getError, getTimerState | currentFile is the incompatible file; error null; timer null | port | player-context-incompatible-sync.spec.ts |
-| 114 | Mirrors #113 for previous() | previous, getCurrentFile, getError, getTimerState | same as #113 | port | player-context-incompatible-sync.spec.ts |
-| 115 | Manually navigating next() off an incompatible file recovers to a compatible one with a timer | launchFileWithContext, next, getError, getCurrentFile, getTimerState | error null throughout; currentFile becomes compatible; timer created | port | player-context-incompatible-sync.spec.ts |
-| 116 | A freshly initialized device has no play history | getPlayHistory | null | port | player-context-history-recording.spec.ts |
-| 117 | History position defaults to -1 (end marker) with no history | getCurrentHistoryPosition | -1 | port | player-context-history-recording.spec.ts |
-| 118 | canNavigateBackwardInHistory is false with no history | canNavigateBackwardInHistory | false | port | player-context-history-recording.spec.ts |
-| 119 | canNavigateForwardInHistory is false with no history | canNavigateForwardInHistory | false | port | player-context-history-recording.spec.ts |
-| 120 | A successful directory launch appends a history entry at end position | launchFileWithContext, getPlayHistory | 1 entry matching launched file; currentPosition -1 | port | player-context-history-recording.spec.ts |
-| 121 | A successful random launch also records a history entry | launchRandomFile, getPlayHistory | 1 entry matching random file | port | player-context-history-recording.spec.ts |
-| 122 | A failed launch does not create a history entry | launchFileWithContext, getPlayHistory | history stays null | port | player-context-history-recording.spec.ts |
-| 123 | An incompatible file launch does not create a history entry | launchFileWithContext, getPlayHistory | history stays null | port | player-context-history-recording.spec.ts |
-| 124 | A compatible launch following an incompatible one records exactly one entry | launchFileWithContext, getPlayHistory | null after incompatible; 1 entry (compatible file) after | port | player-context-history-recording.spec.ts |
-| 125 | Three consecutive incompatible launches record nothing | launchFileWithContext, getPlayHistory | history stays null throughout | port | player-context-history-recording.spec.ts |
-| 126 | History count grows only on compatible launches across an alternating sequence | launchFileWithContext, getPlayHistory | entry count progresses 1,1,2,2,3 with correct names in order | port | player-context-history-recording.spec.ts |
-| 127 | An incompatible launch after two compatible ones leaves existing entries untouched | launchFileWithContext, getPlayHistory | entries unchanged (same names) before/after the incompatible launch | port | player-context-history-recording.spec.ts |
-| 128 | A failed launch doesn't crash history recording; service still works on next success | launchFileWithContext, getPlayHistory | history null after failure; 1 entry after subsequent success | port | player-context-history-recording.spec.ts |
-| 129 | next() from an existing file appends a new history entry | next, getPlayHistory | 2 entries, in launch order | port | player-context-history-recording.spec.ts |
-| 130 | previous() also appends a new history entry (browsing, not history-navigation) | previous, getPlayHistory | 2 entries in order launched | port | player-context-history-recording.spec.ts |
-| 131 | Navigating next() in shuffle mode records history too | toggleShuffleMode, next, getPlayHistory | 2 entries | port | player-context-history-recording.spec.ts |
-| 132 | Re-launching the same file back-to-back doesn't add a second entry | launchFileWithContext, getPlayHistory | 1 entry after two identical launches | port | player-context-history-recording.spec.ts |
-| 133 | Replaying a file after an intervening different file does add a new entry | launchFileWithContext, getPlayHistory | 3 entries: file1, file2, file1 | port | player-context-history-recording.spec.ts |
-| 134 | History grows with each distinct launch (smoke test standing in for the 1000-entry cap) | launchFileWithContext, getPlayHistory | 3 entries after 3 launches; position -1 (note: doesn't exercise the cap itself) | port | player-context-history-recording.spec.ts |
-| 135 | A history entry captures the file's name/path/parentPath/compatibility/timestamp | getPlayHistory | entry fields match the launched file; timestamp > 0 | port | player-context-history-recording.spec.ts |
-| 136 | A history entry's storageKey encodes the device and storage type | getPlayHistory | storageKey truthy, contains deviceId and 'SD' | port | player-context-history-recording.spec.ts |
-| 137 | clearHistory() empties an existing history | clearHistory, getPlayHistory | history null after clear | port | player-context-history-recording.spec.ts |
-| 138 | A launch after clearHistory() starts a fresh single-entry history | clearHistory, launchFileWithContext, getPlayHistory | 1 entry matching the new launch | port | player-context-history-recording.spec.ts |
-| 139 | Clearing an already-null history is a no-op that doesn't throw | clearHistory, getPlayHistory | no throw; history stays null | port | player-context-history-recording.spec.ts |
-| 140 | Across 5 launches alternating compatible/incompatible, only the 3 compatible ones appear, in order (Behavior A) | launchFileWithContext, getPlayHistory | 3 entries named game1/game3/game5 | port | player-context-history-timeline.spec.ts |
-| 141 | Recorded entries' timestamps are strictly non-decreasing and unique (Behavior B) | getPlayHistory | 3 entries; timestamps ascending and unique | port | player-context-history-timeline.spec.ts |
-| 142 | An incompatible file between two compatible ones is skipped; nav flags reflect remainder (Behavior C) | getPlayHistory, canNavigateBackwardInHistory, canNavigateForwardInHistory | 2 entries (track1, track3); canNavigateBackward true, canNavigateForward false | port | player-context-history-timeline.spec.ts |
-| 143 | Across 6 files (2 incompatible), the 4 compatible entries are ordered by timestamp (Behavior D) | getPlayHistory | 4 entries in ascending timestamp/launch order | port | player-context-history-timeline.spec.ts |
-| 144 | An incompatible file is excluded from history regardless of Shuffle/Directory/Search mode (Behavior E) | launchFileWithContext, getPlayHistory | history stays null across all 3 incompatible-mode launches; 1 all-compatible entry after the compatible launch | port | player-context-history-timeline.spec.ts |
-| 145 | Removing a device clears its history | removePlayer, getPlayHistory | history null after removal | port | player-context-history-recording.spec.ts |
-| 146 | Re-initializing a removed device starts a fresh history on next launch | removePlayer, initializePlayer, launchFileWithContext, getPlayHistory | 1 entry for the new launch | port | player-context-history-recording.spec.ts |
-| 147 | Two devices' histories track only their own launches | launchFileWithContext, getPlayHistory | each device shows only its own file | port | player-context-history-recording.spec.ts |
-| 148 | Clearing one device's history leaves another device's history intact | clearHistory, getPlayHistory | device1 null, device2 still 1 entry | port | player-context-history-recording.spec.ts |
-| 149 | After one launch, position is -1 (at end) | getCurrentHistoryPosition | -1 | port | player-context-history-recording.spec.ts |
-| 150 | With entries and at end position, backward navigation is possible | canNavigateBackwardInHistory | true | port | player-context-history-recording.spec.ts |
-| 151 | At end position there's nothing to navigate forward to | canNavigateForwardInHistory | false | port | player-context-history-recording.spec.ts |
+| 73 | Launching a music file with a valid playLength creates a timer sized to that duration | launchFileWithContext, getTimerState | totalTime equals parsed ms (225000) | ported (merged with row 78 into one `it.each` over MM:SS/H:MM:SS) | player-context-timer.spec.ts |
+| 74 | Non-music files never get a timer | launchFileWithContext, getTimerState | timerState null | ported | player-context-timer.spec.ts |
+| 75 | An unparsable playLength falls back to a 3-minute timer and logs a warning | launchFileWithContext, getTimerState | totalTime 180000; console.warn mentions invalid format | ported (merged with row 76 into one `it.each`) | player-context-timer.spec.ts |
+| 76 | An empty playLength also falls back to 3 minutes with a warning | launchFileWithContext, getTimerState | totalTime 180000; warning mentions empty playLength | ported (merged into row 75's `it.each`) | player-context-timer.spec.ts |
+| 77 | The running timer's currentTime advances over real elapsed time | getTimerState | currentTime increases between two reads a second apart | ported | player-context-timer.spec.ts |
+| 78 | An H:MM:SS playLength parses into the correct millisecond duration | launchFileWithContext, getTimerState | totalTime 5025000 for '1:23:45' | ported (merged into row 73's `it.each`) | player-context-timer.spec.ts |
+| 79 | pause() stops the running timer | pause, getTimerState | isRunning false | ported (folded into one pause→play→stop flow test with rows 80–82) | player-context-timer.spec.ts |
+| 80 | play() after pause resumes the timer | pause, play, getTimerState | isRunning true | ported (folded into row 79's flow test) | player-context-timer.spec.ts |
+| 81 | stop() resets the timer's currentTime to 0 and stops it | stop, getTimerState | currentTime 0; isRunning false | ported (folded into row 79's flow test) | player-context-timer.spec.ts |
+| 82 | currentTime is frozen while paused | pause, getTimerState | currentTime unchanged across a wait while paused | ported (folded into row 79's flow test) | player-context-timer.spec.ts |
+| 83 | Playback controls on a non-music file leave the (nonexistent) timer null | pause, play, stop, getTimerState | timerState stays null | ported (merged with row 108 — identical claim) | player-context-timer.spec.ts |
+| 84 | next() into another music file creates a fresh timer sized to the new file | next, getTimerState | totalTime updates to new file's duration; currentTime near 0 | ported | player-context-timer.spec.ts |
+| 85 | Navigating from music to a non-music file destroys the timer | next, getTimerState | timerState becomes null | ported (folded into one test with row 86, alternating both directions) | player-context-timer.spec.ts |
+| 86 | Navigating from non-music to music creates a timer for the destination | next, getTimerState | timerState non-null with correct totalTime | ported (folded into row 85's test) | player-context-timer.spec.ts |
+| 87 | When the timer completes in Directory mode, the service auto-launches the next file | launchFileWithContext, getCurrentFile | launchFile called twice; currentFile becomes the second file | ported (merged with row 89 — same test's pre-flush and post-flush assertions) | player-context-timer.spec.ts |
+| 88 | Timer completion in Shuffle mode triggers a random launch instead | launchFileWithContext, getCurrentFile | launchRandom called once; currentFile becomes the random file | ported | player-context-timer.spec.ts |
+| 89 | The file that auto-progression lands on gets its own timer | getTimerState | totalTime reflects the second file's duration; currentTime reset | ported (merged into row 87's test) | player-context-timer.spec.ts |
+| 90 | Timer completion chains across three consecutive files | getCurrentFile | current file advances music1→music2→music3; launchFile called 3 times | dropped — P03‑T06: a 3-file real-timer chain is redundant with row 87's 2-file chain (same code path, one more repetition) and each such test costs a real multi-second wait; row 87 already proves the chain re-fires correctly once | — |
+| 91 | A paused timer never triggers auto-progression | pause, getCurrentFile | launchFile called only once even after the completion window passes | ported | player-context-timer.spec.ts |
+| 92 | A launch attempt made while one is still in flight is rejected with a warning | launchFileWithContext, getCurrentFile, IAlertService.warning | warning shown; only one launchFile call; first file wins once it resolves | dropped — P03‑T06: this is the general `canLaunch` guard (already a flagged gap at row 53, T04's Execution Notes), not timer-specific; reproducing it in the auto-progression-triggered shape adds real-timer flakiness for no new code path over row 53's gap | — |
+| 93 | A failed launch never creates a timer | launchFileWithContext, getTimerState | timerState null | ported (merged with row 94 into one test covering both the directory and random launch entry points) | player-context-timer.spec.ts |
+| 94 | A failed random launch never creates a timer and sets error | launchRandomFile, getTimerState, getError | timerState null; error truthy | ported (merged into row 93's test) | player-context-timer.spec.ts |
+| 95 | A failed next() leaves the prior file's timer untouched and sets error | next, getTimerState, getError | timer (if present) still shows first file's totalTime; error truthy | ported (behavior corrected) — P03‑T06: `next()`/`previous()` route every post-navigation check through `hasErrorAndCleanup`, which unconditionally tears down the timer whenever an error is present, regardless of which file is still current; the actual current-source behavior is "timer torn down + error set", not "prior timer untouched" — reworded and re-verified against `player-context.service.ts`'s `hasErrorAndCleanup` | player-context-timer.spec.ts |
+| 96 | Mirrors #95 for previous() | previous, getTimerState, getError | timer unchanged from first file; error truthy | ported (folded into row 95's `it.each(['next','previous'])`, same corrected behavior) | player-context-timer.spec.ts |
+| 97 | A failed launch still records the attempted file as current, with the error message | launchFileWithContext, getCurrentFile, getError | currentFile matches attempted file; error contains failure message | dropped — P03‑T06: duplicate of `player-context-launch.spec.ts`'s "records the attempted file and sets error state when the launch API fails" (T03); not timer-specific | — |
+| 98 | A failed launch still populates the file context from the given directory | launchFileWithContext, getFileContext | fileContext.files length/currentIndex/directoryPath correct | dropped — P03‑T06: `createPlayerFileContext` builds fileContext directly from the request's own `directoryPath`/`files` regardless of launch outcome, so this is a deterministic mapping already implicit in every launch test rather than a distinct failure-path behavior; not timer-specific | — |
+| 99 | A second, failing launch tears down the timer left by the first successful one | launchFileWithContext, getTimerState | timerState null after the failing launch | ported (merged with row 100 into one launch→fail→succeed flow test) | player-context-timer.spec.ts |
+| 100 | A subsequent successful launch after a failure clears the error and creates a new timer | launchFileWithContext, getCurrentFile, getError, getTimerState | currentFile updates; error null; timer created with new totalTime | ported (folded into row 99's flow test) | player-context-timer.spec.ts |
+| 101 | A failed shuffle-mode launch keeps the directory context available for the next attempt | launchFileWithContext, getFileContext, launchRandomFile, getCurrentFile | fileContext retains files/path after failure; subsequent random launch succeeds | dropped — P03‑T06: this is shuffle/fileContext-recovery behavior, not timer-specific, and doesn't fit the settings/favorite/history/timer charter of this task; flagging as a genuine coverage gap (same category as row 53, T04) for a future task that owns shuffle failure-recovery | — |
+| 102 | Two devices' timers reflect their own file durations | getTimerState | device1 totalTime 180000, device2 300000 | ported (folded into one multi-device isolation test with rows 103–104) | player-context-timer.spec.ts |
+| 103 | Removing one device clears only its timer | removePlayer, getTimerState | removed device's timer null; other device's timer intact | ported (folded into row 102's test) | player-context-timer.spec.ts |
+| 104 | Pausing one device's timer doesn't pause another's | pause, getTimerState | device1 isRunning false, device2 isRunning true | ported (folded into row 102's test) | player-context-timer.spec.ts |
+| 105 | Rapid pause/play/pause/play/stop leaves the timer in a clean stopped state | pause, play, stop, getTimerState | currentTime 0; isRunning false | ported | player-context-timer.spec.ts |
+| 106 | Timer query for an unknown device returns null | getTimerState | null | ported (merged with row 107 into one test) | player-context-timer.spec.ts |
+| 107 | A freshly initialized device has no timer | getTimerState | null | ported (folded into row 106's test) | player-context-timer.spec.ts |
+| 108 | pause/play/stop never throw on a non-music file | pause, play, stop | all three resolve without throwing | ported (merged into row 83 — identical scenario) | player-context-timer.spec.ts |
+| 109 | getTimerState reflects the underlying store's timer state after creation | getTimerState | non-null with correct totalTime | dropped — P03‑T06: duplicate of row 73's creation assertion (same "non-null, correct totalTime" claim through the same public call) | — |
+| 110 | getTimerState tracks isRunning/currentTime correctly across launch→pause→stop | pause, stop, getTimerState | isRunning true→false; currentTime 0 and isRunning false after stop | dropped — P03‑T06: duplicate of row 79's pause/play/stop flow test, which already asserts isRunning/currentTime across the same sequence | — |
+| 111 | An incompatible launchFile result auto-advances to the next compatible file, then times it | launchFileWithContext, getCurrentFile, getError, getTimerState | currentFile.isCompatible true after auto-advance; error null; timer created | dropped — P03‑T06: duplicate of `player-context-auto-advance.spec.ts`'s directory-mode advancement test (T05), which already lands on a compatible file with no error; adding a timer-creation assertion there is that file's call, not this task's four-area charter | — |
+| 112 | An incompatible random-launch result still loads directory context, no timer/error | launchRandomFile, getCurrentFile, getError, getTimerState | alignToPlayingFile called; currentFile.isCompatible false; error null; timer null | ported (folded into row 26's compatibility-gate test, which now also asserts `getTimerState()` is null right after the incompatible launch — same `determineTimerDuration` guard exercised via the directory-launch entry point rather than random-launch; the `alignToPlayingFile` assertion is random-launch-specific and stays uncovered here, see Execution Notes) | player-context-timer.spec.ts |
+| 113 | Navigating next() onto an incompatible file clears the timer without setting an error | next, getCurrentFile, getError, getTimerState | currentFile is the incompatible file; error null; timer null | dropped — P03‑T06: `determineTimerDuration`'s incompatible-file guard is entry-point-agnostic (checked once per `setupTimerForFile` call regardless of whether the launch came from `launchFileWithContext`, `next()`, or `previous()`); row 112's folded test already exercises the identical guard | — |
+| 114 | Mirrors #113 for previous() | previous, getCurrentFile, getError, getTimerState | same as #113 | dropped — same reasoning as row 113 | — |
+| 115 | Manually navigating next() off an incompatible file recovers to a compatible one with a timer | launchFileWithContext, next, getError, getCurrentFile, getTimerState | error null throughout; currentFile becomes compatible; timer created | dropped — P03‑T06: duplicate of `player-context-auto-advance.spec.ts`'s directory-mode advancement coverage (T05) plus row 84's "timer created for the newly current file" claim; no new code path | — |
+| 116 | A freshly initialized device has no play history | getPlayHistory | null | ported (folded into one "initial state" test with rows 117–119) | player-context-history.spec.ts |
+| 117 | History position defaults to -1 (end marker) with no history | getCurrentHistoryPosition | -1 | ported (folded into row 116's test) | player-context-history.spec.ts |
+| 118 | canNavigateBackwardInHistory is false with no history | canNavigateBackwardInHistory | false | ported (folded into row 116's test) | player-context-history.spec.ts |
+| 119 | canNavigateForwardInHistory is false with no history | canNavigateForwardInHistory | false | ported (folded into row 116's test) | player-context-history.spec.ts |
+| 120 | A successful directory launch appends a history entry at end position | launchFileWithContext, getPlayHistory | 1 entry matching launched file; currentPosition -1 | ported | player-context-history.spec.ts |
+| 121 | A successful random launch also records a history entry | launchRandomFile, getPlayHistory | 1 entry matching random file | ported | player-context-history.spec.ts |
+| 122 | A failed launch does not create a history entry | launchFileWithContext, getPlayHistory | history stays null | ported (folded with row 128 into one fail-then-recover test) | player-context-history.spec.ts |
+| 123 | An incompatible file launch does not create a history entry | launchFileWithContext, getPlayHistory | history stays null | ported (folded into row 126's alternating-sequence test, which walks through incompatible launches and asserts the count doesn't move) | player-context-history.spec.ts |
+| 124 | A compatible launch following an incompatible one records exactly one entry | launchFileWithContext, getPlayHistory | null after incompatible; 1 entry (compatible file) after | ported (folded into row 126's test) | player-context-history.spec.ts |
+| 125 | Three consecutive incompatible launches record nothing | launchFileWithContext, getPlayHistory | history stays null throughout | ported (folded into row 126's test — three consecutive incompatible launches are part of its sequence) | player-context-history.spec.ts |
+| 126 | History count grows only on compatible launches across an alternating sequence | launchFileWithContext, getPlayHistory | entry count progresses 1,1,2,2,3 with correct names in order | ported (test extended to also cover rows 123–125, 127: 1 compatible → 3 consecutive incompatible → 1 compatible → 1 more incompatible → 1 compatible, asserting count and names at each stage) | player-context-history.spec.ts |
+| 127 | An incompatible launch after two compatible ones leaves existing entries untouched | launchFileWithContext, getPlayHistory | entries unchanged (same names) before/after the incompatible launch | ported (folded into row 126's test) | player-context-history.spec.ts |
+| 128 | A failed launch doesn't crash history recording; service still works on next success | launchFileWithContext, getPlayHistory | history null after failure; 1 entry after subsequent success | ported (folded into row 122's test) | player-context-history.spec.ts |
+| 129 | next() from an existing file appends a new history entry | next, getPlayHistory | 2 entries, in launch order | ported (folded into one test with row 130, asserting both next() and previous() append) | player-context-history.spec.ts |
+| 130 | previous() also appends a new history entry (browsing, not history-navigation) | previous, getPlayHistory | 2 entries in order launched | ported (folded into row 129's test) | player-context-history.spec.ts |
+| 131 | Navigating next() in shuffle mode records history too | toggleShuffleMode, next, getPlayHistory | 2 entries | ported | player-context-history.spec.ts |
+| 132 | Re-launching the same file back-to-back doesn't add a second entry | launchFileWithContext, getPlayHistory | 1 entry after two identical launches | ported (folded into one test with row 133) | player-context-history.spec.ts |
+| 133 | Replaying a file after an intervening different file does add a new entry | launchFileWithContext, getPlayHistory | 3 entries: file1, file2, file1 | ported (folded into row 132's test) | player-context-history.spec.ts |
+| 134 | History grows with each distinct launch (smoke test standing in for the 1000-entry cap) | launchFileWithContext, getPlayHistory | 3 entries after 3 launches; position -1 (note: doesn't exercise the cap itself) | ported (replaced) — P03‑T06: per this row's own flag ("doesn't actually exercise the cap") and the inventory's Execution Notes suggesting real cap coverage, this row is replaced with a genuine 1000-entry-cap test (1002 sequential launches, asserting the store evicts the two oldest and caps at exactly 1000) rather than the smoke test that only proved 3-launches-produce-3-entries — already proven by row 120 | player-context-history.spec.ts |
+| 135 | A history entry captures the file's name/path/parentPath/compatibility/timestamp | getPlayHistory | entry fields match the launched file; timestamp > 0 | ported (folded into one test with row 136) | player-context-history.spec.ts |
+| 136 | A history entry's storageKey encodes the device and storage type | getPlayHistory | storageKey truthy, contains deviceId and 'SD' | ported (folded into row 135's test) | player-context-history.spec.ts |
+| 137 | clearHistory() empties an existing history | clearHistory, getPlayHistory | history null after clear | ported (folded into one test with row 139) | player-context-history.spec.ts |
+| 138 | A launch after clearHistory() starts a fresh single-entry history | clearHistory, launchFileWithContext, getPlayHistory | 1 entry matching the new launch | ported | player-context-history.spec.ts |
+| 139 | Clearing an already-null history is a no-op that doesn't throw | clearHistory, getPlayHistory | no throw; history stays null | ported (folded into row 137's test) | player-context-history.spec.ts |
+| 140 | Across 5 launches alternating compatible/incompatible, only the 3 compatible ones appear, in order (Behavior A) | launchFileWithContext, getPlayHistory | 3 entries named game1/game3/game5 | ported (extended to also assert timestamp ordering, folding in row 141) | player-context-history.spec.ts |
+| 141 | Recorded entries' timestamps are strictly non-decreasing and unique (Behavior B) | getPlayHistory | 3 entries; timestamps ascending and unique | ported (folded into row 140's test) | player-context-history.spec.ts |
+| 142 | An incompatible file between two compatible ones is skipped; nav flags reflect remainder (Behavior C) | getPlayHistory, canNavigateBackwardInHistory, canNavigateForwardInHistory | 2 entries (track1, track3); canNavigateBackward true, canNavigateForward false | ported | player-context-history.spec.ts |
+| 143 | Across 6 files (2 incompatible), the 4 compatible entries are ordered by timestamp (Behavior D) | getPlayHistory | 4 entries in ascending timestamp/launch order | dropped — P03‑T06: duplicate coverage of Behavior A/row 140 (same "compatible-only, in order" claim at a larger n); no new code path over the 5-file version | — |
+| 144 | An incompatible file is excluded from history regardless of Shuffle/Directory/Search mode (Behavior E) | launchFileWithContext, getPlayHistory | history stays null across all 3 incompatible-mode launches; 1 all-compatible entry after the compatible launch | ported | player-context-history.spec.ts |
+| 145 | Removing a device clears its history | removePlayer, getPlayHistory | history null after removal | ported (folded into one test with row 146) | player-context-history.spec.ts |
+| 146 | Re-initializing a removed device starts a fresh history on next launch | removePlayer, initializePlayer, launchFileWithContext, getPlayHistory | 1 entry for the new launch | ported (folded into row 145's test) | player-context-history.spec.ts |
+| 147 | Two devices' histories track only their own launches | launchFileWithContext, getPlayHistory | each device shows only its own file | ported (folded into one test with row 148) | player-context-history.spec.ts |
+| 148 | Clearing one device's history leaves another device's history intact | clearHistory, getPlayHistory | device1 null, device2 still 1 entry | ported (folded into row 147's test) | player-context-history.spec.ts |
+| 149 | After one launch, position is -1 (at end) | getCurrentHistoryPosition | -1 | dropped — P03‑T06: duplicate of row 120's "currentPosition -1" assertion on the same single-launch scenario | — |
+| 150 | With entries and at end position, backward navigation is possible | canNavigateBackwardInHistory | true | dropped — P03‑T06: duplicate of the back/forward navigation tests' own precondition (every `previous()` test in this file exercises `canNavigateBackwardInHistory` implicitly by successfully navigating backward) | — |
+| 151 | At end position there's nothing to navigate forward to | canNavigateForwardInHistory | false | dropped — P03‑T06: duplicate of row 119's identical claim (also true at the end position after any number of launches, not just zero) | — |
 
 ## 2. player-context-auto-advancement.service.spec.ts (40 tests)
 
@@ -323,39 +334,39 @@ elsewhere in this file (typically "End-to-End Auto-Advancement Scenarios"), that
 
 | # | Behavior | Public surface | Asserts | Disposition | Target file |
 |---|---|---|---|---|---|
-| 192 | previous() from the end-of-history marker launches the most recent entry via launchFile, not random | previous, getCurrentHistoryPosition, getCurrentFile | position becomes 2; launchFile called with file3; launchRandom not called; currentFile is file3 | port | player-context-history-back-forward.spec.ts |
-| 193 | previous() from the oldest entry wraps to the newest entry without adding a new entry | previous, getCurrentHistoryPosition, getPlayHistory | position wraps 0→2; entry count stays 3; currentFile is file3 | port | player-context-history-back-forward.spec.ts |
-| 194 | previous() with cleared history falls back to a random launch | clearHistory, previous, getCurrentFile | launchRandom called; currentFile is the random file | port | player-context-history-back-forward.spec.ts |
-| 195 | Backward history navigation doesn't grow the history | previous, getPlayHistory | entry count unchanged (3) after two backward navigations | port | player-context-history-back-forward.spec.ts |
-| 196 | previous() in Directory mode uses ordinary file-context navigation, not history | toggleShuffleMode, launchFileWithContext, previous, getCurrentFile, getLaunchMode | launchFile called with the directory-previous file; mode stays Directory | port | player-context-history-back-forward.spec.ts |
-| 197 | Backward history navigation re-aligns and loads the file context for the target file's directory | previous, StorageStore.alignToPlayingFile, getFileContext | alignToPlayingFile called with directory path; fileContext reflects it with correct currentIndex | port | player-context-history-back-forward.spec.ts |
-| 198 | Navigating backward to a music history entry creates a running timer for it | previous, getTimerState | timerState non-null, isRunning true, totalTime > 0 | port | player-context-history-back-forward.spec.ts |
-| 199 | next() from a middle history position launches the following entry via launchFile | next, getCurrentFile, getPlayHistory | launchFile called with file3; launchRandom not called; position becomes 2 | port | player-context-history-back-forward.spec.ts |
-| 200 | next() once at the newest entry launches a brand-new random file instead of reusing history | next, getCurrentFile | launchRandom called; launchFile call count unchanged from the prior forward nav | port | player-context-history-back-forward.spec.ts |
-| 201 | Forward history navigation doesn't add a new entry | next, getPlayHistory | entry count stays 3; position becomes 2 | port | player-context-history-back-forward.spec.ts |
-| 202 | A random launch triggered from the end of history appends a new entry | next, getPlayHistory | entry count 3→4; new entry at end (position -1) matches the new file | port | player-context-history-back-forward.spec.ts |
-| 203 | A brand-new random launch appends after existing entries rather than truncating forward history | next, getPlayHistory | entries grow to 4 with the new file appended at the end | port | player-context-history-back-forward.spec.ts |
-| 204 | next() in Directory mode uses file-context navigation, unaffected by history position | toggleShuffleMode, launchFileWithContext, next, getCurrentFile, getLaunchMode | launchFile called with the directory-next file; mode stays Directory | port | player-context-history-back-forward.spec.ts |
-| 205 | Forward history navigation also re-aligns and loads file context for the target entry's directory | next, StorageStore.alignToPlayingFile, getFileContext | alignToPlayingFile called with path; fileContext matches | port | player-context-history-back-forward.spec.ts |
-| 206 | With one history entry, previous() lands on it and next() launches a new random file | previous, next, getPlayHistory, getCurrentFile | position sequence -1→0→-1; entry count 1 then 2 | port | player-context-history-edge-cases.spec.ts |
-| 207 | previous() with no history is a safe no-op; next() with no history behaves like a normal new launch | previous, next, getPlayHistory | previous() resolves without throw; next() creates the first entry | port | player-context-history-edge-cases.spec.ts |
-| 208 | A launchFile failure during backward navigation leaves history position unchanged and sets an error | previous, getPlayHistory, getError, getTimerState | position stays -1; error truthy; timer null | port | player-context-history-edge-cases.spec.ts |
-| 209 | Mirrors #208 for forward navigation | next, getPlayHistory, getError | position stays at 1; error truthy | port | player-context-history-edge-cases.spec.ts |
-| 210 | Navigating one device's history doesn't affect another device's history | previous, getPlayHistory | device1 position changes; device2 history unchanged (deep-equal to prior snapshot) | port | player-context-history-edge-cases.spec.ts |
-| 211 | A failed alignToPlayingFile during backward navigation doesn't block the file launch itself | previous, getCurrentFile, getPlayHistory | currentFile updates to target file; history position updates despite the directory-load rejection | port | player-context-history-edge-cases.spec.ts |
-| 212 | A rapid back/forward/back/forward/back sequence over a 5-entry history ends at the expected state | previous, next, getPlayHistory, getCurrentFile | final position 4; currentFile matches files[4] | port | player-context-history-edge-cases.spec.ts |
-| 213 | Toggling between shuffle and directory mode doesn't alter existing history | toggleShuffleMode, getPlayHistory, previous | history entries equal (deep) across mode switches; position updates correctly on subsequent previous() | port | player-context-history-edge-cases.spec.ts |
-| 214 | An end-to-end shuffle session (5 launches, 3 back, 2 forward, 1 new) tracks position/file at every step | next, previous, getPlayHistory, getCurrentFile | position and current file name checked after every step; final state has 6 entries at position -1 | port | player-context-history-edge-cases.spec.ts |
-| 215 | A browser-style session (launch 4, back twice, forward once, new launch) appends rather than discards forward history | next, previous, getPlayHistory | final entry count 5 with the new file appended at position -1 | port | player-context-history-edge-cases.spec.ts |
-| 216 | Switching between shuffle and directory mode mid-session keeps history growing and navigable | toggleShuffleMode, next, getPlayHistory, getCurrentFile, canNavigateBackwardInHistory | history length non-decreasing across mode switches; canNavigateBackward true at the end | port | player-context-history-edge-cases.spec.ts |
-| 217 | Backward navigation through 3 music entries keeps history position and current file in sync at each step | previous, getPlayHistory, getCurrentFile | position 2→1→0 with matching file names at each step | port | player-context-history-edge-cases.spec.ts |
-| 218 | A 10-entry history navigated back 5, forward 3, back 2 ends at the correct position with matching current file | previous, next, getPlayHistory, getCurrentFile | position sequence 5→8→6; currentFile name matches history.entries at each stop | port | player-context-history-edge-cases.spec.ts |
-| 219 | History view visibility defaults to hidden | isHistoryViewVisible | false | port | player-context-history-view.spec.ts |
-| 220 | Toggling once shows the history view | toggleHistoryView, isHistoryViewVisible | true | port | player-context-history-view.spec.ts |
-| 221 | Toggling twice hides it again | toggleHistoryView, isHistoryViewVisible | true then false | port | player-context-history-view.spec.ts |
-| 222 | History view visibility is tracked per device | toggleHistoryView, isHistoryViewVisible | toggling device1 doesn't affect device2 and vice versa | port | player-context-history-view.spec.ts |
-| 223 | Navigating to a specific history position doesn't hide an open history view, and doesn't add a new entry | toggleHistoryView, navigateToHistoryPosition, isHistoryViewVisible, getCurrentHistoryPosition, getPlayHistory | view stays visible; position becomes 0; currentFile matches; entry count unchanged (3) | port | player-context-history-view.spec.ts |
-| 224 | Launching a new file via launchFileWithContext closes an open history view | toggleHistoryView, launchFileWithContext, isHistoryViewVisible | view visible before launch, hidden after | port | player-context-history-view.spec.ts |
+| 192 | previous() from the end-of-history marker launches the most recent entry via launchFile, not random | previous, getCurrentHistoryPosition, getCurrentFile | position becomes 2; launchFile called with file3; launchRandom not called; currentFile is file3 | ported (folded with row 195 — entry count is also asserted unchanged) | player-context-history.spec.ts |
+| 193 | previous() from the oldest entry wraps to the newest entry without adding a new entry | previous, getCurrentHistoryPosition, getPlayHistory | position wraps 0→2; entry count stays 3; currentFile is file3 | ported | player-context-history.spec.ts |
+| 194 | previous() with cleared history falls back to a random launch | clearHistory, previous, getCurrentFile | launchRandom called; currentFile is the random file | ported | player-context-history.spec.ts |
+| 195 | Backward history navigation doesn't grow the history | previous, getPlayHistory | entry count unchanged (3) after two backward navigations | ported (folded into row 192's test) | player-context-history.spec.ts |
+| 196 | previous() in Directory mode uses ordinary file-context navigation, not history | toggleShuffleMode, launchFileWithContext, previous, getCurrentFile, getLaunchMode | launchFile called with the directory-previous file; mode stays Directory | ported (folded with row 204 — same claim for next() and previous() in one test) | player-context-history.spec.ts |
+| 197 | Backward history navigation re-aligns and loads the file context for the target file's directory | previous, StorageStore.alignToPlayingFile, getFileContext | alignToPlayingFile called with directory path; fileContext reflects it with correct currentIndex | ported (folded with row 205 — both directions asserted in one test) | player-context-history.spec.ts |
+| 198 | Navigating backward to a music history entry creates a running timer for it | previous, getTimerState | timerState non-null, isRunning true, totalTime > 0 | ported | player-context-history.spec.ts |
+| 199 | next() from a middle history position launches the following entry via launchFile | next, getCurrentFile, getPlayHistory | launchFile called with file3; launchRandom not called; position becomes 2 | ported (folded with row 201 — entry count also asserted unchanged) | player-context-history.spec.ts |
+| 200 | next() once at the newest entry launches a brand-new random file instead of reusing history | next, getCurrentFile | launchRandom called; launchFile call count unchanged from the prior forward nav | ported (folded with rows 202–203 into one test covering the random-launch-at-newest-entry shape and its append effect) | player-context-history.spec.ts |
+| 201 | Forward history navigation doesn't add a new entry | next, getPlayHistory | entry count stays 3; position becomes 2 | ported (folded into row 199's test) | player-context-history.spec.ts |
+| 202 | A random launch triggered from the end of history appends a new entry | next, getPlayHistory | entry count 3→4; new entry at end (position -1) matches the new file | ported (folded into row 200's test) | player-context-history.spec.ts |
+| 203 | A brand-new random launch appends after existing entries rather than truncating forward history | next, getPlayHistory | entries grow to 4 with the new file appended at the end | ported (folded into row 200's test) | player-context-history.spec.ts |
+| 204 | next() in Directory mode uses file-context navigation, unaffected by history position | toggleShuffleMode, launchFileWithContext, next, getCurrentFile, getLaunchMode | launchFile called with the directory-next file; mode stays Directory | ported (folded into row 196's test) | player-context-history.spec.ts |
+| 205 | Forward history navigation also re-aligns and loads file context for the target entry's directory | next, StorageStore.alignToPlayingFile, getFileContext | alignToPlayingFile called with path; fileContext matches | ported (folded into row 197's test) | player-context-history.spec.ts |
+| 206 | With one history entry, previous() lands on it and next() launches a new random file | previous, next, getPlayHistory, getCurrentFile | position sequence -1→0→-1; entry count 1 then 2 | ported | player-context-history.spec.ts |
+| 207 | previous() with no history is a safe no-op; next() with no history behaves like a normal new launch | previous, next, getPlayHistory | previous() resolves without throw; next() creates the first entry | ported | player-context-history.spec.ts |
+| 208 | A launchFile failure during backward navigation leaves history position unchanged and sets an error | previous, getPlayHistory, getError, getTimerState | position stays -1; error truthy; timer null | ported (folded with row 209 into one `it.each(['previous','next'])`, sharing a middle-position setup so both directions take the history-navigation branch) | player-context-history.spec.ts |
+| 209 | Mirrors #208 for forward navigation | next, getPlayHistory, getError | position stays at 1; error truthy | ported (folded into row 208's `it.each`) | player-context-history.spec.ts |
+| 210 | Navigating one device's history doesn't affect another device's history | previous, getPlayHistory | device1 position changes; device2 history unchanged (deep-equal to prior snapshot) | ported | player-context-history.spec.ts |
+| 211 | A failed alignToPlayingFile during backward navigation doesn't block the file launch itself | previous, getCurrentFile, getPlayHistory | currentFile updates to target file; history position updates despite the directory-load rejection | ported | player-context-history.spec.ts |
+| 212 | A rapid back/forward/back/forward/back sequence over a 5-entry history ends at the expected state | previous, next, getPlayHistory, getCurrentFile | final position 4; currentFile matches files[4] | ported (kept as the one representative multi-step walk test — see rows 217–218) | player-context-history.spec.ts |
+| 213 | Toggling between shuffle and directory mode doesn't alter existing history | toggleShuffleMode, getPlayHistory, previous | history entries equal (deep) across mode switches; position updates correctly on subsequent previous() | ported (folded with row 216 into one test) | player-context-history.spec.ts |
+| 214 | An end-to-end shuffle session (5 launches, 3 back, 2 forward, 1 new) tracks position/file at every step | next, previous, getPlayHistory, getCurrentFile | position and current file name checked after every step; final state has 6 entries at position -1 | ported (folded with row 215 into one session test asserting the final appended-not-truncated shape) | player-context-history.spec.ts |
+| 215 | A browser-style session (launch 4, back twice, forward once, new launch) appends rather than discards forward history | next, previous, getPlayHistory | final entry count 5 with the new file appended at position -1 | ported (folded into row 214's test) | player-context-history.spec.ts |
+| 216 | Switching between shuffle and directory mode mid-session keeps history growing and navigable | toggleShuffleMode, next, getPlayHistory, getCurrentFile, canNavigateBackwardInHistory | history length non-decreasing across mode switches; canNavigateBackward true at the end | ported (folded into row 213's test) | player-context-history.spec.ts |
+| 217 | Backward navigation through 3 music entries keeps history position and current file in sync at each step | previous, getPlayHistory, getCurrentFile | position 2→1→0 with matching file names at each step | dropped — P03‑T06: duplicate coverage of row 212's multi-step walk (a "position tracks file at each step" claim); at this scale it's the same claim over a smaller n | — |
+| 218 | A 10-entry history navigated back 5, forward 3, back 2 ends at the correct position with matching current file | previous, next, getPlayHistory, getCurrentFile | position sequence 5→8→6; currentFile name matches history.entries at each stop | dropped — P03‑T06: duplicate of row 212's multi-step walk at a larger n; no new code path | — |
+| 219 | History view visibility defaults to hidden | isHistoryViewVisible | false | ported (folded with rows 220–221 into one toggle test) | player-context-history.spec.ts |
+| 220 | Toggling once shows the history view | toggleHistoryView, isHistoryViewVisible | true | ported (folded into row 219's test) | player-context-history.spec.ts |
+| 221 | Toggling twice hides it again | toggleHistoryView, isHistoryViewVisible | true then false | ported (folded into row 219's test) | player-context-history.spec.ts |
+| 222 | History view visibility is tracked per device | toggleHistoryView, isHistoryViewVisible | toggling device1 doesn't affect device2 and vice versa | ported | player-context-history.spec.ts |
+| 223 | Navigating to a specific history position doesn't hide an open history view, and doesn't add a new entry | toggleHistoryView, navigateToHistoryPosition, isHistoryViewVisible, getCurrentHistoryPosition, getPlayHistory | view stays visible; position becomes 0; currentFile matches; entry count unchanged (3) | ported | player-context-history.spec.ts |
+| 224 | Launching a new file via launchFileWithContext closes an open history view | toggleHistoryView, launchFileWithContext, isHistoryViewVisible | view visible before launch, hidden after | ported | player-context-history.spec.ts |
 
 ## 4. player-context-incompatible-files.service.spec.ts (23 tests)
 
@@ -397,84 +408,84 @@ cross-scenario integration" describe exercises the identical behavior through th
 
 | # | Behavior | Public surface | Asserts | Disposition | Target file |
 |---|---|---|---|---|---|
-| 248 | initializePlayer reads the startup filter from SettingsStore and applies it | initializePlayer, PlayerStore.initializePlayer | called with defaultFilter Games, playTimerEnabled true | port | player-context-settings.spec.ts |
-| 249 | Null settings fall back to the All filter and disabled timer | initializePlayer | called with defaultFilter All, playTimerEnabled false | port | player-context-settings.spec.ts |
-| 250 | Missing playerSettings sub-object also falls back to All/disabled | initializePlayer | called with defaultFilter All, playTimerEnabled false | port | player-context-settings.spec.ts |
-| 251 | The Music startup filter is applied | initializePlayer | called with defaultFilter Music, playTimerEnabled true | port | player-context-settings.spec.ts |
-| 252 | The Hex startup filter is applied | initializePlayer | called with defaultFilter Hex, playTimerEnabled true | merge → #251 (identical shape besides the enum literal; collapses into one parameterized filter-value test) | player-context-settings.spec.ts |
-| 253 | The Images startup filter is applied | initializePlayer | called with defaultFilter Images, playTimerEnabled true | merge → #251 (same reason as #252) | player-context-settings.spec.ts |
-| 254 | initializePlayer applies filter and timer setting together in one store call | initializePlayer | called exactly once with All/true | port | player-context-settings.spec.ts |
-| 255 | Two devices each get their own initializePlayer call carrying the same settings-derived filter | initializePlayer | called twice, once per deviceId, both with Games/true | port | player-context-settings.spec.ts |
-| 256 | Re-initializing an already-initialized device doesn't reset a filter the user changed manually | initializePlayer, PlayerStore.updateShuffleSettings | second call still reflects original Games filter; updateShuffleSettings only called for the manual change | port | player-context-settings.spec.ts |
-| 257 | A true playTimerEnabled setting is passed through to store initialization | initializePlayer | called with playTimerEnabled true | port | player-context-settings.spec.ts |
-| 258 | A false playTimerEnabled setting is passed through as false | initializePlayer | called with playTimerEnabled false | port | player-context-settings.spec.ts |
-| 259 | Null settings default the timer to disabled | initializePlayer | playTimerEnabled false | port | player-context-settings.spec.ts |
-| 260 | Missing playerSettings also defaults the timer to disabled | initializePlayer | playTimerEnabled false | port | player-context-settings.spec.ts |
-| 261 | Two devices each receive the same settings-derived timer flag via their own initializePlayer call | initializePlayer | called twice, once per device, both with playTimerEnabled true | port | player-context-settings.spec.ts |
+| 248 | initializePlayer reads the startup filter from SettingsStore and applies it | initializePlayer, PlayerStore.initializePlayer | called with defaultFilter Games, playTimerEnabled true | ported (rewritten) — P03‑T06: per the handoff's real-`SettingsStore` seam, this seeds `SettingsStore` state directly (`updateState`) instead of stubbing `PlayerStore.initializePlayer`, and asserts the result through `getShuffleSettings()`/`getPlayTimerConfig()` (the real store's derived state) rather than a spy call | player-context-settings.spec.ts |
+| 249 | Null settings fall back to the All filter and disabled timer | initializePlayer | called with defaultFilter All, playTimerEnabled false | ported (rewritten, same real-store approach as row 248) | player-context-settings.spec.ts |
+| 250 | Missing playerSettings sub-object also falls back to All/disabled | initializePlayer | called with defaultFilter All, playTimerEnabled false | ported (rewritten, same real-store approach as row 248) | player-context-settings.spec.ts |
+| 251 | The Music startup filter is applied | initializePlayer | called with defaultFilter Music, playTimerEnabled true | ported (rewritten as an `it.each` over Games/Music/Hex/Images, folding rows 252–253) | player-context-settings.spec.ts |
+| 252 | The Hex startup filter is applied | initializePlayer | called with defaultFilter Hex, playTimerEnabled true | ported (folded into row 251's `it.each`) | player-context-settings.spec.ts |
+| 253 | The Images startup filter is applied | initializePlayer | called with defaultFilter Images, playTimerEnabled true | ported (folded into row 251's `it.each`) | player-context-settings.spec.ts |
+| 254 | initializePlayer applies filter and timer setting together in one store call | initializePlayer | called exactly once with All/true | dropped — P03‑T06: with the real store, filter and playTimerEnabled are read together by the same `initializePlayer` call in row 248's test; the "one call" framing was only meaningful against a spy, which the real-store rewrite no longer uses | — |
+| 255 | Two devices each get their own initializePlayer call carrying the same settings-derived filter | initializePlayer | called twice, once per deviceId, both with Games/true | ported (rewritten, asserts both devices' `getShuffleSettings`/`getPlayTimerConfig` instead of spy call args) | player-context-settings.spec.ts |
+| 256 | Re-initializing an already-initialized device doesn't reset a filter the user changed manually | initializePlayer, PlayerStore.updateShuffleSettings | second call still reflects original Games filter; updateShuffleSettings only called for the manual change | ported (rewritten via the public `setFilterMode`/`getShuffleSettings` surface instead of a store spy) | player-context-settings.spec.ts |
+| 257 | A true playTimerEnabled setting is passed through to store initialization | initializePlayer | called with playTimerEnabled true | dropped — P03‑T06: `playerSettings.startupFilter` and `.playTimerEnabled` are two independent optional-chained reads in `initializePlayer` with no shared branching; row 248's combined test already exercises this exact read for `playTimerEnabled: true` | — |
+| 258 | A false playTimerEnabled setting is passed through as false | initializePlayer | called with playTimerEnabled false | dropped — P03‑T06: same reasoning as row 257; row 249's null-settings test already exercises the `false` branch | — |
+| 259 | Null settings default the timer to disabled | initializePlayer | playTimerEnabled false | dropped — P03‑T06: duplicate of row 249, which already asserts the timer defaults to disabled under null settings | — |
+| 260 | Missing playerSettings also defaults the timer to disabled | initializePlayer | playTimerEnabled false | dropped — P03‑T06: duplicate of row 250, which already asserts the timer defaults to disabled under missing `playerSettings` | — |
+| 261 | Two devices each receive the same settings-derived timer flag via their own initializePlayer call | initializePlayer | called twice, once per device, both with playTimerEnabled true | dropped — P03‑T06: duplicate of row 255, which already asserts both devices' filter and timer flag together | — |
 
 ## 6. player-context-playTimer.service.spec.ts (21 tests)
 
 | # | Behavior | Public surface | Asserts | Disposition | Target file |
 |---|---|---|---|---|---|
-| 262 | A newly initialized device gets a default (disabled, DEFAULT_TIMER_MS) custom timer config | initializePlayer, getPlayTimerConfig | enabled false; durationMs DEFAULT_TIMER_MS | port | player-context-custom-play-timer.spec.ts |
-| 263 | The default timer config survives a subsequent file launch | launchFileWithContext, getPlayTimerConfig | config unchanged (disabled, default duration) after launch | port | player-context-custom-play-timer.spec.ts |
-| 264 | setCustomTimer enables the timer and sets its duration | setCustomTimer, getPlayTimerConfig | enabled true, durationMs 30000 | port | player-context-custom-play-timer.spec.ts |
-| 265 | Calling setCustomTimer again while enabled changes only the duration | setCustomTimer, getPlayTimerConfig | durationMs updates to 60000, still enabled | port | player-context-custom-play-timer.spec.ts |
-| 266 | Disabling the custom timer keeps the last duration but flips enabled off | setCustomTimer, getPlayTimerConfig | enabled false; durationMs persists (30000) | port | player-context-custom-play-timer.spec.ts |
-| 267 | A single setCustomTimer call updates both enabled and duration at once | setCustomTimer, getPlayTimerConfig | enabled true, durationMs 45000 | port | player-context-custom-play-timer.spec.ts |
-| 268 | Updating the custom timer config doesn't disturb the currently playing file or status | setCustomTimer, getCurrentFile, getPlayerStatus | file name unchanged; status stays Playing | port | player-context-custom-play-timer.spec.ts |
-| 269 | For a music file, metadata playLength wins over an enabled custom timer | setCustomTimer, launchFileWithContext, getTimerState | totalTime 225000 (metadata), not the custom 30000 | port | player-context-custom-play-timer.spec.ts |
-| 270 | A non-timer file type (game) gets the custom-timer duration when enabled | setCustomTimer, launchFileWithContext, getTimerState | totalTime 60000 | port | player-context-custom-play-timer.spec.ts |
-| 271 | Image files also receive the custom-timer duration when enabled | setCustomTimer, launchFileWithContext, getTimerState | totalTime 10000 | port | player-context-custom-play-timer.spec.ts |
-| 272 | Hex files are excluded from timers regardless of the custom timer setting | setCustomTimer, launchFileWithContext, getTimerState | timerState null | port | player-context-custom-play-timer.spec.ts |
-| 273 | With the custom timer disabled, music files still time via metadata | launchFileWithContext, getTimerState | totalTime 225000 | port | player-context-custom-play-timer.spec.ts |
-| 274 | Game files get no timer when the custom timer is off | launchFileWithContext, getTimerState | timerState null | port | player-context-custom-play-timer.spec.ts |
-| 275 | Image files also get no timer when the custom timer is off | launchFileWithContext, getTimerState | timerState null | port | player-context-custom-play-timer.spec.ts |
-| 276 | Enabling the custom timer mid-session applies it to the next non-timer-file launch | setCustomTimer, launchFileWithContext, getTimerState | no timer before enabling; totalTime 20000 after enabling and relaunching | port | player-context-custom-play-timer.spec.ts |
-| 277 | Disabling the custom timer mid-session removes it from the next non-timer-file launch | setCustomTimer, launchFileWithContext, getTimerState | timer present (15000) while enabled; null after disabling and relaunching | port | player-context-custom-play-timer.spec.ts |
-| 278 | A set custom duration applies consistently across successive launches | setCustomTimer, launchFileWithContext, getTimerState | totalTime 25000 for both launches | port | player-context-custom-play-timer.spec.ts |
-| 279 | Updating the custom duration mid-session affects only the following launch | setCustomTimer, launchFileWithContext, getTimerState | 30000 then 5000 after the update | port | player-context-custom-play-timer.spec.ts |
-| 280 | Querying config for an unknown device returns null | getPlayTimerConfig | null | port | player-context-custom-play-timer.spec.ts |
-| 281 | A newly initialized device has a default config available | getPlayTimerConfig | enabled false; durationMs DEFAULT_TIMER_MS | port | player-context-custom-play-timer.spec.ts |
-| 282 | The same signal instance reflects config changes made via setCustomTimer | getPlayTimerConfig, setCustomTimer | signal value updates from disabled to enabled/50000 in place | port | player-context-custom-play-timer.spec.ts |
+| 262 | A newly initialized device gets a default (disabled, DEFAULT_TIMER_MS) custom timer config | initializePlayer, getPlayTimerConfig | enabled false; durationMs DEFAULT_TIMER_MS | ported (folded with rows 280–281 into one test covering a fresh device and an unknown one) | player-context-timer.spec.ts |
+| 263 | The default timer config survives a subsequent file launch | launchFileWithContext, getPlayTimerConfig | config unchanged (disabled, default duration) after launch | ported | player-context-timer.spec.ts |
+| 264 | setCustomTimer enables the timer and sets its duration | setCustomTimer, getPlayTimerConfig | enabled true, durationMs 30000 | ported (folded with rows 265–267 into one sequential enable→update→disable flow test; row 267's "single call updates both at once" is this same call) | player-context-timer.spec.ts |
+| 265 | Calling setCustomTimer again while enabled changes only the duration | setCustomTimer, getPlayTimerConfig | durationMs updates to 60000, still enabled | ported (folded into row 264's test) | player-context-timer.spec.ts |
+| 266 | Disabling the custom timer keeps the last duration but flips enabled off | setCustomTimer, getPlayTimerConfig | enabled false; durationMs persists (30000) | ported (folded into row 264's test) | player-context-timer.spec.ts |
+| 267 | A single setCustomTimer call updates both enabled and duration at once | setCustomTimer, getPlayTimerConfig | enabled true, durationMs 45000 | ported (folded into row 264's test — its first call already updates both fields at once) | player-context-timer.spec.ts |
+| 268 | Updating the custom timer config doesn't disturb the currently playing file or status | setCustomTimer, getCurrentFile, getPlayerStatus | file name unchanged; status stays Playing | ported (folded into rows 276–277's immediate-update test) | player-context-timer.spec.ts |
+| 269 | For a music file, metadata playLength wins over an enabled custom timer | setCustomTimer, launchFileWithContext, getTimerState | totalTime 225000 (metadata), not the custom 30000 | ported | player-context-timer.spec.ts |
+| 270 | A non-timer file type (game) gets the custom-timer duration when enabled | setCustomTimer, launchFileWithContext, getTimerState | totalTime 60000 | ported (folded with row 271 into one `it.each([Game, Image])`) | player-context-timer.spec.ts |
+| 271 | Image files also receive the custom-timer duration when enabled | setCustomTimer, launchFileWithContext, getTimerState | totalTime 10000 | ported (folded into row 270's `it.each`) | player-context-timer.spec.ts |
+| 272 | Hex files are excluded from timers regardless of the custom timer setting | setCustomTimer, launchFileWithContext, getTimerState | timerState null | ported | player-context-timer.spec.ts |
+| 273 | With the custom timer disabled, music files still time via metadata | launchFileWithContext, getTimerState | totalTime 225000 | dropped — P03‑T06: duplicate of row 73 (timer creation from file metadata); no custom timer is enabled in any of that section's tests, so it already exercises this exact "disabled by default, music times via metadata" path | — |
+| 274 | Game files get no timer when the custom timer is off | launchFileWithContext, getTimerState | timerState null | ported (folded with row 275 into one `it.each([Game, Image])`) | player-context-timer.spec.ts |
+| 275 | Image files also get no timer when the custom timer is off | launchFileWithContext, getTimerState | timerState null | ported (folded into row 274's `it.each`) | player-context-timer.spec.ts |
+| 276 | Enabling the custom timer mid-session applies it to the next non-timer-file launch | setCustomTimer, launchFileWithContext, getTimerState | no timer before enabling; totalTime 20000 after enabling and relaunching | ported (rewritten) — P03‑T06: `setCustomTimer` recreates the timer immediately for the currently loaded file (`setupTimerForFile` runs inline when a file is already current), so the before/after-enabling contrast is exercised directly on the already-loaded file rather than via an extra relaunch — same claim, fewer steps; folded with rows 268, 277 into one test | player-context-timer.spec.ts |
+| 277 | Disabling the custom timer mid-session removes it from the next non-timer-file launch | setCustomTimer, launchFileWithContext, getTimerState | timer present (15000) while enabled; null after disabling and relaunching | ported (folded into row 276's test, same immediate-update reasoning) | player-context-timer.spec.ts |
+| 278 | A set custom duration applies consistently across successive launches | setCustomTimer, launchFileWithContext, getTimerState | totalTime 25000 for both launches | dropped — P03‑T06: duplicate of row 279's test, whose first launch already shows a set duration (30000) holding until explicitly changed | — |
+| 279 | Updating the custom duration mid-session affects only the following launch | setCustomTimer, launchFileWithContext, getTimerState | 30000 then 5000 after the update | ported | player-context-timer.spec.ts |
+| 280 | Querying config for an unknown device returns null | getPlayTimerConfig | null | ported (folded into row 262's test) | player-context-timer.spec.ts |
+| 281 | A newly initialized device has a default config available | getPlayTimerConfig | enabled false; durationMs DEFAULT_TIMER_MS | ported (folded into row 262's test — duplicate of the same claim) | player-context-timer.spec.ts |
+| 282 | The same signal instance reflects config changes made via setCustomTimer | getPlayTimerConfig, setCustomTimer | signal value updates from disabled to enabled/50000 in place | ported (claim corrected) — P03‑T06: `getPlayTimerConfig(deviceId)` returns a fresh `computed()` on every call (`selectors/get-play-timer-config.ts`), so it is never the *same instance* across two separate calls; the real, verifiable claim is that a *previously obtained* signal keeps reflecting later changes (any computed signal's normal behavior), which is what the rewritten test asserts | player-context-timer.spec.ts |
 
 ## 7. player-context-loading.service.spec.ts (13 tests)
 
 | # | Behavior | Public surface | Asserts | Disposition | Target file |
 |---|---|---|---|---|---|
-| 283 | isSlowLoading is false with no devices | isSlowLoading | false | port | player-context-loading.spec.ts |
-| 284 | isSlowLoading stays false for idle devices | initializePlayer, isSlowLoading | false | port | player-context-loading.spec.ts |
-| 285 | isSlowLoading() returns a stable, memoized signal | isSlowLoading | two calls return the same reference | port | player-context-loading.spec.ts |
-| 286 | A device loading past the 2s threshold flips the global slow-loading signal true | isSlowLoading | signal true after the delay observable resolves | port | player-context-loading.spec.ts |
-| 287 | Loading that finishes inside the 2-second window never trips the slow-loading signal | isSlowLoading | stays false throughout and after completion | port | player-context-loading.spec.ts |
-| 288 | Completing a slow load flips the signal back to false immediately | isSlowLoading | true while loading, false right after completion | port | player-context-loading.spec.ts |
-| 289 | The global signal is true if any one of several devices is slow-loading | isSlowLoading | true once device2 crosses the threshold | port | player-context-loading.spec.ts |
-| 290 | The signal returns to false only once every loading device finishes | isSlowLoading | true while both loading, false once both complete | port | player-context-loading.spec.ts |
-| 291 | Removing one slow-loading device while another remains loading keeps the signal true until that one also stops | removePlayer, isSlowLoading | true after removal (device2 still loading); false once device2 stops | port | player-context-loading.spec.ts |
-| 292 | isSlowLoading is safe to call with no devices at all | isSlowLoading | false | port | player-context-loading.spec.ts |
-| 293 | Many short back-to-back loading spans that individually stay under 2s never trip the signal | isSlowLoading | false after 10 rapid 150ms load/50ms-gap cycles | port | player-context-loading.spec.ts |
-| 294 | A real launchFileWithContext call that takes over 2s trips the slow-loading signal, then clears | launchFileWithContext, isSlowLoading | true mid-launch, false after the launch promise resolves | port | player-context-loading.spec.ts |
-| 295 | A real launch under 2 seconds never trips the signal | launchFileWithContext, isSlowLoading | false even after waiting past the 2-second mark | port | player-context-loading.spec.ts |
+| 283 | isSlowLoading is false with no devices | isSlowLoading | false | ported (folded with row 292 — identical claim, one test) | player-context-timer.spec.ts |
+| 284 | isSlowLoading stays false for idle devices | initializePlayer, isSlowLoading | false | ported (folded into row 283's test) | player-context-timer.spec.ts |
+| 285 | isSlowLoading() returns a stable, memoized signal | isSlowLoading | two calls return the same reference | ported | player-context-timer.spec.ts |
+| 286 | A device loading past the 2s threshold flips the global slow-loading signal true | isSlowLoading | signal true after the delay observable resolves | ported (rewritten) — P03‑T06: carries forward P01‑T02's `skip(1)` race-condition fix coverage; drives `PLAYER_LAUNCH_DELAY_MS` (the real threshold token, not a fixed "2 seconds") through a dedicated short-delay harness instead of the production 2000ms default, per this task's Testing guidance to prefer an overridden delay with short real waits | player-context-timer.spec.ts |
+| 287 | Loading that finishes inside the 2-second window never trips the slow-loading signal | isSlowLoading | stays false throughout and after completion | ported (rewritten, same short-delay-harness approach as row 286) | player-context-timer.spec.ts |
+| 288 | Completing a slow load flips the signal back to false immediately | isSlowLoading | true while loading, false right after completion | ported (folded into row 286's test — asserts the immediate-false transition after the tripped signal) | player-context-timer.spec.ts |
+| 289 | The global signal is true if any one of several devices is slow-loading | isSlowLoading | true once device2 crosses the threshold | ported | player-context-timer.spec.ts |
+| 290 | The signal returns to false only once every loading device finishes | isSlowLoading | true while both loading, false once both complete | ported (folded into row 289's test) | player-context-timer.spec.ts |
+| 291 | Removing one slow-loading device while another remains loading keeps the signal true until that one also stops | removePlayer, isSlowLoading | true after removal (device2 still loading); false once device2 stops | ported | player-context-timer.spec.ts |
+| 292 | isSlowLoading is safe to call with no devices at all | isSlowLoading | false | ported (folded into row 283's test — identical claim) | player-context-timer.spec.ts |
+| 293 | Many short back-to-back loading spans that individually stay under 2s never trip the signal | isSlowLoading | false after 10 rapid 150ms load/50ms-gap cycles | ported (rewritten with shorter spans scaled to the dedicated short-delay harness; same "rapid short spans never trip the signal" claim) | player-context-timer.spec.ts |
+| 294 | A real launchFileWithContext call that takes over 2s trips the slow-loading signal, then clears | launchFileWithContext, isSlowLoading | true mid-launch, false after the launch promise resolves | ported (rewritten against the short-delay harness rather than a real 2-second wait) | player-context-timer.spec.ts |
+| 295 | A real launch under 2 seconds never trips the signal | launchFileWithContext, isSlowLoading | false even after waiting past the 2-second mark | ported (rewritten against the short-delay harness) | player-context-timer.spec.ts |
 
 ## 8. player-context-favorite.service.spec.ts (7 tests)
 
 | # | Behavior | Public surface | Asserts | Disposition | Target file |
 |---|---|---|---|---|---|
-| 296 | Marking a file favorite updates both the current-file signal and the matching entry in file context | updateCurrentFileFavoriteStatus, getCurrentFile, getFileContext | currentFile.file.isFavorite true; matching context entry also true | port | player-context-favorite.spec.ts |
-| 297 | Marking a favorite updates every context entry sharing that file's path | updateCurrentFileFavoriteStatus, getFileContext | both duplicate-path entries become favorite | port | player-context-favorite.spec.ts |
-| 298 | Marking a path that isn't loaded leaves current file/context untouched | updateCurrentFileFavoriteStatus, getCurrentFile, getFileContext | both stay false | port | player-context-favorite.spec.ts |
-| 299 | Calling the update again with false clears the favorite flag it just set | updateCurrentFileFavoriteStatus, getCurrentFile, getFileContext | both false after the second call | port | player-context-favorite.spec.ts |
-| 300 | Calling the update for an unknown device is a safe no-op | updateCurrentFileFavoriteStatus | does not throw | port | player-context-favorite.spec.ts |
-| 301 | Calling the update before any file is launched leaves state null | initializePlayer, updateCurrentFileFavoriteStatus, getCurrentFile, getFileContext | both remain null | port | player-context-favorite.spec.ts |
-| 302 | Marking a favorite on one device's file doesn't affect another device's file | updateCurrentFileFavoriteStatus, getCurrentFile | primary device true, secondary device false | port | player-context-favorite.spec.ts |
+| 296 | Marking a file favorite updates both the current-file signal and the matching entry in file context | updateCurrentFileFavoriteStatus, getCurrentFile, getFileContext | currentFile.file.isFavorite true; matching context entry also true | ported | player-context-favorite.spec.ts |
+| 297 | Marking a favorite updates every context entry sharing that file's path | updateCurrentFileFavoriteStatus, getFileContext | both duplicate-path entries become favorite | ported | player-context-favorite.spec.ts |
+| 298 | Marking a path that isn't loaded leaves current file/context untouched | updateCurrentFileFavoriteStatus, getCurrentFile, getFileContext | both stay false | ported (folded with row 299 into one test: mismatched-path no-op, then toggle on/off) | player-context-favorite.spec.ts |
+| 299 | Calling the update again with false clears the favorite flag it just set | updateCurrentFileFavoriteStatus, getCurrentFile, getFileContext | both false after the second call | ported (folded into row 298's test) | player-context-favorite.spec.ts |
+| 300 | Calling the update for an unknown device is a safe no-op | updateCurrentFileFavoriteStatus | does not throw | ported (folded with row 301 into one test) | player-context-favorite.spec.ts |
+| 301 | Calling the update before any file is launched leaves state null | initializePlayer, updateCurrentFileFavoriteStatus, getCurrentFile, getFileContext | both remain null | ported (folded into row 300's test) | player-context-favorite.spec.ts |
+| 302 | Marking a favorite on one device's file doesn't affect another device's file | updateCurrentFileFavoriteStatus, getCurrentFile | primary device true, secondary device false | ported | player-context-favorite.spec.ts |
 
 ## 9. player-context-initialization.spec.ts (3 tests)
 
 | # | Behavior | Public surface | Asserts | Disposition | Target file |
 |---|---|---|---|---|---|
-| 303 | initializePlayer reads default settings and forwards defaultFilter/playTimerEnabled to the store | initializePlayer, PlayerStore.initializePlayer | called with deviceId, defaultFilter All, playTimerEnabled false | port | player-context-lifecycle.spec.ts |
-| 304 | A custom startup filter/timer setting is forwarded as-is | initializePlayer | called with defaultFilter Games, playTimerEnabled true | port | player-context-lifecycle.spec.ts |
-| 305 | Null settings from SettingsStore fall back to defaults | initializePlayer | called with defaultFilter All, playTimerEnabled false | port | player-context-lifecycle.spec.ts |
+| 303 | initializePlayer reads default settings and forwards defaultFilter/playTimerEnabled to the store | initializePlayer, PlayerStore.initializePlayer | called with deviceId, defaultFilter All, playTimerEnabled false | dropped — P03‑T06: no `player-context-lifecycle.spec.ts` was ever created (T04's Execution Notes); this row is a duplicate of row 249 (null-settings fallback to All/disabled), now exercised in `player-context-settings.spec.ts` against the real `SettingsStore` | — |
+| 304 | A custom startup filter/timer setting is forwarded as-is | initializePlayer | called with defaultFilter Games, playTimerEnabled true | dropped — P03‑T06: duplicate of row 248 (custom filter/timer applied together), same reasoning as row 303 | — |
+| 305 | Null settings from SettingsStore fall back to defaults | initializePlayer | called with defaultFilter All, playTimerEnabled false | dropped — P03‑T06: duplicate of row 249, same reasoning as row 303 | — |
 
 ## Execution Notes
 
@@ -523,3 +534,69 @@ cross-scenario integration" describe exercises the identical behavior through th
   match natural feature boundaries rather than arbitrary line-count cuts.
 - Nothing was deleted or modified in any of the nine spec files as part of this task — this
   document is the only artifact produced.
+
+## P03‑T06 Execution Notes
+
+- **Reconciled the monolith to empty before deleting it.** `player-context.service.spec.ts` still
+  held the Timer System (rows 73–115), Play History (rows 116–151), and Incompatible Playback
+  Prevention (rows 26–28) sections after T03–T05. Every row in those ranges is now marked ported,
+  merged, or dropped-with-reason above; the file itself, along with the other six files this task's
+  handoff names, was deleted in the same commit as the four new files.
+- **`hasErrorAndCleanup` behavior correction (rows 95–96).** The inventory's original claim — a
+  failed `next()`/`previous()` "leaves the prior file's timer untouched" — doesn't hold against the
+  current source: `hasErrorAndCleanup` unconditionally calls `cleanupTimer` whenever `getPlayerError`
+  is truthy, regardless of which file remains current. Verified by reading `player-context.service.ts`
+  directly and confirmed by a failing test before the fix. The rebuilt test asserts the actual
+  behavior (timer torn down, error set) rather than the stale claim.
+- **Windows real-timer resolution and the auto-progression tests (rows 87–91).** `TimerService`
+  increments `currentTime` by `Math.max(PLAYER_TIMER_TICK_MS, 1)` on every real tick. At this
+  repo's default test harness tick (`0`), each real tick's wall-clock cost is bounded below by the
+  OS's timer-resolution floor rather than 1ms — on this environment that floor sits far above 1ms,
+  turning a nominal 1-second timer into a multi-second real wait and making a fixed `waitUntil`
+  budget unreliable. The auto-progression tests instead construct a dedicated harness with
+  `timerTickMs` at or above the timer's own duration, so the timer completes in one bounded real
+  tick instead of ~1000 OS-throttled ones. `waitUntil` (a bounded poll, not a fixed sleep) replaces
+  fixed real-time waits so the tests settle as soon as the condition is true.
+- **isSlowLoading carries forward P01‑T02's race-fix coverage (rows 283–295).** Rewritten against a
+  dedicated harness with a short, overridden `PLAYER_LAUNCH_DELAY_MS` (the actual slow-loading
+  threshold token) rather than the production 2000ms default, per this task's Testing guidance.
+  This is the same three-outcome shape (trips true past the threshold, stays false under it, clears
+  immediately on completion) that P01‑T02's fix targeted, so the regression stays covered.
+- **Real 1000-entry history cap test added (row 134's replacement).** The inventory itself flagged
+  row 134 as not actually exercising the cap it claimed to test. `player-context-history.spec.ts`
+  now launches 1002 sequential files and asserts the store evicts the two oldest, landing at exactly
+  1000 entries — closing a genuine coverage gap the original inventory-author left open for a later
+  task.
+- **`incompatibleRetryDelayMs` and the `handleIncompatibleFile` leak.** Any failed launch marks the
+  attempted file `isCompatible: false` (`createLaunchedFile(..., false)` in the failure branch of
+  `launch-file-with-context.ts`), which unconditionally trips `handleIncompatibleFile` at the end of
+  `launchFileWithContext`/`next`/`previous`. At the harness's default `incompatibleRetryDelayMs: 0`,
+  this schedules a real `setTimeout` retry that can fire after a test (and its TestBed) has already
+  torn down, throwing `NG0205` into whatever test runs next. Both new files that exercise failed
+  launches (`player-context-history.spec.ts`, `player-context-timer.spec.ts`) default their shared
+  harness to a long `incompatibleRetryDelayMs` so this retry never fires within a test's lifetime;
+  the few tests that exercise the retry itself set their own short-lived harness instead.
+- **Settings seeded through the real `SettingsStore`, not a stub.** Per the handoff's explicit seam,
+  `player-context-settings.spec.ts` seeds `SettingsStore` state directly via `updateState` (the same
+  pattern the deleted `player-context-loading.service.spec.ts` used for `PlayerStore`) rather than
+  stubbing `settings()`. This also meant rewriting the "one store call" / "playTimerEnabled forwarded
+  in isolation" rows (254, 257–261) as duplicates: with the real store, `initializePlayer` reads
+  `startupFilter` and `playTimerEnabled` as two independent optional-chained fields with no shared
+  branching, so a combined test already proves both variables' handling that a spy-based "was it
+  called once" assertion existed to distinguish.
+- **`getPlayTimerConfig` is not a cached signal (row 282).** `selectors/get-play-timer-config.ts`
+  returns a fresh `computed()` on every call — there is no per-device caching at the store or service
+  layer. The original row's "same signal instance" claim doesn't hold; the rebuilt test instead
+  verifies the real, useful property: a *previously obtained* signal keeps reflecting later
+  `setCustomTimer` changes, which is ordinary `computed()` reactivity.
+- **Play()/pause()/stop() compatibility gate (rows 26–28) and timer↔incompatibility interplay (rows
+  111–115) had no owner after T03–T05.** Both are exercised through `player-context.service.ts`'s
+  Phase 5 timer-integration code (the play()/pause() guards are literally labeled "Phase 5" in the
+  source despite living in the monolith's "Phase 3" describe block), so they landed in
+  `player-context-timer.spec.ts` rather than a fifth file. Row 112's random-launch-specific
+  `alignToPlayingFile` assertion was not reproduced (the folded test uses the directory-launch entry
+  point); flagging as a minor, low-value gap rather than adding a fifth file for one assertion.
+- Every spec file under `src/libs/application/src/lib/player` is at or under roughly 800 lines
+  (`player-context-timer.spec.ts`, the largest, is under 800). `pnpm nx test application`-equivalent
+  (`vitest run` against the `application` project's Vite config) passed 713/713 non-skipped tests
+  across three consecutive runs at ~66s each.
