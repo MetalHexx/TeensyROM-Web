@@ -1,582 +1,327 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { signal } from '@angular/core';
+import { vi } from 'vitest';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { SettingsStore, AudioStore } from '@teensyrom-nx/application';
+import { STORAGE_SERVICE, CRT_STORAGE, ICrtStorage, CrtSettings, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
+import { createMockStorageService } from '@teensyrom-nx/testing/fixtures';
+import { CRT_CONFIGS, CRT_PRESETS, CRT_PRESET_KEYS, DEFAULT_CRT_SETTINGS } from '@teensyrom-nx/ui/components';
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { VideoDialogComponent, VideoDialogData } from './video-dialog.component';
-import { CRT_CONFIGS, DEFAULT_CRT_SETTINGS, CRT_PRESETS, CRT_PRESET_KEYS } from '@teensyrom-nx/ui/components';
-import { CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
-import { PLAYER_CONTEXT, IPlayerContext, SettingsStore, AudioStore } from '@teensyrom-nx/application';
-import { STORAGE_SERVICE, PlayerStatus, LaunchMode, CRT_STORAGE, ICrtStorage, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 
-/** Mock custom presets for testing */
+// jsdom doesn't implement playback; lib-video-stream calls videoEl.play().catch(...) on every
+// stream assignment, which throws on jsdom's unimplemented play() without this stub.
+HTMLMediaElement.prototype.play = vi.fn().mockImplementation(() => Promise.resolve());
+HTMLMediaElement.prototype.pause = vi.fn();
+
+const customPresetSettings: CrtSettings = {
+  scanlineIntensity: 0.6,
+  scanlineSize: 2.5,
+  vignetteStrength: 1.4,
+  screenCurvature: 115,
+  contrast: 1.2,
+  brightness: 1.4,
+  saturation: 1.2,
+  hue: 0,
+  phosphorPattern: 'none',
+  phosphorIntensity: 0,
+  bloomIntensity: 0.3,
+  barrelDistortion: 0,
+  chromaticAberration: 0,
+  monochromePhosphor: 'none',
+  autoCropBlackBars: false,
+  videoStandard: 'PAL',
+  videoMode: 'auto',
+};
+
 const mockCustomPresets: CustomCrtPreset[] = [
   {
     name: 'custom-dialog-preset' as CustomPresetName,
-    settings: {
-      scanlineIntensity: 0.6,
-      scanlineSize: 2.5,
-      vignetteStrength: 1.4,
-      screenCurvature: 115,
-      contrast: 1.2,
-      brightness: 1.4,
-      saturation: 1.2,
-      hue: 0,
-      phosphorPattern: 'none',
-      phosphorIntensity: 0,
-      bloomEnabled: false,
-      bloomIntensity: 0.3,
-      bloomRadius: 3,
-      barrelDistortion: 0,
-      chromaticAberration: 0,
-    },
+    settings: customPresetSettings,
     createdAt: '2025-12-07T12:00:00.000Z',
   },
 ];
 
-/** Mock CRT storage for testing - stores nothing, returns null */
-const mockCrtStorage: ICrtStorage = {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  save: () => {},
-  load: () => null,
-  hasSavedSettings: () => false,
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  clear: () => {},
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  saveCustomPreset: () => {},
-  loadCustomPresets: vi.fn().mockReturnValue([]),
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  deleteCustomPreset: () => {},
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  renameCustomPreset: () => {},
-  hasCustomPreset: () => false,
-};
-
-// Mock HTMLMediaElement.play and pause for JSDOM environment
-HTMLMediaElement.prototype.play = vi.fn().mockImplementation(function () {
-  return Promise.resolve();
-});
-HTMLMediaElement.prototype.pause = vi.fn().mockImplementation(function () {
-  return undefined;
-});
-
-// Create a complete mock player context using Partial and casting
-function createMockPlayerContext(): IPlayerContext {
-  const mockSignal = <T>(value: T) => signal(value).asReadonly();
-
+function createMockCrtStorage(overrides: Partial<ICrtStorage> = {}): ICrtStorage {
   return {
-    initializePlayer: vi.fn(),
-    removePlayer: vi.fn(),
-    startListeningToPopState: vi.fn(),
-    stopListeningToPopState: vi.fn(),
-    launchFileWithContext: vi.fn().mockResolvedValue(undefined),
-    launchRandomFile: vi.fn().mockResolvedValue(undefined),
-    updateCurrentFileFavoriteStatus: vi.fn(),
-    getCurrentFile: vi.fn().mockReturnValue(mockSignal(null)),
-    getFileContext: vi.fn().mockReturnValue(mockSignal(null)),
-    getPlayerStatus: vi.fn().mockReturnValue(mockSignal(PlayerStatus.Stopped)),
-    getStatus: vi.fn().mockReturnValue(mockSignal(PlayerStatus.Stopped)),
-    isLoading: vi.fn().mockReturnValue(mockSignal(false)),
-    getError: vi.fn().mockReturnValue(mockSignal(null)),
-    toggleShuffleMode: vi.fn(),
-    setShuffleScope: vi.fn(),
-    setFilterMode: vi.fn(),
-    getLaunchMode: vi.fn().mockReturnValue(mockSignal(LaunchMode.Directory)),
-    getShuffleSettings: vi.fn().mockReturnValue(mockSignal(null)),
-    play: vi.fn().mockResolvedValue(undefined),
-    pause: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
-    next: vi.fn().mockResolvedValue(undefined),
-    previous: vi.fn().mockResolvedValue(undefined),
-    getTimerState: vi.fn().mockReturnValue(mockSignal(null)),
-    getPlayTimerConfig: vi.fn().mockReturnValue(mockSignal(null)),
-    setCustomTimer: vi.fn(),
-    isCurrentFileCompatible: vi.fn().mockReturnValue(mockSignal(true)),
-    getPlayHistory: vi.fn().mockReturnValue(mockSignal(null)),
-    getCurrentHistoryPosition: vi.fn().mockReturnValue(mockSignal(0)),
-    canNavigateBackwardInHistory: vi.fn().mockReturnValue(mockSignal(false)),
-    canNavigateForwardInHistory: vi.fn().mockReturnValue(mockSignal(false)),
-    clearHistory: vi.fn(),
-    toggleHistoryView: vi.fn(),
-    isHistoryViewVisible: vi.fn().mockReturnValue(mockSignal(false)),
-    navigateToHistoryPosition: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn(),
+    load: vi.fn(() => null),
+    hasSavedSettings: vi.fn(() => false),
+    clear: vi.fn(),
+    loadCustomPresets: vi.fn().mockReturnValue([]),
+    saveCustomPreset: vi.fn(),
+    updateCustomPreset: vi.fn(),
+    deleteCustomPreset: vi.fn(),
+    renameCustomPreset: vi.fn(),
+    hasCustomPreset: vi.fn().mockReturnValue(false),
+    ...overrides,
   };
 }
 
+function render(crtStorage: ICrtStorage = createMockCrtStorage()) {
+  const mockStream = {
+    getTracks: () => [],
+    getVideoTracks: () => [],
+    getAudioTracks: () => [],
+  } as unknown as MediaStream;
+
+  const dialogData: VideoDialogData = {
+    stream: mockStream,
+    deviceLabel: 'Test Camera',
+    deviceId: 'test-device-123',
+    devices: [
+      { deviceId: 'test-device-123', label: 'Test Camera' },
+      { deviceId: 'test-device-456', label: 'Backup Camera' },
+    ],
+    selectedDeviceId: 'test-device-123',
+  };
+
+  const dialogRef = { close: vi.fn() } as unknown as MatDialogRef<VideoDialogComponent>;
+
+  const result = renderPlayerComponent(VideoDialogComponent, {
+    stubChildren: false,
+    providers: [
+      { provide: MatDialogRef, useValue: dialogRef },
+      { provide: MAT_DIALOG_DATA, useValue: dialogData },
+      { provide: STORAGE_SERVICE, useValue: createMockStorageService() },
+      { provide: CRT_STORAGE, useValue: crtStorage },
+      {
+        provide: SettingsStore,
+        useValue: { enableAudioStreamForDevice: vi.fn().mockReturnValue(signal(false).asReadonly()) },
+      },
+      {
+        provide: AudioStore,
+        useValue: {
+          isMuted: signal(false),
+          masterVolume: signal(0.75),
+          toggleMute: vi.fn(),
+          setMasterVolume: vi.fn(),
+        },
+      },
+    ],
+  });
+
+  return { ...result, dialogRef, dialogData, crtStorage };
+}
+
 describe('VideoDialogComponent', () => {
-  let component: VideoDialogComponent;
-  let fixture: ComponentFixture<VideoDialogComponent>;
-  let mockDialogRef: { close: ReturnType<typeof vi.fn> };
-  let mockDialogData: VideoDialogData;
+  it('creates', () => {
+    const { component } = render();
 
-  beforeEach(async () => {
-    // Create mock MediaStream
-    const mockStream = {
-      getTracks: () => [],
-      getVideoTracks: () => [],
-      getAudioTracks: () => [],
-    } as unknown as MediaStream;
-
-    mockDialogData = {
-      stream: mockStream,
-      deviceLabel: 'Test Camera',
-      deviceId: 'test-device-123',
-      devices: [
-        { deviceId: 'test-device-123', label: 'Test Camera' },
-        { deviceId: 'test-device-456', label: 'Backup Camera' },
-      ],
-      selectedDeviceId: 'test-device-123',
-    };
-
-    mockDialogRef = {
-      close: vi.fn(),
-    };
-
-    await TestBed.configureTestingModule({
-      imports: [VideoDialogComponent, NoopAnimationsModule],
-      providers: [
-        { provide: MatDialogRef, useValue: mockDialogRef },
-        { provide: MAT_DIALOG_DATA, useValue: mockDialogData },
-        { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-        {
-          provide: STORAGE_SERVICE,
-          useValue: {
-            getDirectory: vi.fn(),
-          },
-        },
-        { provide: CRT_STORAGE, useValue: mockCrtStorage },
-        {
-          provide: SettingsStore,
-          useValue: {
-            enableAudioStreamForDevice: vi.fn().mockReturnValue(signal(false).asReadonly()),
-          },
-        },
-        {
-          provide: AudioStore,
-          useValue: {
-            isMuted: signal(false),
-            masterVolume: signal(0.75),
-            toggleMute: vi.fn(),
-            setMasterVolume: vi.fn(),
-          },
-        },
-      ],
-      // Use CUSTOM_ELEMENTS_SCHEMA for shallow testing to ignore child components
-      schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(VideoDialogComponent);
-    component = fixture.componentInstance;
+    expect(component).toBeTruthy();
   });
 
-  describe('Component Creation', () => {
-    it('should create successfully', () => {
-      fixture.detectChanges();
-      expect(component).toBeTruthy();
-    });
+  it('has CRT enabled by default', () => {
+    const { component } = render();
 
-    it('should have CRT enabled by default', () => {
-      fixture.detectChanges();
-      expect(component['isCrtEnabled']()).toBe(true);
-    });
-
-    it('should have CRT controls hidden by default', () => {
-      fixture.detectChanges();
-      expect(component['showCrtControls']()).toBe(false);
-    });
-
-    it('should use CRT_CONFIGS.large for config', () => {
-      fixture.detectChanges();
-      expect(component['crtConfig']).toEqual(CRT_CONFIGS.large);
-    });
-
-    it('should use LARGE_VIDEO_WEBGL preset when no saved settings', () => {
-      fixture.detectChanges();
-      const settings = component['crtSettings']();
-      expect(settings).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
-    });
+    expect(component['isCrtEnabled']()).toBe(true);
   });
 
-  describe('Dialog Data', () => {
-    it('should receive stream from dialog data', () => {
-      fixture.detectChanges();
-      expect(component.data.stream).toBe(mockDialogData.stream);
-    });
+  it('has CRT controls hidden by default', () => {
+    const { component } = render();
 
-    it('should receive deviceLabel from dialog data', () => {
-      fixture.detectChanges();
-      expect(component.data.deviceLabel).toBe('Test Camera');
-    });
-
-    it('should receive deviceId from dialog data', () => {
-      fixture.detectChanges();
-      expect(component.data.deviceId).toBe('test-device-123');
-    });
+    expect(component['showCrtControls']()).toBe(false);
   });
 
-  describe('Close Functionality', () => {
-    it('should close dialog when onClose is called', () => {
-      fixture.detectChanges();
-      component.onClose();
-      expect(mockDialogRef.close).toHaveBeenCalled();
-    });
+  it('uses the large CRT config', () => {
+    const { component } = render();
 
-    it('should render close button in template', () => {
-      fixture.detectChanges();
-      const closeButton = fixture.nativeElement.querySelector(
-        'lib-icon-button[icon="close"]'
-      );
-      expect(closeButton).toBeTruthy();
-    });
+    expect(component['crtConfig']).toEqual(CRT_CONFIGS.large);
   });
 
-  describe('CRT Toggle', () => {
-    it('should toggle CRT enabled state', () => {
-      fixture.detectChanges();
-      expect(component['isCrtEnabled']()).toBe(true);
+  it('uses the LARGE_VIDEO_WEBGL preset when no saved settings exist', () => {
+    const { component } = render();
 
-      component.toggleCrtEffect();
-      expect(component['isCrtEnabled']()).toBe(false);
-
-      component.toggleCrtEffect();
-      expect(component['isCrtEnabled']()).toBe(true);
-    });
-
-    it('should render CRT toggle button', () => {
-      fixture.detectChanges();
-      // CRT toggle button is now inside lib-video-controls-toolbar
-      const toolbar = fixture.nativeElement.querySelector(
-        'lib-video-controls-toolbar'
-      );
-      expect(toolbar).toBeTruthy();
-    });
+    expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
   });
 
-  describe('CRT Controls Panel', () => {
-    it('should toggle CRT controls visibility', () => {
-      fixture.detectChanges();
-      expect(component['showCrtControls']()).toBe(false);
+  it('receives the stream from dialog data', () => {
+    const { component, dialogData } = render();
 
-      component.toggleCrtControls();
-      expect(component['showCrtControls']()).toBe(true);
-
-      component.toggleCrtControls();
-      expect(component['showCrtControls']()).toBe(false);
-    });
-
-    it('should render settings button when CRT is enabled', () => {
-      fixture.detectChanges();
-      const tuneButton = fixture.nativeElement.querySelector(
-        'lib-icon-button[icon="tune"]'
-      );
-      expect(tuneButton).toBeTruthy();
-    });
-
-    it('should not render settings button when CRT is disabled', () => {
-      fixture.detectChanges();
-      component.toggleCrtEffect(); // Disable CRT
-      fixture.detectChanges();
-
-      const tuneButton = fixture.nativeElement.querySelector(
-        'lib-icon-button[icon="tune"]'
-      );
-      expect(tuneButton).toBeFalsy();
-    });
-
-    it('should show CRT settings panel when controls are toggled on', () => {
-      fixture.detectChanges();
-      component.toggleCrtControls(); // Show panel
-      fixture.detectChanges();
-
-      const settingsPanel = fixture.nativeElement.querySelector(
-        'lib-crt-settings-panel'
-      );
-      expect(settingsPanel).toBeTruthy();
-    });
-
-    it('should hide CRT settings panel when controls are toggled off', () => {
-      fixture.detectChanges();
-      // Panel should be rendered but hidden by default (CRT is enabled, controls are hidden)
-      const settingsPanel = fixture.nativeElement.querySelector(
-        'lib-crt-settings-panel'
-      );
-      expect(settingsPanel).toBeTruthy();
-      expect(settingsPanel.classList.contains('panel-hidden')).toBe(true);
-    });
+    expect(component.data.stream).toBe(dialogData.stream);
   });
 
-  describe('CRT Settings Changes', () => {
-    it('should update settings when onCrtSettingsChange is called', () => {
-      fixture.detectChanges();
-      const newSettings = {
-        ...DEFAULT_CRT_SETTINGS,
-        brightness: 2.0,
-        contrast: 1.5,
-      };
+  it('receives the deviceLabel from dialog data', () => {
+    const { component } = render();
 
-      component.onCrtSettingsChange(newSettings);
-
-      expect(component['crtSettings']().brightness).toBe(2.0);
-      expect(component['crtSettings']().contrast).toBe(1.5);
-    });
-
-    it('should apply preset when onCrtPresetSelected is called', () => {
-      fixture.detectChanges();
-
-      component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
-
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
-    });
-
-    it('should apply large WebGL preset correctly', () => {
-      fixture.detectChanges();
-
-      component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
-
-      expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
-    });
-
-    describe('custom preset selection', () => {
-      it('should apply built-in preset settings correctly', () => {
-        fixture.detectChanges();
-
-        component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
-
-        const settings = component['crtSettings']();
-        expect(settings.phosphorPattern).toBe('dot-triad');
-        expect(settings.bloomIntensity).toBe(0.55);
-      });
-
-      it('should apply custom preset settings correctly', () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
-        fixture.detectChanges();
-
-        component.onCrtPresetSelected('custom-dialog-preset' as CustomPresetName);
-        
-        const settings = component['crtSettings']();
-        expect(settings.scanlineIntensity).toBe(0.6);
-        expect(settings.brightness).toBe(1.4);
-      });
-
-      it('should call loadCustomPresets when custom preset selected', () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
-        fixture.detectChanges();
-
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockClear();
-
-        component.onCrtPresetSelected('custom-dialog-preset' as CustomPresetName);
-        
-        expect(mockCrtStorage.loadCustomPresets).toHaveBeenCalled();
-      });
-
-      it('should persist custom preset settings to storage', () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
-        const saveSpy = vi.spyOn(mockCrtStorage, 'save');
-        fixture.detectChanges();
-
-        saveSpy.mockClear();
-
-        component.onCrtPresetSelected('custom-dialog-preset' as CustomPresetName);
-        
-        expect(saveSpy).toHaveBeenCalledWith(
-          'test-device-123',
-          'video-dialog',
-          expect.objectContaining({
-            scanlineIntensity: 0.6,
-          })
-        );
-      });
-
-      it('should log warning when custom preset not found', () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
-        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
-        fixture.detectChanges();
-
-        const originalSettings = component['crtSettings']();
-
-        component.onCrtPresetSelected('custom-nonexistent' as CustomPresetName);
-        
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          '[VideoDialogComponent] Custom preset not found: custom-nonexistent'
-        );
-
-        expect(component['crtSettings']()).toEqual(originalSettings);
-
-        consoleWarnSpy.mockRestore();
-      });
-
-      it('should not change settings when custom preset not found', () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
-        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
-        fixture.detectChanges();
-
-        const customSettings = {
-          ...DEFAULT_CRT_SETTINGS,
-          brightness: 2.5,
-        };
-        component.onCrtSettingsChange(customSettings);
-
-        component.onCrtPresetSelected('custom-missing' as CustomPresetName);
-        
-        expect(component['crtSettings']()).toEqual(customSettings);
-
-        consoleWarnSpy.mockRestore();
-      });
-    });
+    expect(component.data.deviceLabel).toBe('Test Camera');
   });
 
-  describe('Fullscreen Toggle', () => {
-    it('should have fullscreen toggle button', () => {
-      fixture.detectChanges();
-      // Fullscreen button is now inside lib-video-controls-toolbar
-      const toolbar = fixture.nativeElement.querySelector('lib-video-controls-toolbar');
-      expect(toolbar).toBeTruthy();
-    });
+  it('receives the deviceId from dialog data', () => {
+    const { component } = render();
+
+    expect(component.data.deviceId).toBe('test-device-123');
   });
 
-  describe('Composed Components', () => {
-    it('should render lib-content-overlay-container', () => {
-      fixture.detectChanges();
-      const overlayContainer = fixture.nativeElement.querySelector(
-        'lib-content-overlay-container'
-      );
-      expect(overlayContainer).toBeTruthy();
-    });
+  it('closes the dialog when onClose is called', () => {
+    const { component, dialogRef } = render();
 
-    it('should render lib-crt-effect-wrapper', () => {
-      fixture.detectChanges();
-      const crtWrapper = fixture.nativeElement.querySelector(
-        'lib-crt-effect-wrapper'
-      );
-      expect(crtWrapper).toBeTruthy();
-    });
+    component.onClose();
 
-    it('should render lib-video-stream', () => {
-      fixture.detectChanges();
-      const videoStream = fixture.nativeElement.querySelector('lib-video-stream');
-      expect(videoStream).toBeTruthy();
-    });
-
-    it('should render lib-video-controls-toolbar for right controls', () => {
-      fixture.detectChanges();
-      const toolbar = fixture.nativeElement.querySelector(
-        'lib-video-controls-toolbar[rightControls]'
-      );
-      expect(toolbar).toBeTruthy();
-    });
+    expect(dialogRef.close).toHaveBeenCalled();
   });
 
-  describe('Slot Architecture', () => {
-    it('should have content slot with CRT wrapper', () => {
-      fixture.detectChanges();
-      const crtWrapper = fixture.nativeElement.querySelector(
-        'lib-crt-effect-wrapper[content]'
-      );
-      expect(crtWrapper).toBeTruthy();
-    });
+  it('renders the close button', () => {
+    const { fixture } = render();
 
-    it('should have topOverlay slot with filter toolbar', () => {
-      fixture.detectChanges();
-      const filterToolbar = fixture.nativeElement.querySelector(
-        'lib-filter-toolbar[topOverlay]'
-      );
-      expect(filterToolbar).toBeTruthy();
-    });
-
-    it('should have bottomOverlay slot with player toolbar', () => {
-      fixture.detectChanges();
-      const playerToolbar = fixture.nativeElement.querySelector(
-        'lib-player-toolbar[bottomOverlay]'
-      );
-      expect(playerToolbar).toBeTruthy();
-    });
-
-    it('should have topRightCorner slot with close button', () => {
-      fixture.detectChanges();
-      const closeButton = fixture.nativeElement.querySelector(
-        'lib-icon-button[topRightCorner]'
-      );
-      expect(closeButton).toBeTruthy();
-    });
-
-    it('should have rightControls slot with video controls toolbar', () => {
-      fixture.detectChanges();
-      const rightControls = fixture.nativeElement.querySelector(
-        'lib-video-controls-toolbar[rightControls]'
-      );
-      expect(rightControls).toBeTruthy();
-    });
+    expect(fixture.nativeElement.querySelector('lib-icon-button[icon="close"]')).toBeTruthy();
   });
 
-  describe('Unified Config Model', () => {
-    it('should pass same config to CRT wrapper and settings panel', () => {
-      fixture.detectChanges();
-      component.toggleCrtControls(); // Show panel
-      fixture.detectChanges();
+  it('round-trips the CRT enabled state', () => {
+    const { component } = render();
 
-      const crtWrapper = fixture.nativeElement.querySelector(
-        'lib-crt-effect-wrapper'
-      );
-      const settingsPanel = fixture.nativeElement.querySelector(
-        'lib-crt-settings-panel'
-      );
-
-      // Both should exist when panel is shown
-      expect(crtWrapper).toBeTruthy();
-      expect(settingsPanel).toBeTruthy();
-
-      // Component should use CRT_CONFIGS.large for both
-      expect(component['crtConfig']).toEqual(CRT_CONFIGS.large);
-    });
+    component.toggleCrtEffect();
+    expect(component['isCrtEnabled']()).toBe(false);
+    component.toggleCrtEffect();
+    expect(component['isCrtEnabled']()).toBe(true);
   });
 
-  describe('CRT Initialization', () => {
-    it('should use LARGE_VIDEO_WEBGL preset when no saved settings', () => {
-      vi.spyOn(mockCrtStorage, 'load').mockReturnValue(null);
+  it('renders the video-controls-toolbar housing the CRT toggle', () => {
+    const { fixture } = render();
 
-      fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('lib-video-controls-toolbar')).toBeTruthy();
+  });
 
-      const settings = component['crtSettings']();
-      expect(settings).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
-    });
+  it('round-trips the CRT controls panel visibility', () => {
+    const { component } = render();
 
-    it('should load saved settings when they exist', () => {
-      const savedSettings = {
-        ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL],
-        brightness: 2.0,
-      };
-      vi.spyOn(mockCrtStorage, 'load').mockReturnValue(savedSettings);
+    component.toggleCrtControls();
+    expect(component['showCrtControls']()).toBe(true);
+    component.toggleCrtControls();
+    expect(component['showCrtControls']()).toBe(false);
+  });
 
-      fixture.detectChanges();
+  it('renders the settings button when CRT is enabled', () => {
+    const { fixture } = render();
 
-      const settings = component['crtSettings']();
-      expect(settings).toEqual(savedSettings);
-      expect(settings.brightness).toBe(2.0);
-    });
+    expect(fixture.nativeElement.querySelector('lib-icon-button[icon="tune"]')).toBeTruthy();
+  });
 
-    it('should use large CRT config for fullscreen display', () => {
-      fixture.detectChanges();
-      expect(component['crtConfig']).toEqual(CRT_CONFIGS.large);
-    });
+  it('hides the settings button when CRT is disabled', () => {
+    const { component, fixture } = render();
 
-    it('should persist settings with video-dialog storage key', () => {
-      const saveSpy = vi.spyOn(mockCrtStorage, 'save');
-      fixture.detectChanges();
+    component.toggleCrtEffect();
+    fixture.detectChanges();
 
-      const newSettings = {
-        ...DEFAULT_CRT_SETTINGS,
-        brightness: 1.8,
-      };
+    expect(fixture.nativeElement.querySelector('lib-icon-button[icon="tune"]')).toBeFalsy();
+  });
 
-      component.onCrtSettingsChange(newSettings);
+  it('renders the settings panel visually hidden by default', () => {
+    const { fixture } = render();
 
-      expect(saveSpy).toHaveBeenCalledWith('test-device-123', 'video-dialog', newSettings);
-    });
+    const settingsPanel = fixture.nativeElement.querySelector('lib-crt-settings-panel');
+    expect(settingsPanel).toBeTruthy();
+    expect(settingsPanel.classList.contains('panel-hidden')).toBe(true);
+  });
 
-    it('should receive deviceId from dialog data for storage key', () => {
-      fixture.detectChanges();
-      expect(component.data.deviceId).toBe('test-device-123');
-    });
+  it('updates specific settings fields via onCrtSettingsChange', () => {
+    const { component } = render();
+
+    component.onCrtSettingsChange({ ...DEFAULT_CRT_SETTINGS, brightness: 2.0, contrast: 1.5 });
+
+    expect(component['crtSettings']().brightness).toBe(2.0);
+    expect(component['crtSettings']().contrast).toBe(1.5);
+  });
+
+  it('applies the LARGE_VIDEO_WEBGL preset via onCrtPresetSelected', () => {
+    const { component } = render();
+
+    component.onCrtPresetSelected(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
+
+    expect(component['crtSettings']()).toEqual(CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL]);
+  });
+
+  it("applies a custom preset's settings correctly", () => {
+    const crtStorage = createMockCrtStorage({ loadCustomPresets: vi.fn().mockReturnValue(mockCustomPresets) });
+    const { component } = render(crtStorage);
+
+    component.onCrtPresetSelected('custom-dialog-preset' as CustomPresetName);
+
+    const settings = component['crtSettings']();
+    expect(settings.scanlineIntensity).toBe(0.6);
+    expect(settings.brightness).toBe(1.4);
+  });
+
+  it("persists a custom preset to storage under the dialog's key", () => {
+    const crtStorage = createMockCrtStorage({ loadCustomPresets: vi.fn().mockReturnValue(mockCustomPresets) });
+    const { component } = render(crtStorage);
+    vi.mocked(crtStorage.save).mockClear();
+
+    component.onCrtPresetSelected('custom-dialog-preset' as CustomPresetName);
+
+    expect(crtStorage.save).toHaveBeenCalledWith(
+      'test-device-123',
+      'video-dialog',
+      expect.objectContaining({ scanlineIntensity: 0.6 })
+    );
+  });
+
+  it('leaves settings unchanged and warns when a custom preset is not found', () => {
+    const crtStorage = createMockCrtStorage({ loadCustomPresets: vi.fn().mockReturnValue([]) });
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
+    const { component } = render(crtStorage);
+    const originalSettings = component['crtSettings']();
+
+    component.onCrtPresetSelected('custom-nonexistent' as CustomPresetName);
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith('[VideoDialogComponent] Custom preset not found: custom-nonexistent');
+    expect(component['crtSettings']()).toEqual(originalSettings);
+
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('renders the content-overlay-container', () => {
+    const { fixture } = render();
+
+    expect(fixture.nativeElement.querySelector('lib-content-overlay-container')).toBeTruthy();
+  });
+
+  it('renders the video stream element', () => {
+    const { fixture } = render();
+
+    expect(fixture.nativeElement.querySelector('lib-video-stream')).toBeTruthy();
+  });
+
+  it('houses the CRT wrapper in the content slot', () => {
+    const { fixture } = render();
+
+    expect(fixture.nativeElement.querySelector('lib-crt-effect-wrapper[content]')).toBeTruthy();
+  });
+
+  it('houses the filter toolbar in the topOverlay slot', () => {
+    const { fixture } = render();
+
+    expect(fixture.nativeElement.querySelector('lib-filter-toolbar[topOverlay]')).toBeTruthy();
+  });
+
+  it('houses the player toolbar in the bottomOverlay slot', () => {
+    const { fixture } = render();
+
+    expect(fixture.nativeElement.querySelector('lib-player-toolbar[bottomOverlay]')).toBeTruthy();
+  });
+
+  it('houses the video controls toolbar in the rightControls slot', () => {
+    const { fixture } = render();
+
+    expect(fixture.nativeElement.querySelector('lib-video-controls-toolbar[rightControls]')).toBeTruthy();
+  });
+
+  it('loads saved CRT settings when present', () => {
+    const savedSettings: CrtSettings = { ...CRT_PRESETS[CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL], brightness: 2.0 };
+    const crtStorage = createMockCrtStorage({ load: vi.fn(() => savedSettings) });
+
+    const { component } = render(crtStorage);
+
+    expect(component['crtSettings']()).toEqual(savedSettings);
+    expect(component['crtSettings']().brightness).toBe(2.0);
+  });
+
+  it('persists CRT settings under the video-dialog storage key', () => {
+    const crtStorage = createMockCrtStorage();
+    const { component } = render(crtStorage);
+
+    const newSettings = { ...DEFAULT_CRT_SETTINGS, brightness: 1.8 };
+    component.onCrtSettingsChange(newSettings);
+
+    expect(crtStorage.save).toHaveBeenCalledWith('test-device-123', 'video-dialog', newSettings);
   });
 });
-
-

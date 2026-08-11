@@ -1,65 +1,53 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { FileDescriptionMiniComponent } from './file-description-mini.component';
-import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
 import { signal } from '@angular/core';
-import { FileItemType } from '@teensyrom-nx/domain';
+import { vi } from 'vitest';
+import { renderPlayerComponent } from '../../../../testing/render-player-component';
+import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
+import { StorageKeyUtil, type LaunchedFile } from '@teensyrom-nx/application';
+import { FileItemType, StorageType } from '@teensyrom-nx/domain';
+import { FileDescriptionMiniComponent } from './file-description-mini.component';
+
+function createLaunchedFile(overrides: Parameters<typeof createTestFileItem>[0] = {}): LaunchedFile {
+  return {
+    storageKey: StorageKeyUtil.create('test-device-id', StorageType.Sd),
+    file: createTestFileItem(overrides),
+    parentPath: '/music',
+    launchedAt: Date.now(),
+    isCompatible: true,
+  };
+}
+
+function render(currentFile: LaunchedFile | null) {
+  return renderPlayerComponent(FileDescriptionMiniComponent, {
+    inputs: { deviceId: 'test-device-id' },
+    playerContext: {
+      getCurrentFile: vi.fn().mockReturnValue(signal(currentFile).asReadonly()),
+    },
+  });
+}
 
 describe('FileDescriptionMiniComponent', () => {
-  let component: FileDescriptionMiniComponent;
-  let fixture: ComponentFixture<FileDescriptionMiniComponent>;
+  it('creates', () => {
+    const { component } = render(createLaunchedFile());
 
-  const mockPlayerContext = {
-    getCurrentFile: () =>
-      signal({
-        file: {
-          name: 'Test Song.sid',
-          title: 'Test Song',
-          creator: 'Test Composer',
-          type: FileItemType.Song,
-          meta1: '2 min',
-          meta2: 'HVSC',
-        },
-      }),
-  };
-
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [FileDescriptionMiniComponent],
-      providers: [provideNoopAnimations(), { provide: PLAYER_CONTEXT, useValue: mockPlayerContext }],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(FileDescriptionMiniComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'test-device-id');
-    fixture.detectChanges();
-  });
-
-  it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should display title', () => {
+  it('exposes the current file title as displayTitle', () => {
+    const { component } = render(
+      createLaunchedFile({ title: 'Test Song', type: FileItemType.Song })
+    );
+
     expect(component.displayTitle()).toBe('Test Song');
   });
 
-  it('should display creator', () => {
+  it('exposes the current file creator', () => {
+    const { component } = render(createLaunchedFile({ creator: 'Test Composer' }));
+
     expect(component.creator()).toBe('Test Composer');
   });
 
-  it('should handle missing file', () => {
-    const emptyContext = {
-      getCurrentFile: () => signal(null),
-    };
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      imports: [FileDescriptionMiniComponent],
-      providers: [provideNoopAnimations(), { provide: PLAYER_CONTEXT, useValue: emptyContext }],
-    });
-    fixture = TestBed.createComponent(FileDescriptionMiniComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'test-device-id');
-    fixture.detectChanges();
+  it('reports hasFile as false with no current file', () => {
+    const { component } = render(null);
 
     expect(component.hasFile()).toBe(false);
   });

@@ -1,660 +1,294 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ComponentRef, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { signal } from '@angular/core';
+import { vi } from 'vitest';
 import { MatDialog } from '@angular/material/dialog';
-import { VideoCaptureComponent } from './video-capture.component';
-import { SETTINGS_SERVICE, ISettingsService, CRT_STORAGE, ICrtStorage, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
-import { vi, describe, it, expect, afterEach } from 'vitest';
-import { of } from 'rxjs';
+import { SettingsStore } from '@teensyrom-nx/application';
+import { CRT_STORAGE, ICrtStorage, CrtSettings, CustomCrtPreset, CustomPresetName } from '@teensyrom-nx/domain';
 import { CRT_PRESET_KEYS } from '@teensyrom-nx/ui/components';
+import { renderPlayerComponent } from '../../../../testing/render-player-component';
+import { VideoCaptureComponent } from './video-capture.component';
 
-/** Mock custom presets for testing */
+const customPresetSettings: CrtSettings = {
+  scanlineIntensity: 0.7,
+  scanlineSize: 3,
+  vignetteStrength: 1.8,
+  screenCurvature: 0,
+  contrast: 1.3,
+  brightness: 1.7,
+  saturation: 1.5,
+  hue: 0,
+  phosphorPattern: 'none',
+  phosphorIntensity: 0,
+  bloomIntensity: 0.3,
+  barrelDistortion: 0,
+  chromaticAberration: 0,
+  monochromePhosphor: 'none',
+  autoCropBlackBars: false,
+  videoStandard: 'PAL',
+  videoMode: 'auto',
+};
+
 const mockCustomPresets: CustomCrtPreset[] = [
   {
     name: 'custom-arcade-setup' as CustomPresetName,
-    settings: {
-      scanlineIntensity: 0.7,
-      scanlineSize: 3,
-      vignetteStrength: 1.8,
-      screenCurvature: 0,
-      contrast: 1.3,
-      brightness: 1.7,
-      saturation: 1.5,
-      hue: 0,
-      phosphorPattern: 'none',
-      phosphorIntensity: 0,
-      bloomEnabled: false,
-      bloomIntensity: 0.3,
-      bloomRadius: 3,
-      barrelDistortion: 0,
-      chromaticAberration: 0,
-    },
+    settings: customPresetSettings,
     createdAt: '2025-12-07T10:00:00.000Z',
-  },
-  {
-    name: 'custom-my-preset' as CustomPresetName,
-    settings: {
-      scanlineIntensity: 0.4,
-      scanlineSize: 2,
-      vignetteStrength: 1.0,
-      screenCurvature: 0,
-      contrast: 1.0,
-      brightness: 1.0,
-      saturation: 1.0,
-      hue: 0,
-      phosphorPattern: 'none',
-      phosphorIntensity: 0,
-      bloomEnabled: false,
-      bloomIntensity: 0.3,
-      bloomRadius: 3,
-      barrelDistortion: 0,
-      chromaticAberration: 0,
-    },
-    createdAt: '2025-12-07T11:00:00.000Z',
   },
 ];
 
-/** Mock CRT storage for testing - stores nothing, returns null */
-const mockCrtStorage: ICrtStorage = {
-  save: () => {
-    // Mock implementation - intentionally does nothing for testing
-  },
-  load: () => null,
-  hasSavedSettings: () => false,
-  clear: () => {
-    // Mock implementation - intentionally does nothing for testing
-  },
-  loadCustomPresets: vi.fn().mockReturnValue([]),
-  saveCustomPreset: vi.fn(),
-  deleteCustomPreset: vi.fn(),
-  renameCustomPreset: vi.fn(),
-  hasCustomPreset: vi.fn().mockReturnValue(false),
-};
+function createMockCrtStorage(overrides: Partial<ICrtStorage> = {}): ICrtStorage {
+  return {
+    save: vi.fn(),
+    load: vi.fn(() => null),
+    hasSavedSettings: vi.fn(() => false),
+    clear: vi.fn(),
+    loadCustomPresets: vi.fn().mockReturnValue([]),
+    saveCustomPreset: vi.fn(),
+    updateCustomPreset: vi.fn(),
+    deleteCustomPreset: vi.fn(),
+    renameCustomPreset: vi.fn(),
+    hasCustomPreset: vi.fn().mockReturnValue(false),
+    ...overrides,
+  };
+}
 
-/**
- * VideoCaptureComponent Tests
- * 
- * Note: This component uses the SettingsStore (providedIn: 'root') signal store which
- * is difficult to mock in tests. The store integration is tested via the logs showing
- * the correct behavior. These tests focus on:
- * 1. Component creation and basic structure
- * 2. Device enumeration mechanics (mocked navigator.mediaDevices)
- * 3. Device selection UI behavior
- * 4. CRT effect state management
- * 5. Composed component integration
- * 
- * The store persistence behavior is verified via:
- * - Action unit tests in settings/actions/update-device-video-device-id.spec.ts
- * - Selector unit tests in settings/selectors/select-video-device-for-device.spec.ts
- */
+const originalMediaDevices = navigator.mediaDevices;
+
+afterEach(() => {
+  Object.defineProperty(navigator, 'mediaDevices', {
+    value: originalMediaDevices,
+    configurable: true,
+  });
+});
+
+function mockMediaDevices(devices: { deviceId: string; label: string }[]) {
+  const mockStream = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream;
+
+  const enumerateDevices = vi.fn().mockResolvedValue(
+    devices.map((d) => ({ deviceId: d.deviceId, label: d.label, kind: 'videoinput' as MediaDeviceKind, groupId: '', toJSON: () => ({}) }))
+  );
+  const getUserMedia = vi.fn().mockResolvedValue(mockStream);
+
+  Object.defineProperty(navigator, 'mediaDevices', {
+    value: { enumerateDevices, getUserMedia },
+    configurable: true,
+  });
+
+  return { enumerateDevices, getUserMedia };
+}
+
+function render(devices: { deviceId: string; label: string }[], crtStorage: ICrtStorage = createMockCrtStorage()) {
+  const mediaDevices = mockMediaDevices(devices);
+  const settingsStore = {
+    videoDeviceIdForDevice: vi.fn().mockReturnValue(signal('').asReadonly()),
+    updateDeviceVideoDeviceId: vi.fn(),
+  };
+
+  const result = renderPlayerComponent(VideoCaptureComponent, {
+    inputs: { deviceId: 'teensy-device-1' },
+    providers: [
+      { provide: MatDialog, useValue: { open: vi.fn() } },
+      { provide: SettingsStore, useValue: settingsStore },
+      { provide: CRT_STORAGE, useValue: crtStorage },
+    ],
+  });
+
+  return { ...result, mediaDevices, settingsStore, crtStorage };
+}
+
+async function renderAndSettle(
+  devices: { deviceId: string; label: string }[],
+  crtStorage?: ICrtStorage
+) {
+  const rendered = render(devices, crtStorage);
+  await rendered.fixture.whenStable();
+  rendered.fixture.detectChanges();
+  return rendered;
+}
+
 describe('VideoCaptureComponent', () => {
-  let component: VideoCaptureComponent;
-  let componentRef: ComponentRef<VideoCaptureComponent>;
-  let fixture: ComponentFixture<VideoCaptureComponent>;
-  let mockDialog: Partial<MatDialog>;
-  let mockSettingsService: Partial<ISettingsService>;
-  
-  // Track mock function calls
-  let enumerateDevicesSpy: ReturnType<typeof vi.fn>;
-  let getUserMediaSpy: ReturnType<typeof vi.fn>;
-  
-  // Store the original navigator.mediaDevices for restoration
-  let originalMediaDevices: MediaDevices | undefined;
+  it('creates', async () => {
+    const { component } = await renderAndSettle([]);
 
-  function createMockMediaDevices(devices: { deviceId: string; label: string }[]) {
-    const mockStream = {
-      getTracks: () => [{ stop: vi.fn() }],
-      getVideoTracks: () => [{
-        label: 'Mock Camera',
-        getSettings: () => ({ width: 1920, height: 1080 }),
-        enabled: true,
-        readyState: 'live',
-        stop: vi.fn(),
-      }],
-    } as unknown as MediaStream;
-
-    enumerateDevicesSpy = vi.fn().mockResolvedValue(
-      devices.map(d => ({
-        deviceId: d.deviceId,
-        label: d.label,
-        kind: 'videoinput' as MediaDeviceKind,
-        groupId: '',
-        toJSON: () => ({}),
-      }))
-    );
-
-    getUserMediaSpy = vi.fn().mockResolvedValue(mockStream);
-
-    return {
-      enumerateDevices: enumerateDevicesSpy,
-      getUserMedia: getUserMediaSpy,
-    } as unknown as MediaDevices;
-  }
-
-  function setupMediaDevices(devices: { deviceId: string; label: string }[]) {
-    originalMediaDevices = navigator.mediaDevices;
-    Object.defineProperty(navigator, 'mediaDevices', {
-      value: createMockMediaDevices(devices),
-      configurable: true,
-      writable: true,
-    });
-  }
-
-  function restoreMediaDevices() {
-    if (originalMediaDevices !== undefined) {
-      Object.defineProperty(navigator, 'mediaDevices', {
-        value: originalMediaDevices,
-        configurable: true,
-        writable: true,
-      });
-    }
-  }
-
-  afterEach(() => {
-    restoreMediaDevices();
-    TestBed.resetTestingModule();
+    expect(component).toBeTruthy();
   });
 
-  async function setupTestBed(
-    devices: { deviceId: string; label: string }[]
-  ) {
-    // Reset devices mock
-    restoreMediaDevices();
-    setupMediaDevices(devices);
-    
-    mockDialog = {
-      open: vi.fn(),
-    };
-    
-    // Mock the settings service required by SettingsStore
-    mockSettingsService = {
-      getSettings: vi.fn().mockReturnValue(of({
-        playerSettings: {
-          startPath: '/',
-          filterType: 'All',
-          scopeType: 'All',
-        },
-        searchSettings: {
-          searchPath: '/',
-        },
-        fileTransferSettings: {
-          targetPath: '/',
-        },
-        appSettings: {
-          playTimerEnabled: false,
-          playTimerSeconds: 60,
-        },
-        knownDevices: [],
-      })),
-      saveSettings: vi.fn().mockReturnValue(of({})),
-    };
+  it('reflects the deviceId input', async () => {
+    const { component } = await renderAndSettle([]);
 
-    await TestBed.configureTestingModule({
-      imports: [VideoCaptureComponent],
-      providers: [
-        provideNoopAnimations(),
-        { provide: MatDialog, useValue: mockDialog },
-        { provide: SETTINGS_SERVICE, useValue: mockSettingsService },
-        { provide: CRT_STORAGE, useValue: mockCrtStorage },
-      ],
-      schemas: [CUSTOM_ELEMENTS_SCHEMA], // For shallow testing of composed components
-    }).compileComponents();
-  }
+    expect(component.deviceId()).toBe('teensy-device-1');
+  });
 
-  async function createComponent(teensyDeviceId: string) {
-    fixture = TestBed.createComponent(VideoCaptureComponent);
-    component = fixture.componentInstance;
-    componentRef = fixture.componentRef;
-    componentRef.setInput('deviceId', teensyDeviceId);
-    fixture.detectChanges();
-    // Allow async enumeration to complete
+  it('updates selectedDevice when onDeviceSelected is called', async () => {
+    const { component } = await renderAndSettle([
+      { deviceId: 'cam-123', label: 'Front Camera' },
+      { deviceId: 'cam-456', label: 'Back Camera' },
+    ]);
+
+    component.onDeviceSelected('cam-456');
+
+    expect(component.selectedDevice()).toBe('cam-456');
+  });
+
+  it('requests a media stream with an exact deviceId constraint when a device is selected', async () => {
+    const { component, mediaDevices, fixture } = await renderAndSettle([
+      { deviceId: 'cam-123', label: 'Front Camera' },
+      { deviceId: 'cam-456', label: 'Back Camera' },
+    ]);
+    mediaDevices.getUserMedia.mockClear();
+
+    component.onDeviceSelected('cam-456');
     await fixture.whenStable();
-    fixture.detectChanges();
-  }
 
-  describe('component creation', () => {
-    it('should create', async () => {
-      await setupTestBed([]);
-      await createComponent('teensy-123');
-      expect(component).toBeTruthy();
-    });
-
-    it('should have required deviceId input', async () => {
-      await setupTestBed([]);
-      await createComponent('teensy-device-1');
-      // The deviceId input should be set
-      expect(component.deviceId()).toBe('teensy-device-1');
+    expect(mediaDevices.getUserMedia).toHaveBeenCalledWith({
+      video: { deviceId: { exact: 'cam-456' } },
+      audio: false,
     });
   });
 
-  describe('device selection behavior', () => {
-    it('should update selectedDevice when onDeviceSelected is called', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-        { deviceId: 'cam-456', label: 'Back Camera' },
-      ]);
-      await createComponent('teensy-device-1');
+  it('requests user media permission on init', async () => {
+    const { mediaDevices } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
 
-      // Simulate user selecting a device
-      component.onDeviceSelected('cam-456');
-
-      // Should update local state
-      expect(component.selectedDevice()).toBe('cam-456');
-    });
-
-    it('should request media stream when device is selected', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-        { deviceId: 'cam-456', label: 'Back Camera' },
-      ]);
-      await createComponent('teensy-device-1');
-
-      // Reset the spy to clear initial calls
-      getUserMediaSpy.mockClear();
-
-      // Simulate user selecting a device
-      component.onDeviceSelected('cam-456');
-
-      // Allow async operations
-      await fixture.whenStable();
-
-      // Should request the selected device
-      expect(getUserMediaSpy).toHaveBeenCalledWith({
-        video: { deviceId: { exact: 'cam-456' } },
-        audio: false,
-      });
-    });
+    expect(mediaDevices.getUserMedia).toHaveBeenCalled();
   });
 
-  describe('device enumeration', () => {
-    it('should request user media permission on init', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-      ]);
-      await createComponent('teensy-device-1');
+  it('enumerates devices after permission is granted', async () => {
+    const { mediaDevices } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
 
-      // Should have requested permission via getUserMedia
-      expect(getUserMediaSpy).toHaveBeenCalled();
-    });
-
-    it('should call enumerateDevices after getting permission', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-      ]);
-      await createComponent('teensy-device-1');
-
-      expect(enumerateDevicesSpy).toHaveBeenCalled();
-    });
-
-    it('should indicate when no devices are available', async () => {
-      await setupTestBed([]);
-      await createComponent('teensy-device-1');
-
-      expect(component.hasDevices()).toBe(false);
-    });
+    expect(mediaDevices.enumerateDevices).toHaveBeenCalled();
   });
 
-  describe('stream management', () => {
-    it('should initially have no stream', async () => {
-      await setupTestBed([]);
-      
-      // Create component but don't wait for async operations
-      fixture = TestBed.createComponent(VideoCaptureComponent);
-      component = fixture.componentInstance;
-      componentRef = fixture.componentRef;
-      componentRef.setInput('deviceId', 'teensy-123');
-      
-      // Before any async operations, hasStream should be false
-      expect(component.hasStream()).toBe(false);
-    });
+  it('hasDevices is false when no camera devices are available', async () => {
+    const { component } = await renderAndSettle([]);
+
+    expect(component.hasDevices()).toBe(false);
   });
 
-  describe('CRT effects', () => {
-    it('should have CRT enabled by default', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-      ]);
-      await createComponent('teensy-device-1');
+  it('hasStream is false before any async operations complete', () => {
+    const { component } = render([]);
 
-      expect(component['isCrtEnabled']()).toBe(true);
-    });
-
-    it('should toggle CRT effect when toggleCrtEffect is called', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-      ]);
-      await createComponent('teensy-device-1');
-
-      const initialState = component['isCrtEnabled']();
-      component.toggleCrtEffect();
-      expect(component['isCrtEnabled']()).toBe(!initialState);
-    });
-
-    it('should toggle CRT controls panel visibility', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-      ]);
-      await createComponent('teensy-device-1');
-
-      expect(component['showCrtControls']()).toBe(false);
-      component.toggleCrtControls();
-      expect(component['showCrtControls']()).toBe(true);
-    });
-
-    it('should update CRT settings when onCrtSettingsChange is called', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-      ]);
-      await createComponent('teensy-device-1');
-
-      const newSettings = {
-        scanlineIntensity: 0.7,
-        scanlineSize: 4,
-        vignetteStrength: 1.5,
-        screenCurvature: 0,
-        contrast: 1.2,
-        brightness: 1.6,
-        saturation: 1.4,
-        hue: 0,
-        phosphorPattern: 'none' as const,
-        phosphorIntensity: 0,
-        bloomEnabled: false,
-        bloomIntensity: 0.3,
-        bloomRadius: 3,
-        barrelDistortion: 0,
-        chromaticAberration: 0,
-      };
-
-      component.onCrtSettingsChange(newSettings);
-      expect(component['crtSettings']()).toEqual(newSettings);
-    });
-
-    describe('CRT initialization', () => {
-      it('should use SMALL_VIDEO_WEBGL preset when no saved settings', async () => {
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        const settings = component['crtSettings']();
-        expect(settings.phosphorPattern).toBe('aperture-grille');
-        expect(settings.bloomIntensity).toBe(0);
-      });
-
-      it('should load saved settings when they exist', async () => {
-        const savedSettings = {
-          scanlineIntensity: 0.5,
-          scanlineSize: 2,
-          vignetteStrength: 1.2,
-          screenCurvature: 0,
-          contrast: 1.1,
-          brightness: 1.3,
-          saturation: 1.2,
-          hue: 0,
-          phosphorPattern: 'none' as const,
-          phosphorIntensity: 0,
-          bloomEnabled: false,
-          bloomIntensity: 0.3,
-          bloomRadius: 3,
-          barrelDistortion: 0,
-          chromaticAberration: 0,
-        };
-
-        // Mock storage to return saved settings
-        vi.spyOn(mockCrtStorage, 'load').mockReturnValue(savedSettings);
-
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        // Should use saved settings
-        const settings = component['crtSettings']();
-        expect(settings).toEqual(savedSettings);
-      });
-
-      it('should use small CRT config for compact display', async () => {
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        expect(component.crtConfig).toBeDefined();
-        expect(component.crtConfig.showScanlines).toBe(true);
-        expect(component.crtConfig.showVignette).toBe(true);
-        expect(component.crtConfig.showCurvature).toBe(false);
-      });
-
-      it('should persist settings with video-compact storage key', async () => {
-        const saveSpy = vi.spyOn(mockCrtStorage, 'save');
-        
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        saveSpy.mockClear();
-
-        const newSettings = {
-          scanlineIntensity: 0.8,
-          scanlineSize: 3,
-          vignetteStrength: 1.6,
-          screenCurvature: 0,
-          contrast: 1.4,
-          brightness: 1.8,
-          saturation: 1.6,
-          hue: 0,
-          phosphorPattern: 'none' as const,
-          phosphorIntensity: 0,
-          bloomEnabled: false,
-          bloomIntensity: 0.3,
-          bloomRadius: 3,
-          barrelDistortion: 0,
-          chromaticAberration: 0,
-        };
-
-        component.onCrtSettingsChange(newSettings);
-
-        expect(saveSpy).toHaveBeenCalledWith(
-          'teensy-device-1',
-          'video-compact',
-          newSettings
-        );
-      });
-    });
-
-    it('should reset CRT settings to standard preset', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-      ]);
-      await createComponent('teensy-device-1');
-
-      // Change settings first
-      component.onCrtSettingsChange({
-        scanlineIntensity: 0.9,
-        scanlineSize: 5,
-        vignetteStrength: 2.0,
-        screenCurvature: 0,
-        contrast: 1.5,
-        brightness: 2.0,
-        saturation: 2.0,
-        hue: 0,
-        phosphorPattern: 'none' as const,
-        phosphorIntensity: 0,
-        bloomEnabled: false,
-        bloomIntensity: 0.3,
-        bloomRadius: 3,
-        barrelDistortion: 0,
-        chromaticAberration: 0,
-      });
-    });
+    expect(component.hasStream()).toBe(false);
   });
 
-  describe('custom preset selection', () => {
-    it('should apply built-in preset settings correctly', async () => {
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
+  it('CRT effect is enabled by default', async () => {
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
 
-        // Select a built-in preset (use SMALL_VIDEO_WEBGL for compact view)
-        component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL);
-        
-        const settings = component['crtSettings']();
-        // Verify settings match the built-in preset
-        expect(settings).toBeDefined();
-        expect(settings.phosphorPattern).toBe('aperture-grille');
-    });
-
-    it('should apply custom preset settings correctly', async () => {
-        // Mock storage to return custom presets
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
-
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        // Select a custom preset
-        component.onCrtPresetSelected('custom-arcade-setup' as CustomPresetName);
-        
-        const settings = component['crtSettings']();
-        // Verify settings match the custom preset
-        expect(settings.scanlineIntensity).toBe(0.7);
-        expect(settings.scanlineSize).toBe(3);
-        expect(settings.vignetteStrength).toBe(1.8);
-    });
-
-    it('should call loadCustomPresets when custom preset selected', async () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
-
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockClear();
-
-        component.onCrtPresetSelected('custom-my-preset' as CustomPresetName);
-        
-        expect(mockCrtStorage.loadCustomPresets).toHaveBeenCalled();
-    });
-
-    it('should persist custom preset settings to storage', async () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue(mockCustomPresets);
-        const saveSpy = vi.spyOn(mockCrtStorage, 'save');
-
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        saveSpy.mockClear();
-
-        component.onCrtPresetSelected('custom-arcade-setup' as CustomPresetName);
-        
-        expect(saveSpy).toHaveBeenCalledWith(
-          'teensy-device-1',
-          'video-compact',
-          expect.objectContaining({
-            scanlineIntensity: 0.7,
-            scanlineSize: 3,
-          })
-        );
-    });
-
-    it('should log warning when custom preset not found', async () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
-        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
-
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        const originalSettings = component['crtSettings']();
-
-        component.onCrtPresetSelected('custom-nonexistent' as CustomPresetName);
-        
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          '[VideoCaptureComponent] Custom preset not found: custom-nonexistent'
-        );
-
-        // Settings should remain unchanged
-        expect(component['crtSettings']()).toEqual(originalSettings);
-
-        consoleWarnSpy.mockRestore();
-    });
-
-    it('should not change settings when custom preset not found', async () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
-        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
-
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        // Set some custom settings
-        const customSettings = {
-          scanlineIntensity: 0.99,
-          scanlineSize: 10,
-          vignetteStrength: 2.5,
-          screenCurvature: 0,
-          contrast: 2.0,
-          brightness: 2.5,
-          saturation: 2.0,
-          hue: 0,
-          phosphorPattern: 'none' as const,
-          phosphorIntensity: 0,
-          bloomEnabled: false,
-          bloomIntensity: 0.3,
-          bloomRadius: 3,
-          barrelDistortion: 0,
-          chromaticAberration: 0,
-        };
-        component.onCrtSettingsChange(customSettings);
-
-        // Try to select non-existent custom preset
-        component.onCrtPresetSelected('custom-missing' as CustomPresetName);
-        
-        // Settings should remain unchanged
-        expect(component['crtSettings']()).toEqual(customSettings);
-
-        consoleWarnSpy.mockRestore();
-    });
-
-    it('should handle empty custom presets array gracefully', async () => {
-        vi.mocked(mockCrtStorage.loadCustomPresets).mockReturnValue([]);
-
-        await setupTestBed([
-          { deviceId: 'cam-123', label: 'Front Camera' },
-        ]);
-        await createComponent('teensy-device-1');
-
-        const originalSettings = component['crtSettings']();
-
-        // Should not crash
-        expect(() => {
-          component.onCrtPresetSelected('custom-test' as CustomPresetName);
-        }).not.toThrow();
-
-        // Settings should remain unchanged
-        expect(component['crtSettings']()).toEqual(originalSettings);
-    });
+    expect(component['isCrtEnabled']()).toBe(true);
   });
 
-  describe('composed components', () => {
-    it('should use standard CRT config', async () => {
-      await setupTestBed([
-        { deviceId: 'cam-123', label: 'Front Camera' },
-      ]);
-      await createComponent('teensy-device-1');
+  it('toggleCrtEffect flips the enabled state', async () => {
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
 
-      expect(component.crtConfig).toBeDefined();
-      expect(component.crtConfig.showScanlines).toBe(true);
-      expect(component.crtConfig.showVignette).toBe(true);
-      expect(component.crtConfig.showCurvature).toBe(false);
-    });
+    component.toggleCrtEffect();
+
+    expect(component['isCrtEnabled']()).toBe(false);
+  });
+
+  it('toggleCrtControls flips the controls-panel visibility', async () => {
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
+
+    expect(component['showCrtControls']()).toBe(false);
+    component.toggleCrtControls();
+    expect(component['showCrtControls']()).toBe(true);
+  });
+
+  it('onCrtSettingsChange updates crtSettings', async () => {
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
+
+    component.onCrtSettingsChange(customPresetSettings);
+
+    expect(component['crtSettings']()).toEqual(customPresetSettings);
+  });
+
+  it('uses the SMALL_VIDEO_WEBGL preset when no saved settings exist', async () => {
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
+
+    const settings = component['crtSettings']();
+    expect(settings.phosphorPattern).toBe('aperture-grille');
+    expect(settings.bloomIntensity).toBe(0);
+  });
+
+  it('loads saved CRT settings when present', async () => {
+    const savedSettings: CrtSettings = { ...customPresetSettings, screenCurvature: 5 };
+    const crtStorage = createMockCrtStorage({ load: vi.fn(() => savedSettings) });
+
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }], crtStorage);
+
+    expect(component['crtSettings']()).toEqual(savedSettings);
+  });
+
+  it('uses the small/compact CRT config', async () => {
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
+
+    expect(component.crtConfig.showScanlines).toBe(true);
+    expect(component.crtConfig.showVignette).toBe(true);
+    expect(component.crtConfig.showCurvature).toBe(false);
+  });
+
+  it('persists CRT settings under the video-compact storage key', async () => {
+    const crtStorage = createMockCrtStorage();
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }], crtStorage);
+    vi.mocked(crtStorage.save).mockClear();
+
+    component.onCrtSettingsChange(customPresetSettings);
+
+    expect(crtStorage.save).toHaveBeenCalledWith('teensy-device-1', 'video-compact', customPresetSettings);
+  });
+
+  it('applies a built-in preset', async () => {
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }]);
+
+    component.onCrtPresetSelected(CRT_PRESET_KEYS.SMALL_VIDEO_WEBGL);
+
+    expect(component['crtSettings']().phosphorPattern).toBe('aperture-grille');
+  });
+
+  it('applies a custom preset', async () => {
+    const crtStorage = createMockCrtStorage({ loadCustomPresets: vi.fn().mockReturnValue(mockCustomPresets) });
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }], crtStorage);
+
+    component.onCrtPresetSelected('custom-arcade-setup' as CustomPresetName);
+
+    const settings = component['crtSettings']();
+    expect(settings.scanlineIntensity).toBe(0.7);
+    expect(settings.scanlineSize).toBe(3);
+    expect(settings.vignetteStrength).toBe(1.8);
+  });
+
+  it('persists a selected custom preset to storage', async () => {
+    const crtStorage = createMockCrtStorage({ loadCustomPresets: vi.fn().mockReturnValue(mockCustomPresets) });
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }], crtStorage);
+    vi.mocked(crtStorage.save).mockClear();
+
+    component.onCrtPresetSelected('custom-arcade-setup' as CustomPresetName);
+
+    expect(crtStorage.save).toHaveBeenCalledWith(
+      'teensy-device-1',
+      'video-compact',
+      expect.objectContaining({ scanlineIntensity: 0.7, scanlineSize: 3 })
+    );
+  });
+
+  it('leaves settings unchanged and warns when a custom preset is not found', async () => {
+    const crtStorage = createMockCrtStorage({ loadCustomPresets: vi.fn().mockReturnValue([]) });
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* intentionally empty */ });
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }], crtStorage);
+    const originalSettings = component['crtSettings']();
+
+    component.onCrtPresetSelected('custom-nonexistent' as CustomPresetName);
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith('[VideoCaptureComponent] Custom preset not found: custom-nonexistent');
+    expect(component['crtSettings']()).toEqual(originalSettings);
+
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('handles an empty custom presets array gracefully', async () => {
+    const crtStorage = createMockCrtStorage({ loadCustomPresets: vi.fn().mockReturnValue([]) });
+    const { component } = await renderAndSettle([{ deviceId: 'cam-123', label: 'Front Camera' }], crtStorage);
+    const originalSettings = component['crtSettings']();
+
+    expect(() => component.onCrtPresetSelected('custom-test' as CustomPresetName)).not.toThrow();
+
+    expect(component['crtSettings']()).toEqual(originalSettings);
   });
 });
