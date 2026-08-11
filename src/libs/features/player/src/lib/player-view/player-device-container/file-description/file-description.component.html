@@ -1,4 +1,4 @@
-<lib-scaling-card [title]="displayTitle()">
+<lib-scaling-card [title]="displayTitle()" [subtitle]="creator()">
   @if (hasFile()) {
     @if (hasContent()) {
       <!-- Description Layout wraps all metadata content for consistent spacing -->
@@ -15,16 +15,16 @@
         @if (releaseInfo()) {
         <div class="release-section">
           <h4>Release</h4>
-          <p>{{ releaseInfo() }}</p>
+          <p class="release-info">{{ releaseInfo() }}</p>
         </div>
         }
 
         <!-- HVSC Description Section -->
         @if (description()) {
           <div class="description-section">
-            <!-- @if (isSong()) {
+            @if (isSong()) {
               <h4 class="section-label">HVSC STIL</h4>
-            } -->
+            }
             <p class="description-text">{{ description() }}</p>
           </div>
         }

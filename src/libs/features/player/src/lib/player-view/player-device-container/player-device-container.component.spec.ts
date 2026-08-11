@@ -297,16 +297,26 @@ describe('PlayerDeviceContainerComponent', () => {
       expect(fileImage).toBeTruthy();
     });
 
-    it('should still render lib-file-other when video-capture is hidden', () => {
-      const fileOther = fixture.nativeElement.querySelector('lib-file-other');
-      expect(fileOther).toBeTruthy();
+    // lib-file-other was deliberately replaced by lib-file-description as the
+    // metadata-area component (see player-device-container.component.html history);
+    // it renders once a file is loaded, same as the "not empty-state-message" case
+    // covered elsewhere in this file.
+    it('should still render lib-file-description when video-capture is hidden', () => {
+      currentFileSignal.set({ file: { name: 'test.sid', path: '/test.sid', images: [] } });
+      fixture.detectChanges();
+
+      const fileDescription = fixture.nativeElement.querySelector('lib-file-description');
+      expect(fileDescription).toBeTruthy();
     });
 
     it('should maintain device-header layout when video-capture is hidden', () => {
+      currentFileSignal.set({ file: { name: 'test.sid', path: '/test.sid', images: [] } });
+      fixture.detectChanges();
+
       const deviceHeader = fixture.nativeElement.querySelector('.device-header');
       expect(deviceHeader).toBeTruthy();
       expect(deviceHeader.querySelector('lib-file-image')).toBeTruthy();
-      expect(deviceHeader.querySelector('lib-file-other')).toBeTruthy();
+      expect(deviceHeader.querySelector('lib-file-description')).toBeTruthy();
     });
   });
 

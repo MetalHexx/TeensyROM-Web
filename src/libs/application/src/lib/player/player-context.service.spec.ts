@@ -28,6 +28,8 @@ import { TimerState } from './timer-state.interface';
 const realSetTimeout = globalThis.setTimeout;
 const scheduleRealMacrotask = realSetTimeout.bind(globalThis);
 const cancelRealMacrotask = globalThis.clearTimeout.bind(globalThis);
+const realSetInterval = globalThis.setInterval;
+const cancelRealInterval = globalThis.clearInterval.bind(globalThis);
 
 const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
   name: 'test-file.sid',
@@ -103,19 +105,35 @@ describe('PlayerContextService', () => {
   // harness records the timers a test schedules and cancels whatever is still pending.
   const scheduledTimeouts = new Set<ReturnType<typeof scheduleRealMacrotask>>();
 
+  // TimerService's tick loop is RxJS `interval()`, which schedules via `setInterval`, not
+  // `setTimeout` - a separate primitive the harness above doesn't touch. A test that starts a
+  // timer and doesn't drain it before ending leaves that interval running; its next tick then
+  // fires against the next test's already-destroyed TestBed injector (NG0205). Track and
+  // cancel intervals the same way as timeouts above.
+  const scheduledIntervals = new Set<ReturnType<typeof realSetInterval>>();
+
   beforeEach(() => {
     globalThis.setTimeout = ((...args: Parameters<typeof scheduleRealMacrotask>) => {
       const id = scheduleRealMacrotask(...args);
       scheduledTimeouts.add(id);
       return id;
     }) as typeof globalThis.setTimeout;
+
+    globalThis.setInterval = ((...args: Parameters<typeof realSetInterval>) => {
+      const id = realSetInterval(...args);
+      scheduledIntervals.add(id);
+      return id;
+    }) as typeof globalThis.setInterval;
   });
 
   afterEach(() => {
     vi.useRealTimers();
     globalThis.setTimeout = realSetTimeout;
+    globalThis.setInterval = realSetInterval;
     scheduledTimeouts.forEach((id) => cancelRealMacrotask(id));
     scheduledTimeouts.clear();
+    scheduledIntervals.forEach((id) => cancelRealInterval(id));
+    scheduledIntervals.clear();
   });
 
   const waitForTimerState = async (
@@ -715,7 +733,16 @@ describe('PlayerContextService', () => {
         // At this point, the service should have auto-advanced to the compatible file
         expect(service.getCurrentFile(deviceId)()?.file.name).toBe('compatible.sid');
 
-        // Clear the mock to verify it's not called during play()
+        // Auto-advancing to the compatible file is itself a successful launch, which
+        // already marks the player Playing (launching a file starts playback on the
+        // device). Pause first so play() below genuinely exercises its toggleMusic
+        // call, isolated from the unrelated "already playing" no-op guard in
+        // PlayerContextService.play().
+        mockPlayerService.toggleMusic.mockReturnValue(of(undefined));
+        await service.pause(deviceId);
+        await nextTick();
+
+        // Clear the mock to verify it's called during play()
         mockPlayerService.toggleMusic.mockClear();
 
         // Attempt to play - should work now that compatible file is loaded
@@ -2253,58 +2280,65 @@ describe('PlayerContextService', () => {
         expect(secondTimer?.currentTime).toBeLessThan(500); // Reset and started fresh
       });
 
-      it('should handle multiple auto-progression cycles', async () => {
-        const musicFile1 = createTestFileItem({
-          type: FileItemType.Song,
-          playLength: '0:01',
-          path: 'music1.sid',
-          name: 'music1.sid',
-        });
-        const musicFile2 = createTestFileItem({
-          type: FileItemType.Song,
-          playLength: '0:01',
-          path: 'music2.sid',
-          name: 'music2.sid',
-        });
-        const musicFile3 = createTestFileItem({
-          type: FileItemType.Song,
-          playLength: '0:01',
-          path: 'music3.sid',
-          name: 'music3.sid',
-        });
+      // This test intentionally exercises real timer semantics (two chained real-clock
+      // waits >1s each to observe two auto-progression cycles), so it needs a per-test
+      // timeout above the file's tightened 2000ms default rather than a fake tick.
+      it(
+        'should handle multiple auto-progression cycles',
+        async () => {
+          const musicFile1 = createTestFileItem({
+            type: FileItemType.Song,
+            playLength: '0:01',
+            path: 'music1.sid',
+            name: 'music1.sid',
+          });
+          const musicFile2 = createTestFileItem({
+            type: FileItemType.Song,
+            playLength: '0:01',
+            path: 'music2.sid',
+            name: 'music2.sid',
+          });
+          const musicFile3 = createTestFileItem({
+            type: FileItemType.Song,
+            playLength: '0:01',
+            path: 'music3.sid',
+            name: 'music3.sid',
+          });
 
-        mockPlayerService.launchFile
-          .mockReturnValueOnce(of(musicFile1))
-          .mockReturnValueOnce(of(musicFile2))
-          .mockReturnValueOnce(of(musicFile3));
+          mockPlayerService.launchFile
+            .mockReturnValueOnce(of(musicFile1))
+            .mockReturnValueOnce(of(musicFile2))
+            .mockReturnValueOnce(of(musicFile3));
 
-        mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
-          files: [musicFile1, musicFile2, musicFile3],
-          currentPath: '/music',
-        }));
+          mockStorageStore.getSelectedDirectoryState.mockReturnValue(() => ({
+            files: [musicFile1, musicFile2, musicFile3],
+            currentPath: '/music',
+          }));
 
-        // Launch first file
-        await service.launchFileWithContext({
-          deviceId,
-          file: musicFile1,
-          files: [musicFile1, musicFile2, musicFile3],
-          directoryPath: '/music',
-        });
+          // Launch first file
+          await service.launchFileWithContext({
+            deviceId,
+            file: musicFile1,
+            files: [musicFile1, musicFile2, musicFile3],
+            directoryPath: '/music',
+          });
 
-        await nextTick();
-        expect(service.getCurrentFile(deviceId)()?.file.name).toBe('music1.sid');
+          await nextTick();
+          expect(service.getCurrentFile(deviceId)()?.file.name).toBe('music1.sid');
 
-        // Wait for first completion
-        await waitForTime(1200);
-        expect(service.getCurrentFile(deviceId)()?.file.name).toBe('music2.sid');
+          // Wait for first completion
+          await waitForTime(1200);
+          expect(service.getCurrentFile(deviceId)()?.file.name).toBe('music2.sid');
 
-        // Wait for second completion
-        await waitForTime(1200);
-        expect(service.getCurrentFile(deviceId)()?.file.name).toBe('music3.sid');
+          // Wait for second completion
+          await waitForTime(1200);
+          expect(service.getCurrentFile(deviceId)()?.file.name).toBe('music3.sid');
 
-        // Verify 3 launches occurred
-        expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(3);
-      });
+          // Verify 3 launches occurred
+          expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(3);
+        },
+        6000
+      );
 
       it('should not auto-progress when paused', async () => {
         const musicFile = createTestFileItem({
@@ -3427,11 +3461,34 @@ describe('PlayerContextService', () => {
       });
 
       it('should maintain correct history count when mixing compatible and incompatible files', async () => {
-        const compatible1 = createTestFileItem({ name: 'good1.sid', isCompatible: true });
-        const incompatible1 = createTestFileItem({ name: 'bad1.prg', isCompatible: false });
-        const compatible2 = createTestFileItem({ name: 'good2.sid', isCompatible: true });
-        const incompatible2 = createTestFileItem({ name: 'bad2.prg', isCompatible: false });
-        const compatible3 = createTestFileItem({ name: 'good3.sid', isCompatible: true });
+        // Each file needs a distinct path: history recording treats a matching
+        // `file.path` on the immediately preceding entry as a consecutive-duplicate
+        // and skips it, and createTestFileItem() defaults every file to the same path.
+        const compatible1 = createTestFileItem({
+          name: 'good1.sid',
+          path: '/music/good1.sid',
+          isCompatible: true,
+        });
+        const incompatible1 = createTestFileItem({
+          name: 'bad1.prg',
+          path: '/music/bad1.prg',
+          isCompatible: false,
+        });
+        const compatible2 = createTestFileItem({
+          name: 'good2.sid',
+          path: '/music/good2.sid',
+          isCompatible: true,
+        });
+        const incompatible2 = createTestFileItem({
+          name: 'bad2.prg',
+          path: '/music/bad2.prg',
+          isCompatible: false,
+        });
+        const compatible3 = createTestFileItem({
+          name: 'good3.sid',
+          path: '/music/good3.sid',
+          isCompatible: true,
+        });
 
         // Launch compatible file
         mockPlayerService.launchFile.mockReturnValue(of(compatible1));
@@ -3503,9 +3560,24 @@ describe('PlayerContextService', () => {
       });
 
       it('should preserve compatible file history when encountering incompatible files', async () => {
-        const compatible1 = createTestFileItem({ name: 'track1.sid', isCompatible: true });
-        const compatible2 = createTestFileItem({ name: 'track2.sid', isCompatible: true });
-        const incompatible = createTestFileItem({ name: 'bad.prg', isCompatible: false });
+        // Distinct paths: history recording skips an entry whose `file.path` matches
+        // the preceding entry as a consecutive-duplicate, and createTestFileItem()
+        // defaults every file to the same path.
+        const compatible1 = createTestFileItem({
+          name: 'track1.sid',
+          path: '/music/track1.sid',
+          isCompatible: true,
+        });
+        const compatible2 = createTestFileItem({
+          name: 'track2.sid',
+          path: '/music/track2.sid',
+          isCompatible: true,
+        });
+        const incompatible = createTestFileItem({
+          name: 'bad.prg',
+          path: '/music/bad.prg',
+          isCompatible: false,
+        });
 
         // Build initial history with two compatible files
         mockPlayerService.launchFile.mockReturnValue(of(compatible1));
@@ -3833,12 +3905,15 @@ describe('PlayerContextService', () => {
       });
 
       it('should show only compatible files in history after mixed sequence (Behavior A)', async () => {
-        // Launch 5 files: compatible, incompatible, compatible, incompatible, compatible
-        const file1 = createTestFileItem({ name: 'game1.prg', isCompatible: true });
-        const file2 = createTestFileItem({ name: 'game2.prg', isCompatible: false });
-        const file3 = createTestFileItem({ name: 'game3.prg', isCompatible: true });
-        const file4 = createTestFileItem({ name: 'game4.prg', isCompatible: false });
-        const file5 = createTestFileItem({ name: 'game5.prg', isCompatible: true });
+        // Launch 5 files: compatible, incompatible, compatible, incompatible, compatible.
+        // Distinct paths: history recording skips an entry whose `file.path` matches
+        // the preceding entry as a consecutive-duplicate, and createTestFileItem()
+        // defaults every file to the same path.
+        const file1 = createTestFileItem({ name: 'game1.prg', path: '/games/game1.prg', isCompatible: true });
+        const file2 = createTestFileItem({ name: 'game2.prg', path: '/games/game2.prg', isCompatible: false });
+        const file3 = createTestFileItem({ name: 'game3.prg', path: '/games/game3.prg', isCompatible: true });
+        const file4 = createTestFileItem({ name: 'game4.prg', path: '/games/game4.prg', isCompatible: false });
+        const file5 = createTestFileItem({ name: 'game5.prg', path: '/games/game5.prg', isCompatible: true });
 
         const files = [file1, file2, file3, file4, file5];
 
@@ -3907,12 +3982,15 @@ describe('PlayerContextService', () => {
       });
 
       it('should maintain continuous timestamps without gaps (Behavior B)', async () => {
-        // Launch 5 files (2 incompatible) with delays between launches
-        const file1 = createTestFileItem({ name: 'song1.sid', isCompatible: true });
-        const file2 = createTestFileItem({ name: 'song2.sid', isCompatible: false });
-        const file3 = createTestFileItem({ name: 'song3.sid', isCompatible: true });
-        const file4 = createTestFileItem({ name: 'song4.sid', isCompatible: false });
-        const file5 = createTestFileItem({ name: 'song5.sid', isCompatible: true });
+        // Launch 5 files (2 incompatible) with delays between launches.
+        // Distinct paths: history recording skips an entry whose `file.path` matches
+        // the preceding entry as a consecutive-duplicate, and createTestFileItem()
+        // defaults every file to the same path.
+        const file1 = createTestFileItem({ name: 'song1.sid', path: '/music/song1.sid', isCompatible: true });
+        const file2 = createTestFileItem({ name: 'song2.sid', path: '/music/song2.sid', isCompatible: false });
+        const file3 = createTestFileItem({ name: 'song3.sid', path: '/music/song3.sid', isCompatible: true });
+        const file4 = createTestFileItem({ name: 'song4.sid', path: '/music/song4.sid', isCompatible: false });
+        const file5 = createTestFileItem({ name: 'song5.sid', path: '/music/song5.sid', isCompatible: true });
 
         const files = [file1, file2, file3, file4, file5];
 
@@ -3952,10 +4030,13 @@ describe('PlayerContextService', () => {
       });
 
       it('should skip incompatible files when rendering history timeline (Behavior C)', async () => {
-        // Launch compatible file1, then incompatible file2, then compatible file3
-        const file1 = createTestFileItem({ name: 'track1.sid', isCompatible: true });
-        const file2 = createTestFileItem({ name: 'track2.sid', isCompatible: false });
-        const file3 = createTestFileItem({ name: 'track3.sid', isCompatible: true });
+        // Launch compatible file1, then incompatible file2, then compatible file3.
+        // Distinct paths: history recording skips an entry whose `file.path` matches
+        // the preceding entry as a consecutive-duplicate, and createTestFileItem()
+        // defaults every file to the same path.
+        const file1 = createTestFileItem({ name: 'track1.sid', path: '/tracks/track1.sid', isCompatible: true });
+        const file2 = createTestFileItem({ name: 'track2.sid', path: '/tracks/track2.sid', isCompatible: false });
+        const file3 = createTestFileItem({ name: 'track3.sid', path: '/tracks/track3.sid', isCompatible: true });
 
         const files = [file1, file2, file3];
 
@@ -4005,13 +4086,16 @@ describe('PlayerContextService', () => {
       });
 
       it('should maintain correct ordering by timestamp (Behavior D)', async () => {
-        // Launch files in sequence (some incompatible)
-        const file1 = createTestFileItem({ name: 'alpha.prg', isCompatible: true });
-        const file2 = createTestFileItem({ name: 'beta.prg', isCompatible: false });
-        const file3 = createTestFileItem({ name: 'gamma.prg', isCompatible: true });
-        const file4 = createTestFileItem({ name: 'delta.prg', isCompatible: false });
-        const file5 = createTestFileItem({ name: 'epsilon.prg', isCompatible: true });
-        const file6 = createTestFileItem({ name: 'zeta.prg', isCompatible: true });
+        // Launch files in sequence (some incompatible).
+        // Distinct paths: history recording skips an entry whose `file.path` matches
+        // the preceding entry as a consecutive-duplicate, and createTestFileItem()
+        // defaults every file to the same path.
+        const file1 = createTestFileItem({ name: 'alpha.prg', path: '/programs/alpha.prg', isCompatible: true });
+        const file2 = createTestFileItem({ name: 'beta.prg', path: '/programs/beta.prg', isCompatible: false });
+        const file3 = createTestFileItem({ name: 'gamma.prg', path: '/programs/gamma.prg', isCompatible: true });
+        const file4 = createTestFileItem({ name: 'delta.prg', path: '/programs/delta.prg', isCompatible: false });
+        const file5 = createTestFileItem({ name: 'epsilon.prg', path: '/programs/epsilon.prg', isCompatible: true });
+        const file6 = createTestFileItem({ name: 'zeta.prg', path: '/programs/zeta.prg', isCompatible: true });
 
         const files = [file1, file2, file3, file4, file5, file6];
 
