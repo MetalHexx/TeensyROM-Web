@@ -941,6 +941,43 @@ Public surface: `StorageStore`/`IPlayerContext` (mocked), `searchText()`, `canSe
 | 623 | The search input field renders | `lib-input-field` | truthy | dom-structural | drop — duplicate presence claim already proven transitively by row 615's property read | — |
 | 624 | The search field renders with the correct placeholder and clearable properties | `lib-input-field` componentInstance.placeholder()/clearable() | 'Search'; true | state | port | search-toolbar.component.spec.ts |
 
+## 28. video-capture/video-capture.component.spec.ts (25 tests)
+
+Public surface: `deviceId()`, `onDeviceSelected()`/`selectedDevice()`, `hasDevices()`,
+`hasStream()`, `toggleCrtEffect()`/`toggleCrtControls()`, `onCrtSettingsChange()`,
+`onCrtPresetSelected()`, `crtConfig`, `ICrtStorage`/`ISettingsService` (mocked). Per the handoff's
+measured baseline, this file mocks `navigator.mediaDevices` (via `Object.defineProperty`) while
+compiling the real component tree, and uses `CUSTOM_ELEMENTS_SCHEMA` for shallow rendering of
+composed children.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 625 | Component instantiates | component | truthy | state | port | video-capture.component.spec.ts |
+| 626 | deviceId input is reflected on the component | deviceId() | 'teensy-device-1' | state | port | video-capture.component.spec.ts |
+| 627 | onDeviceSelected updates selectedDevice | onDeviceSelected(), selectedDevice() | 'cam-456' | state | port | video-capture.component.spec.ts |
+| 628 | Selecting a device requests a media stream with an exact deviceId constraint | onDeviceSelected(), getUserMedia | called with `{video: {deviceId: {exact: ...}}, audio: false}` | state | port | video-capture.component.spec.ts |
+| 629 | getUserMedia is called on init to request camera permission | getUserMedia | called | state | port | video-capture.component.spec.ts |
+| 630 | enumerateDevices is called after permission is granted | enumerateDevices | called | state | port | video-capture.component.spec.ts |
+| 631 | hasDevices is false when no camera devices are available | hasDevices() | false | state | port | video-capture.component.spec.ts |
+| 632 | hasStream is false before any async operations complete | hasStream() | false | state | port | video-capture.component.spec.ts |
+| 633 | CRT effect is enabled by default | isCrtEnabled() | true | state | port | video-capture.component.spec.ts |
+| 634 | toggleCrtEffect flips the enabled state | toggleCrtEffect(), isCrtEnabled() | inverted | state | port | video-capture.component.spec.ts |
+| 635 | toggleCrtControls flips the controls-panel visibility | toggleCrtControls(), showCrtControls() | false then true | state | port | video-capture.component.spec.ts |
+| 636 | onCrtSettingsChange updates crtSettings | onCrtSettingsChange(), crtSettings() | equals the new settings | state | port | video-capture.component.spec.ts |
+| 637 | SMALL_VIDEO_WEBGL preset is used when no saved settings exist | crtSettings() | phosphorPattern/bloomIntensity match preset | state | port | video-capture.component.spec.ts |
+| 638 | Saved CRT settings load when present | ICrtStorage.load, crtSettings() | equals saved settings | state | port | video-capture.component.spec.ts |
+| 639 | The small/compact CRT config is used | crtConfig | showScanlines/showVignette true; showCurvature false | state | port | video-capture.component.spec.ts |
+| 640 | CRT settings persist under the 'video-compact' storage key | onCrtSettingsChange(), ICrtStorage.save | called with (deviceId, 'video-compact', settings) | state | port | video-capture.component.spec.ts |
+| 641 | 'Resets CRT settings to standard preset' — the test body contains no assertion | onCrtSettingsChange() (no expect()) | — | state | drop — the test performs an action but asserts nothing whatsoever, despite its title (see Execution Notes) | — |
+| 642 | Selecting a built-in preset applies its settings | onCrtPresetSelected(), crtSettings() | phosphorPattern matches preset | state | port | video-capture.component.spec.ts |
+| 643 | Selecting a custom preset applies its settings | onCrtPresetSelected(), crtSettings() | scanlineIntensity/scanlineSize/vignetteStrength match custom preset | state | port | video-capture.component.spec.ts |
+| 644 | Selecting a custom preset loads the custom presets list | onCrtPresetSelected(), ICrtStorage.loadCustomPresets | called | state | drop — asserts a mocked collaborator called with nothing but the trigger the test made; the resulting settings application is already proven by row 643 | — |
+| 645 | Selecting a custom preset persists it to storage | onCrtPresetSelected(), ICrtStorage.save | called with (deviceId, 'video-compact', matching settings) | state | port | video-capture.component.spec.ts |
+| 646 | An unknown custom preset logs a warning and leaves settings unchanged | onCrtPresetSelected(), console.warn, crtSettings() | warning message contains preset name; settings unchanged | state | port (console.warn assertion dropped as implementation detail; settings-unchanged kept) | video-capture.component.spec.ts |
+| 647 | An unknown custom preset is a true no-op on current settings | onCrtSettingsChange(), onCrtPresetSelected(), crtSettings() | settings identical to what was set immediately before | state | drop — duplicate of row 646's no-op claim without the console assertion | — |
+| 648 | Selecting a preset from an empty custom-presets array doesn't throw and leaves settings unchanged | onCrtPresetSelected(), crtSettings() | no throw; settings unchanged | state | port | video-capture.component.spec.ts |
+| 649 | The standard CRT config is used by the composed components | crtConfig | showScanlines/showVignette true; showCurvature false | state | drop — duplicate of row 639's identical config assertion | — |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
