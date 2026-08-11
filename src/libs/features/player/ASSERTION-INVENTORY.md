@@ -489,6 +489,76 @@ rather than per-row.
 | 298 | selectedDurationMs defaults to 180000 when config is null | selectedDurationMs() | 180000 | state | drop — duplicate of row 271's default-duration claim | — |
 | 299 | isCustomTimerEnabled defaults to false when config is null | isCustomTimerEnabled() | false | state | drop — duplicate of row 268's default-enabled claim | — |
 
+## 16. player-toolbar/player-toolbar.component.spec.ts (58 tests)
+
+Public surface: `playPause()`/`stop()`/`next()`/`previous()`, `getPlayPauseIconComputed()`,
+`getPlayPauseLabelComputed()`, `isCurrentFileMusicTypeComputed()`, `canNavigateComputed()`,
+`canNavigatePreviousComputed()`, `getPlayerStatus()`, `getPlayButtonColorComputed()`,
+`hasError()`, `disabled` input, rendered playback buttons via `IconButtonComponent` query,
+`lib-volume-control`. The full-size sibling of `player-toolbar-mini`; same behavior family, more
+states (paused, error-color, click-triggers-method).
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 300 | Component instantiates | component | truthy | state | port | player-toolbar.component.spec.ts |
+| 301 | playPause() calls pause while playing | playPause(), pause/play | pause called; play not called | state | port | player-toolbar.component.spec.ts |
+| 302 | playPause() calls play while stopped | playPause(), play/pause | play called; pause not called | state | port | player-toolbar.component.spec.ts |
+| 303 | playPause() calls play while paused | playPause(), play/pause | play called; pause not called | state | port | player-toolbar.component.spec.ts |
+| 304 | playPause() is a no-op with an empty deviceId | playPause(), play/pause | neither called | state | port | player-toolbar.component.spec.ts |
+| 305 | stop() calls the context's stop with the deviceId | stop(), IPlayerContext.stop | called with deviceId | state | port | player-toolbar.component.spec.ts |
+| 306 | stop() is a no-op with an empty deviceId | stop(), IPlayerContext.stop | not called | state | port | player-toolbar.component.spec.ts |
+| 307 | next() calls the context's next with the deviceId | next(), IPlayerContext.next | called with deviceId | state | port | player-toolbar.component.spec.ts |
+| 308 | next() is a no-op with an empty deviceId | next(), IPlayerContext.next | not called | state | port | player-toolbar.component.spec.ts |
+| 309 | previous() calls the context's previous with the deviceId | previous(), IPlayerContext.previous | called with deviceId | state | port | player-toolbar.component.spec.ts |
+| 310 | previous() is a no-op with an empty deviceId | previous(), IPlayerContext.previous | not called | state | port | player-toolbar.component.spec.ts |
+| 311 | Play/pause icon is play_arrow when Stopped | getPlayPauseIconComputed() | 'play_arrow' | state | port | player-toolbar.component.spec.ts |
+| 312 | Play/pause icon is play_arrow when Paused | getPlayPauseIconComputed() | 'play_arrow' | state | port | player-toolbar.component.spec.ts |
+| 313 | Play/pause icon is pause when Playing | getPlayPauseIconComputed() | 'pause' | state | port | player-toolbar.component.spec.ts |
+| 314 | Play/pause icon is play_arrow with an empty deviceId | getPlayPauseIconComputed() | 'play_arrow' | state | port | player-toolbar.component.spec.ts |
+| 315 | Play/pause label is 'Play' when Stopped | getPlayPauseLabelComputed() | 'Play' | state | port | player-toolbar.component.spec.ts |
+| 316 | Play/pause label is 'Play' when Paused | getPlayPauseLabelComputed() | 'Play' | state | port | player-toolbar.component.spec.ts |
+| 317 | Play/pause label is 'Pause' when Playing | getPlayPauseLabelComputed() | 'Pause' | state | port | player-toolbar.component.spec.ts |
+| 318 | Play/pause label is 'Play' with an empty deviceId | getPlayPauseLabelComputed() | 'Play' | state | port | player-toolbar.component.spec.ts |
+| 319 | Music-type detection is true for a Song | isCurrentFileMusicTypeComputed() | true | state | port | player-toolbar.component.spec.ts |
+| 320 | Music-type detection is false for a Game | isCurrentFileMusicTypeComputed() | false | state | port | player-toolbar.component.spec.ts |
+| 321 | Music-type detection is false for an Image | isCurrentFileMusicTypeComputed() | false | state | port | player-toolbar.component.spec.ts |
+| 322 | Music-type detection is false with no current file | isCurrentFileMusicTypeComputed() | false | state | port | player-toolbar.component.spec.ts |
+| 323 | Music-type detection is false with an empty deviceId | isCurrentFileMusicTypeComputed() | false | state | port | player-toolbar.component.spec.ts |
+| 324 | canNavigate is true with multiple files in context | canNavigateComputed() | true | state | port | player-toolbar.component.spec.ts |
+| 325 | canNavigate is false with a single file in context | canNavigateComputed() | false | state | port | player-toolbar.component.spec.ts |
+| 326 | canNavigate is true in shuffle mode regardless of context | canNavigateComputed() | true | state | port | player-toolbar.component.spec.ts |
+| 327 | canNavigate is false with no context outside shuffle mode | canNavigateComputed() | false | state | port | player-toolbar.component.spec.ts |
+| 328 | canNavigate is false with an empty deviceId | canNavigateComputed() | false | state | port | player-toolbar.component.spec.ts |
+| 329 | canNavigatePrevious delegates to canNavigate | canNavigatePreviousComputed(), canNavigateComputed() | equal; both true | state | drop — proves delegation to an already-fully-covered computed (rows 324-328), no independent behavior | — |
+| 330 | getPlayerStatus returns the context's status | getPlayerStatus() | Playing | state | port | player-toolbar.component.spec.ts |
+| 331 | getPlayerStatus returns Stopped with an empty deviceId | getPlayerStatus() | Stopped | state | port | player-toolbar.component.spec.ts |
+| 332 | Play/pause button shows for music files | icon-button (Play\|Pause label) | truthy; icon matches play_arrow/pause | dom-structural | port | player-toolbar.component.spec.ts |
+| 333 | Stop button shows for non-music files | icon-button ('Stop Playback' label) | truthy; icon 'stop' | dom-structural | port | player-toolbar.component.spec.ts |
+| 334 | Navigation buttons are disabled when canNavigate is false | next/previous icon-buttons | both truthy; disabled() true | state | port | player-toolbar.component.spec.ts |
+| 335 | Navigation buttons are enabled when canNavigate is true | next/previous icon-buttons | both truthy; disabled() false | state | port | player-toolbar.component.spec.ts |
+| 336 | Clicking the play/pause button triggers playPause() | native button click, playPause spy | called | state | port | player-toolbar.component.spec.ts |
+| 337 | Clicking the next button triggers next() | native button click, next spy | called | state | port | player-toolbar.component.spec.ts |
+| 338 | Clicking the previous button triggers previous() | native button click, previous spy | called | state | port | player-toolbar.component.spec.ts |
+| 339 | Play button shows error color when the file is incompatible | getPlayButtonColorComputed() | 'error' | state | port | player-toolbar.component.spec.ts |
+| 340 | Play button shows normal color when the file is compatible | getPlayButtonColorComputed() | 'normal' | state | port | player-toolbar.component.spec.ts |
+| 341 | Play button shows normal color when no file is loaded | getPlayButtonColorComputed() | 'normal' | state | port | player-toolbar.component.spec.ts |
+| 342 | Play button shows normal color when disabled, even if the file is incompatible | getPlayButtonColorComputed() | 'normal' | state | port | player-toolbar.component.spec.ts |
+| 343 | hasError is true when an error is set | hasError() | true | state | port | player-toolbar.component.spec.ts |
+| 344 | hasError is false when the error is null | hasError() | false | state | port | player-toolbar.component.spec.ts |
+| 345 | disabled input defaults to false | disabled() | false | state | port | player-toolbar.component.spec.ts |
+| 346 | disabled input accepts true | disabled() | true | state | port | player-toolbar.component.spec.ts |
+| 347 | disabled-state class is added to the host when disabled | nativeElement.classList | contains 'disabled-state' | dom-structural | port | player-toolbar.component.spec.ts |
+| 348 | disabled-state class is absent when not disabled | nativeElement.classList | doesn't contain 'disabled-state' | dom-structural | port | player-toolbar.component.spec.ts |
+| 349 | All playback buttons are disabled when disabled=true | previous/next/play-pause componentInstance.disabled() | all true | state | port | player-toolbar.component.spec.ts |
+| 350 | Playback buttons are enabled when disabled=false and navigation is possible | previous/next/play-pause componentInstance.disabled() | all false | state | port | player-toolbar.component.spec.ts |
+| 351 | Volume control renders when audio streaming is enabled | `lib-volume-control` count | > 0 | dom-structural | port | player-toolbar.component.spec.ts |
+| 352 | Volume control is absent when audio streaming is disabled | `lib-volume-control` count | 0 | dom-structural | port | player-toolbar.component.spec.ts |
+| 353 | Volume control receives disabled=true matching the toolbar's disabled state | `lib-volume-control` componentInstance.disabled() | true | state | port | player-toolbar.component.spec.ts |
+| 354 | Volume control receives disabled=false when the toolbar is enabled | `lib-volume-control` componentInstance.disabled() | false | state | port | player-toolbar.component.spec.ts |
+| 355 | Audio-stream-enabled lookup uses the component's deviceId | SettingsStore.enableAudioStreamForDevice | called with 'test-device-id' | state | drop — asserts a mocked collaborator called with exactly the input the test set; show/hide behavior already proven by rows 351/352 | — |
+| 356 | Volume control shows/hides reactively as the audio-stream setting changes | `lib-volume-control` count | 0 then > 0 | dom-structural | drop — duplicate of rows 351/352's static before/after states | — |
+| 357 | Volume control renders inside a `.volume-control-section` wrapper | `.volume-control-section`, nested `lib-volume-control` | both truthy | dom-structural | port | player-toolbar.component.spec.ts |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
