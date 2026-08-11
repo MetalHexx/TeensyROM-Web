@@ -26,7 +26,7 @@ import { parsePlayLength } from './timer-utils';
 import { DEFAULT_TIMER_MS } from './player.constants';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import { Subscription, of, timer, concat, race } from 'rxjs';
-import { map, distinctUntilChanged, switchMap, mapTo, take } from 'rxjs/operators';
+import { map, distinctUntilChanged, switchMap, mapTo, take, skip } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerContextService implements IPlayerContext {
@@ -216,7 +216,12 @@ export class PlayerContextService implements IPlayerContext {
           // Monitor for loading to finish: if loading becomes false before timer,
           // the switchMap cancels this inner observable
           isLoadingChanges$.pipe(
-            // Skip the current true value, wait for next change (should be false)
+            // isLoadingChanges$ is backed by toObservable()'s ReplaySubject(1), which
+            // replays its buffered current value synchronously to every new subscriber.
+            // Without skip(1) that replayed `true` (the value that triggered this branch)
+            // would satisfy take(1) immediately, emitting false before any real change.
+            skip(1),
+            // Wait for the next genuine change (should be false when loading finishes)
             take(1),
             // If it's false, we completed fast - emit false
             map(() => false)
