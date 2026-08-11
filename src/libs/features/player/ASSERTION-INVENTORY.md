@@ -51,11 +51,116 @@ pattern across the 29 files), confirming the corpus boundary.
 
 ## Counts
 
-_(filled in after all 29 files are inventoried — see bottom of document)_
+| | Count |
+|---|---:|
+| Tests in (measured `it()` blocks, all 29 files) | **694** |
+| Ported | 562 |
+| Merged (folded into another row) | 30 |
+| Dropped | 102 |
+| Ported + Merged + Dropped | 694 ✓ |
+
+This corpus has one genuine multi-case parameterized table: row 211
+(`file-info.component.spec.ts`'s 16-extension `typeTestCases.forEach(...)` block) collapses into a
+single row because it is one textual `it()` call in source (matching this inventory's grep-based
+`it()` count) even though it runs 16 assertions at test time — called out explicitly at that row.
+No other file in this corpus uses `it.each` or an equivalent runtime-generated-test pattern.
+
+**Before / after assertion-style split:**
+
+| Style | Before (694 rows) | After (562 ported rows) |
+|---|---:|---:|
+| `state` | 513 (73.9%) | 442 (78.6%) |
+| `dom-structural` | 138 (19.9%) | 118 (21.0%) |
+| `dom-copy` | 43 (6.2%) | 2 (0.4%) |
+| **Total** | **694** | **562** |
+
+The two `dom-copy` rows that survive into the rebuild are deliberate exceptions to the
+default-drop rule: row 512 (`filter-toolbar.component.spec.ts`) asserts accessibility aria-labels,
+which are a functional a11y contract rather than decorative UI text; row 532
+(`history-entry.component.spec.ts`) asserts a locale-formatted timestamp string, a genuine
+formatting-logic concern. Every other `dom-copy` row was either dropped (static/decorative copy,
+or duplicate coverage) or re-expressed as a `state`/`dom-structural` assertion per the phase's
+disposition rule.
+
+**Per-source-file test counts** (measured `it()` per file, matching the External Surface figures):
+
+| Source file | Lines | `it()` count |
+|---|---:|---:|
+| file-description-mini.component.spec.ts | 66 | 4 |
+| file-description/file-description.component.spec.ts | 1,037 | 28 |
+| file-description/youtube-dialog/youtube-dialog.component.spec.ts | 87 | 6 |
+| file-image.component.spec.ts | 242 | 11 |
+| file-other/file-other.component.spec.ts | 1,419 | 36 |
+| file-other/youtube-dialog/youtube-dialog.component.spec.ts | 87 | 6 |
+| player-device-container.component.spec.ts | 648 | 43 |
+| player-toolbar-mini/player-toolbar-mini.component.spec.ts | 420 | 32 |
+| player-toolbar/file-info/file-info.component.spec.ts | 501 | 29 |
+| player-toolbar/file-time/file-time.component.spec.ts | 115 | 10 |
+| player-toolbar/player-toolbar-actions/player-toolbar-actions.component.spec.ts | 763 | 69 |
+| player-toolbar/player-toolbar.component.spec.ts | 855 | 58 |
+| player-toolbar/volume-control/volume-control.component.spec.ts | 186 | 18 |
+| player-toolbar/volume-control/volume-popup/volume-popup.component.spec.ts | 135 | 11 |
+| storage-container/directory-files/directory-files.component.spec.ts | 768 | 34 |
+| storage-container/directory-files/file-item/file-item.component.spec.ts | 298 | 26 |
+| storage-container/directory-trail-container/directory-trail-container.component.spec.ts | 494 | 32 |
+| storage-container/directory-tree-container/directory-tree-container.component.spec.ts | 230 | 12 |
+| storage-container/filter-toolbar/filter-toolbar.component.spec.ts | 620 | 50 |
+| storage-container/filter-toolbar/random-roll-button/random-roll-button.component.spec.ts | 100 | 7 |
+| storage-container/play-history/history-entry/history-entry.component.spec.ts | 183 | 12 |
+| storage-container/play-history/play-history.component.spec.ts | 320 | 12 |
+| storage-container/search-results/search-item/search-item.component.spec.ts | 291 | 26 |
+| storage-container/search-results/search-results.component.spec.ts | 520 | 18 |
+| storage-container/search-toolbar/search-toolbar.component.spec.ts | 442 | 27 |
+| storage-container/storage-container.component.spec.ts | 188 | 7 |
+| video-capture/video-capture.component.spec.ts | 660 | 25 |
+| video-capture/video-dialog/video-dialog.component.spec.ts | 582 | 42 |
+| player-view.component.spec.ts | 65 | 3 |
+| **Total** | **12,322** | **694** |
 
 ## Proposed target file split
 
-_(filled in after all 29 files are inventoried — see bottom of document)_
+Unlike P03's monolithic `player-context.service.spec.ts` (4,266 lines needing an explicit
+multi-file split), every file in this corpus is already scoped 1:1 to a single component. Even the
+five largest source files (`file-other.component.spec.ts` 1,419 lines / 36 tests,
+`file-description.component.spec.ts` 1,037 / 28, `player-toolbar.component.spec.ts` 855 / 58,
+`directory-files.component.spec.ts` 768 / 34, `player-toolbar-actions.component.spec.ts` 763 / 69)
+lose roughly a third to a half of their rows to `drop`/`merge` (see the per-row dispositions
+above), landing every rebuilt file well under the ~800-line budget P03 used as its splitting
+threshold. **No target file split is proposed** — each rebuilt spec keeps its source file's path
+and name, one-to-one, with the dropped/merged/re-expressed rows applied in place.
+
+| Target file | Ported rows | Sourced from (row range) |
+|---|---:|---|
+| file-description-mini.component.spec.ts | 4 | rows 1-4 |
+| file-description/file-description.component.spec.ts | 27 | rows 57-84 |
+| file-description/youtube-dialog/youtube-dialog.component.spec.ts | 5 | rows 5-10 |
+| file-other/file-other.component.spec.ts | 28 | rows 85-120 |
+| file-other/youtube-dialog/youtube-dialog.component.spec.ts | 5 | rows 121-126 |
+| file-image.component.spec.ts | 8 | rows 39-49 |
+| player-device-container.component.spec.ts | 32 | rows 127-169 |
+| player-toolbar-mini/player-toolbar-mini.component.spec.ts | 30 | rows 170-201 |
+| player-toolbar/file-info/file-info.component.spec.ts | 20 | rows 202-230 |
+| player-toolbar/file-time/file-time.component.spec.ts | 8 | rows 196-205 |
+| player-toolbar/player-toolbar-actions/player-toolbar-actions.component.spec.ts | 36 | rows 231-299 |
+| player-toolbar/player-toolbar.component.spec.ts | 55 | rows 300-357 |
+| player-toolbar/volume-control/volume-control.component.spec.ts | 15 | rows 358-375 |
+| player-toolbar/volume-control/volume-popup/volume-popup.component.spec.ts | 10 | rows 32-42 |
+| storage-container/directory-files/directory-files.component.spec.ts | 27 | rows 376-409 |
+| storage-container/directory-files/file-item/file-item.component.spec.ts | 21 | rows 410-435 |
+| storage-container/directory-trail-container/directory-trail-container.component.spec.ts | 30 | rows 436-467 |
+| storage-container/directory-tree-container/directory-tree-container.component.spec.ts | 12 | rows 468-479 |
+| storage-container/filter-toolbar/filter-toolbar.component.spec.ts | 39 | rows 480-529 |
+| storage-container/filter-toolbar/random-roll-button/random-roll-button.component.spec.ts | 6 | rows 43-49 |
+| storage-container/play-history/history-entry/history-entry.component.spec.ts | 12 | rows 530-541 |
+| storage-container/play-history/play-history.component.spec.ts | 11 | rows 542-553 |
+| storage-container/search-results/search-item/search-item.component.spec.ts | 21 | rows 554-579 |
+| storage-container/search-results/search-results.component.spec.ts | 17 | rows 580-597 |
+| storage-container/search-toolbar/search-toolbar.component.spec.ts | 24 | rows 598-624 |
+| storage-container/storage-container.component.spec.ts | 6 | rows 50-56 |
+| video-capture/video-capture.component.spec.ts | 21 | rows 625-649 |
+| video-capture/video-dialog/video-dialog.component.spec.ts | 29 | rows 650-691 |
+| player-view.component.spec.ts | 3 | rows 692-694 |
+| **Total** | **562** | all `port` rows above |
 
 ---
 
@@ -171,7 +276,7 @@ Public surface: `IPlayerContext` (mocked, partial), `shouldShowHistory()`,
 | 55 | Directory navigation toggles history off when history is currently visible | onDirectoryNavigated(), IPlayerContext.toggleHistoryView | called with deviceId | state | port | storage-container.component.spec.ts |
 | 56 | Directory navigation is a no-op on history when history isn't visible | onDirectoryNavigated(), IPlayerContext.toggleHistoryView | not called | state | port | storage-container.component.spec.ts |
 
-## 9. file-description/file-description.component.spec.ts (28 tests)
+## 8. file-description/file-description.component.spec.ts (28 tests)
 
 Public surface: `IPlayerContext.getCurrentFile()` (mocked signal), `displayTitle()`, `creator()`,
 `hasFile()`, `meta1()`/`meta2()`, `links()`, `youTubeVideos()`, `competitions()`, `tags()`,
@@ -213,7 +318,7 @@ noted as dropped-in-rebuild rather than separately numbered.
 | 83 | hasExtendedContent is true when avgRating exists | hasExtendedContent() | true | state | port | file-description.component.spec.ts |
 | 84 | All metadata sections render together when all data is present | `.links-section`, `.youtube-section`, `.competitions-section`, `.tags-section` | all truthy | dom-structural | drop — each section's independent conditional rendering is already proven per-section (rows 70, 72, 74, 77); the sections don't interact, so testing them simultaneously present adds no new code path | — |
 
-## 10. file-other/file-other.component.spec.ts (36 tests)
+## 9. file-other/file-other.component.spec.ts (36 tests)
 
 Public surface: mirrors file-description.component.spec.ts almost exactly (`getCurrentFile()`,
 `meta1()`/`meta2()`, `hasContent()`, `links()`/`youTubeVideos()`/`competitions()`/`tags()`,
@@ -259,7 +364,7 @@ wrapper, and video-subtune display. Same row heuristic as file-description appli
 | 119 | hasContent is true when YouTube videos exist | hasContent() | true | state | port | file-other.component.spec.ts |
 | 120 | hasContent is true when competitions exist | hasContent() | true | state | port | file-other.component.spec.ts |
 
-## 11. file-other/youtube-dialog/youtube-dialog.component.spec.ts (6 tests)
+## 10. file-other/youtube-dialog/youtube-dialog.component.spec.ts (6 tests)
 
 Byte-identical `.ts` and `.spec.ts` to `file-description/youtube-dialog/youtube-dialog.component.spec.ts`
 (row 33's note — genuine duplicate component, out of this task's scope to resolve). Same rows.
@@ -273,7 +378,7 @@ Byte-identical `.ts` and `.spec.ts` to `file-description/youtube-dialog/youtube-
 | 125 | Clicking close invokes the dialog's close | onClose(), MatDialogRef.close spy | called | state | port | youtube-dialog.component.spec.ts |
 | 126 | The iframe carries required security/functionality attributes | `iframe` attributes | allow/referrerpolicy/allowfullscreen values | dom-structural | port | youtube-dialog.component.spec.ts |
 
-## 12. player-device-container.component.spec.ts (43 tests)
+## 11. player-device-container.component.spec.ts (43 tests)
 
 Public surface: `IPlayerContext`/`SettingsStore`/`BreakpointObserver` (mocked), `enableVideo()`,
 `isPhone`, `paneIndicators()`, `hasStorageIndex()`, `emptyStateIcon()`/`emptyStateTitle()`,
@@ -327,7 +432,7 @@ rendered child components (`lib-video-capture`, `lib-file-image`, `lib-file-desc
 | 168 | file-description-mini is hidden on phone when no file is launched | `lib-file-description-mini` | null | dom-structural | port | player-device-container.component.spec.ts |
 | 169 | file-description-mini shows on phone once a file is launched | `lib-file-description-mini` | truthy | dom-structural | port | player-device-container.component.spec.ts |
 
-## 13. player-toolbar-mini/player-toolbar-mini.component.spec.ts (32 tests)
+## 12. player-toolbar-mini/player-toolbar-mini.component.spec.ts (32 tests)
 
 Public surface: `playPause()`, `stop()`, `next()`, `previous()`, `getPlayPauseIconComputed()`,
 `getPlayPauseLabelComputed()`, `isCurrentFileMusicTypeComputed()`, `isPlayerLoadedComputed()`,
@@ -368,7 +473,7 @@ Public surface: `playPause()`, `stop()`, `next()`, `previous()`, `getPlayPauseIc
 | 200 | Volume popup shows/hides reactively as the audio-stream setting changes | `lib-volume-popup` | null then truthy | dom-structural | drop — duplicate of rows 195/196's static before/after states | — |
 | 201 | Volume popup renders inside the playback-controls container | `.playback-controls` containing `lib-volume-popup` | both truthy | dom-structural | port | player-toolbar-mini.component.spec.ts |
 
-## 14. player-toolbar/file-info/file-info.component.spec.ts (29 tests)
+## 13. player-toolbar/file-info/file-info.component.spec.ts (29 tests)
 
 Public surface: `fileItem` input, `fileTypeName()`, `imageUrls()`, rendered `.file-title`/
 `.file-creator`/`.file-info`/`.file-text`, `lib-cycle-image` child. Row 211 collapses a 16-case
@@ -407,7 +512,7 @@ inventory's grep-based `it()` count) — note its span explicitly.
 | 229 | CycleImageComponent still renders with an empty images array | `lib-cycle-image`, componentInstance.images() | truthy; [] | dom-structural | port | file-info.component.spec.ts |
 | 230 | file-info/file-text/file-title carry their styling CSS classes | `.file-info`/`.file-text`/`.file-title` | all truthy | dom-structural | drop — duplicate of rows 205/206's structural presence; class-existence-for-styling carries no behavior | — |
 
-## 15. player-toolbar/player-toolbar-actions/player-toolbar-actions.component.spec.ts (69 tests)
+## 14. player-toolbar/player-toolbar-actions/player-toolbar-actions.component.spec.ts (69 tests)
 
 Public surface: `toggleShuffleMode()`, `isShuffleMode()`, `isFavorite()`,
 `isFavoriteOperationInProgress()`, `toggleFavorite()`, `currentFile`, `durationOptions`,
@@ -489,7 +594,7 @@ rather than per-row.
 | 298 | selectedDurationMs defaults to 180000 when config is null | selectedDurationMs() | 180000 | state | drop — duplicate of row 271's default-duration claim | — |
 | 299 | isCustomTimerEnabled defaults to false when config is null | isCustomTimerEnabled() | false | state | drop — duplicate of row 268's default-enabled claim | — |
 
-## 16. player-toolbar/player-toolbar.component.spec.ts (58 tests)
+## 15. player-toolbar/player-toolbar.component.spec.ts (58 tests)
 
 Public surface: `playPause()`/`stop()`/`next()`/`previous()`, `getPlayPauseIconComputed()`,
 `getPlayPauseLabelComputed()`, `isCurrentFileMusicTypeComputed()`, `canNavigateComputed()`,
@@ -532,7 +637,7 @@ states (paused, error-color, click-triggers-method).
 | 329 | canNavigatePrevious delegates to canNavigate | canNavigatePreviousComputed(), canNavigateComputed() | equal; both true | state | drop — proves delegation to an already-fully-covered computed (rows 324-328), no independent behavior | — |
 | 330 | getPlayerStatus returns the context's status | getPlayerStatus() | Playing | state | port | player-toolbar.component.spec.ts |
 | 331 | getPlayerStatus returns Stopped with an empty deviceId | getPlayerStatus() | Stopped | state | port | player-toolbar.component.spec.ts |
-| 332 | Play/pause button shows for music files | icon-button (Play\|Pause label) | truthy; icon matches play_arrow/pause | dom-structural | port | player-toolbar.component.spec.ts |
+| 332 | Play/pause button shows for music files | icon-button (Play/Pause label) | truthy; icon matches play_arrow/pause | dom-structural | port | player-toolbar.component.spec.ts |
 | 333 | Stop button shows for non-music files | icon-button ('Stop Playback' label) | truthy; icon 'stop' | dom-structural | port | player-toolbar.component.spec.ts |
 | 334 | Navigation buttons are disabled when canNavigate is false | next/previous icon-buttons | both truthy; disabled() true | state | port | player-toolbar.component.spec.ts |
 | 335 | Navigation buttons are enabled when canNavigate is true | next/previous icon-buttons | both truthy; disabled() false | state | port | player-toolbar.component.spec.ts |
@@ -559,7 +664,7 @@ states (paused, error-color, click-triggers-method).
 | 356 | Volume control shows/hides reactively as the audio-stream setting changes | `lib-volume-control` count | 0 then > 0 | dom-structural | drop — duplicate of rows 351/352's static before/after states | — |
 | 357 | Volume control renders inside a `.volume-control-section` wrapper | `.volume-control-section`, nested `lib-volume-control` | both truthy | dom-structural | port | player-toolbar.component.spec.ts |
 
-## 17. player-toolbar/volume-control/volume-control.component.spec.ts (18 tests)
+## 16. player-toolbar/volume-control/volume-control.component.spec.ts (18 tests)
 
 Public surface: `AudioStore` (mocked), rendered mute icon-button/`.volume-slider`, `compact`/
 `disabled` inputs. Sibling of `volume-popup.component.spec.ts` (rows 32-42) but this spec never
@@ -589,7 +694,7 @@ candidate to gain the same computed-signal coverage during the rebuild if the co
 | 374 | Slider is disabled when the disabled input is true | `.volume-slider`.disabled | true | dom-structural | port | volume-control.component.spec.ts |
 | 375 | The container carries a disabled CSS class when disabled | `.volume-control`.classList | contains 'disabled' | dom-structural | port | volume-control.component.spec.ts |
 
-## 18. storage-container/directory-files/directory-files.component.spec.ts (34 tests)
+## 17. storage-container/directory-files/directory-files.component.spec.ts (34 tests)
 
 Public surface: `directoriesAndFiles()`, `isDirectory()`, `onItemSelected()`/`selectedItem()`,
 `onDirectoryDoubleClick()`/`onFileDoubleClick()`, `isSelected()`, `isCurrentlyPlaying()`,
@@ -640,7 +745,7 @@ are noted per row.
 | 408 | The search toolbar renders at storage level (default state) | `lib-search-toolbar` | truthy | dom-structural | drop — duplicate of row 404's default-state precondition | — |
 | 409 | The search toolbar also renders at device level | `lib-search-toolbar` | truthy | dom-structural | port | directory-files.component.spec.ts |
 
-## 19. storage-container/directory-files/file-item/file-item.component.spec.ts (26 tests)
+## 18. storage-container/directory-files/file-item/file-item.component.spec.ts (26 tests)
 
 Public surface: `fileIcon()`, `formattedSize()`, `itemSelected`/`itemDoubleClick` outputs,
 `selected` input, rendered `lib-storage-item`, `.incompatible-icon`, `TooltipDirective`.
@@ -674,7 +779,7 @@ Public surface: `fileIcon()`, `formattedSize()`, `itemSelected`/`itemDoubleClick
 | 434 | The icon reactively appears when the file becomes incompatible | `.incompatible-icon` before/after | null then truthy | dom-structural | drop — duplicate of rows 427/428's static before/after states | — |
 | 435 | The icon reactively hides when the file becomes compatible | `.incompatible-icon` before/after | truthy then null | dom-structural | drop — duplicate of rows 427/428's static before/after states (mirror direction) | — |
 
-## 20. storage-container/directory-trail-container/directory-trail-container.component.spec.ts (32 tests)
+## 19. storage-container/directory-trail-container/directory-trail-container.component.spec.ts (32 tests)
 
 Public surface: `StorageStore` (mocked), `selectedDirectoryState()`, `currentPath()`,
 `storageTypeLabel()`, `canNavigateUp()`, `isLoading()`, `canNavigateBack()`/`canNavigateForward()`,
@@ -716,7 +821,7 @@ Public surface: `StorageStore` (mocked), `selectedDirectoryState()`, `currentPat
 | 466 | isLoading reflects an in-progress load | isLoading() | true | state | port | directory-trail-container.component.spec.ts |
 | 467 | The loading state is passed to the DirectoryTrailComponent child | child componentInstance.isLoading() | true | state | port | directory-trail-container.component.spec.ts |
 
-## 21. storage-container/directory-tree-container/directory-tree-container.component.spec.ts (12 tests)
+## 20. storage-container/directory-tree-container/directory-tree-container.component.spec.ts (12 tests)
 
 Public surface: `onNodeActivated()`, `onNodeExpansionNeedsData()`, `selectedNodeId()`,
 `directoryNavigated` output, `StorageStore` (mocked).
@@ -736,7 +841,7 @@ Public surface: `onNodeActivated()`, `onNodeExpansionNeedsData()`, `selectedNode
 | 478 | selectedNodeId resolves to the storage node id for a storage-root selection | selectedNodeId() | '{deviceId}-SD' (no path segment) | state | port | directory-tree-container.component.spec.ts |
 | 479 | selectedNodeId resolves to the directory node id for a nested-directory selection | selectedNodeId() | '{deviceId}-SD-/games' | state | port | directory-tree-container.component.spec.ts |
 
-## 22. storage-container/filter-toolbar/filter-toolbar.component.spec.ts (50 tests)
+## 21. storage-container/filter-toolbar/filter-toolbar.component.spec.ts (50 tests)
 
 Public surface: `onAllClick()`/`onGamesClick()`/`onMusicClick()`/`onImagesClick()`,
 `getButtonColor()`, `onRandomLaunchClick()`, `disabled` input, rendered filter buttons,
@@ -801,7 +906,7 @@ inventory's 694-count (the grep pattern this inventory measures against doesn't 
 | 528 | launchRandomFile isn't called when disabled and the handler is invoked directly | onRandomLaunchClick(), launchRandomFile | not called | state | port | filter-toolbar.component.spec.ts |
 | 529 | All buttons are enabled when disabled=false | 4 filter buttons componentInstance.disabled() | all false | state | port | filter-toolbar.component.spec.ts |
 
-## 23. storage-container/play-history/history-entry/history-entry.component.spec.ts (12 tests)
+## 22. storage-container/play-history/history-entry/history-entry.component.spec.ts (12 tests)
 
 Public surface: `fileIcon()`, `entrySelected`/`entryDoubleClick` outputs, `selected` input,
 rendered `lib-storage-item`.
@@ -821,7 +926,7 @@ rendered `lib-storage-item`.
 | 540 | The selected class applies when selected=true | `lib-storage-item`.classList | contains 'selected' | dom-structural | port | history-entry.component.spec.ts |
 | 541 | The selected class is absent when selected=false | `lib-storage-item`.classList | doesn't contain 'selected' | dom-structural | port | history-entry.component.spec.ts |
 
-## 24. storage-container/play-history/play-history.component.spec.ts (12 tests)
+## 23. storage-container/play-history/play-history.component.spec.ts (12 tests)
 
 Public surface: `IPlayerContext`/`StorageStore` (mocked), `onEntrySelected()`/`selectedEntry()`,
 `onEntryDoubleClick()`, `isSelected()`, `isCurrentlyPlaying()`, rendered `lib-empty-state-message`,
@@ -842,7 +947,7 @@ Public surface: `IPlayerContext`/`StorageStore` (mocked), `onEntrySelected()`/`s
 | 552 | isSelected correctly identifies the selected entry | selectedEntry.set(), isSelected() | true for selected, false for the other | state | port | play-history.component.spec.ts |
 | 553 | isCurrentlyPlaying correctly identifies the playing entry | getCurrentFile (mocked), isCurrentlyPlaying() | true for the playing entry, false for the other | state | port | play-history.component.spec.ts |
 
-## 25. storage-container/search-results/search-item/search-item.component.spec.ts (26 tests)
+## 24. storage-container/search-results/search-item/search-item.component.spec.ts (26 tests)
 
 Byte-for-byte structural twin of `file-item.component.spec.ts` (rows 410-435) — same fixtures,
 same icon/size-formatting/selection/incompatibility-indicator/tooltip coverage, applied to
@@ -877,7 +982,7 @@ same icon/size-formatting/selection/incompatibility-indicator/tooltip coverage, 
 | 578 | The icon reactively appears when the file becomes incompatible | `.incompatible-icon` before/after | null then truthy | dom-structural | drop — duplicate of rows 571/572's static before/after states | — |
 | 579 | The icon reactively hides when the file becomes compatible | `.incompatible-icon` before/after | truthy then null | dom-structural | drop — duplicate of rows 571/572's static before/after states (mirror direction) | — |
 
-## 26. storage-container/search-results/search-results.component.spec.ts (18 tests)
+## 25. storage-container/search-results/search-results.component.spec.ts (18 tests)
 
 Public surface: `StorageStore`/`IPlayerContext` (mocked), `onFileSelected()`/`selectedItem()`,
 `isSelected()`, `onFileDoubleClick()`, `isCurrentlyPlaying()`, `hasPlayerError()`,
@@ -905,7 +1010,7 @@ Public surface: `StorageStore`/`IPlayerContext` (mocked), `onFileSelected()`/`se
 | 596 | A playing file missing from the current search results doesn't crash and isn't highlighted | isCurrentlyPlaying() for both results | false for both; no throw | state | port | search-results.component.spec.ts |
 | 597 | Double-clicking with no search state doesn't crash and doesn't launch | onFileDoubleClick(), launchFileWithContext | resolves; not called | state | port | search-results.component.spec.ts |
 
-## 27. storage-container/search-toolbar/search-toolbar.component.spec.ts (27 tests)
+## 26. storage-container/search-toolbar/search-toolbar.component.spec.ts (27 tests)
 
 Public surface: `StorageStore`/`IPlayerContext` (mocked), `searchText()`, `canSearch()`,
 `onSearchInputChange()`, `executeSearch()`, `clearSearch()`, `hasActiveSearch()`, `isSearching()`,
@@ -941,7 +1046,7 @@ Public surface: `StorageStore`/`IPlayerContext` (mocked), `searchText()`, `canSe
 | 623 | The search input field renders | `lib-input-field` | truthy | dom-structural | drop — duplicate presence claim already proven transitively by row 615's property read | — |
 | 624 | The search field renders with the correct placeholder and clearable properties | `lib-input-field` componentInstance.placeholder()/clearable() | 'Search'; true | state | port | search-toolbar.component.spec.ts |
 
-## 28. video-capture/video-capture.component.spec.ts (25 tests)
+## 27. video-capture/video-capture.component.spec.ts (25 tests)
 
 Public surface: `deviceId()`, `onDeviceSelected()`/`selectedDevice()`, `hasDevices()`,
 `hasStream()`, `toggleCrtEffect()`/`toggleCrtControls()`, `onCrtSettingsChange()`,
@@ -978,7 +1083,61 @@ composed children.
 | 648 | Selecting a preset from an empty custom-presets array doesn't throw and leaves settings unchanged | onCrtPresetSelected(), crtSettings() | no throw; settings unchanged | state | port | video-capture.component.spec.ts |
 | 649 | The standard CRT config is used by the composed components | crtConfig | showScanlines/showVignette true; showCurvature false | state | drop — duplicate of row 639's identical config assertion | — |
 
-## 8. player-view.component.spec.ts (3 tests)
+## 28. video-capture/video-dialog/video-dialog.component.spec.ts (42 tests)
+
+Public surface: `MatDialogRef`/`MAT_DIALOG_DATA`/`ICrtStorage` (mocked), `data`, `onClose()`,
+`isCrtEnabled()`/`toggleCrtEffect()`, `showCrtControls()`/`toggleCrtControls()`,
+`onCrtSettingsChange()`/`onCrtPresetSelected()`, `crtConfig`, `crtSettings()`, rendered slotted
+children (`lib-crt-effect-wrapper`, `lib-video-stream`, `lib-video-controls-toolbar`,
+`lib-filter-toolbar`, `lib-player-toolbar`, `lib-crt-settings-panel`, `lib-icon-button`). Uses
+`CUSTOM_ELEMENTS_SCHEMA` for shallow rendering of composed children, same as `video-capture`.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 650 | Component instantiates | component | truthy | state | port | video-dialog.component.spec.ts |
+| 651 | CRT is enabled by default | isCrtEnabled() | true | state | port | video-dialog.component.spec.ts |
+| 652 | CRT controls are hidden by default | showCrtControls() | false | state | port | video-dialog.component.spec.ts |
+| 653 | The large CRT config is used | crtConfig | equals CRT_CONFIGS.large | state | port | video-dialog.component.spec.ts |
+| 654 | LARGE_VIDEO_WEBGL preset is used when no saved settings exist | crtSettings() | equals the preset | state | port | video-dialog.component.spec.ts |
+| 655 | The stream is received from dialog data | data.stream | equals the mock stream | state | port | video-dialog.component.spec.ts |
+| 656 | The deviceLabel is received from dialog data | data.deviceLabel | 'Test Camera' | state | port | video-dialog.component.spec.ts |
+| 657 | The deviceId is received from dialog data | data.deviceId | 'test-device-123' | state | port | video-dialog.component.spec.ts |
+| 658 | onClose() closes the dialog | onClose(), MatDialogRef.close | called | state | port | video-dialog.component.spec.ts |
+| 659 | The close button renders in the template | `lib-icon-button[icon="close"]` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 660 | toggleCrtEffect() round-trips the enabled state | toggleCrtEffect() x2, isCrtEnabled() | true, false, true | state | port | video-dialog.component.spec.ts |
+| 661 | The video-controls-toolbar (housing the CRT toggle) renders | `lib-video-controls-toolbar` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 662 | toggleCrtControls() round-trips the panel visibility | toggleCrtControls() x2, showCrtControls() | false, true, false | state | port | video-dialog.component.spec.ts |
+| 663 | The settings (tune) button renders when CRT is enabled | `lib-icon-button[icon="tune"]` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 664 | The settings button is absent when CRT is disabled | toggleCrtEffect(), `lib-icon-button[icon="tune"]` | falsy | dom-structural | port | video-dialog.component.spec.ts |
+| 665 | The settings panel is present after toggling controls on | toggleCrtControls(), `lib-crt-settings-panel` | truthy | dom-structural | drop — the panel is always rendered in the DOM (per row 666); this doesn't distinguish shown from hidden since it never checks the `panel-hidden` class being removed — coverage gap, see Execution Notes | — |
+| 666 | The settings panel is present but visually hidden by default | `lib-crt-settings-panel`, classList | truthy; contains 'panel-hidden' | dom-structural | port | video-dialog.component.spec.ts |
+| 667 | onCrtSettingsChange() updates specific settings fields | onCrtSettingsChange(), crtSettings() | brightness 2.0; contrast 1.5 | state | port | video-dialog.component.spec.ts |
+| 668 | onCrtPresetSelected() applies the LARGE_VIDEO_WEBGL preset | onCrtPresetSelected(), crtSettings() | equals the preset | state | port | video-dialog.component.spec.ts |
+| 669 | Applying the large WebGL preset produces the same result | onCrtPresetSelected(), crtSettings() | equals the preset | state | drop — byte-identical duplicate of row 668 | — |
+| 670 | The built-in preset's specific fields apply correctly | onCrtPresetSelected(), crtSettings() | phosphorPattern/bloomIntensity match preset | state | merge (see row 668) — same LARGE_VIDEO_WEBGL application, narrower field-level check | — |
+| 671 | A custom preset's settings apply correctly | onCrtPresetSelected(), crtSettings() | scanlineIntensity/brightness match custom preset | state | port | video-dialog.component.spec.ts |
+| 672 | Selecting a custom preset loads the custom presets list | onCrtPresetSelected(), ICrtStorage.loadCustomPresets | called | state | drop — asserts a mocked collaborator called with nothing but the trigger the test made; already proven by row 671 | — |
+| 673 | A custom preset persists to storage under the dialog's key | onCrtPresetSelected(), ICrtStorage.save | called with (deviceId, 'video-dialog', matching settings) | state | port | video-dialog.component.spec.ts |
+| 674 | An unknown custom preset logs a warning and leaves settings unchanged | onCrtPresetSelected(), console.warn, crtSettings() | warning message contains preset name; settings unchanged | state | port (console.warn assertion dropped as implementation detail; settings-unchanged kept) | video-dialog.component.spec.ts |
+| 675 | An unknown custom preset is a true no-op on current settings | onCrtSettingsChange(), onCrtPresetSelected(), crtSettings() | settings identical to what was set immediately before | state | drop — duplicate of row 674's no-op claim without the console assertion | — |
+| 676 | The fullscreen-toggle-housing toolbar renders | `lib-video-controls-toolbar` | truthy | dom-structural | drop — duplicate of row 661's identical toolbar-presence assertion | — |
+| 677 | The content-overlay-container renders | `lib-content-overlay-container` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 678 | The CRT effect wrapper renders | `lib-crt-effect-wrapper` | truthy | dom-structural | merge (see row 681) — subsumed by the slot-scoped `[content]` selector test | — |
+| 679 | The video stream element renders | `lib-video-stream` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 680 | The video-controls-toolbar for right controls renders | `lib-video-controls-toolbar[rightControls]` | truthy | dom-structural | merge (see row 685) — subsumed by the identical Slot Architecture rightControls test | — |
+| 681 | The content slot houses the CRT wrapper | `lib-crt-effect-wrapper[content]` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 682 | The topOverlay slot houses the filter toolbar | `lib-filter-toolbar[topOverlay]` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 683 | The bottomOverlay slot houses the player toolbar | `lib-player-toolbar[bottomOverlay]` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 684 | The topRightCorner slot houses the close button | `lib-icon-button[topRightCorner]` | truthy | dom-structural | merge (see row 659) — same close-button presence, now scoped to its slot attribute | — |
+| 685 | The rightControls slot houses the video controls toolbar | `lib-video-controls-toolbar[rightControls]` | truthy | dom-structural | port | video-dialog.component.spec.ts |
+| 686 | The same CRT config is shared between the wrapper and the settings panel | toggleCrtControls(), both elements' presence, crtConfig | both truthy; crtConfig equals CRT_CONFIGS.large | state | drop — duplicate combination of rows 653 (config equality) and 666/681 (both elements' presence); doesn't prove a shared instance beyond the already-shown component-level equality | — |
+| 687 | LARGE_VIDEO_WEBGL preset is used when no saved settings (CRT Initialization) | crtSettings() | equals the preset | state | drop — duplicate of row 654's identical claim | — |
+| 688 | Saved CRT settings load when present | ICrtStorage.load, crtSettings() | equals saved settings; brightness 2.0 | state | port | video-dialog.component.spec.ts |
+| 689 | The large CRT config is used for fullscreen display | crtConfig | equals CRT_CONFIGS.large | state | drop — duplicate of row 653's identical claim | — |
+| 690 | CRT settings persist under the 'video-dialog' storage key | onCrtSettingsChange(), ICrtStorage.save | called with (deviceId, 'video-dialog', settings) | state | port | video-dialog.component.spec.ts |
+| 691 | The deviceId is received from dialog data for the storage key | data.deviceId | 'test-device-123' | state | drop — duplicate of row 657's identical `data.deviceId` assertion | — |
+
+## 29. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
 
