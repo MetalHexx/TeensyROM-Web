@@ -13,6 +13,7 @@ import {
   ALERT_SERVICE,
   IAlertService,
   AlertMessage,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerContextService } from './player-context.service';
 import { PlayerStore } from './player-store';
@@ -1830,6 +1831,66 @@ describe('PlayerContextService - Auto-Advancement (Phase 2)', () => {
       await service.previous(deviceId);
       await nextTick();
       expect(service.getCurrentFile(deviceId)()?.file.name).toBe('song1.sid');
+    });
+  });
+
+  describe('PLAYER_INCOMPATIBLE_RETRY_DELAY_MS override', () => {
+    const deviceId = 'test-device';
+
+    beforeEach(() => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          PlayerContextService,
+          PlayerStore,
+          { provide: PLAYER_SERVICE, useValue: mockPlayerService },
+          { provide: DEVICE_SERVICE, useValue: mockDeviceService },
+          { provide: ALERT_SERVICE, useValue: mockAlertService },
+          { provide: StorageStore, useValue: mockStorageStore },
+          { provide: SettingsStore, useValue: mockSettingsStore },
+          { provide: PLAYER_STORAGE, useValue: mockPlayerStorage },
+          { provide: PLAYER_INCOMPATIBLE_RETRY_DELAY_MS, useValue: 0 },
+        ],
+      });
+      service = TestBed.inject(PlayerContextService);
+      service.initializePlayer(deviceId);
+    });
+
+    it('fires the directory-mode retry on the next macrotask instead of after 1000ms', async () => {
+      const incompatibleFile = createTestFileItem({
+        name: 'incompatible.hex',
+        path: '/games/incompatible.hex',
+        isCompatible: false,
+        type: FileItemType.Hex,
+      });
+      const compatibleFile = createTestFileItem({
+        name: 'compatible.sid',
+        path: '/games/compatible.sid',
+        isCompatible: true,
+      });
+      const files = [incompatibleFile, compatibleFile];
+
+      mockPlayerService.launchFile
+        .mockReturnValueOnce(of(incompatibleFile))
+        .mockReturnValueOnce(of(compatibleFile));
+
+      await service.launchFileWithContext({
+        deviceId,
+        file: incompatibleFile,
+        directoryPath: '/games',
+        files,
+        launchMode: LaunchMode.Directory,
+      });
+
+      // No real timer advancement needed: the retry delay is overridden to 0,
+      // so the retry resolves on the next macrotask.
+      await nextTick();
+      await nextTick();
+
+      expect(mockPlayerService.launchFile).toHaveBeenCalledTimes(2);
+      const currentFile = service.getCurrentFile(deviceId)();
+      expect(currentFile?.file.name).toBe('compatible.sid');
+      expect(currentFile?.isCompatible).toBe(true);
     });
   });
 });

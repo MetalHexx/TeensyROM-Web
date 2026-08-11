@@ -12,6 +12,7 @@ import {
   ALERT_SERVICE,
   IAlertService,
   PLAYER_LAUNCH_DELAY_MS,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerStore, LaunchedFile, HistoryEntry } from './player-store';
 import { StorageStore } from '../storage/storage-store';
@@ -38,6 +39,7 @@ export class PlayerContextService implements IPlayerContext {
   private readonly playerStorage = inject(PLAYER_STORAGE);
   private readonly injector = inject(Injector);
   private readonly launchDelayMs = inject(PLAYER_LAUNCH_DELAY_MS);
+  private readonly incompatibleRetryDelayMs = inject(PLAYER_INCOMPATIBLE_RETRY_DELAY_MS);
 
   // Constant null signal to return when no timer exists (avoids NG0602 in reactive contexts)
   private readonly nullTimerSignal: Signal<TimerState | null> = signal<TimerState | null>(
@@ -1032,7 +1034,7 @@ export class PlayerContextService implements IPlayerContext {
       );
       setTimeout(() => {
         void this.launchRandomFile(deviceId);
-      }, 1000);
+      }, this.incompatibleRetryDelayMs);
     } else {
       // Directory or Search modes
       logInfo(
@@ -1041,7 +1043,7 @@ export class PlayerContextService implements IPlayerContext {
       );
       setTimeout(() => {
         void this.advanceToNextCompatibleFileInDirectory(deviceId);
-      }, 1000);
+      }, this.incompatibleRetryDelayMs);
     }
   }
 

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { PLAYER_TIMER_TICK_MS } from '@teensyrom-nx/domain';
 import { TimerService } from './timer.service';
 
 describe('TimerService', () => {
@@ -377,6 +378,42 @@ describe('TimerService', () => {
       expect(service.currentTime).toBeGreaterThan(0);
       expect(service.currentTime).toBeLessThan(1000);
       expect(service.isRunning).toBe(true);
+    });
+  });
+
+  describe('overridden tick interval', () => {
+    let overriddenService: TimerService;
+
+    beforeEach(() => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [TimerService, { provide: PLAYER_TIMER_TICK_MS, useValue: 0 }],
+      });
+      overriddenService = TestBed.inject(TimerService);
+    });
+
+    afterEach(() => {
+      overriddenService.ngOnDestroy();
+    });
+
+    it('ticks on the next macrotask instead of waiting for the default interval', async () => {
+      overriddenService.start(10);
+
+      await waitForTime(10);
+
+      expect(overriddenService.currentTime).toBeGreaterThan(0);
+    });
+
+    it('still reaches completion instead of looping forever at +0', async () => {
+      const completionSpy = vi.fn();
+      overriddenService.completion$.subscribe(() => completionSpy());
+
+      overriddenService.start(3);
+
+      await waitForTime(50);
+
+      expect(completionSpy).toHaveBeenCalled();
+      expect(overriddenService.isRunning).toBe(false);
     });
   });
 });
