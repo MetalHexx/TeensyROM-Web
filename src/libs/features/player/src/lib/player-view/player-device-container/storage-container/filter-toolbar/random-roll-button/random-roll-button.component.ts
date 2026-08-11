@@ -48,8 +48,6 @@ export class RandomRollButtonComponent {
       target.parentElement?.querySelector(COMPONENT_CONSTANTS.SELECTORS.MAT_ICON) ||
       target.querySelector(COMPONENT_CONSTANTS.SELECTORS.MAT_ICON);
 
-    console.log('Animation target found:', matIcon);
-
     if (matIcon) {
       // Remove existing animation class if present
       matIcon.classList.remove(COMPONENT_CONSTANTS.CSS_CLASSES.DICE_ROLL);

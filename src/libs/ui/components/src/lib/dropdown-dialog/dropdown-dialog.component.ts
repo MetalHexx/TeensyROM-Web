@@ -100,7 +100,6 @@ export class DropdownDialogComponent {
           const rect = overlayPane.getBoundingClientRect();
           const fullscreenRect = fullscreenElement.getBoundingClientRect();
           
-          console.log('Moving overlay pane to fullscreen element');
           fullscreenElement.appendChild(overlayPane);
           
           // Reapply position relative to fullscreen container
@@ -111,7 +110,6 @@ export class DropdownDialogComponent {
           overlayPane.style.bottom = 'auto';
         }
         if (backdrop && !fullscreenElement.contains(backdrop)) {
-          console.log('Moving backdrop to fullscreen element');
           fullscreenElement.appendChild(backdrop);
         }
       }, 0);
@@ -135,7 +133,6 @@ export class DropdownDialogComponent {
       
       if (overlayContainer) {
         if (overlayPane && overlayPane.parentElement !== overlayContainer) {
-          console.log('Moving overlay pane back to container');
           // Reset inline styles when moving back
           overlayPane.style.position = '';
           overlayPane.style.left = '';
@@ -145,7 +142,6 @@ export class DropdownDialogComponent {
           overlayContainer.appendChild(overlayPane);
         }
         if (backdrop && backdrop.parentElement !== overlayContainer) {
-          console.log('Moving backdrop back to container');
           overlayContainer.appendChild(backdrop);
         }
       }

@@ -86,6 +86,22 @@ export default [
     rules: {
       // Disallow explicit 'any' type annotations - prefer unknown or specific types
       '@typescript-eslint/no-explicit-any': 'error',
+      // allow the levels that carry real signal; ban the debug ones
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // Spec files are legitimate console users (test setup/mocks, assertions on output).
+    files: ['**/*.spec.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
+    // log-helper.ts is the workspace logging helper and legitimately wraps console.log.
+    files: ['**/log-helper.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 ];

@@ -1,4 +1,5 @@
 import { CrtSettings } from '@teensyrom-nx/domain';
+import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { PASSTHROUGH_VERTEX_SHADER } from './shaders/passthrough.vert';
 import { SCANLINE_FRAGMENT_SHADER } from './shaders/scanline.frag';
 import { CropAnimator } from './crop-animator';
@@ -603,7 +604,7 @@ export class CrtRenderer {
     };
 
     this.contextRestoredHandler = () => {
-      console.info('CrtRenderer: WebGL context restored, reinitializing');
+      logInfo(LogType.Info, 'CrtRenderer: WebGL context restored, reinitializing');
       this.contextLost = false;
 
       // Reinitialize everything
@@ -900,7 +901,7 @@ export class CrtRenderer {
       this.debugCtx.clearRect(0, 0, this.debugCanvas.width, this.debugCanvas.height);
     }
     
-    console.log(`[CrtRenderer] Debug visualization ${enabled ? 'enabled' : 'disabled'} (press 'D' to toggle)`);
+    logInfo(LogType.Info, `CrtRenderer: Debug visualization ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**

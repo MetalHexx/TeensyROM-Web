@@ -128,8 +128,6 @@ export class VideoCaptureComponent implements OnDestroy {
           label: device.label || `Camera ${device.deviceId.slice(0, 8)}`,
         }));
 
-      console.log('🎥 Video devices found:', videoInputs);
-
       permissionStream.getTracks().forEach((track) => track.stop());
 
       this.videoDevices.set(videoInputs);
@@ -149,25 +147,20 @@ export class VideoCaptureComponent implements OnDestroy {
    */
   private selectInitialDevice(videoInputs: VideoDevice[]): void {
     if (videoInputs.length === 0) {
-      console.log('🎥 No video devices available');
       return;
     }
 
     const teensyDeviceId = this.deviceId();
     const storedVideoDeviceId = this.settingsStore.videoDeviceIdForDevice(teensyDeviceId)();
 
-    console.log('🎥 Looking for stored video device:', storedVideoDeviceId);
-
     const storedDeviceExists = storedVideoDeviceId &&
       videoInputs.some(d => d.deviceId === storedVideoDeviceId);
 
     if (storedDeviceExists) {
-      console.log('🎥 Using stored video device:', storedVideoDeviceId);
       this.selectedDeviceId.set(storedVideoDeviceId);
       setTimeout(() => this.switchToDevice(storedVideoDeviceId), 100);
     } else {
       const firstDevice = videoInputs[0];
-      console.log('🎥 Stored device not found, falling back to first device:', firstDevice.deviceId);
       this.selectedDeviceId.set(firstDevice.deviceId);
       setTimeout(() => this.switchToDevice(firstDevice.deviceId), 100);
     }
@@ -179,26 +172,16 @@ export class VideoCaptureComponent implements OnDestroy {
    */
   private async switchToDevice(deviceId: string): Promise<void> {
     try {
-      console.log('🎥 Switching to device:', deviceId);
-
       const currentStream = this.currentStream();
       if (currentStream) {
-        console.log('🎥 Stopping current stream...');
         currentStream.getTracks().forEach((track) => track.stop());
       }
 
-      console.log('🎥 Requesting stream from device:', deviceId);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: deviceId } },
         audio: false,
       });
 
-      const videoTrack = stream.getVideoTracks()[0];
-      console.log('🎥 Stream acquired:', videoTrack?.label);
-      console.log('🎥 Video track settings:', videoTrack?.getSettings());
-      console.log('🎥 Video track enabled:', videoTrack?.enabled);
-      console.log('🎥 Video track ready state:', videoTrack?.readyState);
-      
       this.currentStream.set(stream);
     } catch (error) {
       console.error('🎥 Failed to switch video device:', error);
@@ -213,12 +196,10 @@ export class VideoCaptureComponent implements OnDestroy {
    * Handle device selection from dropdown
    */
   onDeviceSelected(videoDeviceId: string): void {
-    console.log('🎥 User selected device:', videoDeviceId);
     this.selectedDeviceId.set(videoDeviceId);
     this.switchToDevice(videoDeviceId);
 
     const teensyDeviceId = this.deviceId();
-    console.log('🎥 Persisting video device selection for TeensyROM device:', teensyDeviceId);
     this.settingsStore.updateDeviceVideoDeviceId({
       deviceId: teensyDeviceId,
       videoDeviceId,

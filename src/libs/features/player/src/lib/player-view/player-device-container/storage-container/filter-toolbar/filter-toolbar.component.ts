@@ -129,9 +129,7 @@ export class FilterToolbarComponent {
 
   async onRandomLaunchClick(): Promise<void> {
     if (this.disabled()) return;
-    console.log('🚀 LaunchRandomFile method called!');
     const deviceId = this.deviceId();
-    console.log('📱 Device ID:', deviceId);
 
     if (deviceId) {
       try {
@@ -139,8 +137,6 @@ export class FilterToolbarComponent {
       } catch (error) {
         console.error('Failed to launch random file:', error);
       }
-    } else {
-      console.log('❌ No device ID provided, skipping launch');
     }
   }
 }
