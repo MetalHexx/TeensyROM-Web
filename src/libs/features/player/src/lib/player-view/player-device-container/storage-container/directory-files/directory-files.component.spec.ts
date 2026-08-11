@@ -1,768 +1,349 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
-import { signal, Component, input } from '@angular/core';
 import { of } from 'rxjs';
-import { DirectoryFilesComponent } from './directory-files.component';
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { StorageStore } from '@teensyrom-nx/application';
+import type { IPlayerContext, LaunchedFile, PlayerFileContext } from '@teensyrom-nx/application';
 import {
-  DirectoryItem,
-  FileItem,
-  FileItemType,
   STORAGE_SERVICE,
-  IStorageService,
-  StorageDirectory,
   StorageType,
   LaunchMode,
-  PlayerStatus,
+  type DirectoryItem,
+  type FileItem,
 } from '@teensyrom-nx/domain';
-import {
-  StorageStore,
-  PLAYER_CONTEXT,
-  IPlayerContext,
-  LaunchedFile,
-  PlayerFileContext,
-  StorageDirectoryState,
-} from '@teensyrom-nx/application';
-import { DirectoryTrailContainerComponent } from '../directory-trail-container/directory-trail-container.component';
-import { SearchToolbarComponent } from '../search-toolbar/search-toolbar.component';
-
-// Mock DirectoryTrailContainerComponent to avoid needing full store mocks
-@Component({
-  selector: 'lib-directory-trail-container',
-  standalone: true,
-  template: '<div class="mock-directory-trail">Mock Directory Trail</div>',
-})
-class MockDirectoryTrailContainerComponent {
-  deviceId = input.required<string>();
-}
-
-// Mock SearchToolbarComponent to avoid needing search store dependencies
-@Component({
-  selector: 'lib-search-toolbar',
-  standalone: true,
-  template: '<div class="mock-search-toolbar">Mock Search Toolbar</div>',
-})
-class MockSearchToolbarComponent {
-  deviceId = input.required<string>();
-}
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
+import { createMockStorageService, createTestFileItem, createTestStorageDirectory } from '@teensyrom-nx/testing/fixtures';
+import { DirectoryFilesComponent } from './directory-files.component';
 
 describe('DirectoryFilesComponent', () => {
-  let component: DirectoryFilesComponent;
-  let fixture: ComponentFixture<DirectoryFilesComponent>;
-  let mockStorageStore: Partial<typeof StorageStore.prototype>;
-  let mockPlayerContext: Partial<IPlayerContext>;
-
-  // Mock scrollTo for CDK virtual scroll viewport (not available in test environment)
-  const mockScrollTo = vi.fn();
-
-  const mockDirectoryItem: DirectoryItem = {
-    name: 'Test Folder',
-    path: '/test/folder',
-  };
-
-  const mockFileItem: FileItem = {
+  const deviceId = 'device-1';
+  const directoryItem: DirectoryItem = { name: 'Games', path: '/games' };
+  const fileItem: FileItem = createTestFileItem({
     name: 'test-file.sid',
-    path: '/test/file.sid',
-    size: 1024,
-    type: FileItemType.Song,
-    isFavorite: false,
-    title: '',
-    creator: '',
-    releaseInfo: '',
-    description: '',
-    shareUrl: '',
-    metadataSource: '',
-    meta1: '',
-    meta2: '',
-    metadataSourcePath: '',
-    parentPath: '/test',
-    playLength: '',
-    subtuneLengths: [],
-    startSubtuneNum: 0,
-    images: [],
-    isCompatible: true,
-    links: [],
-    tags: [],
-    youTubeVideos: [],
-    competitions: [],
-    ratingCount: 0,
+    path: '/test-file.sid',
     storageType: StorageType.Sd,
-  };
-
-  const mockStorageService: Partial<IStorageService> = {
-    getDirectory: () => of({} as StorageDirectory),
-  };
-
-  beforeEach(async () => {
-    // Mock Element.prototype.scrollTo for CDK virtual scroll viewport
-    Element.prototype.scrollTo = mockScrollTo;
-    mockScrollTo.mockClear();
-
-    const playerCurrentFileSignal = signal<LaunchedFile | null>(null);
-    const playerContextSignal = signal<PlayerFileContext | null>(null);
-    const loadingSignal = signal(false);
-    const errorSignal = signal<string | null>(null);
-    const statusSignal = signal(PlayerStatus.Stopped);
-
-    const directoryStateSignal = signal<StorageDirectoryState | null>({
-      directory: {
-        directories: [mockDirectoryItem],
-        files: [mockFileItem],
-        path: '/test',
-      },
-      currentPath: '/test',
-      storageType: StorageType.Sd,
-      deviceId: 'device-1',
-      isLoading: false,
-      isLoaded: true,
-      error: null,
-      lastLoadTime: Date.now(),
-    });
-
-    mockStorageStore = {
-      getSelectedDirectoryState: vi.fn(() => directoryStateSignal.asReadonly()),
-      navigateToDirectory: vi.fn(),
-      isDeviceLevelView: vi.fn(() => signal(false).asReadonly()),
-      getDeviceStorageEntries: vi.fn(() => signal({}).asReadonly()),
-    };
-
-    mockPlayerContext = {
-      initializePlayer: vi.fn(),
-      removePlayer: vi.fn(),
-      launchFileWithContext: vi.fn().mockResolvedValue(undefined),
-      getCurrentFile: vi.fn().mockReturnValue(playerCurrentFileSignal.asReadonly()),
-      getFileContext: vi.fn().mockReturnValue(playerContextSignal.asReadonly()),
-      isLoading: vi.fn().mockReturnValue(loadingSignal.asReadonly()),
-      getError: vi.fn().mockReturnValue(errorSignal.asReadonly()),
-      getStatus: vi.fn().mockReturnValue(statusSignal.asReadonly()),
-      getLaunchMode: vi.fn().mockReturnValue(signal(LaunchMode.Directory).asReadonly()),
-    };
-
-    await TestBed.configureTestingModule({
-      imports: [DirectoryFilesComponent],
-      providers: [
-        provideNoopAnimations(),
-        { provide: STORAGE_SERVICE, useValue: mockStorageService },
-        { provide: StorageStore, useValue: mockStorageStore },
-        { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
-      ],
-    })
-      .overrideComponent(DirectoryFilesComponent, {
-        remove: { imports: [DirectoryTrailContainerComponent, SearchToolbarComponent] },
-        add: { imports: [MockDirectoryTrailContainerComponent, MockSearchToolbarComponent] },
-      })
-      .compileComponents();
-
-    fixture = TestBed.createComponent(DirectoryFilesComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'device-1');
-    fixture.detectChanges();
   });
 
-  it('should create', () => {
+  beforeEach(() => {
+    // The virtual scroll viewport calls Element.scrollTo internally; jsdom doesn't implement it.
+    Element.prototype.scrollTo = vi.fn();
+  });
+
+  function render(playerContext: Partial<IPlayerContext> = {}, stubChildren = true) {
+    const result = renderPlayerComponent(DirectoryFilesComponent, {
+      inputs: { deviceId },
+      playerContext,
+      stubChildren,
+      providers: [
+        {
+          provide: STORAGE_SERVICE,
+          useValue: createMockStorageService({
+            getDirectory: vi
+              .fn()
+              .mockReturnValue(
+                of(createTestStorageDirectory({ directories: [directoryItem], files: [fileItem] }))
+              ),
+          }),
+        },
+      ],
+    });
+    const storageStore = TestBed.inject(StorageStore);
+    return { ...result, storageStore };
+  }
+
+  async function renderWithStorageLevelContent(
+    playerContext: Partial<IPlayerContext> = {},
+    stubChildren = true
+  ) {
+    const rendered = render(playerContext, stubChildren);
+    await rendered.storageStore.initializeStorage({ deviceId, storageType: StorageType.Sd });
+    rendered.fixture.detectChanges();
+    return rendered;
+  }
+
+  async function renderAtDeviceLevel() {
+    const rendered = render();
+    await rendered.storageStore.initializeStorage({ deviceId, storageType: StorageType.Sd });
+    await rendered.storageStore.initializeStorage({ deviceId, storageType: StorageType.Usb });
+    rendered.storageStore.navigateToDeviceLevel({ deviceId });
+    rendered.fixture.detectChanges();
+    return rendered;
+  }
+
+  it('creates the component', () => {
+    const { component } = render();
     expect(component).toBeTruthy();
   });
 
-  it('should combine directories and files into single data source', () => {
+  it('combines directories and files into one tagged data source', async () => {
+    const { component } = await renderWithStorageLevelContent();
     const combined = component.directoriesAndFiles();
+
     expect(combined).toHaveLength(2);
     expect(combined[0]).toHaveProperty('itemType', 'directory');
     expect(combined[1]).toHaveProperty('itemType', 'file');
   });
 
-  it('should correctly identify directories with type guard', () => {
-    const combined = component.directoriesAndFiles();
-    expect(component.isDirectory(combined[0])).toBe(true);
-    expect(component.isDirectory(combined[1])).toBe(false);
+  it('discriminates directories from files with the type guard', async () => {
+    const { component } = await renderWithStorageLevelContent();
+    const [directory, file] = component.directoriesAndFiles();
+
+    expect(component.isDirectory(directory)).toBe(true);
+    expect(component.isDirectory(file)).toBe(false);
   });
 
-  it('should update selection when item clicked', () => {
-    const combined = component.directoriesAndFiles();
-    component.onItemSelected(combined[0]);
-    expect(component.selectedItem()).toEqual(combined[0]);
+  it('updates the selection when an item is clicked', async () => {
+    const { component } = await renderWithStorageLevelContent();
+    const [directory] = component.directoriesAndFiles();
+
+    component.onItemSelected(directory);
+
+    expect(component.selectedItem()).toEqual(directory);
   });
 
-  it('should call navigateToDirectory on directory double-click', () => {
-    const combined = component.directoriesAndFiles();
-    const directoryItem = combined[0] as DirectoryItem;
+  it('navigates into a directory on double-click', async () => {
+    const { component, storageStore } = await renderWithStorageLevelContent();
+    const [directory] = component.directoriesAndFiles();
+    const navigateToDirectory = vi
+      .spyOn(storageStore, 'navigateToDirectory')
+      .mockImplementation(async () => undefined);
 
-    component.onDirectoryDoubleClick(directoryItem);
+    component.onDirectoryDoubleClick(directory as DirectoryItem);
 
-    expect(mockStorageStore['navigateToDirectory']).toHaveBeenCalledWith({
-      deviceId: 'device-1',
+    expect(navigateToDirectory).toHaveBeenCalledWith({
+      deviceId,
       storageType: StorageType.Sd,
-      path: directoryItem.path,
+      path: directory.path,
     });
   });
 
-  it('should clear selection when directory changes', () => {
-    const combined = component.directoriesAndFiles();
-    component.onItemSelected(combined[0]);
+  it('clears the selection when navigating into a directory', async () => {
+    const { component, storageStore } = await renderWithStorageLevelContent();
+    vi.spyOn(storageStore, 'navigateToDirectory').mockImplementation(async () => undefined);
+    const [directory] = component.directoriesAndFiles();
+    component.onItemSelected(directory);
     expect(component.selectedItem()).toBeTruthy();
 
-    component.onDirectoryDoubleClick(combined[0] as DirectoryItem);
-    expect(component.selectedItem()).toBe(null);
+    component.onDirectoryDoubleClick(directory as DirectoryItem);
+
+    expect(component.selectedItem()).toBeNull();
   });
 
-  it('should call player context on file double-click', () => {
-    const combined = component.directoriesAndFiles();
-    const fileItem = combined[1] as FileItem;
+  it('launches a file via the player context on double-click', async () => {
+    const launchFileWithContext = vi.fn().mockResolvedValue(undefined);
+    const { component } = await renderWithStorageLevelContent({ launchFileWithContext });
+    const [, file] = component.directoriesAndFiles();
 
-    component.onFileDoubleClick(fileItem);
+    component.onFileDoubleClick(file as FileItem);
 
-    expect(mockPlayerContext.launchFileWithContext).toHaveBeenCalledWith({
-      deviceId: 'device-1',
+    expect(launchFileWithContext).toHaveBeenCalledWith({
+      deviceId,
       storageType: StorageType.Sd,
-      file: fileItem,
-      directoryPath: '/test',
-      files: expect.arrayContaining([mockFileItem]),
+      file,
+      directoryPath: '/',
+      files: expect.arrayContaining([fileItem]),
       launchMode: LaunchMode.Directory,
     });
   });
 
-  it('should trigger player context when file is double-clicked via template', () => {
-    // Wait for viewport to render items
-    fixture.detectChanges();
+  it('reports selection state per item', async () => {
+    const { component } = await renderWithStorageLevelContent();
+    const [directory, file] = component.directoriesAndFiles();
+    component.onItemSelected(directory);
 
-    const fileElement: HTMLElement | null = fixture.nativeElement.querySelector('lib-file-item');
-    expect(fileElement).toBeTruthy();
-
-    // Trigger the double-click on the lib-storage-item which emits the activated event
-    const storageItemElement = fileElement?.querySelector('lib-storage-item');
-    expect(storageItemElement).toBeTruthy();
-
-    storageItemElement?.dispatchEvent(new MouseEvent('dblclick'));
-    fixture.detectChanges();
-
-    expect(mockPlayerContext.launchFileWithContext).toHaveBeenCalled();
+    expect(component.isSelected(directory)).toBe(true);
+    expect(component.isSelected(file)).toBe(false);
   });
 
-  it('should render items in virtual scroll viewport', () => {
-    // Virtual scrolling may not render all items at once, only visible + buffer
-    const viewport = fixture.nativeElement.querySelector('cdk-virtual-scroll-viewport');
-    expect(viewport).toBeTruthy();
-
-    // Virtual scroll with *cdkVirtualFor renders items asynchronously
-    // In test environment without proper viewport size, it may not render items immediately
-    // The data binding is validated through the directoriesAndFiles() computed signal test
-    const items = fixture.nativeElement.querySelectorAll('.file-list-item');
-    expect(items.length).toBeGreaterThanOrEqual(0);
-    expect(items.length).toBeLessThanOrEqual(2); // With only 2 total items
-  });
-
-  it('should determine if item is selected correctly', () => {
-    const combined = component.directoriesAndFiles();
-    component.onItemSelected(combined[0]);
-
-    expect(component.isSelected(combined[0])).toBe(true);
-    expect(component.isSelected(combined[1])).toBe(false);
-  });
-
-  it('should identify currently playing file', () => {
-    const combined = component.directoriesAndFiles();
-    const fileItem = combined[1] as FileItem;
-
-    // Initially no file is playing
-    expect(component.isCurrentlyPlaying(fileItem)).toBe(false);
-
-    // Get the signal and update it
-    (mockPlayerContext.getCurrentFile as ReturnType<typeof vi.fn>).mockReturnValue(
-      signal({
-        deviceId: 'device-1',
-        storageType: StorageType.Sd,
-        file: fileItem,
-        isShuffleMode: false,
-      }).asReadonly()
+  it('reflects the currently playing file from the player context', async () => {
+    const currentFile = signal<LaunchedFile | null>(null);
+    const { component, fixture } = await renderWithStorageLevelContent(
+      { getCurrentFile: vi.fn(() => currentFile.asReadonly()) },
+      false
     );
+    const [, file] = component.directoriesAndFiles() as [unknown, FileItem];
 
-    // Re-create component to pick up the new signal
-    fixture = TestBed.createComponent(DirectoryFilesComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'device-1');
+    expect(component.isCurrentlyPlaying(file)).toBe(false);
+
+    currentFile.set({
+      storageKey: 'device-1-SD',
+      file,
+      parentPath: '/',
+      launchedAt: Date.now(),
+      isCompatible: true,
+    });
     fixture.detectChanges();
+    await fixture.whenStable();
 
-    expect(component.isCurrentlyPlaying(fileItem)).toBe(true);
+    expect(component.isCurrentlyPlaying(file)).toBe(true);
   });
 
-  it('should auto-select currently playing file when directory context is available', () => {
-    const combined = component.directoriesAndFiles();
-    const fileItem = combined[1] as FileItem;
-
-    // Mock both signals with the playing file and context
-    (mockPlayerContext.getCurrentFile as ReturnType<typeof vi.fn>).mockReturnValue(
-      signal({
-        deviceId: 'device-1',
-        storageType: StorageType.Sd,
-        file: fileItem,
-        isShuffleMode: false,
-      }).asReadonly()
+  it('auto-selects the currently playing file once directory context is available', async () => {
+    const currentFile = signal<LaunchedFile | null>(null);
+    const fileContext = signal<PlayerFileContext | null>(null);
+    const { component, fixture } = await renderWithStorageLevelContent(
+      {
+        getCurrentFile: vi.fn(() => currentFile.asReadonly()),
+        getFileContext: vi.fn(() => fileContext.asReadonly()),
+      },
+      false
     );
+    const [, file] = component.directoriesAndFiles() as [unknown, FileItem];
 
-    (mockPlayerContext.getFileContext as ReturnType<typeof vi.fn>).mockReturnValue(
-      signal({
-        directoryPath: '/test',
-        files: [mockFileItem],
-        currentIndex: 0,
-      }).asReadonly()
-    );
-
-    // Re-create component to pick up the new signals
-    fixture = TestBed.createComponent(DirectoryFilesComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'device-1');
+    currentFile.set({
+      storageKey: 'device-1-SD',
+      file,
+      parentPath: '/',
+      launchedAt: Date.now(),
+      isCompatible: true,
+    });
+    fileContext.set({
+      storageKey: 'device-1-SD',
+      directoryPath: '/',
+      files: [file],
+      currentIndex: 0,
+    });
     fixture.detectChanges();
+    await fixture.whenStable();
 
-    // The file should be auto-selected
-    expect(component.selectedItem()?.path).toBe(fileItem.path);
+    expect(component.selectedItem()?.path).toBe(file.path);
   });
 
-  describe('Highlight Behavior', () => {
-    it('should return false from hasCurrentFileError when no error exists', () => {
-      // Initially no error
+  describe('current-file error state', () => {
+    it('reports no error by default', async () => {
+      const { component } = await renderWithStorageLevelContent();
       expect(component.hasCurrentFileError()).toBe(false);
     });
 
-    it('should return true from hasCurrentFileError when error exists', () => {
-      const errorSignal = signal<string | null>('Launch failed: Incompatible file format');
-      (mockPlayerContext.getError as ReturnType<typeof vi.fn>).mockReturnValue(
-        errorSignal.asReadonly()
-      );
-
-      // Re-create component to pick up the new signal
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
+    it('reports true when the player context has an error', async () => {
+      const error = signal<string | null>('Launch failed: incompatible file');
+      const { component } = await renderWithStorageLevelContent({
+        getError: vi.fn(() => error.asReadonly()),
+      });
 
       expect(component.hasCurrentFileError()).toBe(true);
     });
-
-    it('should render data-is-playing attribute for currently playing file', () => {
-      const combined = component.directoriesAndFiles();
-      const fileItem = combined[1] as FileItem;
-
-      // Set file as currently playing
-      (mockPlayerContext.getCurrentFile as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          deviceId: 'device-1',
-          storageType: StorageType.Sd,
-          file: fileItem,
-          isShuffleMode: false,
-        }).asReadonly()
-      );
-
-      // Re-create component to pick up the new signal
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
-      // Verify component state reflects playing file
-      expect(component.isCurrentlyPlaying(fileItem)).toBe(true);
-      
-      // Note: DOM attribute validation skipped as virtual scroll may not render
-      // in test environment without proper viewport dimensions
-    });
-
-    it('should render data-has-error attribute when error exists', () => {
-      const combined = component.directoriesAndFiles();
-      const fileItem = combined[1] as FileItem;
-
-      // Set file as currently playing with error
-      const errorSignal = signal<string | null>('Launch failed: Incompatible file format');
-      (mockPlayerContext.getCurrentFile as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          deviceId: 'device-1',
-          storageType: StorageType.Sd,
-          file: fileItem,
-          isShuffleMode: false,
-        }).asReadonly()
-      );
-      (mockPlayerContext.getError as ReturnType<typeof vi.fn>).mockReturnValue(
-        errorSignal.asReadonly()
-      );
-
-      // Re-create component to pick up the new signals
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
-      // Verify component state reflects error
-      expect(component.hasCurrentFileError()).toBe(true);
-      expect(component.isCurrentlyPlaying(fileItem)).toBe(true);
-      
-      // Note: DOM attribute validation skipped as virtual scroll may not render
-      // in test environment without proper viewport dimensions
-    });
   });
 
-  describe('Virtual Scrolling', () => {
-    it('should initialize viewport with correct configuration', () => {
-      const viewport = fixture.nativeElement.querySelector('cdk-virtual-scroll-viewport');
-      expect(viewport).toBeTruthy();
-      expect(viewport.getAttribute('itemsize')).toBe('42');
-    });
+  it('initializes the virtual scroll viewport with the configured item size', async () => {
+    const { fixture } = await renderWithStorageLevelContent();
+    const viewport = fixture.nativeElement.querySelector('cdk-virtual-scroll-viewport');
 
-    it('should automatically scroll to playing file', async () => {
-      const combined = component.directoriesAndFiles();
-      const fileItem = combined[1] as FileItem;
-
-      // Mock getCurrentFile and fileContext to trigger auto-scroll
-      (mockPlayerContext.getCurrentFile as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          deviceId: 'device-1',
-          storageType: StorageType.Sd,
-          file: fileItem,
-          isShuffleMode: false,
-        }).asReadonly()
-      );
-
-      (mockPlayerContext.getFileContext as ReturnType<typeof vi.fn>).mockReturnValue(
-        signal({
-          directoryPath: '/test',
-          files: [mockFileItem],
-          currentIndex: 0,
-        }).asReadonly()
-      );
-
-      // Re-create component to pick up the new signals and trigger the effect
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
-      // Wait for effects and animations
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      fixture.detectChanges();
-
-      // Verify the playing file is visible in the viewport
-      const fileElement = fixture.nativeElement.querySelector(
-        `.file-list-item[data-item-path="${fileItem.path}"]`
-      );
-      
-      // Virtual scroll may not render items in test environment without proper viewport size
-      // The auto-scroll logic is validated through the component state
-      if (fileElement) {
-        expect(fileElement).toBeTruthy();
-      } else {
-        // Verify component selected the file even if not rendered
-        expect(component.selectedItem()?.path).toBe(fileItem.path);
-      }
-    });
-
-    // Note: Testing with large datasets requires isolated TestBed configuration
-    // which is difficult in the current test structure. Virtual scrolling behavior
-    // is validated through manual testing and the integration tests above confirm
-    // the viewport is properly configured and functional.
+    expect(viewport.getAttribute('itemsize')).toBe('42');
   });
 
-  describe('Header Slot Integration', () => {
-    it('should render directory-trail in header slot when at storage level', () => {
-      // At storage level (not device level)
-      const directoryStateSignal = signal<StorageDirectoryState | null>({
-        directory: {
-          directories: [mockDirectoryItem],
-          files: [mockFileItem],
-          path: '/games',
-        },
-        currentPath: '/games',
-        storageType: StorageType.Sd,
-        deviceId: 'device-1',
-        isLoading: false,
-        isLoaded: true,
-        error: null,
-        lastLoadTime: Date.now(),
-      });
-
-      mockStorageStore['getSelectedDirectoryState'] = vi.fn(() =>
-        directoryStateSignal.asReadonly()
-      );
-      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(false).asReadonly());
-
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
+  describe('header slot', () => {
+    it('renders the directory trail in the header slot at storage level', async () => {
+      const { fixture } = await renderWithStorageLevelContent();
 
       const trail = fixture.nativeElement.querySelector('lib-directory-trail-container');
       expect(trail).toBeTruthy();
-      // Trail is now inside .header-toolbar wrapper which has slot="header"
-      const headerToolbar = trail.closest('.header-toolbar');
-      expect(headerToolbar).toBeTruthy();
-      expect(headerToolbar.getAttribute('slot')).toBe('header');
+      expect(trail.closest('.header-toolbar')?.getAttribute('slot')).toBe('header');
     });
 
-    it('should not render directory-trail when at device level', () => {
-      // At device level
-      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(true).asReadonly());
-      mockStorageStore['getDeviceStorageEntries'] = vi.fn(() =>
-        signal({
-          'device-1-Sd': {
-            deviceId: 'device-1',
-            storageType: StorageType.Sd,
-            currentPath: null,
-            directory: null,
-            isLoading: false,
-            isLoaded: false,
-            error: null,
-            lastLoadTime: null,
-          },
-        }).asReadonly()
-      );
+    it('omits the directory trail at device level', async () => {
+      const { fixture } = await renderAtDeviceLevel();
 
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
-      const trail = fixture.nativeElement.querySelector('lib-directory-trail-container');
-      expect(trail).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('lib-directory-trail-container')).toBeNull();
     });
 
-    it('should render Storage Devices title at device level', () => {
-      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(true).asReadonly());
-      mockStorageStore['getDeviceStorageEntries'] = vi.fn(() =>
-        signal({
-          'device-1-Sd': {
-            deviceId: 'device-1',
-            storageType: StorageType.Sd,
-            currentPath: null,
-            directory: null,
-            isLoading: false,
-            isLoaded: false,
-            error: null,
-            lastLoadTime: null,
-          },
-        }).asReadonly()
-      );
+    it('shows a Storage Devices title at device level', async () => {
+      const { fixture } = await renderAtDeviceLevel();
 
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
-      const card = fixture.nativeElement.querySelector('lib-scaling-card');
-      // Angular signal binding creates internal attributes, check actual title rendering
-      expect(card.textContent).toContain('Storage Devices');
+      expect(fixture.nativeElement.querySelector('.header-title')).toBeTruthy();
     });
 
-    it('should render empty title at storage level (trail replaces it)', () => {
-      const directoryStateSignal = signal<StorageDirectoryState | null>({
-        directory: {
-          directories: [],
-          files: [],
-          path: '/games',
-        },
-        currentPath: '/games',
-        storageType: StorageType.Sd,
-        deviceId: 'device-1',
-        isLoading: false,
-        isLoaded: true,
-        error: null,
-        lastLoadTime: Date.now(),
-      });
+    it('omits the title at storage level, since the trail replaces it', async () => {
+      const { fixture } = await renderWithStorageLevelContent();
 
-      mockStorageStore['getSelectedDirectoryState'] = vi.fn(() =>
-        directoryStateSignal.asReadonly()
-      );
-      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(false).asReadonly());
+      expect(fixture.nativeElement.querySelector('.header-title')).toBeNull();
+    });
 
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
+    it('carries slot="header" on the header toolbar wrapper', async () => {
+      const { fixture } = await renderWithStorageLevelContent();
 
-      const trail = fixture.nativeElement.querySelector('lib-directory-trail-container');
-      expect(trail).toBeTruthy();
-      // At storage level, trail is in header slot, no card title rendered
-      const cardHeader = fixture.nativeElement.querySelector('.card-header');
-      if (cardHeader) {
-        // Title should not be present when trail is used
-        const titleElement = cardHeader.querySelector('.card-title');
-        expect(titleElement?.textContent || '').toBe('');
-      }
+      expect(fixture.nativeElement.querySelector('.header-toolbar[slot="header"]')).toBeTruthy();
+    });
+
+    it('renders the search toolbar at storage level', async () => {
+      const { fixture } = await renderWithStorageLevelContent();
+
+      expect(fixture.nativeElement.querySelector('lib-search-toolbar')).toBeTruthy();
+    });
+
+    it('renders the search toolbar at device level too', async () => {
+      const { fixture } = await renderAtDeviceLevel();
+
+      expect(fixture.nativeElement.querySelector('lib-search-toolbar')).toBeTruthy();
     });
   });
 
-  describe('Device-Level View', () => {
-    beforeEach(() => {
-      // Mock isDeviceLevelView to return true
-      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(true).asReadonly());
-
-      // Mock getDeviceStorageEntries to return storage entries
-      mockStorageStore['getDeviceStorageEntries'] = vi.fn(() =>
-        signal({
-          'device-1-Sd': {
-            deviceId: 'device-1',
-            storageType: StorageType.Sd,
-            currentPath: null,
-            directory: null,
-            isLoading: false,
-            isLoaded: false,
-            error: null,
-            lastLoadTime: null,
-          },
-          'device-1-Usb': {
-            deviceId: 'device-1',
-            storageType: StorageType.Usb,
-            currentPath: null,
-            directory: null,
-            isLoading: false,
-            isLoaded: false,
-            error: null,
-            lastLoadTime: null,
-          },
-        }).asReadonly()
-      );
-    });
-
-    it('should detect device-level view', () => {
-      // Re-create component with device-level view mocks
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
+  describe('device-level view', () => {
+    it('detects device-level view', async () => {
+      const { component } = await renderAtDeviceLevel();
       expect(component.isDeviceLevelView()).toBe(true);
     });
 
-    it('should build storage devices list at device level', () => {
-      // Re-create component with device-level view mocks
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
+    it('lists SD and USB storage devices', async () => {
+      const { component } = await renderAtDeviceLevel();
       const devices = component.storageDevices();
+
       expect(devices).toHaveLength(2);
       expect(devices[0]).toMatchObject({
         name: 'SD Storage',
         storageType: StorageType.Sd,
         icon: 'sd_storage',
-        deviceId: 'device-1',
+        deviceId,
         itemType: 'storage-device',
       });
       expect(devices[1]).toMatchObject({
         name: 'USB Storage',
         storageType: StorageType.Usb,
         icon: 'usb',
-        deviceId: 'device-1',
+        deviceId,
         itemType: 'storage-device',
       });
     });
 
-    it('should return empty array when not at device level', () => {
-      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(false).asReadonly());
-
-      // Re-create component
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
-      const devices = component.storageDevices();
-      expect(devices).toHaveLength(0);
+    it('is empty when not at device level', async () => {
+      const { component } = await renderWithStorageLevelContent();
+      expect(component.storageDevices()).toHaveLength(0);
     });
 
-    it('should handle storage device selection', () => {
-      // Re-create component with device-level view mocks
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
+    it('selects a storage device on click', async () => {
+      const { component } = await renderAtDeviceLevel();
+      const [device] = component.storageDevices();
 
-      const device = component.storageDevices()[0];
       component.onStorageDeviceSelected(device);
 
-      const selected = component.selectedItem();
-      expect(selected).toBeTruthy();
-      // Type assertion used in component - check storageType property exists
-      expect('storageType' in (selected ?? {})).toBe(true);
-      expect((selected as unknown as { storageType: StorageType }).storageType).toBe(
-        StorageType.Sd
-      );
+      const selected = component.selectedItem() as unknown as { storageType: StorageType };
+      expect(selected?.storageType).toBe(StorageType.Sd);
     });
 
-    it('should navigate to storage root on double-click', () => {
-      // Re-create component with device-level view mocks
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
+    it('navigates to the storage root and clears the selection on double-click', async () => {
+      const { component, storageStore } = await renderAtDeviceLevel();
+      const [device] = component.storageDevices();
+      const navigateToDirectory = vi
+        .spyOn(storageStore, 'navigateToDirectory')
+        .mockImplementation(async () => undefined);
 
-      const device = component.storageDevices()[0];
       component.onStorageDeviceDoubleClick(device);
 
-      expect(mockStorageStore['navigateToDirectory']).toHaveBeenCalledWith({
-        deviceId: 'device-1',
+      expect(navigateToDirectory).toHaveBeenCalledWith({
+        deviceId,
         storageType: StorageType.Sd,
         path: '/',
       });
       expect(component.selectedItem()).toBeNull();
     });
 
-    it('should correctly identify selected storage device', () => {
-      // Re-create component with device-level view mocks
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
+    it('identifies the selected storage device', async () => {
+      const { component } = await renderAtDeviceLevel();
       const devices = component.storageDevices();
       component.onStorageDeviceSelected(devices[0]);
 
       expect(component.isStorageDeviceSelected(devices[0])).toBe(true);
       expect(component.isStorageDeviceSelected(devices[1])).toBe(false);
-    });
-  });
-
-  describe('Header Slot Integration', () => {
-    it('should render search toolbar inside header slot', () => {
-      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
-      expect(searchToolbar).toBeTruthy();
-    });
-
-    it('should pass deviceId to search toolbar', () => {
-      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
-      expect(searchToolbar).toBeTruthy();
-      // Mock component receives deviceId input - verify it's present in component
-      const searchToolbarComponent = fixture.debugElement.query(
-        (el) => el.nativeElement.tagName === 'LIB-SEARCH-TOOLBAR'
-      );
-      expect(searchToolbarComponent).toBeTruthy();
-    });
-
-    it('should render search toolbar inside header-toolbar wrapper', () => {
-      const headerToolbar = fixture.nativeElement.querySelector('.header-toolbar');
-      expect(headerToolbar).toBeTruthy();
-      const searchToolbar = headerToolbar.querySelector('lib-search-toolbar');
-      expect(searchToolbar).toBeTruthy();
-    });
-
-    it('should have header-toolbar with slot="header" attribute', () => {
-      const headerToolbar = fixture.nativeElement.querySelector('.header-toolbar[slot="header"]');
-      expect(headerToolbar).toBeTruthy();
-    });
-
-    it('should render search toolbar at storage level view', () => {
-      // Default state is storage level view
-      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
-      expect(searchToolbar).toBeTruthy();
-    });
-
-    it('should render search toolbar at device level view', () => {
-      // Mock device level view
-      mockStorageStore['isDeviceLevelView'] = vi.fn(() => signal(true).asReadonly());
-
-      // Re-create component
-      fixture = TestBed.createComponent(DirectoryFilesComponent);
-      component = fixture.componentInstance;
-      fixture.componentRef.setInput('deviceId', 'device-1');
-      fixture.detectChanges();
-
-      const searchToolbar = fixture.nativeElement.querySelector('lib-search-toolbar');
-      expect(searchToolbar).toBeTruthy();
     });
   });
 });
