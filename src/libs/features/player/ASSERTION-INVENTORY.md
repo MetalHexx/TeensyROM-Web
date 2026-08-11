@@ -842,6 +842,69 @@ Public surface: `IPlayerContext`/`StorageStore` (mocked), `onEntrySelected()`/`s
 | 552 | isSelected correctly identifies the selected entry | selectedEntry.set(), isSelected() | true for selected, false for the other | state | port | play-history.component.spec.ts |
 | 553 | isCurrentlyPlaying correctly identifies the playing entry | getCurrentFile (mocked), isCurrentlyPlaying() | true for the playing entry, false for the other | state | port | play-history.component.spec.ts |
 
+## 25. storage-container/search-results/search-item/search-item.component.spec.ts (26 tests)
+
+Byte-for-byte structural twin of `file-item.component.spec.ts` (rows 410-435) — same fixtures,
+same icon/size-formatting/selection/incompatibility-indicator/tooltip coverage, applied to
+`SearchItemComponent` instead of `FileItemComponent`. Same row-by-row treatment.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 554 | Component instantiates | component | truthy | state | port | search-item.component.spec.ts |
+| 555 | Unknown file type maps to insert_drive_file | fileIcon() | 'insert_drive_file' | state | port | search-item.component.spec.ts |
+| 556 | Song maps to music_note | fileIcon() | 'music_note' | state | port | search-item.component.spec.ts |
+| 557 | Game maps to sports_esports | fileIcon() | 'sports_esports' | state | port | search-item.component.spec.ts |
+| 558 | Image maps to image | fileIcon() | 'image' | state | port | search-item.component.spec.ts |
+| 559 | Hex maps to code | fileIcon() | 'code' | state | port | search-item.component.spec.ts |
+| 560 | 0 bytes formats as '0 B' | formattedSize() | '0 B' | state | port | search-item.component.spec.ts |
+| 561 | Sub-KB sizes format with a 'B' suffix | formattedSize() | '512.0 B' | state | port | search-item.component.spec.ts |
+| 562 | KB-range sizes format with a 'KB' suffix | formattedSize() | '1.5 KB' | state | port | search-item.component.spec.ts |
+| 563 | MB-range sizes format with an 'MB' suffix | formattedSize() | '2.3 MB' | state | port | search-item.component.spec.ts |
+| 564 | GB-range sizes format with a 'GB' suffix | formattedSize() | '3.0 GB' | state | port | search-item.component.spec.ts |
+| 565 | Clicking the item emits itemSelected with the file | click, itemSelected output | emits the file | state | port | search-item.component.spec.ts |
+| 566 | Double-clicking the item emits itemDoubleClick with the file | dblclick, itemDoubleClick output | emits the file | state | port | search-item.component.spec.ts |
+| 567 | The selected class applies when selected=true | `lib-storage-item`.classList | contains 'selected' | dom-structural | port | search-item.component.spec.ts |
+| 568 | The selected class is absent when selected=false | `lib-storage-item`.classList | doesn't contain 'selected' | dom-structural | port | search-item.component.spec.ts |
+| 569 | The file name renders in the item's text | nativeElement textContent | contains 'test-file' | dom-copy | port (re-expressed as dom-structural) — assert the name renders, not the literal string | search-item.component.spec.ts |
+| 570 | The formatted size renders in the item's text | nativeElement textContent | contains '1.5 KB' | dom-copy | merge (see row 562) — duplicate of the formattedSize() computed already verified at state level | — |
+| 571 | The incompatible icon shows for an incompatible file | `.incompatible-icon` | truthy | dom-structural | port | search-item.component.spec.ts |
+| 572 | The incompatible icon is absent for a compatible file | `.incompatible-icon` | null | dom-structural | port | search-item.component.spec.ts |
+| 573 | The incompatible icon is absent when isCompatible is undefined | `.incompatible-icon` | null | dom-structural | port | search-item.component.spec.ts |
+| 574 | The incompatible icon uses the correct Material icon name | `.incompatible-icon` textContent | 'sentiment_very_dissatisfied' | dom-copy | drop — duplicate of row 571's presence claim; fixed, non-varying glyph name (static content pin) | — |
+| 575 | The incompatible icon has the tooltip directive applied | icon element's injector | TooltipDirective instance truthy | dom-structural | port | search-item.component.spec.ts |
+| 576 | The tooltip body text is the incompatibility message | TooltipDirective.libTooltip().body | exact message string | dom-copy | drop — static UI copy, not a unit-test concern; tooltip presence already proven by row 575 | — |
+| 577 | The tooltip position is set to Right | TooltipDirective.libTooltip().position | TooltipPosition.Right | state | port | search-item.component.spec.ts |
+| 578 | The icon reactively appears when the file becomes incompatible | `.incompatible-icon` before/after | null then truthy | dom-structural | drop — duplicate of rows 571/572's static before/after states | — |
+| 579 | The icon reactively hides when the file becomes compatible | `.incompatible-icon` before/after | truthy then null | dom-structural | drop — duplicate of rows 571/572's static before/after states (mirror direction) | — |
+
+## 26. storage-container/search-results/search-results.component.spec.ts (18 tests)
+
+Public surface: `StorageStore`/`IPlayerContext` (mocked), `onFileSelected()`/`selectedItem()`,
+`isSelected()`, `onFileDoubleClick()`, `isCurrentlyPlaying()`, `hasPlayerError()`,
+`searchResults()`/`isSearching()`/`hasSearched()`/`searchError()`, rendered
+`lib-empty-state-message`, `.search-results-list`/`.file-list-item`, `.error-state`.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 580 | Component instantiates | component | truthy | state | port | search-results.component.spec.ts |
+| 581 | Neither empty-state nor results list shows while actively searching | `lib-empty-state-message`, `.search-results-list` | both falsy | dom-structural | port | search-results.component.spec.ts |
+| 582 | An error state renders when the search fails | `.error-state` | truthy | dom-structural | port (re-expressed) — drop the literal error-message text, keep the error-state presence | search-results.component.spec.ts |
+| 583 | A 'not searched yet' empty state shows before any search runs | `lib-empty-state-message` | truthy | dom-structural | port | search-results.component.spec.ts |
+| 584 | A 'no results' empty state shows after a search with zero matches | `lib-empty-state-message` | truthy | dom-structural | port | search-results.component.spec.ts |
+| 585 | The results list renders one item per search result | `.file-list-item` count | 2 | dom-structural | port | search-results.component.spec.ts |
+| 586 | Selecting a file sets selectedItem | onFileSelected(), selectedItem() | null before, equals the file after | state | port | search-results.component.spec.ts |
+| 587 | The selected CSS class claim is proven via isSelected(), not a DOM class read | isSelected() | true for selected, false for the other | state | merge (see row 589) — despite its title, never reads a DOM class; duplicate of the dedicated isSelected() test | — |
+| 588 | Double-clicking a file launches it with Search launch mode | onFileDoubleClick(), launchFileWithContext | called with deviceId/storageType/file/directoryPath/files/launchMode=Search | state | port | search-results.component.spec.ts |
+| 589 | isSelected() correctly reports selection state per file | onFileSelected(), isSelected() | true for selected, false for the other | state | port | search-results.component.spec.ts |
+| 590 | The currently playing file is highlighted in Search mode | getCurrentFile, getLaunchMode (mocked), isCurrentlyPlaying() | true for the playing file, false for the other | state | port | search-results.component.spec.ts |
+| 591 | Playing files are not highlighted outside Search mode | getLaunchMode=Directory, isCurrentlyPlaying() | false | state | port | search-results.component.spec.ts |
+| 592 | hasPlayerError is true when the playing file has an error | getError (mocked), hasPlayerError() | true | state | port | search-results.component.spec.ts |
+| 593 | The playing file is auto-selected once playback starts | getCurrentFile (mocked), selectedItem() | null before, equals the playing file after | state | port | search-results.component.spec.ts |
+| 594 | A null search state resolves to safe defaults across all four computeds | searchResults(), isSearching(), hasSearched(), searchError() | []; false; false; null | state | port | search-results.component.spec.ts |
+| 595 | An empty deviceId doesn't crash change detection | detectChanges() | no throw | state | port | search-results.component.spec.ts |
+| 596 | A playing file missing from the current search results doesn't crash and isn't highlighted | isCurrentlyPlaying() for both results | false for both; no throw | state | port | search-results.component.spec.ts |
+| 597 | Double-clicking with no search state doesn't crash and doesn't launch | onFileDoubleClick(), launchFileWithContext | resolves; not called | state | port | search-results.component.spec.ts |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
