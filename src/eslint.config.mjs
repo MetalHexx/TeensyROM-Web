@@ -24,22 +24,34 @@ export default [
             // Application Layer - Can only depend on domain and shared utilities
             {
               sourceTag: 'scope:application',
-              onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared'],
+              onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared', 'scope:testing'],
             },
             // Infrastructure Layer - Can depend on application, domain, shared utilities, and api-client
             {
               sourceTag: 'scope:infrastructure',
-              onlyDependOnLibsWithTags: ['scope:application', 'scope:domain', 'scope:shared', 'scope:data-access'],
+              onlyDependOnLibsWithTags: [
+                'scope:application',
+                'scope:domain',
+                'scope:shared',
+                'scope:data-access',
+                'scope:testing',
+              ],
             },
             // Features Layer - Can depend on application, domain, and shared UI
             {
               sourceTag: 'scope:features',
-              onlyDependOnLibsWithTags: ['scope:application', 'scope:domain', 'scope:shared'],
+              onlyDependOnLibsWithTags: ['scope:application', 'scope:domain', 'scope:shared', 'scope:testing'],
             },
             // Shared libraries - Can depend on each other and domain
             {
               sourceTag: 'scope:shared',
-              onlyDependOnLibsWithTags: ['scope:shared', 'scope:domain'],
+              onlyDependOnLibsWithTags: ['scope:shared', 'scope:domain', 'scope:testing'],
+            },
+            // Testing Layer - Shared test fixtures and mocks; may depend on domain and shared only,
+            // never on application (its own specs consume this library, so that edge would cycle)
+            {
+              sourceTag: 'scope:testing',
+              onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared'],
             },
             // App Layer - Composition root: can depend on everything
             {
@@ -51,6 +63,7 @@ export default [
                 'scope:infrastructure',
                 'scope:shared',
                 'scope:app',
+                'scope:testing',
               ],
             },
             // E2E Tests - Can depend on data-access for API DTOs
