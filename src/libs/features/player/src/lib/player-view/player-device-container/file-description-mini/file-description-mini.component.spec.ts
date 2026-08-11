@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { FileDescriptionMiniComponent } from './file-description-mini.component';
 import { PLAYER_CONTEXT } from '@teensyrom-nx/application';
 import { signal } from '@angular/core';
@@ -9,7 +10,7 @@ describe('FileDescriptionMiniComponent', () => {
   let fixture: ComponentFixture<FileDescriptionMiniComponent>;
 
   const mockPlayerContext = {
-    getCurrentFile: () => () =>
+    getCurrentFile: () =>
       signal({
         file: {
           name: 'Test Song.sid',
@@ -25,7 +26,7 @@ describe('FileDescriptionMiniComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [FileDescriptionMiniComponent],
-      providers: [{ provide: PLAYER_CONTEXT, useValue: mockPlayerContext }],
+      providers: [provideNoopAnimations(), { provide: PLAYER_CONTEXT, useValue: mockPlayerContext }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(FileDescriptionMiniComponent);
@@ -48,12 +49,12 @@ describe('FileDescriptionMiniComponent', () => {
 
   it('should handle missing file', () => {
     const emptyContext = {
-      getCurrentFile: () => () => signal(null),
+      getCurrentFile: () => signal(null),
     };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [FileDescriptionMiniComponent],
-      providers: [{ provide: PLAYER_CONTEXT, useValue: emptyContext }],
+      providers: [provideNoopAnimations(), { provide: PLAYER_CONTEXT, useValue: emptyContext }],
     });
     fixture = TestBed.createComponent(FileDescriptionMiniComponent);
     component = fixture.componentInstance;

@@ -56,7 +56,11 @@ export class StorageContainerComponent {
     for (const storageType of storageTypes) {
       const key = `${deviceId}-${storageType}`;
       const entry = entries[key];
-      if (!entry || (!entry.isLoaded && !entry.isLoading)) {
+      // Only recover an initialization that was never attempted. An entry that failed
+      // (isLoading false, isLoaded false, error set) must not be retried here: doing so
+      // re-triggers this same effect on every failed attempt, which is an infinite
+      // synchronous retry loop with no backoff.
+      if (!entry || (!entry.isLoaded && !entry.isLoading && !entry.error)) {
         untracked(() =>
           this.storageStore.initializeStorage({ deviceId, storageType })
         );
