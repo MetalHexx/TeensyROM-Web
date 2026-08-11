@@ -407,6 +407,88 @@ inventory's grep-based `it()` count) — note its span explicitly.
 | 229 | CycleImageComponent still renders with an empty images array | `lib-cycle-image`, componentInstance.images() | truthy; [] | dom-structural | port | file-info.component.spec.ts |
 | 230 | file-info/file-text/file-title carry their styling CSS classes | `.file-info`/`.file-text`/`.file-title` | all truthy | dom-structural | drop — duplicate of rows 205/206's structural presence; class-existence-for-styling carries no behavior | — |
 
+## 15. player-toolbar/player-toolbar-actions/player-toolbar-actions.component.spec.ts (69 tests)
+
+Public surface: `toggleShuffleMode()`, `isShuffleMode()`, `isFavorite()`,
+`isFavoriteOperationInProgress()`, `toggleFavorite()`, `currentFile`, `durationOptions`,
+`customTimerConfig()`, `isCustomTimerEnabled()`, `selectedDurationMs()`, `onTimerMenuItemClick()`,
+`timerBadgeText()`. A recurring gap in the "Template Integration" describe: several tests titled
+around icon/color/disabled DOM state only re-assert the same underlying signal already proven
+elsewhere, never actually reading the rendered DOM — flagged once here and in Execution Notes
+rather than per-row.
+
+| # | Behavior | Public surface | Asserts | Style | Disposition | Target file |
+|---|---|---|---|---|---|---|
+| 231 | Component instantiates | component | truthy | state | port | player-toolbar-actions.component.spec.ts |
+| 232 | The test's mock playerContext is defined | mockPlayerContext | defined | state | drop — asserts the test's own mock variable, not the component | — |
+| 233 | The test's mock StorageStore is defined | mockStorageStore | defined | state | drop — asserts the test's own mock variable, not the component | — |
+| 234 | toggleShuffleMode() forwards to the context with the deviceId | toggleShuffleMode(), IPlayerContext.toggleShuffleMode | called with deviceId | state | port | player-toolbar-actions.component.spec.ts |
+| 235 | isShuffleMode reflects the context's launch mode | getLaunchMode, isShuffleMode() | true for Shuffle, false for Directory | state | port | player-toolbar-actions.component.spec.ts |
+| 236 | isFavorite is false when no file is loaded | isFavorite() | false | state | port | player-toolbar-actions.component.spec.ts |
+| 237 | isFavorite is true when the current file's flag is true | isFavorite() | true | state | port | player-toolbar-actions.component.spec.ts |
+| 238 | isFavorite is false when the current file's flag is false | isFavorite() | false | state | port | player-toolbar-actions.component.spec.ts |
+| 239 | isFavoriteOperationInProgress is false when idle | isFavoriteOperationInProgress() | false | state | port | player-toolbar-actions.component.spec.ts |
+| 240 | isFavoriteOperationInProgress is true mid-save | isFavoriteOperationInProgress() | true | state | port | player-toolbar-actions.component.spec.ts |
+| 241 | isFavoriteOperationInProgress is true mid-remove | isFavoriteOperationInProgress() | true | state | drop — duplicate of row 240; the two operations share one `isProcessing` flag with no distinguishing behavior | — |
+| 242 | toggleFavorite() saves and updates the context when not favorited | toggleFavorite(), StorageStore.saveFavorite, IPlayerContext.updateCurrentFileFavoriteStatus | called with correct storage key/path; status set true | state | port | player-toolbar-actions.component.spec.ts |
+| 243 | toggleFavorite() removes and updates the context when favorited | toggleFavorite(), StorageStore.removeFavorite, IPlayerContext.updateCurrentFileFavoriteStatus | called with correct storage key/path; status set false | state | port | player-toolbar-actions.component.spec.ts |
+| 244 | toggleFavorite() is a no-op with no current file | toggleFavorite(), save/remove/update spies | none called | state | port | player-toolbar-actions.component.spec.ts |
+| 245 | toggleFavorite() derives deviceId/storageType from the storage key | toggleFavorite(), StorageStore.saveFavorite | called with parsed identifiers | state | drop — duplicate of row 242's save-favorite wiring claim with different fixture data | — |
+| 246 | toggleFavorite() doesn't update the context when the save operation errors | toggleFavorite(), updateCurrentFileFavoriteStatus | saveFavorite called; status update not called | state | port | player-toolbar-actions.component.spec.ts |
+| 247 | toggleFavorite() returns early when an operation is already in progress | toggleFavorite(), save/remove/update spies | none called | state | port | player-toolbar-actions.component.spec.ts |
+| 248 | currentFile computed signal is defined | currentFile | defined | state | drop — trivial existence check subsumed by every value-level currentFile() assertion that follows | — |
+| 249 | currentFile is null when no file is loaded | currentFile() | null | state | port | player-toolbar-actions.component.spec.ts |
+| 250 | currentFile returns the file from the context | currentFile() | equals the launched file | state | port | player-toolbar-actions.component.spec.ts |
+| 251 | currentFile updates when the underlying signal changes | currentFile() before/after | tracks each set value | state | port | player-toolbar-actions.component.spec.ts |
+| 252 | currentFile/isFavorite reactively track a nested favorite-flag update | currentFile(), isFavorite() before/after | false then true after the file object is replaced | state | port | player-toolbar-actions.component.spec.ts |
+| 253 | At least one icon-button renders | `lib-icon-button` count | >= 1 | dom-structural | drop — superseded by row 254's exact-count assertion | — |
+| 254 | Exactly 4 icon-buttons render (timer, history, shuffle, favorite) | `lib-icon-button` count | 4 | dom-structural | port | player-toolbar-actions.component.spec.ts |
+| 255 | favorite_border icon shows when not favorited | isFavorite() | false | state | merge (see row 238) — the test never reads the icon element despite its title; duplicate of the isFavorite()=false claim | — |
+| 256 | favorite icon shows when favorited | isFavorite() | true | state | merge (see row 237) — same gap; duplicate of isFavorite()=true | — |
+| 257 | favorite button is disabled when no file is loaded | !currentFile() | true | state | merge (see row 249) — never reads the button's disabled attribute despite its title; duplicate of currentFile()===null | — |
+| 258 | favorite button is disabled during an in-progress operation | isFavoriteOperationInProgress() | true | state | merge (see row 240) — never reads the button's disabled attribute; duplicate of the in-progress signal | — |
+| 259 | Highlight color shows when favorited | isFavorite() | true | state | merge (see row 237) — never reads the button's color/class; duplicate of isFavorite()=true | — |
+| 260 | Normal color shows when not favorited | isFavorite() | false | state | merge (see row 238) — never reads the button's color/class; duplicate of isFavorite()=false | — |
+| 261 | durationOptions exposes 8 entries (test title claims 10 — stale name, see Execution Notes) | durationOptions | length 8 | state | port | player-toolbar-actions.component.spec.ts |
+| 262 | durationOptions values are strictly ascending | durationOptions | each valueMs > the previous | state | port | player-toolbar-actions.component.spec.ts |
+| 263 | durationOptions labels use s/m/h suffixes | durationOptions | each label matches its constant value | state | drop — pins the literal content of a static constant array; the format invariant (s/m/h shape) isn't asserted, just the exact strings | — |
+| 264 | durationOptions millisecond values match the expected constants | durationOptions | each valueMs matches its constant value | state | drop — pins the literal content of the same static constant array as row 263 | — |
+| 265 | customTimerConfig computed signal is defined | customTimerConfig | defined | state | drop — trivial existence check subsumed by every value-level assertion that follows | — |
+| 266 | customTimerConfig is null when no config exists | customTimerConfig() | null | state | port | player-toolbar-actions.component.spec.ts |
+| 267 | customTimerConfig returns the context's config | customTimerConfig() | equals the config | state | port | player-toolbar-actions.component.spec.ts |
+| 268 | isCustomTimerEnabled defaults to false | isCustomTimerEnabled() | false | state | port | player-toolbar-actions.component.spec.ts |
+| 269 | isCustomTimerEnabled is true when the config is enabled | isCustomTimerEnabled() | true | state | port | player-toolbar-actions.component.spec.ts |
+| 270 | isCustomTimerEnabled is false when the config is disabled | isCustomTimerEnabled() | false | state | drop — duplicate of row 268's default-false claim | — |
+| 271 | selectedDurationMs defaults to 180000 | selectedDurationMs() | 180000 | state | port | player-toolbar-actions.component.spec.ts |
+| 272 | selectedDurationMs returns the config's duration | selectedDurationMs() | matches config | state | port | player-toolbar-actions.component.spec.ts |
+| 273 | isCustomTimerEnabled updates reactively across config changes | isCustomTimerEnabled() across 3 sets | false, true, false | state | port | player-toolbar-actions.component.spec.ts |
+| 274 | selectedDurationMs updates reactively across config changes | selectedDurationMs() across 3 sets | 180000, 30000, 3600000 | state | port | player-toolbar-actions.component.spec.ts |
+| 275 | A null config yields default values for all three computeds together | customTimerConfig(), isCustomTimerEnabled(), selectedDurationMs() | null; false; 180000 | state | drop — duplicate combination of rows 266/268/271, each independently proven with a null config | — |
+| 276 | onTimerMenuItemClick method is defined | onTimerMenuItemClick | defined | state | drop — trivial existence check subsumed by every call-level assertion that follows | — |
+| 277 | Selecting 'Off' disables the timer via setCustomTimer | onTimerMenuItemClick(null), setCustomTimer | called with (deviceId, false, existingDuration) | state | port | player-toolbar-actions.component.spec.ts |
+| 278 | Selecting a duration enables the timer via setCustomTimer | onTimerMenuItemClick(ms), setCustomTimer | called with (deviceId, true, ms) | state | port | player-toolbar-actions.component.spec.ts |
+| 279 | Selecting 'Off' preserves the existing duration | onTimerMenuItemClick(null), setCustomTimer | called with (deviceId, false, 30000) | state | merge (see row 277) — same call pattern with a different starting duration | — |
+| 280 | The timer button renders in the template | `[data-testid="timer-button"]` | truthy | dom-structural | port | player-toolbar-actions.component.spec.ts |
+| 281 | Highlight color shows when the timer is enabled | isCustomTimerEnabled() | true | state | merge (see row 269) — never reads the button's color/class; duplicate of the enabled signal | — |
+| 282 | Normal color shows when the timer is disabled | isCustomTimerEnabled() | false | state | merge (see row 268) — never reads the button's color/class; duplicate of the disabled signal | — |
+| 283 | onTimerMenuItemClick() is a no-op with an empty deviceId | onTimerMenuItemClick(null), setCustomTimer | not called; no throw | state | port | player-toolbar-actions.component.spec.ts |
+| 284 | timerBadgeText computed signal is defined | timerBadgeText | defined | state | drop — trivial existence check subsumed by every value-level assertion that follows | — |
+| 285 | timerBadgeText reflects the selected duration (30s/3m/1h) | timerBadgeText() | '30s', '3m', '1h' across three durations | state | port | player-toolbar-actions.component.spec.ts |
+| 286 | timerBadgeText defaults to '3m' when config is null | timerBadgeText() | '3m' | state | port | player-toolbar-actions.component.spec.ts |
+| 287 | The timer dropdown menu renders in the template | `lib-dropdown-menu` | truthy | dom-structural | port | player-toolbar-actions.component.spec.ts |
+| 288 | Invoking onTimerMenuItemClick(null) via a spy calls setCustomTimer | vi.spyOn(setCustomTimer) | called with (deviceId, false, 180000) | state | drop — duplicate of row 277, spy-wrapped variant of the same call | — |
+| 289 | Invoking onTimerMenuItemClick(duration) via a spy calls setCustomTimer | vi.spyOn(setCustomTimer) | called with (deviceId, true, 30000) | state | drop — duplicate of row 278, spy-wrapped variant of the same call | — |
+| 290 | Selecting a new duration keeps the timer enabled | onTimerMenuItemClick(ms), setCustomTimer | called with (deviceId, true, 60000) | state | merge (see row 278) — same enable-with-duration call pattern | — |
+| 291 | Selecting a duration while off enables the timer | onTimerMenuItemClick(ms), setCustomTimer | called with (deviceId, true, 30000) | state | merge (see row 278) — duplicate of the enable-with-duration claim | — |
+| 292 | A null config in the timer menu doesn't throw and reports disabled | onTimerMenuItemClick(null), isCustomTimerEnabled() | no throw; false | state | drop — duplicate combination of rows 268/283's null-safety claims | — |
+| 293 | Empty deviceId is a no-op for a duration click | onTimerMenuItemClick(ms), setCustomTimer | not called | state | merge (see row 283) — same empty-deviceId guard, different click variant | — |
+| 294 | Empty deviceId is a no-op for an 'Off' click | onTimerMenuItemClick(null), setCustomTimer | not called | state | merge (see row 283) — same empty-deviceId guard | — |
+| 295 | Two devices maintain independent timer configs | getPlayTimerConfig (per-device), isCustomTimerEnabled(), selectedDurationMs(), timerBadgeText() | device-1: true/30000/'30s'; device-2: false/180000/'3m' | state | port | player-toolbar-actions.component.spec.ts |
+| 296 | Component destruction doesn't throw | fixture.destroy() | no throw | state | drop — generic lifecycle smoke test, no distinct behavioral claim | — |
+| 297 | durationOptions values are all positive and unique | durationOptions | every value > 0; no duplicates | state | drop — invariant implied by row 262's strictly-ascending-order assertion | — |
+| 298 | selectedDurationMs defaults to 180000 when config is null | selectedDurationMs() | 180000 | state | drop — duplicate of row 271's default-duration claim | — |
+| 299 | isCustomTimerEnabled defaults to false when config is null | isCustomTimerEnabled() | false | state | drop — duplicate of row 268's default-enabled claim | — |
+
 ## 8. player-view.component.spec.ts (3 tests)
 
 Public surface: `deviceStore`, `enabledDevices`.
