@@ -326,6 +326,41 @@ public class TransferFilesCommandHandlerTests : IDisposable
         port.Received.Should().ContainSingle(f => f.Path == file1.TargetPath.Value);
     }
 
+    [Fact]
+    public async Task Handle_CancellationInsideAcknowledgement_PropagatesWithoutRetryingTheFile()
+    {
+        var file = StreamedFileTransfer.FromFile(WriteTestFile(200).Path, new FilePath("/games/cancelled.prg"), TeensyStorageType.SD);
+
+        using var cts = new CancellationTokenSource();
+        var cancellation = new OperationCanceledException(cts.Token);
+        var port = new RecordingCommunicationPort
+        {
+            ExceptionForAckCall = ackCallNumber =>
+            {
+                if (ackCallNumber != 1) return null;
+
+                cts.Cancel();
+                return cancellation;
+            }
+        };
+        var handler = new TransferFilesCommandHandler(_log);
+
+        Func<Task> act = () => handler.Handle(new TransferFilesCommand
+        {
+            Files = [file],
+            DeviceId = "DEVICEID",
+            CommunicationPort = port,
+            OnFileCompleted = NoOp
+        }, cts.Token);
+
+        // The cancel raised inside the acknowledgement has to travel out untouched. Were it counted as
+        // a failed attempt instead, the retry delay would surface its own cancellation in its place.
+        (await act.Should().ThrowAsync<OperationCanceledException>()).Which.Should().BeSameAs(cancellation);
+
+        port.AttemptCount.Should().Be(1);
+        port.Received.Should().BeEmpty();
+    }
+
     private (string Path, byte[] Bytes) WriteTestFile(int size)
     {
         var bytes = new byte[size];

@@ -82,12 +82,12 @@ namespace TeensyRom.Core.Commands
                 try
                 {
                     port.SendIntBytes(TeensyToken.SendFile, 2);
-                    port.HandleAck();
+                    await port.HandleAckAsync(ct);
                     port.SendIntBytes(file.StreamLength, 4);
                     port.SendIntBytes(file.Checksum, 2);
                     port.SendIntBytes(file.TargetStorage.GetStorageToken(), 1);
                     port.Write($"{file.TargetPath.Value}\0");
-                    port.HandleAck();
+                    await port.HandleAckAsync(ct);
                     port.ClearBuffers();
 
                     using (var stream = file.OpenRead())
@@ -112,10 +112,16 @@ namespace TeensyRom.Core.Commands
                         }
                     }
 
-                    port.HandleAck();
+                    await port.HandleAckAsync(ct);
 
                     logService.InternalSuccess($"Save Success: {file.TargetPath.Value}", deviceId);
                     return (new TransferFileOutcome(file, true, null, true), false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // A cancel can now surface from inside an acknowledgement; without this it would be
+                    // counted as a failed attempt before the retry delay threw it back out anyway.
+                    throw;
                 }
                 catch (Exception ex)
                 {
