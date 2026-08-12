@@ -6,10 +6,12 @@ import { TimerService } from './timer.service';
 describe('TimerService', () => {
   let service: TimerService;
 
-  // Helper to wait for timer ticks
-  const waitForTime = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+  // Advances the fake clock and pumps microtasks so the rxjs interval's
+  // subscription callback actually runs (plain advanceTimersByTime does not).
+  const waitForTime = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
   beforeEach(() => {
+    vi.useFakeTimers();
     TestBed.configureTestingModule({
       providers: [TimerService],
     });
@@ -19,6 +21,7 @@ describe('TimerService', () => {
   afterEach(() => {
     // Cleanup after each test
     service.ngOnDestroy();
+    vi.useRealTimers();
   });
 
   describe('initialization', () => {
