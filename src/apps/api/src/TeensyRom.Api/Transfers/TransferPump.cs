@@ -40,11 +40,7 @@ namespace TeensyRom.Api.Transfers
                 {
                     foreach (var deviceId in queue.ActiveDeviceIds)
                     {
-                        _ = _workers.GetOrAdd(deviceId, id => Task.Factory.StartNew(
-                            () => DrainDeviceAsync(id, stoppingToken),
-                            stoppingToken,
-                            TaskCreationOptions.LongRunning,
-                            TaskScheduler.Default).Unwrap());
+                        _ = _workers.GetOrAdd(deviceId, id => StartDrainWorker(id, stoppingToken));
                     }
 
                     await Task.Delay(SupervisorPollInterval, stoppingToken);
@@ -53,6 +49,53 @@ namespace TeensyRom.Api.Transfers
             catch (OperationCanceledException)
             {
             }
+        }
+
+        /// <summary>
+        /// Runs <see cref="DrainDeviceAsync"/> to completion on one dedicated OS thread for this
+        /// device's entire lifetime - not just its synchronous prologue. A bare
+        /// <c>Task.Factory.StartNew(..., TaskCreationOptions.LongRunning, TaskScheduler.Default)</c>
+        /// only pins the delegate up to its first genuine <c>await</c>; every continuation after that
+        /// resolves <see cref="TaskScheduler.Current"/> back to <see cref="TaskScheduler.Default"/> -
+        /// the ordinary ThreadPool - because that is what the task itself was scheduled on, so an
+        /// inherently async loop like this one would spend almost all of its real work back on the
+        /// pool it exists to stay off of. Installing a single-threaded <see cref="SynchronizationContext"/>
+        /// on a raw <see cref="Thread"/> before starting the loop, and pumping that context's queued
+        /// continuations on the same thread until the loop finishes, keeps every iteration - including
+        /// the async ack path's own network awaits - on the dedicated thread for good.
+        /// </summary>
+        private Task StartDrainWorker(string deviceId, CancellationToken ct)
+        {
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var thread = new Thread(() =>
+            {
+                var syncContext = new SingleThreadSynchronizationContext();
+                SynchronizationContext.SetSynchronizationContext(syncContext);
+
+                try
+                {
+                    var drainTask = DrainDeviceAsync(deviceId, ct);
+                    drainTask.ContinueWith(_ => syncContext.Complete(), TaskScheduler.Default);
+
+                    syncContext.RunOnCurrentThread();
+
+                    drainTask.GetAwaiter().GetResult();
+                    completion.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    completion.SetException(ex);
+                }
+            })
+            {
+                IsBackground = true,
+                Name = $"TransferPump-{deviceId}"
+            };
+
+            thread.Start();
+
+            return completion.Task;
         }
 
         private async Task DrainDeviceAsync(string deviceId, CancellationToken ct)
@@ -373,6 +416,33 @@ namespace TeensyRom.Api.Transfers
             staging.PurgeJob(job.JobId);
             deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
             notifier.JobChanged(job);
+        }
+
+        /// <summary>
+        /// Posts every async continuation back onto the single dedicated thread that installed it, via
+        /// a blocking queue that thread's own message loop drains - the mechanism
+        /// <see cref="StartDrainWorker"/> relies on to keep a drain loop's continuations pinned to one
+        /// OS thread instead of resuming on <see cref="TaskScheduler.Default"/> after the loop's first
+        /// await.
+        /// </summary>
+        private sealed class SingleThreadSynchronizationContext : SynchronizationContext
+        {
+            private readonly BlockingCollection<(SendOrPostCallback Callback, object? State)> _queue = new();
+
+            public override void Post(SendOrPostCallback d, object? state) => _queue.Add((d, state));
+
+            public override void Send(SendOrPostCallback d, object? state) =>
+                throw new NotSupportedException($"{nameof(SingleThreadSynchronizationContext)} does not support synchronous Send.");
+
+            public void RunOnCurrentThread()
+            {
+                foreach (var (callback, state) in _queue.GetConsumingEnumerable())
+                {
+                    callback(state);
+                }
+            }
+
+            public void Complete() => _queue.CompleteAdding();
         }
     }
 }
