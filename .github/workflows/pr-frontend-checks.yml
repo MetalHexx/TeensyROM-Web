@@ -70,9 +70,24 @@ jobs:
       # and 132.9s wall-clock, a ~38% run-to-run spread wide enough to flip
       # pass/fail at a flat 180s bar on ordinary jitter alone. Reset to the
       # worse observed run (182.8s) plus 20% headroom, rounded up to 220s.
+      #
+      # --output-style=static (Nx's own documented CI recommendation) avoids
+      # a real failure mode observed on this runner: without it, streamed
+      # task output is eligible to run through Nx's pseudo-terminal fork path
+      # (forked-process-task-runner.js), which propagates any forked task's
+      # raw exit code straight to the parent via `process.exit(code)` when
+      # that code is >128 — i.e. the task's process was itself killed by a
+      # signal, for any reason, including transient runner conditions
+      # unrelated to the tests. That produced a run where every project had
+      # already finished and reported green, and the wrapper's own budget
+      # summary printed successfully, immediately before the whole step died
+      # with exit 130. `static` forces `streamOutput=false` in Nx's task
+      # orchestrator, which keeps every task on the plain non-pty fork path
+      # and removes this fast-abort branch entirely — it only changes how
+      # task output is buffered for display, not test behavior or results.
       - name: Unit Tests
         timeout-minutes: 10
         run: |
-          node scripts/ci/test-with-budget.mjs -- affected --target=test --parallel=4 \
+          node scripts/ci/test-with-budget.mjs -- affected --target=test --parallel=4 --output-style=static \
             --exclude=teensyrom-ui-e2e,TeensyRom.Api.Tests.Integration,TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api,TeensyRom.Core,TeensyRom.Core.Device,TeensyRom.Core.Serial,TeensyRom.Core.Storage,TeensyRom.Tools.DeepSidExporter
 
