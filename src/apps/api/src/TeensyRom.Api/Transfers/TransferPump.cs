@@ -40,7 +40,11 @@ namespace TeensyRom.Api.Transfers
                 {
                     foreach (var deviceId in queue.ActiveDeviceIds)
                     {
-                        _ = _workers.GetOrAdd(deviceId, id => Task.Run(() => DrainDeviceAsync(id, stoppingToken), stoppingToken));
+                        _ = _workers.GetOrAdd(deviceId, id => Task.Factory.StartNew(
+                            () => DrainDeviceAsync(id, stoppingToken),
+                            stoppingToken,
+                            TaskCreationOptions.LongRunning,
+                            TaskScheduler.Default).Unwrap());
                     }
 
                     await Task.Delay(SupervisorPollInterval, stoppingToken);
