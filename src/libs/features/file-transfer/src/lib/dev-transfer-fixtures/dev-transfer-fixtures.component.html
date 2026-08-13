@@ -28,15 +28,19 @@
 
     <div class="fixture-block confirm-fixture-block">
       <p class="fixture-label">cancel-confirmation dialog</p>
-      <div class="glassy-card confirmation-fixture">
-        <lib-confirmation-dialog
-          [title]="confirmCancelFixture.title"
-          [message]="confirmCancelFixture.message"
-          [confirmLabel]="confirmCancelFixture.confirmLabel"
-          [cancelLabel]="confirmCancelFixture.cancelLabel"
-          [confirmIcon]="confirmCancelFixture.confirmIcon"
-          [showLabels]="confirmCancelFixture.showLabels"
-        />
+      <div class="glassy-dialog">
+        <div class="mat-mdc-dialog-container">
+          <div class="mat-mdc-dialog-surface mdc-dialog__surface">
+            <lib-confirmation-dialog
+              [title]="confirmCancelFixture.title"
+              [message]="confirmCancelFixture.message"
+              [confirmLabel]="confirmCancelFixture.confirmLabel"
+              [cancelLabel]="confirmCancelFixture.cancelLabel"
+              [confirmIcon]="confirmCancelFixture.confirmIcon"
+              [showLabels]="confirmCancelFixture.showLabels"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </section>

@@ -69,12 +69,3 @@
 .confirm-fixture-block {
   align-items: flex-start;
 }
-
-.confirmation-fixture {
-  // Matches the nothing-to-transfer shape's dialog width (SHAPE_WIDTH_PX.nothing-to-transfer in
-  // transfer-progress.component.ts) — the confirmation dialog has no width of its own in
-  // production (MatDialog default), so this fixture-only wrapper just needs to be wide enough
-  // for the two-button row to fit without overflowing.
-  max-width: 480px;
-  padding: var(--spacing-xl);
-}

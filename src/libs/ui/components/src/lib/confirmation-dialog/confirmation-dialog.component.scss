@@ -2,10 +2,20 @@
   display: block;
 }
 
-// Dialog container sizing - narrower than name dialog for focused attention
-lib-scaling-compact-card {
-  max-width: 350px;
+// Dialog container sizing. Self-supplied because MatDialog's shared .glassy-dialog
+// panel class only provides background/blur/radius/shadow, never padding (see
+// BusyDialogComponent for the established sibling pattern). 480px keeps the
+// labelled two-button row (e.g. "Keep transferring" / "Cancel transfer") from
+// overflowing.
+.dialog-panel {
+  max-width: 480px;
   width: 100%;
+  padding: var(--spacing-xl);
+  box-sizing: border-box;
+}
+
+.mat-mdc-dialog-surface {
+  padding: 0;
 }
 
 // Dialog header with warning icon
@@ -50,7 +60,7 @@ lib-scaling-compact-card {
 
 // Mobile responsiveness
 @media (max-width: 600px) {
-  lib-scaling-compact-card {
+  .dialog-panel {
     max-width: 100%;
     margin: var(--spacing-sm);
   }
