@@ -610,6 +610,20 @@ describe('PlayerContextService - play timer', () => {
   });
 
   describe('isSlowLoading', () => {
+    // This block races launchDelayMs thresholds against tight wait() windows (20-90ms), which
+    // is prone to flake under real CPU contention (a real timer can fall behind under load) -
+    // see timer.service.spec.ts for the same class of fix. Fake timers make every threshold
+    // crossing deterministic; advanceTime replaces wait() only within this describe.
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const advanceTime = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+
     const setDeviceLoading = (
       targetHarness: PlayerHarness,
       targetDeviceId: string,
@@ -645,7 +659,7 @@ describe('PlayerContextService - play timer', () => {
       TestBed.flushEffects();
       expect(signal()).toBe(false);
 
-      await wait(70);
+      await advanceTime(70);
       TestBed.flushEffects();
       expect(signal()).toBe(true);
 
@@ -661,11 +675,11 @@ describe('PlayerContextService - play timer', () => {
 
       setDeviceLoading(slowHarness, deviceId, true);
       TestBed.flushEffects();
-      await wait(20);
+      await advanceTime(20);
       setDeviceLoading(slowHarness, deviceId, false);
       TestBed.flushEffects();
 
-      await wait(80);
+      await advanceTime(80);
       TestBed.flushEffects();
       expect(signal()).toBe(false);
     });
@@ -680,7 +694,7 @@ describe('PlayerContextService - play timer', () => {
       setDeviceLoading(slowHarness, deviceId, true);
       setDeviceLoading(slowHarness, other, true);
       TestBed.flushEffects();
-      await wait(50);
+      await advanceTime(50);
       TestBed.flushEffects();
       expect(signal()).toBe(true);
 
@@ -703,7 +717,7 @@ describe('PlayerContextService - play timer', () => {
       setDeviceLoading(slowHarness, deviceId, true);
       setDeviceLoading(slowHarness, other, true);
       TestBed.flushEffects();
-      await wait(50);
+      await advanceTime(50);
       TestBed.flushEffects();
       expect(signal()).toBe(true);
 
@@ -724,17 +738,21 @@ describe('PlayerContextService - play timer', () => {
       for (let i = 0; i < 5; i++) {
         setDeviceLoading(slowHarness, deviceId, true);
         TestBed.flushEffects();
-        await wait(20);
+        await advanceTime(20);
         setDeviceLoading(slowHarness, deviceId, false);
         TestBed.flushEffects();
-        await wait(10);
+        await advanceTime(10);
       }
 
       expect(signal()).toBe(false);
     });
 
     it('a real launch that takes longer than the threshold trips the signal, then clears once it resolves', async () => {
-      const slowHarness = createPlayerHarness({ launchDelayMs: 30 });
+      // timerTickMs defaults to 0 in the harness. A successful launch here starts a real
+      // playback timer with that tick, and advancing fake time across a genuinely 0ms-period
+      // interval() is a runaway (unboundedly many ticks "due" per ms advanced) - give it a
+      // harmless real value, matching the auto-progression describe block's own convention.
+      const slowHarness = createPlayerHarness({ launchDelayMs: 30, timerTickMs: 1100 });
       slowHarness.service.initializePlayer(deviceId);
       const signal = slowHarness.service.isSlowLoading();
       const testFile = createTestFileItem();
@@ -755,30 +773,38 @@ describe('PlayerContextService - play timer', () => {
         files: [testFile],
       });
 
-      await wait(50);
+      await advanceTime(50);
       TestBed.flushEffects();
       expect(signal()).toBe(true);
 
+      // Advance past the mock's own 80ms setTimeout (also faked) so it resolves.
+      await advanceTime(30);
       await launchPromise;
       TestBed.flushEffects();
       expect(signal()).toBe(false);
     });
 
     it('a real launch faster than the threshold never trips the signal', async () => {
-      const slowHarness = createPlayerHarness({ launchDelayMs: 60 });
+      // See the previous test: a non-zero timerTickMs avoids the 0ms-interval runaway once
+      // the launch (here instant) creates a real playback timer before we advance time again.
+      const slowHarness = createPlayerHarness({ launchDelayMs: 60, timerTickMs: 1100 });
       slowHarness.service.initializePlayer(deviceId);
       const signal = slowHarness.service.isSlowLoading();
       const testFile = createTestFileItem();
       slowHarness.playerService.launchFile = vi.fn(() => of(testFile));
 
-      await slowHarness.service.launchFileWithContext({
+      const launchPromise = slowHarness.service.launchFileWithContext({
         deviceId,
         file: testFile,
         directoryPath: '/music',
         files: [testFile],
       });
+      // Even a synchronous of() launch can pass through a zero-delay macrotask
+      // (RxJS/zone.js scheduling) that a bare await never fires under fake timers.
+      await advanceTime(0);
+      await launchPromise;
 
-      await wait(90);
+      await advanceTime(90);
       TestBed.flushEffects();
       expect(signal()).toBe(false);
     });
