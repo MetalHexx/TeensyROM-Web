@@ -544,7 +544,7 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
         }
 
         [Fact]
-        public async Task Pump_PipelineRejectsBatchBeforeHandlerRuns_ReleasesGateWithoutLeakingStagedFiles()
+        public async Task Pump_PipelineRejectsBatchBeforeHandlerRuns_AbortsJobWithReportedErrorInsteadOfSilentlyDropping()
         {
             var device = f.DeviceManager.Devices[0];
             var port = f.DeviceManager.PortFor(device.DeviceId);
@@ -564,7 +564,10 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             // MediatR's ExceptionBehavior converts that into a normal TransferFilesResult with
             // IsSuccess = false and an empty Outcomes list rather than letting the exception escape
             // mediator.Send - the second escape path the exactly-once cleanup invariant has to cover,
-            // since no file is ever reported through the per-file callback at all.
+            // since no file is ever reported through the per-file callback at all. SendBatchAsync must
+            // notice IsSuccess = false and abort every still-pending file with the reported error,
+            // the same way the sibling catch-block does for a composition exception - otherwise these
+            // two files would vanish with the job reporting Completed and no failure at all.
             port.SimulateDeviceLoss = true;
 
             try
@@ -576,12 +579,13 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 pump.TryFinalize(job);
 
                 await WaitUntilAsync(() =>
-                    job.State == TransferJobState.Completed &&
+                    job.State == TransferJobState.Aborted &&
                     leaseCoordinator.GetHolder(device.DeviceId) is null &&
                     gate.Current == (0, 0));
 
                 port.Received.Should().NotContain(r => r.Path == firstTarget.Value || r.Path == secondTarget.Value);
                 gate.Current.Should().Be((0, 0));
+                job.ToSnapshot().Error.Should().NotBeNullOrEmpty();
             }
             finally
             {

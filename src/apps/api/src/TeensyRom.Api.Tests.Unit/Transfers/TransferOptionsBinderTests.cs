@@ -52,6 +52,18 @@ public class TransferOptionsBinderTests
         options.BatchSize.Should().Be(1);
     }
 
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    public void BindFrom_OutOfRangeMaxStagedBytes_ClampsToOne(string configuredMaxStagedBytes)
+    {
+        var configuration = ConfigurationFrom(new() { ["Transfer:MaxStagedBytes"] = configuredMaxStagedBytes });
+
+        var options = TransferOptionsBinder.BindFrom(configuration);
+
+        options.MaxStagedBytes.Should().Be(1);
+    }
+
     [Fact]
     public void BindFrom_ZeroRecentCompletionsBound_ClampsToAtLeastOne()
     {

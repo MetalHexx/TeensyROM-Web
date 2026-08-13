@@ -16,6 +16,7 @@ namespace TeensyRom.Api.Transfers
 
             configuration.GetSection("Transfer").Bind(options);
 
+            options.MaxStagedBytes = Math.Max(1, options.MaxStagedBytes);
             options.BatchSize = Math.Max(1, options.BatchSize);
             options.RecentCompletionsBound = Math.Max(1, options.RecentCompletionsBound);
             options.RetainedFailuresBound = Math.Max(1, options.RetainedFailuresBound);

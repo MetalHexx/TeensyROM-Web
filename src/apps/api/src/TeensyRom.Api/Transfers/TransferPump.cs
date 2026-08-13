@@ -231,7 +231,7 @@ namespace TeensyRom.Api.Transfers
 
                 try
                 {
-                    await mediator.Send(new TransferFilesCommand
+                    var result = await mediator.Send(new TransferFilesCommand
                     {
                         Files = transfers,
                         DeviceId = firstEntry.Job.DeviceId,
@@ -239,6 +239,19 @@ namespace TeensyRom.Api.Transfers
                         OnFileCompleted = (outcome, _) => HandleOutcome(outcome, stagedByTransfer, pending),
                         ShouldSkip = transfer => IsJobInactive(stagedByTransfer, pending, transfer)
                     }, ct);
+
+                    // A pipeline behavior (e.g. CommunicationPortBehavior refusing a busy/minimal-FW
+                    // device) can produce IsSuccess=false without ever invoking the handler, so no
+                    // OnFileCompleted callback ran for any file. Anything still pending at this point
+                    // failed for the reason the pipeline reported, not because it was dropped.
+                    if (!result.IsSuccess)
+                    {
+                        foreach (var entry in pending.Values.ToArray())
+                        {
+                            pending.Remove(entry.Staged);
+                            AbortPendingFile(entry.Job, entry.Staged, $"Device write failed: {result.Error}");
+                        }
+                    }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
