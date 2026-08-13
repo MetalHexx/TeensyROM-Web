@@ -162,6 +162,9 @@ describe('TransferModalComponent', () => {
   });
 
   describe('view model assembly', () => {
+    // Runs a full TestBed setup + fixture per modal state (12 iterations), which is
+    // genuinely ~700-1000ms of real work locally and can tip past the suite's 2000ms
+    // default under CI's parallel CPU contention - give it real headroom instead.
     it('yields a non-null view model for every modal state the store can produce', async () => {
       for (const state of ALL_MODAL_STATES) {
         await setup();
@@ -173,7 +176,7 @@ describe('TransferModalComponent', () => {
         expect(component.vm().state).toBe(state);
         fixture.destroy();
       }
-    });
+    }, 10000);
 
     it('reads deviceName from the matching device, falling back to the deviceId when unmatched', async () => {
       await setup([createDevice({ deviceId: 'other-device', name: 'Someone Else' })]);
