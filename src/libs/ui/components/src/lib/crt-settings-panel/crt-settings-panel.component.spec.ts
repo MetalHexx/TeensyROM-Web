@@ -1215,6 +1215,9 @@ describe('CrtSettingsPanelComponent', () => {
       expect((component as any).showNameDialog()).toBe(false);
     });
 
+    // Rendering 50 custom presets into the dropdown is genuinely slow (~1.3s of real
+    // Angular/jsdom change detection, not a hang) and can tip past the suite's 2000ms
+    // default under CI's parallel CPU contention - give it real headroom instead.
     it('should not save preset when maximum limit reached', () => {
       // Mock 50 existing presets
       const maxPresets = Array.from({ length: 50 }, (_, i) => ({
@@ -1223,22 +1226,22 @@ describe('CrtSettingsPanelComponent', () => {
         createdAt: new Date().toISOString(),
       }));
       mockCrtStorage.loadCustomPresets.mockReturnValue(maxPresets);
-      
+
       fixture = createComponentFixture();
       component = fixture.componentInstance;
       fixture.detectChanges();
-      
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (component as any).onSaveAsPreset();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (component as any).onNameDialogConfirmed('Test Preset');
-      
+
       // Should NOT call save
       expect(mockCrtStorage.saveCustomPreset).not.toHaveBeenCalled();
       // Should close dialog
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((component as any).showNameDialog()).toBe(false);
-    });
+    }, 10000);
 
     it('should handle save errors gracefully', () => {
       mockCrtStorage.saveCustomPreset.mockImplementation(() => {
