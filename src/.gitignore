@@ -34,6 +34,9 @@ yarn-error.log
 testem.log
 /typings
 
+# per-project Vitest JSON timing reports (src/scripts/ci/test-with-budget.mjs)
+/.test-timings
+
 # System Files
 .DS_Store
 Thumbs.db

@@ -15,7 +15,14 @@ export default defineConfig(() => ({
     include: ['{src,tests}/**/*.spec.{js,mjs,cjs,ts,mts,cts,jsx,tsx}', '{src,tests}/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     exclude: [],
     setupFiles: ['src/test-setup.ts'],
-    reporters: ['default'],
+    reporters: ['default', ['json', { outputFile: '../../.test-timings/infrastructure.json' }]],
+    testTimeout: 2000,
+    hookTimeout: 5000,
+    onConsoleLog(log) {
+      if (log.includes('Could not parse CSS stylesheet')) {
+        return false;
+      }
+    },
     coverage: {
       reportsDirectory: '../../coverage/libs/infrastructure',
       provider: 'v8' as const,

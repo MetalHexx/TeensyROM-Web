@@ -150,6 +150,15 @@ export class ContentOverlayContainerComponent {
    */
   private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /**
+   * Timer ID for the pending CDK overlay container detection retry.
+   * Cleared on destroy so the retry chain can't keep firing after teardown.
+   */
+  private overlayObserverRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Set once destroyed, to stop the overlay observer retry chain from rescheduling itself. */
+  private isDestroyed = false;
+
   constructor() {
     afterNextRender(() => {
       // Initialize container element reference for scoped overlay detection
@@ -159,9 +168,14 @@ export class ContentOverlayContainerComponent {
     });
 
     this.destroyRef.onDestroy(() => {
+      this.isDestroyed = true;
       document.removeEventListener('fullscreenchange', this.fullscreenHandler);
       this.overlayObserver?.disconnect();
       this.clearInactivityTimer();
+      if (this.overlayObserverRetryTimer !== null) {
+        clearTimeout(this.overlayObserverRetryTimer);
+        this.overlayObserverRetryTimer = null;
+      }
     });
   }
 
@@ -170,10 +184,17 @@ export class ContentOverlayContainerComponent {
    * This allows us to keep overlays visible when dropdowns are open.
    */
   private setupCdkOverlayObserver(): void {
+    if (this.isDestroyed) {
+      return;
+    }
+
     const overlayContainer = document.querySelector('.cdk-overlay-container');
     if (!overlayContainer) {
       // CDK overlay container doesn't exist yet - try again shortly
-      setTimeout(() => this.setupCdkOverlayObserver(), 100);
+      this.overlayObserverRetryTimer = setTimeout(() => {
+        this.overlayObserverRetryTimer = null;
+        this.setupCdkOverlayObserver();
+      }, 100);
       return;
     }
 

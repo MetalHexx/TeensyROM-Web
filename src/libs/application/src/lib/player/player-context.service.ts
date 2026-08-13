@@ -12,6 +12,7 @@ import {
   ALERT_SERVICE,
   IAlertService,
   PLAYER_LAUNCH_DELAY_MS,
+  PLAYER_INCOMPATIBLE_RETRY_DELAY_MS,
 } from '@teensyrom-nx/domain';
 import { PlayerStore, LaunchedFile, HistoryEntry } from './player-store';
 import { StorageStore } from '../storage/storage-store';
@@ -25,7 +26,7 @@ import { parsePlayLength } from './timer-utils';
 import { DEFAULT_TIMER_MS } from './player.constants';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import { Subscription, of, timer, concat, race } from 'rxjs';
-import { map, distinctUntilChanged, switchMap, mapTo, take } from 'rxjs/operators';
+import { map, distinctUntilChanged, switchMap, mapTo, take, skip } from 'rxjs/operators';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerContextService implements IPlayerContext {
@@ -38,6 +39,7 @@ export class PlayerContextService implements IPlayerContext {
   private readonly playerStorage = inject(PLAYER_STORAGE);
   private readonly injector = inject(Injector);
   private readonly launchDelayMs = inject(PLAYER_LAUNCH_DELAY_MS);
+  private readonly incompatibleRetryDelayMs = inject(PLAYER_INCOMPATIBLE_RETRY_DELAY_MS);
 
   // Constant null signal to return when no timer exists (avoids NG0602 in reactive contexts)
   private readonly nullTimerSignal: Signal<TimerState | null> = signal<TimerState | null>(
@@ -214,7 +216,12 @@ export class PlayerContextService implements IPlayerContext {
           // Monitor for loading to finish: if loading becomes false before timer,
           // the switchMap cancels this inner observable
           isLoadingChanges$.pipe(
-            // Skip the current true value, wait for next change (should be false)
+            // isLoadingChanges$ is backed by toObservable()'s ReplaySubject(1), which
+            // replays its buffered current value synchronously to every new subscriber.
+            // Without skip(1) that replayed `true` (the value that triggered this branch)
+            // would satisfy take(1) immediately, emitting false before any real change.
+            skip(1),
+            // Wait for the next genuine change (should be false when loading finishes)
             take(1),
             // If it's false, we completed fast - emit false
             map(() => false)
@@ -302,10 +309,10 @@ export class PlayerContextService implements IPlayerContext {
             launchMode: this.store.getLaunchMode(deviceId)(),
           });
 
-          // Sync incompatible file to storage store
-          if (launchedFile?.isCompatible === false) {
-            this.markFileInStorageAsIncompatible(deviceId, storageType, launchedFile.file.path);
-          }
+          // Storage sync for an incompatible launched file is left to handleIncompatibleFile,
+          // which every caller of this method invokes immediately afterward. Marking here too
+          // double-invokes updateFileCompatibility for the same path on every random/history
+          // launch of an incompatible file.
         }
       }
     } catch {
@@ -1032,7 +1039,7 @@ export class PlayerContextService implements IPlayerContext {
       );
       setTimeout(() => {
         void this.launchRandomFile(deviceId);
-      }, 1000);
+      }, this.incompatibleRetryDelayMs);
     } else {
       // Directory or Search modes
       logInfo(
@@ -1041,7 +1048,7 @@ export class PlayerContextService implements IPlayerContext {
       );
       setTimeout(() => {
         void this.advanceToNextCompatibleFileInDirectory(deviceId);
-      }, 1000);
+      }, this.incompatibleRetryDelayMs);
     }
   }
 
@@ -1086,7 +1093,13 @@ export class PlayerContextService implements IPlayerContext {
 
     const { files, currentIndex, storageKey } = fileContext;
     const { storageType } = StorageKeyUtil.parse(storageKey);
-    const maxAttempts = files.length; // Prevent infinite loops
+    // Bounded to files.length - 1: examine every *other* file exactly once. At
+    // files.length attempts the wrap-around (currentIndex + 1 + i) % files.length lands
+    // back on currentIndex itself for i = files.length - 1, which is the file
+    // handleIncompatibleFile already marked incompatible before scheduling this scan -
+    // re-examining it double-marks the same path. A single-file directory yields 0
+    // attempts here, falling straight through to the alert + random-launch fallback below.
+    const maxAttempts = files.length - 1;
 
     // Search for next compatible file starting from currentIndex + 1
     for (let i = 0; i < maxAttempts; i++) {

@@ -24,22 +24,46 @@ export default [
             // Application Layer - Can only depend on domain and shared utilities
             {
               sourceTag: 'scope:application',
-              onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared'],
+              onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared', 'scope:testing'],
             },
             // Infrastructure Layer - Can depend on application, domain, shared utilities, and api-client
             {
               sourceTag: 'scope:infrastructure',
-              onlyDependOnLibsWithTags: ['scope:application', 'scope:domain', 'scope:shared', 'scope:data-access'],
+              onlyDependOnLibsWithTags: [
+                'scope:application',
+                'scope:domain',
+                'scope:shared',
+                'scope:data-access',
+                'scope:testing',
+              ],
             },
             // Features Layer - Can depend on application, domain, and shared UI
             {
               sourceTag: 'scope:features',
-              onlyDependOnLibsWithTags: ['scope:application', 'scope:domain', 'scope:shared'],
+              onlyDependOnLibsWithTags: [
+                'scope:application',
+                'scope:domain',
+                'scope:shared',
+                'scope:testing',
+                'scope:testing-app',
+              ],
             },
             // Shared libraries - Can depend on each other and domain
             {
               sourceTag: 'scope:shared',
-              onlyDependOnLibsWithTags: ['scope:shared', 'scope:domain'],
+              onlyDependOnLibsWithTags: ['scope:shared', 'scope:domain', 'scope:testing'],
+            },
+            // Testing Layer - Shared test fixtures and mocks; may depend on domain and shared only,
+            // never on application (its own specs consume this library, so that edge would cycle)
+            {
+              sourceTag: 'scope:testing',
+              onlyDependOnLibsWithTags: ['scope:domain', 'scope:shared'],
+            },
+            // Testing-App Layer - Mocks for application-side contracts (e.g. IPlayerContext);
+            // consumed by features and app, never by application (that edge would cycle)
+            {
+              sourceTag: 'scope:testing-app',
+              onlyDependOnLibsWithTags: ['scope:domain', 'scope:application', 'scope:shared', 'scope:testing'],
             },
             // App Layer - Composition root: can depend on everything
             {
@@ -51,6 +75,8 @@ export default [
                 'scope:infrastructure',
                 'scope:shared',
                 'scope:app',
+                'scope:testing',
+                'scope:testing-app',
               ],
             },
             // E2E Tests - Can depend on data-access for API DTOs
@@ -86,6 +112,22 @@ export default [
     rules: {
       // Disallow explicit 'any' type annotations - prefer unknown or specific types
       '@typescript-eslint/no-explicit-any': 'error',
+      // allow the levels that carry real signal; ban the debug ones
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // Spec files are legitimate console users (test setup/mocks, assertions on output).
+    files: ['**/*.spec.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
+    // log-helper.ts is the workspace logging helper and legitimately wraps console.log.
+    files: ['**/log-helper.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 ];

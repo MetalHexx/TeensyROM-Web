@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   PNPM_VERSION: '9'
   NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
 
@@ -21,6 +21,7 @@ jobs:
   frontend-checks:
     name: Frontend Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     defaults:
       run:
@@ -60,8 +61,32 @@ jobs:
           pnpm exec nx affected --target=typecheck \
             --exclude=teensyrom-ui-e2e,TeensyRom.Api.Tests.Integration,TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api,TeensyRom.Core,TeensyRom.Core.Device,TeensyRom.Core.Serial,TeensyRom.Core.Storage,TeensyRom.Tools.DeepSidExporter
 
+      # Budget defaults to 220s in the wrapper; override by setting a
+      # TEST_BUDGET_SECONDS env var on this step (no script edit needed) to
+      # diagnose a failing run without changing the enforced bar.
+      #
+      # Raised from the original 180s: two consecutive fresh
+      # (--skip-nx-cache) full-suite runs on identical code measured 182.8s
+      # and 132.9s wall-clock, a ~38% run-to-run spread wide enough to flip
+      # pass/fail at a flat 180s bar on ordinary jitter alone. Reset to the
+      # worse observed run (182.8s) plus 20% headroom, rounded up to 220s.
+      #
+      # --exclude uses a "TeensyRom.*" glob rather than the old hand-enumerated
+      # project list: this job never runs `dotnet restore`, so any backend
+      # .NET test project that slips through fails its `TeensyRom.Core:build`
+      # dependency (NETSDK1004: assets file not found) and drags the whole
+      # `nx affected` run down with it (exit 130), even though every frontend
+      # project reports green first. The old exact-name list had drifted from
+      # the current backend project set (e.g. TeensyRom.Core.Tests was split
+      # into TeensyRom.Core.{Device,Serial}.Tests.{Unit,Integration} plus
+      # TeensyRom.Core.Audio.Tests[.Unit] and TeensyRom.Api.Tests.Unit — none
+      # of which were in the old list) and reproduced this on every run, not
+      # just intermittently. No frontend project name starts with "TeensyRom."
+      # (frontend projects use lowercase teensyrom-ui / kebab-case names), so
+      # the glob only ever matches backend .NET projects, present or future.
       - name: Unit Tests
+        timeout-minutes: 10
         run: |
-          pnpm exec nx affected --target=vite:test \
-            --exclude=teensyrom-ui-e2e,TeensyRom.Api.Tests.Integration,TeensyRom.Core.Tests,TeensyRom.Core.Storage.Tests,TeensyRom.Api,TeensyRom.Core,TeensyRom.Core.Device,TeensyRom.Core.Serial,TeensyRom.Core.Storage,TeensyRom.Tools.DeepSidExporter
+          node scripts/ci/test-with-budget.mjs -- affected --target=test --parallel=4 \
+            --exclude=teensyrom-ui-e2e,TeensyRom.*
 

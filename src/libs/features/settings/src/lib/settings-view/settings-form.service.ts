@@ -60,11 +60,20 @@ export class SettingsFormService {
   readonly showSaving = signal<boolean>(false);
 
   /**
+   * Mirrors `settingsForm().valid` as a signal. `FormGroup.valid` is a plain getter, not a
+   * signal, so reading it inside `canSave`'s `computed()` would not register it as a dependency
+   * — the computed would only recompute when `settingsForm` or `isSaving` change, silently
+   * going stale whenever the form transitions valid/invalid on its own (e.g. a field edit).
+   * Kept in sync via `statusChanges` so `canSave` reacts to real form validity changes.
+   */
+  private readonly formValid = signal<boolean>(false);
+
+  /**
    * Computed: whether manual save is allowed
    */
   readonly canSave = computed(() => {
     const form = this.settingsForm();
-    return form !== null && form.valid && !this.isSaving();
+    return form !== null && this.formValid() && !this.isSaving();
   });
 
   /**
@@ -92,6 +101,7 @@ export class SettingsFormService {
     this.setupAutoSave();
     this.setupStoreSync();
     this.setupSavingIndicator();
+    this.setupFormValidityTracking();
   }
 
   /**
@@ -126,6 +136,25 @@ export class SettingsFormService {
             await this.saveSettings();
           });
       }
+    });
+  }
+
+  /**
+   * Keeps `formValid` in sync with the form's real validity, including changes that don't
+   * originate from a `settingsForm`/`isSaving` signal write (e.g. the user editing a field).
+   */
+  private setupFormValidityTracking(): void {
+    effect(() => {
+      const form = this.settingsForm();
+      if (!form) {
+        this.formValid.set(false);
+        return;
+      }
+
+      this.formValid.set(form.valid);
+      form.statusChanges
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => this.formValid.set(form.valid));
     });
   }
 

@@ -18,7 +18,14 @@ export default defineConfig(() => ({
     environment: 'jsdom',
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     setupFiles: ['src/test-setup.ts'],
-    reporters: ['default'],
+    reporters: ['default', ['json', { outputFile: '../../../.test-timings/ui-components.json' }]],
+    testTimeout: 2000,
+    hookTimeout: 5000,
+    onConsoleLog(log) {
+      if (log.includes('Could not parse CSS stylesheet')) {
+        return false;
+      }
+    },
     coverage: {
       reportsDirectory: '../../coverage/libs/ui',
       provider: 'v8' as const,

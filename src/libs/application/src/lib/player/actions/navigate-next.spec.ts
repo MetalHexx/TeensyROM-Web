@@ -3,8 +3,6 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { updateState } from '@angular-architects/ngrx-toolkit';
 import {
-  FileItem,
-  FileItemType,
   LaunchMode,
   PlayerStatus,
   PLAYER_SERVICE,
@@ -12,40 +10,12 @@ import {
   PlayerFilterType,
   DEVICE_SERVICE,
 } from '@teensyrom-nx/domain';
+import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { navigateNext } from './navigate-next';
 import { PlayerStore, PlayerState, PlayerFileContext } from '../player-store';
 import { WritableStore } from '../player-helpers';
 import { PLAYER_STORAGE } from '../player-storage.interface';
 import type { StorageKey } from '../../storage/storage-key.util';
-
-const createTestFileItem = (overrides: Partial<FileItem> = {}): FileItem => ({
-  name: 'test-file.sid',
-  path: '/music/test-file.sid',
-  size: 4096,
-  type: FileItemType.Song,
-  isFavorite: false,
-  isCompatible: true,
-  title: 'Test Song',
-  creator: 'Test Artist',
-  releaseInfo: '2025',
-  description: 'Test song description',
-  shareUrl: '',
-  metadataSource: '',
-  meta1: '',
-  meta2: '',
-  metadataSourcePath: '',
-  parentPath: '/music',
-  playLength: '3:45',
-  subtuneLengths: [],
-  startSubtuneNum: 0,
-  images: [],
-  links: [],
-  tags: [],
-  youTubeVideos: [],
-  competitions: [],
-  ratingCount: 0,
-  ...overrides,
-});
 
 describe('navigateNext', () => {
   let store: WritableStore<PlayerState>;

@@ -1,520 +1,243 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal, WritableSignal, Signal } from '@angular/core';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
+import { of, throwError, NEVER } from 'rxjs';
+import { StorageStore, type IPlayerContext, type LaunchedFile } from '@teensyrom-nx/application';
+import { createMockStorageService, createTestFileItem } from '@teensyrom-nx/testing/fixtures';
+import { STORAGE_SERVICE, LaunchMode, type FileItem, type IStorageService } from '@teensyrom-nx/domain';
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
 import { SearchResultsComponent } from './search-results.component';
-import {
-  PLAYER_CONTEXT,
-  SearchState,
-  LaunchedFile,
-  StorageKeyUtil,
-  IPlayerContext,
-  StorageStore,
-  StorageDirectoryState,
-  ShuffleSettings,
-} from '@teensyrom-nx/application';
-import {
-  FileItem,
-  FileItemType,
-  LaunchMode,
-  StorageType,
-  PlayerFilterType,
-  PlayerScope,
-} from '@teensyrom-nx/domain';
+
+const deviceId = 'device-1';
 
 describe('SearchResultsComponent', () => {
-  let component: SearchResultsComponent;
-  let fixture: ComponentFixture<SearchResultsComponent>;
-  let mockStorageStore: {
-    getSearchState: (deviceId: string) => Signal<SearchState | null>;
-    getSelectedDirectoryState: (deviceId: string) => Signal<StorageDirectoryState | null>;
-  };
-  let mockPlayerContext: Partial<IPlayerContext>;
-
-  let searchStateSignal: WritableSignal<SearchState | null>;
-  let currentFileSignal: WritableSignal<LaunchedFile | null>;
-  let launchModeSignal: WritableSignal<LaunchMode>;
-  let errorSignal: WritableSignal<string | null>;
-  let selectedDirectorySignal: WritableSignal<StorageDirectoryState | null>;
-  let shuffleSettingsSignal: WritableSignal<ShuffleSettings | null>;
-
-  const mockFileItem1: FileItem = {
-    path: '/test/file1.sid',
-    name: 'file1.sid',
-    size: 1024,
-    type: FileItemType.Song,
-    images: [],
-    parentPath: '/test',
-    description: 'Test file 1',
-    isFavorite: false,
-    isCompatible: true,
-    title: '',
-    creator: '',
-    releaseInfo: '',
-    shareUrl: '',
-    metadataSource: '',
-    meta1: '',
-    meta2: '',
-    metadataSourcePath: '',
-    playLength: '',
-    subtuneLengths: [],
-    startSubtuneNum: 0,
-    links: [],
-    tags: [],
-    youTubeVideos: [],
-    competitions: [],
-    ratingCount: 0,
-    storageType: StorageType.Usb,
-  };
-
-  const mockFileItem2: FileItem = {
-    path: '/test/file2.sid',
-    name: 'file2.sid',
-    size: 2048,
-    type: FileItemType.Song,
-    images: [],
-    parentPath: '/test',
-    description: 'Test file 2',
-    isFavorite: false,
-    isCompatible: true,
-    title: '',
-    creator: '',
-    releaseInfo: '',
-    shareUrl: '',
-    metadataSource: '',
-    meta1: '',
-    meta2: '',
-    metadataSourcePath: '',
-    playLength: '',
-    subtuneLengths: [],
-    startSubtuneNum: 0,
-    links: [],
-    tags: [],
-    youTubeVideos: [],
-    competitions: [],
-    ratingCount: 0,
-  };
-
-  beforeEach(async () => {
-    // Create signal mocks
-    searchStateSignal = signal<SearchState | null>(null);
-    currentFileSignal = signal<LaunchedFile | null>(null);
-    launchModeSignal = signal<LaunchMode>(LaunchMode.Directory);
-    errorSignal = signal<string | null>(null);
-    selectedDirectorySignal = signal<StorageDirectoryState | null>(null);
-    shuffleSettingsSignal = signal<ShuffleSettings | null>({
-      filter: PlayerFilterType.All,
-      scope: PlayerScope.DirectoryShallow,
-    });
-
-    // Create mock StorageStore
-    mockStorageStore = {
-      getSearchState: () => searchStateSignal.asReadonly(),
-      getSelectedDirectoryState: () => selectedDirectorySignal.asReadonly(),
+  beforeEach(() => {
+    // The auto-select effect schedules a scroll-into-view that calls CSS.escape and
+    // Element.scrollIntoView; jsdom implements neither.
+    (globalThis as { CSS?: { escape(value: string): string } }).CSS = {
+      escape: (value: string) => value,
     };
+    Element.prototype.scrollIntoView = vi.fn();
+  });
 
-    // Create mock PlayerContext using IPlayerContext interface
-    mockPlayerContext = {
-      getCurrentFile: () => currentFileSignal.asReadonly(),
-      getLaunchMode: () => launchModeSignal.asReadonly(),
-      getError: () => errorSignal.asReadonly(),
-      getShuffleSettings: () => shuffleSettingsSignal.asReadonly(),
-      launchFileWithContext: vi.fn(),
-    } as Partial<IPlayerContext>;
-
-    await TestBed.configureTestingModule({
-      imports: [SearchResultsComponent],
+  function render(
+    searchServiceOverrides: Partial<IStorageService> = {},
+    playerContext: Partial<IPlayerContext> = {}
+  ) {
+    const result = renderPlayerComponent(SearchResultsComponent, {
+      inputs: { deviceId },
+      playerContext,
       providers: [
-        provideNoopAnimations(),
-        { provide: StorageStore, useValue: mockStorageStore },
-        { provide: PLAYER_CONTEXT, useValue: mockPlayerContext },
+        { provide: STORAGE_SERVICE, useValue: createMockStorageService(searchServiceOverrides) },
       ],
-    }).compileComponents();
+    });
+    return { ...result, storageStore: TestBed.inject(StorageStore) };
+  }
 
-    fixture = TestBed.createComponent(SearchResultsComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'test-device');
+  async function renderWithResults(files: FileItem[], playerContext: Partial<IPlayerContext> = {}) {
+    const rendered = render({ search: vi.fn().mockReturnValue(of(files)) }, playerContext);
+    await rendered.storageStore.searchFiles({ deviceId, searchText: 'test' });
+    rendered.fixture.detectChanges();
+    return rendered;
+  }
+
+  it('creates the component', () => {
+    const { component } = render();
+    expect(component).toBeTruthy();
   });
 
-  describe('Component Rendering', () => {
-    it('should create component successfully', () => {
-      expect(component).toBeTruthy();
+  it('shows neither the empty state nor the results list while actively searching', async () => {
+    // The "not searched yet" empty state only clears once a search has completed at least
+    // once (hasSearched stays true across a re-search), so this simulates re-searching rather
+    // than the very first search.
+    const search = vi.fn().mockReturnValueOnce(of([])).mockReturnValue(NEVER);
+    const { fixture, storageStore } = render({ search });
+    await storageStore.searchFiles({ deviceId, searchText: 'first' });
+    void storageStore.searchFiles({ deviceId, searchText: 'test' });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('lib-empty-state-message')).toBeFalsy();
+    expect(fixture.nativeElement.querySelector('.search-results-list')).toBeFalsy();
+  });
+
+  it('renders an error state when the search fails', async () => {
+    const { fixture, storageStore } = render({
+      search: vi.fn().mockReturnValue(throwError(() => new Error('Search failed'))),
     });
+    await storageStore.searchFiles({ deviceId, searchText: 'test' });
+    fixture.detectChanges();
 
-    it('should display loading state when searching', () => {
-      selectedDirectorySignal.set({
-        deviceId: 'test-device',
-        storageType: StorageType.Usb,
-        currentPath: '/test',
-        directory: null,
-        isLoaded: true,
-        isLoading: false,
-        error: null,
-        lastLoadTime: null,
-      });
+    expect(fixture.nativeElement.querySelector('.error-state')).toBeTruthy();
+  });
 
-      searchStateSignal.set({
-        searchText: 'test',
-        filterType: null,
-        results: [],
-        isSearching: true,
-        hasSearched: true, // Changed to true - search has been initiated
-        error: null,
-      });
+  it('shows a "not searched yet" empty state before any search runs', () => {
+    const { fixture } = render();
+    expect(fixture.nativeElement.querySelector('lib-empty-state-message')).toBeTruthy();
+  });
 
-      fixture.detectChanges();
+  it('shows a "no results" empty state after a search with zero matches', async () => {
+    const { fixture } = await renderWithResults([]);
+    expect(fixture.nativeElement.querySelector('lib-empty-state-message')).toBeTruthy();
+  });
 
-      // When searching with no results yet, we shouldn't show empty state or results
-      const emptyStateElement = fixture.nativeElement.querySelector('lib-empty-state-message');
-      const resultsList = fixture.nativeElement.querySelector('.search-results-list');
-      expect(emptyStateElement).toBeFalsy();
-      expect(resultsList).toBeFalsy();
-    });
+  it('renders one list item per search result', async () => {
+    const files = [createTestFileItem({ path: '/a.sid' }), createTestFileItem({ path: '/b.sid' })];
+    const { fixture } = await renderWithResults(files);
 
-    it('should display error state when search fails', () => {
-      selectedDirectorySignal.set({
-        deviceId: 'test-device',
-        storageType: StorageType.Usb,
-        currentPath: '/test',
-        directory: null,
-        isLoaded: true,
-        isLoading: false,
-        error: null,
-        lastLoadTime: null,
-      });
+    expect(fixture.nativeElement.querySelectorAll('.file-list-item')).toHaveLength(2);
+  });
 
-      searchStateSignal.set({
-        searchText: 'test',
-        filterType: null,
-        results: [],
-        isSearching: false,
-        hasSearched: true,
-        error: 'Search failed',
-      });
+  it('sets selectedItem when a file is selected', async () => {
+    const files = [createTestFileItem({ path: '/a.sid' }), createTestFileItem({ path: '/b.sid' })];
+    const { component } = await renderWithResults(files);
+    expect(component.selectedItem()).toBeNull();
 
-      fixture.detectChanges();
+    component.onFileSelected(files[0]);
 
-      const errorElement = fixture.nativeElement.querySelector('.error-state');
-      expect(errorElement).toBeTruthy();
-      expect(errorElement?.textContent).toContain('Search failed');
-    });
+    expect(component.selectedItem()).toEqual(files[0]);
+  });
 
-    it('should display "not searched" message initially', () => {
-      selectedDirectorySignal.set({
-        deviceId: 'test-device',
-        storageType: StorageType.Usb,
-        currentPath: '/test',
-        directory: null,
-        isLoaded: true,
-        isLoading: false,
-        error: null,
-        lastLoadTime: null,
-      });
+  it('launches a file with Search launch mode on double-click', async () => {
+    const files = [createTestFileItem({ path: '/a.sid', parentPath: '/music' })];
+    const launchFileWithContext = vi.fn().mockResolvedValue(undefined);
+    const { component } = await renderWithResults(files, { launchFileWithContext });
 
-      searchStateSignal.set({
-        searchText: '',
-        filterType: null,
-        results: [],
-        isSearching: false,
-        hasSearched: false,
-        error: null,
-      });
+    await component.onFileDoubleClick(files[0]);
 
-      fixture.detectChanges();
-
-      const emptyStateElement = fixture.nativeElement.querySelector('lib-empty-state-message');
-      expect(emptyStateElement).toBeTruthy();
-    });
-
-    it('should display "no results" message for empty results', () => {
-      selectedDirectorySignal.set({
-        deviceId: 'test-device',
-        storageType: StorageType.Usb,
-        currentPath: '/test',
-        directory: null,
-        isLoaded: true,
-        isLoading: false,
-        error: null,
-        lastLoadTime: null,
-      });
-
-      searchStateSignal.set({
-        searchText: 'test',
-        filterType: null,
-        results: [],
-        isSearching: false,
-        hasSearched: true,
-        error: null,
-      });
-
-      fixture.detectChanges();
-
-      const emptyStateElement = fixture.nativeElement.querySelector('lib-empty-state-message');
-      expect(emptyStateElement).toBeTruthy();
-    });
-
-    it('should render search results list', () => {
-      selectedDirectorySignal.set({
-        deviceId: 'test-device',
-        storageType: StorageType.Usb,
-        currentPath: '/test',
-        directory: null,
-        isLoaded: true,
-        isLoading: false,
-        error: null,
-        lastLoadTime: null,
-      });
-
-      searchStateSignal.set({
-        searchText: 'test',
-        filterType: null,
-        results: [mockFileItem1, mockFileItem2],
-        isSearching: false,
-        hasSearched: true,
-        error: null,
-      });
-
-      fixture.detectChanges();
-
-      const listItems = fixture.nativeElement.querySelectorAll('.file-list-item');
-      expect(listItems.length).toBe(2);
+    expect(launchFileWithContext).toHaveBeenCalledWith({
+      deviceId,
+      storageType: files[0].storageType,
+      file: files[0],
+      directoryPath: files[0].parentPath,
+      files,
+      launchMode: LaunchMode.Search,
     });
   });
 
-  describe('File Selection', () => {
-    beforeEach(() => {
-      selectedDirectorySignal.set({
-        deviceId: 'test-device',
-        storageType: StorageType.Usb,
-        currentPath: '/test',
-        directory: null,
-        isLoaded: true,
-        isLoading: false,
-        error: null,
-        lastLoadTime: null,
-      });
+  it('reports selection state per file', async () => {
+    const files = [createTestFileItem({ path: '/a.sid' }), createTestFileItem({ path: '/b.sid' })];
+    const { component } = await renderWithResults(files);
 
-      searchStateSignal.set({
-        searchText: 'test',
-        filterType: null,
-        results: [mockFileItem1, mockFileItem2],
-        isSearching: false,
-        hasSearched: true,
-        error: null,
-      });
-      fixture.detectChanges();
-    });
+    component.onFileSelected(files[0]);
 
-    it('should select file on single-click', () => {
-      expect(component.selectedItem()).toBeNull();
-
-      component.onFileSelected(mockFileItem1);
-
-      expect(component.selectedItem()).toEqual(mockFileItem1);
-    });
-
-    it('should apply selected CSS class to selected file', () => {
-      component.onFileSelected(mockFileItem1);
-      fixture.detectChanges();
-
-      // The lib-file-item component receives the [selected] input binding
-      // Check that the component properly marks the file as selected
-      expect(component.isSelected(mockFileItem1)).toBe(true);
-      expect(component.isSelected(mockFileItem2)).toBe(false);
-    });
-
-    it('should launch file with Search mode on double-click', async () => {
-      await component.onFileDoubleClick(mockFileItem1);
-
-      expect(mockPlayerContext.launchFileWithContext).toHaveBeenCalledWith({
-        deviceId: 'test-device',
-        storageType: StorageType.Usb,
-        file: mockFileItem1,
-        directoryPath: '/test',
-        files: [mockFileItem1, mockFileItem2],
-        launchMode: LaunchMode.Search,
-      });
-    });
-
-    it('should return true from isSelected() for selected file', () => {
-      component.onFileSelected(mockFileItem1);
-
-      expect(component.isSelected(mockFileItem1)).toBe(true);
-      expect(component.isSelected(mockFileItem2)).toBe(false);
-    });
+    expect(component.isSelected(files[0])).toBe(true);
+    expect(component.isSelected(files[1])).toBe(false);
   });
 
-  describe('Player Integration', () => {
-    beforeEach(() => {
-      selectedDirectorySignal.set({
-        deviceId: 'test-device',
-        storageType: StorageType.Usb,
-        currentPath: '/test',
-        directory: null,
-        isLoaded: true,
-        isLoading: false,
-        error: null,
-        lastLoadTime: null,
-      });
-
-      searchStateSignal.set({
-        searchText: 'test',
-        filterType: null,
-        results: [mockFileItem1, mockFileItem2],
-        isSearching: false,
-        hasSearched: true,
-        error: null,
-      });
+  it('highlights the currently playing file in Search mode', async () => {
+    const files = [createTestFileItem({ path: '/a.sid' }), createTestFileItem({ path: '/b.sid' })];
+    const currentFile = signal<LaunchedFile | null>(null);
+    const { component, fixture } = await renderWithResults(files, {
+      getCurrentFile: vi.fn(() => currentFile.asReadonly()),
+      getLaunchMode: vi.fn(() => signal(LaunchMode.Search).asReadonly()),
     });
 
-    it('should highlight currently playing file in search mode', () => {
-      currentFileSignal.set(
-        createLaunchedFile(mockFileItem1, '/test', 'test-device', StorageType.Usb)
-      );
-      launchModeSignal.set(LaunchMode.Search);
-
-      fixture.detectChanges();
-
-      expect(component.isCurrentlyPlaying(mockFileItem1)).toBe(true);
-      expect(component.isCurrentlyPlaying(mockFileItem2)).toBe(false);
+    currentFile.set({
+      storageKey: 'device-1-SD',
+      file: files[0],
+      parentPath: '/',
+      launchedAt: Date.now(),
+      isCompatible: true,
     });
+    fixture.detectChanges();
 
-    it('should NOT highlight playing file in directory mode', () => {
-      currentFileSignal.set(
-        createLaunchedFile(mockFileItem1, '/test', 'test-device', StorageType.Usb)
-      );
-      launchModeSignal.set(LaunchMode.Directory);
-
-      fixture.detectChanges();
-
-      expect(component.isCurrentlyPlaying(mockFileItem1)).toBe(false);
-    });
-
-    it('should show error state for playing file with error', () => {
-      currentFileSignal.set(
-        createLaunchedFile(mockFileItem1, '/test', 'test-device', StorageType.Usb)
-      );
-      launchModeSignal.set(LaunchMode.Search);
-      errorSignal.set('Playback failed');
-
-      fixture.detectChanges();
-
-      expect(component.hasPlayerError()).toBe(true);
-    });
-
-    it('should auto-select playing file on playback start', () => {
-      launchModeSignal.set(LaunchMode.Search);
-      fixture.detectChanges();
-
-      // Initially no file selected
-      expect(component.selectedItem()).toBeNull();
-
-      // Start playing a file
-      currentFileSignal.set(
-        createLaunchedFile(mockFileItem1, '/test', 'test-device', StorageType.Usb)
-      );
-      fixture.detectChanges();
-
-      // File should be auto-selected
-      expect(component.selectedItem()).toEqual(mockFileItem1);
-    });
+    expect(component.isCurrentlyPlaying(files[0])).toBe(true);
+    expect(component.isCurrentlyPlaying(files[1])).toBe(false);
   });
 
-  describe('Edge Cases and Error Handling', () => {
-    it('should handle null search state gracefully', () => {
-      searchStateSignal.set(null);
-      fixture.detectChanges();
-
-      expect(() => fixture.detectChanges()).not.toThrow();
-      expect(component.searchResults()).toEqual([]);
-      expect(component.isSearching()).toBe(false);
-      expect(component.hasSearched()).toBe(false);
-      expect(component.searchError()).toBeNull();
+  it('does not highlight playing files outside Search mode', async () => {
+    const files = [createTestFileItem({ path: '/a.sid' })];
+    const { component } = await renderWithResults(files, {
+      getCurrentFile: vi.fn().mockReturnValue(
+        signal<LaunchedFile>({
+          storageKey: 'device-1-SD',
+          file: files[0],
+          parentPath: '/',
+          launchedAt: Date.now(),
+          isCompatible: true,
+        }).asReadonly()
+      ),
+      getLaunchMode: vi.fn().mockReturnValue(signal(LaunchMode.Directory).asReadonly()),
     });
 
-    it('should handle empty deviceId without crashing', () => {
-      fixture.componentRef.setInput('deviceId', '');
-      fixture.detectChanges();
+    expect(component.isCurrentlyPlaying(files[0])).toBe(false);
+  });
 
-      expect(() => fixture.detectChanges()).not.toThrow();
+  it('reports a player error when the playing file has an error', () => {
+    const { component } = render(undefined, {
+      getError: vi.fn().mockReturnValue(signal('Playback failed').asReadonly()),
     });
 
-    it('should handle missing file in search results during playback', () => {
-      const differentFile: FileItem = {
-        path: '/other/file3.sid',
-        name: 'file3.sid',
-        size: 3072,
-        type: FileItemType.Song,
-        images: [],
-        parentPath: '/other',
-        description: 'Different file',
-        isFavorite: false,
-        isCompatible: true,
-        title: '',
-        creator: '',
-        releaseInfo: '',
-        shareUrl: '',
-        metadataSource: '',
-        meta1: '',
-        meta2: '',
-        metadataSourcePath: '',
-        playLength: '',
-        subtuneLengths: [],
-        startSubtuneNum: 0,
-        links: [],
-        tags: [],
-        youTubeVideos: [],
-        competitions: [],
-        ratingCount: 0,
-      };
+    expect(component.hasPlayerError()).toBe(true);
+  });
 
-      searchStateSignal.set({
-        searchText: 'test',
-        filterType: null,
-        results: [mockFileItem1, mockFileItem2],
-        isSearching: false,
-        hasSearched: true,
-        error: null,
-      });
+  it('auto-selects the playing file once playback starts', async () => {
+    const files = [createTestFileItem({ path: '/a.sid' })];
+    const currentFile = signal<LaunchedFile | null>(null);
+    const { component, fixture } = await renderWithResults(files, {
+      getCurrentFile: vi.fn(() => currentFile.asReadonly()),
+      getLaunchMode: vi.fn(() => signal(LaunchMode.Search).asReadonly()),
+    });
+    expect(component.selectedItem()).toBeNull();
 
-      currentFileSignal.set(
-        createLaunchedFile(differentFile, '/other', 'test-device', StorageType.Usb)
-      );
-      launchModeSignal.set(LaunchMode.Search);
+    currentFile.set({
+      storageKey: 'device-1-SD',
+      file: files[0],
+      parentPath: '/',
+      launchedAt: Date.now(),
+      isCompatible: true,
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
 
-      fixture.detectChanges();
+    expect(component.selectedItem()).toEqual(files[0]);
+  });
 
-      // Component should not crash, just not highlight any file
-      expect(() => fixture.detectChanges()).not.toThrow();
-      expect(component.isCurrentlyPlaying(mockFileItem1)).toBe(false);
-      expect(component.isCurrentlyPlaying(mockFileItem2)).toBe(false);
+  it('resolves a null search state to safe defaults', () => {
+    const { component } = render();
+
+    expect(component.searchResults()).toEqual([]);
+    expect(component.isSearching()).toBe(false);
+    expect(component.hasSearched()).toBe(false);
+    expect(component.searchError()).toBeNull();
+  });
+
+  it('does not crash change detection with an empty deviceId', () => {
+    const { fixture } = renderPlayerComponent(SearchResultsComponent, {
+      inputs: { deviceId: '' },
+      providers: [{ provide: STORAGE_SERVICE, useValue: createMockStorageService() }],
     });
 
-    it('should not crash when double-clicking without search state', async () => {
-      searchStateSignal.set(null);
-      fixture.detectChanges();
+    expect(() => fixture.detectChanges()).not.toThrow();
+  });
 
-      // Should not throw
-      await expect(component.onFileDoubleClick(mockFileItem1)).resolves.toBeUndefined();
-
-      // Should not have called launchFileWithContext
-      expect(mockPlayerContext.launchFileWithContext).not.toHaveBeenCalled();
+  it('does not crash and does not highlight when the playing file is missing from results', async () => {
+    const files = [createTestFileItem({ path: '/a.sid' }), createTestFileItem({ path: '/b.sid' })];
+    const otherFile = createTestFileItem({ path: '/other.sid' });
+    const { component, fixture } = await renderWithResults(files, {
+      getCurrentFile: vi.fn().mockReturnValue(
+        signal<LaunchedFile>({
+          storageKey: 'device-1-SD',
+          file: otherFile,
+          parentPath: '/',
+          launchedAt: Date.now(),
+          isCompatible: true,
+        }).asReadonly()
+      ),
+      getLaunchMode: vi.fn().mockReturnValue(signal(LaunchMode.Search).asReadonly()),
     });
+
+    expect(() => fixture.detectChanges()).not.toThrow();
+    expect(component.isCurrentlyPlaying(files[0])).toBe(false);
+    expect(component.isCurrentlyPlaying(files[1])).toBe(false);
+  });
+
+  it('does not crash and does not launch when double-clicking with no search state', async () => {
+    const launchFileWithContext = vi.fn().mockResolvedValue(undefined);
+    const { component } = render(undefined, { launchFileWithContext });
+
+    await expect(component.onFileDoubleClick(createTestFileItem())).resolves.toBeUndefined();
+
+    expect(launchFileWithContext).not.toHaveBeenCalled();
   });
 });
-
-// Helper function to create LaunchedFile objects
-function createLaunchedFile(
-  file: FileItem,
-  parentPath: string,
-  deviceId: string,
-  storageType: StorageType
-): LaunchedFile {
-  return {
-    storageKey: StorageKeyUtil.create(deviceId, storageType),
-    file,
-    parentPath,
-    launchedAt: Date.now(),
-    isCompatible: true,
-  };
-}

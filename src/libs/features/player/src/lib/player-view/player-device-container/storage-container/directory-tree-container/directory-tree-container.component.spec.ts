@@ -1,79 +1,55 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ComponentRef } from '@angular/core';
-import { vi, describe, beforeEach, it, expect } from 'vitest';
+import { vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
 import { StorageStore } from '@teensyrom-nx/application';
-import { DirectoryTreeNodeType, StorageType } from '@teensyrom-nx/domain';
+import { DirectoryTreeNodeType, StorageType, STORAGE_SERVICE } from '@teensyrom-nx/domain';
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
+import { createMockStorageService } from '@teensyrom-nx/testing/fixtures';
 import { DirectoryTreeContainerComponent } from './directory-tree-container.component';
 
-interface MockStorageStore {
-  getDeviceDirectories: ReturnType<typeof vi.fn>;
-  navigateToDirectory: ReturnType<typeof vi.fn>;
-  navigateToDeviceLevel: ReturnType<typeof vi.fn>;
-  isDeviceLevelView: ReturnType<typeof vi.fn>;
-  getDeviceStorageEntries: ReturnType<typeof vi.fn>;
-  getSelectedDirectoryState: ReturnType<typeof vi.fn>;
-}
-
 describe('DirectoryTreeContainerComponent', () => {
-  let component: DirectoryTreeContainerComponent;
-  let fixture: ComponentFixture<DirectoryTreeContainerComponent>;
-  let componentRef: ComponentRef<DirectoryTreeContainerComponent>;
-  let mockStorageStore: MockStorageStore;
+  const deviceId = 'test-device-123';
 
-  function createComponent(deviceId = 'test-device-123') {
-    fixture = TestBed.createComponent(DirectoryTreeContainerComponent);
-    component = fixture.componentInstance;
-    componentRef = fixture.componentRef;
-    componentRef.setInput('deviceId', deviceId);
-    fixture.detectChanges();
+  function render() {
+    const result = renderPlayerComponent(DirectoryTreeContainerComponent, {
+      inputs: { deviceId },
+      providers: [{ provide: STORAGE_SERVICE, useValue: createMockStorageService() }],
+    });
+    const storageStore = TestBed.inject(StorageStore);
+    return { ...result, storageStore };
   }
 
-  beforeEach(async () => {
-    mockStorageStore = {
-      getDeviceDirectories: vi.fn().mockReturnValue(() => []),
-      navigateToDirectory: vi.fn(),
-      navigateToDeviceLevel: vi.fn(),
-      isDeviceLevelView: vi.fn().mockReturnValue(() => false),
-      getDeviceStorageEntries: vi.fn().mockReturnValue(() => ({})),
-      getSelectedDirectoryState: vi.fn().mockReturnValue(() => null),
-    };
-
-    await TestBed.configureTestingModule({
-      imports: [DirectoryTreeContainerComponent],
-      providers: [provideNoopAnimations(), { provide: StorageStore, useValue: mockStorageStore }],
-    }).compileComponents();
-
-    createComponent();
-  });
-
-  it('should create', () => {
+  it('creates the component', () => {
+    const { component } = render();
     expect(component).toBeTruthy();
   });
 
   describe('onNodeActivated', () => {
-    it('should navigate to device level and emit directoryNavigated for a device node with deviceId', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
+    it('navigates to device level and emits directoryNavigated for a device node with a deviceId', () => {
+      const { component, storageStore } = render();
+      const navigateToDeviceLevel = vi.spyOn(storageStore, 'navigateToDeviceLevel');
+      const navigateToDirectory = vi.spyOn(storageStore, 'navigateToDirectory');
+      const emitted = vi.fn();
+      component.directoryNavigated.subscribe(emitted);
 
       component.onNodeActivated({
-        id: 'device-test-device-123',
-        name: 'Device test-device-123',
+        id: `device-${deviceId}`,
+        name: `Device ${deviceId}`,
         type: DirectoryTreeNodeType.Device,
         icon: 'desktop_windows',
-        deviceId: 'test-device-123',
+        deviceId,
       });
 
-      expect(mockStorageStore.navigateToDeviceLevel).toHaveBeenCalledWith({
-        deviceId: 'test-device-123',
-      });
-      expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
-      expect(emitSpy).toHaveBeenCalledOnce();
+      expect(navigateToDeviceLevel).toHaveBeenCalledWith({ deviceId });
+      expect(navigateToDirectory).not.toHaveBeenCalled();
+      expect(emitted).toHaveBeenCalledOnce();
     });
 
-    it('should not navigate when a device node lacks deviceId', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
+    it('is a no-op for a device node without a deviceId', () => {
+      const { component, storageStore } = render();
+      const navigateToDeviceLevel = vi.spyOn(storageStore, 'navigateToDeviceLevel');
+      const navigateToDirectory = vi.spyOn(storageStore, 'navigateToDirectory');
+      const emitted = vi.fn();
+      component.directoryNavigated.subscribe(emitted);
 
       component.onNodeActivated({
         id: 'device-test',
@@ -82,14 +58,16 @@ describe('DirectoryTreeContainerComponent', () => {
         icon: 'desktop_windows',
       });
 
-      expect(mockStorageStore.navigateToDeviceLevel).not.toHaveBeenCalled();
-      expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
-      expect(emitSpy).not.toHaveBeenCalled();
+      expect(navigateToDeviceLevel).not.toHaveBeenCalled();
+      expect(navigateToDirectory).not.toHaveBeenCalled();
+      expect(emitted).not.toHaveBeenCalled();
     });
 
-    it('should navigate to directory and emit directoryNavigated for a directory node', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
+    it('navigates to the directory and emits directoryNavigated for a directory node', () => {
+      const { component, storageStore } = render();
+      const navigateToDirectory = vi.spyOn(storageStore, 'navigateToDirectory');
+      const emitted = vi.fn();
+      component.directoryNavigated.subscribe(emitted);
 
       component.onNodeActivated({
         id: 'test-node',
@@ -101,39 +79,44 @@ describe('DirectoryTreeContainerComponent', () => {
         path: '/test/path',
       });
 
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
+      expect(navigateToDirectory).toHaveBeenCalledWith({
         deviceId: 'test-device',
         storageType: StorageType.Sd,
         path: '/test/path',
       });
-      expect(emitSpy).toHaveBeenCalledOnce();
+      expect(emitted).toHaveBeenCalledOnce();
     });
 
-    it('should navigate to directory and emit directoryNavigated for a storage node', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
+    it('navigates to the storage root and emits directoryNavigated for a storage-type node', () => {
+      const { component, storageStore } = render();
+      const navigateToDirectory = vi.spyOn(storageStore, 'navigateToDirectory');
+      const emitted = vi.fn();
+      component.directoryNavigated.subscribe(emitted);
 
       component.onNodeActivated({
-        id: 'test-device-123-SD',
+        id: `${deviceId}-SD`,
         name: 'SD Storage',
         type: DirectoryTreeNodeType.StorageType,
         icon: 'sd_storage',
-        deviceId: 'test-device-123',
+        deviceId,
         storageType: StorageType.Sd,
         path: '/',
       });
 
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
-        deviceId: 'test-device-123',
+      expect(navigateToDirectory).toHaveBeenCalledWith({
+        deviceId,
         storageType: StorageType.Sd,
         path: '/',
       });
-      expect(emitSpy).toHaveBeenCalledOnce();
+      expect(emitted).toHaveBeenCalledOnce();
     });
 
-    it('should not call the store or emit for a malformed node', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
+    it('is a no-op for a malformed node', () => {
+      const { component, storageStore } = render();
+      const navigateToDirectory = vi.spyOn(storageStore, 'navigateToDirectory');
+      const navigateToDeviceLevel = vi.spyOn(storageStore, 'navigateToDeviceLevel');
+      const emitted = vi.fn();
+      component.directoryNavigated.subscribe(emitted);
 
       component.onNodeActivated({
         id: 'invalid-node',
@@ -142,36 +125,41 @@ describe('DirectoryTreeContainerComponent', () => {
         icon: 'folder',
       });
 
-      expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
-      expect(mockStorageStore.navigateToDeviceLevel).not.toHaveBeenCalled();
-      expect(emitSpy).not.toHaveBeenCalled();
+      expect(navigateToDirectory).not.toHaveBeenCalled();
+      expect(navigateToDeviceLevel).not.toHaveBeenCalled();
+      expect(emitted).not.toHaveBeenCalled();
     });
   });
 
   describe('onNodeExpansionNeedsData', () => {
-    it('should navigate to directory without emitting directoryNavigated for a storage node', () => {
-      const emitSpy = vi.fn();
-      componentRef.instance.directoryNavigated.subscribe(emitSpy);
+    it('lazy-loads a storage node without emitting directoryNavigated', () => {
+      const { component, storageStore } = render();
+      const navigateToDirectory = vi.spyOn(storageStore, 'navigateToDirectory');
+      const emitted = vi.fn();
+      component.directoryNavigated.subscribe(emitted);
 
       component.onNodeExpansionNeedsData({
-        id: 'test-device-123-SD',
+        id: `${deviceId}-SD`,
         name: 'SD Storage',
         type: DirectoryTreeNodeType.StorageType,
         icon: 'sd_storage',
-        deviceId: 'test-device-123',
+        deviceId,
         storageType: StorageType.Sd,
         path: '/',
       });
 
-      expect(mockStorageStore.navigateToDirectory).toHaveBeenCalledWith({
-        deviceId: 'test-device-123',
+      expect(navigateToDirectory).toHaveBeenCalledWith({
+        deviceId,
         storageType: StorageType.Sd,
         path: '/',
       });
-      expect(emitSpy).not.toHaveBeenCalled();
+      expect(emitted).not.toHaveBeenCalled();
     });
 
-    it('should not call the store for a malformed node', () => {
+    it('is a no-op for a malformed node', () => {
+      const { component, storageStore } = render();
+      const navigateToDirectory = vi.spyOn(storageStore, 'navigateToDirectory');
+
       component.onNodeExpansionNeedsData({
         id: 'invalid-node',
         name: 'Invalid',
@@ -179,52 +167,50 @@ describe('DirectoryTreeContainerComponent', () => {
         icon: 'folder',
       });
 
-      expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
+      expect(navigateToDirectory).not.toHaveBeenCalled();
     });
 
-    it('should not call the store for a device node', () => {
+    it('is a no-op for a device node, since devices do not lazy-load', () => {
+      const { component, storageStore } = render();
+      const navigateToDirectory = vi.spyOn(storageStore, 'navigateToDirectory');
+
       component.onNodeExpansionNeedsData({
-        id: 'device-test-123',
-        name: 'Test Device',
+        id: `device-${deviceId}`,
+        name: `Device ${deviceId}`,
         type: DirectoryTreeNodeType.Device,
         icon: 'desktop_windows',
-        deviceId: 'test-device-123',
+        deviceId,
       });
 
-      expect(mockStorageStore.navigateToDirectory).not.toHaveBeenCalled();
+      expect(navigateToDirectory).not.toHaveBeenCalled();
     });
   });
 
   describe('selectedNodeId', () => {
-    it('should resolve to the device node id at device level', () => {
-      mockStorageStore.isDeviceLevelView = vi.fn().mockReturnValue(() => true);
-      createComponent('test-device-123');
+    it('resolves to the device node id at device level', () => {
+      const { component, storageStore } = render();
+      storageStore.navigateToDeviceLevel({ deviceId });
 
-      expect(component.selectedNodeId()).toBe('device-test-device-123');
+      expect(component.selectedNodeId()).toBe(`device-${deviceId}`);
     });
 
-    it('should resolve to the storage node id (no path segment) for storage-root selection', () => {
-      mockStorageStore.isDeviceLevelView = vi.fn().mockReturnValue(() => false);
-      mockStorageStore.getSelectedDirectoryState = vi.fn().mockReturnValue(() => ({
-        deviceId: 'test-device-123',
-        storageType: StorageType.Sd,
-        currentPath: '/',
-      }));
-      createComponent('test-device-123');
+    it('resolves to the storage node id (no path segment) for a storage-root selection', async () => {
+      const { component, storageStore } = render();
+      await storageStore.initializeStorage({ deviceId, storageType: StorageType.Sd });
 
-      expect(component.selectedNodeId()).toBe('test-device-123-SD');
+      expect(component.selectedNodeId()).toBe(`${deviceId}-SD`);
     });
 
-    it('should resolve to the directory node id for a nested-directory selection', () => {
-      mockStorageStore.isDeviceLevelView = vi.fn().mockReturnValue(() => false);
-      mockStorageStore.getSelectedDirectoryState = vi.fn().mockReturnValue(() => ({
-        deviceId: 'test-device-123',
+    it('resolves to the directory node id for a nested-directory selection', async () => {
+      const { component, storageStore } = render();
+      await storageStore.initializeStorage({ deviceId, storageType: StorageType.Sd });
+      await storageStore.navigateToDirectory({
+        deviceId,
         storageType: StorageType.Sd,
-        currentPath: '/games',
-      }));
-      createComponent('test-device-123');
+        path: '/games',
+      });
 
-      expect(component.selectedNodeId()).toBe('test-device-123-SD-/games');
+      expect(component.selectedNodeId()).toBe(`${deviceId}-SD-/games`);
     });
   });
 });

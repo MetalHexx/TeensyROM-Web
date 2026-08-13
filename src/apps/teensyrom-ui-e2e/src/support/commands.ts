@@ -23,7 +23,7 @@ declare global {
 
 // -- This is a parent command --
 Cypress.Commands.add('login', (email: string, password: string): void => {
-  console.log('Custom command example: Login', email, password);
+  // Example custom command scaffold — implement when a real login flow is needed.
 });
 //
 // -- This is a child command --

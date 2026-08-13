@@ -1,10 +1,12 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { BehaviorSubject, Observable, Subject, Subscription, interval } from 'rxjs';
+import { PLAYER_TIMER_TICK_MS } from '@teensyrom-nx/domain';
 
 /**
  * Core RxJS timer implementation for individual timer instances.
  *
- * Provides 100ms tick precision with pause/resume capabilities.
+ * Provides configurable tick precision (100ms in production, via PLAYER_TIMER_TICK_MS)
+ * with pause/resume capabilities.
  * Single timer instance per service - use PlayerTimerManager for multi-device coordination.
  *
  * Phase 5 Scope:
@@ -19,7 +21,7 @@ import { BehaviorSubject, Observable, Subject, Subscription, interval } from 'rx
  */
 @Injectable()
 export class TimerService implements OnDestroy {
-  private readonly TICK_INTERVAL_MS = 100;
+  private readonly tickIntervalMs = inject(PLAYER_TIMER_TICK_MS);
 
   private _totalTime = 0;
   private _currentTime = 0;
@@ -33,7 +35,7 @@ export class TimerService implements OnDestroy {
 
   /**
    * Observable stream of current time updates.
-   * Emits currentTime in milliseconds at 100ms intervals when timer is running.
+   * Emits currentTime in milliseconds at the configured tick interval when timer is running.
    */
   readonly currentTime$: Observable<number> = this.currentTimeSubject.asObservable();
 
@@ -191,9 +193,10 @@ export class TimerService implements OnDestroy {
     this.stopInterval();
 
     // Create new interval
-    this.intervalSubscription = interval(this.TICK_INTERVAL_MS).subscribe(() => {
-      // Increment currentTime by tick interval
-      this._currentTime += this.TICK_INTERVAL_MS;
+    this.intervalSubscription = interval(this.tickIntervalMs).subscribe(() => {
+      // A 0ms tick (test override) fires on every macrotask; clamp the time increment
+      // to 1ms so completion arithmetic still converges instead of looping at +0.
+      this._currentTime += Math.max(this.tickIntervalMs, 1);
 
       // Emit updated time
       this.currentTimeSubject.next(this._currentTime);

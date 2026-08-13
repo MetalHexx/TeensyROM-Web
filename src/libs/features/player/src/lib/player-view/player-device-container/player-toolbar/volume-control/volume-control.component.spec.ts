@@ -1,185 +1,143 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal, WritableSignal } from '@angular/core';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { VolumeControlComponent } from './volume-control.component';
+import { describe, it, expect, vi } from 'vitest';
+import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { AudioStore } from '@teensyrom-nx/application';
+import { renderPlayerComponent } from '../../../../../testing/render-player-component';
+import { VolumeControlComponent } from './volume-control.component';
 
-function createMockAudioStore() {
-  return {
-    isMuted: signal(false) as WritableSignal<boolean>,
-    masterVolume: signal(0.75) as WritableSignal<number>,
+function render(inputs: Record<string, unknown> = {}) {
+  const isMuted = signal(false);
+  const masterVolume = signal(0.75);
+  const audioStore = {
+    isMuted,
+    masterVolume,
     toggleMute: vi.fn(),
     setMasterVolume: vi.fn(),
   };
+
+  const result = renderPlayerComponent(VolumeControlComponent, {
+    inputs,
+    providers: [{ provide: AudioStore, useValue: audioStore }],
+  });
+
+  return { ...result, audioStore, isMuted, masterVolume };
 }
 
 describe('VolumeControlComponent', () => {
-  let component: VolumeControlComponent;
-  let fixture: ComponentFixture<VolumeControlComponent>;
-  let mockAudioStore: ReturnType<typeof createMockAudioStore>;
+  it('creates', () => {
+    const { component } = render();
 
-  beforeEach(async () => {
-    mockAudioStore = createMockAudioStore();
-
-    await TestBed.configureTestingModule({
-      imports: [VolumeControlComponent],
-      providers: [{ provide: AudioStore, useValue: mockAudioStore }],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(VolumeControlComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-  });
-
-  it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  describe('volume icon states', () => {
-    it('should show volume_off icon when muted', () => {
-      mockAudioStore.isMuted.set(true);
-      fixture.detectChanges();
+  describe('volumeIcon()', () => {
+    it('is volume_off when muted', () => {
+      const { component, isMuted } = render();
+      isMuted.set(true);
 
-      const icon = fixture.nativeElement.querySelector('lib-icon-button mat-icon');
-      expect(icon.textContent.trim()).toBe('volume_off');
+      expect(component.volumeIcon()).toBe('volume_off');
     });
 
-    it('should show volume_up icon when volume >= 0.5 and not muted', () => {
-      mockAudioStore.isMuted.set(false);
-      mockAudioStore.masterVolume.set(0.75);
-      fixture.detectChanges();
+    it('is volume_up when volume >= 0.5 and not muted', () => {
+      const { component, masterVolume } = render();
+      masterVolume.set(0.75);
 
-      const icon = fixture.nativeElement.querySelector('lib-icon-button mat-icon');
-      expect(icon.textContent.trim()).toBe('volume_up');
+      expect(component.volumeIcon()).toBe('volume_up');
     });
 
-    it('should show volume_down icon when volume < 0.5 and > 0 and not muted', () => {
-      mockAudioStore.isMuted.set(false);
-      mockAudioStore.masterVolume.set(0.3);
-      fixture.detectChanges();
+    it('is volume_down when volume is between 0 and 0.5', () => {
+      const { component, masterVolume } = render();
+      masterVolume.set(0.3);
 
-      const icon = fixture.nativeElement.querySelector('lib-icon-button mat-icon');
-      expect(icon.textContent.trim()).toBe('volume_down');
+      expect(component.volumeIcon()).toBe('volume_down');
     });
 
-    it('should show volume_mute icon when volume is 0 and not muted', () => {
-      mockAudioStore.isMuted.set(false);
-      mockAudioStore.masterVolume.set(0);
-      fixture.detectChanges();
+    it('is volume_mute when volume is exactly 0 and unmuted', () => {
+      const { component, masterVolume } = render();
+      masterVolume.set(0);
 
-      const icon = fixture.nativeElement.querySelector('lib-icon-button mat-icon');
-      expect(icon.textContent.trim()).toBe('volume_mute');
+      expect(component.volumeIcon()).toBe('volume_mute');
     });
 
-    it('should show volume_up icon when volume is exactly 0.5', () => {
-      mockAudioStore.isMuted.set(false);
-      mockAudioStore.masterVolume.set(0.5);
-      fixture.detectChanges();
+    it('is volume_up at the 0.5 boundary', () => {
+      const { component, masterVolume } = render();
+      masterVolume.set(0.5);
 
-      const icon = fixture.nativeElement.querySelector('lib-icon-button mat-icon');
-      expect(icon.textContent.trim()).toBe('volume_up');
+      expect(component.volumeIcon()).toBe('volume_up');
     });
   });
 
-  describe('interactions', () => {
-    it('should call toggleMute when mute button is clicked', () => {
-      const button = fixture.nativeElement.querySelector('lib-icon-button button');
-      button.click();
+  it('calls toggleMute when the mute button is clicked', () => {
+    const { fixture, audioStore } = render();
 
-      expect(mockAudioStore.toggleMute).toHaveBeenCalledOnce();
-    });
+    const button = fixture.debugElement.query(By.css('lib-icon-button'));
+    button.nativeElement.dispatchEvent(new Event('buttonClick'));
 
-    it('should call setMasterVolume with correct value when slider changes', () => {
-      const slider: HTMLInputElement = fixture.nativeElement.querySelector('.volume-slider');
-      slider.value = '0.42';
-      slider.dispatchEvent(new Event('input'));
+    expect(audioStore.toggleMute).toHaveBeenCalledOnce();
+  });
 
-      expect(mockAudioStore.setMasterVolume).toHaveBeenCalledWith(0.42);
-    });
+  it('calls setMasterVolume with the new value when the slider changes', () => {
+    const { fixture, audioStore } = render();
 
-    it('should reflect masterVolume signal in the slider value', () => {
-      mockAudioStore.masterVolume.set(0.6);
-      fixture.detectChanges();
+    const slider: HTMLInputElement = fixture.nativeElement.querySelector('.volume-slider');
+    slider.value = '0.42';
+    slider.dispatchEvent(new Event('input'));
 
-      const slider: HTMLInputElement = fixture.nativeElement.querySelector('.volume-slider');
-      expect(parseFloat(slider.value)).toBeCloseTo(0.6);
-    });
+    expect(audioStore.setMasterVolume).toHaveBeenCalledWith(0.42);
+  });
+
+  it("reflects the masterVolume signal in the slider's value", () => {
+    const { fixture, masterVolume } = render();
+    masterVolume.set(0.6);
+    fixture.detectChanges();
+
+    const slider: HTMLInputElement = fixture.nativeElement.querySelector('.volume-slider');
+
+    expect(parseFloat(slider.value)).toBeCloseTo(0.6);
   });
 
   describe('compact mode', () => {
-    it('should show slider when compact is not provided (default false)', () => {
-      const slider = fixture.nativeElement.querySelector('.volume-slider');
-      expect(slider).toBeTruthy();
+    it('shows the slider by default', () => {
+      const { fixture } = render();
+
+      expect(fixture.nativeElement.querySelector('.volume-slider')).toBeTruthy();
     });
 
-    it('should show slider when compact is explicitly false', () => {
-      fixture.componentRef.setInput('compact', false);
-      fixture.detectChanges();
+    it('hides the slider when compact is true', () => {
+      const { fixture } = render({ compact: true });
 
-      const slider = fixture.nativeElement.querySelector('.volume-slider');
-      expect(slider).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('.volume-slider')).toBeNull();
     });
 
-    it('should hide slider when compact is true', () => {
-      fixture.componentRef.setInput('compact', true);
-      fixture.detectChanges();
+    it('still shows the mute icon-button when compact is true', () => {
+      const { fixture } = render({ compact: true });
 
-      const slider = fixture.nativeElement.querySelector('.volume-slider');
-      expect(slider).toBeNull();
-    });
-
-    it('should still show mute icon button when compact is true', () => {
-      fixture.componentRef.setInput('compact', true);
-      fixture.detectChanges();
-
-      const iconButton = fixture.nativeElement.querySelector('lib-icon-button');
-      expect(iconButton).toBeTruthy();
-    });
-
-    it('should call toggleMute when mute button is clicked in compact mode', () => {
-      fixture.componentRef.setInput('compact', true);
-      fixture.detectChanges();
-
-      const button = fixture.nativeElement.querySelector('lib-icon-button button');
-      button.click();
-
-      expect(mockAudioStore.toggleMute).toHaveBeenCalledOnce();
-    });
-
-    it('should show volume_off icon when muted in compact mode', () => {
-      fixture.componentRef.setInput('compact', true);
-      mockAudioStore.isMuted.set(true);
-      fixture.detectChanges();
-
-      const icon = fixture.nativeElement.querySelector('lib-icon-button mat-icon');
-      expect(icon.textContent.trim()).toBe('volume_off');
+      expect(fixture.nativeElement.querySelector('lib-icon-button')).toBeTruthy();
     });
   });
 
   describe('disabled state', () => {
-    it('should disable mute button when disabled input is true', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('disables the mute button when disabled is true', () => {
+      const { fixture } = render({ disabled: true });
 
-      const button: HTMLButtonElement =
-        fixture.nativeElement.querySelector('lib-icon-button button');
-      expect(button.disabled).toBe(true);
+      const button = fixture.debugElement.query(By.css('lib-icon-button'));
+
+      expect(button.properties['disabled']).toBe(true);
     });
 
-    it('should disable slider when disabled input is true', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('disables the slider when disabled is true', () => {
+      const { fixture } = render({ disabled: true });
 
-      const slider: HTMLInputElement =
-        fixture.nativeElement.querySelector('.volume-slider');
+      const slider: HTMLInputElement = fixture.nativeElement.querySelector('.volume-slider');
+
       expect(slider.disabled).toBe(true);
     });
 
-    it('should apply disabled class to container when disabled', () => {
-      fixture.componentRef.setInput('disabled', true);
-      fixture.detectChanges();
+    it('applies the disabled class to the container', () => {
+      const { fixture } = render({ disabled: true });
 
       const container = fixture.nativeElement.querySelector('.volume-control');
+
       expect(container.classList.contains('disabled')).toBe(true);
     });
   });

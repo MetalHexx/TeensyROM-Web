@@ -121,15 +121,11 @@ export class PlayerToolbarActionsComponent {
 
   isFavorite = computed(() => {
     const launchedFile = this.currentFile();
-    const result = launchedFile?.file?.isFavorite ?? false;
-    console.log('[isFavorite] Computed evaluated:', result, 'file:', launchedFile?.file.path);
-    return result;
+    return launchedFile?.file?.isFavorite ?? false;
   });
 
   favoriteIconClass = computed(() => {
-    const result = this.isFavorite() ? 'filled' : 'outlined';
-    console.log('[favoriteIconClass] Computed evaluated:', result);
-    return result;
+    return this.isFavorite() ? 'filled' : 'outlined';
   });
 
   onTimerMenuItemClick(durationMs: number | null): void {

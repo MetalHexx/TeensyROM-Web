@@ -107,7 +107,7 @@ export class VideoModeDetector {
           const crop = this.convertToCropRect(manualMode);
 
           if (this.lastMatchedMode !== manualMode.name) {
-            console.log(`[VideoModeDetector] Manual Mode: ${manualMode.name}`);
+            logInfo(LogType.Info, `VideoModeDetector: Manual Mode: ${manualMode.name}`);
             this.lastMatchedMode = manualMode.name;
           }
 

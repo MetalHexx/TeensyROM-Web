@@ -1,188 +1,92 @@
 import { vi } from 'vitest';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
+import { renderPlayerComponent } from '../../../../testing/render-player-component';
+import { createMockStorageService, createTestFileItem } from '@teensyrom-nx/testing/fixtures';
+import { STORAGE_SERVICE } from '@teensyrom-nx/domain';
+import type { PlayHistory } from '@teensyrom-nx/application';
 import { StorageContainerComponent } from './storage-container.component';
-import {
-  STORAGE_SERVICE,
-  IStorageService,
-  StorageDirectory,
-  PlayerStatus,
-  LaunchMode,
-  FileItemType,
-} from '@teensyrom-nx/domain';
-import {
-  PLAYER_CONTEXT,
-  IPlayerContext,
-  PlayHistory,
-  HistoryEntry,
-} from '@teensyrom-nx/application';
-import { of } from 'rxjs';
 
 describe('StorageContainerComponent', () => {
-  let component: StorageContainerComponent;
-  let fixture: ComponentFixture<StorageContainerComponent>;
-  let historyVisibleSignal: ReturnType<typeof signal<boolean>>;
-  let playHistorySignal: ReturnType<typeof signal<PlayHistory | null>>;
+  let historyVisible: WritableSignal<boolean>;
+  let playHistory: WritableSignal<PlayHistory | null>;
+  let toggleHistoryView: ReturnType<typeof vi.fn>;
 
-  const mockStorageService: Partial<IStorageService> = {
-    getDirectory: () => of({} as StorageDirectory),
-  };
+  function render(deviceId = 'device-1') {
+    historyVisible = signal(false);
+    playHistory = signal(null);
+    toggleHistoryView = vi.fn();
 
-  const createMockPlayerContext = (): Partial<IPlayerContext> => ({
-    initializePlayer: vi.fn(),
-    removePlayer: vi.fn(),
-    launchFileWithContext: vi.fn(),
-    getCurrentFile: vi.fn().mockReturnValue(signal(null).asReadonly()),
-    getFileContext: vi.fn().mockReturnValue(signal(null).asReadonly()),
-    isLoading: vi.fn().mockReturnValue(signal(false).asReadonly()),
-    getError: vi.fn().mockReturnValue(signal(null).asReadonly()),
-    getStatus: vi.fn().mockReturnValue(signal(PlayerStatus.Stopped).asReadonly()),
-    isHistoryViewVisible: vi.fn(() => historyVisibleSignal.asReadonly()),
-    getPlayHistory: vi.fn(() => playHistorySignal.asReadonly()),
-    getShuffleSettings: vi.fn().mockReturnValue(signal(null).asReadonly()),
-    getLaunchMode: vi.fn().mockReturnValue(signal(LaunchMode.Directory).asReadonly()),
-    toggleHistoryView: vi.fn(),
+    return renderPlayerComponent(StorageContainerComponent, {
+      inputs: { deviceId },
+      playerContext: {
+        isHistoryViewVisible: vi.fn(() => historyVisible.asReadonly()),
+        getPlayHistory: vi.fn(() => playHistory.asReadonly()),
+        toggleHistoryView,
+      },
+      providers: [{ provide: STORAGE_SERVICE, useValue: createMockStorageService() }],
+    });
+  }
+
+  const withOneEntry = (): PlayHistory => ({
+    entries: [
+      {
+        file: createTestFileItem(),
+        storageKey: 'device-1-SD',
+        parentPath: '/',
+        timestamp: Date.now(),
+        isCompatible: true,
+      },
+    ],
+    currentPosition: 0,
   });
 
-  beforeEach(async () => {
-    historyVisibleSignal = signal(false);
-    playHistorySignal = signal(null);
-
-    await TestBed.configureTestingModule({
-      imports: [StorageContainerComponent],
-      providers: [
-        provideNoopAnimations(),
-        { provide: STORAGE_SERVICE, useValue: mockStorageService },
-        { provide: PLAYER_CONTEXT, useValue: createMockPlayerContext() },
-      ],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(StorageContainerComponent);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('deviceId', 'test-device');
-    fixture.detectChanges();
-  });
-
-  it('should create', () => {
+  it('creates the component', () => {
+    const { component } = render();
     expect(component).toBeTruthy();
   });
 
-  describe('History View Integration', () => {
-    it('should show history when toggle is on and history entries exist', () => {
-      // Setup: Toggle history on and add entries
-      historyVisibleSignal.set(true);
-      playHistorySignal.set({
-        entries: [
-          {
-            file: {
-              name: 'test.prg',
-              path: '/test.prg',
-              size: 1024,
-              type: FileItemType.Game,
-            },
-            timestamp: Date.now(),
-            launchMode: LaunchMode.Directory,
-          } as Partial<HistoryEntry> as HistoryEntry,
-        ],
-        currentPosition: 0,
-      });
-      fixture.detectChanges();
+  it('shows history when the toggle is on and entries exist', () => {
+    const { component, fixture } = render();
+    historyVisible.set(true);
+    playHistory.set(withOneEntry());
+    fixture.detectChanges();
 
-      expect(component.shouldShowHistory()).toBe(true);
-    });
-
-    it('should hide history when toggle is off', () => {
-      // Setup: Toggle history off but entries exist
-      historyVisibleSignal.set(false);
-      playHistorySignal.set({
-        entries: [
-          {
-            file: {
-              name: 'test.prg',
-              path: '/test.prg',
-              size: 1024,
-              type: FileItemType.Game,
-            },
-            timestamp: Date.now(),
-            launchMode: LaunchMode.Directory,
-          } as Partial<HistoryEntry> as HistoryEntry,
-        ],
-        currentPosition: 0,
-      });
-      fixture.detectChanges();
-
-      expect(component.shouldShowHistory()).toBe(false);
-    });
-
-    it('should hide history when search is active even if toggle is on', () => {
-      // Setup: Toggle history on, add entries
-      historyVisibleSignal.set(true);
-      playHistorySignal.set({
-        entries: [
-          {
-            file: {
-              name: 'test.prg',
-              path: '/test.prg',
-              size: 1024,
-              type: FileItemType.Game,
-            },
-            timestamp: Date.now(),
-            launchMode: LaunchMode.Directory,
-          } as Partial<HistoryEntry> as HistoryEntry,
-        ],
-        currentPosition: 0,
-      });
-      fixture.detectChanges();
-
-      // Verify the computed signals work correctly
-      expect(component.historyViewVisible()).toBe(true);
-      expect(component.hasPlayHistory()).toBe(true);
-
-      // shouldShowHistory checks: historyViewVisible() && !hasActiveSearch() && hasPlayHistory()
-      // When hasActiveSearch is false (no search state), shouldShowHistory should be true
-      expect(component.shouldShowHistory()).toBe(true);
-    });
-
-    it('should hide history when no entries exist even if toggle is on', () => {
-      // Setup: Toggle history on but no entries
-      historyVisibleSignal.set(true);
-      playHistorySignal.set(null);
-      fixture.detectChanges();
-
-      expect(component.shouldShowHistory()).toBe(false);
-    });
+    expect(component.shouldShowHistory()).toBe(true);
   });
 
-  describe('Directory Navigation Handler', () => {
-    it('should call toggleHistoryView when history is visible', () => {
-      const mockPlayerContext = TestBed.inject(PLAYER_CONTEXT) as unknown as {
-        toggleHistoryView: ReturnType<typeof vi.fn>;
-        isHistoryViewVisible: ReturnType<typeof vi.fn>;
-      };
-      
-      historyVisibleSignal.set(true);
-      mockPlayerContext.toggleHistoryView = vi.fn();
-      fixture.detectChanges();
+  it('hides history when the toggle is off, even with entries', () => {
+    const { component, fixture } = render();
+    historyVisible.set(false);
+    playHistory.set(withOneEntry());
+    fixture.detectChanges();
 
-      component.onDirectoryNavigated();
+    expect(component.shouldShowHistory()).toBe(false);
+  });
 
-      expect(mockPlayerContext.toggleHistoryView).toHaveBeenCalledWith('test-device');
-    });
+  it('hides history when there are no entries, even with the toggle on', () => {
+    const { component, fixture } = render();
+    historyVisible.set(true);
+    playHistory.set(null);
+    fixture.detectChanges();
 
-    it('should not call toggleHistoryView when history is not visible', () => {
-      const mockPlayerContext = TestBed.inject(PLAYER_CONTEXT) as unknown as {
-        toggleHistoryView: ReturnType<typeof vi.fn>;
-        isHistoryViewVisible: ReturnType<typeof vi.fn>;
-      };
-      
-      historyVisibleSignal.set(false);
-      mockPlayerContext.toggleHistoryView = vi.fn();
-      fixture.detectChanges();
+    expect(component.shouldShowHistory()).toBe(false);
+  });
 
-      component.onDirectoryNavigated();
+  it('toggles history off when directory navigation happens while history is visible', () => {
+    const { component } = render();
+    historyVisible.set(true);
 
-      expect(mockPlayerContext.toggleHistoryView).not.toHaveBeenCalled();
-    });
+    component.onDirectoryNavigated();
+
+    expect(toggleHistoryView).toHaveBeenCalledWith('device-1');
+  });
+
+  it('is a no-op on directory navigation when history is not visible', () => {
+    const { component } = render();
+    historyVisible.set(false);
+
+    component.onDirectoryNavigated();
+
+    expect(toggleHistoryView).not.toHaveBeenCalled();
   });
 });

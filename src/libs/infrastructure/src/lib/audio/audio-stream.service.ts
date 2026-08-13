@@ -924,7 +924,7 @@ export class AudioStreamService implements IAudioStreamService, OnDestroy {
         this._streamState$.next(AudioStreamState.Error);
       },
       complete: () => {
-        console.debug('[AudioStreamService] Stream complete');
+        logInfo(LogType.Finish, 'AudioStream: Stream complete');
         if (this.currentState === AudioStreamState.Streaming) {
           this._streamState$.next(AudioStreamState.Disconnected);
         }

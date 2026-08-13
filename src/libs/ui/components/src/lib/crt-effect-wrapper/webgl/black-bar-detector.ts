@@ -97,9 +97,9 @@ const BLACK_EDGE_THRESHOLD = 0.7;
  * const cropRect = detector.detect(gl, texture, 1920, 1080);
  *
  * if (cropRect) {
- *   console.log(`Detected black bars: ${JSON.stringify(cropRect)}`);
+ *   // black bars detected — cropRect describes the crop region
  * } else {
- *   console.log('No black bars detected');
+ *   // no black bars detected
  * }
  * ```
  */

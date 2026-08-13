@@ -7,6 +7,7 @@ import {
   signal,
   effect,
   viewChild,
+  DestroyRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
@@ -159,7 +160,23 @@ export class DirectoryFilesComponent {
   // Get file context to know when directory content is available
   readonly playerFileContext = computed(() => this.playerContext.getFileContext(this.deviceId())());
 
+  /**
+   * Pending handle for the auto-select scroll timer below. Tracked so a re-run of the effect
+   * (or component destruction) can cancel a still-pending callback before it fires against a
+   * viewport that's since moved on or torn down.
+   */
+  private pendingScrollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
+    const destroyRef = inject(DestroyRef);
+    const clearPendingScroll = () => {
+      if (this.pendingScrollTimeoutId !== null) {
+        clearTimeout(this.pendingScrollTimeoutId);
+        this.pendingScrollTimeoutId = null;
+      }
+    };
+    destroyRef.onDestroy(clearPendingScroll);
+
     // Effect to automatically select and position viewport to show the currently playing file
     effect(() => {
       const playingFile = this.currentPlayingFile();
@@ -193,24 +210,33 @@ export class DirectoryFilesComponent {
 
         // Now that we're using *cdkVirtualFor, the viewport properly initializes
         // Wait for viewport to be ready, then perform a single smooth scroll to centered position
-        setTimeout(() => {
+        clearPendingScroll();
+        this.pendingScrollTimeoutId = setTimeout(() => {
+          this.pendingScrollTimeoutId = null;
+
+          // The component (and its viewport) may have torn down between scheduling this
+          // callback and it firing; bail out rather than calling into a dead viewport.
+          if (typeof viewport.getDataLength !== 'function') {
+            return;
+          }
+
           const dataLength = viewport.getDataLength();
-          
+
           if (dataLength === 0) {
             console.warn('⚠️ Viewport not initialized');
             return;
           }
-          
+
           // Calculate centered position
           viewport.checkViewportSize();
           const viewportHeight = viewport.getViewportSize();
           const itemHeight = 42;
           const offsetToCenter = Math.max(0, viewportHeight / 2 - itemHeight / 2);
           const targetOffset = Math.max(0, playingFileIndex * itemHeight - offsetToCenter);
-          
+
           // Single smooth scroll directly to centered position
           viewport.scrollToOffset(targetOffset, 'smooth');
-          
+
         }, 150);
       }
     });

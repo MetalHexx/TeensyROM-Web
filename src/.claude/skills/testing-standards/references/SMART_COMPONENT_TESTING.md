@@ -59,6 +59,16 @@ This document describes the standard methodology for testing Angular smart compo
 - Empty states display placeholder or empty state UI
 - DOM updates correctly when mock signal values change
 
+**Render in isolation, without compiling the real descendant tree** — Use the feature layer's dedicated test harness (e.g., `renderPlayerComponent`) which:
+
+- Stubs all child components with `NO_ERRORS_SCHEMA` by default
+- Provides the real component but not its expensive or complex children
+- Avoids JIT-heavy compilation of deep, slow, or media-heavy subtrees
+- Allows naming specific children to leave real via `realChildren` if a test genuinely asserts about that child's own behavior
+- See [`renderPlayerComponent`](../../../../libs/features/player/src/testing/render-player-component.ts) for the worked example — it provides the mocking pattern every feature layer should follow
+
+This keeps tests fast and prevents assertions from reaching into child behavior that belongs in the child's own spec.
+
 ### User Interaction Testing
 
 **Test user interaction handling** - Verify that:
@@ -86,7 +96,7 @@ This document describes the standard methodology for testing Angular smart compo
 - Test stores, context services, and application logic working together
 - Mock only infrastructure layer (API services) using interfaces
 - Validate complete workflows and state coordination
-- See [`player-context.service.spec.ts`](../../../../libs/application/src/lib/player/player-context.service.spec.ts) for examples
+- See [`player-context-launch.spec.ts`](../../../../libs/application/src/lib/player/player-context-launch.spec.ts) for examples
 
 **Key Principle**: Always mock using interfaces - never mock concrete classes. This enforces proper dependency inversion and makes tests resilient to implementation changes.
 
@@ -158,7 +168,8 @@ Use this checklist to design comprehensive smart component tests:
 - Test through component's public interface (inputs, outputs, DOM)
 - Use strongly typed mocks that implement contracts
 - Test user interactions and their effects on the component
-- Assert on DOM changes and component-specific state
+- **Assert component state and derived signals** — for example, a computed signal, a writable signal updated by the component
+- **Assert DOM presence only where an element's presence reflects real state** — e.g., `@if (isLoading())` renders an element, so asserting the element is present proves `isLoading()` is true. Never assert exact user-facing copy.
 - Use TestBed for realistic component instantiation
 - Test error scenarios and edge cases in UI behavior
 - Use injection tokens when providing mocked services
@@ -173,6 +184,7 @@ Use this checklist to design comprehensive smart component tests:
 - Mock Angular framework features unnecessarily
 - Ignore accessibility in component tests
 - Create mocks without implementing the full interface contract
+- **Assert exact user-facing copy or DOM structure** — these are brittle and don't reflect behavior. Test that the right state drives the right elements, not what text those elements hold.
 
 ## Quick Checklist
 

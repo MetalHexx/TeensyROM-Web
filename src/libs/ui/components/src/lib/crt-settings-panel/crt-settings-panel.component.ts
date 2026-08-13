@@ -15,6 +15,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { logInfo, LogType } from '@teensyrom-nx/utils';
 
 import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-layout.component';
 import { IconButtonComponent } from '../icon-button/icon-button.component';
@@ -723,7 +724,7 @@ export class CrtSettingsPanelComponent {
       const wasActive = this.currentPresetName() === presetName;
 
       this.crtStorage.deleteCustomPreset(presetName);
-      console.log(`[CrtSettingsPanel] Deleted custom preset: ${presetName}`);
+      logInfo(LogType.Success, `CrtSettingsPanel: Deleted custom preset: ${presetName}`);
 
       if (wasActive) {
         this.presetSelected.emit(CRT_PRESET_KEYS.LARGE_VIDEO_WEBGL);
@@ -795,7 +796,7 @@ export class CrtSettingsPanelComponent {
       }
 
       this.crtStorage.saveCustomPreset(name, this.settings());
-      console.log(`[CrtSettingsPanel] Saved custom preset: custom-${name}`);
+      logInfo(LogType.Success, `CrtSettingsPanel: Saved custom preset: custom-${name}`);
 
       this.refreshCustomPresets();
       this.showNameDialog.set(false);
@@ -816,7 +817,7 @@ export class CrtSettingsPanelComponent {
     try {
       const oldName = this.dialogPresetName() as CustomPresetName;
       this.crtStorage.renameCustomPreset(oldName, newName);
-      console.log(`[CrtSettingsPanel] Renamed preset: ${oldName} -> custom-${newName}`);
+      logInfo(LogType.Success, `CrtSettingsPanel: Renamed preset: ${oldName} -> custom-${newName}`);
 
       this.refreshCustomPresets();
       this.showNameDialog.set(false);

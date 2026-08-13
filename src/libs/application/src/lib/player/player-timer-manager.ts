@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Injector, inject, runInInjectionContext } from '@angular/core';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { TimerService } from './timer.service';
 import { TimerState } from './timer-state.interface';
@@ -25,6 +25,8 @@ import { LogType, logInfo } from '@teensyrom-nx/utils';
   providedIn: 'root',
 })
 export class PlayerTimerManager {
+  private readonly injector = inject(Injector);
+
   private timers = new Map<string, TimerService>();
   private timerSubscriptions = new Map<string, Subscription[]>();
   private timerUpdateSubjects = new Map<string, Subject<TimerState>>();
@@ -42,8 +44,10 @@ export class PlayerTimerManager {
     // Destroy existing timer if any
     this.destroyTimer(deviceId);
 
-    // Create new timer service
-    const timer = new TimerService();
+    // Create new timer service. TimerService resolves its tick interval via field-level
+    // inject(), which requires an active injection context - `new TimerService()` alone
+    // has none, so it must run inside this manager's injector context.
+    const timer = runInInjectionContext(this.injector, () => new TimerService());
     this.timers.set(deviceId, timer);
 
     // Create or reuse subjects for this device
