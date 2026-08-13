@@ -27,10 +27,15 @@ export default defineConfig(() => ({
     // and crash mid-run ("Worker terminated due to reaching memory limit"), producing
     // collateral failures in unrelated files and, at higher file counts, no summary at
     // all. Capping concurrency trades some wall-clock time for a run that reliably
-    // finishes and reports.
+    // finishes and reports. maxThreads was originally 4 (tuned running this project
+    // alone); CI runs it as one of 16 projects under `nx affected --parallel=4`, so
+    // this project's own threads compete with several other projects' threads for the
+    // runner's fixed RAM at once - that combined peak, not this project in isolation,
+    // is what crashed a worker on CI. Lowered further to reduce this project's own
+    // peak footprint during that shared window.
     poolOptions: {
       threads: {
-        maxThreads: 4,
+        maxThreads: 2,
       },
     },
     onConsoleLog(log) {
