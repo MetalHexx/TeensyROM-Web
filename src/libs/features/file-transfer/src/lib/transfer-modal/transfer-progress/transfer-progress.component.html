@@ -47,10 +47,6 @@
             <span class="metric-label">Uploaded</span>
             <span class="metric-value">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
           </div>
-          <div class="metric metric-staged" data-testid="metric-staged">
-            <span class="metric-label">Staged</span>
-            <span class="metric-value">{{ vm().staged | number }}</span>
-          </div>
           <div class="metric" data-testid="metric-written">
             <span class="metric-label">Completed</span>
             <span class="metric-value">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
@@ -58,6 +54,11 @@
           <div class="metric metric-failed" data-testid="metric-failed">
             <span class="metric-label">Failed</span>
             <span class="metric-value">{{ vm().failed | number }}</span>
+          </div>
+          <div class="metric" data-testid="metric-rate">
+            <span class="metric-label">{{ rateLabel() }}</span>
+            <span class="metric-value">{{ filesPerSecondLabel() }}</span>
+            <span class="metric-sub">{{ bytesPerSecondLabel() }}</span>
           </div>
         </div>
 
@@ -84,13 +85,6 @@
           </div>
         </div>
 
-        @if (vm().currentFile) {
-          <div class="current-file" data-testid="transfer-progress-current-file">
-            <span class="current-file-label current-file-label-strong">Current File:</span>
-            <span class="current-file-path">{{ vm().currentFile }}</span>
-          </div>
-        }
-
         @if (vm().elapsedLabel) {
           <div class="elapsed-readout" data-testid="transfer-progress-elapsed">
             <lib-icon-label icon="schedule" [label]="vm().elapsedLabel ?? ''" size="small"></lib-icon-label>
@@ -109,7 +103,7 @@
                   [color]="entry.success ? 'success' : 'error'"
                   size="small"
                 ></lib-styled-icon>
-                <span class="feed-row-name">{{ entry.fileName }}</span>
+                <span class="feed-row-name">{{ entry.relativePath }}</span>
               </div>
             }
           </div>
@@ -122,10 +116,6 @@
             <span class="metric-label">Uploaded</span>
             <span class="metric-value">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
           </div>
-          <div class="metric metric-staged" data-testid="metric-staged">
-            <span class="metric-label">Staged</span>
-            <span class="metric-value">{{ vm().staged | number }}</span>
-          </div>
           <div class="metric" data-testid="metric-written">
             <span class="metric-label">Completed</span>
             <span class="metric-value">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
@@ -134,14 +124,12 @@
             <span class="metric-label">Failed</span>
             <span class="metric-value">{{ vm().failed | number }}</span>
           </div>
-        </div>
-
-        @if (vm().currentFile) {
-          <div class="current-file" data-testid="transfer-progress-current-file">
-            <span class="current-file-label current-file-label-strong">Current File:</span>
-            <span class="current-file-path">{{ vm().currentFile }}</span>
+          <div class="metric" data-testid="metric-rate">
+            <span class="metric-label">{{ rateLabel() }}</span>
+            <span class="metric-value">{{ filesPerSecondLabel() }}</span>
+            <span class="metric-sub">{{ bytesPerSecondLabel() }}</span>
           </div>
-        }
+        </div>
       }
 
       @case ('terminal') {
@@ -166,10 +154,6 @@
             <span class="metric-label">Uploaded</span>
             <span class="metric-value">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
           </div>
-          <div class="metric metric-staged" data-testid="metric-staged">
-            <span class="metric-label">Staged</span>
-            <span class="metric-value">{{ vm().staged | number }}</span>
-          </div>
           <div class="metric" data-testid="metric-written">
             <span class="metric-label">Completed</span>
             <span class="metric-value">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
@@ -177,6 +161,11 @@
           <div class="metric metric-failed" data-testid="metric-failed">
             <span class="metric-label">Failed</span>
             <span class="metric-value">{{ vm().failed | number }}</span>
+          </div>
+          <div class="metric" data-testid="metric-rate">
+            <span class="metric-label">{{ rateLabel() }}</span>
+            <span class="metric-value">{{ filesPerSecondLabel() }}</span>
+            <span class="metric-sub">{{ bytesPerSecondLabel() }}</span>
           </div>
         </div>
 

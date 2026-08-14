@@ -4,7 +4,7 @@ import { WritableStore, TransferMetrics, computeTransferMetrics } from '../trans
 
 export type { TransferMetrics };
 
-/** Returns the six transfer figures — uploaded, written, staged, failed, apiPct, devicePct. */
+/** Returns the five transfer figures — uploaded, written, failed, apiPct, devicePct. */
 export function getTransferMetrics(store: WritableStore<TransferState>) {
   return {
     getTransferMetrics: (deviceId: string) =>

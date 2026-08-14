@@ -419,27 +419,13 @@ describe('TransferStore', () => {
       expect(store.getTransferMetrics(deviceId)()).toEqual({
         uploaded: 0,
         written: 0,
-        staged: 0,
         failed: 1,
         apiPct: 0,
         devicePct: 0,
       });
     });
 
-    it('never lets staged go negative when local upload failures exceed the delta', () => {
-      store.applyJobSnapshot({
-        deviceId,
-        snapshot: createSnapshot({ filesReceived: 5, filesSent: 5, filesFailed: 0 }),
-      });
-      store.recordUploadFailure({ deviceId, relativePath: 'a.sid', reason: 'timeout' });
-      store.recordUploadFailure({ deviceId, relativePath: 'b.sid', reason: 'timeout' });
-
-      const metrics = store.getTransferMetrics(deviceId)();
-      expect(metrics.staged).toBe(0);
-      expect(metrics.failed).toBe(2);
-    });
-
-    it('computes the combined failed count and staged-and-waiting figure', () => {
+    it('computes the combined failed count from server and local upload failures', () => {
       store.applyJobSnapshot({
         deviceId,
         snapshot: createSnapshot({ filesReceived: 10, filesSent: 6, filesFailed: 1 }),
@@ -448,7 +434,6 @@ describe('TransferStore', () => {
       store.recordUploadFailure({ deviceId, relativePath: 'b.sid', reason: 'timeout' });
 
       const metrics = store.getTransferMetrics(deviceId)();
-      expect(metrics.staged).toBe(3);
       expect(metrics.failed).toBe(3);
     });
 

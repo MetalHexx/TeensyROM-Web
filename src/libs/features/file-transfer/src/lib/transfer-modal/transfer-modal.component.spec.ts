@@ -224,13 +224,39 @@ describe('TransferModalComponent', () => {
 
       expect(vm.uploaded).toBe(metrics.uploaded);
       expect(vm.written).toBe(metrics.written);
-      expect(vm.staged).toBe(metrics.staged);
       expect(vm.failed).toBe(metrics.failed);
       expect(vm.apiPercent).toBe(metrics.apiPct);
       expect(vm.devicePercent).toBe(metrics.devicePct);
       expect(vm.failureOverflow).toBe(summary.failureOverflow);
       expect(vm.reason).toBe(summary.reason);
-      expect(vm.currentFile).toBe('music/song.sid');
+    });
+
+    it('carries the rate figures through from the job snapshot', async () => {
+      await setup();
+      transferStore.setTargetDevice({ deviceId });
+      driveToState(transferStore, deviceId, 'receiving');
+      transferStore.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ deviceId, state: TransferJobState.Receiving, filesPerSecond: 9.8, bytesPerSecond: 1_500_000 }),
+      });
+
+      createFixture();
+
+      const vm = component.vm();
+      expect(vm.filesPerSecond).toBe(9.8);
+      expect(vm.bytesPerSecond).toBe(1_500_000);
+    });
+
+    it('defaults the rate figures to 0 when there is no job', async () => {
+      await setup();
+      transferStore.setTargetDevice({ deviceId });
+      driveToState(transferStore, deviceId, 'scanning');
+
+      createFixture();
+
+      const vm = component.vm();
+      expect(vm.filesPerSecond).toBe(0);
+      expect(vm.bytesPerSecond).toBe(0);
     });
   });
 

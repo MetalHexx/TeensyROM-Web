@@ -140,7 +140,6 @@ export function isTerminalJobState(state: TransferJobState): boolean {
 export interface TransferMetrics {
   uploaded: number;
   written: number;
-  staged: number;
   failed: number;
   apiPct: number;
   devicePct: number;
@@ -159,11 +158,10 @@ function pct(numerator: number, denominator: number): number {
 /**
  * Single source of truth for the transfer metric arithmetic — every consumer (the metrics
  * selector, the summary selector's failure overflow) reads the figures from here. Two seams
- * matter: `staged` uses `filesFailed` alone (never combined with local upload failures, which
- * never reached the server), and `apiPct` pins to 100 once the job is `Sealed` or terminal,
- * because locally-exhausted uploads never reach `filesReceived` and the ratio could otherwise
- * never close. `devicePct` pins to 100 only on `Completed` — an early stop (`Cancelled`,
- * `Aborted`, `Abandoned`) or a merely `Sealed` upload hop reports its true, sub-100 ratio.
+ * matter: `apiPct` pins to 100 once the job is `Sealed` or terminal, because locally-exhausted
+ * uploads never reach `filesReceived` and the ratio could otherwise never close. `devicePct`
+ * pins to 100 only on `Completed` — an early stop (`Cancelled`, `Aborted`, `Abandoned`) or a
+ * merely `Sealed` upload hop reports its true, sub-100 ratio.
  */
 export function computeTransferMetrics(transfer: DeviceTransferState | null): TransferMetrics {
   const job = transfer?.job ?? null;
@@ -174,7 +172,6 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
     return {
       uploaded: 0,
       written: 0,
-      staged: 0,
       failed: uploadFailedCount,
       apiPct: 0,
       devicePct: 0,
@@ -184,7 +181,6 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
   return {
     uploaded: job.filesReceived,
     written: job.filesSent,
-    staged: Math.max(0, job.filesReceived - job.filesSent - job.filesFailed),
     failed: job.filesFailed + uploadFailedCount,
     apiPct: isSealedOrTerminalJobState(job.state) ? 100 : pct(job.filesReceived, scanTotal),
     devicePct: job.state === TransferJobState.Completed ? 100 : pct(job.filesSent, scanTotal),

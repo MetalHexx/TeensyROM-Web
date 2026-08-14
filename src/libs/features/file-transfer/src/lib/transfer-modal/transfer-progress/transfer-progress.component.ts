@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActionButtonComponent, IconLabelComponent, StyledIconComponent } from '@teensyrom-nx/ui/components';
 import { TransferFeedEntry, TransferModalState } from '@teensyrom-nx/application';
+import { formatFileSize } from '@teensyrom-nx/domain';
 
 export interface TransferProgressVm {
   state: TransferModalState;
@@ -13,11 +14,11 @@ export interface TransferProgressVm {
   scanTotal: number;
   uploaded: number;
   written: number;
-  staged: number;
   failed: number;
   apiPercent: number;
   devicePercent: number;
-  currentFile: string | null;
+  filesPerSecond: number;
+  bytesPerSecond: number;
   feed: TransferFeedEntry[];
   failures: TransferFeedEntry[];
   failureOverflow: number;
@@ -190,6 +191,10 @@ export class TransferProgressComponent {
   readonly uploadedTileSuccess = computed(() => this.vm().state === 'draining');
   readonly apiBarSuccess = computed(() => this.vm().state === 'draining');
   readonly metricsMuted = computed(() => this.vm().state === 'cancelling');
+
+  readonly rateLabel = computed(() => (this.renderShape() === 'terminal' ? 'Avg Rate' : 'Rate'));
+  readonly filesPerSecondLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)}/s`);
+  readonly bytesPerSecondLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)}/s`);
 
   readonly terminalBannerTreatment = computed(() => TERMINAL_BANNER_TREATMENT[this.vm().state] ?? null);
   readonly terminalBannerIcon = computed(() => TERMINAL_BANNER_ICON[this.vm().state] ?? 'warning');

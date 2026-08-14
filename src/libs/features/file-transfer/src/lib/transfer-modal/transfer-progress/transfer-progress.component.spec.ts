@@ -23,11 +23,11 @@ function baseVm(overrides: Partial<TransferProgressVm> = {}): TransferProgressVm
     scanTotal: 12480,
     uploaded: 8412,
     written: 6977,
-    staged: 5231,
     failed: 4,
     apiPercent: 67,
     devicePercent: 56,
-    currentFile: 'HVSC/MUSICIANS/H/Hubbard_Rob/Commando.sid',
+    filesPerSecond: 9.8,
+    bytesPerSecond: 1_500_000,
     feed: [feedEntry(1), feedEntry(2, false)],
     failures: [feedEntry(2, false)],
     failureOverflow: 0,
@@ -145,7 +145,6 @@ describe('TransferProgressComponent', () => {
           state: 'receiving',
           uploaded: 8412,
           written: 6977,
-          staged: 5231, // deliberately not scanTotal - uploaded - failed, to prove no recomputation
           failed: 4,
           scanTotal: 12480,
           apiPercent: 67,
@@ -156,17 +155,40 @@ describe('TransferProgressComponent', () => {
       expect(q('metric-uploaded')?.textContent).toContain('8,412');
       expect(q('metric-uploaded')?.textContent).toContain('12,480');
       expect(q('metric-written')?.textContent).toContain('6,977');
-      expect(q('metric-staged')?.textContent?.trim()).toContain('5,231');
       expect(q('metric-failed')?.textContent?.trim()).toContain('4');
       expect(q('api-bar-pct')?.textContent?.trim()).toBe('67%');
       expect(q('device-bar-pct')?.textContent?.trim()).toBe('56%');
     });
 
-    it('orders the tiles Uploaded, Staged, Completed, Failed', async () => {
+    it('orders the tiles Uploaded, Completed, Failed, Rate', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Rate']);
+    });
+
+    it('renders both rate figures, formatted', async () => {
+      await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
+
+      expect(q('metric-rate')?.textContent).toContain('9.8/s');
+      expect(q('metric-rate')?.textContent).toContain('1.5 MB/s');
+    });
+
+    it('reads 0.0/s and 0 B/s when stalled, not a held prior value', async () => {
+      await setup(baseVm({ state: 'receiving', filesPerSecond: 0, bytesPerSecond: 0 }));
+
+      expect(q('metric-rate')?.textContent).toContain('0.0/s');
+      expect(q('metric-rate')?.textContent).toContain('0 B/s');
+    });
+
+    it('labels the rate tile "Rate" while running', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+      expect(q('metric-rate')?.querySelector('.metric-label')?.textContent?.trim()).toBe('Rate');
+    });
+
+    it('labels the rate tile "Avg Rate" once terminal', async () => {
+      await setup(baseVm({ state: 'completed' }));
+      expect(q('metric-rate')?.querySelector('.metric-label')?.textContent?.trim()).toBe('Avg Rate');
     });
 
     it('renders a large uploaded-of-total value as one unbroken run', async () => {
@@ -191,24 +213,20 @@ describe('TransferProgressComponent', () => {
       expect(q('transfer-progress-title')?.textContent?.trim()).toBe('Transferring to Widget');
     });
 
-    it('renders the current file as a bold label with no icon', async () => {
-      await setup(baseVm({ state: 'receiving', currentFile: 'HVSC/a/b/Current.sid' }));
+    it('renders no current-file element in the active state', async () => {
+      await setup(baseVm({ state: 'receiving' }));
 
-      const row = q('transfer-progress-current-file');
-      expect(row?.querySelector('.current-file-label')?.textContent?.trim()).toBe('Current File:');
-      expect(row?.textContent).toContain('Current.sid');
-      expect(row?.querySelector('lib-styled-icon')).toBeFalsy();
+      expect(q('transfer-progress-current-file')).toBeFalsy();
     });
 
-    it('renders the current file and the feed newest-first, as supplied, with no cap caption', async () => {
+    it('renders the feed newest-first, as supplied, with the full relative path and no cap caption', async () => {
       const feed = [feedEntry(1), feedEntry(2, false), feedEntry(3)];
-      await setup(baseVm({ state: 'receiving', feed, currentFile: 'HVSC/a/b/Current.sid' }));
+      await setup(baseVm({ state: 'receiving', feed }));
 
-      expect(q('transfer-progress-current-file')?.textContent).toContain('Current.sid');
       const rows = qAll('.feed-row');
       expect(rows.length).toBe(feed.length);
-      expect(rows[0].textContent).toContain('file-1.sid');
-      expect(rows[1].textContent).toContain('file-2.sid');
+      expect(rows[0].textContent).toContain('HVSC/MUSICIANS/H/Hubbard_Rob/file-1.sid');
+      expect(rows[1].textContent).toContain('HVSC/MUSICIANS/H/Hubbard_Rob/file-2.sid');
       expect(rows[1].classList.contains('feed-row-fail')).toBe(true);
       expect(rows[1].querySelector('.feed-row-reason')).toBeFalsy();
       expect(native().querySelector('.feed-cap-note')).toBeFalsy();
@@ -263,11 +281,11 @@ describe('TransferProgressComponent', () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    it('orders the tiles Uploaded, Staged, Completed, Failed, in step with the active shape', async () => {
+    it('orders the tiles Uploaded, Completed, Failed, Rate, in step with the active shape', async () => {
       await setup(baseVm({ state: 'cancelling' }));
 
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Rate']);
     });
 
     it('renders uploaded-of-total and completed-of-total as one unbroken run, matching the active shape', async () => {
@@ -279,13 +297,10 @@ describe('TransferProgressComponent', () => {
       expect(written?.textContent?.replace(/\s+/g, ' ').trim()).toBe('6,977/ 60,000');
     });
 
-    it('renders the current file as a bold label with no icon, matching the active row', async () => {
-      await setup(baseVm({ state: 'cancelling', currentFile: 'HVSC/a/b/Current.sid' }));
+    it('renders no current-file element in the cancelling state', async () => {
+      await setup(baseVm({ state: 'cancelling' }));
 
-      const row = q('transfer-progress-current-file');
-      expect(row?.querySelector('.current-file-label')?.textContent?.trim()).toBe('Current File:');
-      expect(row?.textContent).toContain('Current.sid');
-      expect(row?.querySelector('lib-styled-icon')).toBeFalsy();
+      expect(q('transfer-progress-current-file')).toBeFalsy();
     });
   });
 
@@ -308,7 +323,7 @@ describe('TransferProgressComponent', () => {
 
       expect(q('transfer-progress-summary')).toBeFalsy();
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Avg Rate']);
       expect(q('metric-written')?.textContent).toContain('12,474');
       expect(q('metric-failed')?.textContent).toContain('6');
       expect(q('api-bar')).toBeTruthy();
@@ -317,7 +332,7 @@ describe('TransferProgressComponent', () => {
     });
 
     it('omits the current-file row entirely — there is no current file in a terminal state', async () => {
-      await setup(baseVm({ state: 'completed', currentFile: null }));
+      await setup(baseVm({ state: 'completed' }));
       expect(q('transfer-progress-current-file')).toBeFalsy();
     });
 

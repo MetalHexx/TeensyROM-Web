@@ -41,7 +41,7 @@
   padding: 0 var(--spacing-2xl) var(--spacing-xl);
 
   // Every block keeps its natural size; only the feed/failure list (below) is allowed to shrink
-  // and scroll, so metrics, bars, and the current-file row never get clipped.
+  // and scroll, so metrics and bars never get clipped.
   > * {
     flex: none;
   }
@@ -138,6 +138,11 @@
   margin-left: 0.25em;
 }
 
+.metric-sub {
+  font-size: 0.75rem;
+  color: var(--color-dimmed-light);
+}
+
 .metrics-muted {
   .metric-value {
     color: var(--color-dimmed-light);
@@ -186,42 +191,6 @@
   &.progress-success {
     --mdc-linear-progress-active-indicator-color: var(--color-success);
   }
-}
-
-/* ── Current file ────────────────────────────────────────── */
-
-.current-file {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: 0.875rem;
-  min-width: 0;
-}
-
-.current-file-label {
-  color: var(--color-dimmed-light);
-  flex: none;
-}
-
-// Shared by the active and cancelling shapes' current-file rows.
-.current-file-label-strong {
-  font-weight: var(--font-weight-bold);
-}
-
-.current-file-path {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  // Ellipsises from the left: the path is a bidi-neutral run inside an RTL container, so the
-  // browser clips its start rather than its end while leaving character order untouched.
-  direction: rtl;
-  text-align: left;
-  unicode-bidi: plaintext;
 }
 
 /* ── Elapsed readout ─────────────────────────────────────── */
@@ -275,9 +244,16 @@
 }
 
 .feed-row-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  // Ellipsises from the left: the path is a bidi-neutral run inside an RTL container, so the
+  // browser clips its start rather than its end while leaving character order untouched.
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
 }
 
 .feed-row-fail .feed-row-name {
