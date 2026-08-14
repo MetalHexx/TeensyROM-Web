@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
@@ -249,6 +250,20 @@ public class TcpCommunicationPortTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_ShouldThrowException_WhenNotConnected()
+    {
+        // Arrange
+        var buffer = new byte[100];
+
+        // Act
+        var act = () => _port.ReadAsync(buffer, 0, buffer.Length, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<TeensyException>()
+            .WithMessage("*Cannot read: TCP connection is not open*");
+    }
+
+    [Fact]
     public void ReadByte_ShouldThrowException_WhenNotConnected()
     {
         // Arrange & Act
@@ -361,6 +376,80 @@ public class TcpCommunicationPortTests : IDisposable
         // Assert
         act.Should().Throw<TimeoutException>()
             .WithMessage("*Timed out waiting for data to be received*");
+    }
+
+    [Fact]
+    public async Task WaitForSerialDataAsync_ShouldTimeout_WhenNoData()
+    {
+        // Arrange & Act
+        var act = () => _port.WaitForSerialDataAsync(10, 100, CancellationToken.None);
+
+        // Assert
+        await act.Should().ThrowAsync<TimeoutException>()
+            .WithMessage("*Timed out waiting for data to be received*");
+    }
+
+    [Fact]
+    public async Task WaitForSerialDataAsync_ShouldReportCancellation_WhenCallersTokenIsAlreadyCancelled()
+    {
+        // Arrange - a timeout far longer than the test could run, so a TimeoutException here would mean
+        // the cancel was misreported as an expiry rather than the wait genuinely timing out.
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act
+        var act = () => _port.WaitForSerialDataAsync(10, 60_000, cts.Token);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task WaitForSerialDataAsync_ShouldBufferBytes_SoAFollowingReadAsyncIsServedWithoutTheSocket()
+    {
+        // Arrange
+        using var listener = new TcpListenerScope();
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, listener.Port);
+        using var accepted = await listener.Accepted;
+        using var port = new TcpCommunicationPort(_mockLogger, client);
+
+        var sent = new byte[] { 0x41, 0x42 };
+        await accepted.GetStream().WriteAsync(sent);
+        await accepted.GetStream().FlushAsync();
+
+        // Act - the wait pulls both bytes off the socket into the receive buffer, so the read that
+        // follows must be served from that buffer. If it went back to the socket instead there is
+        // nothing more to send and the token would cancel it.
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await port.WaitForSerialDataAsync(2, 5000, cts.Token);
+
+        var buffer = new byte[2];
+        var bytesRead = await port.ReadAsync(buffer, 0, 2, cts.Token);
+
+        // Assert
+        bytesRead.Should().Be(2);
+        buffer.Should().Equal(sent);
+    }
+
+    /// <summary>
+    /// A loopback listener on an OS-assigned port, exposing the connection it accepts.
+    /// </summary>
+    private sealed class TcpListenerScope : IDisposable
+    {
+        private readonly TcpListener _listener;
+
+        public TcpListenerScope()
+        {
+            _listener = new TcpListener(IPAddress.Loopback, 0);
+            _listener.Start();
+            Accepted = _listener.AcceptTcpClientAsync();
+        }
+
+        public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
+        public Task<TcpClient> Accepted { get; }
+
+        public void Dispose() => _listener.Stop();
     }
 
     #endregion

@@ -135,13 +135,13 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
         }
 
         [Fact]
-        public async Task Upload_MoreFilesThanMaxStagedFilesCeiling_GateNeverExceedsItAndEveryUploadEventuallySucceeds()
+        public async Task Upload_MoreFilesThanMaxStagedBytesCeiling_GateNeverExceedsItAndEveryUploadEventuallySucceeds()
         {
-            // MaxStagedFiles sizes the gate's file semaphore once, at construction - mutating it on an
-            // already-started host has no effect (see UploadFileEndpointTests.Upload_GateSaturated...),
-            // so this ceiling can only be tested against a fixture built with the low value from the
-            // start. A fresh, unshared fixture instead of the collection's shared one.
-            using var fixture = new LowFileCapacityTransferFixture();
+            // D68 dropped the file-count cap - MaxStagedBytes is the only ceiling left, and it's read
+            // fresh from the options singleton on every call rather than baked in at construction. A
+            // fresh, unshared fixture still isolates this test's low ceiling from the collection's other
+            // tests sharing the same host.
+            using var fixture = new LowByteCapacityTransferFixture();
 
             var device = fixture.DeviceManager.Devices[0];
             var port = fixture.DeviceManager.PortFor(device.DeviceId);
@@ -212,7 +212,9 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             Directory.GetFileSystemEntries(fixture.Options.StagingRoot).Should().BeEmpty();
         }
 
-        private sealed class LowFileCapacityTransferFixture() : TransferFixture(o => o.MaxStagedFiles = 3)
+        // Each upload in the test below carries a 3-byte body, so a 9-byte budget admits exactly 3
+        // concurrently - the same "3 at a time" ceiling the old MaxStagedFiles = 3 enforced directly.
+        private sealed class LowByteCapacityTransferFixture() : TransferFixture(o => o.MaxStagedBytes = 9)
         {
         }
 

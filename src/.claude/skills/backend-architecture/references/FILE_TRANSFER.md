@@ -136,7 +136,7 @@ This design allows long-running transfers to span multiple short-lived serial co
 
 `TransferCapacityGate` looks simple at first — it's a semaphore for disk quota — but it serves three distinct purposes, and removing any one creates a correctness bug:
 
-**1. Disk Quota**: The gate tracks staged bytes in use and blocks uploads when `bytesInUse >= MaxStagedBytes` (default 2 GB). Without it, a pathological client uploading faster than the device drains could fill the server's disk.
+**1. Disk Quota**: The gate tracks staged bytes in use and blocks uploads when `bytesInUse >= MaxStagedBytes` (default 4 GB). Without it, a pathological client uploading faster than the device drains could fill the server's disk.
 
 **2. Flow Control**: The gate paces uploads by making `UploadFileEndpoint.Handle()` await `gate.WaitForSlotAsync()`. This is the system's **only pacing mechanism** — there is no HTTP connection pooling, no back-pressure, no rejection. A slow device means uploads simply take longer to return; they never fail.
 
@@ -176,8 +176,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 - **OnDisconnectedAsync()** → Cleans up all subscriptions for the dropped connection.
 
 **Events** (broadcast to job's group):
-- **JobSnapshot** → Throttled (250ms) snapshot of job state, sent by pump as files complete and by sweeper on state transitions.
-- **FileCompleted** → Per-file event with path, success/failure, size.
+- **JobSnapshot** → Throttled (250ms) snapshot of job state, sent by pump as files complete and by sweeper on state transitions. The snapshot is authoritative and self-contained — there is no separate per-file event; per-file outcomes ride inside the snapshot's `recentCompletions`/`failures` lists.
 
 **Snapshot Structure**: `TransferJobDto` is the single wire shape sent over both HTTP and SignalR:
 ```json
@@ -196,9 +195,23 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
   "startedUtc": "2026-08-04T10:30:00Z",
   "lastActivityUtc": "2026-08-04T10:31:45Z",
   "error": null,
-  "failures": []
+  "failures": [],
+  "recentCompletions": [
+    {
+      "jobId": "abc123...",
+      "relativePath": "track-05.sid",
+      "targetPath": "/music/track-05.sid",
+      "success": true,
+      "error": null,
+      "sizeBytes": 4096
+    }
+  ],
+  "bytesPerSecond": 131072.0,
+  "filesPerSecond": 2.5
 }
 ```
+
+`failures` and `recentCompletions` are both bounded, most-recent-first lists of the same `TransferFileCompleted` shape — `failures` holds only failed files (oldest-evicted once `RetainedFailuresBound` is exceeded; `filesFailed` itself stays an unbounded lifetime counter), while `recentCompletions` holds the last `RecentCompletionsBound` outcomes of either kind, for a live feed. `bytesPerSecond`/`filesPerSecond` are a rolling rate over `RateWindow` while the job is active, falling back to a lifetime average once terminal and to zero after a quiet window.
 
 **Snapshots are authoritative**, not incremental: each broadcast is a complete job state. The client never needs to merge or track deltas — the latest snapshot is the ground truth. This buys simplicity and resilience: late subscribers and disconnected clients that reconnect both get a correct state immediately without needing to replay events.
 
@@ -219,7 +232,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | **Job Sweeper** | `apps/api/src/TeensyRom.Api/Transfers/TransferJobSweeper.cs` |
 | **Endpoints** | `apps/api/src/TeensyRom.Api/Endpoints/Transfers/` |
 | **SignalR Hub** | `apps/api/src/TeensyRom.Api/Endpoints/Transfers/Hub/TransferHub.cs` |
-| **Serial Command** | `apps/api/src/TeensyRom.Core.Serial/Commands/SaveFile/SaveFileCommand.cs`<br/>`apps/api/src/TeensyRom.Core.Serial/Commands/SaveFile/SaveFileCommandHandler.cs` |
+| **Serial Command** | `apps/api/src/TeensyRom.Core.Serial/Commands/TransferFiles/TransferFilesCommand.cs`<br/>`apps/api/src/TeensyRom.Core.Serial/Commands/TransferFiles/TransferFilesCommandHandler.cs` |
 | **DTO** | `apps/api/src/TeensyRom.Api/Models/TransferJobDto.cs` |
 | **Options** | `apps/api/src/TeensyRom.Api/Transfers/TransferOptions.cs` |
 
@@ -227,12 +240,15 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 
 ## Configuration & Tuning
 
-All constants are centralized in `TransferOptions` (a singleton, settable for testing):
+All constants are centralized in `TransferOptions` (a singleton, settable for testing), bound at startup from the `Transfer` section of `appsettings.json` via `TransferOptionsBinder`, which clamps out-of-range values back to the compiled defaults:
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| `MaxStagedFiles` | 10,000 | Maximum concurrent uploads in flight |
-| `MaxStagedBytes` | 2 GB | Disk quota for staged files |
+| `MaxStagedBytes` | 4 GB | Disk quota for staged files — the sole ceiling on staging disk usage; there is no separate file-count cap |
+| `BatchSize` | 25 | Number of staged files the pump batches into a single device write command |
+| `RecentCompletionsBound` | 5 | Number of most-recent completed files (success or failure) a job retains for the live feed |
+| `RetainedFailuresBound` | 50 | Number of most-recent failures a job retains; `FilesFailed` itself stays an unbounded lifetime counter |
+| `RateWindow` | 10 seconds | Sliding window used to compute rolling transfer throughput |
 | `IdleAbandonmentThreshold` | 2 minutes | Idle time before job is abandoned |
 | `SweepInterval` | 30 seconds | How often sweeper checks for abandoned/evictable jobs |
 | `SnapshotThrottle` | 250 ms | Min interval between progress broadcasts |

@@ -110,6 +110,42 @@ namespace TeensyRom.Core.Abstractions
     /// <param name="timeoutMs">Total time to wait before a timeout exception is thrown</param>
     /// <exception cref="TimeoutException">Thrown if the timeout is reached before the specified number of bytes are available</exception>
     void WaitForSerialData(int numBytes, int timeoutMs);
+
+    /// <summary>
+    /// Async counterpart of <see cref="WaitForSerialData"/>. The default implementation observes the
+    /// token and then runs <see cref="WaitForSerialData"/> inline on the calling thread, handing back a
+    /// completed task - a port with no genuine async transport therefore behaves exactly as its
+    /// synchronous self.
+    /// </summary>
+    /// <param name="numBytes"></param>
+    /// <param name="timeoutMs">Total time to wait before a timeout exception is thrown</param>
+    /// <param name="ct">Observed before any I/O is attempted</param>
+    /// <exception cref="TimeoutException">Thrown if the timeout is reached before the specified number of bytes are available</exception>
+    /// <exception cref="OperationCanceledException">Thrown when <paramref name="ct"/> is already cancelled</exception>
+    Task WaitForSerialDataAsync(int numBytes, int timeoutMs, CancellationToken ct)
+    {
+      ct.ThrowIfCancellationRequested();
+      WaitForSerialData(numBytes, timeoutMs);
+      return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Async counterpart of <see cref="Read"/>. The default implementation observes the token and then
+    /// runs <see cref="Read"/> inline on the calling thread, handing back a completed task - a port with
+    /// no genuine async transport therefore behaves exactly as its synchronous self.
+    /// </summary>
+    /// <param name="buffer">Destination for the bytes read</param>
+    /// <param name="offset">Offset into <paramref name="buffer"/> to write from</param>
+    /// <param name="count">Maximum number of bytes to read</param>
+    /// <param name="ct">Observed before any I/O is attempted</param>
+    /// <returns>The number of bytes read, which may be fewer than <paramref name="count"/></returns>
+    /// <exception cref="OperationCanceledException">Thrown when <paramref name="ct"/> is already cancelled</exception>
+    Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+    {
+      ct.ThrowIfCancellationRequested();
+      return Task.FromResult(Read(buffer, offset, count));
+    }
+
     void SendSignedChar(sbyte charToSend);
     void SendSignedShort(short value);
 

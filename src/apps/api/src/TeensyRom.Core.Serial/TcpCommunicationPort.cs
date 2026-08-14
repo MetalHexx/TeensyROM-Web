@@ -224,6 +224,49 @@ namespace TeensyRom.Core.Serial
       }
     }
 
+    /// <summary>
+    /// Async counterpart of <see cref="Read"/>. Drains the receive buffer first and, exactly like
+    /// <see cref="Read"/>, performs at most a single stream read for the remainder - so it may return
+    /// fewer than <paramref name="count"/> bytes.
+    /// </summary>
+    public async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+    {
+      if (_networkStream == null)
+        throw new TeensyException("Cannot read: TCP connection is not open");
+
+      try
+      {
+        int bytesRead = 0;
+
+        lock (_lockObject)
+        {
+          while (_receiveBuffer.Count > 0 && bytesRead < count)
+          {
+            buffer[offset + bytesRead] = _receiveBuffer.Dequeue();
+            bytesRead++;
+          }
+        }
+
+        if (bytesRead < count)
+        {
+          int streamRead = await _networkStream.ReadAsync(buffer.AsMemory(offset + bytesRead, count - bytesRead), ct);
+          bytesRead += streamRead;
+        }
+
+        return bytesRead;
+      }
+      catch (IOException ex)
+      {
+        var errorMessage = GetBufferContentsAsString(buffer, offset, count);
+        throw new TeensyException(errorMessage, ex);
+      }
+      catch (SocketException ex)
+      {
+        var errorMessage = GetBufferContentsAsString(buffer, offset, count);
+        throw new TeensyException(errorMessage, ex);
+      }
+    }
+
     private string GetBufferContentsAsString(byte[] buffer, int offset, int count)
     {
       try
@@ -397,6 +440,64 @@ namespace TeensyRom.Core.Serial
       }
 
       throw new TimeoutException("Timed out waiting for data to be received");
+    }
+
+    /// <summary>
+    /// Async counterpart of <see cref="WaitForSerialData"/>. Awaits the socket rather than polling it,
+    /// so a caller waiting on the device does not hold a thread. <paramref name="timeoutMs"/> is enforced
+    /// by a linked token: its expiry surfaces as a <see cref="TimeoutException"/> while a cancel of
+    /// <paramref name="ct"/> surfaces as an <see cref="OperationCanceledException"/>.
+    /// </summary>
+    /// <exception cref="TimeoutException">Thrown if the timeout is reached before the specified number of bytes are available</exception>
+    public async Task WaitForSerialDataAsync(int numBytes, int timeoutMs, CancellationToken ct)
+    {
+      lock (_lockObject)
+      {
+        if (_receiveBuffer.Count >= numBytes) return;
+      }
+
+      using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+      cts.CancelAfter(timeoutMs);
+
+      var stream = _networkStream;
+
+      try
+      {
+        if (stream == null)
+        {
+          // The synchronous wait has no null-stream guard - it polls until the timeout and throws - so
+          // with nothing to read, wait the linked token out and let it surface as the same timeout.
+          await Task.Delay(Timeout.Infinite, cts.Token);
+          return;
+        }
+
+        var tempBuffer = new byte[4096];
+
+        while (true)
+        {
+          int bytesRead = await stream.ReadAsync(tempBuffer.AsMemory(0, tempBuffer.Length), cts.Token);
+
+          // A zero-length read means the peer closed the connection. The synchronous loop would spin
+          // out its timeout and throw, so report it the same way.
+          if (bytesRead == 0) throw new TimeoutException("Timed out waiting for data to be received");
+
+          lock (_lockObject)
+          {
+            for (int i = 0; i < bytesRead; i++)
+            {
+              _receiveBuffer.Enqueue(tempBuffer[i]);
+            }
+
+            if (_receiveBuffer.Count >= numBytes) return;
+          }
+        }
+      }
+      catch (OperationCanceledException)
+      {
+        if (ct.IsCancellationRequested) throw;
+
+        throw new TimeoutException("Timed out waiting for data to be received");
+      }
     }
 
     public void ClearBuffers()

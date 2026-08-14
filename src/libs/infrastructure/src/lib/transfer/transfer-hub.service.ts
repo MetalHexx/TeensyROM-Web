@@ -1,11 +1,10 @@
 import { Inject, Injectable, OnDestroy } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import * as signalR from '@microsoft/signalr';
-import { TransferJobDto, TransferFileCompleted } from '@teensyrom-nx/data-access/api-client';
+import { TransferJobDto } from '@teensyrom-nx/data-access/api-client';
 import {
   ITransferHubService,
   TransferJobSnapshot,
-  TransferFileCompletion,
   API_CONFIG,
   IApiConfig,
 } from '@teensyrom-nx/domain';
@@ -22,7 +21,6 @@ import { TransferDtoMapper } from './transfer-dto.mapper';
 @Injectable()
 export class TransferHubService implements ITransferHubService, OnDestroy {
   private readonly snapshotSubject = new Subject<TransferJobSnapshot>();
-  private readonly completionSubject = new Subject<TransferFileCompletion>();
 
   private hubConnection: signalR.HubConnection | null = null;
   private connectingPromise: Promise<signalR.HubConnection> | null = null;
@@ -30,10 +28,6 @@ export class TransferHubService implements ITransferHubService, OnDestroy {
 
   get snapshots$(): Observable<TransferJobSnapshot> {
     return this.snapshotSubject.asObservable();
-  }
-
-  get fileCompletions$(): Observable<TransferFileCompletion> {
-    return this.completionSubject.asObservable();
   }
 
   constructor(@Inject(API_CONFIG) private readonly apiConfig: IApiConfig) {}
@@ -98,9 +92,6 @@ export class TransferHubService implements ITransferHubService, OnDestroy {
 
     connection.on('JobSnapshot', (dto: TransferJobDto) =>
       this.snapshotSubject.next(TransferDtoMapper.toSnapshot(dto))
-    );
-    connection.on('FileCompleted', (dto: TransferFileCompleted) =>
-      this.completionSubject.next(TransferDtoMapper.toFileCompletion(dto))
     );
 
     // SignalR groups are per-connection: a reconnect lands the client in no group even

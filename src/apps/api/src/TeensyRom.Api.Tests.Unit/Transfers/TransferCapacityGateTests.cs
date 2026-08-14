@@ -7,7 +7,7 @@ public class TransferCapacityGateTests
     [Fact]
     public async Task WaitForSlotAsync_BelowBothCeilings_ReturnsImmediately()
     {
-        var gate = NewGate(maxFiles: 5, maxBytes: 1000);
+        var gate = NewGate(maxBytes: 1000);
 
         await gate.WaitForSlotAsync(10, CancellationToken.None);
 
@@ -15,26 +15,25 @@ public class TransferCapacityGateTests
     }
 
     [Fact]
-    public async Task WaitForSlotAsync_AtFileCeiling_BlocksThenUnblocksOnRelease()
+    public async Task WaitForSlotAsync_ManyConcurrentFiles_AllAdmitWithinByteBudgetWithoutBlocking()
     {
-        var gate = NewGate(maxFiles: 1, maxBytes: 1000);
-        await gate.WaitForSlotAsync(10, CancellationToken.None);
+        // D68: there is no file-count cap anymore - only the byte budget bounds admission. A count far
+        // beyond any value the old MaxStagedFiles cap would plausibly have been configured to must still
+        // admit concurrently as long as the byte budget allows it.
+        var gate = NewGate(maxBytes: 100_000);
 
-        var waiter = gate.WaitForSlotAsync(10, CancellationToken.None);
+        var admissions = Enumerable.Range(0, 50)
+            .Select(_ => gate.WaitForSlotAsync(10, CancellationToken.None));
 
-        var wonRace = await Task.WhenAny(waiter, Task.Delay(TimeSpan.FromMilliseconds(200)));
-        wonRace.Should().NotBe(waiter);
+        await Task.WhenAll(admissions);
 
-        gate.ReleaseSlot(10);
-
-        await waiter.WaitAsync(TimeSpan.FromSeconds(2));
-        waiter.IsCompletedSuccessfully.Should().BeTrue();
+        gate.Current.Should().Be((50, 500));
     }
 
     [Fact]
     public async Task WaitForSlotAsync_AtByteCeiling_BlocksThenUnblocksOnRelease()
     {
-        var gate = NewGate(maxFiles: 5, maxBytes: 10);
+        var gate = NewGate(maxBytes: 10);
         await gate.WaitForSlotAsync(10, CancellationToken.None);
 
         var waiter = gate.WaitForSlotAsync(1, CancellationToken.None);
@@ -51,7 +50,7 @@ public class TransferCapacityGateTests
     [Fact]
     public async Task WaitForSlotAsync_FileLargerThanMaxStagedBytes_AdmitsWhenStagingAreaEmpty()
     {
-        var gate = NewGate(maxFiles: 5, maxBytes: 100);
+        var gate = NewGate(maxBytes: 100);
 
         var waiter = gate.WaitForSlotAsync(1_000, CancellationToken.None);
 
@@ -63,7 +62,7 @@ public class TransferCapacityGateTests
     [Fact]
     public async Task Current_ReturnsToZero_AfterEveryAdmissionIsReleased()
     {
-        var gate = NewGate(maxFiles: 5, maxBytes: 100);
+        var gate = NewGate(maxBytes: 100);
         await gate.WaitForSlotAsync(50, CancellationToken.None);
         await gate.WaitForSlotAsync(30, CancellationToken.None);
 
@@ -78,7 +77,7 @@ public class TransferCapacityGateTests
     [Fact]
     public async Task Adjust_ActualSmallerThanReserved_FreesTheDifferenceForWaiters()
     {
-        var gate = NewGate(maxFiles: 5, maxBytes: 100);
+        var gate = NewGate(maxBytes: 100);
         await gate.WaitForSlotAsync(80, CancellationToken.None);
 
         var waiter = gate.WaitForSlotAsync(30, CancellationToken.None);
@@ -95,7 +94,7 @@ public class TransferCapacityGateTests
     [Fact]
     public void Adjust_ActualLargerThanReserved_HoldsTheDifference()
     {
-        var gate = NewGate(maxFiles: 5, maxBytes: 1000);
+        var gate = NewGate(maxBytes: 1000);
         gate.WaitForSlotAsync(10, CancellationToken.None).GetAwaiter().GetResult();
 
         var effective = gate.Adjust(reservedBytes: 10, actualBytes: 200);
@@ -107,7 +106,7 @@ public class TransferCapacityGateTests
     [Fact]
     public void Adjust_ActualExceedsMaxStagedBytes_ClampsEffectiveReservation()
     {
-        var gate = NewGate(maxFiles: 5, maxBytes: 100);
+        var gate = NewGate(maxBytes: 100);
         gate.WaitForSlotAsync(50, CancellationToken.None).GetAwaiter().GetResult();
 
         var effective = gate.Adjust(reservedBytes: 50, actualBytes: 500);
@@ -116,6 +115,6 @@ public class TransferCapacityGateTests
         gate.Current.Bytes.Should().Be(100);
     }
 
-    private static TransferCapacityGate NewGate(int maxFiles, long maxBytes) =>
-        new(new TransferOptions { MaxStagedFiles = maxFiles, MaxStagedBytes = maxBytes });
+    private static TransferCapacityGate NewGate(long maxBytes) =>
+        new(new TransferOptions { MaxStagedBytes = maxBytes });
 }

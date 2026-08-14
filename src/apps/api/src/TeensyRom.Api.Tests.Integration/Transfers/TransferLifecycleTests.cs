@@ -167,6 +167,13 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                     response.StatusCode.Should().Be(HttpStatusCode.OK);
                 }
 
+                // The pump composes every already-queued file into one batch and only rechecks
+                // cancellation once per file, right before that file's own handshake - so without this
+                // wait, cancel can beat the pump to the very first file too, leaving nothing genuinely
+                // in flight for this test to prove survives a cancel. Waiting for the first file to
+                // actually land guarantees a real in-flight write for the cancel below to race against.
+                await WaitUntilAsync(() => port.Received.Any(r => r.Path == "/music/cancel-lifecycle/cancel-0.prg"));
+
                 var cancelResponse = await f.Client.PostAsync<CancelJobEndpoint, CancelJobRequest, CancelJobResponse>(new() { JobId = jobId });
                 cancelResponse.Should().BeSuccessful<CancelJobResponse>().WithStatusCode(HttpStatusCode.OK);
 

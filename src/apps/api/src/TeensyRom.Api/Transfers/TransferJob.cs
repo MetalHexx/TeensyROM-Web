@@ -10,8 +10,18 @@ namespace TeensyRom.Api.Transfers
     /// </summary>
     public sealed class TransferJob
     {
+        /// <summary>
+        /// Floor for the rate divisor so a burst of files completing within a few milliseconds of job
+        /// start cannot collapse the divisor toward zero and blow the computed rate up unrealistically.
+        /// </summary>
+        private static readonly TimeSpan MinRateDivisor = TimeSpan.FromMilliseconds(100);
+
         private readonly object _lock = new();
         private readonly List<TransferFileCompleted> _failures = [];
+        private readonly Queue<TransferFileCompleted> _recentCompletions = new();
+        private readonly Queue<(DateTime CompletedUtc, long SizeBytes)> _rateSamples = new();
+        private readonly TransferOptions _options;
+        private readonly Func<DateTime> _clock;
         private readonly DateTime _startedUtc;
 
         private int _filesReceived;
@@ -29,14 +39,25 @@ namespace TeensyRom.Api.Transfers
         public DateTime LastActivityUtc { get; private set; }
         public int PendingCount { get; private set; }
 
-        public TransferJob(string deviceId, TeensyStorageType storageType, DirectoryPath destination)
+        /// <summary>
+        /// <paramref name="clock"/> is a test seam only - production callers omit it and get the wall
+        /// clock. It lets unit tests drive the rolling-rate window deterministically without sleeping.
+        /// </summary>
+        public TransferJob(
+            string deviceId,
+            TeensyStorageType storageType,
+            DirectoryPath destination,
+            TransferOptions options,
+            Func<DateTime>? clock = null)
         {
             JobId = Guid.NewGuid().ToString("N");
             DeviceId = deviceId;
             StorageType = storageType;
             Destination = destination;
+            _options = options;
+            _clock = clock ?? (() => DateTime.UtcNow);
             State = TransferJobState.Created;
-            _startedUtc = DateTime.UtcNow;
+            _startedUtc = _clock();
             LastActivityUtc = _startedUtc;
         }
 
@@ -81,7 +102,7 @@ namespace TeensyRom.Api.Transfers
         {
             lock (_lock)
             {
-                LastActivityUtc = DateTime.UtcNow;
+                LastActivityUtc = _clock();
             }
         }
 
@@ -91,18 +112,22 @@ namespace TeensyRom.Api.Transfers
             {
                 _filesReceived++;
                 PendingCount++;
-                LastActivityUtc = DateTime.UtcNow;
+                LastActivityUtc = _clock();
             }
         }
 
-        public void OnFileSent(long sizeBytes)
+        public void OnFileSent(TransferFileCompleted completed)
         {
             lock (_lock)
             {
+                var now = _clock();
+
                 _filesSent++;
-                _bytesSent += sizeBytes;
+                _bytesSent += completed.SizeBytes;
                 PendingCount--;
-                LastActivityUtc = DateTime.UtcNow;
+                LastActivityUtc = now;
+                RecordRateSample(now, completed.SizeBytes);
+                RecordCompletion(completed);
             }
         }
 
@@ -112,8 +137,17 @@ namespace TeensyRom.Api.Transfers
             {
                 _filesFailed++;
                 PendingCount--;
-                _failures.Add(f);
-                LastActivityUtc = DateTime.UtcNow;
+
+                // Bounded to the first RetainedFailuresBound - the earliest failures in a run are the
+                // diagnostically useful ones - while _filesFailed above stays an unbounded plain
+                // counter so the end-of-job summary's "and N more" overflow line stays accurate.
+                if (_failures.Count < _options.RetainedFailuresBound)
+                {
+                    _failures.Add(f);
+                }
+
+                RecordCompletion(f);
+                LastActivityUtc = _clock();
             }
         }
 
@@ -145,8 +179,78 @@ namespace TeensyRom.Api.Transfers
 
                 State = TransferJobState.Aborted;
                 _error = error;
-                LastActivityUtc = DateTime.UtcNow;
+                LastActivityUtc = _clock();
             }
+        }
+
+        /// <summary>
+        /// The live activity feed: keeps only the last <see cref="TransferOptions.RecentCompletionsBound"/>
+        /// completions - successes and failures alike, in completion order - dropping the oldest once the
+        /// bound is exceeded. Deliberately a different retention policy than <see cref="_failures"/>: this
+        /// list is a liveness indicator, not a record, so it always favors what happened most recently.
+        /// </summary>
+        private void RecordCompletion(TransferFileCompleted completed)
+        {
+            _recentCompletions.Enqueue(completed);
+
+            while (_recentCompletions.Count > _options.RecentCompletionsBound)
+            {
+                _recentCompletions.Dequeue();
+            }
+        }
+
+        /// <summary>
+        /// Appends one throughput sample and evicts anything older than
+        /// <see cref="TransferOptions.RateWindow"/>. Memory is bounded by the window's duration, not the
+        /// job's lifetime.
+        /// </summary>
+        private void RecordRateSample(DateTime completedUtc, long sizeBytes)
+        {
+            _rateSamples.Enqueue((completedUtc, sizeBytes));
+            PruneRateSamples(completedUtc);
+        }
+
+        private void PruneRateSamples(DateTime asOfUtc)
+        {
+            while (_rateSamples.Count > 0 && asOfUtc - _rateSamples.Peek().CompletedUtc > _options.RateWindow)
+            {
+                _rateSamples.Dequeue();
+            }
+        }
+
+        /// <summary>
+        /// Rolling throughput while the job is active; the lifetime average once it is terminal. Must be
+        /// called under <see cref="_lock"/>.
+        /// </summary>
+        private (double BytesPerSecond, double FilesPerSecond) ComputeRates()
+        {
+            if (IsTerminal(State))
+            {
+                var elapsedSeconds = Math.Max((LastActivityUtc - _startedUtc).TotalSeconds, MinRateDivisor.TotalSeconds);
+                return (_bytesSent / elapsedSeconds, _filesSent / elapsedSeconds);
+            }
+
+            var now = _clock();
+            PruneRateSamples(now);
+
+            if (_rateSamples.Count == 0)
+            {
+                // No samples inside the window: report zero rather than the last computed value - a
+                // stalled transfer must look stalled.
+                return (0, 0);
+            }
+
+            var sinceStart = now - _startedUtc;
+            var divisor = sinceStart < _options.RateWindow ? sinceStart : _options.RateWindow;
+            var divisorSeconds = Math.Max(divisor.TotalSeconds, MinRateDivisor.TotalSeconds);
+
+            long windowBytes = 0;
+            foreach (var sample in _rateSamples)
+            {
+                windowBytes += sample.SizeBytes;
+            }
+
+            return (windowBytes / divisorSeconds, _rateSamples.Count / divisorSeconds);
         }
 
         public TransferJobSnapshot ToSnapshot()
@@ -154,6 +258,7 @@ namespace TeensyRom.Api.Transfers
             lock (_lock)
             {
                 var canStillAcceptFiles = State is TransferJobState.Created or TransferJobState.Receiving;
+                var (bytesPerSecond, filesPerSecond) = ComputeRates();
 
                 return new TransferJobSnapshot
                 {
@@ -171,7 +276,10 @@ namespace TeensyRom.Api.Transfers
                     StartedUtc = _startedUtc,
                     LastActivityUtc = LastActivityUtc,
                     Error = _error,
-                    Failures = _failures.ToArray()
+                    Failures = _failures.ToArray(),
+                    RecentCompletions = _recentCompletions.Reverse().ToArray(),
+                    BytesPerSecond = bytesPerSecond,
+                    FilesPerSecond = filesPerSecond
                 };
             }
         }

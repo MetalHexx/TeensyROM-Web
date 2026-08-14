@@ -109,7 +109,7 @@ class Program
 				//ExecuteGetDirectoryRecursiveCommand(tcpPort, "/", recursive: false);
 
 				//var runSuffix = Guid.NewGuid().ToString("N")[..5];
-				//await ExecuteSaveFileCommand(tcpPort, $"/ft-smoke-test/tcpdebug-test-{runSuffix}.txt");
+				//await ExecuteTransferFilesCommand(tcpPort, $"/ft-smoke-test/tcpdebug-test-{runSuffix}.txt");
 
 				await TransferPumpHarness.RunAsync(tcpPort, fileCount: 5);
 
@@ -154,11 +154,11 @@ class Program
 
   /// <summary>
 	/// Isolation harness for the FILE-TRANSFER-4 ack-timeout bug: drives the real
-	/// SaveFileCommandHandler (same code SavePump uses) directly against this TCP port, with none of
-	/// TransferPump's queue/reset/staging machinery around it - just the SendFile wire exchange for a
-	/// single file, with wall-clock timing around it.
+	/// TransferFilesCommandHandler (same code TransferPump uses, a batch of one file) directly
+	/// against this TCP port, with none of TransferPump's queue/reset/staging machinery around it -
+	/// just the SendFile wire exchange for a single file, with wall-clock timing around it.
 	/// </summary>
-	static async Task ExecuteSaveFileCommand(TcpCommunicationPort tcpPort, string targetPath)
+	static async Task ExecuteTransferFilesCommand(TcpCommunicationPort tcpPort, string targetPath)
   {
     LogHeader($"SaveFile Command (isolated) -> {targetPath}");
 
@@ -169,21 +169,24 @@ class Program
     LogDetail($"Source: {sourcePath}");
     LogDetail($"StreamLength: {transfer.StreamLength}, Checksum: {transfer.Checksum}");
 
-    var handler = new SaveFileCommandHandler(new SimpleLoggingService());
+    var handler = new TransferFilesCommandHandler(new SimpleLoggingService());
     var sw = Stopwatch.StartNew();
 
-    var result = await handler.Handle(new SaveFileCommand
+    var result = await handler.Handle(new TransferFilesCommand
     {
-      File = transfer,
+      Files = [transfer],
       DeviceId = "TCP-DEBUG",
-      CommunicationPort = tcpPort
+      CommunicationPort = tcpPort,
+      OnFileCompleted = (_, _) => Task.CompletedTask
     }, CancellationToken.None);
 
     sw.Stop();
 
+    var saved = result.Outcomes.Count == 1 && result.Outcomes[0].Saved;
+
     if (result.IsSuccess)
     {
-      LogSuccess($"SaveFile succeeded in {sw.ElapsedMilliseconds}ms (Saved={result.Saved})");
+      LogSuccess($"SaveFile succeeded in {sw.ElapsedMilliseconds}ms (Saved={saved})");
     }
     else
     {

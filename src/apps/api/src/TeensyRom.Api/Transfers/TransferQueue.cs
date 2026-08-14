@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using TeensyRom.Core.Entities.Transfers;
 
@@ -22,12 +23,11 @@ namespace TeensyRom.Api.Transfers
         public IAsyncEnumerable<StagedFile> ReadAllAsync(string deviceId, CancellationToken ct) =>
             GetOrCreateChannel(deviceId).Reader.ReadAllAsync(ct);
 
+        public bool TryRead(string deviceId, [MaybeNullWhen(false)] out StagedFile file) =>
+            GetOrCreateChannel(deviceId).Reader.TryRead(out file);
+
         private Channel<StagedFile> GetOrCreateChannel(string deviceId) =>
-            _channels.GetOrAdd(deviceId, _ => Channel.CreateBounded<StagedFile>(
-                new BoundedChannelOptions(_options.MaxStagedFiles)
-                {
-                    SingleReader = true,
-                    FullMode = BoundedChannelFullMode.Wait
-                }));
+            _channels.GetOrAdd(deviceId, _ => Channel.CreateUnbounded<StagedFile>(
+                new UnboundedChannelOptions { SingleReader = true }));
     }
 }

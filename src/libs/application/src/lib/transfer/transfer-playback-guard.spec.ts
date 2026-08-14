@@ -28,6 +28,9 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
   startedUtc: new Date('2026-01-01T00:00:00Z'),
   error: null,
   failures: [],
+  recentCompletions: [],
+  bytesPerSecond: 0,
+  filesPerSecond: 0,
   ...overrides,
 });
 

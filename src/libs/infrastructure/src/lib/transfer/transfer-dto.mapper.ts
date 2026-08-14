@@ -38,10 +38,13 @@ export class TransferDtoMapper {
       startedUtc: new Date(dto.startedUtc),
       error: dto.error ?? null,
       failures: dto.failures.map((failure) => this.toFileCompletion(failure)),
+      recentCompletions: dto.recentCompletions.map((c) => this.toFileCompletion(c)),
+      bytesPerSecond: dto.bytesPerSecond,
+      filesPerSecond: dto.filesPerSecond,
     };
   }
 
-  /** Normalizes a single file-completion event, also used directly for the hub's `FileCompleted` push. */
+  /** Normalizes a single file-completion event from either of the snapshot's per-file lists. */
   static toFileCompletion(dto: TransferFileCompleted): TransferFileCompletion {
     return {
       jobId: dto.jobId,

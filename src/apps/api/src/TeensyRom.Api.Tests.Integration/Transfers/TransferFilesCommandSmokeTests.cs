@@ -10,18 +10,18 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
 {
     /// <summary>
     /// Proves the fake device satisfies CommunicationPortBehavior's pre-handler firmware/busy checks and
-    /// the SaveFile handshake - with no hardware attached and no discovery performed. Everything from
+    /// the SendFile handshake - with no hardware attached and no discovery performed. Everything from
     /// P02 onward is built on this assumption holding.
     /// </summary>
     [Collection("Transfer")]
-    public class SaveFileCommandSmokeTests(TransferFixture f) : IDisposable, IAsyncLifetime
+    public class TransferFilesCommandSmokeTests(TransferFixture f) : IDisposable, IAsyncLifetime
     {
         private readonly string _sourceFile = CreateSourceFile();
 
         public Task InitializeAsync() => Task.CompletedTask;
 
         /// <summary>
-        /// This test never touches the job registry/capacity gate - it drives <see cref="SaveFileCommand"/>
+        /// This test never touches the job registry/capacity gate - it drives <see cref="TransferFilesCommand"/>
         /// directly - but still shares <see cref="TransferFixture"/> with every other class in the
         /// "Transfer" collection, so it quiesces on the same terms they do rather than being a silent
         /// exception to the contract.
@@ -29,7 +29,7 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
         public Task DisposeAsync() => f.WaitForQuiescenceAsync();
 
         [Fact]
-        public async Task Handle_SaveFileCommand_AgainstFakeDevice_DeliversFileWithNoHardware()
+        public async Task Handle_TransferFilesCommand_AgainstFakeDevice_DeliversFileWithNoHardware()
         {
             var device = f.DeviceManager.Devices.First();
             var targetPath = new FilePath("/smoke-test.prg");
@@ -38,15 +38,16 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             using var scope = f.Services.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-            var result = await mediator.Send(new SaveFileCommand
+            var result = await mediator.Send(new TransferFilesCommand
             {
-                File = transfer,
+                Files = [transfer],
                 DeviceId = device.DeviceId,
-                CommunicationPort = device.CommunicationPort
+                CommunicationPort = device.CommunicationPort,
+                OnFileCompleted = (_, _) => Task.CompletedTask
             });
 
             result.IsSuccess.Should().BeTrue();
-            result.Saved.Should().BeTrue();
+            result.Outcomes.Should().ContainSingle(o => o.Saved);
 
             var port = f.DeviceManager.PortFor(device.DeviceId);
             port.Received.Should().ContainSingle(file =>

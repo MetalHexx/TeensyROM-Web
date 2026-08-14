@@ -35,14 +35,14 @@ public class TransferJobSweeperTests
 
     private TransferPump NewPump() => new(
         Substitute.For<ITransferQueue>(), _registry, _leaseCoordinator, Substitute.For<ITransferCapacityGate>(),
-        _staging, _deviceManager, Substitute.For<IServiceScopeFactory>(), _notifier, _log);
+        _staging, _deviceManager, Substitute.For<IServiceScopeFactory>(), _notifier, _options, _log);
 
     private TransferJobSweeper NewSweeper() => new(
         _registry, _leaseCoordinator, _staging, _tracker, _deviceManager, _notifier, _options, NewPump(), _log);
 
     private static TransferJob NewJob(TransferJobState state, int pendingCount, bool idle)
     {
-        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"));
+        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
 
         if (state is TransferJobState.Receiving or TransferJobState.Sealed)
         {
@@ -134,7 +134,7 @@ public class TransferJobSweeperTests
     [Fact]
     public void Sweep_CancellingJobWithEmptyQueue_FinalizesToCancelled()
     {
-        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"));
+        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
         job.TryTransitionTo(TransferJobState.Cancelling);
         _registry.All().Returns([job]);
 

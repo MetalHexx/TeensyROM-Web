@@ -42,6 +42,46 @@ namespace TeensyRom.Core.Serial
             throw new TeensyException($"Received unexpected response from TR ({responseString}) with data: {rawResponse}");
         }
 
+        /// <summary>
+        /// Async counterpart of <see cref="HandleAck"/>, composed from the port's async wait and read so
+        /// the caller is not blocked while the device answers. The failure path deliberately stays
+        /// synchronous - it runs once, on an already-failing acknowledgement.
+        /// </summary>
+        public static async Task<TeensyToken> HandleAckAsync(this ICommunicationPort serialState, CancellationToken ct)
+        {
+            await serialState.WaitForSerialDataAsync(numBytes: 2, timeoutMs: 20000, ct);
+
+            byte[] recBuf = new byte[2];
+            await serialState.ReadAsync(recBuf, 0, 2, ct);
+            ushort recU16 = BitConverter.ToUInt16(recBuf, 0);
+
+            var response = recU16 switch
+            {
+              var _ when recU16 == TeensyToken.Ack.Value => TeensyToken.Ack,
+              var _ when recU16 == TeensyToken.Fail.Value => TeensyToken.Fail,
+              var _ when recU16 == TeensyToken.RetryLaunch.Value => TeensyToken.RetryLaunch,
+              _ => TeensyToken.Unnknown,
+            };
+
+            if (response == TeensyToken.Ack) return TeensyToken.Ack;
+            if (response == TeensyToken.RetryLaunch) return TeensyToken.RetryLaunch;
+
+            var rawResponse = serialState.ReadAndLogSerialAsString();
+
+            if (rawResponse.Contains("Busy!"))
+            {
+                throw new TeensyBusyException($"TeensyROM is currently busy.  If you have a program runnning, stop it first. Try caching your files.");
+            }
+            var responseString = response switch
+            {
+                var token when token == TeensyToken.Fail => "Fail Token",
+                _ => "Unknown",
+            };
+            if (rawResponse.Length == 0) rawResponse = "No Data";
+
+            throw new TeensyException($"Received unexpected response from TR ({responseString}) with data: {rawResponse}");
+        }
+
         public static List<string> GetComPorts() => SerialPort.GetPortNames().Distinct().ToList();
     }
 }

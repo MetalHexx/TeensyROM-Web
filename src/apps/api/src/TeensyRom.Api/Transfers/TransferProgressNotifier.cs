@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using TeensyRom.Api.Endpoints.Transfers.Hub;
 using TeensyRom.Api.Models;
-using TeensyRom.Core.Entities.Transfers;
 using TeensyRom.Core.Logging;
 
 namespace TeensyRom.Api.Transfers
@@ -33,9 +32,6 @@ namespace TeensyRom.Api.Transfers
                 _ = FlushAsync(CancellationToken.None);
             }
         }
-
-        public Task FileCompletedAsync(TransferFileCompleted completed) =>
-            hubContext.Clients.Group(GroupName(completed.JobId)).SendAsync("FileCompleted", completed);
 
         public Task StartAsync(CancellationToken cancellationToken)
         {

@@ -2381,7 +2381,10 @@
           "bytesSent",
           "startedUtc",
           "lastActivityUtc",
-          "failures"
+          "failures",
+          "recentCompletions",
+          "bytesPerSecond",
+          "filesPerSecond"
         ],
         "type": "object",
         "properties": {
@@ -2442,6 +2445,20 @@
             "items": {
               "$ref": "#/components/schemas/TransferFileCompleted"
             }
+          },
+          "recentCompletions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferFileCompleted"
+            }
+          },
+          "bytesPerSecond": {
+            "type": "number",
+            "format": "double"
+          },
+          "filesPerSecond": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -2458,7 +2475,10 @@
           "bytesSent",
           "startedUtc",
           "lastActivityUtc",
-          "failures"
+          "failures",
+          "recentCompletions",
+          "bytesPerSecond",
+          "filesPerSecond"
         ],
         "type": "object",
         "properties": {
@@ -2519,6 +2539,20 @@
             "items": {
               "$ref": "#/components/schemas/TransferFileCompleted"
             }
+          },
+          "recentCompletions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransferFileCompleted"
+            }
+          },
+          "bytesPerSecond": {
+            "type": "number",
+            "format": "double"
+          },
+          "filesPerSecond": {
+            "type": "number",
+            "format": "double"
           }
         },
         "nullable": true

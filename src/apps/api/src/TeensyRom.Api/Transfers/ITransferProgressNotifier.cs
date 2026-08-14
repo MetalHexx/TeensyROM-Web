@@ -1,5 +1,3 @@
-using TeensyRom.Core.Entities.Transfers;
-
 namespace TeensyRom.Api.Transfers
 {
     /// <summary>
@@ -10,14 +8,9 @@ namespace TeensyRom.Api.Transfers
     {
         /// <summary>
         /// Marks the job dirty for the next throttled broadcast. Must be cheap and non-blocking — the
-        /// pump calls this on every file.
+        /// pump calls this on every file. The snapshot's bounded recent-completions list, not a
+        /// per-file event, is what carries per-file activity to subscribers.
         /// </summary>
         void JobChanged(TransferJob job);
-
-        /// <summary>
-        /// Broadcasts a per-file completion event immediately. Feeds a recent-activity list; not
-        /// required for correctness since the job snapshot is authoritative.
-        /// </summary>
-        Task FileCompletedAsync(TransferFileCompleted completed);
     }
 }

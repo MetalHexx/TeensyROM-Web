@@ -50,6 +50,9 @@ function createSnapshot(overrides: Partial<TransferJobSnapshot> = {}): TransferJ
     startedUtc: new Date('2026-01-01T00:00:00Z'),
     error: null,
     failures: [],
+    recentCompletions: [],
+    bytesPerSecond: 0,
+    filesPerSecond: 0,
     ...overrides,
   };
 }
@@ -236,8 +239,13 @@ describe('TransferContextService', () => {
 
       const transfer = store.transfers()['device-1'];
       expect(transfer.uploadFailedCount).toBe(1);
-      expect(transfer.failures).toHaveLength(1);
-      expect(transfer.failures[0]).toMatchObject({ relativePath: 'games/b.prg', reason: 'network error' });
+      // `mockHubListener` never pushes a snapshot in this test, so the fold that recomputes
+      // `failures` from `localFailures` never runs — the local entry lands in `localFailures`.
+      expect(transfer.localFailures).toHaveLength(1);
+      expect(transfer.localFailures[0]).toMatchObject({
+        relativePath: 'games/b.prg',
+        reason: 'network error',
+      });
     });
   });
 

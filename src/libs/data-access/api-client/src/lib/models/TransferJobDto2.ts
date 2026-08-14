@@ -131,6 +131,24 @@ export interface TransferJobDto2 {
      * @memberof TransferJobDto2
      */
     failures: Array<TransferFileCompleted>;
+    /**
+     * 
+     * @type {Array<TransferFileCompleted>}
+     * @memberof TransferJobDto2
+     */
+    recentCompletions: Array<TransferFileCompleted>;
+    /**
+     * 
+     * @type {number}
+     * @memberof TransferJobDto2
+     */
+    bytesPerSecond: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof TransferJobDto2
+     */
+    filesPerSecond: number;
 }
 
 
@@ -151,6 +169,9 @@ export function instanceOfTransferJobDto2(value: object): value is TransferJobDt
     if (!('startedUtc' in value) || value['startedUtc'] === undefined) return false;
     if (!('lastActivityUtc' in value) || value['lastActivityUtc'] === undefined) return false;
     if (!('failures' in value) || value['failures'] === undefined) return false;
+    if (!('recentCompletions' in value) || value['recentCompletions'] === undefined) return false;
+    if (!('bytesPerSecond' in value) || value['bytesPerSecond'] === undefined) return false;
+    if (!('filesPerSecond' in value) || value['filesPerSecond'] === undefined) return false;
     return true;
 }
 
@@ -179,6 +200,9 @@ export function TransferJobDto2FromJSONTyped(json: any, ignoreDiscriminator: boo
         'lastActivityUtc': (new Date(json['lastActivityUtc'])),
         'error': json['error'] == null ? undefined : json['error'],
         'failures': ((json['failures'] as Array<any>).map(TransferFileCompletedFromJSON)),
+        'recentCompletions': ((json['recentCompletions'] as Array<any>).map(TransferFileCompletedFromJSON)),
+        'bytesPerSecond': json['bytesPerSecond'],
+        'filesPerSecond': json['filesPerSecond'],
     };
 }
 
@@ -208,6 +232,9 @@ export function TransferJobDto2ToJSONTyped(value?: TransferJobDto2 | null, ignor
         'lastActivityUtc': ((value['lastActivityUtc']).toISOString()),
         'error': value['error'],
         'failures': ((value['failures'] as Array<any>).map(TransferFileCompletedToJSON)),
+        'recentCompletions': ((value['recentCompletions'] as Array<any>).map(TransferFileCompletedToJSON)),
+        'bytesPerSecond': value['bytesPerSecond'],
+        'filesPerSecond': value['filesPerSecond'],
     };
 }
 

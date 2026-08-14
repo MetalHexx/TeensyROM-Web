@@ -1,11 +1,11 @@
 import { InjectionToken } from '@angular/core';
 import { Observable } from 'rxjs';
-import { TransferJobSnapshot, TransferFileCompletion } from '../models/transfer-job-snapshot.model';
+import { TransferJobSnapshot } from '../models/transfer-job-snapshot.model';
 
 /**
  * Service contract for the live transfer hub connection: joining a job's SignalR group,
- * receiving throttled snapshot pushes and per-file completion events, and re-establishing
- * group membership after an automatic reconnect.
+ * receiving throttled snapshot pushes, and re-establishing group membership after an
+ * automatic reconnect.
  */
 export interface ITransferHubService {
   /** Joins the job group and returns the server's current snapshot synchronously. */
@@ -16,9 +16,6 @@ export interface ITransferHubService {
 
   /** Complete job snapshots pushed by the server, including the one seeded by `subscribe`. */
   readonly snapshots$: Observable<TransferJobSnapshot>;
-
-  /** Per-file completion events pushed as files finish uploading. */
-  readonly fileCompletions$: Observable<TransferFileCompletion>;
 
   /** Stops the hub connection and releases resources. */
   disconnect(): Promise<void>;

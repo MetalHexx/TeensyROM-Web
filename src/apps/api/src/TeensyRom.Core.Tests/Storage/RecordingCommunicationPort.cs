@@ -6,9 +6,18 @@ using TeensyRom.Core.Serial;
 namespace TeensyRom.Core.Tests.Storage;
 
 /// <summary>
-/// A small recording stub port driving <see cref="SaveFileCommandHandler"/> directly - tracks the
-/// handshake fields, delete calls and body bytes the handler writes, and can be told to throw on a
-/// given (1-based) ack call to exercise the retry and delete-then-retry branches.
+/// One file received by a <see cref="RecordingCommunicationPort"/>, as declared by the sender's
+/// handshake and the body bytes actually written.
+/// </summary>
+internal sealed record RecordedFile(string Path, uint StorageToken, uint StreamLength, ushort Checksum, byte[] Body);
+
+/// <summary>
+/// A small recording stub port driving <see cref="TransferFilesCommandHandler"/> directly - tracks the
+/// handshake fields, delete calls and body bytes the handler writes for every file in a batch, and can
+/// be told to throw on a given (1-based, batch-wide) ack call or for a specific target path, to exercise
+/// the retry, delete-then-retry, and device-loss branches. <see cref="ClosePort"/> flips
+/// <see cref="IsOpen"/> false so a <see cref="FailFor"/> callback can simulate the device vanishing
+/// mid-write the same way a real port would.
 /// </summary>
 internal sealed class RecordingCommunicationPort : ICommunicationPort
 {
@@ -21,19 +30,19 @@ internal sealed class RecordingCommunicationPort : ICommunicationPort
     private string? _pendingPath;
     private List<byte> _pendingBody = [];
     private int _ackCallCount;
+    private bool _isOpen = true;
 
-    /// <summary>Called with the 1-based ack-read index; a non-null result is thrown from that <see cref="Read"/> call.</summary>
+    /// <summary>Called with the 1-based ack-read index spanning the whole batch; a non-null result is thrown from that <see cref="Read"/> call.</summary>
     public Func<int, Exception?>? ExceptionForAckCall { get; set; }
+
+    /// <summary>Called with the target path about to be sent; a non-null result is thrown from that file's <see cref="Write(string)"/> call, mirroring FakeCommunicationPort.FailFor.</summary>
+    public Func<string, Exception?>? FailFor { get; set; }
 
     public int AttemptCount { get; private set; }
     public List<string> DeletedPaths { get; } = [];
-    public string? ReceivedTargetPath { get; private set; }
-    public uint ReceivedStorageToken { get; private set; }
-    public uint ReceivedStreamLength { get; private set; }
-    public ushort ReceivedChecksum { get; private set; }
-    public byte[] ReceivedBody { get; private set; } = [];
+    public List<RecordedFile> Received { get; } = [];
 
-    public bool IsOpen => true;
+    public bool IsOpen => _isOpen;
     public int BytesToRead => 2;
 
     public void ClearBuffers() { }
@@ -78,6 +87,11 @@ internal sealed class RecordingCommunicationPort : ICommunicationPort
 
         if (_stage == Stage.AwaitPath)
         {
+            if (FailFor?.Invoke(path) is Exception ex)
+            {
+                _stage = Stage.AwaitToken;
+                throw ex;
+            }
             _pendingPath = path;
             _pendingBody = [];
             _stage = Stage.AwaitBody;
@@ -97,11 +111,7 @@ internal sealed class RecordingCommunicationPort : ICommunicationPort
 
         if (_pendingBody.Count >= _pendingLength)
         {
-            ReceivedTargetPath = _pendingPath;
-            ReceivedStorageToken = _pendingStorageToken;
-            ReceivedStreamLength = _pendingLength;
-            ReceivedChecksum = _pendingChecksum;
-            ReceivedBody = [.. _pendingBody];
+            Received.Add(new RecordedFile(_pendingPath!, _pendingStorageToken, _pendingLength, _pendingChecksum, [.. _pendingBody]));
             _stage = Stage.AwaitToken;
         }
     }
@@ -130,8 +140,18 @@ internal sealed class RecordingCommunicationPort : ICommunicationPort
     public void WaitForSerialData(int numBytes, int timeoutMs) { }
     public void SendSignedChar(sbyte charToSend) { }
     public void SendSignedShort(short value) { }
-    public string? OpenPort(bool useRetryLoop = true) => "TEST";
-    public Unit ClosePort() => Unit.Default;
+    public string? OpenPort(bool useRetryLoop = true)
+    {
+        _isOpen = true;
+        return "TEST";
+    }
+
+    public Unit ClosePort()
+    {
+        _isOpen = false;
+        return Unit.Default;
+    }
+
     public Unit SetPort(string port) => Unit.Default;
     public string GetEndpoint() => "TEST";
     public ConnectionType GetConnectionType() => ConnectionType.Serial;

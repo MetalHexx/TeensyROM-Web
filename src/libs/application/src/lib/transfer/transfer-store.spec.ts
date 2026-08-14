@@ -28,6 +28,9 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
   startedUtc: new Date('2026-01-01T00:00:00Z'),
   error: null,
   failures: [],
+  recentCompletions: [],
+  bytesPerSecond: 0,
+  filesPerSecond: 0,
   ...overrides,
 });
 
@@ -148,28 +151,30 @@ describe('TransferStore', () => {
     });
   });
 
-  describe('file completions and local upload failures', () => {
-    it('folds a completion that arrives before the first snapshot', () => {
-      store.recordFileCompletion({
+  describe('snapshot fold and local upload failures', () => {
+    it('folds the very first snapshot for a device — no predecessor to dedupe against', () => {
+      store.applyJobSnapshot({
         deviceId,
-        completion: createCompletion({ relativePath: 'music/a.sid', success: true }),
+        snapshot: createSnapshot({
+          filesReceived: 1,
+          recentCompletions: [createCompletion({ relativePath: 'music/a.sid', success: true })],
+        }),
       });
 
       const transfer = store.transfers()[deviceId];
-      expect(transfer).toBeDefined();
       expect(transfer.feed).toHaveLength(1);
-      expect(transfer.job).toBeNull();
-
-      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot({ filesReceived: 1 }) });
-
-      expect(store.transfers()[deviceId].feed).toHaveLength(1);
-      expect(store.transfers()[deviceId].job?.filesReceived).toBe(1);
+      expect(transfer.job?.filesReceived).toBe(1);
     });
 
     it('records the device-write-failed reason for an unsuccessful completion', () => {
-      store.recordFileCompletion({
+      const failure = createCompletion({
+        relativePath: 'music/b.sid',
+        success: false,
+        error: 'disk full',
+      });
+      store.applyJobSnapshot({
         deviceId,
-        completion: createCompletion({ relativePath: 'music/b.sid', success: false, error: 'disk full' }),
+        snapshot: createSnapshot({ recentCompletions: [failure], failures: [failure] }),
       });
 
       const transfer = store.transfers()[deviceId];
@@ -182,12 +187,35 @@ describe('TransferStore', () => {
       expect(transfer.failures).toHaveLength(1);
     });
 
-    it('keeps the feed newest-first', () => {
-      store.recordFileCompletion({ deviceId, completion: createCompletion({ relativePath: 'a.sid' }) });
-      store.recordFileCompletion({ deviceId, completion: createCompletion({ relativePath: 'b.sid' }) });
+    it('keeps the feed newest-first, folding only the entries new since the previous snapshot', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          recentCompletions: [createCompletion({ relativePath: 'a.sid' })],
+        }),
+      });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          recentCompletions: [
+            createCompletion({ relativePath: 'b.sid' }),
+            createCompletion({ relativePath: 'a.sid' }),
+          ],
+        }),
+      });
 
       expect(store.transfers()[deviceId].feed[0].relativePath).toBe('b.sid');
       expect(store.transfers()[deviceId].feed[1].relativePath).toBe('a.sid');
+    });
+
+    it('does not duplicate feed rows when the same snapshot is applied twice', () => {
+      const snapshot = createSnapshot({
+        recentCompletions: [createCompletion({ relativePath: 'a.sid' })],
+      });
+      store.applyJobSnapshot({ deviceId, snapshot });
+      store.applyJobSnapshot({ deviceId, snapshot });
+
+      expect(store.transfers()[deviceId].feed).toHaveLength(1);
     });
 
     it('records a local upload failure without touching the server-facing job', () => {
@@ -201,7 +229,63 @@ describe('TransferStore', () => {
         success: false,
         reason: 'network timeout',
       });
+      expect(transfer.localFailures).toHaveLength(1);
+      expect(transfer.failures).toHaveLength(0);
+    });
+
+    it('folds a local upload failure into failures on the next snapshot, leaving uploadFailedCount untouched', () => {
+      store.recordUploadFailure({
+        deviceId,
+        relativePath: 'music/c.sid',
+        reason: 'network timeout',
+      });
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot() });
+
+      const transfer = store.transfers()[deviceId];
+      expect(transfer.uploadFailedCount).toBe(1);
+      expect(transfer.feed[0].relativePath).toBe('music/c.sid');
       expect(transfer.failures).toHaveLength(1);
+      expect(transfer.failures[0].relativePath).toBe('music/c.sid');
+    });
+
+    it('does not resurrect a feed row evicted by a local failure when the next snapshot is unchanged', () => {
+      const recentCompletions = Array.from({ length: TRANSFER_FEED_CAP }, (_, i) =>
+        createCompletion({ relativePath: `music/seed-${i}.sid` })
+      );
+      const snapshot = createSnapshot({ recentCompletions });
+      store.applyJobSnapshot({ deviceId, snapshot });
+
+      const evicted = store.transfers()[deviceId].feed[TRANSFER_FEED_CAP - 1].relativePath;
+
+      store.recordUploadFailure({
+        deviceId,
+        relativePath: 'music/local-failure.sid',
+        reason: 'timeout',
+      });
+      store.applyJobSnapshot({ deviceId, snapshot });
+
+      const feed = store.transfers()[deviceId].feed;
+      expect(feed).toHaveLength(TRANSFER_FEED_CAP);
+      expect(feed.some((entry) => entry.relativePath === evicted)).toBe(false);
+      expect(feed[0].relativePath).toBe('music/local-failure.sid');
+    });
+
+    it('routes a failure past the server failure bound into feed only, not failures', () => {
+      const pastBound = createCompletion({
+        relativePath: 'music/past-bound.sid',
+        success: false,
+        error: 'x',
+      });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ recentCompletions: [pastBound], failures: [] }),
+      });
+
+      const transfer = store.transfers()[deviceId];
+      expect(transfer.feed.some((entry) => entry.relativePath === 'music/past-bound.sid')).toBe(
+        true
+      );
+      expect(transfer.failures).toHaveLength(0);
     });
   });
 
@@ -477,14 +561,15 @@ describe('TransferStore', () => {
     });
 
     it('reports the failure overflow remainder', () => {
-      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot({ filesFailed: 10 }) });
-      store.recordFileCompletion({
+      store.applyJobSnapshot({
         deviceId,
-        completion: createCompletion({ relativePath: 'a.sid', success: false, error: 'x' }),
-      });
-      store.recordFileCompletion({
-        deviceId,
-        completion: createCompletion({ relativePath: 'b.sid', success: false, error: 'x' }),
+        snapshot: createSnapshot({
+          filesFailed: 10,
+          failures: [
+            createCompletion({ relativePath: 'a.sid', success: false, error: 'x' }),
+            createCompletion({ relativePath: 'b.sid', success: false, error: 'x' }),
+          ],
+        }),
       });
 
       expect(store.getTransferSummary(deviceId)().failureOverflow).toBe(8);
@@ -531,13 +616,21 @@ describe('TransferStore', () => {
   describe('feed and failure caps', () => {
     it('holds the feed and failure list at their caps under a large synthetic job', () => {
       const totalFiles = 200;
+      const allCompletions = Array.from({ length: totalFiles }, (_, i) =>
+        createCompletion({
+          relativePath: `music/file-${i}.sid`,
+          success: false,
+          error: 'device offline',
+        })
+      );
+
       for (let i = 0; i < totalFiles; i++) {
-        store.recordFileCompletion({
+        store.applyJobSnapshot({
           deviceId,
-          completion: createCompletion({
-            relativePath: `music/file-${i}.sid`,
-            success: false,
-            error: 'device offline',
+          snapshot: createSnapshot({
+            filesFailed: i + 1,
+            recentCompletions: [allCompletions[i]],
+            failures: allCompletions.slice(0, Math.min(i + 1, TRANSFER_FAILURE_CAP)),
           }),
         });
       }
@@ -547,7 +640,6 @@ describe('TransferStore', () => {
       expect(transfer.failures).toHaveLength(TRANSFER_FAILURE_CAP);
       expect(transfer.feed[0].relativePath).toBe(`music/file-${totalFiles - 1}.sid`);
 
-      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot({ filesFailed: totalFiles }) });
       const overflow = store.getTransferSummary(deviceId)().failureOverflow;
       expect(overflow).toBe(totalFiles - TRANSFER_FAILURE_CAP);
     });
@@ -562,7 +654,7 @@ describe('TransferStore', () => {
       store.completeScan({ deviceId, scanTotal: 1 });
       store.beginJob({ deviceId });
       store.applyJobSnapshot({ deviceId, snapshot: createSnapshot() });
-      store.recordFileCompletion({ deviceId, completion: createCompletion() });
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot({ filesReceived: 1 }) });
       store.recordUploadFailure({ deviceId, relativePath: 'x.sid', reason: 'timeout' });
       store.setDeviceBusy({ deviceId, activeForeignJobId: 'x', error: 'busy' });
       store.setTransferError({ deviceId, error: 'nope' });
@@ -577,7 +669,7 @@ describe('TransferStore', () => {
         'complete-scan',
         'begin-job',
         'apply-job-snapshot',
-        'record-file-completion',
+        'apply-job-snapshot',
         'record-upload-failure',
         'set-device-busy',
         'set-transfer-error',

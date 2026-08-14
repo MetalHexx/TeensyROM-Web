@@ -177,9 +177,9 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             var port = f.DeviceManager.PortFor(device.DeviceId);
             var gate = f.Services.GetRequiredService<ITransferCapacityGate>();
 
-            // The file-slot semaphore is sized once from MaxStagedFiles at gate construction, so it can't
-            // be tightened per test - the byte budget is read fresh on every call instead, so that's what
-            // saturates the gate here.
+            // MaxStagedBytes is the only ceiling the gate enforces, and it's read fresh from the shared
+            // options singleton on every call rather than baked in at construction - so tightening it here
+            // on the collection's already-started host is what saturates the gate.
             var originalMaxBytes = f.Options.MaxStagedBytes;
             f.Options.MaxStagedBytes = 5;
             port.PerFileDelay = TimeSpan.FromMilliseconds(600);

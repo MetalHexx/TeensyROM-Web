@@ -4,13 +4,13 @@ using TeensyRom.Core.ValueObjects;
 
 namespace TeensyRom.Api.Transfers
 {
-    public sealed class TransferJobRegistry : ITransferJobRegistry
+    public sealed class TransferJobRegistry(TransferOptions options) : ITransferJobRegistry
     {
         private readonly ConcurrentDictionary<string, TransferJob> _jobs = new();
 
         public TransferJob Create(string deviceId, TeensyStorageType storageType, DirectoryPath destination)
         {
-            var job = new TransferJob(deviceId, storageType, destination);
+            var job = new TransferJob(deviceId, storageType, destination, options);
             _jobs[job.JobId] = job;
             return job;
         }

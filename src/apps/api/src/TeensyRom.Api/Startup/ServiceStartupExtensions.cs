@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Logging;
@@ -50,7 +51,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IAudioStreamManager, AudioStreamManager>();
             services.AddSingleton<ITransferJobRegistry, TransferJobRegistry>();
             services.AddSingleton<IDeviceLeaseCoordinator, DeviceLeaseCoordinator>();
-            services.AddSingleton<TransferOptions>();
+            services.AddSingleton(sp => TransferOptionsBinder.BindFrom(sp.GetRequiredService<IConfiguration>()));
             services.AddSingleton<ITransferStagingStore, TransferStagingStore>();
             services.AddSingleton<ITransferCapacityGate, TransferCapacityGate>();
             services.AddSingleton<ITransferQueue, TransferQueue>();

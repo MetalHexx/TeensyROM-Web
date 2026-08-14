@@ -53,6 +53,7 @@ export interface DeviceTransferState {
   uploadFailedCount: number; // files that exhausted their upload attempts locally
   feed: TransferFeedEntry[]; // capped, newest first
   failures: TransferFeedEntry[]; // capped, for the end-of-job summary
+  localFailures: TransferFeedEntry[]; // capped, client-only source folded into `failures` on each snapshot
   droppedRootName: string | null;
   destinationLabel: string | null;
   startedAt: number | null;

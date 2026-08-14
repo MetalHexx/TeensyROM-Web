@@ -22,6 +22,7 @@ export function createDefaultDeviceTransferState(deviceId: string): DeviceTransf
     uploadFailedCount: 0,
     feed: [],
     failures: [],
+    localFailures: [],
     droppedRootName: null,
     destinationLabel: null,
     startedAt: null,
@@ -89,14 +90,33 @@ function capList<T>(list: T[], cap: number): T[] {
   return list.length > cap ? list.slice(0, cap) : list;
 }
 
-/** Prepends a feed entry (newest first) and, when it's a failure, the failures list too — both capped. */
+/** Prepends a feed entry (newest first) and, when it's a failure, the local failures list too — both capped. */
 export function pushFeedEntry(
   state: DeviceTransferState,
   entry: TransferFeedEntry
-): Pick<DeviceTransferState, 'feed' | 'failures'> {
+): Pick<DeviceTransferState, 'feed' | 'localFailures'> {
   return {
     feed: capList([entry, ...state.feed], TRANSFER_FEED_CAP),
-    failures: entry.success ? state.failures : capList([entry, ...state.failures], TRANSFER_FAILURE_CAP),
+    localFailures: entry.success
+      ? state.localFailures
+      : capList([entry, ...state.localFailures], TRANSFER_FAILURE_CAP),
+  };
+}
+
+/**
+ * List-shaped counterpart to `pushFeedEntry`, for the job-snapshot fold: prepends a batch of
+ * newly-arrived feed entries (already deduped against the previous snapshot, newest first) ahead
+ * of the existing feed, and recomputes `failures` from its two disjoint sources — the client-only
+ * `localFailures` and the server's own failure list — rather than accumulating it. Both capped.
+ */
+export function pushFeedEntries(
+  state: DeviceTransferState,
+  newFeedEntries: TransferFeedEntry[],
+  snapshotFailures: TransferFeedEntry[]
+): Pick<DeviceTransferState, 'feed' | 'failures'> {
+  return {
+    feed: capList([...newFeedEntries, ...state.feed], TRANSFER_FEED_CAP),
+    failures: capList([...state.localFailures, ...snapshotFailures], TRANSFER_FAILURE_CAP),
   };
 }
 

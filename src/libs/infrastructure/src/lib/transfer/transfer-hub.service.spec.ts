@@ -79,6 +79,9 @@ const jobDto = {
   lastActivityUtc: new Date('2026-01-01T00:01:00Z'),
   error: null,
   failures: [],
+  recentCompletions: [],
+  bytesPerSecond: 0,
+  filesPerSecond: 0,
 };
 
 describe('TransferHubService', () => {
@@ -133,30 +136,10 @@ describe('TransferHubService', () => {
     expect(emitted[0].filesReceived).toBe(2);
   });
 
-  it('emits FileCompleted pushes on fileCompletions$', async () => {
+  it('registers only the JobSnapshot handler on the connection', async () => {
     await service.subscribe('job-1');
-    const emitted: unknown[] = [];
-    service.fileCompletions$.subscribe((completion) => emitted.push(completion));
 
-    mocks.__handlers['FileCompleted']({
-      jobId: 'job-1',
-      relativePath: 'a.prg',
-      targetPath: '/games/a.prg',
-      success: true,
-      error: null,
-      sizeBytes: 10,
-    });
-
-    expect(emitted).toEqual([
-      {
-        jobId: 'job-1',
-        relativePath: 'a.prg',
-        targetPath: '/games/a.prg',
-        success: true,
-        error: null,
-        sizeBytes: 10,
-      },
-    ]);
+    expect(Object.keys(mocks.__handlers)).toEqual(['JobSnapshot']);
   });
 
   it('re-invokes Subscribe with the same job id on reconnect and resumes emitting snapshots', async () => {

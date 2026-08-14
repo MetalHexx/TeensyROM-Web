@@ -26,6 +26,9 @@ namespace TeensyRom.Api.Models
         [Required] public DateTime LastActivityUtc { get; set; }
         public string? Error { get; set; }
         [Required] public List<TransferFileCompleted> Failures { get; set; } = [];
+        [Required] public List<TransferFileCompleted> RecentCompletions { get; set; } = [];
+        [Required] public double BytesPerSecond { get; set; }
+        [Required] public double FilesPerSecond { get; set; }
 
         /// <summary>
         /// Maps a domain snapshot to the wire shape. The only place a <see cref="TransferJobSnapshot"/>
@@ -47,7 +50,10 @@ namespace TeensyRom.Api.Models
             StartedUtc = snapshot.StartedUtc,
             LastActivityUtc = snapshot.LastActivityUtc,
             Error = snapshot.Error,
-            Failures = [.. snapshot.Failures]
+            Failures = [.. snapshot.Failures],
+            RecentCompletions = [.. snapshot.RecentCompletions],
+            BytesPerSecond = snapshot.BytesPerSecond,
+            FilesPerSecond = snapshot.FilesPerSecond
         };
     }
 }
