@@ -23,11 +23,11 @@ function baseVm(overrides: Partial<TransferProgressVm> = {}): TransferProgressVm
     scanTotal: 12480,
     uploaded: 8412,
     written: 6977,
-    staged: 5231,
     failed: 4,
     apiPercent: 67,
     devicePercent: 56,
-    currentFile: 'HVSC/MUSICIANS/H/Hubbard_Rob/Commando.sid',
+    filesPerSecond: 9.8,
+    bytesPerSecond: 1_500_000,
     feed: [feedEntry(1), feedEntry(2, false)],
     failures: [feedEntry(2, false)],
     failureOverflow: 0,
@@ -145,7 +145,6 @@ describe('TransferProgressComponent', () => {
           state: 'receiving',
           uploaded: 8412,
           written: 6977,
-          staged: 5231, // deliberately not scanTotal - uploaded - failed, to prove no recomputation
           failed: 4,
           scanTotal: 12480,
           apiPercent: 67,
@@ -156,17 +155,40 @@ describe('TransferProgressComponent', () => {
       expect(q('metric-uploaded')?.textContent).toContain('8,412');
       expect(q('metric-uploaded')?.textContent).toContain('12,480');
       expect(q('metric-written')?.textContent).toContain('6,977');
-      expect(q('metric-staged')?.textContent?.trim()).toContain('5,231');
       expect(q('metric-failed')?.textContent?.trim()).toContain('4');
       expect(q('api-bar-pct')?.textContent?.trim()).toBe('67%');
       expect(q('device-bar-pct')?.textContent?.trim()).toBe('56%');
     });
 
-    it('orders the tiles Uploaded, Staged, Completed, Failed', async () => {
+    it('orders the tiles Uploaded, Completed, Failed, Rate', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Rate']);
+    });
+
+    it('renders both rate figures, formatted', async () => {
+      await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
+
+      expect(q('metric-rate')?.textContent).toContain('9.8/s');
+      expect(q('metric-rate')?.textContent).toContain('1.5 MB/s');
+    });
+
+    it('reads 0.0/s and 0 B/s when stalled, not a held prior value', async () => {
+      await setup(baseVm({ state: 'receiving', filesPerSecond: 0, bytesPerSecond: 0 }));
+
+      expect(q('metric-rate')?.textContent).toContain('0.0/s');
+      expect(q('metric-rate')?.textContent).toContain('0 B/s');
+    });
+
+    it('labels the rate tile "Rate" while running', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+      expect(q('metric-rate')?.querySelector('.metric-label')?.textContent?.trim()).toBe('Rate');
+    });
+
+    it('labels the rate tile "Avg Rate" once terminal', async () => {
+      await setup(baseVm({ state: 'completed' }));
+      expect(q('metric-rate')?.querySelector('.metric-label')?.textContent?.trim()).toBe('Avg Rate');
     });
 
     it('renders a large uploaded-of-total value as one unbroken run', async () => {
@@ -191,24 +213,20 @@ describe('TransferProgressComponent', () => {
       expect(q('transfer-progress-title')?.textContent?.trim()).toBe('Transferring to Widget');
     });
 
-    it('renders the current file as a bold label with no icon', async () => {
-      await setup(baseVm({ state: 'receiving', currentFile: 'HVSC/a/b/Current.sid' }));
+    it('renders no current-file element in the active state', async () => {
+      await setup(baseVm({ state: 'receiving' }));
 
-      const row = q('transfer-progress-current-file');
-      expect(row?.querySelector('.current-file-label')?.textContent?.trim()).toBe('Current File:');
-      expect(row?.textContent).toContain('Current.sid');
-      expect(row?.querySelector('lib-styled-icon')).toBeFalsy();
+      expect(q('transfer-progress-current-file')).toBeFalsy();
     });
 
-    it('renders the current file and the feed newest-first, as supplied, with no cap caption', async () => {
+    it('renders the feed newest-first, as supplied, with the full relative path and no cap caption', async () => {
       const feed = [feedEntry(1), feedEntry(2, false), feedEntry(3)];
-      await setup(baseVm({ state: 'receiving', feed, currentFile: 'HVSC/a/b/Current.sid' }));
+      await setup(baseVm({ state: 'receiving', feed }));
 
-      expect(q('transfer-progress-current-file')?.textContent).toContain('Current.sid');
       const rows = qAll('.feed-row');
       expect(rows.length).toBe(feed.length);
-      expect(rows[0].textContent).toContain('file-1.sid');
-      expect(rows[1].textContent).toContain('file-2.sid');
+      expect(rows[0].textContent).toContain('HVSC/MUSICIANS/H/Hubbard_Rob/file-1.sid');
+      expect(rows[1].textContent).toContain('HVSC/MUSICIANS/H/Hubbard_Rob/file-2.sid');
       expect(rows[1].classList.contains('feed-row-fail')).toBe(true);
       expect(rows[1].querySelector('.feed-row-reason')).toBeFalsy();
       expect(native().querySelector('.feed-cap-note')).toBeFalsy();
@@ -245,6 +263,45 @@ describe('TransferProgressComponent', () => {
 
       expect(spy).toHaveBeenCalled();
     });
+
+    it('names each write bar with a distinct accessible name', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+
+      const apiLabel = q('api-bar')?.getAttribute('aria-label');
+      const deviceLabel = q('device-bar')?.getAttribute('aria-label');
+      expect(apiLabel).toBeTruthy();
+      expect(deviceLabel).toBeTruthy();
+      expect(apiLabel).not.toBe(deviceLabel);
+    });
+
+    it('associates each metric label with its value through dt/dd', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+
+      const tile = q('metric-uploaded');
+      expect(tile?.tagName).toBe('DIV');
+      expect(tile?.querySelector('dt.metric-label')).toBeTruthy();
+      expect(tile?.querySelector('dd.metric-value')).toBeTruthy();
+      expect(q('transfer-progress-metrics')?.tagName).toBe('DL');
+    });
+
+    it('gives the rate tile a spoken form for both figures with no raw slash-s glyph', async () => {
+      await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
+
+      const spoken = q('metric-rate')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent).toBeTruthy();
+      expect(spoken?.textContent).not.toContain('/s');
+      expect(spoken?.textContent).toContain('9.8');
+      expect(spoken?.textContent).toContain('1.5');
+    });
+
+    it('renders the recent feed as a named list of items matching the entries supplied', async () => {
+      const feed = [feedEntry(1), feedEntry(2, false), feedEntry(3)];
+      await setup(baseVm({ state: 'receiving', feed }));
+
+      const list = q('transfer-progress-feed')?.querySelector('ul');
+      expect(list?.getAttribute('aria-label')).toBeTruthy();
+      expect(list?.querySelectorAll('li').length).toBe(feed.length);
+    });
   });
 
   describe('cancelling', () => {
@@ -263,11 +320,11 @@ describe('TransferProgressComponent', () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    it('orders the tiles Uploaded, Staged, Completed, Failed, in step with the active shape', async () => {
+    it('orders the tiles Uploaded, Completed, Failed, Rate, in step with the active shape', async () => {
       await setup(baseVm({ state: 'cancelling' }));
 
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Rate']);
     });
 
     it('renders uploaded-of-total and completed-of-total as one unbroken run, matching the active shape', async () => {
@@ -279,13 +336,10 @@ describe('TransferProgressComponent', () => {
       expect(written?.textContent?.replace(/\s+/g, ' ').trim()).toBe('6,977/ 60,000');
     });
 
-    it('renders the current file as a bold label with no icon, matching the active row', async () => {
-      await setup(baseVm({ state: 'cancelling', currentFile: 'HVSC/a/b/Current.sid' }));
+    it('renders no current-file element in the cancelling state', async () => {
+      await setup(baseVm({ state: 'cancelling' }));
 
-      const row = q('transfer-progress-current-file');
-      expect(row?.querySelector('.current-file-label')?.textContent?.trim()).toBe('Current File:');
-      expect(row?.textContent).toContain('Current.sid');
-      expect(row?.querySelector('lib-styled-icon')).toBeFalsy();
+      expect(q('transfer-progress-current-file')).toBeFalsy();
     });
   });
 
@@ -308,7 +362,7 @@ describe('TransferProgressComponent', () => {
 
       expect(q('transfer-progress-summary')).toBeFalsy();
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Staged', 'Completed', 'Failed']);
+      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Avg Rate']);
       expect(q('metric-written')?.textContent).toContain('12,474');
       expect(q('metric-failed')?.textContent).toContain('6');
       expect(q('api-bar')).toBeTruthy();
@@ -317,7 +371,7 @@ describe('TransferProgressComponent', () => {
     });
 
     it('omits the current-file row entirely — there is no current file in a terminal state', async () => {
-      await setup(baseVm({ state: 'completed', currentFile: null }));
+      await setup(baseVm({ state: 'completed' }));
       expect(q('transfer-progress-current-file')).toBeFalsy();
     });
 
@@ -332,6 +386,35 @@ describe('TransferProgressComponent', () => {
     it('omits the overflow line when nothing overflowed', async () => {
       await setup(baseVm({ state: 'completed', failures: [feedEntry(1, false)], failureOverflow: 0 }));
       expect(q('transfer-progress-failures-overflow')).toBeFalsy();
+    });
+
+    it('names each write bar with a distinct accessible name in the terminal shape', async () => {
+      await setup(baseVm({ state: 'completed' }));
+
+      const apiLabel = q('api-bar')?.getAttribute('aria-label');
+      const deviceLabel = q('device-bar')?.getAttribute('aria-label');
+      expect(apiLabel).toBeTruthy();
+      expect(deviceLabel).toBeTruthy();
+      expect(apiLabel).not.toBe(deviceLabel);
+    });
+
+    it('renders the failures list as a named list whose item count matches overflow + entries', async () => {
+      const failures = [feedEntry(1, false), feedEntry(2, false), feedEntry(3, false)];
+      await setup(baseVm({ state: 'completed', failures, failureOverflow: 3 }));
+
+      const list = q('transfer-progress-failures')?.querySelector('ul');
+      expect(list?.getAttribute('aria-label')).toBeTruthy();
+      // 3 failure rows plus the overflow row — every rendered row is a list item.
+      expect(list?.querySelectorAll('li').length).toBe(4);
+      expect(q('transfer-progress-failures-overflow')?.tagName).toBe('LI');
+    });
+
+    it('renders the empty failures row as a list item too', async () => {
+      await setup(baseVm({ state: 'completed', failures: [], failureOverflow: 0 }));
+
+      const list = q('transfer-progress-failures')?.querySelector('ul');
+      expect(list?.querySelectorAll('li').length).toBe(1);
+      expect(q('transfer-progress-no-failures')?.tagName).toBe('LI');
     });
 
     it('renders a long path and its reason as two separate, unellipsised lines', async () => {
@@ -386,7 +469,12 @@ describe('TransferProgressComponent', () => {
   });
 
   describe('live region', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('exposes an aria-live region that updates on a meaningful delta but not on a trivial one', async () => {
+      vi.useFakeTimers();
       await setup(baseVm({ state: 'receiving', devicePercent: 56 }));
 
       const region = q('transfer-progress-live-region');
@@ -398,6 +486,7 @@ describe('TransferProgressComponent', () => {
       fixture.detectChanges();
       expect(q('transfer-progress-live-region')?.textContent).toBe(firstAnnouncement);
 
+      vi.setSystemTime(Date.now() + 1100);
       fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 75 }));
       fixture.detectChanges();
       expect(q('transfer-progress-live-region')?.textContent).not.toBe(firstAnnouncement);
@@ -416,7 +505,7 @@ describe('TransferProgressComponent', () => {
     // Regression guard: the terminal restructure (item 4) is a visual change only — the
     // announcement text screen readers rely on must stay exactly as it was.
     it.each<[TransferModalState, string]>([
-      ['completed', 'Transfer complete. 100 written, 2 failed.'],
+      ['completed', 'Transfer complete. 100 written, 2 failed, averaging 9.8 files per second.'],
       ['cancelled', 'Transfer cancelled. 100 written, 2 failed.'],
       ['aborted', 'Transfer stopped. Device lost. 100 written, 2 failed.'],
       ['abandoned', 'Transfer wound up. Connection lost. 100 written, 2 failed.'],
@@ -424,6 +513,56 @@ describe('TransferProgressComponent', () => {
       await setup(baseVm({ state, written: 100, failed: 2, reason: 'stopped at your request' }));
 
       expect(q('transfer-progress-live-region')?.textContent).toBe(expected);
+    });
+
+    it('paces a small transfer to at most one announcement per second even when every file crosses the delta threshold', async () => {
+      vi.useFakeTimers();
+      await setup(baseVm({ state: 'receiving', devicePercent: 10 }));
+      const firstAnnouncement = q('transfer-progress-live-region')?.textContent;
+
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 20 }));
+      fixture.detectChanges();
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 30 }));
+      fixture.detectChanges();
+
+      expect(q('transfer-progress-live-region')?.textContent).toBe(firstAnnouncement);
+    });
+
+    it('still announces a state change immediately inside the delta floor window', async () => {
+      vi.useFakeTimers();
+      await setup(baseVm({ state: 'receiving', devicePercent: 10 }));
+      const firstAnnouncement = q('transfer-progress-live-region')?.textContent;
+
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 20 }));
+      fixture.detectChanges();
+      fixture.componentRef.setInput('vm', baseVm({ state: 'draining', devicePercent: 20 }));
+      fixture.detectChanges();
+
+      expect(q('transfer-progress-live-region')?.textContent).not.toBe(firstAnnouncement);
+    });
+
+    it('paces a large transfer by the multi-second interval, unaffected by the delta floor', async () => {
+      vi.useFakeTimers();
+      await setup(baseVm({ state: 'receiving', devicePercent: 10, scanTotal: 60_000 }));
+      const firstAnnouncement = q('transfer-progress-live-region')?.textContent;
+
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 12, scanTotal: 60_000 }));
+      fixture.detectChanges();
+      expect(q('transfer-progress-live-region')?.textContent).toBe(firstAnnouncement);
+
+      vi.setSystemTime(Date.now() + 4100);
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 14, scanTotal: 60_000 }));
+      fixture.detectChanges();
+      expect(q('transfer-progress-live-region')?.textContent).not.toBe(firstAnnouncement);
+    });
+
+    it('never mentions rate in a running state announcement', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+      expect(q('transfer-progress-live-region')?.textContent).not.toContain('per second');
+
+      fixture.componentRef.setInput('vm', baseVm({ state: 'draining' }));
+      fixture.detectChanges();
+      expect(q('transfer-progress-live-region')?.textContent).not.toContain('per second');
     });
   });
 });

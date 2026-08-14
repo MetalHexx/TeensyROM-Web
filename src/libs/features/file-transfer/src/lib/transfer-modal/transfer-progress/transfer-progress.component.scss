@@ -41,7 +41,7 @@
   padding: 0 var(--spacing-2xl) var(--spacing-xl);
 
   // Every block keeps its natural size; only the feed/failure list (below) is allowed to shrink
-  // and scroll, so metrics, bars, and the current-file row never get clipped.
+  // and scroll, so metrics and bars never get clipped.
   > * {
     flex: none;
   }
@@ -105,6 +105,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-md);
+  margin: 0;
 }
 
 .metric {
@@ -121,6 +122,7 @@
   color: var(--color-dimmed-light);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin: 0;
 }
 
 .metric-value {
@@ -129,6 +131,7 @@
   font-variant-numeric: tabular-nums;
   // Keeps a value like "40,000 / 60,000" on one line rather than wrapping mid-tile.
   white-space: nowrap;
+  margin: 0;
 }
 
 .metric-of {
@@ -136,6 +139,12 @@
   font-weight: 400;
   color: var(--color-dimmed-light);
   margin-left: 0.25em;
+}
+
+.metric-sub {
+  font-size: 0.75rem;
+  color: var(--color-dimmed-light);
+  margin: 0;
 }
 
 .metrics-muted {
@@ -188,42 +197,6 @@
   }
 }
 
-/* ── Current file ────────────────────────────────────────── */
-
-.current-file {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: 0.875rem;
-  min-width: 0;
-}
-
-.current-file-label {
-  color: var(--color-dimmed-light);
-  flex: none;
-}
-
-// Shared by the active and cancelling shapes' current-file rows.
-.current-file-label-strong {
-  font-weight: var(--font-weight-bold);
-}
-
-.current-file-path {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  // Ellipsises from the left: the path is a bidi-neutral run inside an RTL container, so the
-  // browser clips its start rather than its end while leaving character order untouched.
-  direction: rtl;
-  text-align: left;
-  unicode-bidi: plaintext;
-}
-
 /* ── Elapsed readout ─────────────────────────────────────── */
 
 .elapsed-readout {
@@ -262,6 +235,11 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
+  // Not `none` — Safari/VoiceOver drops list semantics entirely when the marker is removed via
+  // `list-style: none`. An empty marker string keeps the list exposed to assistive tech.
+  list-style-type: '';
 }
 
 .feed-row {
@@ -275,9 +253,16 @@
 }
 
 .feed-row-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  // Ellipsises from the left: the path is a bidi-neutral run inside an RTL container, so the
+  // browser clips its start rather than its end while leaving character order untouched.
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
 }
 
 .feed-row-fail .feed-row-name {

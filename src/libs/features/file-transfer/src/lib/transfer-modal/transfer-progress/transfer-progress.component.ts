@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActionButtonComponent, IconLabelComponent, StyledIconComponent } from '@teensyrom-nx/ui/components';
 import { TransferFeedEntry, TransferModalState } from '@teensyrom-nx/application';
+import { formatFileSize } from '@teensyrom-nx/domain';
 
 export interface TransferProgressVm {
   state: TransferModalState;
@@ -13,11 +14,11 @@ export interface TransferProgressVm {
   scanTotal: number;
   uploaded: number;
   written: number;
-  staged: number;
   failed: number;
   apiPercent: number;
   devicePercent: number;
-  currentFile: string | null;
+  filesPerSecond: number;
+  bytesPerSecond: number;
   feed: TransferFeedEntry[];
   failures: TransferFeedEntry[];
   failureOverflow: number;
@@ -119,7 +120,8 @@ const STATE_ANNOUNCEMENTS: Record<TransferModalState, (vm: TransferProgressVm) =
     `${vm.devicePercent}% written to device. ${vm.uploaded} of ${vm.scanTotal} uploaded, ${vm.failed} failed.`,
   draining: (vm) => `${vm.devicePercent}% written to device. Upload complete, ${vm.failed} failed.`,
   cancelling: () => 'Cancelling. Finishing current file.',
-  completed: (vm) => `Transfer complete. ${vm.written} written, ${vm.failed} failed.`,
+  completed: (vm) =>
+    `Transfer complete. ${vm.written} written, ${vm.failed} failed, averaging ${vm.filesPerSecond.toFixed(1)} files per second.`,
   cancelled: (vm) => `Transfer cancelled. ${vm.written} written, ${vm.failed} failed.`,
   aborted: (vm) => `Transfer stopped. Device lost. ${vm.written} written, ${vm.failed} failed.`,
   abandoned: (vm) => `Transfer wound up. Connection lost. ${vm.written} written, ${vm.failed} failed.`,
@@ -129,6 +131,8 @@ const STATE_ANNOUNCEMENTS: Record<TransferModalState, (vm: TransferProgressVm) =
 const ANNOUNCE_INTERVAL_MS = 4000;
 /** A device-percent swing this large announces immediately, interval notwithstanding. */
 const ANNOUNCE_DELTA_PERCENT = 5;
+/** The percent-jump path's own minimum gap, so a small transfer's per-file swings don't flood the region. */
+const ANNOUNCE_DELTA_FLOOR_MS = 1000;
 
 /**
  * Renders every state a transfer can be in, from the indeterminate scan count through both live
@@ -191,6 +195,12 @@ export class TransferProgressComponent {
   readonly apiBarSuccess = computed(() => this.vm().state === 'draining');
   readonly metricsMuted = computed(() => this.vm().state === 'cancelling');
 
+  readonly rateLabel = computed(() => (this.renderShape() === 'terminal' ? 'Avg Rate' : 'Rate'));
+  readonly filesPerSecondLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)}/s`);
+  readonly bytesPerSecondLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)}/s`);
+  readonly filesPerSecondSpokenLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)} files per second`);
+  readonly bytesPerSecondSpokenLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)} per second`);
+
   readonly terminalBannerTreatment = computed(() => TERMINAL_BANNER_TREATMENT[this.vm().state] ?? null);
   readonly terminalBannerIcon = computed(() => TERMINAL_BANNER_ICON[this.vm().state] ?? 'warning');
 
@@ -203,8 +213,10 @@ export class TransferProgressComponent {
       const stateChanged = vm.state !== this.lastAnnouncedState;
       const percentDelta = Math.abs(vm.devicePercent - this.lastAnnouncedPercent);
       const dueForInterval = now - this.lastAnnouncedAt >= ANNOUNCE_INTERVAL_MS;
+      const dueForDelta =
+        percentDelta >= ANNOUNCE_DELTA_PERCENT && now - this.lastAnnouncedAt >= ANNOUNCE_DELTA_FLOOR_MS;
 
-      if (!stateChanged && !dueForInterval && percentDelta < ANNOUNCE_DELTA_PERCENT) {
+      if (!stateChanged && !dueForInterval && !dueForDelta) {
         return;
       }
 
