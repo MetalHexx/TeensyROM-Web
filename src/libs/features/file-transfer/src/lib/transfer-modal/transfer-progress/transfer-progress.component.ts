@@ -120,7 +120,8 @@ const STATE_ANNOUNCEMENTS: Record<TransferModalState, (vm: TransferProgressVm) =
     `${vm.devicePercent}% written to device. ${vm.uploaded} of ${vm.scanTotal} uploaded, ${vm.failed} failed.`,
   draining: (vm) => `${vm.devicePercent}% written to device. Upload complete, ${vm.failed} failed.`,
   cancelling: () => 'Cancelling. Finishing current file.',
-  completed: (vm) => `Transfer complete. ${vm.written} written, ${vm.failed} failed.`,
+  completed: (vm) =>
+    `Transfer complete. ${vm.written} written, ${vm.failed} failed, averaging ${vm.filesPerSecond.toFixed(1)} files per second.`,
   cancelled: (vm) => `Transfer cancelled. ${vm.written} written, ${vm.failed} failed.`,
   aborted: (vm) => `Transfer stopped. Device lost. ${vm.written} written, ${vm.failed} failed.`,
   abandoned: (vm) => `Transfer wound up. Connection lost. ${vm.written} written, ${vm.failed} failed.`,
@@ -130,6 +131,8 @@ const STATE_ANNOUNCEMENTS: Record<TransferModalState, (vm: TransferProgressVm) =
 const ANNOUNCE_INTERVAL_MS = 4000;
 /** A device-percent swing this large announces immediately, interval notwithstanding. */
 const ANNOUNCE_DELTA_PERCENT = 5;
+/** The percent-jump path's own minimum gap, so a small transfer's per-file swings don't flood the region. */
+const ANNOUNCE_DELTA_FLOOR_MS = 1000;
 
 /**
  * Renders every state a transfer can be in, from the indeterminate scan count through both live
@@ -210,8 +213,10 @@ export class TransferProgressComponent {
       const stateChanged = vm.state !== this.lastAnnouncedState;
       const percentDelta = Math.abs(vm.devicePercent - this.lastAnnouncedPercent);
       const dueForInterval = now - this.lastAnnouncedAt >= ANNOUNCE_INTERVAL_MS;
+      const dueForDelta =
+        percentDelta >= ANNOUNCE_DELTA_PERCENT && now - this.lastAnnouncedAt >= ANNOUNCE_DELTA_FLOOR_MS;
 
-      if (!stateChanged && !dueForInterval && percentDelta < ANNOUNCE_DELTA_PERCENT) {
+      if (!stateChanged && !dueForInterval && !dueForDelta) {
         return;
       }
 

@@ -469,7 +469,12 @@ describe('TransferProgressComponent', () => {
   });
 
   describe('live region', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('exposes an aria-live region that updates on a meaningful delta but not on a trivial one', async () => {
+      vi.useFakeTimers();
       await setup(baseVm({ state: 'receiving', devicePercent: 56 }));
 
       const region = q('transfer-progress-live-region');
@@ -481,6 +486,7 @@ describe('TransferProgressComponent', () => {
       fixture.detectChanges();
       expect(q('transfer-progress-live-region')?.textContent).toBe(firstAnnouncement);
 
+      vi.setSystemTime(Date.now() + 1100);
       fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 75 }));
       fixture.detectChanges();
       expect(q('transfer-progress-live-region')?.textContent).not.toBe(firstAnnouncement);
@@ -499,7 +505,7 @@ describe('TransferProgressComponent', () => {
     // Regression guard: the terminal restructure (item 4) is a visual change only — the
     // announcement text screen readers rely on must stay exactly as it was.
     it.each<[TransferModalState, string]>([
-      ['completed', 'Transfer complete. 100 written, 2 failed.'],
+      ['completed', 'Transfer complete. 100 written, 2 failed, averaging 9.8 files per second.'],
       ['cancelled', 'Transfer cancelled. 100 written, 2 failed.'],
       ['aborted', 'Transfer stopped. Device lost. 100 written, 2 failed.'],
       ['abandoned', 'Transfer wound up. Connection lost. 100 written, 2 failed.'],
@@ -507,6 +513,56 @@ describe('TransferProgressComponent', () => {
       await setup(baseVm({ state, written: 100, failed: 2, reason: 'stopped at your request' }));
 
       expect(q('transfer-progress-live-region')?.textContent).toBe(expected);
+    });
+
+    it('paces a small transfer to at most one announcement per second even when every file crosses the delta threshold', async () => {
+      vi.useFakeTimers();
+      await setup(baseVm({ state: 'receiving', devicePercent: 10 }));
+      const firstAnnouncement = q('transfer-progress-live-region')?.textContent;
+
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 20 }));
+      fixture.detectChanges();
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 30 }));
+      fixture.detectChanges();
+
+      expect(q('transfer-progress-live-region')?.textContent).toBe(firstAnnouncement);
+    });
+
+    it('still announces a state change immediately inside the delta floor window', async () => {
+      vi.useFakeTimers();
+      await setup(baseVm({ state: 'receiving', devicePercent: 10 }));
+      const firstAnnouncement = q('transfer-progress-live-region')?.textContent;
+
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 20 }));
+      fixture.detectChanges();
+      fixture.componentRef.setInput('vm', baseVm({ state: 'draining', devicePercent: 20 }));
+      fixture.detectChanges();
+
+      expect(q('transfer-progress-live-region')?.textContent).not.toBe(firstAnnouncement);
+    });
+
+    it('paces a large transfer by the multi-second interval, unaffected by the delta floor', async () => {
+      vi.useFakeTimers();
+      await setup(baseVm({ state: 'receiving', devicePercent: 10, scanTotal: 60_000 }));
+      const firstAnnouncement = q('transfer-progress-live-region')?.textContent;
+
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 12, scanTotal: 60_000 }));
+      fixture.detectChanges();
+      expect(q('transfer-progress-live-region')?.textContent).toBe(firstAnnouncement);
+
+      vi.setSystemTime(Date.now() + 4100);
+      fixture.componentRef.setInput('vm', baseVm({ state: 'receiving', devicePercent: 14, scanTotal: 60_000 }));
+      fixture.detectChanges();
+      expect(q('transfer-progress-live-region')?.textContent).not.toBe(firstAnnouncement);
+    });
+
+    it('never mentions rate in a running state announcement', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+      expect(q('transfer-progress-live-region')?.textContent).not.toContain('per second');
+
+      fixture.componentRef.setInput('vm', baseVm({ state: 'draining' }));
+      fixture.detectChanges();
+      expect(q('transfer-progress-live-region')?.textContent).not.toContain('per second');
     });
   });
 });
