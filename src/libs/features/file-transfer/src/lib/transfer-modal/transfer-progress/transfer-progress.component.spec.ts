@@ -170,14 +170,14 @@ describe('TransferProgressComponent', () => {
     it('renders both rate figures, formatted', async () => {
       await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
 
-      expect(q('metric-rate')?.textContent).toContain('9.8/s');
+      expect(q('metric-rate')?.textContent).toContain('9.8 Files/s');
       expect(q('metric-rate')?.textContent).toContain('1.5 MB/s');
     });
 
     it('reads 0.0/s and 0 B/s when stalled, not a held prior value', async () => {
       await setup(baseVm({ state: 'receiving', filesPerSecond: 0, bytesPerSecond: 0 }));
 
-      expect(q('metric-rate')?.textContent).toContain('0.0/s');
+      expect(q('metric-rate')?.textContent).toContain('0.0 Files/s');
       expect(q('metric-rate')?.textContent).toContain('0 B/s');
     });
 
