@@ -263,6 +263,45 @@ describe('TransferProgressComponent', () => {
 
       expect(spy).toHaveBeenCalled();
     });
+
+    it('names each write bar with a distinct accessible name', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+
+      const apiLabel = q('api-bar')?.getAttribute('aria-label');
+      const deviceLabel = q('device-bar')?.getAttribute('aria-label');
+      expect(apiLabel).toBeTruthy();
+      expect(deviceLabel).toBeTruthy();
+      expect(apiLabel).not.toBe(deviceLabel);
+    });
+
+    it('associates each metric label with its value through dt/dd', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+
+      const tile = q('metric-uploaded');
+      expect(tile?.tagName).toBe('DIV');
+      expect(tile?.querySelector('dt.metric-label')).toBeTruthy();
+      expect(tile?.querySelector('dd.metric-value')).toBeTruthy();
+      expect(q('transfer-progress-metrics')?.tagName).toBe('DL');
+    });
+
+    it('gives the rate tile a spoken form for both figures with no raw slash-s glyph', async () => {
+      await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
+
+      const spoken = q('metric-rate')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent).toBeTruthy();
+      expect(spoken?.textContent).not.toContain('/s');
+      expect(spoken?.textContent).toContain('9.8');
+      expect(spoken?.textContent).toContain('1.5');
+    });
+
+    it('renders the recent feed as a named list of items matching the entries supplied', async () => {
+      const feed = [feedEntry(1), feedEntry(2, false), feedEntry(3)];
+      await setup(baseVm({ state: 'receiving', feed }));
+
+      const list = q('transfer-progress-feed')?.querySelector('ul');
+      expect(list?.getAttribute('aria-label')).toBeTruthy();
+      expect(list?.querySelectorAll('li').length).toBe(feed.length);
+    });
   });
 
   describe('cancelling', () => {
@@ -347,6 +386,35 @@ describe('TransferProgressComponent', () => {
     it('omits the overflow line when nothing overflowed', async () => {
       await setup(baseVm({ state: 'completed', failures: [feedEntry(1, false)], failureOverflow: 0 }));
       expect(q('transfer-progress-failures-overflow')).toBeFalsy();
+    });
+
+    it('names each write bar with a distinct accessible name in the terminal shape', async () => {
+      await setup(baseVm({ state: 'completed' }));
+
+      const apiLabel = q('api-bar')?.getAttribute('aria-label');
+      const deviceLabel = q('device-bar')?.getAttribute('aria-label');
+      expect(apiLabel).toBeTruthy();
+      expect(deviceLabel).toBeTruthy();
+      expect(apiLabel).not.toBe(deviceLabel);
+    });
+
+    it('renders the failures list as a named list whose item count matches overflow + entries', async () => {
+      const failures = [feedEntry(1, false), feedEntry(2, false), feedEntry(3, false)];
+      await setup(baseVm({ state: 'completed', failures, failureOverflow: 3 }));
+
+      const list = q('transfer-progress-failures')?.querySelector('ul');
+      expect(list?.getAttribute('aria-label')).toBeTruthy();
+      // 3 failure rows plus the overflow row — every rendered row is a list item.
+      expect(list?.querySelectorAll('li').length).toBe(4);
+      expect(q('transfer-progress-failures-overflow')?.tagName).toBe('LI');
+    });
+
+    it('renders the empty failures row as a list item too', async () => {
+      await setup(baseVm({ state: 'completed', failures: [], failureOverflow: 0 }));
+
+      const list = q('transfer-progress-failures')?.querySelector('ul');
+      expect(list?.querySelectorAll('li').length).toBe(1);
+      expect(q('transfer-progress-no-failures')?.tagName).toBe('LI');
     });
 
     it('renders a long path and its reason as two separate, unellipsised lines', async () => {

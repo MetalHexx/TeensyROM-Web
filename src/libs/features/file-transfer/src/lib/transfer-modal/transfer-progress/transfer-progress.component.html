@@ -42,25 +42,28 @@
       }
 
       @case ('active') {
-        <div class="metrics" data-testid="transfer-progress-metrics">
+        <dl class="metrics" data-testid="transfer-progress-metrics">
           <div class="metric" data-testid="metric-uploaded" [class.metric-success]="uploadedTileSuccess()">
-            <span class="metric-label">Uploaded</span>
-            <span class="metric-value">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+            <dt class="metric-label">Uploaded</dt>
+            <dd class="metric-value" aria-hidden="true">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
+            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }}</dd>
           </div>
           <div class="metric" data-testid="metric-written">
-            <span class="metric-label">Completed</span>
-            <span class="metric-value">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+            <dt class="metric-label">Completed</dt>
+            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
+            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
-            <span class="metric-label">Failed</span>
-            <span class="metric-value">{{ vm().failed | number }}</span>
+            <dt class="metric-label">Failed</dt>
+            <dd class="metric-value">{{ vm().failed | number }}</dd>
           </div>
           <div class="metric" data-testid="metric-rate">
-            <span class="metric-label">{{ rateLabel() }}</span>
-            <span class="metric-value">{{ filesPerSecondLabel() }}</span>
-            <span class="metric-sub">{{ bytesPerSecondLabel() }}</span>
+            <dt class="metric-label">{{ rateLabel() }}</dt>
+            <dd class="metric-value" aria-hidden="true">{{ filesPerSecondLabel() }}</dd>
+            <dd class="metric-sub" aria-hidden="true">{{ bytesPerSecondLabel() }}</dd>
+            <dd class="visually-hidden">{{ filesPerSecondSpokenLabel() }}, {{ bytesPerSecondSpokenLabel() }}</dd>
           </div>
-        </div>
+        </dl>
 
         <div class="write-bars">
           <div class="write-bar">
@@ -71,6 +74,7 @@
             <mat-progress-bar
               class="write-bar-track"
               data-testid="api-bar"
+              aria-label="Transferred to API"
               [class.progress-success]="apiBarSuccess()"
               mode="determinate"
               [value]="vm().apiPercent"
@@ -81,7 +85,13 @@
               <span>Transferred to TR</span>
               <span class="write-bar-pct" data-testid="device-bar-pct">{{ vm().devicePercent }}%</span>
             </div>
-            <mat-progress-bar class="write-bar-track" data-testid="device-bar" mode="determinate" [value]="vm().devicePercent"></mat-progress-bar>
+            <mat-progress-bar
+              class="write-bar-track"
+              data-testid="device-bar"
+              aria-label="Transferred to TR"
+              mode="determinate"
+              [value]="vm().devicePercent"
+            ></mat-progress-bar>
           </div>
         </div>
 
@@ -95,41 +105,44 @@
           <div class="feed-header">
             <span>Recent</span>
           </div>
-          <div class="feed-list">
+          <ul class="feed-list" aria-label="Recent">
             @for (entry of vm().feed; track entry.relativePath) {
-              <div class="feed-row" [class.feed-row-fail]="!entry.success">
+              <li class="feed-row" [class.feed-row-fail]="!entry.success">
                 <lib-styled-icon
                   [icon]="entry.success ? 'check_circle' : 'cancel'"
                   [color]="entry.success ? 'success' : 'error'"
                   size="small"
                 ></lib-styled-icon>
                 <span class="feed-row-name">{{ entry.relativePath }}</span>
-              </div>
+              </li>
             }
-          </div>
+          </ul>
         </div>
       }
 
       @case ('cancelling') {
-        <div class="metrics metrics-muted" data-testid="transfer-progress-metrics">
+        <dl class="metrics metrics-muted" data-testid="transfer-progress-metrics">
           <div class="metric" data-testid="metric-uploaded">
-            <span class="metric-label">Uploaded</span>
-            <span class="metric-value">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+            <dt class="metric-label">Uploaded</dt>
+            <dd class="metric-value" aria-hidden="true">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
+            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }}</dd>
           </div>
           <div class="metric" data-testid="metric-written">
-            <span class="metric-label">Completed</span>
-            <span class="metric-value">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+            <dt class="metric-label">Completed</dt>
+            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
+            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
-            <span class="metric-label">Failed</span>
-            <span class="metric-value">{{ vm().failed | number }}</span>
+            <dt class="metric-label">Failed</dt>
+            <dd class="metric-value">{{ vm().failed | number }}</dd>
           </div>
           <div class="metric" data-testid="metric-rate">
-            <span class="metric-label">{{ rateLabel() }}</span>
-            <span class="metric-value">{{ filesPerSecondLabel() }}</span>
-            <span class="metric-sub">{{ bytesPerSecondLabel() }}</span>
+            <dt class="metric-label">{{ rateLabel() }}</dt>
+            <dd class="metric-value" aria-hidden="true">{{ filesPerSecondLabel() }}</dd>
+            <dd class="metric-sub" aria-hidden="true">{{ bytesPerSecondLabel() }}</dd>
+            <dd class="visually-hidden">{{ filesPerSecondSpokenLabel() }}, {{ bytesPerSecondSpokenLabel() }}</dd>
           </div>
-        </div>
+        </dl>
       }
 
       @case ('terminal') {
@@ -149,25 +162,28 @@
           </div>
         }
 
-        <div class="metrics" data-testid="transfer-progress-metrics">
+        <dl class="metrics" data-testid="transfer-progress-metrics">
           <div class="metric" data-testid="metric-uploaded" [class.metric-success]="uploadedTileSuccess()">
-            <span class="metric-label">Uploaded</span>
-            <span class="metric-value">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+            <dt class="metric-label">Uploaded</dt>
+            <dd class="metric-value" aria-hidden="true">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
+            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }}</dd>
           </div>
           <div class="metric" data-testid="metric-written">
-            <span class="metric-label">Completed</span>
-            <span class="metric-value">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></span>
+            <dt class="metric-label">Completed</dt>
+            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
+            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
-            <span class="metric-label">Failed</span>
-            <span class="metric-value">{{ vm().failed | number }}</span>
+            <dt class="metric-label">Failed</dt>
+            <dd class="metric-value">{{ vm().failed | number }}</dd>
           </div>
           <div class="metric" data-testid="metric-rate">
-            <span class="metric-label">{{ rateLabel() }}</span>
-            <span class="metric-value">{{ filesPerSecondLabel() }}</span>
-            <span class="metric-sub">{{ bytesPerSecondLabel() }}</span>
+            <dt class="metric-label">{{ rateLabel() }}</dt>
+            <dd class="metric-value" aria-hidden="true">{{ filesPerSecondLabel() }}</dd>
+            <dd class="metric-sub" aria-hidden="true">{{ bytesPerSecondLabel() }}</dd>
+            <dd class="visually-hidden">{{ filesPerSecondSpokenLabel() }}, {{ bytesPerSecondSpokenLabel() }}</dd>
           </div>
-        </div>
+        </dl>
 
         <div class="write-bars">
           <div class="write-bar">
@@ -178,6 +194,7 @@
             <mat-progress-bar
               class="write-bar-track"
               data-testid="api-bar"
+              aria-label="Transferred to API"
               [class.progress-success]="apiBarSuccess()"
               mode="determinate"
               [value]="vm().apiPercent"
@@ -188,7 +205,13 @@
               <span>Transferred to TR</span>
               <span class="write-bar-pct" data-testid="device-bar-pct">{{ vm().devicePercent }}%</span>
             </div>
-            <mat-progress-bar class="write-bar-track" data-testid="device-bar" mode="determinate" [value]="vm().devicePercent"></mat-progress-bar>
+            <mat-progress-bar
+              class="write-bar-track"
+              data-testid="device-bar"
+              aria-label="Transferred to TR"
+              mode="determinate"
+              [value]="vm().devicePercent"
+            ></mat-progress-bar>
           </div>
         </div>
 
@@ -200,10 +223,10 @@
 
         <div class="feed" data-testid="transfer-progress-failures">
           <div class="feed-header"><span>Failures</span></div>
-          <div class="feed-list">
+          <ul class="feed-list" aria-label="Failures">
             @if (vm().failures.length > 0) {
               @for (entry of vm().failures; track entry.relativePath) {
-                <div class="failure-row">
+                <li class="failure-row">
                   <lib-styled-icon icon="cancel" color="error" size="small"></lib-styled-icon>
                   <div class="failure-row-text">
                     <span class="failure-row-name">{{ entry.relativePath }}</span>
@@ -211,19 +234,19 @@
                       <span class="failure-row-reason">{{ entry.reason }}</span>
                     }
                   </div>
-                </div>
+                </li>
               }
               @if (vm().failureOverflow > 0) {
-                <div class="failures-more" data-testid="transfer-progress-failures-overflow">
+                <li class="failures-more" data-testid="transfer-progress-failures-overflow">
                   and {{ vm().failureOverflow }} more
-                </div>
+                </li>
               }
             } @else {
-              <div class="failure-row failure-row-empty" data-testid="transfer-progress-no-failures">
+              <li class="failure-row failure-row-empty" data-testid="transfer-progress-no-failures">
                 <lib-icon-label icon="check_circle" color="success" label="No failures" size="small"></lib-icon-label>
-              </div>
+              </li>
             }
-          </div>
+          </ul>
         </div>
       }
     }

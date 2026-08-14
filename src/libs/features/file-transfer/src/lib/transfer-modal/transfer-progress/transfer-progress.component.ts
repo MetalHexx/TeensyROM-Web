@@ -195,6 +195,8 @@ export class TransferProgressComponent {
   readonly rateLabel = computed(() => (this.renderShape() === 'terminal' ? 'Avg Rate' : 'Rate'));
   readonly filesPerSecondLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)}/s`);
   readonly bytesPerSecondLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)}/s`);
+  readonly filesPerSecondSpokenLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)} files per second`);
+  readonly bytesPerSecondSpokenLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)} per second`);
 
   readonly terminalBannerTreatment = computed(() => TERMINAL_BANNER_TREATMENT[this.vm().state] ?? null);
   readonly terminalBannerIcon = computed(() => TERMINAL_BANNER_ICON[this.vm().state] ?? 'warning');

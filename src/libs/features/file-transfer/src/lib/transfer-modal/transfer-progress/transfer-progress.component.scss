@@ -105,6 +105,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-md);
+  margin: 0;
 }
 
 .metric {
@@ -121,6 +122,7 @@
   color: var(--color-dimmed-light);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin: 0;
 }
 
 .metric-value {
@@ -129,6 +131,7 @@
   font-variant-numeric: tabular-nums;
   // Keeps a value like "40,000 / 60,000" on one line rather than wrapping mid-tile.
   white-space: nowrap;
+  margin: 0;
 }
 
 .metric-of {
@@ -141,6 +144,7 @@
 .metric-sub {
   font-size: 0.75rem;
   color: var(--color-dimmed-light);
+  margin: 0;
 }
 
 .metrics-muted {
@@ -231,6 +235,11 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
+  // Not `none` — Safari/VoiceOver drops list semantics entirely when the marker is removed via
+  // `list-style: none`. An empty marker string keeps the list exposed to assistive tech.
+  list-style-type: '';
 }
 
 .feed-row {
