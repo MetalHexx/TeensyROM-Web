@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Transfers;
+using TeensyRom.Api.Transfers.Archives;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Device;
@@ -54,6 +55,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton(sp => TransferOptionsBinder.BindFrom(sp.GetRequiredService<IConfiguration>()));
             services.AddSingleton<ITransferStagingStore, TransferStagingStore>();
             services.AddSingleton<ITransferScratchStore, TransferScratchStore>();
+            services.AddSingleton<IArchiveReader, SharpCompressArchiveReader>();
             services.AddSingleton<ITransferCapacityGate, TransferCapacityGate>();
             services.AddSingleton<ITransferQueue, TransferQueue>();
             services.AddSingleton<ITransferSubscriptionTracker, TransferSubscriptionTracker>();
