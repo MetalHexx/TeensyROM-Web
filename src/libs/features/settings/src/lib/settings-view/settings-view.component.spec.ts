@@ -473,9 +473,8 @@ describe('SettingsViewComponent', () => {
       fixture.detectChanges();
 
       const buttons = fixture.nativeElement.querySelectorAll('.navigation-buttons lib-action-button');
-      // File transfer button is currently commented out in the template
       // Audio button removed - audio settings now embedded in device settings
-      expect(buttons.length).toBe(3);
+      expect(buttons.length).toBe(4);
     });
 
     it('should pass animationTrigger=true to active section', () => {
