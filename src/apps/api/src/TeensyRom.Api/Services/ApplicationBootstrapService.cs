@@ -14,16 +14,19 @@ namespace TeensyRom.Api.Services
     {
         private readonly IDeviceConnectionManager _deviceManager;
         private readonly ITransferStagingStore _stagingStore;
+        private readonly ITransferScratchStore _scratchStore;
         private readonly ILoggingService _log;
 
         public ApplicationBootstrapService(
             ISettingsService settingsService,
             IDeviceConnectionManager deviceManager,
             ITransferStagingStore stagingStore,
+            ITransferScratchStore scratchStore,
             ILoggingService log)
         {
             _deviceManager = deviceManager;
             _stagingStore = stagingStore;
+            _scratchStore = scratchStore;
             _log = log;
         }
 
@@ -34,6 +37,7 @@ namespace TeensyRom.Api.Services
             try
             {
                 _stagingStore.SweepAll();
+                _scratchStore.SweepAll();
 
                 await PerformDeviceAutoDiscovery(cancellationToken);
 

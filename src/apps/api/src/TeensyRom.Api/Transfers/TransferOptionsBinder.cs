@@ -21,6 +21,9 @@ namespace TeensyRom.Api.Transfers
             options.RecentCompletionsBound = Math.Max(1, options.RecentCompletionsBound);
             options.RetainedFailuresBound = Math.Max(1, options.RetainedFailuresBound);
             options.RateWindow = options.RateWindow > TimeSpan.Zero ? options.RateWindow : defaultRateWindow;
+            options.MaxScratchBytes = Math.Max(1, options.MaxScratchBytes);
+            options.MaxExpansionDepth = Math.Max(1, options.MaxExpansionDepth);
+            options.MaxExpandedBytesPerArchive = Math.Max(1, options.MaxExpandedBytesPerArchive);
 
             return options;
         }
