@@ -23,6 +23,7 @@ namespace TeensyRom.Api.Transfers
         private readonly TransferOptions _options;
         private readonly Func<DateTime> _clock;
         private readonly DateTime _startedUtc;
+        private readonly int _expectedArchiveCount; // from the browser at create time; 0 for an archive-free job
 
         private int _filesReceived;
         private int _filesSent;
@@ -30,6 +31,12 @@ namespace TeensyRom.Api.Transfers
         private long _bytesSent;
         private string? _currentFile;
         private string? _error;
+        private string? _expandingArchive;   // relative path of the archive currently being expanded
+        private long _expansionBytesWritten; // for that archive only — resets when the next one starts
+        private long _expansionBytesDeclared; // for that archive only
+        private int _expandedFileCount;      // job-wide running total
+        private int _archivesAccepted;       // archives uploaded and handed to expansion
+        private int _archivesOutstanding;    // accepted but not yet finished expanding
 
         public string JobId { get; }
         public string DeviceId { get; }
@@ -48,7 +55,8 @@ namespace TeensyRom.Api.Transfers
             TeensyStorageType storageType,
             DirectoryPath destination,
             TransferOptions options,
-            Func<DateTime>? clock = null)
+            Func<DateTime>? clock = null,
+            int expectedArchiveCount = 0)
         {
             JobId = Guid.NewGuid().ToString("N");
             DeviceId = deviceId;
@@ -56,6 +64,7 @@ namespace TeensyRom.Api.Transfers
             Destination = destination;
             _options = options;
             _clock = clock ?? (() => DateTime.UtcNow);
+            _expectedArchiveCount = expectedArchiveCount;
             State = TransferJobState.Created;
             _startedUtc = _clock();
             LastActivityUtc = _startedUtc;
@@ -161,6 +170,125 @@ namespace TeensyRom.Api.Transfers
             {
                 PendingCount--;
             }
+        }
+
+        /// <summary>
+        /// An archive has been accepted for expansion. Raises both archive counters; does not touch
+        /// <see cref="PendingCount"/> — <see cref="OnFileReceived"/> already took this archive's slot
+        /// when it was uploaded.
+        /// </summary>
+        public void OnArchiveAccepted()
+        {
+            lock (_lock)
+            {
+                _archivesAccepted++;
+                _archivesOutstanding++;
+                LastActivityUtc = _clock();
+            }
+        }
+
+        /// <summary>
+        /// Extraction of one archive begins. Resets the byte pair and names it — the name changing and
+        /// the bar resetting are the same event, and that is what explains the reset to the user.
+        /// </summary>
+        public void OnArchiveExpansionStarted(string relativePath, long declaredUncompressedBytes)
+        {
+            lock (_lock)
+            {
+                _expandingArchive = relativePath;
+                _expansionBytesWritten = 0;
+                _expansionBytesDeclared = declaredUncompressedBytes;
+                LastActivityUtc = _clock();
+            }
+        }
+
+        /// <summary>
+        /// Absolute bytes written for the archive named by <see cref="OnArchiveExpansionStarted"/> —
+        /// never a delta, so a retry cannot double-count.
+        /// </summary>
+        public void OnArchiveExpansionProgress(long uncompressedBytesWritten)
+        {
+            lock (_lock)
+            {
+                _expansionBytesWritten = uncompressedBytesWritten;
+                LastActivityUtc = _clock();
+            }
+        }
+
+        /// <summary>
+        /// One extracted entry has been admitted. Raises <see cref="PendingCount"/> and the expanded-file
+        /// total; deliberately does NOT raise the received-file count — the entry was never uploaded. Must
+        /// be called before the archive's matching <see cref="OnArchiveExpansionFinished"/>, never after —
+        /// see the ordering note there.
+        /// </summary>
+        public void OnEntryExpanded()
+        {
+            lock (_lock)
+            {
+                PendingCount++;
+                _expandedFileCount++;
+                LastActivityUtc = _clock();
+            }
+        }
+
+        /// <summary>
+        /// A failure produced by expansion — a refused entry, a refused nested archive, an unreadable
+        /// archive. Records it exactly as <see cref="OnFileFailed"/> does but WITHOUT decrementing
+        /// <see cref="PendingCount"/>, because a refused entry never took a slot: routing it through
+        /// <see cref="OnFileFailed"/> would decrement against nothing and drive <see cref="PendingCount"/>
+        /// negative.
+        /// </summary>
+        public void OnExpansionFailure(TransferFileCompleted f)
+        {
+            lock (_lock)
+            {
+                _filesFailed++;
+
+                if (_failures.Count < _options.RetainedFailuresBound)
+                {
+                    _failures.Add(f);
+                }
+
+                RecordCompletion(f);
+                LastActivityUtc = _clock();
+            }
+        }
+
+        /// <summary>
+        /// This archive is done, successfully or not. Clears the in-progress archive name, lowers the
+        /// outstanding-archive count, and releases the archive's own <see cref="PendingCount"/> slot — the
+        /// one <see cref="OnFileReceived"/> took when it was uploaded. Exactly once per accepted archive,
+        /// whatever the outcome. Must run after every <see cref="OnEntryExpanded"/> for this archive: if it
+        /// runs first, <see cref="PendingCount"/> can touch zero between the archive's release and its
+        /// first entry's admission, and the pump will complete a job that is still mid-expansion.
+        /// </summary>
+        public void OnArchiveExpansionFinished()
+        {
+            lock (_lock)
+            {
+                _expandingArchive = null;
+                _archivesOutstanding--;
+                PendingCount--;
+                LastActivityUtc = _clock();
+            }
+        }
+
+        /// <summary>
+        /// True once no further archives can arrive: the browser has sent all it said it would, or the
+        /// job has been sealed — the backstop for an archive whose upload never succeeded.
+        /// </summary>
+        private bool NoMoreArchivesInbound =>
+            _archivesAccepted >= _expectedArchiveCount || State is not (TransferJobState.Created or TransferJobState.Receiving);
+
+        /// <summary>
+        /// True while this job could still produce expanded entries — either an archive is mid-expansion,
+        /// or one the browser promised has not arrived yet. NOT just <c>_archivesOutstanding &gt; 0</c>:
+        /// between two archives that would read false, releasing the device write and publishing a total
+        /// that then grows.
+        /// </summary>
+        public bool HasExpansionOutstanding
+        {
+            get { lock (_lock) return _archivesOutstanding > 0 || !NoMoreArchivesInbound; }
         }
 
         public void SetCurrentFile(string? relativePath)
@@ -279,7 +407,17 @@ namespace TeensyRom.Api.Transfers
                     Failures = _failures.ToArray(),
                     RecentCompletions = _recentCompletions.Reverse().ToArray(),
                     BytesPerSecond = bytesPerSecond,
-                    FilesPerSecond = filesPerSecond
+                    FilesPerSecond = filesPerSecond,
+                    ExpandingArchive = _expandingArchive,
+                    ExpansionBytesWritten = _expansionBytesWritten,
+                    ExpansionBytesDeclared = _expansionBytesDeclared,
+                    // Null until no further archives can arrive AND none is still expanding. The browser
+                    // composes the job's expected total from this; a count published while an archive is
+                    // still inbound gives it a total that grows, which is the exact backwards movement the
+                    // design forbids. Gating on _archivesOutstanding == 0 alone leaks a wrong value twice —
+                    // before the first archive has finished uploading, and in the gap between one archive
+                    // finishing and the next arriving.
+                    ExpandedFileCount = HasExpansionOutstanding ? null : _expandedFileCount
                 };
             }
         }
