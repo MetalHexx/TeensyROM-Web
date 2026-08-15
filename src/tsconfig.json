@@ -39,5 +39,11 @@
     {
       "path": "./apps/teensyrom-ui-e2e/tsconfig.json"
     }
-  ]
+  ],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "moduleResolution": "node10"
+    }
+  }
 }
