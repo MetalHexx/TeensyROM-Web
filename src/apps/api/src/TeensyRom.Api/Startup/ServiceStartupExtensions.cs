@@ -53,6 +53,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IDeviceLeaseCoordinator, DeviceLeaseCoordinator>();
             services.AddSingleton(sp => TransferOptionsBinder.BindFrom(sp.GetRequiredService<IConfiguration>()));
             services.AddSingleton<ITransferStagingStore, TransferStagingStore>();
+            services.AddSingleton<ITransferScratchStore, TransferScratchStore>();
             services.AddSingleton<ITransferCapacityGate, TransferCapacityGate>();
             services.AddSingleton<ITransferQueue, TransferQueue>();
             services.AddSingleton<ITransferSubscriptionTracker, TransferSubscriptionTracker>();
