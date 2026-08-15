@@ -63,11 +63,15 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<TransferProgressNotifier>();
             services.AddSingleton<ITransferProgressNotifier>(sp => sp.GetRequiredService<TransferProgressNotifier>());
             services.AddSingleton<TransferPump>();
+            services.AddSingleton<IArchiveExpansionQueue, ArchiveExpansionQueue>();
+            services.AddSingleton<ArchiveExpansionService>();
+            services.AddSingleton<ArchiveExpansionPump>();
 
             // Register application bootstrap hosted service
             services.AddHostedService<ApplicationBootstrapService>();
             services.AddHostedService(sp => sp.GetRequiredService<TransferProgressNotifier>());
             services.AddHostedService(sp => sp.GetRequiredService<TransferPump>());
+            services.AddHostedService(sp => sp.GetRequiredService<ArchiveExpansionPump>());
             services.AddHostedService<TransferJobSweeper>();
 
             return services;
