@@ -64,7 +64,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
                 return Task.CompletedTask;
             }
 
-            var job = registry.Create(r.DeviceId, r.StorageType, destination);
+            var job = registry.Create(r.DeviceId, r.StorageType, destination, r.Body.ExpectedArchiveCount);
 
             if (!leases.TryAcquire(r.DeviceId, job.JobId))
             {

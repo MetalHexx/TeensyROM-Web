@@ -38,5 +38,10 @@ namespace TeensyRom.Core.Entities.Transfers
 
         /// <summary>Rolling files/second while active; the lifetime average once terminal. 0 when idle.</summary>
         public required double FilesPerSecond { get; init; }
+
+        public string? ExpandingArchive { get; init; }        // relative path; null when nothing is expanding
+        public long ExpansionBytesWritten { get; init; }
+        public long ExpansionBytesDeclared { get; init; }
+        public int? ExpandedFileCount { get; init; }          // null until every archive has finished
     }
 }

@@ -1,3 +1,4 @@
+using TeensyRom.Api.Models;
 using TeensyRom.Api.Transfers;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Entities.Transfers;
@@ -7,8 +8,8 @@ namespace TeensyRom.Api.Tests.Unit.Transfers;
 
 public class TransferJobTests
 {
-    private static TransferJob NewJob(TransferOptions? options = null, Func<DateTime>? clock = null) =>
-        new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), options ?? new TransferOptions(), clock);
+    private static TransferJob NewJob(TransferOptions? options = null, Func<DateTime>? clock = null, int expectedArchiveCount = 0) =>
+        new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), options ?? new TransferOptions(), clock, expectedArchiveCount);
 
     private static TransferFileCompleted Success(TransferJob job, string path, long sizeBytes) =>
         new(job.JobId, path, $"/transfers/{path}", true, null, sizeBytes);
@@ -395,5 +396,177 @@ public class TransferJobTests
         double.IsFinite(snapshot.FilesPerSecond).Should().BeTrue();
         snapshot.BytesPerSecond.Should().BeGreaterThan(0);
         snapshot.FilesPerSecond.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void ArchiveHandoff_PendingCount_NeverReachesZero_WhileEntriesAreExpanding()
+    {
+        var job = NewJob(expectedArchiveCount: 1);
+        var observed = new List<int>();
+
+        job.OnFileReceived(1000); // the archive itself is uploaded like any other file
+        observed.Add(job.PendingCount);
+
+        job.OnArchiveAccepted(); // does not touch PendingCount
+        observed.Add(job.PendingCount);
+
+        job.OnArchiveExpansionStarted("game.zip", 2000);
+        observed.Add(job.PendingCount);
+
+        job.OnEntryExpanded();
+        observed.Add(job.PendingCount);
+
+        job.OnEntryExpanded();
+        observed.Add(job.PendingCount);
+
+        // Releasing the archive's slot after its entries were admitted is the seam that must not
+        // let PendingCount touch zero while expanded entries are still pending delivery.
+        job.OnArchiveExpansionFinished();
+        observed.Add(job.PendingCount);
+
+        observed.Should().AllSatisfy(count => count.Should().BeGreaterThan(0));
+        job.PendingCount.Should().Be(2); // the archive's own slot released, the two entries' slots remain
+    }
+
+    [Fact]
+    public void OnExpansionFailure_RaisesFailedCount_ButLeavesPendingCountUntouched()
+    {
+        var job = NewJob(expectedArchiveCount: 1);
+        job.OnFileReceived(1000);
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("game.zip", 2000);
+        var pendingBeforeFailure = job.PendingCount;
+        var failure = Failure(job, "refused-entry.d64", "entry refused", 0);
+
+        job.OnExpansionFailure(failure);
+
+        job.PendingCount.Should().Be(pendingBeforeFailure);
+        var snapshot = job.ToSnapshot();
+        snapshot.FilesFailed.Should().Be(1);
+        snapshot.Failures.Should().ContainSingle().Which.Should().Be(failure);
+    }
+
+    [Fact]
+    public void FailedArchive_ExpansionFailureThenFinished_NetsExactlyOneDecrement()
+    {
+        var job = NewJob(expectedArchiveCount: 1);
+        job.OnFileReceived(1000); // archive uploaded: PendingCount takes its one slot
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("corrupt.zip", 0);
+        var failure = Failure(job, "corrupt.zip", "unreadable archive", 1000);
+
+        job.OnExpansionFailure(failure);
+        job.OnArchiveExpansionFinished();
+
+        job.PendingCount.Should().Be(0);
+        job.ToSnapshot().FilesFailed.Should().Be(1);
+    }
+
+    [Fact]
+    public void ExpandedFileCount_IsNull_BeforeFirstArchiveArrives()
+    {
+        var job = NewJob(expectedArchiveCount: 1);
+
+        job.ToSnapshot().ExpandedFileCount.Should().BeNull();
+    }
+
+    [Fact]
+    public void ExpandedFileCount_IsNull_InTheGapBetweenTwoArchives()
+    {
+        var job = NewJob(expectedArchiveCount: 2);
+        job.OnFileReceived(100);
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("a.zip", 100);
+        job.OnEntryExpanded();
+        job.OnArchiveExpansionFinished();
+
+        job.ToSnapshot().ExpandedFileCount.Should().BeNull();
+    }
+
+    [Fact]
+    public void ExpandedFileCount_CarriesTheTotal_OnceEveryPromisedArchiveHasFinished()
+    {
+        var job = NewJob(expectedArchiveCount: 2);
+
+        job.OnFileReceived(100);
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("a.zip", 100);
+        job.OnEntryExpanded();
+        job.OnEntryExpanded();
+        job.OnArchiveExpansionFinished();
+
+        job.OnFileReceived(100);
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("b.zip", 100);
+        job.OnEntryExpanded();
+        job.OnArchiveExpansionFinished();
+
+        job.ToSnapshot().ExpandedFileCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void ExpandedFileCount_BecomesNonNull_WhenSealedWithAPromisedArchiveNeverArrived()
+    {
+        var job = NewJob(expectedArchiveCount: 1);
+        job.OnFileReceived(100); // an ordinary file arrives; the promised archive never does
+        job.TryTransitionTo(TransferJobState.Receiving);
+
+        job.HasExpansionOutstanding.Should().BeTrue();
+
+        job.TryTransitionTo(TransferJobState.Sealed);
+
+        job.HasExpansionOutstanding.Should().BeFalse();
+        job.ToSnapshot().ExpandedFileCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void OnArchiveExpansionStarted_SecondArchive_ResetsByteState_RatherThanAccumulating()
+    {
+        var job = NewJob(expectedArchiveCount: 2);
+        job.OnFileReceived(100);
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("a.zip", 500);
+        job.OnArchiveExpansionProgress(300);
+        job.OnArchiveExpansionFinished();
+
+        job.OnFileReceived(100);
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("b.zip", 900);
+
+        var snapshot = job.ToSnapshot();
+        snapshot.ExpandingArchive.Should().Be("b.zip");
+        snapshot.ExpansionBytesWritten.Should().Be(0);
+        snapshot.ExpansionBytesDeclared.Should().Be(900);
+    }
+
+    [Fact]
+    public void ToSnapshot_ArchiveFreeJob_ExpansionFieldsAreUnchangedDefaults()
+    {
+        var job = NewJob(); // expectedArchiveCount defaults to 0
+
+        job.HasExpansionOutstanding.Should().BeFalse();
+
+        var snapshot = job.ToSnapshot();
+        snapshot.ExpandingArchive.Should().BeNull();
+        snapshot.ExpansionBytesWritten.Should().Be(0);
+        snapshot.ExpansionBytesDeclared.Should().Be(0);
+        snapshot.ExpandedFileCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void TransferJobDto_From_CarriesTheExpansionFieldsThroughToTheWireShape()
+    {
+        var job = NewJob(expectedArchiveCount: 1);
+        job.OnFileReceived(500);
+        job.OnArchiveAccepted();
+        job.OnArchiveExpansionStarted("game.zip", 500);
+        job.OnArchiveExpansionProgress(250);
+
+        var dto = TransferJobDto.From(job.ToSnapshot());
+
+        dto.ExpandingArchive.Should().Be("game.zip");
+        dto.ExpansionBytesWritten.Should().Be(250);
+        dto.ExpansionBytesDeclared.Should().Be(500);
+        dto.ExpandedFileCount.Should().BeNull();
     }
 }

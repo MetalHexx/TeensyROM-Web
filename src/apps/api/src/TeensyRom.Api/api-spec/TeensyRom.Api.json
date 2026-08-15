@@ -1492,6 +1492,10 @@
         "properties": {
           "destinationDirectory": {
             "type": "string"
+          },
+          "expectedArchiveCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -2384,7 +2388,9 @@
           "failures",
           "recentCompletions",
           "bytesPerSecond",
-          "filesPerSecond"
+          "filesPerSecond",
+          "expansionBytesWritten",
+          "expansionBytesDeclared"
         ],
         "type": "object",
         "properties": {
@@ -2459,6 +2465,23 @@
           "filesPerSecond": {
             "type": "number",
             "format": "double"
+          },
+          "expandingArchive": {
+            "type": "string",
+            "nullable": true
+          },
+          "expansionBytesWritten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expansionBytesDeclared": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expandedFileCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -2478,7 +2501,9 @@
           "failures",
           "recentCompletions",
           "bytesPerSecond",
-          "filesPerSecond"
+          "filesPerSecond",
+          "expansionBytesWritten",
+          "expansionBytesDeclared"
         ],
         "type": "object",
         "properties": {
@@ -2553,6 +2578,23 @@
           "filesPerSecond": {
             "type": "number",
             "format": "double"
+          },
+          "expandingArchive": {
+            "type": "string",
+            "nullable": true
+          },
+          "expansionBytesWritten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expansionBytesDeclared": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expandedFileCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "nullable": true
