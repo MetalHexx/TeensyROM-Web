@@ -12,10 +12,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
     /// </summary>
     public class UploadFileEndpoint(
         ITransferJobRegistry registry,
-        ITransferStagingStore staging,
-        ITransferCapacityGate gate,
-        ITransferQueue queue,
-        ITransferProgressNotifier notifier) : RadEndpoint<UploadFileRequest, UploadFileResponse>
+        ITransferAdmission admission) : RadEndpoint<UploadFileRequest, UploadFileResponse>
     {
         // Used only when the client omits Content-Length (e.g. chunked transfer encoding). Adjust()
         // reconciles this reservation to the real size once the body is fully staged.
@@ -66,53 +63,18 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
                 return;
             }
 
-            if (!TransferPathResolver.TryResolve(job.Destination, r.Path, out var target, out var error))
+            var reserved = HttpContext.Request.ContentLength ?? DefaultReservationBytes;
+
+            var result = await admission.AdmitAsync(job, HttpContext.Request.Body, r.Path, reserved, countAsReceived: true, ct);
+
+            if (!result.Accepted)
             {
-                SendValidationError(error!);
+                SendValidationError(result.Error!);
                 return;
             }
 
-            var reserved = HttpContext.Request.ContentLength ?? DefaultReservationBytes;
-            await gate.WaitForSlotAsync(reserved, ct);
-
-            string? stagingPath = null;
-            var effective = reserved;
-
-            try
-            {
-                stagingPath = await staging.StageAsync(job.JobId, HttpContext.Request.Body, ct);
-                var actualBytes = new FileInfo(stagingPath).Length;
-                effective = gate.Adjust(reserved, actualBytes);
-
-                job.OnFileReceived(actualBytes);
-                await queue.EnqueueAsync(
-                    job.DeviceId,
-                    new StagedFile(job.JobId, stagingPath, r.Path, target, job.StorageType, actualBytes, effective),
-                    ct);
-                notifier.JobChanged(job);
-
-                if (job.State == TransferJobState.Created)
-                {
-                    job.TryTransitionTo(TransferJobState.Receiving);
-                }
-
-                Response = new() { RelativePath = r.Path, SizeBytes = actualBytes, Queued = true };
-                Send();
-            }
-            catch
-            {
-                // A slot leaked here is permanent and eventually deadlocks every upload for the process
-                // lifetime - releasing exactly `effective` (never the raw reservation once Adjust ran)
-                // keeps the byte counter from drifting.
-                gate.ReleaseSlot(effective);
-
-                if (stagingPath is not null)
-                {
-                    staging.DeleteStagedFile(stagingPath);
-                }
-
-                throw;
-            }
+            Response = new() { RelativePath = r.Path, SizeBytes = result.File!.SizeBytes, Queued = true };
+            Send();
         }
     }
 }

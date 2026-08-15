@@ -58,6 +58,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IArchiveReader, SharpCompressArchiveReader>();
             services.AddSingleton<ITransferCapacityGate, TransferCapacityGate>();
             services.AddSingleton<ITransferQueue, TransferQueue>();
+            services.AddSingleton<ITransferAdmission, TransferAdmission>();
             services.AddSingleton<ITransferSubscriptionTracker, TransferSubscriptionTracker>();
             services.AddSingleton<TransferProgressNotifier>();
             services.AddSingleton<ITransferProgressNotifier>(sp => sp.GetRequiredService<TransferProgressNotifier>());
