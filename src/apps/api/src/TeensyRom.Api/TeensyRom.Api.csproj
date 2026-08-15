@@ -38,6 +38,7 @@
     <PackageReference Include="PortAudioSharp2" Version="1.*" />
     <PackageReference Include="RadEndpoints" Version="1.0.0-alpha.21" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.4.3" />
+    <PackageReference Include="SharpCompress" Version="0.48.0" />
   </ItemGroup>
 
   <ItemGroup>
