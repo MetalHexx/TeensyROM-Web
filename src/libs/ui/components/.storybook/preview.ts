@@ -1,4 +1,5 @@
-import type { Preview } from '@storybook/angular';
+import { applicationConfig, type Preview } from '@storybook/angular';
+import { provideAnimations } from '@angular/platform-browser/animations';
 import { withThemeByClassName } from '@storybook/addon-themes';
 import { setCompodocJson } from '@storybook/addon-docs/angular';
 import docJson from '../documentation.json';
@@ -24,6 +25,9 @@ const preview: Preview = {
 };
 
 export const decorators = [
+  applicationConfig({
+    providers: [provideAnimations()],
+  }),
   withThemeByClassName({
     themes: { light: '', dark: 'dark-mode' },
     defaultTheme: 'light',
