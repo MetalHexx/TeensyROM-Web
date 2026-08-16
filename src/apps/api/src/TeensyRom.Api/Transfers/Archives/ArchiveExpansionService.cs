@@ -191,6 +191,11 @@ namespace TeensyRom.Api.Transfers.Archives
             var producedBytes = 0L;
             var lastReportedPercent = -1;
 
+            // Set for every entry that left a trace - produced, pushed as nested, or individually
+            // refused. NOT set for an entry silently skipped as unsupported/a directory, so a leftover
+            // false here means the whole archive's contents were ignorable, never that every entry failed.
+            var anyEntryOutcome = false;
+
             try
             {
                 await reader.ExtractAsync(item.ScratchArchivePath, async (entry, stream, entryCt) =>
@@ -200,12 +205,14 @@ namespace TeensyRom.Api.Transfers.Archives
                         // Resolve-then-check is impossible for a link that has not been written, and a
                         // check that cannot resolve can be laundered - refuse outright.
                         FailEntry(job, entry.Path, "Symlinked archive entries are not supported.", entry.DeclaredSizeBytes);
+                        anyEntryOutcome = true;
                         return;
                     }
 
                     if (!ArchiveEntryPathResolver.TryResolve(entry.Path, out var relativePath, out var resolveError))
                     {
                         FailEntry(job, entry.Path, resolveError!, entry.DeclaredSizeBytes);
+                        anyEntryOutcome = true;
                         return;
                     }
 
@@ -224,6 +231,7 @@ namespace TeensyRom.Api.Transfers.Archives
                     if (!pathSet.TryAdd(targetPath))
                     {
                         FailEntry(job, targetPath, "Another entry already produced this path, differing only in case.", entry.DeclaredSizeBytes);
+                        anyEntryOutcome = true;
                         return;
                     }
 
@@ -250,7 +258,17 @@ namespace TeensyRom.Api.Transfers.Archives
                         EnqueueProduced(job.JobId, scratchPath, targetPath, actualBytes);
                         producedBytes += actualBytes;
                     }
+
+                    anyEntryOutcome = true;
                 }, ct);
+
+                if (!anyEntryOutcome)
+                {
+                    // Every entry was a directory or unsupported - the archive read cleanly but its usable
+                    // contents came to nothing. Silent success here would leave the browser unable to tell
+                    // "nothing extractable" from "still expanding".
+                    FailArchive(job, item.DisplayPath, "Archive produced no extractable entries.", index.DeclaredUncompressedBytes);
+                }
             }
             catch (ArchiveVolumeExceededException)
             {
