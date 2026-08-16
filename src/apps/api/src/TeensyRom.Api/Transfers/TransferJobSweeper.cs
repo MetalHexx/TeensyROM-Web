@@ -15,6 +15,8 @@ namespace TeensyRom.Api.Transfers
         ITransferJobRegistry registry,
         IDeviceLeaseCoordinator leaseCoordinator,
         ITransferStagingStore staging,
+        ITransferScratchStore scratch,
+        ITransferAdmission admission,
         ITransferSubscriptionTracker tracker,
         IDeviceConnectionManager deviceManager,
         ITransferProgressNotifier notifier,
@@ -54,6 +56,16 @@ namespace TeensyRom.Api.Transfers
             }
         }
 
+        /// <summary>
+        /// A job mid-expansion is never abandoned below, but not because this method checks for it - the
+        /// <c>PendingCount == 0</c> guard on the Created/Receiving branch already excludes it, because an
+        /// accepted archive's own pending slot (taken by <see cref="TransferJob.OnFileReceived"/> when it
+        /// was uploaded) is not released until <see cref="TransferJob.OnArchiveExpansionFinished"/> runs,
+        /// which itself waits for every entry the archive produced to be admitted. That is a consequence
+        /// of the upload/expansion handoff, not something designed into this sweep - so if that release
+        /// ordering ever changes, a mid-expansion job would start being abandoned out from under its own
+        /// expansion, silently, the next time this runs.
+        /// </summary>
         private void SweepJob(TransferJob job)
         {
             switch (job.State)
@@ -90,6 +102,8 @@ namespace TeensyRom.Api.Transfers
 
             leaseCoordinator.Release(job.DeviceId, job.JobId);
             staging.PurgeJob(job.JobId);
+            scratch.PurgeJob(job.JobId);
+            admission.DiscardHeld(job.JobId);
             deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
             notifier.JobChanged(job);
         }
