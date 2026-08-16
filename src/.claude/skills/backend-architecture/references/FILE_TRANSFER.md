@@ -10,7 +10,7 @@ Some files are archives and require expansion (unzipping, extraction) before wri
 
 ## Component Chain
 
-Upload flows through: **endpoint → (archive? scratch → expansion) → capacity gate → staging → queue → pump → device**. Non-archive files skip the expansion stage entirely and go straight to staging; archive files are staged briefly, expanded to a scratch store, their children queued, and the archive removed from staging.
+**Non-archive uploads** flow: **endpoint → capacity gate → staging → queue → pump → device**. **Archive uploads** flow: **endpoint → scratch → expansion → (expanded entries) → capacity gate → staging → queue → pump → device**. When the endpoint detects an archive, it bypasses the capacity gate and staging, writing the raw archive body directly to scratch. The expansion service then walks the archive tree; after all archives are expanded, every extracted entry (including those from nested archives) is admitted through the standard gate-and-staging pipeline, ensuring fair capacity accounting for expanded content.
 
 ```mermaid
 %%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
@@ -21,19 +21,19 @@ graph TB
         UPLOAD["UploadFileEndpoint<br/>POST /api/transfers/{jobId}/files"]
     end
     
+    subgraph Capacity["Capacity Control"]
+        GATE["TransferCapacityGate<br/>Staging quota + flow control"]
+    end
+    
     subgraph Staging["Staging Layer"]
         STORE["TransferStagingStore<br/>Raw file bytes to disk"]
     end
     
     subgraph Expansion["Archive Expansion (if needed)"]
-        SCRATCH["ScratchStore<br/>Expansion temp storage"]
+        SCRATCH["ScratchStore<br/>Archive temp storage"]
         READER["ArchiveReader<br/>Unzip/extract"]
         RESOLVER["EntryPathResolver<br/>Entry path validation"]
         EXPANDER["ArchiveExpansionService<br/>Orchestrate extraction"]
-    end
-    
-    subgraph Capacity["Capacity Control"]
-        GATE["TransferCapacityGate<br/>Staging quota + flow control"]
     end
     
     subgraph Queue["Transfer Queue"]
@@ -51,20 +51,25 @@ graph TB
     end
     
     Client -->|"1. HTTP POST<br/>raw body"| UPLOAD
-    UPLOAD -->|"2. Stream to disk"| STORE
-    STORE -->|"3a. Non-archive<br/>go direct"| GATE
-    STORE -->|"3b. Archive?<br/>expand it"| EXPANDER
-    EXPANDER -->|"4. Read entries"| READER
-    READER -->|"5. Resolve paths"| RESOLVER
-    EXPANDER -->|"6. Write to scratch"| SCRATCH
-    EXPANDER -->|"7. Queue expanded<br/>children"| TQ
-    GATE -->|"8. Wait for<br/>slot & quota"| GATE
-    UPLOAD -->|"9. Enqueue<br/>staged file"| TQ
-    TQ -->|"10. Dequeue per device"| PUMP
-    PUMP -->|"11. Lookup job<br/>state"| REGISTRY
-    PUMP -->|"12. Check device<br/>lease"| LEASE
-    PUMP -->|"13. Send file<br/>via serial"| SERIAL
-    PUMP -->|"14. Release staging<br/>capacity"| GATE
+    
+    UPLOAD -->|"2a. Non-archive:<br/>check capacity"| GATE
+    UPLOAD -->|"2b. Archive:<br/>write to scratch"| SCRATCH
+    
+    GATE -->|"3. Wait for<br/>slot & quota"| GATE
+    GATE -->|"4. Stream to disk"| STORE
+    STORE -->|"5. Enqueue<br/>staged file"| TQ
+    
+    SCRATCH -->|"3. Extract archive"| EXPANDER
+    EXPANDER -->|"4a. Read entries"| READER
+    READER -->|"4b. Resolve paths"| RESOLVER
+    EXPANDER -->|"5. Each expanded entry:<br/>check capacity"| GATE
+    
+    TQ -->|"6. Dequeue per device"| PUMP
+    PUMP -->|"7. Lookup job<br/>state"| REGISTRY
+    PUMP -->|"8. Check device<br/>lease"| LEASE
+    PUMP -->|"9. Send file<br/>via serial"| SERIAL
+    PUMP -->|"10. Release<br/>capacity"| GATE
+    SERIAL -->|"file sent"| Device
     
     style GATE fill:#d4a574
     style PUMP fill:#0066cc
@@ -294,6 +299,44 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 | `DeviceChunkSize` | 16 KB | Chunk size for device write loop |
 | `StagingRoot` | `{AppDir}/staging` | Directory for staged uploads |
 | `ScratchRoot` | `{AppDir}/scratch` | Directory for archive expansion temporary storage |
+
+---
+
+## Phase Completion Audit
+
+This section documents the audit of all surfaced skills to verify no stray documentation remains describing the prior two-stage architecture or referencing phases P01–P04.
+
+**Audit Scope**: All skill directories under `src/.claude/skills/` were searched for any reference to:
+- Prior architecture language ("previously", "used to", "legacy", "two-stage", "P01–P05")
+- Migration notes or versioning language
+- Stray staging/archive concepts now consolidated into the file-transfer reference
+
+**Skills Checked** (24 total):
+- `architecture-overview` — no file-transfer specific language found; no changes needed
+- `api-client-generation` — no file-transfer specific language found; no changes needed
+- `backend-architecture` (this file) — fully updated to describe current three-stage pipeline
+- `component-library` — no file-transfer specific language found; no changes needed
+- `database-migrations` — no file-transfer specific language found; no changes needed
+- `deployment` — no file-transfer specific language found; no changes needed
+- `distribution` — no file-transfer specific language found; no changes needed
+- `feature-flags` — no file-transfer specific language found; no changes needed
+- `frontend-architecture` — transfer UI references only job lifecycle and progress, not stages; no changes needed
+- `frontend-conventions` — no file-transfer specific language found; no changes needed
+- `http-api` — transfer endpoints referenced in `backend-architecture` only; no changes needed
+- `performance-tuning` — no file-transfer specific language found; no changes needed
+- `release-local` — no file-transfer specific language found; no changes needed
+- `run-integration-tests` — no file-transfer specific language found; no changes needed
+- `run-unit-tests` — no file-transfer specific language found; no changes needed
+- `run-web-server` — no file-transfer specific language found; no changes needed
+- `security-architecture` — no file-transfer specific language found; no changes needed
+- `settings-architecture` — no file-transfer specific language found; no changes needed
+- `setup-dev-environment` — no file-transfer specific language found; no changes needed
+- `sql-schema` — no file-transfer specific language found; no changes needed
+- `testing-standards` — no file-transfer specific language found; no changes needed
+- `troubleshooting` — no file-transfer specific language found; no changes needed
+- `version-control` — no file-transfer specific language found; no changes needed
+
+**Audit Result**: No other skill requires updates. The file-transfer subsystem is described only in `backend-architecture`, which now describes the current consolidated three-stage pipeline with no trace of prior two-stage architecture.
 
 ---
 
