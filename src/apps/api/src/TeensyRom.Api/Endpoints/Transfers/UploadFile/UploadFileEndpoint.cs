@@ -137,11 +137,12 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
             }
 
             var actualBytes = new FileInfo(scratchPath).Length;
+            var effectiveReserved = scratch.Adjust(job.JobId, reserved, actualBytes);
 
             job.OnFileReceived(actualBytes);
             job.OnArchiveAccepted();
 
-            await expansionQueue.EnqueueAsync(new ArchiveExpansionRequest(job.JobId, scratchPath, relativePath, reserved), ct);
+            await expansionQueue.EnqueueAsync(new ArchiveExpansionRequest(job.JobId, scratchPath, relativePath, effectiveReserved), ct);
 
             // Same shape as the ordinary path - the browser cannot tell an archive from any other file
             // and should not need to.

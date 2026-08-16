@@ -168,7 +168,7 @@ This design allows long-running transfers to span multiple short-lived serial co
 
 ## Scratch Store Quota
 
-The scratch store holds intermediate data during archive expansion and has its own separate quota: `MaxScratchBytes` (default 2 GB). Unlike the staging gate (which **waits** for capacity), the scratch store **refuses** expansion if it would exceed quota — it returns an error to the client rather than blocking. This separation is deliberate: the staging gate is released only when the pump writes to the device, but archive expansion runs on the upload thread. If expansion waited on the staging gate for space, and expansion was slow enough that it blocked the pump's ability to drain staging, a deadlock would occur: expansion would wait on capacity only the pump could release, and the pump couldn't run because it couldn't release staging without first writing an expanded file that expansion hasn't finished yet. By refusing rather than waiting, expansion fails fast and signals the client to retry later, avoiding the deadlock.
+The scratch store holds intermediate data during archive expansion and has its own separate quota: `MaxScratchBytes` (default 8 GB). Unlike the staging gate (which **waits** for capacity), the scratch store **refuses** expansion if it would exceed quota — it returns an error to the client rather than blocking. This separation is deliberate: the staging gate is released only when the pump writes to the device, but archive expansion runs on the upload thread. If expansion waited on the staging gate for space, and expansion was slow enough that it blocked the pump's ability to drain staging, a deadlock would occur: expansion would wait on capacity only the pump could release, and the pump couldn't run because it couldn't release staging without first writing an expanded file that expansion hasn't finished yet. By refusing rather than waiting, expansion fails fast and signals the client to retry later, avoiding the deadlock.
 
 ---
 
@@ -259,12 +259,12 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | **Registry** | `apps/api/src/TeensyRom.Api/Transfers/TransferJobRegistry.cs` |
 | **Capacity Gate** | `apps/api/src/TeensyRom.Api/Transfers/TransferCapacityGate.cs` |
 | **Staging Store** | `apps/api/src/TeensyRom.Api/Transfers/TransferStagingStore.cs` |
-| **Scratch Store** | `apps/api/src/TeensyRom.Api/Transfers/ScratchStore.cs` |
-| **Archive Reader** | `apps/api/src/TeensyRom.Core.Serial/Archives/ArchiveReader.cs` |
-| **Entry Path Resolver** | `apps/api/src/TeensyRom.Core.Serial/Archives/EntryPathResolver.cs` |
-| **Expansion Service** | `apps/api/src/TeensyRom.Api/Transfers/ArchiveExpansionService.cs` |
-| **Expansion Queue** | `apps/api/src/TeensyRom.Api/Transfers/ExpansionQueue.cs` |
-| **Expansion Pump** | `apps/api/src/TeensyRom.Api/Transfers/ExpansionPump.cs` |
+| **Scratch Store** | `apps/api/src/TeensyRom.Api/Transfers/TransferScratchStore.cs` |
+| **Archive Reader** | `apps/api/src/TeensyRom.Api/Transfers/Archives/SharpCompressArchiveReader.cs` |
+| **Entry Path Resolver** | `apps/api/src/TeensyRom.Api/Transfers/Archives/ArchiveEntryPathResolver.cs` |
+| **Expansion Service** | `apps/api/src/TeensyRom.Api/Transfers/Archives/ArchiveExpansionService.cs` |
+| **Expansion Queue** | `apps/api/src/TeensyRom.Api/Transfers/Archives/ArchiveExpansionQueue.cs` |
+| **Expansion Pump** | `apps/api/src/TeensyRom.Api/Transfers/Archives/ArchiveExpansionPump.cs` |
 | **Queue** | `apps/api/src/TeensyRom.Api/Transfers/TransferQueue.cs` |
 | **Pump** | `apps/api/src/TeensyRom.Api/Transfers/TransferPump.cs` |
 | **Lease Coordinator** | `apps/api/src/TeensyRom.Api/Transfers/DeviceLeaseCoordinator.cs` |
@@ -285,9 +285,9 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 | Setting | Default | Purpose |
 |---------|---------|---------|
 | `MaxStagedBytes` | 4 GB | Disk quota for staged files — the sole ceiling on staging disk usage; there is no separate file-count cap |
-| `MaxScratchBytes` | 2 GB | Disk quota for archive expansion scratch storage; separate from staging to prevent expansion from blocking the pump's ability to drain staging |
-| `MaxExpansionDepth` | 16 | Maximum nesting depth for archives within archives; prevents zip-bomb-style attacks and stack exhaustion |
-| `MaxExpandedBytesPerArchive` | 8 GB | Maximum total size an archive is allowed to expand to; checked before expansion begins and rejected if exceeded |
+| `MaxScratchBytes` | 8 GB | Disk quota for archive expansion scratch storage; separate from staging to prevent expansion from blocking the pump's ability to drain staging |
+| `MaxExpansionDepth` | 32 | Maximum nesting depth for archives within archives; prevents zip-bomb-style attacks and stack exhaustion |
+| `MaxExpandedBytesPerArchive` | 2 GB | Maximum total size an archive is allowed to expand to; checked before expansion begins and rejected if exceeded |
 | `BatchSize` | 25 | Number of staged files the pump batches into a single device write command |
 | `RecentCompletionsBound` | 5 | Number of most-recent completed files (success or failure) a job retains for the live feed |
 | `RetainedFailuresBound` | 50 | Number of most-recent failures a job retains; `FilesFailed` itself stays an unbounded lifetime counter |
@@ -299,44 +299,6 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 | `DeviceChunkSize` | 16 KB | Chunk size for device write loop |
 | `StagingRoot` | `{AppDir}/staging` | Directory for staged uploads |
 | `ScratchRoot` | `{AppDir}/scratch` | Directory for archive expansion temporary storage |
-
----
-
-## Phase Completion Audit
-
-This section documents the audit of all surfaced skills to verify no stray documentation remains describing the prior two-stage architecture or referencing phases P01–P04.
-
-**Audit Scope**: All skill directories under `src/.claude/skills/` were searched for any reference to:
-- Prior architecture language ("previously", "used to", "legacy", "two-stage", "P01–P05")
-- Migration notes or versioning language
-- Stray staging/archive concepts now consolidated into the file-transfer reference
-
-**Skills Checked** (24 total):
-- `architecture-overview` — no file-transfer specific language found; no changes needed
-- `api-client-generation` — no file-transfer specific language found; no changes needed
-- `backend-architecture` (this file) — fully updated to describe current three-stage pipeline
-- `component-library` — no file-transfer specific language found; no changes needed
-- `database-migrations` — no file-transfer specific language found; no changes needed
-- `deployment` — no file-transfer specific language found; no changes needed
-- `distribution` — no file-transfer specific language found; no changes needed
-- `feature-flags` — no file-transfer specific language found; no changes needed
-- `frontend-architecture` — transfer UI references only job lifecycle and progress, not stages; no changes needed
-- `frontend-conventions` — no file-transfer specific language found; no changes needed
-- `http-api` — transfer endpoints referenced in `backend-architecture` only; no changes needed
-- `performance-tuning` — no file-transfer specific language found; no changes needed
-- `release-local` — no file-transfer specific language found; no changes needed
-- `run-integration-tests` — no file-transfer specific language found; no changes needed
-- `run-unit-tests` — no file-transfer specific language found; no changes needed
-- `run-web-server` — no file-transfer specific language found; no changes needed
-- `security-architecture` — no file-transfer specific language found; no changes needed
-- `settings-architecture` — no file-transfer specific language found; no changes needed
-- `setup-dev-environment` — no file-transfer specific language found; no changes needed
-- `sql-schema` — no file-transfer specific language found; no changes needed
-- `testing-standards` — no file-transfer specific language found; no changes needed
-- `troubleshooting` — no file-transfer specific language found; no changes needed
-- `version-control` — no file-transfer specific language found; no changes needed
-
-**Audit Result**: No other skill requires updates. The file-transfer subsystem is described only in `backend-architecture`, which now describes the current consolidated three-stage pipeline with no trace of prior two-stage architecture.
 
 ---
 

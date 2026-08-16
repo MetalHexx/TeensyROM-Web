@@ -21,6 +21,11 @@ namespace TeensyRom.Api.Transfers
         /// Returns bytes to the ceiling without deleting anything on disk.
         void Release(string jobId, long bytes);
 
+        /// Reconciles a prior <see cref="TryReserve"/> to the real byte count once it is known, mirroring
+        /// <c>ITransferCapacityGate.Adjust</c>. Returns the actual bytes, which is what the caller must
+        /// release later instead of the original reservation.
+        long Adjust(string jobId, long reservedBytes, long actualBytes);
+
         /// Allocates an opaque scratch file path under the job's directory. Never derived from an entry name.
         string NewScratchFilePath(string jobId);
 
