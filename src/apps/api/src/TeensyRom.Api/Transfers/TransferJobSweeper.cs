@@ -60,11 +60,11 @@ namespace TeensyRom.Api.Transfers
         /// A job mid-expansion is never abandoned below, but not because this method checks for it - the
         /// <c>PendingCount == 0</c> guard on the Created/Receiving branch already excludes it, because an
         /// accepted archive's own pending slot (taken by <see cref="TransferJob.OnFileReceived"/> when it
-        /// was uploaded) is not released until <see cref="TransferJob.OnArchiveExpansionFinished"/> runs,
-        /// which itself waits for every entry the archive produced to be admitted. That is a consequence
-        /// of the upload/expansion handoff, not something designed into this sweep - so if that release
-        /// ordering ever changes, a mid-expansion job would start being abandoned out from under its own
-        /// expansion, silently, the next time this runs.
+        /// was uploaded) is not released until <see cref="TransferJob.ReleaseFinishedArchiveSlots"/> runs,
+        /// which the walk only calls after every entry every finished archive produced has been admitted.
+        /// That is a consequence of the upload/expansion handoff, not something designed into this sweep -
+        /// so if that release ordering ever changes, a mid-expansion job would start being abandoned out
+        /// from under its own expansion, silently, the next time this runs.
         /// </summary>
         private void SweepJob(TransferJob job)
         {

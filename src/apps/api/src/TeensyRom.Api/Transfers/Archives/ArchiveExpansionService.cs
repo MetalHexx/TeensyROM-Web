@@ -80,9 +80,17 @@ namespace TeensyRom.Api.Transfers.Archives
             }
             finally
             {
-                // Exactly once per accepted archive - the PendingCount slot OnFileReceived took when it
-                // was uploaded. Runs whatever the outcome, so a throw still releases it.
+                // Exactly once per accepted archive - lowers the outstanding count and defers the
+                // PendingCount slot OnFileReceived took when it was uploaded; see
+                // TransferJob.ReleaseFinishedArchiveSlots for why it cannot be released here. Runs whatever
+                // the outcome, so a throw still accounts for it.
                 job.OnArchiveExpansionFinished();
+
+                // The raw upload's own reservation against the scratch ceiling - separate from the
+                // DeclaredUncompressedBytes reservation ProcessArchiveAsync takes for the expanded content.
+                // Safe here because WalkAsync's own finally already deleted this archive's raw scratch file
+                // (the first WorkItem it ever processes) before returning or throwing.
+                scratch.Release(job.JobId, request.RawReservedBytes);
             }
 
             if (job.HasExpansionOutstanding)
@@ -94,6 +102,11 @@ namespace TeensyRom.Api.Transfers.Archives
 
             await admission.ReleaseHeldAsync(job.JobId, ct);
             await AdmitProducedAsync(job, ct);
+
+            // Only now, after every entry every finished archive produced has been admitted or failed, is
+            // it safe to release those archives' own slots - releasing any earlier can let PendingCount
+            // touch zero while an entry is still sitting in scratch, unadmitted.
+            job.ReleaseFinishedArchiveSlots();
         }
 
         private async Task WalkAsync(TransferJob job, ArchiveExpansionRequest request, CancellationToken ct)

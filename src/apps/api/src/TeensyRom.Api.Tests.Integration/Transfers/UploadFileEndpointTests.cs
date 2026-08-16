@@ -219,6 +219,34 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
         }
 
         [Fact]
+        public async Task Upload_ArchiveExceedsScratchCeiling_RejectedWithoutTouchingCapacityGate()
+        {
+            var device = f.DeviceManager.Devices[0];
+            var gate = f.Services.GetRequiredService<ITransferCapacityGate>();
+
+            var originalMaxScratchBytes = f.Options.MaxScratchBytes;
+            f.Options.MaxScratchBytes = 2;
+
+            var createResponse = await f.Client.PostAsync<CreateJobEndpoint, CreateJobRequest, CreateJobResponse>(
+                NewCreateRequest(device.DeviceId, "/music/archive-ceiling"));
+            var jobId = createResponse.Content.JobId;
+
+            try
+            {
+                var response = await f.RawClient.PostAsync(
+                    $"/api/transfers/{jobId}/files?path=pack.zip", RawBody([1, 2, 3, 4, 5]));
+
+                response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+                gate.Current.Should().Be((0, 0));
+            }
+            finally
+            {
+                f.Options.MaxScratchBytes = originalMaxScratchBytes;
+                await CancelAsync(jobId);
+            }
+        }
+
+        [Fact]
         public async Task Upload_ClientAbortsMidBody_ReleasesGateAndLeavesNoPartialFile()
         {
             var device = f.DeviceManager.Devices[0];

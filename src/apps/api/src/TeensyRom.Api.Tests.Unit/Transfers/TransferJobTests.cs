@@ -419,12 +419,17 @@ public class TransferJobTests
         job.OnEntryExpanded();
         observed.Add(job.PendingCount);
 
-        // Releasing the archive's slot after its entries were admitted is the seam that must not
-        // let PendingCount touch zero while expanded entries are still pending delivery.
+        // Lowers _archivesOutstanding but must not touch PendingCount yet - releasing the archive's own
+        // slot here, before ReleaseFinishedArchiveSlots, is the exact bug this test guards against.
         job.OnArchiveExpansionFinished();
         observed.Add(job.PendingCount);
 
         observed.Should().AllSatisfy(count => count.Should().BeGreaterThan(0));
+        job.PendingCount.Should().Be(3); // the archive's own slot is still held, pending release
+
+        // Only once every entry has been admitted is it safe to release the archive's own slot.
+        job.ReleaseFinishedArchiveSlots();
+
         job.PendingCount.Should().Be(2); // the archive's own slot released, the two entries' slots remain
     }
 
@@ -457,6 +462,9 @@ public class TransferJobTests
 
         job.OnExpansionFailure(failure);
         job.OnArchiveExpansionFinished();
+        job.PendingCount.Should().Be(1); // still held until ReleaseFinishedArchiveSlots runs
+
+        job.ReleaseFinishedArchiveSlots();
 
         job.PendingCount.Should().Be(0);
         job.ToSnapshot().FilesFailed.Should().Be(1);

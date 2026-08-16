@@ -37,6 +37,7 @@ namespace TeensyRom.Api.Transfers
         private int _expandedFileCount;      // job-wide running total
         private int _archivesAccepted;       // archives uploaded and handed to expansion
         private int _archivesOutstanding;    // accepted but not yet finished expanding
+        private int _archiveSlotsPendingRelease; // finished archives whose own PendingCount slot is still held
 
         public string JobId { get; }
         public string DeviceId { get; }
@@ -218,8 +219,8 @@ namespace TeensyRom.Api.Transfers
         /// <summary>
         /// One extracted entry has been admitted. Raises <see cref="PendingCount"/> and the expanded-file
         /// total; deliberately does NOT raise the received-file count — the entry was never uploaded. Must
-        /// be called before the archive's matching <see cref="OnArchiveExpansionFinished"/>, never after —
-        /// see the ordering note there.
+        /// be called before <see cref="ReleaseFinishedArchiveSlots"/> runs for the archive that produced
+        /// it, never after — see the ordering note there.
         /// </summary>
         public void OnEntryExpanded()
         {
@@ -255,12 +256,14 @@ namespace TeensyRom.Api.Transfers
         }
 
         /// <summary>
-        /// This archive is done, successfully or not. Clears the in-progress archive name, lowers the
-        /// outstanding-archive count, and releases the archive's own <see cref="PendingCount"/> slot — the
-        /// one <see cref="OnFileReceived"/> took when it was uploaded. Exactly once per accepted archive,
-        /// whatever the outcome. Must run after every <see cref="OnEntryExpanded"/> for this archive: if it
-        /// runs first, <see cref="PendingCount"/> can touch zero between the archive's release and its
-        /// first entry's admission, and the pump will complete a job that is still mid-expansion.
+        /// This archive's walk is done, successfully or not. Clears the in-progress archive name and
+        /// lowers the outstanding-archive count immediately, so <see cref="HasExpansionOutstanding"/>
+        /// reflects it right away. Deliberately does NOT release the archive's own <see cref="PendingCount"/>
+        /// slot — the one <see cref="OnFileReceived"/> took when it was uploaded — that release is deferred
+        /// to <see cref="ReleaseFinishedArchiveSlots"/>. Releasing it here instead would let
+        /// <see cref="PendingCount"/> touch zero before this archive's entries are admitted, and the pump
+        /// would complete a job that is still mid-expansion. Exactly once per accepted archive, whatever
+        /// the outcome.
         /// </summary>
         public void OnArchiveExpansionFinished()
         {
@@ -268,7 +271,24 @@ namespace TeensyRom.Api.Transfers
             {
                 _expandingArchive = null;
                 _archivesOutstanding--;
-                PendingCount--;
+                _archiveSlotsPendingRelease++;
+                LastActivityUtc = _clock();
+            }
+        }
+
+        /// <summary>
+        /// Releases every archive slot <see cref="OnArchiveExpansionFinished"/> has deferred, all at once.
+        /// The caller — <see cref="Archives.ArchiveExpansionService.ExpandAsync"/> — must call this only
+        /// after admitting (or failing) every entry every finished archive produced; that ordering is what
+        /// keeps <see cref="PendingCount"/> from ever touching zero while an expanded entry is still
+        /// sitting unadmitted.
+        /// </summary>
+        public void ReleaseFinishedArchiveSlots()
+        {
+            lock (_lock)
+            {
+                PendingCount -= _archiveSlotsPendingRelease;
+                _archiveSlotsPendingRelease = 0;
                 LastActivityUtc = _clock();
             }
         }

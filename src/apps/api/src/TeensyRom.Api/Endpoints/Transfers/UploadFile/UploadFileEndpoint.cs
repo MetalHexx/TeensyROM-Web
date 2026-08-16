@@ -95,20 +95,45 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
 
         /// <summary>
         /// Streams an archive's raw body to scratch rather than staging and hands it to the expansion
-        /// queue instead of the device queue. The archive itself still counts toward
+        /// queue instead of the device queue. Reserves against the scratch ceiling for the raw upload
+        /// itself, exactly like <see cref="ArchiveExpansionService"/> separately reserves for the archive's
+        /// declared uncompressed size once expansion starts - without this, a raw archive body could grow
+        /// scratch disk usage without bound or backpressure while it waits its turn on the expansion queue.
+        /// <see cref="ArchiveExpansionService.ExpandAsync"/> releases the reservation once this archive's
+        /// scratch file is gone. The archive itself still counts toward
         /// <see cref="TransferJobSnapshot.FilesReceived"/> - it was uploaded - but never reaches the
         /// device; only what it expands to does.
         /// </summary>
         private async Task HandleArchiveAsync(TransferJob job, string relativePath, CancellationToken ct)
         {
             scratch.EnsureJobDirectory(job.JobId);
+
+            var reserved = HttpContext.Request.ContentLength ?? DefaultReservationBytes;
+
+            if (!scratch.TryReserve(job.JobId, reserved))
+            {
+                SendValidationError("Insufficient scratch space to accept this archive.");
+                return;
+            }
+
             var scratchPath = scratch.NewScratchFilePath(job.JobId);
 
-            await using (var fs = new FileStream(
-                scratchPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                bufferSize: CopyBufferSize, useAsync: true))
+            try
             {
-                await HttpContext.Request.Body.CopyToAsync(fs, ct);
+                await using (var fs = new FileStream(
+                    scratchPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    bufferSize: CopyBufferSize, useAsync: true))
+                {
+                    await HttpContext.Request.Body.CopyToAsync(fs, ct);
+                }
+            }
+            catch
+            {
+                // Whatever landed on disk is orphaned until this job's scratch tree is purged at job exit,
+                // but the reservation itself must not wait that long - a run of failed archive uploads
+                // would otherwise exhaust the ceiling for every other job.
+                scratch.Release(job.JobId, reserved);
+                throw;
             }
 
             var actualBytes = new FileInfo(scratchPath).Length;
@@ -116,7 +141,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
             job.OnFileReceived(actualBytes);
             job.OnArchiveAccepted();
 
-            await expansionQueue.EnqueueAsync(new ArchiveExpansionRequest(job.JobId, scratchPath, relativePath), ct);
+            await expansionQueue.EnqueueAsync(new ArchiveExpansionRequest(job.JobId, scratchPath, relativePath, reserved), ct);
 
             // Same shape as the ordinary path - the browser cannot tell an archive from any other file
             // and should not need to.
