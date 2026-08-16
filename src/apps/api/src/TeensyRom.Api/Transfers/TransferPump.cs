@@ -22,6 +22,8 @@ namespace TeensyRom.Api.Transfers
         IDeviceLeaseCoordinator leaseCoordinator,
         ITransferCapacityGate gate,
         ITransferStagingStore staging,
+        ITransferScratchStore scratch,
+        ITransferAdmission admission,
         IDeviceConnectionManager deviceManager,
         IServiceScopeFactory scopeFactory,
         ITransferProgressNotifier notifier,
@@ -399,6 +401,7 @@ namespace TeensyRom.Api.Transfers
             job.Abort(reason);
             leaseCoordinator.Release(job.DeviceId, job.JobId);
             staging.PurgeJob(job.JobId);
+            scratch.PurgeJob(job.JobId);
             deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
             job.OnFileDropped();
             notifier.JobChanged(job);
@@ -427,6 +430,16 @@ namespace TeensyRom.Api.Transfers
 
             leaseCoordinator.Release(job.DeviceId, job.JobId);
             staging.PurgeJob(job.JobId);
+            scratch.PurgeJob(job.JobId);
+
+            if (nextState == TransferJobState.Cancelled)
+            {
+                // A held file still occupies its capacity-gate reservation until admission enqueues or
+                // discards it - draining it here, not just relying on expansion to release it later,
+                // keeps a cancelled job's reservation from outliving the job itself.
+                admission.DiscardHeld(job.JobId);
+            }
+
             deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
             notifier.JobChanged(job);
         }

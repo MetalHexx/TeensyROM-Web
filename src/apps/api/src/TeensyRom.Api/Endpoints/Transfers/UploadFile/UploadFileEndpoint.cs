@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.Features;
 using TeensyRom.Api.Models;
 using TeensyRom.Api.Transfers;
+using TeensyRom.Api.Transfers.Archives;
 using TeensyRom.Core.Entities.Transfers;
 
 namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
@@ -8,15 +9,24 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
     /// <summary>
     /// Streams one file's raw body straight to disk per request. The request waits for capacity instead
     /// of failing when the gate is saturated - there is no rejection and no client-side pacing anywhere
-    /// in this design; a slow device just means in-flight uploads take longer to return.
+    /// in this design; a slow device just means in-flight uploads take longer to return. An archive is the
+    /// one exception: it routes to scratch instead of staging and never touches the capacity gate at all,
+    /// since scratch enforces its own, separate ceiling.
     /// </summary>
     public class UploadFileEndpoint(
         ITransferJobRegistry registry,
-        ITransferAdmission admission) : RadEndpoint<UploadFileRequest, UploadFileResponse>
+        ITransferAdmission admission,
+        ITransferScratchStore scratch,
+        IArchiveReader archiveReader,
+        IArchiveExpansionQueue expansionQueue) : RadEndpoint<UploadFileRequest, UploadFileResponse>
     {
         // Used only when the client omits Content-Length (e.g. chunked transfer encoding). Adjust()
         // reconciles this reservation to the real size once the body is fully staged.
         private const long DefaultReservationBytes = 1 * 1024 * 1024;
+
+        // Matches TransferStagingStore's own copy buffer - there is no shared constant between the two,
+        // just the same well-worn stream-copy size.
+        private const int CopyBufferSize = 81_920;
 
         public override void Configure()
         {
@@ -63,6 +73,12 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
                 return;
             }
 
+            if (archiveReader.IsArchiveExtension(r.Path))
+            {
+                await HandleArchiveAsync(job, r.Path, ct);
+                return;
+            }
+
             var reserved = HttpContext.Request.ContentLength ?? DefaultReservationBytes;
 
             var result = await admission.AdmitAsync(job, HttpContext.Request.Body, r.Path, reserved, countAsReceived: true, ct);
@@ -74,6 +90,37 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
             }
 
             Response = new() { RelativePath = r.Path, SizeBytes = result.File!.SizeBytes, Queued = true };
+            Send();
+        }
+
+        /// <summary>
+        /// Streams an archive's raw body to scratch rather than staging and hands it to the expansion
+        /// queue instead of the device queue. The archive itself still counts toward
+        /// <see cref="TransferJobSnapshot.FilesReceived"/> - it was uploaded - but never reaches the
+        /// device; only what it expands to does.
+        /// </summary>
+        private async Task HandleArchiveAsync(TransferJob job, string relativePath, CancellationToken ct)
+        {
+            scratch.EnsureJobDirectory(job.JobId);
+            var scratchPath = scratch.NewScratchFilePath(job.JobId);
+
+            await using (var fs = new FileStream(
+                scratchPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                bufferSize: CopyBufferSize, useAsync: true))
+            {
+                await HttpContext.Request.Body.CopyToAsync(fs, ct);
+            }
+
+            var actualBytes = new FileInfo(scratchPath).Length;
+
+            job.OnFileReceived(actualBytes);
+            job.OnArchiveAccepted();
+
+            await expansionQueue.EnqueueAsync(new ArchiveExpansionRequest(job.JobId, scratchPath, relativePath), ct);
+
+            // Same shape as the ordinary path - the browser cannot tell an archive from any other file
+            // and should not need to.
+            Response = new() { RelativePath = relativePath, SizeBytes = actualBytes, Queued = true };
             Send();
         }
     }
