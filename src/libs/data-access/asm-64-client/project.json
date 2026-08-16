@@ -1,0 +1,18 @@
+{
+  "name": "asm-64-client",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/data-access/asm-64-client/src",
+  "projectType": "library",
+  "tags": ["scope:data-access", "type:api-client"],
+  "targets": {
+    "generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node .claude/skills/api-client-generation/scripts/generate-asm64-client.js"
+      }
+    },
+    "vite:test": {
+      "command": "echo No tests for generated asm-64-client"
+    }
+  }
+}

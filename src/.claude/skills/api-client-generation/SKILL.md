@@ -16,7 +16,20 @@ TypeScript HTTP client generation from the .NET backend API using OpenAPI Genera
 
 ## Architecture Overview
 
-**Location**: `libs/data-access/api-client` - generated TypeScript fetch clients
+**Location**:
+- `libs/data-access/api-client` - generated TypeScript fetch client for the .NET backend
+- `libs/data-access/asm-64-client` - generated TypeScript fetch client for the third-party Assembly64 API (exploratory; not yet wired to the application)
+
+Both are generated the same way (OpenAPI Generator, `typescript-fetch`, `*Api` classes renamed to `*ApiService`), but from different generation scripts:
+
+| | `api-client` | `asm-64-client` |
+|---|---|---|
+| Spec source | Local build artifact (`apps/api/.../TeensyRom.Api.json`) | Fetched live from `https://hackerswithstyle.se/leet/v3/api-docs` at generation time |
+| Trigger | `pnpm run generate:api-client` | `pnpm run generate:asm-64-client` |
+| Script | `scripts/generate-client.js` | `scripts/generate-asm64-client.js` (standalone sibling, not a shared/refactored script — the async network fetch and error handling differ enough to keep the two scripts independent) |
+| Notes | Prerequisite: `dotnet build` | No prerequisite, but fails loudly if the external server is unreachable. Never vendor/commit the spec. |
+
+**Security note**: several Assembly64 endpoints embed credentials directly in the URL path (e.g. `GET /user/login/{email}/{password}`) — this is a characteristic of the third-party API, not something to fix here, but a reason infrastructure code must never log full request URLs once this client is wired up.
 
 **Consumption Rules** (enforced by ESLint):
 - API clients are consumed **ONLY** by the infrastructure layer
@@ -69,6 +82,7 @@ pnpm run generate:api-client
 ## Scripts
 
 - [scripts/generate-client.js](scripts/generate-client.js) - Post-processes generated code, renames `*Api` to `*ApiService`
+- [scripts/generate-asm64-client.js](scripts/generate-asm64-client.js) - Same post-processing, plus a live fetch of the Assembly64 OpenAPI spec to a temp file before generation
 
 ## Troubleshooting
 
