@@ -149,6 +149,30 @@ export interface TransferJobDto2 {
      * @memberof TransferJobDto2
      */
     filesPerSecond: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof TransferJobDto2
+     */
+    expandingArchive?: string | null;
+    /**
+     * 
+     * @type {number}
+     * @memberof TransferJobDto2
+     */
+    expansionBytesWritten: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof TransferJobDto2
+     */
+    expansionBytesDeclared: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof TransferJobDto2
+     */
+    expandedFileCount?: number | null;
 }
 
 
@@ -172,6 +196,8 @@ export function instanceOfTransferJobDto2(value: object): value is TransferJobDt
     if (!('recentCompletions' in value) || value['recentCompletions'] === undefined) return false;
     if (!('bytesPerSecond' in value) || value['bytesPerSecond'] === undefined) return false;
     if (!('filesPerSecond' in value) || value['filesPerSecond'] === undefined) return false;
+    if (!('expansionBytesWritten' in value) || value['expansionBytesWritten'] === undefined) return false;
+    if (!('expansionBytesDeclared' in value) || value['expansionBytesDeclared'] === undefined) return false;
     return true;
 }
 
@@ -194,15 +220,19 @@ export function TransferJobDto2FromJSONTyped(json: any, ignoreDiscriminator: boo
         'filesSent': json['filesSent'],
         'filesFailed': json['filesFailed'],
         'bytesSent': json['bytesSent'],
-        'totalFiles': json['totalFiles'] == null ? undefined : json['totalFiles'],
-        'currentFile': json['currentFile'] == null ? undefined : json['currentFile'],
+        'totalFiles': json['totalFiles'] === undefined ? undefined : json['totalFiles'] === null ? null : json['totalFiles'],
+        'currentFile': json['currentFile'] === undefined ? undefined : json['currentFile'] === null ? null : json['currentFile'],
         'startedUtc': (new Date(json['startedUtc'])),
         'lastActivityUtc': (new Date(json['lastActivityUtc'])),
-        'error': json['error'] == null ? undefined : json['error'],
+        'error': json['error'] === undefined ? undefined : json['error'] === null ? null : json['error'],
         'failures': ((json['failures'] as Array<any>).map(TransferFileCompletedFromJSON)),
         'recentCompletions': ((json['recentCompletions'] as Array<any>).map(TransferFileCompletedFromJSON)),
         'bytesPerSecond': json['bytesPerSecond'],
         'filesPerSecond': json['filesPerSecond'],
+        'expandingArchive': json['expandingArchive'] === undefined ? undefined : json['expandingArchive'] === null ? null : json['expandingArchive'],
+        'expansionBytesWritten': json['expansionBytesWritten'],
+        'expansionBytesDeclared': json['expansionBytesDeclared'],
+        'expandedFileCount': json['expandedFileCount'] === undefined ? undefined : json['expandedFileCount'] === null ? null : json['expandedFileCount'],
     };
 }
 
@@ -228,13 +258,17 @@ export function TransferJobDto2ToJSONTyped(value?: TransferJobDto2 | null, ignor
         'bytesSent': value['bytesSent'],
         'totalFiles': value['totalFiles'],
         'currentFile': value['currentFile'],
-        'startedUtc': ((value['startedUtc']).toISOString()),
-        'lastActivityUtc': ((value['lastActivityUtc']).toISOString()),
+        'startedUtc': value['startedUtc'].toISOString(),
+        'lastActivityUtc': value['lastActivityUtc'].toISOString(),
         'error': value['error'],
         'failures': ((value['failures'] as Array<any>).map(TransferFileCompletedToJSON)),
         'recentCompletions': ((value['recentCompletions'] as Array<any>).map(TransferFileCompletedToJSON)),
         'bytesPerSecond': value['bytesPerSecond'],
         'filesPerSecond': value['filesPerSecond'],
+        'expandingArchive': value['expandingArchive'],
+        'expansionBytesWritten': value['expansionBytesWritten'],
+        'expansionBytesDeclared': value['expansionBytesDeclared'],
+        'expandedFileCount': value['expandedFileCount'],
     };
 }
 

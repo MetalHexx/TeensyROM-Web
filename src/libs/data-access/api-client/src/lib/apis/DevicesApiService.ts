@@ -12,30 +12,37 @@
  * Do not edit the class manually.
  */
 
-
 import * as runtime from '../runtime';
-import type {
-  FindDevicesResponse,
-  PingDeviceResponse,
-  ProblemDetails,
-  ResetDeviceResponse,
-  StartLogsResponse,
-  StopLogsResponse,
-} from '../models/index';
 import {
+    type FindDevicesResponse,
     FindDevicesResponseFromJSON,
     FindDevicesResponseToJSON,
+} from '../models/FindDevicesResponse';
+import {
+    type PingDeviceResponse,
     PingDeviceResponseFromJSON,
     PingDeviceResponseToJSON,
+} from '../models/PingDeviceResponse';
+import {
+    type ProblemDetails,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
+} from '../models/ProblemDetails';
+import {
+    type ResetDeviceResponse,
     ResetDeviceResponseFromJSON,
     ResetDeviceResponseToJSON,
+} from '../models/ResetDeviceResponse';
+import {
+    type StartLogsResponse,
     StartLogsResponseFromJSON,
     StartLogsResponseToJSON,
+} from '../models/StartLogsResponse';
+import {
+    type StopLogsResponse,
     StopLogsResponseFromJSON,
     StopLogsResponseToJSON,
-} from '../models/index';
+} from '../models/StopLogsResponse';
 
 export interface FindDevicesRequest {
     fullScan: boolean;
@@ -55,10 +62,9 @@ export interface ResetDeviceRequest {
 export class DevicesApiService extends runtime.BaseAPI {
 
     /**
-     * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - TCP devices use cached IPs by default (fullScan=false) for fast discovery. - Set fullScan=true to perform a complete network scan for TCP devices. - Devices with auto-connect enabled will reconnect automatically.
-     * Find Devices
+     * Creates request options for findDevices without sending the request
      */
-    async findDevicesRaw(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
+    async findDevicesRequestOpts(requestParameters: FindDevicesRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['fullScan'] == null) {
             throw new runtime.RequiredError(
                 'fullScan',
@@ -74,12 +80,24 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices`,
+
+        let urlPath = `/api/devices`;
+
+        return {
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - TCP devices use cached IPs by default (fullScan=false) for fast discovery. - Set fullScan=true to perform a complete network scan for TCP devices. - Devices with auto-connect enabled will reconnect automatically.
+     * Find Devices
+     */
+    async findDevicesRaw(requestParameters: FindDevicesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindDevicesResponse>> {
+        const requestOptions = await this.findDevicesRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => FindDevicesResponseFromJSON(jsonValue));
     }
@@ -94,10 +112,9 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Pings a TeensyROM device to check if it is responsive.  - Works the same as clicking the cartridge reset button.
-     * Ping Device
+     * Creates request options for pingDevice without sending the request
      */
-    async pingDeviceRaw(requestParameters: PingDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PingDeviceResponse>> {
+    async pingDeviceRequestOpts(requestParameters: PingDeviceRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -109,12 +126,25 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/ping`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+
+        let urlPath = `/api/devices/{deviceId}/ping`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+
+        return {
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Pings a TeensyROM device to check if it is responsive.  - Works the same as clicking the cartridge reset button.
+     * Ping Device
+     */
+    async pingDeviceRaw(requestParameters: PingDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PingDeviceResponse>> {
+        const requestOptions = await this.pingDeviceRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => PingDeviceResponseFromJSON(jsonValue));
     }
@@ -129,10 +159,9 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Resets a TeensyROM device.  - Works the same as clicking the cartridge reset button.
-     * Reset Device
+     * Creates request options for resetDevice without sending the request
      */
-    async resetDeviceRaw(requestParameters: ResetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ResetDeviceResponse>> {
+    async resetDeviceRequestOpts(requestParameters: ResetDeviceRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -144,12 +173,25 @@ export class DevicesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/reset`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+
+        let urlPath = `/api/devices/{deviceId}/reset`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+
+        return {
+            path: urlPath,
             method: 'PUT',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Resets a TeensyROM device.  - Works the same as clicking the cartridge reset button.
+     * Reset Device
+     */
+    async resetDeviceRaw(requestParameters: ResetDeviceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ResetDeviceResponse>> {
+        const requestOptions = await this.resetDeviceRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => ResetDeviceResponseFromJSON(jsonValue));
     }
@@ -164,20 +206,31 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Starts the logging service and returns a success message.
-     * Start Logging Hub
+     * Creates request options for startLogs without sending the request
      */
-    async startLogsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StartLogsResponse>> {
+    async startLogsRequestOpts(): Promise<runtime.RequestOpts> {
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/logs`,
+
+        let urlPath = `/api/logs`;
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Starts the logging service and returns a success message.
+     * Start Logging Hub
+     */
+    async startLogsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StartLogsResponse>> {
+        const requestOptions = await this.startLogsRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => StartLogsResponseFromJSON(jsonValue));
     }
@@ -192,20 +245,31 @@ export class DevicesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Stops the logging service and returns a success message.
-     * Stop Logging Channel
+     * Creates request options for stopLogs without sending the request
      */
-    async stopLogsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StopLogsResponse>> {
+    async stopLogsRequestOpts(): Promise<runtime.RequestOpts> {
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/logs`,
+
+        let urlPath = `/api/logs`;
+
+        return {
+            path: urlPath,
             method: 'DELETE',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Stops the logging service and returns a success message.
+     * Stop Logging Channel
+     */
+    async stopLogsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<StopLogsResponse>> {
+        const requestOptions = await this.stopLogsRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => StopLogsResponseFromJSON(jsonValue));
     }
