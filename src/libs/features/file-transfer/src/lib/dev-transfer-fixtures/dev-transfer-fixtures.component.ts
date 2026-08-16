@@ -2,7 +2,10 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TransferFeedEntry } from '@teensyrom-nx/application';
 import { ConfirmationDialogComponent } from '@teensyrom-nx/ui/components';
 import { ThemeService } from '@teensyrom-nx/ui/styles';
-import { TransferProgressComponent, TransferProgressVm } from '../transfer-modal/transfer-progress/transfer-progress.component';
+import {
+  TransferProgressComponent,
+  TransferProgressVm,
+} from '../transfer-modal/transfer-progress/transfer-progress.component';
 import { DevDropzoneFixtureComponent } from './dev-dropzone-fixture.component';
 
 interface ProgressFixture {
@@ -149,6 +152,90 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
   {
     label: 'receiving',
     vm: baseVm(),
+  },
+  {
+    label: 'receiving — expanding a top-level archive',
+    vm: baseVm({
+      scanTotal: 1204,
+      uploaded: 842,
+      written: 0,
+      failed: 0,
+      apiPercent: 69,
+      devicePercent: 0,
+      filesPerSecond: 0,
+      bytesPerSecond: 0,
+      hasArchive: true,
+      expansionPercent: 41,
+      expandingArchive: 'HVSC-79.zip',
+      feed: [],
+      failures: [],
+      elapsedLabel: '0:38 elapsed',
+    }),
+  },
+  {
+    label: 'receiving — expanding a nested archive',
+    vm: baseVm({
+      scanTotal: 1204,
+      uploaded: 1097,
+      written: 0,
+      failed: 1,
+      apiPercent: 91,
+      devicePercent: 0,
+      filesPerSecond: 0,
+      bytesPerSecond: 0,
+      hasArchive: true,
+      expansionPercent: 78,
+      expandingArchive: 'HVSC-79/DEMOS/oldschool-pack.rar',
+      feed: [],
+      failures: [],
+      elapsedLabel: '2:11 elapsed',
+    }),
+  },
+  {
+    label: 'receiving — expansion finished, device writing',
+    vm: baseVm({
+      scanTotal: 1204,
+      uploaded: 1168,
+      written: 4318,
+      failed: 2,
+      apiPercent: 97,
+      devicePercent: 34,
+      filesPerSecond: 9.8,
+      bytesPerSecond: 1_300_000,
+      hasArchive: true,
+      expansionPercent: 100,
+      expansionComplete: true,
+      expandedTotal: 12480,
+      feed: [
+        {
+          relativePath: 'HVSC-79/MUSICIANS/H/Hubbard_Rob/Commando.sid',
+          fileName: 'Commando.sid',
+          success: true,
+          reason: null,
+        },
+        {
+          relativePath: 'HVSC-79/DEMOS/oldschool-pack/intro.prg',
+          fileName: 'intro.prg',
+          success: true,
+          reason: null,
+        },
+        {
+          relativePath: 'HVSC-79/DEMOS/oldschool-pack/loader.prg',
+          fileName: 'loader.prg',
+          success: false,
+          reason: 'device write failed — timeout 1',
+        },
+      ],
+      failures: [
+        {
+          relativePath: 'HVSC-79/DEMOS/oldschool-pack/loader.prg',
+          fileName: 'loader.prg',
+          success: false,
+          reason: 'device write failed — timeout 1',
+        },
+      ],
+      elapsedLabel: '6:04 elapsed',
+    }),
   },
   {
     label: 'draining',
