@@ -24,7 +24,7 @@
         "configDir": "libs/ui/components/.storybook",
         "browserTarget": "ui-components:build-storybook",
         "compodoc": true,
-        "compodocArgs": ["-p", "libs/ui/components/tsconfig.lib.json", "-e", "json"],
+        "compodocArgs": ["-p", "libs/ui/components/tsconfig.lib.json", "-e", "json", "-d", "libs/ui/components"],
         "styles": ["libs/ui/styles/src/lib/theme/styles.scss"],
         "stylePreprocessorOptions": {
           "includePaths": ["libs/ui/styles/src/lib"]
@@ -44,7 +44,7 @@
         "configDir": "libs/ui/components/.storybook",
         "browserTarget": "ui-components:build-storybook",
         "compodoc": true,
-        "compodocArgs": ["-p", "libs/ui/components/tsconfig.lib.json", "-e", "json"],
+        "compodocArgs": ["-p", "libs/ui/components/tsconfig.lib.json", "-e", "json", "-d", "libs/ui/components"],
         "styles": ["libs/ui/styles/src/lib/theme/styles.scss"],
         "stylePreprocessorOptions": {
           "includePaths": ["libs/ui/styles/src/lib"]
