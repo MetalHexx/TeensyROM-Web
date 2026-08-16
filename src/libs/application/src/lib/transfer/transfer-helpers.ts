@@ -19,6 +19,7 @@ export function createDefaultDeviceTransferState(deviceId: string): DeviceTransf
     job: null,
     scanFound: 0,
     scanTotal: 0,
+    archivesSent: 0,
     uploadFailedCount: 0,
     feed: [],
     failures: [],

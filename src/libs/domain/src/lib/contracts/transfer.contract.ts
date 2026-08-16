@@ -8,11 +8,16 @@ import { TransferJobSnapshot } from '../models/transfer-job-snapshot.model';
  * Implemented by the infrastructure layer against the transfer API.
  */
 export interface ITransferService {
-  /** Creates a new transfer job for the given device/storage/destination. */
+  /**
+   * Creates a new transfer job for the given device/storage/destination. `expectedArchiveCount`
+   * is the only thing the browser tells the server up front about the archives it's about to
+   * send — it's how the API tells "no archive has arrived yet" from "no archive is coming".
+   */
   createJob(
     deviceId: string,
     storageType: StorageType,
-    destinationDirectory: string
+    destinationDirectory: string,
+    expectedArchiveCount: number
   ): Promise<TransferJobSnapshot>;
 
   /** Uploads a single file's raw bytes into an open transfer job. */

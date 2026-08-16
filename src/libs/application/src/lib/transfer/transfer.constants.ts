@@ -38,4 +38,9 @@ export const TRANSFER_SUPPORTED_EXTENSIONS = new Set<string>([
   '.txt',
   '.d64',
   '.zip',
+  '.7z',
+  '.rar',
 ]);
+
+/** Extensions the server expands into their contents rather than transferring. Subset of the above. */
+export const TRANSFER_ARCHIVE_EXTENSIONS = new Set<string>(['.zip', '.7z', '.rar']);
