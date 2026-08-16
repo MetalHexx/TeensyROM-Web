@@ -26,6 +26,11 @@ function baseVm(overrides: Partial<TransferProgressVm> = {}): TransferProgressVm
     failed: 4,
     apiPercent: 67,
     devicePercent: 56,
+    hasArchive: false,
+    expansionPercent: 0,
+    expandingArchive: null,
+    expansionComplete: false,
+    expandedTotal: null,
     filesPerSecond: 9.8,
     bytesPerSecond: 1_500_000,
     feed: [feedEntry(1), feedEntry(2, false)],
@@ -199,6 +204,24 @@ describe('TransferProgressComponent', () => {
       expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40,000/ 60,000');
     });
 
+    it('carries no denominator on the Completed tile until expandedTotal exists', async () => {
+      await setup(baseVm({ state: 'receiving', written: 6977, expandedTotal: null }));
+
+      const value = q('metric-written')?.querySelector('.metric-value');
+      expect(value?.textContent?.trim()).toBe('6,977');
+      const spoken = q('metric-written')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent?.trim()).toBe('6,977');
+    });
+
+    it('carries the composed expandedTotal denominator on the Completed tile once it exists', async () => {
+      await setup(baseVm({ state: 'receiving', written: 842, expandedTotal: 1204 }));
+
+      const value = q('metric-written')?.querySelector('.metric-value');
+      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('842/ 1,204');
+      const spoken = q('metric-written')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent?.trim()).toBe('842 of 1,204');
+    });
+
     it('captions the device bar "Transferred to TR"', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
@@ -304,6 +327,116 @@ describe('TransferProgressComponent', () => {
     });
   });
 
+  describe('expansion track', () => {
+    it('is absent when the job has no archive, leaving the view pixel-identical to today', async () => {
+      await setup(baseVm({ state: 'receiving', hasArchive: false }));
+
+      expect(q('expansion-bar')).toBeFalsy();
+      expect(q('expansion-bar-pct')).toBeFalsy();
+      const labels = Array.from(qAll('.write-bar-caption span')).map((el) => el.textContent?.trim());
+      expect(labels).not.toContain('Expanding archives');
+    });
+
+    it('renders as the first bar, showing the archive name while expanding', async () => {
+      await setup(
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expansionPercent: 41,
+          expandingArchive: 'HVSC-79.zip',
+          expansionComplete: false,
+        })
+      );
+
+      const bars = qAll('.write-bar-caption span:first-child');
+      expect(bars[0]?.textContent?.trim()).toBe('Expanding archives');
+
+      expect(q('expansion-bar-pct')?.textContent?.trim()).toBe('HVSC-79.zip');
+      expect(q('expansion-bar-pct')?.classList.contains('write-bar-pct-success')).toBe(false);
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('41');
+      expect(q('expansion-bar')?.getAttribute('aria-label')).toBe('Expanding archives');
+    });
+
+    it('shows a success 100% once expansion is finished', async () => {
+      await setup(
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expansionPercent: 100,
+          expandingArchive: null,
+          expansionComplete: true,
+        })
+      );
+
+      expect(q('expansion-bar-pct')?.textContent?.trim()).toBe('100%');
+      expect(q('expansion-bar-pct')?.classList.contains('write-bar-pct-success')).toBe(true);
+      expect(q('expansion-bar')?.classList.contains('progress-success')).toBe(true);
+    });
+
+    it('shows the bar at 0%, not a success 100%, before the first archive has started', async () => {
+      await setup(
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expansionPercent: 0,
+          expandingArchive: null,
+          expansionComplete: false,
+        })
+      );
+
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('0');
+      expect(q('expansion-bar-pct')?.textContent?.trim()).not.toBe('100%');
+      expect(q('expansion-bar-pct')?.classList.contains('write-bar-pct-success')).toBe(false);
+    });
+
+    it('resets and never moves backwards within one archive, including across a nested archive', async () => {
+      await setup(
+        baseVm({ state: 'receiving', hasArchive: true, expandingArchive: 'HVSC-79.zip', expansionPercent: 41 })
+      );
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('41');
+
+      fixture.componentRef.setInput(
+        'vm',
+        baseVm({ state: 'receiving', hasArchive: true, expandingArchive: 'HVSC-79.zip', expansionPercent: 78 })
+      );
+      fixture.detectChanges();
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('78');
+
+      // A nested archive starts: the bar resets to that archive's own progress, not the job's.
+      fixture.componentRef.setInput(
+        'vm',
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expandingArchive: 'HVSC-79/DEMOS/oldschool-pack.rar',
+          expansionPercent: 12,
+        })
+      );
+      fixture.detectChanges();
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('12');
+      expect(q('expansion-bar-pct')?.textContent?.trim()).toBe('HVSC-79/DEMOS/oldschool-pack.rar');
+    });
+
+    it('mentions expansion in the live region while expanding, on the existing throttle, not a second channel', async () => {
+      await setup(
+        baseVm({ state: 'receiving', hasArchive: true, expandingArchive: 'HVSC-79.zip', expansionComplete: false })
+      );
+
+      const region = q('transfer-progress-live-region');
+      expect(region?.textContent).toContain('Expanding archives');
+      // Still exactly one live region in the whole component.
+      expect(qAll('[aria-live]').length).toBe(1);
+    });
+
+    it('does not mention expansion once expansion has finished', async () => {
+      await setup(
+        baseVm({ state: 'receiving', hasArchive: true, expandingArchive: null, expansionComplete: true })
+      );
+
+      expect(q('transfer-progress-live-region')?.textContent).not.toContain('Expanding archives');
+    });
+  });
+
   describe('cancelling', () => {
     it('mutes the tiles, drops the feed, and disables the cancel control', async () => {
       await setup(baseVm({ state: 'cancelling' }));
@@ -328,18 +461,34 @@ describe('TransferProgressComponent', () => {
     });
 
     it('renders uploaded-of-total and completed-of-total as one unbroken run, matching the active shape', async () => {
-      await setup(baseVm({ state: 'cancelling', uploaded: 40000, scanTotal: 60000, written: 6977 }));
+      await setup(
+        baseVm({ state: 'cancelling', uploaded: 40000, scanTotal: 60000, written: 6977, expandedTotal: 59500 })
+      );
 
       const uploaded = q('metric-uploaded')?.querySelector('.metric-value');
       expect(uploaded?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40,000/ 60,000');
       const written = q('metric-written')?.querySelector('.metric-value');
-      expect(written?.textContent?.replace(/\s+/g, ' ').trim()).toBe('6,977/ 60,000');
+      expect(written?.textContent?.replace(/\s+/g, ' ').trim()).toBe('6,977/ 59,500');
     });
 
     it('renders no current-file element in the cancelling state', async () => {
       await setup(baseVm({ state: 'cancelling' }));
 
       expect(q('transfer-progress-current-file')).toBeFalsy();
+    });
+
+    it('carries the composed denominator on the Completed tile when expandedTotal exists', async () => {
+      await setup(baseVm({ state: 'cancelling', written: 842, expandedTotal: 1204 }));
+
+      const value = q('metric-written')?.querySelector('.metric-value');
+      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('842/ 1,204');
+    });
+
+    it('carries no denominator on the Completed tile when expandedTotal is null', async () => {
+      await setup(baseVm({ state: 'cancelling', written: 842, expandedTotal: null }));
+
+      const value = q('metric-written')?.querySelector('.metric-value');
+      expect(value?.textContent?.trim()).toBe('842');
     });
   });
 
@@ -373,6 +522,31 @@ describe('TransferProgressComponent', () => {
     it('omits the current-file row entirely — there is no current file in a terminal state', async () => {
       await setup(baseVm({ state: 'completed' }));
       expect(q('transfer-progress-current-file')).toBeFalsy();
+    });
+
+    // A wrong denominator here is the specific lie the separate denominators exist to prevent —
+    // the written count measured against the browser's upload total on the screen read longest.
+    it('carries the composed expandedTotal denominator, not the upload scanTotal, once an archive job settles', async () => {
+      await setup(baseVm({ state: 'completed', written: 12474, scanTotal: 12480, expandedTotal: 12474 }));
+
+      const value = q('metric-written')?.querySelector('.metric-value');
+      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('12,474/ 12,474');
+      const spoken = q('metric-written')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent?.trim()).toBe('12,474 of 12,474');
+    });
+
+    it('carries no denominator on the Completed tile for an archive-free job', async () => {
+      await setup(baseVm({ state: 'completed', written: 12474, scanTotal: 12480, expandedTotal: null }));
+
+      const value = q('metric-written')?.querySelector('.metric-value');
+      expect(value?.textContent?.trim()).toBe('12,474');
+    });
+
+    it('keeps the Uploaded tile on the browser scan total even when expandedTotal exists', async () => {
+      await setup(baseVm({ state: 'completed', uploaded: 1204, scanTotal: 1204, expandedTotal: 1197 }));
+
+      const value = q('metric-uploaded')?.querySelector('.metric-value');
+      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('1,204/ 1,204');
     });
 
     it('caps the failure list and shows the overflow remainder', async () => {

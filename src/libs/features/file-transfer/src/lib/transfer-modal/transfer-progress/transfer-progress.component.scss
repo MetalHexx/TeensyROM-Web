@@ -180,6 +180,18 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 
+  // The expansion track's right slot holds an archive name, not a percentage — this reuses the
+  // sibling tracks' caption grammar but overrides the value-specific styling for a clipped path.
+  &.expansion-slot {
+    text-align: right;
+    max-width: 58%;
+    text-transform: none;
+    color: var(--on-surface);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   &.write-bar-pct-success {
     color: var(--color-success);
   }

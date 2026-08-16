@@ -17,6 +17,11 @@ export interface TransferProgressVm {
   failed: number;
   apiPercent: number;
   devicePercent: number;
+  hasArchive: boolean;
+  expansionPercent: number;
+  expandingArchive: string | null;
+  expansionComplete: boolean;
+  expandedTotal: number | null;
   filesPerSecond: number;
   bytesPerSecond: number;
   feed: TransferFeedEntry[];
@@ -116,8 +121,10 @@ const STATE_ANNOUNCEMENTS: Record<TransferModalState, (vm: TransferProgressVm) =
   'device-busy': (vm) => `${vm.deviceName} is busy. Nothing has been sent.`,
   'nothing-to-transfer': () => 'Nothing to transfer.',
   failed: (vm) => vm.reason ?? "Transfer couldn't start.",
-  receiving: (vm) =>
-    `${vm.devicePercent}% written to device. ${vm.uploaded} of ${vm.scanTotal} uploaded, ${vm.failed} failed.`,
+  receiving: (vm) => {
+    const expanding = vm.hasArchive && !vm.expansionComplete ? 'Expanding archives. ' : '';
+    return `${expanding}${vm.devicePercent}% written to device. ${vm.uploaded} of ${vm.scanTotal} uploaded, ${vm.failed} failed.`;
+  },
   draining: (vm) => `${vm.devicePercent}% written to device. Upload complete, ${vm.failed} failed.`,
   cancelling: () => 'Cancelling. Finishing current file.',
   completed: (vm) =>
@@ -194,6 +201,11 @@ export class TransferProgressComponent {
   readonly uploadedTileSuccess = computed(() => this.vm().state === 'draining');
   readonly apiBarSuccess = computed(() => this.vm().state === 'draining');
   readonly metricsMuted = computed(() => this.vm().state === 'cancelling');
+
+  readonly expansionComplete = computed(() => this.vm().expansionComplete);
+  readonly expansionSlotText = computed(() =>
+    this.expansionComplete() ? '100%' : this.vm().expandingArchive
+  );
 
   readonly rateLabel = computed(() => (this.renderShape() === 'terminal' ? 'Avg Rate' : 'Rate'));
   readonly filesPerSecondLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)} Files/s`);
