@@ -189,6 +189,50 @@ public class TransferAdmissionTests : IDisposable
         await _queue.Received(1).EnqueueAsync(job.DeviceId, secondAdmit.File!, Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// Mirrors <see cref="ReleaseHeldAsync_AdmissionRacingTheDrain_IsNotStranded"/> but starts from an
+    /// empty <c>_held</c> rather than a pre-seeded one - the exact race Finding 2 identified: an admission
+    /// reads <see cref="TransferJob.HasExpansionOutstanding"/> while it is still true, and by the time it
+    /// would enqueue into <c>_held</c>, the matching <c>ReleaseHeldAsync</c> has already run to completion
+    /// having found nothing to drain. Delays <c>StageAsync</c> - which runs before the hold decision - so
+    /// <c>ReleaseHeldAsync</c> can complete first every time, deterministically.
+    /// </summary>
+    [Fact]
+    public async Task AdmitAsync_ReleaseHeldAsyncFinishesBeforeTheFirstHoldEverEnqueues_FileGoesStraightToQueueInstead()
+    {
+        var admission = NewAdmission();
+        var job = NewJob(expectedArchiveCount: 1);
+        job.OnArchiveAccepted();
+        _registry.Get(job.JobId).Returns(job);
+
+        var stagingStarted = new TaskCompletionSource();
+        var letStagingFinish = new TaskCompletionSource();
+        var stagingPath = NewStagedFile(5);
+
+        _staging.StageAsync(job.JobId, Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                stagingStarted.TrySetResult();
+                await letStagingFinish.Task;
+                return stagingPath;
+            });
+        StubGateAdjustsToActual();
+
+        var admitTask = admission.AdmitAsync(job, Stream.Null, "entry.prg", 10, countAsReceived: false, CancellationToken.None);
+        await stagingStarted.Task;
+
+        // The archive finishes and its ReleaseHeldAsync call drains and returns while the admission above
+        // is still mid-stage - before it has ever touched _held.
+        job.OnArchiveExpansionFinished();
+        await admission.ReleaseHeldAsync(job.JobId, CancellationToken.None);
+        await _queue.DidNotReceiveWithAnyArgs().EnqueueAsync(default!, default!, default);
+
+        letStagingFinish.SetResult();
+        var result = await admitTask;
+
+        await _queue.Received(1).EnqueueAsync(job.DeviceId, result.File!, Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task DiscardHeld_HeldFiles_ReleasesCapacityDeletesStagedFilesAndDropsPendingCount()
     {

@@ -20,6 +20,14 @@ namespace TeensyRom.Api.Transfers
         // promptly in ReleaseHeldAsync is what keeps a large drop from starving every other upload.
         private readonly ConcurrentDictionary<string, ConcurrentQueue<StagedFile>> _held = new();
 
+        // Keyed by job id. Guards the read-HasExpansionOutstanding-then-hold decision in AdmitAsync against
+        // the read-then-drain-then-remove sequence in ReleaseHeldAsync/DiscardHeld, so the two can never
+        // interleave into a state where a file is enqueued into _held after the one drain that would have
+        // caught it has already run - see ReleaseHeldAsync for the shape of the race this closes.
+        private readonly ConcurrentDictionary<string, object> _locks = new();
+
+        private object LockFor(string jobId) => _locks.GetOrAdd(jobId, _ => new object());
+
         public async Task<AdmissionResult> AdmitAsync(
             TransferJob job,
             Stream content,
@@ -55,13 +63,24 @@ namespace TeensyRom.Api.Transfers
 
                 var staged = new StagedFile(job.JobId, stagingPath, relativePath, target, job.StorageType, actualBytes, effective);
 
-                // Consulted once, under the same decision that enqueues - see ReleaseHeldAsync for the
-                // race this leaves between "expansion just finished" and "a file is being admitted".
-                if (job.HasExpansionOutstanding)
+                // Reading HasExpansionOutstanding and (if true) enqueuing into _held must be one atomic
+                // step under the same per-job lock ReleaseHeldAsync/DiscardHeld use for their own
+                // check-then-drain: split across the lock boundary, a drain that runs between the read and
+                // the enqueue would observe an empty or already-removed queue, and this file would never be
+                // picked up again.
+                bool held;
+
+                lock (LockFor(job.JobId))
                 {
-                    _held.GetOrAdd(job.JobId, _ => new ConcurrentQueue<StagedFile>()).Enqueue(staged);
+                    held = job.HasExpansionOutstanding;
+
+                    if (held)
+                    {
+                        _held.GetOrAdd(job.JobId, _ => new ConcurrentQueue<StagedFile>()).Enqueue(staged);
+                    }
                 }
-                else
+
+                if (!held)
                 {
                     await queue.EnqueueAsync(job.DeviceId, staged, ct);
                 }
@@ -93,32 +112,50 @@ namespace TeensyRom.Api.Transfers
 
         public async Task ReleaseHeldAsync(string jobId, CancellationToken ct)
         {
-            if (!_held.TryGetValue(jobId, out var heldQueue))
-            {
-                return;
-            }
-
             var deviceId = registry.Get(jobId)?.DeviceId;
 
-            if (deviceId is null)
+            // Loops rather than draining once: the queue is never removed from _held until a check made
+            // under the lock observes it empty, so a file AdmitAsync enqueues into the very same queue
+            // instance while a drain is already in flight (see AdmitAsync) is still the live target and
+            // gets picked up by the drain already running, or by the next iteration's drain otherwise -
+            // never stranded in a queue nobody will ever look at again.
+            while (true)
             {
-                _held.TryRemove(jobId, out _);
-                return;
+                ConcurrentQueue<StagedFile>? heldQueue;
+
+                lock (LockFor(jobId))
+                {
+                    if (!_held.TryGetValue(jobId, out heldQueue) || heldQueue.IsEmpty)
+                    {
+                        _held.TryRemove(jobId, out _);
+                        return;
+                    }
+                }
+
+                if (deviceId is null)
+                {
+                    lock (LockFor(jobId))
+                    {
+                        _held.TryRemove(jobId, out _);
+                    }
+
+                    return;
+                }
+
+                await DrainAsync(heldQueue, deviceId, ct);
             }
-
-            await DrainAsync(heldQueue, deviceId, ct);
-
-            _held.TryRemove(jobId, out _);
-
-            // Re-drain the same queue instance after the key is gone: a file parked by a concurrent
-            // AdmitAsync between the drain above and this removal targeted this exact object, and would
-            // otherwise be stranded - the job would simply never complete.
-            await DrainAsync(heldQueue, deviceId, ct);
         }
 
         public void DiscardHeld(string jobId)
         {
-            if (!_held.TryRemove(jobId, out var heldQueue))
+            ConcurrentQueue<StagedFile>? heldQueue;
+
+            lock (LockFor(jobId))
+            {
+                _held.TryRemove(jobId, out heldQueue);
+            }
+
+            if (heldQueue is null)
             {
                 return;
             }

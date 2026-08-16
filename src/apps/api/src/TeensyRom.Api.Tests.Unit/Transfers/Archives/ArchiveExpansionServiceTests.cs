@@ -358,6 +358,84 @@ public sealed class ArchiveExpansionServiceTests : IDisposable
         snapshot.ExpansionBytesWritten.Should().Be(first.Length + second.Length);
     }
 
+    /// <summary>
+    /// Drives the walk against a real <see cref="TransferAdmission"/> rather than the class-level mock, so
+    /// admitting a produced entry really runs <see cref="TransferJob.OnEntryExpanded"/> and really raises
+    /// <see cref="TransferJob.PendingCount"/>. A mocked admission never exercises that side effect, which is
+    /// exactly why the mocked suite above cannot catch the ExpandAsync/TransferJob ordering this guards.
+    /// </summary>
+    [Fact]
+    public async Task ExpandAsync_RealTransferAdmission_NeverLetsPendingCountTouchZeroBeforeTheProducedEntryIsAdmitted()
+    {
+        var job = NewJob();
+        AcceptArchive(job);
+
+        var topPath = WriteTopLevelArchive(job.JobId, "ONE");
+        var content = new byte[] { 1, 2, 3 };
+        _reader.Define("ONE", new FakeArchive { Entries = [new FakeEntry("only.sid", content.Length, content)], DeclaredUncompressedBytes = content.Length });
+
+        var registry = Substitute.For<ITransferJobRegistry>();
+        registry.Get(job.JobId).Returns(job);
+
+        var gate = Substitute.For<ITransferCapacityGate>();
+        gate.Adjust(Arg.Any<long>(), Arg.Any<long>()).Returns(ci => (long)ci[1]);
+
+        var stagingPath = Path.GetTempFileName();
+        File.WriteAllBytes(stagingPath, content);
+        var minPendingCountObservedDuringStaging = int.MaxValue;
+
+        var staging = Substitute.For<ITransferStagingStore>();
+        staging.StageAsync(job.JobId, Arg.Any<Stream>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                // Runs inside TransferAdmission.AdmitAsync, strictly before OnEntryExpanded raises
+                // PendingCount for this entry - the exact window the old ExpandAsync ordering could leave
+                // at zero, because the archive's own slot had already been released by then.
+                minPendingCountObservedDuringStaging = Math.Min(minPendingCountObservedDuringStaging, job.PendingCount);
+                return Task.FromResult(stagingPath);
+            });
+
+        var queue = Substitute.For<ITransferQueue>();
+        var notifier = Substitute.For<ITransferProgressNotifier>();
+        var realAdmission = new TransferAdmission(gate, staging, queue, notifier, registry);
+
+        try
+        {
+            var service = new ArchiveExpansionService(_reader, _scratch, realAdmission, registry, _options, _log);
+            await service.ExpandAsync(new ArchiveExpansionRequest(job.JobId, topPath, "one.zip"), CancellationToken.None);
+
+            minPendingCountObservedDuringStaging.Should().BeGreaterThan(0,
+                "the archive's own PendingCount slot must still be held while its entries are being admitted");
+
+            // The archive's own slot is released, but the one produced entry is still awaiting delivery to
+            // the device - this stub queue never drains it, so PendingCount correctly stays at 1.
+            job.PendingCount.Should().Be(1);
+            await queue.Received(1).EnqueueAsync(job.DeviceId, Arg.Any<StagedFile>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            File.Delete(stagingPath);
+        }
+    }
+
+    /// The raw upload's own scratch reservation - separate from the DeclaredUncompressedBytes reservation
+    /// ProcessArchiveAsync takes once expansion starts reading the archive's index.
+    [Fact]
+    public async Task ExpandAsync_ReleasesTheRawUploadReservation_OnceTheTopLevelArchiveIsProcessed()
+    {
+        var job = NewJob();
+        AcceptArchive(job);
+
+        var topPath = WriteTopLevelArchive(job.JobId, "RAW");
+        _reader.Define("RAW", new FakeArchive { Entries = [], DeclaredUncompressedBytes = 0 });
+        _scratch.TryReserve(job.JobId, 500).Should().BeTrue(); // simulates the endpoint's own upload-time reservation
+
+        var service = NewService();
+        await service.ExpandAsync(new ArchiveExpansionRequest(job.JobId, topPath, "raw.zip", RawReservedBytes: 500), CancellationToken.None);
+
+        _scratch.BytesInUse.Should().Be(0);
+    }
+
     [Fact]
     public async Task ExpandAsync_JobPurged_DeletesScratchArchiveAndReturnsQuietlyWithoutAdmitting()
     {
