@@ -21,6 +21,7 @@
       "@teensyrom-nx/app/shell": ["libs/app/shell/src/index.ts"],
       "@teensyrom-nx/application": ["libs/application/src/index.ts"],
       "@teensyrom-nx/data-access/api-client": ["libs/data-access/api-client/src/index.ts"],
+      "@teensyrom-nx/data-access/asm-64-client": ["libs/data-access/asm-64-client/src/index.ts"],
       "@teensyrom-nx/domain": ["libs/domain/src/index.ts"],
       "@teensyrom-nx/features/device": ["libs/features/devices/src/index.ts"],
       "@teensyrom-nx/features/file-transfer": ["libs/features/file-transfer/src/index.ts"],
