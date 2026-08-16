@@ -16,6 +16,31 @@ export interface ImageChangeEvent {
   totalImages: number;
 }
 
+/**
+ * Image carousel that automatically cycles through one or more images with
+ * a 1-second cross-fade, falling back to `placeholderUrl` when `images` is
+ * empty. `size` selects both the rendered dimensions and the rendering mode:
+ * `'thumbnail'`/`'small'` use a simple, single-layer `object-fit: cover`
+ * presentation, while `'medium'`/`'large'` add a dual-layer blurred
+ * background behind an `object-fit: contain` foreground for an artistic,
+ * letterbox-free presentation. `width`/`height` override the size preset's
+ * dimensions when a non-standard aspect ratio is needed (e.g. C64 320x200).
+ *
+ * Reach for `lib-cycle-image` whenever the source data may hold zero, one,
+ * or many images — it handles the empty and single-image cases gracefully
+ * and adds cycling for free when there is more than one. Reach for
+ * `lib-thumbnail-image` instead only when you know in advance there is
+ * exactly one static image and want the smaller, simpler component.
+ *
+ * @example
+ * ```html
+ * <lib-cycle-image
+ *   [images]="fileItem.images.map(img => img.url)"
+ *   size="thumbnail"
+ *   (imageChange)="onImageChange($event)"
+ * ></lib-cycle-image>
+ * ```
+ */
 @Component({
   selector: 'lib-cycle-image',
   standalone: true,
@@ -33,9 +58,19 @@ export interface ImageChangeEvent {
 })
 export class CycleImageComponent {
   // Inputs
+  /** Image URLs to cycle through. When empty, `placeholderUrl` is shown instead and no cycling occurs. */
   images = input.required<string[]>();
+  /** Milliseconds between automatic transitions when more than one image is present. Defaults to `8000`. */
   intervalMs = input<number>(8000);
+  /** Fallback image URL shown when `images` is empty. Defaults to `'/placeholder.jpg'`. */
   placeholderUrl = input<string>('/placeholder.jpg');
+  /**
+   * Size preset controlling both rendered dimensions and rendering mode. Defaults to `'large'`.
+   * - `'thumbnail'` — 48x48px, simple mode (no blur), for player toolbars and compact lists
+   * - `'small'` — 80x80px, simple mode (no blur), for card thumbnails and small galleries
+   * - `'medium'` — 160x160px, complex mode (blurred background), for album art and featured content
+   * - `'large'` — fills its container, complex mode (blurred background), for full detail views
+   */
   size = input<'thumbnail' | 'small' | 'medium' | 'large'>('large');
   /** Custom width override (e.g., '76.8px'). Takes precedence over size preset. */
   width = input<string | undefined>(undefined);

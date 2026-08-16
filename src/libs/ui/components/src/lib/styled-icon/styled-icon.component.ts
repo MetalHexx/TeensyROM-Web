@@ -12,6 +12,27 @@ export type StyledIconColor =
   | 'dimmed'
   | 'directory';
 
+/**
+ * Standalone Material Design icon with consistent sizing and semantic
+ * coloring from the design system. Use it wherever a single icon needs to
+ * stand on its own — directory listings, file browsers, navigation trees,
+ * status indicators — without the button chrome that {@link IconButtonComponent}
+ * adds.
+ *
+ * Reach for `lib-styled-icon` for non-interactive, purely presentational
+ * icons. Reach for `lib-icon-button` instead as soon as the icon needs to be
+ * clickable, and for `lib-icon-label` when the icon needs an adjacent text
+ * label.
+ *
+ * `size` and `color` map to `styled-icon-*` utility classes; see the
+ * `style-guide` skill for their pixel values and the `--color-*` tokens
+ * behind each color option.
+ *
+ * @example
+ * ```html
+ * <lib-styled-icon icon="folder" color="directory" size="medium"></lib-styled-icon>
+ * ```
+ */
 @Component({
   selector: 'lib-styled-icon',
   imports: [CommonModule, MatIconModule],
@@ -19,8 +40,26 @@ export type StyledIconColor =
   styleUrl: './styled-icon.component.scss',
 })
 export class StyledIconComponent {
+  /** Material icon ligature name to display. */
   icon = input.required<string>();
+  /**
+   * Semantic color variant from the design system. Defaults to `'normal'`.
+   * - `'normal'` — default Material icon color, no override
+   * - `'primary'` — brand primary (`--color-primary-bright`)
+   * - `'highlight'` — cyan accent (`--color-highlight`), for active/selected state
+   * - `'success'` — green (`--color-success`), for positive status
+   * - `'error'` — red (`--color-error`), for error/warning status
+   * - `'dimmed'` — muted gray (`--color-dimmed`), for de-emphasized icons
+   * - `'directory'` — folder/gold accent (`--color-directory`), for directory entries
+   */
   color = input<StyledIconColor>('normal');
+  /**
+   * Size variant, controlling both font size and rendered dimensions. Defaults to `'medium'`.
+   * - `'small'` — compact lists, inline indicators
+   * - `'medium'` — standard size, matches directory tree icons
+   * - `'large'` — emphasized single icons
+   * - `'extra-large'` — headline-scale icons (e.g. empty-state illustrations)
+   */
   size = input<StyledIconSize>('medium');
 
   iconClasses = computed(() => {
