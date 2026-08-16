@@ -84,7 +84,17 @@ namespace TeensyRom.Api.Tests.Integration.Common
         /// arguments, so a suite that needs different tuning derives its own fixture and collection
         /// instead of mutating <see cref="Options"/> on a host that already started.
         /// </summary>
-        protected TransferFixture(Action<TransferOptions>? configureOptions)
+        protected TransferFixture(Action<TransferOptions>? configureOptions) : this(configureOptions, null)
+        {
+        }
+
+        /// <summary>
+        /// As above, with an additional hook to override service registrations - e.g. substituting
+        /// <see cref="TeensyRom.Api.Transfers.Archives.IArchiveReader"/> with a test decorator - before
+        /// the host builds. Runs last, after every registration below, so a derived fixture's override
+        /// always wins.
+        /// </summary>
+        protected TransferFixture(Action<TransferOptions>? configureOptions, Action<IServiceCollection>? configureServices)
         {
             _stagingRoot = Directory.CreateTempSubdirectory("teensyrom-transfer-tests-").FullName;
             _scratchRoot = Directory.CreateTempSubdirectory("teensyrom-transfer-tests-scratch-").FullName;
@@ -122,6 +132,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
                             new FakeDeviceConnectionManager(sp.GetRequiredService<IStorageFactory>()));
 
                         services.AddSingleton(Options);
+                        configureServices?.Invoke(services);
                     });
                 });
 
