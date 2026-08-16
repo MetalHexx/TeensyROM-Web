@@ -12,6 +12,24 @@ import { CommonModule } from '@angular/common';
 import type { AnimationParentMode } from '../shared/animation.types';
 import { PARENT_ANIMATION_COMPLETE } from '../shared/animation-tokens';
 
+/**
+ * Animates projected text with a continuous "leet speak" character-cycling effect — a demoscene-
+ * style wave that substitutes individual characters (`a` → `@`/`4`, `e` → `3`, `o` → `0`, etc.) as
+ * it sweeps forward then backward through the text — plus optional `/ - \ |` spinner glyphs before
+ * and/or after the text.
+ *
+ * This is the raw animation primitive: it has no fade-in/fade-out lifecycle of its own. Reach for
+ * `LoadingTextComponent` instead when you need a complete show/hide loading indicator; use
+ * `LeetTextContainerComponent` directly when you want the cycling text always visible, or need to
+ * drive your own visibility/animation-chaining logic via `animationTrigger` and `animationParent`.
+ *
+ * @example
+ * ```html
+ * <lib-leet-text-container [showFrontSpinner]="true" [animationTrigger]="isVisible()">
+ *   Loading...
+ * </lib-leet-text-container>
+ * ```
+ */
 @Component({
   selector: 'lib-leet-text-container',
   imports: [CommonModule],

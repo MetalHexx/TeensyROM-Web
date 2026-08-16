@@ -24,6 +24,23 @@ export type MarqueeEffect =
   | 'spiral' // 3D rotation twist
   | 'random'; // Randomly select an effect (excluding 'none' and 'random')
 
+/**
+ * A CSS-animated horizontal scrolling marquee for text that doesn't fit its container, with seven
+ * optional demoscene-style character effects (wave, rainbow, glitch, bounce, copper, spiral) layered
+ * on top of the scroll itself. Duration is derived from content width and `speed`, so longer text
+ * scrolls for longer rather than faster.
+ *
+ * Reach for `ScrollingMarqueeComponent` for long, dynamic single-line text that must live in a
+ * fixed-width space — file descriptions, notification banners, status bars — where truncation would
+ * lose information the user needs. For static labels that can simply be truncated, use
+ * `IconLabelComponent`'s `truncate` input instead; a marquee is for content the user is expected to
+ * read in full, not a substitute for ellipsis.
+ *
+ * @example
+ * ```html
+ * <lib-scrolling-marquee [text]="fileDescription()" effect="wave"></lib-scrolling-marquee>
+ * ```
+ */
 @Component({
   selector: 'lib-scrolling-marquee',
   standalone: true,
@@ -32,11 +49,29 @@ export type MarqueeEffect =
   styleUrl: './scrolling-marquee.component.scss',
 })
 export class ScrollingMarqueeComponent {
-  // Component inputs
+  /** Text content to scroll — defaults to `''`. When empty, the component renders without animating. */
   text = input<string>('');
-  speed = input<number>(50); // Pixels per second
+
+  /** Scroll speed in pixels per second; animation duration is `content width / speed`, so longer text takes proportionally longer — defaults to `50`. */
+  speed = input<number>(50);
+
+  /** Scroll direction — defaults to `'left'` (text moves right to left). */
   direction = input<'left' | 'right'>('left');
+
+  /** Pauses the scroll animation while the pointer hovers over the marquee, so the user can read a stopped frame — defaults to `true`. */
   pauseOnHover = input<boolean>(true);
+
+  /**
+   * Character-level visual effect layered on top of the scroll — defaults to `'none'`.
+   * - `'none'` — scroll only, no per-character effect
+   * - `'wave'` — characters undulate in a sine wave
+   * - `'rainbow'` — full color spectrum cycles through the text
+   * - `'glitch'` — CRT-style random character displacement
+   * - `'bounce'` — elastic squash/stretch per character
+   * - `'copper'` — Amiga-style copper bar sweep with glow
+   * - `'spiral'` — 3D rotation twist per character
+   * - `'random'` — picks one of the effects above (excluding `'none'`) and re-picks when `text` changes
+   */
   effect = input<MarqueeEffect>('none');
 
   // View children references

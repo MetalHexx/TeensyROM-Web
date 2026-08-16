@@ -5,6 +5,14 @@ const meta: Meta<StatusIconLabelComponent> = {
   title: 'Primitives/Status Icon Label',
   component: StatusIconLabelComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "`IconLabelComponent` plus a pass/fail status glyph: a green check circle when `status` is `true`, a red cancel icon when `status` is `false`, and nothing extra when `status` is `undefined`. Reach for it whenever the label represents a condition that can succeed or fail — device connection state, storage availability, feature checks — rather than composing a separate status icon next to a plain `IconLabelComponent`. When there's no pass/fail semantics to convey, use `IconLabelComponent` directly instead.",
+      },
+    },
+  },
 };
 
 export default meta;
