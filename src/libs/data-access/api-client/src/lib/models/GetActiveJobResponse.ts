@@ -52,7 +52,7 @@ export function GetActiveJobResponseFromJSONTyped(json: any, ignoreDiscriminator
     }
     return {
         
-        'job': json['job'] == null ? undefined : TransferJobDto2FromJSON(json['job']),
+        'job': json['job'] === undefined ? undefined : json['job'] === null ? null : TransferJobDto2FromJSON(json['job']),
     };
 }
 

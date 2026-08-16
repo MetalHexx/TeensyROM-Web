@@ -46,4 +46,12 @@ export interface TransferJobSnapshot {
   recentCompletions: TransferFileCompletion[]; // newest-first, server-bounded
   bytesPerSecond: number; // rolling window; 0 when idle
   filesPerSecond: number; // rolling window; 0 when idle
+  /** Relative path of the archive currently being expanded; null when none is. */
+  expandingArchive: string | null;
+  /** Uncompressed bytes written for that archive only — resets as the next one starts. */
+  expansionBytesWritten: number;
+  /** Uncompressed bytes that archive declares. The expansion bar's denominator. */
+  expansionBytesDeclared: number;
+  /** Files expansion has yielded — null until every archive in the job has finished expanding. */
+  expandedFileCount: number | null;
 }

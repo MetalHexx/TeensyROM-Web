@@ -46,6 +46,10 @@ describe('TransferDtoMapper', () => {
     ],
     bytesPerSecond: 1024,
     filesPerSecond: 2.5,
+    expandingArchive: 'roms/archive.zip',
+    expansionBytesWritten: 512000,
+    expansionBytesDeclared: 1024000,
+    expandedFileCount: 42,
   };
 
   it('normalizes TransferJobDto (create/seal/cancel envelope) into the domain snapshot', () => {
@@ -88,6 +92,10 @@ describe('TransferDtoMapper', () => {
       ],
       bytesPerSecond: 1024,
       filesPerSecond: 2.5,
+      expandingArchive: 'roms/archive.zip',
+      expansionBytesWritten: 512000,
+      expansionBytesDeclared: 1024000,
+      expandedFileCount: 42,
     });
   });
 
@@ -116,7 +124,10 @@ describe('TransferDtoMapper', () => {
   });
 
   it('coerces a raw ISO string startedUtc into a Date (SignalR pushes skip the REST fromJSON deserializer)', () => {
-    const dto = { ...baseFields, startedUtc: '2026-01-01T00:00:00.000Z' } as unknown as TransferJobDto;
+    const dto = {
+      ...baseFields,
+      startedUtc: '2026-01-01T00:00:00.000Z',
+    } as unknown as TransferJobDto;
 
     const snapshot = TransferDtoMapper.toSnapshot(dto);
 
@@ -146,5 +157,20 @@ describe('TransferDtoMapper', () => {
       const dto: TransferJobDto = { ...baseFields, state: apiState };
       expect(TransferDtoMapper.toSnapshot(dto).state).toBe(domainState);
     }
+  });
+
+  it('defaults expandingArchive and expandedFileCount to null when absent', () => {
+    const dto: TransferJobDto = {
+      ...baseFields,
+      expandingArchive: undefined,
+      expandedFileCount: undefined,
+    };
+
+    const snapshot = TransferDtoMapper.toSnapshot(dto);
+
+    expect(snapshot.expandingArchive).toBeNull();
+    expect(snapshot.expandedFileCount).toBeNull();
+    expect(snapshot.expansionBytesWritten).toBe(512000);
+    expect(snapshot.expansionBytesDeclared).toBe(1024000);
   });
 });

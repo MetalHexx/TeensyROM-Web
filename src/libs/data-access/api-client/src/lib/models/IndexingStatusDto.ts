@@ -50,8 +50,8 @@ export function IndexingStatusDtoFromJSONTyped(json: any, ignoreDiscriminator: b
     }
     return {
         
-        'sdLastIndexed': json['sdLastIndexed'] == null ? undefined : (new Date(json['sdLastIndexed'])),
-        'usbLastIndexed': json['usbLastIndexed'] == null ? undefined : (new Date(json['usbLastIndexed'])),
+        'sdLastIndexed': json['sdLastIndexed'] === undefined ? undefined : json['sdLastIndexed'] === null ? null : (new Date(json['sdLastIndexed'])),
+        'usbLastIndexed': json['usbLastIndexed'] === undefined ? undefined : json['usbLastIndexed'] === null ? null : (new Date(json['usbLastIndexed'])),
     };
 }
 
@@ -66,8 +66,8 @@ export function IndexingStatusDtoToJSONTyped(value?: IndexingStatusDto | null, i
 
     return {
         
-        'sdLastIndexed': value['sdLastIndexed'] == null ? undefined : ((value['sdLastIndexed'] as any).toISOString()),
-        'usbLastIndexed': value['usbLastIndexed'] == null ? undefined : ((value['usbLastIndexed'] as any).toISOString()),
+        'sdLastIndexed': value['sdLastIndexed'] == null ? value['sdLastIndexed'] : value['sdLastIndexed'].toISOString(),
+        'usbLastIndexed': value['usbLastIndexed'] == null ? value['usbLastIndexed'] : value['usbLastIndexed'].toISOString(),
     };
 }
 

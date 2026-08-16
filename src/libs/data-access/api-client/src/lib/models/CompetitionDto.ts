@@ -52,7 +52,7 @@ export function CompetitionDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
     return {
         
         'name': json['name'],
-        'place': json['place'] == null ? undefined : json['place'],
+        'place': json['place'] === undefined ? undefined : json['place'] === null ? null : json['place'],
     };
 }
 
