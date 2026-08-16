@@ -17,7 +17,10 @@
       "!{projectRoot}/test-setup.[jt]s",
       "!{projectRoot}/**/*.Tests/**/*",
       "!{projectRoot}/**/bin/**/*",
-      "!{projectRoot}/**/obj/**/*"
+      "!{projectRoot}/**/obj/**/*",
+      "!{projectRoot}/**/*.stories.@(js|jsx|ts|tsx|mdx)",
+      "!{projectRoot}/.storybook/**/*",
+      "!{projectRoot}/tsconfig.storybook.json"
     ],
     "sharedGlobals": []
   },
@@ -44,6 +47,15 @@
       "cache": true,
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
+    },
+    "build-storybook": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{projectRoot}/.storybook/**/*",
+        "{projectRoot}/tsconfig.storybook.json"
+      ]
     }
   },
   "plugins": [

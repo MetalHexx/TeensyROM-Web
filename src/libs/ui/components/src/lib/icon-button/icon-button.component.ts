@@ -16,15 +16,23 @@ export type IconButtonColor = 'normal' | 'highlight' | 'success' | 'error' | 'di
 })
 export class IconButtonComponent {
   // Input properties
-  icon = input<string>(); // Optional for cases using ng-content
+  /** Material icon ligature name to render. Optional when consumers project their own icon via ng-content. */
+  icon = input<string>();
+  /** Accessible label announced to assistive technology for this button. */
   ariaLabel = input.required<string>();
+  /** Optional tooltip configuration shown when hovering or focusing the button. */
   tooltip = input<TooltipConfig | undefined>();
+  /** Color treatment applied to the icon. */
   color = input<IconButtonColor>('normal');
+  /** Button size, controlling padding and icon dimensions. */
   size = input<IconButtonSize>('medium');
+  /** Visual style variant of the button (standard, rounded-primary, or rounded-transparent). */
   variant = input<IconButtonVariant>('standard');
+  /** Disables the button and suppresses click emission when true. */
   disabled = input<boolean>(false);
 
   // Events
+  /** Emits when the button is activated while not disabled. */
   buttonClick = output<void>();
 
   // Computed properties
