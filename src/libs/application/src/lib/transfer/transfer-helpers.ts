@@ -144,6 +144,16 @@ export interface TransferMetrics {
   failed: number;
   apiPct: number;
   devicePct: number;
+  /** The composed transferable total, or null while it does not yet exist. */
+  expandedTotal: number | null;
+  /** 0–100 for the archive named beside it; 100 once every archive has finished. */
+  expansionPct: number;
+  /** Relative path of the archive being expanded, or null. */
+  expandingArchive: string | null;
+  /** True when this job contains at least one archive — the whole track hangs off this. */
+  hasArchive: boolean;
+  /** True once expansion has finished for a job that had archives. */
+  expansionComplete: boolean;
 }
 
 // Floored and capped below 100: at scale, rounding the last fraction of a percent up reads as
@@ -168,6 +178,7 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
   const job = transfer?.job ?? null;
   const uploadFailedCount = transfer?.uploadFailedCount ?? 0;
   const scanTotal = transfer?.scanTotal ?? 0;
+  const archivesSent = transfer?.archivesSent ?? 0;
 
   if (!job) {
     return {
@@ -176,15 +187,45 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
       failed: uploadFailedCount,
       apiPct: 0,
       devicePct: 0,
+      expandedTotal: null,
+      expansionPct: 0,
+      expandingArchive: null,
+      hasArchive: false,
+      expansionComplete: false,
     };
   }
+
+  // Neither side can state this alone. The browser knows what it sent but not what is inside an
+  // archive; the server knows what came out of each archive but is never told how many files are
+  // still coming — a job is created with a destination and nothing else.
+  const expandedTotal =
+    job.expandedFileCount == null ? null : scanTotal - archivesSent + job.expandedFileCount;
+
+  // Clamped at 100: the denominator is a figure the archive declares about itself, and the
+  // server-side guard exists because an archive can understate it. An archive stopped
+  // mid-extraction for exceeding its declaration shows a full bar and then fails — never a bar
+  // past full.
+  const expansionPct =
+    job.expandedFileCount != null
+      ? 100
+      : job.expansionBytesDeclared > 0
+      ? Math.min(100, Math.floor((job.expansionBytesWritten / job.expansionBytesDeclared) * 100))
+      : 0;
 
   return {
     uploaded: job.filesReceived,
     written: job.filesSent,
     failed: job.filesFailed + uploadFailedCount,
     apiPct: isSealedOrTerminalJobState(job.state) ? 100 : pct(job.filesReceived, scanTotal),
-    devicePct: job.state === TransferJobState.Completed ? 100 : pct(job.filesSent, scanTotal),
+    devicePct:
+      job.state === TransferJobState.Completed
+        ? 100
+        : pct(job.filesSent, expandedTotal ?? scanTotal),
+    expandedTotal,
+    expansionPct,
+    expandingArchive: job.expandingArchive,
+    hasArchive: archivesSent > 0,
+    expansionComplete: archivesSent > 0 && job.expandedFileCount != null,
   };
 }
 
