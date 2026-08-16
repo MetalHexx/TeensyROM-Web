@@ -50,8 +50,8 @@
           </div>
           <div class="metric" data-testid="metric-written">
             <dt class="metric-label">Completed</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
+            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}@if (vm().expandedTotal !== null) {<span class="metric-of">/ {{ vm().expandedTotal | number }}</span>}</dd>
+            <dd class="visually-hidden">{{ vm().written | number }}@if (vm().expandedTotal !== null) { of {{ vm().expandedTotal | number }}}</dd>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
             <dt class="metric-label">Failed</dt>
@@ -66,6 +66,20 @@
         </dl>
 
         <div class="write-bars">
+          @if (vm().hasArchive) {
+            <div class="write-bar">
+              <div class="write-bar-caption">
+                <span>Expanding archives</span>
+                <span class="write-bar-pct expansion-slot"
+                      data-testid="expansion-bar-pct"
+                      [class.write-bar-pct-success]="expansionComplete()">{{ expansionSlotText() }}</span>
+              </div>
+              <mat-progress-bar class="write-bar-track" data-testid="expansion-bar"
+                aria-label="Expanding archives"
+                [class.progress-success]="expansionComplete()"
+                mode="determinate" [value]="vm().expansionPercent"></mat-progress-bar>
+            </div>
+          }
           <div class="write-bar">
             <div class="write-bar-caption">
               <span>Transferred to API</span>
@@ -129,8 +143,8 @@
           </div>
           <div class="metric" data-testid="metric-written">
             <dt class="metric-label">Completed</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
+            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}@if (vm().expandedTotal !== null) {<span class="metric-of">/ {{ vm().expandedTotal | number }}</span>}</dd>
+            <dd class="visually-hidden">{{ vm().written | number }}@if (vm().expandedTotal !== null) { of {{ vm().expandedTotal | number }}}</dd>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
             <dt class="metric-label">Failed</dt>
@@ -170,8 +184,8 @@
           </div>
           <div class="metric" data-testid="metric-written">
             <dt class="metric-label">Completed</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
+            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}@if (vm().expandedTotal !== null) {<span class="metric-of">/ {{ vm().expandedTotal | number }}</span>}</dd>
+            <dd class="visually-hidden">{{ vm().written | number }}@if (vm().expandedTotal !== null) { of {{ vm().expandedTotal | number }}}</dd>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
             <dt class="metric-label">Failed</dt>
