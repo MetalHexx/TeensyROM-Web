@@ -20,6 +20,27 @@ import { SwipePaneDirective } from './swipe-pane.directive';
 
 const TOUCH_DEVICE_QUERY = '(hover: none)';
 
+/**
+ * A horizontally-scrolling, snap-to-pane container for swipeable content — think mobile
+ * tab panels. Reads its panes from `contentChildren(SwipePaneDirective)`, so each pane is
+ * declared as an `<ng-template libSwipePane>` rather than passed as an input; an empty
+ * container has nothing to swipe between. On touch devices, panes are navigated by
+ * scroll/swipe gesture directly; on non-touch (`(hover: none)` false) devices, hovering
+ * the swipe area reveals prev/next arrow controls and pagination dots instead, since there
+ * is no native swipe gesture to rely on.
+ *
+ * @example
+ * ```html
+ * <lib-swipe-pane-container [initialPane]="0" (activePaneChange)="onPaneChange($event)">
+ *   <ng-template libSwipePane label="Overview">
+ *     <div>Overview content</div>
+ *   </ng-template>
+ *   <ng-template libSwipePane label="Settings">
+ *     <div>Settings content</div>
+ *   </ng-template>
+ * </lib-swipe-pane-container>
+ * ```
+ */
 @Component({
   selector: 'lib-swipe-pane-container',
   standalone: true,
@@ -32,8 +53,16 @@ export class SwipePaneContainerComponent {
   private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly destroyRef = inject(DestroyRef);
 
+  /** Panes projected via `<ng-template libSwipePane>`, in document order. */
   readonly panes = contentChildren(SwipePaneDirective);
+
+  /** Zero-based index of the pane scrolled into view on init (default: `0` — the first pane). */
   readonly initialPane = input<number>(0);
+
+  /**
+   * Emitted with the new zero-based pane index whenever the active pane changes, whether by
+   * scroll/swipe or by `scrollToPane()`/nav-arrow activation.
+   */
   readonly activePaneChange = output<number>();
 
   protected readonly isTouchDevice = toSignal(

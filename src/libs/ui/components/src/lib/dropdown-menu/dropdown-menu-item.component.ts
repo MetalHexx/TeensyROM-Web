@@ -4,14 +4,25 @@ import { MatIconModule } from '@angular/material/icon';
 import { DropdownMenuComponent } from './dropdown-menu.component';
 
 /**
- * Menu item component for use with lib-dropdown-menu.
- * Provides consistent styling and interaction for dropdown menu items.
- * Automatically closes the parent dropdown when clicked unless autoClose is false.
- * 
- * Supports composable actions via named content projection:
+ * A single row inside a `DropdownMenuComponent`'s `[dropdown-content]` slot. Renders as a
+ * full-width button with an optional leading check icon (`selected`), and injects its
+ * parent `DropdownMenuComponent` (if present, via `inject(..., { optional: true })`) so it
+ * can auto-close the dropdown after a click.
+ *
+ * This is easily confused with `MenuItemComponent` (`lib-menu-item`): that component is
+ * for standalone navigation/action lists driven by a `MenuItem` config object (icon,
+ * label, route, or action callback) and has no relationship to `DropdownMenuComponent`.
+ * `DropdownMenuItemComponent`, by contrast, only makes sense projected inside
+ * `lib-dropdown-menu`'s `[dropdown-content]` slot, takes its label via content projection
+ * rather than a config object, and knows how to close its parent dropdown.
+ *
+ * Supports composable actions via named content projection — content passed to the
+ * `[actions]` slot (e.g. edit/delete icon buttons) stops click propagation so it never
+ * triggers `itemClick` or closes the dropdown.
+ *
  * @example
  * ```html
- * <lib-dropdown-menu-item (itemClick)="onSelect()">
+ * <lib-dropdown-menu-item [selected]="true" (itemClick)="onSelect()">
  *   Item Label
  *   <div actions>
  *     <button (click)="onEdit()">Edit</button>
@@ -55,10 +66,28 @@ import { DropdownMenuComponent } from './dropdown-menu.component';
 export class DropdownMenuItemComponent {
   private readonly parentDropdown = inject(DropdownMenuComponent, { optional: true });
 
+  /**
+   * Whether this item represents the current selection (default: `false`). Renders a leading
+   * `check` icon when `true`.
+   */
   selected = input<boolean>(false);
+
+  /**
+   * `data-testid` attribute applied to the item's button, for e2e targeting
+   * (default: `''` — no attribute value set).
+   */
   testId = input<string>('');
-  /** Whether to automatically close the parent dropdown on click. Defaults to true. */
+
+  /**
+   * Whether to automatically close the parent dropdown on click (default: `true`). Set `false`
+   * for items that shouldn't dismiss the menu, e.g. a toggle.
+   */
   autoClose = input<boolean>(true);
+
+  /**
+   * Emitted with the triggering click/keyboard event when the item (not its `[actions]` slot)
+   * is activated.
+   */
   itemClick = output<Event>();
 
   handleClick(event: Event): void {

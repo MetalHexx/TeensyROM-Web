@@ -5,9 +5,32 @@ import { TemplatePortal } from '@angular/cdk/portal';
 import { trigger, transition, style, animate } from '@angular/animations';
 
 /**
- * Pure positioning container for dialogs and overlays using CDK overlay.
- * Handles overlay lifecycle, positioning, and backdrop management through content projection.
- * Projects any content without styling opinions - visual design is the responsibility of projected components.
+ * Pure positioning container for dialogs and overlays, built on CDK `Overlay`. Handles
+ * overlay creation, `flexibleConnectedTo` positioning against a projected trigger,
+ * transparent-backdrop dismissal, and fullscreen-mode re-parenting. Projects any content
+ * through the `[dialog-content]` slot without imposing card, border, or shadow styling —
+ * that is the projected content's responsibility.
+ *
+ * This is the lower-level building block `DropdownMenuComponent` composes internally to
+ * get its positioning; reach for `lib-dropdown-dialog` directly when the projected
+ * content is a form or confirmation prompt (e.g. `PresetNameDialogComponent` or
+ * `ConfirmationDialogComponent`) rather than a list of `DropdownMenuItemComponent` rows,
+ * since those don't need the menu's glassy card wrapper. Opening and closing is always
+ * imperative — there is no input to drive it declaratively — via the `#templateRef` and
+ * its `.open()` / `.close()` methods.
+ *
+ * @example
+ * ```html
+ * <lib-dropdown-dialog #dialog>
+ *   <button (click)="dialog.open()">Save preset</button>
+ *   <div dialog-content>
+ *     <lib-preset-name-dialog
+ *       (confirmed)="onSave($event); dialog.close()"
+ *       (cancelled)="dialog.close()"
+ *     ></lib-preset-name-dialog>
+ *   </div>
+ * </lib-dropdown-dialog>
+ * ```
  */
 @Component({
   selector: 'lib-dropdown-dialog',
@@ -33,9 +56,21 @@ export class DropdownDialogComponent {
   private dialogTemplate = viewChild<TemplateRef<unknown>>('dialogTemplate');
   private trigger = viewChild<ElementRef>('trigger');
 
+  /**
+   * Positioning mode (default: `false`). When `false`, the overlay tries below-start,
+   * below-end, above-start, then above-end relative to the trigger — the usual dropdown
+   * layout. When `true`, it centers on the trigger's horizontal midpoint, preferring
+   * above then below, which suits centered popovers rather than left-aligned menus.
+   */
   centered = input<boolean>(false);
+
+  /** Signal reflecting whether the overlay is currently attached and visible. */
   isOpen = signal<boolean>(false);
+
+  /** Emitted after `open()` successfully attaches the overlay. */
   opened = output<void>();
+
+  /** Emitted after `close()` disposes the overlay. */
   closed = output<void>();
 
   constructor(overlay: Overlay, private viewContainerRef: ViewContainerRef) {

@@ -6,6 +6,20 @@ const meta: Meta<SwipePaneContainerComponent> = {
   title: 'Overlay & Interaction/Swipe Pane Container',
   component: SwipePaneContainerComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          '`lib-swipe-pane-container` is a horizontally-scrolling, snap-to-pane container ' +
+          'for mobile-style tab panels. Panes come from projected `<ng-template libSwipePane>` ' +
+          'content (each marked with `SwipePaneDirective`), not from an input — the container ' +
+          'reads them via `contentChildren(SwipePaneDirective)`, so an empty container has ' +
+          'nothing to swipe between. On touch devices, panes are navigated by scroll/swipe ' +
+          'gesture; on non-touch devices, hovering the swipe area reveals arrow controls and ' +
+          'pagination dots instead, since there is no native swipe gesture available.',
+      },
+    },
+  },
 };
 
 export default meta;

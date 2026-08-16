@@ -5,8 +5,32 @@ import { DropdownDialogComponent } from '../dropdown-dialog/dropdown-dialog.comp
 import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-layout.component';
 
 /**
- * Custom dropdown menu component using CDK Overlay for better control over rendering lifecycle.
- * Avoids the flicker issues present in Material's mat-menu by managing overlay lifecycle explicitly.
+ * Custom dropdown menu using CDK Overlay for better control over the rendering lifecycle
+ * than Angular Material's `mat-menu`, which flickers on open/close in this app's animated
+ * layouts. Internally composes `DropdownDialogComponent` for overlay creation, positioning,
+ * and backdrop management, then wraps the `[dropdown-content]` slot in a glassy
+ * `CompactCardLayoutComponent` card (`cardClass="glassy-card"` — see the `style-guide`
+ * skill for the token) so menu content gets consistent chrome for free.
+ *
+ * Reach for `lib-dropdown-menu` when the projected content is a list of selectable
+ * actions or options — pair it with `DropdownMenuItemComponent` for each row. When the
+ * projected content is a form or a confirmation prompt instead, use
+ * `DropdownDialogComponent` directly: it provides the same CDK positioning without the
+ * menu's card styling opinions.
+ *
+ * @example
+ * ```html
+ * <lib-dropdown-menu #menu>
+ *   <lib-icon-button icon="more_vert" ariaLabel="Open menu" (buttonClick)="menu.toggle()">
+ *   </lib-icon-button>
+ *   <div dropdown-content>
+ *     <lib-dropdown-menu-item [selected]="true" (itemClick)="onOptionOne()">
+ *       Option One
+ *     </lib-dropdown-menu-item>
+ *     <lib-dropdown-menu-item (itemClick)="onOptionTwo()">Option Two</lib-dropdown-menu-item>
+ *   </div>
+ * </lib-dropdown-menu>
+ * ```
  */
 @Component({
   selector: 'lib-dropdown-menu',
@@ -18,8 +42,13 @@ import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-
 export class DropdownMenuComponent {
   private dialogRef = viewChild.required<DropdownDialogComponent>('dialogRef');
 
+  /** Read-only signal reflecting the internal `DropdownDialogComponent`'s open/closed state. */
   isOpen = computed(() => this.dialogRef().isOpen());
+
+  /** Emitted after the menu finishes opening (re-emits the internal dialog's `opened`). */
   opened = output<void>();
+
+  /** Emitted after the menu finishes closing (re-emits the internal dialog's `closed`). */
   closed = output<void>();
 
   constructor() {

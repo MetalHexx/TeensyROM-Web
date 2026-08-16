@@ -7,6 +7,24 @@ const meta: Meta<DropdownMenuComponent> = {
   title: 'Overlay & Interaction/Dropdown Menu',
   component: DropdownMenuComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          '`lib-dropdown-menu` is the CDK-overlay-backed replacement for Angular Material\'s ' +
+          '`mat-menu`, chosen to avoid `mat-menu`\'s open/close flicker in this app\'s animated ' +
+          'layouts. It internally composes `DropdownDialogComponent` — which owns overlay ' +
+          'creation, positioning against the projected trigger, and backdrop dismissal — and ' +
+          'wraps the `[dropdown-content]` slot in a glassy `CompactCardLayoutComponent` card, ' +
+          'giving menu content consistent chrome without any styling input. Reach for this ' +
+          'component when the projected content is a list of selectable rows, and pair each ' +
+          'row with `DropdownMenuItemComponent` for consistent selection/hover states and ' +
+          'automatic dropdown-close-on-click. When the projected content is a form or a ' +
+          'confirmation prompt instead of a list, use `DropdownDialogComponent` directly — it ' +
+          'gives the same positioning without the menu\'s card styling opinions.',
+      },
+    },
+  },
 };
 
 export default meta;

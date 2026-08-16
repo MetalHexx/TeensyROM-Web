@@ -74,8 +74,13 @@ export interface TooltipConfig {
 /**
  * Tooltip Directive
  *
- * Provides tooltip functionality via attribute directive with intelligent device detection:
- * - **Desktop**: Displays tooltip on mouse hover (500ms delay)
+ * Attribute directive that shows a rich tooltip (optional title + body) on hover, built to
+ * replace Angular Material's `matTooltip` — that directive's CDK overlay created z-index
+ * conflicts with this app's animated dialogs and modal containers, so this directive
+ * renders via direct DOM manipulation instead (no overlay), delegated to
+ * `TooltipRendererService`, which positions the tooltip against the host element and flips
+ * it to stay within the viewport.
+ * - **Desktop**: Displays tooltip on mouse hover (default 500ms delay, per `TooltipConfig.delay`)
  * - **Touch/Mobile**: Tooltips are disabled entirely to avoid "stuck" tooltip UX issues
  *
  * @example
