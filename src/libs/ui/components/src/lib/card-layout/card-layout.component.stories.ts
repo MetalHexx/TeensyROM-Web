@@ -5,6 +5,20 @@ const meta: Meta<CardLayoutComponent> = {
   title: 'Layout/Card Layout',
   component: CardLayoutComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Static card layout with header, corner, and body slots, plus glassy backdrop ' +
+          'styling — no animation. Choose `CardLayoutComponent` when a card should render ' +
+          'without an entry/exit transition; choose `ScalingCardComponent` when it should ' +
+          'animate in and out (it composes this component with `ScalingContainerComponent`). ' +
+          'For header-less, compact cards (forms, toolbars) use `CompactCardLayoutComponent` ' +
+          'or its animated counterpart, `ScalingCompactCardComponent`. Glassy styling tokens ' +
+          'are documented in the `style-guide` skill.',
+      },
+    },
+  },
   argTypes: {
     glassyIntensity: {
       control: 'select',

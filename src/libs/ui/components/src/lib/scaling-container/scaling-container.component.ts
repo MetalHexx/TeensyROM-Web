@@ -4,6 +4,31 @@ import { trigger, style, transition, animate, group } from '@angular/animations'
 import type { AnimationDirection, AnimationParentMode } from '../shared/animation.types';
 import { PARENT_ANIMATION_COMPLETE } from '../shared/animation-tokens';
 
+/**
+ * Scale+fade+slide "pop-in" animation wrapper. Transform-based — it never affects
+ * document flow, so it's safe to use for overlays and cards that must not push
+ * surrounding layout. Content is never clipped during animation, including corner-slotted
+ * elements like close buttons.
+ *
+ * Reach for this component when content should visually "pop" without disturbing layout.
+ * Use `SlidingContainerComponent` instead when the animated content should expand/collapse
+ * and push surrounding elements, or `FadingContainerComponent` for a lighter opacity-only
+ * fade — particularly for content using `backdrop-filter` glassy styling, which renders
+ * more smoothly under opacity-only animation than under this component's transforms (see
+ * the `style-guide` skill for the glassy tokens involved).
+ *
+ * Like the other animation containers, this component both consumes a parent's completion
+ * signal (via `animationParent`) and provides its own via the `PARENT_ANIMATION_COMPLETE`
+ * injection token, so components nested inside it can opt in to wait for it in turn. See
+ * the Animation System entry for the full priority and opt-in mechanism.
+ *
+ * @example
+ * ```html
+ * <lib-scaling-container animationEntry="from-left" [animationTrigger]="isVisible()">
+ *   <div class="panel">Scales and fades in from the left.</div>
+ * </lib-scaling-container>
+ * ```
+ */
 @Component({
   selector: 'lib-scaling-container',
   imports: [CommonModule],
@@ -129,8 +154,14 @@ import { PARENT_ANIMATION_COMPLETE } from '../shared/animation-tokens';
 })
 export class ScalingContainerComponent {
   // Animation configuration inputs
+
+  /** Direction the container scales in from (default: `'random'`), which picks one of the eight directional values below on each instance. `'none'` scales in place with no directional offset. */
   animationEntry = input<AnimationDirection>('random');
+
+  /** Direction the container scales out toward when its exit animation plays (default: `'random'`). Same value set as `animationEntry`. */
   animationExit = input<AnimationDirection>('random');
+
+  /** Manual entry/exit control. `true` plays the entry animation, `false` plays the exit animation and keeps the component visible until it completes; `undefined` (default) renders immediately with no explicit trigger. */
   animationTrigger = input<boolean | undefined>(undefined);
 
   /**
@@ -152,6 +183,8 @@ export class ScalingContainerComponent {
   animationParent = input<AnimationParentMode>(undefined);
 
   // Output events
+
+  /** Emitted each time the entry or exit animation finishes. */
   animationComplete = output<void>();
 
   // Internal animation completion signal for child components (public for provider access)

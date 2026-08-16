@@ -4,6 +4,29 @@ import { trigger, style, transition, animate } from '@angular/animations';
 import type { AnimationParentMode } from '../shared/animation.types';
 import { PARENT_ANIMATION_COMPLETE } from '../shared/animation-tokens';
 
+/**
+ * Simple opacity+blur fade animation wrapper — no transforms, no directional movement, no
+ * layout impact. The lightest of the three animation containers.
+ *
+ * Because it uses no CSS transforms, this is the best choice for content styled with
+ * `backdrop-filter` (glassy effects, see the `style-guide` skill): browsers render
+ * `backdrop-filter` smoothly during opacity-only animation, avoiding the "blur pop-in"
+ * artifact transform-based animation can cause. Use `ScalingContainerComponent` instead
+ * when content should visually "pop" with a transform, or `SlidingContainerComponent` when
+ * it should expand/collapse and push surrounding layout.
+ *
+ * Like the other animation containers, this component both consumes a parent's completion
+ * signal (via `animationParent`) and provides its own via the `PARENT_ANIMATION_COMPLETE`
+ * injection token, so components nested inside it can opt in to wait for it in turn. See
+ * the Animation System entry for the full priority and opt-in mechanism.
+ *
+ * @example
+ * ```html
+ * <lib-fading-container [animationTrigger]="isVisible()">
+ *   <div class="glassy-card">Blur renders smoothly — no transforms involved.</div>
+ * </lib-fading-container>
+ * ```
+ */
 @Component({
   selector: 'lib-fading-container',
   imports: [CommonModule],
@@ -83,6 +106,8 @@ import { PARENT_ANIMATION_COMPLETE } from '../shared/animation-tokens';
 })
 export class FadingContainerComponent {
   // Animation configuration inputs
+
+  /** Manual entry/exit control. `true` plays the entry fade, `false` plays the exit fade and keeps the component visible until it completes; `undefined` (default) renders immediately with no explicit trigger. */
   animationTrigger = input<boolean | undefined>(undefined);
 
   /**
@@ -103,6 +128,8 @@ export class FadingContainerComponent {
   animationParent = input<AnimationParentMode>(undefined);
 
   // Output events
+
+  /** Emitted each time the entry or exit fade finishes. */
   animationComplete = output<void>();
 
   // Internal animation completion signal for child components (public for provider access)

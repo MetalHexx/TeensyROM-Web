@@ -5,6 +5,22 @@ const meta: Meta<ScalingCardComponent> = {
   title: 'Layout/Scaling Card',
   component: ScalingCardComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Animated card — the public-facing wrapper for standard content that should ' +
+          'scale, fade, and slide in (and optionally out). Composes `CardLayoutComponent` ' +
+          '(header, corner, and body slots) with `ScalingContainerComponent` in a single ' +
+          'component, and inherits glassy backdrop styling from `CardLayoutComponent`. ' +
+          'Choose this over `CardLayoutComponent` whenever the card should animate; use ' +
+          '`CardLayoutComponent` directly for a card that renders with no transition. For ' +
+          'compact, header-less surfaces (forms, toolbars) use ' +
+          '`ScalingCompactCardComponent` or its static counterpart, ' +
+          '`CompactCardLayoutComponent`.',
+      },
+    },
+  },
   argTypes: {
     animationEntry: {
       control: 'select',

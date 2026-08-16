@@ -5,6 +5,22 @@ const meta: Meta<ScalingContainerComponent> = {
   title: 'Layout/Scaling Container',
   component: ScalingContainerComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Scale+fade+slide "pop-in" animation wrapper. Transform-based — it never affects ' +
+          'document flow, unlike `SlidingContainerComponent`, and content (including ' +
+          'corner-slotted elements) is never clipped during animation. Prefer ' +
+          '`FadingContainerComponent` instead when content uses `backdrop-filter` glassy ' +
+          'styling, which renders more smoothly under opacity-only animation than under ' +
+          'this component\'s transforms. Like the other animation containers, it both ' +
+          'consumes a parent\'s completion signal and provides its own via ' +
+          '`PARENT_ANIMATION_COMPLETE`, so children opted in with `animationParent` wait ' +
+          'for it in turn — see the Animation System entry for the full mechanism.',
+      },
+    },
+  },
   argTypes: {
     animationEntry: {
       control: 'select',

@@ -6,6 +6,30 @@ import { PARENT_ANIMATION_COMPLETE } from '../shared/animation-tokens';
 
 export type ContainerAnimationDirection = AnimationDirection | 'slide-down' | 'slide-up' | 'fade';
 
+/**
+ * Height/width expansion animation wrapper. Unlike the transform-based containers, this
+ * one affects document flow — its content pushes and pulls surrounding elements as it
+ * expands or collapses. Supports smooth entry and exit animations via `animationTrigger`.
+ *
+ * Reach for this component when the animated content should participate in layout (e.g. a
+ * toolbar that pushes the page down as it slides in). Use `ScalingContainerComponent`
+ * instead for a transform-based "pop" effect that never affects layout, or
+ * `FadingContainerComponent` for a lightweight opacity-only fade — particularly when the
+ * content uses `backdrop-filter` glassy styling, which renders more smoothly under
+ * opacity-only animation than under transforms.
+ *
+ * Like the other animation containers, this component both consumes a parent's completion
+ * signal (via `animationParent`) and provides its own via the `PARENT_ANIMATION_COMPLETE`
+ * injection token, so components nested inside it can opt in to wait for it in turn. See
+ * the Animation System entry for the full priority and opt-in mechanism.
+ *
+ * @example
+ * ```html
+ * <lib-sliding-container containerHeight="80px" animationDirection="from-top" [animationTrigger]="isVisible()">
+ *   <div class="toolbar">Slides in and pushes content below it down.</div>
+ * </lib-sliding-container>
+ * ```
+ */
 @Component({
   selector: 'lib-sliding-container',
   imports: [CommonModule],
@@ -119,11 +143,25 @@ export type ContainerAnimationDirection = AnimationDirection | 'slide-down' | 's
 })
 export class SlidingContainerComponent {
   // Animation configuration inputs
-  containerHeight = input<string>('auto'); // Height of the animated container
-  containerWidth = input<string>('auto'); // Width of the animated container
-  animationDuration = input<number>(400); // Duration of container animation
-  animationDirection = input<ContainerAnimationDirection>('from-top'); // Animation direction
-  animationTrigger = input<boolean | undefined>(undefined); // Optional trigger for manual control
+
+  /** Target height the container expands to on entry (default: `'auto'`). Any valid CSS height value (e.g. `'80px'`). */
+  containerHeight = input<string>('auto');
+
+  /** Target width the container expands to on entry (default: `'auto'`). Any valid CSS width value. */
+  containerWidth = input<string>('auto');
+
+  /** Duration of the expand/collapse animation in milliseconds (default: `400`). */
+  animationDuration = input<number>(400);
+
+  /**
+   * Direction the container animates from on entry (default: `'from-top'`).
+   * `'slide-down'` is an alias for `'from-top'` and `'slide-up'` for `'from-bottom'`;
+   * `'fade'` expands with no directional slide, only an opacity transition.
+   */
+  animationDirection = input<ContainerAnimationDirection>('from-top');
+
+  /** Manual entry/exit control. `true` plays the entry animation, `false` plays the exit animation and keeps the component in the DOM until it completes; `undefined` (default) renders immediately with no explicit trigger. */
+  animationTrigger = input<boolean | undefined>(undefined);
 
   /**
    * Controls whether this component waits for parent animations:
@@ -138,7 +176,9 @@ export class SlidingContainerComponent {
   animationParent = input<AnimationParentMode>(undefined);
 
   // Output events
-  animationComplete = output<void>(); // Emitted when container animation finishes
+
+  /** Emitted each time the entry or exit animation finishes. */
+  animationComplete = output<void>();
 
   // Internal animation completion signal for child components (public for provider access)
   animationCompleteSignal = signal(false);
