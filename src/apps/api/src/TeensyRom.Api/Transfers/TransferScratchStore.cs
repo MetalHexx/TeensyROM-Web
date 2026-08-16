@@ -67,6 +67,22 @@ namespace TeensyRom.Api.Transfers
             }
         }
 
+        public long Adjust(string jobId, long reservedBytes, long actualBytes)
+        {
+            var delta = actualBytes - reservedBytes;
+
+            if (delta != 0)
+            {
+                lock (_byteLock)
+                {
+                    _bytesInUse += delta;
+                    _jobReservations.AddOrUpdate(jobId, delta, (_, current) => current + delta);
+                }
+            }
+
+            return actualBytes;
+        }
+
         public string NewScratchFilePath(string jobId)
         {
             var jobDir = Path.Combine(ScratchRoot, jobId);
