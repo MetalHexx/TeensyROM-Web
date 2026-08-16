@@ -16,6 +16,29 @@ import { DirectoryTreeNodeComponent } from './directory-tree-node/directory-tree
 import { DirectoryTreeNode, DirectoryTreeNodeType } from '@teensyrom-nx/domain';
 import { ScalingCardComponent } from '../scaling-card/scaling-card.component';
 
+/**
+ * A hierarchical device/storage/directory tree, built on Angular Material's `mat-tree` and
+ * rendering each row through `DirectoryTreeNodeComponent`. Supports lazy expansion: a node
+ * whose only child is a `Placeholder`-typed node emits `nodeExpansionNeedsData` the moment
+ * it is expanded, so the caller can fetch real children and replace the placeholder.  The
+ * lone device node and its lone storage-type child (when there is exactly one) auto-expand
+ * on init.
+ *
+ * Reach for `lib-directory-tree` for a sidebar-style view of the whole device/storage/
+ * directory hierarchy at once. Use `DirectoryTrailComponent` instead for a single-path
+ * breadcrumb header, or `DirectoryItemComponent` for a flat listing of one directory's
+ * immediate contents.
+ *
+ * @example
+ * ```html
+ * <lib-directory-tree
+ *   [nodes]="deviceTree()"
+ *   [selectedNodeId]="selectedNodeId()"
+ *   (nodeActivated)="onNodeActivated($event)"
+ *   (nodeExpansionNeedsData)="onNeedsData($event)"
+ * ></lib-directory-tree>
+ * ```
+ */
 @Component({
   selector: 'lib-directory-tree',
   imports: [
@@ -33,10 +56,14 @@ import { ScalingCardComponent } from '../scaling-card/scaling-card.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DirectoryTreeComponent implements AfterViewInit {
+  /** The forest of nodes to render, typically a single device node. See the exported `DirectoryTreeNode` type (`@teensyrom-nx/domain`) for its shape and `DirectoryTreeNodeType` for the node kinds it distinguishes. */
   nodes = input.required<DirectoryTreeNode[]>();
+  /** The `id` of the node to render as selected, or `null` for no selection. Defaults to `null`. */
   selectedNodeId = input<string | null>(null);
 
+  /** Emitted when a node is clicked or activated via Enter/Space — the "navigate here" action for both leaf and expandable nodes. */
   nodeActivated = output<DirectoryTreeNode>();
+  /** Emitted when a node with only a placeholder child is expanded, signaling the caller to fetch that node's real children. */
   nodeExpansionNeedsData = output<DirectoryTreeNode>();
 
   private readonly tree = viewChild<MatTree<DirectoryTreeNode>>('tree');

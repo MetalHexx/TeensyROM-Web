@@ -3,18 +3,22 @@ import { MatIconModule } from '@angular/material/icon';
 import { TooltipDirective, TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 
 /**
- * Directive component for projecting action buttons/content into the storage item.
- * Similar to mat-card-actions pattern from Angular Material.
- * Can display optional text label along with action buttons.
- * Optionally displays storage type icon (SD card or USB) after the label.
+ * Projects action buttons and trailing metadata (e.g. file size, item count, storage
+ * type icon) into the right side of a `StorageItemComponent` row, following the Angular
+ * Material `mat-card-actions` content-projection pattern. Always used together with
+ * `StorageItemComponent`, which owns the row's own click/tap/keyboard selection handling —
+ * this component owns only the trailing metadata label and the per-row action menu content
+ * projected into it (e.g. `lib-icon-button`s for play/download/delete).
  *
  * @example
+ * ```html
  * <lib-storage-item icon="music_note" label="Song.sid">
  *   <lib-storage-item-actions label="1.5 KB" storageType="SD">
- *     <button>Play</button>
- *     <button>Download</button>
+ *     <lib-icon-button icon="play_arrow" ariaLabel="Play" (buttonClick)="play()"></lib-icon-button>
+ *     <lib-icon-button icon="download" ariaLabel="Download" (buttonClick)="download()"></lib-icon-button>
  *   </lib-storage-item-actions>
  * </lib-storage-item>
+ * ```
  */
 @Component({
   selector: 'lib-storage-item-actions',
@@ -33,10 +37,14 @@ import { TooltipDirective, TooltipConfig, TooltipPosition } from '../tooltip/too
   styleUrl: './storage-item-actions.component.scss',
 })
 export class StorageItemActionsComponent {
-  /** Optional text label to display before actions (e.g., file size, item count) */
+  /** Optional text label to display before actions (e.g., file size, item count). Unset renders no label. */
   label = input<string>();
 
-  /** Optional storage type (SD or USB) to display icon */
+  /**
+   * Optional storage type; when set, renders a tooltipped icon after the label. `'SD'`
+   * renders the SD-card icon, anything else (typically `'USB'`) renders the USB icon.
+   * Unset renders no icon.
+   */
   storageType = input<string | undefined>();
 
   /** Computed icon name based on storage type */

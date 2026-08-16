@@ -5,6 +5,18 @@ const meta: Meta<EmptyStateMessageComponent> = {
   title: 'Navigation & Data/Empty State Message',
   component: EmptyStateMessageComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'A centered icon/title/message block for "no data" states — empty lists, no ' +
+          'search results, missing connections. Use it for a stable empty state, not for ' +
+          'transient loading (use a spinner) or recoverable errors (use a dialog). `size` ' +
+          'scales icon, title, and padding together for the container it sits in — small ' +
+          'panels, medium content areas, or large full-page states.',
+      },
+    },
+  },
   argTypes: {
     size: {
       control: 'select',

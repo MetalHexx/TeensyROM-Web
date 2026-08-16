@@ -6,6 +6,20 @@ const meta: Meta<DirectoryTreeComponent> = {
   title: 'Navigation & Data/Directory Tree',
   component: DirectoryTreeComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'A sidebar-style hierarchical view of a device, its storage types, and their ' +
+          'directories, composing `DirectoryTreeNodeComponent` for each row on top of ' +
+          'Angular Material’s `mat-tree`. Supports lazy loading: expanding a node whose ' +
+          'only child is a placeholder emits `nodeExpansionNeedsData` so the caller can ' +
+          'fetch real children. Choose `lib-directory-tree` when the whole hierarchy needs ' +
+          'to be visible and navigable at once; choose `DirectoryTrailComponent` for a ' +
+          'single-path breadcrumb header instead.',
+      },
+    },
+  },
 };
 
 export default meta;

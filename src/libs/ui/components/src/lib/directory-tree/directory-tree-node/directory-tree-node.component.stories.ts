@@ -6,10 +6,25 @@ const meta: Meta<DirectoryTreeNodeComponent> = {
   title: 'Navigation & Data/Directory Tree Node',
   component: DirectoryTreeNodeComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'The icon-plus-label content of one `DirectoryTreeComponent` row, with icon ' +
+          'color derived from `nodeType`. Normally rendered by `DirectoryTreeComponent` ' +
+          'inside each tree row template; render it directly only when another surface ' +
+          'needs the same node iconography and selection styling outside of the tree ' +
+          'itself.',
+      },
+    },
+  },
   argTypes: {
     nodeType: {
       control: 'select',
       options: ['device', 'storage', 'directory', 'placeholder'],
+      description:
+        'Node kind, driving icon color: device → primary, storage → highlight, ' +
+        'directory → directory color, placeholder → highlight (falls through the default case).',
     },
   },
 };

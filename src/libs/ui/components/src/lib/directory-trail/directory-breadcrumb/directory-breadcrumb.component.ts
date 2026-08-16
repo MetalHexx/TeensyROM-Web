@@ -20,6 +20,25 @@ interface PathSegment {
   path: string;
 }
 
+/**
+ * A responsive breadcrumb trail for the current directory path. Splits `currentPath` into
+ * clickable chips (root segment labeled with `storageType`, then one chip per path part),
+ * measures available width, and collapses leading segments that no longer fit behind a
+ * dropdown trigger rather than wrapping or truncating.
+ *
+ * `lib-directory-breadcrumb` is normally rendered by `DirectoryTrailComponent` as the
+ * right-hand half of the directory toolbar; render it directly only when a surface needs
+ * just the path trail without the trail's back/forward/up/refresh controls.
+ *
+ * @example
+ * ```html
+ * <lib-directory-breadcrumb
+ *   [currentPath]="currentPath()"
+ *   [storageType]="storageTypeLabel()"
+ *   (navigationRequested)="onNavigate($event)"
+ * ></lib-directory-breadcrumb>
+ * ```
+ */
 @Component({
   selector: 'lib-directory-breadcrumb',
   standalone: true,
@@ -29,10 +48,13 @@ interface PathSegment {
 })
 export class DirectoryBreadcrumbComponent implements AfterViewInit, OnDestroy {
   // Inputs
+  /** The absolute path to render as breadcrumb segments, e.g. `/games/arcade`. `/` or `''` renders only the root segment. */
   currentPath = input.required<string>();
+  /** Label for the root segment representing the storage device, e.g. `'SD Card'`. */
   storageType = input.required<string>();
 
   // Outputs
+  /** Emitted with the absolute path of whichever segment (visible chip or hidden-segment menu item) the user clicked. */
   navigationRequested = output<string>();
 
   // View references

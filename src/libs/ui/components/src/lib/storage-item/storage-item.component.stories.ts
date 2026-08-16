@@ -5,6 +5,22 @@ const meta: Meta<StorageItemComponent> = {
   title: 'Navigation & Data/Storage Item',
   component: StorageItemComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'A reusable list-item row for storage entries — files, folders, devices — with ' +
+          'icon, label, selection state, and full keyboard/touch accessibility. Owns row ' +
+          'selection (click, tap, and keyboard handling live on this component) while ' +
+          '`StorageItemActionsComponent`, projected as content, owns the trailing metadata ' +
+          'label and per-row action buttons; the two are meant to be used together. Uses ' +
+          'the `selectable-item` mixin from the `style-guide` skill for its hover/selected/' +
+          'active/disabled visual states. Prefer `DirectoryItemComponent` or ' +
+          '`StorageDeviceItemComponent` when the row is a folder or a top-level device, ' +
+          'since those wrap this component with the right icon/color already fixed.',
+      },
+    },
+  },
   argTypes: {
     iconColor: {
       control: 'select',

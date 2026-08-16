@@ -7,6 +7,18 @@ const meta: Meta<StorageItemActionsComponent> = {
   title: 'Navigation & Data/Storage Item Actions',
   component: StorageItemActionsComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Projects trailing metadata (an optional label and storage-type icon) and ' +
+          'per-row action buttons into a `StorageItemComponent` row. Always used together ' +
+          'with `StorageItemComponent`: that component owns the row click/tap/keyboard ' +
+          'selection, while `lib-storage-item-actions` owns only the trailing metadata and ' +
+          'the projected action-button menu.',
+      },
+    },
+  },
 };
 
 export default meta;
