@@ -36,6 +36,10 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
   recentCompletions: [],
   bytesPerSecond: 0,
   filesPerSecond: 0,
+  expandingArchive: null,
+  expansionBytesWritten: 0,
+  expansionBytesDeclared: 0,
+  expandedFileCount: 0,
   ...overrides,
 });
 
@@ -481,6 +485,11 @@ describe('TransferStore', () => {
         failed: 1,
         apiPct: 0,
         devicePct: 0,
+        expandedTotal: null,
+        expansionPct: 0,
+        expandingArchive: null,
+        hasArchive: false,
+        expansionComplete: false,
       });
     });
 
@@ -603,6 +612,101 @@ describe('TransferStore', () => {
       const metrics = store.getTransferMetrics(deviceId)();
       expect(metrics.apiPct).toBe(0);
       expect(metrics.devicePct).toBe(0);
+    });
+
+    it('reads devicePct against scanTotal while expandedTotal does not yet exist, then against the composed total once it does', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 100, archivesSent: 20 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesSent: 50,
+          expandedFileCount: null,
+        }),
+      });
+
+      const beforeExpansion = store.getTransferMetrics(deviceId)();
+      expect(beforeExpansion.expandedTotal).toBeNull();
+      expect(beforeExpansion.devicePct).toBe(50);
+
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesSent: 60,
+          expandedFileCount: 30,
+        }),
+      });
+
+      const afterExpansion = store.getTransferMetrics(deviceId)();
+      expect(afterExpansion.expandedTotal).toBe(110);
+      expect(afterExpansion.devicePct).toBe(54); // floor(60 / 110 * 100)
+      expect(afterExpansion.devicePct).toBeGreaterThanOrEqual(beforeExpansion.devicePct);
+    });
+
+    it('reports hasArchive and expansionComplete once every archive in the job has finished', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 100, archivesSent: 20 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ expandedFileCount: 30 }),
+      });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.hasArchive).toBe(true);
+      expect(metrics.expansionComplete).toBe(true);
+    });
+
+    it('clamps expansionPct at 100 for an archive stopped after exceeding its declared bytes', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          expandingArchive: 'games/big.zip',
+          expansionBytesWritten: 150,
+          expansionBytesDeclared: 100,
+          expandedFileCount: null,
+        }),
+      });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.expansionPct).toBe(100);
+      expect(metrics.expandingArchive).toBe('games/big.zip');
+    });
+
+    it('pins expansionPct to 100 once expandedFileCount is set, the state-driven pin', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          expansionBytesWritten: 10,
+          expansionBytesDeclared: 1000,
+          expandedFileCount: 5,
+        }),
+      });
+
+      expect(store.getTransferMetrics(deviceId)().expansionPct).toBe(100);
+    });
+
+    it('produces metrics identical to the archive-free arithmetic when no archive was sent', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 100 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesReceived: 40,
+          filesSent: 20,
+        }),
+      });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.expandedTotal).toBe(100);
+      expect(metrics.apiPct).toBe(40);
+      expect(metrics.devicePct).toBe(20);
+      expect(metrics.hasArchive).toBe(false);
+      expect(metrics.expansionComplete).toBe(false);
+      expect(metrics.expansionPct).toBe(100); // the state-driven pin is trivially satisfied with no archives
+      expect(metrics.expandingArchive).toBeNull();
     });
   });
 
