@@ -95,8 +95,12 @@ describe('TransferContextService', () => {
   let callOrder: string[];
   let callTimes: Record<string, number>;
 
-  const oneFileScan: DropScanResult = { entries: [createEntry('games/a.prg')], rootName: 'games' };
-  const emptyScan: DropScanResult = { entries: [], rootName: null };
+  const oneFileScan: DropScanResult = {
+    entries: [createEntry('games/a.prg')],
+    rootName: 'games',
+    archiveCount: 0,
+  };
+  const emptyScan: DropScanResult = { entries: [], rootName: null, archiveCount: 0 };
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -170,7 +174,10 @@ describe('TransferContextService', () => {
   });
 
   /** Starts a transfer and advances the fake clock past its state-display floors so it settles. */
-  async function runStartTransfer(deviceId: string, input: DataTransferItemList | FileList): Promise<void> {
+  async function runStartTransfer(
+    deviceId: string,
+    input: DataTransferItemList | FileList
+  ): Promise<void> {
     const promise = service.startTransfer(deviceId, input);
     await advancePastStateFloors();
     await promise;
@@ -190,7 +197,12 @@ describe('TransferContextService', () => {
       await runStartTransfer('device-1', asFileList([]));
 
       expect(mockStorageStore.getSelectedDirectoryForDevice).toHaveBeenCalledWith('device-1');
-      expect(mockTransferService.createJob).toHaveBeenCalledWith('device-1', StorageType.Sd, '/games');
+      expect(mockTransferService.createJob).toHaveBeenCalledWith(
+        'device-1',
+        StorageType.Sd,
+        '/games',
+        0
+      );
       expect(mockHubListener.start).toHaveBeenCalledWith('device-1', 'job-1');
       expect(mockUploadPool.run).toHaveBeenCalledWith(
         'job-1',
@@ -200,7 +212,14 @@ describe('TransferContextService', () => {
       );
       expect(mockTransferService.sealJob).toHaveBeenCalledWith('job-1');
 
-      expect(callOrder).toEqual(['capture-destination', 'scan', 'create-job', 'hub-start', 'upload', 'seal-job']);
+      expect(callOrder).toEqual([
+        'capture-destination',
+        'scan',
+        'create-job',
+        'hub-start',
+        'upload',
+        'seal-job',
+      ]);
     });
 
     it('subscribes the hub before the first upload, and seals only after the pool resolves', async () => {
@@ -277,7 +296,12 @@ describe('TransferContextService', () => {
 
       expect(mockDropScanner.scan).toHaveBeenCalledTimes(1);
       expect(mockTransferService.createJob).toHaveBeenCalledTimes(2);
-      expect(mockTransferService.createJob).toHaveBeenLastCalledWith('device-1', StorageType.Sd, '/games');
+      expect(mockTransferService.createJob).toHaveBeenLastCalledWith(
+        'device-1',
+        StorageType.Sd,
+        '/games',
+        0
+      );
       expect(mockHubListener.start).toHaveBeenCalledWith('device-1', 'job-1');
     });
   });
@@ -300,10 +324,12 @@ describe('TransferContextService', () => {
     it('aborts the scan and issues no server call', async () => {
       const scanGate = deferred<DropScanResult>();
       let scanSignal: AbortSignal | undefined;
-      mockDropScanner.scan.mockImplementation((_input: unknown, _onProgress: unknown, signal: AbortSignal) => {
-        scanSignal = signal;
-        return scanGate.promise;
-      });
+      mockDropScanner.scan.mockImplementation(
+        (_input: unknown, _onProgress: unknown, signal: AbortSignal) => {
+          scanSignal = signal;
+          return scanGate.promise;
+        }
+      );
 
       const startPromise = service.startTransfer('device-1', asFileList([]));
       await flushMicrotasks();

@@ -21,6 +21,7 @@ interface PendingTransfer {
   storageType: StorageType;
   destinationDirectory: string;
   manifest: TransferManifestEntry[];
+  archiveCount: number;
   scanAbort: AbortController;
   uploadAbort: AbortController;
   jobId: string | null;
@@ -33,7 +34,9 @@ const MIN_STATE_DISPLAY_MS = 1000;
 /** Resolves once `minMs` has elapsed since `startedAt`; resolves immediately if it already has. */
 function holdUntil(startedAt: number, minMs: number): Promise<void> {
   const remaining = minMs - (Date.now() - startedAt);
-  return remaining > 0 ? new Promise((resolve) => setTimeout(resolve, remaining)) : Promise.resolve();
+  return remaining > 0
+    ? new Promise((resolve) => setTimeout(resolve, remaining))
+    : Promise.resolve();
 }
 
 /**
@@ -66,6 +69,7 @@ export class TransferContextService implements ITransferContext {
       storageType: destination.storageType,
       destinationDirectory: destination.path,
       manifest: [],
+      archiveCount: 0,
       scanAbort: new AbortController(),
       uploadAbort: new AbortController(),
       jobId: null,
@@ -100,7 +104,11 @@ export class TransferContextService implements ITransferContext {
       return;
     }
 
-    this.store.completeScan({ deviceId, scanTotal: scanResult.entries.length });
+    this.store.completeScan({
+      deviceId,
+      scanTotal: scanResult.entries.length,
+      archivesSent: scanResult.archiveCount,
+    });
 
     if (scanResult.entries.length === 0) {
       logInfo(LogType.Finish, `TransferContextService: Nothing to transfer for device ${deviceId}`);
@@ -108,6 +116,7 @@ export class TransferContextService implements ITransferContext {
     }
 
     pending.manifest = scanResult.entries;
+    pending.archiveCount = scanResult.archiveCount;
 
     await this.createAndRun(deviceId, pending);
   }
@@ -161,7 +170,8 @@ export class TransferContextService implements ITransferContext {
       snapshot = await this.transferService.createJob(
         deviceId,
         pending.storageType,
-        pending.destinationDirectory
+        pending.destinationDirectory,
+        pending.archiveCount
       );
     } catch (error) {
       if (pending.cancelled) {
@@ -234,7 +244,10 @@ export class TransferContextService implements ITransferContext {
     // Without the seal the server can't distinguish "still scanning" from "done".
     await this.transferService.sealJob(snapshot.jobId);
 
-    logInfo(LogType.Finish, `TransferContextService: Sealed job ${snapshot.jobId} for device ${deviceId}`);
+    logInfo(
+      LogType.Finish,
+      `TransferContextService: Sealed job ${snapshot.jobId} for device ${deviceId}`
+    );
   }
 
   private captureDestination(deviceId: string): { storageType: StorageType; path: string } | null {
@@ -247,7 +260,9 @@ export class TransferContextService implements ITransferContext {
   }
 }
 
-function isDataTransferItemList(input: DataTransferItemList | FileList): input is DataTransferItemList {
+function isDataTransferItemList(
+  input: DataTransferItemList | FileList
+): input is DataTransferItemList {
   const first = (input as ArrayLike<{ webkitGetAsEntry?: unknown }>)[0];
   return typeof first?.webkitGetAsEntry === 'function';
 }

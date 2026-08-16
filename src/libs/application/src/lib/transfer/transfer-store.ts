@@ -49,7 +49,11 @@ export interface DeviceTransferState {
   phase: TransferPhase;
   job: TransferJobSnapshot | null;
   scanFound: number; // ticks upward during the walk
-  scanTotal: number; // the manifest size — the denominator for both bars
+  // The manifest size — the denominator for both bars. An archive counts as one entry here (it's
+  // one upload); the transferable total once its contents are expanded is a different number the
+  // server has to help compute.
+  scanTotal: number;
+  archivesSent: number; // number of archive entries sent, of scanTotal
   uploadFailedCount: number; // files that exhausted their upload attempts locally
   feed: TransferFeedEntry[]; // capped, newest first
   failures: TransferFeedEntry[]; // capped, for the end-of-job summary

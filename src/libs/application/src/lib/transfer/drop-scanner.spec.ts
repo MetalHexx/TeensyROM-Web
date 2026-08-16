@@ -20,7 +20,11 @@ function fileEntry(name: string, file: File = createFile(name)): FileSystemFileE
 }
 
 /** A directory entry whose reader only ever hands back `pageSize` children per `readEntries` call. */
-function directoryEntry(name: string, children: FileSystemEntry[], pageSize = 100): FileSystemDirectoryEntry {
+function directoryEntry(
+  name: string,
+  children: FileSystemEntry[],
+  pageSize = 100
+): FileSystemDirectoryEntry {
   return {
     name,
     isFile: false,
@@ -105,7 +109,11 @@ describe('DropScanner', () => {
 
       const progressTicks: number[] = [];
       const scanner = new DropScanner();
-      const result = await scanner.scan(asItemList([dropItem(tree)]), (found) => progressTicks.push(found), signal());
+      const result = await scanner.scan(
+        asItemList([dropItem(tree)]),
+        (found) => progressTicks.push(found),
+        signal()
+      );
 
       expect(result.entries).toHaveLength(60);
       expect(progressTicks.length).toBeGreaterThan(1);
@@ -128,6 +136,67 @@ describe('DropScanner', () => {
       const result = await scanner.scan(asItemList([dropItem(tree)]), noopProgress, signal());
 
       expect(result.entries).toEqual([]);
+    });
+  });
+
+  describe('archive handling', () => {
+    it('admits .7z and .rar alongside the existing extensions and counts them', async () => {
+      const tree = directoryEntry('Pack', [
+        fileEntry('song.sid'),
+        fileEntry('bundle.7z'),
+        fileEntry('extra.rar'),
+        fileEntry('readme.txt'),
+      ]);
+
+      const scanner = new DropScanner();
+      const result = await scanner.scan(asItemList([dropItem(tree)]), noopProgress, signal());
+
+      expect(result.entries.map((e) => e.relativePath).sort()).toEqual(
+        ['Pack/song.sid', 'Pack/bundle.7z', 'Pack/extra.rar', 'Pack/readme.txt'].sort()
+      );
+      expect(result.archiveCount).toBe(2);
+    });
+
+    it('sorts every archive ahead of every ordinary file, preserving relative order within each group', async () => {
+      const tree = directoryEntry('Mixed', [
+        fileEntry('a.sid'),
+        fileEntry('one.zip'),
+        fileEntry('b.crt'),
+        fileEntry('two.7z'),
+        fileEntry('c.prg'),
+        fileEntry('three.rar'),
+      ]);
+
+      const scanner = new DropScanner();
+      const result = await scanner.scan(asItemList([dropItem(tree)]), noopProgress, signal());
+
+      expect(result.entries.map((e) => e.relativePath)).toEqual([
+        'Mixed/one.zip',
+        'Mixed/two.7z',
+        'Mixed/three.rar',
+        'Mixed/a.sid',
+        'Mixed/b.crt',
+        'Mixed/c.prg',
+      ]);
+      expect(result.archiveCount).toBe(3);
+    });
+
+    it("leaves an archive-free drop with a zero count and today's natural order", async () => {
+      const tree = directoryEntry('Clean', [
+        fileEntry('a.sid'),
+        fileEntry('b.crt'),
+        fileEntry('c.prg'),
+      ]);
+
+      const scanner = new DropScanner();
+      const result = await scanner.scan(asItemList([dropItem(tree)]), noopProgress, signal());
+
+      expect(result.entries.map((e) => e.relativePath)).toEqual([
+        'Clean/a.sid',
+        'Clean/b.crt',
+        'Clean/c.prg',
+      ]);
+      expect(result.archiveCount).toBe(0);
     });
   });
 
