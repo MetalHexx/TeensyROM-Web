@@ -507,6 +507,9 @@ describe('TransferStore', () => {
         expandingArchive: null,
         hasArchive: false,
         expansionComplete: false,
+        uploadedBytes: 0,
+        uploadTotalBytes: 0,
+        uploadBytesPerSecond: 0,
       });
     });
 
@@ -541,7 +544,7 @@ describe('TransferStore', () => {
 
     it('derives apiPct from the ratio while still Receiving', () => {
       store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
-      store.completeScan({ deviceId, scanTotal: 100 });
+      store.completeScan({ deviceId, scanTotal: 100, scanTotalBytes: 100 });
       store.applyJobSnapshot({
         deviceId,
         snapshot: createSnapshot({
@@ -550,6 +553,7 @@ describe('TransferStore', () => {
           filesSent: 20,
         }),
       });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 40, uploadBytesPerSecond: 0 });
 
       const metrics = store.getTransferMetrics(deviceId)();
       expect(metrics.apiPct).toBe(40);
@@ -706,7 +710,7 @@ describe('TransferStore', () => {
 
     it('produces metrics identical to the archive-free arithmetic when no archive was sent', () => {
       store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
-      store.completeScan({ deviceId, scanTotal: 100 });
+      store.completeScan({ deviceId, scanTotal: 100, scanTotalBytes: 100 });
       store.applyJobSnapshot({
         deviceId,
         snapshot: createSnapshot({
@@ -715,6 +719,7 @@ describe('TransferStore', () => {
           filesSent: 20,
         }),
       });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 40, uploadBytesPerSecond: 0 });
 
       const metrics = store.getTransferMetrics(deviceId)();
       expect(metrics.expandedTotal).toBe(100);
@@ -724,6 +729,84 @@ describe('TransferStore', () => {
       expect(metrics.expansionComplete).toBe(false);
       expect(metrics.expansionPct).toBe(100); // the state-driven pin is trivially satisfied with no archives
       expect(metrics.expandingArchive).toBeNull();
+    });
+
+    it('derives apiPct from uploaded bytes over scanTotalBytes while receiving', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 10, scanTotalBytes: 1000 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Receiving }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 400, uploadBytesPerSecond: 123 });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.apiPct).toBe(40);
+      expect(metrics.uploadedBytes).toBe(400);
+      expect(metrics.uploadTotalBytes).toBe(1000);
+      expect(metrics.uploadBytesPerSecond).toBe(123);
+    });
+
+    it('pins apiPct to 100 once Sealed, even when uploadedBytes trails scanTotalBytes', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 10, scanTotalBytes: 1000 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Sealed }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 400, uploadBytesPerSecond: 50 });
+
+      expect(store.getTransferMetrics(deviceId)().apiPct).toBe(100);
+    });
+
+    it('yields 0 apiPct for a zero scanTotalBytes denominator rather than a division artifact', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Receiving }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 400, uploadBytesPerSecond: 50 });
+
+      expect(store.getTransferMetrics(deviceId)().apiPct).toBe(0);
+    });
+
+    it('reports the live upload rate while running, then the lifetime average once the job is terminal', () => {
+      const start = new Date('2026-01-01T00:00:00Z');
+      vi.spyOn(Date, 'now').mockReturnValue(start.getTime());
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ startedUtc: start, state: TransferJobState.Receiving }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 500, uploadBytesPerSecond: 111 });
+
+      expect(store.getTransferMetrics(deviceId)().uploadBytesPerSecond).toBe(111);
+
+      vi.spyOn(Date, 'now').mockReturnValue(start.getTime() + 10_000);
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ startedUtc: start, state: TransferJobState.Completed }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 5000, uploadBytesPerSecond: 999 });
+
+      // The terminal average ignores the live figure just reported and instead derives from
+      // uploadedBytes over the elapsed seconds since startedAt: 5000 bytes / 10s.
+      expect(store.getTransferMetrics(deviceId)().uploadBytesPerSecond).toBe(500);
+    });
+
+    it('moves the upload byte figures while the device figures stay at zero and untouched', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 10, scanTotalBytes: 1000 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Receiving, filesSent: 0 }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 900, uploadBytesPerSecond: 500 });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.uploadedBytes).toBe(900);
+      expect(metrics.apiPct).toBe(90);
+      expect(metrics.written).toBe(0);
+      expect(metrics.devicePct).toBe(0);
+      expect(store.transfers()[deviceId].feed).toEqual([]);
     });
   });
 

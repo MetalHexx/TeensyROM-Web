@@ -57,7 +57,13 @@ export class TransferService implements ITransferService {
     }
   }
 
-  uploadFile(jobId: string, file: File, relativePath: string, signal: AbortSignal): Promise<void> {
+  uploadFile(
+    jobId: string,
+    file: File,
+    relativePath: string,
+    signal: AbortSignal,
+    onProgress?: (bytesUploaded: number) => void
+  ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       if (signal.aborted) {
         reject(new DOMException('The upload was aborted.', 'AbortError'));
@@ -72,6 +78,7 @@ export class TransferService implements ITransferService {
       xhr.setRequestHeader('Content-Type', 'application/octet-stream');
       // Deliberately no xhr.timeout - the endpoint blocks awaiting queue capacity, and a
       // slow response is the server's backpressure working correctly, not a hang.
+      xhr.upload.onprogress = (e) => onProgress?.(e.loaded);
 
       const onAbort = () => xhr.abort();
 

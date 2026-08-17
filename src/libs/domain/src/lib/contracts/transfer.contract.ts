@@ -20,8 +20,18 @@ export interface ITransferService {
     expectedArchiveCount: number
   ): Promise<TransferJobSnapshot>;
 
-  /** Uploads a single file's raw bytes into an open transfer job. */
-  uploadFile(jobId: string, file: File, relativePath: string, signal: AbortSignal): Promise<void>;
+  /**
+   * Uploads a single file's raw bytes into an open transfer job. `onProgress`, when given, is
+   * called with the absolute bytes sent for THIS file so far — never a delta — so a retry
+   * restarting the same file at zero simply replaces its prior contribution.
+   */
+  uploadFile(
+    jobId: string,
+    file: File,
+    relativePath: string,
+    signal: AbortSignal,
+    onProgress?: (bytesUploaded: number) => void
+  ): Promise<void>;
 
   /** Marks a transfer job as sealed - no further files will be accepted. */
   sealJob(jobId: string): Promise<void>;
