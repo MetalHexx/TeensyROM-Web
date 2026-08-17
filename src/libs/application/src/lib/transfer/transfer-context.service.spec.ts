@@ -149,7 +149,7 @@ describe('TransferContextService', () => {
       sealJob: vi.fn(async () => {
         record('seal-job');
       }),
-      cancelJob: vi.fn(async () => undefined),
+      cancelJob: vi.fn(async () => createSnapshot({ state: TransferJobState.Cancelled })),
       getActiveJob: vi.fn(async () => null),
     };
 
@@ -371,6 +371,66 @@ describe('TransferContextService', () => {
       await startPromise;
 
       expect(mockTransferService.sealJob).not.toHaveBeenCalled();
+    });
+
+    it('reply-only: folds the cancel reply into the cancelled state with no hub snapshot arriving', async () => {
+      const uploadGate = deferred<void>();
+      mockUploadPool.run.mockImplementation(() => uploadGate.promise);
+
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await advancePastStateFloors();
+
+      await service.cancelTransfer('device-1');
+
+      expect(store.getTransferModalState('device-1')()).toBe('cancelled');
+
+      uploadGate.resolve();
+      await startPromise;
+    });
+
+    it('hub-only: a hub-pushed terminal snapshot lands cancelled even before the cancel reply resolves late', async () => {
+      const uploadGate = deferred<void>();
+      mockUploadPool.run.mockImplementation(() => uploadGate.promise);
+      const cancelReply = deferred<TransferJobSnapshot>();
+      mockTransferService.cancelJob.mockImplementation(() => cancelReply.promise);
+
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await advancePastStateFloors();
+
+      const cancelPromise = service.cancelTransfer('device-1');
+      await flushMicrotasks();
+
+      // The hub push arrives first, ahead of the (still pending) cancel reply.
+      store.applyJobSnapshot({
+        deviceId: 'device-1',
+        snapshot: createSnapshot({ state: TransferJobState.Cancelled }),
+      });
+      expect(store.getTransferModalState('device-1')()).toBe('cancelled');
+
+      cancelReply.resolve(createSnapshot({ state: TransferJobState.Cancelled }));
+      await cancelPromise;
+
+      expect(store.getTransferModalState('device-1')()).toBe('cancelled');
+
+      uploadGate.resolve();
+      await startPromise;
+    });
+
+    it('surfaces a rejected cancel call as a transfer failure', async () => {
+      const uploadGate = deferred<void>();
+      mockUploadPool.run.mockImplementation(() => uploadGate.promise);
+      mockTransferService.cancelJob.mockRejectedValueOnce(new Error('cancel endpoint unreachable'));
+
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await advancePastStateFloors();
+
+      await service.cancelTransfer('device-1');
+
+      expect(store.transfers()['device-1'].phase).toBe('failed');
+      expect(store.getTransferSummary('device-1')().reason).toBe('cancel endpoint unreachable');
+
+      uploadGate.resolve();
+      await startPromise;
     });
   });
 

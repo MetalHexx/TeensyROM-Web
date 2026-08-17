@@ -420,15 +420,6 @@ describe('TransferStore', () => {
         'draining',
       ],
       [
-        'running/Cancelling -> cancelling',
-        (id) =>
-          store.applyJobSnapshot({
-            deviceId: id,
-            snapshot: createSnapshot({ state: TransferJobState.Cancelling }),
-          }),
-        'cancelling',
-      ],
-      [
         'running/Completed -> completed',
         (id) =>
           store.applyJobSnapshot({

@@ -118,9 +118,10 @@ export class TransferService implements ITransferService {
     logInfo(LogType.Success, 'TransferService: Job sealed', { jobId });
   }
 
-  async cancelJob(jobId: string): Promise<void> {
-    await this.transfersApi.cancelTransferJob({ jobId });
+  async cancelJob(jobId: string): Promise<TransferJobSnapshot> {
+    const response = await this.transfersApi.cancelTransferJob({ jobId });
     logInfo(LogType.Info, 'TransferService: Job cancellation requested', { jobId });
+    return TransferDtoMapper.toSnapshot(response.job);
   }
 
   async getActiveJob(deviceId: string): Promise<TransferJobSnapshot | null> {

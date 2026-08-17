@@ -158,6 +158,15 @@ describe('TransferDtoMapper', () => {
     }
   });
 
+  it('throws on a job state the domain does not recognize', () => {
+    const dto: TransferJobDto = {
+      ...baseFields,
+      state: 'Cancelling' as ApiTransferJobState,
+    };
+
+    expect(() => TransferDtoMapper.toSnapshot(dto)).toThrow('Unknown API transfer job state');
+  });
+
   it('defaults expandingArchive and expandedFileCount to null when absent', () => {
     const dto: TransferJobDto = {
       ...baseFields,

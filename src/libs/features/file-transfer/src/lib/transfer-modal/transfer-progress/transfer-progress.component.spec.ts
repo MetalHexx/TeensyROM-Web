@@ -82,7 +82,6 @@ describe('TransferProgressComponent', () => {
       ['failed', "Transfer couldn't start"],
       ['receiving', 'Transferring to Unnamed'],
       ['draining', 'Transferring to Unnamed'],
-      ['cancelling', 'Cancelling'],
       ['completed', 'Transfer Completed'],
       ['cancelled', 'Transfer cancelled'],
       ['aborted', 'Transfer Stopped: Device Lost'],
@@ -434,61 +433,6 @@ describe('TransferProgressComponent', () => {
       );
 
       expect(q('transfer-progress-live-region')?.textContent).not.toContain('Expanding archives');
-    });
-  });
-
-  describe('cancelling', () => {
-    it('mutes the tiles, drops the feed, and disables the cancel control', async () => {
-      await setup(baseVm({ state: 'cancelling' }));
-
-      expect(q('transfer-progress-metrics')?.classList.contains('metrics-muted')).toBe(true);
-      expect(q('transfer-progress-feed')).toBeFalsy();
-
-      const cancelButton = buttonByLabel('Cancel transfer');
-      expect(cancelButton?.disabled).toBe(true);
-
-      const spy = vi.fn();
-      component.cancelRequested.subscribe(spy);
-      cancelButton?.click();
-      expect(spy).not.toHaveBeenCalled();
-    });
-
-    it('orders the tiles Uploaded, Completed, Failed, Rate, in step with the active shape', async () => {
-      await setup(baseVm({ state: 'cancelling' }));
-
-      const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Rate']);
-    });
-
-    it('renders uploaded-of-total and completed-of-total as one unbroken run, matching the active shape', async () => {
-      await setup(
-        baseVm({ state: 'cancelling', uploaded: 40000, scanTotal: 60000, written: 6977, expandedTotal: 59500 })
-      );
-
-      const uploaded = q('metric-uploaded')?.querySelector('.metric-value');
-      expect(uploaded?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40,000/ 60,000');
-      const written = q('metric-written')?.querySelector('.metric-value');
-      expect(written?.textContent?.replace(/\s+/g, ' ').trim()).toBe('6,977/ 59,500');
-    });
-
-    it('renders no current-file element in the cancelling state', async () => {
-      await setup(baseVm({ state: 'cancelling' }));
-
-      expect(q('transfer-progress-current-file')).toBeFalsy();
-    });
-
-    it('carries the composed denominator on the Completed tile when expandedTotal exists', async () => {
-      await setup(baseVm({ state: 'cancelling', written: 842, expandedTotal: 1204 }));
-
-      const value = q('metric-written')?.querySelector('.metric-value');
-      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('842/ 1,204');
-    });
-
-    it('carries no denominator on the Completed tile when expandedTotal is null', async () => {
-      await setup(baseVm({ state: 'cancelling', written: 842, expandedTotal: null }));
-
-      const value = q('metric-written')?.querySelector('.metric-value');
-      expect(value?.textContent?.trim()).toBe('842');
     });
   });
 

@@ -19,7 +19,7 @@
   <section class="fixture-section">
     <h2 class="section-heading">Transfer modal — active journey</h2>
 
-    @for (item of scanThroughCancelling; track item.label) {
+    @for (item of scanThroughDraining; track item.label) {
       <div class="fixture-block">
         <p class="fixture-label">{{ item.label }}</p>
         <lib-transfer-progress class="glassy-card" [vm]="item.vm" />

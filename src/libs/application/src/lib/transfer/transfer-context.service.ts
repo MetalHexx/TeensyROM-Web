@@ -147,7 +147,16 @@ export class TransferContextService implements ITransferContext {
 
     pending.cancelled = true;
     pending.uploadAbort.abort();
-    await this.transferService.cancelJob(pending.jobId);
+    try {
+      const snapshot = await this.transferService.cancelJob(pending.jobId);
+      this.store.applyJobSnapshot({ deviceId, snapshot });
+    } catch (error) {
+      logError(`TransferContextService: Failed to cancel job ${pending.jobId} for device ${deviceId}`, error);
+      this.store.setTransferError({
+        deviceId,
+        error: error instanceof Error ? error.message : 'Failed to cancel transfer.',
+      });
+    }
   }
 
   async closeTransfer(deviceId: string): Promise<void> {

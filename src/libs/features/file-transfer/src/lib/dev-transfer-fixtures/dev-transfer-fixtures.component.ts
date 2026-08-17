@@ -65,7 +65,7 @@ export const CONFIRM_CANCEL_FIXTURE = {
   showLabels: true,
 };
 
-const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
+const SCAN_THROUGH_DRAINING: ProgressFixture[] = [
   {
     label: 'scanning',
     vm: baseVm({
@@ -251,20 +251,6 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
       elapsedLabel: '21:03 elapsed',
     }),
   },
-  {
-    label: 'cancelling',
-    vm: baseVm({
-      state: 'cancelling',
-      uploaded: 8412,
-      written: 5544,
-      failed: 4,
-      // Uploads have stopped by the time cancelling kicks in — makes the zero-rate case
-      // visible without a device.
-      filesPerSecond: 0,
-      bytesPerSecond: 0,
-      elapsedLabel: '16:40 elapsed',
-    }),
-  },
 ];
 
 const TERMINAL_STATES: ProgressFixture[] = [
@@ -356,7 +342,7 @@ export class DevTransferFixturesComponent {
   // without this, ThemeService never constructs and the app's dark-mode class never applies.
   private readonly themeService = inject(ThemeService);
 
-  readonly scanThroughCancelling = SCAN_THROUGH_CANCELLING;
+  readonly scanThroughDraining = SCAN_THROUGH_DRAINING;
   readonly terminalStates = TERMINAL_STATES;
   readonly confirmCancelFixture = CONFIRM_CANCEL_FIXTURE;
 }
