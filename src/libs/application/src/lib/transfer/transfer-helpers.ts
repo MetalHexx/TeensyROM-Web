@@ -256,8 +256,6 @@ export function deriveTransferModalState(
       return 'receiving';
     case TransferJobState.Sealed:
       return 'draining';
-    case TransferJobState.Cancelling:
-      return 'cancelling';
     case TransferJobState.Completed:
       return 'completed';
     case TransferJobState.Cancelled:

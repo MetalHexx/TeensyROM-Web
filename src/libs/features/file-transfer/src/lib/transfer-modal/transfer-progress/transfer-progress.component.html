@@ -134,31 +134,6 @@
         </div>
       }
 
-      @case ('cancelling') {
-        <dl class="metrics metrics-muted" data-testid="transfer-progress-metrics">
-          <div class="metric" data-testid="metric-uploaded">
-            <dt class="metric-label">Uploaded</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }}</dd>
-          </div>
-          <div class="metric" data-testid="metric-written">
-            <dt class="metric-label">Completed</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}@if (vm().expandedTotal !== null) {<span class="metric-of">/ {{ vm().expandedTotal | number }}</span>}</dd>
-            <dd class="visually-hidden">{{ vm().written | number }}@if (vm().expandedTotal !== null) { of {{ vm().expandedTotal | number }}}</dd>
-          </div>
-          <div class="metric metric-failed" data-testid="metric-failed">
-            <dt class="metric-label">Failed</dt>
-            <dd class="metric-value">{{ vm().failed | number }}</dd>
-          </div>
-          <div class="metric" data-testid="metric-rate">
-            <dt class="metric-label">{{ rateLabel() }}</dt>
-            <dd class="metric-value" aria-hidden="true">{{ filesPerSecondLabel() }}</dd>
-            <dd class="metric-sub" aria-hidden="true">{{ bytesPerSecondLabel() }}</dd>
-            <dd class="visually-hidden">{{ filesPerSecondSpokenLabel() }}, {{ bytesPerSecondSpokenLabel() }}</dd>
-          </div>
-        </dl>
-      }
-
       @case ('terminal') {
         @if (terminalBannerTreatment()) {
           <div
@@ -282,16 +257,6 @@
       }
       @case ('active') {
         <lib-action-button icon="close" label="Cancel transfer" color="error" [fullWidth]="false" (buttonClick)="onCancel()"></lib-action-button>
-      }
-      @case ('cancelling') {
-        <lib-action-button
-          icon="close"
-          label="Cancel transfer"
-          color="error"
-          [disabled]="true"
-          [fullWidth]="false"
-          (buttonClick)="onCancel()"
-        ></lib-action-button>
       }
       @case ('terminal') {
         <lib-action-button icon="close" label="Close" color="normal" [fullWidth]="false" (buttonClick)="onClose()"></lib-action-button>

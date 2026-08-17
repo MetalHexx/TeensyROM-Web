@@ -188,12 +188,13 @@ describe('TransferService', () => {
       expect(mockApi.sealTransferJob).toHaveBeenCalledWith({ jobId: 'job-1' });
     });
 
-    it('cancels a job through TransfersApiService', async () => {
+    it('cancels a job through TransfersApiService and returns the post-cancel snapshot', async () => {
       mockApi.cancelTransferJob.mockResolvedValue({ job: jobDto });
 
-      await service.cancelJob('job-1');
+      const snapshot = await service.cancelJob('job-1');
 
       expect(mockApi.cancelTransferJob).toHaveBeenCalledWith({ jobId: 'job-1' });
+      expect(snapshot.jobId).toBe('job-1');
     });
   });
 

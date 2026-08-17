@@ -54,7 +54,6 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
 const JOB_BACKED_JOB_STATES: Record<string, TransferJobState> = {
   receiving: TransferJobState.Receiving,
   draining: TransferJobState.Sealed,
-  cancelling: TransferJobState.Cancelling,
   completed: TransferJobState.Completed,
   cancelled: TransferJobState.Cancelled,
   aborted: TransferJobState.Aborted,
@@ -69,7 +68,6 @@ const ALL_MODAL_STATES: TransferModalState[] = [
   'failed',
   'receiving',
   'draining',
-  'cancelling',
   'completed',
   'cancelled',
   'aborted',

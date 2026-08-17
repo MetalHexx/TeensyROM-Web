@@ -32,7 +32,7 @@ export interface TransferProgressVm {
 }
 
 /** Which family of frame a state renders — several states share the same layout shape. */
-type RenderShape = 'scan' | 'busy-refusal' | 'nothing-to-transfer' | 'active' | 'cancelling' | 'terminal';
+type RenderShape = 'scan' | 'busy-refusal' | 'nothing-to-transfer' | 'active' | 'terminal';
 
 type BottomBarMode = 'determinate' | 'indeterminate' | null;
 
@@ -44,7 +44,6 @@ const STATE_SHAPES: Record<TransferModalState, RenderShape> = {
   'nothing-to-transfer': 'nothing-to-transfer',
   receiving: 'active',
   draining: 'active',
-  cancelling: 'cancelling',
   completed: 'terminal',
   cancelled: 'terminal',
   aborted: 'terminal',
@@ -61,7 +60,6 @@ const SHAPE_WIDTH_PX: Record<RenderShape, number> = {
   'busy-refusal': 480,
   'nothing-to-transfer': 480,
   active: 760,
-  cancelling: 760,
   terminal: 900,
 };
 
@@ -74,7 +72,6 @@ const STATE_TITLES: Record<TransferModalState, (vm: TransferProgressVm) => strin
   receiving: (vm) => `Transferring to ${vm.deviceName}`,
   // Same wording as `receiving` — the title must not change when the job seals.
   draining: (vm) => `Transferring to ${vm.deviceName}`,
-  cancelling: () => 'Cancelling',
   completed: () => 'Transfer Completed',
   cancelled: () => 'Transfer cancelled',
   aborted: () => 'Transfer Stopped: Device Lost',
@@ -91,7 +88,6 @@ const STATE_BOTTOM_BAR: Record<TransferModalState, BottomBarMode> = {
   // bar underneath the actions would be redundant.
   receiving: null,
   draining: null,
-  cancelling: 'indeterminate',
   completed: null,
   cancelled: null,
   aborted: null,
@@ -126,7 +122,6 @@ const STATE_ANNOUNCEMENTS: Record<TransferModalState, (vm: TransferProgressVm) =
     return `${expanding}${vm.devicePercent}% written to device. ${vm.uploaded} of ${vm.scanTotal} uploaded, ${vm.failed} failed.`;
   },
   draining: (vm) => `${vm.devicePercent}% written to device. Upload complete, ${vm.failed} failed.`,
-  cancelling: () => 'Cancelling. Finishing current file.',
   completed: (vm) =>
     `Transfer complete. ${vm.written} written, ${vm.failed} failed, averaging ${vm.filesPerSecond.toFixed(1)} files per second.`,
   cancelled: (vm) => `Transfer cancelled. ${vm.written} written, ${vm.failed} failed.`,
@@ -200,7 +195,6 @@ export class TransferProgressComponent {
 
   readonly uploadedTileSuccess = computed(() => this.vm().state === 'draining');
   readonly apiBarSuccess = computed(() => this.vm().state === 'draining');
-  readonly metricsMuted = computed(() => this.vm().state === 'cancelling');
 
   readonly expansionComplete = computed(() => this.vm().expansionComplete);
   readonly expansionSlotText = computed(() =>

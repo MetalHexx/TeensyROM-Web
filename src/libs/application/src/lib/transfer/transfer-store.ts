@@ -30,7 +30,6 @@ export type TransferModalState =
   | 'failed'
   | 'receiving'
   | 'draining'
-  | 'cancelling'
   | 'completed'
   | 'cancelled'
   | 'aborted'

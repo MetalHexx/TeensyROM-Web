@@ -26,8 +26,8 @@ export interface ITransferService {
   /** Marks a transfer job as sealed - no further files will be accepted. */
   sealJob(jobId: string): Promise<void>;
 
-  /** Requests cancellation of a transfer job. */
-  cancelJob(jobId: string): Promise<void>;
+  /** Requests cancellation of a transfer job; resolves with the job's post-cancel snapshot. */
+  cancelJob(jobId: string): Promise<TransferJobSnapshot>;
 
   /** Gets the device's currently active transfer job, or null when the device is idle. */
   getActiveJob(deviceId: string): Promise<TransferJobSnapshot | null>;
