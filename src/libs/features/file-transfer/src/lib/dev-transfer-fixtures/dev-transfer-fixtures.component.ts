@@ -375,6 +375,38 @@ const TERMINAL_STATES: ProgressFixture[] = [
   },
 ];
 
+// Rendered inside `.phone-frame` (see the stylesheet), a fixed-width box below the `below-phone`
+// breakpoint — the reflow itself is still driven by the real browser viewport (`@media`, not a
+// container query), so this box only pins the two content-heaviest states together for a quick
+// look; confirming the reflow fires still requires the browser viewport itself to narrow.
+const PHONE_WIDTH_FIXTURES: ProgressFixture[] = [
+  {
+    label: 'active — with an expanding archive (phone width)',
+    vm: baseVm({
+      hasArchive: true,
+      expansionPercent: 78,
+      expandingArchive: 'HVSC-79/DEMOS/oldschool-pack.rar',
+      elapsedLabel: '6:04 elapsed',
+    }),
+  },
+  {
+    label: 'terminal — with failures and an overflow line (phone width)',
+    vm: baseVm({
+      state: 'completed',
+      reason: null,
+      uploaded: 12480,
+      written: 12476,
+      failed: 4,
+      apiPercent: 100,
+      devicePercent: 100,
+      filesPerSecond: 8.6,
+      elapsedLabel: '24:18 elapsed',
+      failures: [feedEntry(2, false), feedEntry(4, false), feedEntry(6, false)],
+      failureOverflow: 3,
+    }),
+  },
+];
+
 /**
  * Throwaway dev-only page — reachable only by typing `/dev/transfer-states` in the browser.
  * Renders every ephemeral file-transfer UI state as a static fixture card so UI refinement work
@@ -394,5 +426,6 @@ export class DevTransferFixturesComponent {
 
   readonly scanThroughDraining = SCAN_THROUGH_DRAINING;
   readonly terminalStates = TERMINAL_STATES;
+  readonly phoneWidthFixtures = PHONE_WIDTH_FIXTURES;
   readonly confirmCancelFixture = CONFIRM_CANCEL_FIXTURE;
 }

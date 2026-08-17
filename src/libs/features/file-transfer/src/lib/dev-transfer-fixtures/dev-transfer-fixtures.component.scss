@@ -69,3 +69,16 @@
 .confirm-fixture-block {
   align-items: flex-start;
 }
+
+// A rough phone silhouette for eyeballing the content-heaviest states side by side. The reflow
+// itself is driven by the real browser viewport via `@media`, not this box's width — narrow the
+// browser to see it fire.
+.phone-frame {
+  width: 375px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: var(--spacing-sm);
+  border: 1px dashed rgba(var(--glassy-color), 0.3);
+  border-radius: var(--border-radius-md);
+  overflow-x: auto;
+}

@@ -1,5 +1,15 @@
+@use '../../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: block;
+
+  @include styles.below-phone {
+    // Below phone the shell already renders the dialog frame edge-to-edge (see .glassy-dialog's
+    // below-phone rule in styles.scss) — matching frameWidth()'s own viewport-inset math here
+    // would double up with that full-bleed layout. Only !important beats the inline
+    // `[style.width]` binding frameWidth() drives above phone.
+    width: 100% !important;
+  }
 }
 
 .transfer-progress {
@@ -335,4 +345,53 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ── Below phone: single-column tiles, stacked captions/actions, tighter frame ──── */
+
+@include styles.below-phone {
+  .progress-title {
+    padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-xs);
+  }
+
+  .progress-body {
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .write-bar-caption {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+
+  .write-bar-pct {
+    margin-left: 0;
+
+    // Still clips rather than pushes: stacked under its label, the archive name gets the full
+    // caption width instead of the 58% split it shares with a percentage on one line.
+    &.expansion-slot {
+      max-width: 100%;
+      text-align: left;
+    }
+  }
+
+  .failure-row-reason {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .progress-actions {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+
+    lib-action-button {
+      width: 100%;
+    }
+  }
 }

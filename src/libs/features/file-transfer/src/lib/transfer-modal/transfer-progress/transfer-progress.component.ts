@@ -55,7 +55,9 @@ const STATE_SHAPES: Record<TransferModalState, RenderShape> = {
 /**
  * Target dialog width per render shape — the mockup's content-heavy vs. small-state widths, plus
  * the terminal state's wider allowance for full failure paths. Every value clamps to the viewport
- * in `frameWidth` below, so a narrow window never pushes the dialog off-screen.
+ * in `frameWidth` below, so a narrow window never pushes the dialog off-screen. Below phone width
+ * the stylesheet's `:host` rule overrides `frameWidth`'s output with `width: 100% !important` —
+ * the shell owns the inset there instead (see transfer-progress.component.scss).
  */
 const SHAPE_WIDTH_PX: Record<RenderShape, number> = {
   scan: 480,
