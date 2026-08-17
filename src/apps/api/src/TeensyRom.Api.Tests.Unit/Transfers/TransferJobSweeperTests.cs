@@ -9,8 +9,8 @@ using TeensyRom.Core.ValueObjects;
 namespace TeensyRom.Api.Tests.Unit.Transfers;
 
 /// <summary>
-/// Covers the abandonment predicate (state x pendingCount x idleFor x hasSubscribers) and the
-/// Sealed/Cancelling finalize backstop - the logic most likely to be got subtly wrong. Idle time is
+/// Covers the abandonment predicate (state x pendingCount x idleFor x hasSubscribers) and the Sealed
+/// finalize backstop - the logic most likely to be got subtly wrong. Idle time is
 /// simulated with a short real sleep against a small threshold rather than reaching into the job's
 /// private clock state. <see cref="_scratch"/> is a real <see cref="TransferScratchStore"/> rather than a
 /// substitute so the release tests can assert the budget itself coming back, not just that a purge call
@@ -196,18 +196,6 @@ public class TransferJobSweeperTests : IDisposable
         NewSweeper().Sweep();
 
         job.State.Should().Be(TransferJobState.Sealed);
-    }
-
-    [Fact]
-    public void Sweep_CancellingJobWithEmptyQueue_FinalizesToCancelled()
-    {
-        var job = new TransferJob("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
-        job.TryTransitionTo(TransferJobState.Cancelling);
-        _registry.All().Returns([job]);
-
-        NewSweeper().Sweep();
-
-        job.State.Should().Be(TransferJobState.Cancelled);
     }
 
     [Fact]

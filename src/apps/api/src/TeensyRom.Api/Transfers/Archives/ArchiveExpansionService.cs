@@ -50,24 +50,35 @@ namespace TeensyRom.Api.Transfers.Archives
         /// <summary>
         /// Resolves <paramref name="request"/>'s job, walks its archive tree, and - once no more of the
         /// job's archives are outstanding - releases held uploads and admits everything the walk produced.
+        /// A cancelled job takes neither path: the walk stops where it stands and everything it holds is
+        /// reclaimed.
         /// </summary>
         public async Task ExpandAsync(ArchiveExpansionRequest request, CancellationToken ct)
         {
             var job = registry.Get(request.JobId);
 
-            if (job is null)
+            if (job is null || job.Cancellation.IsCancellationRequested)
             {
                 // Cancelled, abandoned, or swept while this request sat in the channel. Nothing else will
                 // ever consume this archive, so its whole scratch presence for this job - this file and
                 // anything else still queued for the same dead job - is reclaimed in one call rather than
                 // guessed at piecemeal.
-                scratch.PurgeJob(request.JobId);
+                Reclaim(request.JobId);
                 return;
             }
 
+            // Linked so a single large entry's copy stops mid-stream on cancellation rather than at the
+            // next entry boundary, while still honouring the pump's own shutdown token.
+            using var walkCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, job.Cancellation);
+
             try
             {
-                await WalkAsync(job, request, ct);
+                await WalkAsync(job, request, walkCancellation.Token);
+            }
+            catch (OperationCanceledException) when (job.Cancellation.IsCancellationRequested)
+            {
+                // The job was cancelled mid-walk. Its scratch tree is already gone and nothing it
+                // produced will ever be admitted, so there is nothing to record against the job.
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -91,6 +102,16 @@ namespace TeensyRom.Api.Transfers.Archives
                 // Safe here because WalkAsync's own finally already deleted this archive's raw scratch file
                 // (the first WorkItem it ever processes) before returning or throwing.
                 scratch.Release(job.JobId, request.RawReservedBytes);
+            }
+
+            if (job.Cancellation.IsCancellationRequested)
+            {
+                // The whole tail belongs to a job that is still going: releasing held uploads, admitting
+                // what the walk produced, and handing back the finished archives' own slots all describe
+                // work a cancelled job will never do. Anything the walk wrote before it noticed goes
+                // back with the reclaim below.
+                Reclaim(job.JobId);
+                return;
             }
 
             if (job.HasExpansionOutstanding)
@@ -127,9 +148,22 @@ namespace TeensyRom.Api.Transfers.Archives
             // nesting so it never refuses a real archive, which means depth must never cost a stack frame.
             while (work.Count > 0)
             {
+                if (job.Cancellation.IsCancellationRequested) return;
+
                 var item = work.Pop();
                 cumulativeBytes = await ProcessArchiveAsync(job, item, work, pathSet, cumulativeBytes, ct);
             }
+        }
+
+        /// <summary>
+        /// Hands back everything this job still holds in scratch - the tree on disk, its outstanding
+        /// reservation, and whatever the walk produced but will now never admit. Idempotent, and safe
+        /// against a purge the cancel path already ran.
+        /// </summary>
+        private void Reclaim(string jobId)
+        {
+            _producedByJob.TryRemove(jobId, out _);
+            scratch.PurgeJob(jobId);
         }
 
         private async Task<long> ProcessArchiveAsync(
@@ -200,6 +234,10 @@ namespace TeensyRom.Api.Transfers.Archives
             {
                 await reader.ExtractAsync(item.ScratchArchivePath, async (entry, stream, entryCt) =>
                 {
+                    // The job can be cancelled - and its scratch tree reclaimed - at any point between
+                    // two entries; writing this one anyway would put bytes back into a purged tree.
+                    entryCt.ThrowIfCancellationRequested();
+
                     if (entry.IsSymlink)
                     {
                         // Resolve-then-check is impossible for a link that has not been written, and a

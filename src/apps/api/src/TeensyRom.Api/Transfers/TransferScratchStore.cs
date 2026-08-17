@@ -62,8 +62,16 @@ namespace TeensyRom.Api.Transfers
         {
             lock (_byteLock)
             {
-                _bytesInUse -= bytes;
-                _jobReservations.AddOrUpdate(jobId, 0, (_, current) => current - bytes);
+                // Clamped to what the job still holds, so a release racing its own job's PurgeJob - an
+                // expansion that has not yet noticed its job was cancelled - cannot subtract bytes the
+                // purge already handed back.
+                var outstanding = _jobReservations.GetValueOrDefault(jobId);
+                var releasable = Math.Clamp(bytes, 0, outstanding);
+
+                if (releasable == 0) return;
+
+                _bytesInUse -= releasable;
+                _jobReservations[jobId] = outstanding - releasable;
             }
         }
 

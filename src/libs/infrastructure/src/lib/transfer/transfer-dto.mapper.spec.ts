@@ -147,7 +147,6 @@ describe('TransferDtoMapper', () => {
       [ApiTransferJobState.Receiving, TransferJobState.Receiving],
       [ApiTransferJobState.Sealed, TransferJobState.Sealed],
       [ApiTransferJobState.Completed, TransferJobState.Completed],
-      [ApiTransferJobState.Cancelling, TransferJobState.Cancelling],
       [ApiTransferJobState.Cancelled, TransferJobState.Cancelled],
       [ApiTransferJobState.Abandoned, TransferJobState.Abandoned],
       [ApiTransferJobState.Aborted, TransferJobState.Aborted],

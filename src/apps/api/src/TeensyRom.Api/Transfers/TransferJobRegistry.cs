@@ -22,6 +22,16 @@ namespace TeensyRom.Api.Transfers
 
         public IReadOnlyCollection<TransferJob> All() => _jobs.Values.ToArray();
 
-        public void Remove(string jobId) => _jobs.TryRemove(jobId, out _);
+        /// <summary>
+        /// Evicts the job and disposes it. Only ever called for a job that is already terminal, so its
+        /// cancellation source has already been signalled and nothing is left to observe it.
+        /// </summary>
+        public void Remove(string jobId)
+        {
+            if (_jobs.TryRemove(jobId, out var job))
+            {
+                job.Dispose();
+            }
+        }
     }
 }

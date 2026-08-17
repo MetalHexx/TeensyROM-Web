@@ -8,7 +8,7 @@ namespace TeensyRom.Api.Transfers
     /// Mutable, internally locked state for a single file transfer. One instance per job; the pump,
     /// the upload endpoint, the abandonment sweep, and the hub notifier all touch it concurrently.
     /// </summary>
-    public sealed class TransferJob
+    public sealed class TransferJob : IDisposable
     {
         /// <summary>
         /// Floor for the rate divisor so a burst of files completing within a few milliseconds of job
@@ -17,6 +17,7 @@ namespace TeensyRom.Api.Transfers
         private static readonly TimeSpan MinRateDivisor = TimeSpan.FromMilliseconds(100);
 
         private readonly object _lock = new();
+        private readonly CancellationTokenSource _cancellation = new();
         private readonly List<TransferFileCompleted> _failures = [];
         private readonly Queue<TransferFileCompleted> _recentCompletions = new();
         private readonly Queue<(DateTime CompletedUtc, long SizeBytes)> _rateSamples = new();
@@ -45,7 +46,22 @@ namespace TeensyRom.Api.Transfers
         public DirectoryPath Destination { get; }
         public TransferJobState State { get; private set; }
         public DateTime LastActivityUtc { get; private set; }
+
+        /// <summary>
+        /// Work this job still owns: files staged and not yet written to the device, plus the slot each
+        /// accepted archive holds until its expansion has admitted everything it produced. Purely
+        /// informational once the job is terminal - nothing waits for it to reach zero, and the pump
+        /// dropping a file whose job was cancelled mid-batch can legitimately drive it below zero.
+        /// </summary>
         public int PendingCount { get; private set; }
+
+        /// <summary>
+        /// Signalled the moment this job is cancelled, so work already running on its behalf - an
+        /// archive expansion mid-walk above all - stops instead of writing into a tree cancellation has
+        /// already reclaimed. Cancellation only: the other terminal states either follow the work
+        /// finishing or leave it to unwind on its own.
+        /// </summary>
+        public CancellationToken Cancellation { get; }
 
         /// <summary>
         /// <paramref name="clock"/> is a test seam only - production callers omit it and get the wall
@@ -69,6 +85,10 @@ namespace TeensyRom.Api.Transfers
             State = TransferJobState.Created;
             _startedUtc = _clock();
             LastActivityUtc = _startedUtc;
+
+            // Captured once here rather than read from the source on demand: the registry disposes the
+            // source when it evicts the job, and a disposed source refuses to hand out its token.
+            Cancellation = _cancellation.Token;
         }
 
         /// <summary>
@@ -87,24 +107,33 @@ namespace TeensyRom.Api.Transfers
                 if (!IsLegalTransition(State, next)) return false;
 
                 State = next;
-                return true;
             }
+
+            if (next is TransferJobState.Cancelled)
+            {
+                // Deliberately outside _lock: Cancel runs its registrations synchronously on this
+                // thread, and anything they touch that takes _lock in turn would deadlock against this
+                // very call. Only the caller that won the transition above ever reaches here, so the
+                // source is signalled exactly once and never after the registry has disposed it.
+                _cancellation.Cancel();
+            }
+
+            return true;
         }
 
         private static bool IsLegalTransition(TransferJobState from, TransferJobState to) => (from, to) switch
         {
             (TransferJobState.Created, TransferJobState.Receiving) => true,
-            (TransferJobState.Created, TransferJobState.Cancelling) => true,
+            (TransferJobState.Created, TransferJobState.Cancelled) => true,
             (TransferJobState.Created, TransferJobState.Abandoned) => true,
             (TransferJobState.Created, TransferJobState.Aborted) => true,
             (TransferJobState.Receiving, TransferJobState.Sealed) => true,
-            (TransferJobState.Receiving, TransferJobState.Cancelling) => true,
+            (TransferJobState.Receiving, TransferJobState.Cancelled) => true,
             (TransferJobState.Receiving, TransferJobState.Abandoned) => true,
             (TransferJobState.Receiving, TransferJobState.Aborted) => true,
             (TransferJobState.Sealed, TransferJobState.Completed) => true,
-            (TransferJobState.Sealed, TransferJobState.Cancelling) => true,
+            (TransferJobState.Sealed, TransferJobState.Cancelled) => true,
             (TransferJobState.Sealed, TransferJobState.Aborted) => true,
-            (TransferJobState.Cancelling, TransferJobState.Cancelled) => true,
             _ => false
         };
 
@@ -162,8 +191,10 @@ namespace TeensyRom.Api.Transfers
         }
 
         /// <summary>
-        /// The pump's cancellation path: an item discarded at dequeue leaves the queue without counting
-        /// as sent or failed, and must not make a draining, cancelled job look alive to the sweeper.
+        /// The pump's discard path: an item dropped at dequeue leaves the queue without counting as sent
+        /// or failed. A job cancelled while files were still queued for it drops those files after it is
+        /// already terminal, so this can take <see cref="PendingCount"/> below zero - harmless, since
+        /// nothing gates on the count once the job has stopped.
         /// </summary>
         public void OnFileDropped()
         {
@@ -441,5 +472,11 @@ namespace TeensyRom.Api.Transfers
                 };
             }
         }
+
+        /// <summary>
+        /// Releases the job's cancellation source. Called by <see cref="ITransferJobRegistry.Remove"/>
+        /// when a terminal job is evicted - the job is unreachable from that point on.
+        /// </summary>
+        public void Dispose() => _cancellation.Dispose();
     }
 }

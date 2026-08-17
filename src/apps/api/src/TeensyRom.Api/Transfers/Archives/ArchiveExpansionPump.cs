@@ -25,6 +25,11 @@ namespace TeensyRom.Api.Transfers.Archives
                     {
                         await service.ExpandAsync(request, stoppingToken);
                     }
+                    catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+                    {
+                        // A job cancelled mid-walk unwinds its own expansion through this token - routine
+                        // now, and no reason to stop serving every other job's archives.
+                    }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         log.InternalError($"ArchiveExpansionPump: unhandled error expanding archive for job '{request.JobId}': {ex.Message}");

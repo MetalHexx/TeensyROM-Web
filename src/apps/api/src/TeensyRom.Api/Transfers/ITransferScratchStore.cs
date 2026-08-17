@@ -18,7 +18,9 @@ namespace TeensyRom.Api.Transfers
         /// it never waits.
         bool TryReserve(string jobId, long bytes);
 
-        /// Returns bytes to the ceiling without deleting anything on disk.
+        /// Returns bytes to the ceiling without deleting anything on disk. Never takes a job below the
+        /// reservation it still holds, so a release that arrives after <see cref="PurgeJob"/> has already
+        /// returned that job's bytes moves nothing rather than double-releasing them.
         void Release(string jobId, long bytes);
 
         /// Reconciles a prior <see cref="TryReserve"/> to the real byte count once it is known, mirroring

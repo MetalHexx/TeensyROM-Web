@@ -89,21 +89,18 @@ A `TransferJob` is a mutable, thread-safe aggregate managing one logical transfe
 %%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
 stateDiagram-v2
     Created --> Receiving: UploadFileEndpoint<br/>admits first file
-    Created --> Cancelling: Client cancels<br/>before upload
+    Created --> Cancelled: Client cancels<br/>before upload
     Created --> Abandoned: Idle sweep,<br/>no subscribers
     Created --> Aborted: Device vanished<br/>mid-pump
     
     Receiving --> Sealed: SealJobEndpoint<br/>stops accepting files
-    Receiving --> Cancelling: Client cancels<br/>during upload
+    Receiving --> Cancelled: Client cancels<br/>during upload
     Receiving --> Abandoned: Idle sweep,<br/>no activity
     Receiving --> Aborted: Device vanished<br/>mid-pump
     
     Sealed --> Completed: All pending<br/>files sent
-    Sealed --> Cancelling: Client cancels<br/>sealed job
+    Sealed --> Cancelled: Client cancels<br/>sealed job
     Sealed --> Aborted: Device vanished<br/>mid-pump
-    
-    Cancelling --> Cancelled: All pending<br/>files discarded
-    Cancelling --> Aborted: Device vanished<br/>mid-pump
     
     Completed --> [*]
     Cancelled --> [*]
@@ -195,7 +192,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | POST | `/api/transfers/{jobId}/seal` | SealTransferJob | Stop accepting uploads; let pump drain |
 | GET | `/api/transfers/{jobId}` | GetTransferJob | Query job snapshot |
 | GET | `/api/devices/{deviceId}/transfers/active` | GetActiveTransferJob | Get the job currently holding device lease |
-| POST | `/api/transfers/{jobId}/cancel` | CancelTransferJob | Transition to Cancelling; pump discards remaining files |
+| POST | `/api/transfers/{jobId}/cancel` | CancelTransferJob | Transition straight to Cancelled, releasing device/staging/scratch; pump discards remaining files |
 
 ### SignalR Hub: TransferHub
 

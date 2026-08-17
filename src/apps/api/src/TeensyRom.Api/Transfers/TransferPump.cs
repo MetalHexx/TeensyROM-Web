@@ -14,7 +14,7 @@ namespace TeensyRom.Api.Transfers
     /// <summary>
     /// Drains every device's staged-file queue as fast as the device allows, one worker per device so a
     /// slow device never stalls another. Also the only place a job's per-file counters, storage cache,
-    /// and terminal-state transition are applied - see <see cref="TryFinalize"/>.
+    /// and terminal-state transition are applied - see <see cref="TryFinalize"/> and <see cref="Cancel"/>.
     /// </summary>
     public sealed class TransferPump(
         ITransferQueue queue,
@@ -149,7 +149,7 @@ namespace TeensyRom.Api.Transfers
             {
                 var job = registry.Get(staged.JobId);
 
-                if (job is null || job.State is TransferJobState.Cancelling || TransferJob.IsTerminal(job.State))
+                if (job is null || TransferJob.IsTerminal(job.State))
                 {
                     staging.DeleteStagedFile(staged.StagingPath);
                     gate.ReleaseSlot(staged.ReservedBytes);
@@ -196,6 +196,15 @@ namespace TeensyRom.Api.Transfers
                 foreach (var job in touchedJobs)
                 {
                     TryFinalize(job);
+
+                    if (TransferJob.IsTerminal(job.State))
+                    {
+                        // A job that went terminal while this batch held one of its files open for the
+                        // device write leaves that file - and therefore its directory - behind the purge
+                        // its own exit already attempted. Every handle is closed by now, so this is the
+                        // point the tree is reliably gone.
+                        staging.PurgeJob(job.JobId);
+                    }
                 }
             }
         }
@@ -284,7 +293,7 @@ namespace TeensyRom.Api.Transfers
             StreamedFileTransfer transfer)
         {
             var job = pending[stagedByTransfer[transfer]].Job;
-            return job.State is TransferJobState.Cancelling || TransferJob.IsTerminal(job.State);
+            return TransferJob.IsTerminal(job.State);
         }
 
         /// <summary>
@@ -394,7 +403,7 @@ namespace TeensyRom.Api.Transfers
 
         /// <summary>
         /// A device that vanished mid-write or mid-resolution. Terminal immediately - no pending-count
-        /// gating, unlike the Sealed/Cancelling transitions <see cref="TryFinalize"/> owns.
+        /// gating, unlike the Sealed transition <see cref="TryFinalize"/> owns.
         /// </summary>
         private void AbortJob(TransferJob job, string reason)
         {
@@ -408,22 +417,21 @@ namespace TeensyRom.Api.Transfers
         }
 
         /// <summary>
-        /// The single place a job reaches a terminal state from the pump or the sweeper: Sealed
-        /// transitions to Completed and Cancelling transitions to Cancelled, both only once
-        /// <see cref="TransferJob.PendingCount"/> reaches zero. Idempotent and safe to call
-        /// concurrently - <see cref="TransferJob.TryTransitionTo"/> guards the actual transition, and the
-        /// release/purge/persist/notify side effects only run for the caller that wins it.
+        /// Completion's single seam, shared by the pump and the sweeper: a Sealed job whose
+        /// <see cref="TransferJob.PendingCount"/> has reached zero has delivered everything it took in,
+        /// so it becomes Completed. Idempotent and safe to call concurrently -
+        /// <see cref="TransferJob.TryTransitionTo"/> guards the actual transition, and the
+        /// release/purge/persist/notify side effects only run for the caller that wins it. Cancellation
+        /// does not come through here at all; see <see cref="Cancel"/>.
         /// </summary>
         public void TryFinalize(TransferJob job)
         {
-            TransferJobState? nextState = job.State switch
+            if (job.State is not TransferJobState.Sealed || job.PendingCount != 0)
             {
-                TransferJobState.Sealed when job.PendingCount == 0 => TransferJobState.Completed,
-                TransferJobState.Cancelling when job.PendingCount == 0 => TransferJobState.Cancelled,
-                _ => null
-            };
+                return;
+            }
 
-            if (nextState is null || !job.TryTransitionTo(nextState.Value))
+            if (!job.TryTransitionTo(TransferJobState.Completed))
             {
                 return;
             }
@@ -431,17 +439,38 @@ namespace TeensyRom.Api.Transfers
             leaseCoordinator.Release(job.DeviceId, job.JobId);
             staging.PurgeJob(job.JobId);
             scratch.PurgeJob(job.JobId);
+            deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
+            notifier.JobChanged(job);
+        }
 
-            if (nextState == TransferJobState.Cancelled)
+        /// <summary>
+        /// Cancellation's single seam: one terminal transition that also hands back everything the job
+        /// holds, with no wait on <see cref="TransferJob.PendingCount"/> anywhere on the path - an
+        /// archive mid-expansion could hold that count above zero indefinitely, and the device must be
+        /// free the moment this returns. Files already queued for the device still arrive at the pump
+        /// afterwards; it drops them and returns their capacity-gate slots.
+        /// Returns true only for the caller that performed the transition - an already-terminal job
+        /// changes nothing and returns false.
+        /// </summary>
+        public bool Cancel(TransferJob job)
+        {
+            if (!job.TryTransitionTo(TransferJobState.Cancelled))
             {
-                // A held file still occupies its capacity-gate reservation until admission enqueues or
-                // discards it - draining it here, not just relying on expansion to release it later,
-                // keeps a cancelled job's reservation from outliving the job itself.
-                admission.DiscardHeld(job.JobId);
+                return false;
             }
+
+            leaseCoordinator.Release(job.DeviceId, job.JobId);
+            staging.PurgeJob(job.JobId);
+            scratch.PurgeJob(job.JobId);
+
+            // A held file still occupies its capacity-gate reservation until admission enqueues or
+            // discards it - draining it here, not just relying on expansion to release it later, keeps a
+            // cancelled job's reservation from outliving the job itself.
+            admission.DiscardHeld(job.JobId);
 
             deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
             notifier.JobChanged(job);
+            return true;
         }
 
         /// <summary>

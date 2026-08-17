@@ -7,9 +7,9 @@ namespace TeensyRom.Api.Transfers
 {
     /// <summary>
     /// Runs every <see cref="TransferOptions.SweepInterval"/> and closes the gaps the pump cannot: a
-    /// job whose client vanished before sealing (Abandoned), a job sealed or cancelled with an already-
-    /// empty queue that no worker will ever wake for (the <see cref="TransferPump.TryFinalize"/>
-    /// backstop), and terminal jobs old enough to evict.
+    /// job whose client vanished before sealing (Abandoned), a job sealed with an already-empty queue
+    /// that no worker will ever wake for (the <see cref="TransferPump.TryFinalize"/> backstop), and
+    /// terminal jobs old enough to evict.
     /// </summary>
     public sealed class TransferJobSweeper(
         ITransferJobRegistry registry,
@@ -79,7 +79,7 @@ namespace TeensyRom.Api.Transfers
                     }
                     break;
 
-                case TransferJobState.Sealed or TransferJobState.Cancelling:
+                case TransferJobState.Sealed:
                     pump.TryFinalize(job);
                     break;
 
