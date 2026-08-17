@@ -76,7 +76,6 @@ public class TransferProgressNotifierTests
     public async Task JobChanged_TerminalState_FlushesImmediatelyWithoutWaitingForTick()
     {
         var job = NewJob();
-        job.TryTransitionTo(TransferJobState.Cancelling);
         job.TryTransitionTo(TransferJobState.Cancelled);
 
         // A throttle long enough that the assertion below could only pass via the immediate flush path.

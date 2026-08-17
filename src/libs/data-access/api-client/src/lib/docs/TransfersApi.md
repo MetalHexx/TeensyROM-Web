@@ -19,7 +19,7 @@ All URIs are relative to *http://localhost*
 
 Cancel Transfer Job
 
-Requests cancellation of a transfer job.  - Returns immediately - it does not wait for the drain. The pump finishes any in-flight write and drains the rest of the queue in the background. - Idempotent: cancelling an already-cancelling or already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.
+Cancels a transfer job.  - Returns the job already cancelled: its device, staged files, and expansion workspace are all released before this responds, so the device can immediately take a new job. Files already handed to the device are discarded rather than sent. - Idempotent: cancelling an already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.
 
 ### Example
 

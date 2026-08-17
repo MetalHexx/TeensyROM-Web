@@ -81,8 +81,6 @@ export class TransferDtoMapper {
         return TransferJobState.Sealed;
       case ApiTransferJobState.Completed:
         return TransferJobState.Completed;
-      case ApiTransferJobState.Cancelling:
-        return TransferJobState.Cancelling;
       case ApiTransferJobState.Cancelled:
         return TransferJobState.Cancelled;
       case ApiTransferJobState.Abandoned:

@@ -41,11 +41,7 @@ public class TransferJobTests
                 job.TryTransitionTo(TransferJobState.Sealed);
                 job.TryTransitionTo(TransferJobState.Completed);
                 break;
-            case TransferJobState.Cancelling:
-                job.TryTransitionTo(TransferJobState.Cancelling);
-                break;
             case TransferJobState.Cancelled:
-                job.TryTransitionTo(TransferJobState.Cancelling);
                 job.TryTransitionTo(TransferJobState.Cancelled);
                 break;
             case TransferJobState.Abandoned:
@@ -62,17 +58,16 @@ public class TransferJobTests
     private static readonly HashSet<(TransferJobState From, TransferJobState To)> LegalEdges =
     [
         (TransferJobState.Created, TransferJobState.Receiving),
-        (TransferJobState.Created, TransferJobState.Cancelling),
+        (TransferJobState.Created, TransferJobState.Cancelled),
         (TransferJobState.Created, TransferJobState.Abandoned),
         (TransferJobState.Created, TransferJobState.Aborted),
         (TransferJobState.Receiving, TransferJobState.Sealed),
-        (TransferJobState.Receiving, TransferJobState.Cancelling),
+        (TransferJobState.Receiving, TransferJobState.Cancelled),
         (TransferJobState.Receiving, TransferJobState.Abandoned),
         (TransferJobState.Receiving, TransferJobState.Aborted),
         (TransferJobState.Sealed, TransferJobState.Completed),
-        (TransferJobState.Sealed, TransferJobState.Cancelling),
-        (TransferJobState.Sealed, TransferJobState.Aborted),
-        (TransferJobState.Cancelling, TransferJobState.Cancelled)
+        (TransferJobState.Sealed, TransferJobState.Cancelled),
+        (TransferJobState.Sealed, TransferJobState.Aborted)
     ];
 
     public static IEnumerable<object[]> AllTransitionPairs()
@@ -110,9 +105,23 @@ public class TransferJobTests
     [InlineData(TransferJobState.Created)]
     [InlineData(TransferJobState.Receiving)]
     [InlineData(TransferJobState.Sealed)]
-    [InlineData(TransferJobState.Cancelling)]
     public void IsTerminal_NonTerminalStates_ReturnsFalse(TransferJobState state) =>
         TransferJob.IsTerminal(state).Should().BeFalse();
+
+    [Theory]
+    [InlineData(TransferJobState.Completed)]
+    [InlineData(TransferJobState.Abandoned)]
+    [InlineData(TransferJobState.Aborted)]
+    public void Cancellation_TerminalStatesOtherThanCancelled_IsNotSignalled(TransferJobState state) =>
+        JobIn(state).Cancellation.IsCancellationRequested.Should().BeFalse();
+
+    [Fact]
+    public void Cancellation_CancelledJob_IsSignalled() =>
+        JobIn(TransferJobState.Cancelled).Cancellation.IsCancellationRequested.Should().BeTrue();
+
+    [Fact]
+    public void Cancellation_LiveJob_IsNotSignalled() =>
+        NewJob().Cancellation.IsCancellationRequested.Should().BeFalse();
 
     [Fact]
     public void OnFileReceived_IncrementsReceivedAndPending()
