@@ -5,6 +5,20 @@ const meta: Meta<ConfirmationDialogComponent> = {
   title: 'Overlay & Interaction/Confirmation Dialog',
   component: ConfirmationDialogComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          '`lib-confirmation-dialog` is a plain presentational yes/no prompt with no ' +
+          'positioning or open/close state of its own — it always renders "open". Project it ' +
+          'inside `DropdownDialogComponent`\'s `[dialog-content]` slot to position it near the ' +
+          'trigger that opened it, and call the wrapper\'s `.close()` from the `confirmed` / ' +
+          '`cancelled` handlers, since this component never dismisses itself. `showLabels` ' +
+          'swaps the default icon-only confirm/cancel button pair for two labelled ' +
+          '`lib-action-button`s; both variants attach a `[libTooltip]` naming the action.',
+      },
+    },
+  },
 };
 
 export default meta;

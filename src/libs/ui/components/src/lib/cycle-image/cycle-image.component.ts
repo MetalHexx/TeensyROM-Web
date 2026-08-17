@@ -16,6 +16,31 @@ export interface ImageChangeEvent {
   totalImages: number;
 }
 
+/**
+ * Image carousel that automatically cycles through one or more images with
+ * a 1-second cross-fade, falling back to `placeholderUrl` when `images` is
+ * empty. `size` selects both the rendered dimensions and the rendering mode:
+ * `'thumbnail'`/`'small'` use a simple, single-layer `object-fit: cover`
+ * presentation, while `'medium'`/`'large'` add a dual-layer blurred
+ * background behind an `object-fit: contain` foreground for an artistic,
+ * letterbox-free presentation. `width`/`height` override the size preset's
+ * dimensions when a non-standard aspect ratio is needed (e.g. C64 320x200).
+ *
+ * Reach for `lib-cycle-image` whenever the source data may hold zero, one,
+ * or many images — it handles the empty and single-image cases gracefully
+ * and adds cycling for free when there is more than one. Reach for
+ * `lib-thumbnail-image` instead only when you know in advance there is
+ * exactly one static image and want the smaller, simpler component.
+ *
+ * @example
+ * ```html
+ * <lib-cycle-image
+ *   [images]="fileItem.images.map(img => img.url)"
+ *   size="thumbnail"
+ *   (imageChange)="onImageChange($event)"
+ * ></lib-cycle-image>
+ * ```
+ */
 @Component({
   selector: 'lib-cycle-image',
   standalone: true,
@@ -33,9 +58,19 @@ export interface ImageChangeEvent {
 })
 export class CycleImageComponent {
   // Inputs
+  /** Image URLs to cycle through. When empty, `placeholderUrl` is shown instead and no cycling occurs. */
   images = input.required<string[]>();
+  /** Milliseconds between automatic transitions when more than one image is present. Defaults to `8000`. */
   intervalMs = input<number>(8000);
+  /** Fallback image URL shown when `images` is empty. Defaults to `'/placeholder.jpg'`. */
   placeholderUrl = input<string>('/placeholder.jpg');
+  /**
+   * Size preset controlling both rendered dimensions and rendering mode. Defaults to `'large'`.
+   * - `'thumbnail'` — 48x48px, simple mode (no blur), for player toolbars and compact lists
+   * - `'small'` — 80x80px, simple mode (no blur), for card thumbnails and small galleries
+   * - `'medium'` — 160x160px, complex mode (blurred background), for album art and featured content
+   * - `'large'` — fills its container, complex mode (blurred background), for full detail views
+   */
   size = input<'thumbnail' | 'small' | 'medium' | 'large'>('large');
   /** Custom width override (e.g., '76.8px'). Takes precedence over size preset. */
   width = input<string | undefined>(undefined);
@@ -50,37 +85,44 @@ export class CycleImageComponent {
   imageChange = output<ImageChangeEvent>();
 
   // Signals for state management
+  /** Index of the currently displayed image within `effectiveImages`. */
   currentIndex = signal(0);
+  /** Index of the previously displayed image, shown during the cross-fade; `null` when not mid-transition. */
   previousIndex = signal<number | null>(null);
+  /** Whether the previous image layer is still visible during the cross-fade transition. */
   showPrevious = signal(false);
+  /** Incrementing counter used to key the fade-in animation trigger on each image change. */
   animationKey = signal(0);
 
-  // Computed signals - use placeholder if no images
+  /** `images()` when non-empty, otherwise a single-element array with `placeholderUrl()`. */
   private effectiveImages = computed(() => {
     const imgs = this.images();
     return imgs.length > 0 ? imgs : [this.placeholderUrl()];
   });
 
+  /** URL of the image currently shown, or `null` if `effectiveImages` is empty. */
   currentImage = computed(() => this.effectiveImages()[this.currentIndex()] || null);
+  /** URL of the image being faded out, or `null` when not mid-transition. */
   previousImage = computed(() => {
     const idx = this.previousIndex();
     return idx !== null ? this.effectiveImages()[idx] || null : null;
   });
+  /** Whether `effectiveImages` has more than one entry. */
   hasMultipleImages = computed(() => this.effectiveImages().length > 1);
-  
+
   /**
    * Determines if cycling should be active.
    * Only cycle when there are multiple images to display.
    */
   private shouldCycle = computed(() => this.images().length > 1);
 
-  // Simple mode disables blur/background effects for small sizes
+  /** Whether `size()` selects the simple, single-layer rendering mode (`'thumbnail'`/`'small'`). */
   isSimpleMode = computed(() => {
     const sz = this.size();
     return sz === 'thumbnail' || sz === 'small';
   });
-  
-  // Custom dimensions override size presets
+
+  /** Inline style overrides from `width()`/`height()`, or `null` when neither is set. */
   customStyles = computed(() => {
     const w = this.width();
     const h = this.height();
@@ -90,9 +132,10 @@ export class CycleImageComponent {
     return Object.keys(styles).length > 0 ? styles : null;
   });
 
-  // Dependency injection
+  /** Used to unsubscribe the cycling interval when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
 
+  /** Resets to the first image whenever `images()` changes, and starts the cycling interval when there is more than one image. */
   constructor() {
     // Reset when images change and trigger animation
     effect(() => {
@@ -141,6 +184,7 @@ export class CycleImageComponent {
     }
   }
 
+  /** Advances to the next image with a cross-fade, wrapping back to the first image at the end. */
   private cycleToNext(): void {
     // Guard: Don't cycle if only one image
     if (!this.shouldCycle()) {

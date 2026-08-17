@@ -9,6 +9,7 @@
     "generate:asm-64-client": "nx run asm-64-client:generate",
     "build:frontend": "pwsh scripts/copy-frontend.ps1",
     "vite": "vite",
+    "component-docs": "node scripts/component-docs.mjs",
     "format": "prettier --write \"**/*.{ts,js,json,md,html,scss}\"",
     "lint": "nx lint",
     "precommit:lintstaged": "pnpm dlx lint-staged",

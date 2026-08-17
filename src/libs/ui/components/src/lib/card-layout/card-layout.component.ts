@@ -14,16 +14,30 @@ import { MatCardModule } from '@angular/material/card';
 import type { GlassyIntensity } from '../shared/glassy.types';
 
 /**
- * Card layout component with support for title, subtitle, corner slot, and header slot.
- * 
+ * Static card layout with an optional header (title, subtitle, and a `header` content
+ * slot), a `corner` slot for status indicators or close buttons, a default body slot, and
+ * an optional footer attribution line. No animation — pure layout and glassy backdrop
+ * styling.
+ *
+ * Reach for this component when a card should render without an entry/exit animation —
+ * e.g. content that's already on screen, or content whose transition is driven by
+ * something else. Use `ScalingCardComponent` instead when the card should animate in and
+ * out with the library's scale+fade+slide effect; it composes this component with
+ * `ScalingContainerComponent`. For compact, header-less cards (forms, toolbars) use
+ * `CompactCardLayoutComponent` (or its animated counterpart, `ScalingCompactCardComponent`).
+ *
+ * The glassy backdrop effect (enabled by default) is built from design tokens documented
+ * in the `style-guide` skill — see `glassyIntensity` below for what each level means.
+ *
  * **Header Slot**: Project custom content into the card header using `slot="header"`.
  * This content appears above the title/subtitle when both are provided.
- * 
+ *
  * @example
  * ```html
- * <lib-card-layout title="Card Title">
- *   <custom-nav slot="header"></custom-nav>
- *   <p>Card content...</p>
+ * <lib-card-layout title="File Info" subtitle="v1.2.3" glassyIntensity="strong">
+ *   <mat-chip slot="corner">C64</mat-chip>
+ *   <button slot="header" mat-icon-button><mat-icon>arrow_back</mat-icon></button>
+ *   <p>Card content projected into the default slot.</p>
  * </lib-card-layout>
  * ```
  */
@@ -39,29 +53,46 @@ import type { GlassyIntensity } from '../shared/glassy.types';
   },
 })
 export class CardLayoutComponent implements AfterViewInit, OnDestroy {
+  /** Header title text. Omit to render a title-less header (e.g. `header`-slot-only content). */
   title = input<string>();
+
+  /** Text rendered below the title inside the header, when provided. */
   subtitle = input<string>();
+
+  /** Footer attribution text (e.g. a source URL or credit). Rendered in a dedicated footer row only when set; the footer is omitted entirely otherwise. */
   metadataSource = input<string>();
+
+  /** Whether the card content area shows scrollbars when its content overflows (default: `true`). Set to `false` to clip overflow instead. */
   enableOverflow = input<boolean>(true);
-  cardClass = input<string>(''); // Optional CSS class(es) to apply to the mat-card
-  
+
+  /** Additional CSS class name(s) applied to the underlying `mat-card`, alongside the computed glassy classes. */
+  cardClass = input<string>('');
+
   /**
-   * Enable/disable glassy backdrop effect (default: true)
-   * Set to false to disable glassy styling entirely
+   * Enable/disable the glassy backdrop effect (default: `true`).
+   * Set to `false` to disable glassy styling entirely.
    */
   glassy = input<boolean>(true);
-  
+
   /**
-   * Glassy effect intensity (default: 'dark')
-   * Options: 'subtle', 'light', 'medium', 'strong', 'dark', 'default'
-   * Only applies when glassy=true
+   * Glassy effect intensity (default: `'dark'`). Only applies when `glassy` is `true`.
+   * See the `style-guide` skill for the full design-token reference.
+   * - `'subtle'`: 5% white opacity — barely visible tint
+   * - `'light'`: 7.5% white opacity — gentle glassy effect
+   * - `'medium'`: 15% white opacity — balanced glassy effect
+   * - `'strong'`: 20% white opacity — prominent glassy effect
+   * - `'dark'`: 40% black opacity — dark semi-transparent glass (recommended default)
+   * - `'default'`: uses the `.glassy-card` utility class (40% black opacity + Material tokens)
    */
   glassyIntensity = input<GlassyIntensity>('dark');
 
+  /** Reference to the projected `corner` slot content, used to measure how much header space it needs. */
   private readonly cornerContent = viewChild<ElementRef<HTMLDivElement>>('cornerContent');
+  /** Observes the corner content's size so `cornerReservePx` stays in sync as it resizes. */
   private cornerResizeObserver: ResizeObserver | null = null;
+  /** Header space (in px) reserved for the corner slot, derived from its measured width. */
   protected cornerReservePx = signal(0);
-  
+
   /**
    * Computed CSS classes for the mat-card
    */
@@ -87,6 +118,7 @@ export class CardLayoutComponent implements AfterViewInit, OnDestroy {
     return classes.join(' ');
   });
 
+  /** Starts observing the corner slot's size once the view is initialized so header space can be reserved. */
   ngAfterViewInit(): void {
     this.updateCornerReserve();
 
@@ -106,11 +138,13 @@ export class CardLayoutComponent implements AfterViewInit, OnDestroy {
     this.cornerResizeObserver.observe(cornerElement);
   }
 
+  /** Disconnects the corner content resize observer to avoid leaking it past the component's lifetime. */
   ngOnDestroy(): void {
     this.cornerResizeObserver?.disconnect();
     this.cornerResizeObserver = null;
   }
 
+  /** Recomputes `cornerReservePx` from the corner slot's current measured width, or resets it to `0` when the slot is empty. */
   private updateCornerReserve(): void {
     const cornerElement = this.cornerContent()?.nativeElement;
     if (!cornerElement) {

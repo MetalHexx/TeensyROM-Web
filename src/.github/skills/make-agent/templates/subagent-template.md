@@ -264,7 +264,7 @@ List the standards docs relevant to this agent's domain. Examples:
 - [TESTING_STANDARDS.md](../../../../docs/TESTING_STANDARDS.md) — Testing approaches by layer
 - [STATE_STANDARDS.md](../../../../docs/STATE_STANDARDS.md) — NgRx Signal Store patterns
 - [STYLE_GUIDE.md](../../../../docs/STYLE_GUIDE.md) — Global styles and utilities
-- [COMPONENT_LIBRARY.md](../../../../docs/COMPONENT_LIBRARY.md) — Reusable UI components
+- `pnpm component-docs list` / `pnpm component-docs get --component-name <name>` — Reusable UI components (`component-library` skill)
 - [BACKEND_ARCHITECTURE.md](../../../../docs/BACKEND_ARCHITECTURE.md) — API patterns
 -->
 ````
@@ -284,7 +284,7 @@ Use this table when filling in the template:
 | `{{ONE_SENTENCE_DESCRIPTION}}` | What this agent does in one sentence | `Turns component specs into tested, standards-compliant Angular code` |
 | `{{MODEL}}` | AI model to use | `Claude Sonnet 4.6 (copilot)` or `Claude Opus 4.6 (copilot)` |
 | `{{DOMAIN_EXPERTISE_SECTION}}` | Markdown section describing domain knowledge | See examples in the HTML comment block |
-| `{{ADDITIONAL_RESPONSIBILITIES}}` | Extra numbered items for Core Responsibilities | `7. **Component Documentation** — Update COMPONENT_LIBRARY.md for new shared components` |
+| `{{ADDITIONAL_RESPONSIBILITIES}}` | Extra numbered items for Core Responsibilities | `7. **Component Documentation** — Update JSDoc and Storybook narrative for new shared components` |
 | `{{ADDITIONAL_CAN_DO}}` | Extra items for the CAN list | `- Update component library documentation when creating shared components` |
 | `{{RESPONSE_STYLE}}` | How the agent communicates | See examples in the HTML comment block |
 | `{{STANDARDS_REFERENCES}}` | Links to relevant standards docs | See examples in the HTML comment block |

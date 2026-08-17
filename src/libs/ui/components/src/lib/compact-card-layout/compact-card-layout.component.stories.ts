@@ -5,6 +5,21 @@ const meta: Meta<CompactCardLayoutComponent> = {
   title: 'Layout/Compact Card Layout',
   component: CompactCardLayoutComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Minimal card layout — body slot and glassy backdrop styling only, no header, ' +
+          'no animation. Built for forms and toolbars where `CardLayoutComponent`\'s header ' +
+          'chrome would be unwanted overhead. Choose this when the compact surface should ' +
+          'render without an entry/exit transition; choose `ScalingCompactCardComponent` when ' +
+          'it should animate in and out (it composes this component with ' +
+          '`ScalingContainerComponent`). For cards that need a header, use ' +
+          '`CardLayoutComponent` or its animated counterpart, `ScalingCardComponent`. Glassy ' +
+          'styling tokens are documented in the `style-guide` skill.',
+      },
+    },
+  },
   argTypes: {
     glassyIntensity: {
       control: 'select',

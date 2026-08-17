@@ -5,6 +5,19 @@ const meta: Meta<IconButtonComponent> = {
   title: 'Primitives/Icon Button',
   component: IconButtonComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component: `
+Icon-only Material button for dense controls — toolbars, card corners, filter rows — where the icon alone conveys the action and a text label would take up too much space. Accepts a Material icon ligature via \`icon\`, or a projected custom icon component (\`ImageIconComponent\`, \`JoystickIconComponent\`) via content projection; the two are mutually exclusive per instance. \`ariaLabel\` is always required so the action remains accessible without a visible label.
+
+Choose \`IconButtonComponent\` over \`ActionButtonComponent\` when space is constrained and the icon alone is enough. Choose \`ActionButtonComponent\` instead when the action needs a visible text label next to its icon, such as a dialog footer or empty-state call to action.
+
+\`size\` and \`variant\` compose independently and map to \`icon-button-*\` utility classes; \`color\` maps to the design system's semantic \`--color-*\` tokens. See the \`style-guide\` skill for the underlying values.
+        `.trim(),
+      },
+    },
+  },
   argTypes: {
     color: {
       control: 'select',

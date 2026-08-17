@@ -5,6 +5,18 @@ const meta: Meta<DirectoryTrailComponent> = {
   title: 'Navigation & Data/Directory Trail',
   component: DirectoryTrailComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'The top toolbar of a directory browser, composing `DirectoryNavigateComponent` ' +
+          '(back/forward/up/refresh) with `DirectoryBreadcrumbComponent` (the responsive ' +
+          'path breadcrumb) into a single header. Use `lib-directory-trail` whenever both ' +
+          'history navigation and a path breadcrumb are needed together — the common case ' +
+          'for a directory browser header — rather than composing the two children by hand.',
+      },
+    },
+  },
 };
 
 export default meta;

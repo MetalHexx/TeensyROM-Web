@@ -32,10 +32,10 @@ export class NavRailItemComponent {
   /** The navigation item data to display */
   item = input.required<NavRailItem>();
 
-  /** Whether the nav rail is currently expanded (shows label) */
+  /** Whether the parent nav rail is currently expanded (default: `false`). When `true`, the item's label renders next to its icon; when `false`, only the icon is shown. */
   isExpanded = input<boolean>(false);
 
-  /** Whether this item represents the currently active route */
+  /** Whether this item represents the currently active route (default: `false`). Controls the item's active/highlighted styling. */
   isActive = input<boolean>(false);
 
   // --- Outputs ---

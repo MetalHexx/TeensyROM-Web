@@ -5,6 +5,21 @@ const meta: Meta<TooltipDirective> = {
   title: 'Overlay & Interaction/Tooltip',
   component: TooltipDirective,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          '`[libTooltip]` replaces Angular Material\'s `matTooltip`, whose CDK overlay ' +
+          'created z-index conflicts with this app\'s animated dialogs and modal containers. ' +
+          'It has no template or overlay of its own — actual rendering, positioning, and ' +
+          'viewport-overflow flipping is delegated to `TooltipRendererService`, which appends ' +
+          'the tooltip directly to `document.body` (or the fullscreen element) via `Renderer2`. ' +
+          'Tooltips are shown on hover with a configurable `delay` and are disabled entirely ' +
+          'on touch devices to avoid "stuck" tooltip UX. Pass a `TooltipConfig` with `body` ' +
+          'and/or `title` — at least one is required for anything to render.',
+      },
+    },
+  },
 };
 
 export default meta;

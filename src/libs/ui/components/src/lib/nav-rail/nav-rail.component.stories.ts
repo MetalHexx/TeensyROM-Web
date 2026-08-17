@@ -13,6 +13,20 @@ const meta: Meta<NavRailComponent> = {
   title: 'Layout/Nav Rail',
   component: NavRailComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Vertical navigation rail for tablet/desktop widths — collapsed to icons-only by ' +
+          'default, expanding on hover (or when pinned) to show labels. Renders a list of ' +
+          '`NavRailItemComponent` entries wrapped in a `ScalingCompactCardComponent` for ' +
+          'consistent styling and entry animation. At the phone breakpoint (below 640px), ' +
+          'hover expansion is disabled here — swap in `BottomBarComponent` instead for a ' +
+          'fixed bottom strip more appropriate for touch navigation; both share the same ' +
+          'item shape (`NavRailItem`/`BottomBarItem`).',
+      },
+    },
+  },
 };
 
 export default meta;

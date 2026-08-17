@@ -3,10 +3,15 @@ import { CommonModule } from '@angular/common';
 import { LeetTextContainerComponent } from '../leet-text-container/leet-text-container.component';
 
 /**
- * Loading text component with fade-in/fade-out animation and leet-speak cycling effect.
- * Wraps the leet-text-container with elegant fade animations suitable for corner slots and loading indicators.
+ * A pre-packaged loading indicator: wraps `LeetTextContainerComponent` with a 200ms fade in/out
+ * transition driven by the `visible` input, so callers get a complete show/hide loading state
+ * without having to wire animation triggers themselves. Displays "Loading..." by default; pass
+ * `text` for context-specific messages like "Autosaving..." or "Processing...".
  *
- * Displays "Loading..." by default, but custom text can be provided via the text input.
+ * Reach for `LoadingTextComponent` whenever you need a self-contained loading indicator — corner
+ * slots, toolbars, status messages. Use `LeetTextContainerComponent` directly instead only when you
+ * need the raw leet-speak animation without the fade lifecycle (e.g. always-visible text, or a
+ * custom show/hide transition of your own).
  *
  * @example
  * ```html

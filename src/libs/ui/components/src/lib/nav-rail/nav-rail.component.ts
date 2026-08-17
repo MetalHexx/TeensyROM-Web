@@ -7,11 +7,18 @@ import { IconButtonComponent } from '../icon-button/icon-button.component';
 import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 
 /**
- * A reusable navigation rail component that displays a vertical list of navigation items.
- * Wraps content in a scaling compact card for consistent styling and animations.
+ * A reusable vertical navigation rail that displays a list of icon+label items, collapsed
+ * to icons-only by default and expanding on hover (or when pinned) to show labels. Wraps
+ * its content in a `ScalingCompactCardComponent` for consistent styling and entry
+ * animation.
  *
  * The component is decoupled from routing - it emits events when items are clicked
  * and the parent component handles navigation logic.
+ *
+ * Reach for this component at tablet/desktop widths. At the phone breakpoint
+ * (below 640px), hover expansion is disabled here — swap in `BottomBarComponent` instead,
+ * which shares the same item shape (`NavRailItem`/`BottomBarItem`) but renders as a fixed
+ * bottom strip more appropriate for touch navigation.
  *
  * @example
  * ```html
@@ -38,10 +45,14 @@ import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 export class NavRailComponent {
   // --- Private State ---
 
+  /** Used to register teardown logic that runs when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
+  /** Pending hover-expand timer id, or `null` when no expand is scheduled. */
   private expandTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Pending hover-collapse timer id, or `null` when no collapse is scheduled. */
   private collapseTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Clears any pending expand/collapse timers when the component is destroyed. */
   constructor() {
     this.destroyRef.onDestroy(() => {
       this.clearExpandTimer();
@@ -57,13 +68,13 @@ export class NavRailComponent {
   /** Current active route for highlighting the active item */
   activeRoute = input<string>('');
 
-  /** Width of the rail when collapsed */
+  /** Width of the rail when collapsed to icons-only (default: `'56px'`). Any valid CSS width value. */
   collapsedWidth = input<string>('56px');
 
-  /** Width of the rail when expanded */
+  /** Width of the rail when expanded to show labels (default: `'200px'`). Any valid CSS width value. */
   expandedWidth = input<string>('200px');
 
-  /** Delay in milliseconds for hover transitions */
+  /** Milliseconds of hover dwell time before the rail expands or collapses (default: `150`). Prevents flicker from a mouse passing through without stopping. */
   hoverDelayMs = input<number>(150);
 
   // --- Outputs ---
@@ -199,6 +210,7 @@ export class NavRailComponent {
     this.pinClick.emit(newPinnedState);
   }
 
+  /** Schedules `isExpanded` to flip to `true` after `hoverDelayMs()`. */
   private startExpandTimer(): void {
     this.expandTimer = setTimeout(() => {
       this.isExpanded.set(true);
@@ -206,6 +218,7 @@ export class NavRailComponent {
     }, this.hoverDelayMs());
   }
 
+  /** Schedules `isExpanded` to flip to `false` after `hoverDelayMs()`. */
   private startCollapseTimer(): void {
     this.collapseTimer = setTimeout(() => {
       this.isExpanded.set(false);
@@ -213,6 +226,7 @@ export class NavRailComponent {
     }, this.hoverDelayMs());
   }
 
+  /** Cancels any pending expand timer. */
   private clearExpandTimer(): void {
     if (this.expandTimer !== null) {
       clearTimeout(this.expandTimer);
@@ -220,6 +234,7 @@ export class NavRailComponent {
     }
   }
 
+  /** Cancels any pending collapse timer. */
   private clearCollapseTimer(): void {
     if (this.collapseTimer !== null) {
       clearTimeout(this.collapseTimer);

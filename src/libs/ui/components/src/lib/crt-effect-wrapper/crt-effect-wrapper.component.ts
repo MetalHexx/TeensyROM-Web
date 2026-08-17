@@ -21,6 +21,14 @@ const MAX_IMAGE_REFRESH_RETRIES = 3;
  * provide the `contentAspectRatio` input to properly constrain CRT effects to the visible
  * content area (avoiding curvature/vignette on black bars).
  *
+ * Pair this with `CrtSettingsPanelComponent`/`CrtSettingsPanelOverlayComponent` for live
+ * editing of the `settings` object, and typically project a `VideoStreamComponent` or an
+ * `<img>` as the wrapped content — this component detects and post-processes whichever one
+ * it finds. Effect values are exposed as CSS custom properties (`--scanline-intensity`,
+ * `--crt-brightness`, etc.) and mirrored into a WebGL post-process pass; see the
+ * `crt-webgl-effects` skill for the full CRT system architecture and the CSS custom
+ * property reference.
+ *
  * @example
  * ```html
  * <!-- Full CRT effects on video -->
@@ -45,14 +53,23 @@ const MAX_IMAGE_REFRESH_RETRIES = 3;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CrtEffectWrapperComponent {
+  /** Used to register teardown logic that runs when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
+  /** Injection context captured for use outside the constructor's injection context. */
   private readonly injector = inject(Injector);
+  /** Reference to the wrapper element whose projected content is detected and post-processed. */
   private readonly wrapperRef = viewChild<ElementRef<HTMLElement>>('wrapper');
+  /** Reference to the WebGL canvas the CRT post-process pass renders into. */
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('glCanvas');
+  /** Observes the wrapper element so canvas/container dimensions stay in sync with its size. */
   private resizeObserver: ResizeObserver | null = null;
+  /** The active WebGL CRT renderer, or `null` when unsupported or not yet initialized. */
   private renderer: CrtRenderer | null = null;
+  /** Media query tracking the current device pixel ratio, used to detect browser zoom changes. */
   private dprMediaQuery: MediaQueryList | null = null;
+  /** Handler re-attached to `dprMediaQuery` on each DPR change to keep tracking the current ratio. */
   private dprChangeHandler: (() => void) | null = null;
+  /** Watches the wrapper's projected content for added/removed video or image elements. */
   private contentObserver: MutationObserver | null = null;
 
   /** Track if component is destroyed to prevent operations during cleanup */
@@ -78,38 +95,41 @@ export class CrtEffectWrapperComponent {
    * Store reference to current image element for load event handling.
    */
   private currentImageElement: HTMLImageElement | null = null;
+  /** `load` listener attached to `currentImageElement` to trigger a render once it finishes loading. */
   private imageLoadHandler: (() => void) | null = null;
   
   /**
-   * Debug mode input from parent component.
-   * (Phase 1.1 - Task 01.1-006)
+   * Enables debug visualization overlays (e.g. black-bar-crop detection bounds) for
+   * troubleshooting the WebGL pipeline. Default `false`; leave off in production UI.
    */
   readonly debugMode = input<boolean>(false);
 
   /**
    * Debug visualization state for black bar detection overlay.
    * Internal signal for tracking current debug state.
-   * (Phase 1.1 - Task 01.1-006)
    */
   readonly debugVisualizationEnabled = signal<boolean>(false);
 
   /**
-   * CRT effect configuration values.
-   * Use CRT_PRESETS for common configurations or provide custom values.
+   * CRT effect configuration values. Default `DEFAULT_CRT_SETTINGS` (the
+   * `LARGE_VIDEO_WEBGL` preset). Use `CRT_PRESETS` for common configurations or provide
+   * custom values — see `CrtSettings` (in `@teensyrom-nx/domain`) for what each field
+   * controls.
    */
   readonly settings = input<CrtSettings>(DEFAULT_CRT_SETTINGS);
 
   /**
-   * Whether CRT effects are applied.
-   * When false, content renders without any effects (smooth transition).
+   * Whether CRT effects are applied. Default `true`. When `false`, content renders
+   * without any effects (smooth transition via CSS, no unmount).
    */
   readonly enabled = input<boolean>(true);
 
   /**
    * Content aspect ratio (width/height) for proper effect positioning in fullscreen.
-   * When provided and content uses object-fit: contain, CRT effects are constrained
-   * to the visible content area via clip-path.
-   * Example: 4/3 for 4:3 video, 16/9 for 16:9 video.
+   * Default `null` (no adjustment — effects fill the full container). When provided and
+   * content uses `object-fit: contain`, CRT effects are constrained to the visible
+   * content area via clip-path, so curvature/vignette don't bleed onto letterbox/
+   * pillarbox black bars. Example: `4/3` for 4:3 video, `16/9` for 16:9 video.
    */
   readonly contentAspectRatio = input<number | null>(null);
 
@@ -117,6 +137,7 @@ export class CrtEffectWrapperComponent {
    * Container dimensions for calculating visible content area.
    */
   private readonly containerWidth = signal<number>(0);
+  /** Current measured height (px) of the wrapper element. */
   private readonly containerHeight = signal<number>(0);
 
   /**
@@ -213,6 +234,7 @@ export class CrtEffectWrapperComponent {
    */
   protected readonly effectiveSettings = computed(() => this.settings());
 
+  /** Initializes WebGL/resize/DPR tracking after first render, and tears them all down on destroy. */
   constructor() {
     afterNextRender(() => {
       this.setupResizeObserver();

@@ -9,6 +9,19 @@ const meta: Meta<DirectoryItemComponent> = {
   title: 'Navigation & Data/Directory Item',
   component: DirectoryItemComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Renders a single folder row inside a directory listing, fixing the icon and ' +
+          'color that `StorageItemComponent` otherwise leaves open. Choose it over the bare ' +
+          '`StorageItemComponent` whenever the row is a folder, so every listing shows the ' +
+          'same folder icon and directory color; reach for `StorageDeviceItemComponent` ' +
+          'instead when the row represents a top-level storage device rather than a folder ' +
+          'within one.',
+      },
+    },
+  },
 };
 
 export default meta;

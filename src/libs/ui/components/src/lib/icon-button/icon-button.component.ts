@@ -8,6 +8,39 @@ export type IconButtonSize = 'small' | 'medium' | 'large';
 export type IconButtonVariant = 'standard' | 'rounded-primary' | 'rounded-transparent';
 export type IconButtonColor = 'normal' | 'highlight' | 'success' | 'error' | 'dimmed' | 'dimmed-light';
 
+/**
+ * Icon-only button that provides consistent Material Design button styling
+ * with configurable size, variant, and semantic color. Displays either a
+ * Material icon ligature via `icon` or a projected custom icon component
+ * (e.g. {@link JoystickIconComponent}, {@link ImageIconComponent}) via
+ * content projection — the two are mutually exclusive per instance.
+ *
+ * Reach for `lib-icon-button` when space is constrained and the icon alone
+ * conveys the action — dense toolbars, card corner controls, filter rows —
+ * as long as a meaningful `ariaLabel` is supplied for accessibility. Reach
+ * for `lib-action-button` instead when the action needs a visible text label
+ * alongside its icon, such as a dialog footer or empty-state call to action.
+ *
+ * Size and variant map to CSS utility classes (`icon-button-*`); see the
+ * `style-guide` skill for their pixel values and the `--color-*` tokens
+ * behind each `color` option.
+ *
+ * @example
+ * ```html
+ * <!-- Material icon -->
+ * <lib-icon-button
+ *   icon="power_settings_new"
+ *   ariaLabel="Power"
+ *   [color]="connectionStatus() ? 'highlight' : 'normal'"
+ *   (buttonClick)="onTogglePower()"
+ * ></lib-icon-button>
+ *
+ * <!-- Projected custom icon -->
+ * <lib-icon-button ariaLabel="Games Filter" size="large" (buttonClick)="onGamesClick()">
+ *   <lib-joystick-icon></lib-joystick-icon>
+ * </lib-icon-button>
+ * ```
+ */
 @Component({
   selector: 'lib-icon-button',
   imports: [CommonModule, MatButtonModule, MatIconModule, TooltipDirective],
@@ -16,19 +49,40 @@ export type IconButtonColor = 'normal' | 'highlight' | 'success' | 'error' | 'di
 })
 export class IconButtonComponent {
   // Input properties
-  /** Material icon ligature name to render. Optional when consumers project their own icon via ng-content. */
+  /**
+   * Material icon ligature name to render. Leave unset and project a custom
+   * icon component via `ng-content` instead (the two are mutually exclusive).
+   */
   icon = input<string>();
-  /** Accessible label announced to assistive technology for this button. */
+  /** Accessible label announced to assistive technology for this button. Always required, even for icon-only buttons. */
   ariaLabel = input.required<string>();
   /** Optional tooltip configuration shown when hovering or focusing the button. */
   tooltip = input<TooltipConfig | undefined>();
-  /** Color treatment applied to the icon. */
+  /**
+   * Semantic color treatment applied to the icon. Defaults to `'normal'`.
+   * - `'normal'` — inherits the surrounding text color
+   * - `'highlight'` — cyan accent (`--color-highlight`), for active/selected state
+   * - `'success'` — green (`--color-success`), for positive actions (e.g. start)
+   * - `'error'` — red (`--color-error`), for destructive actions (e.g. stop, delete)
+   * - `'dimmed'` — muted gray (`--color-dimmed`), for de-emphasized actions
+   * - `'dimmed-light'` — lighter muted variant, for de-emphasized actions on dark surfaces
+   */
   color = input<IconButtonColor>('normal');
-  /** Button size, controlling padding and icon dimensions. */
+  /**
+   * Button size, controlling padding and icon dimensions. Defaults to `'medium'`.
+   * - `'small'` — compact, for dense rows
+   * - `'medium'` — standard toolbar size
+   * - `'large'` — emphasized, for primary filter/action rows
+   */
   size = input<IconButtonSize>('medium');
-  /** Visual style variant of the button (standard, rounded-primary, or rounded-transparent). */
+  /**
+   * Visual style variant of the button. Defaults to `'standard'`.
+   * - `'standard'` — default Material icon button, no background
+   * - `'rounded-primary'` — filled rounded background using the primary color
+   * - `'rounded-transparent'` — rounded outline with transparent background
+   */
   variant = input<IconButtonVariant>('standard');
-  /** Disables the button and suppresses click emission when true. */
+  /** Disables the button and suppresses `buttonClick` emission when true. Defaults to `false`. */
   disabled = input<boolean>(false);
 
   // Events
@@ -36,9 +90,11 @@ export class IconButtonComponent {
   buttonClick = output<void>();
 
   // Computed properties
+  /** Whether a Material icon name is set via `icon()`, as opposed to a projected custom icon. */
   hasIcon = computed(() => !!this.icon());
 
   // Computed classes
+  /** CSS class list applied to the underlying `mat-icon-button`, derived from `size()` and `variant()`. */
   buttonClasses = computed(() => {
     const classes: string[] = [];
 
@@ -71,10 +127,12 @@ export class IconButtonComponent {
     return classes.join(' ');
   });
 
+  /** CSS class applied to the icon element, equal to `color()`. */
   iconClasses = computed(() => {
     return this.color();
   });
 
+  /** Emits `buttonClick` when the button is activated and not disabled. */
   onButtonClick(): void {
     if (!this.disabled()) {
       this.buttonClick.emit();

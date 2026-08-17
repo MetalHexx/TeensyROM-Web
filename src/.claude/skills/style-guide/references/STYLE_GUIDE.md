@@ -244,7 +244,7 @@ Border radius tokens provide consistent rounded corners across UI elements:
 
 **Component Integration:**
 
-Design tokens are used by reusable components like [IconLabelComponent](COMPONENT_LIBRARY.md#iconlabelcomponent) to provide size presets. See the Component Library for components that leverage these tokens.
+Design tokens are used by reusable components like `IconLabelComponent` to provide size presets. Run `pnpm component-docs get --component-name IconLabelComponent` (or see the `component-library` skill) for components that leverage these tokens.
 
 ---
 
@@ -1307,7 +1307,7 @@ const phoneBreakpoint = getComputedStyle(document.documentElement)
 
 #### Styled Icon Classes
 
-**Purpose**: Size and color styling for the [StyledIconComponent](COMPONENT_LIBRARY.md#stylediconcomponent)
+**Purpose**: Size and color styling for the `StyledIconComponent` (`pnpm component-docs get --component-name StyledIconComponent`)
 
 **Size Classes**:
 
@@ -1371,11 +1371,11 @@ const phoneBreakpoint = getComputedStyle(document.documentElement)
 
 **Used In**:
 
-- [StyledIconComponent](COMPONENT_LIBRARY.md#stylediconcomponent) - Automatically applied based on `size` and `color` props
+- `StyledIconComponent` - Automatically applied based on `size` and `color` props
 - Directory tree components for folder/device/storage icons
 - File listing components for file type icons
 
-**Best Practice:** Use [StyledIconComponent](COMPONENT_LIBRARY.md#stylediconcomponent) instead of applying these classes directly. The component provides type safety, proper defaults, and automatic class application based on semantic props.
+**Best Practice:** Use `StyledIconComponent` (`pnpm component-docs get --component-name StyledIconComponent`) instead of applying these classes directly. The component provides type safety, proper defaults, and automatic class application based on semantic props.
 
 #### Action Button Color Classes
 
@@ -1418,7 +1418,7 @@ const phoneBreakpoint = getComputedStyle(document.documentElement)
 
 - [`device-toolbar.component.html`](../../../../libs/features/devices/src/lib/device-view/device-toolbar/device-toolbar.component.html) - Device management action buttons with semantic colors
 
-**Best Practice:** These classes are automatically applied by [ActionButtonComponent](COMPONENT_LIBRARY.md#actionbuttoncomponent) when using the `color` property. Use semantic colors that match the action's intent (error for destructive actions, success for positive actions, primary for main actions, etc.). The component only applies custom classes for non-primary/normal colors to maintain Material Design consistency.
+**Best Practice:** These classes are automatically applied by `ActionButtonComponent` (`pnpm component-docs get --component-name ActionButtonComponent`) when using the `color` property. Use semantic colors that match the action's intent (error for destructive actions, success for positive actions, primary for main actions, etc.). The component only applies custom classes for non-primary/normal colors to maintain Material Design consistency.
 
 ### Dialogs
 
@@ -1856,7 +1856,7 @@ All CRT effect variables transition smoothly over 300ms when the `[enabled]` inp
 - `filter` - color effects fade in/out
 - `opacity` - scanlines and vignette overlays fade in/out
 
-**See Also**: [CrtEffectWrapperComponent](./COMPONENT_LIBRARY.md#crteffectwrappercomponent) in Component Library
+**See Also**: `CrtEffectWrapperComponent` — `pnpm component-docs get --component-name CrtEffectWrapperComponent`, or the `crt-webgl-effects` skill
 
 ---
 

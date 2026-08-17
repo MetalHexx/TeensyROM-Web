@@ -147,7 +147,7 @@ graph LR
 
 ## 🧩 Component Reuse Analysis
 
-> Identify which existing UI library components should be used. Reference the `COMPONENT_LIBRARY.md`.
+> Identify which existing UI library components should be used. Reference `pnpm component-docs list` (`component-library` skill).
 
 ### Existing Components to Use
 
@@ -178,7 +178,7 @@ graph LR
 
 ## 🎬 Animation & Transitions
 
-> Describe any animations or transitions. Reference existing animation components from `COMPONENT_LIBRARY.md`.
+> Describe any animations or transitions. Reference existing animation components via `pnpm component-docs list` and the `Systems/Animation Chaining` entry (`component-library` skill).
 
 | Trigger | Animation | Component/Approach | Duration |
 |---------|-----------|-------------------|----------|
@@ -250,7 +250,7 @@ graph LR
 ## 🔗 References
 
 - [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md) — Design tokens, spacing, breakpoints, utility classes
-- [COMPONENT_LIBRARY.md](../../docs/COMPONENT_LIBRARY.md) — Reusable UI components catalog
+- `pnpm component-docs list` / `pnpm component-docs get --component-name <name>` — Reusable UI components catalog (`component-library` skill)
 - [Theme styles](../../libs/ui/styles/src/lib/theme/styles.scss) — CSS custom properties and theme definitions
 - [Breakpoint mixins](../../libs/ui/styles/src/lib/theme/_mixins.scss) — SCSS responsive mixins
 - [Master Plan](./PROJECT-NAME-MASTER-PLAN.md) — Feature overview and phases

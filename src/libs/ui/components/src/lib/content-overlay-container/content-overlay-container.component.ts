@@ -55,6 +55,7 @@ import { CommonModule } from '@angular/common';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ContentOverlayContainerComponent {
+  /** Used to register teardown logic that runs when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
 
   /**
@@ -126,6 +127,7 @@ export class ContentOverlayContainerComponent {
     return this.isMouseOver() || this.hasCdkOverlayOpen() || this.overlayLockCount() > 0;
   });
 
+  /** `fullscreenchange` document listener that syncs `isFullscreen` and emits `fullscreenChange`. */
   private readonly fullscreenHandler = (): void => {
     const isFs = !!document.fullscreenElement;
     this.isFullscreen.set(isFs);
@@ -159,6 +161,7 @@ export class ContentOverlayContainerComponent {
   /** Set once destroyed, to stop the overlay observer retry chain from rescheduling itself. */
   private isDestroyed = false;
 
+  /** Wires up fullscreen and CDK overlay detection after the first render, and tears them down on destroy. */
   constructor() {
     afterNextRender(() => {
       // Initialize container element reference for scoped overlay detection

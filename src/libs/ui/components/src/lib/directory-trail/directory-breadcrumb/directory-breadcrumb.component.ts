@@ -20,6 +20,25 @@ interface PathSegment {
   path: string;
 }
 
+/**
+ * A responsive breadcrumb trail for the current directory path. Splits `currentPath` into
+ * clickable chips (root segment labeled with `storageType`, then one chip per path part),
+ * measures available width, and collapses leading segments that no longer fit behind a
+ * dropdown trigger rather than wrapping or truncating.
+ *
+ * `lib-directory-breadcrumb` is normally rendered by `DirectoryTrailComponent` as the
+ * right-hand half of the directory toolbar; render it directly only when a surface needs
+ * just the path trail without the trail's back/forward/up/refresh controls.
+ *
+ * @example
+ * ```html
+ * <lib-directory-breadcrumb
+ *   [currentPath]="currentPath()"
+ *   [storageType]="storageTypeLabel()"
+ *   (navigationRequested)="onNavigate($event)"
+ * ></lib-directory-breadcrumb>
+ * ```
+ */
 @Component({
   selector: 'lib-directory-breadcrumb',
   standalone: true,
@@ -29,26 +48,37 @@ interface PathSegment {
 })
 export class DirectoryBreadcrumbComponent implements AfterViewInit, OnDestroy {
   // Inputs
+  /** The absolute path to render as breadcrumb segments, e.g. `/games/arcade`. `/` or `''` renders only the root segment. */
   currentPath = input.required<string>();
+  /** Label for the root segment representing the storage device, e.g. `'SD Card'`. */
   storageType = input.required<string>();
 
   // Outputs
+  /** Emitted with the absolute path of whichever segment (visible chip or hidden-segment menu item) the user clicked. */
   navigationRequested = output<string>();
 
   // View references
+  /** Reference to the visible breadcrumb row, whose measured width drives the collapse calculation. */
   private breadcrumbContainer = viewChild<ElementRef<HTMLDivElement>>('breadcrumbContainer');
+  /** Reference to the hidden row rendering every segment at full width for measurement. */
   private measureContainer = viewChild<ElementRef<HTMLDivElement>>('measureContainer');
 
   // Signals for responsive behavior
+  /** Observes the breadcrumb container's size so the visible/hidden split stays in sync with available width. */
   private resizeObserver: ResizeObserver | null = null;
+  /** Segments currently rendered as chips. */
   visibleSegments = signal<PathSegment[]>([]);
+  /** Segments collapsed behind the hidden-segments dropdown trigger. */
   hiddenSegments = signal<PathSegment[]>([]);
 
   // Computed segments
+  /** Full breadcrumb segment list derived from `currentPath()` and `storageType()`. */
   pathSegments = computed(() => this.calculatePathSegments());
 
+  /** Whether any segments are currently collapsed behind the dropdown trigger. */
   hasHiddenSegments = computed(() => this.hiddenSegments().length > 0);
 
+  /** Resets to showing all segments and re-measures whenever `pathSegments` changes. */
   constructor() {
     // Update visible/hidden segments when path changes
     effect(() => {
@@ -63,6 +93,7 @@ export class DirectoryBreadcrumbComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  /** Starts observing the container's width for resize-driven recalculation, and schedules the initial measurement. */
   ngAfterViewInit(): void {
     // Set up ResizeObserver to detect container width changes
     const container = this.breadcrumbContainer()?.nativeElement;
@@ -82,6 +113,7 @@ export class DirectoryBreadcrumbComponent implements AfterViewInit, OnDestroy {
     setTimeout(() => this.calculateVisibleSegments(), 0);
   }
 
+  /** Disconnects the resize observer to avoid leaking it past the component's lifetime. */
   ngOnDestroy(): void {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
@@ -89,14 +121,17 @@ export class DirectoryBreadcrumbComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /** Emits `navigationRequested` for a visible breadcrumb chip. */
   onChipClick(path: string): void {
     this.navigationRequested.emit(path);
   }
 
+  /** Emits `navigationRequested` for a segment chosen from the hidden-segments dropdown. */
   onHiddenSegmentClick(path: string): void {
     this.navigationRequested.emit(path);
   }
 
+  /** Re-measures the container and splits `pathSegments` into `visibleSegments`/`hiddenSegments` so the visible chips fit the available width. */
   private calculateVisibleSegments(): void {
     const container = this.breadcrumbContainer()?.nativeElement;
     const measure = this.measureContainer()?.nativeElement;
@@ -150,6 +185,7 @@ export class DirectoryBreadcrumbComponent implements AfterViewInit, OnDestroy {
     this.visibleSegments.set(segments.slice(hiddenCount));
   }
 
+  /** Counts, from the end of the path, how many segment chips fit within `availableWidth` minus `prefixReserve`. */
   private calculateVisibleCount(params: {
     availableWidth: number;
     chips: HTMLElement[];
@@ -177,6 +213,7 @@ export class DirectoryBreadcrumbComponent implements AfterViewInit, OnDestroy {
     return Math.max(1, visibleCount);
   }
 
+  /** An element's offset width plus its horizontal margins. */
   private outerWidth(element: HTMLElement): number {
     const style = window.getComputedStyle(element);
     const marginLeft = Number.parseFloat(style.marginLeft) || 0;
@@ -184,6 +221,7 @@ export class DirectoryBreadcrumbComponent implements AfterViewInit, OnDestroy {
     return element.offsetWidth + marginLeft + marginRight;
   }
 
+  /** Splits `currentPath()` into a root segment (labeled `storageType()`) plus one cumulative-path segment per path part. */
   private calculatePathSegments(): PathSegment[] {
     const path = this.currentPath();
     const storageTypeLabel = this.storageType();

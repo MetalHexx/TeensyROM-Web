@@ -74,8 +74,13 @@ export interface TooltipConfig {
 /**
  * Tooltip Directive
  *
- * Provides tooltip functionality via attribute directive with intelligent device detection:
- * - **Desktop**: Displays tooltip on mouse hover (500ms delay)
+ * Attribute directive that shows a rich tooltip (optional title + body) on hover, built to
+ * replace Angular Material's `matTooltip` — that directive's CDK overlay created z-index
+ * conflicts with this app's animated dialogs and modal containers, so this directive
+ * renders via direct DOM manipulation instead (no overlay), delegated to
+ * `TooltipRendererService`, which positions the tooltip against the host element and flips
+ * it to stay within the viewport.
+ * - **Desktop**: Displays tooltip on mouse hover (default 500ms delay, per `TooltipConfig.delay`)
  * - **Touch/Mobile**: Tooltips are disabled entirely to avoid "stuck" tooltip UX issues
  *
  * @example
@@ -89,12 +94,19 @@ export interface TooltipConfig {
   standalone: true,
 })
 export class TooltipDirective implements OnDestroy {
+  /** Service that creates/destroys and positions the tooltip's DOM element against the host. */
   private tooltipRendererService = inject(TooltipRendererService);
+  /** Reference to the host element the tooltip is positioned against. */
   private elementRef = inject(ElementRef);
+  /** Provides the user's global tooltips-enabled preference. */
   private preferencesService = inject(PreferencesService);
+  /** Injected platform id, used to guard browser-only touch detection. */
   private platformId = inject(PLATFORM_ID);
+  /** The currently rendered tooltip element, or `null` when none is shown. */
   private currentTooltip: HTMLElement | null = null;
+  /** Pending show-tooltip timeout id, or `null` when none is scheduled. */
   private showTimeout: ReturnType<typeof setTimeout> | null = null;
+  /** Whether the current device supports touch, used to disable mouse-based tooltip behavior. */
   private isTouchDevice = false;
 
   /**
@@ -102,6 +114,7 @@ export class TooltipDirective implements OnDestroy {
    */
   libTooltip = input<TooltipConfig | undefined>();
 
+  /** Detects touch capability on the browser platform so tooltips can be disabled on touch devices. */
   constructor() {
     // Detect touch capability (browser only)
     if (isPlatformBrowser(this.platformId)) {

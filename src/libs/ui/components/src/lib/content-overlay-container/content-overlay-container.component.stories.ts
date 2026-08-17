@@ -5,6 +5,22 @@ const meta: Meta<ContentOverlayContainerComponent> = {
   title: 'Layout/Content Overlay Container',
   component: ContentOverlayContainerComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          '9-slot layout container for video players and media displays — a background ' +
+          '`content` slot plus 8 named overlay slots (corners, top/bottom centers, left/right ' +
+          'sides) with hover-to-reveal behavior, an inactivity timer, CDK overlay awareness, ' +
+          'and fullscreen support. Reach for this component when building a Netflix-style ' +
+          'media interface where controls should hide until the user interacts, rather than ' +
+          'a static layout component like `CardLayoutComponent`. Overlays stay visible while ' +
+          'a CDK overlay (dropdown, menu) opened from within the container is open, so ' +
+          'settings panels and menus don\'t flicker shut mid-interaction; use ' +
+          '`overlayLockCount` for programmatic overrides of that behavior.',
+      },
+    },
+  },
 };
 
 export default meta;

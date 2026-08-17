@@ -12,6 +12,21 @@ const meta: Meta<PresetNameDialogComponent> = {
   title: 'Overlay & Interaction/Preset Name Dialog',
   component: PresetNameDialogComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          '`lib-preset-name-dialog` is a plain presentational text-entry prompt — like ' +
+          '`ConfirmationDialogComponent`, it has no internal open/close state or positioning ' +
+          'of its own. Project it inside `DropdownDialogComponent`\'s `[dialog-content]` slot ' +
+          'to position it near the trigger that opened it, and call the wrapper\'s `.close()` ' +
+          'from `confirmed`/`cancelled`. Validation is entirely caller-driven: pass a ' +
+          '`validationFn` that checks the current name against `reservedNames` (or any other ' +
+          'rule) and returns an error string, or `\'\'` when the name is acceptable — `Save` ' +
+          'stays disabled and Enter is a no-op until it does.',
+      },
+    },
+  },
 };
 
 export default meta;

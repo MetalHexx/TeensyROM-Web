@@ -5,6 +5,14 @@ const meta: Meta<IconLabelComponent> = {
   title: 'Primitives/Icon Label',
   component: IconLabelComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "The library's standard icon + text pairing. Choosing a `size` preset scales the icon, primary text, secondary text, font weight, and gap spacing together, so the pairing keeps its visual proportions no matter where it's used — directory trees, file tables, device settings headers, navigation menus. Add `secondaryLabel` for a second line of detail (e.g. a status word or metadata) that scales down proportionally to the primary label. `IconLabelComponent` is purely presentational; wrap it in `ActionLinkComponent` or `ExternalLinkComponent` when the row needs to be clickable, or use `StatusIconLabelComponent` when it needs a success/error status glyph alongside the icon.",
+      },
+    },
+  },
   argTypes: {
     color: {
       control: 'select',

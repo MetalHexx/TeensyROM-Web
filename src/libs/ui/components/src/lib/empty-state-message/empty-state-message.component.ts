@@ -14,6 +14,12 @@ export type EmptyStateMessageSize = 'small' | 'medium' | 'large';
  * title, and optional descriptive text. Commonly used for "no data" scenarios like
  * empty lists, no search results, or missing connections.
  *
+ * Reach for `lib-empty-state-message` whenever a list, grid, or panel has nothing to
+ * show — it is not for transient loading states (use a spinner) or recoverable failures
+ * (use a dialog); it communicates a stable "there is nothing here" state. Icon and text
+ * colors come from the `--color-dimmed` and `--mat-sys-on-surface` design tokens; see the
+ * `style-guide` skill for their values.
+ *
  * @example
  * ```html
  * <!-- Basic usage with required fields -->
@@ -56,12 +62,17 @@ export class EmptyStateMessageComponent {
   message = input<string>();
 
   /**
-   * Optional secondary message text (typically dimmed/smaller)
+   * Optional secondary message text, typically dimmed and smaller than `message`. Rendered
+   * via `innerHTML`, so simple inline markup like `<strong>` is supported for emphasis —
+   * only pass trusted, non-user-controlled content.
    */
   secondaryMessage = input<string>();
 
   /**
-   * Size variant for the component
+   * Size variant controlling icon, title, and padding scale.
+   * - `'small'` — compact areas such as sidebar panels
+   * - `'medium'` — standard content areas (default)
+   * - `'large'` — full-page, prominent empty states
    * @default 'medium'
    */
   size = input<EmptyStateMessageSize>('medium');

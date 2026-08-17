@@ -28,16 +28,25 @@ const meta: Meta<CrtSettingsPanelOverlayComponent> = {
   component: CrtSettingsPanelOverlayComponent,
   tags: ['autodocs'],
   decorators: [moduleMetadata({ providers: [{ provide: CRT_STORAGE, useValue: mockCrtStorage }] })],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Thin CDK-overlay wrapper that portal-attaches `CrtSettingsPanelComponent` at an ' +
+          'anchored position instead of rendering it inline, so the panel can escape a ' +
+          'parent\'s `overflow: hidden`/clipping while staying visually pinned to its usual ' +
+          'spot. All inputs/outputs are a straight pass-through to the portal-attached panel ' +
+          '- see `CrtSettingsPanelComponent`\'s own story for the full slider/preset control ' +
+          'surface, not re-documented here. Prefer the plain `CrtSettingsPanelComponent` ' +
+          'unless overlay clipping is an actual problem in your layout.',
+      },
+    },
+  },
 };
 
 export default meta;
 type Story = StoryObj<CrtSettingsPanelOverlayComponent>;
 
-/**
- * `lib-crt-settings-panel-overlay` is a thin CDK-overlay wrapper that portal-attaches
- * `lib-crt-settings-panel` at an anchored position instead of rendering it inline. See the
- * panel's own story for the full slider/preset control surface - not re-documented here.
- */
 export const Default: Story = {
   args: {
     settings: DEFAULT_CRT_SETTINGS,

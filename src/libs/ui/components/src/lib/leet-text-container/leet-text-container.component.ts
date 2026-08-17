@@ -12,6 +12,24 @@ import { CommonModule } from '@angular/common';
 import type { AnimationParentMode } from '../shared/animation.types';
 import { PARENT_ANIMATION_COMPLETE } from '../shared/animation-tokens';
 
+/**
+ * Animates projected text with a continuous "leet speak" character-cycling effect — a demoscene-
+ * style wave that substitutes individual characters (`a` → `@`/`4`, `e` → `3`, `o` → `0`, etc.) as
+ * it sweeps forward then backward through the text — plus optional `/ - \ |` spinner glyphs before
+ * and/or after the text.
+ *
+ * This is the raw animation primitive: it has no fade-in/fade-out lifecycle of its own. Reach for
+ * `LoadingTextComponent` instead when you need a complete show/hide loading indicator; use
+ * `LeetTextContainerComponent` directly when you want the cycling text always visible, or need to
+ * drive your own visibility/animation-chaining logic via `animationTrigger` and `animationParent`.
+ *
+ * @example
+ * ```html
+ * <lib-leet-text-container [showFrontSpinner]="true" [animationTrigger]="isVisible()">
+ *   Loading...
+ * </lib-leet-text-container>
+ * ```
+ */
 @Component({
   selector: 'lib-leet-text-container',
   imports: [CommonModule],
@@ -67,19 +85,19 @@ export class LeetTextContainerComponent implements AfterViewInit, OnDestroy {
    */
   animationComplete = output<void>();
 
-  // Internal animation completion signal for child components (public for provider access)
+  /** Whether this container's animation has completed; provided to nested containers via `PARENT_ANIMATION_COMPLETE`. */
   animationCompleteSignal = signal(false);
 
-  // Track if the leet animation is running
+  /** Whether the leet character-cycling animation is currently running. */
   protected isAnimating = signal(false);
 
-  // The currently displayed text (may have leet characters during animation)
+  /** The text currently rendered, possibly with leet-substituted characters mid-animation. */
   protected displayText = signal('');
 
-  // Spinner character for the animation
+  /** The current `/ - \ |` spinner glyph. */
   protected spinnerChar = signal('');
 
-  // Leet character mappings
+  /** Substitution options per lowercase character, e.g. `a` → `@`/`4`/`a`. The last option in each list is always the original character. */
   private leetMap: Record<string, string[]> = {
     a: ['@', '4', 'a'],
     e: ['3', 'e'],
@@ -92,21 +110,27 @@ export class LeetTextContainerComponent implements AfterViewInit, OnDestroy {
     b: ['8', 'b'],
   };
 
-  // Spinner animation characters
+  /** Glyphs cycled through for the front/back spinner. */
   private spinnerChars = ['/', '-', '\\', '|'];
+  /** Index into `spinnerChars` for the currently displayed spinner glyph. */
   private spinnerIndex = 0;
+  /** Interval id driving the spinner glyph cycling; `null` when not running. */
   private spinnerInterval: ReturnType<typeof setInterval> | null = null;
+  /** Interval id driving `startLeetAnimation`'s fade cycle; `null` when not running. */
   private leetAnimationInterval: ReturnType<typeof setInterval> | null = null;
+  /** Interval id driving the continuous back-and-forth leet cycling; `null` when not running. */
   private cycleInterval: ReturnType<typeof setInterval> | null = null;
 
-  // Store text content from ng-content
+  /** Text projected via `ng-content`, extracted from the DOM after view init. */
   private textContent = signal<string>('');
 
+  /** Starts the spinner glyph cycling immediately on creation. */
   constructor(private elementRef: ElementRef) {
     // Start spinner animation
     this.startSpinner();
   }
 
+  /** Extracts the projected text content and starts the continuous leet-cycling animation. */
   ngAfterViewInit(): void {
     // Extract text content from ng-content (find the hidden div)
     const hiddenDiv = this.elementRef.nativeElement.querySelector('div[style*="display: none"]');
@@ -119,6 +143,7 @@ export class LeetTextContainerComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /** Continuously sweeps a single leet substitution forward then backward through the translatable characters of `text`, updating `displayText` every 200ms. */
   private startContinuousCycling(text: string): void {
     // Build list of indices that have leet mappings
     const translatableIndices: number[] = [];
@@ -179,6 +204,7 @@ export class LeetTextContainerComponent implements AfterViewInit, OnDestroy {
     this.cycleInterval = cycleInterval;
   }
 
+  /** Clears the spinner, leet-fade, and continuous-cycling intervals so none keep firing after teardown. */
   ngOnDestroy(): void {
     // Clean up spinner interval
     if (this.spinnerInterval) {
@@ -194,6 +220,7 @@ export class LeetTextContainerComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /** Starts cycling `spinnerChar` through `spinnerChars` every 100ms. */
   private startSpinner(): void {
     // Update spinner character every 100ms
     this.spinnerInterval = setInterval(() => {
@@ -202,6 +229,7 @@ export class LeetTextContainerComponent implements AfterViewInit, OnDestroy {
     }, 100);
   }
 
+  /** Runs a fade between fully-leet and normal text over `animationDuration()`, reversing direction each cycle, and sets `isAnimating` while it runs. */
   private startLeetAnimation(finalText: string): void {
     this.isAnimating.set(true);
     const duration = this.animationDuration();
@@ -240,6 +268,7 @@ export class LeetTextContainerComponent implements AfterViewInit, OnDestroy {
     this.leetAnimationInterval = animationInterval;
   }
 
+  /** Substitutes each translatable character of `text` with a random leet option with probability `leetAmount` (0 = original text, 1 = maximally substituted). */
   private generateLeetText(text: string, leetAmount: number): string {
     return text
       .split('')

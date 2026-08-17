@@ -75,40 +75,97 @@ import { AnyPresetName, CrtPresetName } from '../crt-effect-wrapper/crt-settings
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CrtSettingsPanelOverlayComponent {
+  /** CDK overlay service used to create and position the portal-attached panel. */
   private readonly overlay = inject(Overlay);
+  /** Used to register teardown logic that runs when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
   
   // ─────────────────────────────────────────────────────────────────────────
   // Inputs (pass-through to CrtSettingsPanelComponent)
   // ─────────────────────────────────────────────────────────────────────────
-  
+
+  /**
+   * Current CRT settings values, forwarded verbatim to the portal-attached
+   * `CrtSettingsPanelComponent`. See `CrtSettings` (in `@teensyrom-nx/domain`) for field
+   * meanings. Required — there is no default.
+   */
   readonly settings = input.required<CrtSettings>();
+
+  /**
+   * Controls which effect groups the portal-attached panel shows. See `CRT_CONFIGS` for
+   * the standard variants (small/smallVideo/large/none). Required — there is no default.
+   */
   readonly config = input.required<CrtSettingsConfig>();
+
+  /**
+   * Maximum height in pixels for the portal-attached panel; forwarded to
+   * `CrtSettingsPanelComponent.maxHeight`. Default `undefined` (panel grows to fit
+   * content).
+   */
   readonly maxHeight = input<number | undefined>(undefined);
+
+  /**
+   * Additional CSS class(es) forwarded to the portal-attached panel's card layout.
+   * Default `''`.
+   */
   readonly cardClass = input<string>('');
+
+  /**
+   * Optional label override for the current preset, forwarded to
+   * `CrtSettingsPanelComponent.currentPresetLabel`. Default `undefined` (falls back to
+   * the panel's built-in `CRT_PRESET_LABELS`).
+   */
   readonly currentPresetLabel = input<string>();
+
+  /**
+   * Built-in presets to exclude from the portal-attached panel's dropdown. Default `[]`
+   * (all built-in presets shown).
+   */
   readonly excludePresets = input<CrtPresetName[]>([]);
+
+  /**
+   * Validation function for preset names, forwarded to the portal-attached panel's
+   * name dialog. Should return `{ error: string | null }`. Required — there is no
+   * default.
+   */
   readonly validatePresetNameFn = input.required<(name: string, existingNames: string[]) => { error: string | null }>();
+
+  /**
+   * Debug mode state, forwarded to `CrtSettingsPanelComponent.debugMode`. Default
+   * `false`.
+   */
   readonly debugMode = input<boolean>(false);
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // Outputs (pass-through from CrtSettingsPanelComponent)
   // ─────────────────────────────────────────────────────────────────────────
-  
+
+  /** Re-emits the portal-attached panel's `settingsChange` with the updated `CrtSettings`. */
   readonly settingsChange = output<CrtSettings>();
+
+  /** Re-emits the portal-attached panel's `presetSelected` with the chosen preset name. */
   readonly presetSelected = output<AnyPresetName>();
+
+  /** Re-emits the portal-attached panel's `closed` event (its header close button was clicked). */
   readonly closed = output<void>();
+
+  /** Re-emits the portal-attached panel's `debugModeChange` with the new debug-mode state. */
   readonly debugModeChange = output<boolean>();
   
   // ─────────────────────────────────────────────────────────────────────────
   // Overlay Management
   // ─────────────────────────────────────────────────────────────────────────
   
+  /** Reference to the invisible anchor element the overlay is positioned against. */
   private readonly anchor = viewChild<ElementRef>('anchor');
+  /** Handle to the created CDK overlay, or `null` before creation/after disposal. */
   private overlayRef: OverlayRef | null = null;
+  /** Instance of the portal-attached `CrtSettingsPanelComponent`, or `null` when no overlay is attached. */
   private panelComponentInstance: CrtSettingsPanelComponent | null = null;
+  /** `ComponentRef` for the portal-attached panel, used to push input updates via `setInput`. */
   private panelComponentRef: ComponentRef<CrtSettingsPanelComponent> | null = null;
-  
+
+  /** Creates the overlay once the anchor is available, keeps its inputs in sync, and disposes it on destroy. */
   constructor() {
     // Create overlay when anchor is available (on init)
     effect(() => {

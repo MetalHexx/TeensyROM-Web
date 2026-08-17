@@ -22,6 +22,18 @@ const meta: Meta<StorageDeviceItemComponent> = {
   title: 'Navigation & Data/Storage Device Item',
   component: StorageDeviceItemComponent,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Renders a top-level storage device row (e.g. "SD Storage", "USB Storage"), ' +
+          'fixing the highlight icon color that `StorageItemComponent` otherwise leaves ' +
+          'open and sourcing its icon/name from a `StorageDeviceItem`. Choose it over the ' +
+          'bare `StorageItemComponent` for a device root row; reach for ' +
+          '`DirectoryItemComponent` instead for a folder within one of those roots.',
+      },
+    },
+  },
 };
 
 export default meta;

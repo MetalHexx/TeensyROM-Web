@@ -6,6 +6,19 @@ const meta: Meta<SwipePaneDirective> = {
   title: 'Overlay & Interaction/Swipe Pane',
   component: SwipePaneDirective,
   tags: ['autodocs'],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          '`[libSwipePane]` is the attribute directive `SwipePaneContainerComponent` reads ' +
+          'via `contentChildren(SwipePaneDirective)` to find its swipeable panes — it renders ' +
+          'nothing on its own and only makes sense applied to an `<ng-template>` nested ' +
+          'inside `lib-swipe-pane-container`, matching the container\'s consumption pattern. ' +
+          'The optional `label` input feeds the container\'s pagination-dot navigation; omit ' +
+          'it for panes that shouldn\'t be individually labelled.',
+      },
+    },
+  },
 };
 
 export default meta;

@@ -68,6 +68,11 @@ export { CrtPresetName, CRT_PRESETS };
  * The panel displays sliders only for effect groups enabled in the `config` input,
  * allowing flexible use cases (e.g., scanlines only, color filters only, full control).
  *
+ * Renders inline in the component tree. Reach for `CrtSettingsPanelOverlayComponent`
+ * instead when the panel must escape a clipping/overflow container via CDK Overlay while
+ * keeping the same visual position. Card chrome uses the `glassy-card` token — see the
+ * `style-guide` skill for the design-token reference.
+ *
  * @example
  * ```html
  * <!-- Full settings panel -->
@@ -121,6 +126,7 @@ export class CrtSettingsPanelComponent {
   // Dependencies
   // ─────────────────────────────────────────────────────────────────────────
 
+  /** Storage service used to load, save, rename, and delete custom CRT presets. */
   private readonly crtStorage = inject(CRT_STORAGE);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -128,19 +134,22 @@ export class CrtSettingsPanelComponent {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Current CRT settings values.
-   * These values populate the sliders and are used as base for change emissions.
+   * Current CRT settings values. Default `DEFAULT_CRT_SETTINGS` (the `LARGE_VIDEO_WEBGL`
+   * preset). These values populate the sliders and are used as the base object for
+   * change emissions — see `CrtSettings` (in `@teensyrom-nx/domain`) for what each field
+   * controls.
    */
   readonly settings = input<CrtSettings>(DEFAULT_CRT_SETTINGS);
 
   /**
-   * Controls which effect groups are shown in the panel.
-   * Use CRT_CONFIGS for common configurations matching CRT_PRESETS.
+   * Controls which effect groups are shown in the panel. Default `DEFAULT_CRT_CONFIG`
+   * (all groups shown). Use `CRT_CONFIGS` for the standard variants
+   * (small/smallVideo/large/none) matching `CRT_PRESETS`.
    */
   readonly config = input<CrtSettingsConfig>(DEFAULT_CRT_CONFIG);
 
   /**
-   * Additional CSS class(es) to forward to the inner compact card layout.
+   * Additional CSS class(es) to forward to the inner compact card layout. Default `''`.
    * Use this to apply context-specific styling like height constraints.
    */
   readonly cardClass = input<string>('');
@@ -191,7 +200,9 @@ export class CrtSettingsPanelComponent {
   readonly settingsChange = output<CrtSettings>();
 
   /**
-   * Debug mode state from parent component.
+   * Debug mode state from parent component. Default `false`. When `true`, exposes the
+   * debug-mode toggle control's checked state; wire to `CrtEffectWrapperComponent.debugMode`
+   * to enable its debug visualization overlay.
    */
   readonly debugMode = input<boolean>(false);
 
@@ -218,11 +229,13 @@ export class CrtSettingsPanelComponent {
   // Tooltip Configurations
   // ─────────────────────────────────────────────────────────────────────────
 
+  /** Tooltip config for the rename-custom-preset action. */
   readonly renamePresetTooltip: TooltipConfig = {
     body: 'Rename CRT preset',
     position: TooltipPosition.Top,
   };
 
+  /** Tooltip config for the delete-custom-preset action. */
   readonly deletePresetTooltip: TooltipConfig = {
     body: 'Delete CRT preset',
     position: TooltipPosition.Top,
@@ -232,16 +245,27 @@ export class CrtSettingsPanelComponent {
   // Slider Configurations (exposed for template)
   // ─────────────────────────────────────────────────────────────────────────
 
+  /** Slider definitions for the scanline effect group. */
   protected readonly scanlineSliders = SCANLINE_SLIDERS;
+  /** Slider definition for the vignette effect. */
   protected readonly vignetteSlider = VIGNETTE_SLIDER;
+  /** Slider definition for the screen distortion effect. */
   protected readonly distortionSlider = DISTORTION_SLIDER;
+  /** Slider definition for the bloom effect. */
   protected readonly bloomSlider = BLOOM_SLIDER;
+  /** Slider definition for the chromatic aberration effect. */
   protected readonly chromaticAberrationSlider = CHROMATIC_ABERRATION_SLIDER;
+  /** Slider definition for the screen curvature effect. */
   protected readonly curvatureSlider = CURVATURE_SLIDER;
+  /** Slider definitions for the color filter effect group. */
   protected readonly colorFilterSliders = COLOR_FILTER_SLIDERS;
+  /** Slider definition for the phosphor effect. */
   protected readonly phosphorSlider = PHOSPHOR_SLIDER;
+  /** Selectable phosphor pattern options for the phosphor pattern dropdown. */
   protected readonly phosphorPatternOptions = PHOSPHOR_PATTERN_OPTIONS;
+  /** Selectable monochrome phosphor options for the monochrome phosphor dropdown. */
   protected readonly monochromePhosphorOptions = MONOCHROME_PHOSPHOR_OPTIONS;
+  /** Selectable video standard (PAL/NTSC) options for the video standard dropdown. */
   protected readonly videoStandardOptions = VIDEO_STANDARD_OPTIONS;
 
   /** Video mode options filtered by current video standard */
@@ -307,6 +331,7 @@ export class CrtSettingsPanelComponent {
     return null;
   });
 
+  /** Loads custom presets from storage on creation, defaulting to an empty list on failure. */
   constructor() {
     try {
       const presets = this.crtStorage.loadCustomPresets();
