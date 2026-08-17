@@ -23,6 +23,7 @@ export interface TransferProgressVm {
   expansionComplete: boolean;
   expandedTotal: number | null;
   filesPerSecond: number;
+  uploadBytesPerSecond: number;
   bytesPerSecond: number;
   feed: TransferFeedEntry[];
   failures: TransferFeedEntry[];
@@ -208,9 +209,9 @@ export class TransferProgressComponent {
   );
 
   readonly rateLabel = computed(() => (this.renderShape() === 'terminal' ? 'Avg Rate' : 'Rate'));
-  readonly filesPerSecondLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)} Files/s`);
+  readonly uploadRateLabel = computed(() => `${formatFileSize(this.vm().uploadBytesPerSecond)}/s`);
   readonly bytesPerSecondLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)}/s`);
-  readonly filesPerSecondSpokenLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)} files per second`);
+  readonly uploadRateSpokenLabel = computed(() => `${formatFileSize(this.vm().uploadBytesPerSecond)} per second`);
   readonly bytesPerSecondSpokenLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)} per second`);
 
   readonly terminalBannerTreatment = computed(() => TERMINAL_BANNER_TREATMENT[this.vm().state] ?? null);

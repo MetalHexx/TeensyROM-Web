@@ -88,6 +88,7 @@ export class TransferModalComponent {
       expansionComplete: metrics.expansionComplete,
       expandedTotal: metrics.expandedTotal,
       filesPerSecond: job?.filesPerSecond ?? 0,
+      uploadBytesPerSecond: metrics.uploadBytesPerSecond,
       bytesPerSecond: job?.bytesPerSecond ?? 0,
       feed: transfer?.feed ?? [],
       failures: transfer?.failures ?? [],
