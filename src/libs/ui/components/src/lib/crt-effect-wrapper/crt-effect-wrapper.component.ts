@@ -53,14 +53,23 @@ const MAX_IMAGE_REFRESH_RETRIES = 3;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CrtEffectWrapperComponent {
+  /** Used to register teardown logic that runs when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
+  /** Injection context captured for use outside the constructor's injection context. */
   private readonly injector = inject(Injector);
+  /** Reference to the wrapper element whose projected content is detected and post-processed. */
   private readonly wrapperRef = viewChild<ElementRef<HTMLElement>>('wrapper');
+  /** Reference to the WebGL canvas the CRT post-process pass renders into. */
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('glCanvas');
+  /** Observes the wrapper element so canvas/container dimensions stay in sync with its size. */
   private resizeObserver: ResizeObserver | null = null;
+  /** The active WebGL CRT renderer, or `null` when unsupported or not yet initialized. */
   private renderer: CrtRenderer | null = null;
+  /** Media query tracking the current device pixel ratio, used to detect browser zoom changes. */
   private dprMediaQuery: MediaQueryList | null = null;
+  /** Handler re-attached to `dprMediaQuery` on each DPR change to keep tracking the current ratio. */
   private dprChangeHandler: (() => void) | null = null;
+  /** Watches the wrapper's projected content for added/removed video or image elements. */
   private contentObserver: MutationObserver | null = null;
 
   /** Track if component is destroyed to prevent operations during cleanup */
@@ -86,6 +95,7 @@ export class CrtEffectWrapperComponent {
    * Store reference to current image element for load event handling.
    */
   private currentImageElement: HTMLImageElement | null = null;
+  /** `load` listener attached to `currentImageElement` to trigger a render once it finishes loading. */
   private imageLoadHandler: (() => void) | null = null;
   
   /**
@@ -127,6 +137,7 @@ export class CrtEffectWrapperComponent {
    * Container dimensions for calculating visible content area.
    */
   private readonly containerWidth = signal<number>(0);
+  /** Current measured height (px) of the wrapper element. */
   private readonly containerHeight = signal<number>(0);
 
   /**
@@ -223,6 +234,7 @@ export class CrtEffectWrapperComponent {
    */
   protected readonly effectiveSettings = computed(() => this.settings());
 
+  /** Initializes WebGL/resize/DPR tracking after first render, and tears them all down on destroy. */
   constructor() {
     afterNextRender(() => {
       this.setupResizeObserver();

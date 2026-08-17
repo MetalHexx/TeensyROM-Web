@@ -66,23 +66,32 @@ export class DirectoryTreeComponent implements AfterViewInit {
   /** Emitted when a node with only a placeholder child is expanded, signaling the caller to fetch that node's real children. */
   nodeExpansionNeedsData = output<DirectoryTreeNode>();
 
+  /** Reference to the underlying `mat-tree`, used to programmatically expand nodes and query expansion state. */
   private readonly tree = viewChild<MatTree<DirectoryTreeNode>>('tree');
 
+  /** `mat-tree` children accessor: returns a node's children, or an empty array for leaves. */
   childrenAccessor = (node: DirectoryTreeNode) => node.children ?? [];
+  /** `mat-tree` predicate: whether a node has at least one child. */
   hasChild = (_: number, node: DirectoryTreeNode) => !!node.children && node.children.length > 0;
+  /** `mat-tree` predicate: whether a node is the lazy-loading placeholder type. */
   isPlaceholder = (_: number, node: DirectoryTreeNode) =>
     node.type === DirectoryTreeNodeType.Placeholder;
+  /** `trackBy` function for the tree's node iteration, keyed by node `id`. */
   trackByFn = (_: number, node: DirectoryTreeNode) => node.id;
+  /** Expansion-tracking key function for the tree, keyed by node `id`. */
   expansionKeyFn = (node: DirectoryTreeNode) => node.id;
 
+  /** Whether a node should render an expand/collapse toggle button. */
   shouldShowExpansionButton(node: DirectoryTreeNode): boolean {
     return !!node.children && node.children.length > 0;
   }
 
+  /** Auto-expands the lone device node (and its lone storage-type child, if there is exactly one) after the view initializes. */
   ngAfterViewInit() {
     this.autoExpandDirectoryNode();
   }
 
+  /** Expands every device node, and each device's sole storage-type child when it has exactly one. */
   private autoExpandDirectoryNode() {
     const treeComponent = this.tree();
     if (treeComponent) {
@@ -105,14 +114,17 @@ export class DirectoryTreeComponent implements AfterViewInit {
     }
   }
 
+  /** Whether the given node matches `selectedNodeId()`. */
   isNodeSelected(node: DirectoryTreeNode): boolean {
     return node.id === this.selectedNodeId();
   }
 
+  /** Emits `nodeActivated` for the given node. */
   onDirectoryClick(node: DirectoryTreeNode) {
     this.nodeActivated.emit(node);
   }
 
+  /** Activates a node on `Enter`/`Space`, matching the click behavior. */
   onNodeKeyDown(event: KeyboardEvent, node: DirectoryTreeNode) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -121,6 +133,7 @@ export class DirectoryTreeComponent implements AfterViewInit {
     }
   }
 
+  /** After the tree's expansion state updates, emits `nodeExpansionNeedsData` if the toggled node's only child is a placeholder. */
   onToggleClick(node: DirectoryTreeNode) {
     // Use setTimeout to let the Material Tree update its expansion state first
     setTimeout(() => {

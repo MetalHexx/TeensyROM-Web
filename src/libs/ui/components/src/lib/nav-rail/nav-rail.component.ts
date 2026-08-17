@@ -45,10 +45,14 @@ import { TooltipConfig, TooltipPosition } from '../tooltip/tooltip.directive';
 export class NavRailComponent {
   // --- Private State ---
 
+  /** Used to register teardown logic that runs when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
+  /** Pending hover-expand timer id, or `null` when no expand is scheduled. */
   private expandTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Pending hover-collapse timer id, or `null` when no collapse is scheduled. */
   private collapseTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Clears any pending expand/collapse timers when the component is destroyed. */
   constructor() {
     this.destroyRef.onDestroy(() => {
       this.clearExpandTimer();
@@ -206,6 +210,7 @@ export class NavRailComponent {
     this.pinClick.emit(newPinnedState);
   }
 
+  /** Schedules `isExpanded` to flip to `true` after `hoverDelayMs()`. */
   private startExpandTimer(): void {
     this.expandTimer = setTimeout(() => {
       this.isExpanded.set(true);
@@ -213,6 +218,7 @@ export class NavRailComponent {
     }, this.hoverDelayMs());
   }
 
+  /** Schedules `isExpanded` to flip to `false` after `hoverDelayMs()`. */
   private startCollapseTimer(): void {
     this.collapseTimer = setTimeout(() => {
       this.isExpanded.set(false);
@@ -220,6 +226,7 @@ export class NavRailComponent {
     }, this.hoverDelayMs());
   }
 
+  /** Cancels any pending expand timer. */
   private clearExpandTimer(): void {
     if (this.expandTimer !== null) {
       clearTimeout(this.expandTimer);
@@ -227,6 +234,7 @@ export class NavRailComponent {
     }
   }
 
+  /** Cancels any pending collapse timer. */
   private clearCollapseTimer(): void {
     if (this.collapseTimer !== null) {
       clearTimeout(this.collapseTimer);

@@ -180,22 +180,22 @@ export class SlidingContainerComponent {
   /** Emitted each time the entry or exit animation finishes. */
   animationComplete = output<void>();
 
-  // Internal animation completion signal for child components (public for provider access)
+  /** Whether this container's most recent expand/collapse animation has finished; provided to nested containers via `PARENT_ANIMATION_COMPLETE`. */
   animationCompleteSignal = signal(false);
 
-  // Track whether component should be in DOM (stays true during exit animation)
+  /** Whether the host element should stay rendered in the DOM (stays `true` through the exit animation, then flips to `false`). */
   private shouldBeInDom = signal(true);
 
-  // Expose for template
+  /** Read-only view of `shouldBeInDom` for the template. */
   protected shouldRenderInDom = this.shouldBeInDom.asReadonly();
 
-  // Inject parent completion signal (if exists)
+  /** The nearest ancestor animation container's completion signal, if any. */
   private parentComplete = inject(PARENT_ANIMATION_COMPLETE, {
     optional: true,
     skipSelf: true,
   });
 
-  // Determine when to render the container
+  /** Whether content should currently be shown, resolved from `animationTrigger`, then `animationParent`, defaulting to immediate render. */
   protected showContainer = computed(() => {
     const trigger = this.animationTrigger();
 
@@ -221,7 +221,7 @@ export class SlidingContainerComponent {
     return true;
   });
 
-  // Animation parameter computation
+  /** Full Angular animations state (`value` + height/width/transform/duration `params`) bound to the host's `@containerAnimation` trigger. */
   get animationParams() {
     const shouldShow = this.showContainer();
     const direction = this.animationDirection();
@@ -246,6 +246,7 @@ export class SlidingContainerComponent {
     };
   }
 
+  /** Marks the animation complete, emits `animationComplete`, and removes the host from the DOM once the exit animation finishes. */
   onContainerAnimationDone(): void {
     // Set internal signal for child components
     this.animationCompleteSignal.set(true);
@@ -259,7 +260,7 @@ export class SlidingContainerComponent {
     }
   }
 
-  // Effect to manage DOM presence based on showContainer changes
+  /** Re-enters the host into the DOM before the entry animation starts whenever `showContainer` flips to `true`. */
   constructor() {
     effect(() => {
       const shouldShow = this.showContainer();
@@ -272,6 +273,7 @@ export class SlidingContainerComponent {
     });
   }
 
+  /** Resolves a direction (including `'random'`, recursively) to its start/end height, width, and transform animation values. */
   private getAnimationValues(
     direction: ContainerAnimationDirection,
     height: string,

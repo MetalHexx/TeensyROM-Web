@@ -94,12 +94,19 @@ export interface TooltipConfig {
   standalone: true,
 })
 export class TooltipDirective implements OnDestroy {
+  /** Service that creates/destroys and positions the tooltip's DOM element against the host. */
   private tooltipRendererService = inject(TooltipRendererService);
+  /** Reference to the host element the tooltip is positioned against. */
   private elementRef = inject(ElementRef);
+  /** Provides the user's global tooltips-enabled preference. */
   private preferencesService = inject(PreferencesService);
+  /** Injected platform id, used to guard browser-only touch detection. */
   private platformId = inject(PLATFORM_ID);
+  /** The currently rendered tooltip element, or `null` when none is shown. */
   private currentTooltip: HTMLElement | null = null;
+  /** Pending show-tooltip timeout id, or `null` when none is scheduled. */
   private showTimeout: ReturnType<typeof setTimeout> | null = null;
+  /** Whether the current device supports touch, used to disable mouse-based tooltip behavior. */
   private isTouchDevice = false;
 
   /**
@@ -107,6 +114,7 @@ export class TooltipDirective implements OnDestroy {
    */
   libTooltip = input<TooltipConfig | undefined>();
 
+  /** Detects touch capability on the browser platform so tooltips can be disabled on touch devices. */
   constructor() {
     // Detect touch capability (browser only)
     if (isPlatformBrowser(this.platformId)) {

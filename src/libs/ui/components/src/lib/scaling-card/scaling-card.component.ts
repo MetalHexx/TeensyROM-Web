@@ -82,13 +82,13 @@ export class ScalingCardComponent {
    */
   animationParent = input<AnimationParentMode>(undefined);
 
-  // Inject parent completion signal (if exists)
+  /** The nearest ancestor animation container's completion signal, if any. */
   private parentComplete = inject(PARENT_ANIMATION_COMPLETE, {
     optional: true,
     skipSelf: true,
   });
 
-  // Determine when to render the scaling container
+  /** Value passed through to the inner `ScalingContainerComponent`'s `animationTrigger`, resolved from `animationTrigger()`, then `animationParent()`, defaulting to immediate render. */
   protected shouldRender = computed(() => {
     const trigger = this.animationTrigger();
 

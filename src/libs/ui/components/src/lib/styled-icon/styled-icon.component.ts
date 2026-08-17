@@ -62,6 +62,7 @@ export class StyledIconComponent {
    */
   size = input<StyledIconSize>('medium');
 
+  /** CSS class list applied to the icon element, derived from `size()` and `color()`. */
   iconClasses = computed(() => {
     const classes: string[] = [];
 

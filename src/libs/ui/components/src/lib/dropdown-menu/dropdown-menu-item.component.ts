@@ -64,6 +64,7 @@ import { DropdownMenuComponent } from './dropdown-menu.component';
   styleUrl: './dropdown-menu-item.component.scss'
 })
 export class DropdownMenuItemComponent {
+  /** The enclosing `DropdownMenuComponent`, if this item is projected inside one; `null` otherwise. */
   private readonly parentDropdown = inject(DropdownMenuComponent, { optional: true });
 
   /**
@@ -90,6 +91,7 @@ export class DropdownMenuItemComponent {
    */
   itemClick = output<Event>();
 
+  /** Emits `itemClick`, then closes the parent dropdown when `autoClose()` is `true` and a parent is present. */
   handleClick(event: Event): void {
     this.itemClick.emit(event);
     

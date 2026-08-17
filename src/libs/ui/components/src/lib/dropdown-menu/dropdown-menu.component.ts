@@ -40,6 +40,7 @@ import { CompactCardLayoutComponent } from '../compact-card-layout/compact-card-
   styleUrl: './dropdown-menu.component.scss'
 })
 export class DropdownMenuComponent {
+  /** Reference to the internal `DropdownDialogComponent` this menu delegates positioning and lifecycle to. */
   private dialogRef = viewChild.required<DropdownDialogComponent>('dialogRef');
 
   /** Read-only signal reflecting the internal `DropdownDialogComponent`'s open/closed state. */
@@ -51,6 +52,7 @@ export class DropdownMenuComponent {
   /** Emitted after the menu finishes closing (re-emits the internal dialog's `closed`). */
   closed = output<void>();
 
+  /** Subscribes to the internal dialog's `opened`/`closed` events and re-emits them as this menu's own outputs. */
   constructor() {
     // Connect dialog events to menu outputs
     effect(() => {
@@ -68,6 +70,7 @@ export class DropdownMenuComponent {
     });
   }
 
+  /** Opens the menu if closed, or closes it if open. */
   toggle(): void {
     if (this.dialogRef().isOpen()) {
       this.close();
@@ -76,10 +79,12 @@ export class DropdownMenuComponent {
     }
   }
 
+  /** Opens the menu's dropdown overlay. */
   open(): void {
     this.dialogRef().open();
   }
 
+  /** Closes the menu's dropdown overlay. */
   close(): void {
     this.dialogRef().close();
   }

@@ -161,39 +161,46 @@ export class VideoControlsToolbarComponent {
   // Tooltip Configurations
   // ─────────────────────────────────────────────────────────────────────────
 
+  /** Tooltip config for the CRT toggle button when CRT is currently on. */
   readonly crtOnTooltip: TooltipConfig = {
     title: 'Turn off CRT effect',
     position: TooltipPosition.Left,
   };
 
+  /** Tooltip config for the CRT toggle button when CRT is currently off. */
   readonly crtOffTooltip: TooltipConfig = {
     title: 'Turn on CRT effect',
     position: TooltipPosition.Left,
   };
 
+  /** Tooltip config for the CRT settings button. */
   readonly crtSettingsTooltip: TooltipConfig = {
     title: 'Open CRT settings',
     position: TooltipPosition.Left,
   };
 
+  /** Tooltip config for the device selector button. */
   readonly deviceSelectorTooltip: TooltipConfig = {
     title: 'Select Video Device',
-    body: `Select the source video capture device that is connected to your TeensyROM.\n 
+    body: `Select the source video capture device that is connected to your TeensyROM.\n
     ● Should work with most USB video capture devices.
     ● Ensure no other application is using the device.`,
     position: TooltipPosition.Left,
   };
 
+  /** Tooltip config for the fullscreen button when not currently fullscreen. */
   readonly enterFullscreenTooltip: TooltipConfig = {
     title: 'Enter fullscreen',
     position: TooltipPosition.Left,
   };
 
+  /** Tooltip config for the fullscreen button when currently fullscreen. */
   readonly exitFullscreenTooltip: TooltipConfig = {
     title: 'Exit fullscreen',
     position: TooltipPosition.Left,
   };
 
+  /** Tooltip config for the close button. */
   readonly closeTooltip: TooltipConfig = {
     title: 'Close',
     position: TooltipPosition.Left,
@@ -203,10 +210,12 @@ export class VideoControlsToolbarComponent {
   // Computed Properties
   // ─────────────────────────────────────────────────────────────────────────
 
-  readonly crtTooltip = computed(() => 
+  /** `crtOnTooltip`/`crtOffTooltip` selected by `isCrtEnabled()`. */
+  readonly crtTooltip = computed(() =>
     this.isCrtEnabled() ? this.crtOnTooltip : this.crtOffTooltip
   );
 
+  /** `exitFullscreenTooltip`/`enterFullscreenTooltip` selected by `isFullscreen()`. */
   readonly fullscreenTooltip = computed(() =>
     this.isFullscreen() ? this.exitFullscreenTooltip : this.enterFullscreenTooltip
   );

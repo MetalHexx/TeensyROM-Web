@@ -63,6 +63,7 @@ export class ActionLinkComponent {
     return customLabel || this.label();
   });
 
+  /** Emits `linkClick` when the button is activated and not disabled. */
   onButtonClick(): void {
     if (!this.disabled()) {
       this.linkClick.emit();

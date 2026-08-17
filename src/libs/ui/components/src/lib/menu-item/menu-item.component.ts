@@ -40,6 +40,7 @@ export class MenuItemComponent<T = unknown> {
   /** Emitted with the full `item` object on click, Enter, or Space. */
   @Output() menuClick = new EventEmitter<MenuItem<T>>();
 
+  /** Emits `menuClick` with this row's `item`. */
   onClick() {
     this.menuClick.emit(this.item);
   }

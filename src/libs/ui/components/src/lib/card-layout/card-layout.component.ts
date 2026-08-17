@@ -86,10 +86,13 @@ export class CardLayoutComponent implements AfterViewInit, OnDestroy {
    */
   glassyIntensity = input<GlassyIntensity>('dark');
 
+  /** Reference to the projected `corner` slot content, used to measure how much header space it needs. */
   private readonly cornerContent = viewChild<ElementRef<HTMLDivElement>>('cornerContent');
+  /** Observes the corner content's size so `cornerReservePx` stays in sync as it resizes. */
   private cornerResizeObserver: ResizeObserver | null = null;
+  /** Header space (in px) reserved for the corner slot, derived from its measured width. */
   protected cornerReservePx = signal(0);
-  
+
   /**
    * Computed CSS classes for the mat-card
    */
@@ -115,6 +118,7 @@ export class CardLayoutComponent implements AfterViewInit, OnDestroy {
     return classes.join(' ');
   });
 
+  /** Starts observing the corner slot's size once the view is initialized so header space can be reserved. */
   ngAfterViewInit(): void {
     this.updateCornerReserve();
 
@@ -134,11 +138,13 @@ export class CardLayoutComponent implements AfterViewInit, OnDestroy {
     this.cornerResizeObserver.observe(cornerElement);
   }
 
+  /** Disconnects the corner content resize observer to avoid leaking it past the component's lifetime. */
   ngOnDestroy(): void {
     this.cornerResizeObserver?.disconnect();
     this.cornerResizeObserver = null;
   }
 
+  /** Recomputes `cornerReservePx` from the corner slot's current measured width, or resets it to `0` when the slot is empty. */
   private updateCornerReserve(): void {
     const cornerElement = this.cornerContent()?.nativeElement;
     if (!cornerElement) {

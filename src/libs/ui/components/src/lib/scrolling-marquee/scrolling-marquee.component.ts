@@ -75,11 +75,15 @@ export class ScrollingMarqueeComponent {
   effect = input<MarqueeEffect>('none');
 
   // View children references
+  /** Reference to the fixed-width container the content scrolls within. */
   containerRef = viewChild.required<ElementRef<HTMLDivElement>>('container');
+  /** Reference to the scrolling content element, measured to compute the animation duration. */
   contentRef = viewChild.required<ElementRef<HTMLDivElement>>('content');
 
   // Internal state
+  /** Whether the marquee is currently scrolling (`true` whenever `text()` is non-empty). */
   shouldScroll = signal<boolean>(false);
+  /** Computed scroll animation duration in seconds, from content width and `speed()`. */
   scrollDuration = signal<number>(10); // Default duration in seconds
 
   /**
@@ -102,6 +106,7 @@ export class ScrollingMarqueeComponent {
    */
   private selectedEffect = signal<Exclude<MarqueeEffect, 'random'>>('none');
 
+  /** Resolves `'random'` effects and (re)measures overflow/duration on creation and whenever `text` changes. */
   constructor(private injector: Injector) {
     // Select random effect if 'random' is chosen, re-select when text changes
     effect(

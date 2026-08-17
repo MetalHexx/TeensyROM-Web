@@ -61,22 +61,27 @@ export class DirectoryTrailComponent {
   /** Emitted with the absolute path of the breadcrumb segment (visible or overflowed) the user chose to navigate to. */
   navigationRequested = output<string>();
 
+  /** Re-emits the navigate child's `backClicked`. */
   onBackClick(): void {
     this.backClicked.emit();
   }
 
+  /** Re-emits the navigate child's `forwardClicked`. */
   onForwardClick(): void {
     this.forwardClicked.emit();
   }
 
+  /** Re-emits the navigate child's `upClicked`. */
   onUpClick(): void {
     this.upClicked.emit();
   }
 
+  /** Re-emits the navigate child's `refreshClicked`. */
   onRefreshClick(): void {
     this.refreshClicked.emit();
   }
 
+  /** Re-emits the breadcrumb child's `navigationRequested` with the chosen path. */
   onNavigationRequested(path: string): void {
     this.navigationRequested.emit(path);
   }

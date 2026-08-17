@@ -40,10 +40,12 @@ export class StorageDeviceItemComponent {
   /** Emitted on double-click, single tap (touch), or Enter key press — the "open this storage" action. */
   itemDoubleClicked = output<StorageDeviceItem>();
 
+  /** Emits `itemSelected` with this row's `storageDevice`. */
   onItemClick(): void {
     this.itemSelected.emit(this.storageDevice());
   }
 
+  /** Emits `itemDoubleClicked` with this row's `storageDevice`. */
   onItemDoubleClick(): void {
     this.itemDoubleClicked.emit(this.storageDevice());
   }

@@ -90,9 +90,11 @@ export class IconButtonComponent {
   buttonClick = output<void>();
 
   // Computed properties
+  /** Whether a Material icon name is set via `icon()`, as opposed to a projected custom icon. */
   hasIcon = computed(() => !!this.icon());
 
   // Computed classes
+  /** CSS class list applied to the underlying `mat-icon-button`, derived from `size()` and `variant()`. */
   buttonClasses = computed(() => {
     const classes: string[] = [];
 
@@ -125,10 +127,12 @@ export class IconButtonComponent {
     return classes.join(' ');
   });
 
+  /** CSS class applied to the icon element, equal to `color()`. */
   iconClasses = computed(() => {
     return this.color();
   });
 
+  /** Emits `buttonClick` when the button is activated and not disabled. */
   onButtonClick(): void {
     if (!this.disabled()) {
       this.buttonClick.emit();

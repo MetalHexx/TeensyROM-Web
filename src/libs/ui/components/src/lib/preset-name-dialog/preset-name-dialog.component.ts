@@ -77,19 +77,23 @@ export class PresetNameDialogComponent implements OnInit {
   /** Emitted when Cancel is activated (click or Escape). */
   cancelled = output<void>();
 
+  /** Current value of the name input, seeded from `initialValue()` on init. */
   currentName = signal<string>('');
 
   // Tooltip configurations
+  /** Tooltip config for the save action. */
   readonly saveTooltip: TooltipConfig = {
     body: 'Save CRT preset',
     position: TooltipPosition.Top,
   };
 
+  /** Tooltip config for the cancel action. */
   readonly cancelTooltip: TooltipConfig = {
     body: 'Cancel',
     position: TooltipPosition.Top,
   };
 
+  /** Result of `validationFn()` against the current name; `''` when valid. */
   validationError = computed<string>(() => {
     const name = this.currentName();
     const reserved = this.reservedNames();
@@ -97,28 +101,34 @@ export class PresetNameDialogComponent implements OnInit {
     return validateFn(name, reserved);
   });
 
+  /** Character-count display in `"used/50"` form. */
   remainingChars = computed<string>(() => {
     const length = this.currentName().length;
     return `${length}/50`;
   });
 
+  /** Whether Save is currently enabled: no validation error and a non-blank name. */
   canSave = computed<boolean>(() => {
     return this.validationError() === '' && this.currentName().trim() !== '';
   });
 
+  /** Seeds `currentName` from `initialValue()`. */
   ngOnInit(): void {
     this.currentName.set(this.initialValue());
   }
 
+  /** Emits `confirmed` with the trimmed name when `canSave()` is `true`. */
   onSaveClick(): void {
     if (!this.canSave()) return;
     this.confirmed.emit(this.currentName().trim());
   }
 
+  /** Emits `cancelled`. */
   onCancelClick(): void {
     this.cancelled.emit();
   }
 
+  /** Saves on `Enter` (when valid) and cancels on `Escape`. */
   onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
       event.preventDefault();

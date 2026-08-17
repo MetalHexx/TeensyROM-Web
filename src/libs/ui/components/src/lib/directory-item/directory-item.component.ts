@@ -39,10 +39,12 @@ export class DirectoryItemComponent {
   /** Emitted on double-click, single tap (touch), or Enter key press — the "open this folder" action. */
   itemDoubleClicked = output<DirectoryItem>();
 
+  /** Emits `itemSelected` with this row's `directoryItem`. */
   onItemClick(): void {
     this.itemSelected.emit(this.directoryItem());
   }
 
+  /** Emits `itemDoubleClicked` with this row's `directoryItem`. */
   onItemDoubleClick(): void {
     this.itemDoubleClicked.emit(this.directoryItem());
   }

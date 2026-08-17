@@ -132,22 +132,22 @@ export class FadingContainerComponent {
   /** Emitted each time the entry or exit fade finishes. */
   animationComplete = output<void>();
 
-  // Internal animation completion signal for child components (public for provider access)
+  /** Whether this container's most recent fade animation has finished; provided to nested containers via `PARENT_ANIMATION_COMPLETE`. */
   animationCompleteSignal = signal(false);
 
-  // Track whether component should be in DOM (stays true during exit animation)
+  /** Whether the host element should stay rendered in the DOM (stays `true` through the exit animation, then flips to `false`). */
   private shouldBeInDom = signal(true);
 
-  // Expose for template
+  /** Read-only view of `shouldBeInDom` for the template. */
   protected shouldRenderInDom = this.shouldBeInDom.asReadonly();
 
-  // Inject parent completion signal (if exists)
+  /** The nearest ancestor animation container's completion signal, if any. */
   private parentComplete = inject(PARENT_ANIMATION_COMPLETE, {
     optional: true,
     skipSelf: true,
   });
 
-  // Determine when to render content (for DOM entry)
+  /** Whether content should currently be shown, resolved from `animationTrigger`, then `animationParent`, defaulting to immediate render. */
   protected shouldRender = computed(() => {
     const trigger = this.animationTrigger();
 
@@ -173,18 +173,19 @@ export class FadingContainerComponent {
     return true;
   });
 
-  // Determine animation state based on trigger logic
+  /** Angular animations state name (`'visible'`/`'hidden'`) derived from `shouldRender()`. */
   protected animationState = computed(() => {
     const shouldAnimate = this.shouldRender();
     return shouldAnimate ? 'visible' : 'hidden';
   });
 
-  // Animation state with duration params for Angular animations
+  /** `animationState` bundled with the `duration` animation param, bound to the host's `@fadeIn` trigger. */
   protected animationStateWithParams = computed(() => ({
     value: this.animationState(),
     params: { duration: this.animationDuration() },
   }));
 
+  /** Marks the animation complete, emits `animationComplete`, and removes the host from the DOM once the exit fade finishes. */
   onAnimationDone(): void {
     this.animationCompleteSignal.set(true);
     this.animationComplete.emit();
@@ -195,7 +196,7 @@ export class FadingContainerComponent {
     }
   }
 
-  // Effect to manage DOM presence based on shouldRender changes
+  /** Re-enters the host into the DOM before the entry animation starts whenever `shouldRender` flips to `true`. */
   constructor() {
     effect(() => {
       const shouldShow = this.shouldRender();

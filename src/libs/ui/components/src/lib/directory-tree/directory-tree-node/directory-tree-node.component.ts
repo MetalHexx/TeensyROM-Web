@@ -42,6 +42,7 @@ export class DirectoryTreeNodeComponent {
   /** The kind of node being rendered — drives the icon color (device: primary, storage: highlight, directory: directory, unset/other: highlight). See the exported `DirectoryTreeNodeType` enum (`@teensyrom-nx/domain`). */
   nodeType = input<DirectoryTreeNodeType>();
 
+  /** Icon color derived from `nodeType()`: `'primary'` for a device, `'directory'` for a directory, `'highlight'` otherwise. */
   readonly iconColor = computed<StyledIconColor>(() => {
     switch (this.nodeType()) {
       case DirectoryTreeNodeType.Device:

@@ -85,37 +85,44 @@ export class CycleImageComponent {
   imageChange = output<ImageChangeEvent>();
 
   // Signals for state management
+  /** Index of the currently displayed image within `effectiveImages`. */
   currentIndex = signal(0);
+  /** Index of the previously displayed image, shown during the cross-fade; `null` when not mid-transition. */
   previousIndex = signal<number | null>(null);
+  /** Whether the previous image layer is still visible during the cross-fade transition. */
   showPrevious = signal(false);
+  /** Incrementing counter used to key the fade-in animation trigger on each image change. */
   animationKey = signal(0);
 
-  // Computed signals - use placeholder if no images
+  /** `images()` when non-empty, otherwise a single-element array with `placeholderUrl()`. */
   private effectiveImages = computed(() => {
     const imgs = this.images();
     return imgs.length > 0 ? imgs : [this.placeholderUrl()];
   });
 
+  /** URL of the image currently shown, or `null` if `effectiveImages` is empty. */
   currentImage = computed(() => this.effectiveImages()[this.currentIndex()] || null);
+  /** URL of the image being faded out, or `null` when not mid-transition. */
   previousImage = computed(() => {
     const idx = this.previousIndex();
     return idx !== null ? this.effectiveImages()[idx] || null : null;
   });
+  /** Whether `effectiveImages` has more than one entry. */
   hasMultipleImages = computed(() => this.effectiveImages().length > 1);
-  
+
   /**
    * Determines if cycling should be active.
    * Only cycle when there are multiple images to display.
    */
   private shouldCycle = computed(() => this.images().length > 1);
 
-  // Simple mode disables blur/background effects for small sizes
+  /** Whether `size()` selects the simple, single-layer rendering mode (`'thumbnail'`/`'small'`). */
   isSimpleMode = computed(() => {
     const sz = this.size();
     return sz === 'thumbnail' || sz === 'small';
   });
-  
-  // Custom dimensions override size presets
+
+  /** Inline style overrides from `width()`/`height()`, or `null` when neither is set. */
   customStyles = computed(() => {
     const w = this.width();
     const h = this.height();
@@ -125,9 +132,10 @@ export class CycleImageComponent {
     return Object.keys(styles).length > 0 ? styles : null;
   });
 
-  // Dependency injection
+  /** Used to unsubscribe the cycling interval when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
 
+  /** Resets to the first image whenever `images()` changes, and starts the cycling interval when there is more than one image. */
   constructor() {
     // Reset when images change and trigger animation
     effect(() => {
@@ -176,6 +184,7 @@ export class CycleImageComponent {
     }
   }
 
+  /** Advances to the next image with a cross-fade, wrapping back to the first image at the end. */
   private cycleToNext(): void {
     // Guard: Don't cycle if only one image
     if (!this.shouldCycle()) {

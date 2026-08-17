@@ -55,24 +55,28 @@ export class DirectoryNavigateComponent {
   refreshClicked = output<void>();
 
   // Tooltip configurations
+  /** Tooltip config for the back button. */
   readonly backTooltip: TooltipConfig = {
     title: 'Previous Directory',
     body: 'Takes you to the previous directory in your navigation history',
     position: TooltipPosition.Top,
   };
 
+  /** Tooltip config for the forward button. */
   readonly forwardTooltip: TooltipConfig = {
     title: 'Next Directory',
     body: 'Takes you to the next directory in your navigation history',
     position: TooltipPosition.Top,
   };
 
+  /** Tooltip config for the up-to-parent button. */
   readonly upTooltip: TooltipConfig = {
     title: 'Parent Directory',
     body: 'Go to parent directory of the current directory',
     position: TooltipPosition.Top,
   };
 
+  /** Tooltip config for the refresh button. */
   readonly refreshTooltip: TooltipConfig = {
     title: 'Refresh Directory',
     body: 'Synchronizes the current directory with the latest files and subdirectories on your TeensyROM storage.',
@@ -80,18 +84,22 @@ export class DirectoryNavigateComponent {
   };
 
   // Event handlers
+  /** Emits `backClicked` when the back button is activated. */
   onBackClick(): void {
     this.backClicked.emit();
   }
 
+  /** Emits `forwardClicked` when the forward button is activated. */
   onForwardClick(): void {
     this.forwardClicked.emit();
   }
 
+  /** Emits `upClicked` when the up-to-parent button is activated. */
   onUpClick(): void {
     this.upClicked.emit();
   }
 
+  /** Emits `refreshClicked` when the refresh button is activated. */
   onRefreshClick(): void {
     this.refreshClicked.emit();
   }

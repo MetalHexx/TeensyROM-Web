@@ -83,25 +83,30 @@ export class ConfirmationDialogComponent {
   cancelled = output<void>();
 
   // Tooltip configurations
+  /** Tooltip config for the icon-only confirm button, naming `confirmLabel`. */
   readonly confirmTooltip = computed<TooltipConfig>(() => ({
     body: this.confirmLabel(),
     position: TooltipPosition.Top,
   }));
 
+  /** Tooltip config for the icon-only cancel button, naming `cancelLabel`. */
   readonly cancelTooltip = computed<TooltipConfig>(() => ({
     body: this.cancelLabel(),
     position: TooltipPosition.Top,
   }));
 
   // Event handlers
+  /** Emits `confirmed` when the confirm action is activated. */
   onConfirmClick(): void {
     this.confirmed.emit();
   }
 
+  /** Emits `cancelled` when the cancel action is activated. */
   onCancelClick(): void {
     this.cancelled.emit();
   }
 
+  /** Confirms on `Enter` and cancels on `Escape`. */
   onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Enter') {
       this.onConfirmClick();

@@ -51,9 +51,13 @@ import { trigger, transition, style, animate } from '@angular/animations';
   ]
 })
 export class DropdownDialogComponent {
+  /** The injected CDK `Overlay` service, captured as a signal for use in `open()`. */
   private overlay = signal<Overlay | null>(null);
+  /** Handle to the currently attached overlay, or `null` when closed. */
   private overlayRef = signal<OverlayRef | null>(null);
+  /** Reference to the `[dialog-content]` template attached into the overlay on `open()`. */
   private dialogTemplate = viewChild<TemplateRef<unknown>>('dialogTemplate');
+  /** Reference to the trigger element the overlay is positioned against. */
   private trigger = viewChild<ElementRef>('trigger');
 
   /**
@@ -73,10 +77,12 @@ export class DropdownDialogComponent {
   /** Emitted after `close()` disposes the overlay. */
   closed = output<void>();
 
+  /** Captures the injected `Overlay` service for use by `open()`. */
   constructor(overlay: Overlay, private viewContainerRef: ViewContainerRef) {
     this.overlay.set(overlay);
   }
 
+  /** Attaches the `[dialog-content]` template into a newly created, trigger-positioned CDK overlay. No-op when already open. */
   open(): void {
     if (this.isOpen()) return;
 
@@ -157,6 +163,7 @@ export class DropdownDialogComponent {
     this.opened.emit();
   }
 
+  /** Disposes the current overlay, restoring any fullscreen-moved elements to the CDK overlay container first. */
   close(): void {
     const overlayRef = this.overlayRef();
     

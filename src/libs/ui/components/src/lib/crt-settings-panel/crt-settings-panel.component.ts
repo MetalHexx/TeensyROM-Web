@@ -126,6 +126,7 @@ export class CrtSettingsPanelComponent {
   // Dependencies
   // ─────────────────────────────────────────────────────────────────────────
 
+  /** Storage service used to load, save, rename, and delete custom CRT presets. */
   private readonly crtStorage = inject(CRT_STORAGE);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -228,11 +229,13 @@ export class CrtSettingsPanelComponent {
   // Tooltip Configurations
   // ─────────────────────────────────────────────────────────────────────────
 
+  /** Tooltip config for the rename-custom-preset action. */
   readonly renamePresetTooltip: TooltipConfig = {
     body: 'Rename CRT preset',
     position: TooltipPosition.Top,
   };
 
+  /** Tooltip config for the delete-custom-preset action. */
   readonly deletePresetTooltip: TooltipConfig = {
     body: 'Delete CRT preset',
     position: TooltipPosition.Top,
@@ -242,16 +245,27 @@ export class CrtSettingsPanelComponent {
   // Slider Configurations (exposed for template)
   // ─────────────────────────────────────────────────────────────────────────
 
+  /** Slider definitions for the scanline effect group. */
   protected readonly scanlineSliders = SCANLINE_SLIDERS;
+  /** Slider definition for the vignette effect. */
   protected readonly vignetteSlider = VIGNETTE_SLIDER;
+  /** Slider definition for the screen distortion effect. */
   protected readonly distortionSlider = DISTORTION_SLIDER;
+  /** Slider definition for the bloom effect. */
   protected readonly bloomSlider = BLOOM_SLIDER;
+  /** Slider definition for the chromatic aberration effect. */
   protected readonly chromaticAberrationSlider = CHROMATIC_ABERRATION_SLIDER;
+  /** Slider definition for the screen curvature effect. */
   protected readonly curvatureSlider = CURVATURE_SLIDER;
+  /** Slider definitions for the color filter effect group. */
   protected readonly colorFilterSliders = COLOR_FILTER_SLIDERS;
+  /** Slider definition for the phosphor effect. */
   protected readonly phosphorSlider = PHOSPHOR_SLIDER;
+  /** Selectable phosphor pattern options for the phosphor pattern dropdown. */
   protected readonly phosphorPatternOptions = PHOSPHOR_PATTERN_OPTIONS;
+  /** Selectable monochrome phosphor options for the monochrome phosphor dropdown. */
   protected readonly monochromePhosphorOptions = MONOCHROME_PHOSPHOR_OPTIONS;
+  /** Selectable video standard (PAL/NTSC) options for the video standard dropdown. */
   protected readonly videoStandardOptions = VIDEO_STANDARD_OPTIONS;
 
   /** Video mode options filtered by current video standard */
@@ -317,6 +331,7 @@ export class CrtSettingsPanelComponent {
     return null;
   });
 
+  /** Loads custom presets from storage on creation, defaulting to an empty list on failure. */
   constructor() {
     try {
       const presets = this.crtStorage.loadCustomPresets();

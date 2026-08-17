@@ -187,26 +187,27 @@ export class ScalingContainerComponent {
   /** Emitted each time the entry or exit animation finishes. */
   animationComplete = output<void>();
 
-  // Internal animation completion signal for child components (public for provider access)
+  /** Whether this container's most recent scale animation has finished; provided to nested containers via `PARENT_ANIMATION_COMPLETE`. */
   animationCompleteSignal = signal(false);
 
-  // Track whether component should be in DOM (stays true during exit animation)
+  /** Whether the host element should stay rendered in the DOM (stays `true` through the exit animation, then flips to `false`). */
   private shouldBeInDom = signal(true);
 
-  // Expose for template
+  /** Read-only view of `shouldBeInDom` for the template. */
   protected shouldRenderInDom = this.shouldBeInDom.asReadonly();
 
-  // Memoize random direction selection per instance
+  /** Memoized `'random'` entry direction, picked once per instance so it stays stable across re-renders. */
   private selectedEntryDirection: Exclude<AnimationDirection, 'random' | 'none'> | null = null;
+  /** Memoized `'random'` exit direction, picked once per instance so it stays stable across re-renders. */
   private selectedExitDirection: Exclude<AnimationDirection, 'random' | 'none'> | null = null;
 
-  // Inject parent completion signal (if exists)
+  /** The nearest ancestor animation container's completion signal, if any. */
   private parentComplete = inject(PARENT_ANIMATION_COMPLETE, {
     optional: true,
     skipSelf: true,
   });
 
-  // Determine when to render content (for DOM entry)
+  /** Whether content should currently be shown, resolved from `animationTrigger`, then `animationParent`, defaulting to immediate render. */
   protected shouldRender = computed(() => {
     const trigger = this.animationTrigger();
 
@@ -232,7 +233,7 @@ export class ScalingContainerComponent {
     return true;
   });
 
-  // Determine animation state based on trigger logic
+  /** Full Angular animations state (`value` + transform/opacity `params`) bound to the host's `@scaleIn` trigger. */
   protected animationState = computed(() => {
     const shouldAnimate = this.shouldRender();
     const transformDuration = this.animationDuration();
@@ -250,6 +251,7 @@ export class ScalingContainerComponent {
     };
   });
 
+  /** Resolves a direction (including memoized `'random'`) to its CSS `translate()` offset for the entry-start or exit-end transform. */
   private getTransformForDirection(direction: AnimationDirection, isExit: boolean): string {
     // No animation - return no transform
     if (direction === 'none') {
@@ -294,6 +296,7 @@ export class ScalingContainerComponent {
     return directionMap[direction];
   }
 
+  /** Resolves a direction (including memoized `'random'`, matching the entry direction) to its CSS `transform-origin` value. */
   private getTransformOrigin(direction: AnimationDirection): string {
     const originMap: Record<Exclude<AnimationDirection, 'random' | 'none'>, string> = {
       'from-left': 'left center',
@@ -326,6 +329,7 @@ export class ScalingContainerComponent {
     return originMap[direction];
   }
 
+  /** Marks the animation complete, emits `animationComplete`, and removes the host from the DOM once the exit animation finishes. */
   onAnimationDone(): void {
     this.animationCompleteSignal.set(true);
     this.animationComplete.emit();
@@ -337,7 +341,7 @@ export class ScalingContainerComponent {
     }
   }
 
-  // Effect to manage DOM presence based on shouldRender changes
+  /** Re-enters the host into the DOM before the entry animation starts whenever `shouldRender` flips to `true`. */
   constructor() {
     effect(() => {
       const shouldShow = this.shouldRender();

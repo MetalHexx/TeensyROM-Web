@@ -43,6 +43,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VideoStreamComponent {
+  /** Used to register teardown logic that runs when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
 
   // Inputs
@@ -83,6 +84,7 @@ export class VideoStreamComponent {
   /** Shows loading state when no stream and loading is enabled */
   readonly showLoading = () => this.showLoadingState() && !this.stream() && !this.isPlaying();
 
+  /** Binds/unbinds `stream()` to the video element's `srcObject` as it changes, and clears it on destroy. */
   constructor() {
     // React to stream changes and bind to video element
     effect(() => {

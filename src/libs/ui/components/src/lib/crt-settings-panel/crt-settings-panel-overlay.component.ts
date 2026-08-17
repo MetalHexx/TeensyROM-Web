@@ -75,7 +75,9 @@ import { AnyPresetName, CrtPresetName } from '../crt-effect-wrapper/crt-settings
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CrtSettingsPanelOverlayComponent {
+  /** CDK overlay service used to create and position the portal-attached panel. */
   private readonly overlay = inject(Overlay);
+  /** Used to register teardown logic that runs when the component is destroyed. */
   private readonly destroyRef = inject(DestroyRef);
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -154,11 +156,16 @@ export class CrtSettingsPanelOverlayComponent {
   // Overlay Management
   // ─────────────────────────────────────────────────────────────────────────
   
+  /** Reference to the invisible anchor element the overlay is positioned against. */
   private readonly anchor = viewChild<ElementRef>('anchor');
+  /** Handle to the created CDK overlay, or `null` before creation/after disposal. */
   private overlayRef: OverlayRef | null = null;
+  /** Instance of the portal-attached `CrtSettingsPanelComponent`, or `null` when no overlay is attached. */
   private panelComponentInstance: CrtSettingsPanelComponent | null = null;
+  /** `ComponentRef` for the portal-attached panel, used to push input updates via `setInput`. */
   private panelComponentRef: ComponentRef<CrtSettingsPanelComponent> | null = null;
-  
+
+  /** Creates the overlay once the anchor is available, keeps its inputs in sync, and disposes it on destroy. */
   constructor() {
     // Create overlay when anchor is available (on init)
     effect(() => {

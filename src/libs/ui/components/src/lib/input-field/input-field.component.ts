@@ -67,36 +67,42 @@ export class InputFieldComponent implements ControlValueAccessor {
   /** Emits when the clear button is clicked, after the value has been reset to empty. */
   cleared = output<void>();
 
-  // Internal state
+  /** Current input value, kept in sync with the native `<input>` and the bound form control. */
   value = '';
-  
+
+  /** Registered `ControlValueAccessor` change callback, invoked with the new value on every keystroke. */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private onChange = (_value: string) => {
     // Callback function for form control changes
   };
+  /** Registered `ControlValueAccessor` touched callback, invoked on blur. */
   private onTouched = () => {
     // Callback function for form control touch events
   };
 
-  // ControlValueAccessor implementation
+  /** `ControlValueAccessor`: sets `value` from the bound form control (e.g. on `patchValue`/`reset`). */
   writeValue(value: string): void {
     this.value = value || '';
   }
 
+  /** `ControlValueAccessor`: registers the callback invoked with the new value on every keystroke. */
   registerOnChange(fn: (value: string) => void): void {
     this.onChange = fn;
   }
 
+  /** `ControlValueAccessor`: registers the callback invoked when the field is touched (blurred). */
   registerOnTouched(fn: () => void): void {
     this.onTouched = fn;
   }
 
+  /** `ControlValueAccessor`: no-op — disabled state is driven entirely by the `disabled` input. */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setDisabledState(_isDisabled: boolean): void {
     // Handled by the disabled input signal
   }
 
   // Event handlers
+  /** Updates `value`, notifies the form control, and emits `valueChange` on every keystroke. */
   onInput(event: Event): void {
     const target = event.target as HTMLInputElement;
     this.value = target.value;
@@ -104,15 +110,18 @@ export class InputFieldComponent implements ControlValueAccessor {
     this.valueChange.emit(this.value);
   }
 
+  /** Emits `inputFocus` when the native input receives focus. */
   onFocus(): void {
     this.inputFocus.emit();
   }
 
+  /** Notifies the form control it was touched and emits `inputBlur` when the native input loses focus. */
   onBlur(): void {
     this.onTouched();
     this.inputBlur.emit();
   }
 
+  /** Resets `value` to empty, notifies the form control, and emits `valueChange` then `cleared`. */
   onClear(): void {
     this.value = '';
     this.onChange(this.value);

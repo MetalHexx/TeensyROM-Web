@@ -112,11 +112,14 @@ export class IconLabelComponent {
   labelClass = input<string>('');
 
   // Computed signals for preset-based styling
+  /** `StyledIconComponent` size for the current `size()` preset. */
   iconSize = computed(() => SIZE_PRESETS[this.size()].iconSize);
+  /** Primary label CSS text-size class for the current `size()` preset. */
   textClass = computed(() => SIZE_PRESETS[this.size()].textClass);
+  /** Icon-to-text gap CSS class for the current `size()` preset. */
   gapClass = computed(() => SIZE_PRESETS[this.size()].gapClass);
 
-  // Computed signal for secondary text size class (scaled down from primary)
+  /** Secondary label CSS text-size class, scaled down from the primary `textClass` for the current `size()`. */
   secondaryTextClass = computed(() => {
     const sizeMap: Record<IconLabelSize, string> = {
       'small': 'text-xs',

@@ -83,6 +83,7 @@ export class ActionButtonComponent {
   buttonClick = output<void>();
 
   // Computed properties
+  /** CSS class list applied to the button host, adding a semantic color class for non-`'primary'`/`'normal'` colors. */
   buttonClasses = computed(() => {
     const classes: string[] = [];
 
@@ -95,6 +96,7 @@ export class ActionButtonComponent {
     return classes.join(' ');
   });
 
+  /** Material `color` input passed through to the underlying `mat-button`, derived from `color()`. */
   materialColor = computed(() => {
     // Use Material's natural color system for primary and normal
     // Only override for semantic colors that need custom styling
@@ -112,8 +114,10 @@ export class ActionButtonComponent {
     }
   });
 
+  /** Accessible label used on the host element: `ariaLabel()` when set, otherwise `label()`. */
   effectiveAriaLabel = computed(() => this.ariaLabel() || this.label());
 
+  /** Emits `buttonClick` when the button is activated and not disabled. */
   onButtonClick(): void {
     if (!this.disabled()) {
       this.buttonClick.emit();

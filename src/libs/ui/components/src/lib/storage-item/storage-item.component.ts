@@ -68,45 +68,56 @@ export class StorageItemComponent {
   /** Emitted on single click or Space key press — the row's selection-toggle action. */
   selectedChange = output<void>();
 
+  /** Set on touch end to suppress the synthetic `click` a tap generates immediately after emitting `activated`. */
   private suppressNextClick = false;
+  /** Horizontal touch start position (px), used to distinguish a tap from a swipe/scroll. */
   private touchStartX = 0;
+  /** Vertical touch start position (px), used to distinguish a tap from a swipe/scroll. */
   private touchStartY = 0;
 
+  /** Applies the `.selected` host class from `selected()`. */
   @HostBinding('class.selected')
   get isSelected(): boolean {
     return this.selected();
   }
 
+  /** Applies the `.active` host class from `active()`. */
   @HostBinding('class.active')
   get isActive(): boolean {
     return this.active();
   }
 
+  /** Applies the `.disabled` host class from `disabled()`. */
   @HostBinding('class.disabled')
   get isDisabled(): boolean {
     return this.disabled();
   }
 
+  /** Host `tabindex`: `-1` when `disabled()`, otherwise `0`. */
   @HostBinding('attr.tabindex')
   get tabIndex(): string {
     return this.disabled() ? '-1' : '0';
   }
 
+  /** Host ARIA `role`, always `'button'`. */
   @HostBinding('attr.role')
   get role(): string {
     return 'button';
   }
 
+  /** Host `aria-selected`, mirroring `selected()`. */
   @HostBinding('attr.aria-selected')
   get ariaSelected(): string {
     return this.selected().toString();
   }
 
+  /** Host `aria-disabled`, set to `'true'` when `disabled()`, otherwise omitted. */
   @HostBinding('attr.aria-disabled')
   get ariaDisabled(): string | null {
     return this.disabled() ? 'true' : null;
   }
 
+  /** Emits `selectedChange` on host click, unless suppressed by a just-handled tap or the row is disabled. */
   @HostListener('click')
   onClick(): void {
     if (this.suppressNextClick) {
@@ -118,6 +129,7 @@ export class StorageItemComponent {
     }
   }
 
+  /** Emits `activated` on host double-click, unless the row is disabled. */
   @HostListener('dblclick')
   onDoubleClick(): void {
     if (!this.disabled()) {
@@ -125,6 +137,7 @@ export class StorageItemComponent {
     }
   }
 
+  /** Records the touch start position for tap-vs-swipe detection in `onTouchEnd`. */
   @HostListener('touchstart', ['$event'])
   onTouchStart(event: TouchEvent): void {
     if (event.touches.length > 0) {
@@ -133,6 +146,7 @@ export class StorageItemComponent {
     }
   }
 
+  /** Emits `activated` for a tap (movement under the threshold) and suppresses the resulting synthetic click. */
   @HostListener('touchend', ['$event'])
   onTouchEnd(event: TouchEvent): void {
     if (this.disabled()) return;
@@ -150,6 +164,7 @@ export class StorageItemComponent {
     }
   }
 
+  /** Emits `activated` on `Enter`, unless the row is disabled. */
   @HostListener('keydown.enter')
   onEnterKey(): void {
     if (!this.disabled()) {
@@ -157,6 +172,7 @@ export class StorageItemComponent {
     }
   }
 
+  /** Emits `selectedChange` on `Space`, unless the row is disabled. */
   @HostListener('keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
     if (!this.disabled() && (event.code === 'Space' || event.key === ' ')) {
