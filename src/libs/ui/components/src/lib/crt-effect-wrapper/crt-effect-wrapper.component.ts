@@ -21,6 +21,14 @@ const MAX_IMAGE_REFRESH_RETRIES = 3;
  * provide the `contentAspectRatio` input to properly constrain CRT effects to the visible
  * content area (avoiding curvature/vignette on black bars).
  *
+ * Pair this with `CrtSettingsPanelComponent`/`CrtSettingsPanelOverlayComponent` for live
+ * editing of the `settings` object, and typically project a `VideoStreamComponent` or an
+ * `<img>` as the wrapped content — this component detects and post-processes whichever one
+ * it finds. Effect values are exposed as CSS custom properties (`--scanline-intensity`,
+ * `--crt-brightness`, etc.) and mirrored into a WebGL post-process pass; see the
+ * `crt-webgl-effects` skill for the full CRT system architecture and the CSS custom
+ * property reference.
+ *
  * @example
  * ```html
  * <!-- Full CRT effects on video -->
@@ -81,35 +89,37 @@ export class CrtEffectWrapperComponent {
   private imageLoadHandler: (() => void) | null = null;
   
   /**
-   * Debug mode input from parent component.
-   * (Phase 1.1 - Task 01.1-006)
+   * Enables debug visualization overlays (e.g. black-bar-crop detection bounds) for
+   * troubleshooting the WebGL pipeline. Default `false`; leave off in production UI.
    */
   readonly debugMode = input<boolean>(false);
 
   /**
    * Debug visualization state for black bar detection overlay.
    * Internal signal for tracking current debug state.
-   * (Phase 1.1 - Task 01.1-006)
    */
   readonly debugVisualizationEnabled = signal<boolean>(false);
 
   /**
-   * CRT effect configuration values.
-   * Use CRT_PRESETS for common configurations or provide custom values.
+   * CRT effect configuration values. Default `DEFAULT_CRT_SETTINGS` (the
+   * `LARGE_VIDEO_WEBGL` preset). Use `CRT_PRESETS` for common configurations or provide
+   * custom values — see `CrtSettings` (in `@teensyrom-nx/domain`) for what each field
+   * controls.
    */
   readonly settings = input<CrtSettings>(DEFAULT_CRT_SETTINGS);
 
   /**
-   * Whether CRT effects are applied.
-   * When false, content renders without any effects (smooth transition).
+   * Whether CRT effects are applied. Default `true`. When `false`, content renders
+   * without any effects (smooth transition via CSS, no unmount).
    */
   readonly enabled = input<boolean>(true);
 
   /**
    * Content aspect ratio (width/height) for proper effect positioning in fullscreen.
-   * When provided and content uses object-fit: contain, CRT effects are constrained
-   * to the visible content area via clip-path.
-   * Example: 4/3 for 4:3 video, 16/9 for 16:9 video.
+   * Default `null` (no adjustment — effects fill the full container). When provided and
+   * content uses `object-fit: contain`, CRT effects are constrained to the visible
+   * content area via clip-path, so curvature/vignette don't bleed onto letterbox/
+   * pillarbox black bars. Example: `4/3` for 4:3 video, `16/9` for 16:9 video.
    */
   readonly contentAspectRatio = input<number | null>(null);
 

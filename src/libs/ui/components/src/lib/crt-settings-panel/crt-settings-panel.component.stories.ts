@@ -29,6 +29,24 @@ const meta: Meta<CrtSettingsPanelComponent> = {
   component: CrtSettingsPanelComponent,
   tags: ['autodocs'],
   decorators: [moduleMetadata({ providers: [{ provide: CRT_STORAGE, useValue: mockCrtStorage }] })],
+  parameters: {
+    docs: {
+      description: {
+        component:
+          'Full-surface CRT settings editor: sliders and toggles for scanlines, vignette, ' +
+          'curvature, color filters, phosphor pattern, bloom, distortion, chromatic ' +
+          'aberration, and video-mode detection, plus a built-in/custom preset menu with ' +
+          'save/rename/delete. Reads and writes a single `CrtSettings` object shared with ' +
+          '`CrtEffectWrapperComponent` — this panel never applies effects itself, it only ' +
+          'emits `settingsChange` for the wrapper to consume. The `config` input (see ' +
+          '`CRT_CONFIGS`) controls which effect groups are shown, so the same component ' +
+          'serves a compact device-capture panel and a fullscreen dialog panel. Renders ' +
+          'inline in the component tree; use `CrtSettingsPanelOverlayComponent` instead when ' +
+          'the panel needs to render outside a clipping/overflow container via CDK Overlay. ' +
+          'Card chrome uses the `glassy-card` token documented in the `style-guide` skill.',
+      },
+    },
+  },
   argTypes: {
     debugMode: { control: 'boolean' },
   },

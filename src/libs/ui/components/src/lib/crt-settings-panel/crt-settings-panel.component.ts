@@ -68,6 +68,11 @@ export { CrtPresetName, CRT_PRESETS };
  * The panel displays sliders only for effect groups enabled in the `config` input,
  * allowing flexible use cases (e.g., scanlines only, color filters only, full control).
  *
+ * Renders inline in the component tree. Reach for `CrtSettingsPanelOverlayComponent`
+ * instead when the panel must escape a clipping/overflow container via CDK Overlay while
+ * keeping the same visual position. Card chrome uses the `glassy-card` token — see the
+ * `style-guide` skill for the design-token reference.
+ *
  * @example
  * ```html
  * <!-- Full settings panel -->
@@ -128,19 +133,22 @@ export class CrtSettingsPanelComponent {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Current CRT settings values.
-   * These values populate the sliders and are used as base for change emissions.
+   * Current CRT settings values. Default `DEFAULT_CRT_SETTINGS` (the `LARGE_VIDEO_WEBGL`
+   * preset). These values populate the sliders and are used as the base object for
+   * change emissions — see `CrtSettings` (in `@teensyrom-nx/domain`) for what each field
+   * controls.
    */
   readonly settings = input<CrtSettings>(DEFAULT_CRT_SETTINGS);
 
   /**
-   * Controls which effect groups are shown in the panel.
-   * Use CRT_CONFIGS for common configurations matching CRT_PRESETS.
+   * Controls which effect groups are shown in the panel. Default `DEFAULT_CRT_CONFIG`
+   * (all groups shown). Use `CRT_CONFIGS` for the standard variants
+   * (small/smallVideo/large/none) matching `CRT_PRESETS`.
    */
   readonly config = input<CrtSettingsConfig>(DEFAULT_CRT_CONFIG);
 
   /**
-   * Additional CSS class(es) to forward to the inner compact card layout.
+   * Additional CSS class(es) to forward to the inner compact card layout. Default `''`.
    * Use this to apply context-specific styling like height constraints.
    */
   readonly cardClass = input<string>('');
@@ -191,7 +199,9 @@ export class CrtSettingsPanelComponent {
   readonly settingsChange = output<CrtSettings>();
 
   /**
-   * Debug mode state from parent component.
+   * Debug mode state from parent component. Default `false`. When `true`, exposes the
+   * debug-mode toggle control's checked state; wire to `CrtEffectWrapperComponent.debugMode`
+   * to enable its debug visualization overlay.
    */
   readonly debugMode = input<boolean>(false);
 
