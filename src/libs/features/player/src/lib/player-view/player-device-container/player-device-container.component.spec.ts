@@ -90,11 +90,15 @@ function render(device: Device | undefined = createDevice()) {
 }
 
 describe('PlayerDeviceContainerComponent', () => {
+  // First test in the file to hit TestBed.createComponent, which pays the one-time cost
+  // of JIT-compiling this component. That cold compile can exceed the project's tight
+  // 2000ms testTimeout under CI load; every later test here reuses the compiled TestBed
+  // and stays fast, so only this test needs the extra headroom.
   it('creates', () => {
     const { component } = render();
 
     expect(component).toBeTruthy();
-  });
+  }, 10000);
 
   it('initializes the player for the device on construction', () => {
     const { context } = render(createDevice({ deviceId: 'device-42' }));
