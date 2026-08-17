@@ -6,6 +6,7 @@ import { clearTargetDevice } from './clear-target-device';
 import { beginScan } from './begin-scan';
 import { reportScanProgress } from './report-scan-progress';
 import { completeScan } from './complete-scan';
+import { reportUploadProgress } from './report-upload-progress';
 import { beginJob } from './begin-job';
 import { applyJobSnapshot } from './apply-job-snapshot';
 import { recordUploadFailure } from './record-upload-failure';
@@ -24,6 +25,7 @@ export function withTransferActions() {
       ...beginScan(writableStore),
       ...reportScanProgress(writableStore),
       ...completeScan(writableStore),
+      ...reportUploadProgress(writableStore),
       ...beginJob(writableStore),
       ...applyJobSnapshot(writableStore),
       ...recordUploadFailure(writableStore),

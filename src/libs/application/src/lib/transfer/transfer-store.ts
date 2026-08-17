@@ -55,6 +55,9 @@ export interface DeviceTransferState {
   // server has to help compute.
   scanTotal: number;
   archivesSent: number; // number of archive entries sent, of scanTotal
+  scanTotalBytes: number; // sum of the manifest's sizeBytes — the browser-to-API byte denominator
+  uploadedBytes: number; // bytes the browser has put on the wire
+  uploadBytesPerSecond: number; // live while running; the lifetime average once the job is terminal
   uploadFailedCount: number; // files that exhausted their upload attempts locally
   feed: TransferFeedEntry[]; // capped, newest first
   failures: TransferFeedEntry[]; // capped, for the end-of-job summary

@@ -104,10 +104,13 @@ export class TransferContextService implements ITransferContext {
       return;
     }
 
+    const scanTotalBytes = scanResult.entries.reduce((sum, entry) => sum + entry.sizeBytes, 0);
+
     this.store.completeScan({
       deviceId,
       scanTotal: scanResult.entries.length,
       archivesSent: scanResult.archiveCount,
+      scanTotalBytes,
     });
 
     if (scanResult.entries.length === 0) {
@@ -239,6 +242,13 @@ export class TransferContextService implements ITransferContext {
         },
         onFileFailed: (entry, reason) => {
           this.store.recordUploadFailure({ deviceId, relativePath: entry.relativePath, reason });
+        },
+        onBytesProgress: ({ bytesUploaded, bytesPerSecond }) => {
+          this.store.reportUploadProgress({
+            deviceId,
+            uploadedBytes: bytesUploaded,
+            uploadBytesPerSecond: bytesPerSecond,
+          });
         },
       },
       pending.uploadAbort.signal

@@ -30,6 +30,9 @@ class MockXMLHttpRequest {
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onabort: (() => void) | null = null;
+  upload = {
+    onprogress: null as ((e: { loaded: number }) => void) | null,
+  };
 
   constructor() {
     MockXMLHttpRequest.instances.push(this);
@@ -212,13 +215,15 @@ describe('TransferService', () => {
 
     function upload(
       relativePath: string,
-      signal: AbortSignal
+      signal: AbortSignal,
+      onProgress?: (bytesUploaded: number) => void
     ): { promise: Promise<void>; xhr: MockXMLHttpRequest } {
       const promise = service.uploadFile(
         'job-1',
         new File(['data'], 'file.prg'),
         relativePath,
-        signal
+        signal,
+        onProgress
       );
       const xhr = MockXMLHttpRequest.instances[MockXMLHttpRequest.instances.length - 1];
       return { promise, xhr };
@@ -300,6 +305,25 @@ describe('TransferService', () => {
 
       await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
       expect(xhr.aborted).toBe(true);
+    });
+
+    it('reports absolute bytes for this file from the upload object as progress arrives', () => {
+      const controller = new AbortController();
+      const onProgress = vi.fn();
+      const { xhr } = upload('game.prg', controller.signal, onProgress);
+
+      xhr.upload.onprogress?.({ loaded: 512 });
+      xhr.upload.onprogress?.({ loaded: 1024 });
+
+      expect(onProgress).toHaveBeenNthCalledWith(1, 512);
+      expect(onProgress).toHaveBeenNthCalledWith(2, 1024);
+    });
+
+    it('stays silent when no progress callback is passed', () => {
+      const controller = new AbortController();
+      const { xhr } = upload('game.prg', controller.signal);
+
+      expect(() => xhr.upload.onprogress?.({ loaded: 512 })).not.toThrow();
     });
   });
 });

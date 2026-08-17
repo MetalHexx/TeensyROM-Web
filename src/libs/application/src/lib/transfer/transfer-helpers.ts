@@ -8,7 +8,7 @@ import {
   TransferFeedEntry,
   TransferModalState,
 } from './transfer-store';
-import { TRANSFER_FEED_CAP, TRANSFER_FAILURE_CAP } from './transfer.constants';
+import { TRANSFER_FEED_CAP, TRANSFER_FAILURE_CAP, UPLOAD_RATE_MIN_DIVISOR_MS } from './transfer.constants';
 
 export type WritableStore<T extends object> = StateSignals<T> & WritableStateSource<T>;
 
@@ -20,6 +20,9 @@ export function createDefaultDeviceTransferState(deviceId: string): DeviceTransf
     scanFound: 0,
     scanTotal: 0,
     archivesSent: 0,
+    scanTotalBytes: 0,
+    uploadedBytes: 0,
+    uploadBytesPerSecond: 0,
     uploadFailedCount: 0,
     feed: [],
     failures: [],
@@ -154,6 +157,10 @@ export interface TransferMetrics {
   hasArchive: boolean;
   /** True once expansion has finished for a job that had archives. */
   expansionComplete: boolean;
+  uploadedBytes: number;
+  uploadTotalBytes: number;
+  /** Live while running; the lifetime average once the job is terminal. */
+  uploadBytesPerSecond: number;
 }
 
 // Floored and capped below 100: at scale, rounding the last fraction of a percent up reads as
@@ -179,8 +186,10 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
   const uploadFailedCount = transfer?.uploadFailedCount ?? 0;
   const scanTotal = transfer?.scanTotal ?? 0;
   const archivesSent = transfer?.archivesSent ?? 0;
+  const scanTotalBytes = transfer?.scanTotalBytes ?? 0;
+  const uploadedBytes = transfer?.uploadedBytes ?? 0;
 
-  if (!job) {
+  if (!transfer || !job) {
     return {
       uploaded: 0,
       written: 0,
@@ -192,6 +201,9 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
       expandingArchive: null,
       hasArchive: false,
       expansionComplete: false,
+      uploadedBytes,
+      uploadTotalBytes: scanTotalBytes,
+      uploadBytesPerSecond: 0,
     };
   }
 
@@ -216,7 +228,7 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
     uploaded: job.filesReceived,
     written: job.filesSent,
     failed: job.filesFailed + uploadFailedCount,
-    apiPct: isSealedOrTerminalJobState(job.state) ? 100 : pct(job.filesReceived, scanTotal),
+    apiPct: isSealedOrTerminalJobState(job.state) ? 100 : pct(uploadedBytes, scanTotalBytes),
     devicePct:
       job.state === TransferJobState.Completed
         ? 100
@@ -226,7 +238,31 @@ export function computeTransferMetrics(transfer: DeviceTransferState | null): Tr
     expandingArchive: job.expandingArchive,
     hasArchive: archivesSent > 0,
     expansionComplete: archivesSent > 0 && job.expandedFileCount != null,
+    uploadedBytes,
+    uploadTotalBytes: scanTotalBytes,
+    uploadBytesPerSecond: isTerminalJobState(job.state)
+      ? computeTerminalUploadBytesPerSecond(transfer, uploadedBytes)
+      : transfer.uploadBytesPerSecond,
   };
+}
+
+/**
+ * The lifetime average once a job is terminal: `uploadedBytes` over the elapsed seconds since
+ * `startedAt`. `lastUpdated` — the store's own timestamp of its last mutation, set on every
+ * action including the snapshot that lands the terminal state — stands in for a wall-clock read
+ * so this stays a pure function of its input. Floored the same way the live rate is: a job that
+ * finishes within the same millisecond it started cannot produce an absurd figure.
+ */
+function computeTerminalUploadBytesPerSecond(
+  transfer: DeviceTransferState,
+  uploadedBytes: number
+): number {
+  if (transfer.startedAt == null || transfer.lastUpdated == null) {
+    return 0;
+  }
+  const elapsedSeconds =
+    Math.max(transfer.lastUpdated - transfer.startedAt, UPLOAD_RATE_MIN_DIVISOR_MS) / 1000;
+  return uploadedBytes / elapsedSeconds;
 }
 
 /**

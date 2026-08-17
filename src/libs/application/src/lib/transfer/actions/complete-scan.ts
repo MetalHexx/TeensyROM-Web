@@ -6,11 +6,17 @@ export interface CompleteScanParams {
   deviceId: string;
   scanTotal: number;
   archivesSent?: number;
+  scanTotalBytes?: number;
 }
 
 export function completeScan(store: WritableStore<TransferState>) {
   return {
-    completeScan: ({ deviceId, scanTotal, archivesSent = 0 }: CompleteScanParams): void => {
+    completeScan: ({
+      deviceId,
+      scanTotal,
+      archivesSent = 0,
+      scanTotalBytes = 0,
+    }: CompleteScanParams): void => {
       const actionMessage = createAction('complete-scan');
       logInfo(
         LogType.Info,
@@ -21,6 +27,7 @@ export function completeScan(store: WritableStore<TransferState>) {
         ...state,
         scanTotal,
         archivesSent,
+        scanTotalBytes,
         phase: scanTotal === 0 ? 'nothing-to-transfer' : state.phase,
         isLoading: scanTotal === 0 ? false : state.isLoading,
         lastUpdated: Date.now(),

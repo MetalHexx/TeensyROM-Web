@@ -27,8 +27,8 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function createEntry(relativePath: string): TransferManifestEntry {
-  return { file: new File(['x'], relativePath), relativePath, sizeBytes: 1 };
+function createEntry(relativePath: string, sizeBytes = 1): TransferManifestEntry {
+  return { file: new File(['x'], relativePath), relativePath, sizeBytes };
 }
 
 function createSelectedDirectory(overrides: Partial<SelectedDirectory> = {}): SelectedDirectory {
@@ -265,6 +265,34 @@ describe('TransferContextService', () => {
         relativePath: 'games/b.prg',
         reason: 'network error',
       });
+    });
+  });
+
+  describe('byte progress wiring', () => {
+    it('captures the manifest total bytes at scan completion', async () => {
+      mockDropScanner.scan.mockResolvedValue({
+        entries: [createEntry('games/a.prg', 100), createEntry('games/b.prg', 250)],
+        rootName: 'games',
+        archiveCount: 0,
+      });
+
+      await runStartTransfer('device-1', asFileList([]));
+
+      expect(store.transfers()['device-1'].scanTotalBytes).toBe(350);
+    });
+
+    it('wires the upload pool\'s onBytesProgress callback into the store', async () => {
+      mockUploadPool.run.mockImplementation(
+        async (_jobId: string, _manifest: unknown, callbacks: UploadPoolCallbacks) => {
+          callbacks.onBytesProgress({ bytesUploaded: 500, bytesPerSecond: 200 });
+        }
+      );
+
+      await runStartTransfer('device-1', asFileList([]));
+
+      const transfer = store.transfers()['device-1'];
+      expect(transfer.uploadedBytes).toBe(500);
+      expect(transfer.uploadBytesPerSecond).toBe(200);
     });
   });
 
