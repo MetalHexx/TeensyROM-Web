@@ -713,4 +713,42 @@ describe('TransferProgressComponent', () => {
       expect(q('transfer-progress-live-region')?.textContent).not.toContain('per second');
     });
   });
+
+  // The phone-width reflow (below-phone.scss) is CSS-only — it never touches the template — so
+  // these guard the one thing a layout change could actually break: every figure and control
+  // that renders at desktop width is still present in the DOM, not dropped to make room.
+  describe('content survives a layout change — nothing removed', () => {
+    it('keeps every metric card, all three write bars, the elapsed readout, and the feed together while expanding an archive', async () => {
+      await setup(
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expandingArchive: 'HVSC-79/DEMOS/oldschool-pack.rar',
+          expansionPercent: 78,
+          elapsedLabel: '6:04 elapsed',
+        })
+      );
+
+      expect(qAll('.metric-label').length).toBe(3);
+      expect(q('expansion-bar')).toBeTruthy();
+      expect(q('api-bar')).toBeTruthy();
+      expect(q('device-bar')).toBeTruthy();
+      expect(q('transfer-progress-elapsed')).toBeTruthy();
+      expect(qAll('.feed-row').length).toBeGreaterThan(0);
+      expect(buttonByLabel('Cancel transfer')).toBeTruthy();
+      expect(q('transfer-progress-live-region')).toBeTruthy();
+    });
+
+    it('keeps every metric card, both write bars, the full failure list, and its overflow line together in a terminal state', async () => {
+      const failures = [feedEntry(1, false), feedEntry(2, false), feedEntry(3, false)];
+      await setup(baseVm({ state: 'completed', failures, failureOverflow: 2 }));
+
+      expect(qAll('.metric-label').length).toBe(3);
+      expect(q('api-bar')).toBeTruthy();
+      expect(q('device-bar')).toBeTruthy();
+      expect(qAll('.failure-row').length).toBe(3);
+      expect(q('transfer-progress-failures-overflow')?.textContent?.trim()).toBe('and 2 more');
+      expect(buttonByLabel('Close')).toBeTruthy();
+    });
+  });
 });

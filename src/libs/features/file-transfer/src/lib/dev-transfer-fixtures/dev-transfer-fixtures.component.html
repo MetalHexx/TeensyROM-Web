@@ -55,4 +55,21 @@
       </div>
     }
   </section>
+
+  <section class="fixture-section">
+    <h2 class="section-heading">Transfer modal — phone-width reflow</h2>
+    <p class="page-note">
+      Shrink the actual browser viewport below 640px to see these reflow — the boxes below only
+      pin the content-heaviest states together for a quick look, they do not force the breakpoint.
+    </p>
+
+    @for (item of phoneWidthFixtures; track item.label) {
+      <div class="fixture-block">
+        <p class="fixture-label">{{ item.label }}</p>
+        <div class="phone-frame">
+          <lib-transfer-progress class="glassy-card" [vm]="item.vm" />
+        </div>
+      </div>
+    }
+  </section>
 </div>
