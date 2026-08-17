@@ -416,7 +416,7 @@ describe('TransferContextService', () => {
       await startPromise;
     });
 
-    it('surfaces a rejected cancel call as a transfer failure', async () => {
+    it('surfaces a rejected cancel call as a cancel failure, not a start failure', async () => {
       const uploadGate = deferred<void>();
       mockUploadPool.run.mockImplementation(() => uploadGate.promise);
       mockTransferService.cancelJob.mockRejectedValueOnce(new Error('cancel endpoint unreachable'));
@@ -426,8 +426,35 @@ describe('TransferContextService', () => {
 
       await service.cancelTransfer('device-1');
 
-      expect(store.transfers()['device-1'].phase).toBe('failed');
+      expect(store.transfers()['device-1'].phase).toBe('cancel-failed');
+      expect(store.getTransferModalState('device-1')()).toBe('cancel-failed');
       expect(store.getTransferSummary('device-1')().reason).toBe('cancel endpoint unreachable');
+
+      uploadGate.resolve();
+      await startPromise;
+    });
+
+    it('keeps the cancelled screen when the hub lands the cancellation before the reply rejects', async () => {
+      const uploadGate = deferred<void>();
+      mockUploadPool.run.mockImplementation(() => uploadGate.promise);
+      const cancelReply = deferred<TransferJobSnapshot>();
+      mockTransferService.cancelJob.mockImplementation(() => cancelReply.promise);
+
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await advancePastStateFloors();
+
+      const cancelPromise = service.cancelTransfer('device-1');
+      await flushMicrotasks();
+
+      store.applyJobSnapshot({
+        deviceId: 'device-1',
+        snapshot: createSnapshot({ state: TransferJobState.Cancelled }),
+      });
+
+      cancelReply.reject(new Error('cancel reply lost on the way back'));
+      await cancelPromise;
+
+      expect(store.getTransferModalState('device-1')()).toBe('cancelled');
 
       uploadGate.resolve();
       await startPromise;

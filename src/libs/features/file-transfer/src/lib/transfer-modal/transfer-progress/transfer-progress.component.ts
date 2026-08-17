@@ -41,6 +41,7 @@ const STATE_SHAPES: Record<TransferModalState, RenderShape> = {
   starting: 'scan',
   'device-busy': 'busy-refusal',
   failed: 'busy-refusal',
+  'cancel-failed': 'busy-refusal',
   'nothing-to-transfer': 'nothing-to-transfer',
   receiving: 'active',
   draining: 'active',
@@ -69,6 +70,9 @@ const STATE_TITLES: Record<TransferModalState, (vm: TransferProgressVm) => strin
   'device-busy': () => 'Device Busy',
   'nothing-to-transfer': () => 'Nothing to transfer',
   failed: () => "Transfer couldn't start",
+  // The transfer did start — only the request to stop it failed, so it must not read as a
+  // start failure.
+  'cancel-failed': () => "Transfer couldn't be cancelled",
   receiving: (vm) => `Transferring to ${vm.deviceName}`,
   // Same wording as `receiving` — the title must not change when the job seals.
   draining: (vm) => `Transferring to ${vm.deviceName}`,
@@ -84,6 +88,7 @@ const STATE_BOTTOM_BAR: Record<TransferModalState, BottomBarMode> = {
   'device-busy': null,
   'nothing-to-transfer': null,
   failed: null,
+  'cancel-failed': null,
   // The write-bars (API/device) already cover progress for these states, so the modal-level
   // bar underneath the actions would be redundant.
   receiving: null,
@@ -117,6 +122,7 @@ const STATE_ANNOUNCEMENTS: Record<TransferModalState, (vm: TransferProgressVm) =
   'device-busy': (vm) => `${vm.deviceName} is busy. Nothing has been sent.`,
   'nothing-to-transfer': () => 'Nothing to transfer.',
   failed: (vm) => vm.reason ?? "Transfer couldn't start.",
+  'cancel-failed': (vm) => vm.reason ?? "Transfer couldn't be cancelled.",
   receiving: (vm) => {
     const expanding = vm.hasArchive && !vm.expansionComplete ? 'Expanding archives. ' : '';
     return `${expanding}${vm.devicePercent}% written to device. ${vm.uploaded} of ${vm.scanTotal} uploaded, ${vm.failed} failed.`;

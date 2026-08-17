@@ -11,6 +11,7 @@ import { applyJobSnapshot } from './apply-job-snapshot';
 import { recordUploadFailure } from './record-upload-failure';
 import { setDeviceBusy } from './set-device-busy';
 import { setTransferError } from './set-transfer-error';
+import { setCancelError } from './set-cancel-error';
 import { setActiveForeignJob } from './set-active-foreign-job';
 import { clearTransfer } from './clear-transfer';
 
@@ -28,6 +29,7 @@ export function withTransferActions() {
       ...recordUploadFailure(writableStore),
       ...setDeviceBusy(writableStore),
       ...setTransferError(writableStore),
+      ...setCancelError(writableStore),
       ...setActiveForeignJob(writableStore),
       ...clearTransfer(writableStore),
     };

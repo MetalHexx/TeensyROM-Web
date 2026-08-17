@@ -152,7 +152,7 @@ export class TransferContextService implements ITransferContext {
       this.store.applyJobSnapshot({ deviceId, snapshot });
     } catch (error) {
       logError(`TransferContextService: Failed to cancel job ${pending.jobId} for device ${deviceId}`, error);
-      this.store.setTransferError({
+      this.store.setCancelError({
         deviceId,
         error: error instanceof Error ? error.message : 'Failed to cancel transfer.',
       });

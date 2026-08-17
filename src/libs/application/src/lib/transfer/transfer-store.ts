@@ -19,6 +19,7 @@ export type TransferPhase =
   | 'starting' // creating the job
   | 'device-busy' // create refused as a conflict; the manifest is retained
   | 'failed' // create rejected for another reason; not retryable
+  | 'cancel-failed' // the cancel request itself failed; the job may still be running
   | 'running'; // a job exists — the displayed state comes from job.state
 
 /** Renderable states the transfer modal can be in; `null` from a selector means the modal is closed. */
@@ -28,6 +29,7 @@ export type TransferModalState =
   | 'device-busy'
   | 'nothing-to-transfer'
   | 'failed'
+  | 'cancel-failed'
   | 'receiving'
   | 'draining'
   | 'completed'

@@ -80,6 +80,7 @@ describe('TransferProgressComponent', () => {
       ['device-busy', 'Device Busy'],
       ['nothing-to-transfer', 'Nothing to transfer'],
       ['failed', "Transfer couldn't start"],
+      ['cancel-failed', "Transfer couldn't be cancelled"],
       ['receiving', 'Transferring to Unnamed'],
       ['draining', 'Transferring to Unnamed'],
       ['completed', 'Transfer Completed'],
@@ -127,6 +128,16 @@ describe('TransferProgressComponent', () => {
       await setup(baseVm({ state: 'failed', reason: 'the destination directory was rejected' }));
 
       expect(q('transfer-progress-banner')?.textContent).toContain('the destination directory was rejected');
+      expect(buttonByLabel('Close')).toBeTruthy();
+      expect(buttonByLabel('Retry')).toBeFalsy();
+    });
+  });
+
+  describe('cancel-failed', () => {
+    it('surfaces the cancel failure reason and offers only Close', async () => {
+      await setup(baseVm({ state: 'cancel-failed', reason: 'cancel endpoint unreachable' }));
+
+      expect(q('transfer-progress-banner')?.textContent).toContain('cancel endpoint unreachable');
       expect(buttonByLabel('Close')).toBeTruthy();
       expect(buttonByLabel('Retry')).toBeFalsy();
     });

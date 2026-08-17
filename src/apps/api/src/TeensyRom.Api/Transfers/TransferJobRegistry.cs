@@ -23,8 +23,9 @@ namespace TeensyRom.Api.Transfers
         public IReadOnlyCollection<TransferJob> All() => _jobs.Values.ToArray();
 
         /// <summary>
-        /// Evicts the job and disposes it. Only ever called for a job that is already terminal, so its
-        /// cancellation source has already been signalled and nothing is left to observe it.
+        /// Evicts the job and disposes it - either once it is terminal, or when a failed create rolls
+        /// it back before it is ever used. Safe in both cases because an evicted job is unreachable
+        /// from that point on, so nothing is left to observe its cancellation source.
         /// </summary>
         public void Remove(string jobId)
         {
