@@ -39,11 +39,13 @@ export class DropScanner {
     const progress = createProgressReporter(onProgress);
     let rootName: string | null = null;
 
-    for (const item of Array.from(items)) {
-      if (signal.aborted) break;
+    // Synchronous, before any await: the payload is only readable during the drop event's own turn.
+    const entries = Array.from(items)
+      .map((item) => item.webkitGetAsEntry())
+      .filter((entry): entry is FileSystemEntry => entry !== null);
 
-      const entry = item.webkitGetAsEntry();
-      if (!entry) continue;
+    for (const entry of entries) {
+      if (signal.aborted) break;
 
       if (entry.isDirectory) {
         if (rootName === null) {
