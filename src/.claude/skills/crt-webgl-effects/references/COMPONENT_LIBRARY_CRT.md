@@ -1063,6 +1063,6 @@ import {
 
 ## See Also
 
-- [COMPONENT_LIBRARY.md](../../component-library/references/COMPONENT_LIBRARY.md) - Main UI component catalog (`component-library` skill)
+- `pnpm component-docs list` / `pnpm component-docs get --component-name <name>` - Main UI component catalog (`component-library` skill)
 - [STYLE_GUIDE.md](../../style-guide/references/STYLE_GUIDE.md) - Global styles and theming (`style-guide` skill)
 - [USB_VIDEO_DEVICE_INFORMATION.md](../../usb-video-devices/references/USB_VIDEO_DEVICE_INFORMATION.md) - Video capture device integration (`usb-video-devices` skill)

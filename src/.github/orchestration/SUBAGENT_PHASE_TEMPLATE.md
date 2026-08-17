@@ -174,7 +174,7 @@ _Remove this section from the final plan — these are guardrails for the orches
 - [OVERVIEW_CONTEXT.md](../../docs/OVERVIEW_CONTEXT.md) - Architecture overview
 - [CODING_STANDARDS.md](../../docs/CODING_STANDARDS.md) - Code conventions
 - [TESTING_STANDARDS.md](../../docs/TESTING_STANDARDS.md) - Testing approach
-- [COMPONENT_LIBRARY.md](../../docs/COMPONENT_LIBRARY.md) - Reusable UI components
+- `pnpm component-docs list` / `pnpm component-docs get --component-name <name>` - Reusable UI components (`component-library` skill)
 - [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md) - Global styles and utilities
 
 ---

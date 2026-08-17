@@ -1,61 +1,41 @@
 ---
 name: component-library
-description: 'Catalog of shared Angular UI components for TeensyROM (cards, animated containers, feedback, forms, links, modals, menus, lists, icons, video/CRT, display, navigation, utilities). Use when asked to add a new shared UI component, use or compose existing components like CardLayoutComponent, ScalingCardComponent, IconButtonComponent, IconLabelComponent, StyledIconComponent, StorageItemComponent, DropdownMenuComponent, InputFieldComponent, ExternalLinkComponent, ActionLinkComponent, or understand component architecture, animation chaining, glassy effects, or import patterns from `@teensyrom-nx/ui/components`.'
+description: 'Workflow for discovering and using the shared Angular UI components for TeensyROM (cards, animated containers, feedback, forms, links, modals, menus, lists, icons, video/CRT, display, navigation, utilities). Use when asked to add a new shared UI component, use or compose existing components like CardLayoutComponent, ScalingCardComponent, IconButtonComponent, IconLabelComponent, StyledIconComponent, StorageItemComponent, DropdownMenuComponent, InputFieldComponent, ExternalLinkComponent, ActionLinkComponent, or understand component architecture, animation chaining, glassy effects, or import patterns from `@teensyrom-nx/ui/components`.'
 ---
 
 # Component Library Skill
 
-Catalog of all shared UI components in `libs/ui/components/src/lib/` for the TeensyROM Angular application.
+Workflow for working with the shared UI library at `libs/ui/components/src/lib/`. There is no catalog file to read here — the component index and per-component documentation are generated from source (JSDoc and Storybook `*.stories.ts` narrative) and served by the `component-docs` CLI, so they cannot drift from the code.
 
-## When to Use This Skill
+## The Four Moves
 
-- Before adding a new shared UI component — check whether one already exists
-- When using an existing shared component and you need its selector, inputs, outputs, or usage examples
-- Understanding component architecture, composition patterns, or the animation chaining system
-- Fixing import errors or wiring up `@teensyrom-nx/ui/components` exports
+1. **Reach for the library first.** Before building any new UI, check whether a shared component already covers the need:
 
-## Catalog Overview
+   ```
+   pnpm component-docs list --search <term>
+   pnpm component-docs get --component-name <name>
+   ```
 
-See [references/COMPONENT_LIBRARY.md](references/COMPONENT_LIBRARY.md) for the full catalog, organized by category:
+2. **Build new shared components in Storybook.** A new shared component ships with a `*.stories.ts` file from the start, so Storybook — and the generated index — stay current by construction rather than by cleanup.
 
-- **Layout Components** — `CardLayoutComponent`, `CompactCardLayoutComponent`
-- **Animated Card Components** — `ScalingCardComponent`, `ScalingCompactCardComponent`
-- **Animation Container Components** — `SlidingContainerComponent`, `ScalingContainerComponent`, `FadingContainerComponent`, `LoadingTextComponent`, `LeetTextContainerComponent`
-- **Animation System** — DI-based animation chaining via `PARENT_ANIMATION_COMPLETE`
-- **Feedback Components** — `EmptyStateMessageComponent`
-- **Form Components** — `InputFieldComponent`
-- **Link Components** — `LinkComponent`, `ActionLinkComponent`, `ExternalLinkComponent`
-- **Modal Components** — `YouTubeDialogComponent`
-- **Menu Components** — `DropdownMenuComponent`, `DropdownDialogComponent`, `DropdownMenuItemComponent`
-- **List Components** — `StorageItemComponent`, `StorageItemActionsComponent`, `IconButtonComponent`, `ActionButtonComponent`
-- **Icon Components** — `JoystickIconComponent`, `ImageIconComponent`, `ThumbnailImageComponent`
-- **Video & CRT Components** — see `COMPONENT_LIBRARY_CRT.md` for the full CRT emulation system
-- **Display & Label Components** — `CycleImageComponent`, `ScrollingMarqueeComponent`, `StyledIconComponent`, `IconLabelComponent`, `StatusIconLabelComponent`
-- **Navigation Components** — `MenuItemComponent`
-- **Utilities** — `TooltipDirective`
+3. **Document what you build.** Creating or changing a shared component means updating its JSDoc and its story narrative (`parameters.docs.description.component`, `argTypes` descriptions) in the same change. Because the index is generated from source, there is no third artifact to keep in sync.
 
-## Component Architecture
+4. **Run Storybook when a visual check is needed.** `pnpm nx run ui-components:storybook` serves on port 4400. Reach for it when you need to see rendered states or interact with controls; reach for the CLI instead when you just need a component's selector, inputs, outputs, or usage prose — it's faster and works headless.
 
-**Design Principles** — all shared components follow these patterns:
+## The CLI Surface
 
-1. **Standalone Components** — no NgModule dependencies, import directly into consuming components
-2. **Signal-Based Inputs** — use `input()` instead of `@Input()` decorators for type safety
-3. **Modern Control Flow** — `@if`, `@for`, `@switch` in templates
-4. **Content Projection** — flexible content via `<ng-content>` where appropriate
-5. **Material Design Integration** — built on Angular Material with custom styling
-
-**Import Pattern** — all components are exported from the single barrel:
-
-```typescript
-import { CardLayoutComponent, IconButtonComponent, IconLabelComponent } from '@teensyrom-nx/ui/components';
-
-@Component({
-  imports: [CardLayoutComponent, IconButtonComponent, IconLabelComponent],
-})
+```
+pnpm component-docs list [--search <term>] [--json]
+pnpm component-docs get --component-name <name> [--json]
+pnpm component-docs coverage [--min <pct>]
+# exit 0 success · 1 unknown name or below threshold · 2 the CLI could not run
 ```
 
-**Testing Support** — every component has comprehensive unit tests using Vitest covering rendering, signal-based inputs, content projection, conditional rendering, and accessibility.
+`--help` on any subcommand is self-describing — it is not necessary to remember this surface exactly.
+
+Cross-cutting systems that have no single component to live in (animation chaining, CRT effects) are documented the same way: as docs-only story files under `libs/ui/components/src/lib/systems/`, discovered and listed by the same CLI alongside components.
 
 ## Related Skills
 
 - **`style-guide`** — design tokens, breakpoints, utility classes, and Material customizations these components consume
+- **`crt-webgl-effects`** — the CRT/WebGL effects system in depth, including how to add a new shader effect

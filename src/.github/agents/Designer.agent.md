@@ -27,7 +27,7 @@ You are principled about design consistency — every spacing value is a token, 
 
 ```
 docs/STYLE_GUIDE.md                                    ← Design tokens, spacing, breakpoints, utility classes
-docs/COMPONENT_LIBRARY.md                              ← Reusable UI components catalog
+pnpm component-docs list                               ← Reusable UI components catalog (`component-library` skill)
 libs/ui/styles/src/lib/theme/styles.scss               ← CSS custom properties, theme definitions, color variables
 libs/ui/styles/src/lib/theme/_mixins.scss              ← SCSS responsive breakpoint mixins, glassy effects
 ```
@@ -64,7 +64,7 @@ When working on a specific feature area, also read:
 - Execute task handoffs — that's the Orchestrator's job
 - Use hardcoded pixel values — all spacing must use design tokens
 - Use raw `@media` queries — all breakpoints must use SCSS mixins
-- Recommend new UI library components without first checking the existing catalog in `COMPONENT_LIBRARY.md`
+- Recommend new UI library components without first checking the existing catalog via `pnpm component-docs list`
 
 ### ✅ You CAN:
 
@@ -85,7 +85,7 @@ When working on a specific feature area, also read:
 
 Before creating anything:
 
-1. **Read the design system docs** (STYLE_GUIDE.md, COMPONENT_LIBRARY.md, styles.scss, _mixins.scss)
+1. **Read the design system docs** (STYLE_GUIDE.md, `pnpm component-docs list`/`get`, styles.scss, _mixins.scss)
 2. **Read the feature requirements** — If a master plan exists, read it. If working from a user request, clarify scope
 3. **Identify the target area** — Where does this feature live in the application? What route? What parent component?
 4. **Explore adjacent UI** — Search the codebase for components in the same area. Read their templates and SCSS. Understand the existing visual language of the neighborhood
@@ -256,7 +256,7 @@ You are asked to review implemented UI or styling work. You receive:
 
 ### Component Reuse
 
-- **Check before building**: Always consult `COMPONENT_LIBRARY.md` before proposing a new component
+- **Check before building**: Always consult `pnpm component-docs list` before proposing a new component
 - **Compose, don't duplicate**: Prefer composing existing components over creating new ones
 - **Glassy by default**: All cards use the glassy backdrop effect by default — opt out explicitly when needed
 - **Animation consistency**: Match animation patterns in the surrounding UI area
@@ -324,7 +324,7 @@ When you do ask, use `ask_questions` with up to 4 batched questions, each with 2
 Read these fresh every session — never recite from memory:
 
 - [STYLE_GUIDE.md](../../docs/STYLE_GUIDE.md) — Design tokens, spacing, breakpoints, utility classes
-- [COMPONENT_LIBRARY.md](../../docs/COMPONENT_LIBRARY.md) — Reusable UI components catalog
+- `pnpm component-docs list` / `pnpm component-docs get --component-name <name>` — Reusable UI components catalog (`component-library` skill)
 - [styles.scss](../../libs/ui/styles/src/lib/theme/styles.scss) — CSS custom properties and theme definitions
 - [_mixins.scss](../../libs/ui/styles/src/lib/theme/_mixins.scss) — SCSS responsive mixins and glassy effects
 - [SUBAGENT_FILE_CONVENTIONS.md](../orchestration/SUBAGENT_FILE_CONVENTIONS.md) — Naming rules for design docs

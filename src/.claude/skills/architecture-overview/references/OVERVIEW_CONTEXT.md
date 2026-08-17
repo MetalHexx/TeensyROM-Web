@@ -381,7 +381,7 @@ libs/
 - **Themeable**: Consistent design system with dark/light theme support
 - **Framework Agnostic Logic**: Theme and styling logic separated from Angular-specific code
 
-**📖 Documentation**: See [COMPONENT_LIBRARY.md](COMPONENT_LIBRARY.md) for complete component catalog and [STYLE_GUIDE.md](STYLE_GUIDE.md) for global styles and utility classes
+**📖 Documentation**: Run `pnpm component-docs list` (or see the `component-library` skill) for the complete component catalog and [STYLE_GUIDE.md](STYLE_GUIDE.md) for global styles and utility classes
 
 ### Dependency Injection Patterns
 
@@ -447,7 +447,7 @@ import { ActionButtonComponent } from '@teensyrom-nx/ui/components';
 
 **📖 References**:
 
-- [COMPONENT_LIBRARY.md](COMPONENT_LIBRARY.md) - Complete component API documentation
+- `pnpm component-docs get --component-name <name>` (or the `component-library` skill) - Complete component API documentation
 - [STYLE_GUIDE.md](STYLE_GUIDE.md) - Global styling patterns and utility classes
 
 ### Code Organization Standards

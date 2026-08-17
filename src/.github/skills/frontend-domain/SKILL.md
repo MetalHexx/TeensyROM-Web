@@ -75,7 +75,7 @@ Mock only at infrastructure boundaries. See `docs/TESTING_STANDARDS.md` for full
 | Feature component testing | `docs/SMART_COMPONENT_TESTING.md` |
 | Store / state patterns | `docs/STATE_STANDARDS.md` |
 | Styling, spacing, breakpoints | `docs/STYLE_GUIDE.md` |
-| Reusable UI components | `docs/COMPONENT_LIBRARY.md` |
+| Reusable UI components | `pnpm component-docs list` (`component-library` skill) |
 | Service layer patterns | `docs/SERVICE_STANDARDS.md` |
 | Form patterns | `docs/FORM_STANDARDS.md` |
 | Logging | `docs/LOGGING_STANDARDS.md` |

@@ -512,7 +512,7 @@ https://github.com/MetalHexx/TeensyROM-Web/releases/download/v1.2.0/TeensyROM-We
 - **Backend Architecture**: [BACKEND_ARCHITECTURE.md](../../backend-architecture/references/BACKEND_ARCHITECTURE.md) - API design and serial communication (`backend-architecture` skill)
 - **Frontend Architecture**: [OVERVIEW_CONTEXT.md](../../architecture-overview/references/OVERVIEW_CONTEXT.md) - Angular architecture and Clean Architecture layers (`architecture-overview` skill)
 - **Testing Standards**: [TESTING_STANDARDS.md](../../testing-standards/references/TESTING_STANDARDS.md) - Unit, integration, and E2E testing approaches (`testing-standards` skill)
-- **Component Library**: [COMPONENT_LIBRARY.md](../../component-library/references/COMPONENT_LIBRARY.md) - Reusable UI components (`component-library` skill)
+- **Component Library**: `pnpm component-docs list` - Reusable UI components (`component-library` skill)
 
 ---
 
