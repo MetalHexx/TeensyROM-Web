@@ -150,6 +150,22 @@ const SCAN_THROUGH_DRAINING: ProgressFixture[] = [
     }),
   },
   {
+    label: 'cancel-failed',
+    vm: baseVm({
+      state: 'cancel-failed',
+      reason: 'cancel endpoint unreachable',
+      scanTotal: 1204,
+      uploaded: 842,
+      written: 640,
+      failed: 0,
+      filesPerSecond: 0,
+      bytesPerSecond: 0,
+      feed: [],
+      failures: [],
+      elapsedLabel: null,
+    }),
+  },
+  {
     label: 'receiving',
     vm: baseVm(),
   },

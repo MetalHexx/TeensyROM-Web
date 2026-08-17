@@ -66,6 +66,7 @@ const ALL_MODAL_STATES: TransferModalState[] = [
   'device-busy',
   'nothing-to-transfer',
   'failed',
+  'cancel-failed',
   'receiving',
   'draining',
   'completed',
@@ -101,6 +102,11 @@ function driveToState(
 
   if (state === 'failed') {
     store.setTransferError({ deviceId, error: 'Create rejected' });
+    return;
+  }
+
+  if (state === 'cancel-failed') {
+    store.setCancelError({ deviceId, error: 'Cancel rejected' });
     return;
   }
 

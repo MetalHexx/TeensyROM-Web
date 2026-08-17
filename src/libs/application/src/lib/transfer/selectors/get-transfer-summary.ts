@@ -18,8 +18,8 @@ export function formatElapsedLabel(startedAt: number, now: number): string {
 
 /**
  * The three derived display values the modal needs and nothing else computes. `reason` reads
- * as a fixed client-authored banner for cancelled/aborted/abandoned, and as the create failure's
- * own message for device-busy/failed; every other modal state has no banner.
+ * as a fixed client-authored banner for cancelled/aborted/abandoned, and as the failing call's
+ * own message for device-busy/failed/cancel-failed; every other modal state has no banner.
  */
 export function getTransferSummary(store: WritableStore<TransferState>) {
   return {
@@ -47,6 +47,7 @@ export function getTransferSummary(store: WritableStore<TransferState>) {
             break;
           case 'device-busy':
           case 'failed':
+          case 'cancel-failed':
             reason = transfer?.error ?? null;
             break;
           default:

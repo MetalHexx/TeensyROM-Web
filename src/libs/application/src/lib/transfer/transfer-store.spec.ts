@@ -342,6 +342,27 @@ describe('TransferStore', () => {
       expect(transfer.error).toBe('invalid destination');
     });
 
+    it('records a failed cancel under its own phase, distinct from a create failure', () => {
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot() });
+      store.setCancelError({ deviceId, error: 'cancel endpoint unreachable' });
+
+      const transfer = store.transfers()[deviceId];
+      expect(transfer.phase).toBe('cancel-failed');
+      expect(transfer.error).toBe('cancel endpoint unreachable');
+    });
+
+    it('ignores a failed cancel once the job has already settled', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Cancelled }),
+      });
+      store.setCancelError({ deviceId, error: 'cancel endpoint unreachable' });
+
+      const transfer = store.transfers()[deviceId];
+      expect(transfer.phase).toBe('running');
+      expect(transfer.error).toBeNull();
+    });
+
     it('records the busy-device pre-check independent of phase', () => {
       store.setActiveForeignJob({ deviceId, activeForeignJobId: 'foreign-job' });
 
@@ -392,6 +413,11 @@ describe('TransferStore', () => {
         'device-busy',
       ],
       ['failed', (id) => store.setTransferError({ deviceId: id, error: 'nope' }), 'failed'],
+      [
+        'cancel-failed',
+        (id) => store.setCancelError({ deviceId: id, error: 'nope' }),
+        'cancel-failed',
+      ],
       [
         'running/Created -> receiving',
         (id) =>
@@ -828,6 +854,7 @@ describe('TransferStore', () => {
       store.recordUploadFailure({ deviceId, relativePath: 'x.sid', reason: 'timeout' });
       store.setDeviceBusy({ deviceId, activeForeignJobId: 'x', error: 'busy' });
       store.setTransferError({ deviceId, error: 'nope' });
+      store.setCancelError({ deviceId, error: 'nope' });
       store.setActiveForeignJob({ deviceId, activeForeignJobId: null });
       store.clearTransfer({ deviceId });
       store.setTargetDevice({ deviceId });
@@ -843,6 +870,7 @@ describe('TransferStore', () => {
         'record-upload-failure',
         'set-device-busy',
         'set-transfer-error',
+        'set-cancel-error',
         'set-active-foreign-job',
         'clear-transfer',
         'set-target-device',

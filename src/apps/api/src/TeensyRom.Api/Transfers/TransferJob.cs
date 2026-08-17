@@ -475,7 +475,8 @@ namespace TeensyRom.Api.Transfers
 
         /// <summary>
         /// Releases the job's cancellation source. Called by <see cref="ITransferJobRegistry.Remove"/>
-        /// when a terminal job is evicted - the job is unreachable from that point on.
+        /// when a job is evicted - whether terminal or rolled back before use - and the job is
+        /// unreachable from that point on.
         /// </summary>
         public void Dispose() => _cancellation.Dispose();
     }
