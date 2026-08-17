@@ -1,3 +1,5 @@
+@use '../../../../styles/src/lib/theme/mixins' as styles;
+
 :host {
   display: block;
 }
@@ -58,13 +60,9 @@
   margin: var(--spacing-md) auto 0;
 }
 
-// Mobile responsiveness
-@media (max-width: 600px) {
-  .dialog-panel {
-    max-width: 100%;
-    margin: var(--spacing-sm);
-  }
-
+// Mobile responsiveness. The shared .glassy-dialog panel class now owns the frame
+// (width, margin) at phone width, so only the button-row layout stays here.
+@include styles.below-phone {
   .button-row {
     display: flex;
     flex-direction: column-reverse;

@@ -644,6 +644,22 @@ mat-card-title {
     background-color: transparent !important;
     box-shadow: none !important;
   }
+
+  @include mixins.below-phone {
+    // MatDialogConfig writes width/max-width as an inline style on this pane (Material's
+    // 80vw default, or a dialog's own override, e.g. the transfer dialog's 95vw) — only
+    // !important can win that seam so every dialog gets the same full-bleed frame here.
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 100dvh;
+
+    .mat-mdc-dialog-container {
+      width: 100%;
+      max-width: 100%;
+      max-height: 100dvh;
+      border-radius: 0;
+    }
+  }
 }
 
 // Lighter backdrop for busy/loading dialogs - uses Material's default semi-transparent color
