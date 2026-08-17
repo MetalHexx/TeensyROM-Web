@@ -60,7 +60,11 @@ export function toViteRootRelative(workspaceRelativePath: string): string {
 }
 
 /**
- * First sentence of a description — everything up to the first `. ` or line break, trimmed.
+ * First sentence of a description — everything up to the first real sentence boundary
+ * (a period followed by whitespace) or paragraph break, trimmed. JSDoc prose is routinely
+ * hand-wrapped across physical lines within a single paragraph, so those soft line breaks
+ * are folded into spaces before the boundary search runs; only a blank line (an actual
+ * paragraph break) stops the summary on its own.
  * Markdown syntax is left intact so the caller decides how to render it.
  */
 export function summarize(description: string | undefined): string {
@@ -69,13 +73,31 @@ export function summarize(description: string | undefined): string {
     return '';
   }
 
-  const boundary = /\.\s|\n/.exec(trimmed);
-  if (boundary === null) {
-    return trimmed;
-  }
+  const [firstParagraph] = trimmed.split(/\n\s*\n/);
+  // A wrap that lands right after a hyphen is mid-word (e.g. a hyphenated compound wrapping at
+  // its hyphen), so it joins with no space; every other wrap becomes a single space.
+  const collapsed = firstParagraph
+    .replace(/-\n\s*/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  const includesPeriod = boundary[0].startsWith('.') ? 1 : 0;
-  return trimmed.slice(0, boundary.index + includesPeriod).trim();
+  const boundary = findSentenceBoundary(collapsed);
+  return boundary === null ? collapsed : collapsed.slice(0, boundary + 1).trim();
+}
+
+/** Common technical abbreviations whose internal `. ` is not a sentence boundary. */
+const ABBREVIATION = /\b(?:e\.g|i\.e|etc|vs|approx|fig)\.$/i;
+
+/** Index of the `.` that ends the first real sentence, skipping abbreviation periods. */
+function findSentenceBoundary(text: string): number | null {
+  const boundaries = /\. /g;
+  let match: RegExpExecArray | null;
+  while ((match = boundaries.exec(text)) !== null) {
+    if (!ABBREVIATION.test(text.slice(0, match.index + 1))) {
+      return match.index;
+    }
+  }
+  return null;
 }
 
 /** True when a filesystem rejection means "the path is not there" rather than a real failure. */
