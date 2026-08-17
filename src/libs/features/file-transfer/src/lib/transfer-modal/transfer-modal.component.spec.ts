@@ -262,6 +262,18 @@ describe('TransferModalComponent', () => {
       expect(vm.filesPerSecond).toBe(0);
       expect(vm.bytesPerSecond).toBe(0);
     });
+
+    it('reads uploadBytesPerSecond from the metrics selector, not the job snapshot', async () => {
+      await setup();
+      transferStore.setTargetDevice({ deviceId });
+      driveToState(transferStore, deviceId, 'receiving');
+
+      createFixture();
+
+      const vm = component.vm();
+      const metrics = transferStore.getTransferMetrics(deviceId)();
+      expect(vm.uploadBytesPerSecond).toBe(metrics.uploadBytesPerSecond);
+    });
   });
 
   describe('elapsed ticker', () => {

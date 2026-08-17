@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
 import { TransferFeedEntry, TransferModalState } from '@teensyrom-nx/application';
+import { formatFileSize } from '@teensyrom-nx/domain';
 import { TransferProgressComponent, TransferProgressVm } from './transfer-progress.component';
 
 function feedEntry(index: number, success = true): TransferFeedEntry {
@@ -32,6 +33,7 @@ function baseVm(overrides: Partial<TransferProgressVm> = {}): TransferProgressVm
     expansionComplete: false,
     expandedTotal: null,
     filesPerSecond: 9.8,
+    uploadBytesPerSecond: 1_200_000,
     bytesPerSecond: 1_500_000,
     feed: [feedEntry(1), feedEntry(2, false)],
     failures: [feedEntry(2, false)],
@@ -167,77 +169,90 @@ describe('TransferProgressComponent', () => {
         })
       );
 
-      expect(q('metric-uploaded')?.textContent).toContain('8,412');
-      expect(q('metric-uploaded')?.textContent).toContain('12,480');
-      expect(q('metric-written')?.textContent).toContain('6,977');
+      expect(q('metric-upload-api')?.textContent).toContain('8,412');
+      expect(q('metric-upload-api')?.textContent).toContain('12,480');
+      expect(q('metric-upload-tr')?.textContent).toContain('6,977');
       expect(q('metric-failed')?.textContent?.trim()).toContain('4');
       expect(q('api-bar-pct')?.textContent?.trim()).toBe('67%');
       expect(q('device-bar-pct')?.textContent?.trim()).toBe('56%');
     });
 
-    it('orders the tiles Uploaded, Completed, Failed, Rate', async () => {
+    it('orders the tiles UPLOAD → API, UPLOAD → TR, Failed', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Rate']);
+      expect(labels).toEqual(['UPLOAD → API', 'UPLOAD → TR', 'Failed']);
     });
 
-    it('renders both rate figures, formatted', async () => {
-      await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
+    it('renders each hop card carrying its own byte rate, formatted', async () => {
+      await setup(baseVm({ state: 'receiving', uploadBytesPerSecond: 900_000, bytesPerSecond: 1_572_864 }));
 
-      expect(q('metric-rate')?.textContent).toContain('9.8 Files/s');
-      expect(q('metric-rate')?.textContent).toContain('1.5 MB/s');
+      expect(q('metric-upload-api')?.textContent).toContain(formatFileSize(900_000));
+      expect(q('metric-upload-tr')?.textContent).toContain(formatFileSize(1_572_864));
     });
 
-    it('reads 0.0/s and 0 B/s when stalled, not a held prior value', async () => {
-      await setup(baseVm({ state: 'receiving', filesPerSecond: 0, bytesPerSecond: 0 }));
+    it('reads a zero rate when stalled, not a held prior value', async () => {
+      await setup(baseVm({ state: 'receiving', uploadBytesPerSecond: 0, bytesPerSecond: 0 }));
 
-      expect(q('metric-rate')?.textContent).toContain('0.0 Files/s');
-      expect(q('metric-rate')?.textContent).toContain('0 B/s');
+      expect(q('metric-upload-api')?.querySelector('.metric-sub')?.textContent).toContain(formatFileSize(0));
+      expect(q('metric-upload-tr')?.querySelector('.metric-sub')?.textContent).toContain(formatFileSize(0));
     });
 
-    it('labels the rate tile "Rate" while running', async () => {
+    it('prefixes each hop rate with "Rate" while running', async () => {
       await setup(baseVm({ state: 'receiving' }));
-      expect(q('metric-rate')?.querySelector('.metric-label')?.textContent?.trim()).toBe('Rate');
+      expect(q('metric-upload-api')?.querySelector('.metric-sub')?.textContent).toContain('Rate');
+      expect(q('metric-upload-tr')?.querySelector('.metric-sub')?.textContent).toContain('Rate');
     });
 
-    it('labels the rate tile "Avg Rate" once terminal', async () => {
+    it('prefixes each hop rate with "Avg Rate" once terminal', async () => {
       await setup(baseVm({ state: 'completed' }));
-      expect(q('metric-rate')?.querySelector('.metric-label')?.textContent?.trim()).toBe('Avg Rate');
+      expect(q('metric-upload-api')?.querySelector('.metric-sub')?.textContent).toContain('Avg Rate');
+      expect(q('metric-upload-tr')?.querySelector('.metric-sub')?.textContent).toContain('Avg Rate');
     });
 
     it('renders a large uploaded-of-total value as one unbroken run', async () => {
       await setup(baseVm({ state: 'receiving', uploaded: 40000, scanTotal: 60000 }));
 
       // The gap before "/" is CSS margin, not a text character — the DOM text is unbroken.
-      const value = q('metric-uploaded')?.querySelector('.metric-value');
+      const value = q('metric-upload-api')?.querySelector('.metric-value');
       expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40,000/ 60,000');
     });
 
-    it('carries no denominator on the Completed tile until expandedTotal exists', async () => {
+    it('carries no denominator on the UPLOAD → TR tile until expandedTotal exists', async () => {
       await setup(baseVm({ state: 'receiving', written: 6977, expandedTotal: null }));
 
-      const value = q('metric-written')?.querySelector('.metric-value');
+      const value = q('metric-upload-tr')?.querySelector('.metric-value');
       expect(value?.textContent?.trim()).toBe('6,977');
-      const spoken = q('metric-written')?.querySelector('.visually-hidden');
-      expect(spoken?.textContent?.trim()).toBe('6,977');
+      const spoken = q('metric-upload-tr')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent).toContain('6,977');
+      expect(spoken?.textContent).not.toContain('of');
     });
 
-    it('carries the composed expandedTotal denominator on the Completed tile once it exists', async () => {
+    it('carries the composed expandedTotal denominator on the UPLOAD → TR tile once it exists', async () => {
       await setup(baseVm({ state: 'receiving', written: 842, expandedTotal: 1204 }));
 
-      const value = q('metric-written')?.querySelector('.metric-value');
+      const value = q('metric-upload-tr')?.querySelector('.metric-value');
       expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('842/ 1,204');
-      const spoken = q('metric-written')?.querySelector('.visually-hidden');
-      expect(spoken?.textContent?.trim()).toBe('842 of 1,204');
+      const spoken = q('metric-upload-tr')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent).toContain('842 of 1,204');
     });
 
-    it('captions the device bar "Transferred to TR"', async () => {
+    it('captions the device bar "UPLOAD → TR", matching its card', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
       const deviceCaption = q('device-bar-pct')?.parentElement;
-      expect(deviceCaption?.textContent).toContain('Transferred to TR');
-      expect(deviceCaption?.textContent).not.toContain('Transferred to TR Device');
+      const cardLabel = q('metric-upload-tr')?.querySelector('.metric-label')?.textContent?.trim();
+      expect(deviceCaption?.textContent).toContain('UPLOAD → TR');
+      expect(cardLabel).toBe('UPLOAD → TR');
+    });
+
+    it('captions the API bar "UPLOAD → API", matching its card', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+
+      const apiCaption = q('api-bar-pct')?.parentElement;
+      const cardLabel = q('metric-upload-api')?.querySelector('.metric-label')?.textContent?.trim();
+      expect(apiCaption?.textContent).toContain('UPLOAD → API');
+      expect(cardLabel).toBe('UPLOAD → API');
     });
 
     it('gives draining the same title format as receiving, not "Writing to"', async () => {
@@ -279,10 +294,10 @@ describe('TransferProgressComponent', () => {
       expect(q('transfer-progress-elapsed')?.textContent).toContain('3:07 elapsed');
     });
 
-    it('gives the Uploaded tile and the API bar the success treatment while draining', async () => {
+    it('gives the UPLOAD → API tile and the API bar the success treatment while draining', async () => {
       await setup(baseVm({ state: 'draining', uploaded: 12480, scanTotal: 12480, apiPercent: 100 }));
 
-      expect(q('metric-uploaded')?.classList.contains('metric-success')).toBe(true);
+      expect(q('metric-upload-api')?.classList.contains('metric-success')).toBe(true);
       expect(q('api-bar')?.classList.contains('progress-success')).toBe(true);
       expect(q('api-bar-pct')?.textContent?.trim()).toBe('100%');
     });
@@ -310,21 +325,25 @@ describe('TransferProgressComponent', () => {
     it('associates each metric label with its value through dt/dd', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
-      const tile = q('metric-uploaded');
+      const tile = q('metric-upload-api');
       expect(tile?.tagName).toBe('DIV');
       expect(tile?.querySelector('dt.metric-label')).toBeTruthy();
       expect(tile?.querySelector('dd.metric-value')).toBeTruthy();
       expect(q('transfer-progress-metrics')?.tagName).toBe('DL');
     });
 
-    it('gives the rate tile a spoken form for both figures with no raw slash-s glyph', async () => {
-      await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
+    it('gives each hop card a spoken form for its count and rate, with no raw slash-s glyph', async () => {
+      await setup(baseVm({ state: 'receiving', uploadBytesPerSecond: 900_000, bytesPerSecond: 1_572_864 }));
 
-      const spoken = q('metric-rate')?.querySelector('.visually-hidden');
-      expect(spoken?.textContent).toBeTruthy();
-      expect(spoken?.textContent).not.toContain('/s');
-      expect(spoken?.textContent).toContain('9.8');
-      expect(spoken?.textContent).toContain('1.5');
+      const uploadSpoken = q('metric-upload-api')?.querySelector('.visually-hidden');
+      expect(uploadSpoken?.textContent).toBeTruthy();
+      expect(uploadSpoken?.textContent).not.toContain('/s');
+      expect(uploadSpoken?.textContent).toContain(formatFileSize(900_000));
+
+      const deviceSpoken = q('metric-upload-tr')?.querySelector('.visually-hidden');
+      expect(deviceSpoken?.textContent).toBeTruthy();
+      expect(deviceSpoken?.textContent).not.toContain('/s');
+      expect(deviceSpoken?.textContent).toContain(formatFileSize(1_572_864));
     });
 
     it('renders the recent feed as a named list of items matching the entries supplied', async () => {
@@ -466,8 +485,8 @@ describe('TransferProgressComponent', () => {
 
       expect(q('transfer-progress-summary')).toBeFalsy();
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Avg Rate']);
-      expect(q('metric-written')?.textContent).toContain('12,474');
+      expect(labels).toEqual(['UPLOAD → API', 'UPLOAD → TR', 'Failed']);
+      expect(q('metric-upload-tr')?.textContent).toContain('12,474');
       expect(q('metric-failed')?.textContent).toContain('6');
       expect(q('api-bar')).toBeTruthy();
       expect(q('device-bar')).toBeTruthy();
@@ -484,23 +503,23 @@ describe('TransferProgressComponent', () => {
     it('carries the composed expandedTotal denominator, not the upload scanTotal, once an archive job settles', async () => {
       await setup(baseVm({ state: 'completed', written: 12474, scanTotal: 12480, expandedTotal: 12474 }));
 
-      const value = q('metric-written')?.querySelector('.metric-value');
+      const value = q('metric-upload-tr')?.querySelector('.metric-value');
       expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('12,474/ 12,474');
-      const spoken = q('metric-written')?.querySelector('.visually-hidden');
-      expect(spoken?.textContent?.trim()).toBe('12,474 of 12,474');
+      const spoken = q('metric-upload-tr')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent).toContain('12,474 of 12,474');
     });
 
-    it('carries no denominator on the Completed tile for an archive-free job', async () => {
+    it('carries no denominator on the UPLOAD → TR tile for an archive-free job', async () => {
       await setup(baseVm({ state: 'completed', written: 12474, scanTotal: 12480, expandedTotal: null }));
 
-      const value = q('metric-written')?.querySelector('.metric-value');
+      const value = q('metric-upload-tr')?.querySelector('.metric-value');
       expect(value?.textContent?.trim()).toBe('12,474');
     });
 
-    it('keeps the Uploaded tile on the browser scan total even when expandedTotal exists', async () => {
+    it('keeps the UPLOAD → API tile on the browser scan total even when expandedTotal exists', async () => {
       await setup(baseVm({ state: 'completed', uploaded: 1204, scanTotal: 1204, expandedTotal: 1197 }));
 
-      const value = q('metric-uploaded')?.querySelector('.metric-value');
+      const value = q('metric-upload-api')?.querySelector('.metric-value');
       expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('1,204/ 1,204');
     });
 
