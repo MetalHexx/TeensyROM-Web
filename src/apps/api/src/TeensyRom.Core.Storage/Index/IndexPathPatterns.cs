@@ -18,6 +18,7 @@ namespace TeensyRom.Core.Storage.Index
         public const char Like_Escape_Character = '\\';
 
         private const string FavoriteParameterPrefix = "$favoritePrefix";
+        private const string PlaylistParameterName = "$playlistPrefix";
 
         private static readonly string[] FavoriteRoots = StorageHelper.FavoritePaths
             .Select(path => path.Value)
@@ -49,6 +50,12 @@ namespace TeensyRom.Core.Storage.Index
         /// Builds the pattern matching <paramref name="prefix"/> and everything beneath it.
         /// </summary>
         public static string PrefixPattern(string prefix) => EscapeLike(prefix) + "%";
+
+        /// <summary>
+        /// Builds the pattern matching a path containing <paramref name="value"/> anywhere, mirroring the
+        /// application's substring-based exclude-path semantics.
+        /// </summary>
+        public static string ContainsPattern(string value) => "%" + EscapeLike(value) + "%";
 
         /// <summary>
         /// True when <paramref name="path"/> sits under one of the favourite trees.
@@ -83,6 +90,25 @@ namespace TeensyRom.Core.Storage.Index
             {
                 command.Parameters.AddWithValue($"{FavoriteParameterPrefix}{index}", PrefixPattern(FavoriteRoots[index]));
             }
+        }
+
+        /// <summary>
+        /// Builds the "is under a favourite or playlist tree" predicate over <paramref name="pathColumn"/> —
+        /// the set of locations that hold a linked copy of a file rather than its original. The values are
+        /// bound by <see cref="BindLinkedCopyParameters"/>.
+        /// </summary>
+        public static string LinkedCopyPredicate(string pathColumn) =>
+            $"({FavoritePredicate(pathColumn)} OR {pathColumn} LIKE {PlaylistParameterName} ESCAPE '{Like_Escape_Character}')";
+
+        /// <summary>
+        /// Binds the patterns the predicate returned by <see cref="LinkedCopyPredicate"/> refers to.
+        /// </summary>
+        public static void BindLinkedCopyParameters(SqliteCommand command)
+        {
+            ArgumentNullException.ThrowIfNull(command);
+
+            BindFavoriteParameters(command);
+            command.Parameters.AddWithValue(PlaylistParameterName, PrefixPattern(StorageHelper.Playlist_Path));
         }
     }
 }
