@@ -44,12 +44,12 @@ The comparison measurement runs the harness against a real device index paired w
 
 The baseline committed to this repository used:
 - **Index file**: `Sd-L5ZMCNBR.json` (155.4 MB, 64,658 files)
-- **Extracted fixture**: `.local-fixtures/Sd-L5ZMCNBR.tsv` (stored in the repo)
+- **Extracted fixture**: `.local-fixtures/Sd-L5ZMCNBR.tsv` (local, gitignored artifact — not committed)
 
 **To obtain these files:**
 - If you have the shipped build `TeensyROM-Web-1.0.0-alpha.8-win-x64`, the index is present in its `Assets/System/Cache/` directory
-- The extracted fixture is already committed at `src/apps/api/.local-fixtures/Sd-L5ZMCNBR.tsv`
-- If neither is available, you cannot regenerate the real-data comparison; use a more recent device index when it is available
+- The extracted fixture must be obtained locally by placing the index file and running extraction or obtaining it from the build's source; it is a gitignored local artifact and not committed to the repository
+- If the index file is not available, you cannot regenerate the real-data comparison; use a more recent device index when it is available
 
 ### Step 2: Run the Comparison Benchmark
 
@@ -80,7 +80,7 @@ The fixture `Sd-L5ZMCNBR.tsv` was extracted from `Sd-L5ZMCNBR.json` using the no
 dotnet run -- --input Sd-L5ZMCNBR.json --output Sd-L5ZMCNBR.tsv
 ```
 
-The fixture is retained in the repository (`.local-fixtures/Sd-L5ZMCNBR.tsv`) so the benchmark can run against real data without requiring the extraction tool. When a new real index becomes available for comparison, extract its fixture manually (or restore the extraction tool from git history if needed), then commit both the results and the new fixture.
+The fixture is a gitignored local artifact (`.local-fixtures/Sd-L5ZMCNBR.tsv`) used for benchmarking against real data without requiring the extraction tool at benchmark time. When a new real index becomes available for comparison, extract its fixture manually (or restore the extraction tool from git history if needed), place both files locally per Step 1 instructions, then commit only the results (not the fixture itself).
 
 ## Harness Implementation
 
@@ -99,7 +99,7 @@ The benchmark harness is at `src/TeensyRom.Tools.StorageBenchmark/Program.cs`. I
 ## Troubleshooting
 
 - **"Data directory not found"**: Confirm the path to the index files is correct and the files exist
-- **"Cannot open fixture"**: Ensure `.local-fixtures/Sd-L5ZMCNBR.tsv` is present and readable; it should be committed to the repository
+- **"Cannot open fixture"**: Ensure `.local-fixtures/Sd-L5ZMCNBR.tsv` is present and readable locally; see Step 1 "Obtain the Index and Fixture" to regenerate or obtain it from the shipped build
 - **Memory exhaustion on large indices**: The harness loads the entire index and store into memory. On collections over 200 MB, ensure sufficient RAM; consider running on a machine with > 16 GB
 
 ## CI Integration
