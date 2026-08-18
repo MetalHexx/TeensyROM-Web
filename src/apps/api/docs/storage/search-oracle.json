@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "notes": "Synthetic-but-schema-faithful oracle: the real 270,972-file collection is not available on the machine that curated this file (see SEARCH-ORACLE.md and STORAGE-1-TASK-P04-T02's Execution Notes). Each case still exercises a distinct search behaviour through the real store and FTS index, over a small self-contained synthetic dataset seeded by TeensyRom.Core.Storage.Tests.Integration.SearchOracleTests. Re-curate against the real collection once it is available.",
+  "cases": [
+    {
+      "term": "Hubbard",
+      "intent": "creator name that lives only in projected metadata (content_search.creator), not in the filename or path",
+      "expectedPaths": ["/music/mob/theme1.sid"],
+      "mustNotMatch": ["/music/mob/zorbatron.sid", "/music/filler/track001.sid"],
+      "minResults": 1,
+      "maxResults": 1
+    },
+    {
+      "term": "Stardust",
+      "intent": "title that lives only in projected metadata (content_search.title), not in the filename or path",
+      "expectedPaths": ["/music/mob/opus7.sid"],
+      "mustNotMatch": ["/music/mob/theme1.sid", "/music/filler/track001.sid"],
+      "minResults": 1,
+      "maxResults": 1
+    },
+    {
+      "term": "Zorbatron",
+      "intent": "word drawn from a filename, matched via the file_search name column",
+      "expectedPaths": ["/music/mob/zorbatron.sid"],
+      "mustNotMatch": ["/music/mob/theme1.sid"],
+      "minResults": 1,
+      "maxResults": 1
+    },
+    {
+      "term": "Galaxians",
+      "intent": "word from a path segment (a directory name) that appears in no filename",
+      "expectedPaths": ["/games/GALAXIANS/blaster.prg"],
+      "mustNotMatch": ["/games/NEBULA/quantum.prg"],
+      "minResults": 1,
+      "maxResults": 1
+    },
+    {
+      "term": "Quantum Nebula",
+      "intent": "multi-word term whose parts live in different file_search columns: 'Quantum' in the filename, 'Nebula' only in the enclosing directory segment",
+      "expectedPaths": ["/games/NEBULA/quantum.prg"],
+      "mustNotMatch": ["/games/GALAXIANS/blaster.prg"],
+      "minResults": 1,
+      "maxResults": 1
+    },
+    {
+      "term": "Frostbyte",
+      "intent": "word from genuine per-file commentary (a real STIL-style entry), present nowhere else",
+      "expectedPaths": ["/music/mob/twilight.sid"],
+      "mustNotMatch": ["/music/filler/track001.sid"],
+      "minResults": 1,
+      "maxResults": 1
+    },
+    {
+      "term": "demoscene",
+      "intent": "word drawn from the generated type-description boilerplate (SongItem's SID fallback description). The case that proves the change: today's predicate (BaseStorageCache.Search, Description.Contains on the live entity) matches 53 of this dataset's 56 seeded files, every one whose description was never overridden with genuine commentary. Against the new store the boilerplate is recognised as derived and never written to the search index, so this must return none of them. See SEARCH-ORACLE.md for how the 53-file count was verified.",
+      "expectedPaths": [],
+      "mustNotMatch": ["/music/filler/track001.sid", "/music/mob/theme1.sid", "/music/mob/zorbatron.sid"],
+      "minResults": 0,
+      "maxResults": 0
+    },
+    {
+      "term": "Blorpazoid",
+      "intent": "term matching nothing in the collection",
+      "expectedPaths": [],
+      "mustNotMatch": [],
+      "minResults": 0,
+      "maxResults": 0
+    },
+    {
+      "term": "Hubbard-\"*",
+      "intent": "term containing full-text operator characters (\", -, *) that must be handled rather than throw. FtsQuery quotes the whole token, so FTS5 treats it as a phrase; the unicode61 tokenizer drops the punctuation from that phrase, leaving a prefix match on 'hubbard' and still finding the creator match",
+      "expectedPaths": ["/music/mob/theme1.sid"],
+      "mustNotMatch": [],
+      "minResults": 1,
+      "maxResults": 1
+    }
+  ]
+}
