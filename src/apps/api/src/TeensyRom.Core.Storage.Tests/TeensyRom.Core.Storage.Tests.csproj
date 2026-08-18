@@ -28,6 +28,7 @@
   <ItemGroup>
     <ProjectReference Include="..\TeensyRom.Core.Storage\TeensyRom.Core.Storage.csproj" />
     <ProjectReference Include="..\TeensyRom.Core\TeensyRom.Core.csproj" />
+    <ProjectReference Include="..\TeensyRom.Tools.StorageBenchmark\TeensyRom.Tools.StorageBenchmark.csproj" />
   </ItemGroup>
 
 </Project>
