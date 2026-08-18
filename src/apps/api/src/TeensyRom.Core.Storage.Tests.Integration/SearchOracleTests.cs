@@ -1,14 +1,8 @@
 using FluentAssertions;
-using NSubstitute;
 using TeensyRom.Core.Entities.Storage;
-using TeensyRom.Core.Games;
-using TeensyRom.Core.Music;
-using TeensyRom.Core.Music.DeepSid;
-using TeensyRom.Core.Music.Hvsc;
-using TeensyRom.Core.Music.Sid;
 using TeensyRom.Core.Storage.Index;
+using TeensyRom.Core.Storage.Index.Fixtures;
 using TeensyRom.Core.Storage.Index.Search;
-using TeensyRom.Core.ValueObjects;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -16,50 +10,43 @@ namespace TeensyRom.Core.Storage.Tests.Integration
 {
     /// <summary>
     /// Asserts <see cref="SqliteIndexStore.SearchAsync"/> — the new store's real FTS-backed search — against
-    /// the committed <c>search-oracle.json</c>.
+    /// the committed <c>search-oracle.json</c>, over the same real collection
+    /// <see cref="QueryEquivalenceTests"/> compares: the local fixture seeded through the production write and
+    /// projection paths, with the real HVSC database supplying creators and STIL commentary.
     /// </summary>
     /// <remarks>
-    /// The oracle was meant to run against the real 270,972-file collection, seeded the same way as
-    /// <see cref="QueryEquivalenceTests"/>. That collection is a personal, git-ignored fixture, and neither it
-    /// nor a matching real index file exists on this machine (the same gap <see cref="FixtureAvailability"/>
-    /// reports for the equivalence suite). Reusing <see cref="SeededCollectionFixture"/> as-is would not have
-    /// closed that gap even on a machine that has the real fixture: its projection deliberately stubs HVSC and
-    /// DeepSID to no-ops, because the equivalence assertions never read a metadata field — but every
-    /// metadata-dependent case here (creator-only, title-only, genuine commentary) needs real enrichment
-    /// output to exist at all. So this suite seeds its own small, synthetic-but-schema-faithful collection
-    /// through the exact same production path (<see cref="SqliteIndexStore"/>, <see cref="MetadataProjection"/>,
-    /// <see cref="FtsQuery"/>) with controlled HVSC/game enrichment standing in for the real databases, proving
-    /// the real mechanism rather than an unverifiable claim about it. It is not gated behind
-    /// <see cref="FixtureFactAttribute"/>: it needs no local fixture, so it always runs. Once a real fixture,
-    /// index file, and HVSC/DeepSID data are available on a machine, <c>search-oracle.json</c> should be
-    /// re-curated with terms drawn from that real collection and pointed at
-    /// <see cref="SeededCollectionFixture"/> instead, per the original design.
+    /// The oracle's expected paths and exact counts belong to one collection, so every test here is an
+    /// <see cref="OracleFactAttribute"/>: a machine with no fixture, no HVSC database, or a different
+    /// collection is told which of the three it is and skipped, rather than failed against numbers that were
+    /// never about its card.
     /// </remarks>
-    [Collection(SearchOracleCollection.Name)]
+    [Collection(SeededCollection.Name)]
     public sealed class SearchOracleTests
     {
+        private const int Generous_Limit = 5000;
+
         private static readonly CancellationToken Ct = CancellationToken.None;
 
-        private readonly SearchOracleFixture _fixture;
+        private readonly SeededCollectionFixture _fixture;
         private readonly ITestOutputHelper _output;
 
-        public SearchOracleTests(SearchOracleFixture fixture, ITestOutputHelper output)
+        public SearchOracleTests(SeededCollectionFixture fixture, ITestOutputHelper output)
         {
             _fixture = fixture;
             _output = output;
         }
 
-        public static IEnumerable<object[]> Cases() => SearchOracleFixture.OracleCases.Select(c => new object[] { c });
+        public static IEnumerable<object[]> Cases() => CommittedOracle.Cases.Select(c => new object[] { c });
 
-        [Theory]
+        [OracleTheory]
         [MemberData(nameof(Cases))]
         public async Task Search_ForEachOracleCase_MatchesExpectedPaths_ExcludesForbiddenPaths_AndStaysWithinBounds(SearchOracleCase oracleCase)
         {
             var results = await _fixture.Store.SearchAsync(
-                _fixture.Scope, oracleCase.Term, SearchOracleFixture.ExcludePaths, [], SearchOracleFixture.GenerousLimit, Ct);
+                _fixture.Scope, oracleCase.Term, SeededCollectionFixture.ExcludePaths, [], Generous_Limit, Ct);
 
             var paths = results.Select(r => r.Path.Value).ToList();
-            _output.WriteLine($"'{oracleCase.Term}' ({oracleCase.Intent}): {paths.Count} result(s) -> {string.Join(", ", paths)}");
+            _output.WriteLine($"'{oracleCase.Term}' ({oracleCase.Intent}): {paths.Count} result(s)");
 
             foreach (var expected in oracleCase.ExpectedPaths)
             {
@@ -78,221 +65,71 @@ namespace TeensyRom.Core.Storage.Tests.Integration
                 oracleCase.Term, oracleCase.Intent, oracleCase.MinResults, oracleCase.MaxResults, paths.Count);
         }
 
-        [Fact]
+        [OracleFact]
         public async Task Search_ForTheOperatorCharacterCase_DoesNotThrow()
         {
-            var operatorCase = SearchOracleFixture.OracleCases.Single(c => c.Term.Any(ch => ch is '"' or '-' or '*'));
+            var operatorCase = CommittedOracle.Cases.Single(c => c.Term.Any(ch => ch is '"' or '-' or '*'));
 
             Func<Task> act = async () => await _fixture.Store.SearchAsync(
-                _fixture.Scope, operatorCase.Term, SearchOracleFixture.ExcludePaths, [], SearchOracleFixture.GenerousLimit, Ct);
+                _fixture.Scope, operatorCase.Term, SeededCollectionFixture.ExcludePaths, [], Generous_Limit, Ct);
 
             await act.Should().NotThrowAsync("a search term with FTS5 operator characters must be handled, not throw");
         }
 
         /// <summary>
-        /// Not an assertion on the new store — it documents, with a verified number rather than an estimate,
-        /// what today's predicate (<c>BaseStorageCache.Search</c>) would return for the boilerplate term
-        /// against this fixture's corpus. See <c>SEARCH-ORACLE.md</c> for the recorded count.
+        /// The comparison the oracle exists for: today's predicate reads a generated fallback description off
+        /// every unenriched entity, so a word from that boilerplate matches a large fraction of the whole
+        /// collection, while the new store — which never indexes the fallback — answers with the handful of
+        /// files whose commentary genuinely says it. Both numbers are measured here, live, against the same
+        /// card. <c>SEARCH-ORACLE.md</c> records the run.
         /// </summary>
-        [Fact]
-        public async Task TodaysPredicate_ForTheBoilerplateTerm_MatchesEveryFileWhoseDescriptionWasNeverOverridden()
+        [OracleFact]
+        public async Task Search_ForTheBoilerplateTerm_AnswersOrdersOfMagnitudeSmallerThanTodaysPredicate()
         {
-            var boilerplateCase = SearchOracleFixture.OracleCases.Single(c => c.Term == "demoscene");
+            var boilerplateCase = CommittedOracle.BoilerplateCase;
 
-            var matches = await _fixture.TodaysPredicateMatches(boilerplateCase.Term);
+            var fromStore = await _fixture.Store.SearchAsync(
+                _fixture.Scope, boilerplateCase.Term, SeededCollectionFixture.ExcludePaths, [], Generous_Limit, Ct);
 
-            _output.WriteLine($"Today's predicate matches {matches.Count} of {_fixture.AllPaths.Count} seeded files for '{boilerplateCase.Term}':");
-            _output.WriteLine(string.Join(Environment.NewLine, matches));
+            var fromToday = _fixture.Cache
+                .Search(boilerplateCase.Term, SeededCollectionFixture.ExcludePaths, TeensyFileTypeExtensions.GetLaunchFileTypes())
+                .ToList();
 
-            matches.Should().NotBeEmpty("the boilerplate case only proves anything if today's predicate actually over-matches");
+            _output.WriteLine($"'{boilerplateCase.Term}': new store {fromStore.Count}, today's predicate {fromToday.Count}, " +
+                              $"of {await _fixture.Store.GetFileCountAsync(_fixture.Scope, Ct)} indexed files");
+
+            fromToday.Count.Should().BeGreaterThan(fromStore.Count * 100,
+                "the boilerplate term only proves anything if today's predicate over-matches by orders of magnitude");
         }
     }
 
-    [CollectionDefinition(SearchOracleCollection.Name)]
-    public sealed class SearchOracleCollection : ICollectionFixture<SearchOracleFixture>
+    /// <summary>The committed oracle, read once for the whole suite from the repository's docs directory.</summary>
+    public static class CommittedOracle
     {
-        public const string Name = "search-oracle-synthetic-collection";
-    }
+        private static readonly SearchOracleDocument Document = SearchOracle.Load(ResolvePath());
 
-    /// <summary>
-    /// Seeds a small, self-contained synthetic collection once for the whole suite, through the real
-    /// production write, projection, and search paths — see the remarks on <see cref="SearchOracleTests"/> for
-    /// why this stands in for the real 270,972-file collection.
-    /// </summary>
-    public sealed class SearchOracleFixture : IAsyncLifetime
-    {
-        public const int GenerousLimit = 200;
-        private const int Filler_Count = 50;
+        public static SearchOracleCollection Collection => Document.Collection;
 
-        private static readonly IndexScope Fixed_Scope = new("search-oracle-device", TeensyStorageType.SD);
-
-        public static IReadOnlyList<DirectoryPath> ExcludePaths { get; } =
-            [.. StorageHelper.FavoritePaths, new DirectoryPath(StorageHelper.Playlist_Path)];
+        public static IReadOnlyList<SearchOracleCase> Cases => Document.Cases;
 
         /// <summary>
-        /// The nine behaviours <c>search-oracle.json</c> pins, resolved once against the loaded oracle so
-        /// every case's term, intent, and bounds are read from the committed document rather than duplicated
-        /// here.
+        /// The case whose term comes from a type's generated fallback description. It is the one case whose
+        /// meaning is a comparison against today rather than a bound, so the suite has to be able to name it.
         /// </summary>
-        public static IReadOnlyList<SearchOracleCase> OracleCases { get; } = SearchOracle.Load(ResolveOraclePath());
-
-        private static readonly CancellationToken Ct = CancellationToken.None;
-
-        private TemporaryIndex? _index;
-
-        public SqliteIndexStore Store => _index?.Store ?? throw NotSeeded();
-
-        public IndexScope Scope => _index?.Scope ?? throw NotSeeded();
-
-        /// <summary>Every path this fixture seeded — the corpus <see cref="TodaysPredicateMatches"/> scans.</summary>
-        public IReadOnlyList<string> AllPaths { get; private set; } = [];
-
-        public async Task InitializeAsync()
-        {
-            _index = TemporaryIndex.Create(Fixed_Scope);
-            await _index.Database.EnsureCreatedAsync(Ct);
-
-            var store = _index.Store;
-
-            var namedFiles = new (string Path, long Size)[]
-            {
-                ("/music/mob/theme1.sid", 1001),
-                ("/music/mob/opus7.sid", 1002),
-                ("/music/mob/zorbatron.sid", 1003),
-                ("/music/mob/twilight.sid", 1004),
-                ("/games/GALAXIANS/blaster.prg", 2001),
-                ("/games/NEBULA/quantum.prg", 2002),
-            };
-
-            var fillerPaths = Enumerable.Range(1, Filler_Count).Select(i => $"/music/filler/track{i:000}.sid").ToArray();
-
-            foreach (var (path, size) in namedFiles)
-            {
-                await store.UpsertFileAsync(Fixed_Scope, CreateFile(path, size), Ct);
-            }
-
-            foreach (var path in fillerPaths)
-            {
-                await store.UpsertFileAsync(Fixed_Scope, CreateFile(path, 100), Ct);
-            }
-
-            AllPaths = [.. namedFiles.Select(f => f.Path), .. fillerPaths];
-
-            await RunProjectionAsync();
-            await OverrideTitleOnlyCaseAsync();
-        }
+        public static SearchOracleCase BoilerplateCase => Cases.Single(c => c.Intent.Contains("boilerplate", StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
-        /// Replicates <c>BaseStorageCache.Search</c>'s predicate verbatim — case-insensitive
-        /// <c>Contains</c> over Title, Name, Creator, Path, and Description — against the live entities this
-        /// fixture seeded, read back through the same store. Used only to document, honestly, what today's
-        /// predicate would return for the boilerplate case against this synthetic corpus; it plays no part in
-        /// the assertions against the new store.
+        /// Whether <paramref name="header"/> and <paramref name="hvscCsvPath"/> are the pair the oracle was
+        /// curated against. Terms and counts drawn from one card say nothing about another, and the creator
+        /// and commentary counts move with the HVSC export too.
         /// </summary>
-        public async Task<IReadOnlyList<string>> TodaysPredicateMatches(string term)
-        {
-            var matches = new List<string>();
+        public static bool DescribesCollection(IndexFixtureHeader header, string hvscCsvPath) =>
+            string.Equals(header.DeviceId, Collection.DeviceId, StringComparison.OrdinalIgnoreCase) &&
+            header.StorageType == Collection.StorageType &&
+            header.FileCount == Collection.FileCount &&
+            string.Equals(Path.GetFileName(hvscCsvPath), Collection.MetadataSource, StringComparison.OrdinalIgnoreCase);
 
-            foreach (var path in AllPaths)
-            {
-                var file = await Store.GetFileByPathAsync(Scope, new FilePath(path), Ct);
-
-                if (file is null)
-                {
-                    continue;
-                }
-
-                var isMatch = file.Title.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                              file.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                              file.Creator.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                              file.Path.Value.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                              file.Description.Contains(term, StringComparison.OrdinalIgnoreCase);
-
-                if (isMatch)
-                {
-                    matches.Add(path);
-                }
-            }
-
-            return matches;
-        }
-
-        public Task DisposeAsync()
-        {
-            _index?.Dispose();
-            _index = null;
-
-            return Task.CompletedTask;
-        }
-
-        private static FileItem CreateFile(string path, long size)
-        {
-            var filePath = new FilePath(path);
-
-            return new FileItem { Path = filePath, Name = filePath.FileName, Size = size };
-        }
-
-        /// <summary>
-        /// Runs the real <see cref="MetadataProjection"/> with a controlled HVSC stub: one record supplies a
-        /// creator with no commentary (the creator-only case), one supplies genuine STIL commentary (the
-        /// commentary case), and every other file is left unenriched so its description falls back to the
-        /// type's own generated boilerplate — which <see cref="MetadataProjection"/> then recognises as
-        /// derived and drops, rather than persisting it into the search index. That drop is the mechanism the
-        /// boilerplate case exists to pin.
-        /// </summary>
-        private async Task RunProjectionAsync()
-        {
-            var hvsc = Substitute.For<IHvscDatabase>();
-
-            hvsc.GetRecord("1001theme1.sid").Returns(new SidRecord { Filename = "theme1.sid", Author = "Rob Hubbard" });
-            hvsc.GetRecord("1004twilight.sid").Returns(new SidRecord
-            {
-                Filename = "twilight.sid",
-                StilEntry = "A composition remembered for its icy synth motif, nicknamed Frostbyte among collectors."
-            });
-
-            var gameMetadata = Substitute.For<IGameMetadataService>();
-            gameMetadata.EnrichGame(Arg.Any<GameItem>()).Returns(call => call.Arg<GameItem>());
-
-            var sourceVersion = Substitute.For<IMetadataSourceVersion>();
-            sourceVersion.Current.Returns("search-oracle");
-
-            var sidMetadata = new SidMetadataService(hvsc, Substitute.For<IDeepSidDatabase>());
-            var projection = new MetadataProjection(_index!.Database, sidMetadata, gameMetadata, sourceVersion);
-
-            await projection.ProjectAsync(Fixed_Scope, null, Ct);
-        }
-
-        /// <summary>
-        /// A title that lives only in projected metadata cannot be produced through
-        /// <see cref="MetadataProjection"/> today: <c>SongItem.Title</c> and <c>GameItem.Title</c> are both
-        /// computed from the filename with no settable backing field, so <c>Title</c> is always "derived" and
-        /// always dropped (see <c>MetadataProjectionTests.ProjectAsync_TitleAndMeta1_AreNeverPersisted...</c>).
-        /// The <c>content_search.title</c> column is real schema, so this writes it directly for the
-        /// title-only case rather than skip a behaviour the format has to support.
-        /// </summary>
-        private Task OverrideTitleOnlyCaseAsync() => _index!.Database.WriteAsync(async (connection, transaction) =>
-        {
-            const string ContentId = "1002opus7.sid";
-
-            await using var metadata = connection.CreateCommand();
-            metadata.Transaction = transaction;
-            metadata.CommandText = "UPDATE content_metadata SET title = $title WHERE content_id = $id;";
-            metadata.Parameters.AddWithValue("$title", "Stardust Reverie");
-            metadata.Parameters.AddWithValue("$id", ContentId);
-            await metadata.ExecuteNonQueryAsync(Ct);
-
-            await using var search = connection.CreateCommand();
-            search.Transaction = transaction;
-            search.CommandText = "UPDATE content_search SET title = $title WHERE content_id = $id;";
-            search.Parameters.AddWithValue("$title", "Stardust Reverie");
-            search.Parameters.AddWithValue("$id", ContentId);
-            await search.ExecuteNonQueryAsync(Ct);
-
-            return true;
-        }, Ct);
-
-        private static string ResolveOraclePath() =>
+        private static string ResolvePath() =>
             Path.Combine(FindRepositoryRoot(), "src", "apps", "api", "docs", "storage", "search-oracle.json");
 
         private static string FindRepositoryRoot()
@@ -311,8 +148,53 @@ namespace TeensyRom.Core.Storage.Tests.Integration
 
             throw new DirectoryNotFoundException($"Could not locate the repository root above '{AppContext.BaseDirectory}'.");
         }
+    }
 
-        private static InvalidOperationException NotSeeded() =>
-            new("The search oracle fixture was never initialised.");
+    /// <summary>
+    /// Resolves whether this machine can be asked the oracle's questions at all: it needs the fixture/index
+    /// pair, the HVSC database the projection draws real creators and commentary from, and the very
+    /// collection the oracle was curated against.
+    /// </summary>
+    internal static class OracleAvailability
+    {
+        public static string? WhyUnavailable()
+        {
+            if (!FixtureAvailability.HasFixtureAndIndex(out var noFixture))
+            {
+                return noFixture;
+            }
+
+            if (!MetadataSourceAvailability.HasHvsc(out var noHvsc))
+            {
+                return $"{noHvsc} The oracle's creator and commentary cases need real enrichment to mean anything.";
+            }
+
+            var header = FixtureAvailability.Require().Header;
+            var hvscCsvPath = MetadataSourceAvailability.TryResolve()!.HvscCsvPath;
+
+            if (!CommittedOracle.DescribesCollection(header, hvscCsvPath))
+            {
+                var oracle = CommittedOracle.Collection;
+
+                return $"The local inputs (device '{header.DeviceId}', {header.StorageType}, {header.FileCount} files, " +
+                       $"'{Path.GetFileName(hvscCsvPath)}') are not what the oracle was curated against (device " +
+                       $"'{oracle.DeviceId}', {oracle.StorageType}, {oracle.FileCount} files, '{oracle.MetadataSource}'). " +
+                       $"Re-curate the oracle against this collection to assert it here.";
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>A fact that skips — rather than fails — when this machine is not the oracle's collection.</summary>
+    public sealed class OracleFactAttribute : FactAttribute
+    {
+        public OracleFactAttribute() => Skip = OracleAvailability.WhyUnavailable();
+    }
+
+    /// <summary>A theory that skips — rather than fails — when this machine is not the oracle's collection.</summary>
+    public sealed class OracleTheoryAttribute : TheoryAttribute
+    {
+        public OracleTheoryAttribute() => Skip = OracleAvailability.WhyUnavailable();
     }
 }

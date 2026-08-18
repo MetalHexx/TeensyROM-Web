@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TeensyRom.Core.Entities.Storage;
 
 namespace TeensyRom.Core.Storage.Index.Search
 {
@@ -16,6 +17,17 @@ namespace TeensyRom.Core.Storage.Index.Search
         int MaxResults);
 
     /// <summary>
+    /// The collection the oracle's terms and counts were drawn from, and the metadata export that enriched
+    /// it. Exact expected paths and exact result counts only mean anything against that pair, so an oracle
+    /// that does not name it cannot be checked — and a machine holding a different one must be told to skip
+    /// rather than fail.
+    /// </summary>
+    public sealed record SearchOracleCollection(string DeviceId, TeensyStorageType StorageType, int FileCount, string MetadataSource);
+
+    /// <summary>The committed oracle: the collection it was curated against, and the cases drawn from it.</summary>
+    public sealed record SearchOracleDocument(SearchOracleCollection Collection, IReadOnlyList<SearchOracleCase> Cases);
+
+    /// <summary>
     /// Loads the committed search oracle: a small, human-edited set of real search terms and the bounds a
     /// correct search must satisfy against them.
     /// </summary>
@@ -26,9 +38,10 @@ namespace TeensyRom.Core.Storage.Index.Search
         /// <summary>
         /// Reads and validates the oracle at <paramref name="path"/>. A malformed case — an empty (or
         /// missing) term, a negative bound, or a minimum above its maximum — throws naming that case rather
-        /// than being silently skipped, which would otherwise pass for the wrong reason.
+        /// than being silently skipped, which would otherwise pass for the wrong reason. An oracle that does
+        /// not name the collection it was curated against throws for the same reason.
         /// </summary>
-        public static IReadOnlyList<SearchOracleCase> Load(string path)
+        public static SearchOracleDocument Load(string path)
         {
             ArgumentNullException.ThrowIfNull(path);
 
@@ -46,7 +59,36 @@ namespace TeensyRom.Core.Storage.Index.Search
                 cases.Add(Validate(document.Cases[index], index, path));
             }
 
-            return cases;
+            return new SearchOracleDocument(ValidateCollection(document.Collection, path), cases);
+        }
+
+        private static SearchOracleCollection ValidateCollection(RawCollection? raw, string path)
+        {
+            if (raw is null || string.IsNullOrWhiteSpace(raw.DeviceId))
+            {
+                throw new InvalidDataException(
+                    $"The search oracle at '{path}' does not name the collection it was curated against.");
+            }
+
+            if (!Enum.TryParse<TeensyStorageType>(raw.StorageType, ignoreCase: true, out var storageType))
+            {
+                throw new InvalidDataException(
+                    $"The search oracle at '{path}' names an unknown storage type '{raw.StorageType}'.");
+            }
+
+            if (raw.FileCount <= 0)
+            {
+                throw new InvalidDataException(
+                    $"The search oracle at '{path}' records a non-positive file count ({raw.FileCount}).");
+            }
+
+            if (string.IsNullOrWhiteSpace(raw.MetadataSource))
+            {
+                throw new InvalidDataException(
+                    $"The search oracle at '{path}' does not name the metadata export its counts were drawn with.");
+            }
+
+            return new SearchOracleCollection(raw.DeviceId, storageType, raw.FileCount, raw.MetadataSource);
         }
 
         private static RawDocument Deserialize(string path)
@@ -106,7 +148,9 @@ namespace TeensyRom.Core.Storage.Index.Search
                 raw.MaxResults);
         }
 
-        private sealed record RawDocument(int Version, string? Notes, List<RawCase>? Cases);
+        private sealed record RawDocument(int Version, string? Notes, RawCollection? Collection, List<RawCase>? Cases);
+
+        private sealed record RawCollection(string? DeviceId, string? StorageType, int FileCount, string? MetadataSource);
 
         private sealed record RawCase(
             string? Term,

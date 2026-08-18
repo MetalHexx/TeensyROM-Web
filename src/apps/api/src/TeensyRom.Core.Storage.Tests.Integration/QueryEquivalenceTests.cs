@@ -60,7 +60,7 @@ namespace TeensyRom.Core.Storage.Tests.Integration
                     .BeEquivalentTo(Identities(fromCache!.Files), "the files of the {0} '{1}' must agree", label, path);
 
                 SubdirectoryPaths(fromStore.Directories).Should()
-                    .BeEquivalentTo(SubdirectoryPaths(fromCache.Directories),
+                    .BeEquivalentTo(SubdirectoriesTheFixtureCanCarry(fromCache.Directories),
                         "the subdirectories of the {0} '{1}' must agree", label, path);
             }
         }
@@ -279,6 +279,21 @@ namespace TeensyRom.Core.Storage.Tests.Integration
 
         private static List<string> SubdirectoryPaths(IEnumerable<DirectoryItem> directories) =>
             directories.Select(directory => Normalize(directory.Path.Value)).ToList();
+
+        /// <summary>
+        /// The cache's subdirectories, minus the ones the fixture is incapable of carrying. A fixture is a
+        /// listing of files: a directory with no file anywhere beneath it leaves no record in one, so the
+        /// seeded store has no way to know it exists. Comparing it would measure the fixture format, not the
+        /// store — a device scan, which is what fills the store in production, does report such a directory.
+        /// </summary>
+        private List<string> SubdirectoriesTheFixtureCanCarry(IEnumerable<DirectoryItem> directories) =>
+            directories
+                .Where(directory => CacheHoldsAFileBeneath(directory.Path))
+                .Select(directory => Normalize(directory.Path.Value))
+                .ToList();
+
+        private bool CacheHoldsAFileBeneath(DirectoryPath path) => _seeded.Cache
+            .Any(entry => entry.Key.StartsWith(path.Value, StringComparison.OrdinalIgnoreCase) && entry.Value.Files.Any());
 
         /// <summary>
         /// Paths are compared case-insensitively throughout the system — the value objects use

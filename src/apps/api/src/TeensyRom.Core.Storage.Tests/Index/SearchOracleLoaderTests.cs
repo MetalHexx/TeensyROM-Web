@@ -1,3 +1,4 @@
+using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Storage.Index.Search;
 
 namespace TeensyRom.Core.Storage.Tests.Index
@@ -15,6 +16,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
                 {
                   "version": 1,
                   "notes": "inline test oracle",
+                  "collection": { "deviceId": "TESTCARD", "storageType": "SD", "fileCount": 64658, "metadataSource": "SIDlist_82_UTF8.csv" },
                   "cases": [
                     {
                       "term": "Hubbard",
@@ -30,11 +32,15 @@ namespace TeensyRom.Core.Storage.Tests.Index
 
             try
             {
-                var cases = SearchOracle.Load(path);
+                var document = SearchOracle.Load(path);
 
-                cases.Should().HaveCount(1);
+                document.Collection.DeviceId.Should().Be("TESTCARD");
+                document.Collection.StorageType.Should().Be(TeensyStorageType.SD);
+                document.Collection.FileCount.Should().Be(64658);
+                document.Collection.MetadataSource.Should().Be("SIDlist_82_UTF8.csv");
+                document.Cases.Should().HaveCount(1);
 
-                var loaded = cases[0];
+                var loaded = document.Cases[0];
                 loaded.Term.Should().Be("Hubbard");
                 loaded.Intent.Should().Be("creator name from projected metadata");
                 loaded.ExpectedPaths.Should().ContainSingle().Which.Should().Be("/music/MUSICIANS/H/Hubbard_Rob/Commando.sid");
@@ -54,6 +60,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
             var path = WriteOracle("""
                 {
                   "version": 1,
+                  "collection": { "deviceId": "TESTCARD", "storageType": "SD", "fileCount": 10, "metadataSource": "SIDlist.csv" },
                   "cases": [
                     { "term": "", "intent": "empty term case", "minResults": 0, "maxResults": 1 }
                   ]
@@ -78,6 +85,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
             var path = WriteOracle("""
                 {
                   "version": 1,
+                  "collection": { "deviceId": "TESTCARD", "storageType": "SD", "fileCount": 10, "metadataSource": "SIDlist.csv" },
                   "cases": [
                     { "term": "inverted", "intent": "bounds reversed", "minResults": 10, "maxResults": 1 }
                   ]
@@ -102,6 +110,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
             var path = WriteOracle("""
                 {
                   "version": 1,
+                  "collection": { "deviceId": "TESTCARD", "storageType": "SD", "fileCount": 10, "metadataSource": "SIDlist.csv" },
                   "cases": [
                     { "intent": "term field omitted entirely", "minResults": 0, "maxResults": 1 }
                   ]
@@ -126,6 +135,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
             var path = WriteOracle("""
                 {
                   "version": 1,
+                  "collection": { "deviceId": "TESTCARD", "storageType": "SD", "fileCount": 10, "metadataSource": "SIDlist.csv" },
                   "cases": [
                     { "term": "negative", "minResults": -1, "maxResults": 1 }
                   ]
@@ -137,6 +147,30 @@ namespace TeensyRom.Core.Storage.Tests.Index
                 var act = () => SearchOracle.Load(path);
 
                 act.Should().Throw<InvalidDataException>().WithMessage("*negative*");
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Fact]
+        public void Load_AnOracleThatNamesNoCollection_Throws()
+        {
+            var path = WriteOracle("""
+                {
+                  "version": 1,
+                  "cases": [
+                    { "term": "orphaned", "minResults": 0, "maxResults": 1 }
+                  ]
+                }
+                """);
+
+            try
+            {
+                var act = () => SearchOracle.Load(path);
+
+                act.Should().Throw<InvalidDataException>().WithMessage("*collection it was curated against*");
             }
             finally
             {

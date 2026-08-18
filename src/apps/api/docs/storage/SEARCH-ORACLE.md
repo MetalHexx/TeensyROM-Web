@@ -1,98 +1,90 @@
-<!--
-Data provenance: the real 270,972-file collection this oracle was meant to be drawn from (the
-Sd-*.json/Usb-*.json index file plus its matching .tsv fixture, per STORAGE-1-TASK-P01-T02) is not
-present on the machine that curated this file, the same gap P01-T01, P01-T02, and P04-T01 already
-recorded. Every case below is instead curated against a small, self-contained synthetic collection —
-6 named files plus 50 filler files, 56 total — seeded by
-TeensyRom.Core.Storage.Tests.Integration.SearchOracleTests through the real production write,
-projection, and search paths (SqliteIndexStore, MetadataProjection, FtsQuery), with a controlled HVSC
-stub standing in for the real metadata databases. Every count recorded here was produced by an actual
-`dotnet test` run against that dataset, not estimated. Re-curate this file against the real collection,
-with genuine HVSC/DeepSID data, the first time both are available on a machine — and at that point point
-SearchOracleTests at SeededCollectionFixture instead, per the design this task was handed.
--->
-
 # Search Oracle
 
-Nine terms, each pinning a distinct way a search predicate can go right or wrong, asserted against
-`SqliteIndexStore.SearchAsync` — the new store's real FTS5-backed search — rather than the current
-in-memory `BaseStorageCache.Search`. That current predicate is what this oracle replaces as a reference:
-it is a case-insensitive `Contains` over `Title`, `Name`, `Creator`, `Path.Value`, and `Description` on
-every live `LaunchableItem`, and it cannot itself serve as ground truth because its `Description` field
-falls back to tens of thousands of words of generated boilerplate the moment a file has no real metadata
-(see the boilerplate case below). This document is what the next iteration reads before changing search;
-each row explains what its case pins and why, not just what its term is.
+Nine terms drawn from a real collection, each pinning a distinct way a search predicate can go right or
+wrong, asserted against `SqliteIndexStore.SearchAsync` — the new store's FTS5-backed search — rather than
+the current in-memory `BaseStorageCache.Search`. That current predicate is what this oracle replaces as a
+reference: it is a case-insensitive `Contains` over `Title`, `Name`, `Creator`, `Path.Value`, and
+`Description` on every live `LaunchableItem`, and it cannot itself serve as ground truth because its
+`Description` falls back to generated boilerplate the moment a file has no real metadata — which, on the
+collection below, makes one ordinary word match 41,285 files. This document is what the next iteration
+reads before changing search; each row explains what its case pins and why, not just what its term is.
 
-## The synthetic dataset
+## The collection these terms came from
 
-| Path | Type | What makes it distinct |
-|---|---|---|
-| `/music/mob/theme1.sid` | Song | HVSC record sets `Creator = "Rob Hubbard"`, no commentary |
-| `/music/mob/opus7.sid` | Song | `content_search.title` set directly to `"Stardust Reverie"` (see the title-only case) |
-| `/music/mob/zorbatron.sid` | Song | No enrichment; distinctive filename only |
-| `/music/mob/twilight.sid` | Song | HVSC record's `StilEntry` is genuine commentary mentioning "Frostbyte" |
-| `/games/GALAXIANS/blaster.prg` | Game | No enrichment; distinctive directory segment, ordinary filename |
-| `/games/NEBULA/quantum.prg` | Game | No enrichment; distinctive filename *and* distinctive directory segment |
-| `/music/filler/track001.sid` … `track050.sid` (50 files) | Song | No enrichment at all — plain boilerplate carriers |
+| | |
+|---|---|
+| Device | `L5ZMCNBR`, SD |
+| Files | 64,658 (64,081 distinct content identities, 1,979 directories) |
+| Metadata | HVSC export `SIDlist_82_UTF8.csv` — 59,221 identities got a real creator, 17,992 got real STIL commentary |
+| Seeded through | `IndexFixtureSeeder` → `SqliteIndexStore` → `MetadataProjection` → `FtsQuery`, the production path |
 
-Every file without an HVSC record falls back to `SongItem`/`GameItem`'s own generated description —
-the exact mechanism the boilerplate case pins.
+Every count in this document and in `search-oracle.json` was produced by a live run over that collection.
+None is estimated. The counts belong to that card *and* that HVSC export, so `search-oracle.json` names
+both under `collection`, and `SearchOracleTests` skips — rather than fails — on a machine whose fixture or
+HVSC export is a different one.
+
+The inputs themselves are not committed: the fixture is a listing of a personal collection and the HVSC
+export is a 20 MB third-party database. What is committed is the oracle they produced.
+
+### Reproducing or re-curating on another card
+
+1. Extract a fixture from the device's own index file:
+   `dotnet run --project src/TeensyRom.Tools.IndexExtractor -- --input <data-dir>/Assets/System/Cache/Sd-<device>.json --output src/apps/api/.local-fixtures/Sd-<device>.tsv`
+2. Point `TEENSYROM_DATA_DIR` at the data directory holding both `Assets/System/Cache/` (the index file the
+   equivalence suite compares against) and `Assets/Music/SidList/` (the HVSC CSV the projection enriches from).
+3. Run `SearchOracleTests`. It will skip, naming this card and export as not the ones the oracle describes.
+4. Replace `collection` and re-measure each case's counts against the new card, then update `cases`.
+
+Step 3's skip is the whole point of the `collection` block: exact counts drawn from one card say nothing
+about another, so the suite refuses to pretend otherwise. Seeding and projecting 64,658 files takes about
+47 minutes, so this is a deliberate, occasional act, not something a normal test run pays.
 
 ## Cases
 
-| Term | Intent | Mechanism |
+| Term | Results | Mechanism |
 |---|---|---|
-| `Hubbard` | Creator name that lives only in projected metadata | Matches `content_search.creator` for `theme1.sid` only; the word appears in no filename or path |
-| `Stardust` | Title that lives only in projected metadata | Matches `content_search.title` for `opus7.sid`. **Deviation**: `MetadataProjection` never actually persists a title differently from the filename today — see "Why the title case is written directly", below |
-| `Zorbatron` | Word from a filename | Matches `file_search.name` |
-| `Galaxians` | Word from a path segment, absent from every filename | Matches `file_search.path` only |
-| `Quantum Nebula` | Multi-word term whose parts live in different `file_search` columns | `Quantum` matches the filename, `Nebula` matches only the enclosing directory; both tokens must match the same row for FTS5's implicit AND to succeed |
-| `Frostbyte` | Word from genuine per-file commentary | Matches `content_search.description` for `twilight.sid`, whose STIL-style entry differs from the type's generated fallback and is therefore persisted, not dropped |
-| `demoscene` | Word from the generated type-description boilerplate | **The case that proves the change** — see below |
-| `Blorpazoid` | Term matching nothing | Zero results, no throw |
-| `Hubbard-"*` | Term containing FTS5 operator characters (`"`, `-`, `*`) | Must not throw. `FtsQuery` quotes the whole token, so FTS5 treats it as a phrase; the `unicode61` tokenizer strips the punctuation from that phrase before matching, leaving a prefix match on `hubbard` — so this one **still finds** `theme1.sid`, demonstrating that the operator characters are neutralised rather than crashing the query or being read as FTS5 syntax |
+| `Mroczkowski` | 239 | Creator that lives only in projected metadata: the composer's real name, where every path uses his handle (`/MUSICIANS/S/Surgeon/`). The word appears in no filename, path, or description |
+| `Abyssonaut` | 2 | Word from a filename, via `file_search.name` — and it finds both a `.crt` and a `.sid`, so the match is not a file-type accident |
+| `MultiLoad64` | 149 | Word from a directory segment that appears in no filename at all: every hit is `file_search.path`, and 149 is exactly the file count of `/games/MultiLoad64/` |
+| `Korg` | 2 | Word from genuine per-file STIL commentary (two JCH worktunes describing the synth they sampled), present in no name, path, or creator |
+| `Hubbard Commando` | 45 | Multi-word term whose parts live in different tables — `Hubbard` in `content_search`, `Commando` in `file_search` — so both tokens must land on the same row for FTS5's implicit AND to succeed |
+| `demoscene` | 9 | Word from the generated type-description boilerplate. **The case that proves the change** — see below |
+| `10th Frame` | 1 | The file and its favourite are the only two copies; the favourites tree is excluded from every scoped read, so the original comes back and the copy does not |
+| `Blorpazoid` | 0 | Term matching nothing: no results, no throw |
+| `Hubbard-"*` | 492 | Term full of FTS5 operator characters (`"`, `-`, `*`) that must be handled, not throw. `FtsQuery` quotes the whole token, so FTS5 reads it as a phrase and the `unicode61` tokenizer strips the punctuation out of it — leaving a prefix match on `hubbard` and the same 492 results the bare term returns |
 
 ## The boilerplate case, in detail
 
-`SongItem.Description` falls back to a fixed, multi-hundred-word paragraph about the SID format
-whenever a song has no real description — a paragraph that contains the word "demoscene". Today's
-predicate (`BaseStorageCache.Search`) reads `Description` off the live entity, so it matches every song
-that has no real description, regardless of how many that is.
+`SongItem.Description` falls back to a fixed, multi-hundred-word paragraph about the SID format whenever a
+song has no real description — a paragraph containing the word "demoscene". Today's predicate reads
+`Description` off the live entity, so it matches every song that has no real description.
 
-Run live against this task's synthetic dataset (`SearchOracleTests.TodaysPredicate_ForTheBoilerplateTerm_MatchesEveryFileWhoseDescriptionWasNeverOverridden`):
+Measured live against this collection, both sides in the same run
+(`SearchOracleTests.Search_ForTheBoilerplateTerm_AnswersOrdersOfMagnitudeSmallerThanTodaysPredicate`):
 
-- **Today's predicate**: matches **53 of the dataset's 56 seeded files** — every file except `twilight.sid`
-  (real commentary overrides the boilerplate) and the two `.prg` files (`GameItem`'s boilerplate text
-  doesn't contain "demoscene"). In other words: every ordinary, unenriched `.sid` file.
-- **The new store**: matches **0**. `MetadataProjection` builds one enriched and one unenriched instance
-  of each file's type and only persists a field into `content_metadata`/`content_search` when enrichment
-  actually changed it (`DerivedValueProbe.IsDerived`); when nothing changed, the fallback is recognised as
-  the type's own generated text and is written as empty rather than carried into the search index. The
-  boilerplate is never there to match.
+- **Today's predicate** (`SimpleStorageCache` over the device's real index file): **41,285 of 64,658 files** —
+  roughly two thirds of the card, for a word that describes none of them.
+- **The new store**: **9** — the files whose STIL commentary genuinely says "demoscene".
 
-Against the real 270,972-file collection the same mechanism applies to every unenriched file of a given
-type, which is what turns an ordinary boilerplate word into a match count in the tens of thousands today.
-This dataset's 53-of-56 is the same failure mode at a scale small enough to seed in milliseconds and
-verify exactly.
+`MetadataProjection` builds one enriched and one unenriched instance of each identity's type and persists a
+field only when enrichment actually changed it (`DerivedValueProbe.IsDerived`). When nothing changed, the
+fallback is recognised as the type's own generated text and written as empty rather than carried into the
+search index, so the boilerplate is never there to match.
 
-## Why the title case is written directly
+## Why there is no "title" case
 
-`SearchOracle`'s "title that lives only in projected metadata" behaviour cannot be produced through
-`MetadataProjection` as it stands: both `SongItem.Title` and `GameItem.Title` are computed directly from
-the filename with no settable backing field (`Title => $"{Name[..Name.LastIndexOf('.')]}"`), so
-`ProbeOrNull` always finds the enriched and unenriched instances agree and drops `Title` as derived —
-confirmed by the existing unit test
-`MetadataProjectionTests.ProjectAsync_TitleAndMeta1_AreNeverPersisted_EvenWithGenuineMetadata`. Since
-`content_search.title` is real, load-bearing schema (used exactly like `creator` and `description`), the
-fixture writes it directly for `opus7.sid` rather than dropping the case: it proves the search
-mechanism's title-column behaviour, forward-compatible with a future enrichment source that can actually
-set a title independent of the filename. It is not a claim about what today's production pipeline
-currently produces.
+`content_search.title` is empty for all 64,081 identities on this card, and that is correct behaviour
+today rather than a projection bug: `SongItem.Title` and `GameItem.Title` are computed from the filename
+with no settable backing field (`Title => $"{Name[..Name.LastIndexOf('.')]}"`), so `ProbeOrNull` always
+finds the enriched and unenriched instances agree and drops `Title` as derived — the behaviour
+`MetadataProjectionTests.ProjectAsync_TitleAndMeta1_AreNeverPersisted_EvenWithGenuineMetadata` pins. HVSC
+titles therefore reach neither `content_metadata` nor the search index, and a term drawn from one would be
+asserting a behaviour the system does not have. When an enrichment source can set a title independently of
+the filename, that is the moment to add the case.
 
 ## Reading the bounds
 
 `minResults`/`maxResults` bound the result count; `expectedPaths` are files that must appear;
-`mustNotMatch` are files that must not. Every positive case here has an exact, verified count
-(`minResults == maxResults`) because the dataset is small and fully controlled — a real-collection
-re-curation should keep the same discipline where the count is knowable, and use a wider band only where
-collection churn makes an exact count unstable.
+`mustNotMatch` are files that must not. Every case here has an exact count (`minResults == maxResults`)
+because the collection is pinned by the `collection` block — a re-curation should keep that discipline and
+widen a band only where the count is genuinely unstable.

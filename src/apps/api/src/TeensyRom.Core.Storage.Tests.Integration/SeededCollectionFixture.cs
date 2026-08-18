@@ -63,6 +63,9 @@ namespace TeensyRom.Core.Storage.Tests.Integration
         /// <summary>What this run paired: the fixture header, and the index file path and size beside it.</summary>
         public string Manifest { get; private set; } = string.Empty;
 
+        /// <summary>The metadata source the projection ran over, or why it ran stubbed.</summary>
+        public string MetadataSourceNote { get; private set; } = string.Empty;
+
         /// <summary>
         /// A handful of real directories chosen to span the shapes a listing has to survive: the root, the
         /// deepest path, one with no files, the most crowded one, and one under the favourites tree.
@@ -118,7 +121,7 @@ namespace TeensyRom.Core.Storage.Tests.Integration
 
             _cache = CreateCache(_inputs);
 
-            Manifest = BuildManifest(_inputs, _seed, _cache);
+            Manifest = BuildManifest(_inputs, _seed, _cache, MetadataSourceNote);
             Console.WriteLine(Manifest);
         }
 
@@ -164,11 +167,12 @@ namespace TeensyRom.Core.Storage.Tests.Integration
         }
 
         /// <summary>
-        /// The projection runs with stubbed metadata sources: HVSC and DeepSID are multi-hundred-megabyte
-        /// downloads that no machine is guaranteed to have, and no equivalence assertion reads a metadata
-        /// field. What the projection is here for is the row and search-index shape, which is unaffected.
+        /// Builds the projection over the real HVSC database when the local data directory carries it, and
+        /// over a stub when it does not. The search oracle needs real creators and real STIL commentary in
+        /// <c>content_search</c> to mean anything; the equivalence assertions read no metadata field, so they
+        /// are indifferent either way and a machine without HVSC still runs them.
         /// </summary>
-        private static MetadataProjection CreateProjection(TemporaryIndex index)
+        private MetadataProjection CreateProjection(TemporaryIndex index)
         {
             var gameMetadata = Substitute.For<IGameMetadataService>();
             gameMetadata.EnrichGame(Arg.Any<GameItem>()).Returns(call => call.Arg<GameItem>());
@@ -176,12 +180,28 @@ namespace TeensyRom.Core.Storage.Tests.Integration
             var sourceVersion = Substitute.For<IMetadataSourceVersion>();
             sourceVersion.Current.Returns("integration");
 
-            var sidMetadata = new SidMetadataService(Substitute.For<IHvscDatabase>(), Substitute.For<IDeepSidDatabase>());
+            var hvscSources = MetadataSourceAvailability.TryResolve();
+
+            IHvscDatabase hvsc;
+
+            if (hvscSources is null)
+            {
+                MetadataSourceAvailability.HasHvsc(out var why);
+                MetadataSourceNote = why!;
+                hvsc = Substitute.For<IHvscDatabase>();
+            }
+            else
+            {
+                MetadataSourceNote = $"HVSC '{hvscSources.HvscCsvPath}'";
+                hvsc = new HvscDatabase(hvscSources.HvscCsvPath);
+            }
+
+            var sidMetadata = new SidMetadataService(hvsc, Substitute.For<IDeepSidDatabase>());
 
             return new MetadataProjection(index.Database, sidMetadata, gameMetadata, sourceVersion);
         }
 
-        private static string BuildManifest(FixtureInputs inputs, SeedResult seed, SimpleStorageCache cache)
+        private static string BuildManifest(FixtureInputs inputs, SeedResult seed, SimpleStorageCache cache, string metadataSourceNote)
         {
             var header = inputs.Header;
             var indexFile = new FileInfo(inputs.IndexFilePath);
@@ -190,7 +210,8 @@ namespace TeensyRom.Core.Storage.Tests.Integration
                    $"(v{header.Version}, device '{header.DeviceId}', {header.StorageType}, {header.FileCount} files) " +
                    $"against index file '{inputs.IndexFilePath}' ({indexFile.Length} bytes). " +
                    $"Seeded {seed.Files} files, {seed.Directories} directories, {seed.MetadataRows} metadata rows " +
-                   $"in {seed.Elapsed}. Cache holds {cache.Count} directories and {cache.GetCacheSize()} files.";
+                   $"in {seed.Elapsed}. Cache holds {cache.Count} directories and {cache.GetCacheSize()} files. " +
+                   $"Projected metadata from: {metadataSourceNote}.";
         }
 
         private IReadOnlyList<(string, string)> BuildDirectorySample()
