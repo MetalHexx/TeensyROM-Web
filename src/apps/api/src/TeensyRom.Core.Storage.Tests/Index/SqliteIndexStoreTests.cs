@@ -208,6 +208,39 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
+        public async Task UpsertFileAsync_AfterItsFavouriteCopyWasIndexedFirst_StillFlagsTheOriginal()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/favorites/music/monty.sid", size: 100), Ct);
+
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/mob/monty.sid", size: 100), Ct);
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/other/jane.sid", size: 100), Ct);
+
+            fixture.Strings("SELECT path FROM file WHERE is_favorite = 1 ORDER BY path;")
+                .Should().Equal("/favorites/music/monty.sid", "/music/mob/monty.sid");
+        }
+
+        [Fact]
+        public async Task UpsertFilesAsync_AfterItsFavouriteCopyWasIndexedFirst_StillFlagsTheOriginal()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+
+            await fixture.Store.UpsertFilesAsync(fixture.Scope, [IndexTestFixture.CreateFile("/favorites/music/monty.sid", size: 100)], Ct);
+
+            await fixture.Store.UpsertFilesAsync(
+                fixture.Scope,
+                [
+                    IndexTestFixture.CreateFile("/music/mob/monty.sid", size: 100),
+                    IndexTestFixture.CreateFile("/music/other/jane.sid", size: 100)
+                ],
+                Ct);
+
+            fixture.Strings("SELECT path FROM file WHERE is_favorite = 1 ORDER BY path;")
+                .Should().Equal("/favorites/music/monty.sid", "/music/mob/monty.sid");
+        }
+
+        [Fact]
         public async Task DeleteFileAsync_OfTheFavouriteCopy_ClearsTheFlagOnTheRemainingCopies()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();

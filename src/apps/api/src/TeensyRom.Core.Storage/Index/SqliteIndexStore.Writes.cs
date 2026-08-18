@@ -42,11 +42,10 @@ namespace TeensyRom.Core.Storage.Index
                 var fileId = await UpsertFileRowAsync(upsert, storageId, directoryId, file, ct);
                 await RefreshSearchRowAsync(searchDelete, searchInsert, fileId, file, ct);
 
-                if (IndexPathPatterns.IsFavoritePath(file.Path.Value))
-                {
-                    await using var recompute = CreateFavoriteRecomputeCommand(connection, transaction);
-                    await RecomputeFavoriteAsync(recompute, storageId, file.Id, ct);
-                }
+                // Recomputed unconditionally: the row just written may be either the favourite copy or the
+                // original it flags, and the write path cannot assume which was indexed first.
+                await using var recompute = CreateFavoriteRecomputeCommand(connection, transaction);
+                await RecomputeFavoriteAsync(recompute, storageId, file.Id, ct);
 
                 return true;
             }, ct);
@@ -62,7 +61,7 @@ namespace TeensyRom.Core.Storage.Index
                 {
                     var storageId = await ResolveStorageIdAsync(connection, transaction, scope, ct);
                     var directoryIds = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-                    var favoriteContentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var contentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                     await using var upsert = CreateFileUpsertCommand(connection, transaction);
                     await using var searchDelete = CreateSearchDeleteCommand(connection, transaction);
@@ -81,21 +80,12 @@ namespace TeensyRom.Core.Storage.Index
                         var fileId = await UpsertFileRowAsync(upsert, storageId, directoryId, file, ct);
                         await RefreshSearchRowAsync(searchDelete, searchInsert, fileId, file, ct);
 
-                        if (IndexPathPatterns.IsFavoritePath(file.Path.Value))
-                        {
-                            favoriteContentIds.Add(file.Id);
-                        }
+                        contentIds.Add(file.Id);
                     }
 
-                    if (favoriteContentIds.Count > 0)
-                    {
-                        await using var recompute = CreateFavoriteRecomputeCommand(connection, transaction);
-
-                        foreach (var contentId in favoriteContentIds)
-                        {
-                            await RecomputeFavoriteAsync(recompute, storageId, contentId, ct);
-                        }
-                    }
+                    // Recomputed for every content identity written, not just the ones under a favourite
+                    // path: a favourite copy indexed before its original must still flag that original.
+                    await RecomputeFavoritesAsync(connection, transaction, storageId, contentIds, ct);
 
                     return true;
                 }, ct);
