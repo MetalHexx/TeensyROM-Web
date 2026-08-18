@@ -28,8 +28,9 @@ export is a 20 MB third-party database. What is committed is the oracle they pro
 
 ### Reproducing or re-curating on another card
 
-1. Extract a fixture from the device's own index file:
-   `dotnet run --project src/TeensyRom.Tools.IndexExtractor -- --input <data-dir>/Assets/System/Cache/Sd-<device>.json --output src/apps/api/.local-fixtures/Sd-<device>.tsv`
+1. Extract a fixture from the device's own index file using the fixture seeder or a prior copy of the
+   `TeensyRom.Tools.IndexExtractor` tool (which has been removed from the repository; restore it from git
+   history if needed). The fixture should be written to `src/apps/api/.local-fixtures/Sd-<device>.tsv`.
 2. Point `TEENSYROM_DATA_DIR` at the data directory holding both `Assets/System/Cache/` (the index file the
    equivalence suite compares against) and `Assets/Music/SidList/` (the HVSC CSV the projection enriches from).
 3. Run `SearchOracleTests`. It will skip, naming this card and export as not the ones the oracle describes.

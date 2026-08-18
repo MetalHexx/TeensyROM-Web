@@ -110,8 +110,8 @@ public static class Program
         if (!File.Exists(fixturePath))
         {
             throw new FileNotFoundException(
-                $"No index fixture found at '{fixturePath}'. Pass --fixture <path>, or extract one from a real " +
-                "index with TeensyRom.Tools.IndexExtractor.", fixturePath);
+                $"No index fixture found at '{fixturePath}'. Pass --fixture <path>, or use the fixture seeder " +
+                "to extract one from a real index.", fixturePath);
         }
 
         var dbPath = ResolveDbPath(options);
