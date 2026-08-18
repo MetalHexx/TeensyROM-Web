@@ -48,6 +48,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Audio.Tests"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Tools.StorageBenchmark", "src\TeensyRom.Tools.StorageBenchmark\TeensyRom.Tools.StorageBenchmark.csproj", "{FA6021AB-7E98-44B3-894A-8F0EC99BF15B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Tools.IndexExtractor", "src\TeensyRom.Tools.IndexExtractor\TeensyRom.Tools.IndexExtractor.csproj", "{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -274,6 +276,18 @@ Global
 		{FA6021AB-7E98-44B3-894A-8F0EC99BF15B}.Release|x64.Build.0 = Release|Any CPU
 		{FA6021AB-7E98-44B3-894A-8F0EC99BF15B}.Release|x86.ActiveCfg = Release|Any CPU
 		{FA6021AB-7E98-44B3-894A-8F0EC99BF15B}.Release|x86.Build.0 = Release|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Debug|x64.Build.0 = Debug|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Debug|x86.Build.0 = Debug|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|x64.ActiveCfg = Release|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|x64.Build.0 = Release|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|x86.ActiveCfg = Release|Any CPU
+		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

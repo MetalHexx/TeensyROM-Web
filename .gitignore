@@ -404,3 +404,4 @@ Source/Windows/TeensyRom.Ui/src/TeensyRom.Api/ClientApp/teensyrom-nx/apps/teensy
 /src/apps/api/src/TeensyRom.Core.Device.Tests.Integration/test-reports/device-manager-discover-tcp-report.md
 /src/apps/api/src/TeensyRom.Core.Device.Tests.Integration/test-reports/local-subnet-scan-report.md
 /src/apps/api/.editorconfig
+/src/apps/api/.local-fixtures/
