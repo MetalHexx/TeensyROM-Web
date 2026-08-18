@@ -1,13 +1,13 @@
 <!--
-Data provenance: no hardware-synced Sd-*.json / Usb-*.json index files were present in this
-environment (the path named by the P01-T01 handoff, src/apps/api/src/TeensyRom.Api/bin/Debug/net9.0/
-win-x64/Assets/System/Cache/, does not exist in this worktree - the API has never been run against a
-real device here). The run below is a genuine `dotnet run` of TeensyRom.Tools.StorageBenchmark, executed
-against a synthetic index built by driving SimpleStorageCache's own EnsureParents/UpsertFile/WriteToDisk
-path (so the on-disk JSON is schema-identical to a real index), containing 25,920 files across a
-composer/album/song tree - real numbers, real code paths, synthetic content. Re-run this harness against
-a real multi-hundred-megabyte index the first time one is available and replace this file; the scenario
-list and sampling methodology are what future runs are compared against, not this file size.
+Data provenance: This file documents a baseline run against a synthetic index (25,920 files, generated via
+SimpleStorageCache's EnsureParents/UpsertFile/WriteToDisk path). It serves as a smoke test to confirm the
+benchmark harness and scenario framework function correctly.
+
+A real-data baseline was generated in Phase 5 and is documented in STORAGE-BENCHMARK-RESULTS.md, which
+measures the same operation set against a genuine 64,658-file index (Sd-L5ZMCNBR.json, 155.4 MB). That
+report is authoritative for actual performance requirements and system decisions. This file is retained as
+the synthetic smoke-test record for regression detection in the benchmark harness itself, and is no longer
+intended to be updated from real data.
 
 Everything from "# Storage Benchmark Report" onward is the harness's own emitted markdown, unedited.
 -->
