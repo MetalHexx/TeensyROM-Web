@@ -50,6 +50,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Tools.StorageBenc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Tools.IndexExtractor", "src\TeensyRom.Tools.IndexExtractor\TeensyRom.Tools.IndexExtractor.csproj", "{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeensyRom.Core.Storage.Tests.Integration", "src\TeensyRom.Core.Storage.Tests.Integration\TeensyRom.Core.Storage.Tests.Integration.csproj", "{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -288,6 +290,18 @@ Global
 		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|x64.Build.0 = Release|Any CPU
 		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|x86.ActiveCfg = Release|Any CPU
 		{3F1D9E2A-6B47-4C9E-8A2D-9F6E7C1B5A44}.Release|x86.Build.0 = Release|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Debug|x64.Build.0 = Debug|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Debug|x86.Build.0 = Debug|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Release|x64.ActiveCfg = Release|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Release|x64.Build.0 = Release|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Release|x86.ActiveCfg = Release|Any CPU
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -303,6 +317,7 @@ Global
 		{B02B6B71-CBFA-4B4B-9BC0-D3D1817DFA22} = {7E3C6ECA-A1A8-446F-A8D0-A662F109F2B9}
 		{7BBA86DA-05C3-46F7-B705-BD48084B496B} = {7E3C6ECA-A1A8-446F-A8D0-A662F109F2B9}
 		{0ABDED67-BBB0-42D9-9249-0751746DB140} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{E24F4614-698F-4C73-9B6E-7DAFAA7EA505} = {7E3C6ECA-A1A8-446F-A8D0-A662F109F2B9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CEA1D327-E773-4A3D-837C-6B01037E16E5}
