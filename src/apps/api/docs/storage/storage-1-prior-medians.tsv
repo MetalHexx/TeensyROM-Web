@@ -1,0 +1,11 @@
+Cold start to queryable	4.128
+Directory listing by path	0.239
+Search	100.904
+Random by scope (Storage)	109.999
+Random by scope (DirDeep)	110.647
+Random by scope (DirShallow)	22.648
+Parent lookup by identity	0.097
+Sibling lookup by identity	31.615
+Single upsert	63.617
+Bulk upsert (500) + parent lookup (identity map rebuild)	32459.181
+Peak memory with every discovered index loaded	260.183

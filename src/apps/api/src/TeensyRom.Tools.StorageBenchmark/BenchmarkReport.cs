@@ -12,15 +12,25 @@ public record IndexFileInfo(string Path, long SizeBytes, int FileCount);
 /// <summary>
 /// One operation's legacy-vs-store comparison. A side missing a counterpart carries a
 /// <see langword="null"/> - never a zero - since "not measured" and "no difference" are different claims.
+/// <see cref="PriorMedianMs"/> and <see cref="PriorDeltaMs"/> are populated only when a <c>--prior</c> file
+/// was supplied and it carried a value for this operation.
 /// </summary>
 public record ComparisonRow(
     string Operation,
     double? LegacyMedianMs,
+    double? PriorMedianMs,
     double? StoreMedianMs,
     double? DeltaMs,
+    double? PriorDeltaMs,
     long? LegacyPeakWorkingSetBytes,
     long? StorePeakWorkingSetBytes,
     string Expectation);
+
+/// <summary>
+/// One <c>IndexSql</c> statement's <c>EXPLAIN QUERY PLAN</c> result, captured for the <c>--explain</c>
+/// report section.
+/// </summary>
+public record QueryPlanEntry(string Statement, IReadOnlyList<string> PlanRows);
 
 /// <summary>
 /// Renders a <see cref="BenchmarkRunner"/> run as a markdown report: a provenance header followed by either
@@ -86,31 +96,55 @@ public static class BenchmarkReport
     /// Renders the <c>--scenarios both</c> report: one row per operation with a legacy column, a store
     /// column, an absolute delta in milliseconds, and the expectation for that operation. Judged in absolute
     /// time, not ratios - an operation going from a fraction of a millisecond to a few milliseconds is a large
-    /// ratio and an invisible change.
+    /// ratio and an invisible change. When <paramref name="priorMedians"/> is supplied, the table gains a
+    /// prior-store column between the legacy and current-store columns, plus a delta against it; omitting it
+    /// leaves today's table unchanged.
     /// </summary>
     public static string BuildComparison(
         BenchmarkOptions options,
         IReadOnlyList<ScenarioResult> legacyResults,
         IReadOnlyList<ScenarioResult> storeResults,
         IReadOnlyList<IndexFileInfo> indexFiles,
-        TimeSpan seedElapsed)
+        TimeSpan seedElapsed,
+        IReadOnlyDictionary<string, double>? priorMedians = null)
     {
         var sb = new StringBuilder();
         AppendHeader(sb, options, indexFiles, seedElapsed);
 
         sb.AppendLine("## Legacy vs. store comparison");
         sb.AppendLine();
-        sb.AppendLine(
-            "| Operation | Legacy median (ms) | Store median (ms) | Delta (ms) | Legacy peak working set (bytes) | " +
-            "Store peak working set (bytes) | Expectation |");
-        sb.AppendLine("|---|---|---|---|---|---|---|");
 
-        foreach (var row in BuildComparisonRows(legacyResults, storeResults))
+        var rows = BuildComparisonRows(legacyResults, storeResults, priorMedians);
+
+        if (priorMedians is null)
         {
             sb.AppendLine(
-                $"| {row.Operation} | {FormatMs(row.LegacyMedianMs)} | {FormatMs(row.StoreMedianMs)} | " +
-                $"{FormatMs(row.DeltaMs)} | {FormatBytes(row.LegacyPeakWorkingSetBytes)} | " +
-                $"{FormatBytes(row.StorePeakWorkingSetBytes)} | {row.Expectation} |");
+                "| Operation | Legacy median (ms) | Store median (ms) | Delta (ms) | Legacy peak working set (bytes) | " +
+                "Store peak working set (bytes) | Expectation |");
+            sb.AppendLine("|---|---|---|---|---|---|---|");
+
+            foreach (var row in rows)
+            {
+                sb.AppendLine(
+                    $"| {row.Operation} | {FormatMs(row.LegacyMedianMs)} | {FormatMs(row.StoreMedianMs)} | " +
+                    $"{FormatMs(row.DeltaMs)} | {FormatBytes(row.LegacyPeakWorkingSetBytes)} | " +
+                    $"{FormatBytes(row.StorePeakWorkingSetBytes)} | {row.Expectation} |");
+            }
+        }
+        else
+        {
+            sb.AppendLine(
+                "| Operation | Legacy median (ms) | Store median, STORAGE-1 (ms) | Store median (ms) | Delta (ms) | " +
+                "Delta vs. STORAGE-1 (ms) | Legacy peak working set (bytes) | Store peak working set (bytes) | Expectation |");
+            sb.AppendLine("|---|---|---|---|---|---|---|---|---|");
+
+            foreach (var row in rows)
+            {
+                sb.AppendLine(
+                    $"| {row.Operation} | {FormatMs(row.LegacyMedianMs)} | {FormatMs(row.PriorMedianMs)} | " +
+                    $"{FormatMs(row.StoreMedianMs)} | {FormatMs(row.DeltaMs)} | {FormatMs(row.PriorDeltaMs)} | " +
+                    $"{FormatBytes(row.LegacyPeakWorkingSetBytes)} | {FormatBytes(row.StorePeakWorkingSetBytes)} | {row.Expectation} |");
+            }
         }
 
         return sb.ToString();
@@ -120,16 +154,36 @@ public static class BenchmarkReport
     /// Pairs legacy and store results by operation name into one row per operation seen on either side. A
     /// side missing a counterpart contributes <see langword="null"/> fields rather than zeros, and the delta
     /// is only computed when both sides have a measurement.
+    /// <para>
+    /// <paramref name="priorMedians"/>, when supplied, must be keyed with an ordinal comparer - a key that
+    /// matches no operation on either side is a defect in the file, not a silently dropped row, so it throws
+    /// naming the key rather than being ignored. An operation with no prior entry renders <see langword="null"/>
+    /// for <see cref="ComparisonRow.PriorMedianMs"/>, the same "not measured" convention as the legacy/store pair.
+    /// </para>
     /// </summary>
     public static IReadOnlyList<ComparisonRow> BuildComparisonRows(
-        IReadOnlyList<ScenarioResult> legacyResults, IReadOnlyList<ScenarioResult> storeResults)
+        IReadOnlyList<ScenarioResult> legacyResults,
+        IReadOnlyList<ScenarioResult> storeResults,
+        IReadOnlyDictionary<string, double>? priorMedians = null)
     {
         var legacyByOperation = legacyResults.ToDictionary(r => r.Operation);
         var storeByOperation = storeResults.ToDictionary(r => r.Operation);
 
         var operations = legacyResults.Select(r => r.Operation)
             .Concat(storeResults.Select(r => r.Operation))
-            .Distinct();
+            .Distinct()
+            .ToList();
+
+        if (priorMedians is not null)
+        {
+            var unmatchedKeys = priorMedians.Keys.Where(key => !operations.Contains(key)).ToList();
+
+            if (unmatchedKeys.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Prior median file has operation(s) with no matching scenario: {string.Join(", ", unmatchedKeys)}");
+            }
+        }
 
         var rows = new List<ComparisonRow>();
 
@@ -141,14 +195,50 @@ public static class BenchmarkReport
             double? legacyMedian = legacy?.MedianMs;
             double? storeMedian = store?.MedianMs;
             double? delta = legacyMedian is { } l && storeMedian is { } s ? s - l : null;
+            double? priorMedian = priorMedians is not null && priorMedians.TryGetValue(operation, out var p) ? p : null;
+            double? priorDelta = priorMedian is { } pm && storeMedian is { } sm ? sm - pm : null;
             var expectation = ExpectationByOperation.TryGetValue(operation, out var text) ? text : string.Empty;
 
             rows.Add(new ComparisonRow(
-                operation, legacyMedian, storeMedian, delta,
+                operation, legacyMedian, priorMedian, storeMedian, delta, priorDelta,
                 legacy?.PeakWorkingSetBytes, store?.PeakWorkingSetBytes, expectation));
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Renders the <c>--explain</c> report section: one heading per statement captured, followed by its
+    /// <c>EXPLAIN QUERY PLAN</c> detail rows. A statement whose plan has no rows (a literal-values write with
+    /// nothing to scan) renders a note saying so rather than an empty, ambiguous-looking heading.
+    /// </summary>
+    public static string BuildQueryPlans(IReadOnlyList<QueryPlanEntry> entries)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("## Query plans");
+        sb.AppendLine();
+
+        foreach (var entry in entries)
+        {
+            sb.AppendLine($"### {entry.Statement}");
+            sb.AppendLine();
+
+            if (entry.PlanRows.Count == 0)
+            {
+                sb.AppendLine("- (no plan rows)");
+            }
+            else
+            {
+                foreach (var planRow in entry.PlanRows)
+                {
+                    sb.AppendLine($"- {planRow}");
+                }
+            }
+
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
     }
 
     private static void AppendHeader(
