@@ -47,15 +47,19 @@ namespace TeensyRom.Core.Storage.Index
             RETURNING id;
             """;
 
-        /// <summary>Removes a file's row from the file-name search index.</summary>
-        public const string FileSearchDelete = "DELETE FROM file_search WHERE file_id = $fileId;";
+        /// <summary>Removes a file's row from the file-name search index, addressed by its rowid.</summary>
+        public const string FileSearchDelete = "DELETE FROM file_search WHERE rowid = $fileId;";
 
-        /// <summary>Adds a file's row to the file-name search index.</summary>
-        public const string FileSearchInsert = "INSERT INTO file_search (name, path, file_id) VALUES ($name, $path, $fileId);";
+        /// <summary>
+        /// Adds a file's row to the file-name search index. <c>rowid</c> is the <c>file</c> row's own id, so
+        /// the row is a seek away from the id every caller already holds; <c>file_id</c> stays alongside it,
+        /// unindexed, for <see cref="Search"/> to select back out.
+        /// </summary>
+        public const string FileSearchInsert = "INSERT INTO file_search (rowid, name, path, file_id) VALUES ($fileId, $name, $path, $fileId);";
 
         /// <summary>Removes every file-name search row belonging to a storage, ahead of clearing its files.</summary>
         public const string FileSearchDeleteByStorage =
-            "DELETE FROM file_search WHERE file_id IN (SELECT id FROM file WHERE storage_id = $storage);";
+            "DELETE FROM file_search WHERE rowid IN (SELECT id FROM file WHERE storage_id = $storage);";
 
         /// <summary>The directory listing: every file directly under one parent path.</summary>
         public const string FilesByParent =
@@ -65,14 +69,22 @@ namespace TeensyRom.Core.Storage.Index
         public const string GetFileByPath =
             "SELECT " + FileColumns + " FROM " + MetadataJoin + " WHERE f.storage_id = $storage AND f.path = $path;";
 
-        /// <summary>Removes a content identity's row from the metadata search index.</summary>
-        public const string ContentSearchDelete = "DELETE FROM content_search WHERE content_id = $contentId;";
+        /// <summary>Removes a content identity's row from the metadata search index, addressed by its rowid.</summary>
+        public const string ContentSearchDelete = "DELETE FROM content_search WHERE rowid = $rowId;";
 
-        /// <summary>Adds a content identity's row to the metadata search index.</summary>
+        /// <summary>
+        /// Adds a content identity's row to the metadata search index. <c>rowid</c> is the
+        /// <c>content_metadata</c> row's own id, handed back by <see cref="ContentMetadataUpsert"/>; <c>content_id</c>
+        /// stays alongside it, unindexed, for <see cref="Search"/> to select back out.
+        /// </summary>
         public const string ContentSearchInsert =
-            "INSERT INTO content_search (title, creator, description, content_id) VALUES ($title, $creator, $description, $contentId);";
+            "INSERT INTO content_search (rowid, title, creator, description, content_id) VALUES ($rowId, $title, $creator, $description, $contentId);";
 
-        /// <summary>Inserts or updates a content identity's projected metadata.</summary>
+        /// <summary>
+        /// Inserts or updates a content identity's projected metadata, returning the row's own id so the
+        /// caller can address <c>content_search</c> by it rather than by scanning the full-text index for
+        /// <c>content_id</c>.
+        /// </summary>
         public const string ContentMetadataUpsert = """
             INSERT INTO content_metadata
               (content_id, title, creator, description, play_length, release_info,
@@ -91,7 +103,8 @@ namespace TeensyRom.Core.Storage.Index
               share_url            = excluded.share_url,
               meta1                = excluded.meta1,
               meta2                = excluded.meta2,
-              source_version       = excluded.source_version;
+              source_version       = excluded.source_version
+            RETURNING rowid;
             """;
 
         /// <summary>

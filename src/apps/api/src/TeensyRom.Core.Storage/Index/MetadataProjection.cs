@@ -54,8 +54,8 @@ namespace TeensyRom.Core.Storage.Index
 
                         var projected = Project(identity);
 
-                        await WriteMetadataRowAsync(metadataUpsert, identity.ContentId, projected, sourceVersion, ct);
-                        await RefreshContentSearchRowAsync(searchDelete, searchInsert, identity.ContentId, projected, ct);
+                        var rowId = await WriteMetadataRowAsync(metadataUpsert, identity.ContentId, projected, sourceVersion, ct);
+                        await RefreshContentSearchRowAsync(searchDelete, searchInsert, rowId, identity.ContentId, projected, ct);
                     }
 
                     return true;
@@ -197,7 +197,7 @@ namespace TeensyRom.Core.Storage.Index
             return command;
         }
 
-        private static async Task WriteMetadataRowAsync(SqliteCommand command, string contentId,
+        private static async Task<long> WriteMetadataRowAsync(SqliteCommand command, string contentId,
             ProjectedMetadata projected, string sourceVersion, CancellationToken ct)
         {
             command.Parameters["$contentId"].Value = contentId;
@@ -215,7 +215,7 @@ namespace TeensyRom.Core.Storage.Index
             command.Parameters["$meta2"].Value = (object?)projected.Meta2 ?? DBNull.Value;
             command.Parameters["$sourceVersion"].Value = sourceVersion;
 
-            await command.ExecuteNonQueryAsync(ct);
+            return Convert.ToInt64(await command.ExecuteScalarAsync(ct));
         }
 
         private static SqliteCommand CreateSearchDeleteCommand(SqliteConnection connection, SqliteTransaction transaction)
@@ -223,7 +223,7 @@ namespace TeensyRom.Core.Storage.Index
             var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = IndexSql.ContentSearchDelete;
-            command.Parameters.Add("$contentId", SqliteType.Text);
+            command.Parameters.Add("$rowId", SqliteType.Integer);
             command.Prepare();
 
             return command;
@@ -234,6 +234,7 @@ namespace TeensyRom.Core.Storage.Index
             var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = IndexSql.ContentSearchInsert;
+            command.Parameters.Add("$rowId", SqliteType.Integer);
             command.Parameters.Add("$title", SqliteType.Text);
             command.Parameters.Add("$creator", SqliteType.Text);
             command.Parameters.Add("$description", SqliteType.Text);
@@ -244,11 +245,12 @@ namespace TeensyRom.Core.Storage.Index
         }
 
         private static async Task RefreshContentSearchRowAsync(SqliteCommand delete, SqliteCommand insert,
-            string contentId, ProjectedMetadata projected, CancellationToken ct)
+            long rowId, string contentId, ProjectedMetadata projected, CancellationToken ct)
         {
-            delete.Parameters["$contentId"].Value = contentId;
+            delete.Parameters["$rowId"].Value = rowId;
             await delete.ExecuteNonQueryAsync(ct);
 
+            insert.Parameters["$rowId"].Value = rowId;
             insert.Parameters["$title"].Value = projected.Title ?? string.Empty;
             insert.Parameters["$creator"].Value = projected.Creator ?? string.Empty;
             insert.Parameters["$description"].Value = projected.Description ?? string.Empty;
