@@ -54,7 +54,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
-        public async Task RandomCandidate_Storage_Plan_DoesNotUseTempBTreeForOrderBy()
+        public async Task RandomCandidate_Storage_Plan_SeeksByPathRangeInsteadOfScanningTheFile()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
@@ -70,11 +70,14 @@ namespace TeensyRom.Core.Storage.Tests.Index
             });
 
             plan.Should().NotBeEmpty();
-            plan.Should().NotContain(line => line.Contains("USE TEMP B-TREE FOR ORDER BY"));
+            // The prefix LIKE optimization turns the path predicate into a range scan against the
+            // UNIQUE(storage_id, path) autoindex; a genuine regression to a bare table scan reads
+            // "SCAN f" instead, which this line can actually catch.
+            plan.Should().Contain(line => line.StartsWith("SEARCH f USING INDEX") && line.Contains("path"));
         }
 
         [Fact]
-        public async Task RandomCandidate_DirDeep_Plan_DoesNotUseTempBTreeForOrderBy()
+        public async Task RandomCandidate_DirDeep_Plan_SeeksByPathRangeInsteadOfScanningTheFile()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
@@ -90,7 +93,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
             });
 
             plan.Should().NotBeEmpty();
-            plan.Should().NotContain(line => line.Contains("USE TEMP B-TREE FOR ORDER BY"));
+            plan.Should().Contain(line => line.StartsWith("SEARCH f USING INDEX") && line.Contains("path"));
         }
 
         [Fact]
@@ -100,9 +103,11 @@ namespace TeensyRom.Core.Storage.Tests.Index
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
 
             // Seed one file under the scoped directory against many sharing its file type under other
-            // directories, so parent_path is by far the more selective filter and a regression back to
-            // ix_file_type — the other index the file_type predicate could otherwise justify — shows up as
-            // that index's name in the plan rather than as the planner's legitimate choice on a handful of rows.
+            // directories. Without ANALYZE — production's actual condition, never exercised here — SQLite's
+            // planner defaults this predicate to ix_file_type, the same shared, unselective index Search's own
+            // no-ANALYZE blind spot picks; IndexSql.RandomTable pins DirShallow to ix_file_parent so the plan
+            // this asserts is the one production gets, not one that only appears after a statistics pass
+            // production never runs.
             await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
 
             for (int i = 0; i < 1000; i++)
@@ -110,16 +115,39 @@ namespace TeensyRom.Core.Storage.Tests.Index
                 await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/other{i}/file{i}.sid"), Ct);
             }
 
-            // Without real statistics SQLite guesses a fixed row count per equality key for every candidate
-            // index alike, so the skew just seeded is invisible to the planner until ANALYZE records it.
-            await fixture.ExecuteAsync("ANALYZE;");
-
             var plan = fixture.QueryPlan(IndexSql.RandomCandidate(StorageScope.DirShallow, 1, 0), bind =>
             {
                 bind.Parameters.AddWithValue("$storage", storageId);
                 bind.Parameters.AddWithValue("$scopePath", "/music/");
                 bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
                 bind.Parameters.AddWithValue("$offset", 0L);
+            });
+
+            plan.Should().NotBeEmpty();
+            plan.Should().Contain(line => line.Contains("ix_file_parent"));
+        }
+
+        [Fact]
+        public async Task RandomCount_DirShallow_Plan_SeeksIxFileParent()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+            var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
+
+            // RandomCount and RandomCandidate share one predicate so they never see different candidate
+            // sets; pinning only the offset query would leave the count still driving off ix_file_type,
+            // costing every file of the requested type storage-wide on every draw.
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
+
+            for (int i = 0; i < 1000; i++)
+            {
+                await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/other{i}/file{i}.sid"), Ct);
+            }
+
+            var plan = fixture.QueryPlan(IndexSql.RandomCount(StorageScope.DirShallow, 1, 0), bind =>
+            {
+                bind.Parameters.AddWithValue("$storage", storageId);
+                bind.Parameters.AddWithValue("$scopePath", "/music/");
+                bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
             });
 
             plan.Should().NotBeEmpty();

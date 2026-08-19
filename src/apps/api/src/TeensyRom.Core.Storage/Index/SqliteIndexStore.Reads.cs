@@ -214,9 +214,19 @@ namespace TeensyRom.Core.Storage.Index
             }
             catch
             {
-                await using var rollbackCommand = connection.CreateCommand();
-                rollbackCommand.CommandText = "ROLLBACK;";
-                await rollbackCommand.ExecuteNonQueryAsync(CancellationToken.None);
+                try
+                {
+                    await using var rollbackCommand = connection.CreateCommand();
+                    rollbackCommand.CommandText = "ROLLBACK;";
+                    await rollbackCommand.ExecuteNonQueryAsync(CancellationToken.None);
+                }
+                catch
+                {
+                    // A failed ROLLBACK here almost always means the transaction is already gone — most
+                    // often because the COMMIT that triggered this catch ended it. Swallowing keeps that
+                    // recovery failure from masking the original exception, which is what the caller needs.
+                }
+
                 throw;
             }
         }

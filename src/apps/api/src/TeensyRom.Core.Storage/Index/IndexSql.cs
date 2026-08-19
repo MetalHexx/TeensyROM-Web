@@ -269,12 +269,27 @@ namespace TeensyRom.Core.Storage.Index
         }
 
         /// <summary>
+        /// The table clause <see cref="RandomCount"/> and <see cref="RandomCandidate"/> select from.
+        /// <c>DirShallow</c>'s predicate narrows on <c>parent_path</c> equality — selective because it is
+        /// scoped to one directory's immediate children, not because of anything <c>ANALYZE</c> statistics
+        /// would reveal (production never runs <c>ANALYZE</c>; see <see cref="Search"/>'s own no-<c>ANALYZE</c>
+        /// blind spot). Left unpinned, the planner defaults to the shared, unselective <c>ix_file_type</c> for
+        /// the common <c>storage_id</c> equality — a scan proportional to every file of that type storage-wide,
+        /// exactly the collection-size-proportional cost this phase exists to remove — instead of
+        /// <c>ix_file_parent</c>, whose scan is bounded by the requested directory's own children.
+        /// <c>Storage</c>/<c>DirDeep</c> scope by a <c>path LIKE</c> prefix instead, which the
+        /// <c>UNIQUE(storage_id, path)</c> autoindex already seeks on its own.
+        /// </summary>
+        private static string RandomTable(StorageScope scope) =>
+            scope == StorageScope.DirShallow ? "file f INDEXED BY ix_file_parent" : "file f";
+
+        /// <summary>
         /// The size of the candidate set <see cref="RandomCandidate"/> draws its offset against. No metadata
         /// join and no projection: the join contributes nothing to any predicate, so counting through it
         /// would cost rows this statement never needs to touch.
         /// </summary>
         public static string RandomCount(StorageScope scope, int typeCount, int excludeCount) =>
-            $"SELECT COUNT(*) FROM file f WHERE {RandomPredicate(scope, typeCount, excludeCount)};";
+            $"SELECT COUNT(*) FROM {RandomTable(scope)} WHERE {RandomPredicate(scope, typeCount, excludeCount)};";
 
         /// <summary>
         /// The id of the candidate sitting at <c>$offset</c> among the rows <see cref="RandomCount"/>
@@ -282,7 +297,7 @@ namespace TeensyRom.Core.Storage.Index
         /// <see cref="FileById"/> instead of materialising and sorting the whole candidate set to reach it.
         /// </summary>
         public static string RandomCandidate(StorageScope scope, int typeCount, int excludeCount) =>
-            $"SELECT f.id FROM file f WHERE {RandomPredicate(scope, typeCount, excludeCount)} LIMIT 1 OFFSET $offset;";
+            $"SELECT f.id FROM {RandomTable(scope)} WHERE {RandomPredicate(scope, typeCount, excludeCount)} LIMIT 1 OFFSET $offset;";
 
         /// <summary>A single file, addressed by its primary key, for the fetch that follows a resolved random offset.</summary>
         public const string FileById = $"SELECT {FileColumns} FROM {MetadataJoin} WHERE f.id = $id;";
