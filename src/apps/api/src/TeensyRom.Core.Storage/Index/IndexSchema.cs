@@ -47,6 +47,9 @@ namespace TeensyRom.Core.Storage.Index
             -- Not a query index: directory's upsert is a foreign-key parent update, and without this SQLite
             -- must scan every file row to check for children referencing the directory being written.
             CREATE INDEX IF NOT EXISTS ix_file_directory ON file (directory_id);
+            -- Superseded by ix_file_identity; dropped here so an index.db predating that composite index
+            -- loses the single-column one on the next start rather than carrying both forever.
+            DROP INDEX IF EXISTS ix_file_content;
 
             CREATE TABLE IF NOT EXISTS content_metadata (
               content_id           TEXT PRIMARY KEY COLLATE NOCASE,

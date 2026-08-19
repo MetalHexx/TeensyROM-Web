@@ -66,57 +66,60 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
-        public async Task ParentLookup_Plan_UsesIndexedAccess()
+        public async Task ParentLookup_Plan_SeeksIxFileIdentity()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
 
-            // Seed many files to encourage efficient index use
+            // Seed many files, ordered ahead of the match in path order, so a regression back to the
+            // path-ordered UNIQUE(storage_id, path) autoindex shows up as that index's name in the plan
+            // rather than as the planner's legitimate choice on a handful of rows.
             var file0 = IndexTestFixture.CreateFile("/music/file0.sid");
             for (int i = 0; i < 1000; i++)
             {
                 await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/music/file{i}.sid"), Ct);
             }
 
-            // Verify the composite index is in place by testing a simple query
-            var plan = fixture.QueryPlan(
-                "SELECT f.id FROM file f WHERE f.storage_id = $storage AND f.content_id = $contentId LIMIT 1",
-                bind =>
-                {
-                    bind.Parameters.AddWithValue("$storage", storageId);
-                    bind.Parameters.AddWithValue("$contentId", file0.Id);
-                }
-            );
+            var plan = fixture.QueryPlan(IndexSql.ParentLookup(), bind =>
+            {
+                bind.Parameters.AddWithValue("$storage", storageId);
+                bind.Parameters.AddWithValue("$contentId", file0.Id);
+                bind.Parameters.AddWithValue("$storageType", (long)fixture.Scope.StorageType);
+                IndexPathPatterns.BindLinkedCopyParameters(bind);
+            });
 
             plan.Should().NotBeEmpty();
             plan.Should().Contain(line => line.Contains("ix_file_identity"));
+            plan.Should().NotContain(line => line.Contains("sqlite_autoindex_file"));
         }
 
         [Fact]
-        public async Task SiblingLookup_Plan_UsesIndexedAccess()
+        public async Task SiblingLookup_Plan_SeeksIxFileIdentity()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
 
-            // Seed many files to encourage efficient index use
+            // Seed many files, ordered ahead of the match in path order, so a regression back to the
+            // path-ordered UNIQUE(storage_id, path) autoindex shows up as that index's name in the plan
+            // rather than as the planner's legitimate choice on a handful of rows.
             var file0 = IndexTestFixture.CreateFile("/music/file0.sid");
             for (int i = 0; i < 1000; i++)
             {
                 await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/music/file{i}.sid"), Ct);
             }
 
-            // Verify the composite index is in place by testing a simple query
-            var plan = fixture.QueryPlan(
-                "SELECT f.id FROM file f WHERE f.storage_id = $storage AND f.content_id = $contentId LIMIT 10",
-                bind =>
-                {
-                    bind.Parameters.AddWithValue("$storage", storageId);
-                    bind.Parameters.AddWithValue("$contentId", file0.Id);
-                }
-            );
+            var plan = fixture.QueryPlan(IndexSql.SiblingLookup(), bind =>
+            {
+                bind.Parameters.AddWithValue("$storage", storageId);
+                bind.Parameters.AddWithValue("$contentId", file0.Id);
+                bind.Parameters.AddWithValue("$ownPath", "/music/file0.sid");
+                bind.Parameters.AddWithValue("$storageType", (long)fixture.Scope.StorageType);
+                IndexPathPatterns.BindLinkedCopyParameters(bind);
+            });
 
             plan.Should().NotBeEmpty();
             plan.Should().Contain(line => line.Contains("ix_file_identity"));
+            plan.Should().NotContain(line => line.Contains("sqlite_autoindex_file"));
         }
 
         [Fact]

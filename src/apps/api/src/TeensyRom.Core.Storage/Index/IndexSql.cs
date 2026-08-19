@@ -30,6 +30,17 @@ namespace TeensyRom.Core.Storage.Index
         public const string MetadataJoin = "file f LEFT JOIN content_metadata m ON m.content_id = f.content_id";
 
         /// <summary>
+        /// The join <see cref="ParentLookup"/> and <see cref="SiblingLookup"/> share: identical to
+        /// <see cref="MetadataJoin"/> except <c>f</c> is pinned to <c>ix_file_identity</c>. Both statements
+        /// filter by <c>content_id</c> but also carry <c>ORDER BY f.path</c>, and without the pin SQLite's
+        /// planner prefers the path-ordered <c>UNIQUE(storage_id, path)</c> autoindex because it satisfies that
+        /// ordering for free — at the cost of a scan proportional to how many of the storage's files precede
+        /// the matching row in path order, rather than to how many rows actually share the identity, which is
+        /// exactly the collection-size-proportional cost this phase exists to remove.
+        /// </summary>
+        private const string IdentityMetadataJoin = "file f INDEXED BY ix_file_identity LEFT JOIN content_metadata m ON m.content_id = f.content_id";
+
+        /// <summary>
         /// Inserts or updates a file row and returns its id. <c>is_favorite</c> is deliberately absent from
         /// the update list — it is maintained by the favourite invariant, not supplied by the caller.
         /// </summary>
@@ -165,7 +176,7 @@ namespace TeensyRom.Core.Storage.Index
 
         /// <summary>The original file for a content identity: the one row not sitting under a linked-copy tree.</summary>
         public static string ParentLookup() => $"""
-            SELECT {FileColumns} FROM {MetadataJoin}
+            SELECT {FileColumns} FROM {IdentityMetadataJoin}
              WHERE f.storage_id = $storage
                AND f.content_id = $contentId
                AND NOT {IndexPathPatterns.LinkedCopyPredicate("f.path")}
@@ -175,7 +186,7 @@ namespace TeensyRom.Core.Storage.Index
 
         /// <summary>Every other linked copy of a file's content identity, excluding the file itself.</summary>
         public static string SiblingLookup() => $"""
-            SELECT {FileColumns} FROM {MetadataJoin}
+            SELECT {FileColumns} FROM {IdentityMetadataJoin}
              WHERE f.storage_id = $storage
                AND f.content_id = $contentId
                AND {IndexPathPatterns.LinkedCopyPredicate("f.path")}
