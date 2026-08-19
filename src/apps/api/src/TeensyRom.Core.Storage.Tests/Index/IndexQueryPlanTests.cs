@@ -299,6 +299,140 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
+        public async Task Search_Plan_PinsContentBranchToIxFileIdentity()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+            var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
+
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
+
+            var plan = fixture.QueryPlan(IndexSql.Search(1, 0), bind =>
+            {
+                bind.Parameters.AddWithValue("$storage", storageId);
+                bind.Parameters.AddWithValue("$match", "\"mon\"*");
+                bind.Parameters.AddWithValue("$limit", 200L);
+                bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
+            });
+
+            plan.Should().NotBeEmpty();
+            // SEARCH-PLAN-FINDING.md: with no ANALYZE statistics, SQLite's planner never switches off the
+            // shared ix_file_type scan to reach ix_file_identity for the content_id branch on its own, so an
+            // OR of the two full-text subqueries falls back to one unselective scan probing both. The UNION
+            // rewrite pins the content_id branch with INDEXED BY, which is what this plan line proves took.
+            plan.Should().Contain(line => line.Contains("SEARCH f USING INDEX ix_file_identity") && line.Contains("content_id"));
+        }
+
+        [Fact]
+        public async Task Search_WhenAFileMatchesBothTheNameAndContentBranches_ReturnsItExactlyOnce()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+            await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
+
+            // A file whose name matches "zelda" via file_search and whose (directly seeded) content_search
+            // row also carries "zelda": one row satisfies both UNION branches. UNION — not UNION ALL — is
+            // what keeps it from surfacing twice; that dedup behavior is the failure mode the OR-to-UNION
+            // rewrite could plausibly introduce, so it earns its own case per the task's testing guidance.
+            var file = IndexTestFixture.CreateFile("/music/zelda.sid");
+            await fixture.Store.UpsertFileAsync(fixture.Scope, file, Ct);
+
+            await fixture.ExecuteAsync(
+                "INSERT INTO content_search (title, creator, description, content_id) VALUES ($title, '', '', $contentId);",
+                ("$title", "Zelda Tribute"),
+                ("$contentId", file.Id));
+
+            var results = await fixture.Store.SearchAsync(
+                fixture.Scope, "zelda", [], [TeensyFileType.Sid], 10, Ct);
+
+            results.Should().ContainSingle(r => r.Path.Value == file.Path.Value);
+        }
+
+        /// <summary>
+        /// <c>SearchOracleTests</c> is the real contract for search's results, but it does not execute in
+        /// every environment — it skips wherever the seeded real-collection fixture and index cache it needs
+        /// are absent. This is the guard that runs everywhere: it seeds a small mixed collection right
+        /// here and shows the shipped UNION statement answers exactly what the pre-fix OR statement answered,
+        /// in the same order, for a term that exercises a name-only match, a content-only match, a match on
+        /// both branches at once (the UNION's own new dedup concern), and non-matching noise.
+        /// </summary>
+        [Fact]
+        public async Task Search_UnionRewrite_ReturnsTheSameOrderedResultsAsTheOriginalOrStatement()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+            var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
+
+            var nameOnlyMatches = new[] { "riverquest.sid", "riverside.sid", "riverboat.sid" };
+            var contentOnlyMatches = new[] { "alpha.sid", "beta.sid" };
+            var bothBranchesMatch = new[] { "riverdance.sid" };
+            var noMatch = new[] { "unrelated1.sid", "unrelated2.sid", "unrelated3.sid" };
+
+            foreach (var name in nameOnlyMatches.Concat(contentOnlyMatches).Concat(bothBranchesMatch).Concat(noMatch))
+            {
+                await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/music/{name}"), Ct);
+            }
+
+            foreach (var name in contentOnlyMatches.Concat(bothBranchesMatch))
+            {
+                var file = IndexTestFixture.CreateFile($"/music/{name}");
+
+                await fixture.ExecuteAsync(
+                    "INSERT INTO content_search (title, creator, description, content_id) VALUES ($title, '', '', $contentId);",
+                    ("$title", "river tributary"),
+                    ("$contentId", file.Id));
+            }
+
+            const string OldOrStatement = """
+                SELECT f.path
+                  FROM file f LEFT JOIN content_metadata m ON m.content_id = f.content_id
+                 WHERE f.storage_id = $storage
+                   AND f.file_type IN ($type0)
+                   AND ( f.id         IN (SELECT file_id    FROM file_search    WHERE file_search    MATCH $match)
+                      OR f.content_id IN (SELECT content_id FROM content_search WHERE content_search MATCH $match) )
+                 ORDER BY f.name
+                 LIMIT $limit;
+                """;
+
+            void Bind(SqliteCommand command)
+            {
+                command.Parameters.AddWithValue("$storage", storageId);
+                command.Parameters.AddWithValue("$match", "\"river\"*");
+                command.Parameters.AddWithValue("$limit", 200L);
+                command.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
+                command.Parameters.AddWithValue("$storageType", (long)fixture.Scope.StorageType);
+            }
+
+            var oldPaths = ReadColumn(fixture, OldOrStatement, "path", Bind);
+            var newPaths = ReadColumn(fixture, IndexSql.Search(1, 0), "path", Bind);
+
+            newPaths.Should().NotBeEmpty();
+            newPaths.Should().OnlyHaveUniqueItems();
+            newPaths.Should().Equal(oldPaths, "the UNION rewrite must answer exactly what the OR statement it replaced answered, in the same order");
+        }
+
+        private static List<string> ReadColumn(IndexTestFixture fixture, string sql, string column, Action<SqliteCommand> bind)
+        {
+            using var connection = fixture.Database.OpenRead();
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            bind(command);
+
+            using var reader = command.ExecuteReader();
+            var ordinal = -1;
+            var values = new List<string>();
+
+            while (reader.Read())
+            {
+                if (ordinal < 0)
+                {
+                    ordinal = reader.GetOrdinal(column);
+                }
+
+                values.Add(reader.GetString(ordinal));
+            }
+
+            return values;
+        }
+
+        [Fact]
         public async Task FavoriteRecompute_Plan_UsesIxFileIdentityIndex()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();

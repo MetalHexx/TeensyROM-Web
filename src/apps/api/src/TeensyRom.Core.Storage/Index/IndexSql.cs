@@ -13,8 +13,9 @@ namespace TeensyRom.Core.Storage.Index
         /// The column list every file-selecting query shares, closed by a projection of the scope's storage
         /// type so <see cref="IndexRowMapper.MapFile"/> can read it off the row like every other field — the
         /// column itself does not exist on <c>file</c> because a scope is already exactly one storage type.
-        /// Every query pairs this with <see cref="MetadataJoin"/>, so the content-identity columns ride along
-        /// unconditionally.
+        /// Every query pairs this with a <c>content_metadata</c> left join keyed on content identity — usually
+        /// <see cref="MetadataJoin"/> directly, though <see cref="Search"/> joins it against a derived table
+        /// instead — so the content-identity columns ride along unconditionally.
         /// </summary>
         public const string FileColumns = """
             f.name, f.path, f.size, f.file_type, f.is_favorite, f.is_compatible, $storageType AS storage_type,
@@ -199,22 +200,50 @@ namespace TeensyRom.Core.Storage.Index
         /// file types and excluding <paramref name="excludeCount"/> path patterns. The type parameters are
         /// named <c>$type0</c>… and the exclude parameters <c>$exclude0</c>…, matching
         /// <see cref="BuildParameterNames"/>.
+        /// <para>
+        /// The two full-text branches run as a <c>UNION</c> rather than an <c>OR</c>: with no <c>ANALYZE</c>
+        /// statistics, SQLite's planner never switches off the shared, unselective <c>ix_file_type</c> scan to
+        /// reach <c>ix_file_identity</c> for the <c>content_id</c> branch, even though it exists — an <c>OR</c>
+        /// instead materialises both <c>MATCH</c> subqueries and probes them per row that scan visits. Pinning
+        /// the <c>content_id</c> branch with <c>INDEXED BY ix_file_identity</c> forces the seek the planner
+        /// won't choose on its own; <c>UNION</c> — not <c>UNION ALL</c> — is what keeps a file whose row
+        /// satisfies both branches from surfacing twice.
+        /// </para>
         /// </summary>
         public static string Search(int typeCount, int excludeCount)
+        {
+            var filter = SearchFilterPredicate(typeCount, excludeCount);
+
+            return $"""
+                SELECT {FileColumns} FROM (
+                    SELECT f.id, f.name, f.path, f.size, f.file_type, f.is_favorite, f.is_compatible, f.content_id
+                      FROM file f
+                     WHERE {filter}
+                       AND f.id IN (SELECT file_id FROM file_search WHERE file_search MATCH $match)
+                    UNION
+                    SELECT f.id, f.name, f.path, f.size, f.file_type, f.is_favorite, f.is_compatible, f.content_id
+                      FROM file f INDEXED BY ix_file_identity
+                     WHERE {filter}
+                       AND f.content_id IN (SELECT content_id FROM content_search WHERE content_search MATCH $match)
+                ) f LEFT JOIN content_metadata m ON m.content_id = f.content_id
+                 ORDER BY f.name
+                 LIMIT $limit;
+                """;
+        }
+
+        /// <summary>
+        /// The storage/type/exclude predicate shared by both <see cref="Search"/> branches, written once so
+        /// the <c>id</c> and <c>content_id</c> branches cannot silently filter a different candidate set.
+        /// </summary>
+        private static string SearchFilterPredicate(int typeCount, int excludeCount)
         {
             var typeParameterNames = BuildParameterNames("$type", typeCount);
             var excludeClause = BuildExcludeClause(excludeCount);
 
             return $"""
-                SELECT {FileColumns}
-                  FROM {MetadataJoin}
-                 WHERE f.storage_id = $storage
+                f.storage_id = $storage
                    AND f.file_type IN ({string.Join(", ", typeParameterNames)})
                    {excludeClause}
-                   AND ( f.id         IN (SELECT file_id    FROM file_search    WHERE file_search    MATCH $match)
-                      OR f.content_id IN (SELECT content_id FROM content_search WHERE content_search MATCH $match) )
-                 ORDER BY f.name
-                 LIMIT $limit;
                 """;
         }
 
