@@ -142,16 +142,7 @@ namespace TeensyRom.Core.Storage.Index
             }
 
             await using var command = connection.CreateCommand();
-            command.CommandText = """
-                SELECT rep.content_id, rep.name, rep.path, rep.size, rep.file_type
-                  FROM (SELECT content_id, MIN(id) AS file_id
-                          FROM file
-                         WHERE storage_id = $storage
-                         GROUP BY content_id) grouped
-                  JOIN file rep ON rep.id = grouped.file_id
-                  LEFT JOIN content_metadata m ON m.content_id = rep.content_id
-                 WHERE m.content_id IS NULL OR m.source_version <> $sourceVersion;
-                """;
+            command.CommandText = IndexSql.StaleIdentities;
             command.Parameters.AddWithValue("$storage", storageId.Value);
             command.Parameters.AddWithValue("$sourceVersion", sourceVersion);
 
@@ -188,26 +179,7 @@ namespace TeensyRom.Core.Storage.Index
         {
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = """
-                INSERT INTO content_metadata
-                  (content_id, title, creator, description, play_length, release_info,
-                   metadata_source, metadata_source_path, share_url, meta1, meta2, source_version)
-                VALUES
-                  ($contentId, $title, $creator, $description, $playLength, $releaseInfo,
-                   $metadataSource, $metadataSourcePath, $shareUrl, $meta1, $meta2, $sourceVersion)
-                ON CONFLICT (content_id) DO UPDATE SET
-                  title                = excluded.title,
-                  creator              = excluded.creator,
-                  description          = excluded.description,
-                  play_length          = excluded.play_length,
-                  release_info         = excluded.release_info,
-                  metadata_source      = excluded.metadata_source,
-                  metadata_source_path = excluded.metadata_source_path,
-                  share_url            = excluded.share_url,
-                  meta1                = excluded.meta1,
-                  meta2                = excluded.meta2,
-                  source_version       = excluded.source_version;
-                """;
+            command.CommandText = IndexSql.ContentMetadataUpsert;
             command.Parameters.Add("$contentId", SqliteType.Text);
             command.Parameters.Add("$title", SqliteType.Text);
             command.Parameters.Add("$creator", SqliteType.Text);
@@ -250,7 +222,7 @@ namespace TeensyRom.Core.Storage.Index
         {
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = "DELETE FROM content_search WHERE content_id = $contentId;";
+            command.CommandText = IndexSql.ContentSearchDelete;
             command.Parameters.Add("$contentId", SqliteType.Text);
             command.Prepare();
 
@@ -261,7 +233,7 @@ namespace TeensyRom.Core.Storage.Index
         {
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = "INSERT INTO content_search (title, creator, description, content_id) VALUES ($title, $creator, $description, $contentId);";
+            command.CommandText = IndexSql.ContentSearchInsert;
             command.Parameters.Add("$title", SqliteType.Text);
             command.Parameters.Add("$creator", SqliteType.Text);
             command.Parameters.Add("$description", SqliteType.Text);

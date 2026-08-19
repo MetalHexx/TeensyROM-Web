@@ -7,26 +7,6 @@ namespace TeensyRom.Core.Storage.Index
     /// <inheritdoc cref="IIndexStore"/>
     public sealed partial class SqliteIndexStore
     {
-        /// <summary>
-        /// The column list every file-selecting query shares, closed by a projection of the scope's storage
-        /// type so <see cref="IndexRowMapper.MapFile"/> can read it off the row like every other field — the
-        /// column itself does not exist on <c>file</c> because a scope is already exactly one storage type.
-        /// Every query pairs this with <see cref="MetadataJoin"/>, so the content-identity columns ride along
-        /// unconditionally.
-        /// </summary>
-        private const string FileColumns = """
-            f.name, f.path, f.size, f.file_type, f.is_favorite, f.is_compatible, $storageType AS storage_type,
-            m.title, m.creator, m.description, m.play_length, m.release_info,
-            m.metadata_source, m.metadata_source_path, m.share_url, m.meta1, m.meta2
-            """;
-
-        /// <summary>
-        /// The join every file-selecting query shares: filesystem facts and content metadata are separate
-        /// tables joined on content identity, so two copies of the same content share one metadata row instead
-        /// of each query varying the shape.
-        /// </summary>
-        private const string MetadataJoin = "file f LEFT JOIN content_metadata m ON m.content_id = f.content_id";
-
         public async Task<IStorageCacheItem?> GetDirectoryAsync(IndexScope scope, DirectoryPath path, CancellationToken ct)
         {
             ArgumentNullException.ThrowIfNull(path);
@@ -58,7 +38,7 @@ namespace TeensyRom.Core.Storage.Index
             }
 
             await using var command = connection.CreateCommand();
-            command.CommandText = $"SELECT {FileColumns} FROM {MetadataJoin} WHERE f.storage_id = $storage AND f.path = $path;";
+            command.CommandText = $"SELECT {IndexSql.FileColumns} FROM {IndexSql.MetadataJoin} WHERE f.storage_id = $storage AND f.path = $path;";
             command.Parameters.AddWithValue("$storage", storageId.Value);
             command.Parameters.AddWithValue("$path", path.Value);
             AddStorageTypeParameter(command, scope);
@@ -81,7 +61,7 @@ namespace TeensyRom.Core.Storage.Index
             }
 
             await using var command = connection.CreateCommand();
-            command.CommandText = $"SELECT {FileColumns} FROM {MetadataJoin} WHERE f.storage_id = $storage AND f.name = $name ORDER BY f.path;";
+            command.CommandText = $"SELECT {IndexSql.FileColumns} FROM {IndexSql.MetadataJoin} WHERE f.storage_id = $storage AND f.name = $name ORDER BY f.path;";
             command.Parameters.AddWithValue("$storage", storageId.Value);
             command.Parameters.AddWithValue("$name", name);
             AddStorageTypeParameter(command, scope);
@@ -117,21 +97,11 @@ namespace TeensyRom.Core.Storage.Index
                 return [];
             }
 
-            var typeParameterNames = BuildParameterNames("$type", types.Length);
-            var excludeClause = BuildExcludeClause(excludePaths, out var excludeParameterNames);
+            var typeParameterNames = IndexSql.BuildParameterNames("$type", types.Length);
+            var excludeParameterNames = IndexSql.BuildParameterNames("$exclude", excludePaths.Count);
 
             await using var command = connection.CreateCommand();
-            command.CommandText = $"""
-                SELECT {FileColumns}
-                  FROM {MetadataJoin}
-                 WHERE f.storage_id = $storage
-                   AND f.file_type IN ({string.Join(", ", typeParameterNames)})
-                   {excludeClause}
-                   AND ( f.id         IN (SELECT file_id    FROM file_search    WHERE file_search    MATCH $match)
-                      OR f.content_id IN (SELECT content_id FROM content_search WHERE content_search MATCH $match) )
-                 ORDER BY f.name
-                 LIMIT $limit;
-                """;
+            command.CommandText = IndexSql.Search(types.Length, excludePaths.Count);
             command.Parameters.AddWithValue("$storage", storageId.Value);
             command.Parameters.AddWithValue("$match", matchExpression);
             command.Parameters.AddWithValue("$limit", limit);
@@ -164,23 +134,11 @@ namespace TeensyRom.Core.Storage.Index
                 return null;
             }
 
-            var typeParameterNames = BuildParameterNames("$type", types.Length);
-            var excludeClause = BuildExcludeClause(excludePaths, out var excludeParameterNames);
-            var scopeClause = storageScope == StorageScope.DirShallow
-                ? "f.parent_path = $scopePath"
-                : $"f.path LIKE $scopePrefix ESCAPE '{IndexPathPatterns.Like_Escape_Character}'";
+            var typeParameterNames = IndexSql.BuildParameterNames("$type", types.Length);
+            var excludeParameterNames = IndexSql.BuildParameterNames("$exclude", excludePaths.Count);
 
             await using var command = connection.CreateCommand();
-            command.CommandText = $"""
-                SELECT {FileColumns}
-                  FROM {MetadataJoin}
-                 WHERE f.storage_id = $storage
-                   AND {scopeClause}
-                   AND f.file_type IN ({string.Join(", ", typeParameterNames)})
-                   {excludeClause}
-                 ORDER BY RANDOM()
-                 LIMIT 1;
-                """;
+            command.CommandText = IndexSql.RandomCandidate(storageScope, types.Length, excludePaths.Count);
             command.Parameters.AddWithValue("$storage", storageId.Value);
             AddStorageTypeParameter(command, scope);
 
@@ -214,14 +172,7 @@ namespace TeensyRom.Core.Storage.Index
             }
 
             await using var command = connection.CreateCommand();
-            command.CommandText = $"""
-                SELECT {FileColumns} FROM {MetadataJoin}
-                 WHERE f.storage_id = $storage
-                   AND f.content_id = $contentId
-                   AND NOT {IndexPathPatterns.LinkedCopyPredicate("f.path")}
-                 ORDER BY f.path
-                 LIMIT 1;
-                """;
+            command.CommandText = IndexSql.ParentLookup();
             command.Parameters.AddWithValue("$storage", storageId.Value);
             command.Parameters.AddWithValue("$contentId", file.Id);
             AddStorageTypeParameter(command, scope);
@@ -245,14 +196,7 @@ namespace TeensyRom.Core.Storage.Index
             }
 
             await using var command = connection.CreateCommand();
-            command.CommandText = $"""
-                SELECT {FileColumns} FROM {MetadataJoin}
-                 WHERE f.storage_id = $storage
-                   AND f.content_id = $contentId
-                   AND {IndexPathPatterns.LinkedCopyPredicate("f.path")}
-                   AND f.path <> $ownPath
-                 ORDER BY f.path;
-                """;
+            command.CommandText = IndexSql.SiblingLookup();
             command.Parameters.AddWithValue("$storage", storageId.Value);
             command.Parameters.AddWithValue("$contentId", file.Id);
             command.Parameters.AddWithValue("$ownPath", file.Path.Value);
@@ -274,7 +218,7 @@ namespace TeensyRom.Core.Storage.Index
 
             await using var command = connection.CreateCommand();
             command.CommandText = $"""
-                SELECT {FileColumns} FROM {MetadataJoin}
+                SELECT {IndexSql.FileColumns} FROM {IndexSql.MetadataJoin}
                  WHERE f.storage_id = $storage AND {IndexPathPatterns.FavoritePredicate("f.path")}
                  ORDER BY f.path;
                 """;
@@ -297,7 +241,7 @@ namespace TeensyRom.Core.Storage.Index
 
             await using var command = connection.CreateCommand();
             command.CommandText = $"""
-                SELECT {FileColumns} FROM {MetadataJoin}
+                SELECT {IndexSql.FileColumns} FROM {IndexSql.MetadataJoin}
                  WHERE f.storage_id = $storage AND f.path LIKE $playlistPrefix ESCAPE '{IndexPathPatterns.Like_Escape_Character}'
                  ORDER BY f.path;
                 """;
@@ -368,7 +312,7 @@ namespace TeensyRom.Core.Storage.Index
         private static async Task<List<FileItem>> ReadFilesByParentAsync(SqliteConnection connection, int storageId, DirectoryPath path, IndexScope scope, CancellationToken ct)
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = $"SELECT {FileColumns} FROM {MetadataJoin} WHERE f.storage_id = $storage AND f.parent_path = $path ORDER BY f.name;";
+            command.CommandText = IndexSql.FilesByParent;
             command.Parameters.AddWithValue("$storage", storageId);
             command.Parameters.AddWithValue("$path", path.Value);
             AddStorageTypeParameter(command, scope);
@@ -408,33 +352,12 @@ namespace TeensyRom.Core.Storage.Index
         private static void AddStorageTypeParameter(SqliteCommand command, IndexScope scope) =>
             command.Parameters.AddWithValue("$storageType", (int)scope.StorageType);
 
-        private static string[] BuildParameterNames(string prefix, int count) =>
-            Enumerable.Range(0, count).Select(index => $"{prefix}{index}").ToArray();
-
         private static void BindTypeParameters(SqliteCommand command, string[] parameterNames, TeensyFileType[] types)
         {
             for (var index = 0; index < types.Length; index++)
             {
                 command.Parameters.AddWithValue(parameterNames[index], (int)types[index]);
             }
-        }
-
-        /// <summary>
-        /// Builds the exclude-path predicate: a file is excluded when its path contains any of
-        /// <paramref name="excludePaths"/> anywhere, mirroring today's in-memory filter.
-        /// </summary>
-        private static string BuildExcludeClause(IReadOnlyCollection<DirectoryPath> excludePaths, out string[] parameterNames)
-        {
-            parameterNames = BuildParameterNames("$exclude", excludePaths.Count);
-
-            if (parameterNames.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            var clauses = parameterNames.Select(name => $"f.path NOT LIKE {name} ESCAPE '{IndexPathPatterns.Like_Escape_Character}'");
-
-            return "AND " + string.Join(" AND ", clauses);
         }
 
         private static void BindExcludeParameters(SqliteCommand command, IReadOnlyCollection<DirectoryPath> excludePaths, string[] parameterNames)

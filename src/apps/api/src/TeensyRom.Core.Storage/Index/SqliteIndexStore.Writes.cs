@@ -267,7 +267,7 @@ namespace TeensyRom.Core.Storage.Index
                 await ExecuteAsync(
                     connection,
                     transaction,
-                    "DELETE FROM file_search WHERE file_id IN (SELECT id FROM file WHERE storage_id = $storage);",
+                    IndexSql.FileSearchDeleteByStorage,
                     null,
                     storageId,
                     ct);
@@ -282,19 +282,9 @@ namespace TeensyRom.Core.Storage.Index
             _database.WriteAsync(async (connection, transaction) =>
             {
                 var storageId = await ResolveStorageIdAsync(connection, transaction, scope, ct);
-                var favorited = IndexPathPatterns.FavoritePredicate("path");
 
-                var cleared = await ExecuteFavoriteRepairAsync(connection, transaction, storageId, $"""
-                    UPDATE file SET is_favorite = 0
-                    WHERE storage_id = $storage AND is_favorite = 1 AND content_id NOT IN (
-                      SELECT content_id FROM file WHERE storage_id = $storage AND {favorited});
-                    """, ct);
-
-                var set = await ExecuteFavoriteRepairAsync(connection, transaction, storageId, $"""
-                    UPDATE file SET is_favorite = 1
-                    WHERE storage_id = $storage AND is_favorite = 0 AND content_id IN (
-                      SELECT content_id FROM file WHERE storage_id = $storage AND {favorited});
-                    """, ct);
+                var cleared = await ExecuteFavoriteRepairAsync(connection, transaction, storageId, IndexSql.FavoriteRepairClear(), ct);
+                var set = await ExecuteFavoriteRepairAsync(connection, transaction, storageId, IndexSql.FavoriteRepairSet(), ct);
 
                 return cleared + set;
             }, ct);
@@ -365,21 +355,7 @@ namespace TeensyRom.Core.Storage.Index
             var command = connection.CreateCommand();
             command.Transaction = transaction;
 
-            // is_favorite is deliberately absent from the update list: it is maintained by the favourite
-            // invariant, not supplied by the caller.
-            command.CommandText = """
-                INSERT INTO file (storage_id, directory_id, path, parent_path, name, size, file_type, content_id, is_compatible)
-                VALUES ($storage, $directory, $path, $parent, $name, $size, $fileType, $contentId, $isCompatible)
-                ON CONFLICT (storage_id, path) DO UPDATE SET
-                  directory_id  = excluded.directory_id,
-                  parent_path   = excluded.parent_path,
-                  name          = excluded.name,
-                  size          = excluded.size,
-                  file_type     = excluded.file_type,
-                  content_id    = excluded.content_id,
-                  is_compatible = excluded.is_compatible
-                RETURNING id;
-                """;
+            command.CommandText = IndexSql.FileUpsert;
             command.Parameters.Add("$storage", SqliteType.Integer);
             command.Parameters.Add("$directory", SqliteType.Integer);
             command.Parameters.Add("$path", SqliteType.Text);
@@ -413,7 +389,7 @@ namespace TeensyRom.Core.Storage.Index
         {
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = "DELETE FROM file_search WHERE file_id = $fileId;";
+            command.CommandText = IndexSql.FileSearchDelete;
             command.Parameters.Add("$fileId", SqliteType.Integer);
             command.Prepare();
 
@@ -424,7 +400,7 @@ namespace TeensyRom.Core.Storage.Index
         {
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = "INSERT INTO file_search (name, path, file_id) VALUES ($name, $path, $fileId);";
+            command.CommandText = IndexSql.FileSearchInsert;
             command.Parameters.Add("$name", SqliteType.Text);
             command.Parameters.Add("$path", SqliteType.Text);
             command.Parameters.Add("$fileId", SqliteType.Integer);
@@ -455,15 +431,7 @@ namespace TeensyRom.Core.Storage.Index
         {
             var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = $"""
-                UPDATE file SET is_favorite = CASE WHEN EXISTS (
-                    SELECT 1 FROM file AS favorite
-                    WHERE favorite.storage_id = $storage
-                      AND favorite.content_id = $contentId
-                      AND {IndexPathPatterns.FavoritePredicate("favorite.path")})
-                  THEN 1 ELSE 0 END
-                WHERE storage_id = $storage AND content_id = $contentId;
-                """;
+            command.CommandText = IndexSql.FavoriteRecompute();
             command.Parameters.Add("$storage", SqliteType.Integer);
             command.Parameters.Add("$contentId", SqliteType.Text);
             IndexPathPatterns.BindFavoriteParameters(command);
