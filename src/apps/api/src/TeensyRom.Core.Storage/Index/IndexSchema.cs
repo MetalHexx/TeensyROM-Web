@@ -41,9 +41,9 @@ namespace TeensyRom.Core.Storage.Index
               is_favorite   INTEGER NOT NULL DEFAULT 0,
               is_compatible INTEGER NOT NULL DEFAULT 1,
               UNIQUE (storage_id, path));
-            CREATE INDEX IF NOT EXISTS ix_file_parent  ON file (storage_id, parent_path);
-            CREATE INDEX IF NOT EXISTS ix_file_content ON file (content_id);
-            CREATE INDEX IF NOT EXISTS ix_file_type    ON file (storage_id, file_type);
+            CREATE INDEX IF NOT EXISTS ix_file_parent   ON file (storage_id, parent_path);
+            CREATE INDEX IF NOT EXISTS ix_file_identity ON file (storage_id, content_id);
+            CREATE INDEX IF NOT EXISTS ix_file_type     ON file (storage_id, file_type);
 
             CREATE TABLE IF NOT EXISTS content_metadata (
               content_id           TEXT PRIMARY KEY COLLATE NOCASE,
