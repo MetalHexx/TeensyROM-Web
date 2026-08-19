@@ -4,3 +4,6 @@ export * from './lib/sid/sid-file.parser';
 export * from './lib/sid/bundled';
 export * from './lib/cpu/cpu-constants';
 export * from './lib/cpu/c64-machine';
+export * from './lib/asid/asid-constants';
+export * from './lib/asid/register-frame';
+export * from './lib/asid/asid-encoder';
