@@ -12,12 +12,24 @@
 }
 
 .poc-section {
-  min-height: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-content-gap);
+  padding: var(--spacing-content-gap);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+
+  > h2 {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: var(--font-size-md);
+  }
 }
 
 .control-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--spacing-sm);
 }
 
@@ -28,6 +40,31 @@
   margin-right: var(--spacing-md);
 }
 
-.engine-error {
+.timing-commands {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+// Visually set apart from the command controls above — a select here changes nothing on the
+// cartridge, it only documents what the firmware already has set.
+.record-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px dashed var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+}
+
+.caption {
+  margin: 0;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+.error-text {
+  margin: 0;
   color: var(--color-error);
+  font-size: var(--font-size-sm);
 }

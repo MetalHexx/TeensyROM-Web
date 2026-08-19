@@ -23,12 +23,13 @@ interface TuneSource {
 
 const MICROSECONDS_PER_SECOND = 1_000_000;
 
-/** What the schedule-ahead toggle asks for when it is on — roughly one frame of lookahead. */
-const SCHEDULE_AHEAD_MS = 20;
+/** off / 5 ms / 20 ms — the schedule-ahead choices this experiment needs to answer whether a
+ * timestamped `send()` is honoured at all in this browser. */
+const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
 
 /**
- * Throwaway spike for the ASID DJ player — reachable only by typing `/dev/dj-poc` in the browser.
- * Each later phase fills in one of the placeholder sections below.
+ * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. One column
+ * of labelled control groups: MIDI, Timing, Tune, Transport, Speed, Diagnostics.
  */
 @Component({
   selector: 'lib-dj-poc-view',
@@ -54,6 +55,14 @@ export class DjPocViewComponent {
   protected readonly selectedMidiPortId = this.midiService.selectedPortId;
   protected readonly midiError = this.midiService.lastError;
 
+  // Web MIDI enumerates zero ports for a granted-but-empty session (no cartridge attached, or the
+  // OS hasn't surfaced it yet) without the service itself treating that as an error.
+  protected readonly noPortsFoundError = computed<string | null>(() =>
+    this.midiAccessState() === 'granted' && this.midiPorts().length === 0
+      ? 'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.'
+      : null
+  );
+
   private readonly engine = inject(DjPlayerEngine);
   protected readonly engineState = this.engine.state;
   protected readonly engineError = this.engine.lastError;
@@ -68,7 +77,13 @@ export class DjPocViewComponent {
 
   protected readonly minSpeed = MIN_SPEED_MULTIPLIER;
   protected readonly maxSpeed = MAX_SPEED_MULTIPLIER;
-  protected readonly scheduleAheadStep = SCHEDULE_AHEAD_MS;
+  protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
+
+  // Neither the timer mode nor the queue depth is part of the ASID protocol this browser speaks —
+  // the cartridge decides both on its own, so these are a fixed record for the tester, not a live
+  // read of firmware state.
+  protected readonly timerModeRecord = 'Firmware-managed — not sent by this browser';
+  protected readonly bufferSizeRecord = 'Firmware-managed — not sent by this browser';
 
   // Identify interrupts the stream on the cartridge, so it stays out of reach while a tune plays.
   protected readonly canIdentify = computed(
@@ -83,6 +98,9 @@ export class DjPocViewComponent {
       this.selectedMidiPortId() !== null &&
       this.engineState() !== 'playing'
   );
+  protected readonly canStepSubtune = computed(
+    () => this.currentTune() !== null && this.subtuneCount() > 1
+  );
 
   /** An NTSC tune loads an interval of its own, so the selector has to be able to show it. */
   protected readonly intervalOptions = computed<readonly number[]>(() => {
@@ -90,6 +108,17 @@ export class DjPocViewComponent {
     return NOMINAL_INTERVAL_OPTIONS_US.includes(current)
       ? NOMINAL_INTERVAL_OPTIONS_US
       : [current, ...NOMINAL_INTERVAL_OPTIONS_US];
+  });
+
+  // One SID-data packet goes out per clock tick, so the clock's own measured tick rate is the
+  // frame-packet rate; the occasional Start/Stop/Identify control packet is noise against it.
+  protected readonly packetsPerSecond = computed(() => {
+    const intervalUs = this.engineStats().measuredMeanIntervalUs;
+    return intervalUs > 0 ? MICROSECONDS_PER_SECOND / intervalUs : 0;
+  });
+  protected readonly bytesPerSecond = computed(() => {
+    const stats = this.engineStats();
+    return stats.packetsSent > 0 ? this.packetsPerSecond() * (stats.bytesSent / stats.packetsSent) : 0;
   });
 
   private readonly bundledSources: readonly TuneSource[] = BUNDLED_TUNES.map((tune) => ({
@@ -193,9 +222,8 @@ export class DjPocViewComponent {
     this.engine.setNominalIntervalUs(Number((event.target as HTMLSelectElement).value));
   }
 
-  onScheduleAheadToggle(event: Event): void {
-    const on = (event.target as HTMLInputElement).checked;
-    this.engine.setScheduleAhead(on ? SCHEDULE_AHEAD_MS : 0);
+  onScheduleAheadChange(event: Event): void {
+    this.engine.setScheduleAhead(Number((event.target as HTMLSelectElement).value));
   }
 
   protected frameRateHz(intervalUs: number): string {

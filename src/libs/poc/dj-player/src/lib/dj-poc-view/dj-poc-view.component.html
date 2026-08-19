@@ -8,7 +8,7 @@
       Enable MIDI
     </button>
 
-    <label class="midi-port-picker">
+    <label class="control">
       Output port
       <select [disabled]="midiPorts().length === 0" (change)="onSelectMidiPort($event)">
         <option value="" [selected]="selectedMidiPortId() === null">— select a port —</option>
@@ -21,39 +21,87 @@
     </label>
 
     <button type="button" (click)="onIdentify()" [disabled]="!canIdentify()">Identify</button>
-    <p class="midi-caption">
-      Identify sends text to the selected cartridge's C64 screen. It briefly interrupts playback,
-      so use it before or between tunes rather than mid-stream.
+    <p class="caption">
+      Identify is disabled while a tune is playing: the firmware drains and re-initialises its
+      queue on every display-chars packet, so identifying mid-stream interrupts the music.
     </p>
 
     <p class="midi-status">Status: {{ midiAccessState() }}</p>
     @if (midiError()) {
-      <p class="midi-error" role="alert">{{ midiError() }}</p>
+      <p class="error-text" role="alert">{{ midiError() }}</p>
+    }
+    @if (noPortsFoundError()) {
+      <p class="error-text" role="alert">{{ noPortsFoundError() }}</p>
     }
   </section>
 
   <section class="poc-section" aria-label="Timing">
     <h2>Timing</h2>
 
-    <label class="control">
-      Nominal frame interval
-      <select (change)="onNominalIntervalChange($event)">
-        @for (option of intervalOptions(); track option) {
-          <option [value]="option" [selected]="option === nominalIntervalUs()">
-            {{ option }} µs ({{ frameRateHz(option) }} Hz)
-          </option>
-        }
-      </select>
-    </label>
+    <div class="timing-commands">
+      <label class="control">
+        <input
+          type="checkbox"
+          [checked]="recipeEnabled()"
+          (change)="onRecipeToggle($event)"
+        />
+        Send recipe packet
+      </label>
 
-    <label class="control">
-      <input
-        type="checkbox"
-        [checked]="scheduleAheadMs() > 0"
-        (change)="onScheduleAheadToggle($event)"
-      />
-      Timestamp sends {{ scheduleAheadStep }} ms ahead
-    </label>
+      <label class="control">
+        Nominal frame interval
+        <select (change)="onNominalIntervalChange($event)">
+          @for (option of intervalOptions(); track option) {
+            <option [value]="option" [selected]="option === nominalIntervalUs()">
+              {{ option }} µs ({{ frameRateHz(option) }} Hz)
+            </option>
+          }
+        </select>
+      </label>
+
+      <label class="control">
+        Schedule ahead
+        <select (change)="onScheduleAheadChange($event)">
+          @for (option of scheduleAheadOptionsMs; track option) {
+            <option [value]="option" [selected]="option === scheduleAheadMs()">
+              {{ option === 0 ? 'off' : option + ' ms' }}
+            </option>
+          }
+        </select>
+      </label>
+
+      @if (engineStats().effectiveIntervalUs > 0) {
+        <p class="timing-effective">
+          Effective interval: {{ engineStats().effectiveIntervalUs.toFixed(1) }} µs ({{
+            frameRateHz(engineStats().effectiveIntervalUs)
+          }}
+          Hz), {{ engineStats().callsPerFrame }}x multispeed
+        </p>
+      } @else {
+        <p class="timing-effective">Effective interval: — (load a tune to compute)</p>
+      }
+    </div>
+
+    <div class="record-group">
+      <p class="caption">
+        Record only — these reflect what is already set on the C64, not something this browser can
+        change.
+      </p>
+
+      <label class="control">
+        Timer mode (C64)
+        <select disabled>
+          <option selected>{{ timerModeRecord }}</option>
+        </select>
+      </label>
+
+      <label class="control">
+        Buffer size (C64)
+        <select disabled>
+          <option selected>{{ bufferSizeRecord }}</option>
+        </select>
+      </label>
+    </div>
   </section>
 
   <section class="poc-section" aria-label="Tune">
@@ -71,7 +119,7 @@
     </div>
 
     @if (tuneError()) {
-      <p class="tune-error" role="alert">{{ tuneError() }}</p>
+      <p class="error-text" role="alert">{{ tuneError() }}</p>
     }
 
     @if (currentTune(); as tune) {
@@ -84,7 +132,7 @@
         <dd>{{ tune.author }}</dd>
         <dt>Released</dt>
         <dd>{{ tune.released }}</dd>
-        <dt>Songs</dt>
+        <dt>Subtune count</dt>
         <dd>{{ tune.songs }} (starts at {{ tune.startSong }})</dd>
         <dt>Load / init / play address</dt>
         <dd>
@@ -94,14 +142,23 @@
         </dd>
         <dt>Clock / model</dt>
         <dd>{{ tune.clock }} / {{ tune.model }}</dd>
-        <dt>Second / third SID</dt>
-        <dd>
-          {{ tune.secondSidAddress ? '$' + tune.secondSidAddress.toString(16) : '—' }} /
-          {{ tune.thirdSidAddress ? '$' + tune.thirdSidAddress.toString(16) : '—' }}
-        </dd>
+        @if (tune.secondSidAddress !== null) {
+          <dt>Second SID</dt>
+          <dd>${{ tune.secondSidAddress.toString(16) }}</dd>
+        }
+        @if (tune.thirdSidAddress !== null) {
+          <dt>Third SID</dt>
+          <dd>${{ tune.thirdSidAddress.toString(16) }}</dd>
+        }
         <dt>Data size</dt>
         <dd>{{ tune.data.length }} bytes</dd>
       </dl>
+
+      <div class="subtune-nav control-row">
+        <button type="button" (click)="onPreviousSubtune()" [disabled]="!canStepSubtune()">◀</button>
+        <span>Subtune {{ currentSubtune() }} of {{ subtuneCount() }}</span>
+        <button type="button" (click)="onNextSubtune()" [disabled]="!canStepSubtune()">▶</button>
+      </div>
     }
   </section>
 
@@ -109,24 +166,16 @@
     <h2>Transport</h2>
 
     <div class="control-row">
-      <button type="button" (click)="onPreviousSubtune()" [disabled]="currentTune() === null">
-        Previous subtune
-      </button>
       <button type="button" (click)="onPlay()" [disabled]="!canPlay()">Play</button>
       <button type="button" (click)="onPause()" [disabled]="engineState() !== 'playing'">
         Pause
       </button>
       <button type="button" (click)="onStop()" [disabled]="currentTune() === null">Stop</button>
-      <button type="button" (click)="onNextSubtune()" [disabled]="currentTune() === null">
-        Next subtune
-      </button>
     </div>
 
-    <p class="engine-status">
-      State: {{ engineState() }} — subtune {{ currentSubtune() }} of {{ subtuneCount() }}
-    </p>
+    <p class="engine-status">State: {{ engineState() }}</p>
     @if (engineError()) {
-      <p class="engine-error" role="alert">{{ engineError() }}</p>
+      <p class="error-text" role="alert">{{ engineError() }}</p>
     }
   </section>
 
@@ -155,12 +204,7 @@
       </select>
     </label>
 
-    <label class="control">
-      <input type="checkbox" [checked]="recipeEnabled()" (change)="onRecipeToggle($event)" />
-      Send the framerate recipe
-    </label>
-
-    <p class="speed-caption">
+    <p class="caption">
       clock-only retimes the packet stream alone; clock-and-recipe also re-seeds the cartridge's
       frame timer, which drains its queue and interrupts playback.
     </p>
@@ -170,20 +214,30 @@
     <h2>Diagnostics</h2>
 
     <dl class="diagnostic-fields">
-      <dt>Frames / packets</dt>
-      <dd>{{ engineStats().framesRendered }} / {{ engineStats().packetsSent }}</dd>
-      <dt>Recipe resends</dt>
-      <dd>{{ engineStats().recipeResends }}</dd>
-      <dt>Multispeed</dt>
-      <dd>{{ engineStats().callsPerFrame }}x</dd>
-      <dt>Interval (nominal / effective)</dt>
-      <dd>{{ nominalIntervalUs() }} µs / {{ engineStats().effectiveIntervalUs.toFixed(1) }} µs</dd>
-      <dt>Measured mean interval</dt>
-      <dd>{{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs</dd>
+      <dt>Frames emitted</dt>
+      <dd>{{ engineStats().framesRendered }}</dd>
+      <dt>Packets / second</dt>
+      <dd>{{ packetsPerSecond().toFixed(1) }}</dd>
+      <dt>Bytes / second</dt>
+      <dd>{{ bytesPerSecond().toFixed(0) }}</dd>
+      <dt>Measured mean interval (nominal)</dt>
+      <dd>{{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)</dd>
       <dt>Drift</dt>
       <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
-      <dt>Suppressed writes</dt>
+      <dt>Suppressed double-writes</dt>
       <dd>{{ engineStats().suppressedWrites }}</dd>
+      <dt>Illegal opcodes</dt>
+      <dd>{{ engineStats().illegalOpcodeCount }}</dd>
+      <dt>Recipe resends</dt>
+      <dd>{{ engineStats().recipeResends }}</dd>
+      <dt>Last error</dt>
+      <dd>{{ engineError() ?? '—' }}</dd>
     </dl>
+
+    <p class="caption">
+      The host cannot read the cartridge's queue fill — watch the C64's own screen too: the
+      buffer-fill bar graph, per-SID write spinners, the 25 register lights, the packet-error
+      indicator, and the read-error indicator.
+    </p>
   </section>
 </div>

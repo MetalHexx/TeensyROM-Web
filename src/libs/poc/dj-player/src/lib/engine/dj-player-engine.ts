@@ -23,8 +23,10 @@ export type SpeedMode = 'clock-only' | 'clock-and-recipe';
 export interface EngineStats {
   readonly framesRendered: number;
   readonly packetsSent: number;
+  readonly bytesSent: number;
   readonly recipeResends: number;
   readonly suppressedWrites: number;
+  readonly illegalOpcodeCount: number;
   /** The tune's multispeed: how many ticks the engine runs per video frame. */
   readonly callsPerFrame: number;
   readonly effectiveIntervalUs: number;
@@ -74,8 +76,10 @@ const RECIPE_MAX_INTERVAL_US = 0xffff;
 const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
   packetsSent: 0,
+  bytesSent: 0,
   recipeResends: 0,
   suppressedWrites: 0,
+  illegalOpcodeCount: 0,
   callsPerFrame: 1,
   effectiveIntervalUs: 0,
   measuredMeanIntervalUs: 0,
@@ -112,6 +116,7 @@ export class DjPlayerEngine implements OnDestroy {
   private recipeResendTimer: ReturnType<typeof setTimeout> | null = null;
   private framesRendered = 0;
   private packetsSent = 0;
+  private bytesSent = 0;
   private recipeResends = 0;
   private framesSincePublish = 0;
 
@@ -441,11 +446,13 @@ export class DjPlayerEngine implements OnDestroy {
       this.midi.send(packet);
     }
     this.packetsSent++;
+    this.bytesSent += packet.length;
   }
 
   private sendControl(packet: Uint8Array): void {
     this.midi.send(packet);
     this.packetsSent++;
+    this.bytesSent += packet.length;
   }
 
   /** Stops playback and records why, leaving the page usable without a reload. */
@@ -461,6 +468,7 @@ export class DjPlayerEngine implements OnDestroy {
   private resetCounters(): void {
     this.framesRendered = 0;
     this.packetsSent = 0;
+    this.bytesSent = 0;
     this.recipeResends = 0;
   }
 
@@ -470,8 +478,10 @@ export class DjPlayerEngine implements OnDestroy {
     this.stats.set({
       framesRendered: this.framesRendered,
       packetsSent: this.packetsSent,
+      bytesSent: this.bytesSent,
       recipeResends: this.recipeResends,
       suppressedWrites: this.frame?.suppressedWriteCount ?? 0,
+      illegalOpcodeCount: this.machine?.illegalOpcodeCount ?? 0,
       callsPerFrame: this.machine?.callsPerFrame ?? 1,
       effectiveIntervalUs: this.file === null ? 0 : this.effectiveIntervalUs(),
       measuredMeanIntervalUs: clockStats.measuredMeanIntervalUs,
