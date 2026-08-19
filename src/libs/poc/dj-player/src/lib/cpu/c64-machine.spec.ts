@@ -18,6 +18,8 @@ interface TuneOptions {
   clock?: SidClock;
   songs?: number;
   padTo?: number;
+  secondSidAddress?: number | null;
+  thirdSidAddress?: number | null;
   blocks: readonly CodeBlock[];
 }
 
@@ -47,8 +49,8 @@ function tune(options: TuneOptions): SidFile {
     released: '',
     clock: options.clock ?? 'pal',
     model: 'unknown',
-    secondSidAddress: null,
-    thirdSidAddress: null,
+    secondSidAddress: options.secondSidAddress ?? null,
+    thirdSidAddress: options.thirdSidAddress ?? null,
     data,
   };
 }
@@ -106,6 +108,30 @@ describe('C64Machine', () => {
     new C64Machine(file, sink).initSubtune(1);
 
     expect(sink.writes).toEqual([{ register: 0, value: 0x2a }]);
+  });
+
+  it('excludes writes to a v3 header second SID address from the sink', () => {
+    // init:  LDA #$2A / STA $D400 / LDA #$55 / STA $D420 / RTS
+    // play:  LDA #$3C / STA $D401 / LDA #$66 / STA $D421 / RTS
+    const file = tune({
+      loadAddress: 0x2000,
+      playAddress: 0x200b,
+      secondSidAddress: 0xd420,
+      blocks: [
+        { at: 0x2000, bytes: [0xa9, 0x2a, 0x8d, 0x00, 0xd4, 0xa9, 0x55, 0x8d, 0x20, 0xd4, 0x60] },
+        { at: 0x200b, bytes: [0xa9, 0x3c, 0x8d, 0x01, 0xd4, 0xa9, 0x66, 0x8d, 0x21, 0xd4, 0x60] },
+      ],
+    });
+    const sink = new RecordingSink();
+    const machine = new C64Machine(file, sink);
+
+    machine.initSubtune(1);
+    machine.runFrame();
+
+    expect(sink.writes).toEqual([
+      { register: 0, value: 0x2a },
+      { register: 1, value: 0x3c },
+    ]);
   });
 
   it('runs the play routine exactly once per frame', () => {

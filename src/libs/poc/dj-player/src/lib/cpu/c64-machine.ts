@@ -279,9 +279,11 @@ export class C64Machine {
     this.memory[address & 0xffff] = byte;
 
     if (address >= SID_RANGE_START && address <= SID_RANGE_END) {
-      const register = address & SID_REGISTER_MASK;
-      if (register <= SID_LAST_AUDIBLE_REGISTER) {
-        this.sink.onSidWrite(register, byte);
+      if (!this.isSecondOrThirdSidAddress(address)) {
+        const register = address & SID_REGISTER_MASK;
+        if (register <= SID_LAST_AUDIBLE_REGISTER) {
+          this.sink.onSidWrite(register, byte);
+        }
       }
       return;
     }
@@ -289,6 +291,20 @@ export class C64Machine {
     if (address === CIA1_TIMER_A_LATCH_LOW || address === CIA1_TIMER_A_LATCH_HIGH) {
       this.timerALatch = this.readWord(CIA1_TIMER_A_LATCH_LOW);
     }
+  }
+
+  /**
+   * Whether `address` falls in the 32-byte mirrored block of a v3/v4 header's second or third SID
+   * address. Those chips are reported to the caller, not emulated, so their writes still land in
+   * `this.memory` (above) but must never reach the sink alongside the first chip's registers.
+   */
+  private isSecondOrThirdSidAddress(address: number): boolean {
+    const block = address & ~SID_REGISTER_MASK;
+    const { secondSidAddress, thirdSidAddress } = this.file;
+    return (
+      (secondSidAddress !== null && block === (secondSidAddress & ~SID_REGISTER_MASK)) ||
+      (thirdSidAddress !== null && block === (thirdSidAddress & ~SID_REGISTER_MASK))
+    );
   }
 
   /** Players poll the raster in a spin loop, so a frozen value hangs them. */
