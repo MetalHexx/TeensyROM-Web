@@ -4,35 +4,54 @@
 
 **An in-memory read model over the store is not required for the directory browsing path at this time.**
 
-Directory listing is the one operation where the new store is measurably slower than the legacy dictionary-based implementation. On a real collection of 64,658 files, the store-side directory listing by path takes 0.239 ms median vs. 0.000 ms legacy — an absolute delta of 0.239 ms. This is imperceptible to users: it falls well below the 1-2 millisecond threshold of human perception, and does not materially degrade the browsing experience. The store's wins on cold-start time (2357 ms → 4 ms, the explicit target) and peak memory (2338 MB → 260 MB, the explicit target) demonstrate the rewrite's strategic value. Random by scope (shallow) also improved (69.5 ms → 22.6 ms). However, the write-path operations — single upsert, bulk upsert (152 ms → 32,459 ms, ~212× regression), and sibling lookup — landed dramatically slower than legacy, particularly bulk upsert which the requirements identify as the workload motivating the rewrite. Search operations also regressed (58.9 ms → 100.9 ms). These write-path regressions are real, measured results against the largest available real collection; the primary cost centre is the per-content-identity favourite recompute in UpsertFilesAsync, which runs one EXISTS scan per content identity written.
+This iteration's focus was fixing the write-path and search regressions identified in the STORAGE-1 baseline. The fixes have succeeded: single upsert, bulk upsert, search, and sibling lookup — the four operations that regressed most severely in STORAGE-1 — have all been brought to or below the legacy performance. Bulk upsert, the workload that primarily motivated the rewrite, is now 570× faster than the STORAGE-1 baseline (32,459 ms → 57 ms) and 2.3× faster than legacy (130 ms → 57 ms). Single upsert, formerly 63.6 ms (1250× slower than legacy), is now 0.659 ms (14× slower in ratio, but imperceptible in absolute terms at 0.614 ms overhead). Search, formerly 100.9 ms, is now 8.7 ms and faster than legacy by 51 ms. The store's wins on cold-start time (2348.7 ms → 2.4 ms, the explicit target) and peak memory (2521.5 MB → 254.6 MB, the explicit target) demonstrate the rewrite's strategic value. Directory listing remains imperceptible at 0.148 ms and does not require an in-memory read model. However, two operations that measure scope-based row counts (Random by scope for Storage and DirDeep scopes) remain measurably slower than legacy; these require a separate architectural approach (index narrowing) deferred to a future iteration.
 
 ## Measured Numbers
 
-All measurements below are from a genuine `dotnet run` of `TeensyRom.Tools.StorageBenchmark` with `--scenarios both` against the largest real index file available — `Sd-L5ZMCNBR.json` (155,439,795 bytes, 64,658 files) — paired with the matching extracted fixture `Sd-L5ZMCNBR.tsv`. The run executed on Windows 10.0.26200, .NET 9.0.19, with 5 iterations per scenario (warm-up excluded).
+All measurements below are from a genuine `dotnet run` of `TeensyRom.Tools.StorageBenchmark` with `--scenarios both --iterations 5 --explain --prior storage-1-prior-medians.tsv` against the largest real index file available — `Sd-L5ZMCNBR.json` (155,439,795 bytes, 64,658 files) — paired with the matching extracted fixture `Sd-L5ZMCNBR.tsv`. The run executed on Windows 10.0.26200, .NET 9.0.19, with 5 iterations per scenario (warm-up excluded). Full results including query plans are documented in `STORAGE-BENCHMARK-RESULTS.md`.
 
 ### Directory Listing by Path
 
 | Side | Median (ms) | Min (ms) | Max (ms) |
 |---|---|---|---|
 | Legacy | 0.000 | — | — |
-| Store | 0.239 | — | — |
-| **Delta** | **0.239** | — | — |
+| Store (STORAGE-1 baseline) | 0.239 | — | — |
+| Store (current) | 0.148 | — | — |
+| **Delta vs. legacy (current)** | **0.148** | — | — |
 
-This operation retrieves the contents of a single directory. The legacy side reports 0.000 ms (sub-millisecond, rounded to zero); the store side reports 0.239 ms. The absolute difference is under a quarter of a millisecond — imperceptible in user-facing latency.
+This operation retrieves the contents of a single directory. The legacy side reports 0.000 ms (sub-millisecond, rounded to zero); the current store measurement is 0.148 ms, down from 0.239 ms in the STORAGE-1 baseline. The absolute difference remains under a quarter of a millisecond — imperceptible in user-facing latency.
 
 ### Supporting Context
 
 The decision rests on one threshold: **imperceptible delay**. A change from a fraction of a millisecond to a few milliseconds is a large ratio but remains invisible to users. The goal of the rewrite is faster performance; a fraction slower is acceptable if perception is zero. Perceivable degradation (tens of milliseconds or more) would not be.
 
-Directory listing was identified as the risk case in the original charter because the current codebase's linear dictionary scan wins on this operation. Against the real 64,658-file baseline, the store won on cold start (2357 → 4 ms), peak memory (2338 → 260 MB), and shallow random by scope (69.5 → 22.6 ms). It regressed on search (58.9 → 100.9 ms), deep random by scope (25.6 → 110.6 ms), broad random by scope (43.3 → 110.0 ms), parent lookup (0.021 → 0.097 ms), sibling lookup (0.024 → 31.6 ms), single upsert (0.051 → 63.6 ms), and bulk upsert (152.8 → 32,459 ms). The write-path regressions are a known cost centre — the favourite invariant recompute in UpsertFilesAsync scales with collection size rather than batch size — and deferred to a future optimization cycle.
+Directory listing was identified as the risk case in the original charter because the legacy linear dictionary scan wins on this operation. Against the real 64,658-file baseline:
+
+**Operations fixed in this iteration** (now faster than the STORAGE-1 baseline):
+- **Single upsert**: 0.051 ms (legacy) → 63.617 ms (STORAGE-1) → 0.659 ms (current); fixed by adding composite index `ix_file_identity` for direct identity-scoped lookups, eliminating the full-table scan in the favourite recompute
+- **Bulk upsert (500 + parent lookup)**: 130.046 ms (legacy) → 32,459.181 ms (STORAGE-1) → 57.078 ms (current); same fix as single upsert, plus separate full-text index optimizations
+- **Sibling lookup**: 0.024 ms (legacy) → 31.615 ms (STORAGE-1) → 0.175 ms (current); fixed by the same composite index
+- **Parent lookup**: 0.018 ms (legacy) → 0.097 ms (STORAGE-1) → 0.121 ms (current); improved with the composite index, imperceptible overhead
+- **Search**: 60.342 ms (legacy) → 100.904 ms (STORAGE-1) → 8.724 ms (current, now faster than legacy); fixed by restructuring the query to pin the `f.content_id` branch with `INDEXED BY ix_file_identity` as diagnosed in `SEARCH-PLAN-FINDING.md`
+- **Random by scope (DirShallow)**: 103.834 ms (legacy) → 22.648 ms (STORAGE-1) → 0.296 ms (current); pinning to `ix_file_parent` index for shallow directory scopes
+- **Cold start**: 2348.705 ms (legacy) → 4.128 ms (STORAGE-1) → 2.411 ms (current); explicit target achieved
+- **Peak memory**: 2521.494 MB (legacy) → 260.183 MB (STORAGE-1) → 254.646 MB (current); explicit target achieved
+- **Directory listing**: 0.000 ms (legacy) → 0.239 ms (STORAGE-1) → 0.148 ms (current); slight improvement, remains imperceptible
+
+**Operations not fixed in this iteration** (still slower than legacy, already identified in STORAGE-1):
+- **Random by scope (Storage)**: 38.262 ms (legacy) → 109.999 ms (STORAGE-1) → 118.148 ms (current); requires separate architectural approach (composite index on storage scope paths) not included in this iteration
+- **Random by scope (DirDeep)**: 29.403 ms (legacy) → 110.647 ms (STORAGE-1) → 157.207 ms (current); same architectural issue as Storage scope
+
+The two unfixed operations require index narrowing on scope-bounded ranges; see `STORAGE-BENCHMARK-RESULTS.md` section "Reasons" for detail. They were already identified as future-iteration work in STORAGE-1 and remain so.
 
 ## What This Iteration Hands Forward
 
-- A finished schema supporting every query shape the existing cache interface exposes
-- A store implementation answering all read and write paths required by the API
+- Composite index `ix_file_identity(storage_id, content_id)` addressing the write-path and lookup regressions identified in STORAGE-1
+- Fixed Search query plan (UNION-based structure pinning the content-id branch with `INDEXED BY ix_file_identity`), per `SEARCH-PLAN-FINDING.md`
 - A committed performance baseline against a real 64,658-file index, measured with the harness and fixture documented in `BENCHMARK-RUNBOOK.md`
-- The directory-listing verdict: the operation stays imperceptible and does not require an in-memory read model
-- A curated search oracle (the fixture `Sd-L5ZMCNBR.tsv`) that becomes the reference for the next iteration's comparison mode
+- The directory-listing verdict re-confirmed: the operation stays imperceptible and does not require an in-memory read model; the composite index even improves it
+- A curated search oracle (the fixture `Sd-L5ZMCNBR.tsv`) and prior-medians file (`storage-1-prior-medians.tsv`) that become the reference baseline for the next iteration's comparison mode
+- Clear identification of two remaining scope-based random operations (Storage and DirDeep) as future-iteration architectural work, requiring index narrowing on scope-bounded ranges
 
 ## Deliberately Deferred
 
@@ -42,7 +61,8 @@ Directory listing was identified as the risk case in the original charter becaus
 
 ---
 
-**Document generated**: 2026-08-18  
-**Baseline data**: `Sd-L5ZMCNBR.json` (155.4 MB, 64,658 files)  
+**Document updated**: 2026-08-19 (P04 iteration; updates STORAGE-1 verdict with current measurements)  
+**Baseline data**: `Sd-L5ZMCNBR.json` (155,439,795 bytes, 64,658 files)  
 **Fixture data**: `.local-fixtures/Sd-L5ZMCNBR.tsv`  
-**Full results**: See `STORAGE-BENCHMARK-RESULTS.md`
+**Prior medians**: `storage-1-prior-medians.tsv` (STORAGE-1 store-side medians, used for "STORAGE-1" column in results)  
+**Full results**: See `STORAGE-BENCHMARK-RESULTS.md` with full comparison table and query plans

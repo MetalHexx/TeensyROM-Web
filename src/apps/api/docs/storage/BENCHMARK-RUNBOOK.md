@@ -27,9 +27,9 @@ The baseline measurement exercises the store against a synthetic index containin
    cd src/apps/api/src/TeensyRom.Tools.StorageBenchmark
    ```
 
-2. Run the harness against the synthetic data directory (the tool will create a temp directory with a synthetic index):
+2. Run the harness against a working data directory containing a device index (required for the `--device` parameter). The tool generates a temp database and synthetically seeds it:
    ```bash
-   dotnet run -- --output ../../docs/storage/STORAGE-BASELINE.md
+   dotnet run -- --data-dir <path-to-index-directory> --device <deviceId> --scenarios store --out ../../docs/storage/STORAGE-BASELINE.md
    ```
 
 3. The harness emits the full markdown report. Review it to confirm the scenario names and measurements match the structure of prior baselines.
@@ -58,10 +58,12 @@ The baseline committed to this repository used:
    cd src/apps/api/src/TeensyRom.Tools.StorageBenchmark
    ```
 
-2. Point the data directory at the location of the real index and fixture. Assuming `Sd-L5ZMCNBR.json` is in `C:\Users\Metal\Downloads\TeensyROM-Web-1.0.0-alpha.8-win-x64\Assets\System\Cache\`:
+2. Point the data directory at the location of the real index file. Assuming `Sd-L5ZMCNBR.json` is in `C:\Users\Metal\Downloads\TeensyROM-Web-1.0.0-alpha.8-win-x64\Assets\System\Cache\`:
    ```bash
-   dotnet run -- --data-directory "C:\Users\Metal\Downloads\TeensyROM-Web-1.0.0-alpha.8-win-x64" --scenarios both --output ../../docs/storage/STORAGE-BENCHMARK-RESULTS.md
+   dotnet run -- --data-dir "C:\Users\Metal\Downloads\TeensyROM-Web-1.0.0-alpha.8-win-x64" --device L5ZMCNBR --iterations 5 --scenarios both --explain --prior <path-to-prior-medians.tsv> --out ../../docs/storage/STORAGE-BENCHMARK-RESULTS.md
    ```
+   
+   The `--prior <path>` argument points to a two-column TSV file (operation name, then median milliseconds) capturing the prior iteration's store-side medians. This baseline is used to populate the "Store median, STORAGE-1" column in the results, allowing side-by-side comparison of improvements. The prior-medians file is committed data (copied forward from a previous run) rather than regenerated.
 
 3. The harness runs both the legacy and store scenarios back-to-back in one process. The output is written to `STORAGE-BENCHMARK-RESULTS.md`.
 
@@ -84,11 +86,33 @@ The fixture is a gitignored local artifact (`.local-fixtures/Sd-L5ZMCNBR.tsv`) u
 
 ## Harness Implementation
 
-The benchmark harness is at `src/TeensyRom.Tools.StorageBenchmark/Program.cs`. It:
-- Accepts command-line arguments for `--data-directory`, `--scenarios` (baseline, comparison, or both), and `--output`
+The benchmark harness is at `src/TeensyRom.Tools.StorageBenchmark/Program.cs`. It accepts the following command-line arguments:
+
+- `--data-dir <dir>` (required): Path to the directory containing real index files
+- `--device <deviceId>` (required): The device identifier (e.g., `L5ZMCNBR`) for the index file
+- `--storage sd|usb` (optional, defaults to `sd`): Storage type
+- `--iterations <n>` (optional, defaults to `5`): Number of iterations per scenario (warm-up excluded)
+- `--out <path.md>` (optional): Output markdown report path; if omitted, output goes to stdout
+- `--scenarios legacy|store|both` (optional, defaults to `legacy`): Which scenarios to run
+- `--fixture <path>` (optional): Custom fixture path; if omitted, resolved from `IndexFixturePaths`
+- `--db <path>` (optional): Custom database path; if omitted, a temp database is created
+- `--keep-db` (optional, no value): Retain the database file after the run completes
+- `--prior <path.tsv>` (optional): Path to a two-column TSV of prior iteration's medians (operation, median ms)
+- `--explain` (optional, no value): Capture `EXPLAIN QUERY PLAN` output for all measured operations
+
+The harness:
 - Emits structured scenario results and a markdown report
 - Measures wall-clock time (median, min, max), managed memory delta, and peak working set for each operation
+- When `--explain` is passed, appends a `## Query Plans` section documenting the database's access plans for each operation
 - Is self-documenting — review `Program.cs` and the fixture reader in `TeensyRom.Core.Storage` for the exact measurements taken
+
+## Full-Text Search Index Compatibility
+
+**Important**: This iteration (P04) changed how full-text row IDs are assigned to files. Index databases written before this iteration are now stale: the file IDs stored in their full-text index tables do not match the file IDs the new write path assigns.
+
+**If you have a cached device index (`.db` file) from an earlier iteration**: Delete it and re-scan the card. The store will rebuild the database from scratch with the correct row-ID mappings. Search results from a stale index will point to the wrong files or fail to resolve.
+
+This applies to local development iteration files, not just production indices; any stored index predating this iteration must be discarded.
 
 ## When to Re-run
 
