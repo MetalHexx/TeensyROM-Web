@@ -54,6 +54,79 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
+        public async Task RandomCandidate_Storage_Plan_DoesNotUseTempBTreeForOrderBy()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+            var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
+
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
+
+            var plan = fixture.QueryPlan(IndexSql.RandomCandidate(StorageScope.Storage, 1, 0), bind =>
+            {
+                bind.Parameters.AddWithValue("$storage", storageId);
+                bind.Parameters.AddWithValue("$scopePrefix", IndexPathPatterns.PrefixPattern("/"));
+                bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
+                bind.Parameters.AddWithValue("$offset", 0L);
+            });
+
+            plan.Should().NotBeEmpty();
+            plan.Should().NotContain(line => line.Contains("USE TEMP B-TREE FOR ORDER BY"));
+        }
+
+        [Fact]
+        public async Task RandomCandidate_DirDeep_Plan_DoesNotUseTempBTreeForOrderBy()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+            var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
+
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
+
+            var plan = fixture.QueryPlan(IndexSql.RandomCandidate(StorageScope.DirDeep, 1, 0), bind =>
+            {
+                bind.Parameters.AddWithValue("$storage", storageId);
+                bind.Parameters.AddWithValue("$scopePrefix", IndexPathPatterns.PrefixPattern("/music/"));
+                bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
+                bind.Parameters.AddWithValue("$offset", 0L);
+            });
+
+            plan.Should().NotBeEmpty();
+            plan.Should().NotContain(line => line.Contains("USE TEMP B-TREE FOR ORDER BY"));
+        }
+
+        [Fact]
+        public async Task RandomCandidate_DirShallow_Plan_SeeksIxFileParent()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+            var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
+
+            // Seed one file under the scoped directory against many sharing its file type under other
+            // directories, so parent_path is by far the more selective filter and a regression back to
+            // ix_file_type — the other index the file_type predicate could otherwise justify — shows up as
+            // that index's name in the plan rather than as the planner's legitimate choice on a handful of rows.
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
+
+            for (int i = 0; i < 1000; i++)
+            {
+                await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/other{i}/file{i}.sid"), Ct);
+            }
+
+            // Without real statistics SQLite guesses a fixed row count per equality key for every candidate
+            // index alike, so the skew just seeded is invisible to the planner until ANALYZE records it.
+            await fixture.ExecuteAsync("ANALYZE;");
+
+            var plan = fixture.QueryPlan(IndexSql.RandomCandidate(StorageScope.DirShallow, 1, 0), bind =>
+            {
+                bind.Parameters.AddWithValue("$storage", storageId);
+                bind.Parameters.AddWithValue("$scopePath", "/music/");
+                bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
+                bind.Parameters.AddWithValue("$offset", 0L);
+            });
+
+            plan.Should().NotBeEmpty();
+            plan.Should().Contain(line => line.Contains("ix_file_parent"));
+        }
+
+        [Fact]
         public async Task IndexSchema_HasIxFileIdentityIndex()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();

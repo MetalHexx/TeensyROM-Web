@@ -137,26 +137,88 @@ namespace TeensyRom.Core.Storage.Index
             var typeParameterNames = IndexSql.BuildParameterNames("$type", types.Length);
             var excludeParameterNames = IndexSql.BuildParameterNames("$exclude", excludePaths.Count);
 
-            await using var command = connection.CreateCommand();
-            command.CommandText = IndexSql.RandomCandidate(storageScope, types.Length, excludePaths.Count);
-            command.Parameters.AddWithValue("$storage", storageId.Value);
-            AddStorageTypeParameter(command, scope);
-
-            if (storageScope == StorageScope.DirShallow)
+            void BindCandidateParameters(SqliteCommand command)
             {
-                command.Parameters.AddWithValue("$scopePath", scopePath.Value);
+                command.Parameters.AddWithValue("$storage", storageId.Value);
+
+                if (storageScope == StorageScope.DirShallow)
+                {
+                    command.Parameters.AddWithValue("$scopePath", scopePath.Value);
+                }
+                else
+                {
+                    command.Parameters.AddWithValue("$scopePrefix", IndexPathPatterns.PrefixPattern(scopePath.Value));
+                }
+
+                BindTypeParameters(command, typeParameterNames, types);
+                BindExcludeParameters(command, excludePaths, excludeParameterNames);
             }
-            else
+
+            // Three statements sharing one predicate replace a single "ORDER BY RANDOM() LIMIT 1": a count,
+            // a C#-side offset into it, and a primary-key seek for the row that offset lands on. All three
+            // run inside one deferred read transaction so they share a single snapshot — under WAL that costs
+            // the writer nothing, and it closes the two race windows three statements opened where one
+            // didn't: a delete between the count and the offset seek, and a delete between the offset seek
+            // and the final fetch. A raw "BEGIN DEFERRED" is used instead of the ADO.NET transaction wrapper
+            // because its default isolation level begins immediate, which would take a write-intent lock this
+            // read has no business holding.
+            await using (var beginCommand = connection.CreateCommand())
             {
-                command.Parameters.AddWithValue("$scopePrefix", IndexPathPatterns.PrefixPattern(scopePath.Value));
+                beginCommand.CommandText = "BEGIN DEFERRED;";
+                await beginCommand.ExecuteNonQueryAsync(ct);
             }
 
-            BindTypeParameters(command, typeParameterNames, types);
-            BindExcludeParameters(command, excludePaths, excludeParameterNames);
+            try
+            {
+                await using var countCommand = connection.CreateCommand();
+                countCommand.CommandText = IndexSql.RandomCount(storageScope, types.Length, excludePaths.Count);
+                BindCandidateParameters(countCommand);
 
-            await using var reader = await command.ExecuteReaderAsync(ct);
+                var count = Convert.ToInt32(await countCommand.ExecuteScalarAsync(ct));
 
-            return await reader.ReadAsync(ct) && IndexRowMapper.MapFile(reader) is LaunchableItem item ? item : null;
+                if (count == 0)
+                {
+                    await CommitAsync(connection, ct);
+                    return null;
+                }
+
+                var offset = Random.Shared.Next(count);
+
+                await using var offsetCommand = connection.CreateCommand();
+                offsetCommand.CommandText = IndexSql.RandomCandidate(storageScope, types.Length, excludePaths.Count);
+                BindCandidateParameters(offsetCommand);
+                offsetCommand.Parameters.AddWithValue("$offset", offset);
+
+                var id = await offsetCommand.ExecuteScalarAsync(ct);
+
+                if (id is null or DBNull)
+                {
+                    await CommitAsync(connection, ct);
+                    return null;
+                }
+
+                await using var fetchCommand = connection.CreateCommand();
+                fetchCommand.CommandText = IndexSql.FileById;
+                fetchCommand.Parameters.AddWithValue("$id", id);
+                AddStorageTypeParameter(fetchCommand, scope);
+
+                LaunchableItem? result;
+
+                await using (var reader = await fetchCommand.ExecuteReaderAsync(ct))
+                {
+                    result = await reader.ReadAsync(ct) && IndexRowMapper.MapFile(reader) is LaunchableItem item ? item : null;
+                }
+
+                await CommitAsync(connection, ct);
+                return result;
+            }
+            catch
+            {
+                await using var rollbackCommand = connection.CreateCommand();
+                rollbackCommand.CommandText = "ROLLBACK;";
+                await rollbackCommand.ExecuteNonQueryAsync(CancellationToken.None);
+                throw;
+            }
         }
 
         public async Task<FileItem?> FindParentFileAsync(IndexScope scope, FileItem file, CancellationToken ct)
@@ -347,6 +409,13 @@ namespace TeensyRom.Core.Storage.Index
             }
 
             return results;
+        }
+
+        private static async Task CommitAsync(SqliteConnection connection, CancellationToken ct)
+        {
+            await using var commitCommand = connection.CreateCommand();
+            commitCommand.CommandText = "COMMIT;";
+            await commitCommand.ExecuteNonQueryAsync(ct);
         }
 
         private static void AddStorageTypeParameter(SqliteCommand command, IndexScope scope) =>

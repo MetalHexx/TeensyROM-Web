@@ -219,10 +219,11 @@ namespace TeensyRom.Core.Storage.Index
         }
 
         /// <summary>
-        /// One random file within <paramref name="scope"/>, restricted to <paramref name="typeCount"/> file
-        /// types and excluding <paramref name="excludeCount"/> path patterns.
+        /// The predicate shared by <see cref="RandomCount"/> and <see cref="RandomCandidate"/>, restricted to
+        /// <paramref name="typeCount"/> file types and excluding <paramref name="excludeCount"/> path
+        /// patterns, written once so the count and the offset it bounds cannot see different candidate sets.
         /// </summary>
-        public static string RandomCandidate(StorageScope scope, int typeCount, int excludeCount)
+        private static string RandomPredicate(StorageScope scope, int typeCount, int excludeCount)
         {
             var typeParameterNames = BuildParameterNames("$type", typeCount);
             var excludeClause = BuildExcludeClause(excludeCount);
@@ -231,16 +232,31 @@ namespace TeensyRom.Core.Storage.Index
                 : $"f.path LIKE $scopePrefix ESCAPE '{IndexPathPatterns.Like_Escape_Character}'";
 
             return $"""
-                SELECT {FileColumns}
-                  FROM {MetadataJoin}
-                 WHERE f.storage_id = $storage
+                f.storage_id = $storage
                    AND {scopeClause}
                    AND f.file_type IN ({string.Join(", ", typeParameterNames)})
                    {excludeClause}
-                 ORDER BY RANDOM()
-                 LIMIT 1;
                 """;
         }
+
+        /// <summary>
+        /// The size of the candidate set <see cref="RandomCandidate"/> draws its offset against. No metadata
+        /// join and no projection: the join contributes nothing to any predicate, so counting through it
+        /// would cost rows this statement never needs to touch.
+        /// </summary>
+        public static string RandomCount(StorageScope scope, int typeCount, int excludeCount) =>
+            $"SELECT COUNT(*) FROM file f WHERE {RandomPredicate(scope, typeCount, excludeCount)};";
+
+        /// <summary>
+        /// The id of the candidate sitting at <c>$offset</c> among the rows <see cref="RandomCount"/>
+        /// counted — an id, not a row, so the caller seeks the one chosen file by primary key in
+        /// <see cref="FileById"/> instead of materialising and sorting the whole candidate set to reach it.
+        /// </summary>
+        public static string RandomCandidate(StorageScope scope, int typeCount, int excludeCount) =>
+            $"SELECT f.id FROM file f WHERE {RandomPredicate(scope, typeCount, excludeCount)} LIMIT 1 OFFSET $offset;";
+
+        /// <summary>A single file, addressed by its primary key, for the fetch that follows a resolved random offset.</summary>
+        public const string FileById = $"SELECT {FileColumns} FROM {MetadataJoin} WHERE f.id = $id;";
 
         /// <summary>Builds <paramref name="count"/> sequential parameter names sharing <paramref name="prefix"/>.</summary>
         public static string[] BuildParameterNames(string prefix, int count) =>

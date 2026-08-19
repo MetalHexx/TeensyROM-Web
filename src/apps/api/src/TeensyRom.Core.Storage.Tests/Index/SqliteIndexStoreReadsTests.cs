@@ -354,6 +354,32 @@ namespace TeensyRom.Core.Storage.Tests.Index
             file.Should().BeNull();
         }
 
+        [Fact]
+        public async Task GetRandomFileAsync_IsUniform_EveryCandidateInASmallSetIsReachable()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+
+            var paths = new[] { "/music/a.sid", "/music/b.sid", "/music/c.sid", "/music/d.sid", "/music/e.sid" };
+
+            foreach (var path in paths)
+            {
+                await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile(path), Ct);
+            }
+
+            var seen = new HashSet<string>();
+
+            for (var draw = 0; draw < 300 && seen.Count < paths.Length; draw++)
+            {
+                var file = await fixture.Store.GetRandomFileAsync(
+                    fixture.Scope, StorageScope.Storage, new DirectoryPath("/"), [], [], Ct);
+
+                file.Should().NotBeNull();
+                seen.Add(file!.Path.Value);
+            }
+
+            seen.Should().BeEquivalentTo(paths, "every candidate must be reachable, not just a non-constant subset of them");
+        }
+
         // === FindParentFileAsync / FindSiblingsAsync ===
 
         [Fact]
