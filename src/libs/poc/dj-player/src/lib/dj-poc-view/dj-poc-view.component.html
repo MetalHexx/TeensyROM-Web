@@ -32,7 +32,29 @@
     }
   </section>
 
-  <section class="poc-section" aria-label="Timing"></section>
+  <section class="poc-section" aria-label="Timing">
+    <h2>Timing</h2>
+
+    <label class="control">
+      Nominal frame interval
+      <select (change)="onNominalIntervalChange($event)">
+        @for (option of intervalOptions(); track option) {
+          <option [value]="option" [selected]="option === nominalIntervalUs()">
+            {{ option }} µs ({{ frameRateHz(option) }} Hz)
+          </option>
+        }
+      </select>
+    </label>
+
+    <label class="control">
+      <input
+        type="checkbox"
+        [checked]="scheduleAheadMs() > 0"
+        (change)="onScheduleAheadToggle($event)"
+      />
+      Timestamp sends {{ scheduleAheadStep }} ms ahead
+    </label>
+  </section>
 
   <section class="poc-section" aria-label="Tune">
     <h2>Tune</h2>
@@ -83,9 +105,85 @@
     }
   </section>
 
-  <section class="poc-section" aria-label="Transport"></section>
+  <section class="poc-section" aria-label="Transport">
+    <h2>Transport</h2>
 
-  <section class="poc-section" aria-label="Speed"></section>
+    <div class="control-row">
+      <button type="button" (click)="onPreviousSubtune()" [disabled]="currentTune() === null">
+        Previous subtune
+      </button>
+      <button type="button" (click)="onPlay()" [disabled]="!canPlay()">Play</button>
+      <button type="button" (click)="onPause()" [disabled]="engineState() !== 'playing'">
+        Pause
+      </button>
+      <button type="button" (click)="onStop()" [disabled]="currentTune() === null">Stop</button>
+      <button type="button" (click)="onNextSubtune()" [disabled]="currentTune() === null">
+        Next subtune
+      </button>
+    </div>
 
-  <section class="poc-section" aria-label="Diagnostics"></section>
+    <p class="engine-status">
+      State: {{ engineState() }} — subtune {{ currentSubtune() }} of {{ subtuneCount() }}
+    </p>
+    @if (engineError()) {
+      <p class="engine-error" role="alert">{{ engineError() }}</p>
+    }
+  </section>
+
+  <section class="poc-section" aria-label="Speed">
+    <h2>Speed</h2>
+
+    <label class="control">
+      Multiplier {{ speedMultiplier().toFixed(3) }}x
+      <input
+        type="range"
+        [min]="minSpeed"
+        [max]="maxSpeed"
+        step="0.005"
+        [value]="speedMultiplier()"
+        (input)="onSpeedInput($event)"
+      />
+    </label>
+
+    <label class="control">
+      Mode
+      <select (change)="onSpeedModeChange($event)">
+        <option value="clock-only" [selected]="speedMode() === 'clock-only'">clock-only</option>
+        <option value="clock-and-recipe" [selected]="speedMode() === 'clock-and-recipe'">
+          clock-and-recipe
+        </option>
+      </select>
+    </label>
+
+    <label class="control">
+      <input type="checkbox" [checked]="recipeEnabled()" (change)="onRecipeToggle($event)" />
+      Send the framerate recipe
+    </label>
+
+    <p class="speed-caption">
+      clock-only retimes the packet stream alone; clock-and-recipe also re-seeds the cartridge's
+      frame timer, which drains its queue and interrupts playback.
+    </p>
+  </section>
+
+  <section class="poc-section" aria-label="Diagnostics">
+    <h2>Diagnostics</h2>
+
+    <dl class="diagnostic-fields">
+      <dt>Frames / packets</dt>
+      <dd>{{ engineStats().framesRendered }} / {{ engineStats().packetsSent }}</dd>
+      <dt>Recipe resends</dt>
+      <dd>{{ engineStats().recipeResends }}</dd>
+      <dt>Multispeed</dt>
+      <dd>{{ engineStats().callsPerFrame }}x</dd>
+      <dt>Interval (nominal / effective)</dt>
+      <dd>{{ nominalIntervalUs() }} µs / {{ engineStats().effectiveIntervalUs.toFixed(1) }} µs</dd>
+      <dt>Measured mean interval</dt>
+      <dd>{{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs</dd>
+      <dt>Drift</dt>
+      <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
+      <dt>Suppressed writes</dt>
+      <dd>{{ engineStats().suppressedWrites }}</dd>
+    </dl>
+  </section>
 </div>

@@ -14,3 +14,20 @@
 .poc-section {
   min-height: 3rem;
 }
+
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-right: var(--spacing-md);
+}
+
+.engine-error {
+  color: var(--color-error);
+}

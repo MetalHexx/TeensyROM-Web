@@ -8,3 +8,5 @@ export * from './lib/asid/asid-constants';
 export * from './lib/asid/register-frame';
 export * from './lib/asid/asid-encoder';
 export * from './lib/midi/midi-output.service';
+export * from './lib/clock/frame-clock';
+export * from './lib/engine/dj-player-engine';
