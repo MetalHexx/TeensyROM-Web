@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MidiOutputService } from './midi-output.service';
+import { buildDisplayCharsPacket } from '../asid/asid-encoder';
 
 const STORAGE_KEY = 'asid-dj-0.selected-midi-port';
 
@@ -146,5 +147,47 @@ describe('MidiOutputService', () => {
   it('warns and does not throw when send() is called with no port selected', () => {
     expect(() => service.send(Uint8Array.from([0xf0, 0x2d, 0xf7]))).not.toThrow();
     expect(console.warn).toHaveBeenCalled();
+  });
+
+  it('forwards bytes to the selected output when send() is called', async () => {
+    const output = makeOutput('port-1', 'TeensyROM Cart', 'Acme');
+    const access = makeAccess([output]);
+    stubRequestMidiAccess(() => Promise.resolve(access));
+
+    await service.requestAccess();
+    service.selectPort('port-1');
+
+    const bytes = Uint8Array.from([0xf0, 0x2d, 0x4f, 0x41, 0xf7]);
+    service.send(bytes);
+
+    expect(output.send).toHaveBeenCalledTimes(1);
+    expect(output.send).toHaveBeenCalledWith(bytes);
+  });
+
+  it('forwards timestampMs to the selected output send() when provided', async () => {
+    const output = makeOutput('port-1', 'TeensyROM Cart', 'Acme');
+    const access = makeAccess([output]);
+    stubRequestMidiAccess(() => Promise.resolve(access));
+
+    await service.requestAccess();
+    service.selectPort('port-1');
+
+    const bytes = Uint8Array.from([0xf0, 0x2d, 0x4f, 0x41, 0xf7]);
+    service.send(bytes, 123);
+
+    expect(output.send).toHaveBeenCalledWith(bytes, 123);
+  });
+
+  it('identify() sends the encoded display-chars packet to the selected output', async () => {
+    const output = makeOutput('port-1', 'TeensyROM Cart', 'Acme');
+    const access = makeAccess([output]);
+    stubRequestMidiAccess(() => Promise.resolve(access));
+
+    await service.requestAccess();
+    service.selectPort('port-1');
+
+    service.identify('TEST');
+
+    expect(output.send).toHaveBeenCalledWith(buildDisplayCharsPacket('TEST'));
   });
 });
