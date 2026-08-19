@@ -1,4 +1,4 @@
-import { inject, Injectable, InjectionToken, signal } from '@angular/core';
+import { inject, Injectable, InjectionToken, OnDestroy, signal } from '@angular/core';
 import { logError, logInfo, LogType, logWarn } from '@teensyrom-nx/utils';
 import { NTSC_FRAME_INTERVAL_US, PAL_FRAME_INTERVAL_US } from '../asid/asid-constants';
 import {
@@ -91,7 +91,7 @@ const EMPTY_STATS: EngineStats = {
  * rebuilt on every `loadTune`.
  */
 @Injectable()
-export class DjPlayerEngine {
+export class DjPlayerEngine implements OnDestroy {
   private readonly midi = inject(MidiOutputService);
   private readonly clock = inject(FRAME_CLOCK);
 
@@ -179,6 +179,9 @@ export class DjPlayerEngine {
     try {
       await this.clock.start(intervalUs, () => this.onTick());
     } catch (error) {
+      // The cartridge is already in ASID mode waiting on a frame stream that will never start, so
+      // close the session rather than leaving it open for the tester to notice and stop by hand.
+      this.sendControl(buildStopPacket());
       this.fail(`the frame clock could not start — ${describeError(error)}`);
       return;
     }
@@ -217,6 +220,22 @@ export class DjPlayerEngine {
       this.initSubtune(this.currentSubtune());
     }
     this.publishStats();
+  }
+
+  /**
+   * Tears playback down with the injector that provides the engine — the view leaving the screen
+   * destroys neither the clock's audio graph nor the cartridge's ASID session on its own, and a
+   * clock left ticking keeps streaming frames with no UI left to reach `stop()`.
+   *
+   * Deliberately lighter than `stop()`: re-initialising the subtune during a route change costs a
+   * synchronous machine run nothing will ever play.
+   */
+  ngOnDestroy(): void {
+    this.clock.stop();
+    this.clearRecipeResend();
+    if (this.state() === 'playing' || this.state() === 'paused') {
+      this.sendControl(buildStopPacket());
+    }
   }
 
   nextSubtune(): void {

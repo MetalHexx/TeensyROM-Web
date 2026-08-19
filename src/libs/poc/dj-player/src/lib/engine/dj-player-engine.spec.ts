@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { signal } from '@angular/core';
+import { createEnvironmentInjector, EnvironmentInjector, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import {
   ASID_MSG_FRAMERATE_RECIPE,
@@ -27,6 +27,8 @@ class FakeFrameClock implements FrameClock {
   intervalUs = 0;
   running = false;
   startCount = 0;
+  /** Set to reject the next `start()`, as a real `AudioContext.resume()` can outside a gesture. */
+  startError: Error | null = null;
   stats: FrameClockStats = {
     framesEmitted: 0,
     measuredMeanIntervalUs: 0,
@@ -37,10 +39,13 @@ class FakeFrameClock implements FrameClock {
   private onFrame: (() => void) | null = null;
 
   start(intervalUs: number, onFrame: () => void): Promise<void> {
+    this.startCount++;
+    if (this.startError !== null) {
+      return Promise.reject(this.startError);
+    }
     this.intervalUs = intervalUs;
     this.onFrame = onFrame;
     this.running = true;
-    this.startCount++;
     return Promise.resolve();
   }
 
@@ -353,6 +358,42 @@ describe('DjPlayerEngine', () => {
 
     expect(engine.state()).toBe('error');
     expect(clock.startCount).toBe(0);
+  });
+
+  it('closes the ASID session when the clock fails to start', async () => {
+    engine.loadTune(silentTune());
+    clock.startError = new Error('the audio context could not resume');
+
+    await engine.play();
+
+    expect(engine.state()).toBe('error');
+    expect(engine.lastError()).toBeTruthy();
+    expect(clock.running).toBe(false);
+    // The cartridge was told to enter ASID mode before the clock was known to run, so the sequence
+    // has to close rather than leave it waiting on frames.
+    expect(messageSequence(midi).at(-1)).toBe(ASID_MSG_STOP);
+  });
+
+  it('stops the clock and closes the session when its injector is destroyed', async () => {
+    // A route change destroys the component that provides the engine; the clock's audio graph
+    // outlives the injector unless the engine's destroy hook tears it down.
+    const injector = createEnvironmentInjector(
+      [
+        DjPlayerEngine,
+        { provide: FRAME_CLOCK, useValue: clock },
+        { provide: MidiOutputService, useValue: midi as unknown as MidiOutputService },
+      ],
+      TestBed.inject(EnvironmentInjector)
+    );
+    const scopedEngine = injector.get(DjPlayerEngine);
+    scopedEngine.loadTune(silentTune());
+    await scopedEngine.play();
+    clock.tick(2);
+
+    injector.destroy();
+
+    expect(clock.running).toBe(false);
+    expect(messageSequence(midi).at(-1)).toBe(ASID_MSG_STOP);
   });
 
   it('timestamps only the frame stream when a schedule-ahead is set', async () => {
