@@ -36,8 +36,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
             // Seed a file so the plan has something to work with
             await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
 
-            var sql = $"SELECT {IndexSql.FileColumns} FROM {IndexSql.MetadataJoin} WHERE f.storage_id = $storage AND f.path = $path;";
-            var plan = fixture.QueryPlan(sql, bind =>
+            var plan = fixture.QueryPlan(IndexSql.GetFileByPath, bind =>
             {
                 bind.Parameters.AddWithValue("$storage", storageId);
                 bind.Parameters.AddWithValue("$path", "/music/monty.sid");
@@ -45,10 +44,8 @@ namespace TeensyRom.Core.Storage.Tests.Index
             });
 
             plan.Should().NotBeEmpty();
-            // Should use an index for the file table lookup (UNIQUE constraint on storage_id, path)
-            var fileLookup = plan.FirstOrDefault(line => line.Contains("f"));
-            fileLookup.Should().NotBeNullOrEmpty();
-            fileLookup.Should().NotContain("SCAN file");
+            // Should use the UNIQUE(storage_id, path) index for the file table lookup, not a table scan
+            plan.Should().Contain(line => line.StartsWith("SEARCH f USING") && line.Contains("storage_id") && line.Contains("path"));
         }
     }
 }

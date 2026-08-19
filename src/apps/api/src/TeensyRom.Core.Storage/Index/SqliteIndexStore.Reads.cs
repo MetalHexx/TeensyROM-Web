@@ -38,7 +38,7 @@ namespace TeensyRom.Core.Storage.Index
             }
 
             await using var command = connection.CreateCommand();
-            command.CommandText = $"SELECT {IndexSql.FileColumns} FROM {IndexSql.MetadataJoin} WHERE f.storage_id = $storage AND f.path = $path;";
+            command.CommandText = IndexSql.GetFileByPath;
             command.Parameters.AddWithValue("$storage", storageId.Value);
             command.Parameters.AddWithValue("$path", path.Value);
             AddStorageTypeParameter(command, scope);

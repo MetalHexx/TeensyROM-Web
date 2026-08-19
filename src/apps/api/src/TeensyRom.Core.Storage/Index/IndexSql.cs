@@ -61,6 +61,10 @@ namespace TeensyRom.Core.Storage.Index
         public const string FilesByParent =
             "SELECT " + FileColumns + " FROM " + MetadataJoin + " WHERE f.storage_id = $storage AND f.parent_path = $path ORDER BY f.name;";
 
+        /// <summary>A single file looked up by its exact path, keyed off the storage/path unique constraint.</summary>
+        public const string GetFileByPath =
+            "SELECT " + FileColumns + " FROM " + MetadataJoin + " WHERE f.storage_id = $storage AND f.path = $path;";
+
         /// <summary>Removes a content identity's row from the metadata search index.</summary>
         public const string ContentSearchDelete = "DELETE FROM content_search WHERE content_id = $contentId;";
 
