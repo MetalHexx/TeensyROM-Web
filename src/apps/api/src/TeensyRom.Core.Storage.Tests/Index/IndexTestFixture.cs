@@ -91,6 +91,26 @@ namespace TeensyRom.Core.Storage.Tests.Index
             return values;
         }
 
+        /// <summary>Runs EXPLAIN QUERY PLAN over <paramref name="sql"/> and returns each plan row's detail text.</summary>
+        public IReadOnlyList<string> QueryPlan(string sql, Action<SqliteCommand>? bind = null)
+        {
+            using var connection = Database.OpenRead();
+            using var command = connection.CreateCommand();
+            command.CommandText = $"EXPLAIN QUERY PLAN {sql}";
+
+            bind?.Invoke(command);
+
+            using var reader = command.ExecuteReader();
+            var details = new List<string>();
+
+            while (reader.Read())
+            {
+                details.Add(reader.GetString(3));
+            }
+
+            return details;
+        }
+
         /// <summary>
         /// Writes straight to the database, bypassing the store — used to corrupt state the store is then
         /// asked to repair.
