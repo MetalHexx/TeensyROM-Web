@@ -27,6 +27,28 @@ const MICROSECONDS_PER_SECOND = 1_000_000;
  * timestamped `send()` is honoured at all in this browser. */
 const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
 
+/** The three timer modes the cartridge's own ASID player menu offers — the browser never sets
+ * this, it only records which one the tester configured before a session. */
+export type TimerMode = 'off' | 'auto-seed' | 'fixed-50hz';
+
+const TIMER_MODE_OPTIONS: readonly { readonly value: TimerMode; readonly label: string }[] = [
+  { value: 'off', label: 'off' },
+  { value: 'auto-seed', label: 'auto-seed' },
+  { value: 'fixed-50hz', label: 'fixed 50 Hz' },
+];
+
+/** The six buffer sizes the cartridge's own menu offers — likewise a record, not a command. */
+export type BufferSize = 'tiny' | 'small' | 'medium' | 'large' | 'xl' | 'xxl';
+
+const BUFFER_SIZE_OPTIONS: readonly { readonly value: BufferSize; readonly label: string }[] = [
+  { value: 'tiny', label: 'Tiny (256 B)' },
+  { value: 'small', label: 'Small (512 B)' },
+  { value: 'medium', label: 'Medium (1024 B)' },
+  { value: 'large', label: 'Large (2048 B)' },
+  { value: 'xl', label: 'XL (4096 B)' },
+  { value: 'xxl', label: 'XXL (8192 B)' },
+];
+
 /**
  * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. One column
  * of labelled control groups: MIDI, Timing, Tune, Transport, Speed, Diagnostics.
@@ -79,11 +101,20 @@ export class DjPocViewComponent {
   protected readonly maxSpeed = MAX_SPEED_MULTIPLIER;
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
 
-  // Neither the timer mode nor the queue depth is part of the ASID protocol this browser speaks —
-  // the cartridge decides both on its own, so these are a fixed record for the tester, not a live
-  // read of firmware state.
-  protected readonly timerModeRecord = 'Firmware-managed — not sent by this browser';
-  protected readonly bufferSizeRecord = 'Firmware-managed — not sent by this browser';
+  // Neither the timer mode nor the buffer size is part of the ASID protocol this browser speaks —
+  // the cartridge decides both on its own, in its own menu. These signals record what the tester
+  // set there so the diagnostics readout and the findings log can attribute a session to the
+  // right one of the eighteen timer-mode x buffer-size combinations under test.
+  protected readonly timerMode = signal<TimerMode>('off');
+  protected readonly bufferSize = signal<BufferSize>('tiny');
+  protected readonly timerModeOptions = TIMER_MODE_OPTIONS;
+  protected readonly bufferSizeOptions = BUFFER_SIZE_OPTIONS;
+  protected readonly timerModeLabel = computed(
+    () => TIMER_MODE_OPTIONS.find((option) => option.value === this.timerMode())?.label ?? ''
+  );
+  protected readonly bufferSizeLabel = computed(
+    () => BUFFER_SIZE_OPTIONS.find((option) => option.value === this.bufferSize())?.label ?? ''
+  );
 
   // Identify interrupts the stream on the cartridge, so it stays out of reach while a tune plays.
   protected readonly canIdentify = computed(
@@ -224,6 +255,14 @@ export class DjPocViewComponent {
 
   onScheduleAheadChange(event: Event): void {
     this.engine.setScheduleAhead(Number((event.target as HTMLSelectElement).value));
+  }
+
+  onTimerModeChange(event: Event): void {
+    this.timerMode.set((event.target as HTMLSelectElement).value as TimerMode);
+  }
+
+  onBufferSizeChange(event: Event): void {
+    this.bufferSize.set((event.target as HTMLSelectElement).value as BufferSize);
   }
 
   protected frameRateHz(intervalUs: number): string {

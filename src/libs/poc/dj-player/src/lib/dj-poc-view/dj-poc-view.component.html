@@ -84,21 +84,29 @@
 
     <div class="record-group">
       <p class="caption">
-        Record only — these reflect what is already set on the C64, not something this browser can
-        change.
+        Record only — these reflect what you set on the C64 in the cartridge's own ASID player
+        menu; this browser cannot change either one.
       </p>
 
       <label class="control">
         Timer mode (C64)
-        <select disabled>
-          <option selected>{{ timerModeRecord }}</option>
+        <select (change)="onTimerModeChange($event)">
+          @for (option of timerModeOptions; track option.value) {
+            <option [value]="option.value" [selected]="option.value === timerMode()">
+              {{ option.label }}
+            </option>
+          }
         </select>
       </label>
 
       <label class="control">
         Buffer size (C64)
-        <select disabled>
-          <option selected>{{ bufferSizeRecord }}</option>
+        <select (change)="onBufferSizeChange($event)">
+          @for (option of bufferSizeOptions; track option.value) {
+            <option [value]="option.value" [selected]="option.value === bufferSize()">
+              {{ option.label }}
+            </option>
+          }
         </select>
       </label>
     </div>
@@ -214,6 +222,8 @@
     <h2>Diagnostics</h2>
 
     <dl class="diagnostic-fields">
+      <dt>Timer mode / buffer size (C64)</dt>
+      <dd>{{ timerModeLabel() }} / {{ bufferSizeLabel() }}</dd>
       <dt>Frames emitted</dt>
       <dd>{{ engineStats().framesRendered }}</dd>
       <dt>Packets / second</dt>

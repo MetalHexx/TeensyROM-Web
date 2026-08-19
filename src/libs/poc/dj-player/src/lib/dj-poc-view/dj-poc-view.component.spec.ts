@@ -253,6 +253,42 @@ describe('DjPocViewComponent', () => {
     });
   });
 
+  describe('timer mode / buffer size record', () => {
+    function selectByLabel(labelText: string): HTMLSelectElement {
+      const labels: HTMLLabelElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('label.control')
+      );
+      const label = labels.find((candidate) => candidate.textContent?.includes(labelText));
+      const select = label?.querySelector('select');
+      if (!select) {
+        throw new Error(`no select found under label "${labelText}"`);
+      }
+      return select;
+    }
+
+    it('defaults to off / Tiny and updates the diagnostics readout on change', () => {
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('off / Tiny (256 B)');
+
+      const timerSelect = selectByLabel('Timer mode (C64)');
+      timerSelect.value = 'fixed-50hz';
+      timerSelect.dispatchEvent(new Event('change'));
+
+      const bufferSelect = selectByLabel('Buffer size (C64)');
+      bufferSelect.value = 'xxl';
+      bufferSelect.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      const updatedText = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(updatedText).toContain('fixed 50 Hz / XXL (8192 B)');
+    });
+
+    it('renders both selects as enabled, real controls', () => {
+      expect(selectByLabel('Timer mode (C64)').disabled).toBe(false);
+      expect(selectByLabel('Buffer size (C64)').disabled).toBe(false);
+    });
+  });
+
   describe('subtune navigation', () => {
     it('disables previous/next on a single-subtune tune', () => {
       engine.subtuneCount.set(1);
