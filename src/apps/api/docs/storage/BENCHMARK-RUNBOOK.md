@@ -27,14 +27,16 @@ The baseline measurement exercises the store against a synthetic index containin
    cd src/apps/api/src/TeensyRom.Tools.StorageBenchmark
    ```
 
-2. Run the harness against a working data directory containing a device index (required for the `--device` parameter). The tool generates a temp database and synthetically seeds it:
+2. Run the harness with `--scenarios store` against a working data directory containing a device index (required for the `--device` parameter). The tool creates a temp database and seeds it from whichever fixture file resolves for the given `--device`/`--storage` — either the path passed via `--fixture`, or `{fixture-dir}/{Sd-|Usb-}<deviceId>.tsv` under `IndexFixturePaths.ResolveDirectory()` (`.local-fixtures` by default). There is no code path that fabricates index content: the store is seeded from a real, already-extracted `.tsv` fixture, the same mechanism the real-data comparison run below uses:
    ```bash
    dotnet run -- --data-dir <path-to-index-directory> --device <deviceId> --scenarios store --out ../../docs/storage/STORAGE-BASELINE.md
    ```
 
+   To reproduce the originally-committed 25,920-file synthetic baseline specifically, that fixture must exist locally — place it at `.local-fixtures/Sd-<deviceId>.tsv` (or pass `--fixture <path-to-that-file>`) before running the command above.
+
 3. The harness emits the full markdown report. Review it to confirm the scenario names and measurements match the structure of prior baselines.
 
-**Note**: The synthetic fixture is ephemeral — it is generated each run inside the harness and not retained on disk. The `STORAGE-BASELINE.md` report is the committed artifact.
+**Note**: The fixture is a local, gitignored artifact — it is not committed to the repository. The `STORAGE-BASELINE.md` report is the committed artifact.
 
 ## Comparison Measurement (Real Data)
 

@@ -28,15 +28,17 @@ The decision rests on one threshold: **imperceptible delay**. A change from a fr
 Directory listing was identified as the risk case in the original charter because the legacy linear dictionary scan wins on this operation. Against the real 64,658-file baseline:
 
 **Operations fixed in this iteration** (now faster than the STORAGE-1 baseline):
-- **Single upsert**: 0.051 ms (legacy) → 63.617 ms (STORAGE-1) → 0.659 ms (current); fixed by adding composite index `ix_file_identity` for direct identity-scoped lookups, eliminating the full-table scan in the favourite recompute
+- **Single upsert**: 0.045 ms (legacy) → 63.617 ms (STORAGE-1) → 0.659 ms (current); fixed by adding composite index `ix_file_identity` for direct identity-scoped lookups, eliminating the full-table scan in the favourite recompute
 - **Bulk upsert (500 + parent lookup)**: 130.046 ms (legacy) → 32,459.181 ms (STORAGE-1) → 57.078 ms (current); same fix as single upsert, plus separate full-text index optimizations
-- **Sibling lookup**: 0.024 ms (legacy) → 31.615 ms (STORAGE-1) → 0.175 ms (current); fixed by the same composite index
-- **Parent lookup**: 0.018 ms (legacy) → 0.097 ms (STORAGE-1) → 0.121 ms (current); improved with the composite index, imperceptible overhead
+- **Sibling lookup**: 0.032 ms (legacy) → 31.615 ms (STORAGE-1) → 0.175 ms (current); fixed by the same composite index
 - **Search**: 60.342 ms (legacy) → 100.904 ms (STORAGE-1) → 8.724 ms (current, now faster than legacy); fixed by restructuring the query to pin the `f.content_id` branch with `INDEXED BY ix_file_identity` as diagnosed in `SEARCH-PLAN-FINDING.md`
 - **Random by scope (DirShallow)**: 103.834 ms (legacy) → 22.648 ms (STORAGE-1) → 0.296 ms (current); pinning to `ix_file_parent` index for shallow directory scopes
 - **Cold start**: 2348.705 ms (legacy) → 4.128 ms (STORAGE-1) → 2.411 ms (current); explicit target achieved
 - **Peak memory**: 2521.494 MB (legacy) → 260.183 MB (STORAGE-1) → 254.646 MB (current); explicit target achieved
 - **Directory listing**: 0.000 ms (legacy) → 0.239 ms (STORAGE-1) → 0.148 ms (current); slight improvement, remains imperceptible
+
+**Effectively unchanged, still imperceptible** (at or below the 1 ms bar in both directions):
+- **Parent lookup**: 0.018 ms (legacy) → 0.097 ms (STORAGE-1) → 0.121 ms (current); the composite index applies here too, but the measured delta against the STORAGE-1 baseline is +0.024 ms — flat, not faster; overhead remains imperceptible against both legacy and STORAGE-1
 
 **Operations not fixed in this iteration** (still slower than legacy, already identified in STORAGE-1):
 - **Random by scope (Storage)**: 38.262 ms (legacy) → 109.999 ms (STORAGE-1) → 118.148 ms (current); requires separate architectural approach (composite index on storage scope paths) not included in this iteration
