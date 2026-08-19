@@ -1,7 +1,36 @@
 <div class="dj-poc-page">
   <h1 class="page-heading">ASID DJ Player (spike)</h1>
 
-  <section class="poc-section" aria-label="MIDI"></section>
+  <section class="poc-section" aria-label="MIDI">
+    <h2>MIDI</h2>
+
+    <button type="button" (click)="onEnableMidi()" [disabled]="midiAccessState() === 'requesting'">
+      Enable MIDI
+    </button>
+
+    <label class="midi-port-picker">
+      Output port
+      <select [disabled]="midiPorts().length === 0" (change)="onSelectMidiPort($event)">
+        <option value="" [selected]="selectedMidiPortId() === null">— select a port —</option>
+        @for (port of midiPorts(); track port.id) {
+          <option [value]="port.id" [selected]="port.id === selectedMidiPortId()">
+            {{ port.name }} ({{ port.manufacturer }})
+          </option>
+        }
+      </select>
+    </label>
+
+    <button type="button" (click)="onIdentify()" [disabled]="!canIdentify()">Identify</button>
+    <p class="midi-caption">
+      Identify sends text to the selected cartridge's C64 screen. It briefly interrupts playback,
+      so use it before or between tunes rather than mid-stream.
+    </p>
+
+    <p class="midi-status">Status: {{ midiAccessState() }}</p>
+    @if (midiError()) {
+      <p class="midi-error" role="alert">{{ midiError() }}</p>
+    }
+  </section>
 
   <section class="poc-section" aria-label="Timing"></section>
 

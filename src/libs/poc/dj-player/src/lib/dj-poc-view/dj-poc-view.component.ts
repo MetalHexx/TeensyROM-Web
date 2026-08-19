@@ -3,6 +3,7 @@ import { ThemeService } from '@teensyrom-nx/ui/styles';
 import { SidFile, SidParseError } from '../sid/sid-file.model';
 import { parseSidFile } from '../sid/sid-file.parser';
 import { BUNDLED_TUNES, decodeBundledTune } from '../sid/bundled';
+import { MidiOutputService } from '../midi/midi-output.service';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
 interface TuneSource {
@@ -20,11 +21,25 @@ interface TuneSource {
   templateUrl: './dj-poc-view.component.html',
   styleUrl: './dj-poc-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // Provided here rather than root: this is a quarantined POC surface and its permission-holding
+  // service should not register in the app injector.
+  providers: [MidiOutputService],
 })
 export class DjPocViewComponent {
   // This route bypasses LayoutComponent, the only place ThemeService is normally injected —
   // without this, ThemeService never constructs and the app's dark-mode class never applies.
   private readonly themeService = inject(ThemeService);
+
+  private readonly midiService = inject(MidiOutputService);
+  protected readonly midiAccessState = this.midiService.accessState;
+  protected readonly midiPorts = this.midiService.ports;
+  protected readonly selectedMidiPortId = this.midiService.selectedPortId;
+  protected readonly midiError = this.midiService.lastError;
+  // No engine exists yet in this phase (P04 wires playback) — identify is only gated on having
+  // something to send to. Once the engine lands, its playing state should join this condition.
+  protected readonly canIdentify = computed(
+    () => this.midiAccessState() === 'granted' && this.selectedMidiPortId() !== null
+  );
 
   private readonly bundledSources: readonly TuneSource[] = BUNDLED_TUNES.map((tune) => ({
     id: tune.id,
@@ -75,6 +90,22 @@ export class DjPocViewComponent {
       this.currentTune.set(null);
       this.tuneError.set(describeParseError(error));
     }
+  }
+
+  onEnableMidi(): void {
+    void this.midiService.requestAccess();
+  }
+
+  onSelectMidiPort(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    this.midiService.selectPort(select.value);
+  }
+
+  onIdentify(): void {
+    const ports = this.midiPorts();
+    const index = ports.findIndex((port) => port.id === this.selectedMidiPortId());
+    const label = index === -1 ? 'ASID-DJ-0 PORT ?' : `ASID-DJ-0 PORT ${index + 1}`;
+    this.midiService.identify(label);
   }
 }
 
