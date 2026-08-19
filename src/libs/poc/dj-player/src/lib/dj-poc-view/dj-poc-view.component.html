@@ -5,7 +5,54 @@
 
   <section class="poc-section" aria-label="Timing"></section>
 
-  <section class="poc-section" aria-label="Tune"></section>
+  <section class="poc-section" aria-label="Tune">
+    <h2>Tune</h2>
+
+    <div class="tune-sources">
+      @for (source of availableTunes(); track source.id) {
+        <button type="button" (click)="selectTune(source)">{{ source.label }}</button>
+      }
+
+      <label class="file-picker">
+        Open from disk…
+        <input type="file" accept=".sid" (change)="onFilePicked($event)" />
+      </label>
+    </div>
+
+    @if (tuneError()) {
+      <p class="tune-error" role="alert">{{ tuneError() }}</p>
+    }
+
+    @if (currentTune(); as tune) {
+      <dl class="tune-fields">
+        <dt>Format</dt>
+        <dd>{{ tune.format }} v{{ tune.version }}</dd>
+        <dt>Name</dt>
+        <dd>{{ tune.name }}</dd>
+        <dt>Author</dt>
+        <dd>{{ tune.author }}</dd>
+        <dt>Released</dt>
+        <dd>{{ tune.released }}</dd>
+        <dt>Songs</dt>
+        <dd>{{ tune.songs }} (starts at {{ tune.startSong }})</dd>
+        <dt>Load / init / play address</dt>
+        <dd>
+          ${{ tune.loadAddress.toString(16) }} / ${{ tune.initAddress.toString(16) }} / ${{
+            tune.playAddress.toString(16)
+          }}
+        </dd>
+        <dt>Clock / model</dt>
+        <dd>{{ tune.clock }} / {{ tune.model }}</dd>
+        <dt>Second / third SID</dt>
+        <dd>
+          {{ tune.secondSidAddress ? '$' + tune.secondSidAddress.toString(16) : '—' }} /
+          {{ tune.thirdSidAddress ? '$' + tune.thirdSidAddress.toString(16) : '—' }}
+        </dd>
+        <dt>Data size</dt>
+        <dd>{{ tune.data.length }} bytes</dd>
+      </dl>
+    }
+  </section>
 
   <section class="poc-section" aria-label="Transport"></section>
 
