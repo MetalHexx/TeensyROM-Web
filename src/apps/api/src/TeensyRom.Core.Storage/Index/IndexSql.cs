@@ -47,6 +47,19 @@ namespace TeensyRom.Core.Storage.Index
             RETURNING id;
             """;
 
+        /// <summary>
+        /// Inserts or updates a directory's row and returns its id. <c>file.directory_id</c> references this
+        /// table with <c>ON DELETE CASCADE</c>, so the conflict branch is a foreign-key parent update; keeping
+        /// it here alongside <see cref="FileUpsert"/> is what let the write-cost tests catch that its child
+        /// scan needed <c>ix_file_directory</c> to stay a seek.
+        /// </summary>
+        public const string DirectoryUpsert = """
+            INSERT INTO directory (storage_id, path, parent_path, name)
+            VALUES ($storage, $path, $parent, $name)
+            ON CONFLICT (storage_id, path) DO UPDATE SET parent_path = excluded.parent_path, name = excluded.name
+            RETURNING id;
+            """;
+
         /// <summary>Removes a file's row from the file-name search index, addressed by its rowid.</summary>
         public const string FileSearchDelete = "DELETE FROM file_search WHERE rowid = $fileId;";
 

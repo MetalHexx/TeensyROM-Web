@@ -323,12 +323,7 @@ namespace TeensyRom.Core.Storage.Index
 
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
-            command.CommandText = """
-                INSERT INTO directory (storage_id, path, parent_path, name)
-                VALUES ($storage, $path, $parent, $name)
-                ON CONFLICT (storage_id, path) DO UPDATE SET parent_path = excluded.parent_path, name = excluded.name
-                RETURNING id;
-                """;
+            command.CommandText = IndexSql.DirectoryUpsert;
             command.Parameters.Add("$storage", SqliteType.Integer);
             command.Parameters.Add("$path", SqliteType.Text);
             command.Parameters.Add("$parent", SqliteType.Text);
