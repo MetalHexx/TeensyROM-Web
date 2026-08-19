@@ -4,6 +4,13 @@ import { playerRouteResolver } from '@teensyrom-nx/app/navigation';
 
 export const appRoutes: Route[] = [
   {
+    // ASID-DJ-0 spike. Unlinked from nav — reachable only by typing the URL.
+    // Throwaway: delete libs/poc/ and this entry to remove it.
+    path: 'dev/dj-poc',
+    loadComponent: () =>
+      import('@teensyrom-nx/poc/dj-player').then((m) => m.DjPocViewComponent),
+  },
+  {
     // Dev-only fixture page for the file-transfer UI states. Unlinked from any nav — reachable
     // only by typing the URL. Throwaway; delete once the current UI refinement pass wraps.
     path: 'dev/transfer-states',

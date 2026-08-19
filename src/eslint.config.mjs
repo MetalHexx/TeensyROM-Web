@@ -65,6 +65,13 @@ export default [
               sourceTag: 'scope:testing-app',
               onlyDependOnLibsWithTags: ['scope:domain', 'scope:application', 'scope:shared', 'scope:testing'],
             },
+            // POC Layer - quarantined throwaway spikes. Only scope:app may import these,
+            // and only to register a dev route. Deleting libs/poc/ plus this entry and the
+            // scope:app allowlist entry below removes the POC entirely.
+            {
+              sourceTag: 'scope:poc',
+              onlyDependOnLibsWithTags: ['scope:shared', 'scope:domain'],
+            },
             // App Layer - Composition root: can depend on everything
             {
               sourceTag: 'scope:app',
@@ -77,6 +84,7 @@ export default [
                 'scope:app',
                 'scope:testing',
                 'scope:testing-app',
+                'scope:poc',
               ],
             },
             // E2E Tests - Can depend on data-access for API DTOs

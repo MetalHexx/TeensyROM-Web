@@ -47,6 +47,9 @@ importers:
       '@ngrx/signals':
         specifier: ^19.2.0
         version: 19.2.1(@angular/core@19.2.15(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      mos6502:
+        specifier: 1.1.1
+        version: 1.1.1
       opus-decoder:
         specifier: ^0.7.11
         version: 0.7.11
@@ -7065,6 +7068,9 @@ packages:
     resolution: {integrity: sha512-fucGSh8643QkSvNRFOaJ3+kfjF0FhA/YtvDncnRAG0A4oCtAzHIFkt/+SgsWil1uwoeT+Nu5fsAnrKkFtnPcZQ==}
     peerDependencies:
       mocha: '>=7'
+
+  mos6502@1.1.1:
+    resolution: {integrity: sha512-yfVQ1EBgi0YoZuNJCvwE1cqrqOoEZY6yykhAGTvH5ePAfx0Cz3rl+ZZXArPxpKVKZ3uCHVpKS337GWptaIcCnQ==}
 
   mrmime@2.0.1:
     resolution: {integrity: sha512-Y3wQdFg2Va6etvQ5I82yUhGdsKrcYox6p7FfL1LbK2J4V01F9TGlepTIhnK24t7koZibmg82KGglhA1XK5IsLQ==}
@@ -18555,6 +18561,8 @@ snapshots:
       mochawesome-report-generator: 6.3.2
       strip-ansi: 6.0.1
       uuid: 8.3.2
+
+  mos6502@1.1.1: {}
 
   mrmime@2.0.1: {}
 

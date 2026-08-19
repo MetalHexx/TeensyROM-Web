@@ -1,0 +1,16 @@
+.dj-poc-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+}
+
+.page-heading {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: var(--font-size-md);
+}
+
+.poc-section {
+  min-height: 3rem;
+}
