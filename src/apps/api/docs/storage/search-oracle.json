@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "notes": "Curated against the real collection named below: the device's own index file, extracted to a local .tsv fixture, seeded through the production write and projection paths (SqliteIndexStore, MetadataProjection, FtsQuery) with the real HVSC database supplying creators and STIL commentary. Every count here was produced by a live run over that collection, not estimated. The counts belong to this collection and this HVSC export, so a machine holding a different card is skipped rather than failed. See SEARCH-ORACLE.md.",
+  "collection": {
+    "deviceId": "L5ZMCNBR",
+    "storageType": "SD",
+    "fileCount": 64658,
+    "metadataSource": "SIDlist_82_UTF8.csv"
+  },
+  "cases": [
+    {
+      "term": "Mroczkowski",
+      "intent": "creator name that lives only in projected metadata (content_search.creator): the composer's real name, while every path uses his handle",
+      "expectedPaths": ["/music/MUSICIANS/S/Surgeon/0005.sid", "/music/MUSICIANS/S/Surgeon/Amelia.sid"],
+      "mustNotMatch": ["/music/MUSICIANS/H/Hubbard_Rob/Commando.sid"],
+      "minResults": 239,
+      "maxResults": 239
+    },
+    {
+      "term": "Abyssonaut",
+      "intent": "word drawn from a filename, matched via the file_search name column, across two file types",
+      "expectedPaths": ["/games/Abyssonaut (Anthony Stiller - 2015).crt", "/music/MUSICIANS/B/Bayliss_Richard/Abyssonaut_v2.sid"],
+      "mustNotMatch": ["/music/MUSICIANS/S/Surgeon/0005.sid"],
+      "minResults": 2,
+      "maxResults": 2
+    },
+    {
+      "term": "MultiLoad64",
+      "intent": "word from a directory segment that appears in no filename at all — every hit is the file_search path column",
+      "expectedPaths": ["/games/MultiLoad64/Assault Machine.crt"],
+      "mustNotMatch": ["/games/10th Frame.crt"],
+      "minResults": 149,
+      "maxResults": 149
+    },
+    {
+      "term": "Korg",
+      "intent": "word from genuine per-file STIL commentary, present in no filename, path, or creator",
+      "expectedPaths": ["/music/MUSICIANS/J/JCH/Little_Test.sid", "/music/MUSICIANS/J/JCH/Shift.sid"],
+      "mustNotMatch": ["/music/MUSICIANS/S/Surgeon/0005.sid"],
+      "minResults": 2,
+      "maxResults": 2
+    },
+    {
+      "term": "Hubbard Commando",
+      "intent": "multi-word term whose parts live in different columns: 'Hubbard' in content_search (creator or commentary), 'Commando' in file_search (name or path). Both tokens must match the same row for FTS5's implicit AND to succeed",
+      "expectedPaths": ["/music/MUSICIANS/H/Hubbard_Rob/Commando.sid", "/music/MUSICIANS/G/Galway_Martin/Commando_High-Score.sid"],
+      "mustNotMatch": ["/music/MUSICIANS/S/Surgeon/0005.sid"],
+      "minResults": 45,
+      "maxResults": 45
+    },
+    {
+      "term": "demoscene",
+      "intent": "word from the generated type-description boilerplate (SongItem's SID fallback). The case that proves the change: today's predicate reads Description off every live entity and matches 41,285 of this collection's files, while the new store never indexes that fallback and answers with the 9 whose commentary genuinely says 'demoscene'. See SEARCH-ORACLE.md for the run that measured both",
+      "expectedPaths": [
+        "/music/MUSICIANS/N/NecroPolo/Borxx.sid",
+        "/music/MUSICIANS/N/NecroPolo/Chaos_Theory.sid",
+        "/music/MUSICIANS/J/Jammer/Krak_Zak.sid",
+        "/music/MUSICIANS/N/NecroPolo/Laser_Squad_Tribute.sid",
+        "/music/MUSICIANS/N/NecroPolo/Lying_Rosie_Flying_Horsie.sid",
+        "/music/MUSICIANS/J/Jammer/Scenial.sid",
+        "/music/MUSICIANS/C/Crowley_Owen/Seeing_Is_Believing.sid",
+        "/music/MUSICIANS/J/Julian_Jaymz/Sonic_Dreams.sid",
+        "/music/MUSICIANS/W/Wacek/Tekk_It.sid"
+      ],
+      "mustNotMatch": ["/music/MUSICIANS/S/Surgeon/0005.sid", "/games/10th Frame.crt"],
+      "minResults": 9,
+      "maxResults": 9
+    },
+    {
+      "term": "10th Frame",
+      "intent": "term whose only two copies are a file and its favourite: the favourites tree is excluded from every scoped read, so the original is returned and the copy is not",
+      "expectedPaths": ["/games/10th Frame.crt"],
+      "mustNotMatch": ["/favorites/games/10th Frame.crt"],
+      "minResults": 1,
+      "maxResults": 1
+    },
+    {
+      "term": "Blorpazoid",
+      "intent": "term matching nothing in the collection",
+      "expectedPaths": [],
+      "mustNotMatch": [],
+      "minResults": 0,
+      "maxResults": 0
+    },
+    {
+      "term": "Hubbard-\"*",
+      "intent": "term containing full-text operator characters (\", -, *) that must be handled rather than throw. FtsQuery quotes the whole token, so FTS5 reads it as a phrase; the unicode61 tokenizer drops the punctuation from that phrase, leaving a prefix match on 'hubbard' — the same 492 results the bare term returns",
+      "expectedPaths": ["/music/MUSICIANS/H/Hubbard_Rob/Commando.sid"],
+      "mustNotMatch": [],
+      "minResults": 492,
+      "maxResults": 492
+    }
+  ]
+}
