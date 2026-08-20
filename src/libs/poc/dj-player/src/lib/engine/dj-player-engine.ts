@@ -1,6 +1,10 @@
 import { inject, Injectable, InjectionToken, OnDestroy, signal } from '@angular/core';
 import { logError, logInfo, LogType, logWarn } from '@teensyrom-nx/utils';
-import { NTSC_FRAME_INTERVAL_US, PAL_FRAME_INTERVAL_US } from '../asid/asid-constants';
+import {
+  NTSC_FRAME_INTERVAL_US,
+  PAL_FRAME_INTERVAL_US,
+  VOICE_CONTROL_REGISTERS,
+} from '../asid/asid-constants';
 import {
   buildFramerateRecipePacket,
   buildSidDataPacket,
@@ -62,9 +66,6 @@ export const MAX_SPEED_MULTIPLIER = 1.2;
  */
 export const RECIPE_RESEND_DEBOUNCE_MS = 500;
 
-/** `$D404`, `$D40B`, `$D412` — the per-voice control registers whose bit 0 is the gate. */
-const VOICE_CONTROL_REGISTERS: readonly number[] = [4, 11, 18];
-
 /**
  * Frames between `stats` publishes. A signal write per frame would run Angular change detection at
  * the frame rate, which is jitter this experiment cannot afford.
@@ -109,6 +110,7 @@ export class DjPlayerEngine implements OnDestroy {
   readonly scheduleAheadMs = signal<number>(0);
   readonly lastError = signal<string | null>(null);
   readonly stats = signal<EngineStats>(EMPTY_STATS);
+  readonly mutedVoices = signal<readonly boolean[]>([false, false, false]);
 
   private file: SidFile | null = null;
   private machine: C64Machine | null = null;
@@ -130,6 +132,7 @@ export class DjPlayerEngine implements OnDestroy {
 
     this.file = file;
     this.frame = new RegisterFrame();
+    this.mutedVoices.set([false, false, false]);
     this.machine = new C64Machine(file, this.frame);
     this.subtuneCount.set(Math.max(1, file.songs));
     this.nominalIntervalUs.set(
@@ -249,6 +252,16 @@ export class DjPlayerEngine implements OnDestroy {
 
   previousSubtune(): void {
     this.selectSubtune(this.currentSubtune() - 1);
+  }
+
+  /**
+   * Voice 0/1/2. Replicates the firmware's own hardware-mute technique: forces that voice's control
+   * register to 0 once, then drops every further write the tune's code makes to it until unmuted.
+   */
+  setVoiceMuted(voice: number, muted: boolean): void {
+    if (voice < 0 || voice > 2) return;
+    this.mutedVoices.update((voices) => voices.map((v, i) => (i === voice ? muted : v)));
+    this.frame?.setVoiceMuted(voice, muted);
   }
 
   /** Clamped to 0.8–1.2. A divisor on the clock and nothing else, which is why it is nearly free. */

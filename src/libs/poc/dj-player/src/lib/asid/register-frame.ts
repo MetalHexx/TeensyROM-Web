@@ -1,5 +1,10 @@
 import type { SidWriteSink } from '../cpu/c64-machine';
-import { ASID_SLOT_COUNT, ASID_SLOT_TO_REGISTER, SID_REGISTER_COUNT } from './asid-constants';
+import {
+  ASID_SLOT_COUNT,
+  ASID_SLOT_TO_REGISTER,
+  SID_REGISTER_COUNT,
+  VOICE_CONTROL_REGISTERS,
+} from './asid-constants';
 
 /** The present/MSB mask bytes and present-slot values a SID data packet is built from. */
 export interface FrameSnapshot {
@@ -43,8 +48,27 @@ export class RegisterFrame implements SidWriteSink {
   private readonly values = new Uint8Array(ASID_SLOT_COUNT);
   private readonly writtenThisFrame = new Uint8Array(SID_REGISTER_COUNT);
   private suppressedWrites = 0;
+  private readonly mutedVoices = new Set<number>(); // voice index 0..2
+
+  /** Voice 0/1/2. Muting forces that voice's control register to 0 once, then drops every further
+   * write the tune's code makes to it until unmuted — every other register for that voice keeps
+   * updating live throughout, exactly matching `IOH_ASID.c`'s hardware-mute technique. */
+  setVoiceMuted(voice: number, muted: boolean): void {
+    if (muted === this.mutedVoices.has(voice)) return;
+    if (muted) {
+      this.mutedVoices.add(voice);
+      this.setSlot(PRIMARY_SLOT_FOR_REGISTER[VOICE_CONTROL_REGISTERS[voice]], 0);
+    } else {
+      this.mutedVoices.delete(voice);
+    }
+  }
 
   onSidWrite(register: number, value: number): void {
+    const voiceIndex = VOICE_CONTROL_REGISTERS.indexOf(register);
+    if (voiceIndex !== -1 && this.mutedVoices.has(voiceIndex)) {
+      return; // muted — matches the firmware's discard-register redirect
+    }
+
     const primarySlot = PRIMARY_SLOT_FOR_REGISTER[register];
 
     if (!this.writtenThisFrame[register]) {

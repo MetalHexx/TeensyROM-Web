@@ -274,6 +274,16 @@ describe('DjPlayerEngine', () => {
     expect(engine.currentSubtune()).toBe(2);
   });
 
+  it('resets mutedVoices to all-unmuted when a new tune loads', () => {
+    engine.loadTune(silentTune());
+    engine.setVoiceMuted(1, true);
+    expect(engine.mutedVoices()).toEqual([false, true, false]);
+
+    engine.loadTune(silentTune());
+
+    expect(engine.mutedVoices()).toEqual([false, false, false]);
+  });
+
   it('gates the voices off on pause and restores the chip on resume', async () => {
     engine.loadTune(silentTune());
     await engine.play();

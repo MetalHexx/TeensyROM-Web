@@ -137,6 +137,79 @@ describe('RegisterFrame', () => {
     // register 24 -> slot 21 -> the 22nd present slot in ascending order
     expect(snapshot.values[21]).toBe(0x42);
   });
+
+  describe('voice mute', () => {
+    it('forces the control register to 0 in the very next snapshot on mute-engage', () => {
+      const frame = new RegisterFrame();
+
+      frame.setVoiceMuted(1, true);
+      const snapshot = frame.takeSnapshot();
+
+      // voice 1's control register is $D40B (register 11) -> primary slot 23 -> byte 3, bit 2
+      expect(snapshot.values).toEqual([0]);
+      expect(snapshot.presentMask[3] & 0b100).toBe(0b100);
+    });
+
+    it('suppresses further writes to a muted voice control register but not its secondary slot sibling registers', () => {
+      const frame = new RegisterFrame();
+
+      frame.setVoiceMuted(1, true);
+      frame.takeSnapshot();
+
+      frame.onSidWrite(11, 0x41); // muted control register — dropped
+      frame.onSidWrite(9, 0x77); // voice 1's pulse-width-lo register — unaffected
+      const snapshot = frame.takeSnapshot();
+
+      expect(snapshot.values).toEqual([0x77]);
+    });
+
+    it('lets a subsequent write through unmodified after unmuting', () => {
+      const frame = new RegisterFrame();
+
+      frame.setVoiceMuted(1, true);
+      frame.takeSnapshot();
+      frame.setVoiceMuted(1, false);
+
+      frame.onSidWrite(11, 0x41);
+      const snapshot = frame.takeSnapshot();
+
+      expect(snapshot.values).toEqual([0x41]);
+    });
+
+    it('unmuting forces no extra write of its own', () => {
+      const frame = new RegisterFrame();
+
+      frame.setVoiceMuted(1, true);
+      frame.takeSnapshot();
+      frame.setVoiceMuted(1, false);
+
+      const snapshot = frame.takeSnapshot();
+
+      expect(snapshot.values).toEqual([]);
+    });
+
+    it('muting an already-muted voice is a no-op', () => {
+      const frame = new RegisterFrame();
+
+      frame.setVoiceMuted(1, true);
+      frame.takeSnapshot();
+      frame.setVoiceMuted(1, true);
+
+      const snapshot = frame.takeSnapshot();
+
+      expect(snapshot.values).toEqual([]);
+    });
+
+    it('unmuting an already-unmuted voice is a no-op', () => {
+      const frame = new RegisterFrame();
+
+      frame.setVoiceMuted(1, false);
+
+      const snapshot = frame.takeSnapshot();
+
+      expect(snapshot.values).toEqual([]);
+    });
+  });
 });
 
 function popcount(byte: number): number {
