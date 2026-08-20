@@ -56,6 +56,11 @@ export const NOMINAL_INTERVAL_OPTIONS_US: readonly number[] = [PAL_FRAME_INTERVA
 export const MIN_SPEED_MULTIPLIER = 0.8;
 export const MAX_SPEED_MULTIPLIER = 1.2;
 
+const MICROSECONDS_PER_SECOND = 1_000_000;
+/** The assumed length loop/scrub percentages are measured against — not the tune's real,
+ * unmeasured length. A single tunable constant, not derived from anything about the file. */
+export const JUMP_CEILING_SECONDS = 300;
+
 /**
  * How long a speed change settles before `clock-and-recipe` mode resends the recipe.
  *
@@ -111,6 +116,10 @@ export class DjPlayerEngine implements OnDestroy {
   readonly lastError = signal<string | null>(null);
   readonly stats = signal<EngineStats>(EMPTY_STATS);
   readonly mutedVoices = signal<readonly boolean[]>([false, false, false]);
+  readonly cueFrames = signal<readonly (number | null)[]>([null, null, null, null]);
+  readonly loopInPercent = signal<number>(0);
+  readonly loopOutPercent = signal<number>(100);
+  readonly loopEnabled = signal<boolean>(false);
 
   private file: SidFile | null = null;
   private machine: C64Machine | null = null;
@@ -317,6 +326,37 @@ export class DjPlayerEngine implements OnDestroy {
     this.scheduleAheadMs.set(ms);
   }
 
+  /** Captures the current position (in frames) into one of four cue slots. */
+  addCue(slot: number): void {
+    if (slot < 0 || slot > 3 || this.machine === null) return;
+    this.cueFrames.update((cues) => cues.map((c, i) => (i === slot ? this.framesRendered : c)));
+  }
+
+  /** Jumps to a previously captured cue slot; a no-op for an empty slot. */
+  hopToCue(slot: number): void {
+    const target = this.cueFrames()[slot] ?? null;
+    if (target !== null) this.jumpToFrame(target);
+  }
+
+  /** Sets the loop's in/out points as percentages of `ceilingFrames()`, ordered low-to-high. */
+  setLoopRange(inPercent: number, outPercent: number): void {
+    const clampedIn = clamp(inPercent, 0, 100);
+    const clampedOut = clamp(outPercent, 0, 100);
+    this.loopInPercent.set(Math.min(clampedIn, clampedOut));
+    this.loopOutPercent.set(Math.max(clampedIn, clampedOut));
+  }
+
+  /** Arms or disarms looping; re-entry is checked in `onTick`. */
+  setLoopEnabled(enabled: boolean): void {
+    this.loopEnabled.set(enabled);
+  }
+
+  /** Jumps to `percent` of `ceilingFrames()`. */
+  scrubTo(percent: number): void {
+    if (this.machine === null) return;
+    this.jumpToFrame(this.frameForPercent(percent));
+  }
+
   /**
    * One emulated frame, one packet — including frames where nothing changed. A skipped packet loses
    * a frame on the cartridge's queue and the timing drifts.
@@ -349,6 +389,10 @@ export class DjPlayerEngine implements OnDestroy {
 
     this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()));
     this.framesRendered++;
+    if (this.loopEnabled() && this.framesRendered >= this.frameForPercent(this.loopOutPercent())) {
+      this.jumpToFrame(this.frameForPercent(this.loopInPercent()));
+      return; // jumpToFrame already sent this tick's packet (the resync); don't publish stats twice
+    }
     if (++this.framesSincePublish >= STATS_PUBLISH_FRAME_INTERVAL) {
       this.publishStats();
     }
@@ -388,9 +432,85 @@ export class DjPlayerEngine implements OnDestroy {
     }
 
     frame.markAllDirty();
+    this.framesRendered = 0;
+    this.cueFrames.set([null, null, null, null]);
+    this.loopEnabled.set(false);
     this.currentSubtune.set(clamped);
     this.lastError.set(null);
     return true;
+  }
+
+  /** Ignores multispeed deliberately: for a callsPerFrame > 1 tune the ceiling represents a shorter
+   * real-world duration than JUMP_CEILING_SECONDS, since more play-calls land in the same frame
+   * count. Acceptable simplification for this iteration — most of the tune list is callsPerFrame 1. */
+  private ceilingFrames(): number {
+    return Math.round((JUMP_CEILING_SECONDS * MICROSECONDS_PER_SECOND) / this.nominalIntervalUs());
+  }
+  // Known, accepted coupling: this reads the same nominalIntervalUs signal the existing Timing panel
+  // lets a tester change mid-session (50.125 / 19975 / 20000 µs). Changing it after a loop or cue is
+  // set shifts the resolved frame count by well under 1% — negligible, and cheaper to accept than to
+  // snapshot the interval at tune-load time for a session-only spike control.
+
+  private frameForPercent(percent: number): number {
+    const clamped = clamp(percent, 0, 100);
+    return Math.round((clamped / 100) * this.ceilingFrames());
+  }
+
+  /**
+   * The shared silent-replay primitive: rebuilds the tune from a clean `init` on a throwaway
+   * machine/frame pair, runs it forward frame-by-frame with output discarded, then emits the
+   * accumulated state as one resync packet and adopts the replayed pair as live.
+   *
+   * A fresh `C64Machine` + `RegisterFrame` pair, never the live one — reusing the live pair would let
+   * RAM state from wherever playback currently is bleed into the replay.
+   */
+  private jumpToFrame(targetFrame: number): void {
+    const file = this.file;
+    if (file === null || this.machine === null || this.frame === null) return;
+    const clampedTarget = Math.max(0, Math.round(targetFrame));
+
+    const replayFrame = new RegisterFrame();
+    this.mutedVoices().forEach((muted, voice) => replayFrame.setVoiceMuted(voice, muted));
+    const replayMachine = new C64Machine(file, replayFrame);
+
+    try {
+      replayMachine.initSubtune(this.currentSubtune());
+    } catch (error) {
+      this.fail(`jump to frame ${clampedTarget} failed during init — ${describeError(error)}`);
+      return;
+    }
+
+    for (let i = 0; i < clampedTarget; i++) {
+      let result: FrameResult;
+      try {
+        result = replayMachine.runFrame();
+      } catch (error) {
+        this.fail(`jump to frame ${clampedTarget} failed during replay — ${describeError(error)}`);
+        return;
+      }
+      if (!result.completed) {
+        this.fail(`jump to frame ${clampedTarget} exceeded its cycle budget during replay`);
+        return;
+      }
+      replayFrame.takeSnapshot(); // discarded — resets per-frame duplicate-write tracking only;
+                                  // the accumulated register values persist across the call regardless
+    }
+
+    replayFrame.markAllDirty();
+    const snapshot = replayFrame.takeSnapshot();
+
+    this.machine = replayMachine;
+    this.frame = replayFrame;
+    this.framesRendered = clampedTarget;
+    // A jump landing while paused must stay silent: `pause()` already zeroed the three voice control
+    // registers on the real chip, and this snapshot is a *full* re-emit computed from the replay — if
+    // sent verbatim it could re-open a gate and produce sound while the UI still reads "Paused". Force
+    // the same three registers to 0 in the outgoing packet only; the internal `replayFrame` keeps its
+    // true computed values, so `play()`'s existing paused-resume branch (`frame.markAllDirty()`)
+    // restores the real state correctly whenever Play is next pressed.
+    const outgoing = this.state() === 'paused' ? withVoiceGatesOff(snapshot) : snapshot;
+    this.sendFramePacket(buildSidDataPacket(outgoing));
+    this.publishStats();
   }
 
   private applyIntervalChange(): void {
@@ -513,6 +633,17 @@ function buildVoiceGateOffSnapshot(): FrameSnapshot {
     scratch.onSidWrite(register, 0);
   }
   return scratch.takeSnapshot();
+}
+
+/** After `markAllDirty()` + `takeSnapshot()`, slots 0-24 are present in ascending order with no
+ * gaps, so `values` has exactly one entry per slot — indices 22/23/24 are the three voice control
+ * registers. Returns a copy with those three forced to 0; used only when a jump lands while paused. */
+function withVoiceGatesOff(snapshot: FrameSnapshot): FrameSnapshot {
+  const values = [...snapshot.values];
+  values[22] = 0;
+  values[23] = 0;
+  values[24] = 0;
+  return { ...snapshot, values };
 }
 
 function clamp(value: number, min: number, max: number): number {
