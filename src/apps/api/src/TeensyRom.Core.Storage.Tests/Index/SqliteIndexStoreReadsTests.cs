@@ -380,6 +380,76 @@ namespace TeensyRom.Core.Storage.Tests.Index
             seen.Should().BeEquivalentTo(paths, "every candidate must be reachable, not just a non-constant subset of them");
         }
 
+        [Fact]
+        public async Task GetRandomFileAsync_Storage_RejectionSampling_IsNotSkewedByIdGaps()
+        {
+            // Rejection sampling's whole point over a seek-to-nearest-match approach is that a rejected draw
+            // is discarded, not attributed to whichever surviving row it happened to land near - so deleting
+            // rows to leave gaps in the id range (exactly what a seek-forward approach would be biased by)
+            // must not skew which of the survivors gets drawn more often.
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+
+            var kept = new[] { "/music/a.sid", "/music/b.sid", "/music/c.sid" };
+            var deleted = new[] { "/music/gap1.sid", "/music/gap2.sid", "/music/gap3.sid", "/music/gap4.sid" };
+
+            // Interleave so the gaps sit between kept ids, not after all of them.
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile(kept[0]), Ct);
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile(deleted[0]), Ct);
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile(deleted[1]), Ct);
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile(kept[1]), Ct);
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile(deleted[2]), Ct);
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile(deleted[3]), Ct);
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile(kept[2]), Ct);
+
+            foreach (var path in deleted)
+            {
+                await fixture.Store.DeleteFileAsync(fixture.Scope, new FilePath(path), Ct);
+            }
+
+            var counts = kept.ToDictionary(path => path, _ => 0);
+            const int draws = 900;
+
+            for (var draw = 0; draw < draws; draw++)
+            {
+                var file = await fixture.Store.GetRandomFileAsync(
+                    fixture.Scope, StorageScope.Storage, new DirectoryPath("/"), [], [], Ct);
+
+                file.Should().NotBeNull();
+                counts[file!.Path.Value]++;
+            }
+
+            // Perfectly even would be 300 each; a seek-forward approach would pile draws onto "c.sid" (it
+            // follows the two-gap run) far past what chance alone explains. A generous tolerance keeps this
+            // from being a flaky test while still catching that kind of skew.
+            foreach (var count in counts.Values)
+            {
+                count.Should().BeInRange(200, 400, "rejection sampling must not favour a candidate just because it follows a bigger gap in the id range");
+            }
+        }
+
+        [Fact]
+        public async Task GetRandomFileAsync_Storage_FallsBackToRandomPick_WhenRejectionSamplingCannotFindARareMatch()
+        {
+            // A narrow type filter against a wide id range is exactly the low-density case rejection sampling
+            // is expected to exhaust its attempts on (measured on the real card: a single rare type there
+            // needed ~64,000 expected attempts) - the result still has to be correct via the RandomPick
+            // fallback, not merely "eventually terminates".
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+
+            for (int i = 0; i < 60; i++)
+            {
+                await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/games/game{i}.prg"), Ct);
+            }
+
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/onlyone.sid"), Ct);
+
+            var file = await fixture.Store.GetRandomFileAsync(
+                fixture.Scope, StorageScope.Storage, new DirectoryPath("/"), [], [TeensyFileType.Sid], Ct);
+
+            file.Should().NotBeNull();
+            file!.Path.Value.Should().Be("/music/onlyone.sid");
+        }
+
         // === FindParentFileAsync / FindSiblingsAsync ===
 
         [Fact]

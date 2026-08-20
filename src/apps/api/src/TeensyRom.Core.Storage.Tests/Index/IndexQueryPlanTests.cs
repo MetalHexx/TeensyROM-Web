@@ -54,19 +54,18 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
-        public async Task RandomCandidate_Storage_Plan_SeeksByPathRangeInsteadOfScanningTheFile()
+        public async Task RandomPick_Storage_Plan_SeeksByPathRangeInsteadOfScanningTheFile()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
 
             await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
 
-            var plan = fixture.QueryPlan(IndexSql.RandomCandidate(StorageScope.Storage, 1, 0), bind =>
+            var plan = fixture.QueryPlan(IndexSql.RandomPick(StorageScope.Storage, 1, 0), bind =>
             {
                 bind.Parameters.AddWithValue("$storage", storageId);
                 bind.Parameters.AddWithValue("$scopePrefix", IndexPathPatterns.PrefixPattern("/"));
                 bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
-                bind.Parameters.AddWithValue("$offset", 0L);
             });
 
             plan.Should().NotBeEmpty();
@@ -77,19 +76,18 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
-        public async Task RandomCandidate_DirDeep_Plan_SeeksByPathRangeInsteadOfScanningTheFile()
+        public async Task RandomPick_DirDeep_Plan_SeeksByPathRangeInsteadOfScanningTheFile()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
 
             await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
 
-            var plan = fixture.QueryPlan(IndexSql.RandomCandidate(StorageScope.DirDeep, 1, 0), bind =>
+            var plan = fixture.QueryPlan(IndexSql.RandomPick(StorageScope.DirDeep, 1, 0), bind =>
             {
                 bind.Parameters.AddWithValue("$storage", storageId);
                 bind.Parameters.AddWithValue("$scopePrefix", IndexPathPatterns.PrefixPattern("/music/"));
                 bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
-                bind.Parameters.AddWithValue("$offset", 0L);
             });
 
             plan.Should().NotBeEmpty();
@@ -97,7 +95,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
-        public async Task RandomCandidate_DirShallow_Plan_SeeksIxFileParent()
+        public async Task RandomPick_DirShallow_Plan_SeeksIxFileParent()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
@@ -115,12 +113,11 @@ namespace TeensyRom.Core.Storage.Tests.Index
                 await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/other{i}/file{i}.sid"), Ct);
             }
 
-            var plan = fixture.QueryPlan(IndexSql.RandomCandidate(StorageScope.DirShallow, 1, 0), bind =>
+            var plan = fixture.QueryPlan(IndexSql.RandomPick(StorageScope.DirShallow, 1, 0), bind =>
             {
                 bind.Parameters.AddWithValue("$storage", storageId);
                 bind.Parameters.AddWithValue("$scopePath", "/music/");
                 bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
-                bind.Parameters.AddWithValue("$offset", 0L);
             });
 
             plan.Should().NotBeEmpty();
@@ -128,30 +125,52 @@ namespace TeensyRom.Core.Storage.Tests.Index
         }
 
         [Fact]
-        public async Task RandomCount_DirShallow_Plan_SeeksIxFileParent()
+        public async Task RandomBounds_Plan_UsesIxFileStorageIdNotIxFileType()
         {
             using var fixture = await IndexTestFixture.CreateReadyAsync();
             var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
 
-            // RandomCount and RandomCandidate share one predicate so they never see different candidate
-            // sets; pinning only the offset query would leave the count still driving off ix_file_type,
-            // costing every file of the requested type storage-wide on every draw.
             await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
 
-            for (int i = 0; i < 1000; i++)
-            {
-                await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile($"/other{i}/file{i}.sid"), Ct);
-            }
-
-            var plan = fixture.QueryPlan(IndexSql.RandomCount(StorageScope.DirShallow, 1, 0), bind =>
+            var plan = fixture.QueryPlan(IndexSql.RandomBounds, bind =>
             {
                 bind.Parameters.AddWithValue("$storage", storageId);
-                bind.Parameters.AddWithValue("$scopePath", "/music/");
+            });
+
+            plan.Should().NotBeEmpty();
+            // EXPLAIN QUERY PLAN's text cannot distinguish SQLite's min/max seek-to-edge optimization from a
+            // full range scan restricted by storage_id - both render as "SEARCH ... USING COVERING INDEX ...
+            // (storage_id=?)" regardless of which index is chosen (confirmed by timing, not by this line: an
+            // ix_file_storage_id MIN(id) landed within noise of a raw primary-key point lookup at 40,000 rows,
+            // while the same query without it took ~120x longer). What this line can catch is a regression to
+            // the wrong index entirely - ix_file_type would satisfy storage_id=? too, but orders by file_type
+            // first, which does not carry the min/max optimization for id.
+            plan.Should().Contain(line => line.Contains("ix_file_storage_id"));
+            plan.Should().NotContain(line => line.Contains("ix_file_type"));
+        }
+
+        [Fact]
+        public async Task RandomReject_Plan_IsAPrimaryKeyPointLookup()
+        {
+            using var fixture = await IndexTestFixture.CreateReadyAsync();
+            var storageId = await fixture.Store.EnsureStorageAsync(fixture.Scope, Ct);
+
+            await fixture.Store.UpsertFileAsync(fixture.Scope, IndexTestFixture.CreateFile("/music/monty.sid"), Ct);
+            var fileId = fixture.Scalar("SELECT id FROM file WHERE storage_id = $storage AND path = '/music/monty.sid';", ("$storage", storageId));
+
+            var plan = fixture.QueryPlan(IndexSql.RandomReject(StorageScope.Storage, 1, 0), bind =>
+            {
+                bind.Parameters.AddWithValue("$id", fileId!);
+                bind.Parameters.AddWithValue("$storage", storageId);
+                bind.Parameters.AddWithValue("$scopePrefix", IndexPathPatterns.PrefixPattern("/"));
                 bind.Parameters.AddWithValue("$type0", (long)TeensyFileType.Sid);
             });
 
             plan.Should().NotBeEmpty();
-            plan.Should().Contain(line => line.Contains("ix_file_parent"));
+            // A rejected draw must cost a point lookup regardless of collection size - the whole basis for
+            // preferring this over touching every candidate row - so this has to be a rowid seek, not a scan
+            // or a range search bounded only by storage_id.
+            plan.Should().Contain(line => line.Contains("INTEGER PRIMARY KEY") && line.Contains("rowid=?"));
         }
 
         [Fact]

@@ -256,13 +256,21 @@ public static class Program
                 command.Parameters.AddWithValue("$type0", (int)TeensyFileType.Sid);
             }
 
-            Capture($"RandomCount ({storageScope})", IndexSql.RandomCount(storageScope, 1, 0), BindCandidateParameters);
+            Capture($"RandomPick ({storageScope})", IndexSql.RandomPick(storageScope, 1, 0), BindCandidateParameters);
 
-            Capture($"RandomCandidate ({storageScope})", IndexSql.RandomCandidate(storageScope, 1, 0), command =>
+            if (storageScope == StorageScope.Storage)
             {
-                BindCandidateParameters(command);
-                command.Parameters.AddWithValue("$offset", 0);
-            });
+                Capture("RandomBounds", IndexSql.RandomBounds, command =>
+                {
+                    command.Parameters.AddWithValue("$storage", storageId);
+                });
+
+                Capture("RandomReject (Storage)", IndexSql.RandomReject(storageScope, 1, 0), command =>
+                {
+                    command.Parameters.AddWithValue("$id", sample.Id);
+                    BindCandidateParameters(command);
+                });
+            }
         }
 
         Capture("FileById", IndexSql.FileById, command =>

@@ -41,12 +41,20 @@ namespace TeensyRom.Core.Storage.Index
               is_favorite   INTEGER NOT NULL DEFAULT 0,
               is_compatible INTEGER NOT NULL DEFAULT 1,
               UNIQUE (storage_id, path));
-            CREATE INDEX IF NOT EXISTS ix_file_parent    ON file (storage_id, parent_path);
-            CREATE INDEX IF NOT EXISTS ix_file_identity  ON file (storage_id, content_id);
-            CREATE INDEX IF NOT EXISTS ix_file_type      ON file (storage_id, file_type);
+            CREATE INDEX IF NOT EXISTS ix_file_parent     ON file (storage_id, parent_path);
+            CREATE INDEX IF NOT EXISTS ix_file_identity   ON file (storage_id, content_id);
+            CREATE INDEX IF NOT EXISTS ix_file_type       ON file (storage_id, file_type);
             -- Not a query index: directory's upsert is a foreign-key parent update, and without this SQLite
             -- must scan every file row to check for children referencing the directory being written.
-            CREATE INDEX IF NOT EXISTS ix_file_directory ON file (directory_id);
+            CREATE INDEX IF NOT EXISTS ix_file_directory  ON file (directory_id);
+            -- Lets MIN(id)/MAX(id) WHERE storage_id=? resolve as an O(log n) seek to the first/last matching
+            -- entry rather than a scan of every one of the storage's rows: none of the other composite
+            -- indexes above are ordered by id after storage_id (ix_file_type sorts by file_type next, for
+            -- example), so without this SQLite's min/max seek optimization has no compatible index to use and
+            -- falls back to reading every row for that storage_id even though EXPLAIN QUERY PLAN's text looks
+            -- identical either way ("SEARCH ... USING COVERING INDEX ... (storage_id=?)") — confirmed by
+            -- timing, not by the plan text, which cannot tell the two apart here.
+            CREATE INDEX IF NOT EXISTS ix_file_storage_id ON file (storage_id, id);
             -- Superseded by ix_file_identity; dropped here so an index.db predating that composite index
             -- loses the single-column one on the next start rather than carrying both forever.
             DROP INDEX IF EXISTS ix_file_content;

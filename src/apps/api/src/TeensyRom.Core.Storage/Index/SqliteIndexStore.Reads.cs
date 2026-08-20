@@ -112,6 +112,15 @@ namespace TeensyRom.Core.Storage.Index
             return await ReadLaunchableFilesAsync(command, ct);
         }
 
+        // Rejection sampling only pays off when a randomly drawn id has a good chance of already satisfying
+        // the predicate — see the "Random by scope" reasons in STORAGE-BENCHMARK-RESULTS.md for the measured
+        // densities this held at (~99% for the common Storage-scope draw: essentially always the first try)
+        // and collapsed at (a single rare file-type filter measured ~64,000 expected attempts; a real narrow
+        // DirDeep subtree measured ~430). 32 attempts costs roughly 32 primary-key point lookups if it fails —
+        // negligible next to RandomPick's cost for the scope this applies to — while covering everything down
+        // to roughly 3% density before falling back.
+        private const int Random_Reject_Max_Attempts = 32;
+
         public async Task<LaunchableItem?> GetRandomFileAsync(IndexScope scope, StorageScope storageScope, DirectoryPath scopePath,
             IReadOnlyCollection<DirectoryPath> excludePaths, TeensyFileType[] fileTypes, CancellationToken ct)
         {
@@ -154,14 +163,58 @@ namespace TeensyRom.Core.Storage.Index
                 BindExcludeParameters(command, excludePaths, excludeParameterNames);
             }
 
-            // Three statements sharing one predicate replace a single "ORDER BY RANDOM() LIMIT 1": a count,
-            // a C#-side offset into it, and a primary-key seek for the row that offset lands on. All three
-            // run inside one deferred read transaction so they share a single snapshot — under WAL that costs
-            // the writer nothing, and it closes the two race windows three statements opened where one
-            // didn't: a delete between the count and the offset seek, and a delete between the offset seek
-            // and the final fetch. A raw "BEGIN DEFERRED" is used instead of the ADO.NET transaction wrapper
-            // because its default isolation level begins immediate, which would take a write-intent lock this
-            // read has no business holding.
+            // Draws a uniform random id from the storage's id range and tests whether it happens to satisfy
+            // the scope's predicate, up to Random_Reject_Max_Attempts times. A rejected draw is simply
+            // discarded, not attributed to a neighbouring row, so every matching row keeps exactly equal odds
+            // regardless of how the matches are distributed across the id range.
+            async Task<long?> TryRejectionSampleAsync()
+            {
+                long lo, hi;
+
+                await using (var boundsCommand = connection.CreateCommand())
+                {
+                    boundsCommand.CommandText = IndexSql.RandomBounds;
+                    boundsCommand.Parameters.AddWithValue("$storage", storageId.Value);
+
+                    await using var reader = await boundsCommand.ExecuteReaderAsync(ct);
+
+                    if (!await reader.ReadAsync(ct) || reader.IsDBNull(0))
+                    {
+                        return null;
+                    }
+
+                    lo = reader.GetInt64(0);
+                    await reader.ReadAsync(ct);
+                    hi = reader.GetInt64(0);
+                }
+
+                var rejectSql = IndexSql.RandomReject(storageScope, types.Length, excludePaths.Count);
+
+                for (var attempt = 0; attempt < Random_Reject_Max_Attempts; attempt++)
+                {
+                    var candidateId = lo == hi ? lo : Random.Shared.NextInt64(lo, hi + 1);
+
+                    await using var rejectCommand = connection.CreateCommand();
+                    rejectCommand.CommandText = rejectSql;
+                    rejectCommand.Parameters.AddWithValue("$id", candidateId);
+                    BindCandidateParameters(rejectCommand);
+
+                    var hit = await rejectCommand.ExecuteScalarAsync(ct);
+
+                    if (hit is not null and not DBNull)
+                    {
+                        return candidateId;
+                    }
+                }
+
+                return null;
+            }
+
+            // Every statement here runs inside one deferred read transaction so they share a single snapshot —
+            // under WAL that costs the writer nothing, and it closes the race window between choosing a
+            // candidate and the final fetch (a delete landing in between). A raw "BEGIN DEFERRED" is used
+            // instead of the ADO.NET transaction wrapper because its default isolation level begins immediate,
+            // which would take a write-intent lock this read has no business holding.
             await using (var beginCommand = connection.CreateCommand())
             {
                 beginCommand.CommandText = "BEGIN DEFERRED;";
@@ -170,28 +223,27 @@ namespace TeensyRom.Core.Storage.Index
 
             try
             {
-                await using var countCommand = connection.CreateCommand();
-                countCommand.CommandText = IndexSql.RandomCount(storageScope, types.Length, excludePaths.Count);
-                BindCandidateParameters(countCommand);
+                // Storage scope's candidate set is, in practice, most of the storage — rejection sampling by
+                // primary key stays exactly uniform (a rejected draw is simply discarded, not attributed to a
+                // neighbouring row) and costs a handful of point lookups instead of touching every candidate
+                // row. DirDeep and DirShallow scope down to a subtree or a single directory, where the
+                // candidate set is typically a small fraction of the storage's id range — rejection sampling
+                // would mostly exhaust its attempts and fall through anyway, so they go straight to RandomPick.
+                var id = storageScope == StorageScope.Storage
+                    ? await TryRejectionSampleAsync()
+                    : null;
 
-                var count = Convert.ToInt32(await countCommand.ExecuteScalarAsync(ct));
-
-                if (count == 0)
+                if (id is null)
                 {
-                    await CommitAsync(connection, ct);
-                    return null;
+                    await using var pickCommand = connection.CreateCommand();
+                    pickCommand.CommandText = IndexSql.RandomPick(storageScope, types.Length, excludePaths.Count);
+                    BindCandidateParameters(pickCommand);
+
+                    var picked = await pickCommand.ExecuteScalarAsync(ct);
+                    id = picked is null or DBNull ? null : Convert.ToInt64(picked);
                 }
 
-                var offset = Random.Shared.Next(count);
-
-                await using var offsetCommand = connection.CreateCommand();
-                offsetCommand.CommandText = IndexSql.RandomCandidate(storageScope, types.Length, excludePaths.Count);
-                BindCandidateParameters(offsetCommand);
-                offsetCommand.Parameters.AddWithValue("$offset", offset);
-
-                var id = await offsetCommand.ExecuteScalarAsync(ct);
-
-                if (id is null or DBNull)
+                if (id is null)
                 {
                     await CommitAsync(connection, ct);
                     return null;
@@ -199,7 +251,7 @@ namespace TeensyRom.Core.Storage.Index
 
                 await using var fetchCommand = connection.CreateCommand();
                 fetchCommand.CommandText = IndexSql.FileById;
-                fetchCommand.Parameters.AddWithValue("$id", id);
+                fetchCommand.Parameters.AddWithValue("$id", id.Value);
                 AddStorageTypeParameter(fetchCommand, scope);
 
                 LaunchableItem? result;

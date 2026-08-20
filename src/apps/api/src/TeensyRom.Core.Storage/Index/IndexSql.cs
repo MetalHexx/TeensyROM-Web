@@ -248,9 +248,8 @@ namespace TeensyRom.Core.Storage.Index
         }
 
         /// <summary>
-        /// The predicate shared by <see cref="RandomCount"/> and <see cref="RandomCandidate"/>, restricted to
-        /// <paramref name="typeCount"/> file types and excluding <paramref name="excludeCount"/> path
-        /// patterns, written once so the count and the offset it bounds cannot see different candidate sets.
+        /// The predicate <see cref="RandomPick"/> selects against, restricted to <paramref name="typeCount"/>
+        /// file types and excluding <paramref name="excludeCount"/> path patterns.
         /// </summary>
         private static string RandomPredicate(StorageScope scope, int typeCount, int excludeCount)
         {
@@ -269,7 +268,7 @@ namespace TeensyRom.Core.Storage.Index
         }
 
         /// <summary>
-        /// The table clause <see cref="RandomCount"/> and <see cref="RandomCandidate"/> select from.
+        /// The table clause <see cref="RandomPick"/> selects from.
         /// <c>DirShallow</c>'s predicate narrows on <c>parent_path</c> equality — selective because it is
         /// scoped to one directory's immediate children, not because of anything <c>ANALYZE</c> statistics
         /// would reveal (production never runs <c>ANALYZE</c>; see <see cref="Search"/>'s own no-<c>ANALYZE</c>
@@ -284,23 +283,45 @@ namespace TeensyRom.Core.Storage.Index
             scope == StorageScope.DirShallow ? "file f INDEXED BY ix_file_parent" : "file f";
 
         /// <summary>
-        /// The size of the candidate set <see cref="RandomCandidate"/> draws its offset against. No metadata
-        /// join and no projection: the join contributes nothing to any predicate, so counting through it
-        /// would cost rows this statement never needs to touch.
+        /// Picks one candidate id from the scoped set in a single pass — no metadata join and no projection,
+        /// since the join contributes nothing to the predicate and would cost rows this statement never needs
+        /// to touch. Replaces a separate count-then-offset pair (two full passes over the same candidate set)
+        /// with one: SQLite still touches every qualifying row once to assign it a sort key, but a LIMIT 1
+        /// paired with ORDER BY lets it keep only the best key seen so far rather than materialising and
+        /// sorting the whole set, so this costs one pass, not two. An id, not a row, so the caller seeks the
+        /// one chosen file by primary key in <see cref="FileById"/> rather than projecting columns for every
+        /// row touched along the way.
         /// </summary>
-        public static string RandomCount(StorageScope scope, int typeCount, int excludeCount) =>
-            $"SELECT COUNT(*) FROM {RandomTable(scope)} WHERE {RandomPredicate(scope, typeCount, excludeCount)};";
-
-        /// <summary>
-        /// The id of the candidate sitting at <c>$offset</c> among the rows <see cref="RandomCount"/>
-        /// counted — an id, not a row, so the caller seeks the one chosen file by primary key in
-        /// <see cref="FileById"/> instead of materialising and sorting the whole candidate set to reach it.
-        /// </summary>
-        public static string RandomCandidate(StorageScope scope, int typeCount, int excludeCount) =>
-            $"SELECT f.id FROM {RandomTable(scope)} WHERE {RandomPredicate(scope, typeCount, excludeCount)} LIMIT 1 OFFSET $offset;";
+        public static string RandomPick(StorageScope scope, int typeCount, int excludeCount) =>
+            $"SELECT f.id FROM {RandomTable(scope)} WHERE {RandomPredicate(scope, typeCount, excludeCount)} ORDER BY random() LIMIT 1;";
 
         /// <summary>A single file, addressed by its primary key, for the fetch that follows a resolved random offset.</summary>
         public const string FileById = $"SELECT {FileColumns} FROM {MetadataJoin} WHERE f.id = $id;";
+
+        /// <summary>
+        /// The lowest and highest <c>file.id</c> a storage holds, as two rows from one round trip. Backs
+        /// <see cref="RandomReject"/>'s rejection sampling: a uniform draw from this id range, rejected and
+        /// redrawn until it lands on a row satisfying the scope's predicate, is exactly uniform over the
+        /// matching rows — unlike a seek-to-nearest-match approach, a rejected draw is discarded rather than
+        /// attributed to whichever row it happened to land near, so no row's odds depend on the width of the
+        /// gap before it. <c>ix_file_storage_id</c> is what makes this a seek rather than a scan: written as
+        /// two separate <c>MIN</c>/<c>MAX</c> aggregates unioned rather than one <c>SELECT MIN(id), MAX(id)</c>,
+        /// because SQLite's min/max seek optimization does not fire once two different aggregates share a
+        /// query, only when each is asked alone.
+        /// </summary>
+        public const string RandomBounds =
+            "SELECT MIN(id) FROM file WHERE storage_id = $storage UNION ALL SELECT MAX(id) FROM file WHERE storage_id = $storage;";
+
+        /// <summary>
+        /// Tests whether one specific id happens to satisfy a random draw's scope/type/exclude predicate — a
+        /// primary-key point lookup, not a scan, so a rejected draw costs the same regardless of how wide the
+        /// scope is. Only worth calling when the scope's candidate set is a large share of the storage's id
+        /// range (see the "Random by scope" reasons in STORAGE-BENCHMARK-RESULTS.md for the measured density
+        /// this holds and fails to hold at); the caller caps retries and falls back to <see cref="RandomPick"/>
+        /// when density is too low for this to be worth it.
+        /// </summary>
+        public static string RandomReject(StorageScope scope, int typeCount, int excludeCount) =>
+            $"SELECT 1 FROM file f WHERE f.id = $id AND {RandomPredicate(scope, typeCount, excludeCount)} LIMIT 1;";
 
         /// <summary>Builds <paramref name="count"/> sequential parameter names sharing <paramref name="prefix"/>.</summary>
         public static string[] BuildParameterNames(string prefix, int count) =>
