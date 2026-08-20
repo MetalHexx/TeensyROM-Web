@@ -191,6 +191,30 @@ Record observations as they happen during the session. Findings cannot be recons
 
 ---
 
+#### 12. Does muting a voice mid-playback click, pop, or leave the SID chip in a state un-muting doesn't cleanly restore?
+
+*Whether the hardware-mute technique is safe to expose as a live performance control.*
+
+**Observations:**
+
+---
+
+#### 13. Do cue points and the loop's in/out handles stay musically usable across a multi-minute session, or does frame-count drift make them feel imprecise?
+
+*Whether frame-indexed jump points are the right primitive for a DJ-style cueing tool.*
+
+**Observations:**
+
+---
+
+#### 14. Does scrubbing — a hard jump to an arbitrary frame — leave the chip coherent, or does it need an explicit reset/resync after the jump?
+
+*A second data point for the pause/resume state-snapshot question (D9), this time under a harder discontinuity.*
+
+**Observations:**
+
+---
+
 ### Transcription
 
-When the session is complete, transcribe the eleven findings into `ASID-DJ-ITERATIONS.md`'s decision log, superseding any entries in place where these findings overturn something.
+When the session is complete, transcribe the eleven findings, plus three from `0.1`, into `ASID-DJ-ITERATIONS.md`'s decision log, superseding any entries in place where these findings overturn something.

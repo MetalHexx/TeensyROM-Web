@@ -40,6 +40,11 @@ interface MockDjPlayerEngine {
   recipeEnabled: WritableSignal<boolean>;
   nominalIntervalUs: WritableSignal<number>;
   scheduleAheadMs: WritableSignal<number>;
+  mutedVoices: WritableSignal<readonly boolean[]>;
+  cueFrames: WritableSignal<readonly (number | null)[]>;
+  loopInPercent: WritableSignal<number>;
+  loopOutPercent: WritableSignal<number>;
+  loopEnabled: WritableSignal<boolean>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -51,6 +56,12 @@ interface MockDjPlayerEngine {
   setNominalIntervalUs: ReturnType<typeof vi.fn>;
   setScheduleAhead: ReturnType<typeof vi.fn>;
   loadTune: ReturnType<typeof vi.fn>;
+  setVoiceMuted: ReturnType<typeof vi.fn>;
+  addCue: ReturnType<typeof vi.fn>;
+  hopToCue: ReturnType<typeof vi.fn>;
+  setLoopRange: ReturnType<typeof vi.fn>;
+  setLoopEnabled: ReturnType<typeof vi.fn>;
+  scrubTo: ReturnType<typeof vi.fn>;
 }
 
 function makeMidiService(): MockMidiOutputService {
@@ -77,6 +88,11 @@ function makeEngine(): MockDjPlayerEngine {
     recipeEnabled: signal(true),
     nominalIntervalUs: signal(19950),
     scheduleAheadMs: signal(0),
+    mutedVoices: signal<readonly boolean[]>([false, false, false]),
+    cueFrames: signal<readonly (number | null)[]>([null, null, null, null]),
+    loopInPercent: signal(0),
+    loopOutPercent: signal(100),
+    loopEnabled: signal(false),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
@@ -88,7 +104,33 @@ function makeEngine(): MockDjPlayerEngine {
     setNominalIntervalUs: vi.fn(),
     setScheduleAhead: vi.fn(),
     loadTune: vi.fn(),
+    setVoiceMuted: vi.fn(),
+    addCue: vi.fn(),
+    hopToCue: vi.fn(),
+    setLoopRange: vi.fn(),
+    setLoopEnabled: vi.fn(),
+    scrubTo: vi.fn(),
   };
+}
+
+const PSID_HEADER_SIZE = 0x7c;
+
+/** A minimal well-formed PSID v2 file — enough for `parseSidFile` to accept without throwing. */
+function validSidBytes(): Uint8Array {
+  const payload = [0xa9, 0x00, 0x60];
+  const buffer = new Uint8Array(PSID_HEADER_SIZE + payload.length);
+  const view = new DataView(buffer.buffer);
+  buffer.set([0x50, 0x53, 0x49, 0x44], 0x00); // 'PSID'
+  view.setUint16(0x04, 2, false);
+  view.setUint16(0x06, PSID_HEADER_SIZE, false);
+  view.setUint16(0x08, 0x1000, false);
+  view.setUint16(0x0a, 0x1000, false);
+  view.setUint16(0x0c, 0x1003, false);
+  view.setUint16(0x0e, 1, false);
+  view.setUint16(0x10, 1, false);
+  view.setUint32(0x12, 0, false);
+  buffer.set(payload, PSID_HEADER_SIZE);
+  return buffer;
 }
 
 function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
@@ -319,6 +361,99 @@ describe('DjPocViewComponent', () => {
 
       subtuneButtons[1].click();
       expect(engine.nextSubtune).toHaveBeenCalled();
+    });
+  });
+
+  describe('auto-play', () => {
+    it('plays automatically once a tune is selected', () => {
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      expect(engine.loadTune).toHaveBeenCalled();
+      expect(engine.play).toHaveBeenCalled();
+    });
+  });
+
+  describe('voice mute toggles', () => {
+    it('calls engine.setVoiceMuted with the voice index and the checkbox state', () => {
+      const checkbox = fixture.nativeElement.querySelector(
+        '[aria-label="Voice"] input[type="checkbox"]'
+      ) as HTMLInputElement;
+
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event('change'));
+
+      expect(engine.setVoiceMuted).toHaveBeenCalledWith(0, true);
+    });
+  });
+
+  describe('cue slots', () => {
+    function cueButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Cues"] button'));
+    }
+
+    it('adds a cue for an empty slot, then hops once the slot is set', () => {
+      cueButtons()[0].click();
+      expect(engine.addCue).toHaveBeenCalledWith(0);
+
+      engine.cueFrames.set([1234, null, null, null]);
+      fixture.detectChanges();
+
+      cueButtons()[0].click();
+      expect(engine.hopToCue).toHaveBeenCalledWith(0);
+    });
+  });
+
+  describe('loop handlers', () => {
+    function dualRangeInputs(): HTMLInputElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.dual-range input[type="range"]'));
+    }
+
+    it('clamps the in-handle so it never drags past the out-handle', () => {
+      engine.loopOutPercent.set(50);
+      fixture.detectChanges();
+
+      const [inHandle] = dualRangeInputs();
+      inHandle.value = '80';
+      inHandle.dispatchEvent(new Event('input'));
+
+      expect(engine.setLoopRange).toHaveBeenCalledWith(49, 50);
+    });
+
+    it('clamps the out-handle so it never drags past the in-handle', () => {
+      engine.loopInPercent.set(50);
+      fixture.detectChanges();
+
+      const [, outHandle] = dualRangeInputs();
+      outHandle.value = '20';
+      outHandle.dispatchEvent(new Event('input'));
+
+      expect(engine.setLoopRange).toHaveBeenCalledWith(50, 51);
+    });
+  });
+
+  describe('scrub handler', () => {
+    function scrubInput(): HTMLInputElement {
+      const rangesInSection: HTMLInputElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Loop / Scrub"] input[type="range"]')
+      );
+      return rangesInSection[rangesInSection.length - 1];
+    }
+
+    it('does not call engine.scrubTo while dragging', () => {
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+
+      expect(engine.scrubTo).not.toHaveBeenCalled();
+    });
+
+    it('calls engine.scrubTo with the value once the drag releases', () => {
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.scrubTo).toHaveBeenCalledWith(42);
     });
   });
 });

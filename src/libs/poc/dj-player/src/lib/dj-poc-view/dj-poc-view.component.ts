@@ -51,7 +51,8 @@ const BUFFER_SIZE_OPTIONS: readonly { readonly value: BufferSize; readonly label
 
 /**
  * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. One column
- * of labelled control groups: MIDI, Timing, Tune, Transport, Speed, Diagnostics.
+ * of labelled control groups: MIDI, Timing, Tune, Transport, Speed, Voice, Cues, Loop/Scrub,
+ * Diagnostics.
  */
 @Component({
   selector: 'lib-dj-poc-view',
@@ -96,10 +97,22 @@ export class DjPocViewComponent {
   protected readonly recipeEnabled = this.engine.recipeEnabled;
   protected readonly nominalIntervalUs = this.engine.nominalIntervalUs;
   protected readonly scheduleAheadMs = this.engine.scheduleAheadMs;
+  protected readonly mutedVoices = this.engine.mutedVoices;
+  protected readonly cueFrames = this.engine.cueFrames;
+  protected readonly loopInPercent = this.engine.loopInPercent;
+  protected readonly loopOutPercent = this.engine.loopOutPercent;
+  protected readonly loopEnabled = this.engine.loopEnabled;
 
   protected readonly minSpeed = MIN_SPEED_MULTIPLIER;
   protected readonly maxSpeed = MAX_SPEED_MULTIPLIER;
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
+  protected readonly voiceIndices: readonly number[] = [0, 1, 2];
+  protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
+
+  // The scrub slider's own displayed position — deliberately not sourced from the engine, which
+  // exposes no continuous playback-position signal. Updated on every drag tick; the engine only
+  // hears about it once the drag releases (see onScrubChange).
+  protected readonly scrubDisplayPercent = signal<number>(0);
 
   // Neither the timer mode nor the buffer size is part of the ASID protocol this browser speaks —
   // the cartridge decides both on its own, in its own menu. These signals record what the tester
@@ -257,6 +270,44 @@ export class DjPocViewComponent {
     this.engine.setScheduleAhead(Number((event.target as HTMLSelectElement).value));
   }
 
+  onVoiceMuteToggle(voice: number, event: Event): void {
+    this.engine.setVoiceMuted(voice, (event.target as HTMLInputElement).checked);
+  }
+
+  onAddCue(slot: number): void {
+    this.engine.addCue(slot);
+  }
+
+  onHopToCue(slot: number): void {
+    this.engine.hopToCue(slot);
+  }
+
+  onLoopInInput(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.engine.setLoopRange(Math.min(value, this.loopOutPercent() - 1), this.loopOutPercent());
+  }
+
+  onLoopOutInput(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.engine.setLoopRange(this.loopInPercent(), Math.max(value, this.loopInPercent() + 1));
+  }
+
+  onLoopEnabledToggle(event: Event): void {
+    this.engine.setLoopEnabled((event.target as HTMLInputElement).checked);
+  }
+
+  onScrubInput(event: Event): void {
+    this.scrubDisplayPercent.set(Number((event.target as HTMLInputElement).value));
+  }
+
+  // (change) fires on release, not on every drag tick — the seam that makes this "drag anywhere,
+  // release, and it jumps" rather than a continuous scrub.
+  onScrubChange(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.scrubDisplayPercent.set(value);
+    this.engine.scrubTo(value);
+  }
+
   onTimerModeChange(event: Event): void {
     this.timerMode.set((event.target as HTMLSelectElement).value as TimerMode);
   }
@@ -273,6 +324,9 @@ export class DjPocViewComponent {
     this.currentTune.set(file);
     this.tuneError.set(null);
     this.engine.loadTune(file);
+    // play() already no-ops into the engine's "no MIDI output port selected" error path when no
+    // port is chosen, so no separate guard is needed here.
+    void this.engine.play();
   }
 }
 

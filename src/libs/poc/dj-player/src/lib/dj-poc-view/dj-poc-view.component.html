@@ -218,6 +218,67 @@
     </p>
   </section>
 
+  <section class="poc-section" aria-label="Voice">
+    <h2>Voice</h2>
+
+    @for (voice of voiceIndices; track voice) {
+      <label class="control">
+        <input
+          type="checkbox"
+          [checked]="mutedVoices()[voice]"
+          (change)="onVoiceMuteToggle(voice, $event)"
+        />
+        Voice {{ voice + 1 }}
+      </label>
+    }
+  </section>
+
+  <section class="poc-section" aria-label="Cues">
+    <h2>Cues</h2>
+
+    <div class="control-row">
+      @for (slot of cueIndices; track slot) {
+        @if (cueFrames()[slot] === null) {
+          <button type="button" (click)="onAddCue(slot)">Add {{ slot + 1 }}</button>
+        } @else {
+          <button type="button" (click)="onHopToCue(slot)">Hop {{ slot + 1 }}</button>
+        }
+      }
+    </div>
+  </section>
+
+  <section class="poc-section" aria-label="Loop / Scrub">
+    <h2>Loop / Scrub</h2>
+
+    <label class="control">
+      <input
+        type="checkbox"
+        [checked]="loopEnabled()"
+        (change)="onLoopEnabledToggle($event)"
+      />
+      Loop armed
+    </label>
+
+    <p class="caption">Loop {{ loopInPercent() }}% – {{ loopOutPercent() }}%</p>
+
+    <div class="dual-range">
+      <input type="range" min="0" max="100" [value]="loopInPercent()" (input)="onLoopInInput($event)" />
+      <input type="range" min="0" max="100" [value]="loopOutPercent()" (input)="onLoopOutInput($event)" />
+    </div>
+
+    <label class="control">
+      Scrub {{ scrubDisplayPercent() }}%
+      <input
+        type="range"
+        min="0"
+        max="100"
+        [value]="scrubDisplayPercent()"
+        (input)="onScrubInput($event)"
+        (change)="onScrubChange($event)"
+      />
+    </label>
+  </section>
+
   <section class="poc-section poc-section--wide" aria-label="Diagnostics">
     <h2>Diagnostics</h2>
 

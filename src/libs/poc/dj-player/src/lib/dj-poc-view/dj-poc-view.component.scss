@@ -120,3 +120,25 @@
   color: var(--color-error);
   font-size: var(--font-size-sm);
 }
+
+// Two range inputs stacked on the same spot so one drag surface covers both handles. The track
+// itself ignores pointer events so it never steals a click meant for the other handle's thumb.
+.dual-range {
+  position: relative;
+  height: 1.5rem;
+
+  input[type='range'] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: transparent;
+    pointer-events: none;
+
+    &::-webkit-slider-thumb {
+      pointer-events: auto;
+    }
+    &::-moz-range-thumb {
+      pointer-events: auto;
+    }
+  }
+}
