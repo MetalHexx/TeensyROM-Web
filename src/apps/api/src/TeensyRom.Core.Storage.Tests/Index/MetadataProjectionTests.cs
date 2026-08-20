@@ -235,7 +235,7 @@ namespace TeensyRom.Core.Storage.Tests.Index
             var projection = CreateSidProjection(fixture, Substitute.For<IHvscDatabase>(), Substitute.For<IDeepSidDatabase>());
             var reports = new List<int>();
 
-            await projection.ProjectAsync(fixture.Scope, new Progress<int>(reports.Add), Ct);
+            await projection.ProjectAsync(fixture.Scope, new SynchronousProgress<int>(reports.Add), Ct);
 
             reports.Should().NotBeEmpty();
             reports.Last().Should().Be(2);
@@ -260,6 +260,16 @@ namespace TeensyRom.Core.Storage.Tests.Index
         private sealed class FakeSourceVersion(string current) : IMetadataSourceVersion
         {
             public string Current { get; set; } = current;
+        }
+
+        /// <summary>
+        /// Reports inline on the calling thread. Unlike <see cref="Progress{T}"/>, which posts
+        /// through <see cref="SynchronizationContext"/> and falls back to the thread pool when
+        /// none is captured, this makes reports observable the instant ProjectAsync returns.
+        /// </summary>
+        private sealed class SynchronousProgress<T>(Action<T> handler) : IProgress<T>
+        {
+            public void Report(T value) => handler(value);
         }
     }
 }
