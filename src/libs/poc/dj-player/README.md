@@ -2,7 +2,7 @@
 
 ## What This Is
 
-This is a throwaway spike proving that a browser tab can hold musical timing over Web MIDI well enough to stream SID tunes to a real Commodore 64. The entire codebase is disposable and expected to be replaced by `ASID-DJ-1`; its only permanent value is the eleven written findings in the listening protocol below.
+This is a throwaway spike proving that a browser tab can hold musical timing over Web MIDI well enough to stream SID tunes to a real Commodore 64. The entire codebase is disposable and expected to be replaced by `ASID-DJ-1`; its only permanent value is the fourteen written findings in the listening protocol below.
 
 The spike makes a C64 play a SID tune whose player code runs in this browser tab, with an audio-rate frame clock, ASID SysEx encoding over Web MIDI, and a frame-timer recipe packet to measure whether the ASID protocol closes the jitter gap that Web MIDI is known to have.
 
@@ -101,7 +101,7 @@ The cartridge's diagnostics are your oracle. Watch all of these as you play:
 
 Record observations as they happen during the session. Findings cannot be reconstructed from memory afterwards. For each question below, note what you heard, which tunes showed the phenomenon, and which configuration was under test.
 
-### The Eleven Questions
+### The Fourteen Questions
 
 #### 1. Does the browser hold musical timing over a long playback?
 
@@ -191,25 +191,25 @@ Record observations as they happen during the session. Findings cannot be recons
 
 ---
 
-#### 12. Does muting a voice mid-playback click, pop, or leave the SID chip in a state un-muting doesn't cleanly restore?
+#### 12. Does `R2`'s software control-register interception sound indistinguishable from what real hardware mute would produce?
 
-*Whether the hardware-mute technique is safe to expose as a live performance control.*
-
-**Observations:**
-
----
-
-#### 13. Do cue points and the loop's in/out handles stay musically usable across a multi-minute session, or does frame-count drift make them feel imprecise?
-
-*Whether frame-indexed jump points are the right primitive for a DJ-style cueing tool.*
+*Confirms whether the corrected voice-mute design is sound, or whether the firmware ask needs to happen sooner than planned.*
 
 **Observations:**
 
 ---
 
-#### 14. Does scrubbing — a hard jump to an arbitrary frame — leave the chip coherent, or does it need an explicit reset/resync after the jump?
+#### 13. How does jump latency (silent-replay time) scale as the target frame approaches the top of the fixed ceiling, and around what frame count?
 
-*A second data point for the pause/resume state-snapshot question (D9), this time under a harder discontinuity.*
+*Sizes the practical range where frame-indexed cue points and loop handles remain a usable DJ-cueing primitive.*
+
+**Observations:**
+
+---
+
+#### 14. Does the mid-stream full-register snapshot every hop/loop-reentry/scrub jump sends cause the same audible interruption the recipe packet did, or is it clean since it never touches `APT_ContFramerate`?
+
+*A second data point for the pause/resume state-snapshot question (D9), now covering hop, loop-reentry, and scrub jumps together against the recipe packet's known interruption cost.*
 
 **Observations:**
 
