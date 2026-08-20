@@ -605,6 +605,18 @@ describe('DjPlayerEngine', () => {
       expect(voiceGateValues(playingPacket)).toEqual([0x11, 0x11, 0x11]);
     });
 
+    it("reports a muted voice's control register as 0 in a jump's resync packet, leaving the others live", () => {
+      engine.loadTune(counterTune());
+      engine.setVoiceMuted(1, true);
+
+      engine.scrubTo(5);
+
+      const gates = voiceGateValues(lastDataPacket(midi));
+      expect(gates[1]).toBe(0);
+      expect(gates[0]).toBeGreaterThan(0);
+      expect(gates[2]).toBeGreaterThan(0);
+    });
+
     it('re-enters at the loop-in frame on the tick that reaches loop-out, without stopping the clock', async () => {
       engine.loadTune(counterTune());
       await engine.play();
@@ -625,12 +637,14 @@ describe('DjPlayerEngine', () => {
       clock.tick(5);
       engine.addCue(0);
       engine.setLoopEnabled(true);
+      engine.setVoiceMuted(1, true);
 
       engine.nextSubtune();
 
       expect(engine.stats().framesRendered).toBe(0);
       expect(engine.cueFrames()).toEqual([null, null, null, null]);
       expect(engine.loopEnabled()).toBe(false);
+      expect(engine.mutedVoices()).toEqual([false, true, false]);
     });
 
     it('resolves 0%/100% to frame 0 and the jump ceiling exactly, clamping out-of-range input', () => {
