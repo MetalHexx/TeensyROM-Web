@@ -1,0 +1,18 @@
+{
+  "name": "dj-player",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "/libs/poc/dj-player/src",
+  "prefix": "lib",
+  "projectType": "library",
+  "tags": ["scope:poc", "type:feature"],
+  "implicitDependencies": [],
+  "targets": {
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"]
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}

@@ -1,0 +1,122 @@
+// This route bypasses LayoutComponent, so it inherits `body { overflow: hidden }` from the
+// global stylesheet with no scroll container of its own — without this, content past the
+// viewport height is silently clipped instead of scrollable.
+:host {
+  display: block;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.dj-poc-page {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: start;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+}
+
+.page-heading {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-primary);
+  font-size: var(--font-size-md);
+}
+
+.poc-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-content-gap);
+  padding: var(--spacing-content-gap);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+
+  > h2 {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: var(--font-size-md);
+  }
+}
+
+// The diagnostics readout has more fields than any other section — let it use two grid tracks'
+// worth of width so its two-column dl (added below) doesn't get squeezed as narrow as everything
+// else.
+.poc-section--wide {
+  grid-column: span 2;
+}
+
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-right: var(--spacing-md);
+}
+
+.timing-commands {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+
+  // The effective-interval readout is a full sentence — let it own its own line rather than
+  // wrapping inline with the controls beside it.
+  > p {
+    flex-basis: 100%;
+  }
+}
+
+// Visually set apart from the command controls above — a select here changes nothing on the
+// cartridge, it only documents what the firmware already has set.
+.record-group {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px dashed var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+
+  // Same reasoning as .timing-commands above: the caption is prose, not a control.
+  > p {
+    flex-basis: 100%;
+  }
+}
+
+// dt/dd pairs default to stacking each label on its own line above its value — for the
+// diagnostics and tune-metadata readouts that doubles the line count for no reason, since every
+// label here is short. Lay them out as a compact two-column grid instead.
+.diagnostic-fields,
+.tune-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--spacing-sm);
+  row-gap: var(--spacing-sm);
+  margin: 0;
+
+  dt {
+    color: var(--color-dimmed);
+    font-size: var(--font-size-sm);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.caption {
+  margin: 0;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+.error-text {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
