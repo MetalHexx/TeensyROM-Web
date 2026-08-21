@@ -13,6 +13,16 @@ export interface FrameSnapshot {
   readonly values: number[];
 }
 
+/**
+ * The accumulated slot values alone, detached from any per-frame dirty state.
+ *
+ * Deliberately not a `FrameSnapshot`: that type is a packet under construction, this one is chip
+ * state — where every register stood at a moment, regardless of which of them were about to be sent.
+ */
+export interface RegisterValuesSnapshot {
+  readonly values: Uint8Array;
+}
+
 const PRIMARY_SLOT_FOR_REGISTER = buildPrimarySlotTable();
 const SECONDARY_SLOT_FOR_REGISTER = buildSecondarySlotTable();
 
@@ -136,6 +146,32 @@ export class RegisterFrame implements SidWriteSink {
     this.writtenThisFrame.fill(0);
 
     return { presentMask, msbMask, values };
+  }
+
+  /**
+   * Copies the accumulated slot values, leaving this frame untouched.
+   *
+   * Per-frame dirty tracking is excluded on purpose — a cue records where the chip stood, not which
+   * registers happened to be mid-flight when it was captured.
+   */
+  snapshotValues(): RegisterValuesSnapshot {
+    return { values: this.values.slice() };
+  }
+
+  /**
+   * Replaces the accumulated slot values wholesale and drops any half-built frame.
+   *
+   * Mute is not part of the snapshot: whichever voices are muted *now* stay muted, so returning to a
+   * cue captured before a mute does not un-mute it on the way back in. Only the primary slots are
+   * re-zeroed — `markAllDirty` covers slots 0-24, so the secondary gate slots never reach a resync.
+   */
+  restoreValues(snapshot: RegisterValuesSnapshot): void {
+    this.values.set(snapshot.values);
+    this.present.fill(0);
+    this.writtenThisFrame.fill(0);
+    for (const voice of this.mutedVoices) {
+      this.values[PRIMARY_SLOT_FOR_REGISTER[VOICE_CONTROL_REGISTERS[voice]]] = 0;
+    }
   }
 
   private setSlot(slot: number, value: number): void {

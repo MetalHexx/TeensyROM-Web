@@ -239,15 +239,38 @@
     <div class="control-row">
       @for (slot of cueIndices; track slot) {
         <div class="cue-slot">
-          @if (cueFrames()[slot] === null) {
-            <button type="button" (click)="onAddCue(slot)">Add {{ slot + 1 }}</button>
-          } @else {
+          @if (cues()[slot]; as cue) {
             <button type="button" (click)="onHopToCue(slot)">Hop {{ slot + 1 }}</button>
             <button type="button" (click)="onClearCue(slot)">Clear {{ slot + 1 }}</button>
+            <span class="caption">frame {{ cue.frame }}</span>
+          } @else {
+            <button type="button" (click)="onAddCue(slot)">Add {{ slot + 1 }}</button>
           }
         </div>
       }
     </div>
+
+    <label class="control">
+      <input
+        type="checkbox"
+        [checked]="gateOffOnJump()"
+        (change)="onGateOffOnJumpToggle($event)"
+      />
+      Gate voices off across a jump
+    </label>
+
+    <p class="caption">
+      A resync re-emits every register at its true value, so a voice already sounding sees its gate go
+      1 → 1 — no edge, no re-attack, and the old note carries across the seam. Gating off first
+      forces a 1 → 0 → 1 edge. Toggle it to A/B the same cue on hardware.
+    </p>
+
+    <p class="caption">
+      Cues store machine state, not a position, so a hop restores in constant time instead of
+      re-emulating from init — no main-thread stall, and the frame clock keeps ticking through it. A
+      snapshot only means anything to the machine it came from, so anything that re-inits one —
+      loading a tune, stopping, changing subtune — clears all four slots.
+    </p>
   </section>
 
   <section class="poc-section" aria-label="Loop / Scrub">

@@ -13,8 +13,9 @@ import {
   buildStopPacket,
 } from '../asid/asid-encoder';
 import { RegisterFrame } from '../asid/register-frame';
-import type { FrameSnapshot } from '../asid/register-frame';
+import type { FrameSnapshot, RegisterValuesSnapshot } from '../asid/register-frame';
 import { C64Machine } from '../cpu/c64-machine';
+import type { MachineSnapshot } from '../cpu/c64-machine';
 import type { FrameResult } from '../cpu/c64-machine';
 import type { SidFile } from '../sid/sid-file.model';
 import { MidiOutputService } from '../midi/midi-output.service';
@@ -22,6 +23,18 @@ import type { FrameClock } from '../clock/frame-clock';
 
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
 export type SpeedMode = 'clock-only' | 'clock-and-recipe';
+
+/**
+ * A captured position, held as restorable state rather than as a frame number.
+ *
+ * `frame` is carried only so the diagnostics and stats stay honest about where a hop landed; the
+ * machine and register snapshots are what actually make the return trip.
+ */
+export interface CueSlot {
+  readonly frame: number;
+  readonly machine: MachineSnapshot;
+  readonly registers: RegisterValuesSnapshot;
+}
 
 /** Counters and measurements the diagnostics panel reads. */
 export interface EngineStats {
@@ -116,7 +129,8 @@ export class DjPlayerEngine implements OnDestroy {
   readonly lastError = signal<string | null>(null);
   readonly stats = signal<EngineStats>(EMPTY_STATS);
   readonly mutedVoices = signal<readonly boolean[]>([false, false, false]);
-  readonly cueFrames = signal<readonly (number | null)[]>([null, null, null, null]);
+  readonly cues = signal<readonly (CueSlot | null)[]>([null, null, null, null]);
+  readonly gateOffOnJump = signal<boolean>(true);
   readonly loopInPercent = signal<number>(0);
   readonly loopOutPercent = signal<number>(100);
   readonly loopEnabled = signal<boolean>(false);
@@ -326,22 +340,66 @@ export class DjPlayerEngine implements OnDestroy {
     this.scheduleAheadMs.set(ms);
   }
 
-  /** Captures the current position (in frames) into one of four cue slots. */
+  /**
+   * Captures the current position into one of four cue slots — as machine state, not as a frame
+   * number.
+   *
+   * The whole point: you are already *at* this position, so there is nothing to re-derive. Storing
+   * the state itself is what lets `hopToCue` skip the replay that `jumpToFrame` cannot avoid.
+   */
   addCue(slot: number): void {
-    if (slot < 0 || slot > 3 || this.machine === null) return;
-    this.cueFrames.update((cues) => cues.map((c, i) => (i === slot ? this.framesRendered : c)));
+    if (slot < 0 || slot > 3) return;
+    const machine = this.machine;
+    const frame = this.frame;
+    if (machine === null || frame === null) return;
+
+    const cue: CueSlot = {
+      frame: this.framesRendered,
+      machine: machine.snapshot(),
+      registers: frame.snapshotValues(),
+    };
+    this.cues.update((cues) => cues.map((c, i) => (i === slot ? cue : c)));
   }
 
-  /** Jumps to a previously captured cue slot; a no-op for an empty slot. */
+  /**
+   * Returns to a captured cue slot in constant time; a no-op for an empty slot.
+   *
+   * Restores the snapshot onto the live machine and resyncs the chip — no emulation, so the main
+   * thread never stalls and the frame clock (a main-thread `ScriptProcessorNode`) keeps ticking
+   * straight through. That stall is what made a deep cue hop hold its last note: with the thread
+   * blocked, no packets went out and the SID simply kept sounding whatever it was last told.
+   */
   hopToCue(slot: number): void {
-    const target = this.cueFrames()[slot] ?? null;
-    if (target !== null) this.jumpToFrame(target);
+    const cue = this.cues()[slot] ?? null;
+    const machine = this.machine;
+    const frame = this.frame;
+    if (cue === null || machine === null || frame === null) return;
+
+    machine.restore(cue.machine);
+    frame.restoreValues(cue.registers);
+    this.framesRendered = cue.frame;
+    this.emitResync();
   }
 
   /** Empties a cue slot, returning it to "Add". */
   clearCue(slot: number): void {
     if (slot < 0 || slot > 3) return;
-    this.cueFrames.update((cues) => cues.map((c, i) => (i === slot ? null : c)));
+    this.cues.update((cues) => cues.map((c, i) => (i === slot ? null : c)));
+  }
+
+  /**
+   * Whether a jump gates all three voices off immediately before its resync packet.
+   *
+   * A resync re-emits every register at its true value, which for a voice already sounding means the
+   * gate bit goes 1 -> 1: no edge, so the SID's envelope generator never re-attacks and the note
+   * carries across the seam. Gating off first guarantees a 1 -> 0 -> 1 edge, and because ASID orders
+   * the three control registers last within a packet, the new frequency, waveform and ADSR all land
+   * before the gate re-opens.
+   *
+   * A toggle rather than a constant so it can be A/B'd against the same cue on real hardware.
+   */
+  setGateOffOnJump(enabled: boolean): void {
+    this.gateOffOnJump.set(enabled);
   }
 
   /** Sets the loop's in/out points as percentages of `ceilingFrames()`, ordered low-to-high. */
@@ -439,7 +497,10 @@ export class DjPlayerEngine implements OnDestroy {
 
     frame.markAllDirty();
     this.framesRendered = 0;
-    this.cueFrames.set([null, null, null, null]);
+    // Cues hold machine state now, not frame numbers, so this clear carries more weight than it did:
+    // a re-init leaves any captured snapshot describing a machine that no longer exists. Every path
+    // that rebuilds or re-inits — load, stop, play-from-stopped, subtune change — lands here.
+    this.cues.set([null, null, null, null]);
     this.loopEnabled.set(false);
     this.currentSubtune.set(clamped);
     this.lastError.set(null);
@@ -502,20 +563,43 @@ export class DjPlayerEngine implements OnDestroy {
                                   // the accumulated register values persist across the call regardless
     }
 
-    replayFrame.markAllDirty();
-    const snapshot = replayFrame.takeSnapshot();
-
     this.machine = replayMachine;
     this.frame = replayFrame;
     this.framesRendered = clampedTarget;
-    // A jump landing while paused must stay silent: `pause()` already zeroed the three voice control
-    // registers on the real chip, and this snapshot is a *full* re-emit computed from the replay — if
-    // sent verbatim it could re-open a gate and produce sound while the UI still reads "Paused". Force
-    // the same three registers to 0 in the outgoing packet only; the internal `replayFrame` keeps its
-    // true computed values, so `play()`'s existing paused-resume branch (`frame.markAllDirty()`)
-    // restores the real state correctly whenever Play is next pressed.
-    const outgoing = this.state() === 'paused' ? withVoiceGatesOff(snapshot) : snapshot;
-    this.sendFramePacket(buildSidDataPacket(outgoing));
+    this.emitResync();
+  }
+
+  /**
+   * Re-emits every register at its current value, so the chip matches the engine wherever it just
+   * landed. Shared by the replay jump and the constant-time cue hop — they differ in how they arrive
+   * at a position, never in how they announce it.
+   */
+  private emitResync(): void {
+    const frame = this.frame;
+    if (frame === null) return;
+
+    frame.markAllDirty();
+    const snapshot = frame.takeSnapshot();
+
+    if (this.state() === 'paused') {
+      // A jump landing while paused must stay silent: `pause()` already zeroed the three voice
+      // control registers on the real chip, and this snapshot is a *full* re-emit — if sent verbatim
+      // it could re-open a gate and produce sound while the UI still reads "Paused". Force those
+      // three to 0 in the outgoing packet only; `frame` keeps its true values, so `play()`'s
+      // paused-resume branch (`markAllDirty()`) restores the real state on the next Play.
+      this.sendFramePacket(buildSidDataPacket(withVoiceGatesOff(snapshot)));
+      this.publishStats();
+      return;
+    }
+
+    // Gate off first so every sounding voice sees a 1 -> 0 -> 1 edge and re-attacks, rather than
+    // carrying its old envelope across the seam (see `setGateOffOnJump`). Sent down the same
+    // `sendFramePacket` path as the resync it precedes, never `sendControl` — a control packet
+    // ignores schedule-ahead and would overtake the very packet it is meant to lead.
+    if (this.gateOffOnJump()) {
+      this.sendFramePacket(buildSidDataPacket(buildVoiceGateOffSnapshot()));
+    }
+    this.sendFramePacket(buildSidDataPacket(snapshot));
     this.publishStats();
   }
 

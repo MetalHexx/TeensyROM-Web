@@ -91,6 +91,58 @@ Object.defineProperty(QuietMos6502.prototype, 'getProcessorStatus', {
 });
 
 /**
+ * The `mos6502` instance fields carrying execution state.
+ *
+ * The core declares every one of them `private` and offers `getState()` to read them but nothing to
+ * write them back, so a restore has to assign them directly — they are ordinary runtime properties
+ * whatever TypeScript says. That is the one place this class reaches past a dependency's stated
+ * surface, and it is why `mos6502` is pinned: a rename upstream would otherwise restore nothing and
+ * leave a cue hop playing silence with no error. `assertCpuStateKeys` turns that into a loud failure
+ * at construction instead.
+ */
+const CPU_STATE_KEYS = [
+  'a',
+  'x',
+  'y',
+  'pc',
+  'stkp',
+  'status',
+  'addr',
+  'currentInstruction',
+  'cycle',
+] as const;
+
+function assertCpuStateKeys(cpu: mos6502): void {
+  const record = cpu as unknown as Record<string, unknown>;
+  const missing = CPU_STATE_KEYS.filter((key) => !(key in record));
+  if (missing.length > 0) {
+    throw new Error(
+      `mos6502 no longer exposes ${missing.join(', ')} — cue snapshots would restore incomplete CPU ` +
+        `state without saying so. Check the pinned mos6502 version before changing CPU_STATE_KEYS.`
+    );
+  }
+}
+
+/**
+ * Everything about a running machine that changes as it runs.
+ *
+ * Configuration fixed at construction — the file, the sink, the clock-derived cycle counts — is
+ * deliberately absent: a snapshot is only ever restored into the machine it was taken from.
+ */
+export interface MachineSnapshot {
+  readonly memory: Uint8Array;
+  readonly cpu: ReadonlyMap<string, unknown>;
+  readonly trampoline: number;
+  readonly idleAddress: number;
+  readonly playAddress: number;
+  readonly timerALatch: number | null;
+  readonly cyclesThisCall: number;
+  readonly reachedIdle: boolean;
+  readonly expectingOpcodeFetch: boolean;
+  readonly illegalOpcodes: number;
+}
+
+/**
  * A 64 KB address space with just enough faked C64 hardware — CIA timers, a moving raster counter
  * and ROM vector stubs — for a tune's `init` and `play` routines to run to completion. Every write
  * the tune makes to the SID's address range is handed to the sink.
@@ -130,6 +182,54 @@ export class C64Machine {
       (address: number): number => this.read(address),
       (address: number, value: number): void => this.write(address, value)
     );
+    assertCpuStateKeys(this.cpu);
+  }
+
+  /**
+   * A complete, detached copy of the machine's mutable state: 64 KB of address space, the CPU's
+   * execution state, and this class's own bookkeeping.
+   *
+   * The point of it is `restore` — a position captured here can be returned to in constant time
+   * rather than by re-emulating the tune from `init`, which is what makes a cue hop free of the
+   * main-thread stall that a replay of the same distance costs.
+   */
+  snapshot(): MachineSnapshot {
+    const cpu = this.cpu as unknown as Record<string, unknown>;
+    return {
+      memory: this.memory.slice(),
+      cpu: new Map(CPU_STATE_KEYS.map((key) => [key, cpu[key]])),
+      trampoline: this.trampoline,
+      idleAddress: this.idleAddress,
+      playAddress: this.playAddress,
+      timerALatch: this.timerALatch,
+      cyclesThisCall: this.cyclesThisCall,
+      reachedIdle: this.reachedIdle,
+      expectingOpcodeFetch: this.expectingOpcodeFetch,
+      illegalOpcodes: this.illegalOpcodes,
+    };
+  }
+
+  /**
+   * Puts the machine back exactly where `snapshot` was taken.
+   *
+   * Restoring the entire address space is what makes this safe to run on the *live* machine rather
+   * than a throwaway one: nothing of wherever playback currently is survives the call, so there is no
+   * RAM left to bleed into the restored position.
+   */
+  restore(snapshot: MachineSnapshot): void {
+    this.memory.set(snapshot.memory);
+    const cpu = this.cpu as unknown as Record<string, unknown>;
+    for (const [key, value] of snapshot.cpu) {
+      cpu[key] = value;
+    }
+    this.trampoline = snapshot.trampoline;
+    this.idleAddress = snapshot.idleAddress;
+    this.playAddress = snapshot.playAddress;
+    this.timerALatch = snapshot.timerALatch;
+    this.cyclesThisCall = snapshot.cyclesThisCall;
+    this.reachedIdle = snapshot.reachedIdle;
+    this.expectingOpcodeFetch = snapshot.expectingOpcodeFetch;
+    this.illegalOpcodes = snapshot.illegalOpcodes;
   }
 
   /** Cycles between play calls when the tune programmed CIA 1 timer A; `null` for a frame-rate tune. */

@@ -98,7 +98,8 @@ export class DjPocViewComponent {
   protected readonly nominalIntervalUs = this.engine.nominalIntervalUs;
   protected readonly scheduleAheadMs = this.engine.scheduleAheadMs;
   protected readonly mutedVoices = this.engine.mutedVoices;
-  protected readonly cueFrames = this.engine.cueFrames;
+  protected readonly cues = this.engine.cues;
+  protected readonly gateOffOnJump = this.engine.gateOffOnJump;
   protected readonly loopInPercent = this.engine.loopInPercent;
   protected readonly loopOutPercent = this.engine.loopOutPercent;
   protected readonly loopEnabled = this.engine.loopEnabled;
@@ -284,6 +285,10 @@ export class DjPocViewComponent {
 
   onClearCue(slot: number): void {
     this.engine.clearCue(slot);
+  }
+
+  onGateOffOnJumpToggle(event: Event): void {
+    this.engine.setGateOffOnJump((event.target as HTMLInputElement).checked);
   }
 
   onLoopInInput(event: Event): void {

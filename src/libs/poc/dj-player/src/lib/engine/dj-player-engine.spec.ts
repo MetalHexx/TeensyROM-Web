@@ -579,7 +579,7 @@ describe('DjPlayerEngine', () => {
       await freshEngine.play();
       freshClock.tick(5);
       freshEngine.addCue(0);
-      freshEngine.hopToCue(0); // replays straight to the captured frame, nothing played after it
+      freshEngine.hopToCue(0); // captured and restored back to back, nothing played in between
 
       expect(hopped).toEqual(lastDataPacket(freshMidi).bytes);
     });
@@ -591,7 +591,68 @@ describe('DjPlayerEngine', () => {
 
       engine.clearCue(0);
 
-      expect(engine.cueFrames()).toEqual([null, null, expect.any(Number), null]);
+      const cues = engine.cues();
+      expect(cues[0]).toBeNull();
+      expect(cues[2]).not.toBeNull();
+      expect([cues[1], cues[3]]).toEqual([null, null]);
+    });
+
+    it('restores a cue without re-emulating, so the machine keeps running forward from it', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      const atCue = slotValue(lastDataPacket(midi), 0);
+
+      clock.tick(20);
+      expect(slotValue(lastDataPacket(midi), 0)).not.toBe(atCue);
+
+      engine.hopToCue(0);
+      expect(slotValue(lastDataPacket(midi), 0)).toBe(atCue);
+      expect(engine.stats().framesRendered).toBe(5);
+
+      // The restored machine is live, not a frozen snapshot: the counter keeps climbing from where
+      // the cue put it back, which a shallow value-only restore would not manage.
+      clock.tick(1);
+      expect(slotValue(lastDataPacket(midi), 0)).toBeGreaterThan(atCue);
+    });
+
+    it('gates every voice off in a packet of its own immediately before a hop resync', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      clock.tick(5);
+
+      const before = dataPackets(midi).length;
+      engine.hopToCue(0);
+      const emitted = dataPackets(midi).slice(before);
+
+      expect(emitted).toHaveLength(2);
+      // Three present slots and nothing else — the seam packet touches only the gate registers and
+      // leaves frequency, waveform and ADSR to arrive with the resync behind it. `voiceGateValues`
+      // does not apply here: it reads slots 22/23/24 of a full 25-register re-emit.
+      expect(valueCount(emitted[0])).toBe(3);
+      expect([0, 1, 2].map((slot) => slotValue(emitted[0], slot))).toEqual([0, 0, 0]);
+      // The resync that follows carries the cue's real gate state, so the chip sees a 1 -> 0 -> 1
+      // edge and re-attacks rather than letting the pre-hop note carry across the seam.
+      expect(voiceGateValues(emitted[1])).toEqual([0x11, 0x11, 0x11]);
+    });
+
+    it('sends the resync alone when the gate-off seam is switched off', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      engine.setGateOffOnJump(false);
+      clock.tick(5);
+
+      const before = dataPackets(midi).length;
+      engine.hopToCue(0);
+      const emitted = dataPackets(midi).slice(before);
+
+      expect(emitted).toHaveLength(1);
+      expect(voiceGateValues(emitted[0])).toEqual([0x11, 0x11, 0x11]);
     });
 
     it('forces the voice gates off in the resync packet when a jump lands while paused', async () => {
@@ -652,7 +713,7 @@ describe('DjPlayerEngine', () => {
       engine.nextSubtune();
 
       expect(engine.stats().framesRendered).toBe(0);
-      expect(engine.cueFrames()).toEqual([null, null, null, null]);
+      expect(engine.cues()).toEqual([null, null, null, null]);
       expect(engine.loopEnabled()).toBe(false);
       expect(engine.mutedVoices()).toEqual([false, true, false]);
     });

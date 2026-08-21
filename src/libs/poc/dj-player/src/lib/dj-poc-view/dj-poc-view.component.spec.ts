@@ -2,7 +2,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DjPocViewComponent } from './dj-poc-view.component';
-import { DjPlayerEngine, EngineState, EngineStats, SpeedMode } from '../engine/dj-player-engine';
+import {
+  CueSlot,
+  DjPlayerEngine,
+  EngineState,
+  EngineStats,
+  SpeedMode,
+} from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
 
@@ -41,7 +47,8 @@ interface MockDjPlayerEngine {
   nominalIntervalUs: WritableSignal<number>;
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
-  cueFrames: WritableSignal<readonly (number | null)[]>;
+  cues: WritableSignal<readonly (CueSlot | null)[]>;
+  gateOffOnJump: WritableSignal<boolean>;
   loopInPercent: WritableSignal<number>;
   loopOutPercent: WritableSignal<number>;
   loopEnabled: WritableSignal<boolean>;
@@ -60,6 +67,7 @@ interface MockDjPlayerEngine {
   addCue: ReturnType<typeof vi.fn>;
   hopToCue: ReturnType<typeof vi.fn>;
   clearCue: ReturnType<typeof vi.fn>;
+  setGateOffOnJump: ReturnType<typeof vi.fn>;
   setLoopRange: ReturnType<typeof vi.fn>;
   setLoopEnabled: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
@@ -90,7 +98,8 @@ function makeEngine(): MockDjPlayerEngine {
     nominalIntervalUs: signal(19950),
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
-    cueFrames: signal<readonly (number | null)[]>([null, null, null, null]),
+    cues: signal<readonly (CueSlot | null)[]>([null, null, null, null]),
+    gateOffOnJump: signal(true),
     loopInPercent: signal(0),
     loopOutPercent: signal(100),
     loopEnabled: signal(false),
@@ -109,6 +118,7 @@ function makeEngine(): MockDjPlayerEngine {
     addCue: vi.fn(),
     hopToCue: vi.fn(),
     clearCue: vi.fn(),
+    setGateOffOnJump: vi.fn(),
     setLoopRange: vi.fn(),
     setLoopEnabled: vi.fn(),
     scrubTo: vi.fn(),
@@ -393,11 +403,16 @@ describe('DjPocViewComponent', () => {
       return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Cues"] button'));
     }
 
+    /** A slot the view treats as set. Only `frame` is rendered; the snapshots are opaque to it. */
+    function cueAt(frame: number): CueSlot {
+      return { frame, machine: {}, registers: {} } as unknown as CueSlot;
+    }
+
     it('adds a cue for an empty slot, then hops once the slot is set', () => {
       cueButtons()[0].click();
       expect(engine.addCue).toHaveBeenCalledWith(0);
 
-      engine.cueFrames.set([1234, null, null, null]);
+      engine.cues.set([cueAt(1234), null, null, null]);
       fixture.detectChanges();
 
       cueButtons()[0].click();
@@ -405,7 +420,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it('shows a Clear button alongside Hop once a slot is set, and clears it on click', () => {
-      engine.cueFrames.set([1234, null, null, null]);
+      engine.cues.set([cueAt(1234), null, null, null]);
       fixture.detectChanges();
 
       const buttons = cueButtons();
@@ -414,6 +429,27 @@ describe('DjPocViewComponent', () => {
 
       buttons[1].click();
       expect(engine.clearCue).toHaveBeenCalledWith(0);
+    });
+
+    it('shows the captured frame for a set slot', () => {
+      engine.cues.set([cueAt(1234), null, null, null]);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-slot').textContent).toContain(
+        'frame 1234'
+      );
+    });
+
+    it('toggles the gate-off seam', () => {
+      const checkbox = fixture.nativeElement.querySelector(
+        '[aria-label="Cues"] input[type="checkbox"]'
+      ) as HTMLInputElement;
+      expect(checkbox.checked).toBe(true);
+
+      checkbox.checked = false;
+      checkbox.dispatchEvent(new Event('change'));
+
+      expect(engine.setGateOffOnJump).toHaveBeenCalledWith(false);
     });
   });
 
