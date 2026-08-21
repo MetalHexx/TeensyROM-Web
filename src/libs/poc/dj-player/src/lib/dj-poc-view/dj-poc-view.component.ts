@@ -282,6 +282,10 @@ export class DjPocViewComponent {
     this.engine.hopToCue(slot);
   }
 
+  onClearCue(slot: number): void {
+    this.engine.clearCue(slot);
+  }
+
   onLoopInInput(event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
     this.engine.setLoopRange(Math.min(value, this.loopOutPercent() - 1), this.loopOutPercent());

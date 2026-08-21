@@ -59,6 +59,7 @@ interface MockDjPlayerEngine {
   setVoiceMuted: ReturnType<typeof vi.fn>;
   addCue: ReturnType<typeof vi.fn>;
   hopToCue: ReturnType<typeof vi.fn>;
+  clearCue: ReturnType<typeof vi.fn>;
   setLoopRange: ReturnType<typeof vi.fn>;
   setLoopEnabled: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
@@ -107,6 +108,7 @@ function makeEngine(): MockDjPlayerEngine {
     setVoiceMuted: vi.fn(),
     addCue: vi.fn(),
     hopToCue: vi.fn(),
+    clearCue: vi.fn(),
     setLoopRange: vi.fn(),
     setLoopEnabled: vi.fn(),
     scrubTo: vi.fn(),
@@ -400,6 +402,18 @@ describe('DjPocViewComponent', () => {
 
       cueButtons()[0].click();
       expect(engine.hopToCue).toHaveBeenCalledWith(0);
+    });
+
+    it('shows a Clear button alongside Hop once a slot is set, and clears it on click', () => {
+      engine.cueFrames.set([1234, null, null, null]);
+      fixture.detectChanges();
+
+      const buttons = cueButtons();
+      expect(buttons[0].textContent).toContain('Hop 1');
+      expect(buttons[1].textContent).toContain('Clear 1');
+
+      buttons[1].click();
+      expect(engine.clearCue).toHaveBeenCalledWith(0);
     });
   });
 

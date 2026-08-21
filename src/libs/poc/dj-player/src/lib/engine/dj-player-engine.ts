@@ -338,6 +338,12 @@ export class DjPlayerEngine implements OnDestroy {
     if (target !== null) this.jumpToFrame(target);
   }
 
+  /** Empties a cue slot, returning it to "Add". */
+  clearCue(slot: number): void {
+    if (slot < 0 || slot > 3) return;
+    this.cueFrames.update((cues) => cues.map((c, i) => (i === slot ? null : c)));
+  }
+
   /** Sets the loop's in/out points as percentages of `ceilingFrames()`, ordered low-to-high. */
   setLoopRange(inPercent: number, outPercent: number): void {
     const clampedIn = clamp(inPercent, 0, 100);

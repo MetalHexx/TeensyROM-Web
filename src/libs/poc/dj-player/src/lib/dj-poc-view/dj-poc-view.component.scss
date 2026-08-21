@@ -115,6 +115,14 @@
   font-size: var(--font-size-sm);
 }
 
+// A hopped-to slot grows a second button (Clear); stack it below Hop rather than widening the
+// row, so the four cue slots keep a consistent column width regardless of set/empty state.
+.cue-slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
 .error-text {
   margin: 0;
   color: var(--color-error);

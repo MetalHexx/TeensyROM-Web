@@ -584,6 +584,16 @@ describe('DjPlayerEngine', () => {
       expect(hopped).toEqual(lastDataPacket(freshMidi).bytes);
     });
 
+    it('clears a captured cue back to null, and leaves other slots untouched', () => {
+      engine.loadTune(counterTune());
+      engine.addCue(0);
+      engine.addCue(2);
+
+      engine.clearCue(0);
+
+      expect(engine.cueFrames()).toEqual([null, null, expect.any(Number), null]);
+    });
+
     it('forces the voice gates off in the resync packet when a jump lands while paused', async () => {
       engine.loadTune(counterTune());
       await engine.play();

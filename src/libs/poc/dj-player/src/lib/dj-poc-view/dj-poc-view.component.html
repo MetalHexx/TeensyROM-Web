@@ -238,11 +238,14 @@
 
     <div class="control-row">
       @for (slot of cueIndices; track slot) {
-        @if (cueFrames()[slot] === null) {
-          <button type="button" (click)="onAddCue(slot)">Add {{ slot + 1 }}</button>
-        } @else {
-          <button type="button" (click)="onHopToCue(slot)">Hop {{ slot + 1 }}</button>
-        }
+        <div class="cue-slot">
+          @if (cueFrames()[slot] === null) {
+            <button type="button" (click)="onAddCue(slot)">Add {{ slot + 1 }}</button>
+          } @else {
+            <button type="button" (click)="onHopToCue(slot)">Hop {{ slot + 1 }}</button>
+            <button type="button" (click)="onClearCue(slot)">Clear {{ slot + 1 }}</button>
+          }
+        </div>
       }
     </div>
   </section>
