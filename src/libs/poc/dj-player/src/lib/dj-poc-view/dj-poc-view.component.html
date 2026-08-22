@@ -315,6 +315,12 @@
       <dd>{{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)</dd>
       <dt>Drift</dt>
       <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
+      <dt>Clock jitter (σ / worst gap)</dt>
+      <dd>
+        {{ engineStats().jitterMs.toFixed(2) }} ms / {{ engineStats().worstGapMs.toFixed(1) }} ms
+      </dd>
+      <dt>Late callbacks</dt>
+      <dd>{{ engineStats().lateCallbacks }}</dd>
       <dt>Suppressed double-writes</dt>
       <dd>{{ engineStats().suppressedWrites }}</dd>
       <dt>Illegal opcodes</dt>
@@ -324,6 +330,24 @@
       <dt>Last error</dt>
       <dd>{{ engineError() ?? '—' }}</dd>
     </dl>
+
+    <p class="caption">
+      Jitter is the spread of the gap between audio callbacks, measured on the callback rather than
+      on emitted frames so it reads the same whatever multispeed the tune carries. Mean interval and
+      drift can both look healthy while individual callbacks scatter, and scatter is what empties the
+      cartridge's queue — no callback means no packet, and a queue that runs dry re-buffers. The
+      worst gap is the number that catches a rare dropout: a single long main-thread stall barely
+      moves σ but empties any buffer outright. Worst gap is a running maximum that never decays, so
+      the late count beside it separates one spike from a recurring one.
+    </p>
+
+    <p class="caption">
+      Drift is the check on the clock itself. Frames fall due against measured elapsed time rather
+      than the buffer duration the sample rate implies, so a healthy stream holds drift near zero. A
+      figure that climbs steadily means we are emitting at a different rate from the one the recipe
+      advertises to the cartridge — which drains its queue faster than we fill it and leaves the
+      firmware's slow re-timer hunting, the swing you can watch on the C64's bar graph.
+    </p>
 
     <p class="caption">
       The host cannot read the cartridge's queue fill — watch the C64's own screen too: the

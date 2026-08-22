@@ -23,6 +23,9 @@ const EMPTY_STATS: EngineStats = {
   effectiveIntervalUs: 0,
   measuredMeanIntervalUs: 0,
   driftMs: 0,
+  jitterMs: 0,
+  worstGapMs: 0,
+  lateCallbacks: 0,
 };
 
 interface MockMidiOutputService {
@@ -316,9 +319,11 @@ describe('DjPocViewComponent', () => {
       return select;
     }
 
-    it('defaults to off / Tiny and updates the diagnostics readout on change', () => {
+    // Medium, not Tiny: the record has to start where the cartridge actually starts, or every
+    // session that never touches the select is attributed to hardware it never ran on.
+    it('defaults to off / Medium and updates the diagnostics readout on change', () => {
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-      expect(text).toContain('off / Tiny (256 B)');
+      expect(text).toContain('off / Medium (1024 B)');
 
       const timerSelect = selectByLabel('Timer mode (C64)');
       timerSelect.value = 'fixed-50hz';

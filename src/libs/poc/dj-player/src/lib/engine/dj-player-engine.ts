@@ -49,6 +49,12 @@ export interface EngineStats {
   readonly effectiveIntervalUs: number;
   readonly measuredMeanIntervalUs: number;
   readonly driftMs: number;
+  /** Standard deviation of the audio-callback gap — the scatter that empties the cartridge queue. */
+  readonly jitterMs: number;
+  /** The longest single audio-callback gap since play started. */
+  readonly worstGapMs: number;
+  /** Callbacks that arrived more than 2x the nominal buffer duration late. */
+  readonly lateCallbacks: number;
 }
 
 /**
@@ -103,6 +109,9 @@ const EMPTY_STATS: EngineStats = {
   effectiveIntervalUs: 0,
   measuredMeanIntervalUs: 0,
   driftMs: 0,
+  jitterMs: 0,
+  worstGapMs: 0,
+  lateCallbacks: 0,
 };
 
 /**
@@ -719,6 +728,9 @@ export class DjPlayerEngine implements OnDestroy {
       effectiveIntervalUs: this.file === null ? 0 : this.effectiveIntervalUs(),
       measuredMeanIntervalUs: clockStats.measuredMeanIntervalUs,
       driftMs: clockStats.driftMs,
+      jitterMs: clockStats.jitterMs,
+      worstGapMs: clockStats.worstGapMs,
+      lateCallbacks: clockStats.lateCallbacks,
     });
   }
 }

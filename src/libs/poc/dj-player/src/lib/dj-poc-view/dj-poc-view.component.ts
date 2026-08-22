@@ -119,7 +119,11 @@ export class DjPocViewComponent {
   // set there so the diagnostics readout and the findings log can attribute a session to the
   // right one of the eighteen timer-mode x buffer-size combinations under test.
   protected readonly timerMode = signal<TimerMode>('off');
-  protected readonly bufferSize = signal<BufferSize>('tiny');
+  // Medium, matching the cartridge's own default — the firmware initialises `ASIDQueueSize` to
+  // Medium with the comment "Initialize to match memBufferSize default", and the C64's menu agrees.
+  // A record that starts on a value the hardware never sits at mis-attributes every session that
+  // doesn't touch it.
+  protected readonly bufferSize = signal<BufferSize>('medium');
   protected readonly timerModeOptions = TIMER_MODE_OPTIONS;
   protected readonly bufferSizeOptions = BUFFER_SIZE_OPTIONS;
   protected readonly timerModeLabel = computed(
