@@ -217,4 +217,4 @@ Record observations as they happen during the session. Findings cannot be recons
 
 ### Transcription
 
-When the session is complete, transcribe the eleven findings, plus three from `0.1`, into `ASID-DJ-ITERATIONS.md`'s decision log, superseding any entries in place where these findings overturn something.
+When the session is complete, transcribe the fourteen findings into `ASID-DJ-ITERATIONS.md`'s decision log, superseding any entries in place where these findings overturn something.
