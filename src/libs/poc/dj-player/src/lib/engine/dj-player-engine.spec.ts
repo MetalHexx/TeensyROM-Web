@@ -39,6 +39,9 @@ class FakeFrameClock implements FrameClock {
     measuredMeanIntervalUs: 0,
     nominalIntervalUs: 0,
     driftMs: 0,
+    jitterMs: 0,
+    worstGapMs: 0,
+    lateCallbacks: 0,
   };
 
   private onFrame: (() => void) | null = null;

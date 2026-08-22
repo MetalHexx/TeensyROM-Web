@@ -25,6 +25,7 @@ export interface RegisterValuesSnapshot {
 
 const PRIMARY_SLOT_FOR_REGISTER = buildPrimarySlotTable();
 const SECONDARY_SLOT_FOR_REGISTER = buildSecondarySlotTable();
+const VOICE_INDEX_FOR_REGISTER = buildVoiceIndexTable();
 
 /** `ASID_SLOT_TO_REGISTER` inverted over its first 25 (non-duplicate) entries. */
 function buildPrimarySlotTable(): readonly number[] {
@@ -41,6 +42,13 @@ function buildSecondarySlotTable(): ReadonlyMap<number, number> {
   for (let slot = SID_REGISTER_COUNT; slot < ASID_SLOT_TO_REGISTER.length; slot++) {
     table.set(ASID_SLOT_TO_REGISTER[slot], slot);
   }
+  return table;
+}
+
+/** `VOICE_CONTROL_REGISTERS` inverted: register -> its voice index, for the per-write hot path. */
+function buildVoiceIndexTable(): ReadonlyMap<number, number> {
+  const table = new Map<number, number>();
+  VOICE_CONTROL_REGISTERS.forEach((register, voice) => table.set(register, voice));
   return table;
 }
 
@@ -64,6 +72,7 @@ export class RegisterFrame implements SidWriteSink {
    * write the tune's code makes to it until unmuted — every other register for that voice keeps
    * updating live throughout, exactly matching `IOH_ASID.c`'s hardware-mute technique. */
   setVoiceMuted(voice: number, muted: boolean): void {
+    if (voice < 0 || voice >= VOICE_CONTROL_REGISTERS.length) return;
     if (muted === this.mutedVoices.has(voice)) return;
     if (muted) {
       this.mutedVoices.add(voice);
@@ -74,8 +83,8 @@ export class RegisterFrame implements SidWriteSink {
   }
 
   onSidWrite(register: number, value: number): void {
-    const voiceIndex = VOICE_CONTROL_REGISTERS.indexOf(register);
-    if (voiceIndex !== -1 && this.mutedVoices.has(voiceIndex)) {
+    const voiceIndex = VOICE_INDEX_FOR_REGISTER.get(register);
+    if (voiceIndex !== undefined && this.mutedVoices.has(voiceIndex)) {
       return; // muted — matches the firmware's discard-register redirect
     }
 
