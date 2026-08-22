@@ -130,7 +130,6 @@ export class DjPlayerEngine implements OnDestroy {
   readonly stats = signal<EngineStats>(EMPTY_STATS);
   readonly mutedVoices = signal<readonly boolean[]>([false, false, false]);
   readonly cues = signal<readonly (CueSlot | null)[]>([null, null, null, null]);
-  readonly gateOffOnJump = signal<boolean>(true);
   readonly loopInPercent = signal<number>(0);
   readonly loopOutPercent = signal<number>(100);
   readonly loopEnabled = signal<boolean>(false);
@@ -144,6 +143,8 @@ export class DjPlayerEngine implements OnDestroy {
   private bytesSent = 0;
   private recipeResends = 0;
   private framesSincePublish = 0;
+  /** Resync packets a jump still owes the stream, drained one per tick by `onTick`. */
+  private pendingResync: FrameSnapshot[] = [];
 
   /** Rebuilds the machine and register frame for `file` and initialises its start subtune. */
   loadTune(file: SidFile): void {
@@ -233,6 +234,8 @@ export class DjPlayerEngine implements OnDestroy {
 
     this.clock.stop();
     this.clearRecipeResend();
+    // No tick will come to drain them, and the gate-off below supersedes them anyway.
+    this.pendingResync = [];
     this.sendControl(buildSidDataPacket(buildVoiceGateOffSnapshot()));
     this.state.set('paused');
     this.publishStats();
@@ -378,28 +381,13 @@ export class DjPlayerEngine implements OnDestroy {
     machine.restore(cue.machine);
     frame.restoreValues(cue.registers);
     this.framesRendered = cue.frame;
-    this.emitResync();
+    this.queueResync();
   }
 
   /** Empties a cue slot, returning it to "Add". */
   clearCue(slot: number): void {
     if (slot < 0 || slot > 3) return;
     this.cues.update((cues) => cues.map((c, i) => (i === slot ? null : c)));
-  }
-
-  /**
-   * Whether a jump gates all three voices off immediately before its resync packet.
-   *
-   * A resync re-emits every register at its true value, which for a voice already sounding means the
-   * gate bit goes 1 -> 1: no edge, so the SID's envelope generator never re-attacks and the note
-   * carries across the seam. Gating off first guarantees a 1 -> 0 -> 1 edge, and because ASID orders
-   * the three control registers last within a packet, the new frequency, waveform and ADSR all land
-   * before the gate re-opens.
-   *
-   * A toggle rather than a constant so it can be A/B'd against the same cue on real hardware.
-   */
-  setGateOffOnJump(enabled: boolean): void {
-    this.gateOffOnJump.set(enabled);
   }
 
   /** Sets the loop's in/out points as percentages of `ceilingFrames()`, ordered low-to-high. */
@@ -437,6 +425,16 @@ export class DjPlayerEngine implements OnDestroy {
       return;
     }
 
+    // A jump's packets ride the tick rather than arriving beside it: the cartridge counts every
+    // SID-data packet as a frame and drains exactly one per timer tick, so anything injected between
+    // ticks is a frame it never asked for and never drains. See `queueResync`.
+    const pending = this.pendingResync.shift();
+    if (pending !== undefined) {
+      this.sendFramePacket(buildSidDataPacket(pending));
+      this.publishStats();
+      return;
+    }
+
     let result: FrameResult;
     try {
       result = machine.runFrame();
@@ -455,7 +453,7 @@ export class DjPlayerEngine implements OnDestroy {
     this.framesRendered++;
     if (this.loopEnabled() && this.framesRendered >= this.frameForPercent(this.loopOutPercent())) {
       this.jumpToFrame(this.frameForPercent(this.loopInPercent()));
-      return; // jumpToFrame already sent this tick's packet (the resync); don't publish stats twice
+      return; // the resync it queued goes out on the next tick; don't publish stats twice
     }
     if (++this.framesSincePublish >= STATS_PUBLISH_FRAME_INTERVAL) {
       this.publishStats();
@@ -566,41 +564,52 @@ export class DjPlayerEngine implements OnDestroy {
     this.machine = replayMachine;
     this.frame = replayFrame;
     this.framesRendered = clampedTarget;
-    this.emitResync();
+    this.queueResync();
   }
 
   /**
-   * Re-emits every register at its current value, so the chip matches the engine wherever it just
-   * landed. Shared by the replay jump and the constant-time cue hop — they differ in how they arrive
-   * at a position, never in how they announce it.
+   * Hands the chip-resync packets to the frame clock instead of sending them here.
+   *
+   * The cartridge treats every SID-data packet as one frame and drains exactly one per timer tick,
+   * so a packet injected between ticks is a frame it never drains: the queue grows by that much and
+   * stays grown until the re-timer claws it back. Two packets per hop, hopped repeatedly, walks the
+   * queue straight into the overflow that resets it — an audible dropout. Riding the tick keeps the
+   * rate at exactly one packet per frame no matter how hard the cue buttons are hit.
+   *
+   * The gate-off leads in a packet of its own so it drains a whole frame ahead of the resync, giving
+   * every voice a real release window before it re-attacks. Folding both into one packet via the
+   * ASID secondary gate slots would halve the frames but collapse that window to a few cycles.
+   *
+   * Costs the hop up to two frames of latency (~40 ms at 50 Hz), which is well under what a hand
+   * hitting a cue button can hear.
    */
-  private emitResync(): void {
+  private queueResync(): void {
     const frame = this.frame;
     if (frame === null) return;
 
     frame.markAllDirty();
     const snapshot = frame.takeSnapshot();
 
-    if (this.state() === 'paused') {
-      // A jump landing while paused must stay silent: `pause()` already zeroed the three voice
-      // control registers on the real chip, and this snapshot is a *full* re-emit — if sent verbatim
-      // it could re-open a gate and produce sound while the UI still reads "Paused". Force those
-      // three to 0 in the outgoing packet only; `frame` keeps its true values, so `play()`'s
-      // paused-resume branch (`markAllDirty()`) restores the real state on the next Play.
-      this.sendFramePacket(buildSidDataPacket(withVoiceGatesOff(snapshot)));
+    // Nothing is ticking while paused or stopped, so there is no tick to ride and no stream to stay
+    // in step with — send at once instead.
+    if (this.state() !== 'playing') {
+      this.pendingResync = [];
+      // A jump landing while *paused* must also stay silent: `pause()` already zeroed the three
+      // voice control registers on the real chip, and this snapshot is a full re-emit, so sent
+      // verbatim it could re-open a gate while the UI still reads "Paused". Force those three to 0
+      // in the outgoing packet only — `frame` keeps its true values, so `play()`'s paused-resume
+      // branch (`markAllDirty()`) restores the real state on the next Play. Stopped needs none of
+      // that: nothing is sounding to silence, and the true state is what the chip should hold.
+      const outgoing = this.state() === 'paused' ? withVoiceGatesOff(snapshot) : snapshot;
+      this.sendFramePacket(buildSidDataPacket(outgoing));
       this.publishStats();
       return;
     }
 
-    // Gate off first so every sounding voice sees a 1 -> 0 -> 1 edge and re-attacks, rather than
-    // carrying its old envelope across the seam (see `setGateOffOnJump`). Sent down the same
-    // `sendFramePacket` path as the resync it precedes, never `sendControl` — a control packet
-    // ignores schedule-ahead and would overtake the very packet it is meant to lead.
-    if (this.gateOffOnJump()) {
-      this.sendFramePacket(buildSidDataPacket(buildVoiceGateOffSnapshot()));
-    }
-    this.sendFramePacket(buildSidDataPacket(snapshot));
-    this.publishStats();
+    // Replaces any sequence still owed rather than appending to it. Spamming hops then costs one
+    // packet per tick forever, instead of building a backlog that plays every hop the button ever
+    // took — the newest hop is always the one that lands.
+    this.pendingResync = [buildVoiceGateOffSnapshot(), snapshot];
   }
 
   private applyIntervalChange(): void {
@@ -693,6 +702,7 @@ export class DjPlayerEngine implements OnDestroy {
     this.packetsSent = 0;
     this.bytesSent = 0;
     this.recipeResends = 0;
+    this.pendingResync = [];
   }
 
   private publishStats(): void {

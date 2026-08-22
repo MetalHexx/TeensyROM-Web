@@ -562,6 +562,7 @@ describe('DjPlayerEngine', () => {
       clock.tick(10);
 
       engine.hopToCue(0);
+      clock.tick(2); // gate-off, then the resync — the packet under test
       const hopped = lastDataPacket(midi).bytes;
 
       const freshClock = new FakeFrameClock();
@@ -580,6 +581,7 @@ describe('DjPlayerEngine', () => {
       freshClock.tick(5);
       freshEngine.addCue(0);
       freshEngine.hopToCue(0); // captured and restored back to back, nothing played in between
+      freshClock.tick(2);
 
       expect(hopped).toEqual(lastDataPacket(freshMidi).bytes);
     });
@@ -608,6 +610,7 @@ describe('DjPlayerEngine', () => {
       expect(slotValue(lastDataPacket(midi), 0)).not.toBe(atCue);
 
       engine.hopToCue(0);
+      clock.tick(2); // gate-off, then the resync carrying the cue's registers
       expect(slotValue(lastDataPacket(midi), 0)).toBe(atCue);
       expect(engine.stats().framesRendered).toBe(5);
 
@@ -617,7 +620,7 @@ describe('DjPlayerEngine', () => {
       expect(slotValue(lastDataPacket(midi), 0)).toBeGreaterThan(atCue);
     });
 
-    it('gates every voice off in a packet of its own immediately before a hop resync', async () => {
+    it('sends nothing of its own on a hop, then gate-off and resync on the next two ticks', async () => {
       engine.loadTune(counterTune());
       await engine.play();
       clock.tick(5);
@@ -626,33 +629,57 @@ describe('DjPlayerEngine', () => {
 
       const before = dataPackets(midi).length;
       engine.hopToCue(0);
-      const emitted = dataPackets(midi).slice(before);
+      // The cartridge drains exactly one packet per timer tick, so a hop that sent its own packets
+      // here would hand it frames it never drains.
+      expect(dataPackets(midi)).toHaveLength(before);
 
-      expect(emitted).toHaveLength(2);
+      clock.tick(1);
+      const gateOff = dataPackets(midi).slice(before);
+      expect(gateOff).toHaveLength(1);
       // Three present slots and nothing else — the seam packet touches only the gate registers and
-      // leaves frequency, waveform and ADSR to arrive with the resync behind it. `voiceGateValues`
-      // does not apply here: it reads slots 22/23/24 of a full 25-register re-emit.
-      expect(valueCount(emitted[0])).toBe(3);
-      expect([0, 1, 2].map((slot) => slotValue(emitted[0], slot))).toEqual([0, 0, 0]);
-      // The resync that follows carries the cue's real gate state, so the chip sees a 1 -> 0 -> 1
-      // edge and re-attacks rather than letting the pre-hop note carry across the seam.
-      expect(voiceGateValues(emitted[1])).toEqual([0x11, 0x11, 0x11]);
+      // leaves frequency, waveform and ADSR to the resync behind it. `voiceGateValues` does not
+      // apply here: it reads slots 22/23/24 of a full 25-register re-emit.
+      expect(valueCount(gateOff[0])).toBe(3);
+      expect([0, 1, 2].map((slot) => slotValue(gateOff[0], slot))).toEqual([0, 0, 0]);
+
+      clock.tick(1);
+      const resync = dataPackets(midi).slice(before + 1);
+      expect(resync).toHaveLength(1);
+      // A full frame after the gate-off, so every voice gets a real release window before this
+      // re-attacks it — the chip sees 1 -> 0 -> 1 rather than carrying the pre-hop note across.
+      expect(voiceGateValues(resync[0])).toEqual([0x11, 0x11, 0x11]);
     });
 
-    it('sends the resync alone when the gate-off seam is switched off', async () => {
+    it('holds the packet rate at one per tick however hard cues are spammed', async () => {
       engine.loadTune(counterTune());
       await engine.play();
       clock.tick(5);
       engine.addCue(0);
-      engine.setGateOffOnJump(false);
       clock.tick(5);
+      engine.addCue(1);
 
       const before = dataPackets(midi).length;
-      engine.hopToCue(0);
-      const emitted = dataPackets(midi).slice(before);
+      for (let i = 0; i < 50; i++) engine.hopToCue(i % 2);
+      expect(dataPackets(midi)).toHaveLength(before);
 
-      expect(emitted).toHaveLength(1);
-      expect(voiceGateValues(emitted[0])).toEqual([0x11, 0x11, 0x11]);
+      // Fifty hops between two ticks still cost two packets, not a hundred: a hop arriving while one
+      // is pending replaces it rather than queueing behind it, so the newest hop is the one that
+      // lands and no backlog survives to be played out.
+      clock.tick(2);
+      expect(dataPackets(midi)).toHaveLength(before + 2);
+
+      clock.tick(1);
+      expect(dataPackets(midi)).toHaveLength(before + 3);
+    });
+
+    it('resyncs immediately when a jump lands with the clock stopped', () => {
+      engine.loadTune(counterTune());
+
+      const before = dataPackets(midi).length;
+      engine.scrubTo(5);
+
+      // Nothing is ticking, so there is no tick to ride and nothing to stay in step with.
+      expect(dataPackets(midi).length).toBeGreaterThan(before);
     });
 
     it('forces the voice gates off in the resync packet when a jump lands while paused', async () => {
@@ -671,6 +698,7 @@ describe('DjPlayerEngine', () => {
       // while playing proves the masking above is a paused-only override, not the tune's real state.
       await engine.play();
       engine.scrubTo(5);
+      clock.tick(2); // playing now, so the resync rides the clock rather than going out here
       const playingPacket = lastDataPacket(midi);
 
       expect(voiceGateValues(playingPacket)).toEqual([0x11, 0x11, 0x11]);

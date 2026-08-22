@@ -48,7 +48,6 @@ interface MockDjPlayerEngine {
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
   cues: WritableSignal<readonly (CueSlot | null)[]>;
-  gateOffOnJump: WritableSignal<boolean>;
   loopInPercent: WritableSignal<number>;
   loopOutPercent: WritableSignal<number>;
   loopEnabled: WritableSignal<boolean>;
@@ -67,7 +66,6 @@ interface MockDjPlayerEngine {
   addCue: ReturnType<typeof vi.fn>;
   hopToCue: ReturnType<typeof vi.fn>;
   clearCue: ReturnType<typeof vi.fn>;
-  setGateOffOnJump: ReturnType<typeof vi.fn>;
   setLoopRange: ReturnType<typeof vi.fn>;
   setLoopEnabled: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
@@ -99,7 +97,6 @@ function makeEngine(): MockDjPlayerEngine {
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
     cues: signal<readonly (CueSlot | null)[]>([null, null, null, null]),
-    gateOffOnJump: signal(true),
     loopInPercent: signal(0),
     loopOutPercent: signal(100),
     loopEnabled: signal(false),
@@ -118,7 +115,6 @@ function makeEngine(): MockDjPlayerEngine {
     addCue: vi.fn(),
     hopToCue: vi.fn(),
     clearCue: vi.fn(),
-    setGateOffOnJump: vi.fn(),
     setLoopRange: vi.fn(),
     setLoopEnabled: vi.fn(),
     scrubTo: vi.fn(),
@@ -440,17 +436,6 @@ describe('DjPocViewComponent', () => {
       );
     });
 
-    it('toggles the gate-off seam', () => {
-      const checkbox = fixture.nativeElement.querySelector(
-        '[aria-label="Cues"] input[type="checkbox"]'
-      ) as HTMLInputElement;
-      expect(checkbox.checked).toBe(true);
-
-      checkbox.checked = false;
-      checkbox.dispatchEvent(new Event('change'));
-
-      expect(engine.setGateOffOnJump).toHaveBeenCalledWith(false);
-    });
   });
 
   describe('loop handlers', () => {
