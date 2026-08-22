@@ -100,11 +100,29 @@ public class TransferScratchStoreTests : IDisposable
         var filePath = Path.Combine(jobDir, "0.bin");
         File.WriteAllBytes(filePath, [1]);
 
-        using (var handle = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
+        // Windows blocks the delete via an exclusive file handle. Linux/macOS allow unlinking an
+        // open file (POSIX semantics), so an open handle alone never throws there — the failure
+        // has to come from denying write permission on the job directory itself instead.
+        if (OperatingSystem.IsWindows())
         {
+            using var handle = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.None);
             var act = () => store.PurgeJob("job-1");
 
             act.Should().NotThrow();
+        }
+        else
+        {
+            File.SetUnixFileMode(jobDir, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+            try
+            {
+                var act = () => store.PurgeJob("job-1");
+
+                act.Should().NotThrow();
+            }
+            finally
+            {
+                File.SetUnixFileMode(jobDir, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
         }
 
         log.Received(1).InternalWarning(Arg.Any<string>());
