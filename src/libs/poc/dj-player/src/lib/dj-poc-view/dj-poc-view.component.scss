@@ -71,23 +71,6 @@
   }
 }
 
-// Visually set apart from the command controls above — a select here changes nothing on the
-// cartridge, it only documents what the firmware already has set.
-.record-group {
-  display: flex;
-  flex-flow: row wrap;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  border: 1px dashed var(--color-dimmed);
-  border-radius: var(--border-radius-md);
-
-  // Same reasoning as .timing-commands above: the caption is prose, not a control.
-  > p {
-    flex-basis: 100%;
-  }
-}
-
 // dt/dd pairs default to stacking each label on its own line above its value — for the
 // diagnostics and tune-metadata readouts that doubles the line count for no reason, since every
 // label here is short. Lay them out as a compact two-column grid instead.

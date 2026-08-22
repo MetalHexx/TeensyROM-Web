@@ -47,6 +47,7 @@ interface MockDjPlayerEngine {
   speedMultiplier: WritableSignal<number>;
   speedMode: WritableSignal<SpeedMode>;
   recipeEnabled: WritableSignal<boolean>;
+  recipeSent: WritableSignal<boolean>;
   nominalIntervalUs: WritableSignal<number>;
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
@@ -96,6 +97,7 @@ function makeEngine(): MockDjPlayerEngine {
     speedMultiplier: signal(1),
     speedMode: signal<SpeedMode>('clock-only'),
     recipeEnabled: signal(true),
+    recipeSent: signal(false),
     nominalIntervalUs: signal(19950),
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
@@ -306,41 +308,46 @@ describe('DjPocViewComponent', () => {
     });
   });
 
-  describe('timer mode / buffer size record', () => {
-    function selectByLabel(labelText: string): HTMLSelectElement {
+  describe('cartridge frame timer status', () => {
+    function panelText(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    it('reports the timer as unset by this browser before any recipe has gone out', () => {
+      engine.recipeSent.set(false);
+      fixture.detectChanges();
+
+      expect(panelText()).toContain('not set by this browser');
+    });
+
+    it('reports the timer as forced, at the effective interval, once a recipe has gone out', () => {
+      engine.recipeSent.set(true);
+      engine.stats.set({ ...EMPTY_STATS, effectiveIntervalUs: 9975 });
+      fixture.detectChanges();
+
+      const text = panelText();
+      expect(text).toContain('forced by the recipe packet at 9975');
+      // The two traps this status exists to make visible: un-checking the box does not clear the
+      // cartridge's flag, and the C64's own menu never learns the host overrode it.
+      expect(text).toContain('exited and re-entered');
+      expect(text).toContain('disagree with this');
+    });
+
+    // Deleted rather than relabelled: the browser can neither set nor read the buffer size, so any
+    // value shown here would be a hand-kept note that goes stale the next time B is pressed.
+    it('offers no buffer-size control, since the browser cannot know it', () => {
+      const selects: HTMLSelectElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('select')
+      );
       const labels: HTMLLabelElement[] = Array.from(
         fixture.nativeElement.querySelectorAll('label.control')
       );
-      const label = labels.find((candidate) => candidate.textContent?.includes(labelText));
-      const select = label?.querySelector('select');
-      if (!select) {
-        throw new Error(`no select found under label "${labelText}"`);
-      }
-      return select;
-    }
 
-    // Medium, not Tiny: the record has to start where the cartridge actually starts, or every
-    // session that never touches the select is attributed to hardware it never ran on.
-    it('defaults to off / Medium and updates the diagnostics readout on change', () => {
-      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-      expect(text).toContain('off / Medium (1024 B)');
-
-      const timerSelect = selectByLabel('Timer mode (C64)');
-      timerSelect.value = 'fixed-50hz';
-      timerSelect.dispatchEvent(new Event('change'));
-
-      const bufferSelect = selectByLabel('Buffer size (C64)');
-      bufferSelect.value = 'xxl';
-      bufferSelect.dispatchEvent(new Event('change'));
-      fixture.detectChanges();
-
-      const updatedText = (fixture.nativeElement as HTMLElement).textContent ?? '';
-      expect(updatedText).toContain('fixed 50 Hz / XXL (8192 B)');
-    });
-
-    it('renders both selects as enabled, real controls', () => {
-      expect(selectByLabel('Timer mode (C64)').disabled).toBe(false);
-      expect(selectByLabel('Buffer size (C64)').disabled).toBe(false);
+      expect(labels.some((label) => (label.textContent ?? '').includes('Buffer size'))).toBe(false);
+      expect(labels.some((label) => (label.textContent ?? '').includes('Timer mode'))).toBe(false);
+      expect(selects.some((select) => select.value === 'medium' || select.value === 'tiny')).toBe(
+        false
+      );
     });
   });
 

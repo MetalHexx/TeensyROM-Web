@@ -27,28 +27,6 @@ const MICROSECONDS_PER_SECOND = 1_000_000;
  * timestamped `send()` is honoured at all in this browser. */
 const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
 
-/** The three timer modes the cartridge's own ASID player menu offers — the browser never sets
- * this, it only records which one the tester configured before a session. */
-export type TimerMode = 'off' | 'auto-seed' | 'fixed-50hz';
-
-const TIMER_MODE_OPTIONS: readonly { readonly value: TimerMode; readonly label: string }[] = [
-  { value: 'off', label: 'off' },
-  { value: 'auto-seed', label: 'auto-seed' },
-  { value: 'fixed-50hz', label: 'fixed 50 Hz' },
-];
-
-/** The six buffer sizes the cartridge's own menu offers — likewise a record, not a command. */
-export type BufferSize = 'tiny' | 'small' | 'medium' | 'large' | 'xl' | 'xxl';
-
-const BUFFER_SIZE_OPTIONS: readonly { readonly value: BufferSize; readonly label: string }[] = [
-  { value: 'tiny', label: 'Tiny (256 B)' },
-  { value: 'small', label: 'Small (512 B)' },
-  { value: 'medium', label: 'Medium (1024 B)' },
-  { value: 'large', label: 'Large (2048 B)' },
-  { value: 'xl', label: 'XL (4096 B)' },
-  { value: 'xxl', label: 'XXL (8192 B)' },
-];
-
 /**
  * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. One column
  * of labelled control groups: MIDI, Timing, Tune, Transport, Speed, Voice, Cues, Loop/Scrub,
@@ -114,23 +92,19 @@ export class DjPocViewComponent {
   // hears about it once the drag releases (see onScrubChange).
   protected readonly scrubDisplayPercent = signal<number>(0);
 
-  // Neither the timer mode nor the buffer size is part of the ASID protocol this browser speaks —
-  // the cartridge decides both on its own, in its own menu. These signals record what the tester
-  // set there so the diagnostics readout and the findings log can attribute a session to the
-  // right one of the eighteen timer-mode x buffer-size combinations under test.
-  protected readonly timerMode = signal<TimerMode>('off');
-  // Medium, matching the cartridge's own default — the firmware initialises `ASIDQueueSize` to
-  // Medium with the comment "Initialize to match memBufferSize default", and the C64's menu agrees.
-  // A record that starts on a value the hardware never sits at mis-attributes every session that
-  // doesn't touch it.
-  protected readonly bufferSize = signal<BufferSize>('medium');
-  protected readonly timerModeOptions = TIMER_MODE_OPTIONS;
-  protected readonly bufferSizeOptions = BUFFER_SIZE_OPTIONS;
-  protected readonly timerModeLabel = computed(
-    () => TIMER_MODE_OPTIONS.find((option) => option.value === this.timerMode())?.label ?? ''
-  );
-  protected readonly bufferSizeLabel = computed(
-    () => BUFFER_SIZE_OPTIONS.find((option) => option.value === this.bufferSize())?.label ?? ''
+  // The cartridge's frame timer, stated rather than recorded: we know it is on once we have sent a
+  // recipe packet, because the firmware's handler forces `FrameTimerMode = true` on receipt.
+  //
+  // Buffer size has no equivalent and is deliberately absent. ASID is one-way host -> cartridge and
+  // Identify writes text to the C64 screen rather than querying it, so this browser has no way to
+  // read the buffer size back. A hand-kept record of it is only true while someone remembers to
+  // update two places at once, and a stale one is worse than nothing — the C64's own menu already
+  // displays the buffer size accurately, so that is where it is read.
+  protected readonly frameTimerForced = this.engine.recipeSent;
+  protected readonly frameTimerStatus = computed(() =>
+    this.frameTimerForced()
+      ? `on — forced by the recipe packet at ${Math.round(this.engineStats().effectiveIntervalUs)} µs`
+      : 'not set by this browser — the cartridge keeps whatever it last had'
   );
 
   // Identify interrupts the stream on the cartridge, so it stays out of reach while a tune plays.
@@ -314,14 +288,6 @@ export class DjPocViewComponent {
     const value = Number((event.target as HTMLInputElement).value);
     this.scrubDisplayPercent.set(value);
     this.engine.scrubTo(value);
-  }
-
-  onTimerModeChange(event: Event): void {
-    this.timerMode.set((event.target as HTMLSelectElement).value as TimerMode);
-  }
-
-  onBufferSizeChange(event: Event): void {
-    this.bufferSize.set((event.target as HTMLSelectElement).value as BufferSize);
   }
 
   protected frameRateHz(intervalUs: number): string {

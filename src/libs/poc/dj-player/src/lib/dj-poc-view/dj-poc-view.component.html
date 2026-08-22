@@ -82,34 +82,22 @@
       }
     </div>
 
-    <div class="record-group">
-      <p class="caption">
-        Record only — these reflect what you set on the C64 in the cartridge's own ASID player
-        menu; this browser cannot change either one.
-      </p>
+    <p class="caption">
+      Cartridge frame timer: {{ frameTimerStatus() }}.
+      @if (frameTimerForced()) {
+        It stays on until the ASID player is exited and re-entered — un-checking the box above only
+        stops us sending more recipes, it does not turn the timer off. The C64's own menu still
+        displays whatever you last set there; that display is never updated by the host, so it will
+        disagree with this.
+      }
+    </p>
 
-      <label class="control">
-        Timer mode (C64)
-        <select (change)="onTimerModeChange($event)">
-          @for (option of timerModeOptions; track option.value) {
-            <option [value]="option.value" [selected]="option.value === timerMode()">
-              {{ option.label }}
-            </option>
-          }
-        </select>
-      </label>
-
-      <label class="control">
-        Buffer size (C64)
-        <select (change)="onBufferSizeChange($event)">
-          @for (option of bufferSizeOptions; track option.value) {
-            <option [value]="option.value" [selected]="option.value === bufferSize()">
-              {{ option.label }}
-            </option>
-          }
-        </select>
-      </label>
-    </div>
+    <p class="caption">
+      Buffer size is set on the C64 with <code>b</code> / <code>B</code> and read from its screen.
+      This browser cannot set it — the recipe packet reserves a bit for it that the firmware parses
+      but never acts on — and cannot read it back, so it is not shown here rather than shown as a
+      guess that goes stale.
+    </p>
   </section>
 
   <section class="poc-section" aria-label="Tune">
@@ -303,8 +291,8 @@
     <h2>Diagnostics</h2>
 
     <dl class="diagnostic-fields">
-      <dt>Timer mode / buffer size (C64)</dt>
-      <dd>{{ timerModeLabel() }} / {{ bufferSizeLabel() }}</dd>
+      <dt>Cartridge frame timer</dt>
+      <dd>{{ frameTimerStatus() }}</dd>
       <dt>Frames emitted</dt>
       <dd>{{ engineStats().framesRendered }}</dd>
       <dt>Packets / second</dt>

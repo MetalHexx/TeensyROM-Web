@@ -133,6 +133,18 @@ export class DjPlayerEngine implements OnDestroy {
   readonly speedMultiplier = signal<number>(1);
   readonly speedMode = signal<SpeedMode>('clock-only');
   readonly recipeEnabled = signal<boolean>(true);
+  /**
+   * Whether a recipe packet has gone out since this engine was constructed — which means the
+   * cartridge's frame timer is on, because the firmware's `APT_ContFramerate` handler does
+   * `FrameTimerMode = true` unconditionally on receipt.
+   *
+   * Deliberately sticky: `stop()`, `loadTune()` and `resetCounters()` all leave the cartridge's flag
+   * set, and so does un-checking `recipeEnabled` — that only stops us sending *more* recipes. The
+   * flag clears on the cartridge only when the ASID player app is exited and re-entered, where
+   * `InitHndlr_ASID` sets it false, which this browser cannot observe. So this tracks what we know
+   * we caused rather than pretending to read the cartridge.
+   */
+  readonly recipeSent = signal<boolean>(false);
   readonly nominalIntervalUs = signal<number>(PAL_FRAME_INTERVAL_US);
   readonly scheduleAheadMs = signal<number>(0);
   readonly lastError = signal<string | null>(null);
@@ -666,6 +678,7 @@ export class DjPlayerEngine implements OnDestroy {
         frameIntervalUs: clamp(Math.round(this.effectiveIntervalUs()), 0, RECIPE_MAX_INTERVAL_US),
       })
     );
+    this.recipeSent.set(true);
     this.recipeResends++;
     this.publishStats();
   }
