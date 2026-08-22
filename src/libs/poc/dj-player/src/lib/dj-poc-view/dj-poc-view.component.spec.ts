@@ -2,7 +2,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DjPocViewComponent } from './dj-poc-view.component';
-import { DjPlayerEngine, EngineState, EngineStats, SpeedMode } from '../engine/dj-player-engine';
+import {
+  CueSlot,
+  DjPlayerEngine,
+  EngineState,
+  EngineStats,
+  SpeedMode,
+} from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
 
@@ -17,6 +23,9 @@ const EMPTY_STATS: EngineStats = {
   effectiveIntervalUs: 0,
   measuredMeanIntervalUs: 0,
   driftMs: 0,
+  jitterMs: 0,
+  worstGapMs: 0,
+  lateCallbacks: 0,
 };
 
 interface MockMidiOutputService {
@@ -38,8 +47,14 @@ interface MockDjPlayerEngine {
   speedMultiplier: WritableSignal<number>;
   speedMode: WritableSignal<SpeedMode>;
   recipeEnabled: WritableSignal<boolean>;
+  recipeSent: WritableSignal<boolean>;
   nominalIntervalUs: WritableSignal<number>;
   scheduleAheadMs: WritableSignal<number>;
+  mutedVoices: WritableSignal<readonly boolean[]>;
+  cues: WritableSignal<readonly (CueSlot | null)[]>;
+  loopInPercent: WritableSignal<number>;
+  loopOutPercent: WritableSignal<number>;
+  loopEnabled: WritableSignal<boolean>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -51,6 +66,13 @@ interface MockDjPlayerEngine {
   setNominalIntervalUs: ReturnType<typeof vi.fn>;
   setScheduleAhead: ReturnType<typeof vi.fn>;
   loadTune: ReturnType<typeof vi.fn>;
+  setVoiceMuted: ReturnType<typeof vi.fn>;
+  addCue: ReturnType<typeof vi.fn>;
+  hopToCue: ReturnType<typeof vi.fn>;
+  clearCue: ReturnType<typeof vi.fn>;
+  setLoopRange: ReturnType<typeof vi.fn>;
+  setLoopEnabled: ReturnType<typeof vi.fn>;
+  scrubTo: ReturnType<typeof vi.fn>;
 }
 
 function makeMidiService(): MockMidiOutputService {
@@ -75,8 +97,14 @@ function makeEngine(): MockDjPlayerEngine {
     speedMultiplier: signal(1),
     speedMode: signal<SpeedMode>('clock-only'),
     recipeEnabled: signal(true),
+    recipeSent: signal(false),
     nominalIntervalUs: signal(19950),
     scheduleAheadMs: signal(0),
+    mutedVoices: signal<readonly boolean[]>([false, false, false]),
+    cues: signal<readonly (CueSlot | null)[]>([null, null, null, null]),
+    loopInPercent: signal(0),
+    loopOutPercent: signal(100),
+    loopEnabled: signal(false),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
@@ -88,7 +116,34 @@ function makeEngine(): MockDjPlayerEngine {
     setNominalIntervalUs: vi.fn(),
     setScheduleAhead: vi.fn(),
     loadTune: vi.fn(),
+    setVoiceMuted: vi.fn(),
+    addCue: vi.fn(),
+    hopToCue: vi.fn(),
+    clearCue: vi.fn(),
+    setLoopRange: vi.fn(),
+    setLoopEnabled: vi.fn(),
+    scrubTo: vi.fn(),
   };
+}
+
+const PSID_HEADER_SIZE = 0x7c;
+
+/** A minimal well-formed PSID v2 file — enough for `parseSidFile` to accept without throwing. */
+function validSidBytes(): Uint8Array {
+  const payload = [0xa9, 0x00, 0x60];
+  const buffer = new Uint8Array(PSID_HEADER_SIZE + payload.length);
+  const view = new DataView(buffer.buffer);
+  buffer.set([0x50, 0x53, 0x49, 0x44], 0x00); // 'PSID'
+  view.setUint16(0x04, 2, false);
+  view.setUint16(0x06, PSID_HEADER_SIZE, false);
+  view.setUint16(0x08, 0x1000, false);
+  view.setUint16(0x0a, 0x1000, false);
+  view.setUint16(0x0c, 0x1003, false);
+  view.setUint16(0x0e, 1, false);
+  view.setUint16(0x10, 1, false);
+  view.setUint32(0x12, 0, false);
+  buffer.set(payload, PSID_HEADER_SIZE);
+  return buffer;
 }
 
 function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
@@ -253,39 +308,46 @@ describe('DjPocViewComponent', () => {
     });
   });
 
-  describe('timer mode / buffer size record', () => {
-    function selectByLabel(labelText: string): HTMLSelectElement {
+  describe('cartridge frame timer status', () => {
+    function panelText(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    it('reports the timer as unset by this browser before any recipe has gone out', () => {
+      engine.recipeSent.set(false);
+      fixture.detectChanges();
+
+      expect(panelText()).toContain('not set by this browser');
+    });
+
+    it('reports the timer as forced, at the effective interval, once a recipe has gone out', () => {
+      engine.recipeSent.set(true);
+      engine.stats.set({ ...EMPTY_STATS, effectiveIntervalUs: 9975 });
+      fixture.detectChanges();
+
+      const text = panelText();
+      expect(text).toContain('forced by the recipe packet at 9975');
+      // The two traps this status exists to make visible: un-checking the box does not clear the
+      // cartridge's flag, and the C64's own menu never learns the host overrode it.
+      expect(text).toContain('exited and re-entered');
+      expect(text).toContain('disagree with this');
+    });
+
+    // Deleted rather than relabelled: the browser can neither set nor read the buffer size, so any
+    // value shown here would be a hand-kept note that goes stale the next time B is pressed.
+    it('offers no buffer-size control, since the browser cannot know it', () => {
+      const selects: HTMLSelectElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('select')
+      );
       const labels: HTMLLabelElement[] = Array.from(
         fixture.nativeElement.querySelectorAll('label.control')
       );
-      const label = labels.find((candidate) => candidate.textContent?.includes(labelText));
-      const select = label?.querySelector('select');
-      if (!select) {
-        throw new Error(`no select found under label "${labelText}"`);
-      }
-      return select;
-    }
 
-    it('defaults to off / Tiny and updates the diagnostics readout on change', () => {
-      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-      expect(text).toContain('off / Tiny (256 B)');
-
-      const timerSelect = selectByLabel('Timer mode (C64)');
-      timerSelect.value = 'fixed-50hz';
-      timerSelect.dispatchEvent(new Event('change'));
-
-      const bufferSelect = selectByLabel('Buffer size (C64)');
-      bufferSelect.value = 'xxl';
-      bufferSelect.dispatchEvent(new Event('change'));
-      fixture.detectChanges();
-
-      const updatedText = (fixture.nativeElement as HTMLElement).textContent ?? '';
-      expect(updatedText).toContain('fixed 50 Hz / XXL (8192 B)');
-    });
-
-    it('renders both selects as enabled, real controls', () => {
-      expect(selectByLabel('Timer mode (C64)').disabled).toBe(false);
-      expect(selectByLabel('Buffer size (C64)').disabled).toBe(false);
+      expect(labels.some((label) => (label.textContent ?? '').includes('Buffer size'))).toBe(false);
+      expect(labels.some((label) => (label.textContent ?? '').includes('Timer mode'))).toBe(false);
+      expect(selects.some((select) => select.value === 'medium' || select.value === 'tiny')).toBe(
+        false
+      );
     });
   });
 
@@ -319,6 +381,126 @@ describe('DjPocViewComponent', () => {
 
       subtuneButtons[1].click();
       expect(engine.nextSubtune).toHaveBeenCalled();
+    });
+  });
+
+  describe('auto-play', () => {
+    it('plays automatically once a tune is selected', () => {
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      expect(engine.loadTune).toHaveBeenCalled();
+      expect(engine.play).toHaveBeenCalled();
+    });
+  });
+
+  describe('voice mute toggles', () => {
+    it('calls engine.setVoiceMuted with the voice index and the checkbox state', () => {
+      const checkbox = fixture.nativeElement.querySelector(
+        '[aria-label="Voice"] input[type="checkbox"]'
+      ) as HTMLInputElement;
+
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event('change'));
+
+      expect(engine.setVoiceMuted).toHaveBeenCalledWith(0, true);
+    });
+  });
+
+  describe('cue slots', () => {
+    function cueButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Cues"] button'));
+    }
+
+    /** A slot the view treats as set. Only `frame` is rendered; the snapshots are opaque to it. */
+    function cueAt(frame: number): CueSlot {
+      return { frame, machine: {}, registers: {} } as unknown as CueSlot;
+    }
+
+    it('adds a cue for an empty slot, then hops once the slot is set', () => {
+      cueButtons()[0].click();
+      expect(engine.addCue).toHaveBeenCalledWith(0);
+
+      engine.cues.set([cueAt(1234), null, null, null]);
+      fixture.detectChanges();
+
+      cueButtons()[0].click();
+      expect(engine.hopToCue).toHaveBeenCalledWith(0);
+    });
+
+    it('shows a Clear button alongside Hop once a slot is set, and clears it on click', () => {
+      engine.cues.set([cueAt(1234), null, null, null]);
+      fixture.detectChanges();
+
+      const buttons = cueButtons();
+      expect(buttons[0].textContent).toContain('Hop 1');
+      expect(buttons[1].textContent).toContain('Clear 1');
+
+      buttons[1].click();
+      expect(engine.clearCue).toHaveBeenCalledWith(0);
+    });
+
+    it('shows the captured frame for a set slot', () => {
+      engine.cues.set([cueAt(1234), null, null, null]);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-slot').textContent).toContain(
+        'frame 1234'
+      );
+    });
+
+  });
+
+  describe('loop handlers', () => {
+    function dualRangeInputs(): HTMLInputElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.dual-range input[type="range"]'));
+    }
+
+    it('clamps the in-handle so it never drags past the out-handle', () => {
+      engine.loopOutPercent.set(50);
+      fixture.detectChanges();
+
+      const [inHandle] = dualRangeInputs();
+      inHandle.value = '80';
+      inHandle.dispatchEvent(new Event('input'));
+
+      expect(engine.setLoopRange).toHaveBeenCalledWith(49, 50);
+    });
+
+    it('clamps the out-handle so it never drags past the in-handle', () => {
+      engine.loopInPercent.set(50);
+      fixture.detectChanges();
+
+      const [, outHandle] = dualRangeInputs();
+      outHandle.value = '20';
+      outHandle.dispatchEvent(new Event('input'));
+
+      expect(engine.setLoopRange).toHaveBeenCalledWith(50, 51);
+    });
+  });
+
+  describe('scrub handler', () => {
+    function scrubInput(): HTMLInputElement {
+      const rangesInSection: HTMLInputElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Loop / Scrub"] input[type="range"]')
+      );
+      return rangesInSection[rangesInSection.length - 1];
+    }
+
+    it('does not call engine.scrubTo while dragging', () => {
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+
+      expect(engine.scrubTo).not.toHaveBeenCalled();
+    });
+
+    it('calls engine.scrubTo with the value once the drag releases', () => {
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.scrubTo).toHaveBeenCalledWith(42);
     });
   });
 });

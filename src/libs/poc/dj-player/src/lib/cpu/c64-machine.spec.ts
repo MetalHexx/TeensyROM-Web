@@ -341,4 +341,59 @@ describe('C64Machine on the bundled tunes', () => {
     expect(machine.cyclesPerPlayCall).not.toBeNull();
     expect(machine.callsPerFrame).toBeGreaterThanOrEqual(1);
   }, 20_000);
+
+  describe('snapshot and restore', () => {
+    /**
+     * The guard on `CPU_STATE_KEYS`. `mos6502` declares its registers `private` and offers no setter,
+     * so a restore assigns them directly by name — if an upstream release renames one, the restore
+     * would silently put back partial state and this is what catches it. Divergence here means the
+     * key list is stale, not that the test is wrong.
+     */
+    it('replays byte-for-byte identically after a restore', () => {
+      const sink = new RecordingSink();
+      const machine = new C64Machine(bundled('still-time'), sink);
+      machine.initSubtune(1);
+      for (let i = 0; i < 20; i++) machine.runFrame();
+
+      const snapshot = machine.snapshot();
+      const fromSnapshot = sink.writes.length;
+      for (let i = 0; i < 30; i++) machine.runFrame();
+      const expected = sink.writes.slice(fromSnapshot);
+
+      machine.restore(snapshot);
+      const fromRestore = sink.writes.length;
+      for (let i = 0; i < 30; i++) machine.runFrame();
+
+      expect(sink.writes.slice(fromRestore)).toEqual(expected);
+      expect(expected.length).toBeGreaterThan(0); // a machine writing nothing would pass vacuously
+    }, 20_000);
+
+    it('detaches the snapshot from the machine, so later frames cannot alter it', () => {
+      const machine = new C64Machine(bundled('still-time'), new RecordingSink());
+      machine.initSubtune(1);
+      machine.runFrame();
+
+      const snapshot = machine.snapshot();
+      const memoryAtCapture = snapshot.memory.slice();
+      for (let i = 0; i < 30; i++) machine.runFrame();
+
+      expect(snapshot.memory).toEqual(memoryAtCapture);
+    }, 20_000);
+
+    it('rewinds an advanced machine to an earlier capture', () => {
+      const sink = new RecordingSink();
+      const machine = new C64Machine(bundled('still-time'), sink);
+      machine.initSubtune(1);
+      machine.runFrame();
+
+      const early = machine.snapshot();
+      for (let i = 0; i < 40; i++) machine.runFrame();
+      const advanced = machine.snapshot();
+
+      expect(advanced.memory).not.toEqual(early.memory);
+
+      machine.restore(early);
+      expect(machine.snapshot().memory).toEqual(early.memory);
+    }, 20_000);
+  });
 });

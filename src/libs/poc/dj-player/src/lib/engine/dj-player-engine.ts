@@ -1,6 +1,10 @@
 import { inject, Injectable, InjectionToken, OnDestroy, signal } from '@angular/core';
 import { logError, logInfo, LogType, logWarn } from '@teensyrom-nx/utils';
-import { NTSC_FRAME_INTERVAL_US, PAL_FRAME_INTERVAL_US } from '../asid/asid-constants';
+import {
+  NTSC_FRAME_INTERVAL_US,
+  PAL_FRAME_INTERVAL_US,
+  VOICE_CONTROL_REGISTERS,
+} from '../asid/asid-constants';
 import {
   buildFramerateRecipePacket,
   buildSidDataPacket,
@@ -9,8 +13,9 @@ import {
   buildStopPacket,
 } from '../asid/asid-encoder';
 import { RegisterFrame } from '../asid/register-frame';
-import type { FrameSnapshot } from '../asid/register-frame';
+import type { FrameSnapshot, RegisterValuesSnapshot } from '../asid/register-frame';
 import { C64Machine } from '../cpu/c64-machine';
+import type { MachineSnapshot } from '../cpu/c64-machine';
 import type { FrameResult } from '../cpu/c64-machine';
 import type { SidFile } from '../sid/sid-file.model';
 import { MidiOutputService } from '../midi/midi-output.service';
@@ -18,6 +23,18 @@ import type { FrameClock } from '../clock/frame-clock';
 
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
 export type SpeedMode = 'clock-only' | 'clock-and-recipe';
+
+/**
+ * A captured position, held as restorable state rather than as a frame number.
+ *
+ * `frame` is carried only so the diagnostics and stats stay honest about where a hop landed; the
+ * machine and register snapshots are what actually make the return trip.
+ */
+export interface CueSlot {
+  readonly frame: number;
+  readonly machine: MachineSnapshot;
+  readonly registers: RegisterValuesSnapshot;
+}
 
 /** Counters and measurements the diagnostics panel reads. */
 export interface EngineStats {
@@ -32,6 +49,12 @@ export interface EngineStats {
   readonly effectiveIntervalUs: number;
   readonly measuredMeanIntervalUs: number;
   readonly driftMs: number;
+  /** Standard deviation of the audio-callback gap — the scatter that empties the cartridge queue. */
+  readonly jitterMs: number;
+  /** The longest single audio-callback gap since play started. */
+  readonly worstGapMs: number;
+  /** Callbacks that arrived more than 2x the nominal buffer duration late. */
+  readonly lateCallbacks: number;
 }
 
 /**
@@ -52,6 +75,11 @@ export const NOMINAL_INTERVAL_OPTIONS_US: readonly number[] = [PAL_FRAME_INTERVA
 export const MIN_SPEED_MULTIPLIER = 0.8;
 export const MAX_SPEED_MULTIPLIER = 1.2;
 
+const MICROSECONDS_PER_SECOND = 1_000_000;
+/** The assumed length loop/scrub percentages are measured against — not the tune's real,
+ * unmeasured length. A single tunable constant, not derived from anything about the file. */
+export const JUMP_CEILING_SECONDS = 300;
+
 /**
  * How long a speed change settles before `clock-and-recipe` mode resends the recipe.
  *
@@ -61,9 +89,6 @@ export const MAX_SPEED_MULTIPLIER = 1.2;
  * the experiment.
  */
 export const RECIPE_RESEND_DEBOUNCE_MS = 500;
-
-/** `$D404`, `$D40B`, `$D412` — the per-voice control registers whose bit 0 is the gate. */
-const VOICE_CONTROL_REGISTERS: readonly number[] = [4, 11, 18];
 
 /**
  * Frames between `stats` publishes. A signal write per frame would run Angular change detection at
@@ -84,6 +109,9 @@ const EMPTY_STATS: EngineStats = {
   effectiveIntervalUs: 0,
   measuredMeanIntervalUs: 0,
   driftMs: 0,
+  jitterMs: 0,
+  worstGapMs: 0,
+  lateCallbacks: 0,
 };
 
 /**
@@ -105,10 +133,27 @@ export class DjPlayerEngine implements OnDestroy {
   readonly speedMultiplier = signal<number>(1);
   readonly speedMode = signal<SpeedMode>('clock-only');
   readonly recipeEnabled = signal<boolean>(true);
+  /**
+   * Whether a recipe packet has gone out since this engine was constructed — which means the
+   * cartridge's frame timer is on, because the firmware's `APT_ContFramerate` handler does
+   * `FrameTimerMode = true` unconditionally on receipt.
+   *
+   * Deliberately sticky: `stop()`, `loadTune()` and `resetCounters()` all leave the cartridge's flag
+   * set, and so does un-checking `recipeEnabled` — that only stops us sending *more* recipes. The
+   * flag clears on the cartridge only when the ASID player app is exited and re-entered, where
+   * `InitHndlr_ASID` sets it false, which this browser cannot observe. So this tracks what we know
+   * we caused rather than pretending to read the cartridge.
+   */
+  readonly recipeSent = signal<boolean>(false);
   readonly nominalIntervalUs = signal<number>(PAL_FRAME_INTERVAL_US);
   readonly scheduleAheadMs = signal<number>(0);
   readonly lastError = signal<string | null>(null);
   readonly stats = signal<EngineStats>(EMPTY_STATS);
+  readonly mutedVoices = signal<readonly boolean[]>([false, false, false]);
+  readonly cues = signal<readonly (CueSlot | null)[]>([null, null, null, null]);
+  readonly loopInPercent = signal<number>(0);
+  readonly loopOutPercent = signal<number>(100);
+  readonly loopEnabled = signal<boolean>(false);
 
   private file: SidFile | null = null;
   private machine: C64Machine | null = null;
@@ -119,6 +164,8 @@ export class DjPlayerEngine implements OnDestroy {
   private bytesSent = 0;
   private recipeResends = 0;
   private framesSincePublish = 0;
+  /** Resync packets a jump still owes the stream, drained one per tick by `onTick`. */
+  private pendingResync: FrameSnapshot[] = [];
 
   /** Rebuilds the machine and register frame for `file` and initialises its start subtune. */
   loadTune(file: SidFile): void {
@@ -130,6 +177,7 @@ export class DjPlayerEngine implements OnDestroy {
 
     this.file = file;
     this.frame = new RegisterFrame();
+    this.mutedVoices.set([false, false, false]);
     this.machine = new C64Machine(file, this.frame);
     this.subtuneCount.set(Math.max(1, file.songs));
     this.nominalIntervalUs.set(
@@ -207,6 +255,8 @@ export class DjPlayerEngine implements OnDestroy {
 
     this.clock.stop();
     this.clearRecipeResend();
+    // No tick will come to drain them, and the gate-off below supersedes them anyway.
+    this.pendingResync = [];
     this.sendControl(buildSidDataPacket(buildVoiceGateOffSnapshot()));
     this.state.set('paused');
     this.publishStats();
@@ -249,6 +299,16 @@ export class DjPlayerEngine implements OnDestroy {
 
   previousSubtune(): void {
     this.selectSubtune(this.currentSubtune() - 1);
+  }
+
+  /**
+   * Voice 0/1/2. Replicates the firmware's own hardware-mute technique: forces that voice's control
+   * register to 0 once, then drops every further write the tune's code makes to it until unmuted.
+   */
+  setVoiceMuted(voice: number, muted: boolean): void {
+    if (voice < 0 || voice > 2) return;
+    this.mutedVoices.update((voices) => voices.map((v, i) => (i === voice ? muted : v)));
+    this.frame?.setVoiceMuted(voice, muted);
   }
 
   /** Clamped to 0.8–1.2. A divisor on the clock and nothing else, which is why it is nearly free. */
@@ -305,6 +365,72 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
+   * Captures the current position into one of four cue slots — as machine state, not as a frame
+   * number.
+   *
+   * The whole point: you are already *at* this position, so there is nothing to re-derive. Storing
+   * the state itself is what lets `hopToCue` skip the replay that `jumpToFrame` cannot avoid.
+   */
+  addCue(slot: number): void {
+    if (slot < 0 || slot > 3) return;
+    const machine = this.machine;
+    const frame = this.frame;
+    if (machine === null || frame === null) return;
+
+    const cue: CueSlot = {
+      frame: this.framesRendered,
+      machine: machine.snapshot(),
+      registers: frame.snapshotValues(),
+    };
+    this.cues.update((cues) => cues.map((c, i) => (i === slot ? cue : c)));
+  }
+
+  /**
+   * Returns to a captured cue slot in constant time; a no-op for an empty slot.
+   *
+   * Restores the snapshot onto the live machine and resyncs the chip — no emulation, so the main
+   * thread never stalls and the frame clock (a main-thread `ScriptProcessorNode`) keeps ticking
+   * straight through. That stall is what made a deep cue hop hold its last note: with the thread
+   * blocked, no packets went out and the SID simply kept sounding whatever it was last told.
+   */
+  hopToCue(slot: number): void {
+    const cue = this.cues()[slot] ?? null;
+    const machine = this.machine;
+    const frame = this.frame;
+    if (cue === null || machine === null || frame === null) return;
+
+    machine.restore(cue.machine);
+    frame.restoreValues(cue.registers);
+    this.framesRendered = cue.frame;
+    this.queueResync();
+  }
+
+  /** Empties a cue slot, returning it to "Add". */
+  clearCue(slot: number): void {
+    if (slot < 0 || slot > 3) return;
+    this.cues.update((cues) => cues.map((c, i) => (i === slot ? null : c)));
+  }
+
+  /** Sets the loop's in/out points as percentages of `ceilingFrames()`, ordered low-to-high. */
+  setLoopRange(inPercent: number, outPercent: number): void {
+    const clampedIn = clamp(inPercent, 0, 100);
+    const clampedOut = clamp(outPercent, 0, 100);
+    this.loopInPercent.set(Math.min(clampedIn, clampedOut));
+    this.loopOutPercent.set(Math.max(clampedIn, clampedOut));
+  }
+
+  /** Arms or disarms looping; re-entry is checked in `onTick`. */
+  setLoopEnabled(enabled: boolean): void {
+    this.loopEnabled.set(enabled);
+  }
+
+  /** Jumps to `percent` of `ceilingFrames()`. */
+  scrubTo(percent: number): void {
+    if (this.machine === null) return;
+    this.jumpToFrame(this.frameForPercent(percent));
+  }
+
+  /**
    * One emulated frame, one packet — including frames where nothing changed. A skipped packet loses
    * a frame on the cartridge's queue and the timing drifts.
    */
@@ -317,6 +443,16 @@ export class DjPlayerEngine implements OnDestroy {
 
     if (this.midi.selectedPortId() === null) {
       this.fail('the MIDI output port disappeared — playback stopped');
+      return;
+    }
+
+    // A jump's packets ride the tick rather than arriving beside it: the cartridge counts every
+    // SID-data packet as a frame and drains exactly one per timer tick, so anything injected between
+    // ticks is a frame it never asked for and never drains. See `queueResync`.
+    const pending = this.pendingResync.shift();
+    if (pending !== undefined) {
+      this.sendFramePacket(buildSidDataPacket(pending));
+      this.publishStats();
       return;
     }
 
@@ -336,6 +472,10 @@ export class DjPlayerEngine implements OnDestroy {
 
     this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()));
     this.framesRendered++;
+    if (this.loopEnabled() && this.framesRendered >= this.frameForPercent(this.loopOutPercent())) {
+      this.jumpToFrame(this.frameForPercent(this.loopInPercent()));
+      return; // the resync it queued goes out on the next tick; don't publish stats twice
+    }
     if (++this.framesSincePublish >= STATS_PUBLISH_FRAME_INTERVAL) {
       this.publishStats();
     }
@@ -375,9 +515,122 @@ export class DjPlayerEngine implements OnDestroy {
     }
 
     frame.markAllDirty();
+    this.framesRendered = 0;
+    // Cues hold machine state now, not frame numbers, so this clear carries more weight than it did:
+    // a re-init leaves any captured snapshot describing a machine that no longer exists. Every path
+    // that rebuilds or re-inits — load, stop, play-from-stopped, subtune change — lands here.
+    this.cues.set([null, null, null, null]);
+    this.loopEnabled.set(false);
     this.currentSubtune.set(clamped);
     this.lastError.set(null);
     return true;
+  }
+
+  /** Ignores multispeed deliberately: for a callsPerFrame > 1 tune the ceiling represents a shorter
+   * real-world duration than JUMP_CEILING_SECONDS, since more play-calls land in the same frame
+   * count. Acceptable simplification for this iteration — most of the tune list is callsPerFrame 1. */
+  private ceilingFrames(): number {
+    return Math.round((JUMP_CEILING_SECONDS * MICROSECONDS_PER_SECOND) / this.nominalIntervalUs());
+  }
+  // Known, accepted coupling: this reads the same nominalIntervalUs signal the existing Timing panel
+  // lets a tester change mid-session (50.125 / 19975 / 20000 µs). Changing it after a loop or cue is
+  // set shifts the resolved frame count by well under 1% — negligible, and cheaper to accept than to
+  // snapshot the interval at tune-load time for a session-only spike control.
+
+  private frameForPercent(percent: number): number {
+    const clamped = clamp(percent, 0, 100);
+    return Math.round((clamped / 100) * this.ceilingFrames());
+  }
+
+  /**
+   * The shared silent-replay primitive: rebuilds the tune from a clean `init` on a throwaway
+   * machine/frame pair, runs it forward frame-by-frame with output discarded, then emits the
+   * accumulated state as one resync packet and adopts the replayed pair as live.
+   *
+   * A fresh `C64Machine` + `RegisterFrame` pair, never the live one — reusing the live pair would let
+   * RAM state from wherever playback currently is bleed into the replay.
+   */
+  private jumpToFrame(targetFrame: number): void {
+    const file = this.file;
+    if (file === null || this.machine === null || this.frame === null) return;
+    const clampedTarget = Math.max(0, Math.round(targetFrame));
+
+    const replayFrame = new RegisterFrame();
+    this.mutedVoices().forEach((muted, voice) => replayFrame.setVoiceMuted(voice, muted));
+    const replayMachine = new C64Machine(file, replayFrame);
+
+    try {
+      replayMachine.initSubtune(this.currentSubtune());
+    } catch (error) {
+      this.fail(`jump to frame ${clampedTarget} failed during init — ${describeError(error)}`);
+      return;
+    }
+
+    for (let i = 0; i < clampedTarget; i++) {
+      let result: FrameResult;
+      try {
+        result = replayMachine.runFrame();
+      } catch (error) {
+        this.fail(`jump to frame ${clampedTarget} failed during replay — ${describeError(error)}`);
+        return;
+      }
+      if (!result.completed) {
+        this.fail(`jump to frame ${clampedTarget} exceeded its cycle budget during replay`);
+        return;
+      }
+      replayFrame.takeSnapshot(); // discarded — resets per-frame duplicate-write tracking only;
+                                  // the accumulated register values persist across the call regardless
+    }
+
+    this.machine = replayMachine;
+    this.frame = replayFrame;
+    this.framesRendered = clampedTarget;
+    this.queueResync();
+  }
+
+  /**
+   * Hands the chip-resync packets to the frame clock instead of sending them here.
+   *
+   * The cartridge treats every SID-data packet as one frame and drains exactly one per timer tick,
+   * so a packet injected between ticks is a frame it never drains: the queue grows by that much and
+   * stays grown until the re-timer claws it back. Two packets per hop, hopped repeatedly, walks the
+   * queue straight into the overflow that resets it — an audible dropout. Riding the tick keeps the
+   * rate at exactly one packet per frame no matter how hard the cue buttons are hit.
+   *
+   * The gate-off leads in a packet of its own so it drains a whole frame ahead of the resync, giving
+   * every voice a real release window before it re-attacks. Folding both into one packet via the
+   * ASID secondary gate slots would halve the frames but collapse that window to a few cycles.
+   *
+   * Costs the hop up to two frames of latency (~40 ms at 50 Hz), which is well under what a hand
+   * hitting a cue button can hear.
+   */
+  private queueResync(): void {
+    const frame = this.frame;
+    if (frame === null) return;
+
+    frame.markAllDirty();
+    const snapshot = frame.takeSnapshot();
+
+    // Nothing is ticking while paused or stopped, so there is no tick to ride and no stream to stay
+    // in step with — send at once instead.
+    if (this.state() !== 'playing') {
+      this.pendingResync = [];
+      // A jump landing while *paused* must also stay silent: `pause()` already zeroed the three
+      // voice control registers on the real chip, and this snapshot is a full re-emit, so sent
+      // verbatim it could re-open a gate while the UI still reads "Paused". Force those three to 0
+      // in the outgoing packet only — `frame` keeps its true values, so `play()`'s paused-resume
+      // branch (`markAllDirty()`) restores the real state on the next Play. Stopped needs none of
+      // that: nothing is sounding to silence, and the true state is what the chip should hold.
+      const outgoing = this.state() === 'paused' ? withVoiceGatesOff(snapshot) : snapshot;
+      this.sendFramePacket(buildSidDataPacket(outgoing));
+      this.publishStats();
+      return;
+    }
+
+    // Replaces any sequence still owed rather than appending to it. Spamming hops then costs one
+    // packet per tick forever, instead of building a backlog that plays every hop the button ever
+    // took — the newest hop is always the one that lands.
+    this.pendingResync = [buildVoiceGateOffSnapshot(), snapshot];
   }
 
   private applyIntervalChange(): void {
@@ -425,6 +678,7 @@ export class DjPlayerEngine implements OnDestroy {
         frameIntervalUs: clamp(Math.round(this.effectiveIntervalUs()), 0, RECIPE_MAX_INTERVAL_US),
       })
     );
+    this.recipeSent.set(true);
     this.recipeResends++;
     this.publishStats();
   }
@@ -470,6 +724,7 @@ export class DjPlayerEngine implements OnDestroy {
     this.packetsSent = 0;
     this.bytesSent = 0;
     this.recipeResends = 0;
+    this.pendingResync = [];
   }
 
   private publishStats(): void {
@@ -486,6 +741,9 @@ export class DjPlayerEngine implements OnDestroy {
       effectiveIntervalUs: this.file === null ? 0 : this.effectiveIntervalUs(),
       measuredMeanIntervalUs: clockStats.measuredMeanIntervalUs,
       driftMs: clockStats.driftMs,
+      jitterMs: clockStats.jitterMs,
+      worstGapMs: clockStats.worstGapMs,
+      lateCallbacks: clockStats.lateCallbacks,
     });
   }
 }
@@ -500,6 +758,17 @@ function buildVoiceGateOffSnapshot(): FrameSnapshot {
     scratch.onSidWrite(register, 0);
   }
   return scratch.takeSnapshot();
+}
+
+/** After `markAllDirty()` + `takeSnapshot()`, slots 0-24 are present in ascending order with no
+ * gaps, so `values` has exactly one entry per slot — indices 22/23/24 are the three voice control
+ * registers. Returns a copy with those three forced to 0; used only when a jump lands while paused. */
+function withVoiceGatesOff(snapshot: FrameSnapshot): FrameSnapshot {
+  const values = [...snapshot.values];
+  values[22] = 0;
+  values[23] = 0;
+  values[24] = 0;
+  return { ...snapshot, values };
 }
 
 function clamp(value: number, min: number, max: number): number {

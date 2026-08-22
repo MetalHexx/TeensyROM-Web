@@ -32,3 +32,6 @@ export const ASID_SLOT_TO_REGISTER: readonly number[] = [
 export const PAL_FRAME_INTERVAL_US = 19950;
 /** 59.827 Hz. */
 export const NTSC_FRAME_INTERVAL_US = 16715;
+
+/** `$D404`, `$D40B`, `$D412` — the per-voice control registers, indexed by voice (0..2). */
+export const VOICE_CONTROL_REGISTERS: readonly number[] = [4, 11, 18];

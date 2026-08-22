@@ -13,7 +13,12 @@ import { buildFramerateRecipePacket } from '../asid/asid-encoder';
 import { MidiOutputService } from '../midi/midi-output.service';
 import type { SidClock, SidFile, SidModel } from '../sid/sid-file.model';
 import type { FrameClock, FrameClockStats } from '../clock/frame-clock';
-import { DjPlayerEngine, FRAME_CLOCK, RECIPE_RESEND_DEBOUNCE_MS } from './dj-player-engine';
+import {
+  DjPlayerEngine,
+  FRAME_CLOCK,
+  JUMP_CEILING_SECONDS,
+  RECIPE_RESEND_DEBOUNCE_MS,
+} from './dj-player-engine';
 
 /** Bytes before the values in a SID data packet, plus the trailing `F7`. */
 const SID_DATA_PACKET_OVERHEAD = 12;
@@ -152,6 +157,36 @@ function doubleSpeedTune(): SidFile {
   });
 }
 
+/** init sets each voice's control register once, non-zero, and never touches it again; play
+ * increments a zero-page counter and stores it into $D400 every frame. Mirrors `doubleSpeedTune`'s
+ * hand-assembled-bytes style, but — unlike `silentTune` — its output actually depends on how many
+ * frames ran, which is what the jump primitive's tests need. */
+function counterTune(): SidFile {
+  return tune({
+    blocks: [
+      {
+        at: 0x1000,
+        bytes: [
+          0xa9, 0x11, // LDA #$11
+          0x8d, 0x04, 0xd4, // STA $D404 (voice 1 control)
+          0x8d, 0x0b, 0xd4, // STA $D40B (voice 2 control)
+          0x8d, 0x12, 0xd4, // STA $D412 (voice 3 control)
+          RTS,
+        ],
+      },
+      {
+        at: 0x1010,
+        bytes: [
+          0xe6, 0xfb, // INC $FB
+          0xa5, 0xfb, // LDA $FB
+          0x8d, 0x00, 0xd4, // STA $D400
+          RTS,
+        ],
+      },
+    ],
+  });
+}
+
 /** The play routine never returns, so the frame burns its whole cycle budget. */
 function runawayTune(): SidFile {
   return tune({
@@ -185,6 +220,30 @@ function valueCount(packet: SentPacket): number {
 
 function messageSequence(midi: FakeMidiOutputService): number[] {
   return midi.sent.map((packet) => packet.bytes[2]);
+}
+
+/**
+ * The engine's own `ceilingFrames`/`frameForPercent` formula (`dj-player-engine.ts`), duplicated only
+ * to compute the boundary values a jump should land on — not a re-test of the formula itself.
+ */
+function expectedCeilingFrames(intervalUs = PAL_FRAME_INTERVAL_US): number {
+  return Math.round((JUMP_CEILING_SECONDS * 1_000_000) / intervalUs);
+}
+
+function expectedFrameForPercent(percent: number, intervalUs = PAL_FRAME_INTERVAL_US): number {
+  const clamped = Math.min(100, Math.max(0, percent));
+  return Math.round((clamped / 100) * expectedCeilingFrames(intervalUs));
+}
+
+/** The value byte for a given present slot within a SID data packet (see `buildSidDataPacket`). */
+function slotValue(packet: SentPacket, slot: number): number {
+  return packet.bytes[SID_DATA_PACKET_OVERHEAD - 1 + slot];
+}
+
+/** After a jump's `markAllDirty()` snapshot, slots 22/23/24 are the three voice control registers
+ * ($D404/$D40B/$D412) — see `withVoiceGatesOff` in `dj-player-engine.ts`. */
+function voiceGateValues(packet: SentPacket): number[] {
+  return [22, 23, 24].map((slot) => slotValue(packet, slot));
 }
 
 describe('DjPlayerEngine', () => {
@@ -272,6 +331,16 @@ describe('DjPlayerEngine', () => {
     engine.nextSubtune();
     engine.nextSubtune();
     expect(engine.currentSubtune()).toBe(2);
+  });
+
+  it('resets mutedVoices to all-unmuted when a new tune loads', () => {
+    engine.loadTune(silentTune());
+    engine.setVoiceMuted(1, true);
+    expect(engine.mutedVoices()).toEqual([false, true, false]);
+
+    engine.loadTune(silentTune());
+
+    expect(engine.mutedVoices()).toEqual([false, false, false]);
   });
 
   it('gates the voices off on pause and restores the chip on resume', async () => {
@@ -467,6 +536,242 @@ describe('DjPlayerEngine', () => {
       vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 2);
 
       expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(resendsBefore);
+    });
+  });
+
+  describe('the jump primitive: cue, loop and scrub', () => {
+    it('produces byte-identical replayed output when jumping to the same frame twice', () => {
+      engine.loadTune(counterTune());
+
+      engine.scrubTo(5);
+      const first = lastDataPacket(midi).bytes;
+      engine.scrubTo(5);
+      const second = lastDataPacket(midi).bytes;
+
+      expect(second).toEqual(first);
+      // Sanity: the replay actually depends on how many frames ran, so a bug that always landed on
+      // frame 0 could not pass the identity check above by coincidence.
+      expect(slotValue(lastDataPacket(midi), 0)).toBeGreaterThan(0);
+    });
+
+    it('hops to a captured cue at exactly the frame it was captured, regardless of what played after', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      clock.tick(10);
+
+      engine.hopToCue(0);
+      clock.tick(2); // gate-off, then the resync — the packet under test
+      const hopped = lastDataPacket(midi).bytes;
+
+      const freshClock = new FakeFrameClock();
+      const freshMidi = new FakeMidiOutputService();
+      const freshInjector = createEnvironmentInjector(
+        [
+          DjPlayerEngine,
+          { provide: FRAME_CLOCK, useValue: freshClock },
+          { provide: MidiOutputService, useValue: freshMidi as unknown as MidiOutputService },
+        ],
+        TestBed.inject(EnvironmentInjector)
+      );
+      const freshEngine = freshInjector.get(DjPlayerEngine);
+      freshEngine.loadTune(counterTune());
+      await freshEngine.play();
+      freshClock.tick(5);
+      freshEngine.addCue(0);
+      freshEngine.hopToCue(0); // captured and restored back to back, nothing played in between
+      freshClock.tick(2);
+
+      expect(hopped).toEqual(lastDataPacket(freshMidi).bytes);
+    });
+
+    it('clears a captured cue back to null, and leaves other slots untouched', () => {
+      engine.loadTune(counterTune());
+      engine.addCue(0);
+      engine.addCue(2);
+
+      engine.clearCue(0);
+
+      const cues = engine.cues();
+      expect(cues[0]).toBeNull();
+      expect(cues[2]).not.toBeNull();
+      expect([cues[1], cues[3]]).toEqual([null, null]);
+    });
+
+    it('restores a cue without re-emulating, so the machine keeps running forward from it', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      const atCue = slotValue(lastDataPacket(midi), 0);
+
+      clock.tick(20);
+      expect(slotValue(lastDataPacket(midi), 0)).not.toBe(atCue);
+
+      engine.hopToCue(0);
+      clock.tick(2); // gate-off, then the resync carrying the cue's registers
+      expect(slotValue(lastDataPacket(midi), 0)).toBe(atCue);
+      expect(engine.stats().framesRendered).toBe(5);
+
+      // The restored machine is live, not a frozen snapshot: the counter keeps climbing from where
+      // the cue put it back, which a shallow value-only restore would not manage.
+      clock.tick(1);
+      expect(slotValue(lastDataPacket(midi), 0)).toBeGreaterThan(atCue);
+    });
+
+    it('sends nothing of its own on a hop, then gate-off and resync on the next two ticks', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      clock.tick(5);
+
+      const before = dataPackets(midi).length;
+      engine.hopToCue(0);
+      // The cartridge drains exactly one packet per timer tick, so a hop that sent its own packets
+      // here would hand it frames it never drains.
+      expect(dataPackets(midi)).toHaveLength(before);
+
+      clock.tick(1);
+      const gateOff = dataPackets(midi).slice(before);
+      expect(gateOff).toHaveLength(1);
+      // Three present slots and nothing else — the seam packet touches only the gate registers and
+      // leaves frequency, waveform and ADSR to the resync behind it. `voiceGateValues` does not
+      // apply here: it reads slots 22/23/24 of a full 25-register re-emit.
+      expect(valueCount(gateOff[0])).toBe(3);
+      expect([0, 1, 2].map((slot) => slotValue(gateOff[0], slot))).toEqual([0, 0, 0]);
+
+      clock.tick(1);
+      const resync = dataPackets(midi).slice(before + 1);
+      expect(resync).toHaveLength(1);
+      // A full frame after the gate-off, so every voice gets a real release window before this
+      // re-attacks it — the chip sees 1 -> 0 -> 1 rather than carrying the pre-hop note across.
+      expect(voiceGateValues(resync[0])).toEqual([0x11, 0x11, 0x11]);
+    });
+
+    it('holds the packet rate at one per tick however hard cues are spammed', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      clock.tick(5);
+      engine.addCue(1);
+
+      const before = dataPackets(midi).length;
+      for (let i = 0; i < 50; i++) engine.hopToCue(i % 2);
+      expect(dataPackets(midi)).toHaveLength(before);
+
+      // Fifty hops between two ticks still cost two packets, not a hundred: a hop arriving while one
+      // is pending replaces it rather than queueing behind it, so the newest hop is the one that
+      // lands and no backlog survives to be played out.
+      clock.tick(2);
+      expect(dataPackets(midi)).toHaveLength(before + 2);
+
+      clock.tick(1);
+      expect(dataPackets(midi)).toHaveLength(before + 3);
+    });
+
+    it('resyncs immediately when a jump lands with the clock stopped', () => {
+      engine.loadTune(counterTune());
+
+      const before = dataPackets(midi).length;
+      engine.scrubTo(5);
+
+      // Nothing is ticking, so there is no tick to ride and nothing to stay in step with.
+      expect(dataPackets(midi).length).toBeGreaterThan(before);
+    });
+
+    it('forces the voice gates off in the resync packet when a jump lands while paused', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(3);
+      engine.pause();
+
+      engine.scrubTo(5);
+      const pausedPacket = lastDataPacket(midi);
+
+      expect(voiceGateValues(pausedPacket)).toEqual([0, 0, 0]);
+      expect(engine.state()).toBe('paused');
+
+      // The replay's own computed state is not actually zero — resuming and repeating the same jump
+      // while playing proves the masking above is a paused-only override, not the tune's real state.
+      await engine.play();
+      engine.scrubTo(5);
+      clock.tick(2); // playing now, so the resync rides the clock rather than going out here
+      const playingPacket = lastDataPacket(midi);
+
+      expect(voiceGateValues(playingPacket)).toEqual([0x11, 0x11, 0x11]);
+    });
+
+    it("reports a muted voice's control register as 0 in a jump's resync packet, leaving the others live", () => {
+      engine.loadTune(counterTune());
+      engine.setVoiceMuted(1, true);
+
+      engine.scrubTo(5);
+
+      const gates = voiceGateValues(lastDataPacket(midi));
+      expect(gates[1]).toBe(0);
+      expect(gates[0]).toBeGreaterThan(0);
+      expect(gates[2]).toBeGreaterThan(0);
+    });
+
+    it('re-enters at the loop-in frame on the tick that reaches loop-out, without stopping the clock', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+
+      const outFrame = expectedFrameForPercent(0.1);
+      engine.setLoopRange(0, 0.1);
+      engine.setLoopEnabled(true);
+
+      clock.tick(outFrame);
+
+      expect(engine.stats().framesRendered).toBe(0);
+      expect(clock.running).toBe(true);
+    });
+
+    it('resets position, cues and the loop arm when the subtune changes', async () => {
+      engine.loadTune(silentTune(2));
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      engine.setLoopEnabled(true);
+      engine.setVoiceMuted(1, true);
+
+      engine.nextSubtune();
+
+      expect(engine.stats().framesRendered).toBe(0);
+      expect(engine.cues()).toEqual([null, null, null, null]);
+      expect(engine.loopEnabled()).toBe(false);
+      expect(engine.mutedVoices()).toEqual([false, true, false]);
+    });
+
+    it('resolves 0%/100% to frame 0 and the jump ceiling exactly, clamping out-of-range input', () => {
+      engine.loadTune(counterTune());
+      const ceiling = expectedCeilingFrames();
+
+      engine.scrubTo(0);
+      expect(engine.stats().framesRendered).toBe(0);
+
+      engine.scrubTo(100);
+      expect(engine.stats().framesRendered).toBe(ceiling);
+
+      engine.scrubTo(-25);
+      expect(engine.stats().framesRendered).toBe(0);
+
+      engine.scrubTo(140);
+      expect(engine.stats().framesRendered).toBe(ceiling);
+    });
+
+    it('aborts the whole jump, not just one frame of it, when the play routine never returns', () => {
+      engine.loadTune(runawayTune());
+      const packetsBefore = dataPackets(midi).length;
+
+      engine.scrubTo(1);
+
+      expect(engine.state()).toBe('error');
+      expect(engine.lastError()).toBeTruthy();
+      expect(dataPackets(midi)).toHaveLength(packetsBefore);
     });
   });
 });

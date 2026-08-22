@@ -82,34 +82,22 @@
       }
     </div>
 
-    <div class="record-group">
-      <p class="caption">
-        Record only — these reflect what you set on the C64 in the cartridge's own ASID player
-        menu; this browser cannot change either one.
-      </p>
+    <p class="caption">
+      Cartridge frame timer: {{ frameTimerStatus() }}.
+      @if (frameTimerForced()) {
+        It stays on until the ASID player is exited and re-entered — un-checking the box above only
+        stops us sending more recipes, it does not turn the timer off. The C64's own menu still
+        displays whatever you last set there; that display is never updated by the host, so it will
+        disagree with this.
+      }
+    </p>
 
-      <label class="control">
-        Timer mode (C64)
-        <select (change)="onTimerModeChange($event)">
-          @for (option of timerModeOptions; track option.value) {
-            <option [value]="option.value" [selected]="option.value === timerMode()">
-              {{ option.label }}
-            </option>
-          }
-        </select>
-      </label>
-
-      <label class="control">
-        Buffer size (C64)
-        <select (change)="onBufferSizeChange($event)">
-          @for (option of bufferSizeOptions; track option.value) {
-            <option [value]="option.value" [selected]="option.value === bufferSize()">
-              {{ option.label }}
-            </option>
-          }
-        </select>
-      </label>
-    </div>
+    <p class="caption">
+      Buffer size is set on the C64 with <code>b</code> / <code>B</code> and read from its screen.
+      This browser cannot set it — the recipe packet reserves a bit for it that the firmware parses
+      but never acts on — and cannot read it back, so it is not shown here rather than shown as a
+      guess that goes stale.
+    </p>
   </section>
 
   <section class="poc-section" aria-label="Tune">
@@ -218,12 +206,93 @@
     </p>
   </section>
 
+  <section class="poc-section" aria-label="Voice">
+    <h2>Voice</h2>
+
+    @for (voice of voiceIndices; track voice) {
+      <label class="control">
+        <input
+          type="checkbox"
+          [checked]="mutedVoices()[voice]"
+          (change)="onVoiceMuteToggle(voice, $event)"
+        />
+        Voice {{ voice + 1 }}
+      </label>
+    }
+  </section>
+
+  <section class="poc-section" aria-label="Cues">
+    <h2>Cues</h2>
+
+    <div class="control-row">
+      @for (slot of cueIndices; track slot) {
+        <div class="cue-slot">
+          @if (cues()[slot]; as cue) {
+            <button type="button" (click)="onHopToCue(slot)">Hop {{ slot + 1 }}</button>
+            <button type="button" (click)="onClearCue(slot)">Clear {{ slot + 1 }}</button>
+            <span class="caption">frame {{ cue.frame }}</span>
+          } @else {
+            <button type="button" (click)="onAddCue(slot)">Add {{ slot + 1 }}</button>
+          }
+        </div>
+      }
+    </div>
+
+    <p class="caption">
+      Cues store machine state, not a position, so a hop restores in constant time instead of
+      re-emulating from init — no main-thread stall, and the frame clock keeps ticking through it. A
+      snapshot only means anything to the machine it came from, so anything that re-inits one —
+      loading a tune, stopping, changing subtune — clears all four slots.
+    </p>
+
+    <p class="caption">
+      A hop rides the frame clock rather than sending beside it: the cartridge counts every SID-data
+      packet as a frame and drains exactly one per timer tick, so anything injected between ticks is a
+      frame it never drains and the queue grows until it overflows and resets. Two packets go out on
+      the next two ticks — gate-off, then the resync — so the rate stays at one packet per frame no
+      matter how hard the cue buttons are hit, at the cost of up to ~40 ms of latency per hop. A hop
+      arriving while one is still pending replaces it, so spamming never builds a backlog.
+    </p>
+  </section>
+
+  <section class="poc-section" aria-label="Loop / Scrub">
+    <h2>Loop / Scrub</h2>
+
+    <label class="control">
+      <input
+        type="checkbox"
+        [checked]="loopEnabled()"
+        (change)="onLoopEnabledToggle($event)"
+      />
+      Loop armed
+    </label>
+
+    <p class="caption">Loop {{ loopInPercent() }}% – {{ loopOutPercent() }}%</p>
+
+    <div class="dual-range">
+      <input type="range" min="0" max="100" [value]="loopInPercent()" (input)="onLoopInInput($event)" />
+      <input type="range" min="0" max="100" [value]="loopOutPercent()" (input)="onLoopOutInput($event)" />
+    </div>
+
+    <label class="control">
+      Scrub {{ scrubDisplayPercent() }}%
+      <input
+        type="range"
+        min="0"
+        max="100"
+        [value]="scrubDisplayPercent()"
+        (input)="onScrubInput($event)"
+        (change)="onScrubChange($event)"
+      />
+    </label>
+  </section>
+
   <section class="poc-section poc-section--wide" aria-label="Diagnostics">
     <h2>Diagnostics</h2>
 
     <dl class="diagnostic-fields">
-      <dt>Timer mode / buffer size (C64)</dt>
-      <dd>{{ timerModeLabel() }} / {{ bufferSizeLabel() }}</dd>
+      <dt>Cartridge frame timer</dt>
+      <dd>{{ frameTimerStatus() }}</dd>
       <dt>Frames emitted</dt>
       <dd>{{ engineStats().framesRendered }}</dd>
       <dt>Packets / second</dt>
@@ -234,6 +303,12 @@
       <dd>{{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)</dd>
       <dt>Drift</dt>
       <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
+      <dt>Clock jitter (σ / worst gap)</dt>
+      <dd>
+        {{ engineStats().jitterMs.toFixed(2) }} ms / {{ engineStats().worstGapMs.toFixed(1) }} ms
+      </dd>
+      <dt>Late callbacks</dt>
+      <dd>{{ engineStats().lateCallbacks }}</dd>
       <dt>Suppressed double-writes</dt>
       <dd>{{ engineStats().suppressedWrites }}</dd>
       <dt>Illegal opcodes</dt>
@@ -243,6 +318,24 @@
       <dt>Last error</dt>
       <dd>{{ engineError() ?? '—' }}</dd>
     </dl>
+
+    <p class="caption">
+      Jitter is the spread of the gap between audio callbacks, measured on the callback rather than
+      on emitted frames so it reads the same whatever multispeed the tune carries. Mean interval and
+      drift can both look healthy while individual callbacks scatter, and scatter is what empties the
+      cartridge's queue — no callback means no packet, and a queue that runs dry re-buffers. The
+      worst gap is the number that catches a rare dropout: a single long main-thread stall barely
+      moves σ but empties any buffer outright. Worst gap is a running maximum that never decays, so
+      the late count beside it separates one spike from a recurring one.
+    </p>
+
+    <p class="caption">
+      Drift is the check on the clock itself. Frames fall due against measured elapsed time rather
+      than the buffer duration the sample rate implies, so a healthy stream holds drift near zero. A
+      figure that climbs steadily means we are emitting at a different rate from the one the recipe
+      advertises to the cartridge — which drains its queue faster than we fill it and leaves the
+      firmware's slow re-timer hunting, the swing you can watch on the C64's bar graph.
+    </p>
 
     <p class="caption">
       The host cannot read the cartridge's queue fill — watch the C64's own screen too: the

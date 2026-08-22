@@ -4,13 +4,57 @@ const MICROSECONDS_PER_MILLISECOND = 1000;
 /** Frames per `createScriptProcessor` buffer — 256 is ≈ 5.3 ms at 48 kHz. */
 const AUDIO_BUFFER_FRAMES = 256;
 
+/**
+ * The most catch-up a single callback may emit after a stall.
+ *
+ * Catching up is normally self-correcting: the cartridge drained frames while we were stalled, so
+ * emitting exactly what we owe puts its queue back where it was. That stops holding past the point
+ * where the cartridge would have underflowed and re-buffered on its own — beyond there the queue has
+ * already refilled itself, and a burst on top of it overflows rather than restores. 250 ms is
+ * comfortably past every buffer size the cartridge offers at frame rates this engine runs.
+ */
+const MAX_CATCH_UP_US = 250_000;
+
+/** A callback gap beyond this multiple of the nominal buffer duration counts as late. */
+const LATE_CALLBACK_FACTOR = 2;
+
 /** What the clock has actually done since `start`, for the diagnostics panel. */
 export interface FrameClockStats {
   readonly framesEmitted: number;
   readonly measuredMeanIntervalUs: number;
   readonly nominalIntervalUs: number;
-  /** Cumulative measured − nominal since `start`. */
+  /**
+   * Cumulative measured − nominal since `start`.
+   *
+   * Now that the clock advances on measured time, this is the check on that: frames fall due against
+   * the wall clock, so a healthy stream holds this near zero. A figure that climbs steadily means the
+   * engine is emitting at a different rate from the one it advertises to the cartridge, which is what
+   * makes the cartridge's queue depth oscillate.
+   */
   readonly driftMs: number;
+  /**
+   * Standard deviation of the gap between audio callbacks.
+   *
+   * The mean interval and the drift can both look healthy while individual callbacks scatter, and it
+   * is the scatter that empties the cartridge's queue: no callback means no packet, and a queue that
+   * runs dry re-buffers. Measured on the callback rather than on emitted frames so the figure means
+   * the same thing whatever multispeed the tune carries.
+   */
+  readonly jitterMs: number;
+  /**
+   * The longest single gap between audio callbacks since `start`.
+   *
+   * The number that actually catches a rare dropout: one 200 ms main-thread stall barely moves the
+   * standard deviation but empties any buffer outright.
+   */
+  readonly worstGapMs: number;
+  /**
+   * How many callbacks arrived more than `LATE_CALLBACK_FACTOR`x the nominal buffer duration apart.
+   *
+   * `worstGapMs` is a running maximum that never decays, so a single spike sets it for the session
+   * and cannot be told apart from a constant problem. This is the frequency alongside it.
+   */
+  readonly lateCallbacks: number;
 }
 
 /**
@@ -69,11 +113,11 @@ export class FrameAccumulator {
   }
 
   /**
-   * Adds a buffer's worth of time and fires every frame that now falls due.
+   * Adds `elapsedUs` of time and fires every frame that now falls due.
    *
-   * More than one frame can fall inside a single buffer at short intervals, and they must all fire —
-   * so this bursts several packets back to back. Absorbing bursts is exactly what the cartridge's
-   * queue is for.
+   * More than one frame can fall inside a single advance at short intervals, or after a caller
+   * hands over a long measured gap, and they must all fire — so this bursts several packets back to
+   * back. Absorbing bursts is exactly what the cartridge's queue is for.
    */
   advance(elapsedUs: number, onFrame: () => void): void {
     this.accumulatorUs += elapsedUs;
@@ -102,11 +146,26 @@ export class ScriptProcessorFrameClock implements FrameClock {
   private accumulator: FrameAccumulator | null = null;
   private startedAtMs = 0;
   private lastTickAtMs = 0;
+  // Running sums rather than a kept list of samples: this updates on the audio callback, where
+  // allocating per tick is exactly the jitter it is trying to measure.
+  private gapCount = 0;
+  private gapSumMs = 0;
+  private gapSumSqMs = 0;
+  private worstGapMs = 0;
+  private lateCallbacks = 0;
 
   get stats(): FrameClockStats {
     const accumulator = this.accumulator;
     if (accumulator === null) {
-      return { framesEmitted: 0, measuredMeanIntervalUs: 0, nominalIntervalUs: 0, driftMs: 0 };
+      return {
+        framesEmitted: 0,
+        measuredMeanIntervalUs: 0,
+        nominalIntervalUs: 0,
+        driftMs: 0,
+        jitterMs: 0,
+        worstGapMs: 0,
+        lateCallbacks: 0,
+      };
     }
 
     const measuredElapsedUs = (this.lastTickAtMs - this.startedAtMs) * MICROSECONDS_PER_MILLISECOND;
@@ -116,7 +175,19 @@ export class ScriptProcessorFrameClock implements FrameClock {
       measuredMeanIntervalUs: framesEmitted === 0 ? 0 : measuredElapsedUs / framesEmitted,
       nominalIntervalUs: accumulator.nominalIntervalUs,
       driftMs: (measuredElapsedUs - accumulator.nominalElapsedUs) / MICROSECONDS_PER_MILLISECOND,
+      jitterMs: this.gapStandardDeviationMs(),
+      worstGapMs: this.worstGapMs,
+      lateCallbacks: this.lateCallbacks,
     };
+  }
+
+  /** Population standard deviation from the running sums, floored at 0 against float cancellation. */
+  private gapStandardDeviationMs(): number {
+    if (this.gapCount < 2) {
+      return 0;
+    }
+    const mean = this.gapSumMs / this.gapCount;
+    return Math.sqrt(Math.max(0, this.gapSumSqMs / this.gapCount - mean * mean));
   }
 
   /** @throws {RangeError} when `intervalUs` is not a positive finite number. */
@@ -139,9 +210,44 @@ export class ScriptProcessorFrameClock implements FrameClock {
 
     this.startedAtMs = performance.now();
     this.lastTickAtMs = this.startedAtMs;
+    this.gapCount = 0;
+    this.gapSumMs = 0;
+    this.gapSumSqMs = 0;
+    this.worstGapMs = 0;
+    this.lateCallbacks = 0;
+
+    const lateThresholdMs = (bufferDurationUs * LATE_CALLBACK_FACTOR) / MICROSECONDS_PER_MILLISECOND;
+    let firstCallback = true;
     node.onaudioprocess = () => {
-      this.lastTickAtMs = performance.now();
-      accumulator.advance(bufferDurationUs, onFrame);
+      const now = performance.now();
+
+      // Credit the accumulator with the time that actually passed, not with the buffer duration the
+      // sample rate implies. Those differ by a fraction of a percent — the audio device's crystal
+      // against `performance.now()` — and that fraction is a *sustained rate error*: the cartridge
+      // re-times playback to the interval this engine advertises, so a stream that runs slow against
+      // its own advertised rate drains the cartridge's queue faster than it fills, until the
+      // firmware's slow re-timer claws it back and the depth oscillates. Measuring instead of
+      // assuming keeps the advertised rate honest.
+      //
+      // It also makes a stall self-correcting: no callback means no packet, and the cartridge drains
+      // straight through it. Advancing by real elapsed time emits exactly the frames that fell due
+      // and restores the depth the stall cost, where a fixed-duration advance would leave the queue
+      // permanently shallower.
+      let elapsedUs = bufferDurationUs;
+      if (firstCallback) {
+        firstCallback = false;
+      } else {
+        const gapMs = now - this.lastTickAtMs;
+        this.gapCount++;
+        this.gapSumMs += gapMs;
+        this.gapSumSqMs += gapMs * gapMs;
+        if (gapMs > this.worstGapMs) this.worstGapMs = gapMs;
+        if (gapMs > lateThresholdMs) this.lateCallbacks++;
+        elapsedUs = Math.min(gapMs * MICROSECONDS_PER_MILLISECOND, MAX_CATCH_UP_US);
+      }
+
+      this.lastTickAtMs = now;
+      accumulator.advance(elapsedUs, onFrame);
     };
 
     this.context = context;
