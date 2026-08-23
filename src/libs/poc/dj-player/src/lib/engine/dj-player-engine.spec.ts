@@ -346,6 +346,66 @@ describe('DjPlayerEngine', () => {
     expect(engine.mutedVoices()).toEqual([false, false, false]);
   });
 
+  describe('momentary voice hold', () => {
+    it('composes effectiveMutes as latched XOR held, in both directions', () => {
+      engine.loadTune(silentTune());
+
+      engine.setVoiceHeld(0, true); // audible -> held silences it
+      expect(engine.effectiveMutes()).toEqual([true, false, false]);
+
+      engine.setVoiceMuted(1, true);
+      engine.setVoiceHeld(1, true); // checkbox-muted -> held makes it sound
+      expect(engine.effectiveMutes()).toEqual([true, false, false]);
+    });
+
+    it('restores the latched state when the hold releases', () => {
+      engine.loadTune(silentTune());
+      engine.setVoiceMuted(0, true);
+
+      engine.setVoiceHeld(0, true);
+      expect(engine.effectiveMutes()[0]).toBe(false);
+
+      engine.setVoiceHeld(0, false);
+      expect(engine.effectiveMutes()[0]).toBe(true);
+      expect(engine.mutedVoices()[0]).toBe(true);
+    });
+
+    it('honours a checkbox change made mid-hold once the button releases', () => {
+      engine.loadTune(silentTune());
+
+      engine.setVoiceHeld(0, true);
+      expect(engine.effectiveMutes()[0]).toBe(true);
+
+      engine.setVoiceMuted(0, true); // latched value toggled while still held
+      expect(engine.effectiveMutes()[0]).toBe(false); // held still wins until release
+
+      engine.setVoiceHeld(0, false);
+      expect(engine.effectiveMutes()[0]).toBe(true); // release honours the new latched value
+    });
+
+    it('clears only the latched signal, leaving a held voice untouched', () => {
+      engine.loadTune(silentTune());
+      engine.setVoiceMuted(0, true);
+      engine.setVoiceMuted(1, true);
+      engine.setVoiceHeld(1, true);
+
+      engine.clearVoiceMutes();
+
+      expect(engine.mutedVoices()).toEqual([false, false, false]);
+      expect(engine.heldVoices()).toEqual([false, true, false]);
+      expect(engine.effectiveMutes()).toEqual([false, true, false]);
+    });
+
+    it('is a no-op for an out-of-range voice', () => {
+      engine.loadTune(silentTune());
+
+      engine.setVoiceHeld(3, true);
+      engine.setVoiceHeld(-1, true);
+
+      expect(engine.heldVoices()).toEqual([false, false, false]);
+    });
+  });
+
   it('gates the voices off on pause and restores the chip on resume', async () => {
     engine.loadTune(silentTune());
     await engine.play();
@@ -710,6 +770,18 @@ describe('DjPlayerEngine', () => {
     it("reports a muted voice's control register as 0 in a jump's resync packet, leaving the others live", () => {
       engine.loadTune(counterTune());
       engine.setVoiceMuted(1, true);
+
+      engine.scrubTo(5);
+
+      const gates = voiceGateValues(lastDataPacket(midi));
+      expect(gates[1]).toBe(0);
+      expect(gates[0]).toBeGreaterThan(0);
+      expect(gates[2]).toBeGreaterThan(0);
+    });
+
+    it("seeds a jump's replay frame from the effective (held) set rather than the latched one", () => {
+      engine.loadTune(counterTune());
+      engine.setVoiceHeld(1, true); // voice 1 is audible (latched); held inverts it to muted
 
       engine.scrubTo(5);
 

@@ -210,15 +210,33 @@
     <h2>Voice</h2>
 
     @for (voice of voiceIndices; track voice) {
-      <label class="control">
+      <div class="voice-row">
         <input
           type="checkbox"
+          [id]="'voice-mute-' + voice"
           [checked]="mutedVoices()[voice]"
           (change)="onVoiceMuteToggle(voice, $event)"
         />
-        Voice {{ voice + 1 }}
-      </label>
+        <label [for]="'voice-mute-' + voice">Voice {{ voice + 1 }}</label>
+
+        <button
+          type="button"
+          class="voice-hold"
+          [attr.aria-label]="(mutedVoices()[voice] ? 'Punch in voice ' : 'Kill voice ') + (voice + 1)"
+          (pointerdown)="onVoiceHoldStart(voice, $event)"
+          (pointerup)="onVoiceHoldEnd(voice)"
+          (pointercancel)="onVoiceHoldEnd(voice)"
+        >
+          {{ mutedVoices()[voice] ? 'Punch In' : 'Kill' }}
+        </button>
+
+        <span class="voice-state">{{ effectiveMutes()[voice] ? 'muted' : 'audible' }}</span>
+      </div>
     }
+
+    <div class="voice-clear">
+      <button type="button" (click)="onClearVoiceMutes()">Clear All Mutes</button>
+    </div>
   </section>
 
   <section class="poc-section" aria-label="Cues">

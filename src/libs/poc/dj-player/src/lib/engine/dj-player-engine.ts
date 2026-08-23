@@ -1,4 +1,4 @@
-import { inject, Injectable, InjectionToken, OnDestroy, signal } from '@angular/core';
+import { computed, inject, Injectable, InjectionToken, OnDestroy, signal } from '@angular/core';
 import { logError, logInfo, LogType, logWarn } from '@teensyrom-nx/utils';
 import {
   NTSC_FRAME_INTERVAL_US,
@@ -150,6 +150,12 @@ export class DjPlayerEngine implements OnDestroy {
   readonly lastError = signal<string | null>(null);
   readonly stats = signal<EngineStats>(EMPTY_STATS);
   readonly mutedVoices = signal<readonly boolean[]>([false, false, false]);
+  /** Momentary hold state — the button beside each checkbox, held down. */
+  readonly heldVoices = signal<readonly boolean[]>([false, false, false]);
+  /** What the chip actually does: latched XOR held. */
+  readonly effectiveMutes = computed<readonly boolean[]>(() =>
+    this.mutedVoices().map((latched, i) => latched !== this.heldVoices()[i])
+  );
   readonly cues = signal<readonly (CueSlot | null)[]>([null, null, null, null]);
   readonly loopInPercent = signal<number>(0);
   readonly loopOutPercent = signal<number>(100);
@@ -178,6 +184,9 @@ export class DjPlayerEngine implements OnDestroy {
     this.file = file;
     this.frame = new RegisterFrame();
     this.mutedVoices.set([false, false, false]);
+    // A fresh RegisterFrame starts fully unmuted, so a held button must not survive into a tune it
+    // never pressed against — otherwise effectiveMutes would disagree with the chip it just replaced.
+    this.heldVoices.set([false, false, false]);
     this.machine = new C64Machine(file, this.frame);
     this.subtuneCount.set(Math.max(1, file.songs));
     this.nominalIntervalUs.set(
@@ -302,13 +311,34 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Voice 0/1/2. Replicates the firmware's own hardware-mute technique: forces that voice's control
-   * register to 0 once, then drops every further write the tune's code makes to it until unmuted.
+   * Voice 0/1/2 — the latched checkbox state. Replicates the firmware's own hardware-mute
+   * technique: forces that voice's control register to 0 once, then drops every further write the
+   * tune's code makes to it until unmuted.
    */
   setVoiceMuted(voice: number, muted: boolean): void {
     if (voice < 0 || voice > 2) return;
     this.mutedVoices.update((voices) => voices.map((v, i) => (i === voice ? muted : v)));
-    this.frame?.setVoiceMuted(voice, muted);
+    this.applyEffectiveMute(voice);
+  }
+
+  /** Voice 0/1/2 — the momentary hold state a press-and-hold button drives. Release always restores
+   * whatever the latched checkbox says, even if it changed while held. */
+  setVoiceHeld(voice: number, held: boolean): void {
+    if (voice < 0 || voice > 2) return;
+    this.heldVoices.update((voices) => voices.map((v, i) => (i === voice ? held : v)));
+    this.applyEffectiveMute(voice);
+  }
+
+  /** Unchecks every latched mute without disturbing whichever voice is currently held. */
+  clearVoiceMutes(): void {
+    this.mutedVoices.set([false, false, false]);
+    for (let voice = 0; voice < 3; voice++) {
+      this.applyEffectiveMute(voice);
+    }
+  }
+
+  private applyEffectiveMute(voice: number): void {
+    this.frame?.setVoiceMuted(voice, this.effectiveMutes()[voice]);
   }
 
   /** Clamped to 0.8–1.2. A divisor on the clock and nothing else, which is why it is nearly free. */
@@ -556,7 +586,7 @@ export class DjPlayerEngine implements OnDestroy {
     const clampedTarget = Math.max(0, Math.round(targetFrame));
 
     const replayFrame = new RegisterFrame();
-    this.mutedVoices().forEach((muted, voice) => replayFrame.setVoiceMuted(voice, muted));
+    this.effectiveMutes().forEach((muted, voice) => replayFrame.setVoiceMuted(voice, muted));
     const replayMachine = new C64Machine(file, replayFrame);
 
     try {

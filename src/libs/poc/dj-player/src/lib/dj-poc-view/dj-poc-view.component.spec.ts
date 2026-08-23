@@ -51,6 +51,8 @@ interface MockDjPlayerEngine {
   nominalIntervalUs: WritableSignal<number>;
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
+  heldVoices: WritableSignal<readonly boolean[]>;
+  effectiveMutes: WritableSignal<readonly boolean[]>;
   cues: WritableSignal<readonly (CueSlot | null)[]>;
   loopInPercent: WritableSignal<number>;
   loopOutPercent: WritableSignal<number>;
@@ -67,6 +69,8 @@ interface MockDjPlayerEngine {
   setScheduleAhead: ReturnType<typeof vi.fn>;
   loadTune: ReturnType<typeof vi.fn>;
   setVoiceMuted: ReturnType<typeof vi.fn>;
+  setVoiceHeld: ReturnType<typeof vi.fn>;
+  clearVoiceMutes: ReturnType<typeof vi.fn>;
   addCue: ReturnType<typeof vi.fn>;
   hopToCue: ReturnType<typeof vi.fn>;
   clearCue: ReturnType<typeof vi.fn>;
@@ -101,6 +105,8 @@ function makeEngine(): MockDjPlayerEngine {
     nominalIntervalUs: signal(19950),
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
+    heldVoices: signal<readonly boolean[]>([false, false, false]),
+    effectiveMutes: signal<readonly boolean[]>([false, false, false]),
     cues: signal<readonly (CueSlot | null)[]>([null, null, null, null]),
     loopInPercent: signal(0),
     loopOutPercent: signal(100),
@@ -117,6 +123,8 @@ function makeEngine(): MockDjPlayerEngine {
     setScheduleAhead: vi.fn(),
     loadTune: vi.fn(),
     setVoiceMuted: vi.fn(),
+    setVoiceHeld: vi.fn(),
+    clearVoiceMutes: vi.fn(),
     addCue: vi.fn(),
     hopToCue: vi.fn(),
     clearCue: vi.fn(),
@@ -403,6 +411,70 @@ describe('DjPocViewComponent', () => {
       checkbox.dispatchEvent(new Event('change'));
 
       expect(engine.setVoiceMuted).toHaveBeenCalledWith(0, true);
+    });
+  });
+
+  describe('voice momentary hold', () => {
+    // jsdom has no native Pointer Events implementation — polyfill the one API surface the
+    // handler touches so a real `pointerdown` dispatch exercises the actual template wiring.
+    beforeEach(() => {
+      if (!('setPointerCapture' in HTMLElement.prototype)) {
+        (HTMLElement.prototype as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture =
+          vi.fn();
+      } else {
+        vi.spyOn(HTMLElement.prototype, 'setPointerCapture').mockImplementation(() => undefined);
+      }
+    });
+
+    function firePointer(el: Element, type: string, pointerId = 1): void {
+      const event = new Event(type) as unknown as PointerEvent;
+      Object.defineProperty(event, 'pointerId', { value: pointerId, configurable: true });
+      el.dispatchEvent(event);
+    }
+
+    function holdButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Voice"] .voice-hold'));
+    }
+
+    it("flips the hold button's label with the checkbox's latched state", () => {
+      expect(holdButtons()[0].textContent?.trim()).toBe('Kill');
+
+      engine.mutedVoices.set([true, false, false]);
+      fixture.detectChanges();
+
+      expect(holdButtons()[0].textContent?.trim()).toBe('Punch In');
+    });
+
+    it('drives the engine on pointerdown and pointerup', () => {
+      const button = holdButtons()[0];
+
+      firePointer(button, 'pointerdown');
+      expect(engine.setVoiceHeld).toHaveBeenCalledWith(0, true);
+
+      firePointer(button, 'pointerup');
+      expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(0, false);
+    });
+
+    it('releases the hold on pointercancel', () => {
+      const button = holdButtons()[1];
+
+      firePointer(button, 'pointerdown');
+      expect(engine.setVoiceHeld).toHaveBeenCalledWith(1, true);
+
+      firePointer(button, 'pointercancel');
+      expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(1, false);
+    });
+
+    it('calls engine.clearVoiceMutes from the clear-all control', () => {
+      const clearButton = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Voice"] button')
+      ).find((button) => (button as HTMLButtonElement).textContent?.trim() === 'Clear All Mutes') as
+        | HTMLButtonElement
+        | undefined;
+
+      clearButton?.click();
+
+      expect(engine.clearVoiceMutes).toHaveBeenCalled();
     });
   });
 

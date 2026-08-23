@@ -98,6 +98,32 @@
   font-size: var(--font-size-sm);
 }
 
+// checkbox | label | momentary button | state caption, one row per voice.
+.voice-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-dimmed);
+
+  &:last-of-type {
+    border-bottom: 0;
+  }
+}
+
+.voice-state {
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+  justify-self: end;
+}
+
+.voice-clear {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-content-gap);
+  border-top: 1px solid var(--color-dimmed);
+}
+
 // A hopped-to slot grows a second button (Clear); stack it below Hop rather than widening the
 // row, so the four cue slots keep a consistent column width regardless of set/empty state.
 .cue-slot {

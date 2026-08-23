@@ -76,6 +76,8 @@ export class DjPocViewComponent {
   protected readonly nominalIntervalUs = this.engine.nominalIntervalUs;
   protected readonly scheduleAheadMs = this.engine.scheduleAheadMs;
   protected readonly mutedVoices = this.engine.mutedVoices;
+  protected readonly heldVoices = this.engine.heldVoices;
+  protected readonly effectiveMutes = this.engine.effectiveMutes;
   protected readonly cues = this.engine.cues;
   protected readonly loopInPercent = this.engine.loopInPercent;
   protected readonly loopOutPercent = this.engine.loopOutPercent;
@@ -250,6 +252,22 @@ export class DjPocViewComponent {
 
   onVoiceMuteToggle(voice: number, event: Event): void {
     this.engine.setVoiceMuted(voice, (event.target as HTMLInputElement).checked);
+  }
+
+  /** Pointer capture keeps the release on this element even if the press drags off it — without it
+   * the browser fires no `pointerup` here and the voice stays inverted. */
+  onVoiceHoldStart(voice: number, event: PointerEvent): void {
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    this.engine.setVoiceHeld(voice, true);
+  }
+
+  /** Handles both `pointerup` and `pointercancel` — either way the hold ends. */
+  onVoiceHoldEnd(voice: number): void {
+    this.engine.setVoiceHeld(voice, false);
+  }
+
+  onClearVoiceMutes(): void {
+    this.engine.clearVoiceMutes();
   }
 
   onAddCue(slot: number): void {
