@@ -2,7 +2,7 @@
 
 ## What This Is
 
-This is a throwaway spike proving that a browser tab can hold musical timing over Web MIDI well enough to stream SID tunes to a real Commodore 64. The entire codebase is disposable and expected to be replaced by `ASID-DJ-1`; its only permanent value is the fourteen written findings in the listening protocol below.
+This is a throwaway spike proving that a browser tab can hold musical timing over Web MIDI well enough to stream SID tunes to a real Commodore 64. The entire codebase is disposable and expected to be replaced by `ASID-DJ-1`; its only permanent value is the seventeen written findings in the listening protocol below.
 
 The spike makes a C64 play a SID tune whose player code runs in this browser tab, with an audio-rate frame clock, ASID SysEx encoding over Web MIDI, and a frame-timer recipe packet to measure whether the ASID protocol closes the jitter gap that Web MIDI is known to have.
 
@@ -101,7 +101,7 @@ The cartridge's diagnostics are your oracle. Watch all of these as you play:
 
 Record observations as they happen during the session. Findings cannot be reconstructed from memory afterwards. For each question below, note what you heard, which tunes showed the phenomenon, and which configuration was under test.
 
-### The Fourteen Questions
+### The Seventeen Questions
 
 #### 1. Does the browser hold musical timing over a long playback?
 
@@ -195,7 +195,7 @@ Record observations as they happen during the session. Findings cannot be recons
 
 *Confirms whether the corrected voice-mute design is sound, or whether the firmware ask needs to happen sooner than planned.*
 
-**Observations:**
+**Observations:** Yes, indistinguishable from hardware mute.
 
 ---
 
@@ -215,6 +215,30 @@ Record observations as they happen during the session. Findings cannot be recons
 
 ---
 
+#### 15. Does a momentary invert control feel like a performance gesture, or does the punch-in direction turn out to be the one that actually gets used?
+
+*Decides whether the eventual voice channel strip needs both directions as distinct mapped actions.*
+
+**Observations:**
+
+---
+
+#### 16. Is ±25 frames of nudge travel enough to land a missed cue on its transient, and is a one-frame step fine enough to feel exact?
+
+*Sizes the fine-adjustment contract for the real cue and loop features, in the only unit that exists.*
+
+**Observations:**
+
+---
+
+#### 17. Does snapshot-based loop re-entry produce an audible seam?
+
+*Confirms whether a loop can engage without a seam, which is the precondition for hopping between multiple loops later.*
+
+**Observations:**
+
+---
+
 ### Transcription
 
-When the session is complete, transcribe the fourteen findings into `ASID-DJ-ITERATIONS.md`'s decision log, superseding any entries in place where these findings overturn something.
+When the session is complete, transcribe the seventeen findings into `ASID-DJ-ITERATIONS.md`'s decision log, superseding any entries in place where these findings overturn something.
