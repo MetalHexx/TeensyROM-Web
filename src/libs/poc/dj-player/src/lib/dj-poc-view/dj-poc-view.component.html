@@ -259,7 +259,27 @@
           } @else {
             <span class="cue-frame cue-frame--empty">empty</span>
           }
-          <div class="cue-nudge" aria-hidden="true"></div>
+          @if (cues()[slot]) {
+            <div class="cue-nudge">
+              <div class="cue-nudge-centre"></div>
+              <input
+                type="range"
+                [min]="-nudgeRange"
+                [max]="nudgeRange"
+                step="1"
+                [attr.aria-label]="'Nudge cue ' + (slot + 1)"
+                [value]="displayedCueOffset(slot)"
+                (input)="onCueNudgeInput(slot, $event)"
+                (change)="onCueNudgeChange(slot, $event)"
+              />
+            </div>
+            <span class="cue-offset">{{ cueOffsetLabel(slot) }}</span>
+          } @else {
+            <div class="cue-nudge cue-nudge--empty" aria-hidden="true">
+              <div class="cue-nudge-centre"></div>
+            </div>
+            <span class="cue-offset cue-offset--empty">—</span>
+          }
         </div>
       }
     </div>
@@ -270,6 +290,15 @@
       snapshot only means anything to the machine it came from, so only loading a new tune — which
       rebuilds the machine outright — clears all four slots; stopping or changing subtune now leaves
       them intact.
+    </p>
+
+    <p class="caption">
+      The nudge slider walks a captured point ±{{ nudgeRange }} frames onto the transient. The frame
+      column keeps showing where the point was taken; the offset beside the slider shows how far it
+      has been walked. Each step re-derives the point by replaying from an anchor snapshot taken
+      before it — a snapshot can only be run forward, so that anchor is what makes a backward nudge
+      possible without replaying from the start of the tune. The re-derivation and the audition both
+      wait for the slider to be released rather than running on every drag tick.
     </p>
 
     <p class="caption">

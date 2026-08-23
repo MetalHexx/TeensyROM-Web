@@ -129,9 +129,9 @@
   flex-direction: column;
 }
 
-// label | button pair | captured frame | nudge track (reserved for P02-T02). The button column
-// and the frame column stay fixed width across the empty/filled states so filling or clearing a
-// slot never moves anything else in the row — the row that wraps a fourth button onto its own
+// label | button pair | captured frame | nudge track | offset readout. Every column but the track
+// stays fixed width across the empty/filled states so filling or clearing a slot never moves
+// anything else in the row — the row that wraps a fourth button onto its own
 // line is exactly the fault this layout exists to avoid.
 .cue-row {
   display: flex;
@@ -173,11 +173,50 @@
   color: var(--color-dimmed);
 }
 
-// Reserved for the nudge track P02-T02 adds; kept empty and flexible here so that task's addition
-// doesn't have to re-plumb the row.
+// The nudge track: a centred range input over a zero marker, the same transparent-background
+// stacking as .scrub-track. Full row width is what gives a one-frame step enough travel to hit.
 .cue-nudge {
+  position: relative;
   flex: 1 1 auto;
   min-width: 8rem;
+  height: 1.5rem;
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+
+  input[type='range'] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: transparent;
+  }
+}
+
+// An empty slot keeps the track's space so filling one never moves the row, but dims it to read as
+// inactive.
+.cue-nudge--empty {
+  opacity: 0.4;
+}
+
+.cue-nudge-centre {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--color-dimmed);
+  pointer-events: none;
+}
+
+// Monospaced and fixed-width so the signed value doesn't shuffle the row as it crosses ±10.
+.cue-offset {
+  flex: 0 0 4rem;
+  font-family: 'Roboto Mono', monospace;
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.cue-offset--empty {
+  color: var(--color-dimmed);
 }
 
 .error-text {

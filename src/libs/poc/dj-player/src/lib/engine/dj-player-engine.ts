@@ -24,17 +24,39 @@ import type { FrameClock } from '../clock/frame-clock';
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
 export type SpeedMode = 'clock-only' | 'clock-and-recipe';
 
+/** How far either side of its captured frame a point can be walked. */
+export const NUDGE_RANGE_FRAMES = 25;
+/** Frames between the anchor images `onTick` retains for the nudge to replay forward from. */
+export const ANCHOR_SNAPSHOT_FRAME_INTERVAL = 25;
+
 /**
- * A captured position, held as restorable state rather than as a frame number.
+ * An earlier machine image a captured point can replay forward from.
  *
- * `frame` is carried only so the diagnostics and stats stay honest about where a hop landed; the
- * machine and register snapshots are what actually make the return trip.
+ * A snapshot can only be run forward, so reaching a frame *before* a captured point means starting
+ * from something older than it — this is that something.
  */
-export interface CueSlot {
+export interface PositionAnchor {
   readonly frame: number;
   readonly machine: MachineSnapshot;
   readonly registers: RegisterValuesSnapshot;
 }
+
+/**
+ * A captured position plus its nudge offset, held as restorable state rather than as a frame
+ * number: `machine`/`registers` are already resolved at `frame + offset`, so returning to the point
+ * costs a restore and no emulation.
+ */
+export interface CapturedPoint {
+  /** Where the point was originally captured, before any nudge. */
+  readonly frame: number;
+  /** −NUDGE_RANGE_FRAMES..+NUDGE_RANGE_FRAMES. */
+  readonly offset: number;
+  readonly machine: MachineSnapshot;
+  readonly registers: RegisterValuesSnapshot;
+  readonly anchor: PositionAnchor;
+}
+
+export type CueSlot = CapturedPoint;
 
 /** Counters and measurements the diagnostics panel reads. */
 export interface EngineStats {
@@ -95,6 +117,12 @@ export const RECIPE_RESEND_DEBOUNCE_MS = 500;
  * the frame rate, which is jitter this experiment cannot afford.
  */
 const STATS_PUBLISH_FRAME_INTERVAL = 25;
+
+/**
+ * Anchor images kept at once: three recent ones plus the frame-0 seed that never leaves index 0.
+ * Each is a 64 KB memory image, so this is a memory-against-replay-distance trade and nothing more.
+ */
+const ANCHOR_RING_SIZE = 4;
 
 const RECIPE_MAX_INTERVAL_US = 0xffff;
 
@@ -172,6 +200,13 @@ export class DjPlayerEngine implements OnDestroy {
   private framesSincePublish = 0;
   /** Resync packets a jump still owes the stream, drained one per tick by `onTick`. */
   private pendingResync: FrameSnapshot[] = [];
+  /**
+   * Recent machine images, oldest first, that a nudge can replay forward from.
+   *
+   * Index 0 is the frame-0 seed and is never evicted: it is the only anchor guaranteed to sit
+   * before every capture, so it is what a point taken in the first seconds of a tune falls back to.
+   */
+  private anchorRing: PositionAnchor[] = [];
 
   /** Rebuilds the machine and register frame for `file` and initialises its start subtune. */
   loadTune(file: SidFile): void {
@@ -404,19 +439,36 @@ export class DjPlayerEngine implements OnDestroy {
    *
    * The whole point: you are already *at* this position, so there is nothing to re-derive. Storing
    * the state itself is what lets `hopToCue` skip the replay that `jumpToFrame` cannot avoid.
+   *
+   * The point is paired with an anchor from the ring on the way in, which is what makes a later
+   * backward nudge of it possible at all.
    */
   addCue(slot: number): void {
     if (slot < 0 || slot > 3) return;
-    const machine = this.machine;
-    const frame = this.frame;
-    if (machine === null || frame === null) return;
-
-    const cue: CueSlot = {
-      frame: this.framesRendered,
-      machine: machine.snapshot(),
-      registers: frame.snapshotValues(),
-    };
+    const cue = this.captureAnchoredPoint();
+    if (cue === null) return;
     this.cues.update((cues) => cues.map((c, i) => (i === slot ? cue : c)));
+  }
+
+  /**
+   * Walks a captured cue up to ±`NUDGE_RANGE_FRAMES` onto the exact transient; a no-op for an empty
+   * slot. Clamped to that range, and rounded — a frame is the finest position there is.
+   *
+   * Re-derives the slot's resolved snapshot by replaying from its anchor, which is why this is a
+   * setup gesture and `hopToCue` is not: the cost here is bounded by the anchor distance plus the
+   * nudge range, never by how deep into the tune the point was taken.
+   */
+  setCueOffset(slot: number, offset: number): void {
+    if (slot < 0 || slot > 3 || !Number.isFinite(offset)) return;
+    const cue = this.cues()[slot] ?? null;
+    if (cue === null) return;
+
+    const clamped = clamp(Math.round(offset), -NUDGE_RANGE_FRAMES, NUDGE_RANGE_FRAMES);
+    if (clamped === cue.offset) return;
+
+    const resolved = this.resolvePoint(cue, clamped);
+    if (resolved === null) return;
+    this.cues.update((cues) => cues.map((c, i) => (i === slot ? resolved : c)));
   }
 
   /**
@@ -426,6 +478,9 @@ export class DjPlayerEngine implements OnDestroy {
    * thread never stalls and the frame clock (a main-thread `ScriptProcessorNode`) keeps ticking
    * straight through. That stall is what made a deep cue hop hold its last note: with the thread
    * blocked, no packets went out and the SID simply kept sounding whatever it was last told.
+   *
+   * A nudged cue changes nothing here: its snapshot is already resolved at `frame + offset`, so the
+   * hop restores it as-is. Re-deriving it on the way through would put the stall straight back.
    */
   hopToCue(slot: number): void {
     const cue = this.cues()[slot] ?? null;
@@ -435,7 +490,9 @@ export class DjPlayerEngine implements OnDestroy {
 
     machine.restore(cue.machine);
     frame.restoreValues(cue.registers);
-    this.framesRendered = cue.frame;
+    // The stored snapshot is the nudged one, so the counter has to name the frame it actually is —
+    // otherwise the playhead and the row's frame readout both drift by the offset.
+    this.framesRendered = resolvedFrame(cue);
     this.queueResync();
   }
 
@@ -506,6 +563,9 @@ export class DjPlayerEngine implements OnDestroy {
 
     this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()));
     this.framesRendered++;
+    if (this.framesRendered % ANCHOR_SNAPSHOT_FRAME_INTERVAL === 0) {
+      this.recordAnchor();
+    }
     if (this.loopEnabled() && this.framesRendered >= this.frameForPercent(this.loopOutPercent())) {
       this.jumpToFrame(this.frameForPercent(this.loopInPercent()));
       return; // the resync it queued goes out on the next tick; don't publish stats twice
@@ -550,6 +610,11 @@ export class DjPlayerEngine implements OnDestroy {
 
     frame.markAllDirty();
     this.framesRendered = 0;
+    // The ring is dropped rather than carried: its entries describe a machine that no longer exists,
+    // at frame numbers the reset counter has just invalidated. Cues survive this deliberately —
+    // each owns its own anchor, so none of them needs the ring to persist.
+    this.anchorRing = [];
+    this.recordAnchor();
     this.loopEnabled.set(false);
     this.currentSubtune.set(clamped);
     this.lastError.set(null);
@@ -626,6 +691,101 @@ export class DjPlayerEngine implements OnDestroy {
     this.frame = replayFrame;
     this.framesRendered = clampedTarget;
     this.queueResync();
+  }
+
+  /**
+   * Snapshots the live machine at the current position and pairs it with an anchor from the ring.
+   * Returns null when no tune is loaded.
+   *
+   * `offset` starts at 0, so the resolved snapshot *is* the captured one — capture costs a copy and
+   * no replay.
+   */
+  private captureAnchoredPoint(): CapturedPoint | null {
+    const machine = this.machine;
+    const frame = this.frame;
+    if (machine === null || frame === null) return null;
+
+    const anchor = this.selectAnchor(this.framesRendered);
+    if (anchor === null) return null;
+
+    return {
+      frame: this.framesRendered,
+      offset: 0,
+      machine: machine.snapshot(),
+      registers: frame.snapshotValues(),
+      anchor,
+    };
+  }
+
+  /**
+   * The newest ring entry far enough back that a full backward nudge from `frame` still lands after
+   * it, falling back to the frame-0 seed.
+   */
+  private selectAnchor(frame: number): PositionAnchor | null {
+    const latestUsable = frame - NUDGE_RANGE_FRAMES;
+    for (let i = this.anchorRing.length - 1; i >= 0; i--) {
+      if (this.anchorRing[i].frame <= latestUsable) {
+        return this.anchorRing[i];
+      }
+    }
+    return this.anchorRing[0] ?? null;
+  }
+
+  /** Adds the live machine to the ring, dropping the oldest non-seed entry once it is full. */
+  private recordAnchor(): void {
+    const machine = this.machine;
+    const frame = this.frame;
+    if (machine === null || frame === null) return;
+
+    this.anchorRing.push({
+      frame: this.framesRendered,
+      machine: machine.snapshot(),
+      registers: frame.snapshotValues(),
+    });
+    if (this.anchorRing.length > ANCHOR_RING_SIZE) {
+      this.anchorRing.splice(1, 1);
+    }
+  }
+
+  /**
+   * Replays forward from `point.anchor` to `point.frame + newOffset`, returning the resolved point.
+   * Returns null and fails the engine if the replay cannot complete.
+   *
+   * Deliberately does *not* adopt the throwaway pair as live the way `jumpToFrame` does: a nudge is
+   * a setup gesture and must leave playback exactly where it is.
+   */
+  private resolvePoint(point: CapturedPoint, newOffset: number): CapturedPoint | null {
+    const file = this.file;
+    if (file === null) return null;
+
+    const target = resolvedFrame({ ...point, offset: newOffset });
+    const replayFrame = new RegisterFrame();
+    this.effectiveMutes().forEach((muted, voice) => replayFrame.setVoiceMuted(voice, muted));
+    const replayMachine = new C64Machine(file, replayFrame);
+    replayMachine.restore(point.anchor.machine);
+    replayFrame.restoreValues(point.anchor.registers);
+
+    for (let i = point.anchor.frame; i < target; i++) {
+      let result: FrameResult;
+      try {
+        result = replayMachine.runFrame();
+      } catch (error) {
+        this.fail(`the cue nudge to frame ${target} failed during replay — ${describeError(error)}`);
+        return null;
+      }
+      if (!result.completed) {
+        this.fail(`the cue nudge to frame ${target} exceeded its cycle budget during replay`);
+        return null;
+      }
+      replayFrame.takeSnapshot(); // discarded — clears per-frame duplicate-write tracking only
+    }
+
+    return {
+      ...point,
+      offset: newOffset,
+      machine: replayMachine.snapshot(),
+      registers: replayFrame.snapshotValues(),
+    };
   }
 
   /**
@@ -809,6 +969,11 @@ function withVoiceGatesOff(snapshot: FrameSnapshot): FrameSnapshot {
   values[23] = 0;
   values[24] = 0;
   return { ...snapshot, values };
+}
+
+/** Where a point actually sits once its nudge is applied — never before the start of the tune. */
+function resolvedFrame(point: CapturedPoint): number {
+  return Math.max(0, point.frame + point.offset);
 }
 
 function clamp(value: number, min: number, max: number): number {

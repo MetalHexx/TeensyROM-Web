@@ -75,6 +75,7 @@ interface MockDjPlayerEngine {
   addCue: ReturnType<typeof vi.fn>;
   hopToCue: ReturnType<typeof vi.fn>;
   clearCue: ReturnType<typeof vi.fn>;
+  setCueOffset: ReturnType<typeof vi.fn>;
   setLoopRange: ReturnType<typeof vi.fn>;
   setLoopEnabled: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
@@ -130,6 +131,7 @@ function makeEngine(): MockDjPlayerEngine {
     addCue: vi.fn(),
     hopToCue: vi.fn(),
     clearCue: vi.fn(),
+    setCueOffset: vi.fn(),
     setLoopRange: vi.fn(),
     setLoopEnabled: vi.fn(),
     scrubTo: vi.fn(),
@@ -176,6 +178,12 @@ function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
     data: new Uint8Array([0]),
     ...overrides,
   };
+}
+
+/** A slot the view treats as set. Only `frame` and `offset` are rendered; the snapshots and the
+ * anchor are opaque to it. */
+function cueAt(frame: number, offset = 0): CueSlot {
+  return { frame, offset, machine: {}, registers: {}, anchor: {} } as unknown as CueSlot;
 }
 
 describe('DjPocViewComponent', () => {
@@ -485,11 +493,6 @@ describe('DjPocViewComponent', () => {
       return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Cues"] button'));
     }
 
-    /** A slot the view treats as set. Only `frame` is rendered; the snapshots are opaque to it. */
-    function cueAt(frame: number): CueSlot {
-      return { frame, machine: {}, registers: {} } as unknown as CueSlot;
-    }
-
     it('adds a cue for an empty slot, then hops once the slot is set', () => {
       cueButtons()[0].click();
       expect(engine.addCue).toHaveBeenCalledWith(0);
@@ -561,6 +564,85 @@ describe('DjPocViewComponent', () => {
       expect(childIndex(filledBtns)).toBe(btnsIndex);
       expect(childIndex(filledFrame)).toBe(frameIndex);
       expect(filledFrame.textContent?.trim()).toBe('frame 1234');
+    });
+  });
+
+  describe('cue nudge', () => {
+    function nudgeInput(slot = 0): HTMLInputElement {
+      return fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-nudge input')[
+        slot
+      ] as HTMLInputElement;
+    }
+
+    function offsetReadout(slot = 0): string {
+      const rows: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-row')
+      );
+      return rows[slot].querySelector('.cue-offset')?.textContent?.trim() ?? '';
+    }
+
+    beforeEach(() => {
+      engine.cues.set([cueAt(1234), cueAt(50), null, null]);
+      fixture.detectChanges();
+    });
+
+    it('offers a nudge track only for a slot that holds a point', () => {
+      expect(
+        fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-nudge input')
+      ).toHaveLength(2);
+    });
+
+    it('moves the readout on input without auditioning', () => {
+      const input = nudgeInput();
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(nudgeInput().value).toBe('-7');
+      expect(offsetReadout()).toContain('7');
+      // Every re-derivation replays frames on the frame clock's own thread, so the drag must not
+      // trigger one.
+      expect(engine.setCueOffset).not.toHaveBeenCalled();
+      expect(engine.hopToCue).not.toHaveBeenCalled();
+    });
+
+    it('commits the offset and auditions it when the drag releases', () => {
+      const input = nudgeInput();
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.setCueOffset).toHaveBeenCalledWith(0, -7);
+      expect(engine.hopToCue).toHaveBeenCalledWith(0);
+    });
+
+    it("follows the engine's committed offset once the drag has been released", () => {
+      const input = nudgeInput();
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      engine.cues.set([cueAt(1234, -7), cueAt(50), null, null]);
+      fixture.detectChanges();
+
+      expect(nudgeInput().value).toBe('-7');
+
+      engine.cues.set([cueAt(1234, 3), cueAt(50), null, null]);
+      fixture.detectChanges();
+
+      expect(nudgeInput().value).toBe('3');
+    });
+
+    it('drives only the dragged slot', () => {
+      const input = nudgeInput(1);
+      input.value = '12';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(nudgeInput(1).value).toBe('12');
+      expect(nudgeInput(0).value).toBe('0');
+
+      input.dispatchEvent(new Event('change'));
+      expect(engine.setCueOffset).toHaveBeenCalledWith(1, 12);
     });
   });
 

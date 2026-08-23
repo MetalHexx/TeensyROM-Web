@@ -13,10 +13,12 @@ import { buildFramerateRecipePacket } from '../asid/asid-encoder';
 import { MidiOutputService } from '../midi/midi-output.service';
 import type { SidClock, SidFile, SidModel } from '../sid/sid-file.model';
 import type { FrameClock, FrameClockStats } from '../clock/frame-clock';
+import { C64Machine } from '../cpu/c64-machine';
 import {
   DjPlayerEngine,
   FRAME_CLOCK,
   JUMP_CEILING_SECONDS,
+  NUDGE_RANGE_FRAMES,
   RECIPE_RESEND_DEBOUNCE_MS,
 } from './dj-player-engine';
 
@@ -872,6 +874,136 @@ describe('DjPlayerEngine', () => {
       expect(engine.state()).toBe('error');
       expect(engine.lastError()).toBeTruthy();
       expect(dataPackets(midi)).toHaveLength(packetsBefore);
+    });
+  });
+
+  describe('the cue nudge', () => {
+    /** `counterTune` stores its play-call count into $D400, so slot 0 of a resync packet names the
+     * frame whatever was restored actually came from. */
+    const COUNTER_SLOT = 0;
+
+    /** SysEx data bytes carry seven bits — the eighth lives in the packet's MSB map, which
+     * `slotValue` does not reassemble — so the counter reads back modulo 128. */
+    function counterAt(frame: number): number {
+      return frame % 128;
+    }
+
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    /** Hops, then rides the two ticks the resync takes, and reads the frame it landed on. */
+    function hopAndReadFrame(slot: number): number {
+      engine.hopToCue(slot);
+      clock.tick(2); // gate-off, then the resync carrying the resolved registers
+      return slotValue(lastDataPacket(midi), COUNTER_SLOT);
+    }
+
+    it('walks a cue backward onto an earlier frame without replaying from init', async () => {
+      await playTo(60);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, -10);
+
+      expect(hopAndReadFrame(0)).toBe(counterAt(50));
+      // The counter has to agree with the state that was restored, or the playhead and the row's
+      // frame readout both drift by the offset.
+      expect(engine.stats().framesRendered).toBe(50);
+    });
+
+    it('walks a cue forward onto a later frame', async () => {
+      await playTo(60);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, 10);
+
+      expect(hopAndReadFrame(0)).toBe(counterAt(70));
+      expect(engine.stats().framesRendered).toBe(70);
+    });
+
+    it('resolves to the same state a direct replay to that frame produces', async () => {
+      await playTo(60);
+      engine.addCue(0);
+      engine.setCueOffset(0, -10);
+      engine.hopToCue(0);
+      clock.tick(5); // the resync, then three frames played on from it
+      const nudged = dataPackets(midi).slice(-4).map((packet) => packet.bytes);
+
+      const freshClock = new FakeFrameClock();
+      const freshMidi = new FakeMidiOutputService();
+      const freshInjector = createEnvironmentInjector(
+        [
+          DjPlayerEngine,
+          { provide: FRAME_CLOCK, useValue: freshClock },
+          { provide: MidiOutputService, useValue: freshMidi as unknown as MidiOutputService },
+        ],
+        TestBed.inject(EnvironmentInjector)
+      );
+      const freshEngine = freshInjector.get(DjPlayerEngine);
+      freshEngine.loadTune(counterTune());
+      await freshEngine.play();
+      freshClock.tick(50); // played straight through to the frame the nudge walked onto
+      freshEngine.addCue(0);
+      freshEngine.hopToCue(0);
+      freshClock.tick(5);
+
+      expect(nudged).toEqual(dataPackets(freshMidi).slice(-4).map((packet) => packet.bytes));
+    });
+
+    it('hops to a nudged cue without emulating a frame, however deep it was captured', async () => {
+      await playTo(200);
+      engine.addCue(0);
+      engine.setCueOffset(0, -20);
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+
+      engine.hopToCue(0);
+
+      // The stall this whole design exists to avoid: a hop that re-derived the nudged point would
+      // block the main thread, and with it the frame clock's own audio callback.
+      expect(runFrame).not.toHaveBeenCalled();
+      clock.tick(2);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(180));
+    });
+
+    it('falls back to the frame-0 anchor for a cue captured before the ring has filled', async () => {
+      await playTo(5);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, -5);
+
+      expect(hopAndReadFrame(0)).toBe(counterAt(0));
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+
+    it('leaves playback exactly where it is, since the re-derivation runs on a throwaway machine', async () => {
+      await playTo(60);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, -10);
+
+      clock.tick(1);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(61));
+    });
+
+    it('clamps the offset to the nudge range in both directions', async () => {
+      await playTo(60);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, 999);
+      expect(engine.cues()[0]?.offset).toBe(NUDGE_RANGE_FRAMES);
+
+      engine.setCueOffset(0, -999);
+      expect(engine.cues()[0]?.offset).toBe(-NUDGE_RANGE_FRAMES);
+    });
+
+    it('is a no-op on an empty slot', async () => {
+      await playTo(30);
+
+      engine.setCueOffset(1, 5);
+
+      expect(engine.cues()[1]).toBeNull();
     });
   });
 

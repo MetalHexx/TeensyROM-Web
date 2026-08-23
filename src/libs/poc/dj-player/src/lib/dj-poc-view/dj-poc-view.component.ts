@@ -11,6 +11,7 @@ import {
   MAX_SPEED_MULTIPLIER,
   MIN_SPEED_MULTIPLIER,
   NOMINAL_INTERVAL_OPTIONS_US,
+  NUDGE_RANGE_FRAMES,
   SpeedMode,
 } from '../engine/dj-player-engine';
 
@@ -88,6 +89,7 @@ export class DjPocViewComponent {
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
   protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
+  protected readonly nudgeRange = NUDGE_RANGE_FRAMES;
 
   // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
   // own position updates (which fire from stats publishes, not from the drag) can't fight it and
@@ -97,6 +99,9 @@ export class DjPocViewComponent {
   protected readonly scrubDisplayPercent = computed<number>(
     () => this.scrubDragValue() ?? this.engine.positionPercent()
   );
+
+  /** Slot index → the offset being dragged right now. Absent means "not dragging that slot". */
+  private readonly cueDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
 
   // The cartridge's frame timer, stated rather than recorded: we know it is on once we have sent a
   // recipe packet, because the firmware's handler forces `FrameTimerMode = true` on receipt.
@@ -284,6 +289,39 @@ export class DjPocViewComponent {
 
   onClearCue(slot: number): void {
     this.engine.clearCue(slot);
+  }
+
+  /** The offset the row shows: the live drag while one is in flight, the committed value otherwise. */
+  protected displayedCueOffset(slot: number): number {
+    return this.cueDragOffsets().get(slot) ?? this.cues()[slot]?.offset ?? 0;
+  }
+
+  /** Signed and unit-suffixed, as the row reads it: `+0 fr`, `−7 fr`. */
+  protected cueOffsetLabel(slot: number): string {
+    const offset = this.displayedCueOffset(slot);
+    return `${offset < 0 ? '−' : '+'}${Math.abs(offset)} fr`;
+  }
+
+  // Moves the readout only. Every re-derivation replays up to ~50 frames of emulation on the thread
+  // the frame clock rides, so running one per drag tick would put steady replay load beside the
+  // audio callback.
+  onCueNudgeInput(slot: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.cueDragOffsets.update((offsets) => new Map(offsets).set(slot, value));
+  }
+
+  // (change) fires on release: commit the offset, then hop so the operator hears where the point
+  // landed. The drag entry is dropped only after the commit, so the readout falls back to an engine
+  // value that already agrees with it rather than snapping back through the old one.
+  onCueNudgeChange(slot: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.engine.setCueOffset(slot, value);
+    this.engine.hopToCue(slot);
+    this.cueDragOffsets.update((offsets) => {
+      const next = new Map(offsets);
+      next.delete(slot);
+      return next;
+    });
   }
 
   onLoopInInput(event: Event): void {
