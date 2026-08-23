@@ -374,8 +374,9 @@ export class DjPocViewComponent {
     this.loopInDragOffset.set(null);
   }
 
-  // Committed on every drag tick rather than on release: moving the exit is arithmetic, with no
-  // replay to defer and nothing to audition — the next pass simply wraps at the new point.
+  // Committed on every drag tick rather than on release: moving the exit is arithmetic, no replay
+  // to defer. The engine exposes `auditionLoopOut` to preview the seam, but this dev panel doesn't
+  // wire it in here — that binding belongs to the real control panel in a later phase.
   onLoopOutNudgeInput(event: Event): void {
     this.engine.setLoopOutOffset(PANEL_LOOP_SLOT, Number((event.target as HTMLInputElement).value));
   }

@@ -743,13 +743,19 @@ export class DjPlayerEngine implements OnDestroy {
     return outFrame > resolvedFrame(slot.in) ? { start: slot.in, outFrame } : null;
   }
 
-  /** Re-enters a slot and makes it the one playing, dropping whatever was queued behind it. */
-  private engageLoop(slot: number): void {
-    const start = this.loopSlots()[slot]?.in ?? null;
-    if (start === null) return;
-    this.restorePoint(start);
+  /**
+   * Re-enters a slot and makes it the one playing, dropping whatever was queued behind it.
+   * Re-checks playability at the point of engagement — a queued slot's ends can be nudged across
+   * each other while it waits, so the punch-time check alone isn't enough. Returns whether the
+   * engage actually happened.
+   */
+  private engageLoop(slot: number): boolean {
+    const resolved = this.resolveLoopSlot(this.loopSlots()[slot] ?? null);
+    if (resolved === null) return false;
+    this.restorePoint(resolved.start);
     this.activeLoopSlot.set(slot);
     this.queuedLoopSlot.set(null);
+    return true;
   }
 
   private updateLoopSlot(slot: number, next: (current: LoopSlot | null) => LoopSlot | null): void {
@@ -818,9 +824,10 @@ export class DjPlayerEngine implements OnDestroy {
         if (queued === null) {
           // A restore, not a replay: the pass costs nothing per frame however deep the entry sits.
           this.restorePoint(loop.start);
-        } else {
-          // The lap the punch waited for is over, so the queued slot takes the loop here.
-          this.engageLoop(queued);
+        } else if (!this.engageLoop(queued)) {
+          // The lap the punch waited for is over, but the queued slot's ends were nudged across
+          // each other while it waited — nothing playable to switch to, so drop out.
+          this.stopLoop();
         }
         return; // the resync it queued goes out on the next tick; don't publish stats twice
       }
