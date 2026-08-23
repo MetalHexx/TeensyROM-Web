@@ -24,10 +24,9 @@ import type { FrameClock } from '../clock/frame-clock';
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
 export type SpeedMode = 'clock-only' | 'clock-and-recipe';
 
-/** How far either side of its captured frame a point can be walked. */
-export const NUDGE_RANGE_FRAMES = 25;
-/** Frames between the anchor images `onTick` retains for the nudge to replay forward from. */
-export const ANCHOR_SNAPSHOT_FRAME_INTERVAL = 25;
+/** The nudge window in real time. Frames are derived from the tune's rate so the felt range is
+ *  the same on a 1x tune and a 2x-multispeed one. */
+export const NUDGE_RANGE_MS = 1000;
 
 /**
  * An earlier machine image a captured point can replay forward from.
@@ -49,7 +48,7 @@ export interface PositionAnchor {
 export interface CapturedPoint {
   /** Where the point was originally captured, before any nudge. */
   readonly frame: number;
-  /** −NUDGE_RANGE_FRAMES..+NUDGE_RANGE_FRAMES. */
+  /** −nudgeRangeFrames()..+nudgeRangeFrames(). */
   readonly offset: number;
   readonly machine: MachineSnapshot;
   readonly registers: RegisterValuesSnapshot;
@@ -65,7 +64,7 @@ export type CueSlot = CapturedPoint;
  */
 export interface LoopOutPoint {
   readonly frame: number;
-  /** −NUDGE_RANGE_FRAMES..+NUDGE_RANGE_FRAMES. */
+  /** −nudgeRangeFrames()..+nudgeRangeFrames(). */
   readonly offset: number;
 }
 
@@ -232,6 +231,37 @@ export class DjPlayerEngine implements OnDestroy {
     const outFrame = Math.max(0, end.frame + end.offset);
     return outFrame > resolvedFrame(start) ? { start, outFrame } : null;
   });
+
+  /**
+   * The nudge range in frames for the loaded tune.
+   *
+   * Derived from the tune's own rate (`nominalIntervalUs` divided by `callsPerFrame`), never the
+   * live `speedMultiplier` — riding the speed fader must not make the range breathe, and the anchor
+   * spacing below is only valid because this stays fixed for a given tune.
+   */
+  readonly nudgeRangeFrames = computed<number>(() => {
+    const callsPerFrame = this.machine?.callsPerFrame ?? 1;
+    const nominalUs = this.nominalIntervalUs();
+    const tuneIntervalUs = nominalUs > 0 ? nominalUs / callsPerFrame : PAL_FRAME_INTERVAL_US;
+    return Math.round((NUDGE_RANGE_MS * 1000) / tuneIntervalUs);
+  });
+
+  /**
+   * Frames between the anchor images `onTick` retains for the nudge to replay forward from.
+   *
+   * Derived from the nudge range rather than fixed, to hold the ring's actual reach: eviction keeps
+   * the seed plus the 3 newest recordings, i.e. `ANCHOR_RING_SIZE − 2` gaps of this interval between
+   * the oldest kept (non-seed) anchor and the newest. A query can land right on the newest recording
+   * (nothing rounds that away), so the guarantee needs `(ANCHOR_RING_SIZE − 2) × interval ≥
+   * nudgeRangeFrames()` — one fewer factor than `(ANCHOR_RING_SIZE − 1)` would suggest, since the
+   * seed anchor is not part of this evenly-spaced run. A wider range on a multispeed tune widens the
+   * spacing accordingly, or the ring falls short of it and every nudge that deep replays from the
+   * frame-0 seed instead of a recent anchor — the O(distance-from-start) stall this ring exists to
+   * avoid.
+   */
+  private readonly anchorSnapshotFrameInterval = computed<number>(() =>
+    Math.max(1, Math.ceil(this.nudgeRangeFrames() / (ANCHOR_RING_SIZE - 2)))
+  );
 
   private file: SidFile | null = null;
   private machine: C64Machine | null = null;
@@ -499,7 +529,7 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Walks a captured cue up to ±`NUDGE_RANGE_FRAMES` onto the exact transient; a no-op for an empty
+   * Walks a captured cue up to ±`nudgeRangeFrames()` onto the exact transient; a no-op for an empty
    * slot. Clamped to that range, and rounded — a frame is the finest position there is.
    *
    * Re-derives the slot's resolved snapshot by replaying from its anchor, which is why this is a
@@ -511,7 +541,8 @@ export class DjPlayerEngine implements OnDestroy {
     const cue = this.cues()[slot] ?? null;
     if (cue === null) return;
 
-    const clamped = clamp(Math.round(offset), -NUDGE_RANGE_FRAMES, NUDGE_RANGE_FRAMES);
+    const range = this.nudgeRangeFrames();
+    const clamped = clamp(Math.round(offset), -range, range);
     if (clamped === cue.offset) return;
 
     const resolved = this.resolvePoint(cue, clamped);
@@ -555,7 +586,7 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Walks the loop's entry up to ±`NUDGE_RANGE_FRAMES` onto the transient, re-deriving its snapshot
+   * Walks the loop's entry up to ±`nudgeRangeFrames()` onto the transient, re-deriving its snapshot
    * from the point's anchor; a no-op with no entry marked. A setup gesture, for the same reason
    * `setCueOffset` is: the re-derivation replays frames, so it must not run per drag tick.
    */
@@ -564,7 +595,8 @@ export class DjPlayerEngine implements OnDestroy {
     const point = this.loopIn();
     if (point === null) return;
 
-    const clamped = clamp(Math.round(frames), -NUDGE_RANGE_FRAMES, NUDGE_RANGE_FRAMES);
+    const range = this.nudgeRangeFrames();
+    const clamped = clamp(Math.round(frames), -range, range);
     if (clamped === point.offset) return;
 
     const resolved = this.resolvePoint(point, clamped);
@@ -573,16 +605,17 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Walks the loop's exit up to ±`NUDGE_RANGE_FRAMES`; a no-op with no exit marked. Arithmetic
+   * Walks the loop's exit up to ±`nudgeRangeFrames()`; a no-op with no exit marked. Arithmetic
    * alone — the exit is a number the tick compares, so moving it replays nothing.
    */
   setLoopOutOffset(frames: number): void {
     if (!Number.isFinite(frames)) return;
     const point = this.loopOut();
     if (point === null) return;
+    const range = this.nudgeRangeFrames();
     this.loopOut.set({
       ...point,
-      offset: clamp(Math.round(frames), -NUDGE_RANGE_FRAMES, NUDGE_RANGE_FRAMES),
+      offset: clamp(Math.round(frames), -range, range),
     });
   }
 
@@ -653,7 +686,7 @@ export class DjPlayerEngine implements OnDestroy {
 
     this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()));
     this.framesRendered++;
-    if (this.framesRendered % ANCHOR_SNAPSHOT_FRAME_INTERVAL === 0) {
+    if (this.framesRendered % this.anchorSnapshotFrameInterval() === 0) {
       this.recordAnchor();
     }
     if (this.loopEnabled()) {
@@ -819,7 +852,7 @@ export class DjPlayerEngine implements OnDestroy {
    * it, falling back to the frame-0 seed.
    */
   private selectAnchor(frame: number): PositionAnchor | null {
-    const latestUsable = frame - NUDGE_RANGE_FRAMES;
+    const latestUsable = frame - this.nudgeRangeFrames();
     for (let i = this.anchorRing.length - 1; i >= 0; i--) {
       if (this.anchorRing[i].frame <= latestUsable) {
         return this.anchorRing[i];

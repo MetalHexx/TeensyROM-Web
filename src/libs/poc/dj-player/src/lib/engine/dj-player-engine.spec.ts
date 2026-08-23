@@ -18,7 +18,7 @@ import {
   DjPlayerEngine,
   FRAME_CLOCK,
   JUMP_CEILING_SECONDS,
-  NUDGE_RANGE_FRAMES,
+  NUDGE_RANGE_MS,
   RECIPE_RESEND_DEBOUNCE_MS,
 } from './dj-player-engine';
 
@@ -179,6 +179,25 @@ function counterTune(): SidFile {
           RTS,
         ],
       },
+      {
+        at: 0x1010,
+        bytes: [
+          0xe6, 0xfb, // INC $FB
+          0xa5, 0xfb, // LDA $FB
+          0x8d, 0x00, 0xd4, // STA $D400
+          RTS,
+        ],
+      },
+    ],
+  });
+}
+
+/** Combines `doubleSpeedTune`'s CIA-programmed 2x rate with `counterTune`'s per-play-call counter,
+ * so a nudge test can identify exactly which frame a 2x-multispeed tune landed on. */
+function doubleSpeedCounterTune(): SidFile {
+  return tune({
+    blocks: [
+      { at: 0x1000, bytes: [0xa9, 0x63, 0x8d, 0x04, 0xdc, 0xa9, 0x26, 0x8d, 0x05, 0xdc, RTS] },
       {
         at: 0x1010,
         bytes: [
@@ -975,11 +994,12 @@ describe('DjPlayerEngine', () => {
       await playTo(60);
       engine.addCue(0);
 
+      const range = engine.nudgeRangeFrames();
       engine.setCueOffset(0, 999);
-      expect(engine.cues()[0]?.offset).toBe(NUDGE_RANGE_FRAMES);
+      expect(engine.cues()[0]?.offset).toBe(range);
 
       engine.setCueOffset(0, -999);
-      expect(engine.cues()[0]?.offset).toBe(-NUDGE_RANGE_FRAMES);
+      expect(engine.cues()[0]?.offset).toBe(-range);
     });
 
     it('is a no-op on an empty slot', async () => {
@@ -1102,7 +1122,7 @@ describe('DjPlayerEngine', () => {
       await markLoop(10, 20);
       engine.setLoopEnabled(true);
 
-      engine.setLoopOutOffset(-NUDGE_RANGE_FRAMES); // the exit walks back behind the entry
+      engine.setLoopOutOffset(-engine.nudgeRangeFrames()); // the exit walks back behind the entry
 
       expect(engine.loopArmable()).toBe(false);
       clock.tick(1);
@@ -1132,11 +1152,12 @@ describe('DjPlayerEngine', () => {
     it('clamps the out-point offset to the nudge range in both directions', async () => {
       await markLoop(60, 30);
 
+      const range = engine.nudgeRangeFrames();
       engine.setLoopOutOffset(999);
-      expect(engine.loopOut()?.offset).toBe(NUDGE_RANGE_FRAMES);
+      expect(engine.loopOut()?.offset).toBe(range);
 
       engine.setLoopOutOffset(-999);
-      expect(engine.loopOut()?.offset).toBe(-NUDGE_RANGE_FRAMES);
+      expect(engine.loopOut()?.offset).toBe(-range);
     });
 
     it('walks the in-point onto an earlier frame and auditions it from the anchor', async () => {
@@ -1188,6 +1209,58 @@ describe('DjPlayerEngine', () => {
       expect(engine.loopIn()).toBeNull();
       expect(engine.loopOut()).toBeNull();
       expect(engine.loopEnabled()).toBe(false);
+    });
+  });
+
+  describe('the nudge range', () => {
+    it('derives ~1 s of frames from the tune rate at 1x', () => {
+      engine.loadTune(counterTune());
+
+      expect(engine.nudgeRangeFrames()).toBe(
+        Math.round((NUDGE_RANGE_MS * 1000) / PAL_FRAME_INTERVAL_US)
+      );
+    });
+
+    it('doubles the frame count on a 2x-multispeed tune, covering the same wall-clock span', () => {
+      engine.loadTune(doubleSpeedCounterTune());
+
+      expect(engine.nudgeRangeFrames()).toBe(
+        Math.round((NUDGE_RANGE_MS * 1000 * 2) / PAL_FRAME_INTERVAL_US)
+      );
+    });
+
+    it('falls back to the PAL nominal interval so the range is never zero or NaN with no tune loaded', () => {
+      expect(engine.nudgeRangeFrames()).toBe(
+        Math.round((NUDGE_RANGE_MS * 1000) / PAL_FRAME_INTERVAL_US)
+      );
+    });
+
+    it('does not change when the speed fader moves — only the tune rate, never the live speed', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      const before = engine.nudgeRangeFrames();
+
+      engine.setSpeed(1.2);
+      expect(engine.nudgeRangeFrames()).toBe(before);
+
+      engine.setSpeed(0.8);
+      expect(engine.nudgeRangeFrames()).toBe(before);
+    });
+
+    it('resolves a cue captured deep into a 2x-multispeed tune against a recent anchor, not the frame-0 seed', async () => {
+      engine.loadTune(doubleSpeedCounterTune());
+      await engine.play();
+      // Well past the old fixed 75-frame ring span, deep enough that replaying from the frame-0 seed
+      // would need hundreds of frames — the regression this ring resize exists to prevent.
+      clock.tick(400);
+      engine.addCue(0);
+
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+      engine.setCueOffset(0, -engine.nudgeRangeFrames());
+
+      // A replay from the frame-0 seed would run ~400 frames; one from a recent anchor is bounded by
+      // the anchor spacing plus the nudge range, well under that.
+      expect(runFrame.mock.calls.length).toBeLessThan(200);
     });
   });
 

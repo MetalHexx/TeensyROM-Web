@@ -264,8 +264,8 @@
               <div class="cue-nudge-centre"></div>
               <input
                 type="range"
-                [min]="-nudgeRange"
-                [max]="nudgeRange"
+                [min]="-nudgeRange()"
+                [max]="nudgeRange()"
                 step="1"
                 [attr.aria-label]="'Nudge cue ' + (slot + 1)"
                 [value]="displayedCueOffset(slot)"
@@ -293,7 +293,7 @@
     </p>
 
     <p class="caption">
-      The nudge slider walks a captured point ±{{ nudgeRange }} frames onto the transient. The frame
+      The nudge slider walks a captured point ±{{ nudgeRange() }} frames onto the transient. The frame
       column keeps showing where the point was taken; the offset beside the slider shows how far it
       has been walked. Each step re-derives the point by replaying from an anchor snapshot taken
       before it — a snapshot can only be run forward, so that anchor is what makes a backward nudge
@@ -339,8 +339,8 @@
             <div class="loop-nudge-centre"></div>
             <input
               type="range"
-              [min]="-nudgeRange"
-              [max]="nudgeRange"
+              [min]="-nudgeRange()"
+              [max]="nudgeRange()"
               step="1"
               aria-label="Nudge loop in"
               [value]="displayedLoopInOffset()"
@@ -369,8 +369,8 @@
             <div class="loop-nudge-centre"></div>
             <input
               type="range"
-              [min]="-nudgeRange"
-              [max]="nudgeRange"
+              [min]="-nudgeRange()"
+              [max]="nudgeRange()"
               step="1"
               aria-label="Nudge loop out"
               [value]="point.offset"

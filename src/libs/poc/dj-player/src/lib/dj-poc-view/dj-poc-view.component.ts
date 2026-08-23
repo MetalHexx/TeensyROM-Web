@@ -11,7 +11,6 @@ import {
   MAX_SPEED_MULTIPLIER,
   MIN_SPEED_MULTIPLIER,
   NOMINAL_INTERVAL_OPTIONS_US,
-  NUDGE_RANGE_FRAMES,
   SpeedMode,
 } from '../engine/dj-player-engine';
 
@@ -90,7 +89,7 @@ export class DjPocViewComponent {
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
   protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
-  protected readonly nudgeRange = NUDGE_RANGE_FRAMES;
+  protected readonly nudgeRange = this.engine.nudgeRangeFrames;
 
   // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
   // own position updates (which fire from stats publishes, not from the drag) can't fight it and

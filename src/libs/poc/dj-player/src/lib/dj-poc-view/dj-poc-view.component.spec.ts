@@ -61,6 +61,7 @@ interface MockDjPlayerEngine {
   loopArmable: WritableSignal<boolean>;
   loopEnabled: WritableSignal<boolean>;
   positionPercent: WritableSignal<number>;
+  nudgeRangeFrames: WritableSignal<number>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -122,6 +123,7 @@ function makeEngine(): MockDjPlayerEngine {
     loopArmable: signal(false),
     loopEnabled: signal(false),
     positionPercent: signal(0),
+    nudgeRangeFrames: signal(50),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
