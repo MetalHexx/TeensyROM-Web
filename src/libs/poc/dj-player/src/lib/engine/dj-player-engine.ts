@@ -668,6 +668,19 @@ export class DjPlayerEngine implements OnDestroy {
     this.queueResync();
   }
 
+  /**
+   * Re-enters `slot` at its in-point and makes it the active loop, immediately and without going
+   * through the queue — a setup gesture on a specific slot, not a performance punch, mirroring
+   * `auditionLoopOut`. Unlike the out-point audition there is no seam ahead to pre-roll toward:
+   * restoring the in-point snapshot is itself the audible feedback. No-op for a slot that is not
+   * playable.
+   */
+  auditionLoopIn(slot: number): void {
+    if (slot < 0 || slot > 3) return;
+    if (this.resolveLoopSlot(this.loopSlots()[slot] ?? null) === null) return;
+    this.engageLoop(slot);
+  }
+
   /** Empties a slot, and lets go of it if it was the one playing or the one waiting to. */
   clearLoopSlot(slot: number): void {
     if (slot < 0 || slot > 3) return;

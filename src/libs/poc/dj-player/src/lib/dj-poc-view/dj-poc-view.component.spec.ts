@@ -87,6 +87,7 @@ interface MockDjPlayerEngine {
   clearLoopSlot: ReturnType<typeof vi.fn>;
   punchLoop: ReturnType<typeof vi.fn>;
   stopLoop: ReturnType<typeof vi.fn>;
+  auditionLoopIn: ReturnType<typeof vi.fn>;
   auditionLoopOut: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
 }
@@ -151,6 +152,7 @@ function makeEngine(): MockDjPlayerEngine {
     clearLoopSlot: vi.fn(),
     punchLoop: vi.fn(),
     stopLoop: vi.fn(),
+    auditionLoopIn: vi.fn(),
     auditionLoopOut: vi.fn(),
     scrubTo: vi.fn(),
   };
@@ -787,10 +789,10 @@ describe('DjPocViewComponent', () => {
       // Re-deriving the in-point replays frames on the frame clock's own thread, so the drag must
       // not trigger one.
       expect(engine.setLoopInOffset).not.toHaveBeenCalled();
-      expect(engine.punchLoop).not.toHaveBeenCalled();
+      expect(engine.auditionLoopIn).not.toHaveBeenCalled();
     });
 
-    it('commits the in-point offset and re-enters the slot when the drag releases', () => {
+    it('commits the in-point offset and auditions it when the drag releases', () => {
       setSlots([null, { in: loopInPoint(2140), out: null }, null, null]);
 
       const input = nudgeInput(1, 'in') as HTMLInputElement;
@@ -799,7 +801,26 @@ describe('DjPocViewComponent', () => {
       input.dispatchEvent(new Event('change'));
 
       expect(engine.setLoopInOffset).toHaveBeenCalledWith(1, -7);
-      expect(engine.punchLoop).toHaveBeenCalledWith(1);
+      expect(engine.auditionLoopIn).toHaveBeenCalledWith(1);
+      expect(engine.punchLoop).not.toHaveBeenCalled();
+    });
+
+    it('auditions the in-point commit even while a different slot is the active loop, without queuing a switch', () => {
+      engine.activeLoopSlot.set(0);
+      setSlots([
+        { in: loopInPoint(100), out: { frame: 400, offset: 0 } },
+        { in: loopInPoint(2140), out: null },
+        null,
+        null,
+      ]);
+
+      const input = nudgeInput(1, 'in') as HTMLInputElement;
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.auditionLoopIn).toHaveBeenCalledWith(1);
+      expect(engine.punchLoop).not.toHaveBeenCalled();
     });
 
     it('moves the out-point readout on input without committing or auditioning', () => {

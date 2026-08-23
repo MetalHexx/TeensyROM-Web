@@ -424,12 +424,12 @@ export class DjPocViewComponent {
     this.loopInDragOffsets.update((offsets) => new Map(offsets).set(slot, value));
   }
 
-  // (change) fires on release: commit the offset, then re-enter the slot so the operator hears
-  // where the loop will now start.
+  // (change) fires on release: commit the offset, then audition so the operator hears where the
+  // entry now lands — bypasses the queue, same as the out-point audition.
   onLoopInNudgeChange(slot: number, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
     this.engine.setLoopInOffset(slot, value);
-    this.engine.punchLoop(slot);
+    this.engine.auditionLoopIn(slot);
     this.loopInDragOffsets.update((offsets) => {
       const next = new Map(offsets);
       next.delete(slot);

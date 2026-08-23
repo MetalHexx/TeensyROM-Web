@@ -1485,6 +1485,57 @@ describe('DjPlayerEngine', () => {
     });
   });
 
+  describe('the in-point audition', () => {
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    function markSlotHere(slot: number, length: number): void {
+      engine.tapLoopIn(slot);
+      clock.tick(length);
+      engine.tapLoopOut(slot);
+    }
+
+    async function markLoop(slot: number, inFrame: number, length: number): Promise<void> {
+      await playTo(inFrame);
+      markSlotHere(slot, length);
+    }
+
+    it('makes the audited slot active immediately rather than queueing it', async () => {
+      await markLoop(0, 5, 100); // in 5, out 105
+      await markLoop(1, 200, 300); // in 200, out 500
+      engine.punchLoop(0);
+      clock.tick(2);
+
+      engine.auditionLoopIn(1);
+
+      // Immediate, not the wait-for-lap rule a punch follows — a queued switch would leave slot 0
+      // active with nothing to hear yet from the nudged slot.
+      expect(engine.activeLoopSlot()).toBe(1);
+      expect(engine.queuedLoopSlot()).toBeNull();
+    });
+
+    it('restores the slot to its in-point', async () => {
+      await markLoop(0, 50, 200); // in 50, out 250
+
+      engine.auditionLoopIn(0);
+      clock.tick(2); // the gate-off, then the resync carrying the restored registers
+
+      expect(engine.stats().framesRendered).toBe(50);
+    });
+
+    it('is a no-op for a slot that is not playable', async () => {
+      await playTo(10);
+      engine.tapLoopIn(0); // no out marked yet
+
+      engine.auditionLoopIn(0);
+
+      expect(engine.activeLoopSlot()).toBeNull();
+    });
+  });
+
   describe('the nudge range', () => {
     it('derives ~1 s of frames from the tune rate at 1x', () => {
       engine.loadTune(counterTune());
