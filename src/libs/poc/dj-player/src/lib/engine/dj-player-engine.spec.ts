@@ -13,10 +13,12 @@ import { buildFramerateRecipePacket } from '../asid/asid-encoder';
 import { MidiOutputService } from '../midi/midi-output.service';
 import type { SidClock, SidFile, SidModel } from '../sid/sid-file.model';
 import type { FrameClock, FrameClockStats } from '../clock/frame-clock';
+import { C64Machine } from '../cpu/c64-machine';
 import {
   DjPlayerEngine,
   FRAME_CLOCK,
   JUMP_CEILING_SECONDS,
+  NUDGE_RANGE_FRAMES,
   RECIPE_RESEND_DEBOUNCE_MS,
 } from './dj-player-engine';
 
@@ -226,16 +228,11 @@ function messageSequence(midi: FakeMidiOutputService): number[] {
 }
 
 /**
- * The engine's own `ceilingFrames`/`frameForPercent` formula (`dj-player-engine.ts`), duplicated only
- * to compute the boundary values a jump should land on — not a re-test of the formula itself.
+ * The engine's own `ceilingFrames` formula (`dj-player-engine.ts`), duplicated only to compute the
+ * boundary values a scrub should land on — not a re-test of the formula itself.
  */
 function expectedCeilingFrames(intervalUs = PAL_FRAME_INTERVAL_US): number {
   return Math.round((JUMP_CEILING_SECONDS * 1_000_000) / intervalUs);
-}
-
-function expectedFrameForPercent(percent: number, intervalUs = PAL_FRAME_INTERVAL_US): number {
-  const clamped = Math.min(100, Math.max(0, percent));
-  return Math.round((clamped / 100) * expectedCeilingFrames(intervalUs));
 }
 
 /** The value byte for a given present slot within a SID data packet (see `buildSidDataPacket`). */
@@ -344,6 +341,66 @@ describe('DjPlayerEngine', () => {
     engine.loadTune(silentTune());
 
     expect(engine.mutedVoices()).toEqual([false, false, false]);
+  });
+
+  describe('momentary voice hold', () => {
+    it('composes effectiveMutes as latched XOR held, in both directions', () => {
+      engine.loadTune(silentTune());
+
+      engine.setVoiceHeld(0, true); // audible -> held silences it
+      expect(engine.effectiveMutes()).toEqual([true, false, false]);
+
+      engine.setVoiceMuted(1, true);
+      engine.setVoiceHeld(1, true); // checkbox-muted -> held makes it sound
+      expect(engine.effectiveMutes()).toEqual([true, false, false]);
+    });
+
+    it('restores the latched state when the hold releases', () => {
+      engine.loadTune(silentTune());
+      engine.setVoiceMuted(0, true);
+
+      engine.setVoiceHeld(0, true);
+      expect(engine.effectiveMutes()[0]).toBe(false);
+
+      engine.setVoiceHeld(0, false);
+      expect(engine.effectiveMutes()[0]).toBe(true);
+      expect(engine.mutedVoices()[0]).toBe(true);
+    });
+
+    it('honours a checkbox change made mid-hold once the button releases', () => {
+      engine.loadTune(silentTune());
+
+      engine.setVoiceHeld(0, true);
+      expect(engine.effectiveMutes()[0]).toBe(true);
+
+      engine.setVoiceMuted(0, true); // latched value toggled while still held
+      expect(engine.effectiveMutes()[0]).toBe(false); // held still wins until release
+
+      engine.setVoiceHeld(0, false);
+      expect(engine.effectiveMutes()[0]).toBe(true); // release honours the new latched value
+    });
+
+    it('clears only the latched signal, leaving a held voice untouched', () => {
+      engine.loadTune(silentTune());
+      engine.setVoiceMuted(0, true);
+      engine.setVoiceMuted(1, true);
+      engine.setVoiceHeld(1, true);
+
+      engine.clearVoiceMutes();
+
+      expect(engine.mutedVoices()).toEqual([false, false, false]);
+      expect(engine.heldVoices()).toEqual([false, true, false]);
+      expect(engine.effectiveMutes()).toEqual([false, true, false]);
+    });
+
+    it('is a no-op for an out-of-range voice', () => {
+      engine.loadTune(silentTune());
+
+      engine.setVoiceHeld(3, true);
+      engine.setVoiceHeld(-1, true);
+
+      expect(engine.heldVoices()).toEqual([false, false, false]);
+    });
   });
 
   it('gates the voices off on pause and restores the chip on resume', async () => {
@@ -602,6 +659,31 @@ describe('DjPlayerEngine', () => {
       expect([cues[1], cues[3]]).toEqual([null, null]);
     });
 
+    it('survives stop() and a play from stopped, since neither rebuilds the tune', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+
+      engine.stop();
+      expect(engine.cues()[0]).not.toBeNull();
+
+      await engine.play();
+      expect(engine.cues()[0]).not.toBeNull();
+    });
+
+    it('clears every slot on loadTune, since a new tune invalidates every captured snapshot', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      engine.addCue(2);
+
+      engine.loadTune(counterTune());
+
+      expect(engine.cues()).toEqual([null, null, null, null]);
+    });
+
     it('restores a cue without re-emulating, so the machine keeps running forward from it', async () => {
       engine.loadTune(counterTune());
       await engine.play();
@@ -719,33 +801,34 @@ describe('DjPlayerEngine', () => {
       expect(gates[2]).toBeGreaterThan(0);
     });
 
-    it('re-enters at the loop-in frame on the tick that reaches loop-out, without stopping the clock', async () => {
+    it("seeds a jump's replay frame from the effective (held) set rather than the latched one", () => {
       engine.loadTune(counterTune());
-      await engine.play();
+      engine.setVoiceHeld(1, true); // voice 1 is audible (latched); held inverts it to muted
 
-      const outFrame = expectedFrameForPercent(0.1);
-      engine.setLoopRange(0, 0.1);
-      engine.setLoopEnabled(true);
+      engine.scrubTo(5);
 
-      clock.tick(outFrame);
-
-      expect(engine.stats().framesRendered).toBe(0);
-      expect(clock.running).toBe(true);
+      const gates = voiceGateValues(lastDataPacket(midi));
+      expect(gates[1]).toBe(0);
+      expect(gates[0]).toBeGreaterThan(0);
+      expect(gates[2]).toBeGreaterThan(0);
     });
 
-    it('resets position, cues and the loop arm when the subtune changes', async () => {
+    it('resets position when the subtune changes, but leaves captured points alone', async () => {
       engine.loadTune(silentTune(2));
       await engine.play();
       clock.tick(5);
       engine.addCue(0);
-      engine.setLoopEnabled(true);
+      engine.tapLoopIn();
+      clock.tick(5);
+      engine.tapLoopOut();
       engine.setVoiceMuted(1, true);
 
       engine.nextSubtune();
 
       expect(engine.stats().framesRendered).toBe(0);
-      expect(engine.cues()).toEqual([null, null, null, null]);
-      expect(engine.loopEnabled()).toBe(false);
+      expect(engine.cues()[0]).not.toBeNull();
+      expect(engine.loopIn()).not.toBeNull();
+      expect(engine.loopOut()).not.toBeNull();
       expect(engine.mutedVoices()).toEqual([false, true, false]);
     });
 
@@ -775,6 +858,365 @@ describe('DjPlayerEngine', () => {
       expect(engine.state()).toBe('error');
       expect(engine.lastError()).toBeTruthy();
       expect(dataPackets(midi)).toHaveLength(packetsBefore);
+    });
+  });
+
+  describe('the cue nudge', () => {
+    /** `counterTune` stores its play-call count into $D400, so slot 0 of a resync packet names the
+     * frame whatever was restored actually came from. */
+    const COUNTER_SLOT = 0;
+
+    /** SysEx data bytes carry seven bits — the eighth lives in the packet's MSB map, which
+     * `slotValue` does not reassemble — so the counter reads back modulo 128. */
+    function counterAt(frame: number): number {
+      return frame % 128;
+    }
+
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    /** Hops, then rides the two ticks the resync takes, and reads the frame it landed on. */
+    function hopAndReadFrame(slot: number): number {
+      engine.hopToCue(slot);
+      clock.tick(2); // gate-off, then the resync carrying the resolved registers
+      return slotValue(lastDataPacket(midi), COUNTER_SLOT);
+    }
+
+    it('walks a cue backward onto an earlier frame without replaying from init', async () => {
+      await playTo(60);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, -10);
+
+      expect(hopAndReadFrame(0)).toBe(counterAt(50));
+      // The counter has to agree with the state that was restored, or the playhead and the row's
+      // frame readout both drift by the offset.
+      expect(engine.stats().framesRendered).toBe(50);
+    });
+
+    it('walks a cue forward onto a later frame', async () => {
+      await playTo(60);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, 10);
+
+      expect(hopAndReadFrame(0)).toBe(counterAt(70));
+      expect(engine.stats().framesRendered).toBe(70);
+    });
+
+    it('resolves to the same state a direct replay to that frame produces', async () => {
+      await playTo(60);
+      engine.addCue(0);
+      engine.setCueOffset(0, -10);
+      engine.hopToCue(0);
+      clock.tick(5); // the resync, then three frames played on from it
+      const nudged = dataPackets(midi).slice(-4).map((packet) => packet.bytes);
+
+      const freshClock = new FakeFrameClock();
+      const freshMidi = new FakeMidiOutputService();
+      const freshInjector = createEnvironmentInjector(
+        [
+          DjPlayerEngine,
+          { provide: FRAME_CLOCK, useValue: freshClock },
+          { provide: MidiOutputService, useValue: freshMidi as unknown as MidiOutputService },
+        ],
+        TestBed.inject(EnvironmentInjector)
+      );
+      const freshEngine = freshInjector.get(DjPlayerEngine);
+      freshEngine.loadTune(counterTune());
+      await freshEngine.play();
+      freshClock.tick(50); // played straight through to the frame the nudge walked onto
+      freshEngine.addCue(0);
+      freshEngine.hopToCue(0);
+      freshClock.tick(5);
+
+      expect(nudged).toEqual(dataPackets(freshMidi).slice(-4).map((packet) => packet.bytes));
+    });
+
+    it('hops to a nudged cue without emulating a frame, however deep it was captured', async () => {
+      await playTo(200);
+      engine.addCue(0);
+      engine.setCueOffset(0, -20);
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+
+      engine.hopToCue(0);
+
+      // The stall this whole design exists to avoid: a hop that re-derived the nudged point would
+      // block the main thread, and with it the frame clock's own audio callback.
+      expect(runFrame).not.toHaveBeenCalled();
+      clock.tick(2);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(180));
+    });
+
+    it('falls back to the frame-0 anchor for a cue captured before the ring has filled', async () => {
+      await playTo(5);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, -5);
+
+      expect(hopAndReadFrame(0)).toBe(counterAt(0));
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+
+    it('leaves playback exactly where it is, since the re-derivation runs on a throwaway machine', async () => {
+      await playTo(60);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, -10);
+
+      clock.tick(1);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(61));
+    });
+
+    it('clamps the offset to the nudge range in both directions', async () => {
+      await playTo(60);
+      engine.addCue(0);
+
+      engine.setCueOffset(0, 999);
+      expect(engine.cues()[0]?.offset).toBe(NUDGE_RANGE_FRAMES);
+
+      engine.setCueOffset(0, -999);
+      expect(engine.cues()[0]?.offset).toBe(-NUDGE_RANGE_FRAMES);
+    });
+
+    it('is a no-op on an empty slot', async () => {
+      await playTo(30);
+
+      engine.setCueOffset(1, 5);
+
+      expect(engine.cues()[1]).toBeNull();
+    });
+  });
+
+  describe('the loop', () => {
+    /** `counterTune` stores its play-call count into $D400, so slot 0 of a resync packet names the
+     * frame whatever was restored actually came from. */
+    const COUNTER_SLOT = 0;
+
+    /** SysEx data bytes carry seven bits — the eighth lives in the packet's MSB map, which
+     * `slotValue` does not reassemble — so the counter reads back modulo 128. */
+    function counterAt(frame: number): number {
+      return frame % 128;
+    }
+
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    /** Marks a loop from the current position: in here, out `length` frames later. */
+    async function markLoop(inFrame: number, length: number): Promise<void> {
+      await playTo(inFrame);
+      engine.tapLoopIn();
+      clock.tick(length);
+      engine.tapLoopOut();
+    }
+
+    it('re-enters at the tapped in-point on the tick that reaches the out-point, without stopping the clock', async () => {
+      await markLoop(10, 10);
+      engine.setLoopEnabled(true);
+
+      clock.tick(1); // renders frame 21, which is past the out-point, so it re-enters
+
+      expect(clock.running).toBe(true);
+
+      clock.tick(2); // gate-off, then the resync carrying the in-point's registers
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(10));
+      expect(engine.stats().framesRendered).toBe(10);
+    });
+
+    it('re-enters by restoring the in-point, emulating no frame of its own however deep it sits', async () => {
+      await markLoop(200, 10);
+      engine.setLoopEnabled(true);
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+
+      clock.tick(1);
+
+      // The tick's own frame and nothing else: a re-entry that replayed to the in-point would run
+      // two hundred more, blocking the main thread the frame clock's audio callback rides — on
+      // every single pass.
+      expect(runFrame).toHaveBeenCalledTimes(1);
+
+      clock.tick(2);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(200));
+    });
+
+    it('sends nothing of its own on re-entry, then rides the clock for the gate-off and resync', async () => {
+      await markLoop(10, 10);
+      engine.setLoopEnabled(true);
+      const before = dataPackets(midi).length;
+
+      // The cartridge drains exactly one packet per timer tick, so a re-entry that sent its own
+      // packets here would hand it frames it never drains — and a loop does it over and over.
+      clock.tick(1);
+      expect(dataPackets(midi)).toHaveLength(before + 1);
+
+      clock.tick(1);
+      const gateOff = dataPackets(midi).slice(before + 1);
+      expect(gateOff).toHaveLength(1);
+      expect(valueCount(gateOff[0])).toBe(3);
+      expect([0, 1, 2].map((slot) => slotValue(gateOff[0], slot))).toEqual([0, 0, 0]);
+
+      clock.tick(1);
+      const resync = dataPackets(midi).slice(before + 2);
+      expect(resync).toHaveLength(1);
+      expect(voiceGateValues(resync[0])).toEqual([0x11, 0x11, 0x11]);
+    });
+
+    it('refuses to arm until both ends are marked', async () => {
+      await playTo(10);
+
+      engine.setLoopEnabled(true);
+      expect(engine.loopArmable()).toBe(false);
+      expect(engine.loopEnabled()).toBe(false);
+
+      engine.tapLoopIn();
+      engine.setLoopEnabled(true);
+      expect(engine.loopArmable()).toBe(false);
+      expect(engine.loopEnabled()).toBe(false);
+
+      clock.tick(10);
+      engine.tapLoopOut();
+
+      expect(engine.loopArmable()).toBe(true);
+      engine.setLoopEnabled(true);
+      expect(engine.loopEnabled()).toBe(true);
+    });
+
+    it('refuses to arm on ends that coincide', async () => {
+      await playTo(10);
+      engine.tapLoopIn();
+      engine.tapLoopOut(); // same frame — no pass to play
+
+      engine.setLoopEnabled(true);
+
+      expect(engine.loopArmable()).toBe(false);
+      expect(engine.loopEnabled()).toBe(false);
+    });
+
+    it('disarms rather than spinning when a nudge crosses the ends', async () => {
+      await markLoop(10, 20);
+      engine.setLoopEnabled(true);
+
+      engine.setLoopOutOffset(-NUDGE_RANGE_FRAMES); // the exit walks back behind the entry
+
+      expect(engine.loopArmable()).toBe(false);
+      clock.tick(1);
+      expect(engine.loopEnabled()).toBe(false);
+
+      // Playback carries on past the crossed exit instead of re-entering on every tick.
+      clock.tick(30);
+      expect(engine.stats().framesRendered).toBeGreaterThan(30);
+    });
+
+    it('moves where the next pass wraps when the out-point is nudged, replaying nothing', async () => {
+      await markLoop(5, 35); // in 5, out 40
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+
+      engine.setLoopOutOffset(-25); // the pass now wraps at frame 15
+
+      expect(runFrame).not.toHaveBeenCalled();
+      expect(engine.loopOut()?.offset).toBe(-25);
+
+      engine.setLoopEnabled(true);
+      clock.tick(100);
+
+      expect(engine.stats().framesRendered).toBeLessThanOrEqual(15);
+      expect(engine.stats().framesRendered).toBeGreaterThanOrEqual(5);
+    });
+
+    it('clamps the out-point offset to the nudge range in both directions', async () => {
+      await markLoop(60, 30);
+
+      engine.setLoopOutOffset(999);
+      expect(engine.loopOut()?.offset).toBe(NUDGE_RANGE_FRAMES);
+
+      engine.setLoopOutOffset(-999);
+      expect(engine.loopOut()?.offset).toBe(-NUDGE_RANGE_FRAMES);
+    });
+
+    it('walks the in-point onto an earlier frame and auditions it from the anchor', async () => {
+      await playTo(60);
+      engine.tapLoopIn();
+
+      engine.setLoopInOffset(-10);
+      engine.hopToLoopIn();
+      clock.tick(2);
+
+      expect(engine.loopIn()?.offset).toBe(-10);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(50));
+      expect(engine.stats().framesRendered).toBe(50);
+    });
+
+    it('is a no-op to nudge either end before it is marked', async () => {
+      await playTo(10);
+
+      engine.setLoopInOffset(-5);
+      engine.setLoopOutOffset(5);
+
+      expect(engine.loopIn()).toBeNull();
+      expect(engine.loopOut()).toBeNull();
+    });
+
+    it('keeps both ends through pause, stop and a play from stopped', async () => {
+      await markLoop(10, 10);
+
+      engine.pause();
+      expect(engine.loopIn()).not.toBeNull();
+      expect(engine.loopOut()).not.toBeNull();
+
+      await engine.play();
+      engine.stop();
+      expect(engine.loopIn()).not.toBeNull();
+      expect(engine.loopOut()).not.toBeNull();
+
+      await engine.play();
+      expect(engine.loopIn()).not.toBeNull();
+      expect(engine.loopOut()).not.toBeNull();
+    });
+
+    it('clears both ends and the arm on loadTune, since the in-point holds a machine image', async () => {
+      await markLoop(10, 10);
+      engine.setLoopEnabled(true);
+
+      engine.loadTune(counterTune());
+
+      expect(engine.loopIn()).toBeNull();
+      expect(engine.loopOut()).toBeNull();
+      expect(engine.loopEnabled()).toBe(false);
+    });
+  });
+
+  describe('positionPercent', () => {
+    it('derives from the published framesRendered against the jump ceiling', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+
+      const ceiling = expectedCeilingFrames();
+      clock.tick(Math.round(ceiling * 0.1));
+
+      expect(engine.positionPercent()).toBeCloseTo(engine.stats().framesRendered / ceiling * 100, 6);
+    });
+
+    it('clamps to 100 past the fixed ceiling rather than overflowing', async () => {
+      engine.loadTune(counterTune());
+
+      engine.scrubTo(100);
+
+      expect(engine.positionPercent()).toBe(100);
+    });
+
+    it('is 0 when the nominal interval is 0, guarding a zero ceiling', () => {
+      engine.loadTune(counterTune());
+      // setNominalIntervalUs() itself refuses <= 0 — this reaches the guard directly, the way a
+      // divide-by-zero could otherwise slip through if the ceiling were ever computed as 0.
+      engine.nominalIntervalUs.set(0);
+
+      expect(engine.positionPercent()).toBe(0);
     });
   });
 });

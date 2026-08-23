@@ -3,10 +3,12 @@ import { signal, WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DjPocViewComponent } from './dj-poc-view.component';
 import {
+  CapturedPoint,
   CueSlot,
   DjPlayerEngine,
   EngineState,
   EngineStats,
+  LoopOutPoint,
   SpeedMode,
 } from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
@@ -51,10 +53,14 @@ interface MockDjPlayerEngine {
   nominalIntervalUs: WritableSignal<number>;
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
+  heldVoices: WritableSignal<readonly boolean[]>;
+  effectiveMutes: WritableSignal<readonly boolean[]>;
   cues: WritableSignal<readonly (CueSlot | null)[]>;
-  loopInPercent: WritableSignal<number>;
-  loopOutPercent: WritableSignal<number>;
+  loopIn: WritableSignal<CapturedPoint | null>;
+  loopOut: WritableSignal<LoopOutPoint | null>;
+  loopArmable: WritableSignal<boolean>;
   loopEnabled: WritableSignal<boolean>;
+  positionPercent: WritableSignal<number>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -67,10 +73,17 @@ interface MockDjPlayerEngine {
   setScheduleAhead: ReturnType<typeof vi.fn>;
   loadTune: ReturnType<typeof vi.fn>;
   setVoiceMuted: ReturnType<typeof vi.fn>;
+  setVoiceHeld: ReturnType<typeof vi.fn>;
+  clearVoiceMutes: ReturnType<typeof vi.fn>;
   addCue: ReturnType<typeof vi.fn>;
   hopToCue: ReturnType<typeof vi.fn>;
   clearCue: ReturnType<typeof vi.fn>;
-  setLoopRange: ReturnType<typeof vi.fn>;
+  setCueOffset: ReturnType<typeof vi.fn>;
+  tapLoopIn: ReturnType<typeof vi.fn>;
+  tapLoopOut: ReturnType<typeof vi.fn>;
+  setLoopInOffset: ReturnType<typeof vi.fn>;
+  setLoopOutOffset: ReturnType<typeof vi.fn>;
+  hopToLoopIn: ReturnType<typeof vi.fn>;
   setLoopEnabled: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
 }
@@ -101,10 +114,14 @@ function makeEngine(): MockDjPlayerEngine {
     nominalIntervalUs: signal(19950),
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
+    heldVoices: signal<readonly boolean[]>([false, false, false]),
+    effectiveMutes: signal<readonly boolean[]>([false, false, false]),
     cues: signal<readonly (CueSlot | null)[]>([null, null, null, null]),
-    loopInPercent: signal(0),
-    loopOutPercent: signal(100),
+    loopIn: signal<CapturedPoint | null>(null),
+    loopOut: signal<LoopOutPoint | null>(null),
+    loopArmable: signal(false),
     loopEnabled: signal(false),
+    positionPercent: signal(0),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
@@ -117,10 +134,17 @@ function makeEngine(): MockDjPlayerEngine {
     setScheduleAhead: vi.fn(),
     loadTune: vi.fn(),
     setVoiceMuted: vi.fn(),
+    setVoiceHeld: vi.fn(),
+    clearVoiceMutes: vi.fn(),
     addCue: vi.fn(),
     hopToCue: vi.fn(),
     clearCue: vi.fn(),
-    setLoopRange: vi.fn(),
+    setCueOffset: vi.fn(),
+    tapLoopIn: vi.fn(),
+    tapLoopOut: vi.fn(),
+    setLoopInOffset: vi.fn(),
+    setLoopOutOffset: vi.fn(),
+    hopToLoopIn: vi.fn(),
     setLoopEnabled: vi.fn(),
     scrubTo: vi.fn(),
   };
@@ -166,6 +190,17 @@ function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
     data: new Uint8Array([0]),
     ...overrides,
   };
+}
+
+/** A slot the view treats as set. Only `frame` and `offset` are rendered; the snapshots and the
+ * anchor are opaque to it. */
+function cueAt(frame: number, offset = 0): CueSlot {
+  return { frame, offset, machine: {}, registers: {}, anchor: {} } as unknown as CueSlot;
+}
+
+/** The loop's in-point, captured the same way a cue is. */
+function loopInPoint(frame: number, offset = 0): CapturedPoint {
+  return cueAt(frame, offset);
 }
 
 describe('DjPocViewComponent', () => {
@@ -406,14 +441,73 @@ describe('DjPocViewComponent', () => {
     });
   });
 
+  describe('voice momentary hold', () => {
+    // jsdom has no native Pointer Events implementation — polyfill the one API surface the
+    // handler touches so a real `pointerdown` dispatch exercises the actual template wiring.
+    beforeEach(() => {
+      if (!('setPointerCapture' in HTMLElement.prototype)) {
+        (HTMLElement.prototype as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture =
+          vi.fn();
+      } else {
+        vi.spyOn(HTMLElement.prototype, 'setPointerCapture').mockImplementation(() => undefined);
+      }
+    });
+
+    function firePointer(el: Element, type: string, pointerId = 1): void {
+      const event = new Event(type) as unknown as PointerEvent;
+      Object.defineProperty(event, 'pointerId', { value: pointerId, configurable: true });
+      el.dispatchEvent(event);
+    }
+
+    function holdButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Voice"] .voice-hold'));
+    }
+
+    it("flips the hold button's label with the checkbox's latched state", () => {
+      expect(holdButtons()[0].textContent?.trim()).toBe('Kill');
+
+      engine.mutedVoices.set([true, false, false]);
+      fixture.detectChanges();
+
+      expect(holdButtons()[0].textContent?.trim()).toBe('Punch In');
+    });
+
+    it('drives the engine on pointerdown and pointerup', () => {
+      const button = holdButtons()[0];
+
+      firePointer(button, 'pointerdown');
+      expect(engine.setVoiceHeld).toHaveBeenCalledWith(0, true);
+
+      firePointer(button, 'pointerup');
+      expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(0, false);
+    });
+
+    it('releases the hold on pointercancel', () => {
+      const button = holdButtons()[1];
+
+      firePointer(button, 'pointerdown');
+      expect(engine.setVoiceHeld).toHaveBeenCalledWith(1, true);
+
+      firePointer(button, 'pointercancel');
+      expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(1, false);
+    });
+
+    it('calls engine.clearVoiceMutes from the clear-all control', () => {
+      const clearButton = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Voice"] button')
+      ).find((button) => (button as HTMLButtonElement).textContent?.trim() === 'Clear All Mutes') as
+        | HTMLButtonElement
+        | undefined;
+
+      clearButton?.click();
+
+      expect(engine.clearVoiceMutes).toHaveBeenCalled();
+    });
+  });
+
   describe('cue slots', () => {
     function cueButtons(): HTMLButtonElement[] {
       return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Cues"] button'));
-    }
-
-    /** A slot the view treats as set. Only `frame` is rendered; the snapshots are opaque to it. */
-    function cueAt(frame: number): CueSlot {
-      return { frame, machine: {}, registers: {} } as unknown as CueSlot;
     }
 
     it('adds a cue for an empty slot, then hops once the slot is set', () => {
@@ -432,8 +526,8 @@ describe('DjPocViewComponent', () => {
       fixture.detectChanges();
 
       const buttons = cueButtons();
-      expect(buttons[0].textContent).toContain('Hop 1');
-      expect(buttons[1].textContent).toContain('Clear 1');
+      expect(buttons[0].textContent?.trim()).toBe('Hop');
+      expect(buttons[1].textContent?.trim()).toBe('Clear');
 
       buttons[1].click();
       expect(engine.clearCue).toHaveBeenCalledWith(0);
@@ -443,38 +537,233 @@ describe('DjPocViewComponent', () => {
       engine.cues.set([cueAt(1234), null, null, null]);
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-slot').textContent).toContain(
+      expect(fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-row').textContent).toContain(
         'frame 1234'
       );
     });
 
-  });
+    it('renders one row per cue slot, labelled Cue 1 through Cue 4', () => {
+      const rows: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-row')
+      );
 
-  describe('loop handlers', () => {
-    function dualRangeInputs(): HTMLInputElement[] {
-      return Array.from(fixture.nativeElement.querySelectorAll('.dual-range input[type="range"]'));
-    }
-
-    it('clamps the in-handle so it never drags past the out-handle', () => {
-      engine.loopOutPercent.set(50);
-      fixture.detectChanges();
-
-      const [inHandle] = dualRangeInputs();
-      inHandle.value = '80';
-      inHandle.dispatchEvent(new Event('input'));
-
-      expect(engine.setLoopRange).toHaveBeenCalledWith(49, 50);
+      expect(rows).toHaveLength(4);
+      expect(rows.map((row) => row.querySelector('.cue-tag')?.textContent?.trim())).toEqual([
+        'Cue 1',
+        'Cue 2',
+        'Cue 3',
+        'Cue 4',
+      ]);
     });
 
-    it('clamps the out-handle so it never drags past the in-handle', () => {
-      engine.loopInPercent.set(50);
+    it('keeps the frame column in the same position across the empty to filled transition', () => {
+      const emptyRow = fixture.nativeElement.querySelector(
+        '[aria-label="Cues"] .cue-row'
+      ) as HTMLElement;
+      const childIndex = (el: Element): number =>
+        el.parentElement === null ? -1 : Array.from(el.parentElement.children).indexOf(el);
+
+      const emptyFrame = emptyRow.querySelector('.cue-frame') as HTMLElement;
+      const emptyBtns = emptyRow.querySelector('.cue-btns') as HTMLElement;
+      expect(emptyFrame.textContent?.trim()).toBe('empty');
+      const btnsIndex = childIndex(emptyBtns);
+      const frameIndex = childIndex(emptyFrame);
+
+      engine.cues.set([cueAt(1234), null, null, null]);
       fixture.detectChanges();
 
-      const [, outHandle] = dualRangeInputs();
-      outHandle.value = '20';
-      outHandle.dispatchEvent(new Event('input'));
+      const filledRow = fixture.nativeElement.querySelector(
+        '[aria-label="Cues"] .cue-row'
+      ) as HTMLElement;
+      const filledFrame = filledRow.querySelector('.cue-frame') as HTMLElement;
+      const filledBtns = filledRow.querySelector('.cue-btns') as HTMLElement;
 
-      expect(engine.setLoopRange).toHaveBeenCalledWith(50, 51);
+      expect(childIndex(filledBtns)).toBe(btnsIndex);
+      expect(childIndex(filledFrame)).toBe(frameIndex);
+      expect(filledFrame.textContent?.trim()).toBe('frame 1234');
+    });
+  });
+
+  describe('cue nudge', () => {
+    function nudgeInput(slot = 0): HTMLInputElement {
+      return fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-nudge input')[
+        slot
+      ] as HTMLInputElement;
+    }
+
+    function offsetReadout(slot = 0): string {
+      const rows: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-row')
+      );
+      return rows[slot].querySelector('.cue-offset')?.textContent?.trim() ?? '';
+    }
+
+    beforeEach(() => {
+      engine.cues.set([cueAt(1234), cueAt(50), null, null]);
+      fixture.detectChanges();
+    });
+
+    it('offers a nudge track only for a slot that holds a point', () => {
+      expect(
+        fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-nudge input')
+      ).toHaveLength(2);
+    });
+
+    it('moves the readout on input without auditioning', () => {
+      const input = nudgeInput();
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(nudgeInput().value).toBe('-7');
+      expect(offsetReadout()).toContain('7');
+      // Every re-derivation replays frames on the frame clock's own thread, so the drag must not
+      // trigger one.
+      expect(engine.setCueOffset).not.toHaveBeenCalled();
+      expect(engine.hopToCue).not.toHaveBeenCalled();
+    });
+
+    it('commits the offset and auditions it when the drag releases', () => {
+      const input = nudgeInput();
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.setCueOffset).toHaveBeenCalledWith(0, -7);
+      expect(engine.hopToCue).toHaveBeenCalledWith(0);
+    });
+
+    it("follows the engine's committed offset once the drag has been released", () => {
+      const input = nudgeInput();
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      engine.cues.set([cueAt(1234, -7), cueAt(50), null, null]);
+      fixture.detectChanges();
+
+      expect(nudgeInput().value).toBe('-7');
+
+      engine.cues.set([cueAt(1234, 3), cueAt(50), null, null]);
+      fixture.detectChanges();
+
+      expect(nudgeInput().value).toBe('3');
+    });
+
+    it('drives only the dragged slot', () => {
+      const input = nudgeInput(1);
+      input.value = '12';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(nudgeInput(1).value).toBe('12');
+      expect(nudgeInput(0).value).toBe('0');
+
+      input.dispatchEvent(new Event('change'));
+      expect(engine.setCueOffset).toHaveBeenCalledWith(1, 12);
+    });
+  });
+
+  describe('loop rows', () => {
+    function armCheckbox(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('.loop-arm input[type="checkbox"]');
+    }
+
+    function tapButton(label: string): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.loop-row button')
+      );
+      return buttons.find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
+    }
+
+    function nudgeInput(which: 'in' | 'out'): HTMLInputElement {
+      return fixture.nativeElement.querySelector(
+        `.loop-row input[aria-label="Nudge loop ${which}"]`
+      );
+    }
+
+    function offsetReadout(row: number): string {
+      const rows: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.loop-row')
+      );
+      return rows[row].querySelector('.loop-offset')?.textContent?.trim() ?? '';
+    }
+
+    it('disables the arm control until the engine reports the loop armable', () => {
+      expect(armCheckbox().disabled).toBe(true);
+
+      engine.loopArmable.set(true);
+      fixture.detectChanges();
+
+      expect(armCheckbox().disabled).toBe(false);
+
+      armCheckbox().checked = true;
+      armCheckbox().dispatchEvent(new Event('change'));
+      expect(engine.setLoopEnabled).toHaveBeenCalledWith(true);
+    });
+
+    it('taps each end from its own button', () => {
+      tapButton('Tap In').click();
+      expect(engine.tapLoopIn).toHaveBeenCalled();
+
+      tapButton('Tap Out').click();
+      expect(engine.tapLoopOut).toHaveBeenCalled();
+    });
+
+    it('offers a nudge track only for an end that has been marked', () => {
+      expect(nudgeInput('in')).toBeNull();
+      expect(nudgeInput('out')).toBeNull();
+
+      engine.loopIn.set(loopInPoint(2140));
+      engine.loopOut.set({ frame: 2536, offset: 0 });
+      fixture.detectChanges();
+
+      expect(nudgeInput('in')).not.toBeNull();
+      expect(nudgeInput('out')).not.toBeNull();
+      expect(
+        (fixture.nativeElement.querySelector('.loop-row .loop-frame') as HTMLElement).textContent
+      ).toContain('frame 2140');
+    });
+
+    it('moves the in-point readout on input without re-deriving or auditioning', () => {
+      engine.loopIn.set(loopInPoint(2140));
+      fixture.detectChanges();
+
+      const input = nudgeInput('in');
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(nudgeInput('in').value).toBe('-7');
+      expect(offsetReadout(0)).toContain('7');
+      // Re-deriving the in-point replays frames on the frame clock's own thread, so the drag must
+      // not trigger one.
+      expect(engine.setLoopInOffset).not.toHaveBeenCalled();
+      expect(engine.hopToLoopIn).not.toHaveBeenCalled();
+    });
+
+    it('commits the in-point offset and auditions it when the drag releases', () => {
+      engine.loopIn.set(loopInPoint(2140));
+      fixture.detectChanges();
+
+      const input = nudgeInput('in');
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.setLoopInOffset).toHaveBeenCalledWith(-7);
+      expect(engine.hopToLoopIn).toHaveBeenCalled();
+    });
+
+    it('commits the out-point offset on input, since moving it replays nothing', () => {
+      engine.loopOut.set({ frame: 2536, offset: 0 });
+      fixture.detectChanges();
+
+      const input = nudgeInput('out');
+      input.value = '-3';
+      input.dispatchEvent(new Event('input'));
+
+      expect(engine.setLoopOutOffset).toHaveBeenCalledWith(-3);
+      expect(engine.hopToLoopIn).not.toHaveBeenCalled();
     });
   });
 
@@ -501,6 +790,51 @@ describe('DjPocViewComponent', () => {
       input.dispatchEvent(new Event('change'));
 
       expect(engine.scrubTo).toHaveBeenCalledWith(42);
+    });
+
+    it('follows the engine position while idle', () => {
+      engine.positionPercent.set(17);
+      fixture.detectChanges();
+
+      expect(scrubInput().value).toBe('17');
+
+      engine.positionPercent.set(63);
+      fixture.detectChanges();
+
+      expect(scrubInput().value).toBe('63');
+    });
+
+    it('pins the displayed value on input, ignoring further engine position changes mid-drag', () => {
+      engine.positionPercent.set(10);
+      fixture.detectChanges();
+
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      expect(scrubInput().value).toBe('42');
+
+      // The live position moves under the drag — the pin must hold the thumb rather than snap it.
+      engine.positionPercent.set(55);
+      fixture.detectChanges();
+
+      expect(scrubInput().value).toBe('42');
+    });
+
+    it('releases the pin on change, letting the engine position resume driving the display', () => {
+      engine.positionPercent.set(10);
+      fixture.detectChanges();
+
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      engine.positionPercent.set(77);
+      fixture.detectChanges();
+
+      expect(scrubInput().value).toBe('77');
     });
   });
 });

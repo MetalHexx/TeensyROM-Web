@@ -210,29 +210,75 @@
     <h2>Voice</h2>
 
     @for (voice of voiceIndices; track voice) {
-      <label class="control">
+      <div class="voice-row">
         <input
           type="checkbox"
+          [id]="'voice-mute-' + voice"
           [checked]="mutedVoices()[voice]"
           (change)="onVoiceMuteToggle(voice, $event)"
         />
-        Voice {{ voice + 1 }}
-      </label>
+        <label [for]="'voice-mute-' + voice">Voice {{ voice + 1 }}</label>
+
+        <button
+          type="button"
+          class="voice-hold"
+          [attr.aria-label]="(mutedVoices()[voice] ? 'Punch in voice ' : 'Kill voice ') + (voice + 1)"
+          (pointerdown)="onVoiceHoldStart(voice, $event)"
+          (pointerup)="onVoiceHoldEnd(voice)"
+          (pointercancel)="onVoiceHoldEnd(voice)"
+        >
+          {{ mutedVoices()[voice] ? 'Punch In' : 'Kill' }}
+        </button>
+
+        <span class="voice-state">{{ effectiveMutes()[voice] ? 'muted' : 'audible' }}</span>
+      </div>
     }
+
+    <div class="voice-clear">
+      <button type="button" (click)="onClearVoiceMutes()">Clear All Mutes</button>
+    </div>
   </section>
 
-  <section class="poc-section" aria-label="Cues">
+  <section class="poc-section poc-section--wide" aria-label="Cues">
     <h2>Cues</h2>
 
-    <div class="control-row">
+    <div class="cue-rows">
       @for (slot of cueIndices; track slot) {
-        <div class="cue-slot">
+        <div class="cue-row">
+          <span class="cue-tag">Cue {{ slot + 1 }}</span>
+          <div class="cue-btns">
+            @if (cues()[slot]; as cue) {
+              <button type="button" (click)="onHopToCue(slot)">Hop</button>
+              <button type="button" (click)="onClearCue(slot)">Clear</button>
+            } @else {
+              <button type="button" class="cue-btn-wide" (click)="onAddCue(slot)">Add</button>
+            }
+          </div>
           @if (cues()[slot]; as cue) {
-            <button type="button" (click)="onHopToCue(slot)">Hop {{ slot + 1 }}</button>
-            <button type="button" (click)="onClearCue(slot)">Clear {{ slot + 1 }}</button>
-            <span class="caption">frame {{ cue.frame }}</span>
+            <span class="cue-frame">frame {{ cue.frame }}</span>
           } @else {
-            <button type="button" (click)="onAddCue(slot)">Add {{ slot + 1 }}</button>
+            <span class="cue-frame cue-frame--empty">empty</span>
+          }
+          @if (cues()[slot]) {
+            <div class="cue-nudge">
+              <div class="cue-nudge-centre"></div>
+              <input
+                type="range"
+                [min]="-nudgeRange"
+                [max]="nudgeRange"
+                step="1"
+                [attr.aria-label]="'Nudge cue ' + (slot + 1)"
+                [value]="displayedCueOffset(slot)"
+                (input)="onCueNudgeInput(slot, $event)"
+                (change)="onCueNudgeChange(slot, $event)"
+              />
+            </div>
+            <span class="cue-offset">{{ cueOffsetLabel(slot) }}</span>
+          } @else {
+            <div class="cue-nudge cue-nudge--empty" aria-hidden="true">
+              <div class="cue-nudge-centre"></div>
+            </div>
+            <span class="cue-offset cue-offset--empty">—</span>
           }
         </div>
       }
@@ -241,8 +287,18 @@
     <p class="caption">
       Cues store machine state, not a position, so a hop restores in constant time instead of
       re-emulating from init — no main-thread stall, and the frame clock keeps ticking through it. A
-      snapshot only means anything to the machine it came from, so anything that re-inits one —
-      loading a tune, stopping, changing subtune — clears all four slots.
+      snapshot only means anything to the machine it came from, so only loading a new tune — which
+      rebuilds the machine outright — clears all four slots; stopping or changing subtune now leaves
+      them intact.
+    </p>
+
+    <p class="caption">
+      The nudge slider walks a captured point ±{{ nudgeRange }} frames onto the transient. The frame
+      column keeps showing where the point was taken; the offset beside the slider shows how far it
+      has been walked. Each step re-derives the point by replaying from an anchor snapshot taken
+      before it — a snapshot can only be run forward, so that anchor is what makes a backward nudge
+      possible without replaying from the start of the tune. The re-derivation and the audition both
+      wait for the slider to be released rather than running on every drag tick.
     </p>
 
     <p class="caption">
@@ -255,36 +311,106 @@
     </p>
   </section>
 
-  <section class="poc-section" aria-label="Loop / Scrub">
+  <section class="poc-section poc-section--wide" aria-label="Loop / Scrub">
     <h2>Loop / Scrub</h2>
 
-    <label class="control">
-      <input
-        type="checkbox"
-        [checked]="loopEnabled()"
-        (change)="onLoopEnabledToggle($event)"
-      />
-      Loop armed
-    </label>
-
-    <p class="caption">Loop {{ loopInPercent() }}% – {{ loopOutPercent() }}%</p>
-
-    <div class="dual-range">
-      <input type="range" min="0" max="100" [value]="loopInPercent()" (input)="onLoopInInput($event)" />
-      <input type="range" min="0" max="100" [value]="loopOutPercent()" (input)="onLoopOutInput($event)" />
+    <div class="loop-arm">
+      <label class="control">
+        <input
+          type="checkbox"
+          [checked]="loopEnabled()"
+          [disabled]="!loopArmable()"
+          (change)="onLoopEnabledToggle($event)"
+        />
+        Loop armed
+      </label>
+      <span class="caption">enabled once In and Out are both marked</span>
     </div>
 
-    <label class="control">
-      Scrub {{ scrubDisplayPercent() }}%
-      <input
-        type="range"
-        min="0"
-        max="100"
-        [value]="scrubDisplayPercent()"
-        (input)="onScrubInput($event)"
-        (change)="onScrubChange($event)"
-      />
-    </label>
+    <div class="loop-rows">
+      <div class="loop-row">
+        <span class="loop-tag">In</span>
+        <div class="loop-btns">
+          <button type="button" (click)="onTapLoopIn()">Tap In</button>
+        </div>
+        @if (loopIn(); as point) {
+          <span class="loop-frame">frame {{ point.frame }}</span>
+          <div class="loop-nudge">
+            <div class="loop-nudge-centre"></div>
+            <input
+              type="range"
+              [min]="-nudgeRange"
+              [max]="nudgeRange"
+              step="1"
+              aria-label="Nudge loop in"
+              [value]="displayedLoopInOffset()"
+              (input)="onLoopInNudgeInput($event)"
+              (change)="onLoopInNudgeChange($event)"
+            />
+          </div>
+          <span class="loop-offset">{{ loopInOffsetLabel() }}</span>
+        } @else {
+          <span class="loop-frame loop-frame--empty">unmarked</span>
+          <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
+            <div class="loop-nudge-centre"></div>
+          </div>
+          <span class="loop-offset loop-offset--empty">—</span>
+        }
+      </div>
+
+      <div class="loop-row">
+        <span class="loop-tag">Out</span>
+        <div class="loop-btns">
+          <button type="button" (click)="onTapLoopOut()">Tap Out</button>
+        </div>
+        @if (loopOut(); as point) {
+          <span class="loop-frame">frame {{ point.frame }}</span>
+          <div class="loop-nudge">
+            <div class="loop-nudge-centre"></div>
+            <input
+              type="range"
+              [min]="-nudgeRange"
+              [max]="nudgeRange"
+              step="1"
+              aria-label="Nudge loop out"
+              [value]="point.offset"
+              (input)="onLoopOutNudgeInput($event)"
+            />
+          </div>
+          <span class="loop-offset">{{ loopOutOffsetLabel() }}</span>
+        } @else {
+          <span class="loop-frame loop-frame--empty">unmarked</span>
+          <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
+            <div class="loop-nudge-centre"></div>
+          </div>
+          <span class="loop-offset loop-offset--empty">—</span>
+        }
+      </div>
+    </div>
+
+    <p class="caption">
+      Tap In and Tap Out mark frames while the tune plays. The in-point stores machine state the way
+      a cue does, so every pass re-enters by restoring it rather than replaying the tune from init —
+      the loop costs nothing per frame however deep its entry sits. Only the in-point needs a
+      snapshot; the out-point is a frame number the tick compares, so nudging it is arithmetic. Its
+      nudge takes effect on the next pass, which is the audition — the in-point's plays on release.
+    </p>
+
+    <div class="control-row scrub-row">
+      <span class="caption">Position</span>
+      <div class="scrub-track">
+        <div class="scrub-track-fill" [style.width.%]="scrubDisplayPercent()"></div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          [value]="scrubDisplayPercent()"
+          (input)="onScrubInput($event)"
+          (change)="onScrubChange($event)"
+        />
+      </div>
+      <span class="caption">frame {{ engineStats().framesRendered }}</span>
+    </div>
   </section>
 
   <section class="poc-section poc-section--wide" aria-label="Diagnostics">

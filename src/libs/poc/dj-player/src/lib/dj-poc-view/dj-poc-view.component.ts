@@ -11,6 +11,7 @@ import {
   MAX_SPEED_MULTIPLIER,
   MIN_SPEED_MULTIPLIER,
   NOMINAL_INTERVAL_OPTIONS_US,
+  NUDGE_RANGE_FRAMES,
   SpeedMode,
 } from '../engine/dj-player-engine';
 
@@ -76,9 +77,12 @@ export class DjPocViewComponent {
   protected readonly nominalIntervalUs = this.engine.nominalIntervalUs;
   protected readonly scheduleAheadMs = this.engine.scheduleAheadMs;
   protected readonly mutedVoices = this.engine.mutedVoices;
+  protected readonly heldVoices = this.engine.heldVoices;
+  protected readonly effectiveMutes = this.engine.effectiveMutes;
   protected readonly cues = this.engine.cues;
-  protected readonly loopInPercent = this.engine.loopInPercent;
-  protected readonly loopOutPercent = this.engine.loopOutPercent;
+  protected readonly loopIn = this.engine.loopIn;
+  protected readonly loopOut = this.engine.loopOut;
+  protected readonly loopArmable = this.engine.loopArmable;
   protected readonly loopEnabled = this.engine.loopEnabled;
 
   protected readonly minSpeed = MIN_SPEED_MULTIPLIER;
@@ -86,11 +90,23 @@ export class DjPocViewComponent {
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
   protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
+  protected readonly nudgeRange = NUDGE_RANGE_FRAMES;
 
-  // The scrub slider's own displayed position — deliberately not sourced from the engine, which
-  // exposes no continuous playback-position signal. Updated on every drag tick; the engine only
-  // hears about it once the drag releases (see onScrubChange).
-  protected readonly scrubDisplayPercent = signal<number>(0);
+  // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
+  // own position updates (which fire from stats publishes, not from the drag) can't fight it and
+  // snap the thumb out from under the operator. Cleared back to null on release, at which point the
+  // engine's live position takes back over.
+  private readonly scrubDragValue = signal<number | null>(null);
+  protected readonly scrubDisplayPercent = computed<number>(
+    () => this.scrubDragValue() ?? this.engine.positionPercent()
+  );
+
+  /** Slot index → the offset being dragged right now. Absent means "not dragging that slot". */
+  private readonly cueDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
+
+  /** Non-null only mid-drag, for the same reason the cue rows keep a drag offset: re-deriving the
+   * loop's entry replays frames, so it has to wait for the release. */
+  private readonly loopInDragOffset = signal<number | null>(null);
 
   // The cartridge's frame timer, stated rather than recorded: we know it is on once we have sent a
   // recipe packet, because the firmware's handler forces `FrameTimerMode = true` on receipt.
@@ -252,6 +268,22 @@ export class DjPocViewComponent {
     this.engine.setVoiceMuted(voice, (event.target as HTMLInputElement).checked);
   }
 
+  /** Pointer capture keeps the release on this element even if the press drags off it — without it
+   * the browser fires no `pointerup` here and the voice stays inverted. */
+  onVoiceHoldStart(voice: number, event: PointerEvent): void {
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    this.engine.setVoiceHeld(voice, true);
+  }
+
+  /** Handles both `pointerup` and `pointercancel` — either way the hold ends. */
+  onVoiceHoldEnd(voice: number): void {
+    this.engine.setVoiceHeld(voice, false);
+  }
+
+  onClearVoiceMutes(): void {
+    this.engine.clearVoiceMutes();
+  }
+
   onAddCue(slot: number): void {
     this.engine.addCue(slot);
   }
@@ -264,14 +296,76 @@ export class DjPocViewComponent {
     this.engine.clearCue(slot);
   }
 
-  onLoopInInput(event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
-    this.engine.setLoopRange(Math.min(value, this.loopOutPercent() - 1), this.loopOutPercent());
+  /** The offset the row shows: the live drag while one is in flight, the committed value otherwise. */
+  protected displayedCueOffset(slot: number): number {
+    return this.cueDragOffsets().get(slot) ?? this.cues()[slot]?.offset ?? 0;
   }
 
-  onLoopOutInput(event: Event): void {
+  /** Signed and unit-suffixed, as the row reads it: `+0 fr`, `−7 fr`. */
+  protected cueOffsetLabel(slot: number): string {
+    return offsetLabel(this.displayedCueOffset(slot));
+  }
+
+  // Moves the readout only. Every re-derivation replays up to ~50 frames of emulation on the thread
+  // the frame clock rides, so running one per drag tick would put steady replay load beside the
+  // audio callback.
+  onCueNudgeInput(slot: number, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.engine.setLoopRange(this.loopInPercent(), Math.max(value, this.loopInPercent() + 1));
+    this.cueDragOffsets.update((offsets) => new Map(offsets).set(slot, value));
+  }
+
+  // (change) fires on release: commit the offset, then hop so the operator hears where the point
+  // landed. The drag entry is dropped only after the commit, so the readout falls back to an engine
+  // value that already agrees with it rather than snapping back through the old one.
+  onCueNudgeChange(slot: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.engine.setCueOffset(slot, value);
+    this.engine.hopToCue(slot);
+    this.cueDragOffsets.update((offsets) => {
+      const next = new Map(offsets);
+      next.delete(slot);
+      return next;
+    });
+  }
+
+  onTapLoopIn(): void {
+    this.engine.tapLoopIn();
+  }
+
+  onTapLoopOut(): void {
+    this.engine.tapLoopOut();
+  }
+
+  /** The offset the In row shows: the live drag while one is in flight, the committed value otherwise. */
+  protected displayedLoopInOffset(): number {
+    return this.loopInDragOffset() ?? this.loopIn()?.offset ?? 0;
+  }
+
+  protected loopInOffsetLabel(): string {
+    return offsetLabel(this.displayedLoopInOffset());
+  }
+
+  protected loopOutOffsetLabel(): string {
+    return offsetLabel(this.loopOut()?.offset ?? 0);
+  }
+
+  // Moves the readout only — see `onCueNudgeInput`.
+  onLoopInNudgeInput(event: Event): void {
+    this.loopInDragOffset.set(Number((event.target as HTMLInputElement).value));
+  }
+
+  // (change) fires on release: commit the offset, then hop so the operator hears where the loop will
+  // now re-enter.
+  onLoopInNudgeChange(event: Event): void {
+    this.engine.setLoopInOffset(Number((event.target as HTMLInputElement).value));
+    this.engine.hopToLoopIn();
+    this.loopInDragOffset.set(null);
+  }
+
+  // Committed on every drag tick rather than on release: moving the exit is arithmetic, with no
+  // replay to defer and nothing to audition — the next pass simply wraps at the new point.
+  onLoopOutNudgeInput(event: Event): void {
+    this.engine.setLoopOutOffset(Number((event.target as HTMLInputElement).value));
   }
 
   onLoopEnabledToggle(event: Event): void {
@@ -279,15 +373,17 @@ export class DjPocViewComponent {
   }
 
   onScrubInput(event: Event): void {
-    this.scrubDisplayPercent.set(Number((event.target as HTMLInputElement).value));
+    this.scrubDragValue.set(Number((event.target as HTMLInputElement).value));
   }
 
   // (change) fires on release, not on every drag tick — the seam that makes this "drag anywhere,
-  // release, and it jumps" rather than a continuous scrub.
+  // release, and it jumps" rather than a continuous scrub. Clearing the pin here, after the jump is
+  // committed, is what lets tracking resume without a stale drag value racing the engine's own
+  // position update.
   onScrubChange(event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.scrubDisplayPercent.set(value);
     this.engine.scrubTo(value);
+    this.scrubDragValue.set(null);
   }
 
   protected frameRateHz(intervalUs: number): string {
@@ -302,6 +398,11 @@ export class DjPocViewComponent {
     // port is chosen, so no separate guard is needed here.
     void this.engine.play();
   }
+}
+
+/** Signed and unit-suffixed, as a nudge row reads it: `+0 fr`, `−7 fr`. */
+function offsetLabel(offset: number): string {
+  return `${offset < 0 ? '−' : '+'}${Math.abs(offset)} fr`;
 }
 
 function describeParseError(error: unknown): string {
