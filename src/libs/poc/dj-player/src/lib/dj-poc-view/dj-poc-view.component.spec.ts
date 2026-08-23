@@ -711,7 +711,7 @@ describe('DjPocViewComponent', () => {
     }
 
     function stopButton(): HTMLButtonElement {
-      return fixture.nativeElement.querySelector('[aria-label="Loop"] [aria-label="Stop loop"]');
+      return fixture.nativeElement.querySelector('[aria-label="Loops"] [aria-label="Stop loop"]');
     }
 
     function tapButton(slot: number, label: 'Tap In' | 'Tap Out'): HTMLButtonElement {
