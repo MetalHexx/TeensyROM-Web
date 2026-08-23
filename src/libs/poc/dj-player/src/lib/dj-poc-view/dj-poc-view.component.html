@@ -292,17 +292,21 @@
       <input type="range" min="0" max="100" [value]="loopOutPercent()" (input)="onLoopOutInput($event)" />
     </div>
 
-    <label class="control">
-      Scrub {{ scrubDisplayPercent() }}%
-      <input
-        type="range"
-        min="0"
-        max="100"
-        [value]="scrubDisplayPercent()"
-        (input)="onScrubInput($event)"
-        (change)="onScrubChange($event)"
-      />
-    </label>
+    <div class="control-row scrub-row">
+      <span class="caption">Position</span>
+      <div class="scrub-track">
+        <div class="scrub-track-fill" [style.width.%]="scrubDisplayPercent()"></div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          [value]="scrubDisplayPercent()"
+          (input)="onScrubInput($event)"
+          (change)="onScrubChange($event)"
+        />
+      </div>
+      <span class="caption">frame {{ engineStats().framesRendered }}</span>
+    </div>
   </section>
 
   <section class="poc-section poc-section--wide" aria-label="Diagnostics">

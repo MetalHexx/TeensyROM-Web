@@ -159,3 +159,37 @@
     }
   }
 }
+
+.scrub-row {
+  flex-wrap: nowrap;
+
+  .caption {
+    flex: 0 0 auto;
+  }
+}
+
+// The elapsed fill sits behind a transparent-background range input, the same stacking technique
+// as .dual-range above — the fill shows the played portion, the native thumb still handles drag.
+.scrub-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 1.5rem;
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+
+  input[type='range'] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: transparent;
+  }
+}
+
+.scrub-track-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: var(--color-dimmed);
+  pointer-events: none;
+}

@@ -556,16 +556,26 @@ export class DjPlayerEngine implements OnDestroy {
     return true;
   }
 
-  /** Ignores multispeed deliberately: for a callsPerFrame > 1 tune the ceiling represents a shorter
+  /** Frames in the fixed jump ceiling at the current nominal interval. Was a private method.
+   * Ignores multispeed deliberately: for a callsPerFrame > 1 tune the ceiling represents a shorter
    * real-world duration than JUMP_CEILING_SECONDS, since more play-calls land in the same frame
    * count. Acceptable simplification for this iteration — most of the tune list is callsPerFrame 1. */
-  private ceilingFrames(): number {
-    return Math.round((JUMP_CEILING_SECONDS * MICROSECONDS_PER_SECOND) / this.nominalIntervalUs());
-  }
+  readonly ceilingFrames = computed<number>(() =>
+    Math.round((JUMP_CEILING_SECONDS * MICROSECONDS_PER_SECOND) / this.nominalIntervalUs())
+  );
   // Known, accepted coupling: this reads the same nominalIntervalUs signal the existing Timing panel
   // lets a tester change mid-session (50.125 / 19975 / 20000 µs). Changing it after a loop or cue is
   // set shifts the resolved frame count by well under 1% — negligible, and cheaper to accept than to
   // snapshot the interval at tune-load time for a session-only spike control.
+
+  /** Current playback position as a percentage of the ceiling, for the playhead. Clamped to 0–100
+   * because JUMP_CEILING_SECONDS is a fixed fiction, not the tune's real length — past ~5 PAL minutes
+   * of continuous play framesRendered/ceilingFrames exceeds 100% and the thumb should pin, not
+   * overflow. */
+  readonly positionPercent = computed<number>(() => {
+    const ceiling = this.ceilingFrames();
+    return ceiling === 0 ? 0 : clamp((this.stats().framesRendered / ceiling) * 100, 0, 100);
+  });
 
   private frameForPercent(percent: number): number {
     const clamped = clamp(percent, 0, 100);

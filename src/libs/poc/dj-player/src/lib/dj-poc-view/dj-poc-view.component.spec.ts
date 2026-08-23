@@ -57,6 +57,7 @@ interface MockDjPlayerEngine {
   loopInPercent: WritableSignal<number>;
   loopOutPercent: WritableSignal<number>;
   loopEnabled: WritableSignal<boolean>;
+  positionPercent: WritableSignal<number>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -111,6 +112,7 @@ function makeEngine(): MockDjPlayerEngine {
     loopInPercent: signal(0),
     loopOutPercent: signal(100),
     loopEnabled: signal(false),
+    positionPercent: signal(0),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
@@ -573,6 +575,51 @@ describe('DjPocViewComponent', () => {
       input.dispatchEvent(new Event('change'));
 
       expect(engine.scrubTo).toHaveBeenCalledWith(42);
+    });
+
+    it('follows the engine position while idle', () => {
+      engine.positionPercent.set(17);
+      fixture.detectChanges();
+
+      expect(scrubInput().value).toBe('17');
+
+      engine.positionPercent.set(63);
+      fixture.detectChanges();
+
+      expect(scrubInput().value).toBe('63');
+    });
+
+    it('pins the displayed value on input, ignoring further engine position changes mid-drag', () => {
+      engine.positionPercent.set(10);
+      fixture.detectChanges();
+
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      expect(scrubInput().value).toBe('42');
+
+      // The live position moves under the drag — the pin must hold the thumb rather than snap it.
+      engine.positionPercent.set(55);
+      fixture.detectChanges();
+
+      expect(scrubInput().value).toBe('42');
+    });
+
+    it('releases the pin on change, letting the engine position resume driving the display', () => {
+      engine.positionPercent.set(10);
+      fixture.detectChanges();
+
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      engine.positionPercent.set(77);
+      fixture.detectChanges();
+
+      expect(scrubInput().value).toBe('77');
     });
   });
 });

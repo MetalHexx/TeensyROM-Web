@@ -89,10 +89,14 @@ export class DjPocViewComponent {
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
   protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
 
-  // The scrub slider's own displayed position — deliberately not sourced from the engine, which
-  // exposes no continuous playback-position signal. Updated on every drag tick; the engine only
-  // hears about it once the drag releases (see onScrubChange).
-  protected readonly scrubDisplayPercent = signal<number>(0);
+  // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
+  // own position updates (which fire from stats publishes, not from the drag) can't fight it and
+  // snap the thumb out from under the operator. Cleared back to null on release, at which point the
+  // engine's live position takes back over.
+  private readonly scrubDragValue = signal<number | null>(null);
+  protected readonly scrubDisplayPercent = computed<number>(
+    () => this.scrubDragValue() ?? this.engine.positionPercent()
+  );
 
   // The cartridge's frame timer, stated rather than recorded: we know it is on once we have sent a
   // recipe packet, because the firmware's handler forces `FrameTimerMode = true` on receipt.
@@ -297,15 +301,17 @@ export class DjPocViewComponent {
   }
 
   onScrubInput(event: Event): void {
-    this.scrubDisplayPercent.set(Number((event.target as HTMLInputElement).value));
+    this.scrubDragValue.set(Number((event.target as HTMLInputElement).value));
   }
 
   // (change) fires on release, not on every drag tick — the seam that makes this "drag anywhere,
-  // release, and it jumps" rather than a continuous scrub.
+  // release, and it jumps" rather than a continuous scrub. Clearing the pin here, after the jump is
+  // committed, is what lets tracking resume without a stale drag value racing the engine's own
+  // position update.
   onScrubChange(event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.scrubDisplayPercent.set(value);
     this.engine.scrubTo(value);
+    this.scrubDragValue.set(null);
   }
 
   protected frameRateHz(intervalUs: number): string {

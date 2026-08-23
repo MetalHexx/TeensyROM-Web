@@ -849,4 +849,33 @@ describe('DjPlayerEngine', () => {
       expect(dataPackets(midi)).toHaveLength(packetsBefore);
     });
   });
+
+  describe('positionPercent', () => {
+    it('derives from the published framesRendered against the jump ceiling', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+
+      const ceiling = expectedCeilingFrames();
+      clock.tick(Math.round(ceiling * 0.1));
+
+      expect(engine.positionPercent()).toBeCloseTo(engine.stats().framesRendered / ceiling * 100, 6);
+    });
+
+    it('clamps to 100 past the fixed ceiling rather than overflowing', async () => {
+      engine.loadTune(counterTune());
+
+      engine.scrubTo(100);
+
+      expect(engine.positionPercent()).toBe(100);
+    });
+
+    it('is 0 when the nominal interval is 0, guarding a zero ceiling', () => {
+      engine.loadTune(counterTune());
+      // setNominalIntervalUs() itself refuses <= 0 — this reaches the guard directly, the way a
+      // divide-by-zero could otherwise slip through if the ceiling were ever computed as 0.
+      engine.nominalIntervalUs.set(0);
+
+      expect(engine.positionPercent()).toBe(0);
+    });
+  });
 });
