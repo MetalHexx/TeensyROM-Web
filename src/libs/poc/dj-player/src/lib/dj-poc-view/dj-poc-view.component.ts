@@ -27,9 +27,6 @@ const MICROSECONDS_PER_SECOND = 1_000_000;
  * timestamped `send()` is honoured at all in this browser. */
 const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
 
-/** This panel's Loop section drives a single one of the engine's four punch-in slots. */
-const PANEL_LOOP_SLOT = 0;
-
 /**
  * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. A
  * performance stage (Transport/Scrub, Cues, Loop, Voice, Speed) beside a persistent sidebar
@@ -82,18 +79,29 @@ export class DjPocViewComponent {
   protected readonly heldVoices = this.engine.heldVoices;
   protected readonly effectiveMutes = this.engine.effectiveMutes;
   protected readonly cues = this.engine.cues;
-  /** The one slot this panel marks up and punches; the engine holds four. */
-  protected readonly loopSlot = computed(() => this.engine.loopSlots()[PANEL_LOOP_SLOT] ?? null);
-  protected readonly loopActive = computed(() => this.engine.activeLoopSlot() === PANEL_LOOP_SLOT);
-  protected readonly loopProgressPercent = computed(() =>
-    this.engine.progressPercentFor(PANEL_LOOP_SLOT)
-  );
+  protected readonly loopSlots = this.engine.loopSlots;
+  protected readonly activeLoopSlot = this.engine.activeLoopSlot;
+  protected readonly queuedLoopSlot = this.engine.queuedLoopSlot;
+
+  /** 0–100, non-zero only for the active slot — the engine does the arithmetic. */
+  protected progressPercentFor(slot: number): number {
+    return this.engine.progressPercentFor(slot);
+  }
+
+  /** Which of the three states a slot's row is in — drives the visual distinction between active,
+   * queued and idle without relying on a text label. */
+  protected loopSlotState(slot: number): 'active' | 'queued' | 'idle' {
+    if (this.activeLoopSlot() === slot) return 'active';
+    if (this.queuedLoopSlot() === slot) return 'queued';
+    return 'idle';
+  }
 
   protected readonly minSpeed = MIN_SPEED_MULTIPLIER;
   protected readonly maxSpeed = MAX_SPEED_MULTIPLIER;
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
   protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
+  protected readonly loopIndices: readonly number[] = [0, 1, 2, 3];
   protected readonly nudgeRange = this.engine.nudgeRangeFrames;
 
   // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
@@ -108,9 +116,15 @@ export class DjPocViewComponent {
   /** Slot index → the offset being dragged right now. Absent means "not dragging that slot". */
   private readonly cueDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
 
-  /** Non-null only mid-drag, for the same reason the cue rows keep a drag offset: re-deriving the
-   * loop's entry replays frames, so it has to wait for the release. */
-  private readonly loopInDragOffset = signal<number | null>(null);
+  /** Slot index → the in-point offset being dragged right now. Absent means "not dragging that
+   * slot's in-point". Re-deriving a loop's entry replays frames, the same reason the cue rows keep
+   * a drag offset, so it has to wait for the release. */
+  private readonly loopInDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
+
+  /** Slot index → the out-point offset being dragged right now. Kept purely so the readout tracks
+   * the thumb; the commit itself waits for release even though the arithmetic is cheap, because the
+   * commit now also auditions the seam. */
+  private readonly loopOutDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
 
   // The cartridge's frame timer, stated rather than recorded: we know it is on once we have sent a
   // recipe packet, because the firmware's handler forces `FrameTimerMode = true` on receipt.
@@ -337,53 +351,94 @@ export class DjPocViewComponent {
     });
   }
 
-  onTapLoopIn(): void {
-    this.engine.tapLoopIn(PANEL_LOOP_SLOT);
+  onTapLoopIn(slot: number): void {
+    this.engine.tapLoopIn(slot);
   }
 
-  onTapLoopOut(): void {
-    this.engine.tapLoopOut(PANEL_LOOP_SLOT);
+  onTapLoopOut(slot: number): void {
+    this.engine.tapLoopOut(slot);
   }
 
-  onPunchLoop(): void {
-    this.engine.punchLoop(PANEL_LOOP_SLOT);
+  onPunchLoop(slot: number): void {
+    this.engine.punchLoop(slot);
+  }
+
+  onClearLoopSlot(slot: number): void {
+    this.engine.clearLoopSlot(slot);
   }
 
   onStopLoop(): void {
     this.engine.stopLoop();
   }
 
-  /** The offset the In row shows: the live drag while one is in flight, the committed value otherwise. */
-  protected displayedLoopInOffset(): number {
-    return this.loopInDragOffset() ?? this.loopSlot()?.in?.offset ?? 0;
+  /** The in-point offset a slot's row shows: the live drag while one is in flight, the committed
+   * value otherwise. */
+  protected displayedLoopInOffset(slot: number): number {
+    return this.loopInDragOffsets().get(slot) ?? this.loopSlots()[slot]?.in?.offset ?? 0;
   }
 
-  protected loopInOffsetLabel(): string {
-    return offsetLabel(this.displayedLoopInOffset());
+  /** The out-point offset a slot's row shows — mirrors `displayedLoopInOffset`. */
+  protected displayedLoopOutOffset(slot: number): number {
+    return this.loopOutDragOffsets().get(slot) ?? this.loopSlots()[slot]?.out?.offset ?? 0;
   }
 
-  protected loopOutOffsetLabel(): string {
-    return offsetLabel(this.loopSlot()?.out?.offset ?? 0);
+  /** The In row's frame readout: the captured frame plus whichever offset is currently displayed. */
+  protected loopInFrame(slot: number): number | null {
+    const point = this.loopSlots()[slot]?.in ?? null;
+    return point === null ? null : point.frame + this.displayedLoopInOffset(slot);
+  }
+
+  /** The Out row's frame readout — mirrors `loopInFrame`. */
+  protected loopOutFrame(slot: number): number | null {
+    const point = this.loopSlots()[slot]?.out ?? null;
+    return point === null ? null : point.frame + this.displayedLoopOutOffset(slot);
+  }
+
+  protected loopInOffsetLabel(slot: number): string {
+    return offsetLabel(this.displayedLoopInOffset(slot));
+  }
+
+  protected loopOutOffsetLabel(slot: number): string {
+    return offsetLabel(this.displayedLoopOutOffset(slot));
   }
 
   // Moves the readout only — see `onCueNudgeInput`.
-  onLoopInNudgeInput(event: Event): void {
-    this.loopInDragOffset.set(Number((event.target as HTMLInputElement).value));
+  onLoopInNudgeInput(slot: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.loopInDragOffsets.update((offsets) => new Map(offsets).set(slot, value));
   }
 
-  // (change) fires on release: commit the offset, then punch so the operator hears where the loop
-  // will now re-enter.
-  onLoopInNudgeChange(event: Event): void {
-    this.engine.setLoopInOffset(PANEL_LOOP_SLOT, Number((event.target as HTMLInputElement).value));
-    this.engine.punchLoop(PANEL_LOOP_SLOT);
-    this.loopInDragOffset.set(null);
+  // (change) fires on release: commit the offset, then re-enter the slot so the operator hears
+  // where the loop will now start.
+  onLoopInNudgeChange(slot: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.engine.setLoopInOffset(slot, value);
+    this.engine.punchLoop(slot);
+    this.loopInDragOffsets.update((offsets) => {
+      const next = new Map(offsets);
+      next.delete(slot);
+      return next;
+    });
   }
 
-  // Committed on every drag tick rather than on release: moving the exit is arithmetic, no replay
-  // to defer. The engine exposes `auditionLoopOut` to preview the seam, but this dev panel doesn't
-  // wire it in here — that binding belongs to the real control panel in a later phase.
-  onLoopOutNudgeInput(event: Event): void {
-    this.engine.setLoopOutOffset(PANEL_LOOP_SLOT, Number((event.target as HTMLInputElement).value));
+  // Moves the readout only, same as the in-point drag: now that there is an audition to run, moving
+  // the exit on every tick would put replay-adjacent work on the frame clock's own thread.
+  onLoopOutNudgeInput(slot: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.loopOutDragOffsets.update((offsets) => new Map(offsets).set(slot, value));
+  }
+
+  // (change) fires on release: commit the offset, then audition so the operator hears where the
+  // seam now lands.
+  onLoopOutNudgeChange(slot: number, event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    this.engine.setLoopOutOffset(slot, value);
+    this.engine.auditionLoopOut(slot);
+    this.loopOutDragOffsets.update((offsets) => {
+      const next = new Map(offsets);
+      next.delete(slot);
+      return next;
+    });
   }
 
   onScrubInput(event: Event): void {

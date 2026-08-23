@@ -82,76 +82,112 @@
         </section>
 
         <section class="panel" aria-label="Loop">
-          <h2>Loop</h2>
-
-          <div class="loop-arm">
-            <button type="button" (click)="onPunchLoop()">Punch</button>
-            <button type="button" (click)="onStopLoop()">Stop</button>
-            <div class="loop-progress" aria-hidden="true">
-              <div class="loop-progress-fill" [style.width.%]="loopProgressPercent()"></div>
-            </div>
-            <span class="caption">{{ loopActive() ? 'looping' : 'not looping' }}</span>
+          <div class="loop-panel-header">
+            <h2>Loop</h2>
+            <button type="button" aria-label="Stop loop" (click)="onStopLoop()">Stop</button>
           </div>
 
-          <div class="loop-rows">
-            <div class="loop-row">
-              <span class="loop-tag">In</span>
-              <div class="loop-btns">
-                <button type="button" (click)="onTapLoopIn()">Tap In</button>
-              </div>
-              @if (loopSlot()?.in; as point) {
-              <span class="loop-frame">frame {{ point.frame }}</span>
-              <div class="loop-nudge">
-                <div class="loop-nudge-centre"></div>
-                <input
-                  type="range"
-                  [min]="-nudgeRange()"
-                  [max]="nudgeRange()"
-                  step="1"
-                  aria-label="Nudge loop in"
-                  [value]="displayedLoopInOffset()"
-                  (input)="onLoopInNudgeInput($event)"
-                  (change)="onLoopInNudgeChange($event)"
-                />
-              </div>
-              <span class="loop-offset">{{ loopInOffsetLabel() }}</span>
-              } @else {
-              <span class="loop-frame loop-frame--empty">unmarked</span>
-              <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
-                <div class="loop-nudge-centre"></div>
-              </div>
-              <span class="loop-offset loop-offset--empty">—</span>
-              }
-            </div>
+          <div class="loop-slots">
+            @for (slot of loopIndices; track slot) {
+            <div class="loop-slot-row" [attr.data-loop-state]="loopSlotState(slot)">
+              <button
+                type="button"
+                class="loop-slot-punch"
+                [attr.aria-label]="'Punch slot ' + (slot + 1)"
+                (click)="onPunchLoop(slot)"
+              >
+                {{ slot + 1 }}
+              </button>
 
-            <div class="loop-row">
-              <span class="loop-tag">Out</span>
-              <div class="loop-btns">
-                <button type="button" (click)="onTapLoopOut()">Tap Out</button>
+              <div class="loop-slot-ends">
+                <div class="loop-end">
+                  <span class="loop-tag">In</span>
+                  <button
+                    type="button"
+                    [attr.aria-label]="'Tap in for slot ' + (slot + 1)"
+                    (click)="onTapLoopIn(slot)"
+                  >
+                    Tap In
+                  </button>
+                  @if (loopSlots()[slot]?.in; as point) {
+                  <span class="loop-frame">frame {{ loopInFrame(slot) }}</span>
+                  <div class="loop-nudge">
+                    <div class="loop-nudge-centre"></div>
+                    <input
+                      type="range"
+                      [min]="-nudgeRange()"
+                      [max]="nudgeRange()"
+                      step="1"
+                      [attr.aria-label]="'Nudge loop ' + (slot + 1) + ' in'"
+                      [value]="displayedLoopInOffset(slot)"
+                      (input)="onLoopInNudgeInput(slot, $event)"
+                      (change)="onLoopInNudgeChange(slot, $event)"
+                    />
+                  </div>
+                  <span class="loop-offset">{{ loopInOffsetLabel(slot) }}</span>
+                  } @else {
+                  <span class="loop-frame loop-frame--empty">unmarked</span>
+                  <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
+                    <div class="loop-nudge-centre"></div>
+                  </div>
+                  <span class="loop-offset loop-offset--empty">—</span>
+                  }
+                </div>
+
+                <div class="loop-end">
+                  <span class="loop-tag">Out</span>
+                  <button
+                    type="button"
+                    [attr.aria-label]="'Tap out for slot ' + (slot + 1)"
+                    (click)="onTapLoopOut(slot)"
+                  >
+                    Tap Out
+                  </button>
+                  @if (loopSlots()[slot]?.out; as point) {
+                  <span class="loop-frame">frame {{ loopOutFrame(slot) }}</span>
+                  <div class="loop-nudge">
+                    <div class="loop-nudge-centre"></div>
+                    <input
+                      type="range"
+                      [min]="-nudgeRange()"
+                      [max]="nudgeRange()"
+                      step="1"
+                      [attr.aria-label]="'Nudge loop ' + (slot + 1) + ' out'"
+                      [value]="displayedLoopOutOffset(slot)"
+                      (input)="onLoopOutNudgeInput(slot, $event)"
+                      (change)="onLoopOutNudgeChange(slot, $event)"
+                    />
+                  </div>
+                  <span class="loop-offset">{{ loopOutOffsetLabel(slot) }}</span>
+                  } @else {
+                  <span class="loop-frame loop-frame--empty">unmarked</span>
+                  <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
+                    <div class="loop-nudge-centre"></div>
+                  </div>
+                  <span class="loop-offset loop-offset--empty">—</span>
+                  }
+                </div>
               </div>
-              @if (loopSlot()?.out; as point) {
-              <span class="loop-frame">frame {{ point.frame }}</span>
-              <div class="loop-nudge">
-                <div class="loop-nudge-centre"></div>
-                <input
-                  type="range"
-                  [min]="-nudgeRange()"
-                  [max]="nudgeRange()"
-                  step="1"
-                  aria-label="Nudge loop out"
-                  [value]="point.offset"
-                  (input)="onLoopOutNudgeInput($event)"
-                />
+
+              <div class="loop-slot-progress" aria-hidden="true">
+                <div
+                  class="loop-slot-progress-fill"
+                  [style.width.%]="progressPercentFor(slot)"
+                ></div>
               </div>
-              <span class="loop-offset">{{ loopOutOffsetLabel() }}</span>
-              } @else {
-              <span class="loop-frame loop-frame--empty">unmarked</span>
-              <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
-                <div class="loop-nudge-centre"></div>
-              </div>
-              <span class="loop-offset loop-offset--empty">—</span>
+
+              @if (loopSlots()[slot]) {
+              <button
+                type="button"
+                class="loop-slot-clear"
+                [attr.aria-label]="'Clear slot ' + (slot + 1)"
+                (click)="onClearLoopSlot(slot)"
+              >
+                Clear
+              </button>
               }
             </div>
+            }
           </div>
         </section>
       </div>

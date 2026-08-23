@@ -84,8 +84,10 @@ interface MockDjPlayerEngine {
   tapLoopOut: ReturnType<typeof vi.fn>;
   setLoopInOffset: ReturnType<typeof vi.fn>;
   setLoopOutOffset: ReturnType<typeof vi.fn>;
+  clearLoopSlot: ReturnType<typeof vi.fn>;
   punchLoop: ReturnType<typeof vi.fn>;
   stopLoop: ReturnType<typeof vi.fn>;
+  auditionLoopOut: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
 }
 
@@ -146,8 +148,10 @@ function makeEngine(): MockDjPlayerEngine {
     tapLoopOut: vi.fn(),
     setLoopInOffset: vi.fn(),
     setLoopOutOffset: vi.fn(),
+    clearLoopSlot: vi.fn(),
     punchLoop: vi.fn(),
     stopLoop: vi.fn(),
+    auditionLoopOut: vi.fn(),
     scrubTo: vi.fn(),
   };
 }
@@ -666,106 +670,179 @@ describe('DjPocViewComponent', () => {
     });
   });
 
-  describe('loop rows', () => {
-    /** The panel drives one of the engine's four slots. */
-    const PANEL_SLOT = 0;
-
-    function setSlot(slot: LoopSlot | null): void {
-      engine.loopSlots.set([slot, null, null, null]);
+  describe('loop slots', () => {
+    function setSlots(slots: readonly (LoopSlot | null)[]): void {
+      engine.loopSlots.set(slots);
       fixture.detectChanges();
     }
 
-    function punchButton(label: string): HTMLButtonElement {
-      const buttons: HTMLButtonElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('.loop-arm button')
-      );
+    function slotRows(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.loop-slot-row'));
+    }
+
+    function punchButton(slot: number): HTMLButtonElement {
+      return slotRows()[slot].querySelector('.loop-slot-punch') as HTMLButtonElement;
+    }
+
+    function stopButton(): HTMLButtonElement {
+      return fixture.nativeElement.querySelector('[aria-label="Loop"] [aria-label="Stop loop"]');
+    }
+
+    function tapButton(slot: number, label: 'Tap In' | 'Tap Out'): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(slotRows()[slot].querySelectorAll('button'));
       return buttons.find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
     }
 
-    function tapButton(label: string): HTMLButtonElement {
-      const buttons: HTMLButtonElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('.loop-row button')
-      );
-      return buttons.find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
+    function clearButton(slot: number): HTMLButtonElement | null {
+      return slotRows()[slot].querySelector('.loop-slot-clear');
     }
 
-    function nudgeInput(which: 'in' | 'out'): HTMLInputElement {
-      return fixture.nativeElement.querySelector(
-        `.loop-row input[aria-label="Nudge loop ${which}"]`
-      );
+    function nudgeInput(slot: number, which: 'in' | 'out'): HTMLInputElement | null {
+      return slotRows()[slot].querySelector(`input[aria-label="Nudge loop ${slot + 1} ${which}"]`);
     }
 
-    function offsetReadout(row: number): string {
-      const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.loop-row'));
-      return rows[row].querySelector('.loop-offset')?.textContent?.trim() ?? '';
+    function offsetReadout(slot: number, which: 'in' | 'out'): string {
+      const ends: HTMLElement[] = Array.from(slotRows()[slot].querySelectorAll('.loop-end'));
+      const end = which === 'in' ? ends[0] : ends[1];
+      return end.querySelector('.loop-offset')?.textContent?.trim() ?? '';
     }
 
-    it('punches its slot in and stops the loop from their own buttons', () => {
-      punchButton('Punch').click();
-      expect(engine.punchLoop).toHaveBeenCalledWith(PANEL_SLOT);
+    it('renders one row per loop slot', () => {
+      expect(slotRows()).toHaveLength(4);
+    });
 
-      punchButton('Stop').click();
+    it('punches the tapped slot from its own punch target', () => {
+      punchButton(2).click();
+      expect(engine.punchLoop).toHaveBeenCalledWith(2);
+    });
+
+    it('stops the loop from the single panel-level Stop control', () => {
+      stopButton().click();
       expect(engine.stopLoop).toHaveBeenCalled();
     });
 
-    it('taps each end from its own button', () => {
-      tapButton('Tap In').click();
-      expect(engine.tapLoopIn).toHaveBeenCalledWith(PANEL_SLOT);
+    it('taps each end of the right slot from its own button', () => {
+      tapButton(1, 'Tap In').click();
+      expect(engine.tapLoopIn).toHaveBeenCalledWith(1);
 
-      tapButton('Tap Out').click();
-      expect(engine.tapLoopOut).toHaveBeenCalledWith(PANEL_SLOT);
+      tapButton(1, 'Tap Out').click();
+      expect(engine.tapLoopOut).toHaveBeenCalledWith(1);
     });
 
-    it('offers a nudge track only for an end that has been marked', () => {
-      expect(nudgeInput('in')).toBeNull();
-      expect(nudgeInput('out')).toBeNull();
+    it('clears the right slot from its own Clear control, offered only once the slot is set', () => {
+      expect(clearButton(0)).toBeNull();
 
-      setSlot({ in: loopInPoint(2140), out: { frame: 2536, offset: 0 } });
+      setSlots([{ in: loopInPoint(2140), out: null }, null, null, null]);
 
-      expect(nudgeInput('in')).not.toBeNull();
-      expect(nudgeInput('out')).not.toBeNull();
-      expect(
-        (fixture.nativeElement.querySelector('.loop-row .loop-frame') as HTMLElement).textContent
-      ).toContain('frame 2140');
+      clearButton(0)?.click();
+      expect(engine.clearLoopSlot).toHaveBeenCalledWith(0);
     });
 
-    it('moves the in-point readout on input without re-deriving or auditioning', () => {
-      setSlot({ in: loopInPoint(2140), out: null });
+    it('offers a nudge track only for an end that has been marked, on the right slot', () => {
+      expect(nudgeInput(1, 'in')).toBeNull();
+      expect(nudgeInput(1, 'out')).toBeNull();
 
-      const input = nudgeInput('in');
+      setSlots([null, { in: loopInPoint(2140), out: { frame: 2536, offset: 0 } }, null, null]);
+
+      expect(nudgeInput(1, 'in')).not.toBeNull();
+      expect(nudgeInput(1, 'out')).not.toBeNull();
+      expect(nudgeInput(0, 'in')).toBeNull();
+      expect(slotRows()[1].querySelector('.loop-frame')?.textContent).toContain('frame 2140');
+    });
+
+    it('moves the in-point readout on input without re-deriving or committing', () => {
+      setSlots([{ in: loopInPoint(2140), out: null }, null, null, null]);
+
+      const input = nudgeInput(0, 'in') as HTMLInputElement;
       input.value = '-7';
       input.dispatchEvent(new Event('input'));
       fixture.detectChanges();
 
-      expect(nudgeInput('in').value).toBe('-7');
-      expect(offsetReadout(0)).toContain('7');
+      expect((nudgeInput(0, 'in') as HTMLInputElement).value).toBe('-7');
+      expect(offsetReadout(0, 'in')).toContain('7');
       // Re-deriving the in-point replays frames on the frame clock's own thread, so the drag must
       // not trigger one.
       expect(engine.setLoopInOffset).not.toHaveBeenCalled();
       expect(engine.punchLoop).not.toHaveBeenCalled();
     });
 
-    it('commits the in-point offset and auditions it when the drag releases', () => {
-      setSlot({ in: loopInPoint(2140), out: null });
+    it('commits the in-point offset and re-enters the slot when the drag releases', () => {
+      setSlots([null, { in: loopInPoint(2140), out: null }, null, null]);
 
-      const input = nudgeInput('in');
+      const input = nudgeInput(1, 'in') as HTMLInputElement;
       input.value = '-7';
       input.dispatchEvent(new Event('input'));
       input.dispatchEvent(new Event('change'));
 
-      expect(engine.setLoopInOffset).toHaveBeenCalledWith(PANEL_SLOT, -7);
-      expect(engine.punchLoop).toHaveBeenCalledWith(PANEL_SLOT);
+      expect(engine.setLoopInOffset).toHaveBeenCalledWith(1, -7);
+      expect(engine.punchLoop).toHaveBeenCalledWith(1);
     });
 
-    it('commits the out-point offset on input, since moving it replays nothing', () => {
-      setSlot({ in: null, out: { frame: 2536, offset: 0 } });
+    it('moves the out-point readout on input without committing or auditioning', () => {
+      setSlots([{ in: null, out: { frame: 2536, offset: 0 } }, null, null, null]);
 
-      const input = nudgeInput('out');
+      const input = nudgeInput(0, 'out') as HTMLInputElement;
       input.value = '-3';
       input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
 
-      expect(engine.setLoopOutOffset).toHaveBeenCalledWith(PANEL_SLOT, -3);
+      expect((nudgeInput(0, 'out') as HTMLInputElement).value).toBe('-3');
+      expect(offsetReadout(0, 'out')).toContain('3');
+      // This is the seam that changed: with an audition to run on release, committing every drag
+      // tick would put replay-adjacent work on the frame clock's own thread.
+      expect(engine.setLoopOutOffset).not.toHaveBeenCalled();
+      expect(engine.auditionLoopOut).not.toHaveBeenCalled();
+    });
+
+    it('commits the out-point offset and auditions it when the drag releases', () => {
+      setSlots([null, null, { in: null, out: { frame: 2536, offset: 0 } }, null]);
+
+      const input = nudgeInput(2, 'out') as HTMLInputElement;
+      input.value = '-3';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.setLoopOutOffset).toHaveBeenCalledWith(2, -3);
+      expect(engine.auditionLoopOut).toHaveBeenCalledWith(2);
       expect(engine.punchLoop).not.toHaveBeenCalled();
+    });
+
+    it('renders the active and queued slots distinguishably from each other and from idle slots', () => {
+      setSlots([
+        { in: loopInPoint(100), out: { frame: 200, offset: 0 } },
+        { in: loopInPoint(300), out: { frame: 400, offset: 0 } },
+        null,
+        null,
+      ]);
+      engine.activeLoopSlot.set(0);
+      engine.queuedLoopSlot.set(1);
+      fixture.detectChanges();
+
+      const rows = slotRows();
+      const activeState = rows[0].getAttribute('data-loop-state');
+      const queuedState = rows[1].getAttribute('data-loop-state');
+      const idleState = rows[2].getAttribute('data-loop-state');
+
+      expect(activeState).not.toBe(queuedState);
+      expect(activeState).not.toBe(idleState);
+      expect(queuedState).not.toBe(idleState);
+    });
+
+    it("shows progress only for the engine's active slot", () => {
+      // progressPercentFor is only ever non-zero for the active slot in the real engine, so drive
+      // both together — the activeLoopSlot write is also what marks this OnPush view for re-check.
+      engine.progressPercentFor.mockImplementation((slot: number) => (slot === 2 ? 63 : 0));
+      engine.activeLoopSlot.set(2);
+      fixture.detectChanges();
+
+      const fills: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.loop-slot-progress-fill')
+      );
+
+      expect(fills[2].style.width).toBe('63%');
+      expect(fills[0].style.width).toBe('0%');
+      expect(fills[1].style.width).toBe('0%');
+      expect(fills[3].style.width).toBe('0%');
     });
   });
 

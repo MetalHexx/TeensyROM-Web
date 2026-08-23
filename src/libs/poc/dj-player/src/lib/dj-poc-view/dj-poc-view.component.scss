@@ -234,19 +234,15 @@
   border-top: 1px solid var(--color-dimmed);
 }
 
-.cue-rows,
-.loop-rows {
+.cue-rows {
   display: flex;
   flex-direction: column;
 }
 
 // label | button pair | captured frame | nudge track | offset readout. Every column but the track
 // stays fixed width across the empty/filled states so filling or clearing a slot never moves
-// anything else in the row — the row that wraps a fourth button onto its own
-// line is exactly the fault this layout exists to avoid. The loop's In and Out rows share the
-// rhythm: the two sections read as one idiom rather than two.
-.cue-row,
-.loop-row {
+// anything else in the row.
+.cue-row {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -267,8 +263,7 @@
 
 // Fixed-width column reserved whether the row shows one wide button or two — a hopped-to slot's
 // extra Clear button must never widen the row.
-.cue-btns,
-.loop-btns {
+.cue-btns {
   display: flex;
   gap: var(--spacing-sm);
   flex: 0 0 11rem;
@@ -341,30 +336,86 @@
   color: var(--color-dimmed);
 }
 
-// The punch controls, the progress strip and its caption sit together above the In/Out rows.
-.loop-arm {
+// The panel-level Stop sits beside the heading rather than per slot — one control ends whichever
+// slot is looping.
+.loop-panel-header {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.loop-slots {
+  display: flex;
+  flex-direction: column;
+}
+
+// punch target | In end | Out end | progress strip | clear, one row per slot. A left border reports
+// active/queued state so the row reads without a text label — solid and lit for active, dashed and
+// dimmer for queued, invisible for idle.
+.loop-slot-row {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-dimmed);
+  border-left: 3px solid transparent;
+
+  &:last-of-type {
+    border-bottom: 0;
+  }
+
+  &[data-loop-state='active'] {
+    border-left-color: var(--color-primary);
+  }
+
+  &[data-loop-state='queued'] {
+    border-left-style: dashed;
+    border-left-color: var(--color-dimmed);
+  }
+}
+
+.loop-slot-punch {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+}
+
+.loop-slot-ends {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 16rem;
+  gap: var(--spacing-sm);
+}
+
+// tag | tap button | frame | nudge track | offset readout — the cue row's rhythm, once per loop end.
+.loop-end {
+  display: flex;
   align-items: center;
   gap: var(--spacing-sm);
 }
 
-// Deliberately thinner than .scrub-track: it reports the pass rather than inviting a drag.
-.loop-progress {
+// Deliberately thinner than .scrub-track: it reports the pass rather than inviting a drag. Stays
+// empty for every slot but the active one — the engine only returns non-zero progress for it.
+.loop-slot-progress {
   position: relative;
-  flex: 1 1 auto;
-  min-width: 8rem;
+  flex: 0 0 6rem;
   height: 0.5rem;
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
   overflow: hidden;
 }
 
-.loop-progress-fill {
+.loop-slot-progress-fill {
   position: absolute;
   inset: 0;
   width: 0;
   background: var(--color-dimmed);
+}
+
+.loop-slot-clear {
+  flex: 0 0 auto;
 }
 
 .error-text {
