@@ -124,7 +124,8 @@
   border-top: 1px solid var(--color-dimmed);
 }
 
-.cue-rows {
+.cue-rows,
+.loop-rows {
   display: flex;
   flex-direction: column;
 }
@@ -132,8 +133,10 @@
 // label | button pair | captured frame | nudge track | offset readout. Every column but the track
 // stays fixed width across the empty/filled states so filling or clearing a slot never moves
 // anything else in the row — the row that wraps a fourth button onto its own
-// line is exactly the fault this layout exists to avoid.
-.cue-row {
+// line is exactly the fault this layout exists to avoid. The loop's In and Out rows share the
+// rhythm: the two sections read as one idiom rather than two.
+.cue-row,
+.loop-row {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
@@ -145,7 +148,8 @@
   }
 }
 
-.cue-tag {
+.cue-tag,
+.loop-tag {
   flex: 0 0 4.5rem;
   color: var(--color-dimmed);
   font-size: var(--font-size-sm);
@@ -153,7 +157,8 @@
 
 // Fixed-width column reserved whether the row shows one wide button or two — a hopped-to slot's
 // extra Clear button must never widen the row.
-.cue-btns {
+.cue-btns,
+.loop-btns {
   display: flex;
   gap: var(--spacing-sm);
   flex: 0 0 11rem;
@@ -164,18 +169,21 @@
   }
 }
 
-.cue-frame {
+.cue-frame,
+.loop-frame {
   flex: 0 0 6rem;
   font-size: var(--font-size-sm);
 }
 
-.cue-frame--empty {
+.cue-frame--empty,
+.loop-frame--empty {
   color: var(--color-dimmed);
 }
 
 // The nudge track: a centred range input over a zero marker, the same transparent-background
 // stacking as .scrub-track. Full row width is what gives a one-frame step enough travel to hit.
-.cue-nudge {
+.cue-nudge,
+.loop-nudge {
   position: relative;
   flex: 1 1 auto;
   min-width: 8rem;
@@ -191,13 +199,15 @@
   }
 }
 
-// An empty slot keeps the track's space so filling one never moves the row, but dims it to read as
-// inactive.
-.cue-nudge--empty {
+// An unmarked point keeps the track's space so marking one never moves the row, but dims it to read
+// as inactive.
+.cue-nudge--empty,
+.loop-nudge--empty {
   opacity: 0.4;
 }
 
-.cue-nudge-centre {
+.cue-nudge-centre,
+.loop-nudge-centre {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -208,43 +218,31 @@
 }
 
 // Monospaced and fixed-width so the signed value doesn't shuffle the row as it crosses ±10.
-.cue-offset {
+.cue-offset,
+.loop-offset {
   flex: 0 0 4rem;
   font-family: 'Roboto Mono', monospace;
   font-size: var(--font-size-sm);
   text-align: center;
 }
 
-.cue-offset--empty {
+.cue-offset--empty,
+.loop-offset--empty {
   color: var(--color-dimmed);
+}
+
+// The arm control and its caption sit together above the In/Out rows.
+.loop-arm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
 }
 
 .error-text {
   margin: 0;
   color: var(--color-error);
   font-size: var(--font-size-sm);
-}
-
-// Two range inputs stacked on the same spot so one drag surface covers both handles. The track
-// itself ignores pointer events so it never steals a click meant for the other handle's thumb.
-.dual-range {
-  position: relative;
-  height: 1.5rem;
-
-  input[type='range'] {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    background: transparent;
-    pointer-events: none;
-
-    &::-webkit-slider-thumb {
-      pointer-events: auto;
-    }
-    &::-moz-range-thumb {
-      pointer-events: auto;
-    }
-  }
 }
 
 .scrub-row {
@@ -256,7 +254,7 @@
 }
 
 // The elapsed fill sits behind a transparent-background range input, the same stacking technique
-// as .dual-range above — the fill shows the played portion, the native thumb still handles drag.
+// as .cue-nudge above — the fill shows the played portion, the native thumb still handles drag.
 .scrub-track {
   position: relative;
   flex: 1 1 auto;

@@ -80,8 +80,9 @@ export class DjPocViewComponent {
   protected readonly heldVoices = this.engine.heldVoices;
   protected readonly effectiveMutes = this.engine.effectiveMutes;
   protected readonly cues = this.engine.cues;
-  protected readonly loopInPercent = this.engine.loopInPercent;
-  protected readonly loopOutPercent = this.engine.loopOutPercent;
+  protected readonly loopIn = this.engine.loopIn;
+  protected readonly loopOut = this.engine.loopOut;
+  protected readonly loopArmable = this.engine.loopArmable;
   protected readonly loopEnabled = this.engine.loopEnabled;
 
   protected readonly minSpeed = MIN_SPEED_MULTIPLIER;
@@ -102,6 +103,10 @@ export class DjPocViewComponent {
 
   /** Slot index → the offset being dragged right now. Absent means "not dragging that slot". */
   private readonly cueDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
+
+  /** Non-null only mid-drag, for the same reason the cue rows keep a drag offset: re-deriving the
+   * loop's entry replays frames, so it has to wait for the release. */
+  private readonly loopInDragOffset = signal<number | null>(null);
 
   // The cartridge's frame timer, stated rather than recorded: we know it is on once we have sent a
   // recipe packet, because the firmware's handler forces `FrameTimerMode = true` on receipt.
@@ -298,8 +303,7 @@ export class DjPocViewComponent {
 
   /** Signed and unit-suffixed, as the row reads it: `+0 fr`, `−7 fr`. */
   protected cueOffsetLabel(slot: number): string {
-    const offset = this.displayedCueOffset(slot);
-    return `${offset < 0 ? '−' : '+'}${Math.abs(offset)} fr`;
+    return offsetLabel(this.displayedCueOffset(slot));
   }
 
   // Moves the readout only. Every re-derivation replays up to ~50 frames of emulation on the thread
@@ -324,14 +328,44 @@ export class DjPocViewComponent {
     });
   }
 
-  onLoopInInput(event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
-    this.engine.setLoopRange(Math.min(value, this.loopOutPercent() - 1), this.loopOutPercent());
+  onTapLoopIn(): void {
+    this.engine.tapLoopIn();
   }
 
-  onLoopOutInput(event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
-    this.engine.setLoopRange(this.loopInPercent(), Math.max(value, this.loopInPercent() + 1));
+  onTapLoopOut(): void {
+    this.engine.tapLoopOut();
+  }
+
+  /** The offset the In row shows: the live drag while one is in flight, the committed value otherwise. */
+  protected displayedLoopInOffset(): number {
+    return this.loopInDragOffset() ?? this.loopIn()?.offset ?? 0;
+  }
+
+  protected loopInOffsetLabel(): string {
+    return offsetLabel(this.displayedLoopInOffset());
+  }
+
+  protected loopOutOffsetLabel(): string {
+    return offsetLabel(this.loopOut()?.offset ?? 0);
+  }
+
+  // Moves the readout only — see `onCueNudgeInput`.
+  onLoopInNudgeInput(event: Event): void {
+    this.loopInDragOffset.set(Number((event.target as HTMLInputElement).value));
+  }
+
+  // (change) fires on release: commit the offset, then hop so the operator hears where the loop will
+  // now re-enter.
+  onLoopInNudgeChange(event: Event): void {
+    this.engine.setLoopInOffset(Number((event.target as HTMLInputElement).value));
+    this.engine.hopToLoopIn();
+    this.loopInDragOffset.set(null);
+  }
+
+  // Committed on every drag tick rather than on release: moving the exit is arithmetic, with no
+  // replay to defer and nothing to audition — the next pass simply wraps at the new point.
+  onLoopOutNudgeInput(event: Event): void {
+    this.engine.setLoopOutOffset(Number((event.target as HTMLInputElement).value));
   }
 
   onLoopEnabledToggle(event: Event): void {
@@ -364,6 +398,11 @@ export class DjPocViewComponent {
     // port is chosen, so no separate guard is needed here.
     void this.engine.play();
   }
+}
+
+/** Signed and unit-suffixed, as a nudge row reads it: `+0 fr`, `−7 fr`. */
+function offsetLabel(offset: number): string {
+  return `${offset < 0 ? '−' : '+'}${Math.abs(offset)} fr`;
 }
 
 function describeParseError(error: unknown): string {

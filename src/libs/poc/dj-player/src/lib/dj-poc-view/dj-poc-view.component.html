@@ -311,24 +311,90 @@
     </p>
   </section>
 
-  <section class="poc-section" aria-label="Loop / Scrub">
+  <section class="poc-section poc-section--wide" aria-label="Loop / Scrub">
     <h2>Loop / Scrub</h2>
 
-    <label class="control">
-      <input
-        type="checkbox"
-        [checked]="loopEnabled()"
-        (change)="onLoopEnabledToggle($event)"
-      />
-      Loop armed
-    </label>
-
-    <p class="caption">Loop {{ loopInPercent() }}% – {{ loopOutPercent() }}%</p>
-
-    <div class="dual-range">
-      <input type="range" min="0" max="100" [value]="loopInPercent()" (input)="onLoopInInput($event)" />
-      <input type="range" min="0" max="100" [value]="loopOutPercent()" (input)="onLoopOutInput($event)" />
+    <div class="loop-arm">
+      <label class="control">
+        <input
+          type="checkbox"
+          [checked]="loopEnabled()"
+          [disabled]="!loopArmable()"
+          (change)="onLoopEnabledToggle($event)"
+        />
+        Loop armed
+      </label>
+      <span class="caption">enabled once In and Out are both marked</span>
     </div>
+
+    <div class="loop-rows">
+      <div class="loop-row">
+        <span class="loop-tag">In</span>
+        <div class="loop-btns">
+          <button type="button" (click)="onTapLoopIn()">Tap In</button>
+        </div>
+        @if (loopIn(); as point) {
+          <span class="loop-frame">frame {{ point.frame }}</span>
+          <div class="loop-nudge">
+            <div class="loop-nudge-centre"></div>
+            <input
+              type="range"
+              [min]="-nudgeRange"
+              [max]="nudgeRange"
+              step="1"
+              aria-label="Nudge loop in"
+              [value]="displayedLoopInOffset()"
+              (input)="onLoopInNudgeInput($event)"
+              (change)="onLoopInNudgeChange($event)"
+            />
+          </div>
+          <span class="loop-offset">{{ loopInOffsetLabel() }}</span>
+        } @else {
+          <span class="loop-frame loop-frame--empty">unmarked</span>
+          <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
+            <div class="loop-nudge-centre"></div>
+          </div>
+          <span class="loop-offset loop-offset--empty">—</span>
+        }
+      </div>
+
+      <div class="loop-row">
+        <span class="loop-tag">Out</span>
+        <div class="loop-btns">
+          <button type="button" (click)="onTapLoopOut()">Tap Out</button>
+        </div>
+        @if (loopOut(); as point) {
+          <span class="loop-frame">frame {{ point.frame }}</span>
+          <div class="loop-nudge">
+            <div class="loop-nudge-centre"></div>
+            <input
+              type="range"
+              [min]="-nudgeRange"
+              [max]="nudgeRange"
+              step="1"
+              aria-label="Nudge loop out"
+              [value]="point.offset"
+              (input)="onLoopOutNudgeInput($event)"
+            />
+          </div>
+          <span class="loop-offset">{{ loopOutOffsetLabel() }}</span>
+        } @else {
+          <span class="loop-frame loop-frame--empty">unmarked</span>
+          <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
+            <div class="loop-nudge-centre"></div>
+          </div>
+          <span class="loop-offset loop-offset--empty">—</span>
+        }
+      </div>
+    </div>
+
+    <p class="caption">
+      Tap In and Tap Out mark frames while the tune plays. The in-point stores machine state the way
+      a cue does, so every pass re-enters by restoring it rather than replaying the tune from init —
+      the loop costs nothing per frame however deep its entry sits. Only the in-point needs a
+      snapshot; the out-point is a frame number the tick compares, so nudging it is arithmetic. Its
+      nudge takes effect on the next pass, which is the audition — the in-point's plays on release.
+    </p>
 
     <div class="control-row scrub-row">
       <span class="caption">Position</span>
