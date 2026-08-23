@@ -8,7 +8,7 @@ import {
   DjPlayerEngine,
   EngineState,
   EngineStats,
-  LoopOutPoint,
+  LoopSlot,
   SpeedMode,
 } from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
@@ -56,10 +56,10 @@ interface MockDjPlayerEngine {
   heldVoices: WritableSignal<readonly boolean[]>;
   effectiveMutes: WritableSignal<readonly boolean[]>;
   cues: WritableSignal<readonly (CueSlot | null)[]>;
-  loopIn: WritableSignal<CapturedPoint | null>;
-  loopOut: WritableSignal<LoopOutPoint | null>;
-  loopArmable: WritableSignal<boolean>;
-  loopEnabled: WritableSignal<boolean>;
+  loopSlots: WritableSignal<readonly (LoopSlot | null)[]>;
+  activeLoopSlot: WritableSignal<number | null>;
+  queuedLoopSlot: WritableSignal<number | null>;
+  progressPercentFor: ReturnType<typeof vi.fn>;
   positionPercent: WritableSignal<number>;
   nudgeRangeFrames: WritableSignal<number>;
   play: ReturnType<typeof vi.fn>;
@@ -84,8 +84,8 @@ interface MockDjPlayerEngine {
   tapLoopOut: ReturnType<typeof vi.fn>;
   setLoopInOffset: ReturnType<typeof vi.fn>;
   setLoopOutOffset: ReturnType<typeof vi.fn>;
-  hopToLoopIn: ReturnType<typeof vi.fn>;
-  setLoopEnabled: ReturnType<typeof vi.fn>;
+  punchLoop: ReturnType<typeof vi.fn>;
+  stopLoop: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
 }
 
@@ -118,10 +118,10 @@ function makeEngine(): MockDjPlayerEngine {
     heldVoices: signal<readonly boolean[]>([false, false, false]),
     effectiveMutes: signal<readonly boolean[]>([false, false, false]),
     cues: signal<readonly (CueSlot | null)[]>([null, null, null, null]),
-    loopIn: signal<CapturedPoint | null>(null),
-    loopOut: signal<LoopOutPoint | null>(null),
-    loopArmable: signal(false),
-    loopEnabled: signal(false),
+    loopSlots: signal<readonly (LoopSlot | null)[]>([null, null, null, null]),
+    activeLoopSlot: signal<number | null>(null),
+    queuedLoopSlot: signal<number | null>(null),
+    progressPercentFor: vi.fn(() => 0),
     positionPercent: signal(0),
     nudgeRangeFrames: signal(50),
     play: vi.fn(),
@@ -146,8 +146,8 @@ function makeEngine(): MockDjPlayerEngine {
     tapLoopOut: vi.fn(),
     setLoopInOffset: vi.fn(),
     setLoopOutOffset: vi.fn(),
-    hopToLoopIn: vi.fn(),
-    setLoopEnabled: vi.fn(),
+    punchLoop: vi.fn(),
+    stopLoop: vi.fn(),
     scrubTo: vi.fn(),
   };
 }
@@ -666,8 +666,19 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('loop rows', () => {
-    function armCheckbox(): HTMLInputElement {
-      return fixture.nativeElement.querySelector('.loop-arm input[type="checkbox"]');
+    /** The panel drives one of the engine's four slots. */
+    const PANEL_SLOT = 0;
+
+    function setSlot(slot: LoopSlot | null): void {
+      engine.loopSlots.set([slot, null, null, null]);
+      fixture.detectChanges();
+    }
+
+    function punchButton(label: string): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.loop-arm button')
+      );
+      return buttons.find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
     }
 
     function tapButton(label: string): HTMLButtonElement {
@@ -690,34 +701,27 @@ describe('DjPocViewComponent', () => {
       return rows[row].querySelector('.loop-offset')?.textContent?.trim() ?? '';
     }
 
-    it('disables the arm control until the engine reports the loop armable', () => {
-      expect(armCheckbox().disabled).toBe(true);
+    it('punches its slot in and stops the loop from their own buttons', () => {
+      punchButton('Punch').click();
+      expect(engine.punchLoop).toHaveBeenCalledWith(PANEL_SLOT);
 
-      engine.loopArmable.set(true);
-      fixture.detectChanges();
-
-      expect(armCheckbox().disabled).toBe(false);
-
-      armCheckbox().checked = true;
-      armCheckbox().dispatchEvent(new Event('change'));
-      expect(engine.setLoopEnabled).toHaveBeenCalledWith(true);
+      punchButton('Stop').click();
+      expect(engine.stopLoop).toHaveBeenCalled();
     });
 
     it('taps each end from its own button', () => {
       tapButton('Tap In').click();
-      expect(engine.tapLoopIn).toHaveBeenCalled();
+      expect(engine.tapLoopIn).toHaveBeenCalledWith(PANEL_SLOT);
 
       tapButton('Tap Out').click();
-      expect(engine.tapLoopOut).toHaveBeenCalled();
+      expect(engine.tapLoopOut).toHaveBeenCalledWith(PANEL_SLOT);
     });
 
     it('offers a nudge track only for an end that has been marked', () => {
       expect(nudgeInput('in')).toBeNull();
       expect(nudgeInput('out')).toBeNull();
 
-      engine.loopIn.set(loopInPoint(2140));
-      engine.loopOut.set({ frame: 2536, offset: 0 });
-      fixture.detectChanges();
+      setSlot({ in: loopInPoint(2140), out: { frame: 2536, offset: 0 } });
 
       expect(nudgeInput('in')).not.toBeNull();
       expect(nudgeInput('out')).not.toBeNull();
@@ -727,8 +731,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it('moves the in-point readout on input without re-deriving or auditioning', () => {
-      engine.loopIn.set(loopInPoint(2140));
-      fixture.detectChanges();
+      setSlot({ in: loopInPoint(2140), out: null });
 
       const input = nudgeInput('in');
       input.value = '-7';
@@ -740,32 +743,30 @@ describe('DjPocViewComponent', () => {
       // Re-deriving the in-point replays frames on the frame clock's own thread, so the drag must
       // not trigger one.
       expect(engine.setLoopInOffset).not.toHaveBeenCalled();
-      expect(engine.hopToLoopIn).not.toHaveBeenCalled();
+      expect(engine.punchLoop).not.toHaveBeenCalled();
     });
 
     it('commits the in-point offset and auditions it when the drag releases', () => {
-      engine.loopIn.set(loopInPoint(2140));
-      fixture.detectChanges();
+      setSlot({ in: loopInPoint(2140), out: null });
 
       const input = nudgeInput('in');
       input.value = '-7';
       input.dispatchEvent(new Event('input'));
       input.dispatchEvent(new Event('change'));
 
-      expect(engine.setLoopInOffset).toHaveBeenCalledWith(-7);
-      expect(engine.hopToLoopIn).toHaveBeenCalled();
+      expect(engine.setLoopInOffset).toHaveBeenCalledWith(PANEL_SLOT, -7);
+      expect(engine.punchLoop).toHaveBeenCalledWith(PANEL_SLOT);
     });
 
     it('commits the out-point offset on input, since moving it replays nothing', () => {
-      engine.loopOut.set({ frame: 2536, offset: 0 });
-      fixture.detectChanges();
+      setSlot({ in: null, out: { frame: 2536, offset: 0 } });
 
       const input = nudgeInput('out');
       input.value = '-3';
       input.dispatchEvent(new Event('input'));
 
-      expect(engine.setLoopOutOffset).toHaveBeenCalledWith(-3);
-      expect(engine.hopToLoopIn).not.toHaveBeenCalled();
+      expect(engine.setLoopOutOffset).toHaveBeenCalledWith(PANEL_SLOT, -3);
+      expect(engine.punchLoop).not.toHaveBeenCalled();
     });
   });
 

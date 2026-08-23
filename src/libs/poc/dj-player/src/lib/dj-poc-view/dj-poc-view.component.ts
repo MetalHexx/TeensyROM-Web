@@ -27,6 +27,9 @@ const MICROSECONDS_PER_SECOND = 1_000_000;
  * timestamped `send()` is honoured at all in this browser. */
 const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
 
+/** This panel's Loop section drives a single one of the engine's four punch-in slots. */
+const PANEL_LOOP_SLOT = 0;
+
 /**
  * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. One column
  * of labelled control groups: MIDI, Timing, Tune, Transport, Speed, Voice, Cues, Loop/Scrub,
@@ -79,10 +82,12 @@ export class DjPocViewComponent {
   protected readonly heldVoices = this.engine.heldVoices;
   protected readonly effectiveMutes = this.engine.effectiveMutes;
   protected readonly cues = this.engine.cues;
-  protected readonly loopIn = this.engine.loopIn;
-  protected readonly loopOut = this.engine.loopOut;
-  protected readonly loopArmable = this.engine.loopArmable;
-  protected readonly loopEnabled = this.engine.loopEnabled;
+  /** The one slot this panel marks up and punches; the engine holds four. */
+  protected readonly loopSlot = computed(() => this.engine.loopSlots()[PANEL_LOOP_SLOT] ?? null);
+  protected readonly loopActive = computed(() => this.engine.activeLoopSlot() === PANEL_LOOP_SLOT);
+  protected readonly loopProgressPercent = computed(() =>
+    this.engine.progressPercentFor(PANEL_LOOP_SLOT)
+  );
 
   protected readonly minSpeed = MIN_SPEED_MULTIPLIER;
   protected readonly maxSpeed = MAX_SPEED_MULTIPLIER;
@@ -328,16 +333,24 @@ export class DjPocViewComponent {
   }
 
   onTapLoopIn(): void {
-    this.engine.tapLoopIn();
+    this.engine.tapLoopIn(PANEL_LOOP_SLOT);
   }
 
   onTapLoopOut(): void {
-    this.engine.tapLoopOut();
+    this.engine.tapLoopOut(PANEL_LOOP_SLOT);
+  }
+
+  onPunchLoop(): void {
+    this.engine.punchLoop(PANEL_LOOP_SLOT);
+  }
+
+  onStopLoop(): void {
+    this.engine.stopLoop();
   }
 
   /** The offset the In row shows: the live drag while one is in flight, the committed value otherwise. */
   protected displayedLoopInOffset(): number {
-    return this.loopInDragOffset() ?? this.loopIn()?.offset ?? 0;
+    return this.loopInDragOffset() ?? this.loopSlot()?.in?.offset ?? 0;
   }
 
   protected loopInOffsetLabel(): string {
@@ -345,7 +358,7 @@ export class DjPocViewComponent {
   }
 
   protected loopOutOffsetLabel(): string {
-    return offsetLabel(this.loopOut()?.offset ?? 0);
+    return offsetLabel(this.loopSlot()?.out?.offset ?? 0);
   }
 
   // Moves the readout only — see `onCueNudgeInput`.
@@ -353,22 +366,18 @@ export class DjPocViewComponent {
     this.loopInDragOffset.set(Number((event.target as HTMLInputElement).value));
   }
 
-  // (change) fires on release: commit the offset, then hop so the operator hears where the loop will
-  // now re-enter.
+  // (change) fires on release: commit the offset, then punch so the operator hears where the loop
+  // will now re-enter.
   onLoopInNudgeChange(event: Event): void {
-    this.engine.setLoopInOffset(Number((event.target as HTMLInputElement).value));
-    this.engine.hopToLoopIn();
+    this.engine.setLoopInOffset(PANEL_LOOP_SLOT, Number((event.target as HTMLInputElement).value));
+    this.engine.punchLoop(PANEL_LOOP_SLOT);
     this.loopInDragOffset.set(null);
   }
 
   // Committed on every drag tick rather than on release: moving the exit is arithmetic, with no
   // replay to defer and nothing to audition — the next pass simply wraps at the new point.
   onLoopOutNudgeInput(event: Event): void {
-    this.engine.setLoopOutOffset(Number((event.target as HTMLInputElement).value));
-  }
-
-  onLoopEnabledToggle(event: Event): void {
-    this.engine.setLoopEnabled((event.target as HTMLInputElement).checked);
+    this.engine.setLoopOutOffset(PANEL_LOOP_SLOT, Number((event.target as HTMLInputElement).value));
   }
 
   onScrubInput(event: Event): void {

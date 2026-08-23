@@ -315,16 +315,12 @@
     <h2>Loop / Scrub</h2>
 
     <div class="loop-arm">
-      <label class="control">
-        <input
-          type="checkbox"
-          [checked]="loopEnabled()"
-          [disabled]="!loopArmable()"
-          (change)="onLoopEnabledToggle($event)"
-        />
-        Loop armed
-      </label>
-      <span class="caption">enabled once In and Out are both marked</span>
+      <button type="button" (click)="onPunchLoop()">Punch</button>
+      <button type="button" (click)="onStopLoop()">Stop</button>
+      <div class="loop-progress" aria-hidden="true">
+        <div class="loop-progress-fill" [style.width.%]="loopProgressPercent()"></div>
+      </div>
+      <span class="caption">{{ loopActive() ? 'looping' : 'not looping' }}</span>
     </div>
 
     <div class="loop-rows">
@@ -333,7 +329,7 @@
         <div class="loop-btns">
           <button type="button" (click)="onTapLoopIn()">Tap In</button>
         </div>
-        @if (loopIn(); as point) {
+        @if (loopSlot()?.in; as point) {
           <span class="loop-frame">frame {{ point.frame }}</span>
           <div class="loop-nudge">
             <div class="loop-nudge-centre"></div>
@@ -363,7 +359,7 @@
         <div class="loop-btns">
           <button type="button" (click)="onTapLoopOut()">Tap Out</button>
         </div>
-        @if (loopOut(); as point) {
+        @if (loopSlot()?.out; as point) {
           <span class="loop-frame">frame {{ point.frame }}</span>
           <div class="loop-nudge">
             <div class="loop-nudge-centre"></div>
@@ -389,6 +385,8 @@
     </div>
 
     <p class="caption">
+      Punch engages the loop from its in-point at once, once both ends are marked and in order; Stop
+      exits on the spot and playback carries on linearly from wherever it had reached.
       Tap In and Tap Out mark frames while the tune plays. The in-point stores machine state the way
       a cue does, so every pass re-enters by restoring it rather than replaying the tune from init —
       the loop costs nothing per frame however deep its entry sits. Only the in-point needs a

@@ -231,12 +231,30 @@
   color: var(--color-dimmed);
 }
 
-// The arm control and its caption sit together above the In/Out rows.
+// The punch controls, the progress strip and its caption sit together above the In/Out rows.
 .loop-arm {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-sm);
+}
+
+// Deliberately thinner than .scrub-track: it reports the pass rather than inviting a drag.
+.loop-progress {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 8rem;
+  height: 0.5rem;
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+
+.loop-progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: var(--color-dimmed);
 }
 
 .error-text {

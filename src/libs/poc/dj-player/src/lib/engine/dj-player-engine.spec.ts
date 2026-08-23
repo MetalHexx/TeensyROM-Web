@@ -837,17 +837,17 @@ describe('DjPlayerEngine', () => {
       await engine.play();
       clock.tick(5);
       engine.addCue(0);
-      engine.tapLoopIn();
+      engine.tapLoopIn(0);
       clock.tick(5);
-      engine.tapLoopOut();
+      engine.tapLoopOut(0);
       engine.setVoiceMuted(1, true);
 
       engine.nextSubtune();
 
       expect(engine.stats().framesRendered).toBe(0);
       expect(engine.cues()[0]).not.toBeNull();
-      expect(engine.loopIn()).not.toBeNull();
-      expect(engine.loopOut()).not.toBeNull();
+      expect(engine.loopSlots()[0]?.in).not.toBeNull();
+      expect(engine.loopSlots()[0]?.out).not.toBeNull();
       expect(engine.mutedVoices()).toEqual([false, true, false]);
     });
 
@@ -1011,7 +1011,7 @@ describe('DjPlayerEngine', () => {
     });
   });
 
-  describe('the loop', () => {
+  describe('the loop slots', () => {
     /** `counterTune` stores its play-call count into $D400, so slot 0 of a resync packet names the
      * frame whatever was restored actually came from. */
     const COUNTER_SLOT = 0;
@@ -1028,30 +1028,69 @@ describe('DjPlayerEngine', () => {
       clock.tick(frames);
     }
 
-    /** Marks a loop from the current position: in here, out `length` frames later. */
-    async function markLoop(inFrame: number, length: number): Promise<void> {
-      await playTo(inFrame);
-      engine.tapLoopIn();
+    /** Marks a slot from the current position: in here, out `length` frames later. */
+    function markSlotHere(slot: number, length: number): void {
+      engine.tapLoopIn(slot);
       clock.tick(length);
-      engine.tapLoopOut();
+      engine.tapLoopOut(slot);
     }
 
-    it('re-enters at the tapped in-point on the tick that reaches the out-point, without stopping the clock', async () => {
-      await markLoop(10, 10);
-      engine.setLoopEnabled(true);
+    /** Marks one slot on a fresh tune: in at `inFrame`, out `length` frames later. */
+    async function markLoop(slot: number, inFrame: number, length: number): Promise<void> {
+      await playTo(inFrame);
+      markSlotHere(slot, length);
+    }
 
-      clock.tick(1); // renders frame 21, which is past the out-point, so it re-enters
+    /**
+     * Three ten-frame loops in at 10, 50 and 90, with slot 0 punched in and its re-entry already
+     * ridden out — so the playhead sits on slot 0's in-point with ten frames of lap left to run.
+     */
+    async function threeSlotsWithFirstLooping(): Promise<void> {
+      await playTo(10);
+      markSlotHere(0, 10);
+      clock.tick(30);
+      markSlotHere(1, 10);
+      clock.tick(30);
+      markSlotHere(2, 10);
+      engine.punchLoop(0);
+      clock.tick(2); // the gate-off and resync the engagement rides out on
+    }
+
+    it('engages a punched slot at once when nothing is looping', async () => {
+      await markLoop(0, 200, 10);
+      clock.tick(5);
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+
+      engine.punchLoop(0);
+
+      // A restore, never a replay: engaging a slot whose in-point sits deep in the tune must not
+      // block the main thread the frame clock's audio callback rides.
+      expect(runFrame).not.toHaveBeenCalled();
+      expect(engine.activeLoopSlot()).toBe(0);
+      clock.tick(2); // gate-off, then the resync carrying the in-point's registers
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(200));
+      expect(engine.stats().framesRendered).toBe(200);
+    });
+
+    it('re-enters at the tapped in-point on the tick that reaches the out-point, without stopping the clock', async () => {
+      await markLoop(0, 10, 10);
+      engine.punchLoop(0);
+      clock.tick(2);
+
+      clock.tick(10); // the tenth renders frame 20, the out-point, so it re-enters
 
       expect(clock.running).toBe(true);
+      expect(engine.activeLoopSlot()).toBe(0);
 
-      clock.tick(2); // gate-off, then the resync carrying the in-point's registers
+      clock.tick(2);
       expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(10));
       expect(engine.stats().framesRendered).toBe(10);
     });
 
     it('re-enters by restoring the in-point, emulating no frame of its own however deep it sits', async () => {
-      await markLoop(200, 10);
-      engine.setLoopEnabled(true);
+      await markLoop(0, 200, 10);
+      engine.punchLoop(0);
+      clock.tick(2 + 9); // the resync pair, then up to the frame before the out-point
       const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
 
       clock.tick(1);
@@ -1066,8 +1105,9 @@ describe('DjPlayerEngine', () => {
     });
 
     it('sends nothing of its own on re-entry, then rides the clock for the gate-off and resync', async () => {
-      await markLoop(10, 10);
-      engine.setLoopEnabled(true);
+      await markLoop(0, 10, 10);
+      engine.punchLoop(0);
+      clock.tick(2 + 9);
       const before = dataPackets(midi).length;
 
       // The cartridge drains exactly one packet per timer tick, so a re-entry that sent its own
@@ -1087,46 +1127,143 @@ describe('DjPlayerEngine', () => {
       expect(voiceGateValues(resync[0])).toEqual([0x11, 0x11, 0x11]);
     });
 
-    it('refuses to arm until both ends are marked', async () => {
-      await playTo(10);
+    it('leaves the playing slot alone until its out-point, then switches to the punched one', async () => {
+      await threeSlotsWithFirstLooping();
 
-      engine.setLoopEnabled(true);
-      expect(engine.loopArmable()).toBe(false);
-      expect(engine.loopEnabled()).toBe(false);
+      engine.punchLoop(1);
 
-      engine.tapLoopIn();
-      engine.setLoopEnabled(true);
-      expect(engine.loopArmable()).toBe(false);
-      expect(engine.loopEnabled()).toBe(false);
+      expect(engine.activeLoopSlot()).toBe(0);
+      expect(engine.queuedLoopSlot()).toBe(1);
+      // Nine frames of the lap left: the switch must not cut them off.
+      clock.tick(9);
+      expect(engine.activeLoopSlot()).toBe(0);
+
+      clock.tick(1);
+      expect(engine.activeLoopSlot()).toBe(1);
+      expect(engine.queuedLoopSlot()).toBeNull();
+
+      clock.tick(2);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(50));
+      expect(engine.stats().framesRendered).toBe(50);
+    });
+
+    it('replaces the queued slot when another is punched before the switch lands', async () => {
+      await threeSlotsWithFirstLooping();
+
+      engine.punchLoop(1);
+      engine.punchLoop(2);
+
+      expect(engine.queuedLoopSlot()).toBe(2);
 
       clock.tick(10);
-      engine.tapLoopOut();
+      expect(engine.activeLoopSlot()).toBe(2);
 
-      expect(engine.loopArmable()).toBe(true);
-      engine.setLoopEnabled(true);
-      expect(engine.loopEnabled()).toBe(true);
+      clock.tick(2);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(90));
     });
 
-    it('refuses to arm on ends that coincide', async () => {
-      await playTo(10);
-      engine.tapLoopIn();
-      engine.tapLoopOut(); // same frame — no pass to play
+    it('sends no more packets on the switching tick than a plain re-entry does', async () => {
+      await threeSlotsWithFirstLooping();
+      engine.punchLoop(1);
+      clock.tick(9);
+      const before = dataPackets(midi).length;
 
-      engine.setLoopEnabled(true);
-
-      expect(engine.loopArmable()).toBe(false);
-      expect(engine.loopEnabled()).toBe(false);
-    });
-
-    it('disarms rather than spinning when a nudge crosses the ends', async () => {
-      await markLoop(10, 20);
-      engine.setLoopEnabled(true);
-
-      engine.setLoopOutOffset(-engine.nudgeRangeFrames()); // the exit walks back behind the entry
-
-      expect(engine.loopArmable()).toBe(false);
+      // The switch is a restore like any other: one packet on the tick it lands, then the gate-off
+      // and resync one per tick. Two on one tick is a frame the cartridge never drains.
       clock.tick(1);
-      expect(engine.loopEnabled()).toBe(false);
+      expect(dataPackets(midi)).toHaveLength(before + 1);
+
+      clock.tick(1);
+      const gateOff = dataPackets(midi).slice(before + 1);
+      expect(gateOff).toHaveLength(1);
+      expect([0, 1, 2].map((slot) => slotValue(gateOff[0], slot))).toEqual([0, 0, 0]);
+
+      clock.tick(1);
+      expect(dataPackets(midi).slice(before + 2)).toHaveLength(1);
+    });
+
+    it('re-triggers the playing slot when it is punched again with nothing queued', async () => {
+      await markLoop(0, 10, 10);
+      engine.punchLoop(0);
+      clock.tick(2 + 3);
+
+      engine.punchLoop(0);
+
+      clock.tick(2);
+      expect(engine.activeLoopSlot()).toBe(0);
+      expect(engine.stats().framesRendered).toBe(10);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(10));
+    });
+
+    it('stops on the spot when told to, dropping the queue and playing on linearly', async () => {
+      await threeSlotsWithFirstLooping();
+      engine.punchLoop(1);
+
+      clock.tick(3);
+      engine.stopLoop();
+
+      expect(engine.activeLoopSlot()).toBeNull();
+      expect(engine.queuedLoopSlot()).toBeNull();
+      // Straight past slot 0's out-point at frame 20 rather than wrapping at it.
+      clock.tick(30);
+      expect(engine.stats().framesRendered).toBeGreaterThan(20);
+    });
+
+    it('reports progress through the active slot bounds and none for the others', async () => {
+      await markLoop(0, 10, 100); // in 10, out 110
+      engine.punchLoop(0);
+
+      clock.tick(2 + 50); // the resync pair, then halfway through the lap
+
+      expect(engine.progressPercentFor(0)).toBeCloseTo(50, 5);
+      expect(engine.progressPercentFor(1)).toBe(0);
+
+      engine.stopLoop();
+      expect(engine.progressPercentFor(0)).toBe(0);
+    });
+
+    it('refuses to punch a slot until both ends are marked and in order', async () => {
+      await playTo(10);
+
+      engine.punchLoop(0);
+      expect(engine.activeLoopSlot()).toBeNull();
+
+      engine.tapLoopIn(0);
+      engine.punchLoop(0);
+      expect(engine.activeLoopSlot()).toBeNull();
+
+      engine.tapLoopOut(0); // same frame — no pass to play
+      engine.punchLoop(0);
+      expect(engine.activeLoopSlot()).toBeNull();
+
+      clock.tick(10);
+      engine.tapLoopOut(0);
+      engine.punchLoop(0);
+      expect(engine.activeLoopSlot()).toBe(0);
+    });
+
+    it('creates a slot from whichever end is tapped first', async () => {
+      await playTo(10);
+
+      engine.tapLoopOut(2);
+
+      expect(engine.loopSlots()[2]?.out?.frame).toBe(10);
+      expect(engine.loopSlots()[2]?.in).toBeNull();
+
+      engine.tapLoopIn(2);
+      expect(engine.loopSlots()[2]?.in?.frame).toBe(10);
+      expect(engine.loopSlots()[2]?.out?.frame).toBe(10);
+    });
+
+    it('drops out rather than spinning when a nudge crosses the ends', async () => {
+      await markLoop(0, 10, 20);
+      engine.punchLoop(0);
+      clock.tick(2);
+
+      engine.setLoopOutOffset(0, -engine.nudgeRangeFrames()); // the exit walks back behind the entry
+
+      clock.tick(1);
+      expect(engine.activeLoopSlot()).toBeNull();
 
       // Playback carries on past the crossed exit instead of re-entering on every tick.
       clock.tick(30);
@@ -1134,15 +1271,15 @@ describe('DjPlayerEngine', () => {
     });
 
     it('moves where the next pass wraps when the out-point is nudged, replaying nothing', async () => {
-      await markLoop(5, 35); // in 5, out 40
+      await markLoop(0, 5, 35); // in 5, out 40
       const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
 
-      engine.setLoopOutOffset(-25); // the pass now wraps at frame 15
+      engine.setLoopOutOffset(0, -25); // the pass now wraps at frame 15
 
       expect(runFrame).not.toHaveBeenCalled();
-      expect(engine.loopOut()?.offset).toBe(-25);
+      expect(engine.loopSlots()[0]?.out?.offset).toBe(-25);
 
-      engine.setLoopEnabled(true);
+      engine.punchLoop(0);
       clock.tick(100);
 
       expect(engine.stats().framesRendered).toBeLessThanOrEqual(15);
@@ -1150,65 +1287,89 @@ describe('DjPlayerEngine', () => {
     });
 
     it('clamps the out-point offset to the nudge range in both directions', async () => {
-      await markLoop(60, 30);
+      await markLoop(0, 60, 30);
 
       const range = engine.nudgeRangeFrames();
-      engine.setLoopOutOffset(999);
-      expect(engine.loopOut()?.offset).toBe(range);
+      engine.setLoopOutOffset(0, 999);
+      expect(engine.loopSlots()[0]?.out?.offset).toBe(range);
 
-      engine.setLoopOutOffset(-999);
-      expect(engine.loopOut()?.offset).toBe(-range);
+      engine.setLoopOutOffset(0, -999);
+      expect(engine.loopSlots()[0]?.out?.offset).toBe(-range);
     });
 
-    it('walks the in-point onto an earlier frame and auditions it from the anchor', async () => {
-      await playTo(60);
-      engine.tapLoopIn();
+    it('walks the in-point onto an earlier frame and re-enters there when punched', async () => {
+      await markLoop(0, 60, 10);
 
-      engine.setLoopInOffset(-10);
-      engine.hopToLoopIn();
+      engine.setLoopInOffset(0, -10);
+      engine.punchLoop(0);
       clock.tick(2);
 
-      expect(engine.loopIn()?.offset).toBe(-10);
+      expect(engine.loopSlots()[0]?.in?.offset).toBe(-10);
       expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(50));
       expect(engine.stats().framesRendered).toBe(50);
     });
 
-    it('is a no-op to nudge either end before it is marked', async () => {
+    it('is a no-op to nudge either end of an unmarked slot', async () => {
       await playTo(10);
 
-      engine.setLoopInOffset(-5);
-      engine.setLoopOutOffset(5);
+      engine.setLoopInOffset(1, -5);
+      engine.setLoopOutOffset(1, 5);
 
-      expect(engine.loopIn()).toBeNull();
-      expect(engine.loopOut()).toBeNull();
+      expect(engine.loopSlots()[1]).toBeNull();
     });
 
-    it('keeps both ends through pause, stop and a play from stopped', async () => {
-      await markLoop(10, 10);
+    it('keeps each slot to itself when another is nudged or cleared', async () => {
+      await playTo(10);
+      markSlotHere(0, 10);
+      clock.tick(10);
+      markSlotHere(2, 10); // in 30, out 40
+
+      engine.setLoopOutOffset(0, -3);
+      engine.clearLoopSlot(1);
+
+      expect(engine.loopSlots()[2]?.in?.frame).toBe(30);
+      expect(engine.loopSlots()[2]?.out).toEqual({ frame: 40, offset: 0 });
+      expect(engine.loopSlots()[0]?.out?.offset).toBe(-3);
+    });
+
+    it('lets go of a cleared slot that was playing, leaving the rest marked', async () => {
+      await threeSlotsWithFirstLooping();
+      engine.punchLoop(1);
+
+      engine.clearLoopSlot(0);
+      engine.clearLoopSlot(1);
+
+      expect(engine.activeLoopSlot()).toBeNull();
+      expect(engine.queuedLoopSlot()).toBeNull();
+      expect(engine.loopSlots()[0]).toBeNull();
+      expect(engine.loopSlots()[2]).not.toBeNull();
+    });
+
+    it('keeps every marked slot through pause, stop and a play from stopped', async () => {
+      await markLoop(0, 10, 10);
 
       engine.pause();
-      expect(engine.loopIn()).not.toBeNull();
-      expect(engine.loopOut()).not.toBeNull();
+      expect(engine.loopSlots()[0]?.in).not.toBeNull();
+      expect(engine.loopSlots()[0]?.out).not.toBeNull();
 
       await engine.play();
       engine.stop();
-      expect(engine.loopIn()).not.toBeNull();
-      expect(engine.loopOut()).not.toBeNull();
+      expect(engine.loopSlots()[0]?.in).not.toBeNull();
 
       await engine.play();
-      expect(engine.loopIn()).not.toBeNull();
-      expect(engine.loopOut()).not.toBeNull();
+      expect(engine.loopSlots()[0]?.in).not.toBeNull();
+      expect(engine.loopSlots()[0]?.out).not.toBeNull();
     });
 
-    it('clears both ends and the arm on loadTune, since the in-point holds a machine image', async () => {
-      await markLoop(10, 10);
-      engine.setLoopEnabled(true);
+    it('clears every slot on loadTune, since an in-point holds a machine image', async () => {
+      await threeSlotsWithFirstLooping();
+      engine.punchLoop(1);
 
       engine.loadTune(counterTune());
 
-      expect(engine.loopIn()).toBeNull();
-      expect(engine.loopOut()).toBeNull();
-      expect(engine.loopEnabled()).toBe(false);
+      expect(engine.loopSlots()).toEqual([null, null, null, null]);
+      expect(engine.activeLoopSlot()).toBeNull();
+      expect(engine.queuedLoopSlot()).toBeNull();
     });
   });
 
