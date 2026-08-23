@@ -526,11 +526,11 @@ describe('DjPocViewComponent', () => {
     });
 
     it('calls engine.clearVoiceMutes from the clear-all control', () => {
-      const clearButton = Array.from(
-        fixture.nativeElement.querySelectorAll('[aria-label="Voice"] button')
-      ).find(
-        (button) => (button as HTMLButtonElement).textContent?.trim() === 'Clear All Mutes'
-      ) as HTMLButtonElement | undefined;
+      // Matched on the accessible name, not the visible text: the rail is narrow enough that the
+      // button reads just "Clear", and the spelled-out name lives in aria-label.
+      const clearButton = fixture.nativeElement.querySelector(
+        '[aria-label="Voice"] button[aria-label="Clear all voice mutes"]'
+      ) as HTMLButtonElement | null;
 
       clearButton?.click();
 

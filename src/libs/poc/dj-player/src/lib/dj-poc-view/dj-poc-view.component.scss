@@ -1,19 +1,39 @@
-// This route bypasses LayoutComponent, so it inherits `body { overflow: hidden }` from the
-// global stylesheet with no scroll container of its own — without this, content past the
-// viewport height is silently clipped instead of scrollable.
+// This route bypasses LayoutComponent, so the page is the only thing on screen and owns the whole
+// viewport. It frames itself to that height and never scrolls — a performance surface that scrolls
+// hides controls the operator is reaching for mid-tune.
 :host {
   display: block;
   height: 100%;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+// The app has no global box-sizing reset, and every panel here is sized by its border box (padding
+// and border sit inside a flex basis). Angular's emulated encapsulation keeps this local.
+* {
+  box-sizing: border-box;
 }
 
 .dj-poc-page {
+  // Shared column widths so the cue rows and the loop rows land on one rhythm rather than each panel
+  // inventing its own. They are chosen so both panels' leading columns add up to the same width and
+  // the nudge tracks start on one line down the whole stage:
+  //   cue   3 + 8 + tag + 8 + btns + 8 + frame + 8
+  //   loop  3 + 8 + 2rem + 8 + tag + 8 + tap + 8 + frame + 8
+  // Every control on the performance surface is this tall. The browser's default button height is
+  // around 19px, which is a fine form control and a poor thing to hit mid-tune.
+  --perf-control-height: 2rem;
+
+  --slot-tag-width: 3.5rem;
+  --slot-frame-width: 6rem;
+  --slot-offset-width: 3.25rem;
+  --cue-btns-width: 7rem;
+  --loop-tap-width: 4.5rem;
+
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-lg);
   height: 100%;
   padding: var(--spacing-lg);
-  min-height: 0;
+  overflow: hidden;
 }
 
 .page-heading {
@@ -23,34 +43,41 @@
   font-size: var(--font-size-md);
 }
 
-// Two-column shell: the stage takes whatever width is left, the sidebar holds a fixed width so
-// its controls never reflow as the stage grows or shrinks.
+// Two-column shell: the stage takes whatever width is left, the sidebar holds a fluid width band so
+// its controls stay legible without ever stealing the stage's room.
 .stage {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   min-width: 0;
   min-height: 0;
 }
 
+// The floor is not cosmetic: below roughly 24rem the field lists drop from two columns to one and
+// the sidebar's content near-doubles in height, which is the one thing it has no room for.
 .sidebar {
-  flex: 0 0 320px;
+  flex: 0 0 clamp(24rem, 26%, 30rem);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   min-height: 0;
+  overflow: hidden;
 }
 
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-content-gap);
-  padding: var(--spacing-content-gap);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
+  min-height: 0;
 
-  > h2 {
+  // Descendant, not direct child: the Loop panel wraps its heading in a header row beside the Stop
+  // control, and a `>` here left that one heading unstyled.
+  h2 {
+    flex: 0 0 auto;
     margin: 0;
     color: var(--color-primary);
     font-size: var(--font-size-md);
@@ -69,14 +96,23 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height);
+    min-width: 4rem;
+  }
 }
 
-// Cues and Loop dominate the stage width; Voice and Speed sit in a narrow fixed-width rail beside
-// them.
+.engine-status {
+  margin: 0;
+}
+
+// Cues and Loop dominate the stage width; Voice and Speed sit in a narrow rail beside them whose
+// width tracks the viewport rather than being pinned to one resolution.
 .performance-cluster {
   flex: 1 1 auto;
   display: flex;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   min-height: 0;
 }
 
@@ -84,22 +120,25 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   min-width: 0;
   min-height: 0;
 
+  // Sized by their content, then handed a share of whatever height is left. These two are the
+  // panels with slack, so they absorb it instead of leaving a dead band under the stage.
   > .panel {
-    flex: 1 1 0;
+    flex: 1 1 auto;
     min-height: 0;
-    overflow-y: auto;
   }
 }
 
+// Narrow on purpose — every pixel here is one the Cues and Loop rows don't get. The floor is what
+// the widest voice cell needs (checkbox, label, state caption) without wrapping.
 .stage-rail {
-  flex: 0 0 160px;
+  flex: 0 0 clamp(6.75rem, 7.5%, 8.5rem);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   min-height: 0;
 }
 
@@ -115,23 +154,35 @@
 }
 
 .subsection {
-  &:not(:last-child) {
-    margin-bottom: var(--spacing-content-gap);
-  }
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
 }
 
 .subsection-title {
-  margin: 0 0 var(--spacing-sm);
+  margin: 0;
   color: var(--color-dimmed);
   font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
+// Setup carries controls and can't compress past them; Diagnostics is the readout that gives.
+.setup-panel {
+  flex: 0 0 auto;
+}
+
+// The stage never scrolls. This is the one exception, and it is a floor rather than a habit: at and
+// above the target viewport the whole sidebar fits and no scrollbar appears, but on a short window
+// a read-only readout scrolling beats it silently losing its last few rows.
 .diagnostics-panel {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
+}
+
+.sidebar .panel {
+  padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .control-row {
@@ -141,45 +192,102 @@
   gap: var(--spacing-sm);
 }
 
+// Label left, its control pushed right — the same left-label / right-value rhythm the field lists
+// below use, so the whole sidebar reads as one column.
 .control {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  margin-right: var(--spacing-md);
+  font-size: var(--font-size-sm);
+
+  > select {
+    margin-left: auto;
+    min-width: 0;
+  }
 }
 
 .timing-commands {
   display: flex;
-  flex-flow: row wrap;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.midi-status,
+.timing-effective {
+  margin: 0;
+  margin-left: auto;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+.timing-effective {
+  margin-left: 0;
+}
+
+.tune-sources {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-sm);
 
-  // The effective-interval readout is a full sentence — let it own its own line rather than
-  // wrapping inline with the controls beside it.
-  > p {
-    flex-basis: 100%;
+  button {
+    flex: 1 1 auto;
   }
 }
 
-// dt/dd pairs default to stacking each label on its own line above its value — for the
-// diagnostics and tune-metadata readouts that doubles the line count for no reason, since every
-// label here is short. Lay them out as a compact two-column grid instead.
-.diagnostic-fields,
-.tune-fields {
+.file-picker {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+
+  input[type='file'] {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+  }
+}
+
+// Label/value readouts, borrowed from the wireframe's field-row idiom: one line per field, label
+// left and value right, packed into as many columns as the sidebar's current width allows. Stacking
+// each label above its value — the browser default for dt/dd — doubled the line count for no gain.
+.field-list {
   display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: var(--spacing-sm);
-  row-gap: var(--spacing-sm);
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  column-gap: var(--spacing-md);
   margin: 0;
+}
+
+.field-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  padding: 1px 0;
+  border-bottom: 1px solid var(--color-dimmed);
+  font-size: var(--font-size-sm);
 
   dt {
+    flex: 0 1 auto;
+    min-width: 0;
     color: var(--color-dimmed);
-    font-size: var(--font-size-sm);
   }
 
   dd {
+    flex: 0 1 auto;
+    min-width: 0;
     margin: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
   }
+}
+
+// Names, addresses and error text run long — these take the full sidebar width instead of half of
+// it, so the value never wraps under its own label.
+.field-row--wide {
+  grid-column: 1 / -1;
 }
 
 .caption {
@@ -188,8 +296,17 @@
   font-size: var(--font-size-sm);
 }
 
-// checkbox | label | momentary button | state caption, one row per voice. The rail is too narrow
-// for this to stay a single row, so it wraps onto two lines instead.
+.voice-rows {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-height: 0;
+}
+
+// checkbox | short label | state caption, with the momentary button on a second line — the rail is
+// too narrow for one row, and the button wants the full width as a hold target anyway. The label is
+// abbreviated to fit that width; the checkbox carries the spelled-out name for assistive tech.
 .voice-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -197,16 +314,13 @@
     'check label state'
     'hold hold hold';
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) 0;
-  border-bottom: 1px solid var(--color-dimmed);
-
-  &:last-of-type {
-    border-bottom: 0;
-  }
+  column-gap: var(--spacing-xs);
+  row-gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
 
   input[type='checkbox'] {
     grid-area: check;
+    margin: 0;
   }
 
   label {
@@ -219,6 +333,8 @@
 
   .voice-hold {
     grid-area: hold;
+    width: 100%;
+    height: var(--perf-control-height);
   }
 }
 
@@ -228,35 +344,49 @@
   justify-self: end;
 }
 
+// Deliberately set apart from the voice cells above it: this one undoes the whole mute state, and a
+// stray finger reaching for V3's hold button must not land on it mid-tune.
 .voice-clear {
-  margin-top: var(--spacing-sm);
-  padding-top: var(--spacing-content-gap);
+  flex: 0 0 auto;
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
   border-top: 1px solid var(--color-dimmed);
+
+  button {
+    width: 100%;
+    height: var(--perf-control-height);
+  }
 }
 
-.cue-rows {
+// The rows spread through whatever height the panel was given rather than bunching at the top. The
+// slack goes into the rows themselves rather than into gaps between them (`justify-content`), so
+// every separator lands on an even pitch with its row's contents centred in the band above it.
+.cue-rows,
+.loop-slots {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 // label | button pair | captured frame | nudge track | offset readout. Every column but the track
 // stays fixed width across the empty/filled states so filling or clearing a slot never moves
-// anything else in the row.
+// anything else in the row. No separator rule: the even pitch and the tracks' own outlines already
+// group each row, and a line per row only added noise.
+// The transparent left border has no state to report as the loop rows' does — it is here so the cue
+// rows and the loop rows indent identically and their nudge tracks share one left edge.
 .cue-row {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm) 0;
-  border-bottom: 1px solid var(--color-dimmed);
-
-  &:last-of-type {
-    border-bottom: 0;
-  }
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-left: 3px solid transparent;
 }
 
 .cue-tag,
 .loop-tag {
-  flex: 0 0 4.5rem;
+  flex: 0 0 var(--slot-tag-width);
   color: var(--color-dimmed);
   font-size: var(--font-size-sm);
 }
@@ -266,18 +396,21 @@
 .cue-btns {
   display: flex;
   gap: var(--spacing-sm);
-  flex: 0 0 11rem;
+  flex: 0 0 var(--cue-btns-width);
 
   button {
     flex: 1 1 0;
     min-width: 0;
+    height: var(--perf-control-height);
   }
 }
 
 .cue-frame,
 .loop-frame {
-  flex: 0 0 6rem;
+  flex: 0 1 var(--slot-frame-width);
+  min-width: 0;
   font-size: var(--font-size-sm);
+  white-space: nowrap;
 }
 
 .cue-frame--empty,
@@ -286,20 +419,23 @@
 }
 
 // The nudge track: a centred range input over a zero marker, the same transparent-background
-// stacking as .scrub-track. Full row width is what gives a one-frame step enough travel to hit.
+// stacking as .scrub-track. It takes every pixel the row has left over — travel is what makes a
+// one-frame step hittable — and it is also the column that gives first as the viewport narrows.
 .cue-nudge,
 .loop-nudge {
   position: relative;
   flex: 1 1 auto;
-  min-width: 8rem;
-  height: 1.5rem;
+  min-width: 2.5rem;
+  height: var(--perf-control-height);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
 
+  // `inset: 0` already stretches the input to the track's padding box — a `width: 100%` on top of
+  // that resolves against the same box and then pushes past the borders by 2px.
   input[type='range'] {
     position: absolute;
     inset: 0;
-    width: 100%;
+    margin: 0;
     background: transparent;
   }
 }
@@ -325,7 +461,7 @@
 // Monospaced and fixed-width so the signed value doesn't shuffle the row as it crosses ±10.
 .cue-offset,
 .loop-offset {
-  flex: 0 0 4rem;
+  flex: 0 0 var(--slot-offset-width);
   font-family: 'Roboto Mono', monospace;
   font-size: var(--font-size-sm);
   text-align: center;
@@ -339,31 +475,30 @@
 // The panel-level Stop sits beside the heading rather than per slot — one control ends whichever
 // slot is looping.
 .loop-panel-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height);
+    min-width: 4rem;
+  }
 }
 
-.loop-slots {
-  display: flex;
-  flex-direction: column;
-}
-
-// punch target | In end | Out end | progress strip | clear, one row per slot. A left border reports
-// active/queued state so the row reads without a text label — solid and lit for active, dashed and
-// dimmer for queued, invisible for idle.
+// Two lines per slot, as the wireframe has it: punch target | In end | Out end | clear, with the
+// progress strip spanning underneath them. A left border reports active/queued state so the row
+// reads without a text label — solid and lit for active, dashed and dimmer for queued, invisible
+// for idle.
 .loop-slot-row {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  border-bottom: 1px solid var(--color-dimmed);
+  padding: var(--spacing-xs) var(--spacing-sm);
   border-left: 3px solid transparent;
-
-  &:last-of-type {
-    border-bottom: 0;
-  }
 
   &[data-loop-state='active'] {
     border-left-color: var(--color-primary);
@@ -375,17 +510,27 @@
   }
 }
 
+.loop-slot-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
 .loop-slot-punch {
   flex: 0 0 auto;
   width: 2rem;
-  height: 2rem;
+  height: var(--perf-control-height);
 }
 
+// In and Out sit side by side, as the wireframe has them — stacking them doubled the height of
+// every slot row. They fall back to stacking only once the pair genuinely can't fit.
 .loop-slot-ends {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   flex: 1 1 auto;
-  min-width: 16rem;
+  min-width: 0;
   gap: var(--spacing-sm);
 }
 
@@ -393,15 +538,32 @@
 .loop-end {
   display: flex;
   align-items: center;
+  flex: 1 1 15rem;
+  min-width: 0;
   gap: var(--spacing-sm);
+
+  // A fixed width, or "Tap Out" would sit a few pixels wider than "Tap In" and knock the Out half of
+  // every row out of step with the In half. It also makes the columns' total width computable,
+  // which is what lets the progress strip below line up with the first nudge track.
+  > button {
+    flex: 0 0 var(--loop-tap-width);
+    height: var(--perf-control-height);
+  }
 }
 
-// Deliberately thinner than .scrub-track: it reports the pass rather than inviting a drag. Stays
-// empty for every slot but the active one — the engine only returns non-zero progress for it.
+// Runs beneath its slot's controls, starting exactly where the In nudge track above it starts —
+// past the punch target, tag, tap button and frame readout — so it reads as that slot's lap rather
+// than a fifth column. Deliberately thinner than .scrub-track: it reports the pass rather than
+// inviting a drag. Stays empty for every slot but the active one — the engine only returns non-zero
+// progress for it.
 .loop-slot-progress {
   position: relative;
-  flex: 0 0 6rem;
-  height: 0.5rem;
+  flex: 0 0 auto;
+  margin-left: calc(
+    2rem + var(--slot-tag-width) + var(--loop-tap-width) + var(--slot-frame-width) + 4 *
+      var(--spacing-sm)
+  );
+  height: 0.375rem;
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
   overflow: hidden;
@@ -416,6 +578,7 @@
 
 .loop-slot-clear {
   flex: 0 0 auto;
+  height: var(--perf-control-height);
 }
 
 .error-text {
@@ -437,7 +600,7 @@
 .scrub-track {
   position: relative;
   flex: 1 1 auto;
-  height: 1.5rem;
+  height: var(--perf-control-height);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
   overflow: hidden;
@@ -445,7 +608,7 @@
   input[type='range'] {
     position: absolute;
     inset: 0;
-    width: 100%;
+    margin: 0;
     background: transparent;
   }
 }
@@ -476,10 +639,13 @@
   color: var(--color-primary);
 }
 
+// The floor is the fix for the original defect: the fader resolved to zero height, so the control
+// existed but had no throw at all. It can shrink with the rail, never to nothing.
 .speed-fader {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 6rem;
   width: 1.5rem;
+  margin: 0;
   writing-mode: vertical-lr;
   direction: rtl;
 }
@@ -487,4 +653,5 @@
 .speed-mode {
   flex: 0 0 auto;
   width: 100%;
+  min-width: 0;
 }

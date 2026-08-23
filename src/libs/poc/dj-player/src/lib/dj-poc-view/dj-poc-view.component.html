@@ -1,7 +1,7 @@
 <div class="dj-poc-page">
-  <h1 class="page-heading">ASID DJ Player (spike)</h1>
-
   <div class="stage">
+    <h1 class="page-heading">ASID DJ Player (spike)</h1>
+
     <div class="player-block">
       <div class="control-row scrub-row">
         <span class="caption">Position</span>
@@ -90,83 +90,96 @@
           <div class="loop-slots">
             @for (slot of loopIndices; track slot) {
             <div class="loop-slot-row" [attr.data-loop-state]="loopSlotState(slot)">
-              <button
-                type="button"
-                class="loop-slot-punch"
-                [attr.aria-label]="'Punch slot ' + (slot + 1)"
-                (click)="onPunchLoop(slot)"
-              >
-                {{ slot + 1 }}
-              </button>
+              <div class="loop-slot-main">
+                <button
+                  type="button"
+                  class="loop-slot-punch"
+                  [attr.aria-label]="'Punch slot ' + (slot + 1)"
+                  (click)="onPunchLoop(slot)"
+                >
+                  {{ slot + 1 }}
+                </button>
 
-              <div class="loop-slot-ends">
-                <div class="loop-end">
-                  <span class="loop-tag">In</span>
-                  <button
-                    type="button"
-                    [attr.aria-label]="'Tap in for slot ' + (slot + 1)"
-                    (click)="onTapLoopIn(slot)"
-                  >
-                    Tap In
-                  </button>
-                  @if (loopSlots()[slot]?.in; as point) {
-                  <span class="loop-frame">frame {{ loopInFrame(slot) }}</span>
-                  <div class="loop-nudge">
-                    <div class="loop-nudge-centre"></div>
-                    <input
-                      type="range"
-                      [min]="-nudgeRange()"
-                      [max]="nudgeRange()"
-                      step="1"
-                      [attr.aria-label]="'Nudge loop ' + (slot + 1) + ' in'"
-                      [value]="displayedLoopInOffset(slot)"
-                      (input)="onLoopInNudgeInput(slot, $event)"
-                      (change)="onLoopInNudgeChange(slot, $event)"
-                    />
+                <div class="loop-slot-ends">
+                  <div class="loop-end">
+                    <span class="loop-tag">In</span>
+                    <button
+                      type="button"
+                      [attr.aria-label]="'Tap in for slot ' + (slot + 1)"
+                      (click)="onTapLoopIn(slot)"
+                    >
+                      Tap In
+                    </button>
+                    @if (loopSlots()[slot]?.in; as point) {
+                    <span class="loop-frame">frame {{ loopInFrame(slot) }}</span>
+                    <div class="loop-nudge">
+                      <div class="loop-nudge-centre"></div>
+                      <input
+                        type="range"
+                        [min]="-nudgeRange()"
+                        [max]="nudgeRange()"
+                        step="1"
+                        [attr.aria-label]="'Nudge loop ' + (slot + 1) + ' in'"
+                        [value]="displayedLoopInOffset(slot)"
+                        (input)="onLoopInNudgeInput(slot, $event)"
+                        (change)="onLoopInNudgeChange(slot, $event)"
+                      />
+                    </div>
+                    <span class="loop-offset">{{ loopInOffsetLabel(slot) }}</span>
+                    } @else {
+                    <span class="loop-frame loop-frame--empty">unmarked</span>
+                    <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
+                      <div class="loop-nudge-centre"></div>
+                    </div>
+                    <span class="loop-offset loop-offset--empty">—</span>
+                    }
                   </div>
-                  <span class="loop-offset">{{ loopInOffsetLabel(slot) }}</span>
-                  } @else {
-                  <span class="loop-frame loop-frame--empty">unmarked</span>
-                  <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
-                    <div class="loop-nudge-centre"></div>
+
+                  <div class="loop-end">
+                    <span class="loop-tag">Out</span>
+                    <button
+                      type="button"
+                      [attr.aria-label]="'Tap out for slot ' + (slot + 1)"
+                      (click)="onTapLoopOut(slot)"
+                    >
+                      Tap Out
+                    </button>
+                    @if (loopSlots()[slot]?.out; as point) {
+                    <span class="loop-frame">frame {{ loopOutFrame(slot) }}</span>
+                    <div class="loop-nudge">
+                      <div class="loop-nudge-centre"></div>
+                      <input
+                        type="range"
+                        [min]="-nudgeRange()"
+                        [max]="nudgeRange()"
+                        step="1"
+                        [attr.aria-label]="'Nudge loop ' + (slot + 1) + ' out'"
+                        [value]="displayedLoopOutOffset(slot)"
+                        (input)="onLoopOutNudgeInput(slot, $event)"
+                        (change)="onLoopOutNudgeChange(slot, $event)"
+                      />
+                    </div>
+                    <span class="loop-offset">{{ loopOutOffsetLabel(slot) }}</span>
+                    } @else {
+                    <span class="loop-frame loop-frame--empty">unmarked</span>
+                    <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
+                      <div class="loop-nudge-centre"></div>
+                    </div>
+                    <span class="loop-offset loop-offset--empty">—</span>
+                    }
                   </div>
-                  <span class="loop-offset loop-offset--empty">—</span>
-                  }
                 </div>
 
-                <div class="loop-end">
-                  <span class="loop-tag">Out</span>
-                  <button
-                    type="button"
-                    [attr.aria-label]="'Tap out for slot ' + (slot + 1)"
-                    (click)="onTapLoopOut(slot)"
-                  >
-                    Tap Out
-                  </button>
-                  @if (loopSlots()[slot]?.out; as point) {
-                  <span class="loop-frame">frame {{ loopOutFrame(slot) }}</span>
-                  <div class="loop-nudge">
-                    <div class="loop-nudge-centre"></div>
-                    <input
-                      type="range"
-                      [min]="-nudgeRange()"
-                      [max]="nudgeRange()"
-                      step="1"
-                      [attr.aria-label]="'Nudge loop ' + (slot + 1) + ' out'"
-                      [value]="displayedLoopOutOffset(slot)"
-                      (input)="onLoopOutNudgeInput(slot, $event)"
-                      (change)="onLoopOutNudgeChange(slot, $event)"
-                    />
-                  </div>
-                  <span class="loop-offset">{{ loopOutOffsetLabel(slot) }}</span>
-                  } @else {
-                  <span class="loop-frame loop-frame--empty">unmarked</span>
-                  <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
-                    <div class="loop-nudge-centre"></div>
-                  </div>
-                  <span class="loop-offset loop-offset--empty">—</span>
-                  }
-                </div>
+                @if (loopSlots()[slot]) {
+                <button
+                  type="button"
+                  class="loop-slot-clear"
+                  [attr.aria-label]="'Clear slot ' + (slot + 1)"
+                  (click)="onClearLoopSlot(slot)"
+                >
+                  Clear
+                </button>
+                }
               </div>
 
               <div class="loop-slot-progress" aria-hidden="true">
@@ -175,17 +188,6 @@
                   [style.width.%]="progressPercentFor(slot)"
                 ></div>
               </div>
-
-              @if (loopSlots()[slot]) {
-              <button
-                type="button"
-                class="loop-slot-clear"
-                [attr.aria-label]="'Clear slot ' + (slot + 1)"
-                (click)="onClearLoopSlot(slot)"
-              >
-                Clear
-              </button>
-              }
             </div>
             }
           </div>
@@ -196,37 +198,42 @@
         <section class="panel voice-panel" aria-label="Voice">
           <h2>Voice</h2>
 
-          @for (voice of voiceIndices; track voice) {
-          <div class="voice-row">
-            <input
-              type="checkbox"
-              [id]="'voice-mute-' + voice"
-              [checked]="mutedVoices()[voice]"
-              (change)="onVoiceMuteToggle(voice, $event)"
-            />
-            <label [for]="'voice-mute-' + voice">Voice {{ voice + 1 }}</label>
+          <div class="voice-rows">
+            @for (voice of voiceIndices; track voice) {
+            <div class="voice-row">
+              <input
+                type="checkbox"
+                [id]="'voice-mute-' + voice"
+                [attr.aria-label]="'Mute voice ' + (voice + 1)"
+                [checked]="mutedVoices()[voice]"
+                (change)="onVoiceMuteToggle(voice, $event)"
+              />
+              <label [for]="'voice-mute-' + voice">V{{ voice + 1 }}</label>
 
-            <button
-              type="button"
-              class="voice-hold"
-              [attr.aria-label]="
-                (mutedVoices()[voice] ? 'Punch in voice ' : 'Kill voice ') + (voice + 1)
-              "
-              (pointerdown)="onVoiceHoldStart(voice, $event)"
-              (pointerup)="onVoiceHoldEnd(voice)"
-              (pointercancel)="onVoiceHoldEnd(voice)"
-              (keydown)="onVoiceHoldKeyDown(voice, $event)"
-              (keyup)="onVoiceHoldKeyUp(voice, $event)"
-            >
-              {{ mutedVoices()[voice] ? 'Punch In' : 'Kill' }}
-            </button>
+              <button
+                type="button"
+                class="voice-hold"
+                [attr.aria-label]="
+                  (mutedVoices()[voice] ? 'Punch in voice ' : 'Kill voice ') + (voice + 1)
+                "
+                (pointerdown)="onVoiceHoldStart(voice, $event)"
+                (pointerup)="onVoiceHoldEnd(voice)"
+                (pointercancel)="onVoiceHoldEnd(voice)"
+                (keydown)="onVoiceHoldKeyDown(voice, $event)"
+                (keyup)="onVoiceHoldKeyUp(voice, $event)"
+              >
+                {{ mutedVoices()[voice] ? 'Punch In' : 'Kill' }}
+              </button>
 
-            <span class="voice-state">{{ effectiveMutes()[voice] ? 'muted' : 'audible' }}</span>
+              <span class="voice-state">{{ effectiveMutes()[voice] ? 'muted' : 'audible' }}</span>
+            </div>
+            }
           </div>
-          }
 
           <div class="voice-clear">
-            <button type="button" (click)="onClearVoiceMutes()">Clear All Mutes</button>
+            <button type="button" aria-label="Clear all voice mutes" (click)="onClearVoiceMutes()">
+              Clear
+            </button>
           </div>
         </section>
 
@@ -363,34 +370,54 @@
         @if (tuneError()) {
         <p class="error-text" role="alert">{{ tuneError() }}</p>
         } @if (currentTune(); as tune) {
-        <dl class="tune-fields">
-          <dt>Format</dt>
-          <dd>{{ tune.format }} v{{ tune.version }}</dd>
-          <dt>Name</dt>
-          <dd>{{ tune.name }}</dd>
-          <dt>Author</dt>
-          <dd>{{ tune.author }}</dd>
-          <dt>Released</dt>
-          <dd>{{ tune.released }}</dd>
-          <dt>Subtune count</dt>
-          <dd>{{ tune.songs }} (starts at {{ tune.startSong }})</dd>
-          <dt>Load / init / play address</dt>
-          <dd>
-            ${{ tune.loadAddress.toString(16) }} / ${{ tune.initAddress.toString(16) }} / ${{
-              tune.playAddress.toString(16)
-            }}
-          </dd>
-          <dt>Clock / model</dt>
-          <dd>{{ tune.clock }} / {{ tune.model }}</dd>
+        <dl class="field-list tune-fields">
+          <div class="field-row field-row--wide">
+            <dt>Name</dt>
+            <dd>{{ tune.name }}</dd>
+          </div>
+          <div class="field-row field-row--wide">
+            <dt>Author</dt>
+            <dd>{{ tune.author }}</dd>
+          </div>
+          <div class="field-row">
+            <dt>Format</dt>
+            <dd>{{ tune.format }} v{{ tune.version }}</dd>
+          </div>
+          <div class="field-row">
+            <dt>Released</dt>
+            <dd>{{ tune.released }}</dd>
+          </div>
+          <div class="field-row">
+            <dt>Subtunes</dt>
+            <dd>{{ tune.songs }} (starts at {{ tune.startSong }})</dd>
+          </div>
+          <div class="field-row">
+            <dt>Clock / model</dt>
+            <dd>{{ tune.clock }} / {{ tune.model }}</dd>
+          </div>
+          <div class="field-row field-row--wide">
+            <dt>Load / init / play</dt>
+            <dd>
+              ${{ tune.loadAddress.toString(16) }} / ${{ tune.initAddress.toString(16) }} / ${{
+                tune.playAddress.toString(16)
+              }}
+            </dd>
+          </div>
           @if (tune.secondSidAddress !== null) {
-          <dt>Second SID</dt>
-          <dd>${{ tune.secondSidAddress.toString(16) }}</dd>
+          <div class="field-row">
+            <dt>Second SID</dt>
+            <dd>${{ tune.secondSidAddress.toString(16) }}</dd>
+          </div>
           } @if (tune.thirdSidAddress !== null) {
-          <dt>Third SID</dt>
-          <dd>${{ tune.thirdSidAddress.toString(16) }}</dd>
+          <div class="field-row">
+            <dt>Third SID</dt>
+            <dd>${{ tune.thirdSidAddress.toString(16) }}</dd>
+          </div>
           }
-          <dt>Data size</dt>
-          <dd>{{ tune.data.length }} bytes</dd>
+          <div class="field-row">
+            <dt>Data size</dt>
+            <dd>{{ tune.data.length }} bytes</dd>
+          </div>
         </dl>
 
         <div class="subtune-nav control-row">
@@ -407,35 +434,60 @@
     <section class="panel diagnostics-panel" aria-label="Diagnostics">
       <h2>Diagnostics</h2>
 
-      <dl class="diagnostic-fields">
-        <dt>Cartridge frame timer</dt>
-        <dd>{{ frameTimerStatus() }}</dd>
-        <dt>Frames emitted</dt>
-        <dd>{{ engineStats().framesRendered }}</dd>
-        <dt>Packets / second</dt>
-        <dd>{{ packetsPerSecond().toFixed(1) }}</dd>
-        <dt>Bytes / second</dt>
-        <dd>{{ bytesPerSecond().toFixed(0) }}</dd>
-        <dt>Measured mean interval (nominal)</dt>
-        <dd>
-          {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)
-        </dd>
-        <dt>Drift</dt>
-        <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
-        <dt>Clock jitter (σ / worst gap)</dt>
-        <dd>
-          {{ engineStats().jitterMs.toFixed(2) }} ms / {{ engineStats().worstGapMs.toFixed(1) }} ms
-        </dd>
-        <dt>Late callbacks</dt>
-        <dd>{{ engineStats().lateCallbacks }}</dd>
-        <dt>Suppressed double-writes</dt>
-        <dd>{{ engineStats().suppressedWrites }}</dd>
-        <dt>Illegal opcodes</dt>
-        <dd>{{ engineStats().illegalOpcodeCount }}</dd>
-        <dt>Recipe resends</dt>
-        <dd>{{ engineStats().recipeResends }}</dd>
-        <dt>Last error</dt>
-        <dd>{{ engineError() ?? '—' }}</dd>
+      <dl class="field-list diagnostic-fields">
+        <div class="field-row field-row--wide">
+          <dt>Frame timer</dt>
+          <dd>{{ frameTimerStatus() }}</dd>
+        </div>
+        <div class="field-row">
+          <dt>Frames emitted</dt>
+          <dd>{{ engineStats().framesRendered }}</dd>
+        </div>
+        <div class="field-row">
+          <dt>Packets / s</dt>
+          <dd>{{ packetsPerSecond().toFixed(1) }}</dd>
+        </div>
+        <div class="field-row">
+          <dt>Bytes / s</dt>
+          <dd>{{ bytesPerSecond().toFixed(0) }}</dd>
+        </div>
+        <div class="field-row">
+          <dt>Drift</dt>
+          <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
+        </div>
+        <div class="field-row field-row--wide">
+          <dt>Interval (nominal)</dt>
+          <dd>
+            {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)
+          </dd>
+        </div>
+        <div class="field-row field-row--wide">
+          <dt>Jitter σ / worst gap</dt>
+          <dd>
+            {{ engineStats().jitterMs.toFixed(2) }} ms /
+            {{ engineStats().worstGapMs.toFixed(1) }} ms
+          </dd>
+        </div>
+        <div class="field-row">
+          <dt>Late callbacks</dt>
+          <dd>{{ engineStats().lateCallbacks }}</dd>
+        </div>
+        <div class="field-row">
+          <dt>Suppressed writes</dt>
+          <dd>{{ engineStats().suppressedWrites }}</dd>
+        </div>
+        <div class="field-row">
+          <dt>Illegal opcodes</dt>
+          <dd>{{ engineStats().illegalOpcodeCount }}</dd>
+        </div>
+        <div class="field-row">
+          <dt>Recipe resends</dt>
+          <dd>{{ engineStats().recipeResends }}</dd>
+        </div>
+        <div class="field-row field-row--wide">
+          <dt>Last error</dt>
+          <dd>{{ engineError() ?? '—' }}</dd>
+        </div>
       </dl>
     </section>
   </aside>
