@@ -304,8 +304,13 @@ export class DjPocViewComponent {
   }
 
   /** Keyboard equivalent of `onVoiceHoldStart` for Enter/Space; `event.repeat` guards against the
-   * browser's auto-repeat re-triggering the press while the key stays down. */
+   * browser's auto-repeat re-triggering the press while the key stays down. Bound to the plain
+   * `keydown` event (rather than Angular's `keydown.enter`/`keydown.space` filter syntax) because
+   * strict template type checking can't resolve those filtered event names to `KeyboardEvent`. */
   onVoiceHoldKeyDown(voice: number, event: KeyboardEvent): void {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
     event.preventDefault();
     if (event.repeat) {
       return;
@@ -315,6 +320,9 @@ export class DjPocViewComponent {
 
   /** Keyboard equivalent of `onVoiceHoldEnd` for Enter/Space. */
   onVoiceHoldKeyUp(voice: number, event: KeyboardEvent): void {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
     event.preventDefault();
     this.engine.setVoiceHeld(voice, false);
   }
