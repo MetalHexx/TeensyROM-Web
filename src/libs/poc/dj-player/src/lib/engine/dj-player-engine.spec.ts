@@ -575,6 +575,7 @@ describe('DjPlayerEngine', () => {
 
     it('never resends the recipe in clock-only mode', async () => {
       engine.loadTune(silentTune());
+      engine.setSpeedMode('clock-only');
       await engine.play();
       const resendsBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
 

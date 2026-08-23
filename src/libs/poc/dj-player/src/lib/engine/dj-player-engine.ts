@@ -193,7 +193,7 @@ export class DjPlayerEngine implements OnDestroy {
   readonly currentSubtune = signal<number>(1);
   readonly subtuneCount = signal<number>(1);
   readonly speedMultiplier = signal<number>(1);
-  readonly speedMode = signal<SpeedMode>('clock-only');
+  readonly speedMode = signal<SpeedMode>('clock-and-recipe');
   readonly recipeEnabled = signal<boolean>(true);
   /**
    * Whether a recipe packet has gone out since this engine was constructed — which means the
