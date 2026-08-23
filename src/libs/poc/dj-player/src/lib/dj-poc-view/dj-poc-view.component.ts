@@ -31,9 +31,9 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
 const PANEL_LOOP_SLOT = 0;
 
 /**
- * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. One column
- * of labelled control groups: MIDI, Timing, Tune, Transport, Speed, Voice, Cues, Loop/Scrub,
- * Diagnostics.
+ * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. A
+ * performance stage (Transport/Scrub, Cues, Loop, Voice, Speed) beside a persistent sidebar
+ * (Setup: MIDI/Timing/Tune, and Diagnostics).
  */
 @Component({
   selector: 'lib-dj-poc-view',
@@ -123,8 +123,8 @@ export class DjPocViewComponent {
   protected readonly frameTimerForced = this.engine.recipeSent;
   protected readonly frameTimerStatus = computed(() =>
     this.frameTimerForced()
-      ? `on — forced by the recipe packet at ${Math.round(this.engineStats().effectiveIntervalUs)} µs`
-      : 'not set by this browser — the cartridge keeps whatever it last had'
+      ? `on at ${Math.round(this.engineStats().effectiveIntervalUs)} µs`
+      : 'not set'
   );
 
   // Identify interrupts the stream on the cartridge, so it stays out of reach while a tune plays.
@@ -160,7 +160,9 @@ export class DjPocViewComponent {
   });
   protected readonly bytesPerSecond = computed(() => {
     const stats = this.engineStats();
-    return stats.packetsSent > 0 ? this.packetsPerSecond() * (stats.bytesSent / stats.packetsSent) : 0;
+    return stats.packetsSent > 0
+      ? this.packetsPerSecond() * (stats.bytesSent / stats.packetsSent)
+      : 0;
   });
 
   private readonly bundledSources: readonly TuneSource[] = BUNDLED_TUNES.map((tune) => ({
@@ -174,7 +176,10 @@ export class DjPocViewComponent {
   private readonly diskSources = signal<readonly TuneSource[]>([]);
   private diskTuneCount = 0;
 
-  readonly availableTunes = computed<readonly TuneSource[]>(() => [...this.bundledSources, ...this.diskSources()]);
+  readonly availableTunes = computed<readonly TuneSource[]>(() => [
+    ...this.bundledSources,
+    ...this.diskSources(),
+  ]);
   readonly currentTune = signal<SidFile | null>(null);
   readonly tuneError = signal<string | null>(null);
 

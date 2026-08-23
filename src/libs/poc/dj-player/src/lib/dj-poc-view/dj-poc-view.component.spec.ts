@@ -261,8 +261,9 @@ describe('DjPocViewComponent', () => {
       midi.ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
       fixture.detectChanges();
 
-      // The port select is the first <select> in the panel — MIDI is the first control group.
-      const portSelect = fixture.nativeElement.querySelectorAll('select')[0] as HTMLSelectElement;
+      const portSelect = fixture.nativeElement.querySelector(
+        '[aria-label="MIDI"] select'
+      ) as HTMLSelectElement;
       portSelect.value = 'port-1';
       portSelect.dispatchEvent(new Event('change'));
 
@@ -297,7 +298,9 @@ describe('DjPocViewComponent', () => {
 
   describe('speed input', () => {
     it('calls engine.setSpeed with the numeric value', () => {
-      const range: HTMLInputElement = fixture.nativeElement.querySelector('input[type="range"]');
+      const range: HTMLInputElement = fixture.nativeElement.querySelector(
+        '[aria-label="Speed"] input[type="range"]'
+      );
       range.value = '0.9';
       range.dispatchEvent(new Event('input'));
 
@@ -315,7 +318,9 @@ describe('DjPocViewComponent', () => {
     });
 
     it('renders the engine last error', () => {
-      engine.lastError.set('the play routine did not return within its cycle budget (12345 cycles)');
+      engine.lastError.set(
+        'the play routine did not return within its cycle budget (12345 cycles)'
+      );
       fixture.detectChanges();
 
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -350,24 +355,19 @@ describe('DjPocViewComponent', () => {
       return (fixture.nativeElement as HTMLElement).textContent ?? '';
     }
 
-    it('reports the timer as unset by this browser before any recipe has gone out', () => {
+    it('reports the timer as not set before any recipe has gone out', () => {
       engine.recipeSent.set(false);
       fixture.detectChanges();
 
-      expect(panelText()).toContain('not set by this browser');
+      expect(panelText()).toContain('not set');
     });
 
-    it('reports the timer as forced, at the effective interval, once a recipe has gone out', () => {
+    it('reports the timer as on, at the effective interval, once a recipe has gone out', () => {
       engine.recipeSent.set(true);
       engine.stats.set({ ...EMPTY_STATS, effectiveIntervalUs: 9975 });
       fixture.detectChanges();
 
-      const text = panelText();
-      expect(text).toContain('forced by the recipe packet at 9975');
-      // The two traps this status exists to make visible: un-checking the box does not clear the
-      // cartridge's flag, and the C64's own menu never learns the host overrode it.
-      expect(text).toContain('exited and re-entered');
-      expect(text).toContain('disagree with this');
+      expect(panelText()).toContain('on at 9975');
     });
 
     // Deleted rather than relabelled: the browser can neither set nor read the buffer size, so any
@@ -448,8 +448,9 @@ describe('DjPocViewComponent', () => {
     // handler touches so a real `pointerdown` dispatch exercises the actual template wiring.
     beforeEach(() => {
       if (!('setPointerCapture' in HTMLElement.prototype)) {
-        (HTMLElement.prototype as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture =
-          vi.fn();
+        (
+          HTMLElement.prototype as unknown as { setPointerCapture: (id: number) => void }
+        ).setPointerCapture = vi.fn();
       } else {
         vi.spyOn(HTMLElement.prototype, 'setPointerCapture').mockImplementation(() => undefined);
       }
@@ -497,9 +498,9 @@ describe('DjPocViewComponent', () => {
     it('calls engine.clearVoiceMutes from the clear-all control', () => {
       const clearButton = Array.from(
         fixture.nativeElement.querySelectorAll('[aria-label="Voice"] button')
-      ).find((button) => (button as HTMLButtonElement).textContent?.trim() === 'Clear All Mutes') as
-        | HTMLButtonElement
-        | undefined;
+      ).find(
+        (button) => (button as HTMLButtonElement).textContent?.trim() === 'Clear All Mutes'
+      ) as HTMLButtonElement | undefined;
 
       clearButton?.click();
 
@@ -539,9 +540,9 @@ describe('DjPocViewComponent', () => {
       engine.cues.set([cueAt(1234), null, null, null]);
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-row').textContent).toContain(
-        'frame 1234'
-      );
+      expect(
+        fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-row').textContent
+      ).toContain('frame 1234');
     });
 
     it('renders one row per cue slot, labelled Cue 1 through Cue 4', () => {
@@ -695,9 +696,7 @@ describe('DjPocViewComponent', () => {
     }
 
     function offsetReadout(row: number): string {
-      const rows: HTMLElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('.loop-row')
-      );
+      const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.loop-row'));
       return rows[row].querySelector('.loop-offset')?.textContent?.trim() ?? '';
     }
 
@@ -772,10 +771,7 @@ describe('DjPocViewComponent', () => {
 
   describe('scrub handler', () => {
     function scrubInput(): HTMLInputElement {
-      const rangesInSection: HTMLInputElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('[aria-label="Loop / Scrub"] input[type="range"]')
-      );
-      return rangesInSection[rangesInSection.length - 1];
+      return fixture.nativeElement.querySelector('.scrub-row input[type="range"]');
     }
 
     it('does not call engine.scrubTo while dragging', () => {

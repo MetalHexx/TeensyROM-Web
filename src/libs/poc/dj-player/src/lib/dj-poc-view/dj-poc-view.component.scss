@@ -8,21 +8,41 @@
 }
 
 .dj-poc-page {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  align-items: start;
-  gap: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  height: 100%;
   padding: var(--spacing-lg);
+  min-height: 0;
 }
 
 .page-heading {
-  grid-column: 1 / -1;
+  flex: 0 0 auto;
   margin: 0;
   color: var(--color-primary);
   font-size: var(--font-size-md);
 }
 
-.poc-section {
+// Two-column shell: the stage takes whatever width is left, the sidebar holds a fixed width so
+// its controls never reflow as the stage grows or shrinks.
+.stage {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-width: 0;
+  min-height: 0;
+}
+
+.sidebar {
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-height: 0;
+}
+
+.panel {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-content-gap);
@@ -37,11 +57,81 @@
   }
 }
 
-// The diagnostics readout has more fields than any other section — let it use two grid tracks'
-// worth of width so its two-column dl (added below) doesn't get squeezed as narrow as everything
-// else.
-.poc-section--wide {
-  grid-column: span 2;
+// Scrub bar directly above the transport buttons, media-player style.
+.player-block {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.transport-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+// Cues and Loop dominate the stage width; Voice and Speed sit in a narrow fixed-width rail beside
+// them.
+.performance-cluster {
+  flex: 1 1 auto;
+  display: flex;
+  gap: var(--spacing-lg);
+  min-height: 0;
+}
+
+.stage-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-width: 0;
+  min-height: 0;
+
+  > .panel {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+.stage-rail {
+  flex: 0 0 160px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  min-height: 0;
+}
+
+// Voice sizes to its three rows; Speed takes whatever height is left in the rail rather than
+// splitting it evenly.
+.voice-panel {
+  flex: 0 0 auto;
+}
+
+.speed-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.subsection {
+  &:not(:last-child) {
+    margin-bottom: var(--spacing-content-gap);
+  }
+}
+
+.subsection-title {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.diagnostics-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .control-row {
@@ -98,10 +188,14 @@
   font-size: var(--font-size-sm);
 }
 
-// checkbox | label | momentary button | state caption, one row per voice.
+// checkbox | label | momentary button | state caption, one row per voice. The rail is too narrow
+// for this to stay a single row, so it wraps onto two lines instead.
 .voice-row {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    'check label state'
+    'hold hold hold';
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) 0;
@@ -109,6 +203,22 @@
 
   &:last-of-type {
     border-bottom: 0;
+  }
+
+  input[type='checkbox'] {
+    grid-area: check;
+  }
+
+  label {
+    grid-area: label;
+  }
+
+  .voice-state {
+    grid-area: state;
+  }
+
+  .voice-hold {
+    grid-area: hold;
   }
 }
 
@@ -295,4 +405,35 @@
   width: 0;
   background: var(--color-dimmed);
   pointer-events: none;
+}
+
+// Speed: multiplier readout above the fader, mode selector below it. The fader is vertical — a
+// longer throw is the point of the control — and stretches to fill whatever height Speed is given
+// in the rail.
+.speed-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 0;
+}
+
+.speed-value {
+  flex: 0 0 auto;
+  font-size: var(--font-size-md);
+  color: var(--color-primary);
+}
+
+.speed-fader {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 1.5rem;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.speed-mode {
+  flex: 0 0 auto;
+  width: 100%;
 }
