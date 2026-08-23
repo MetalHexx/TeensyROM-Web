@@ -8,7 +8,7 @@ import {
   DjPlayerEngine,
   EngineState,
   EngineStats,
-  LoopOutPoint,
+  LoopSlot,
   SpeedMode,
 } from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
@@ -56,11 +56,12 @@ interface MockDjPlayerEngine {
   heldVoices: WritableSignal<readonly boolean[]>;
   effectiveMutes: WritableSignal<readonly boolean[]>;
   cues: WritableSignal<readonly (CueSlot | null)[]>;
-  loopIn: WritableSignal<CapturedPoint | null>;
-  loopOut: WritableSignal<LoopOutPoint | null>;
-  loopArmable: WritableSignal<boolean>;
-  loopEnabled: WritableSignal<boolean>;
+  loopSlots: WritableSignal<readonly (LoopSlot | null)[]>;
+  activeLoopSlot: WritableSignal<number | null>;
+  queuedLoopSlot: WritableSignal<number | null>;
+  progressPercentFor: ReturnType<typeof vi.fn>;
   positionPercent: WritableSignal<number>;
+  nudgeRangeFrames: WritableSignal<number>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -83,8 +84,11 @@ interface MockDjPlayerEngine {
   tapLoopOut: ReturnType<typeof vi.fn>;
   setLoopInOffset: ReturnType<typeof vi.fn>;
   setLoopOutOffset: ReturnType<typeof vi.fn>;
-  hopToLoopIn: ReturnType<typeof vi.fn>;
-  setLoopEnabled: ReturnType<typeof vi.fn>;
+  clearLoopSlot: ReturnType<typeof vi.fn>;
+  punchLoop: ReturnType<typeof vi.fn>;
+  stopLoop: ReturnType<typeof vi.fn>;
+  auditionLoopIn: ReturnType<typeof vi.fn>;
+  auditionLoopOut: ReturnType<typeof vi.fn>;
   scrubTo: ReturnType<typeof vi.fn>;
 }
 
@@ -117,11 +121,12 @@ function makeEngine(): MockDjPlayerEngine {
     heldVoices: signal<readonly boolean[]>([false, false, false]),
     effectiveMutes: signal<readonly boolean[]>([false, false, false]),
     cues: signal<readonly (CueSlot | null)[]>([null, null, null, null]),
-    loopIn: signal<CapturedPoint | null>(null),
-    loopOut: signal<LoopOutPoint | null>(null),
-    loopArmable: signal(false),
-    loopEnabled: signal(false),
+    loopSlots: signal<readonly (LoopSlot | null)[]>([null, null, null, null]),
+    activeLoopSlot: signal<number | null>(null),
+    queuedLoopSlot: signal<number | null>(null),
+    progressPercentFor: vi.fn(() => 0),
     positionPercent: signal(0),
+    nudgeRangeFrames: signal(50),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
@@ -144,8 +149,11 @@ function makeEngine(): MockDjPlayerEngine {
     tapLoopOut: vi.fn(),
     setLoopInOffset: vi.fn(),
     setLoopOutOffset: vi.fn(),
-    hopToLoopIn: vi.fn(),
-    setLoopEnabled: vi.fn(),
+    clearLoopSlot: vi.fn(),
+    punchLoop: vi.fn(),
+    stopLoop: vi.fn(),
+    auditionLoopIn: vi.fn(),
+    auditionLoopOut: vi.fn(),
     scrubTo: vi.fn(),
   };
 }
@@ -259,8 +267,9 @@ describe('DjPocViewComponent', () => {
       midi.ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
       fixture.detectChanges();
 
-      // The port select is the first <select> in the panel — MIDI is the first control group.
-      const portSelect = fixture.nativeElement.querySelectorAll('select')[0] as HTMLSelectElement;
+      const portSelect = fixture.nativeElement.querySelector(
+        '[aria-label="MIDI"] select'
+      ) as HTMLSelectElement;
       portSelect.value = 'port-1';
       portSelect.dispatchEvent(new Event('change'));
 
@@ -295,7 +304,9 @@ describe('DjPocViewComponent', () => {
 
   describe('speed input', () => {
     it('calls engine.setSpeed with the numeric value', () => {
-      const range: HTMLInputElement = fixture.nativeElement.querySelector('input[type="range"]');
+      const range: HTMLInputElement = fixture.nativeElement.querySelector(
+        '[aria-label="Speed"] input[type="range"]'
+      );
       range.value = '0.9';
       range.dispatchEvent(new Event('input'));
 
@@ -313,7 +324,9 @@ describe('DjPocViewComponent', () => {
     });
 
     it('renders the engine last error', () => {
-      engine.lastError.set('the play routine did not return within its cycle budget (12345 cycles)');
+      engine.lastError.set(
+        'the play routine did not return within its cycle budget (12345 cycles)'
+      );
       fixture.detectChanges();
 
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -348,24 +361,19 @@ describe('DjPocViewComponent', () => {
       return (fixture.nativeElement as HTMLElement).textContent ?? '';
     }
 
-    it('reports the timer as unset by this browser before any recipe has gone out', () => {
+    it('reports the timer as not set before any recipe has gone out', () => {
       engine.recipeSent.set(false);
       fixture.detectChanges();
 
-      expect(panelText()).toContain('not set by this browser');
+      expect(panelText()).toContain('not set');
     });
 
-    it('reports the timer as forced, at the effective interval, once a recipe has gone out', () => {
+    it('reports the timer as on, at the effective interval, once a recipe has gone out', () => {
       engine.recipeSent.set(true);
       engine.stats.set({ ...EMPTY_STATS, effectiveIntervalUs: 9975 });
       fixture.detectChanges();
 
-      const text = panelText();
-      expect(text).toContain('forced by the recipe packet at 9975');
-      // The two traps this status exists to make visible: un-checking the box does not clear the
-      // cartridge's flag, and the C64's own menu never learns the host overrode it.
-      expect(text).toContain('exited and re-entered');
-      expect(text).toContain('disagree with this');
+      expect(panelText()).toContain('on at 9975');
     });
 
     // Deleted rather than relabelled: the browser can neither set nor read the buffer size, so any
@@ -446,8 +454,9 @@ describe('DjPocViewComponent', () => {
     // handler touches so a real `pointerdown` dispatch exercises the actual template wiring.
     beforeEach(() => {
       if (!('setPointerCapture' in HTMLElement.prototype)) {
-        (HTMLElement.prototype as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture =
-          vi.fn();
+        (
+          HTMLElement.prototype as unknown as { setPointerCapture: (id: number) => void }
+        ).setPointerCapture = vi.fn();
       } else {
         vi.spyOn(HTMLElement.prototype, 'setPointerCapture').mockImplementation(() => undefined);
       }
@@ -492,12 +501,36 @@ describe('DjPocViewComponent', () => {
       expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(1, false);
     });
 
+    it('drives the engine on Enter keydown and keyup', () => {
+      const button = holdButtons()[0];
+
+      button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(engine.setVoiceHeld).toHaveBeenCalledWith(0, true);
+
+      button.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+      expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(0, false);
+    });
+
+    it('drives the engine on Space keydown and keyup, ignoring auto-repeat', () => {
+      const button = holdButtons()[1];
+
+      button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      expect(engine.setVoiceHeld).toHaveBeenCalledWith(1, true);
+
+      engine.setVoiceHeld.mockClear();
+      button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, repeat: true }));
+      expect(engine.setVoiceHeld).not.toHaveBeenCalled();
+
+      button.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
+      expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(1, false);
+    });
+
     it('calls engine.clearVoiceMutes from the clear-all control', () => {
-      const clearButton = Array.from(
-        fixture.nativeElement.querySelectorAll('[aria-label="Voice"] button')
-      ).find((button) => (button as HTMLButtonElement).textContent?.trim() === 'Clear All Mutes') as
-        | HTMLButtonElement
-        | undefined;
+      // Matched on the accessible name, not the visible text: the rail is narrow enough that the
+      // button reads just "Clear", and the spelled-out name lives in aria-label.
+      const clearButton = fixture.nativeElement.querySelector(
+        '[aria-label="Voice"] button[aria-label="Clear all voice mutes"]'
+      ) as HTMLButtonElement | null;
 
       clearButton?.click();
 
@@ -537,9 +570,9 @@ describe('DjPocViewComponent', () => {
       engine.cues.set([cueAt(1234), null, null, null]);
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-row').textContent).toContain(
-        'frame 1234'
-      );
+      expect(
+        fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-row').textContent
+      ).toContain('frame 1234');
     });
 
     it('renders one row per cue slot, labelled Cue 1 through Cue 4', () => {
@@ -663,116 +696,204 @@ describe('DjPocViewComponent', () => {
     });
   });
 
-  describe('loop rows', () => {
-    function armCheckbox(): HTMLInputElement {
-      return fixture.nativeElement.querySelector('.loop-arm input[type="checkbox"]');
+  describe('loop slots', () => {
+    function setSlots(slots: readonly (LoopSlot | null)[]): void {
+      engine.loopSlots.set(slots);
+      fixture.detectChanges();
     }
 
-    function tapButton(label: string): HTMLButtonElement {
-      const buttons: HTMLButtonElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('.loop-row button')
-      );
+    function slotRows(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.loop-slot-row'));
+    }
+
+    function punchButton(slot: number): HTMLButtonElement {
+      return slotRows()[slot].querySelector('.loop-slot-punch') as HTMLButtonElement;
+    }
+
+    function stopButton(): HTMLButtonElement {
+      return fixture.nativeElement.querySelector('[aria-label="Loops"] [aria-label="Stop loop"]');
+    }
+
+    function tapButton(slot: number, label: 'Tap In' | 'Tap Out'): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(slotRows()[slot].querySelectorAll('button'));
       return buttons.find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
     }
 
-    function nudgeInput(which: 'in' | 'out'): HTMLInputElement {
-      return fixture.nativeElement.querySelector(
-        `.loop-row input[aria-label="Nudge loop ${which}"]`
-      );
+    function clearButton(slot: number): HTMLButtonElement | null {
+      return slotRows()[slot].querySelector('.loop-slot-clear');
     }
 
-    function offsetReadout(row: number): string {
-      const rows: HTMLElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('.loop-row')
-      );
-      return rows[row].querySelector('.loop-offset')?.textContent?.trim() ?? '';
+    function nudgeInput(slot: number, which: 'in' | 'out'): HTMLInputElement | null {
+      return slotRows()[slot].querySelector(`input[aria-label="Nudge loop ${slot + 1} ${which}"]`);
     }
 
-    it('disables the arm control until the engine reports the loop armable', () => {
-      expect(armCheckbox().disabled).toBe(true);
+    function offsetReadout(slot: number, which: 'in' | 'out'): string {
+      const ends: HTMLElement[] = Array.from(slotRows()[slot].querySelectorAll('.loop-end'));
+      const end = which === 'in' ? ends[0] : ends[1];
+      return end.querySelector('.loop-offset')?.textContent?.trim() ?? '';
+    }
 
-      engine.loopArmable.set(true);
-      fixture.detectChanges();
-
-      expect(armCheckbox().disabled).toBe(false);
-
-      armCheckbox().checked = true;
-      armCheckbox().dispatchEvent(new Event('change'));
-      expect(engine.setLoopEnabled).toHaveBeenCalledWith(true);
+    it('renders one row per loop slot', () => {
+      expect(slotRows()).toHaveLength(4);
     });
 
-    it('taps each end from its own button', () => {
-      tapButton('Tap In').click();
-      expect(engine.tapLoopIn).toHaveBeenCalled();
-
-      tapButton('Tap Out').click();
-      expect(engine.tapLoopOut).toHaveBeenCalled();
+    it('punches the tapped slot from its own punch target', () => {
+      punchButton(2).click();
+      expect(engine.punchLoop).toHaveBeenCalledWith(2);
     });
 
-    it('offers a nudge track only for an end that has been marked', () => {
-      expect(nudgeInput('in')).toBeNull();
-      expect(nudgeInput('out')).toBeNull();
-
-      engine.loopIn.set(loopInPoint(2140));
-      engine.loopOut.set({ frame: 2536, offset: 0 });
-      fixture.detectChanges();
-
-      expect(nudgeInput('in')).not.toBeNull();
-      expect(nudgeInput('out')).not.toBeNull();
-      expect(
-        (fixture.nativeElement.querySelector('.loop-row .loop-frame') as HTMLElement).textContent
-      ).toContain('frame 2140');
+    it('stops the loop from the single panel-level Stop control', () => {
+      stopButton().click();
+      expect(engine.stopLoop).toHaveBeenCalled();
     });
 
-    it('moves the in-point readout on input without re-deriving or auditioning', () => {
-      engine.loopIn.set(loopInPoint(2140));
-      fixture.detectChanges();
+    it('taps each end of the right slot from its own button', () => {
+      tapButton(1, 'Tap In').click();
+      expect(engine.tapLoopIn).toHaveBeenCalledWith(1);
 
-      const input = nudgeInput('in');
+      tapButton(1, 'Tap Out').click();
+      expect(engine.tapLoopOut).toHaveBeenCalledWith(1);
+    });
+
+    it('clears the right slot from its own Clear control, offered only once the slot is set', () => {
+      expect(clearButton(0)).toBeNull();
+
+      setSlots([{ in: loopInPoint(2140), out: null }, null, null, null]);
+
+      clearButton(0)?.click();
+      expect(engine.clearLoopSlot).toHaveBeenCalledWith(0);
+    });
+
+    it('offers a nudge track only for an end that has been marked, on the right slot', () => {
+      expect(nudgeInput(1, 'in')).toBeNull();
+      expect(nudgeInput(1, 'out')).toBeNull();
+
+      setSlots([null, { in: loopInPoint(2140), out: { frame: 2536, offset: 0 } }, null, null]);
+
+      expect(nudgeInput(1, 'in')).not.toBeNull();
+      expect(nudgeInput(1, 'out')).not.toBeNull();
+      expect(nudgeInput(0, 'in')).toBeNull();
+      expect(slotRows()[1].querySelector('.loop-frame')?.textContent).toContain('frame 2140');
+    });
+
+    it('moves the in-point readout on input without re-deriving or committing', () => {
+      setSlots([{ in: loopInPoint(2140), out: null }, null, null, null]);
+
+      const input = nudgeInput(0, 'in') as HTMLInputElement;
       input.value = '-7';
       input.dispatchEvent(new Event('input'));
       fixture.detectChanges();
 
-      expect(nudgeInput('in').value).toBe('-7');
-      expect(offsetReadout(0)).toContain('7');
+      expect((nudgeInput(0, 'in') as HTMLInputElement).value).toBe('-7');
+      expect(offsetReadout(0, 'in')).toContain('7');
       // Re-deriving the in-point replays frames on the frame clock's own thread, so the drag must
       // not trigger one.
       expect(engine.setLoopInOffset).not.toHaveBeenCalled();
-      expect(engine.hopToLoopIn).not.toHaveBeenCalled();
+      expect(engine.auditionLoopIn).not.toHaveBeenCalled();
     });
 
     it('commits the in-point offset and auditions it when the drag releases', () => {
-      engine.loopIn.set(loopInPoint(2140));
-      fixture.detectChanges();
+      setSlots([null, { in: loopInPoint(2140), out: null }, null, null]);
 
-      const input = nudgeInput('in');
+      const input = nudgeInput(1, 'in') as HTMLInputElement;
       input.value = '-7';
       input.dispatchEvent(new Event('input'));
       input.dispatchEvent(new Event('change'));
 
-      expect(engine.setLoopInOffset).toHaveBeenCalledWith(-7);
-      expect(engine.hopToLoopIn).toHaveBeenCalled();
+      expect(engine.setLoopInOffset).toHaveBeenCalledWith(1, -7);
+      expect(engine.auditionLoopIn).toHaveBeenCalledWith(1);
+      expect(engine.punchLoop).not.toHaveBeenCalled();
     });
 
-    it('commits the out-point offset on input, since moving it replays nothing', () => {
-      engine.loopOut.set({ frame: 2536, offset: 0 });
-      fixture.detectChanges();
+    it('auditions the in-point commit even while a different slot is the active loop, without queuing a switch', () => {
+      engine.activeLoopSlot.set(0);
+      setSlots([
+        { in: loopInPoint(100), out: { frame: 400, offset: 0 } },
+        { in: loopInPoint(2140), out: null },
+        null,
+        null,
+      ]);
 
-      const input = nudgeInput('out');
+      const input = nudgeInput(1, 'in') as HTMLInputElement;
+      input.value = '-7';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.auditionLoopIn).toHaveBeenCalledWith(1);
+      expect(engine.punchLoop).not.toHaveBeenCalled();
+    });
+
+    it('moves the out-point readout on input without committing or auditioning', () => {
+      setSlots([{ in: null, out: { frame: 2536, offset: 0 } }, null, null, null]);
+
+      const input = nudgeInput(0, 'out') as HTMLInputElement;
       input.value = '-3';
       input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
 
-      expect(engine.setLoopOutOffset).toHaveBeenCalledWith(-3);
-      expect(engine.hopToLoopIn).not.toHaveBeenCalled();
+      expect((nudgeInput(0, 'out') as HTMLInputElement).value).toBe('-3');
+      expect(offsetReadout(0, 'out')).toContain('3');
+      // This is the seam that changed: with an audition to run on release, committing every drag
+      // tick would put replay-adjacent work on the frame clock's own thread.
+      expect(engine.setLoopOutOffset).not.toHaveBeenCalled();
+      expect(engine.auditionLoopOut).not.toHaveBeenCalled();
+    });
+
+    it('commits the out-point offset and auditions it when the drag releases', () => {
+      setSlots([null, null, { in: null, out: { frame: 2536, offset: 0 } }, null]);
+
+      const input = nudgeInput(2, 'out') as HTMLInputElement;
+      input.value = '-3';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+
+      expect(engine.setLoopOutOffset).toHaveBeenCalledWith(2, -3);
+      expect(engine.auditionLoopOut).toHaveBeenCalledWith(2);
+      expect(engine.punchLoop).not.toHaveBeenCalled();
+    });
+
+    it('renders the active and queued slots distinguishably from each other and from idle slots', () => {
+      setSlots([
+        { in: loopInPoint(100), out: { frame: 200, offset: 0 } },
+        { in: loopInPoint(300), out: { frame: 400, offset: 0 } },
+        null,
+        null,
+      ]);
+      engine.activeLoopSlot.set(0);
+      engine.queuedLoopSlot.set(1);
+      fixture.detectChanges();
+
+      const rows = slotRows();
+      const activeState = rows[0].getAttribute('data-loop-state');
+      const queuedState = rows[1].getAttribute('data-loop-state');
+      const idleState = rows[2].getAttribute('data-loop-state');
+
+      expect(activeState).not.toBe(queuedState);
+      expect(activeState).not.toBe(idleState);
+      expect(queuedState).not.toBe(idleState);
+    });
+
+    it("shows progress only for the engine's active slot", () => {
+      // progressPercentFor is only ever non-zero for the active slot in the real engine, so drive
+      // both together — the activeLoopSlot write is also what marks this OnPush view for re-check.
+      engine.progressPercentFor.mockImplementation((slot: number) => (slot === 2 ? 63 : 0));
+      engine.activeLoopSlot.set(2);
+      fixture.detectChanges();
+
+      const fills: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.loop-slot-progress-fill')
+      );
+
+      expect(fills[2].style.width).toBe('63%');
+      expect(fills[0].style.width).toBe('0%');
+      expect(fills[1].style.width).toBe('0%');
+      expect(fills[3].style.width).toBe('0%');
     });
   });
 
   describe('scrub handler', () => {
     function scrubInput(): HTMLInputElement {
-      const rangesInSection: HTMLInputElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('[aria-label="Loop / Scrub"] input[type="range"]')
-      );
-      return rangesInSection[rangesInSection.length - 1];
+      return fixture.nativeElement.querySelector('.scrub-row input[type="range"]');
     }
 
     it('does not call engine.scrubTo while dragging', () => {
