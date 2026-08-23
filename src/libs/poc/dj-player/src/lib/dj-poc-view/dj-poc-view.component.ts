@@ -303,6 +303,22 @@ export class DjPocViewComponent {
     this.engine.setVoiceHeld(voice, false);
   }
 
+  /** Keyboard equivalent of `onVoiceHoldStart` for Enter/Space; `event.repeat` guards against the
+   * browser's auto-repeat re-triggering the press while the key stays down. */
+  onVoiceHoldKeyDown(voice: number, event: KeyboardEvent): void {
+    event.preventDefault();
+    if (event.repeat) {
+      return;
+    }
+    this.engine.setVoiceHeld(voice, true);
+  }
+
+  /** Keyboard equivalent of `onVoiceHoldEnd` for Enter/Space. */
+  onVoiceHoldKeyUp(voice: number, event: KeyboardEvent): void {
+    event.preventDefault();
+    this.engine.setVoiceHeld(voice, false);
+  }
+
   onClearVoiceMutes(): void {
     this.engine.clearVoiceMutes();
   }

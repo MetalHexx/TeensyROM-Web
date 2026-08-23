@@ -215,6 +215,10 @@
               (pointerdown)="onVoiceHoldStart(voice, $event)"
               (pointerup)="onVoiceHoldEnd(voice)"
               (pointercancel)="onVoiceHoldEnd(voice)"
+              (keydown.enter)="onVoiceHoldKeyDown(voice, $event)"
+              (keydown.space)="onVoiceHoldKeyDown(voice, $event)"
+              (keyup.enter)="onVoiceHoldKeyUp(voice, $event)"
+              (keyup.space)="onVoiceHoldKeyUp(voice, $event)"
             >
               {{ mutedVoices()[voice] ? 'Punch In' : 'Kill' }}
             </button>

@@ -499,6 +499,30 @@ describe('DjPocViewComponent', () => {
       expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(1, false);
     });
 
+    it('drives the engine on Enter keydown and keyup', () => {
+      const button = holdButtons()[0];
+
+      button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(engine.setVoiceHeld).toHaveBeenCalledWith(0, true);
+
+      button.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+      expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(0, false);
+    });
+
+    it('drives the engine on Space keydown and keyup, ignoring auto-repeat', () => {
+      const button = holdButtons()[1];
+
+      button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      expect(engine.setVoiceHeld).toHaveBeenCalledWith(1, true);
+
+      engine.setVoiceHeld.mockClear();
+      button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, repeat: true }));
+      expect(engine.setVoiceHeld).not.toHaveBeenCalled();
+
+      button.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
+      expect(engine.setVoiceHeld).toHaveBeenLastCalledWith(1, false);
+    });
+
     it('calls engine.clearVoiceMutes from the clear-all control', () => {
       const clearButton = Array.from(
         fixture.nativeElement.querySelectorAll('[aria-label="Voice"] button')
