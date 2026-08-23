@@ -28,6 +28,10 @@ export type SpeedMode = 'clock-only' | 'clock-and-recipe';
  *  the same on a 1x tune and a 2x-multispeed one. */
 export const NUDGE_RANGE_MS = 1000;
 
+/** How much music plays into the seam when a loop's out-point is auditioned. A feel default —
+ *  confirm by ear on hardware. */
+export const LOOP_AUDITION_PREROLL_MS = 2000;
+
 /**
  * An earlier machine image a captured point can replay forward from.
  *
@@ -233,12 +237,17 @@ export class DjPlayerEngine implements OnDestroy {
    * live `speedMultiplier` — riding the speed fader must not make the range breathe, and the anchor
    * spacing below is only valid because this stays fixed for a given tune.
    */
-  readonly nudgeRangeFrames = computed<number>(() => {
+  readonly nudgeRangeFrames = computed<number>(() => this.msToFrames(NUDGE_RANGE_MS));
+
+  /** Converts a real-time duration to frames at the tune's own rate (`nominalIntervalUs` divided by
+   *  `callsPerFrame`), never the live `speedMultiplier` — shared by the nudge range and the loop
+   *  audition pre-roll so both breathe with the tune, never the speed fader. */
+  private msToFrames(ms: number): number {
     const callsPerFrame = this.machine?.callsPerFrame ?? 1;
     const nominalUs = this.nominalIntervalUs();
     const tuneIntervalUs = nominalUs > 0 ? nominalUs / callsPerFrame : PAL_FRAME_INTERVAL_US;
-    return Math.round((NUDGE_RANGE_MS * 1000) / tuneIntervalUs);
-  });
+    return Math.round((ms * 1000) / tuneIntervalUs);
+  }
 
   /**
    * Frames between the anchor images `onTick` retains for the nudge to replay forward from.
@@ -612,6 +621,51 @@ export class DjPlayerEngine implements OnDestroy {
     const range = this.nudgeRangeFrames();
     const nudged: LoopOutPoint = { ...point, offset: clamp(Math.round(frames), -range, range) };
     this.updateLoopSlot(slot, (current) => (current === null ? null : { ...current, out: nudged }));
+  }
+
+  /**
+   * Re-enters `slot` far enough before its out-point to hear the loop-back seam, and makes it the
+   * active loop so the wrap actually happens. No-op for a slot that is not playable.
+   *
+   * Re-entry is a restore, not a replay — see `engageLoop` — and the pre-roll itself replays forward
+   * on the live machine from that restored in-point, so the cost is bounded by the loop's own length
+   * however deep the loop sits in the tune. Reaching the pre-roll point with `jumpToFrame` would
+   * replay from `init` instead, reintroducing the stall a prior iteration removed.
+   */
+  auditionLoopOut(slot: number): void {
+    if (slot < 0 || slot > 3) return;
+    const loop = this.resolveLoopSlot(this.loopSlots()[slot] ?? null);
+    if (loop === null) return;
+    const machine = this.machine;
+    const frame = this.frame;
+    if (machine === null || frame === null) return;
+
+    this.engageLoop(slot);
+
+    const inFrame = resolvedFrame(loop.start);
+    const prerollFrames = this.msToFrames(LOOP_AUDITION_PREROLL_MS);
+    const target = Math.max(inFrame, loop.outFrame - prerollFrames);
+    const framesToReplay = target - inFrame;
+    if (framesToReplay <= 0) return;
+
+    for (let i = 0; i < framesToReplay; i++) {
+      let result: FrameResult;
+      try {
+        result = machine.runFrame();
+      } catch (error) {
+        this.fail(`the loop audition for slot ${slot} failed during replay — ${describeError(error)}`);
+        return;
+      }
+      if (!result.completed) {
+        this.fail(`the loop audition for slot ${slot} exceeded its cycle budget during replay`);
+        return;
+      }
+      frame.takeSnapshot(); // discarded — resets per-frame duplicate-write tracking only;
+                             // the accumulated register values persist across the call regardless
+    }
+
+    this.framesRendered = target;
+    this.queueResync();
   }
 
   /** Empties a slot, and lets go of it if it was the one playing or the one waiting to. */

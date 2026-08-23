@@ -18,6 +18,7 @@ import {
   DjPlayerEngine,
   FRAME_CLOCK,
   JUMP_CEILING_SECONDS,
+  LOOP_AUDITION_PREROLL_MS,
   NUDGE_RANGE_MS,
   RECIPE_RESEND_DEBOUNCE_MS,
 } from './dj-player-engine';
@@ -252,6 +253,14 @@ function messageSequence(midi: FakeMidiOutputService): number[] {
  */
 function expectedCeilingFrames(intervalUs = PAL_FRAME_INTERVAL_US): number {
   return Math.round((JUMP_CEILING_SECONDS * 1_000_000) / intervalUs);
+}
+
+/**
+ * The engine's own pre-roll formula (`msToFrames` in `dj-player-engine.ts`), duplicated only to
+ * compute the frame count an audition should land on — not a re-test of the formula itself.
+ */
+function expectedPrerollFrames(callsPerFrame = 1, intervalUs = PAL_FRAME_INTERVAL_US): number {
+  return Math.round((LOOP_AUDITION_PREROLL_MS * 1000) / (intervalUs / callsPerFrame));
 }
 
 /** The value byte for a given present slot within a SID data packet (see `buildSidDataPacket`). */
@@ -1370,6 +1379,109 @@ describe('DjPlayerEngine', () => {
       expect(engine.loopSlots()).toEqual([null, null, null, null]);
       expect(engine.activeLoopSlot()).toBeNull();
       expect(engine.queuedLoopSlot()).toBeNull();
+    });
+  });
+
+  describe('the loop audition', () => {
+    /** `counterTune` stores its play-call count into $D400, so slot 0 of a resync packet names the
+     * frame the audition actually landed on. */
+    const COUNTER_SLOT = 0;
+
+    function counterAt(frame: number): number {
+      return frame % 128;
+    }
+
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    /** Marks a slot from the current position: in here, out `length` frames later. */
+    function markSlotHere(slot: number, length: number): void {
+      engine.tapLoopIn(slot);
+      clock.tick(length);
+      engine.tapLoopOut(slot);
+    }
+
+    /** Marks one slot on a fresh tune: in at `inFrame`, out `length` frames later. */
+    async function markLoop(slot: number, inFrame: number, length: number): Promise<void> {
+      await playTo(inFrame);
+      markSlotHere(slot, length);
+    }
+
+    it('resumes pre-roll frames before the out-point and wraps to the in-point on the seam', async () => {
+      await markLoop(0, 10, 200); // in 10, out 210
+      const target = 210 - expectedPrerollFrames();
+
+      engine.auditionLoopOut(0);
+      clock.tick(2); // the gate-off, then the resync carrying the pre-roll's registers
+
+      expect(engine.stats().framesRendered).toBe(target);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(target));
+    });
+
+    it('clamps to the in-point when the pre-roll is longer than the loop', async () => {
+      await markLoop(0, 300, 50); // in 300, out 350 — shorter than the 2 s pre-roll
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+
+      engine.auditionLoopOut(0);
+
+      // No forward replay at all: target clamps straight to the in-point restorePoint already reached.
+      expect(runFrame).not.toHaveBeenCalled();
+      clock.tick(2);
+      expect(engine.stats().framesRendered).toBe(300);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(300));
+    });
+
+    it('bounds the replay to the loop length, not to how deep the loop sits in the tune', async () => {
+      await markLoop(0, 1000, 300); // in 1000, out 1300 — deep in the tune
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+
+      engine.auditionLoopOut(0);
+
+      expect(runFrame).toHaveBeenCalledTimes(300 - expectedPrerollFrames());
+    });
+
+    it('makes the audited slot active immediately rather than queueing it', async () => {
+      await markLoop(0, 5, 100); // in 5, out 105
+      await markLoop(1, 200, 300); // in 200, out 500
+      engine.punchLoop(0);
+      clock.tick(2);
+
+      engine.auditionLoopOut(1);
+
+      // Immediate, not the wait-for-lap rule a punch follows — a queued switch would leave slot 0
+      // active until its lap finished, with nothing to hear yet.
+      expect(engine.activeLoopSlot()).toBe(1);
+      expect(engine.queuedLoopSlot()).toBeNull();
+    });
+
+    it('is a no-op for a slot that is not playable', async () => {
+      await playTo(10);
+      engine.tapLoopIn(0); // no out marked yet
+
+      engine.auditionLoopOut(0);
+
+      expect(engine.activeLoopSlot()).toBeNull();
+    });
+
+    it('derives the pre-roll from the tune rate at 1x and 2x, never the live speed', async () => {
+      await markLoop(0, 10, 300); // in 10, out 310
+      engine.setSpeed(1.2);
+      const runFrame1x = vi.spyOn(C64Machine.prototype, 'runFrame');
+      engine.auditionLoopOut(0);
+      expect(runFrame1x).toHaveBeenCalledTimes(300 - expectedPrerollFrames());
+
+      engine.loadTune(doubleSpeedCounterTune());
+      await engine.play();
+      clock.tick(10);
+      markSlotHere(0, 300); // in 10, out 310, at 2x
+      const runFrame2x = vi.spyOn(C64Machine.prototype, 'runFrame');
+
+      engine.auditionLoopOut(0);
+
+      expect(runFrame2x).toHaveBeenCalledTimes(300 - expectedPrerollFrames(2));
     });
   });
 
