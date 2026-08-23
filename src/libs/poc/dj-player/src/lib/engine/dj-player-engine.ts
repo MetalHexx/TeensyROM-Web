@@ -193,6 +193,10 @@ export class DjPlayerEngine implements OnDestroy {
       file.clock === 'ntsc' ? NTSC_FRAME_INTERVAL_US : PAL_FRAME_INTERVAL_US
     );
     this.resetCounters();
+    // Cues hold machine state, not frame numbers, so a new tune invalidates every captured snapshot —
+    // this is the only path that clears them. Stop, play-from-stopped and subtune changes reuse the
+    // same machine and must leave captured cues alone.
+    this.cues.set([null, null, null, null]);
 
     if (this.initSubtune(file.startSong)) {
       this.state.set('stopped');
@@ -546,10 +550,6 @@ export class DjPlayerEngine implements OnDestroy {
 
     frame.markAllDirty();
     this.framesRendered = 0;
-    // Cues hold machine state now, not frame numbers, so this clear carries more weight than it did:
-    // a re-init leaves any captured snapshot describing a machine that no longer exists. Every path
-    // that rebuilds or re-inits — load, stop, play-from-stopped, subtune change — lands here.
-    this.cues.set([null, null, null, null]);
     this.loopEnabled.set(false);
     this.currentSubtune.set(clamped);
     this.lastError.set(null);

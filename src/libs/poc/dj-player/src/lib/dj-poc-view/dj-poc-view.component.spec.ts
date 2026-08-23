@@ -506,8 +506,8 @@ describe('DjPocViewComponent', () => {
       fixture.detectChanges();
 
       const buttons = cueButtons();
-      expect(buttons[0].textContent).toContain('Hop 1');
-      expect(buttons[1].textContent).toContain('Clear 1');
+      expect(buttons[0].textContent?.trim()).toBe('Hop');
+      expect(buttons[1].textContent?.trim()).toBe('Clear');
 
       buttons[1].click();
       expect(engine.clearCue).toHaveBeenCalledWith(0);
@@ -517,11 +517,51 @@ describe('DjPocViewComponent', () => {
       engine.cues.set([cueAt(1234), null, null, null]);
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-slot').textContent).toContain(
+      expect(fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-row').textContent).toContain(
         'frame 1234'
       );
     });
 
+    it('renders one row per cue slot, labelled Cue 1 through Cue 4', () => {
+      const rows: HTMLElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-row')
+      );
+
+      expect(rows).toHaveLength(4);
+      expect(rows.map((row) => row.querySelector('.cue-tag')?.textContent?.trim())).toEqual([
+        'Cue 1',
+        'Cue 2',
+        'Cue 3',
+        'Cue 4',
+      ]);
+    });
+
+    it('keeps the frame column in the same position across the empty to filled transition', () => {
+      const emptyRow = fixture.nativeElement.querySelector(
+        '[aria-label="Cues"] .cue-row'
+      ) as HTMLElement;
+      const childIndex = (el: Element): number =>
+        el.parentElement === null ? -1 : Array.from(el.parentElement.children).indexOf(el);
+
+      const emptyFrame = emptyRow.querySelector('.cue-frame') as HTMLElement;
+      const emptyBtns = emptyRow.querySelector('.cue-btns') as HTMLElement;
+      expect(emptyFrame.textContent?.trim()).toBe('empty');
+      const btnsIndex = childIndex(emptyBtns);
+      const frameIndex = childIndex(emptyFrame);
+
+      engine.cues.set([cueAt(1234), null, null, null]);
+      fixture.detectChanges();
+
+      const filledRow = fixture.nativeElement.querySelector(
+        '[aria-label="Cues"] .cue-row'
+      ) as HTMLElement;
+      const filledFrame = filledRow.querySelector('.cue-frame') as HTMLElement;
+      const filledBtns = filledRow.querySelector('.cue-btns') as HTMLElement;
+
+      expect(childIndex(filledBtns)).toBe(btnsIndex);
+      expect(childIndex(filledFrame)).toBe(frameIndex);
+      expect(filledFrame.textContent?.trim()).toBe('frame 1234');
+    });
   });
 
   describe('loop handlers', () => {

@@ -239,19 +239,27 @@
     </div>
   </section>
 
-  <section class="poc-section" aria-label="Cues">
+  <section class="poc-section poc-section--wide" aria-label="Cues">
     <h2>Cues</h2>
 
-    <div class="control-row">
+    <div class="cue-rows">
       @for (slot of cueIndices; track slot) {
-        <div class="cue-slot">
+        <div class="cue-row">
+          <span class="cue-tag">Cue {{ slot + 1 }}</span>
+          <div class="cue-btns">
+            @if (cues()[slot]; as cue) {
+              <button type="button" (click)="onHopToCue(slot)">Hop</button>
+              <button type="button" (click)="onClearCue(slot)">Clear</button>
+            } @else {
+              <button type="button" class="cue-btn-wide" (click)="onAddCue(slot)">Add</button>
+            }
+          </div>
           @if (cues()[slot]; as cue) {
-            <button type="button" (click)="onHopToCue(slot)">Hop {{ slot + 1 }}</button>
-            <button type="button" (click)="onClearCue(slot)">Clear {{ slot + 1 }}</button>
-            <span class="caption">frame {{ cue.frame }}</span>
+            <span class="cue-frame">frame {{ cue.frame }}</span>
           } @else {
-            <button type="button" (click)="onAddCue(slot)">Add {{ slot + 1 }}</button>
+            <span class="cue-frame cue-frame--empty">empty</span>
           }
+          <div class="cue-nudge" aria-hidden="true"></div>
         </div>
       }
     </div>
@@ -259,8 +267,9 @@
     <p class="caption">
       Cues store machine state, not a position, so a hop restores in constant time instead of
       re-emulating from init — no main-thread stall, and the frame clock keeps ticking through it. A
-      snapshot only means anything to the machine it came from, so anything that re-inits one —
-      loading a tune, stopping, changing subtune — clears all four slots.
+      snapshot only means anything to the machine it came from, so only loading a new tune — which
+      rebuilds the machine outright — clears all four slots; stopping or changing subtune now leaves
+      them intact.
     </p>
 
     <p class="caption">

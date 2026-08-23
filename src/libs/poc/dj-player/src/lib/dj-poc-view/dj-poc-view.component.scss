@@ -124,12 +124,60 @@
   border-top: 1px solid var(--color-dimmed);
 }
 
-// A hopped-to slot grows a second button (Clear); stack it below Hop rather than widening the
-// row, so the four cue slots keep a consistent column width regardless of set/empty state.
-.cue-slot {
+.cue-rows {
   display: flex;
   flex-direction: column;
+}
+
+// label | button pair | captured frame | nudge track (reserved for P02-T02). The button column
+// and the frame column stay fixed width across the empty/filled states so filling or clearing a
+// slot never moves anything else in the row — the row that wraps a fourth button onto its own
+// line is exactly the fault this layout exists to avoid.
+.cue-row {
+  display: flex;
+  align-items: center;
   gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-dimmed);
+
+  &:last-of-type {
+    border-bottom: 0;
+  }
+}
+
+.cue-tag {
+  flex: 0 0 4.5rem;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+// Fixed-width column reserved whether the row shows one wide button or two — a hopped-to slot's
+// extra Clear button must never widen the row.
+.cue-btns {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex: 0 0 11rem;
+
+  button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+.cue-frame {
+  flex: 0 0 6rem;
+  font-size: var(--font-size-sm);
+}
+
+.cue-frame--empty {
+  color: var(--color-dimmed);
+}
+
+// Reserved for the nudge track P02-T02 adds; kept empty and flexible here so that task's addition
+// doesn't have to re-plumb the row.
+.cue-nudge {
+  flex: 1 1 auto;
+  min-width: 8rem;
 }
 
 .error-text {

@@ -662,6 +662,31 @@ describe('DjPlayerEngine', () => {
       expect([cues[1], cues[3]]).toEqual([null, null]);
     });
 
+    it('survives stop() and a play from stopped, since neither rebuilds the tune', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+
+      engine.stop();
+      expect(engine.cues()[0]).not.toBeNull();
+
+      await engine.play();
+      expect(engine.cues()[0]).not.toBeNull();
+    });
+
+    it('clears every slot on loadTune, since a new tune invalidates every captured snapshot', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(5);
+      engine.addCue(0);
+      engine.addCue(2);
+
+      engine.loadTune(counterTune());
+
+      expect(engine.cues()).toEqual([null, null, null, null]);
+    });
+
     it('restores a cue without re-emulating, so the machine keeps running forward from it', async () => {
       engine.loadTune(counterTune());
       await engine.play();
@@ -805,7 +830,7 @@ describe('DjPlayerEngine', () => {
       expect(clock.running).toBe(true);
     });
 
-    it('resets position, cues and the loop arm when the subtune changes', async () => {
+    it('resets position and the loop arm when the subtune changes, but leaves cues alone', async () => {
       engine.loadTune(silentTune(2));
       await engine.play();
       clock.tick(5);
@@ -816,7 +841,7 @@ describe('DjPlayerEngine', () => {
       engine.nextSubtune();
 
       expect(engine.stats().framesRendered).toBe(0);
-      expect(engine.cues()).toEqual([null, null, null, null]);
+      expect(engine.cues()[0]).not.toBeNull();
       expect(engine.loopEnabled()).toBe(false);
       expect(engine.mutedVoices()).toEqual([false, true, false]);
     });
