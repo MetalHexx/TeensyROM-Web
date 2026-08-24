@@ -503,13 +503,18 @@ export class DjPocViewComponent {
   }
 
   // (change) fires on release, not on every drag tick — the seam that makes this "drag anywhere,
-  // release, and it jumps" rather than a continuous scrub. Clearing the pin here, after the jump is
-  // committed, is what lets tracking resume without a stale drag value racing the engine's own
-  // position update.
-  onScrubChange(event: Event): void {
+  // release, and it jumps" rather than a continuous scrub. The pin stays set — holding the thumb at
+  // the clicked spot — until the engine's async scrub actually lands; releasing it early snapped the
+  // thumb back to the stale position and then forward again once the worker's replay landed. Guarded
+  // on the pin still being this call's own value so a superseded scrub settling late cannot clear a
+  // newer one's pin out from under it.
+  async onScrubChange(event: Event): Promise<void> {
     const value = Number((event.target as HTMLInputElement).value);
-    this.engine.scrubTo(value);
-    this.scrubDragValue.set(null);
+    this.scrubDragValue.set(value);
+    await this.engine.scrubTo(value);
+    if (this.scrubDragValue() === value) {
+      this.scrubDragValue.set(null);
+    }
   }
 
   protected frameRateHz(intervalUs: number): string {

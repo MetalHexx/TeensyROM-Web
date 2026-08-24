@@ -1082,7 +1082,11 @@ describe('DjPocViewComponent', () => {
       expect(scrubInput().value).toBe('42');
     });
 
-    it('releases the pin on change, letting the engine position resume driving the display', () => {
+    it('holds the pin while the scrub is in flight, even as the engine position keeps advancing', async () => {
+      let resolveScrub!: () => void;
+      engine.scrubTo.mockImplementation(
+        () => new Promise<void>((resolve) => (resolveScrub = resolve))
+      );
       engine.positionPercent.set(10);
       fixture.detectChanges();
 
@@ -1090,6 +1094,35 @@ describe('DjPocViewComponent', () => {
       input.value = '42';
       input.dispatchEvent(new Event('input'));
       input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      // The live position keeps moving while the replay is still in flight — the pin must hold, or
+      // the thumb snaps back to the stale position before the real jump lands.
+      engine.positionPercent.set(55);
+      fixture.detectChanges();
+      expect(scrubInput().value).toBe('42');
+
+      resolveScrub();
+      await Promise.resolve();
+      fixture.detectChanges();
+    });
+
+    it('releases the pin once the scrub settles, letting the engine position resume driving the display', async () => {
+      let resolveScrub!: () => void;
+      engine.scrubTo.mockImplementation(
+        () => new Promise<void>((resolve) => (resolveScrub = resolve))
+      );
+      engine.positionPercent.set(10);
+      fixture.detectChanges();
+
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      resolveScrub();
+      await Promise.resolve();
       fixture.detectChanges();
 
       engine.positionPercent.set(77);

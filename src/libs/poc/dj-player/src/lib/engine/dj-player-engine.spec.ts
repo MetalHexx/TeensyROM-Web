@@ -1404,6 +1404,20 @@ describe('DjPlayerEngine', () => {
       expect(engine.state()).toBe('playing');
     });
 
+    it('scrubTo does not resolve until the replay settles', async () => {
+      await playTo(5);
+      replay.manual = true;
+
+      const landed = vi.fn();
+      void engine.scrubTo(4).then(landed);
+      await Promise.resolve(); // let any already-settled microtasks run
+      expect(landed).not.toHaveBeenCalled();
+
+      replay.resolveAll();
+      await replay.settle();
+      expect(landed).toHaveBeenCalled();
+    });
+
     it('applies only the newest of two scrubs issued before either resolves', async () => {
       await playTo(5);
       replay.manual = true;

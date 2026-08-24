@@ -1036,13 +1036,15 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Asks for `percent` of `ceilingFrames()`. Returns before the position moves — the replay runs off
-   * this thread and lands a moment later, and a second scrub issued in the meantime supersedes this
-   * one. Playback carries on untouched until it lands.
+   * Asks for `percent` of `ceilingFrames()`. The position does not move as soon as this returns — the
+   * replay runs off this thread and lands a moment later, and a second scrub issued in the meantime
+   * supersedes this one. Playback carries on untouched until it lands. The returned promise resolves
+   * once this request has settled — landed, failed, or been superseded/discarded — so a caller that
+   * needs to know when the jump is done (rather than merely requested) can await it.
    */
-  scrubTo(percent: number): void {
-    if (this.machine === null) return;
-    this.jumpToFrame(this.frameForPercent(percent));
+  scrubTo(percent: number): Promise<void> {
+    if (this.machine === null) return Promise.resolve();
+    return this.jumpToFrame(this.frameForPercent(percent));
   }
 
   /**
@@ -1229,9 +1231,9 @@ export class DjPlayerEngine implements OnDestroy {
    * response carrying any other id is dropped — a second scrub supersedes the first rather than
    * queueing behind it.
    */
-  private jumpToFrame(targetFrame: number): void {
+  private jumpToFrame(targetFrame: number): Promise<void> {
     const file = this.file;
-    if (file === null || this.machine === null || this.frame === null) return;
+    if (file === null || this.machine === null || this.frame === null) return Promise.resolve();
 
     const request: ReplayRequest = {
       id: ++this.jumpRequestId,
@@ -1243,7 +1245,7 @@ export class DjPlayerEngine implements OnDestroy {
       mutes: this.effectiveMutes(),
     };
     this.outstandingJumpId = request.id;
-    void this.awaitJump(request);
+    return this.awaitJump(request);
   }
 
   /** Waits out one replay request and applies its result if it is still the one being waited on. */
