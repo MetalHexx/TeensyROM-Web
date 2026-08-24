@@ -22,6 +22,7 @@ import {
   LOOP_AUDITION_PREROLL_MS,
   NUDGE_RANGE_MS,
   RECIPE_RESEND_DEBOUNCE_MS,
+  RETUNE_GATE_LEAD_FRAMES,
 } from './dj-player-engine';
 
 /** Bytes before the values in a SID data packet, plus the trailing `F7`. */
@@ -303,6 +304,16 @@ describe('DjPlayerEngine', () => {
     vi.restoreAllMocks();
   });
 
+  /**
+   * Drives a queued `clock-and-recipe` retune past the debounce that starts it, then through its
+   * gate lead and the retime tick that carries the recipe. Leaves the closing resync still owed, so
+   * a caller can tick onto it and assert what comes back. Fake timers must be installed.
+   */
+  function completeRetune(): void {
+    vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+    clock.tick(RETUNE_GATE_LEAD_FRAMES + 1);
+  }
+
   it('sends one SID data packet per tick, including frames that changed nothing', async () => {
     engine.loadTune(silentTune());
     await engine.play();
@@ -471,6 +482,10 @@ describe('DjPlayerEngine', () => {
 
   it('divides the clock interval by the speed multiplier, clamped to the input span', async () => {
     engine.loadTune(silentTune());
+    // Ridden in clock-only mode because clock-and-recipe deliberately freezes the clock until its
+    // retune lands: the division reaching the clock is what is under test here, not when it does —
+    // see 'the managed retune sequence' for that.
+    engine.setSpeedMode('clock-only');
     await engine.play();
 
     engine.setSpeed(1.3);
@@ -484,6 +499,14 @@ describe('DjPlayerEngine', () => {
   });
 
   describe('the per-tune speed floor', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     /** The engine's own protocol-floor formula (`slowestSpeed` in `dj-player-engine.ts`), duplicated
      * only to compute the boundary the floor should resolve to — not a re-test of the formula. */
     function expectedProtocolFloor(intervalUs: number, callsPerFrame = 1): number {
@@ -529,11 +552,21 @@ describe('DjPlayerEngine', () => {
       engine.setSpeed(0.5); // the fader minimum
 
       engine.jumpSpeedDown(); // additive from 0.5 lands well under the floor, so it clamps up to it
+      completeRetune();
 
       expect(engine.speedMultiplier()).toBeCloseTo(expectedProtocolFloor(PAL_FRAME_INTERVAL_US), 6);
       // Rounded the same way `sendRecipe` rounds before clamping — the floating-point floor lands a
       // hair either side of 0xffff, and it is the rounded value the cartridge actually receives.
-      expect(Math.round(engine.stats().effectiveIntervalUs)).toBeLessThanOrEqual(0xffff);
+      // The floor exists so that clamp never has to bite, which the recipe below is the proof of.
+      expect(Math.round(clock.intervalUs)).toBeLessThanOrEqual(0xffff);
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).at(-1)?.bytes).toEqual(
+        buildFramerateRecipePacket({
+          ntsc: false,
+          speedMultiplier: 1,
+          bufferingRequested: true,
+          frameIntervalUs: Math.round(clock.intervalUs),
+        })
+      );
     });
   });
 
@@ -741,6 +774,10 @@ describe('DjPlayerEngine', () => {
       expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(resendsBefore);
 
       vi.advanceTimersByTime(1);
+      // The debounce only queues the retune; the recipe rides the tick at the end of its gate lead.
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(resendsBefore);
+
+      clock.tick(RETUNE_GATE_LEAD_FRAMES + 1);
 
       const resends = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE);
       expect(resends).toHaveLength(resendsBefore + 1);
@@ -765,6 +802,229 @@ describe('DjPlayerEngine', () => {
       vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 2);
 
       expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(resendsBefore);
+    });
+  });
+
+  describe('the managed retune sequence', () => {
+    /** `counterTune` stores its play-call count into $D400, so slot 0 of a full re-emit names the
+     *  frame that packet carries. */
+    const COUNTER_SLOT = 0;
+    /** What `counterTune`'s init writes to all three voice control registers, and never rewrites. */
+    const LIVE_GATE = 0x11;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    it('emits a gated lead, then a silent retime tick, then one full resync, in that order', async () => {
+      await playTo(5);
+      const before = dataPackets(midi).length;
+      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
+
+      engine.setSpeed(1.2);
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+      clock.tick(RETUNE_GATE_LEAD_FRAMES);
+
+      const lead = dataPackets(midi).slice(before);
+      expect(lead).toHaveLength(RETUNE_GATE_LEAD_FRAMES);
+      for (const packet of lead) {
+        // Every frame of the lead is a complete re-emit, which is the only shape in which slots
+        // 22/23/24 are the three voice control registers — zeroing those indices on a compacted
+        // delta would leave the gates open and corrupt three unrelated registers instead.
+        expect(valueCount(packet)).toBe(25);
+        expect(voiceGateValues(packet)).toEqual([0, 0, 0]);
+      }
+      // The tune's own registers carry their true values through the silence: the counter steps one
+      // per frame across the lead rather than freezing, which is what a gate-off-only lead would do.
+      expect(lead.map((packet) => slotValue(packet, COUNTER_SLOT))).toEqual(
+        Array.from({ length: RETUNE_GATE_LEAD_FRAMES }, (_, i) => 6 + i)
+      );
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
+
+      clock.tick(1);
+      // The recipe flushes the cartridge's queue on receipt, so a frame sent on this tick would be
+      // discarded anyway — the recipe goes out alone.
+      expect(dataPackets(midi)).toHaveLength(before + RETUNE_GATE_LEAD_FRAMES);
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore + 1);
+
+      clock.tick(1);
+      const resync = lastDataPacket(midi);
+      expect(valueCount(resync)).toBe(25);
+      // Sound returns here, and at the tune's real gate values rather than the zeros the lead sent.
+      expect(voiceGateValues(resync)).toEqual([LIVE_GATE, LIVE_GATE, LIVE_GATE]);
+
+      clock.tick(1);
+      // Back to ordinary deltas: the sequence is over, not merely quiet.
+      expect(valueCount(lastDataPacket(midi))).toBe(1);
+    });
+
+    it('keeps the tune advancing across the sequence rather than holding its place', async () => {
+      await playTo(5);
+      engine.setSpeed(1.2);
+      const framesBefore = engine.stats().framesRendered;
+
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
+      // `stats` republishes every 25 frames, so a sequence this short needs a publish forced to read
+      // the counter back. Pausing is the cheapest gesture that does so and never touches it.
+      engine.pause();
+
+      expect(engine.stats().framesRendered).toBe(framesBefore + RETUNE_GATE_LEAD_FRAMES + 2);
+    });
+
+    it('leaves the clock on the old interval until the retime step, then moves it', async () => {
+      await playTo(5);
+
+      engine.setSpeed(1.2);
+      expect(clock.intervalUs).toBe(PAL_FRAME_INTERVAL_US);
+
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+      clock.tick(RETUNE_GATE_LEAD_FRAMES);
+      // Host and cartridge change rate in the same instant or not at all — feeding a new rate while
+      // the cartridge still paces the old one is the disagreement this sequence exists to close.
+      expect(clock.intervalUs).toBe(PAL_FRAME_INTERVAL_US);
+
+      clock.tick(1);
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+    });
+
+    it('reports the interval the clock is running, not the one the fader has already asked for', async () => {
+      await playTo(5);
+
+      engine.setSpeed(1.2);
+      expect(engine.stats().effectiveIntervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US, 6);
+
+      completeRetune();
+
+      expect(engine.stats().effectiveIntervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+    });
+
+    it('restarts the lead on a speed change mid-sequence, and still sends only one recipe', async () => {
+      await playTo(5);
+      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
+
+      engine.setSpeed(1.2);
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+      clock.tick(4); // four of the first lead's gated frames have already gone out
+
+      engine.setSpeed(1.3);
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+      const before = dataPackets(midi).length;
+      clock.tick(RETUNE_GATE_LEAD_FRAMES);
+
+      // A full fresh lead, not the twelve frames the superseded one had left: a second change starts
+      // over rather than stacking dropouts.
+      const lead = dataPackets(midi).slice(before);
+      expect(lead).toHaveLength(RETUNE_GATE_LEAD_FRAMES);
+      for (const packet of lead) {
+        expect(voiceGateValues(packet)).toEqual([0, 0, 0]);
+      }
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
+
+      clock.tick(1);
+      const recipes = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE);
+      expect(recipes).toHaveLength(recipesBefore + 1);
+      expect(recipes.at(-1)?.bytes).toEqual(
+        buildFramerateRecipePacket({
+          ntsc: false,
+          speedMultiplier: 1,
+          bufferingRequested: true,
+          frameIntervalUs: Math.round(PAL_FRAME_INTERVAL_US / 1.3),
+        })
+      );
+    });
+
+    /**
+     * A surviving lead would keep zeroing the gates and re-emitting the whole chip on every tick; a
+     * dropped one leaves the tune's own gate values standing in the packet that restores the chip,
+     * and falls straight back to ordinary deltas behind it.
+     */
+    function expectSequenceDropped(): void {
+      const before = dataPackets(midi).length;
+      clock.tick(2);
+
+      const resumed = dataPackets(midi).slice(before);
+      expect(voiceGateValues(resumed[0])).toEqual([LIVE_GATE, LIVE_GATE, LIVE_GATE]);
+      expect(valueCount(resumed[1])).toBe(1);
+    }
+
+    async function retuneInFlight(): Promise<void> {
+      await playTo(5);
+      engine.setSpeed(1.2);
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+      clock.tick(3);
+    }
+
+    it('drops a sequence in flight when playback pauses', async () => {
+      await retuneInFlight();
+
+      engine.pause();
+      await engine.play();
+
+      expectSequenceDropped();
+    });
+
+    it('drops a sequence in flight when playback stops', async () => {
+      await retuneInFlight();
+
+      engine.stop();
+      await engine.play();
+
+      expectSequenceDropped();
+    });
+
+    it('drops a sequence in flight when a new tune loads', async () => {
+      await retuneInFlight();
+
+      engine.loadTune(counterTune());
+      await engine.play();
+
+      expectSequenceDropped();
+    });
+
+    it('changes the interval at once and builds no sequence in clock-only mode', async () => {
+      engine.setSpeedMode('clock-only');
+      await playTo(5);
+      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
+
+      engine.setSpeed(1.2);
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
+      const before = dataPackets(midi).length;
+      clock.tick(3);
+
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
+      // Ordinary deltas throughout — no lead was ever queued, which is the whole point of the mode.
+      for (const packet of dataPackets(midi).slice(before)) {
+        expect(valueCount(packet)).toBe(1);
+      }
+    });
+
+    it('changes the interval at once and builds no sequence with the recipe switched off', async () => {
+      await playTo(5);
+      engine.setRecipeEnabled(false);
+
+      engine.setSpeed(1.2);
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
+      const before = dataPackets(midi).length;
+      clock.tick(3);
+
+      for (const packet of dataPackets(midi).slice(before)) {
+        expect(valueCount(packet)).toBe(1);
+      }
     });
   });
 
