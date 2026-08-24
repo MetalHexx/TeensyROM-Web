@@ -1126,7 +1126,7 @@ describe('DjPlayerEngine', () => {
       engine.loadTune(counterTune());
       await engine.play();
       clock.tick(5);
-      engine.addCue(0);
+      engine.addCue();
       clock.tick(10);
 
       engine.hopToCue(0);
@@ -1147,31 +1147,30 @@ describe('DjPlayerEngine', () => {
       freshEngine.loadTune(counterTune());
       await freshEngine.play();
       freshClock.tick(5);
-      freshEngine.addCue(0);
+      freshEngine.addCue();
       freshEngine.hopToCue(0); // captured and restored back to back, nothing played in between
       freshClock.tick(2);
 
       expect(hopped).toEqual(lastDataPacket(freshMidi).bytes);
     });
 
-    it('clears a captured cue back to null, and leaves other slots untouched', () => {
+    it('clears a captured cue back to null, and leaves other rows untouched', () => {
       engine.loadTune(counterTune());
-      engine.addCue(0);
-      engine.addCue(2);
+      engine.addCue();
+      engine.addCue();
 
       engine.clearCue(0);
 
       const cues = engine.cues();
       expect(cues[0]).toBeNull();
-      expect(cues[2]).not.toBeNull();
-      expect([cues[1], cues[3]]).toEqual([null, null]);
+      expect(cues[1]).not.toBeNull();
     });
 
     it('survives stop() and a play from stopped, since neither rebuilds the tune', async () => {
       engine.loadTune(counterTune());
       await engine.play();
       clock.tick(5);
-      engine.addCue(0);
+      engine.addCue();
 
       engine.stop();
       expect(engine.cues()[0]).not.toBeNull();
@@ -1180,23 +1179,23 @@ describe('DjPlayerEngine', () => {
       expect(engine.cues()[0]).not.toBeNull();
     });
 
-    it('clears every slot on loadTune, since a new tune invalidates every captured snapshot', async () => {
+    it('clears every cue on loadTune, since a new tune invalidates every captured snapshot', async () => {
       engine.loadTune(counterTune());
       await engine.play();
       clock.tick(5);
-      engine.addCue(0);
-      engine.addCue(2);
+      engine.addCue();
+      engine.addCue();
 
       engine.loadTune(counterTune());
 
-      expect(engine.cues()).toEqual([null, null, null, null]);
+      expect(engine.cues()).toEqual([]);
     });
 
     it('restores a cue without re-emulating, so the machine keeps running forward from it', async () => {
       engine.loadTune(counterTune());
       await engine.play();
       clock.tick(5);
-      engine.addCue(0);
+      engine.addCue();
       const atCue = slotValue(lastDataPacket(midi), 0);
 
       clock.tick(20);
@@ -1217,7 +1216,7 @@ describe('DjPlayerEngine', () => {
       engine.loadTune(counterTune());
       await engine.play();
       clock.tick(5);
-      engine.addCue(0);
+      engine.addCue();
       clock.tick(5);
 
       const before = dataPackets(midi).length;
@@ -1247,9 +1246,9 @@ describe('DjPlayerEngine', () => {
       engine.loadTune(counterTune());
       await engine.play();
       clock.tick(5);
-      engine.addCue(0);
+      engine.addCue();
       clock.tick(5);
-      engine.addCue(1);
+      engine.addCue();
 
       const before = dataPackets(midi).length;
       for (let i = 0; i < 50; i++) engine.hopToCue(i % 2);
@@ -1330,7 +1329,8 @@ describe('DjPlayerEngine', () => {
       engine.loadTune(silentTune(2));
       await engine.play();
       clock.tick(5);
-      engine.addCue(0);
+      engine.addCue();
+      engine.addLoop();
       engine.tapLoopIn(0);
       clock.tick(5);
       engine.tapLoopOut(0);
@@ -1538,7 +1538,7 @@ describe('DjPlayerEngine', () => {
 
     it('walks a cue backward onto an earlier frame without replaying from init', async () => {
       await playTo(60);
-      engine.addCue(0);
+      engine.addCue();
 
       engine.setCueOffset(0, -10);
 
@@ -1550,7 +1550,7 @@ describe('DjPlayerEngine', () => {
 
     it('walks a cue forward onto a later frame', async () => {
       await playTo(60);
-      engine.addCue(0);
+      engine.addCue();
 
       engine.setCueOffset(0, 10);
 
@@ -1560,7 +1560,7 @@ describe('DjPlayerEngine', () => {
 
     it('resolves to the same state a direct replay to that frame produces', async () => {
       await playTo(60);
-      engine.addCue(0);
+      engine.addCue();
       engine.setCueOffset(0, -10);
       engine.hopToCue(0);
       clock.tick(5); // the resync, then three frames played on from it
@@ -1580,7 +1580,7 @@ describe('DjPlayerEngine', () => {
       freshEngine.loadTune(counterTune());
       await freshEngine.play();
       freshClock.tick(50); // played straight through to the frame the nudge walked onto
-      freshEngine.addCue(0);
+      freshEngine.addCue();
       freshEngine.hopToCue(0);
       freshClock.tick(5);
 
@@ -1589,7 +1589,7 @@ describe('DjPlayerEngine', () => {
 
     it('hops to a nudged cue without emulating a frame, however deep it was captured', async () => {
       await playTo(200);
-      engine.addCue(0);
+      engine.addCue();
       engine.setCueOffset(0, -20);
       const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
 
@@ -1604,7 +1604,7 @@ describe('DjPlayerEngine', () => {
 
     it('falls back to the frame-0 anchor for a cue captured before the ring has filled', async () => {
       await playTo(5);
-      engine.addCue(0);
+      engine.addCue();
 
       engine.setCueOffset(0, -5);
 
@@ -1614,7 +1614,7 @@ describe('DjPlayerEngine', () => {
 
     it('leaves playback exactly where it is, since the re-derivation runs on a throwaway machine', async () => {
       await playTo(60);
-      engine.addCue(0);
+      engine.addCue();
 
       engine.setCueOffset(0, -10);
 
@@ -1624,7 +1624,7 @@ describe('DjPlayerEngine', () => {
 
     it('clamps the offset to the nudge range in both directions', async () => {
       await playTo(60);
-      engine.addCue(0);
+      engine.addCue();
 
       const range = engine.nudgeRangeFrames();
       engine.setCueOffset(0, 999);
@@ -1634,12 +1634,24 @@ describe('DjPlayerEngine', () => {
       expect(engine.cues()[0]?.offset).toBe(-range);
     });
 
-    it('is a no-op on an empty slot', async () => {
+    it('is a no-op on a cleared row', async () => {
       await playTo(30);
+      engine.addCue();
+      engine.clearCue(0);
+
+      engine.setCueOffset(0, 5);
+
+      expect(engine.cues()[0]).toBeNull();
+    });
+
+    it('is a no-op for an index beyond the collection', async () => {
+      await playTo(30);
+      engine.addCue();
 
       engine.setCueOffset(1, 5);
 
-      expect(engine.cues()[1]).toBeNull();
+      expect(engine.cues()).toHaveLength(1);
+      expect(engine.cues()[0]?.offset).toBe(0);
     });
   });
 
@@ -1660,8 +1672,17 @@ describe('DjPlayerEngine', () => {
       clock.tick(frames);
     }
 
+    /** Appends empty rows until `slot` exists — the tests below tap a specific row index the way a
+     *  UI would only after adding it, so this stands in for the row having already been added. */
+    function ensureLoopRow(slot: number): void {
+      while (engine.loopSlots().length <= slot) {
+        engine.addLoop();
+      }
+    }
+
     /** Marks a slot from the current position: in here, out `length` frames later. */
     function markSlotHere(slot: number, length: number): void {
+      ensureLoopRow(slot);
       engine.tapLoopIn(slot);
       clock.tick(length);
       engine.tapLoopOut(slot);
@@ -1684,7 +1705,7 @@ describe('DjPlayerEngine', () => {
       markSlotHere(1, 10);
       clock.tick(30);
       markSlotHere(2, 10);
-      engine.punchLoop(0);
+      await engine.punchLoop(0);
       clock.tick(2); // the gate-off and resync the engagement rides out on
     }
 
@@ -1856,6 +1877,7 @@ describe('DjPlayerEngine', () => {
 
     it('refuses to punch a slot until both ends are marked and in order', async () => {
       await playTo(10);
+      engine.addLoop();
 
       engine.punchLoop(0);
       expect(engine.activeLoopSlot()).toBeNull();
@@ -1876,15 +1898,16 @@ describe('DjPlayerEngine', () => {
 
     it('creates a slot from whichever end is tapped first', async () => {
       await playTo(10);
+      engine.addLoop();
 
-      engine.tapLoopOut(2);
+      engine.tapLoopOut(0);
 
-      expect(engine.loopSlots()[2]?.out?.frame).toBe(10);
-      expect(engine.loopSlots()[2]?.in).toBeNull();
+      expect(engine.loopSlots()[0].out?.frame).toBe(10);
+      expect(engine.loopSlots()[0].in).toBeNull();
 
-      engine.tapLoopIn(2);
-      expect(engine.loopSlots()[2]?.in?.frame).toBe(10);
-      expect(engine.loopSlots()[2]?.out?.frame).toBe(10);
+      engine.tapLoopIn(0);
+      expect(engine.loopSlots()[0].in?.frame).toBe(10);
+      expect(engine.loopSlots()[0].out?.frame).toBe(10);
     });
 
     it('drops out rather than spinning when a nudge crosses the ends', async () => {
@@ -1941,13 +1964,23 @@ describe('DjPlayerEngine', () => {
       expect(engine.stats().framesRendered).toBe(50);
     });
 
-    it('is a no-op to nudge either end of an unmarked slot', async () => {
+    it('is a no-op to nudge either end of an unmarked row', async () => {
+      await playTo(10);
+      engine.addLoop();
+
+      engine.setLoopInOffset(0, -5);
+      engine.setLoopOutOffset(0, 5);
+
+      expect(engine.loopSlots()[0]).toEqual({ in: null, out: null });
+    });
+
+    it('is a no-op to nudge a row that does not exist', async () => {
       await playTo(10);
 
-      engine.setLoopInOffset(1, -5);
-      engine.setLoopOutOffset(1, 5);
+      engine.setLoopInOffset(0, -5);
+      engine.setLoopOutOffset(0, 5);
 
-      expect(engine.loopSlots()[1]).toBeNull();
+      expect(engine.loopSlots()).toHaveLength(0);
     });
 
     it('keeps each slot to itself when another is nudged or cleared', async () => {
@@ -1973,8 +2006,9 @@ describe('DjPlayerEngine', () => {
 
       expect(engine.activeLoopSlot()).toBeNull();
       expect(engine.queuedLoopSlot()).toBeNull();
-      expect(engine.loopSlots()[0]).toBeNull();
-      expect(engine.loopSlots()[2]).not.toBeNull();
+      expect(engine.loopSlots()[0]).toEqual({ in: null, out: null });
+      expect(engine.loopSlots()[2].in).not.toBeNull();
+      expect(engine.loopSlots()[2].out).not.toBeNull();
     });
 
     it('keeps every marked slot through pause, stop and a play from stopped', async () => {
@@ -1993,14 +2027,331 @@ describe('DjPlayerEngine', () => {
       expect(engine.loopSlots()[0]?.out).not.toBeNull();
     });
 
-    it('clears every slot on loadTune, since an in-point holds a machine image', async () => {
+    it('clears every loop on loadTune, since an in-point holds a machine image', async () => {
       await threeSlotsWithFirstLooping();
       engine.punchLoop(1);
 
       engine.loadTune(counterTune());
 
-      expect(engine.loopSlots()).toEqual([null, null, null, null]);
+      expect(engine.loopSlots()).toEqual([]);
       expect(engine.activeLoopSlot()).toBeNull();
+      expect(engine.queuedLoopSlot()).toBeNull();
+    });
+  });
+
+  describe('appending and deleting cues and loops', () => {
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    it('starts both collections empty', () => {
+      engine.loadTune(counterTune());
+
+      expect(engine.cues()).toEqual([]);
+      expect(engine.loopSlots()).toEqual([]);
+    });
+
+    it('appends on add, returning the new row index', async () => {
+      await playTo(5);
+
+      expect(engine.addCue()).toBe(0);
+      expect(engine.addCue()).toBe(1);
+      expect(engine.cues()).toHaveLength(2);
+
+      expect(engine.addLoop()).toBe(0);
+      expect(engine.addLoop()).toBe(1);
+      expect(engine.loopSlots()).toEqual([
+        { in: null, out: null },
+        { in: null, out: null },
+      ]);
+    });
+
+    it('removes a cue outright on delete, shifting later rows down', async () => {
+      await playTo(5);
+      engine.addCue(); // frame 5
+      clock.tick(5);
+      engine.addCue(); // frame 10
+      clock.tick(5);
+      engine.addCue(); // frame 15
+
+      engine.deleteCue(0);
+
+      const cues = engine.cues();
+      expect(cues).toHaveLength(2);
+      expect(cues[0]?.frame).toBe(10);
+      expect(cues[1]?.frame).toBe(15);
+    });
+
+    it('is a no-op to delete a cue index beyond the collection', async () => {
+      await playTo(5);
+      engine.addCue();
+
+      engine.deleteCue(5);
+      engine.deleteCue(-1);
+
+      expect(engine.cues()).toHaveLength(1);
+    });
+
+    it('removes a loop row outright on delete, shifting later rows down', async () => {
+      await playTo(5);
+      engine.addLoop();
+      engine.tapLoopIn(0);
+      clock.tick(5);
+      engine.tapLoopOut(0);
+      engine.addLoop();
+      engine.tapLoopIn(1);
+      clock.tick(5);
+      engine.tapLoopOut(1);
+
+      engine.deleteLoop(0);
+
+      const loops = engine.loopSlots();
+      expect(loops).toHaveLength(1);
+      expect(loops[0].in?.frame).toBe(10);
+    });
+
+    it('is a no-op to delete a loop index beyond the collection', async () => {
+      await playTo(5);
+      engine.addLoop();
+
+      engine.deleteLoop(5);
+      engine.deleteLoop(-1);
+
+      expect(engine.loopSlots()).toHaveLength(1);
+    });
+
+    it('refills a cleared cue row by capturing into it again, landing at the new position', async () => {
+      await playTo(10);
+      engine.addCue(); // frame 10
+      engine.clearCue(0);
+
+      clock.tick(10);
+      engine.captureCue(0);
+
+      const cue = engine.cues()[0];
+      expect(cue).not.toBeNull();
+      expect(cue?.frame).toBe(20);
+    });
+
+    it('is a no-op to captureCue an index beyond the collection', async () => {
+      await playTo(10);
+
+      engine.captureCue(0);
+
+      expect(engine.cues()).toHaveLength(0);
+    });
+  });
+
+  describe('deleting a loop shifts the active and queued index seam', () => {
+    /** Three empty loop rows on a loaded tune — no need to tap either end, since the table below
+     *  drives `activeLoopSlot`/`queuedLoopSlot` directly to isolate the index shift from
+     *  `engageLoop`'s own playability checks. */
+    function threeRows(): void {
+      engine.loadTune(counterTune());
+      engine.addLoop();
+      engine.addLoop();
+      engine.addLoop();
+    }
+
+    it.each([
+      { label: 'before', deleteIndex: 0, activeBefore: 2, activeAfter: 1 },
+      { label: 'at', deleteIndex: 1, activeBefore: 1, activeAfter: null },
+      { label: 'after', deleteIndex: 2, activeBefore: 0, activeAfter: 0 },
+    ])(
+      'deleting $label the active index leaves activeLoopSlot at $activeAfter',
+      ({ deleteIndex, activeBefore, activeAfter }) => {
+        threeRows();
+        engine.activeLoopSlot.set(activeBefore);
+
+        engine.deleteLoop(deleteIndex);
+
+        expect(engine.activeLoopSlot()).toBe(activeAfter);
+      }
+    );
+
+    it.each([
+      { label: 'before', deleteIndex: 0, queuedBefore: 2, queuedAfter: 1 },
+      { label: 'at', deleteIndex: 1, queuedBefore: 1, queuedAfter: null },
+      { label: 'after', deleteIndex: 2, queuedBefore: 0, queuedAfter: 0 },
+    ])(
+      'deleting $label the queued index leaves queuedLoopSlot at $queuedAfter',
+      ({ deleteIndex, queuedBefore, queuedAfter }) => {
+        threeRows();
+        engine.queuedLoopSlot.set(queuedBefore);
+
+        engine.deleteLoop(deleteIndex);
+
+        expect(engine.queuedLoopSlot()).toBe(queuedAfter);
+      }
+    );
+
+    it('stops looping outright when the deleted row was both active and queued', () => {
+      threeRows();
+      engine.activeLoopSlot.set(1);
+      engine.queuedLoopSlot.set(1);
+
+      engine.deleteLoop(1);
+
+      expect(engine.activeLoopSlot()).toBeNull();
+      expect(engine.queuedLoopSlot()).toBeNull();
+    });
+  });
+
+  describe('launching from stopped or paused', () => {
+    it('hops to a cue from stopped, launching playback and landing on the cue rather than frame 0', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(20);
+      engine.addCue();
+      engine.stop();
+      expect(engine.state()).toBe('stopped');
+
+      await engine.hopToCue(0);
+
+      expect(engine.state()).toBe('playing');
+      clock.tick(2); // gate-off, then the resync
+      expect(engine.stats().framesRendered).toBe(20);
+    });
+
+    it('hops to a cue from paused, resuming and landing on the cue', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(20);
+      engine.addCue();
+      clock.tick(10);
+      engine.pause();
+
+      await engine.hopToCue(0);
+
+      expect(engine.state()).toBe('playing');
+      clock.tick(2);
+      expect(engine.stats().framesRendered).toBe(20);
+    });
+
+    it('restores nothing when the launch from stopped fails', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(20);
+      engine.addCue();
+      engine.stop();
+      midi.selectedPortId.set(null); // play() will now fail
+
+      await engine.hopToCue(0);
+
+      expect(engine.state()).toBe('error');
+      // stop() already reset the counters to 0; a landed cue would have moved them to 20.
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+
+    it('punches a loop from stopped, launching playback and engaging it', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(10);
+      engine.addLoop();
+      engine.tapLoopIn(0);
+      clock.tick(10);
+      engine.tapLoopOut(0);
+      engine.stop();
+
+      await engine.punchLoop(0);
+
+      expect(engine.state()).toBe('playing');
+      expect(engine.activeLoopSlot()).toBe(0);
+      clock.tick(2);
+      expect(engine.stats().framesRendered).toBe(10);
+    });
+
+    it('punches a loop from paused, resuming and engaging it', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(10);
+      engine.addLoop();
+      engine.tapLoopIn(0);
+      clock.tick(10);
+      engine.tapLoopOut(0);
+      engine.pause();
+
+      await engine.punchLoop(0);
+
+      expect(engine.state()).toBe('playing');
+      expect(engine.activeLoopSlot()).toBe(0);
+    });
+
+    it('restores nothing when the launch for a punch from stopped fails', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(10);
+      engine.addLoop();
+      engine.tapLoopIn(0);
+      clock.tick(10);
+      engine.tapLoopOut(0);
+      engine.stop();
+      midi.selectedPortId.set(null);
+
+      await engine.punchLoop(0);
+
+      expect(engine.state()).toBe('error');
+      expect(engine.activeLoopSlot()).toBeNull();
+    });
+  });
+
+  describe('a cue trigger escapes a loop', () => {
+    it('clears activeLoopSlot and queuedLoopSlot immediately, keeping both slots\' points', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(10);
+      engine.addLoop(); // slot 0: in 10, out 20
+      engine.tapLoopIn(0);
+      clock.tick(10);
+      engine.tapLoopOut(0);
+      engine.addLoop(); // slot 1: in 30, out 40
+      engine.tapLoopIn(1);
+      clock.tick(10);
+      engine.tapLoopOut(1);
+
+      await engine.punchLoop(0);
+      clock.tick(2); // rides the engagement's gate-off and resync
+      await engine.punchLoop(1); // nothing is due yet, so this queues behind slot 0's lap
+
+      expect(engine.activeLoopSlot()).toBe(0);
+      expect(engine.queuedLoopSlot()).toBe(1);
+
+      engine.addCue();
+      await engine.hopToCue(0);
+
+      expect(engine.activeLoopSlot()).toBeNull();
+      expect(engine.queuedLoopSlot()).toBeNull();
+      expect(engine.loopSlots()[0].in).not.toBeNull();
+      expect(engine.loopSlots()[0].out).not.toBeNull();
+      expect(engine.loopSlots()[1].in).not.toBeNull();
+      expect(engine.loopSlots()[1].out).not.toBeNull();
+    });
+
+    it('does not disturb a loop-to-loop switch, which still waits for the lap', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(10);
+      engine.addLoop(); // slot 0: in 10, out 20
+      engine.tapLoopIn(0);
+      clock.tick(10);
+      engine.tapLoopOut(0);
+      engine.addLoop(); // slot 1: in 30, out 40
+      engine.tapLoopIn(1);
+      clock.tick(10);
+      engine.tapLoopOut(1);
+
+      await engine.punchLoop(0);
+      clock.tick(2);
+      await engine.punchLoop(1); // queued, waiting for slot 0's lap to finish
+
+      expect(engine.queuedLoopSlot()).toBe(1);
+      clock.tick(9); // nine of the ten remaining frames in slot 0's lap
+      expect(engine.activeLoopSlot()).toBe(0);
+
+      clock.tick(1); // the lap completes — the queued switch lands on its own, untouched by any cue
+      expect(engine.activeLoopSlot()).toBe(1);
       expect(engine.queuedLoopSlot()).toBeNull();
     });
   });
@@ -2020,8 +2371,16 @@ describe('DjPlayerEngine', () => {
       clock.tick(frames);
     }
 
+    /** Appends empty rows until `slot` exists. */
+    function ensureLoopRow(slot: number): void {
+      while (engine.loopSlots().length <= slot) {
+        engine.addLoop();
+      }
+    }
+
     /** Marks a slot from the current position: in here, out `length` frames later. */
     function markSlotHere(slot: number, length: number): void {
+      ensureLoopRow(slot);
       engine.tapLoopIn(slot);
       clock.tick(length);
       engine.tapLoopOut(slot);
@@ -2082,6 +2441,7 @@ describe('DjPlayerEngine', () => {
 
     it('is a no-op for a slot that is not playable', async () => {
       await playTo(10);
+      engine.addLoop();
       engine.tapLoopIn(0); // no out marked yet
 
       engine.auditionLoopOut(0);
@@ -2115,7 +2475,14 @@ describe('DjPlayerEngine', () => {
       clock.tick(frames);
     }
 
+    function ensureLoopRow(slot: number): void {
+      while (engine.loopSlots().length <= slot) {
+        engine.addLoop();
+      }
+    }
+
     function markSlotHere(slot: number, length: number): void {
+      ensureLoopRow(slot);
       engine.tapLoopIn(slot);
       clock.tick(length);
       engine.tapLoopOut(slot);
@@ -2151,6 +2518,7 @@ describe('DjPlayerEngine', () => {
 
     it('is a no-op for a slot that is not playable', async () => {
       await playTo(10);
+      engine.addLoop();
       engine.tapLoopIn(0); // no out marked yet
 
       engine.auditionLoopIn(0);
@@ -2200,7 +2568,7 @@ describe('DjPlayerEngine', () => {
       // Well past the old fixed 75-frame ring span, deep enough that replaying from the frame-0 seed
       // would need hundreds of frames — the regression this ring resize exists to prevent.
       clock.tick(400);
-      engine.addCue(0);
+      engine.addCue();
 
       const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
       engine.setCueOffset(0, -engine.nudgeRangeFrames());

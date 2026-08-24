@@ -83,11 +83,12 @@ export interface LoopOutPoint {
 }
 
 /**
- * One punch-in slot: a loop's two ends held together, so four loops can be marked up independently
- * and engaged against each other.
+ * One punch-in loop: a loop's two ends held together, appended and removed freely, so any number of
+ * loops can be marked up independently and engaged against each other.
  *
- * A slot comes into being on its first tap, whichever end that is, and only *plays* once both ends
- * are marked and still in order with their nudges applied.
+ * A row comes into being on its first tap, whichever end that is, and only *plays* once both ends
+ * are marked and still in order with their nudges applied. `addLoop`/`clearLoopSlot` both start it
+ * at `{ in: null, out: null }`, so `null` never occurs in the collection itself — only inside a row.
  */
 export interface LoopSlot {
   /** Restorable state, exactly as a cue holds it — re-entry is a restore, never a replay. */
@@ -295,13 +296,15 @@ export class DjPlayerEngine implements OnDestroy {
   readonly effectiveMutes = computed<readonly boolean[]>(() =>
     this.mutedVoices().map((latched, i) => latched !== this.heldVoices()[i])
   );
-  readonly cues = signal<readonly (CueSlot | null)[]>([null, null, null, null]);
+  readonly cues = signal<readonly (CueSlot | null)[]>([]);
   /**
-   * Four loops marked up side by side. Each holds its entry as restorable state — re-entry is a
-   * snapshot restore, so a pass costs the same whether the point sits at frame 10 or frame 10,000 —
-   * and its exit as a frame number alone, which is only ever compared against the position counter.
+   * Loops marked up side by side, appended and removed freely. Each holds its entry as restorable
+   * state — re-entry is a snapshot restore, so a pass costs the same whether the point sits at frame
+   * 10 or frame 10,000 — and its exit as a frame number alone, which is only ever compared against
+   * the position counter. Never holds `null`: an empty row is `{ in: null, out: null }`, so there is
+   * exactly one representation for "nothing marked" rather than two that mean the same thing.
    */
-  readonly loopSlots = signal<readonly (LoopSlot | null)[]>([null, null, null, null]);
+  readonly loopSlots = signal<readonly LoopSlot[]>([]);
   /** The slot currently looping, or null. */
   readonly activeLoopSlot = signal<number | null>(null);
   /** The slot that takes over when the active one finishes its lap, or null. */
@@ -410,8 +413,8 @@ export class DjPlayerEngine implements OnDestroy {
     // captured snapshot — this is the only path that clears them. Stop, play-from-stopped and
     // subtune changes reuse the same machine and must leave captured points alone. Whatever was
     // looping goes with the points: there is nothing left to loop against.
-    this.cues.set([null, null, null, null]);
-    this.loopSlots.set([null, null, null, null]);
+    this.cues.set([]);
+    this.loopSlots.set([]);
     this.stopLoop();
 
     if (this.initSubtune(file.startSong)) {
@@ -693,33 +696,45 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Captures the current position into one of four cue slots — as machine state, not as a frame
-   * number.
+   * Appends a new cue row, capturing the current position into it — as machine state, not as a
+   * frame number. Returns the row's index.
    *
    * The whole point: you are already *at* this position, so there is nothing to re-derive. Storing
    * the state itself is what lets `hopToCue` skip the replay that `jumpToFrame` cannot avoid.
    *
    * The point is paired with an anchor from the ring on the way in, which is what makes a later
-   * backward nudge of it possible at all.
+   * backward nudge of it possible at all. With no tune loaded the capture comes back null and the
+   * row is still appended, empty — `captureCue` is what fills it in once a tune exists.
    */
-  addCue(slot: number): void {
-    if (slot < 0 || slot > 3) return;
+  addCue(): number {
+    const cue = this.captureAnchoredPoint();
+    const index = this.cues().length;
+    this.cues.update((cues) => [...cues, cue]);
+    return index;
+  }
+
+  /**
+   * (Re)captures the current position into an existing cue row, exactly as `addCue` captures a new
+   * one. The only way back into a row `clearCue` has blanked, since cues are otherwise append-only.
+   */
+  captureCue(index: number): void {
+    if (index < 0 || index >= this.cues().length) return;
     const cue = this.captureAnchoredPoint();
     if (cue === null) return;
-    this.cues.update((cues) => cues.map((c, i) => (i === slot ? cue : c)));
+    this.cues.update((cues) => cues.map((c, i) => (i === index ? cue : c)));
   }
 
   /**
    * Walks a captured cue up to ±`nudgeRangeFrames()` onto the exact transient; a no-op for an empty
-   * slot. Clamped to that range, and rounded — a frame is the finest position there is.
+   * row. Clamped to that range, and rounded — a frame is the finest position there is.
    *
-   * Re-derives the slot's resolved snapshot by replaying from its anchor, which is why this is a
+   * Re-derives the row's resolved snapshot by replaying from its anchor, which is why this is a
    * setup gesture and `hopToCue` is not: the cost here is bounded by the anchor distance plus the
    * nudge range, never by how deep into the tune the point was taken.
    */
-  setCueOffset(slot: number, offset: number): void {
-    if (slot < 0 || slot > 3 || !Number.isFinite(offset)) return;
-    const cue = this.cues()[slot] ?? null;
+  setCueOffset(index: number, offset: number): void {
+    if (index < 0 || index >= this.cues().length || !Number.isFinite(offset)) return;
+    const cue = this.cues()[index];
     if (cue === null) return;
 
     const range = this.nudgeRangeFrames();
@@ -728,55 +743,77 @@ export class DjPlayerEngine implements OnDestroy {
 
     const resolved = this.resolvePoint(cue, clamped);
     if (resolved === null) return;
-    this.cues.update((cues) => cues.map((c, i) => (i === slot ? resolved : c)));
+    this.cues.update((cues) => cues.map((c, i) => (i === index ? resolved : c)));
   }
 
   /**
-   * Returns to a captured cue slot in constant time; a no-op for an empty slot. See `restorePoint`
-   * for why the hop costs no emulation.
+   * Returns to a captured cue row, launching playback first if it is not already running; a no-op
+   * for an empty row. See `restorePoint` for why the hop itself costs no emulation.
+   *
+   * Escapes a running loop immediately rather than waiting out its lap — the same effect as
+   * `stopLoop()`, called rather than reimplemented — and leaves both slots' points untouched.
+   *
+   * From `stopped`, `play()` re-inits the subtune and resets the counters, which puts the machine
+   * back at frame 0; from `paused` it only re-marks the register frame dirty. Either way the restore
+   * must happen after `play()` lands, never before, or the launch would clobber it straight back to
+   * frame 0. If `play()` fails it has already set the error state, and nothing here gets restored.
    *
    * A nudged cue changes nothing here: its snapshot is already resolved at `frame + offset`, so the
    * hop restores it as-is. Re-deriving it on the way through would put the stall straight back.
    */
-  hopToCue(slot: number): void {
-    const cue = this.cues()[slot] ?? null;
+  async hopToCue(index: number): Promise<void> {
+    if (index < 0 || index >= this.cues().length) return;
+    const cue = this.cues()[index];
     if (cue === null) return;
+
+    if (this.state() !== 'playing') {
+      await this.play();
+      if (this.state() !== 'playing') return;
+    }
+
+    this.stopLoop();
     this.restorePoint(cue);
   }
 
-  /** Empties a cue slot, returning it to "Add". */
-  clearCue(slot: number): void {
-    if (slot < 0 || slot > 3) return;
-    this.cues.update((cues) => cues.map((c, i) => (i === slot ? null : c)));
+  /** Empties a cue row, returning it to "Add", and keeps the row itself in place. */
+  clearCue(index: number): void {
+    if (index < 0 || index >= this.cues().length) return;
+    this.cues.update((cues) => cues.map((c, i) => (i === index ? null : c)));
+  }
+
+  /** Removes a cue row outright, shifting every later index down by one. */
+  deleteCue(index: number): void {
+    if (index < 0 || index >= this.cues().length) return;
+    this.cues.update((cues) => cues.filter((_, i) => i !== index));
   }
 
   /**
-   * Marks a slot's entry at the current position, capturing it exactly as `addCue` does — the
+   * Marks a row's entry at the current position, capturing it exactly as `addCue` does — the
    * snapshot is what lets every later pass re-enter without replaying the tune. Leaves whatever
-   * exit the slot already holds.
+   * exit the row already holds.
    */
-  tapLoopIn(slot: number): void {
-    if (slot < 0 || slot > 3) return;
+  tapLoopIn(index: number): void {
+    if (index < 0 || index >= this.loopSlots().length) return;
     const point = this.captureAnchoredPoint();
     if (point === null) return;
-    this.updateLoopSlot(slot, (current) => ({ in: point, out: current?.out ?? null }));
+    this.updateLoopSlot(index, (current) => ({ in: point, out: current.out }));
   }
 
-  /** Marks a slot's exit at the current frame. No snapshot: the exit is only ever compared. */
-  tapLoopOut(slot: number): void {
-    if (slot < 0 || slot > 3 || this.machine === null) return;
+  /** Marks a row's exit at the current frame. No snapshot: the exit is only ever compared. */
+  tapLoopOut(index: number): void {
+    if (index < 0 || index >= this.loopSlots().length || this.machine === null) return;
     const point: LoopOutPoint = { frame: this.framesRendered, offset: 0 };
-    this.updateLoopSlot(slot, (current) => ({ in: current?.in ?? null, out: point }));
+    this.updateLoopSlot(index, (current) => ({ in: current.in, out: point }));
   }
 
   /**
-   * Walks a slot's entry up to ±`nudgeRangeFrames()` onto the transient, re-deriving its snapshot
+   * Walks a row's entry up to ±`nudgeRangeFrames()` onto the transient, re-deriving its snapshot
    * from the point's anchor; a no-op with no entry marked. A setup gesture, for the same reason
    * `setCueOffset` is: the re-derivation replays frames, so it must not run per drag tick.
    */
-  setLoopInOffset(slot: number, frames: number): void {
-    if (slot < 0 || slot > 3 || !Number.isFinite(frames)) return;
-    const point = this.loopSlots()[slot]?.in ?? null;
+  setLoopInOffset(index: number, frames: number): void {
+    if (index < 0 || index >= this.loopSlots().length || !Number.isFinite(frames)) return;
+    const point = this.loopSlots()[index].in;
     if (point === null) return;
 
     const range = this.nudgeRangeFrames();
@@ -785,26 +822,26 @@ export class DjPlayerEngine implements OnDestroy {
 
     const resolved = this.resolvePoint(point, clamped);
     if (resolved === null) return;
-    this.updateLoopSlot(slot, (current) => (current === null ? null : { ...current, in: resolved }));
+    this.updateLoopSlot(index, (current) => ({ ...current, in: resolved }));
   }
 
   /**
-   * Walks a slot's exit up to ±`nudgeRangeFrames()`; a no-op with no exit marked. Arithmetic
+   * Walks a row's exit up to ±`nudgeRangeFrames()`; a no-op with no exit marked. Arithmetic
    * alone — the exit is a number the tick compares, so moving it replays nothing.
    */
-  setLoopOutOffset(slot: number, frames: number): void {
-    if (slot < 0 || slot > 3 || !Number.isFinite(frames)) return;
-    const point = this.loopSlots()[slot]?.out ?? null;
+  setLoopOutOffset(index: number, frames: number): void {
+    if (index < 0 || index >= this.loopSlots().length || !Number.isFinite(frames)) return;
+    const point = this.loopSlots()[index].out;
     if (point === null) return;
 
     const range = this.nudgeRangeFrames();
     const nudged: LoopOutPoint = { ...point, offset: clamp(Math.round(frames), -range, range) };
-    this.updateLoopSlot(slot, (current) => (current === null ? null : { ...current, out: nudged }));
+    this.updateLoopSlot(index, (current) => ({ ...current, out: nudged }));
   }
 
   /**
-   * Re-enters `slot` far enough before its out-point to hear the loop-back seam, and makes it the
-   * active loop so the wrap actually happens. No-op for a slot that is not playable.
+   * Re-enters `index` far enough before its out-point to hear the loop-back seam, and makes it the
+   * active loop so the wrap actually happens. No-op for a row that is not playable.
    *
    * Re-entry is a restore, not a replay — see `engageLoop` — and the pre-roll itself replays forward
    * on the live machine from that restored in-point, so the cost is bounded by the loop's own length
@@ -812,15 +849,15 @@ export class DjPlayerEngine implements OnDestroy {
    * replay from `init` instead — off-thread now, but still O(depth) and still landing a beat after
    * the button was pressed.
    */
-  auditionLoopOut(slot: number): void {
-    if (slot < 0 || slot > 3) return;
-    const loop = this.resolveLoopSlot(this.loopSlots()[slot] ?? null);
+  auditionLoopOut(index: number): void {
+    if (index < 0 || index >= this.loopSlots().length) return;
+    const loop = this.resolveLoopSlot(this.loopSlots()[index]);
     if (loop === null) return;
     const machine = this.machine;
     const frame = this.frame;
     if (machine === null || frame === null) return;
 
-    this.engageLoop(slot);
+    this.engageLoop(index);
 
     const inFrame = resolvedFrame(loop.start);
     const prerollFrames = this.msToFrames(LOOP_AUDITION_PREROLL_MS);
@@ -833,11 +870,11 @@ export class DjPlayerEngine implements OnDestroy {
       try {
         result = machine.runFrame();
       } catch (error) {
-        this.fail(`the loop audition for slot ${slot} failed during replay — ${describeError(error)}`);
+        this.fail(`the loop audition for slot ${index} failed during replay — ${describeError(error)}`);
         return;
       }
       if (!result.completed) {
-        this.fail(`the loop audition for slot ${slot} exceeded its cycle budget during replay`);
+        this.fail(`the loop audition for slot ${index} exceeded its cycle budget during replay`);
         return;
       }
       frame.takeSnapshot(); // discarded — resets per-frame duplicate-write tracking only;
@@ -849,51 +886,92 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Re-enters `slot` at its in-point and makes it the active loop, immediately and without going
-   * through the queue — a setup gesture on a specific slot, not a performance punch, mirroring
+   * Re-enters `index` at its in-point and makes it the active loop, immediately and without going
+   * through the queue — a setup gesture on a specific row, not a performance punch, mirroring
    * `auditionLoopOut`. Unlike the out-point audition there is no seam ahead to pre-roll toward:
-   * restoring the in-point snapshot is itself the audible feedback. No-op for a slot that is not
+   * restoring the in-point snapshot is itself the audible feedback. No-op for a row that is not
    * playable.
    */
-  auditionLoopIn(slot: number): void {
-    if (slot < 0 || slot > 3) return;
-    if (this.resolveLoopSlot(this.loopSlots()[slot] ?? null) === null) return;
-    this.engageLoop(slot);
+  auditionLoopIn(index: number): void {
+    if (index < 0 || index >= this.loopSlots().length) return;
+    if (this.resolveLoopSlot(this.loopSlots()[index]) === null) return;
+    this.engageLoop(index);
   }
 
-  /** Empties a slot, and lets go of it if it was the one playing or the one waiting to. */
-  clearLoopSlot(slot: number): void {
-    if (slot < 0 || slot > 3) return;
-    this.updateLoopSlot(slot, () => null);
-    if (this.activeLoopSlot() === slot) {
+  /** Empties a row, and lets go of it if it was the one playing or the one waiting to. */
+  clearLoopSlot(index: number): void {
+    if (index < 0 || index >= this.loopSlots().length) return;
+    this.updateLoopSlot(index, () => ({ in: null, out: null }));
+    if (this.activeLoopSlot() === index) {
       this.activeLoopSlot.set(null);
     }
-    if (this.queuedLoopSlot() === slot) {
+    if (this.queuedLoopSlot() === index) {
       this.queuedLoopSlot.set(null);
     }
   }
 
   /**
-   * Punches a slot in: engages it now if nothing is looping, queues it behind the current lap if
-   * something is. A slot that is not playable — an end missing, or ends nudged until they crossed —
-   * is a no-op.
+   * Appends an empty loop row — `{ in: null, out: null }`, the same shape `clearLoopSlot` blanks a
+   * row back to, so an empty row has exactly one representation. Returns the row's index.
+   */
+  addLoop(): number {
+    const index = this.loopSlots().length;
+    this.loopSlots.update((slots) => [...slots, { in: null, out: null }]);
+    return index;
+  }
+
+  /**
+   * Removes a loop row outright, shifting every later index down by one. `activeLoopSlot` and
+   * `queuedLoopSlot` are indices into this same array, so each is cleared if it names the deleted
+   * row and decremented if it names one that just shifted — getting this wrong silently loops the
+   * wrong row, which is worse than an error.
+   */
+  deleteLoop(index: number): void {
+    if (index < 0 || index >= this.loopSlots().length) return;
+    this.loopSlots.update((slots) => slots.filter((_, i) => i !== index));
+
+    const active = this.activeLoopSlot();
+    if (active === index) {
+      this.activeLoopSlot.set(null); // the row playing is gone — stop looping
+    } else if (active !== null && active > index) {
+      this.activeLoopSlot.set(active - 1);
+    }
+
+    const queued = this.queuedLoopSlot();
+    if (queued === index) {
+      this.queuedLoopSlot.set(null);
+    } else if (queued !== null && queued > index) {
+      this.queuedLoopSlot.set(queued - 1);
+    }
+  }
+
+  /**
+   * Punches a row in: engages it now if nothing is looping, queues it behind the current lap if
+   * something is, launching playback first if it is not already running. A row that is not
+   * playable — an end missing, or ends nudged until they crossed — is a no-op, checked before the
+   * launch so a launch is never spent on a row with nothing to play.
    *
    * The asymmetry with `stopLoop` is the point of the gesture: a punch is musical and waits for the
    * bar it is already in to finish, so the switch lands where the operator hears it land.
    */
-  punchLoop(slot: number): void {
-    if (slot < 0 || slot > 3) return;
-    if (this.resolveLoopSlot(this.loopSlots()[slot] ?? null) === null) return;
+  async punchLoop(index: number): Promise<void> {
+    if (index < 0 || index >= this.loopSlots().length) return;
+    if (this.resolveLoopSlot(this.loopSlots()[index]) === null) return;
+
+    if (this.state() !== 'playing') {
+      await this.play();
+      if (this.state() !== 'playing') return;
+    }
 
     const active = this.activeLoopSlot();
-    // Punching the slot already playing, with nothing waiting behind it, is a re-trigger — the same
+    // Punching the row already playing, with nothing waiting behind it, is a re-trigger — the same
     // gesture as re-hopping a cue.
-    if (active === null || (active === slot && this.queuedLoopSlot() === null)) {
-      this.engageLoop(slot);
+    if (active === null || (active === index && this.queuedLoopSlot() === null)) {
+      this.engageLoop(index);
       return;
     }
     // Newest punch wins, and playback is left alone to finish its lap.
-    this.queuedLoopSlot.set(slot);
+    this.queuedLoopSlot.set(index);
   }
 
   /**
@@ -909,14 +987,15 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * How far the active slot is through its bounds, 0–100; 0 for every other slot, playable or not.
+   * How far the active row is through its bounds, 0–100; 0 for every other row, playable or not.
    *
    * Reads the published `stats` rather than the live counter, so it moves with the same
    * every-25-frames cadence the playhead does instead of demanding change detection per frame.
    */
   progressPercentFor(slot: number): number {
     if (slot !== this.activeLoopSlot()) return 0;
-    const loop = this.resolveLoopSlot(this.loopSlots()[slot] ?? null);
+    if (slot < 0 || slot >= this.loopSlots().length) return 0;
+    const loop = this.resolveLoopSlot(this.loopSlots()[slot]);
     if (loop === null) return 0;
 
     const startFrame = resolvedFrame(loop.start);
@@ -925,34 +1004,35 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * The slot as `onTick` needs it: the point to restore, and the frame that triggers the restore.
+   * The row as `onTick` needs it: the point to restore, and the frame that triggers the restore.
    * Null unless both ends are marked and, with their nudges applied, still in order — ends that
    * have crossed or met describe no pass at all, and a loop running on them would re-enter on every
    * tick rather than play anything.
    */
-  private resolveLoopSlot(slot: LoopSlot | null): ResolvedLoop | null {
-    if (slot === null || slot.in === null || slot.out === null) return null;
+  private resolveLoopSlot(slot: LoopSlot): ResolvedLoop | null {
+    if (slot.in === null || slot.out === null) return null;
     const outFrame = resolvedFrame(slot.out);
     return outFrame > resolvedFrame(slot.in) ? { start: slot.in, outFrame } : null;
   }
 
   /**
-   * Re-enters a slot and makes it the one playing, dropping whatever was queued behind it.
-   * Re-checks playability at the point of engagement — a queued slot's ends can be nudged across
+   * Re-enters a row and makes it the one playing, dropping whatever was queued behind it.
+   * Re-checks playability at the point of engagement — a queued row's ends can be nudged across
    * each other while it waits, so the punch-time check alone isn't enough. Returns whether the
    * engage actually happened.
    */
-  private engageLoop(slot: number): boolean {
-    const resolved = this.resolveLoopSlot(this.loopSlots()[slot] ?? null);
+  private engageLoop(index: number): boolean {
+    if (index < 0 || index >= this.loopSlots().length) return false;
+    const resolved = this.resolveLoopSlot(this.loopSlots()[index]);
     if (resolved === null) return false;
     this.restorePoint(resolved.start);
-    this.activeLoopSlot.set(slot);
+    this.activeLoopSlot.set(index);
     this.queuedLoopSlot.set(null);
     return true;
   }
 
-  private updateLoopSlot(slot: number, next: (current: LoopSlot | null) => LoopSlot | null): void {
-    this.loopSlots.update((slots) => slots.map((s, i) => (i === slot ? next(s) : s)));
+  private updateLoopSlot(index: number, next: (current: LoopSlot) => LoopSlot): void {
+    this.loopSlots.update((slots) => slots.map((s, i) => (i === index ? next(s) : s)));
   }
 
   /**
@@ -1036,7 +1116,7 @@ export class DjPlayerEngine implements OnDestroy {
     }
     const active = this.activeLoopSlot();
     if (active !== null) {
-      const loop = this.resolveLoopSlot(this.loopSlots()[active] ?? null);
+      const loop = this.resolveLoopSlot(this.loopSlots()[active]);
       if (loop === null) {
         // Ends nudged until they crossed describe no pass — drop out rather than re-enter every tick.
         this.stopLoop();
