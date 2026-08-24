@@ -1,4 +1,12 @@
-import { computed, inject, Injectable, InjectionToken, OnDestroy, signal } from '@angular/core';
+import {
+  computed,
+  inject,
+  Injectable,
+  InjectionToken,
+  OnDestroy,
+  Signal,
+  signal,
+} from '@angular/core';
 import { logError, logInfo, LogType, logWarn } from '@teensyrom-nx/utils';
 import {
   NTSC_FRAME_INTERVAL_US,
@@ -127,9 +135,12 @@ export const FRAME_CLOCK = new InjectionToken<FrameClock>('FRAME_CLOCK');
  */
 export const NOMINAL_INTERVAL_OPTIONS_US: readonly number[] = [PAL_FRAME_INTERVAL_US, 19975, 20000];
 
-/** Enough range to feel latency and hear pitch move — a tuning parameter, not a product decision. */
-export const MIN_SPEED_MULTIPLIER = 0.8;
-export const MAX_SPEED_MULTIPLIER = 1.2;
+/** What the fader and any typed value may reach: 0.5x–1.5x. */
+export const SPEED_INPUT_SPAN = 0.5;
+/** What the jump buttons may reach: 0.3x–1.7x, subject to the per-tune floor below. */
+export const SPEED_HARD_SPAN = 0.7;
+/** One press of a jump button moves the multiplier by this much, additively. */
+export const SPEED_JUMP_STEP = 0.5;
 
 const MICROSECONDS_PER_SECOND = 1_000_000;
 /** The assumed length the scrub and playhead percentages are measured against — not the tune's real,
@@ -193,6 +204,34 @@ export class DjPlayerEngine implements OnDestroy {
   readonly currentSubtune = signal<number>(1);
   readonly subtuneCount = signal<number>(1);
   readonly speedMultiplier = signal<number>(1);
+  /**
+   * Bumped whenever the machine or its multispeed can change, purely to give `slowestSpeed` a signal
+   * to recompute on: `machine.callsPerFrame` is a plain readonly field, not itself a signal.
+   */
+  private readonly tuneRevision = signal(0);
+  /**
+   * The slowest multiplier this tune can be told about. Never looser than 1 − SPEED_HARD_SPAN.
+   *
+   * On a normal PAL tune (19950 µs, callsPerFrame 1) this resolves to ~0.3044 — the protocol floor,
+   * since the recipe's 16-bit interval field would otherwise overflow before the hard span does. On
+   * a 2x-multispeed PAL tune it resolves to 0.3 — the hard span wins instead, because halving the
+   * interval for the second play call halves the protocol floor with it. The asymmetry is real, not
+   * a bug: it is `max()` picking whichever constraint actually binds for the tune in hand.
+   */
+  readonly slowestSpeed = computed<number>(() => {
+    this.tuneRevision();
+    const callsPerFrame = this.machine?.callsPerFrame ?? 1;
+    const protocolFloor = this.nominalIntervalUs() / (RECIPE_MAX_INTERVAL_US * callsPerFrame);
+    return Math.max(1 - SPEED_HARD_SPAN, protocolFloor);
+  });
+  readonly fastestSpeed = computed<number>(() => 1 + SPEED_HARD_SPAN);
+  private readonly _rememberedSpeed = signal<number | null>(null);
+  /** The speed being ridden before the current jump excursion; null when not on an excursion. */
+  readonly rememberedSpeed: Signal<number | null> = this._rememberedSpeed.asReadonly();
+  /** Which jump button opened the current excursion — null when `rememberedSpeed` is null. Tracked
+   * separately because "same button again" vs. "opposite button" cannot be told apart from the
+   * multiplier's value alone once a jump has clamped. */
+  private excursionDirection: 'up' | 'down' | null = null;
   readonly speedMode = signal<SpeedMode>('clock-and-recipe');
   readonly recipeEnabled = signal<boolean>(true);
   /**
@@ -300,6 +339,9 @@ export class DjPlayerEngine implements OnDestroy {
     // never pressed against — otherwise effectiveMutes would disagree with the chip it just replaced.
     this.heldVoices.set([false, false, false]);
     this.machine = new C64Machine(file, this.frame);
+    // A new machine can carry a different multispeed than whatever tune played last — see
+    // `slowestSpeed`, the one reader this exists for.
+    this.tuneRevision.update((revision) => revision + 1);
     this.subtuneCount.set(Math.max(1, file.songs));
     this.nominalIntervalUs.set(
       file.clock === 'ntsc' ? NTSC_FRAME_INTERVAL_US : PAL_FRAME_INTERVAL_US
@@ -460,12 +502,81 @@ export class DjPlayerEngine implements OnDestroy {
     this.frame?.setVoiceMuted(voice, this.effectiveMutes()[voice]);
   }
 
-  /** Clamped to 0.8–1.2. A divisor on the clock and nothing else, which is why it is nearly free. */
+  /** Clamped to the input span intersected with the per-tune floor. A divisor on the clock and
+   * nothing else, which is why it is nearly free. */
   setSpeed(multiplier: number): void {
     if (!Number.isFinite(multiplier)) {
       return;
     }
-    this.speedMultiplier.set(clamp(multiplier, MIN_SPEED_MULTIPLIER, MAX_SPEED_MULTIPLIER));
+    this.applySpeedBounded(
+      multiplier,
+      Math.max(1 - SPEED_INPUT_SPAN, this.slowestSpeed()),
+      1 + SPEED_INPUT_SPAN
+    );
+  }
+
+  /**
+   * Moves the multiplier up by `SPEED_JUMP_STEP` from wherever it currently sits, clamped to the
+   * hard range. See `jump` for the excursion state machine this and `jumpSpeedDown` share.
+   */
+  jumpSpeedUp(): void {
+    this.jump('up');
+  }
+
+  /** Moves the multiplier down by `SPEED_JUMP_STEP`. See `jump`. */
+  jumpSpeedDown(): void {
+    this.jump('down');
+  }
+
+  /**
+   * Dual-purpose: with no excursion open, sets 1.0. With one open, restores `rememberedSpeed`
+   * exactly and closes the excursion — the same return path a jump on the opposite button takes.
+   */
+  homeSpeed(): void {
+    const remembered = this._rememberedSpeed();
+    if (remembered === null) {
+      this.applySpeedBounded(1, this.slowestSpeed(), this.fastestSpeed());
+      return;
+    }
+    this.returnFromExcursion(remembered);
+  }
+
+  /**
+   * The jump excursion state machine. The first press of either button opens an excursion by
+   * recording the pre-jump multiplier into `rememberedSpeed`, then moves additively; a same-side
+   * press while open is a no-op, and an opposite-side press returns to `rememberedSpeed` exactly
+   * (never by re-deriving it with arithmetic — see `returnFromExcursion`) and closes the excursion.
+   */
+  private jump(direction: 'up' | 'down'): void {
+    const remembered = this._rememberedSpeed();
+    if (remembered === null) {
+      this._rememberedSpeed.set(this.speedMultiplier());
+      this.excursionDirection = direction;
+      const delta = direction === 'up' ? SPEED_JUMP_STEP : -SPEED_JUMP_STEP;
+      this.applySpeedBounded(this.speedMultiplier() + delta, this.slowestSpeed(), this.fastestSpeed());
+      return;
+    }
+    if (this.excursionDirection === direction) {
+      return; // same button again while on an excursion — no-op
+    }
+    this.returnFromExcursion(remembered);
+  }
+
+  /**
+   * Restores `remembered` exactly and closes the excursion. Reads the stored value rather than
+   * subtracting the jump step back out — a jump that clamped on the way out must not corrupt the
+   * way back, and this is what makes that fall out for free.
+   */
+  private returnFromExcursion(remembered: number): void {
+    this.applySpeedBounded(remembered, this.slowestSpeed(), this.fastestSpeed());
+    this._rememberedSpeed.set(null);
+    this.excursionDirection = null;
+  }
+
+  /** Shared by `setSpeed` (input bounds) and the jump surface (hard bounds), so both funnel through
+   * one `applyIntervalChange()` call rather than duplicating it. */
+  private applySpeedBounded(multiplier: number, lo: number, hi: number): void {
+    this.speedMultiplier.set(clamp(multiplier, lo, hi));
     this.applyIntervalChange();
   }
 
@@ -855,10 +966,12 @@ export class DjPlayerEngine implements OnDestroy {
       return;
     }
     const clamped = clamp(song, 1, this.subtuneCount());
+    // A subtune can carry a different multispeed — initSubtune() bumps tuneRevision on success, so
+    // slowestSpeed re-resolves against whichever subtune actually loaded.
     if (clamped === this.currentSubtune() || !this.initSubtune(clamped)) {
       return;
     }
-    // A subtune can carry a different multispeed, so the tick rate has to be re-resolved.
+    // The tick rate itself also has to be re-resolved.
     this.applyIntervalChange();
   }
 
@@ -890,6 +1003,9 @@ export class DjPlayerEngine implements OnDestroy {
     // this deliberately — each owns its own anchor, so none of them needs the ring to persist.
     this.anchorRing = [];
     this.recordAnchor();
+    // This subtune's CIA multispeed is now resolved on the machine, so slowestSpeed's floor may have
+    // moved — see the constructor-time comment on tuneRevision.
+    this.tuneRevision.update((revision) => revision + 1);
     this.currentSubtune.set(clamped);
     this.lastError.set(null);
     return true;

@@ -68,6 +68,9 @@ interface MockDjPlayerEngine {
   previousSubtune: ReturnType<typeof vi.fn>;
   nextSubtune: ReturnType<typeof vi.fn>;
   setSpeed: ReturnType<typeof vi.fn>;
+  jumpSpeedUp: ReturnType<typeof vi.fn>;
+  jumpSpeedDown: ReturnType<typeof vi.fn>;
+  homeSpeed: ReturnType<typeof vi.fn>;
   setSpeedMode: ReturnType<typeof vi.fn>;
   setRecipeEnabled: ReturnType<typeof vi.fn>;
   setNominalIntervalUs: ReturnType<typeof vi.fn>;
@@ -133,6 +136,9 @@ function makeEngine(): MockDjPlayerEngine {
     previousSubtune: vi.fn(),
     nextSubtune: vi.fn(),
     setSpeed: vi.fn(),
+    jumpSpeedUp: vi.fn(),
+    jumpSpeedDown: vi.fn(),
+    homeSpeed: vi.fn(),
     setSpeedMode: vi.fn(),
     setRecipeEnabled: vi.fn(),
     setNominalIntervalUs: vi.fn(),
@@ -303,14 +309,55 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('speed input', () => {
-    it('calls engine.setSpeed with the numeric value', () => {
-      const range: HTMLInputElement = fixture.nativeElement.querySelector(
-        '[aria-label="Speed"] input[type="range"]'
+    function speedFader(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('[aria-label="Speed"] input[type="range"]');
+    }
+
+    function speedButton(label: '+50%' | '−50%' | 'Home'): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Speed"] button')
       );
+      return buttons.find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
+    }
+
+    it('calls engine.setSpeed with the numeric value', () => {
+      const range = speedFader();
       range.value = '0.9';
       range.dispatchEvent(new Event('input'));
 
       expect(engine.setSpeed).toHaveBeenCalledWith(0.9);
+    });
+
+    it('binds the fader to the 0.5–1.5 input span', () => {
+      const range = speedFader();
+
+      expect(range.min).toBe('0.5');
+      expect(range.max).toBe('1.5');
+    });
+
+    it("pins the fader's displayed value to the input span without writing back to the engine", () => {
+      engine.speedMultiplier.set(1.65); // beyond the input span, as a jump excursion can leave it
+      fixture.detectChanges();
+
+      expect(speedFader().value).toBe('1.5');
+      expect(engine.setSpeed).not.toHaveBeenCalled();
+
+      engine.speedMultiplier.set(0.4);
+      fixture.detectChanges();
+
+      expect(speedFader().value).toBe('0.5');
+      expect(engine.setSpeed).not.toHaveBeenCalled();
+    });
+
+    it('calls the jump and home methods from their own buttons', () => {
+      speedButton('+50%').click();
+      expect(engine.jumpSpeedUp).toHaveBeenCalled();
+
+      speedButton('−50%').click();
+      expect(engine.jumpSpeedDown).toHaveBeenCalled();
+
+      speedButton('Home').click();
+      expect(engine.homeSpeed).toHaveBeenCalled();
     });
   });
 

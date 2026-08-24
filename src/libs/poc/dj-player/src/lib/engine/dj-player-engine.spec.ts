@@ -7,6 +7,7 @@ import {
   ASID_MSG_SID_TYPE,
   ASID_MSG_START,
   ASID_MSG_STOP,
+  NTSC_FRAME_INTERVAL_US,
   PAL_FRAME_INTERVAL_US,
 } from '../asid/asid-constants';
 import { buildFramerateRecipePacket } from '../asid/asid-encoder';
@@ -468,15 +469,154 @@ describe('DjPlayerEngine', () => {
     );
   });
 
-  it('divides the clock interval by the speed multiplier, clamped to its range', async () => {
+  it('divides the clock interval by the speed multiplier, clamped to the input span', async () => {
     engine.loadTune(silentTune());
     await engine.play();
 
-    engine.setSpeed(1.2);
-    expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+    engine.setSpeed(1.3);
+    expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.3, 6);
 
     engine.setSpeed(5);
-    expect(engine.speedMultiplier()).toBe(1.2);
+    expect(engine.speedMultiplier()).toBe(1.5);
+
+    engine.setSpeed(-5);
+    expect(engine.speedMultiplier()).toBe(0.5);
+  });
+
+  describe('the per-tune speed floor', () => {
+    /** The engine's own protocol-floor formula (`slowestSpeed` in `dj-player-engine.ts`), duplicated
+     * only to compute the boundary the floor should resolve to — not a re-test of the formula. */
+    function expectedProtocolFloor(intervalUs: number, callsPerFrame = 1): number {
+      return intervalUs / (0xffff * callsPerFrame);
+    }
+
+    it('resolves the protocol floor on a normal PAL tune, looser than the 0.3 hard span', () => {
+      engine.loadTune(silentTune());
+
+      const floor = expectedProtocolFloor(PAL_FRAME_INTERVAL_US);
+      expect(engine.slowestSpeed()).toBeCloseTo(floor, 6);
+      expect(engine.slowestSpeed()).toBeGreaterThan(0.3);
+    });
+
+    it('resolves the 0.3 hard span on an NTSC tune, since its protocol floor is looser still', () => {
+      engine.loadTune(tune({ clock: 'ntsc', blocks: [{ at: 0x1000, bytes: [RTS] }] }));
+
+      expect(expectedProtocolFloor(NTSC_FRAME_INTERVAL_US)).toBeLessThan(0.3);
+      expect(engine.slowestSpeed()).toBeCloseTo(0.3, 6);
+    });
+
+    it('resolves the 0.3 hard span on a 2x-multispeed PAL tune, since halving the interval halves the protocol floor too', () => {
+      engine.loadTune(doubleSpeedTune());
+
+      expect(expectedProtocolFloor(PAL_FRAME_INTERVAL_US, 2)).toBeLessThan(0.3);
+      expect(engine.slowestSpeed()).toBeCloseTo(0.3, 6);
+    });
+
+    it('re-resolves the floor after loading a normal tune over a multispeed one, rather than keeping the stale value', () => {
+      engine.loadTune(doubleSpeedTune());
+      expect(engine.slowestSpeed()).toBeCloseTo(0.3, 6);
+
+      // Both tunes share the same nominal PAL interval, so only callsPerFrame moving from 2 back to
+      // 1 can explain a floor that loosens back to the protocol floor here.
+      engine.loadTune(silentTune());
+
+      expect(engine.slowestSpeed()).toBeCloseTo(expectedProtocolFloor(PAL_FRAME_INTERVAL_US), 6);
+    });
+
+    it('keeps the outgoing recipe interval at or under 0xffff when a down jump reaches the floor', async () => {
+      engine.loadTune(silentTune());
+      await engine.play();
+      engine.setSpeed(0.5); // the fader minimum
+
+      engine.jumpSpeedDown(); // additive from 0.5 lands well under the floor, so it clamps up to it
+
+      expect(engine.speedMultiplier()).toBeCloseTo(expectedProtocolFloor(PAL_FRAME_INTERVAL_US), 6);
+      // Rounded the same way `sendRecipe` rounds before clamping — the floating-point floor lands a
+      // hair either side of 0xffff, and it is the rounded value the cartridge actually receives.
+      expect(Math.round(engine.stats().effectiveIntervalUs)).toBeLessThanOrEqual(0xffff);
+    });
+  });
+
+  describe('the speed jump excursion', () => {
+    it('jumps additively from the current value, clamped to the hard range', () => {
+      engine.loadTune(silentTune());
+      engine.setSpeed(1.15);
+
+      engine.jumpSpeedUp();
+      expect(engine.speedMultiplier()).toBeCloseTo(1.65, 6);
+
+      engine.homeSpeed(); // close the excursion before the next one opens
+      engine.setSpeed(1.15);
+      engine.jumpSpeedDown();
+      expect(engine.speedMultiplier()).toBeCloseTo(0.65, 6);
+    });
+
+    it('records the pre-jump speed into rememberedSpeed on the first jump of an excursion', () => {
+      engine.loadTune(silentTune());
+      engine.setSpeed(1.15);
+
+      expect(engine.rememberedSpeed()).toBeNull();
+      engine.jumpSpeedUp();
+      expect(engine.rememberedSpeed()).toBeCloseTo(1.15, 6);
+    });
+
+    it('returns to the remembered speed exactly on the opposite button, and clears the excursion', () => {
+      engine.loadTune(silentTune());
+      engine.setSpeed(1.15);
+      engine.jumpSpeedUp();
+
+      engine.jumpSpeedDown();
+
+      expect(engine.speedMultiplier()).toBeCloseTo(1.15, 6);
+      expect(engine.rememberedSpeed()).toBeNull();
+    });
+
+    it('is a no-op to press the same button again mid-excursion', () => {
+      engine.loadTune(silentTune());
+      engine.setSpeed(1);
+      engine.jumpSpeedUp();
+      const afterFirstJump = engine.speedMultiplier();
+
+      engine.jumpSpeedUp();
+
+      expect(engine.speedMultiplier()).toBe(afterFirstJump);
+      expect(engine.rememberedSpeed()).toBe(1);
+    });
+
+    it('returns exactly to the remembered speed even when the outbound jump clamped, never by re-deriving with arithmetic', () => {
+      engine.loadTune(silentTune());
+      engine.setSpeed(1.5); // the fader maximum
+
+      engine.jumpSpeedUp(); // 1.5 + 0.5 = 2.0, clamped to the 1.7 hard ceiling
+      expect(engine.speedMultiplier()).toBeCloseTo(1.7, 6);
+
+      engine.jumpSpeedDown(); // the opposite button — must land exactly on 1.5, not 1.7 - 0.5 = 1.2
+
+      expect(engine.speedMultiplier()).toBeCloseTo(1.5, 6);
+    });
+
+    it('is dual-purpose: Home sets 1.0 with no excursion open, or restores the ridden speed and closes it', () => {
+      engine.loadTune(silentTune());
+      engine.setSpeed(1.15);
+      engine.jumpSpeedUp();
+
+      engine.homeSpeed();
+      expect(engine.speedMultiplier()).toBeCloseTo(1.15, 6);
+      expect(engine.rememberedSpeed()).toBeNull();
+
+      engine.homeSpeed();
+      expect(engine.speedMultiplier()).toBe(1);
+    });
+
+    it('reaches the hard span rather than the input span, unlike setSpeed', () => {
+      engine.loadTune(silentTune());
+      engine.setSpeed(1.6); // beyond the input span
+      expect(engine.speedMultiplier()).toBe(1.5);
+
+      engine.jumpSpeedUp(); // additive from 1.5 -> 2.0, clamped to the 1.7 hard span
+
+      expect(engine.speedMultiplier()).toBeCloseTo(1.7, 6);
+    });
   });
 
   it('stops and reports why when a frame runs out of cycles', async () => {

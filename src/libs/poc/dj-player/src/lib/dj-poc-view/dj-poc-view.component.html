@@ -243,16 +243,28 @@
           <div class="speed-body">
             <span class="speed-value">{{ speedMultiplier().toFixed(3) }}x</span>
 
-            <input
-              type="range"
-              class="speed-fader"
-              [min]="minSpeed"
-              [max]="maxSpeed"
-              step="0.005"
-              [value]="speedMultiplier()"
-              (input)="onSpeedInput($event)"
-              aria-label="Speed multiplier"
-            />
+            <div class="speed-fader-row">
+              <input
+                type="range"
+                class="speed-fader"
+                [min]="minSpeed"
+                [max]="maxSpeed"
+                step="0.001"
+                [value]="speedFaderValue()"
+                (input)="onSpeedInput($event)"
+                aria-label="Speed multiplier"
+              />
+
+              <div class="speed-jump-buttons">
+                <button type="button" aria-label="Speed up 50%" (click)="onSpeedJumpUp()">
+                  +50%
+                </button>
+                <button type="button" aria-label="Speed down 50%" (click)="onSpeedJumpDown()">
+                  −50%
+                </button>
+                <button type="button" aria-label="Speed home" (click)="onSpeedHome()">Home</button>
+              </div>
+            </div>
 
             <select class="speed-mode" (change)="onSpeedModeChange($event)">
               <option value="clock-only" [selected]="speedMode() === 'clock-only'">

@@ -8,9 +8,8 @@ import { ScriptProcessorFrameClock } from '../clock/frame-clock';
 import {
   DjPlayerEngine,
   FRAME_CLOCK,
-  MAX_SPEED_MULTIPLIER,
-  MIN_SPEED_MULTIPLIER,
   NOMINAL_INTERVAL_OPTIONS_US,
+  SPEED_INPUT_SPAN,
   SpeedMode,
 } from '../engine/dj-player-engine';
 
@@ -96,8 +95,13 @@ export class DjPocViewComponent {
     return 'idle';
   }
 
-  protected readonly minSpeed = MIN_SPEED_MULTIPLIER;
-  protected readonly maxSpeed = MAX_SPEED_MULTIPLIER;
+  protected readonly minSpeed = 1 - SPEED_INPUT_SPAN;
+  protected readonly maxSpeed = 1 + SPEED_INPUT_SPAN;
+  /** The fader's displayed value, pinned to its own span when a jump has carried the multiplier
+   * beyond it — display only, never written back to the engine. */
+  protected readonly speedFaderValue = computed<number>(() =>
+    Math.min(Math.max(this.speedMultiplier(), this.minSpeed), this.maxSpeed)
+  );
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
   protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
@@ -269,6 +273,18 @@ export class DjPocViewComponent {
 
   onSpeedInput(event: Event): void {
     this.engine.setSpeed(Number((event.target as HTMLInputElement).value));
+  }
+
+  onSpeedJumpUp(): void {
+    this.engine.jumpSpeedUp();
+  }
+
+  onSpeedJumpDown(): void {
+    this.engine.jumpSpeedDown();
+  }
+
+  onSpeedHome(): void {
+    this.engine.homeSpeed();
   }
 
   onSpeedModeChange(event: Event): void {

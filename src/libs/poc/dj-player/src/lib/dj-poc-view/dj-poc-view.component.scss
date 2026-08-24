@@ -639,15 +639,41 @@
   color: var(--color-primary);
 }
 
-// The floor is the fix for the original defect: the fader resolved to zero height, so the control
-// existed but had no throw at all. It can shrink with the rail, never to nothing.
-.speed-fader {
+// The fader and its three jump buttons side by side, filling whatever height Speed is given.
+.speed-fader-row {
   flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-sm);
+  min-height: 0;
+  width: 100%;
+}
+
+// The floor is the fix for the original defect: the fader resolved to zero height, so the control
+// existed but had no throw at all. It can shrink with the row, never to nothing. No horizontal grow
+// here — that would eat into the jump buttons' column — its height instead stretches to match
+// `.speed-fader-row`.
+.speed-fader {
+  flex: 0 1 auto;
   min-height: 6rem;
   width: 1.5rem;
   margin: 0;
   writing-mode: vertical-lr;
   direction: rtl;
+}
+
+.speed-jump-buttons {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  min-width: 4rem;
+
+  button {
+    width: 100%;
+    height: var(--perf-control-height);
+  }
 }
 
 .speed-mode {
