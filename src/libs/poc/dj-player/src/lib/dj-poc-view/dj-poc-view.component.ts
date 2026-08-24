@@ -107,8 +107,6 @@ export class DjPocViewComponent {
   );
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
-  protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
-  protected readonly loopIndices: readonly number[] = [0, 1, 2, 3];
   protected readonly nudgeRange = this.engine.nudgeRangeFrames;
 
   // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
@@ -350,16 +348,24 @@ export class DjPocViewComponent {
     this.engine.clearVoiceMutes();
   }
 
-  onAddCue(slot: number): void {
-    this.engine.addCue(slot);
+  onAddCue(): void {
+    this.engine.addCue();
+  }
+
+  onCaptureCue(slot: number): void {
+    this.engine.captureCue(slot);
   }
 
   onHopToCue(slot: number): void {
-    this.engine.hopToCue(slot);
+    void this.engine.hopToCue(slot);
   }
 
   onClearCue(slot: number): void {
     this.engine.clearCue(slot);
+  }
+
+  onDeleteCue(slot: number): void {
+    this.engine.deleteCue(slot);
   }
 
   /** The offset the row shows: the live drag while one is in flight, the committed value otherwise. */
@@ -386,7 +392,7 @@ export class DjPocViewComponent {
   onCueNudgeChange(slot: number, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
     this.engine.setCueOffset(slot, value);
-    this.engine.hopToCue(slot);
+    void this.engine.hopToCue(slot);
     this.cueDragOffsets.update((offsets) => {
       const next = new Map(offsets);
       next.delete(slot);
@@ -403,11 +409,19 @@ export class DjPocViewComponent {
   }
 
   onPunchLoop(slot: number): void {
-    this.engine.punchLoop(slot);
+    void this.engine.punchLoop(slot);
   }
 
   onClearLoopSlot(slot: number): void {
     this.engine.clearLoopSlot(slot);
+  }
+
+  onDeleteLoop(slot: number): void {
+    this.engine.deleteLoop(slot);
+  }
+
+  onAddLoop(): void {
+    this.engine.addLoop();
   }
 
   onStopLoop(): void {

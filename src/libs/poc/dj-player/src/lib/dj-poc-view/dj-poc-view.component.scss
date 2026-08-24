@@ -358,15 +358,20 @@
   }
 }
 
-// The rows spread through whatever height the panel was given rather than bunching at the top. The
-// slack goes into the rows themselves rather than into gaps between them (`justify-content`), so
-// every separator lands on an even pitch with its row's contents centred in the band above it.
+// Rows are sized by their own content (`.cue-row`/`.loop-slot-row` are `flex: 0 0 auto`) and stack
+// from the top rather than stretching to fill the panel, so density comes from the real gap below
+// rather than from each row silently absorbing the panel's slack. Once rows stop growing this also
+// becomes the scroll container: a bounded height (inherited from the panel's own flex sizing) plus
+// `overflow-y: auto` lets the list scroll instead of pushing the page.
 .cue-rows,
 .loop-slots {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
+  gap: var(--spacing-xs);
   min-height: 0;
+  overflow-y: auto;
 }
 
 // label | button pair | captured frame | nudge track | offset readout. Every column but the track
@@ -377,7 +382,7 @@
 // rows and the loop rows indent identically and their nudge tracks share one left edge.
 .cue-row {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
@@ -472,8 +477,9 @@
   color: var(--color-dimmed);
 }
 
-// The panel-level Stop sits beside the heading rather than per slot — one control ends whichever
-// slot is looping.
+// Heading plus the panel-level add control. Loops adds the panel-level Stop control beside them —
+// one control ends whichever slot is looping, rather than a per-row stop.
+.panel-header,
 .loop-panel-header {
   flex: 0 0 auto;
   display: flex;
@@ -487,13 +493,20 @@
   }
 }
 
+.panel-header-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
 // Two lines per slot, as the wireframe has it: punch target | In end | Out end | clear, with the
 // progress strip spanning underneath them. A left border reports active/queued state so the row
 // reads without a text label — solid and lit for active, dashed and dimmer for queued, invisible
 // for idle.
 .loop-slot-row {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
   justify-content: center;
   gap: var(--spacing-sm);
@@ -576,9 +589,22 @@
   background: var(--color-dimmed);
 }
 
+// The right-edge action cluster, identical in both panels: Clear then Delete, Delete outermost. It
+// is each row's last flex child, so it lands at the row's right edge on whatever space the earlier
+// (flex-growing) columns left behind rather than needing a margin-left of its own.
+.row-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height);
+    min-width: 4rem;
+  }
+}
+
 .loop-slot-clear {
   flex: 0 0 auto;
-  height: var(--perf-control-height);
 }
 
 .error-text {

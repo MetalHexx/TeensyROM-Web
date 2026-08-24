@@ -37,25 +37,34 @@
     <div class="performance-cluster">
       <div class="stage-main">
         <section class="panel" aria-label="Cues">
-          <h2>Cues</h2>
+          <div class="panel-header">
+            <h2>Cues</h2>
+            <button type="button" (click)="onAddCue()">Add Cue</button>
+          </div>
 
           <div class="cue-rows">
-            @for (slot of cueIndices; track slot) {
+            @for (cue of cues(); track $index) {
             <div class="cue-row">
-              <span class="cue-tag">Cue {{ slot + 1 }}</span>
+              <span class="cue-tag">Cue {{ $index + 1 }}</span>
               <div class="cue-btns">
-                @if (cues()[slot]; as cue) {
-                <button type="button" (click)="onHopToCue(slot)">Hop</button>
-                <button type="button" (click)="onClearCue(slot)">Clear</button>
+                @if (cue) {
+                <button type="button" (click)="onHopToCue($index)">Hop</button>
                 } @else {
-                <button type="button" class="cue-btn-wide" (click)="onAddCue(slot)">Add</button>
+                <button
+                  type="button"
+                  class="cue-btn-wide"
+                  [attr.aria-label]="'Capture cue ' + ($index + 1)"
+                  (click)="onCaptureCue($index)"
+                >
+                  Capture
+                </button>
                 }
               </div>
-              @if (cues()[slot]; as cue) {
+              @if (cue) {
               <span class="cue-frame">frame {{ cue.frame }}</span>
               } @else {
               <span class="cue-frame cue-frame--empty">empty</span>
-              } @if (cues()[slot]) {
+              } @if (cue) {
               <div class="cue-nudge">
                 <div class="cue-nudge-centre"></div>
                 <input
@@ -63,19 +72,35 @@
                   [min]="-nudgeRange()"
                   [max]="nudgeRange()"
                   step="1"
-                  [attr.aria-label]="'Nudge cue ' + (slot + 1)"
-                  [value]="displayedCueOffset(slot)"
-                  (input)="onCueNudgeInput(slot, $event)"
-                  (change)="onCueNudgeChange(slot, $event)"
+                  [attr.aria-label]="'Nudge cue ' + ($index + 1)"
+                  [value]="displayedCueOffset($index)"
+                  (input)="onCueNudgeInput($index, $event)"
+                  (change)="onCueNudgeChange($index, $event)"
                 />
               </div>
-              <span class="cue-offset">{{ cueOffsetLabel(slot) }}</span>
+              <span class="cue-offset">{{ cueOffsetLabel($index) }}</span>
               } @else {
               <div class="cue-nudge cue-nudge--empty" aria-hidden="true">
                 <div class="cue-nudge-centre"></div>
               </div>
               <span class="cue-offset cue-offset--empty">—</span>
               }
+              <div class="row-actions">
+                <button
+                  type="button"
+                  [attr.aria-label]="'Clear cue ' + ($index + 1)"
+                  (click)="onClearCue($index)"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  [attr.aria-label]="'Delete cue ' + ($index + 1)"
+                  (click)="onDeleteCue($index)"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
             }
           </div>
@@ -84,20 +109,23 @@
         <section class="panel" aria-label="Loops">
           <div class="loop-panel-header">
             <h2>Loops</h2>
-            <button type="button" aria-label="Stop loop" (click)="onStopLoop()">Stop</button>
+            <div class="panel-header-actions">
+              <button type="button" (click)="onAddLoop()">Add Loop</button>
+              <button type="button" aria-label="Stop loop" (click)="onStopLoop()">Stop</button>
+            </div>
           </div>
 
           <div class="loop-slots">
-            @for (slot of loopIndices; track slot) {
-            <div class="loop-slot-row" [attr.data-loop-state]="loopSlotState(slot)">
+            @for (slot of loopSlots(); track $index) {
+            <div class="loop-slot-row" [attr.data-loop-state]="loopSlotState($index)">
               <div class="loop-slot-main">
                 <button
                   type="button"
                   class="loop-slot-punch"
-                  [attr.aria-label]="'Punch slot ' + (slot + 1)"
-                  (click)="onPunchLoop(slot)"
+                  [attr.aria-label]="'Punch slot ' + ($index + 1)"
+                  (click)="onPunchLoop($index)"
                 >
-                  {{ slot + 1 }}
+                  {{ $index + 1 }}
                 </button>
 
                 <div class="loop-slot-ends">
@@ -105,13 +133,13 @@
                     <span class="loop-tag">In</span>
                     <button
                       type="button"
-                      [attr.aria-label]="'Tap in for slot ' + (slot + 1)"
-                      (click)="onTapLoopIn(slot)"
+                      [attr.aria-label]="'Tap in for slot ' + ($index + 1)"
+                      (click)="onTapLoopIn($index)"
                     >
                       Tap In
                     </button>
-                    @if (loopSlots()[slot]?.in; as point) {
-                    <span class="loop-frame">frame {{ loopInFrame(slot) }}</span>
+                    @if (slot.in; as point) {
+                    <span class="loop-frame">frame {{ loopInFrame($index) }}</span>
                     <div class="loop-nudge">
                       <div class="loop-nudge-centre"></div>
                       <input
@@ -119,13 +147,13 @@
                         [min]="-nudgeRange()"
                         [max]="nudgeRange()"
                         step="1"
-                        [attr.aria-label]="'Nudge loop ' + (slot + 1) + ' in'"
-                        [value]="displayedLoopInOffset(slot)"
-                        (input)="onLoopInNudgeInput(slot, $event)"
-                        (change)="onLoopInNudgeChange(slot, $event)"
+                        [attr.aria-label]="'Nudge loop ' + ($index + 1) + ' in'"
+                        [value]="displayedLoopInOffset($index)"
+                        (input)="onLoopInNudgeInput($index, $event)"
+                        (change)="onLoopInNudgeChange($index, $event)"
                       />
                     </div>
-                    <span class="loop-offset">{{ loopInOffsetLabel(slot) }}</span>
+                    <span class="loop-offset">{{ loopInOffsetLabel($index) }}</span>
                     } @else {
                     <span class="loop-frame loop-frame--empty">unmarked</span>
                     <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
@@ -139,13 +167,13 @@
                     <span class="loop-tag">Out</span>
                     <button
                       type="button"
-                      [attr.aria-label]="'Tap out for slot ' + (slot + 1)"
-                      (click)="onTapLoopOut(slot)"
+                      [attr.aria-label]="'Tap out for slot ' + ($index + 1)"
+                      (click)="onTapLoopOut($index)"
                     >
                       Tap Out
                     </button>
-                    @if (loopSlots()[slot]?.out; as point) {
-                    <span class="loop-frame">frame {{ loopOutFrame(slot) }}</span>
+                    @if (slot.out; as point) {
+                    <span class="loop-frame">frame {{ loopOutFrame($index) }}</span>
                     <div class="loop-nudge">
                       <div class="loop-nudge-centre"></div>
                       <input
@@ -153,13 +181,13 @@
                         [min]="-nudgeRange()"
                         [max]="nudgeRange()"
                         step="1"
-                        [attr.aria-label]="'Nudge loop ' + (slot + 1) + ' out'"
-                        [value]="displayedLoopOutOffset(slot)"
-                        (input)="onLoopOutNudgeInput(slot, $event)"
-                        (change)="onLoopOutNudgeChange(slot, $event)"
+                        [attr.aria-label]="'Nudge loop ' + ($index + 1) + ' out'"
+                        [value]="displayedLoopOutOffset($index)"
+                        (input)="onLoopOutNudgeInput($index, $event)"
+                        (change)="onLoopOutNudgeChange($index, $event)"
                       />
                     </div>
-                    <span class="loop-offset">{{ loopOutOffsetLabel(slot) }}</span>
+                    <span class="loop-offset">{{ loopOutOffsetLabel($index) }}</span>
                     } @else {
                     <span class="loop-frame loop-frame--empty">unmarked</span>
                     <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
@@ -170,22 +198,29 @@
                   </div>
                 </div>
 
-                @if (loopSlots()[slot]) {
-                <button
-                  type="button"
-                  class="loop-slot-clear"
-                  [attr.aria-label]="'Clear slot ' + (slot + 1)"
-                  (click)="onClearLoopSlot(slot)"
-                >
-                  Clear
-                </button>
-                }
+                <div class="row-actions">
+                  <button
+                    type="button"
+                    class="loop-slot-clear"
+                    [attr.aria-label]="'Clear slot ' + ($index + 1)"
+                    (click)="onClearLoopSlot($index)"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    [attr.aria-label]="'Delete slot ' + ($index + 1)"
+                    (click)="onDeleteLoop($index)"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
 
               <div class="loop-slot-progress" aria-hidden="true">
                 <div
                   class="loop-slot-progress-fill"
-                  [style.width.%]="progressPercentFor(slot)"
+                  [style.width.%]="progressPercentFor($index)"
                 ></div>
               </div>
             </div>
