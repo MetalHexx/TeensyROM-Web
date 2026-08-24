@@ -28,6 +28,8 @@ import type { FrameResult } from '../cpu/c64-machine';
 import type { SidFile } from '../sid/sid-file.model';
 import { MidiOutputService } from '../midi/midi-output.service';
 import type { FrameClock } from '../clock/frame-clock';
+import { REPLAY_RUNNER } from '../replay/replay-runner';
+import type { ReplayRequest, ReplayResponse } from '../replay/replay-runner';
 
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
 export type SpeedMode = 'clock-only' | 'clock-and-recipe';
@@ -234,6 +236,7 @@ const EMPTY_STATS: EngineStats = {
 export class DjPlayerEngine implements OnDestroy {
   private readonly midi = inject(MidiOutputService);
   private readonly clock = inject(FRAME_CLOCK);
+  private readonly replayRunner = inject(REPLAY_RUNNER);
 
   readonly state = signal<EngineState>('stopped');
   readonly currentSubtune = signal<number>(1);
@@ -366,6 +369,17 @@ export class DjPlayerEngine implements OnDestroy {
    * before every capture, so it is what a point taken in the first seconds of a tune falls back to.
    */
   private anchorRing: PositionAnchor[] = [];
+  /** Stamped onto every jump request, so responses can be told apart by age. */
+  private jumpRequestId = 0;
+  /**
+   * The id of the only jump whose result may still be applied, or null when none may.
+   *
+   * A replay now runs off-thread while playback carries on, so a result can arrive after the
+   * operator has already asked for another position — or after a stop, a tune load or a subtune
+   * change made the answer describe a machine this engine no longer has. Anything that does not
+   * match is dropped without a trace of it reaching the stream.
+   */
+  private outstandingJumpId: number | null = null;
 
   /** Rebuilds the machine and register frame for `file` and initialises its start subtune. */
   loadTune(file: SidFile): void {
@@ -374,6 +388,8 @@ export class DjPlayerEngine implements OnDestroy {
       this.sendControl(buildStopPacket());
     }
     this.clearRecipeResend();
+    // Whatever a jump is replaying describes the outgoing tune, not this one.
+    this.discardOutstandingJump();
 
     this.file = file;
     this.frame = new RegisterFrame();
@@ -482,8 +498,10 @@ export class DjPlayerEngine implements OnDestroy {
     this.clock.stop();
     this.clearRecipeResend();
     // A sequence must never survive a transport change: no tick is coming to drain it, and the
-    // subtune re-init below invalidates whatever it was holding anyway.
+    // subtune re-init below invalidates whatever it was holding anyway. A jump still replaying is
+    // owed the same treatment — landing it would restart playback at a position nobody asked for.
     this.pending = [];
+    this.discardOutstandingJump();
     if (this.file !== null) {
       this.sendControl(buildStopPacket());
     }
@@ -505,6 +523,9 @@ export class DjPlayerEngine implements OnDestroy {
   ngOnDestroy(): void {
     this.clock.stop();
     this.clearRecipeResend();
+    this.discardOutstandingJump();
+    // The replay thread outlives this injector otherwise — nothing else holds the runner.
+    this.replayRunner.dispose();
     if (this.state() === 'playing' || this.state() === 'paused') {
       this.sendControl(buildStopPacket());
     }
@@ -788,7 +809,8 @@ export class DjPlayerEngine implements OnDestroy {
    * Re-entry is a restore, not a replay — see `engageLoop` — and the pre-roll itself replays forward
    * on the live machine from that restored in-point, so the cost is bounded by the loop's own length
    * however deep the loop sits in the tune. Reaching the pre-roll point with `jumpToFrame` would
-   * replay from `init` instead, reintroducing the stall a prior iteration removed.
+   * replay from `init` instead — off-thread now, but still O(depth) and still landing a beat after
+   * the button was pressed.
    */
   auditionLoopOut(slot: number): void {
     if (slot < 0 || slot > 3) return;
@@ -933,7 +955,11 @@ export class DjPlayerEngine implements OnDestroy {
     this.loopSlots.update((slots) => slots.map((s, i) => (i === slot ? next(s) : s)));
   }
 
-  /** Jumps to `percent` of `ceilingFrames()`. */
+  /**
+   * Asks for `percent` of `ceilingFrames()`. Returns before the position moves — the replay runs off
+   * this thread and lands a moment later, and a second scrub issued in the meantime supersedes this
+   * one. Playback carries on untouched until it lands.
+   */
   scrubTo(percent: number): void {
     if (this.machine === null) return;
     this.jumpToFrame(this.frameForPercent(percent));
@@ -1037,9 +1063,14 @@ export class DjPlayerEngine implements OnDestroy {
       return;
     }
     const clamped = clamp(song, 1, this.subtuneCount());
+    if (clamped === this.currentSubtune()) {
+      return;
+    }
+    // A jump in flight was replaying the outgoing subtune, so its answer is about to be wrong.
+    this.discardOutstandingJump();
     // A subtune can carry a different multispeed — initSubtune() bumps tuneRevision on success, so
     // slowestSpeed re-resolves against whichever subtune actually loaded.
-    if (clamped === this.currentSubtune() || !this.initSubtune(clamped)) {
+    if (!this.initSubtune(clamped)) {
       return;
     }
     // The tick rate itself also has to be re-resolved.
@@ -1110,49 +1141,66 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * The shared silent-replay primitive: rebuilds the tune from a clean `init` on a throwaway
-   * machine/frame pair, runs it forward frame-by-frame with output discarded, then emits the
-   * accumulated state as one resync packet and adopts the replayed pair as live.
+   * The shared silent-replay primitive, now a request rather than a replay: hands the rebuild to the
+   * `REPLAY_RUNNER` and returns at once, so the frame clock keeps ticking and a packet still goes out
+   * on every tick while the replay runs. The landing happens later, in `awaitJump`.
    *
-   * A fresh `C64Machine` + `RegisterFrame` pair, never the live one — reusing the live pair would let
-   * RAM state from wherever playback currently is bleed into the replay.
+   * Only the newest request may land. The id stamped here is recorded as the outstanding one, and a
+   * response carrying any other id is dropped — a second scrub supersedes the first rather than
+   * queueing behind it.
    */
   private jumpToFrame(targetFrame: number): void {
     const file = this.file;
     if (file === null || this.machine === null || this.frame === null) return;
-    const clampedTarget = Math.max(0, Math.round(targetFrame));
 
-    const replayFrame = new RegisterFrame();
-    this.effectiveMutes().forEach((muted, voice) => replayFrame.setVoiceMuted(voice, muted));
-    const replayMachine = new C64Machine(file, replayFrame);
+    const request: ReplayRequest = {
+      id: ++this.jumpRequestId,
+      file,
+      subtune: this.currentSubtune(),
+      targetFrame,
+      // The mutes as they stand now; `awaitJump` re-asserts whatever they have become by the time
+      // the result lands.
+      mutes: this.effectiveMutes(),
+    };
+    this.outstandingJumpId = request.id;
+    void this.awaitJump(request);
+  }
 
+  /** Waits out one replay request and applies its result if it is still the one being waited on. */
+  private async awaitJump(request: ReplayRequest): Promise<void> {
+    let response: ReplayResponse;
     try {
-      replayMachine.initSubtune(this.currentSubtune());
+      response = await this.replayRunner.run(request);
     } catch (error) {
-      this.fail(`jump to frame ${clampedTarget} failed during init — ${describeError(error)}`);
+      response = {
+        id: request.id,
+        ok: false,
+        error: `jump to frame ${request.targetFrame} failed during replay — ${describeError(error)}`,
+      };
+    }
+
+    if (response.id !== this.outstandingJumpId) {
+      return; // superseded, or discarded by a stop, a tune load or a subtune change
+    }
+    this.outstandingJumpId = null;
+
+    if (!response.ok) {
+      this.fail(response.error);
       return;
     }
 
-    for (let i = 0; i < clampedTarget; i++) {
-      let result: FrameResult;
-      try {
-        result = replayMachine.runFrame();
-      } catch (error) {
-        this.fail(`jump to frame ${clampedTarget} failed during replay — ${describeError(error)}`);
-        return;
-      }
-      if (!result.completed) {
-        this.fail(`jump to frame ${clampedTarget} exceeded its cycle budget during replay`);
-        return;
-      }
-      replayFrame.takeSnapshot(); // discarded — resets per-frame duplicate-write tracking only;
-                                  // the accumulated register values persist across the call regardless
+    // The operator can move a mute while the replay is in flight, so what the request carried may
+    // already be stale. This has to land before `restoreState` takes the resync snapshot:
+    // `restoreValues` re-zeroes exactly the voices the live frame knows about at that moment.
+    for (let voice = 0; voice < 3; voice++) {
+      this.applyEffectiveMute(voice);
     }
+    this.restoreState(response.result.machine, response.result.registers, response.result.frame);
+  }
 
-    this.machine = replayMachine;
-    this.frame = replayFrame;
-    this.framesRendered = clampedTarget;
-    this.queueResync();
+  /** Drops whatever jump is in flight, so its result is discarded rather than applied. */
+  private discardOutstandingJump(): void {
+    this.outstandingJumpId = null;
   }
 
   /**
@@ -1250,24 +1298,37 @@ export class DjPlayerEngine implements OnDestroy {
     };
   }
 
+  /** Puts a captured point back onto the live machine. The stored snapshot is the nudged one, so the
+   *  counter has to name the frame it actually is — otherwise the playhead and the row's frame
+   *  readout both drift by the offset. */
+  private restorePoint(point: CapturedPoint): void {
+    this.restoreState(point.machine, point.registers, resolvedFrame(point));
+  }
+
   /**
-   * Puts a captured point back onto the live machine: restore, adopt its frame number, resync.
+   * Puts an image back onto the live pair: restore, adopt its frame number, resync. Shared by a cue
+   * or loop re-entry and by a landing jump.
    *
    * No emulation, so the main thread never stalls and the frame clock (a main-thread
    * `ScriptProcessorNode`) keeps ticking straight through. That stall is what made a deep cue hop —
    * and a loop with a deep entry — hold its last note: with the thread blocked, no packets went out
    * and the SID simply kept sounding whatever it was last told.
+   *
+   * Takes the three pieces raw rather than a `CapturedPoint`: a jump has no nudge offset and no
+   * anchor, so there is no point to hand over.
    */
-  private restorePoint(point: CapturedPoint): void {
-    const machine = this.machine;
-    const frame = this.frame;
-    if (machine === null || frame === null) return;
+  private restoreState(
+    machine: MachineSnapshot,
+    registers: RegisterValuesSnapshot,
+    frameNumber: number
+  ): void {
+    const liveMachine = this.machine;
+    const liveFrame = this.frame;
+    if (liveMachine === null || liveFrame === null) return;
 
-    machine.restore(point.machine);
-    frame.restoreValues(point.registers);
-    // The stored snapshot is the nudged one, so the counter has to name the frame it actually is —
-    // otherwise the playhead and the row's frame readout both drift by the offset.
-    this.framesRendered = resolvedFrame(point);
+    liveMachine.restore(machine);
+    liveFrame.restoreValues(registers);
+    this.framesRendered = frameNumber;
     this.queueResync();
   }
 

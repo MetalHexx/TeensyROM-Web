@@ -15,6 +15,9 @@ import { MidiOutputService } from '../midi/midi-output.service';
 import type { SidClock, SidFile, SidModel } from '../sid/sid-file.model';
 import type { FrameClock, FrameClockStats } from '../clock/frame-clock';
 import { C64Machine } from '../cpu/c64-machine';
+import { REPLAY_RUNNER } from '../replay/replay-runner';
+import type { ReplayRequest, ReplayResponse, ReplayRunner } from '../replay/replay-runner';
+import { replayToFrame } from '../replay/replay-to-frame';
 import {
   DjPlayerEngine,
   FRAME_CLOCK,
@@ -74,6 +77,76 @@ class FakeFrameClock implements FrameClock {
     for (let i = 0; i < count && this.running; i++) {
       this.onFrame?.();
     }
+  }
+}
+
+/**
+ * Replaces `WorkerReplayRunner`, the boundary onto the worker thread: jsdom has no `Worker`, and a
+ * real one would answer on its own schedule — which is precisely what a supersede, a discard and a
+ * mute-changed-mid-flight need held still to be observable at all.
+ *
+ * The replay itself is the production `replayToFrame`, so what lands here is what the worker would
+ * have sent back.
+ */
+class FakeReplayRunner implements ReplayRunner {
+  readonly requests: ReplayRequest[] = [];
+  disposed = false;
+  /** Holds every request until `resolveAll()`, so a test can drive the clock across one in flight. */
+  manual = false;
+
+  private readonly held: ((response: ReplayResponse) => void)[] = [];
+  private readonly heldRequests: ReplayRequest[] = [];
+  private settling: Promise<ReplayResponse>[] = [];
+
+  run(request: ReplayRequest): Promise<ReplayResponse> {
+    this.requests.push(request);
+    const promise = this.manual
+      ? new Promise<ReplayResponse>((resolve) => {
+          this.held.push(resolve);
+          this.heldRequests.push(request);
+        })
+      : Promise.resolve(answer(request));
+    this.settling.push(promise);
+    return promise;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+  }
+
+  /** Answers every held request, oldest first. */
+  resolveAll(): void {
+    const resolvers = this.held.splice(0);
+    const requests = this.heldRequests.splice(0);
+    resolvers.forEach((resolve, i) => resolve(answer(requests[i])));
+  }
+
+  /** Waits until every answered request has reached the engine. */
+  async settle(): Promise<void> {
+    while (this.settling.length > 0) {
+      const batch = this.settling;
+      this.settling = [];
+      await Promise.all(batch);
+    }
+    // One more turn, so the engine's own continuation on the last response has run before the test
+    // looks at what it did with it.
+    await Promise.resolve();
+  }
+}
+
+function answer(request: ReplayRequest): ReplayResponse {
+  try {
+    return {
+      id: request.id,
+      ok: true,
+      result: replayToFrame(request.file, request.subtune, request.targetFrame, request.mutes),
+    };
+  } catch (error) {
+    return {
+      id: request.id,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -169,8 +242,9 @@ function doubleSpeedTune(): SidFile {
  * increments a zero-page counter and stores it into $D400 every frame. Mirrors `doubleSpeedTune`'s
  * hand-assembled-bytes style, but — unlike `silentTune` — its output actually depends on how many
  * frames ran, which is what the jump primitive's tests need. */
-function counterTune(): SidFile {
+function counterTune(songs = 1): SidFile {
   return tune({
+    songs,
     blocks: [
       {
         at: 0x1000,
@@ -280,6 +354,7 @@ describe('DjPlayerEngine', () => {
   let engine: DjPlayerEngine;
   let clock: FakeFrameClock;
   let midi: FakeMidiOutputService;
+  let replay: FakeReplayRunner;
 
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -288,6 +363,7 @@ describe('DjPlayerEngine', () => {
 
     clock = new FakeFrameClock();
     midi = new FakeMidiOutputService();
+    replay = new FakeReplayRunner();
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -295,6 +371,7 @@ describe('DjPlayerEngine', () => {
         DjPlayerEngine,
         { provide: FRAME_CLOCK, useValue: clock },
         { provide: MidiOutputService, useValue: midi as unknown as MidiOutputService },
+        { provide: REPLAY_RUNNER, useValue: replay },
       ],
     });
     engine = TestBed.inject(DjPlayerEngine);
@@ -1029,12 +1106,14 @@ describe('DjPlayerEngine', () => {
   });
 
   describe('the jump primitive: cue, loop and scrub', () => {
-    it('produces byte-identical replayed output when jumping to the same frame twice', () => {
+    it('produces byte-identical replayed output when jumping to the same frame twice', async () => {
       engine.loadTune(counterTune());
 
       engine.scrubTo(5);
+      await replay.settle();
       const first = lastDataPacket(midi).bytes;
       engine.scrubTo(5);
+      await replay.settle();
       const second = lastDataPacket(midi).bytes;
 
       expect(second).toEqual(first);
@@ -1186,11 +1265,12 @@ describe('DjPlayerEngine', () => {
       expect(dataPackets(midi)).toHaveLength(before + 3);
     });
 
-    it('resyncs immediately when a jump lands with the clock stopped', () => {
+    it('resyncs immediately when a jump lands with the clock stopped', async () => {
       engine.loadTune(counterTune());
 
       const before = dataPackets(midi).length;
       engine.scrubTo(5);
+      await replay.settle();
 
       // Nothing is ticking, so there is no tick to ride and nothing to stay in step with.
       expect(dataPackets(midi).length).toBeGreaterThan(before);
@@ -1203,6 +1283,7 @@ describe('DjPlayerEngine', () => {
       engine.pause();
 
       engine.scrubTo(5);
+      await replay.settle();
       const pausedPacket = lastDataPacket(midi);
 
       expect(voiceGateValues(pausedPacket)).toEqual([0, 0, 0]);
@@ -1212,17 +1293,19 @@ describe('DjPlayerEngine', () => {
       // while playing proves the masking above is a paused-only override, not the tune's real state.
       await engine.play();
       engine.scrubTo(5);
+      await replay.settle();
       clock.tick(2); // playing now, so the resync rides the clock rather than going out here
       const playingPacket = lastDataPacket(midi);
 
       expect(voiceGateValues(playingPacket)).toEqual([0x11, 0x11, 0x11]);
     });
 
-    it("reports a muted voice's control register as 0 in a jump's resync packet, leaving the others live", () => {
+    it("reports a muted voice's control register as 0 in a jump's resync packet, leaving the others live", async () => {
       engine.loadTune(counterTune());
       engine.setVoiceMuted(1, true);
 
       engine.scrubTo(5);
+      await replay.settle();
 
       const gates = voiceGateValues(lastDataPacket(midi));
       expect(gates[1]).toBe(0);
@@ -1230,11 +1313,12 @@ describe('DjPlayerEngine', () => {
       expect(gates[2]).toBeGreaterThan(0);
     });
 
-    it("seeds a jump's replay frame from the effective (held) set rather than the latched one", () => {
+    it("seeds a jump's replay frame from the effective (held) set rather than the latched one", async () => {
       engine.loadTune(counterTune());
       engine.setVoiceHeld(1, true); // voice 1 is audible (latched); held inverts it to muted
 
       engine.scrubTo(5);
+      await replay.settle();
 
       const gates = voiceGateValues(lastDataPacket(midi));
       expect(gates[1]).toBe(0);
@@ -1261,32 +1345,170 @@ describe('DjPlayerEngine', () => {
       expect(engine.mutedVoices()).toEqual([false, true, false]);
     });
 
-    it('resolves 0%/100% to frame 0 and the jump ceiling exactly, clamping out-of-range input', () => {
+    it('resolves 0%/100% to frame 0 and the jump ceiling exactly, clamping out-of-range input', async () => {
       engine.loadTune(counterTune());
       const ceiling = expectedCeilingFrames();
 
       engine.scrubTo(0);
+      await replay.settle();
       expect(engine.stats().framesRendered).toBe(0);
 
       engine.scrubTo(100);
+      await replay.settle();
       expect(engine.stats().framesRendered).toBe(ceiling);
 
       engine.scrubTo(-25);
+      await replay.settle();
       expect(engine.stats().framesRendered).toBe(0);
 
       engine.scrubTo(140);
+      await replay.settle();
       expect(engine.stats().framesRendered).toBe(ceiling);
     });
 
-    it('aborts the whole jump, not just one frame of it, when the play routine never returns', () => {
+    it('aborts the whole jump, not just one frame of it, when the play routine never returns', async () => {
       engine.loadTune(runawayTune());
       const packetsBefore = dataPackets(midi).length;
 
       engine.scrubTo(1);
+      await replay.settle();
 
       expect(engine.state()).toBe('error');
       expect(engine.lastError()).toBeTruthy();
       expect(dataPackets(midi)).toHaveLength(packetsBefore);
+    });
+  });
+
+  describe('the off-thread jump', () => {
+    /** `counterTune` stores its play-call count into $D400, so slot 0 of a resync packet names the
+     *  frame whatever was restored actually came from. */
+    const COUNTER_SLOT = 0;
+
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    it('keeps a packet going out on every tick while a deep scrub is still replaying', async () => {
+      await playTo(5);
+      replay.manual = true;
+
+      engine.scrubTo(90);
+      const before = dataPackets(midi).length;
+      clock.tick(20);
+
+      // The whole point of moving the replay off this thread: the clock is not blocked, so the
+      // cartridge's queue is fed one frame per tick straight through the request.
+      expect(dataPackets(midi)).toHaveLength(before + 20);
+      expect(engine.state()).toBe('playing');
+    });
+
+    it('applies only the newest of two scrubs issued before either resolves', async () => {
+      await playTo(5);
+      replay.manual = true;
+
+      engine.scrubTo(1);
+      engine.scrubTo(4);
+      replay.resolveAll();
+      await replay.settle();
+      clock.tick(2); // gate-off, then the resync — the second publishes the landed position
+
+      expect(replay.requests).toHaveLength(2);
+      expect(engine.stats().framesRendered).toBe(Math.round(expectedCeilingFrames() * 0.04));
+    });
+
+    it('discards a result that arrives after a stop', async () => {
+      await playTo(5);
+      replay.manual = true;
+
+      engine.scrubTo(4);
+      engine.stop();
+      replay.resolveAll();
+      await replay.settle();
+
+      // stop() re-inits the subtune, which puts the counter back to 0; a landing jump would move it.
+      expect(engine.stats().framesRendered).toBe(0);
+      expect(engine.state()).toBe('stopped');
+    });
+
+    it('discards a result that arrives after a new tune is loaded', async () => {
+      await playTo(5);
+      replay.manual = true;
+
+      engine.scrubTo(4);
+      engine.loadTune(counterTune());
+      replay.resolveAll();
+      await replay.settle();
+
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+
+    it('discards a result that arrives after the subtune changed', async () => {
+      engine.loadTune(counterTune(3));
+      await engine.play();
+      clock.tick(5);
+      replay.manual = true;
+
+      engine.scrubTo(4);
+      engine.nextSubtune();
+      replay.resolveAll();
+      await replay.settle();
+
+      expect(engine.currentSubtune()).toBe(2);
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+
+    it('lands with the mutes as they stand now, not as they stood when the scrub was issued', async () => {
+      await playTo(5);
+      replay.manual = true;
+
+      engine.scrubTo(1);
+      engine.setVoiceMuted(1, true); // the operator moves a mute while the worker is replaying
+      replay.resolveAll();
+      await replay.settle();
+      clock.tick(2); // gate-off, then the resync carrying the landed state
+
+      const gates = voiceGateValues(lastDataPacket(midi));
+      expect(gates[1]).toBe(0);
+      expect(gates[0]).toBeGreaterThan(0);
+      expect(gates[2]).toBeGreaterThan(0);
+    });
+
+    it('carries the failure message back from the replay rather than swallowing it', async () => {
+      engine.loadTune(runawayTune());
+
+      engine.scrubTo(1);
+      await replay.settle();
+
+      expect(engine.state()).toBe('error');
+      expect(engine.lastError()).toContain('exceeded its cycle budget during replay');
+    });
+
+    it('leaves the position where it is until the result lands, then moves it', async () => {
+      await playTo(5);
+      replay.manual = true;
+      const target = Math.round(expectedCeilingFrames() * 0.04);
+
+      engine.scrubTo(4);
+      clock.tick(3);
+      // The tune ran on across the request rather than jumping the moment it was asked for; the
+      // counter it stores into $D400 is what says so.
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(8);
+
+      replay.resolveAll();
+      await replay.settle();
+      clock.tick(2); // gate-off, then the resync the landing queued
+
+      expect(engine.stats().framesRendered).toBe(target);
+    });
+
+    it('releases the replay thread when the engine is destroyed', () => {
+      engine.loadTune(counterTune());
+
+      engine.ngOnDestroy();
+
+      expect(replay.disposed).toBe(true);
     });
   });
 
@@ -2004,6 +2226,7 @@ describe('DjPlayerEngine', () => {
       engine.loadTune(counterTune());
 
       engine.scrubTo(100);
+      await replay.settle();
 
       expect(engine.positionPercent()).toBe(100);
     });

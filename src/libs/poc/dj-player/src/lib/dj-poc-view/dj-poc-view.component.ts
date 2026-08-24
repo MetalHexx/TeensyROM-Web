@@ -5,6 +5,8 @@ import { parseSidFile } from '../sid/sid-file.parser';
 import { BUNDLED_TUNES, decodeBundledTune } from '../sid/bundled';
 import { MidiOutputService } from '../midi/midi-output.service';
 import { ScriptProcessorFrameClock } from '../clock/frame-clock';
+import { REPLAY_RUNNER } from '../replay/replay-runner';
+import { WorkerReplayRunner } from '../replay/worker-replay-runner';
 import {
   DjPlayerEngine,
   FRAME_CLOCK,
@@ -42,6 +44,7 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
     MidiOutputService,
     DjPlayerEngine,
     { provide: FRAME_CLOCK, useFactory: () => new ScriptProcessorFrameClock() },
+    { provide: REPLAY_RUNNER, useFactory: () => new WorkerReplayRunner() },
   ],
 })
 export class DjPocViewComponent {
