@@ -5,12 +5,13 @@ import { parseSidFile } from '../sid/sid-file.parser';
 import { BUNDLED_TUNES, decodeBundledTune } from '../sid/bundled';
 import { MidiOutputService } from '../midi/midi-output.service';
 import { ScriptProcessorFrameClock } from '../clock/frame-clock';
+import { REPLAY_RUNNER } from '../replay/replay-runner';
+import { WorkerReplayRunner } from '../replay/worker-replay-runner';
 import {
   DjPlayerEngine,
   FRAME_CLOCK,
-  MAX_SPEED_MULTIPLIER,
-  MIN_SPEED_MULTIPLIER,
   NOMINAL_INTERVAL_OPTIONS_US,
+  SPEED_INPUT_SPAN,
   SpeedMode,
 } from '../engine/dj-player-engine';
 
@@ -43,6 +44,7 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
     MidiOutputService,
     DjPlayerEngine,
     { provide: FRAME_CLOCK, useFactory: () => new ScriptProcessorFrameClock() },
+    { provide: REPLAY_RUNNER, useFactory: () => new WorkerReplayRunner() },
   ],
 })
 export class DjPocViewComponent {
@@ -96,12 +98,15 @@ export class DjPocViewComponent {
     return 'idle';
   }
 
-  protected readonly minSpeed = MIN_SPEED_MULTIPLIER;
-  protected readonly maxSpeed = MAX_SPEED_MULTIPLIER;
+  protected readonly minSpeed = 1 - SPEED_INPUT_SPAN;
+  protected readonly maxSpeed = 1 + SPEED_INPUT_SPAN;
+  /** The fader's displayed value, pinned to its own span when a jump has carried the multiplier
+   * beyond it — display only, never written back to the engine. */
+  protected readonly speedFaderValue = computed<number>(() =>
+    Math.min(Math.max(this.speedMultiplier(), this.minSpeed), this.maxSpeed)
+  );
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
-  protected readonly cueIndices: readonly number[] = [0, 1, 2, 3];
-  protected readonly loopIndices: readonly number[] = [0, 1, 2, 3];
   protected readonly nudgeRange = this.engine.nudgeRangeFrames;
 
   // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
@@ -271,6 +276,18 @@ export class DjPocViewComponent {
     this.engine.setSpeed(Number((event.target as HTMLInputElement).value));
   }
 
+  onSpeedJumpUp(): void {
+    this.engine.jumpSpeedUp();
+  }
+
+  onSpeedJumpDown(): void {
+    this.engine.jumpSpeedDown();
+  }
+
+  onSpeedHome(): void {
+    this.engine.homeSpeed();
+  }
+
   onSpeedModeChange(event: Event): void {
     this.engine.setSpeedMode((event.target as HTMLSelectElement).value as SpeedMode);
   }
@@ -331,16 +348,24 @@ export class DjPocViewComponent {
     this.engine.clearVoiceMutes();
   }
 
-  onAddCue(slot: number): void {
-    this.engine.addCue(slot);
+  onAddCue(): void {
+    this.engine.addCue();
+  }
+
+  onCaptureCue(slot: number): void {
+    this.engine.captureCue(slot);
   }
 
   onHopToCue(slot: number): void {
-    this.engine.hopToCue(slot);
+    void this.engine.hopToCue(slot);
   }
 
   onClearCue(slot: number): void {
     this.engine.clearCue(slot);
+  }
+
+  onDeleteCue(slot: number): void {
+    this.engine.deleteCue(slot);
   }
 
   /** The offset the row shows: the live drag while one is in flight, the committed value otherwise. */
@@ -367,7 +392,7 @@ export class DjPocViewComponent {
   onCueNudgeChange(slot: number, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
     this.engine.setCueOffset(slot, value);
-    this.engine.hopToCue(slot);
+    void this.engine.hopToCue(slot);
     this.cueDragOffsets.update((offsets) => {
       const next = new Map(offsets);
       next.delete(slot);
@@ -384,11 +409,19 @@ export class DjPocViewComponent {
   }
 
   onPunchLoop(slot: number): void {
-    this.engine.punchLoop(slot);
+    void this.engine.punchLoop(slot);
   }
 
   onClearLoopSlot(slot: number): void {
     this.engine.clearLoopSlot(slot);
+  }
+
+  onDeleteLoop(slot: number): void {
+    this.engine.deleteLoop(slot);
+  }
+
+  onAddLoop(): void {
+    this.engine.addLoop();
   }
 
   onStopLoop(): void {
@@ -470,13 +503,18 @@ export class DjPocViewComponent {
   }
 
   // (change) fires on release, not on every drag tick — the seam that makes this "drag anywhere,
-  // release, and it jumps" rather than a continuous scrub. Clearing the pin here, after the jump is
-  // committed, is what lets tracking resume without a stale drag value racing the engine's own
-  // position update.
-  onScrubChange(event: Event): void {
+  // release, and it jumps" rather than a continuous scrub. The pin stays set — holding the thumb at
+  // the clicked spot — until the engine's async scrub actually lands; releasing it early snapped the
+  // thumb back to the stale position and then forward again once the worker's replay landed. Guarded
+  // on the pin still being this call's own value so a superseded scrub settling late cannot clear a
+  // newer one's pin out from under it.
+  async onScrubChange(event: Event): Promise<void> {
     const value = Number((event.target as HTMLInputElement).value);
-    this.engine.scrubTo(value);
-    this.scrubDragValue.set(null);
+    this.scrubDragValue.set(value);
+    await this.engine.scrubTo(value);
+    if (this.scrubDragValue() === value) {
+      this.scrubDragValue.set(null);
+    }
   }
 
   protected frameRateHz(intervalUs: number): string {

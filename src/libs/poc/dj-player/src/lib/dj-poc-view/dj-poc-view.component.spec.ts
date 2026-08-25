@@ -56,7 +56,7 @@ interface MockDjPlayerEngine {
   heldVoices: WritableSignal<readonly boolean[]>;
   effectiveMutes: WritableSignal<readonly boolean[]>;
   cues: WritableSignal<readonly (CueSlot | null)[]>;
-  loopSlots: WritableSignal<readonly (LoopSlot | null)[]>;
+  loopSlots: WritableSignal<readonly LoopSlot[]>;
   activeLoopSlot: WritableSignal<number | null>;
   queuedLoopSlot: WritableSignal<number | null>;
   progressPercentFor: ReturnType<typeof vi.fn>;
@@ -68,6 +68,9 @@ interface MockDjPlayerEngine {
   previousSubtune: ReturnType<typeof vi.fn>;
   nextSubtune: ReturnType<typeof vi.fn>;
   setSpeed: ReturnType<typeof vi.fn>;
+  jumpSpeedUp: ReturnType<typeof vi.fn>;
+  jumpSpeedDown: ReturnType<typeof vi.fn>;
+  homeSpeed: ReturnType<typeof vi.fn>;
   setSpeedMode: ReturnType<typeof vi.fn>;
   setRecipeEnabled: ReturnType<typeof vi.fn>;
   setNominalIntervalUs: ReturnType<typeof vi.fn>;
@@ -77,14 +80,18 @@ interface MockDjPlayerEngine {
   setVoiceHeld: ReturnType<typeof vi.fn>;
   clearVoiceMutes: ReturnType<typeof vi.fn>;
   addCue: ReturnType<typeof vi.fn>;
+  captureCue: ReturnType<typeof vi.fn>;
   hopToCue: ReturnType<typeof vi.fn>;
   clearCue: ReturnType<typeof vi.fn>;
+  deleteCue: ReturnType<typeof vi.fn>;
   setCueOffset: ReturnType<typeof vi.fn>;
   tapLoopIn: ReturnType<typeof vi.fn>;
   tapLoopOut: ReturnType<typeof vi.fn>;
   setLoopInOffset: ReturnType<typeof vi.fn>;
   setLoopOutOffset: ReturnType<typeof vi.fn>;
   clearLoopSlot: ReturnType<typeof vi.fn>;
+  addLoop: ReturnType<typeof vi.fn>;
+  deleteLoop: ReturnType<typeof vi.fn>;
   punchLoop: ReturnType<typeof vi.fn>;
   stopLoop: ReturnType<typeof vi.fn>;
   auditionLoopIn: ReturnType<typeof vi.fn>;
@@ -120,8 +127,8 @@ function makeEngine(): MockDjPlayerEngine {
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
     heldVoices: signal<readonly boolean[]>([false, false, false]),
     effectiveMutes: signal<readonly boolean[]>([false, false, false]),
-    cues: signal<readonly (CueSlot | null)[]>([null, null, null, null]),
-    loopSlots: signal<readonly (LoopSlot | null)[]>([null, null, null, null]),
+    cues: signal<readonly (CueSlot | null)[]>([]),
+    loopSlots: signal<readonly LoopSlot[]>([]),
     activeLoopSlot: signal<number | null>(null),
     queuedLoopSlot: signal<number | null>(null),
     progressPercentFor: vi.fn(() => 0),
@@ -133,6 +140,9 @@ function makeEngine(): MockDjPlayerEngine {
     previousSubtune: vi.fn(),
     nextSubtune: vi.fn(),
     setSpeed: vi.fn(),
+    jumpSpeedUp: vi.fn(),
+    jumpSpeedDown: vi.fn(),
+    homeSpeed: vi.fn(),
     setSpeedMode: vi.fn(),
     setRecipeEnabled: vi.fn(),
     setNominalIntervalUs: vi.fn(),
@@ -142,14 +152,18 @@ function makeEngine(): MockDjPlayerEngine {
     setVoiceHeld: vi.fn(),
     clearVoiceMutes: vi.fn(),
     addCue: vi.fn(),
+    captureCue: vi.fn(),
     hopToCue: vi.fn(),
     clearCue: vi.fn(),
+    deleteCue: vi.fn(),
     setCueOffset: vi.fn(),
     tapLoopIn: vi.fn(),
     tapLoopOut: vi.fn(),
     setLoopInOffset: vi.fn(),
     setLoopOutOffset: vi.fn(),
     clearLoopSlot: vi.fn(),
+    addLoop: vi.fn(),
+    deleteLoop: vi.fn(),
     punchLoop: vi.fn(),
     stopLoop: vi.fn(),
     auditionLoopIn: vi.fn(),
@@ -303,14 +317,55 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('speed input', () => {
-    it('calls engine.setSpeed with the numeric value', () => {
-      const range: HTMLInputElement = fixture.nativeElement.querySelector(
-        '[aria-label="Speed"] input[type="range"]'
+    function speedFader(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('[aria-label="Speed"] input[type="range"]');
+    }
+
+    function speedButton(label: '+50%' | '−50%' | 'Home'): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Speed"] button')
       );
+      return buttons.find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
+    }
+
+    it('calls engine.setSpeed with the numeric value', () => {
+      const range = speedFader();
       range.value = '0.9';
       range.dispatchEvent(new Event('input'));
 
       expect(engine.setSpeed).toHaveBeenCalledWith(0.9);
+    });
+
+    it('binds the fader to the 0.5–1.5 input span', () => {
+      const range = speedFader();
+
+      expect(range.min).toBe('0.5');
+      expect(range.max).toBe('1.5');
+    });
+
+    it("pins the fader's displayed value to the input span without writing back to the engine", () => {
+      engine.speedMultiplier.set(1.65); // beyond the input span, as a jump excursion can leave it
+      fixture.detectChanges();
+
+      expect(speedFader().value).toBe('1.5');
+      expect(engine.setSpeed).not.toHaveBeenCalled();
+
+      engine.speedMultiplier.set(0.4);
+      fixture.detectChanges();
+
+      expect(speedFader().value).toBe('0.5');
+      expect(engine.setSpeed).not.toHaveBeenCalled();
+    });
+
+    it('calls the jump and home methods from their own buttons', () => {
+      speedButton('+50%').click();
+      expect(engine.jumpSpeedUp).toHaveBeenCalled();
+
+      speedButton('−50%').click();
+      expect(engine.jumpSpeedDown).toHaveBeenCalled();
+
+      speedButton('Home').click();
+      expect(engine.homeSpeed).toHaveBeenCalled();
     });
   });
 
@@ -539,81 +594,113 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('cue slots', () => {
-    function cueButtons(): HTMLButtonElement[] {
-      return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Cues"] button'));
+    function addCueButton(): HTMLButtonElement {
+      return fixture.nativeElement.querySelector('[aria-label="Cues"] .panel-header button');
     }
 
-    it('adds a cue for an empty slot, then hops once the slot is set', () => {
-      cueButtons()[0].click();
-      expect(engine.addCue).toHaveBeenCalledWith(0);
+    function cueRows(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-row'));
+    }
 
-      engine.cues.set([cueAt(1234), null, null, null]);
-      fixture.detectChanges();
+    function rowActionButton(row: HTMLElement, label: 'Clear' | 'Delete'): HTMLButtonElement {
+      return row.querySelector(`.row-actions button[aria-label^="${label}"]`) as HTMLButtonElement;
+    }
 
-      cueButtons()[0].click();
-      expect(engine.hopToCue).toHaveBeenCalledWith(0);
+    it('renders only the add control when there are no cues', () => {
+      expect(addCueButton()).not.toBeNull();
+      expect(cueRows()).toHaveLength(0);
     });
 
-    it('shows a Clear button alongside Hop once a slot is set, and clears it on click', () => {
-      engine.cues.set([cueAt(1234), null, null, null]);
+    it('calls engine.addCue with no arguments from the add control, and a row appears once the collection grows', () => {
+      engine.addCue.mockImplementation(() => {
+        engine.cues.set([...engine.cues(), null]);
+        return engine.cues().length - 1;
+      });
+
+      addCueButton().click();
+
+      expect(engine.addCue).toHaveBeenCalledWith();
       fixture.detectChanges();
-
-      const buttons = cueButtons();
-      expect(buttons[0].textContent?.trim()).toBe('Hop');
-      expect(buttons[1].textContent?.trim()).toBe('Clear');
-
-      buttons[1].click();
-      expect(engine.clearCue).toHaveBeenCalledWith(0);
+      expect(cueRows()).toHaveLength(1);
     });
 
-    it('shows the captured frame for a set slot', () => {
-      engine.cues.set([cueAt(1234), null, null, null]);
+    it('renders one row per cue, and hops from a set row', () => {
+      engine.cues.set([cueAt(1234), null]);
       fixture.detectChanges();
 
-      expect(
-        fixture.nativeElement.querySelector('[aria-label="Cues"] .cue-row').textContent
-      ).toContain('frame 1234');
-    });
-
-    it('renders one row per cue slot, labelled Cue 1 through Cue 4', () => {
-      const rows: HTMLElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('[aria-label="Cues"] .cue-row')
-      );
-
-      expect(rows).toHaveLength(4);
+      const rows = cueRows();
+      expect(rows).toHaveLength(2);
       expect(rows.map((row) => row.querySelector('.cue-tag')?.textContent?.trim())).toEqual([
         'Cue 1',
         'Cue 2',
-        'Cue 3',
-        'Cue 4',
       ]);
+
+      const hopButton = rows[0].querySelector('.cue-btns button') as HTMLButtonElement;
+      expect(hopButton.textContent?.trim()).toBe('Hop');
+      hopButton.click();
+      expect(engine.hopToCue).toHaveBeenCalledWith(0);
     });
 
-    it('keeps the frame column in the same position across the empty to filled transition', () => {
-      const emptyRow = fixture.nativeElement.querySelector(
-        '[aria-label="Cues"] .cue-row'
-      ) as HTMLElement;
-      const childIndex = (el: Element): number =>
-        el.parentElement === null ? -1 : Array.from(el.parentElement.children).indexOf(el);
-
-      const emptyFrame = emptyRow.querySelector('.cue-frame') as HTMLElement;
-      const emptyBtns = emptyRow.querySelector('.cue-btns') as HTMLElement;
-      expect(emptyFrame.textContent?.trim()).toBe('empty');
-      const btnsIndex = childIndex(emptyBtns);
-      const frameIndex = childIndex(emptyFrame);
-
-      engine.cues.set([cueAt(1234), null, null, null]);
+    it('offers a capture control instead of Hop for a row with no point, keyed to its own index', () => {
+      engine.cues.set([null, cueAt(500)]);
       fixture.detectChanges();
 
-      const filledRow = fixture.nativeElement.querySelector(
-        '[aria-label="Cues"] .cue-row'
-      ) as HTMLElement;
-      const filledFrame = filledRow.querySelector('.cue-frame') as HTMLElement;
-      const filledBtns = filledRow.querySelector('.cue-btns') as HTMLElement;
+      const rows = cueRows();
+      const captureButton = rows[0].querySelector('.cue-btns button') as HTMLButtonElement;
+      expect(captureButton.textContent?.trim()).toBe('Capture');
+      expect(captureButton.getAttribute('aria-label')).toBe('Capture cue 1');
 
-      expect(childIndex(filledBtns)).toBe(btnsIndex);
-      expect(childIndex(filledFrame)).toBe(frameIndex);
-      expect(filledFrame.textContent?.trim()).toBe('frame 1234');
+      captureButton.click();
+      expect(engine.captureCue).toHaveBeenCalledWith(0);
+    });
+
+    it('shows the captured frame for a set row and "empty" for a cleared one', () => {
+      engine.cues.set([cueAt(1234), null]);
+      fixture.detectChanges();
+
+      const rows = cueRows();
+      expect(rows[0].querySelector('.cue-frame')?.textContent).toContain('frame 1234');
+      expect(rows[1].querySelector('.cue-frame')?.textContent?.trim()).toBe('empty');
+    });
+
+    it('renders the Clear-then-Delete action cluster on every row, each named for its own row', () => {
+      engine.cues.set([cueAt(1234), null]);
+      fixture.detectChanges();
+
+      const rows = cueRows();
+      for (const [index, row] of rows.entries()) {
+        const actionButtons: HTMLButtonElement[] = Array.from(
+          row.querySelectorAll('.row-actions button')
+        );
+        expect(actionButtons.map((button) => button.textContent?.trim())).toEqual([
+          'Clear',
+          'Delete',
+        ]);
+        expect(actionButtons[0].getAttribute('aria-label')).toBe(`Clear cue ${index + 1}`);
+        expect(actionButtons[1].getAttribute('aria-label')).toBe(`Delete cue ${index + 1}`);
+      }
+    });
+
+    it('clears a row from its own Clear control', () => {
+      engine.cues.set([cueAt(1234)]);
+      fixture.detectChanges();
+
+      rowActionButton(cueRows()[0], 'Clear').click();
+      expect(engine.clearCue).toHaveBeenCalledWith(0);
+    });
+
+    it('deletes a row from its own Delete control, and it disappears once the collection shrinks', () => {
+      engine.cues.set([cueAt(1234), cueAt(5678)]);
+      fixture.detectChanges();
+      engine.deleteCue.mockImplementation((index: number) => {
+        engine.cues.set(engine.cues().filter((_, i) => i !== index));
+      });
+
+      rowActionButton(cueRows()[1], 'Delete').click();
+
+      expect(engine.deleteCue).toHaveBeenCalledWith(1);
+      fixture.detectChanges();
+      expect(cueRows()).toHaveLength(1);
     });
   });
 
@@ -697,9 +784,17 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('loop slots', () => {
-    function setSlots(slots: readonly (LoopSlot | null)[]): void {
+    const EMPTY_SLOT: LoopSlot = { in: null, out: null };
+
+    function setSlots(slots: readonly LoopSlot[]): void {
       engine.loopSlots.set(slots);
       fixture.detectChanges();
+    }
+
+    function addLoopButton(): HTMLButtonElement {
+      return fixture.nativeElement.querySelector(
+        '[aria-label="Loops"] .panel-header-actions button'
+      );
     }
 
     function slotRows(): HTMLElement[] {
@@ -719,8 +814,10 @@ describe('DjPocViewComponent', () => {
       return buttons.find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
     }
 
-    function clearButton(slot: number): HTMLButtonElement | null {
-      return slotRows()[slot].querySelector('.loop-slot-clear');
+    function rowActionButton(slot: number, label: 'Clear' | 'Delete'): HTMLButtonElement {
+      return slotRows()[slot].querySelector(
+        `.row-actions button[aria-label^="${label}"]`
+      ) as HTMLButtonElement;
     }
 
     function nudgeInput(slot: number, which: 'in' | 'out'): HTMLInputElement | null {
@@ -733,11 +830,31 @@ describe('DjPocViewComponent', () => {
       return end.querySelector('.loop-offset')?.textContent?.trim() ?? '';
     }
 
+    it('renders only the add control when there are no loops', () => {
+      expect(addLoopButton()).not.toBeNull();
+      expect(slotRows()).toHaveLength(0);
+    });
+
+    it('calls engine.addLoop with no arguments from the add control, and a row appears once the collection grows', () => {
+      engine.addLoop.mockImplementation(() => {
+        engine.loopSlots.set([...engine.loopSlots(), EMPTY_SLOT]);
+        return engine.loopSlots().length - 1;
+      });
+
+      addLoopButton().click();
+
+      expect(engine.addLoop).toHaveBeenCalledWith();
+      fixture.detectChanges();
+      expect(slotRows()).toHaveLength(1);
+    });
+
     it('renders one row per loop slot', () => {
+      setSlots([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
       expect(slotRows()).toHaveLength(4);
     });
 
     it('punches the tapped slot from its own punch target', () => {
+      setSlots([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
       punchButton(2).click();
       expect(engine.punchLoop).toHaveBeenCalledWith(2);
     });
@@ -748,6 +865,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it('taps each end of the right slot from its own button', () => {
+      setSlots([EMPTY_SLOT, EMPTY_SLOT]);
       tapButton(1, 'Tap In').click();
       expect(engine.tapLoopIn).toHaveBeenCalledWith(1);
 
@@ -755,20 +873,44 @@ describe('DjPocViewComponent', () => {
       expect(engine.tapLoopOut).toHaveBeenCalledWith(1);
     });
 
-    it('clears the right slot from its own Clear control, offered only once the slot is set', () => {
-      expect(clearButton(0)).toBeNull();
+    it('renders the Clear-then-Delete action cluster on every row, whether or not it is set', () => {
+      setSlots([{ in: loopInPoint(2140), out: null }, EMPTY_SLOT]);
 
-      setSlots([{ in: loopInPoint(2140), out: null }, null, null, null]);
+      for (const [index, row] of slotRows().entries()) {
+        const actionButtons: HTMLButtonElement[] = Array.from(
+          row.querySelectorAll('.row-actions button')
+        );
+        expect(actionButtons.map((button) => button.textContent?.trim())).toEqual([
+          'Clear',
+          'Delete',
+        ]);
+        expect(actionButtons[0].getAttribute('aria-label')).toBe(`Clear slot ${index + 1}`);
+        expect(actionButtons[1].getAttribute('aria-label')).toBe(`Delete slot ${index + 1}`);
+      }
+    });
 
-      clearButton(0)?.click();
+    it('clears the right slot from its own Clear control', () => {
+      setSlots([{ in: loopInPoint(2140), out: null }, EMPTY_SLOT]);
+
+      rowActionButton(0, 'Clear').click();
       expect(engine.clearLoopSlot).toHaveBeenCalledWith(0);
     });
 
-    it('offers a nudge track only for an end that has been marked, on the right slot', () => {
-      expect(nudgeInput(1, 'in')).toBeNull();
-      expect(nudgeInput(1, 'out')).toBeNull();
+    it('deletes the right slot from its own Delete control, and it disappears once the collection shrinks', () => {
+      setSlots([EMPTY_SLOT, { in: loopInPoint(2140), out: null }]);
+      engine.deleteLoop.mockImplementation((index: number) => {
+        engine.loopSlots.set(engine.loopSlots().filter((_, i) => i !== index));
+      });
 
-      setSlots([null, { in: loopInPoint(2140), out: { frame: 2536, offset: 0 } }, null, null]);
+      rowActionButton(1, 'Delete').click();
+
+      expect(engine.deleteLoop).toHaveBeenCalledWith(1);
+      fixture.detectChanges();
+      expect(slotRows()).toHaveLength(1);
+    });
+
+    it('offers a nudge track only for an end that has been marked, on the right slot', () => {
+      setSlots([EMPTY_SLOT, { in: loopInPoint(2140), out: { frame: 2536, offset: 0 } }]);
 
       expect(nudgeInput(1, 'in')).not.toBeNull();
       expect(nudgeInput(1, 'out')).not.toBeNull();
@@ -777,7 +919,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it('moves the in-point readout on input without re-deriving or committing', () => {
-      setSlots([{ in: loopInPoint(2140), out: null }, null, null, null]);
+      setSlots([{ in: loopInPoint(2140), out: null }]);
 
       const input = nudgeInput(0, 'in') as HTMLInputElement;
       input.value = '-7';
@@ -793,7 +935,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it('commits the in-point offset and auditions it when the drag releases', () => {
-      setSlots([null, { in: loopInPoint(2140), out: null }, null, null]);
+      setSlots([EMPTY_SLOT, { in: loopInPoint(2140), out: null }]);
 
       const input = nudgeInput(1, 'in') as HTMLInputElement;
       input.value = '-7';
@@ -810,8 +952,6 @@ describe('DjPocViewComponent', () => {
       setSlots([
         { in: loopInPoint(100), out: { frame: 400, offset: 0 } },
         { in: loopInPoint(2140), out: null },
-        null,
-        null,
       ]);
 
       const input = nudgeInput(1, 'in') as HTMLInputElement;
@@ -824,7 +964,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it('moves the out-point readout on input without committing or auditioning', () => {
-      setSlots([{ in: null, out: { frame: 2536, offset: 0 } }, null, null, null]);
+      setSlots([{ in: null, out: { frame: 2536, offset: 0 } }]);
 
       const input = nudgeInput(0, 'out') as HTMLInputElement;
       input.value = '-3';
@@ -840,7 +980,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it('commits the out-point offset and auditions it when the drag releases', () => {
-      setSlots([null, null, { in: null, out: { frame: 2536, offset: 0 } }, null]);
+      setSlots([EMPTY_SLOT, EMPTY_SLOT, { in: null, out: { frame: 2536, offset: 0 } }]);
 
       const input = nudgeInput(2, 'out') as HTMLInputElement;
       input.value = '-3';
@@ -856,8 +996,7 @@ describe('DjPocViewComponent', () => {
       setSlots([
         { in: loopInPoint(100), out: { frame: 200, offset: 0 } },
         { in: loopInPoint(300), out: { frame: 400, offset: 0 } },
-        null,
-        null,
+        EMPTY_SLOT,
       ]);
       engine.activeLoopSlot.set(0);
       engine.queuedLoopSlot.set(1);
@@ -874,6 +1013,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it("shows progress only for the engine's active slot", () => {
+      setSlots([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
       // progressPercentFor is only ever non-zero for the active slot in the real engine, so drive
       // both together — the activeLoopSlot write is also what marks this OnPush view for re-check.
       engine.progressPercentFor.mockImplementation((slot: number) => (slot === 2 ? 63 : 0));
@@ -942,7 +1082,11 @@ describe('DjPocViewComponent', () => {
       expect(scrubInput().value).toBe('42');
     });
 
-    it('releases the pin on change, letting the engine position resume driving the display', () => {
+    it('holds the pin while the scrub is in flight, even as the engine position keeps advancing', async () => {
+      let resolveScrub!: () => void;
+      engine.scrubTo.mockImplementation(
+        () => new Promise<void>((resolve) => (resolveScrub = resolve))
+      );
       engine.positionPercent.set(10);
       fixture.detectChanges();
 
@@ -950,6 +1094,35 @@ describe('DjPocViewComponent', () => {
       input.value = '42';
       input.dispatchEvent(new Event('input'));
       input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      // The live position keeps moving while the replay is still in flight — the pin must hold, or
+      // the thumb snaps back to the stale position before the real jump lands.
+      engine.positionPercent.set(55);
+      fixture.detectChanges();
+      expect(scrubInput().value).toBe('42');
+
+      resolveScrub();
+      await Promise.resolve();
+      fixture.detectChanges();
+    });
+
+    it('releases the pin once the scrub settles, letting the engine position resume driving the display', async () => {
+      let resolveScrub!: () => void;
+      engine.scrubTo.mockImplementation(
+        () => new Promise<void>((resolve) => (resolveScrub = resolve))
+      );
+      engine.positionPercent.set(10);
+      fixture.detectChanges();
+
+      const input = scrubInput();
+      input.value = '42';
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      resolveScrub();
+      await Promise.resolve();
       fixture.detectChanges();
 
       engine.positionPercent.set(77);
