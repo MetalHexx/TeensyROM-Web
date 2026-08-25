@@ -2,7 +2,6 @@ import type { FrameSnapshot } from './register-frame';
 import {
   ASID_MANUFACTURER_ID,
   ASID_MSG_DISPLAY_CHARS,
-  ASID_MSG_FRAMERATE_RECIPE,
   ASID_MSG_SID_DATA,
   ASID_MSG_SID_TYPE,
   ASID_MSG_START,
@@ -66,43 +65,6 @@ export function buildSidTypePacket(chipIndex: number, is8580: boolean): Uint8Arr
     ASID_MSG_SID_TYPE,
     chipIndex & 0x7f,
     is8580 ? 1 : 0,
-    ASID_SYSEX_END,
-  ]);
-}
-
-/**
- * `F0 2D 31 <settings> <us0> <us1> <us2> F7`, exactly 8 bytes. Receiving this packet forces the
- * cartridge's frame timer on and re-initialises its queue — four blocking stop-drain-reinit cycles
- * that flush any buffered music. Treat a resend as a hard interruption, not a glitch.
- */
-export function buildFramerateRecipePacket(opts: {
-  ntsc: boolean;
-  speedMultiplier: number; // 1..16
-  bufferingRequested: boolean;
-  frameIntervalUs: number; // 0..65535
-}): Uint8Array {
-  const { ntsc, speedMultiplier, bufferingRequested, frameIntervalUs } = opts;
-
-  if (!Number.isInteger(speedMultiplier) || speedMultiplier < 1 || speedMultiplier > 16) {
-    throw new RangeError(`speedMultiplier ${speedMultiplier} is outside 1..16`);
-  }
-  if (!Number.isInteger(frameIntervalUs) || frameIntervalUs < 0 || frameIntervalUs > 0xffff) {
-    throw new RangeError(`frameIntervalUs ${frameIntervalUs} is outside 0..65535`);
-  }
-
-  const settings = (ntsc ? 1 : 0) | ((speedMultiplier - 1) << 1) | (bufferingRequested ? 0x40 : 0);
-  const us0 = frameIntervalUs & 0x7f;
-  const us1 = (frameIntervalUs >> 7) & 0x7f;
-  const us2 = (frameIntervalUs >> 14) & 0x03;
-
-  return Uint8Array.from([
-    ASID_SYSEX_START,
-    ASID_MANUFACTURER_ID,
-    ASID_MSG_FRAMERATE_RECIPE,
-    settings,
-    us0,
-    us1,
-    us2,
     ASID_SYSEX_END,
   ]);
 }

@@ -9,8 +9,6 @@ import {
   EngineState,
   EngineStats,
   LoopSlot,
-  SpeedMode,
-  TimingMode,
 } from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
@@ -19,7 +17,6 @@ const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
   packetsSent: 0,
   bytesSent: 0,
-  recipeResends: 0,
   suppressedWrites: 0,
   illegalOpcodeCount: 0,
   callsPerFrame: 1,
@@ -56,10 +53,6 @@ interface MockDjPlayerEngine {
   currentSubtune: WritableSignal<number>;
   subtuneCount: WritableSignal<number>;
   speedMultiplier: WritableSignal<number>;
-  speedMode: WritableSignal<SpeedMode>;
-  timingMode: WritableSignal<TimingMode>;
-  recipeEnabled: WritableSignal<boolean>;
-  recipeSent: WritableSignal<boolean>;
   nominalIntervalUs: WritableSignal<number>;
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
@@ -81,9 +74,6 @@ interface MockDjPlayerEngine {
   jumpSpeedUp: ReturnType<typeof vi.fn>;
   jumpSpeedDown: ReturnType<typeof vi.fn>;
   homeSpeed: ReturnType<typeof vi.fn>;
-  setSpeedMode: ReturnType<typeof vi.fn>;
-  setTimingMode: ReturnType<typeof vi.fn>;
-  setRecipeEnabled: ReturnType<typeof vi.fn>;
   setNominalIntervalUs: ReturnType<typeof vi.fn>;
   setScheduleAhead: ReturnType<typeof vi.fn>;
   loadTune: ReturnType<typeof vi.fn>;
@@ -130,10 +120,6 @@ function makeEngine(): MockDjPlayerEngine {
     currentSubtune: signal(1),
     subtuneCount: signal(1),
     speedMultiplier: signal(1),
-    speedMode: signal<SpeedMode>('clock-only'),
-    timingMode: signal<TimingMode>('cartridge-timed'),
-    recipeEnabled: signal(true),
-    recipeSent: signal(false),
     nominalIntervalUs: signal(19950),
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
@@ -155,9 +141,6 @@ function makeEngine(): MockDjPlayerEngine {
     jumpSpeedUp: vi.fn(),
     jumpSpeedDown: vi.fn(),
     homeSpeed: vi.fn(),
-    setSpeedMode: vi.fn(),
-    setTimingMode: vi.fn(),
-    setRecipeEnabled: vi.fn(),
     setNominalIntervalUs: vi.fn(),
     setScheduleAhead: vi.fn(),
     loadTune: vi.fn(),
@@ -424,90 +407,22 @@ describe('DjPocViewComponent', () => {
     });
   });
 
-  describe('cartridge frame timer status', () => {
-    function panelText(): string {
-      return (fixture.nativeElement as HTMLElement).textContent ?? '';
-    }
+  // Deleted rather than relabelled: the browser can neither set nor read the cartridge's own timer
+  // mode or buffer size, so any value shown here would be a hand-kept note that goes stale the next
+  // time the operator presses B at the C64.
+  it('offers no cartridge timer-mode or buffer-size control, since the browser cannot know either', () => {
+    const selects: HTMLSelectElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll('select')
+    );
+    const labels: HTMLLabelElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll('label.control')
+    );
 
-    it('reports the timer as not set before any recipe has gone out', () => {
-      engine.recipeSent.set(false);
-      fixture.detectChanges();
-
-      expect(panelText()).toContain('not set');
-    });
-
-    it('reports the timer as on, at the effective interval, once a recipe has gone out', () => {
-      engine.recipeSent.set(true);
-      engine.stats.set({ ...EMPTY_STATS, effectiveIntervalUs: 9975 });
-      fixture.detectChanges();
-
-      expect(panelText()).toContain('on at 9975');
-    });
-
-    // Deleted rather than relabelled: the browser can neither set nor read the buffer size, so any
-    // value shown here would be a hand-kept note that goes stale the next time B is pressed.
-    it('offers no buffer-size control, since the browser cannot know it', () => {
-      const selects: HTMLSelectElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('select')
-      );
-      const labels: HTMLLabelElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('label.control')
-      );
-
-      expect(labels.some((label) => (label.textContent ?? '').includes('Buffer size'))).toBe(false);
-      expect(labels.some((label) => (label.textContent ?? '').includes('Timer mode'))).toBe(false);
-      expect(selects.some((select) => select.value === 'medium' || select.value === 'tiny')).toBe(
-        false
-      );
-    });
-  });
-
-  describe('timing mode', () => {
-    function timingModeSelect(): HTMLSelectElement {
-      return fixture.nativeElement.querySelector('[aria-label="Timing"] select.timing-mode');
-    }
-
-    function recipeCheckbox(): HTMLInputElement {
-      return fixture.nativeElement.querySelector('[aria-label="Timing"] input[type="checkbox"]');
-    }
-
-    function speedModeSelect(): HTMLSelectElement {
-      return fixture.nativeElement.querySelector('[aria-label="Speed"] select.speed-mode');
-    }
-
-    it('calls engine.setTimingMode with the chosen mode', () => {
-      const select = timingModeSelect();
-      select.value = 'host-scheduled';
-      select.dispatchEvent(new Event('change'));
-
-      expect(engine.setTimingMode).toHaveBeenCalledWith('host-scheduled');
-    });
-
-    it('shows which mode is live', () => {
-      engine.timingMode.set('host-scheduled');
-      fixture.detectChanges();
-      expect(timingModeSelect().value).toBe('host-scheduled');
-
-      engine.timingMode.set('cartridge-timed');
-      fixture.detectChanges();
-      expect(timingModeSelect().value).toBe('cartridge-timed');
-    });
-
-    it('disables the recipe checkbox and the speed-mode select once host-scheduled is live', () => {
-      engine.timingMode.set('host-scheduled');
-      fixture.detectChanges();
-
-      expect(recipeCheckbox().disabled).toBe(true);
-      expect(speedModeSelect().disabled).toBe(true);
-    });
-
-    it('leaves the recipe checkbox and the speed-mode select enabled in cartridge-timed', () => {
-      engine.timingMode.set('cartridge-timed');
-      fixture.detectChanges();
-
-      expect(recipeCheckbox().disabled).toBe(false);
-      expect(speedModeSelect().disabled).toBe(false);
-    });
+    expect(labels.some((label) => (label.textContent ?? '').includes('Buffer size'))).toBe(false);
+    expect(labels.some((label) => (label.textContent ?? '').includes('Timer mode'))).toBe(false);
+    expect(selects.some((select) => select.value === 'medium' || select.value === 'tiny')).toBe(
+      false
+    );
   });
 
   describe('subtune navigation', () => {
@@ -1199,14 +1114,11 @@ describe('DjPocViewComponent', () => {
       return section?.textContent ?? '';
     }
 
-    it('makes the live timing mode and schedule-ahead offset unmistakable', () => {
-      engine.timingMode.set('host-scheduled');
+    it('makes the live schedule-ahead offset unmistakable', () => {
       engine.scheduleAheadMs.set(40);
       fixture.detectChanges();
 
-      const text = sectionText('Diagnostics');
-      expect(text).toContain('host-scheduled');
-      expect(text).toContain('40 ms');
+      expect(sectionText('Diagnostics')).toContain('40 ms');
     });
 
     it("binds the delivery numbers to the engine's stats signal", () => {
@@ -1297,6 +1209,38 @@ describe('DjPocViewComponent', () => {
       const elapsed = performance.now() - before;
 
       expect(elapsed).toBeGreaterThanOrEqual(20);
+    });
+
+    /**
+     * Runs the stall against a virtual clock — one that only advances when the busy-wait reads
+     * it — and reports how much virtual time the stall consumed before returning. Real time is no
+     * use here: the whole point of the ceiling is that the value being defended against would
+     * freeze the tab for minutes.
+     */
+    function virtualStallElapsedMs(): number {
+      const button = stallButton();
+      const startMs = 1_000_000;
+      let nowMs = startMs;
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => nowMs++);
+      try {
+        button.click();
+      } finally {
+        clock.mockRestore();
+      }
+      return nowMs - 1 - startMs;
+    }
+
+    it('caps the stall at the ceiling its own input advertises, however large the typed value', () => {
+      const ceilingMs = Number(stallDurationInput().max);
+      const input = stallDurationInput();
+      input.value = String(ceilingMs * 30); // the mistyped-value case the ceiling exists for
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      const elapsed = virtualStallElapsedMs();
+
+      expect(elapsed).toBeGreaterThanOrEqual(ceilingMs);
+      expect(elapsed).toBeLessThan(ceilingMs * 2);
     });
   });
 });

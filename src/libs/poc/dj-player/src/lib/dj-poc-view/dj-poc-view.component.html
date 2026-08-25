@@ -300,20 +300,6 @@
                 <button type="button" aria-label="Speed home" (click)="onSpeedHome()">Home</button>
               </div>
             </div>
-
-            <select
-              class="speed-mode"
-              [disabled]="timingMode() === 'host-scheduled'"
-              title="Inert while Timing mode is host-scheduled — the fader drives the clock directly there."
-              (change)="onSpeedModeChange($event)"
-            >
-              <option value="clock-only" [selected]="speedMode() === 'clock-only'">
-                clock-only
-              </option>
-              <option value="clock-and-recipe" [selected]="speedMode() === 'clock-and-recipe'">
-                clock-and-recipe
-              </option>
-            </select>
           </div>
         </section>
       </div>
@@ -365,29 +351,6 @@
         <h3 class="subsection-title">Timing</h3>
 
         <div class="timing-commands">
-          <label class="control">
-            Timing mode
-            <select class="timing-mode" (change)="onTimingModeChange($event)">
-              <option value="cartridge-timed" [selected]="timingMode() === 'cartridge-timed'">
-                cartridge-timed
-              </option>
-              <option value="host-scheduled" [selected]="timingMode() === 'host-scheduled'">
-                host-scheduled
-              </option>
-            </select>
-          </label>
-
-          <label class="control">
-            <input
-              type="checkbox"
-              [checked]="recipeEnabled()"
-              [disabled]="timingMode() === 'host-scheduled'"
-              title="Inert while Timing mode is host-scheduled — the recipe never goes out there."
-              (change)="onRecipeToggle($event)"
-            />
-            Send recipe packet
-          </label>
-
           <label class="control">
             Nominal frame interval
             <select (change)="onNominalIntervalChange($event)">
@@ -510,6 +473,7 @@
           <input
             type="number"
             min="0"
+            [max]="maxStallDurationMs"
             step="50"
             aria-label="Stall duration in milliseconds"
             [value]="stallDurationMs()"
@@ -522,15 +486,8 @@
 
       <dl class="field-list diagnostic-fields">
         <div class="field-row field-row--wide">
-          <dt>Frame timer</dt>
-          <dd>{{ frameTimerStatus() }}</dd>
-        </div>
-        <div class="field-row field-row--wide">
-          <dt>Mode</dt>
-          <dd>
-            {{ timingMode() }}, schedule-ahead
-            {{ scheduleAheadMs() === 0 ? 'off' : scheduleAheadMs() + ' ms' }}
-          </dd>
+          <dt>Schedule ahead</dt>
+          <dd>{{ scheduleAheadMs() === 0 ? 'off' : scheduleAheadMs() + ' ms' }}</dd>
         </div>
         <div class="field-row">
           <dt>Frames emitted</dt>
@@ -551,10 +508,6 @@
         <div class="field-row">
           <dt>Illegal opcodes</dt>
           <dd>{{ engineStats().illegalOpcodeCount }}</dd>
-        </div>
-        <div class="field-row">
-          <dt>Recipe resends</dt>
-          <dd>{{ engineStats().recipeResends }}</dd>
         </div>
         <div class="field-row field-row--wide">
           <dt>Last error</dt>

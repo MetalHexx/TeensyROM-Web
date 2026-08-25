@@ -14,7 +14,6 @@ import {
   VOICE_CONTROL_REGISTERS,
 } from '../asid/asid-constants';
 import {
-  buildFramerateRecipePacket,
   buildSidDataPacket,
   buildSidTypePacket,
   buildStartPacket,
@@ -32,13 +31,6 @@ import { REPLAY_RUNNER } from '../replay/replay-runner';
 import type { ReplayRequest, ReplayResponse } from '../replay/replay-runner';
 
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
-export type SpeedMode = 'clock-only' | 'clock-and-recipe';
-/**
- * `cartridge-timed` sends the framerate recipe and lets the cartridge's own timer pace the stream —
- * today's behaviour. `host-scheduled` never sends it: the cartridge's timer stays off and runs
- * pass-through, while the host paces delivery itself against each frame's own due time.
- */
-export type TimingMode = 'cartridge-timed' | 'host-scheduled';
 
 /** The nudge window in real time. Frames are derived from the tune's rate so the felt range is
  *  the same on a 1x tune and a 2x-multispeed one. */
@@ -109,42 +101,22 @@ interface ResolvedLoop {
   readonly outFrame: number;
 }
 
-/**
- * One tick of a sequence the engine owes the stream, drained in order by `onTick`.
- *
- * Only `packet` replaces the tick's frame; every other kind runs the tune's frame as usual and
- * differs solely in what goes out afterwards. That is what lets a retune hold the tune's place
- * across the silence rather than pausing it.
- */
-type PendingStep =
-  /** A precomputed packet that replaces this tick's frame — the cue-hop resync. */
-  | { readonly kind: 'packet'; readonly snapshot: FrameSnapshot }
-  /** Run the frame normally, but emit it with the three voice control registers forced to 0. */
-  | { readonly kind: 'gated-frame' }
-  /** Run the frame, switch the host clock's interval, send the recipe. No SID packet this tick. */
-  | { readonly kind: 'retime' }
-  /** Run the frame, then emit every register at its true value. Sound returns here. */
-  | { readonly kind: 'resync' };
-
 /** Counters and measurements the diagnostics panel reads. */
 export interface EngineStats {
   readonly framesRendered: number;
   readonly packetsSent: number;
   readonly bytesSent: number;
-  readonly recipeResends: number;
   readonly suppressedWrites: number;
   readonly illegalOpcodeCount: number;
   /** The tune's multispeed: how many ticks the engine runs per video frame. */
   readonly callsPerFrame: number;
-  /**
-   * The interval the frame clock is actually pacing at, which deliberately lags the speed fader
-   * while a retune waits out its debounce and gate lead — the readout is the acceptance instrument
-   * for the retune sequence, so it must not claim a rate nothing is running yet.
-   */
+  /** The interval the frame clock is actually pacing at, rather than whatever the fader has asked
+   *  for — the two only differ while nothing is playing and no clock is running. */
   readonly effectiveIntervalUs: number;
   readonly measuredMeanIntervalUs: number;
   readonly driftMs: number;
-  /** Standard deviation of the audio-callback gap — the scatter that empties the cartridge queue. */
+  /** Standard deviation of the audio-callback gap — how far the clock's own cadence scatters around
+   *  the interval it was asked for. */
   readonly jitterMs: number;
   /** The longest single audio-callback gap since play started. */
   readonly worstGapMs: number;
@@ -201,29 +173,6 @@ const MICROSECONDS_PER_SECOND = 1_000_000;
 export const JUMP_CEILING_SECONDS = 300;
 
 /**
- * How long a speed change settles before `clock-and-recipe` mode begins its retune.
- *
- * Every recipe costs the cartridge four blocking queue drains plus four lines printed to the C64
- * screen, so a fader sweep at 150 ms stacks interruptions faster than the cartridge clears them.
- *
- * Deliberately lower than the 500 ms this used to be, because the retune sequence now sits on top
- * of it: the clock does not move until the `retime` step, so nothing about the pitch changes until
- * this debounce *plus* `RETUNE_GATE_LEAD_FRAMES` has elapsed — ~570 ms at 250 ms, against ~820 ms
- * at 500. That the pitch is frozen while the fader is being swept is the price of host and
- * cartridge changing rate in the same instant, and is not a bug to be fixed by unfreezing the
- * clock. Anyone who needs to *hear* the pitch move while riding the fader wants `clock-only` mode,
- * which tracks the fader live and sends no recipe at all — that is what it is for.
- */
-export const RECIPE_RESEND_DEBOUNCE_MS = 250;
-
-/**
- * How many gated frames drain ahead of the recipe. The gate-off has to actually reach the C64
- * before the cartridge flushes, and the buffer's depth is a value the host cannot read — 16 covers
- * the cartridge's power-on default of roughly 13 frames with margin. ~320 ms on a normal PAL tune.
- */
-export const RETUNE_GATE_LEAD_FRAMES = 16;
-
-/**
  * Frames between `stats` publishes. A signal write per frame would run Angular change detection at
  * the frame rate, which is jitter this experiment cannot afford.
  */
@@ -234,8 +183,6 @@ const STATS_PUBLISH_FRAME_INTERVAL = 25;
  * Each is a 64 KB memory image, so this is a memory-against-replay-distance trade and nothing more.
  */
 const ANCHOR_RING_SIZE = 4;
-
-const RECIPE_MAX_INTERVAL_US = 0xffff;
 
 /**
  * The `scheduleAheadMs` ceiling enforced whenever the selected MIDI port cannot cancel a pending
@@ -255,7 +202,6 @@ const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
   packetsSent: 0,
   bytesSent: 0,
-  recipeResends: 0,
   suppressedWrites: 0,
   illegalOpcodeCount: 0,
   callsPerFrame: 1,
@@ -294,25 +240,11 @@ export class DjPlayerEngine implements OnDestroy {
   readonly subtuneCount = signal<number>(1);
   readonly speedMultiplier = signal<number>(1);
   /**
-   * Bumped whenever the machine or its multispeed can change, purely to give `slowestSpeed` a signal
-   * to recompute on: `machine.callsPerFrame` is a plain readonly field, not itself a signal.
+   * The slowest multiplier any tune can be told about. The clock is the only thing a speed change
+   * touches now, and it has no ceiling of its own, so the hard span is the whole constraint —
+   * multispeed and nominal interval no longer narrow it.
    */
-  private readonly tuneRevision = signal(0);
-  /**
-   * The slowest multiplier this tune can be told about. Never looser than 1 − SPEED_HARD_SPAN.
-   *
-   * On a normal PAL tune (19950 µs, callsPerFrame 1) this resolves to ~0.3044 — the protocol floor,
-   * since the recipe's 16-bit interval field would otherwise overflow before the hard span does. On
-   * a 2x-multispeed PAL tune it resolves to 0.3 — the hard span wins instead, because halving the
-   * interval for the second play call halves the protocol floor with it. The asymmetry is real, not
-   * a bug: it is `max()` picking whichever constraint actually binds for the tune in hand.
-   */
-  readonly slowestSpeed = computed<number>(() => {
-    this.tuneRevision();
-    const callsPerFrame = this.machine?.callsPerFrame ?? 1;
-    const protocolFloor = this.nominalIntervalUs() / (RECIPE_MAX_INTERVAL_US * callsPerFrame);
-    return Math.max(1 - SPEED_HARD_SPAN, protocolFloor);
-  });
+  readonly slowestSpeed = computed<number>(() => 1 - SPEED_HARD_SPAN);
   readonly fastestSpeed = computed<number>(() => 1 + SPEED_HARD_SPAN);
   private readonly _rememberedSpeed = signal<number | null>(null);
   /** The speed being ridden before the current jump excursion; null when not on an excursion. */
@@ -321,21 +253,6 @@ export class DjPlayerEngine implements OnDestroy {
    * separately because "same button again" vs. "opposite button" cannot be told apart from the
    * multiplier's value alone once a jump has clamped. */
   private excursionDirection: 'up' | 'down' | null = null;
-  readonly speedMode = signal<SpeedMode>('clock-and-recipe');
-  readonly timingMode = signal<TimingMode>('cartridge-timed');
-  readonly recipeEnabled = signal<boolean>(true);
-  /**
-   * Whether a recipe packet has gone out since this engine was constructed — which means the
-   * cartridge's frame timer is on, because the firmware's `APT_ContFramerate` handler does
-   * `FrameTimerMode = true` unconditionally on receipt.
-   *
-   * Deliberately sticky: `stop()`, `loadTune()` and `resetCounters()` all leave the cartridge's flag
-   * set, and so does un-checking `recipeEnabled` — that only stops us sending *more* recipes. The
-   * flag clears on the cartridge only when the ASID player app is exited and re-entered, where
-   * `InitHndlr_ASID` sets it false, which this browser cannot observe. So this tracks what we know
-   * we caused rather than pretending to read the cartridge.
-   */
-  readonly recipeSent = signal<boolean>(false);
   readonly nominalIntervalUs = signal<number>(PAL_FRAME_INTERVAL_US);
   readonly scheduleAheadMs = signal<number>(0);
   readonly lastError = signal<string | null>(null);
@@ -400,11 +317,9 @@ export class DjPlayerEngine implements OnDestroy {
   private file: SidFile | null = null;
   private machine: C64Machine | null = null;
   private frame: RegisterFrame | null = null;
-  private recipeResendTimer: ReturnType<typeof setTimeout> | null = null;
   private framesRendered = 0;
   private packetsSent = 0;
   private bytesSent = 0;
-  private recipeResends = 0;
   private framesSincePublish = 0;
   /** The delivery-against-due-time counters `sendFramePacket` maintains — see `recordDeliveryStats`
    *  and the matching fields on `EngineStats` for what each one means. */
@@ -418,22 +333,17 @@ export class DjPlayerEngine implements OnDestroy {
   /** The previous frame's delivery time, so `recordDeliveryStats` can detect an inversion. Null
    *  before the first frame of a run — there is nothing yet to be earlier than. */
   private lastScheduledAtMs: number | null = null;
-  /** Steps a jump or a retune still owes the stream, drained one per tick by `onTick`. */
-  private pending: PendingStep[] = [];
+  /** Snapshots a jump still owes the stream, drained one per tick by `onTick`. */
+  private pending: FrameSnapshot[] = [];
   /**
-   * Frame packets already handed to the transport with a future delivery time, `host-scheduled`
-   * only — pruned as each entry's delivery time passes. What a tempo change can still catch:
-   * `retimeCommittedHostSends()` cancels the transport's queue and re-sends exactly these, at the
-   * new spacing, rather than losing whatever they were carrying.
+   * Frame packets already handed to the transport with a future delivery time — pruned as each
+   * entry's delivery time passes. What a tempo change can still catch: `retimeCommittedHostSends()`
+   * cancels the transport's queue and re-sends exactly these, at the new spacing, rather than losing
+   * whatever they were carrying.
    */
   private committedHostSends: { readonly packet: Uint8Array; readonly scheduledAtMs: number }[] = [];
-  /**
-   * What the frame clock is actually pacing at, or null before it has ever been started.
-   *
-   * Kept apart from `effectiveIntervalUs()` — which reads the *new* rate the moment the fader
-   * moves — because a `clock-and-recipe` retune deliberately leaves the clock alone until its
-   * `retime` step. Diagnostics report this one.
-   */
+  /** What the frame clock was last handed, or null before it has ever been started — the rate
+   *  diagnostics report, rather than one derived from a fader that may have moved while stopped. */
   private runningIntervalUs: number | null = null;
   /**
    * Recent machine images, oldest first, that a nudge can replay forward from.
@@ -460,7 +370,6 @@ export class DjPlayerEngine implements OnDestroy {
       this.clock.stop();
       this.sendControl(buildStopPacket());
     }
-    this.clearRecipeResend();
     // Whatever a jump is replaying describes the outgoing tune, not this one.
     this.discardOutstandingJump();
 
@@ -471,9 +380,6 @@ export class DjPlayerEngine implements OnDestroy {
     // never pressed against — otherwise effectiveMutes would disagree with the chip it just replaced.
     this.heldVoices.set([false, false, false]);
     this.machine = new C64Machine(file, this.frame);
-    // A new machine can carry a different multispeed than whatever tune played last — see
-    // `slowestSpeed`, the one reader this exists for.
-    this.tuneRevision.update((revision) => revision + 1);
     this.subtuneCount.set(Math.max(1, file.songs));
     this.nominalIntervalUs.set(
       file.clock === 'ntsc' ? NTSC_FRAME_INTERVAL_US : PAL_FRAME_INTERVAL_US
@@ -526,9 +432,6 @@ export class DjPlayerEngine implements OnDestroy {
     // The header already told us the model and the cartridge displays it.
     this.sendControl(buildSidTypePacket(0, file.model === 'mos8580'));
     this.sendControl(buildStartPacket());
-    if (this.recipeEnabled()) {
-      this.sendRecipe();
-    }
 
     const intervalUs = this.effectiveIntervalUs();
     try {
@@ -559,7 +462,6 @@ export class DjPlayerEngine implements OnDestroy {
     }
 
     this.clock.stop();
-    this.clearRecipeResend();
     // No tick will come to drain them, and the gate-off below supersedes them anyway.
     this.pending = [];
     this.committedHostSends = [];
@@ -572,7 +474,6 @@ export class DjPlayerEngine implements OnDestroy {
   /** Stops the clock, tells the cartridge to leave ASID mode, and resets the machine. */
   stop(): void {
     this.clock.stop();
-    this.clearRecipeResend();
     // A sequence must never survive a transport change: no tick is coming to drain it, and the
     // subtune re-init below invalidates whatever it was holding anyway. A jump still replaying is
     // owed the same treatment — landing it would restart playback at a position nobody asked for.
@@ -599,7 +500,6 @@ export class DjPlayerEngine implements OnDestroy {
    */
   ngOnDestroy(): void {
     this.clock.stop();
-    this.clearRecipeResend();
     this.discardOutstandingJump();
     // The replay thread outlives this injector otherwise — nothing else holds the runner.
     this.replayRunner.dispose();
@@ -723,54 +623,6 @@ export class DjPlayerEngine implements OnDestroy {
   private applySpeedBounded(multiplier: number, lo: number, hi: number): void {
     this.speedMultiplier.set(clamp(multiplier, lo, hi));
     this.applyIntervalChange();
-  }
-
-  /**
-   * The master switch for the framerate recipe: without it the cartridge never engages its own frame
-   * timer, and `clock-and-recipe` has nothing to resend.
-   */
-  setRecipeEnabled(enabled: boolean): void {
-    this.recipeEnabled.set(enabled);
-    if (enabled && this.state() === 'playing') {
-      this.sendRecipe();
-    }
-  }
-
-  /**
-   * `clock-only` changes the interval the instant the fader moves — the pitch tracks the hand, but
-   * the cartridge's frame timer stays seeded to the old rate and its queue drifts.
-   * `clock-and-recipe` instead runs the managed retune (see `beginRetune`), which keeps both ends
-   * on the same rate at the cost of the pitch not moving at all until the sequence lands.
-   */
-  setSpeedMode(mode: SpeedMode): void {
-    this.speedMode.set(mode);
-  }
-
-  /**
-   * Switching mid-session never needs a reload. Switching *into* `cartridge-timed` re-sends the
-   * recipe so the cartridge is told the rate it may have missed while pass-through was live;
-   * switching *out* of it cannot un-send one — the cartridge's timer stays on until the operator's
-   * own toggle at the C64 or a cartridge reset turns it off, which this browser has no way to do for
-   * them.
-   *
-   * Clears any pending resend timer regardless of direction: a debounce left running from
-   * `cartridge-timed` would otherwise fire after the switch and queue a gated lead — silence this
-   * mode has no reason to pay for — even though the recipe itself is separately suppressed inside
-   * `sendRecipe()`.
-   */
-  setTimingMode(mode: TimingMode): void {
-    if (mode === this.timingMode()) {
-      return;
-    }
-    this.clearRecipeResend();
-    // Whichever direction the switch runs, whatever this held no longer describes a live tempo to
-    // reconcile against — cartridge-timed never populates it, and stale entries left from a prior
-    // host-scheduled stretch must not be re-timed against a rate that moved for a different reason.
-    this.committedHostSends = [];
-    this.timingMode.set(mode);
-    if (mode === 'cartridge-timed' && this.recipeEnabled() && this.state() === 'playing') {
-      this.sendRecipe();
-    }
   }
 
   /** One of `NOMINAL_INTERVAL_OPTIONS_US` for a PAL tune; NTSC tunes load their own default. */
@@ -1177,8 +1029,8 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * One emulated frame, one packet — including frames where nothing changed. A skipped packet loses
-   * a frame on the cartridge's queue and the timing drifts.
+   * One emulated frame, one packet — including frames where nothing changed, so the packet stream
+   * and the frame grid stay one-to-one and a packet's place in it always names its due time.
    *
    * `dueAtMs` is when the clock says this frame fell due, which is before now and one interval apart
    * from its neighbour when a callback releases several at once. It rides the tick through to the
@@ -1198,12 +1050,13 @@ export class DjPlayerEngine implements OnDestroy {
       return;
     }
 
-    // A sequence's packets ride the tick rather than arriving beside it: the cartridge counts every
-    // SID-data packet as a frame and drains exactly one per timer tick, so anything injected between
-    // ticks is a frame it never asked for and never drains. See `queueResync` and `beginRetune`.
-    const step = this.pending.shift();
-    if (step?.kind === 'packet') {
-      this.sendFramePacket(buildSidDataPacket(step.snapshot), dueAtMs, catchUpClamped);
+    // A sequence's packets ride the tick rather than arriving beside it: the host paces the stream
+    // frame by frame, so each of `queueResync`'s two packets needs a frame slot of its own and the
+    // due time that comes with it. Sent between ticks they would share one slot, and the release
+    // window the gate-off exists to open would collapse to the gap between two `midi.send` calls.
+    const queued = this.pending.shift();
+    if (queued !== undefined) {
+      this.sendFramePacket(buildSidDataPacket(queued), dueAtMs, catchUpClamped);
       this.publishStats();
       return;
     }
@@ -1222,35 +1075,7 @@ export class DjPlayerEngine implements OnDestroy {
       return;
     }
 
-    switch (step?.kind) {
-      case 'gated-frame':
-        // `markAllDirty()` first is load-bearing, not tidiness: `takeSnapshot()` compacts `values`
-        // to one entry per *present* slot, so on an ordinary running frame `withVoiceGatesOff`'s
-        // indices 22/23/24 would land on whichever registers the tune happened to write — leaving
-        // the gates open and corrupting three unrelated registers, silently. Only an all-dirty
-        // snapshot puts slot n at values[n]. Re-sending a single gate-off packet instead would not
-        // work either: the tune rewrites its own control registers every frame.
-        frame.markAllDirty();
-        this.sendFramePacket(
-          buildSidDataPacket(withVoiceGatesOff(frame.takeSnapshot())),
-          dueAtMs,
-          catchUpClamped
-        );
-        break;
-      case 'retime':
-        // No SID packet: the recipe flushes the cartridge's queue on receipt, so a frame sent on
-        // this tick is discarded anyway. Host and cartridge change rate in the same instant here,
-        // which is the whole point of freezing the clock until now.
-        this.setClockIntervalUs(this.effectiveIntervalUs());
-        this.sendRecipe();
-        break;
-      case 'resync':
-        frame.markAllDirty();
-        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs, catchUpClamped);
-        break;
-      default:
-        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs, catchUpClamped);
-    }
+    this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs, catchUpClamped);
     this.framesRendered++;
     if (this.framesRendered % this.anchorSnapshotFrameInterval() === 0) {
       this.recordAnchor();
@@ -1289,8 +1114,6 @@ export class DjPlayerEngine implements OnDestroy {
     }
     // A jump in flight was replaying the outgoing subtune, so its answer is about to be wrong.
     this.discardOutstandingJump();
-    // A subtune can carry a different multispeed — initSubtune() bumps tuneRevision on success, so
-    // slowestSpeed re-resolves against whichever subtune actually loaded.
     if (!this.initSubtune(clamped)) {
       return;
     }
@@ -1326,9 +1149,6 @@ export class DjPlayerEngine implements OnDestroy {
     // this deliberately — each owns its own anchor, so none of them needs the ring to persist.
     this.anchorRing = [];
     this.recordAnchor();
-    // This subtune's CIA multispeed is now resolved on the machine, so slowestSpeed's floor may have
-    // moved — see the constructor-time comment on tuneRevision.
-    this.tuneRevision.update((revision) => revision + 1);
     this.currentSubtune.set(clamped);
     this.lastError.set(null);
     return true;
@@ -1556,13 +1376,12 @@ export class DjPlayerEngine implements OnDestroy {
   /**
    * Hands the chip-resync packets to the frame clock instead of sending them here.
    *
-   * The cartridge treats every SID-data packet as one frame and drains exactly one per timer tick,
-   * so a packet injected between ticks is a frame it never drains: the queue grows by that much and
-   * stays grown until the re-timer claws it back. Two packets per hop, hopped repeatedly, walks the
-   * queue straight into the overflow that resets it — an audible dropout. Riding the tick keeps the
-   * rate at exactly one packet per frame no matter how hard the cue buttons are hit.
+   * The host paces the stream one frame per tick, so a packet injected between ticks lands inside a
+   * frame slot another packet already owns — two frames' worth of register writes arriving as one,
+   * however hard the cue buttons are hit. Riding the tick gives each packet a slot and a due time of
+   * its own.
    *
-   * The gate-off leads in a packet of its own so it drains a whole frame ahead of the resync, giving
+   * The gate-off leads in a packet of its own so it lands a whole frame ahead of the resync, giving
    * every voice a real release window before it re-attacks. Folding both into one packet via the
    * ASID secondary gate slots would halve the frames but collapse that window to a few cycles.
    *
@@ -1597,37 +1416,13 @@ export class DjPlayerEngine implements OnDestroy {
     // Replaces any sequence still owed rather than appending to it. Spamming hops then costs one
     // packet per tick forever, instead of building a backlog that plays every hop the button ever
     // took — the newest hop is always the one that lands.
-    this.pending = [
-      { kind: 'packet', snapshot: buildVoiceGateOffSnapshot() },
-      { kind: 'packet', snapshot },
-    ];
+    this.pending = [buildVoiceGateOffSnapshot(), snapshot];
   }
 
   /**
-   * Queues the managed retune: a lead of gated frames, then the tick that re-times both ends, then
-   * the one that brings the sound back.
-   *
-   * The cartridge discards its whole buffer on receiving a recipe and refills before it resumes,
-   * and nothing here can prevent that — only control what the chip is holding when it happens. The
-   * lead is what makes that buffer's contents silent; the tune plays on through it regardless, so
-   * the sequence costs the tune's place nothing.
-   *
-   * Assigns rather than appends: a second speed change mid-sequence starts a fresh lead rather than
-   * stacking dropouts.
-   */
-  private beginRetune(): void {
-    this.pending = [
-      ...Array.from({ length: RETUNE_GATE_LEAD_FRAMES }, () => ({ kind: 'gated-frame' } as const)),
-      { kind: 'retime' },
-      { kind: 'resync' },
-    ];
-  }
-
-  /**
-   * Where the "one instant" rule lives: in `clock-and-recipe` the clock is *not* moved here, so the
-   * host never feeds a rate the cartridge is not pacing. `beginRetune`'s `retime` step moves both.
-   * `host-scheduled` sends no recipe at all, so it has no cartridge-side rate to agree with and
-   * takes the same direct route as `clock-only` — otherwise the fader would move nothing.
+   * Moves the clock the instant the fader does, so the pitch tracks the hand. The cartridge runs
+   * pass-through and holds no rate of its own to agree with, which is what makes the direct route
+   * safe here.
    */
   private applyIntervalChange(): void {
     if (this.state() !== 'playing') {
@@ -1635,29 +1430,15 @@ export class DjPlayerEngine implements OnDestroy {
       this.publishStats();
       return;
     }
-    if (this.timingMode() === 'host-scheduled') {
-      // No recipe, no cartridge-side rate to disagree with — the clock follows the fader live, same
-      // as `clock-only`. What is unique to this mode is what may already be sitting in the transport's
-      // queue at the old rate; `retimeCommittedHostSends()` is the cancel-and-reschedule half of that.
-      this.setClockIntervalUs(this.effectiveIntervalUs());
-      this.retimeCommittedHostSends();
-      this.publishStats();
-      return;
-    }
-    if (this.speedMode() === 'clock-only' || !this.recipeEnabled()) {
-      // No recipe goes out in these modes, so there is no cartridge-side rate to disagree with and
-      // the clock can follow the fader live. That is the whole point of `clock-only`.
-      this.setClockIntervalUs(this.effectiveIntervalUs());
-      this.publishStats();
-      return;
-    }
+    // Frames may already be sitting in the transport's queue at the old rate;
+    // `retimeCommittedHostSends()` is the cancel-and-reschedule half of the change.
+    this.setClockIntervalUs(this.effectiveIntervalUs());
+    this.retimeCommittedHostSends();
     this.publishStats();
-    this.scheduleRetune();
   }
 
   /**
-   * The cancellation half of a `host-scheduled` tempo change. There is no recipe and no gate-off
-   * here — the cartridge holds nothing to flush, because this mode never told it to buffer anything.
+   * The cancellation half of a tempo change.
    *
    * With a port that can cancel, whatever is still sitting in the transport's queue was scheduled
    * against the old interval and would land at the wrong spacing; wiping it and re-sending the same
@@ -1687,7 +1468,9 @@ export class DjPlayerEngine implements OnDestroy {
     // truth for "the window actually in effect right now."
     const aheadMs = this.effectiveScheduleAheadMs();
     const newIntervalMs = this.effectiveIntervalUs() / (MICROSECONDS_PER_SECOND / 1000);
-    let scheduledAtMs = performance.now() + aheadMs;
+    // The same `nowMs` the latency above was measured against: a second reading would put the
+    // measurement and the first re-sent packet on two different anchors.
+    let scheduledAtMs = nowMs + aheadMs;
     for (const { packet } of outstanding) {
       this.midi.send(packet, scheduledAtMs);
       this.committedHostSends.push({ packet, scheduledAtMs });
@@ -1695,58 +1478,11 @@ export class DjPlayerEngine implements OnDestroy {
     }
   }
 
-  private scheduleRetune(): void {
-    this.clearRecipeResend();
-    this.recipeResendTimer = setTimeout(() => {
-      this.recipeResendTimer = null;
-      if (this.state() === 'playing') {
-        this.beginRetune();
-      }
-    }, RECIPE_RESEND_DEBOUNCE_MS);
-  }
-
   /** Moves the clock and records what it is now pacing, so diagnostics report the rate actually
    *  running rather than the one the fader has already asked for. */
   private setClockIntervalUs(intervalUs: number): void {
     this.clock.setIntervalUs(intervalUs);
     this.runningIntervalUs = intervalUs;
-  }
-
-  private clearRecipeResend(): void {
-    if (this.recipeResendTimer !== null) {
-      clearTimeout(this.recipeResendTimer);
-      this.recipeResendTimer = null;
-    }
-  }
-
-  /**
-   * The only place that suppresses `host-scheduled`: every caller — `play()`, the recipe checkbox,
-   * and the retune's `retime` step — funnels through here, so none of them can leak a packet by
-   * being added later without also checking the mode.
-   */
-  private sendRecipe(): void {
-    if (this.timingMode() === 'host-scheduled') {
-      return;
-    }
-    const file = this.file;
-    const machine = this.machine;
-    if (file === null || machine === null) {
-      return;
-    }
-
-    this.sendControl(
-      buildFramerateRecipePacket({
-        ntsc: file.clock === 'ntsc',
-        // The cartridge only displays this; its timer runs off the interval below. Leaving it at 1
-        // while sending a divided interval would describe the stream incorrectly.
-        speedMultiplier: machine.callsPerFrame,
-        bufferingRequested: true,
-        frameIntervalUs: clamp(Math.round(this.effectiveIntervalUs()), 0, RECIPE_MAX_INTERVAL_US),
-      })
-    );
-    this.recipeSent.set(true);
-    this.recipeResends++;
-    this.publishStats();
   }
 
   /**
@@ -1759,13 +1495,7 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Sends one frame packet, on whichever arm `timingMode` selects.
-   *
-   * `cartridge-timed` schedules against `performance.now() + effectiveScheduleAheadMs()` —
-   * unchanged in shape from before this mode existed — where the offset means "this far from now"
-   * and 0 means immediately.
-   *
-   * `host-scheduled` schedules against `dueAtMs + effectiveScheduleAheadMs()` instead: `dueAtMs` is
+   * Sends one frame packet, scheduled against `dueAtMs + effectiveScheduleAheadMs()`: `dueAtMs` is
    * when the clock says this frame fell due, always at or before now, so anchoring to it rather than
    * to whenever the main thread reached the packet is what makes packet spacing independent of
    * callback timing.
@@ -1775,32 +1505,16 @@ export class DjPlayerEngine implements OnDestroy {
    * time `setScheduleAhead()` ran.
    */
   private sendFramePacket(packet: Uint8Array, dueAtMs: number, catchUpClamped: boolean): void {
-    const aheadMs = this.effectiveScheduleAheadMs();
     const handOffMs = performance.now();
-    let scheduledAtMs: number;
-    if (this.timingMode() === 'host-scheduled') {
-      scheduledAtMs = dueAtMs + aheadMs;
-      this.midi.send(packet, scheduledAtMs);
-      this.recordCommittedHostSend(packet, scheduledAtMs);
-    } else if (aheadMs > 0) {
-      scheduledAtMs = handOffMs + aheadMs;
-      this.midi.send(packet, scheduledAtMs);
-    } else {
-      // No timestamp reaches the transport here — "now" is the closest thing this frame has to a
-      // delivery time, and is what the reorder check below compares it against.
-      scheduledAtMs = handOffMs;
-      this.midi.send(packet);
-    }
+    const scheduledAtMs = dueAtMs + this.effectiveScheduleAheadMs();
+    this.midi.send(packet, scheduledAtMs);
+    this.recordCommittedHostSend(packet, scheduledAtMs);
     this.packetsSent++;
     this.bytesSent += packet.length;
     this.recordDeliveryStats(dueAtMs, handOffMs, scheduledAtMs, catchUpClamped);
   }
 
-  /**
-   * Updates the delivery-against-due-time counters `publishStats()` reports. Runs on every frame
-   * packet, in both timing modes, so `cartridge-timed` and `host-scheduled` can be compared against
-   * the same instrument rather than each against memory.
-   */
+  /** Updates the delivery-against-due-time counters `publishStats()` reports. */
   private recordDeliveryStats(
     dueAtMs: number,
     handOffMs: number,
@@ -1832,9 +1546,16 @@ export class DjPlayerEngine implements OnDestroy {
     this.committedHostSends = this.committedHostSends.filter((entry) => entry.scheduledAtMs > nowMs);
   }
 
+  /** Records a send a tempo change could still catch — and only such a send. One whose delivery time
+   *  has already passed, because the main thread stalled between the frame falling due and reaching
+   *  the transport, has been handed over for immediate release: there is nothing left to cancel or
+   *  re-time, so it never belonged in this collection. */
   private recordCommittedHostSend(packet: Uint8Array, scheduledAtMs: number): void {
-    this.pruneCommittedHostSends(performance.now());
-    this.committedHostSends.push({ packet, scheduledAtMs });
+    const nowMs = performance.now();
+    this.pruneCommittedHostSends(nowMs);
+    if (scheduledAtMs > nowMs) {
+      this.committedHostSends.push({ packet, scheduledAtMs });
+    }
   }
 
   private sendControl(packet: Uint8Array): void {
@@ -1846,7 +1567,6 @@ export class DjPlayerEngine implements OnDestroy {
   /** Stops playback and records why, leaving the page usable without a reload. */
   private fail(reason: string): void {
     this.clock.stop();
-    this.clearRecipeResend();
     this.lastError.set(reason);
     this.state.set('error');
     this.publishStats();
@@ -1857,7 +1577,6 @@ export class DjPlayerEngine implements OnDestroy {
     this.framesRendered = 0;
     this.packetsSent = 0;
     this.bytesSent = 0;
-    this.recipeResends = 0;
     this.pending = [];
     this.committedHostSends = [];
     this.scheduledFrames = 0;
@@ -1871,10 +1590,9 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * The interval the diagnostics readout reports: what the clock is running, not what the fader has
-   * asked for. The two differ for the length of a retune's debounce plus its gate lead, and the
-   * readout is the acceptance instrument for that sequence — reporting the derived value there
-   * would have it claim a rate nothing is pacing yet.
+   * The interval the diagnostics readout reports: what the clock is running while playing, and the
+   * rate the next `play()` would start at otherwise. Reading `runningIntervalUs` while stopped would
+   * report a rate that stopped being true when the clock did.
    */
   private reportedIntervalUs(): number {
     if (this.file === null) return 0;
@@ -1890,7 +1608,6 @@ export class DjPlayerEngine implements OnDestroy {
       framesRendered: this.framesRendered,
       packetsSent: this.packetsSent,
       bytesSent: this.bytesSent,
-      recipeResends: this.recipeResends,
       suppressedWrites: this.frame?.suppressedWriteCount ?? 0,
       illegalOpcodeCount: this.machine?.illegalOpcodeCount ?? 0,
       callsPerFrame: this.machine?.callsPerFrame ?? 1,
@@ -1934,7 +1651,7 @@ function buildVoiceGateOffSnapshot(): FrameSnapshot {
  *
  * Only ever valid on an all-dirty snapshot: `takeSnapshot()` compacts `values` to one entry per
  * *present* slot, so on an ordinary frame those indices name whatever the tune happened to write.
- * Callers are a jump landing while paused, and each gated frame of a retune's lead.
+ * The one caller is a jump landing while paused.
  */
 function withVoiceGatesOff(snapshot: FrameSnapshot): FrameSnapshot {
   const values = [...snapshot.values];

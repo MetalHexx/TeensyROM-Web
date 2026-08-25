@@ -13,8 +13,6 @@ import {
   FRAME_CLOCK,
   NOMINAL_INTERVAL_OPTIONS_US,
   SPEED_INPUT_SPAN,
-  SpeedMode,
-  TimingMode,
 } from '../engine/dj-player-engine';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
@@ -29,6 +27,14 @@ const MICROSECONDS_PER_SECOND = 1_000_000;
 /** The stall control's starting span — long enough to be heard, short enough not to trip
  *  `MAX_CATCH_UP_US`'s catch-up ceiling in the frame clock on a single press. */
 const DEFAULT_STALL_DURATION_MS = 150;
+
+/**
+ * The longest stall the control will actually run. The busy-wait is synchronous and uncancellable,
+ * so a mistyped `150000` would freeze the tab for two and a half minutes with no way back. This
+ * still reaches well past the widest schedule-ahead option (160 ms), which is the span the stall
+ * has to out-last to prove anything.
+ */
+const MAX_STALL_DURATION_MS = 2000;
 
 /**
  * Off, two sub-frame probes, then a ceiling that reaches well past a single PAL frame (~19.95 ms).
@@ -84,9 +90,6 @@ export class DjPocViewComponent {
   protected readonly currentSubtune = this.engine.currentSubtune;
   protected readonly subtuneCount = this.engine.subtuneCount;
   protected readonly speedMultiplier = this.engine.speedMultiplier;
-  protected readonly speedMode = this.engine.speedMode;
-  protected readonly timingMode = this.engine.timingMode;
-  protected readonly recipeEnabled = this.engine.recipeEnabled;
   protected readonly nominalIntervalUs = this.engine.nominalIntervalUs;
   protected readonly scheduleAheadMs = this.engine.scheduleAheadMs;
   protected readonly mutedVoices = this.engine.mutedVoices;
@@ -123,6 +126,7 @@ export class DjPocViewComponent {
 
   /** The main-thread stall control's configured span, ms — see `onStallMainThread`. */
   protected readonly stallDurationMs = signal<number>(DEFAULT_STALL_DURATION_MS);
+  protected readonly maxStallDurationMs = MAX_STALL_DURATION_MS;
 
   // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
   // own position updates (which fire from stats publishes, not from the drag) can't fight it and
@@ -145,21 +149,6 @@ export class DjPocViewComponent {
    * the thumb; the commit itself waits for release even though the arithmetic is cheap, because the
    * commit now also auditions the seam. */
   private readonly loopOutDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
-
-  // The cartridge's frame timer, stated rather than recorded: we know it is on once we have sent a
-  // recipe packet, because the firmware's handler forces `FrameTimerMode = true` on receipt.
-  //
-  // Buffer size has no equivalent and is deliberately absent. ASID is one-way host -> cartridge and
-  // Identify writes text to the C64 screen rather than querying it, so this browser has no way to
-  // read the buffer size back. A hand-kept record of it is only true while someone remembers to
-  // update two places at once, and a stale one is worse than nothing — the C64's own menu already
-  // displays the buffer size accurately, so that is where it is read.
-  protected readonly frameTimerForced = this.engine.recipeSent;
-  protected readonly frameTimerStatus = computed(() =>
-    this.frameTimerForced()
-      ? `on at ${Math.round(this.engineStats().effectiveIntervalUs)} µs`
-      : 'not set'
-  );
 
   // Identify interrupts the stream on the cartridge, so it stays out of reach while a tune plays.
   protected readonly canIdentify = computed(
@@ -303,18 +292,6 @@ export class DjPocViewComponent {
     this.engine.homeSpeed();
   }
 
-  onSpeedModeChange(event: Event): void {
-    this.engine.setSpeedMode((event.target as HTMLSelectElement).value as SpeedMode);
-  }
-
-  onTimingModeChange(event: Event): void {
-    this.engine.setTimingMode((event.target as HTMLSelectElement).value as TimingMode);
-  }
-
-  onRecipeToggle(event: Event): void {
-    this.engine.setRecipeEnabled((event.target as HTMLInputElement).checked);
-  }
-
   onNominalIntervalChange(event: Event): void {
     this.engine.setNominalIntervalUs(Number((event.target as HTMLSelectElement).value));
   }
@@ -331,14 +308,17 @@ export class DjPocViewComponent {
   }
 
   /**
-   * Blocks the main thread synchronously for `stallDurationMs()` — the deliberate stall `R5` needs
-   * to put the resilience claim on demand rather than waiting for a real one to land during a
-   * session. The frame clock's audio callback rides this same thread, so nothing it paces can run
-   * until the loop below returns; the delivery stats afterward are what say whether that gap was
-   * heard.
+   * Blocks the main thread synchronously for `stallDurationMs()`, capped at
+   * `MAX_STALL_DURATION_MS` — the deliberate stall the resilience claim needs on demand rather than
+   * waiting for a real one to land during a session. The frame clock's audio callback rides this
+   * same thread, so nothing it paces can run until the loop below returns; the delivery stats
+   * afterward are what say whether that gap was heard.
+   *
+   * The log line carries the duration actually run, so a clamped value reads as the override it is
+   * rather than as the control silently ignoring what was typed.
    */
   onStallMainThread(): void {
-    const ms = this.stallDurationMs();
+    const ms = Math.min(this.stallDurationMs(), MAX_STALL_DURATION_MS);
     logInfo(LogType.Debug, `DJ POC: stalling the main thread for ${ms} ms.`);
     const until = performance.now() + ms;
     while (performance.now() < until) {

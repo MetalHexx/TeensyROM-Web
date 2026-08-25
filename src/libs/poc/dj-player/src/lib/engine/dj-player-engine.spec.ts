@@ -2,15 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createEnvironmentInjector, EnvironmentInjector, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import {
-  ASID_MSG_FRAMERATE_RECIPE,
   ASID_MSG_SID_DATA,
   ASID_MSG_SID_TYPE,
   ASID_MSG_START,
   ASID_MSG_STOP,
-  NTSC_FRAME_INTERVAL_US,
   PAL_FRAME_INTERVAL_US,
 } from '../asid/asid-constants';
-import { buildFramerateRecipePacket } from '../asid/asid-encoder';
 import { MidiOutputService } from '../midi/midi-output.service';
 import type { SidClock, SidFile, SidModel } from '../sid/sid-file.model';
 import type { FrameClock, FrameClockStats } from '../clock/frame-clock';
@@ -24,8 +21,6 @@ import {
   JUMP_CEILING_SECONDS,
   LOOP_AUDITION_PREROLL_MS,
   NUDGE_RANGE_MS,
-  RECIPE_RESEND_DEBOUNCE_MS,
-  RETUNE_GATE_LEAD_FRAMES,
   UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS,
 } from './dj-player-engine';
 
@@ -408,16 +403,6 @@ describe('DjPlayerEngine', () => {
     vi.restoreAllMocks();
   });
 
-  /**
-   * Drives a queued `clock-and-recipe` retune past the debounce that starts it, then through its
-   * gate lead and the retime tick that carries the recipe. Leaves the closing resync still owed, so
-   * a caller can tick onto it and assert what comes back. Fake timers must be installed.
-   */
-  function completeRetune(): void {
-    vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
-    clock.tick(RETUNE_GATE_LEAD_FRAMES + 1);
-  }
-
   it('sends one SID data packet per tick, including frames that changed nothing', async () => {
     engine.loadTune(silentTune());
     await engine.play();
@@ -438,11 +423,7 @@ describe('DjPlayerEngine', () => {
 
     await engine.play();
 
-    expect(messageSequence(midi)).toEqual([
-      ASID_MSG_SID_TYPE,
-      ASID_MSG_START,
-      ASID_MSG_FRAMERATE_RECIPE,
-    ]);
+    expect(messageSequence(midi)).toEqual([ASID_MSG_SID_TYPE, ASID_MSG_START]);
 
     clock.tick(2);
     engine.stop();
@@ -574,22 +555,10 @@ describe('DjPlayerEngine', () => {
 
     expect(clock.intervalUs).toBe(PAL_FRAME_INTERVAL_US / 2);
     expect(dataPackets(midi)).toHaveLength(1);
-    expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)[0].bytes).toEqual(
-      buildFramerateRecipePacket({
-        ntsc: false,
-        speedMultiplier: 2,
-        bufferingRequested: true,
-        frameIntervalUs: PAL_FRAME_INTERVAL_US / 2,
-      })
-    );
   });
 
   it('divides the clock interval by the speed multiplier, clamped to the input span', async () => {
     engine.loadTune(silentTune());
-    // Ridden in clock-only mode because clock-and-recipe deliberately freezes the clock until its
-    // retune lands: the division reaching the clock is what is under test here, not when it does —
-    // see 'the managed retune sequence' for that.
-    engine.setSpeedMode('clock-only');
     await engine.play();
 
     engine.setSpeed(1.3);
@@ -602,75 +571,30 @@ describe('DjPlayerEngine', () => {
     expect(engine.speedMultiplier()).toBe(0.5);
   });
 
-  describe('the per-tune speed floor', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    /** The engine's own protocol-floor formula (`slowestSpeed` in `dj-player-engine.ts`), duplicated
-     * only to compute the boundary the floor should resolve to — not a re-test of the formula. */
-    function expectedProtocolFloor(intervalUs: number, callsPerFrame = 1): number {
-      return intervalUs / (0xffff * callsPerFrame);
-    }
-
-    it('resolves the protocol floor on a normal PAL tune, looser than the 0.3 hard span', () => {
+  describe('the speed floor', () => {
+    it('resolves the 0.3 hard span on a normal PAL tune', () => {
       engine.loadTune(silentTune());
 
-      const floor = expectedProtocolFloor(PAL_FRAME_INTERVAL_US);
-      expect(engine.slowestSpeed()).toBeCloseTo(floor, 6);
-      expect(engine.slowestSpeed()).toBeGreaterThan(0.3);
+      expect(engine.slowestSpeed()).toBeCloseTo(0.3, 6);
     });
 
-    it('resolves the 0.3 hard span on an NTSC tune, since its protocol floor is looser still', () => {
+    it('resolves the same 0.3 hard span on an NTSC tune and on a 2x-multispeed one', () => {
       engine.loadTune(tune({ clock: 'ntsc', blocks: [{ at: 0x1000, bytes: [RTS] }] }));
-
-      expect(expectedProtocolFloor(NTSC_FRAME_INTERVAL_US)).toBeLessThan(0.3);
       expect(engine.slowestSpeed()).toBeCloseTo(0.3, 6);
-    });
 
-    it('resolves the 0.3 hard span on a 2x-multispeed PAL tune, since halving the interval halves the protocol floor too', () => {
-      engine.loadTune(doubleSpeedTune());
-
-      expect(expectedProtocolFloor(PAL_FRAME_INTERVAL_US, 2)).toBeLessThan(0.3);
-      expect(engine.slowestSpeed()).toBeCloseTo(0.3, 6);
-    });
-
-    it('re-resolves the floor after loading a normal tune over a multispeed one, rather than keeping the stale value', () => {
       engine.loadTune(doubleSpeedTune());
       expect(engine.slowestSpeed()).toBeCloseTo(0.3, 6);
-
-      // Both tunes share the same nominal PAL interval, so only callsPerFrame moving from 2 back to
-      // 1 can explain a floor that loosens back to the protocol floor here.
-      engine.loadTune(silentTune());
-
-      expect(engine.slowestSpeed()).toBeCloseTo(expectedProtocolFloor(PAL_FRAME_INTERVAL_US), 6);
     });
 
-    it('keeps the outgoing recipe interval at or under 0xffff when a down jump reaches the floor', async () => {
+    it('carries a down jump all the way to the hard span, with nothing narrowing it', async () => {
       engine.loadTune(silentTune());
       await engine.play();
       engine.setSpeed(0.5); // the fader minimum
 
-      engine.jumpSpeedDown(); // additive from 0.5 lands well under the floor, so it clamps up to it
-      completeRetune();
+      engine.jumpSpeedDown(); // additive from 0.5 lands under the span, so it clamps up to it
 
-      expect(engine.speedMultiplier()).toBeCloseTo(expectedProtocolFloor(PAL_FRAME_INTERVAL_US), 6);
-      // Rounded the same way `sendRecipe` rounds before clamping — the floating-point floor lands a
-      // hair either side of 0xffff, and it is the rounded value the cartridge actually receives.
-      // The floor exists so that clamp never has to bite, which the recipe below is the proof of.
-      expect(Math.round(clock.intervalUs)).toBeLessThanOrEqual(0xffff);
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).at(-1)?.bytes).toEqual(
-        buildFramerateRecipePacket({
-          ntsc: false,
-          speedMultiplier: 1,
-          bufferingRequested: true,
-          frameIntervalUs: Math.round(clock.intervalUs),
-        })
-      );
+      expect(engine.speedMultiplier()).toBeCloseTo(0.3, 6);
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 0.3, 6);
     });
   });
 
@@ -841,437 +765,41 @@ describe('DjPlayerEngine', () => {
     expect(typeof dataPackets(midi)[0].timestampMs).toBe('number');
   });
 
-  describe('recipe resends', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
+  it('schedules every frame packet against its own due time, with no schedule-ahead offset set', async () => {
+    engine.loadTune(silentTune());
+    await engine.play();
 
-    afterEach(() => {
-      vi.useRealTimers();
-    });
+    clock.tickWithDueAt(1_000_000);
 
-    it('never resends the recipe in clock-only mode', async () => {
-      engine.loadTune(silentTune());
-      engine.setSpeedMode('clock-only');
-      await engine.play();
-      const resendsBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
-
-      engine.setSpeed(1.1);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
-
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(resendsBefore);
-      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.1, 6);
-    });
-
-    it('collapses a sweep of speed changes into one resend after the debounce', async () => {
-      engine.loadTune(silentTune());
-      engine.setSpeedMode('clock-and-recipe');
-      await engine.play();
-      const resendsBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
-
-      engine.setSpeed(1.05);
-      engine.setSpeed(1.1);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS - 1);
-      engine.setSpeed(1.15);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS - 1);
-
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(resendsBefore);
-
-      vi.advanceTimersByTime(1);
-      // The debounce only queues the retune; the recipe rides the tick at the end of its gate lead.
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(resendsBefore);
-
-      clock.tick(RETUNE_GATE_LEAD_FRAMES + 1);
-
-      const resends = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE);
-      expect(resends).toHaveLength(resendsBefore + 1);
-      expect(resends.at(-1)?.bytes).toEqual(
-        buildFramerateRecipePacket({
-          ntsc: false,
-          speedMultiplier: 1,
-          bufferingRequested: true,
-          frameIntervalUs: Math.round(PAL_FRAME_INTERVAL_US / 1.15),
-        })
-      );
-    });
-
-    it('drops a pending resend when playback stops before the debounce elapses', async () => {
-      engine.loadTune(silentTune());
-      engine.setSpeedMode('clock-and-recipe');
-      await engine.play();
-      engine.setSpeed(1.1);
-      const resendsBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
-
-      engine.stop();
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 2);
-
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(resendsBefore);
-    });
+    // Anchored to when the frame fell due rather than to whenever the main thread reached it, which
+    // is what keeps packet spacing independent of callback timing.
+    expect(lastDataPacket(midi).timestampMs).toBeCloseTo(1_000_000, 6);
   });
 
-  describe('the managed retune sequence', () => {
-    /** `counterTune` stores its play-call count into $D400, so slot 0 of a full re-emit names the
-     *  frame that packet carries. */
-    const COUNTER_SLOT = 0;
-    /** What `counterTune`'s init writes to all three voice control registers, and never rewrites. */
-    const LIVE_GATE = 0x11;
+  it('reaches the clock at once on a speed change, queueing no sequence of its own', async () => {
+    engine.loadTune(silentTune());
+    await engine.play();
+    clock.tick(1); // consumes the tune's initial full-dirty snapshot
 
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
+    engine.setSpeed(1.2);
+    expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
 
-    afterEach(() => {
-      vi.useRealTimers();
-    });
+    const before = dataPackets(midi).length;
+    clock.tick(3);
 
-    async function playTo(frames: number): Promise<void> {
-      engine.loadTune(counterTune());
-      await engine.play();
-      clock.tick(frames);
+    // Every packet since the change stays an ordinary, undirtied delta — nothing was queued ahead
+    // of them to silence or re-emit the chip.
+    for (const packet of dataPackets(midi).slice(before)) {
+      expect(valueCount(packet)).toBe(0);
     }
-
-    it('emits a gated lead, then a silent retime tick, then one full resync, in that order', async () => {
-      await playTo(5);
-      const before = dataPackets(midi).length;
-      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
-
-      engine.setSpeed(1.2);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
-      clock.tick(RETUNE_GATE_LEAD_FRAMES);
-
-      const lead = dataPackets(midi).slice(before);
-      expect(lead).toHaveLength(RETUNE_GATE_LEAD_FRAMES);
-      for (const packet of lead) {
-        // Every frame of the lead is a complete re-emit, which is the only shape in which slots
-        // 22/23/24 are the three voice control registers — zeroing those indices on a compacted
-        // delta would leave the gates open and corrupt three unrelated registers instead.
-        expect(valueCount(packet)).toBe(25);
-        expect(voiceGateValues(packet)).toEqual([0, 0, 0]);
-      }
-      // The tune's own registers carry their true values through the silence: the counter steps one
-      // per frame across the lead rather than freezing, which is what a gate-off-only lead would do.
-      expect(lead.map((packet) => slotValue(packet, COUNTER_SLOT))).toEqual(
-        Array.from({ length: RETUNE_GATE_LEAD_FRAMES }, (_, i) => 6 + i)
-      );
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
-
-      clock.tick(1);
-      // The recipe flushes the cartridge's queue on receipt, so a frame sent on this tick would be
-      // discarded anyway — the recipe goes out alone.
-      expect(dataPackets(midi)).toHaveLength(before + RETUNE_GATE_LEAD_FRAMES);
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore + 1);
-
-      clock.tick(1);
-      const resync = lastDataPacket(midi);
-      expect(valueCount(resync)).toBe(25);
-      // Sound returns here, and at the tune's real gate values rather than the zeros the lead sent.
-      expect(voiceGateValues(resync)).toEqual([LIVE_GATE, LIVE_GATE, LIVE_GATE]);
-
-      clock.tick(1);
-      // Back to ordinary deltas: the sequence is over, not merely quiet.
-      expect(valueCount(lastDataPacket(midi))).toBe(1);
-    });
-
-    it('keeps the tune advancing across the sequence rather than holding its place', async () => {
-      await playTo(5);
-      engine.setSpeed(1.2);
-      const framesBefore = engine.stats().framesRendered;
-
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
-      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
-      // `stats` republishes every 25 frames, so a sequence this short needs a publish forced to read
-      // the counter back. Pausing is the cheapest gesture that does so and never touches it.
-      engine.pause();
-
-      expect(engine.stats().framesRendered).toBe(framesBefore + RETUNE_GATE_LEAD_FRAMES + 2);
-    });
-
-    it('leaves the clock on the old interval until the retime step, then moves it', async () => {
-      await playTo(5);
-
-      engine.setSpeed(1.2);
-      expect(clock.intervalUs).toBe(PAL_FRAME_INTERVAL_US);
-
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
-      clock.tick(RETUNE_GATE_LEAD_FRAMES);
-      // Host and cartridge change rate in the same instant or not at all — feeding a new rate while
-      // the cartridge still paces the old one is the disagreement this sequence exists to close.
-      expect(clock.intervalUs).toBe(PAL_FRAME_INTERVAL_US);
-
-      clock.tick(1);
-      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
-    });
-
-    it('reports the interval the clock is running, not the one the fader has already asked for', async () => {
-      await playTo(5);
-
-      engine.setSpeed(1.2);
-      expect(engine.stats().effectiveIntervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US, 6);
-
-      completeRetune();
-
-      expect(engine.stats().effectiveIntervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
-    });
-
-    it('restarts the lead on a speed change mid-sequence, and still sends only one recipe', async () => {
-      await playTo(5);
-      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
-
-      engine.setSpeed(1.2);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
-      clock.tick(4); // four of the first lead's gated frames have already gone out
-
-      engine.setSpeed(1.3);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
-      const before = dataPackets(midi).length;
-      clock.tick(RETUNE_GATE_LEAD_FRAMES);
-
-      // A full fresh lead, not the twelve frames the superseded one had left: a second change starts
-      // over rather than stacking dropouts.
-      const lead = dataPackets(midi).slice(before);
-      expect(lead).toHaveLength(RETUNE_GATE_LEAD_FRAMES);
-      for (const packet of lead) {
-        expect(voiceGateValues(packet)).toEqual([0, 0, 0]);
-      }
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
-
-      clock.tick(1);
-      const recipes = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE);
-      expect(recipes).toHaveLength(recipesBefore + 1);
-      expect(recipes.at(-1)?.bytes).toEqual(
-        buildFramerateRecipePacket({
-          ntsc: false,
-          speedMultiplier: 1,
-          bufferingRequested: true,
-          frameIntervalUs: Math.round(PAL_FRAME_INTERVAL_US / 1.3),
-        })
-      );
-    });
-
-    /**
-     * A surviving lead would keep zeroing the gates and re-emitting the whole chip on every tick; a
-     * dropped one leaves the tune's own gate values standing in the packet that restores the chip,
-     * and falls straight back to ordinary deltas behind it.
-     */
-    function expectSequenceDropped(): void {
-      const before = dataPackets(midi).length;
-      clock.tick(2);
-
-      const resumed = dataPackets(midi).slice(before);
-      expect(voiceGateValues(resumed[0])).toEqual([LIVE_GATE, LIVE_GATE, LIVE_GATE]);
-      expect(valueCount(resumed[1])).toBe(1);
-    }
-
-    async function retuneInFlight(): Promise<void> {
-      await playTo(5);
-      engine.setSpeed(1.2);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
-      clock.tick(3);
-    }
-
-    it('drops a sequence in flight when playback pauses', async () => {
-      await retuneInFlight();
-
-      engine.pause();
-      await engine.play();
-
-      expectSequenceDropped();
-    });
-
-    it('drops a sequence in flight when playback stops', async () => {
-      await retuneInFlight();
-
-      engine.stop();
-      await engine.play();
-
-      expectSequenceDropped();
-    });
-
-    it('drops a sequence in flight when a new tune loads', async () => {
-      await retuneInFlight();
-
-      engine.loadTune(counterTune());
-      await engine.play();
-
-      expectSequenceDropped();
-    });
-
-    it('changes the interval at once and builds no sequence in clock-only mode', async () => {
-      engine.setSpeedMode('clock-only');
-      await playTo(5);
-      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
-
-      engine.setSpeed(1.2);
-      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
-
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
-      const before = dataPackets(midi).length;
-      clock.tick(3);
-
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
-      // Ordinary deltas throughout — no lead was ever queued, which is the whole point of the mode.
-      for (const packet of dataPackets(midi).slice(before)) {
-        expect(valueCount(packet)).toBe(1);
-      }
-    });
-
-    it('changes the interval at once and builds no sequence with the recipe switched off', async () => {
-      await playTo(5);
-      engine.setRecipeEnabled(false);
-
-      engine.setSpeed(1.2);
-      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
-
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
-      const before = dataPackets(midi).length;
-      clock.tick(3);
-
-      for (const packet of dataPackets(midi).slice(before)) {
-        expect(valueCount(packet)).toBe(1);
-      }
-    });
   });
 
-  describe('timing mode', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
 
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    /** Bit 0x40 of the recipe's settings byte (byte index 3 — see `buildFramerateRecipePacket`),
-     *  checked directly rather than via a full packet comparison since only this one flag matters
-     *  here; the byte layout itself is already covered where the packet is built. */
-    function bufferingRequested(packet: SentPacket): boolean {
-      return (packet.bytes[3] & 0x40) !== 0;
-    }
-
-    it('sends no recipe packet across play(), the recipe checkbox and repeated speed changes', async () => {
-      engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
-
-      await engine.play(); // real call site 1: play()
-
-      engine.setRecipeEnabled(false);
-      engine.setRecipeEnabled(true); // real call site 2: the recipe checkbox, while playing
-
-      engine.setSpeed(1.1);
-      engine.setSpeed(1.2);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
-      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
-
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(0);
-    });
-
-    it('reaches the clock at once on a speed change, never scheduling the debounced retune', async () => {
-      engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
-      await engine.play();
-      clock.tick(1); // consumes the tune's initial full-dirty snapshot
-
-      engine.setSpeed(1.2);
-      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
-
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
-      const before = dataPackets(midi).length;
-      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
-
-      // No gated lead was ever queued — every packet since stays an ordinary, undirtied delta
-      // rather than the all-dirty gated frames a retune's lead would have sent.
-      for (const packet of dataPackets(midi).slice(before)) {
-        expect(valueCount(packet)).toBe(0);
-      }
-    });
-
-    it('drops a resend already pending in cartridge-timed once the mode switches to host-scheduled', async () => {
-      engine.loadTune(silentTune());
-      await engine.play(); // defaults: cartridge-timed, clock-and-recipe
-      clock.tick(1); // consumes the tune's initial full-dirty snapshot
-      engine.setSpeed(1.2); // schedules the debounce timer
-
-      engine.setTimingMode('host-scheduled');
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
-      const before = dataPackets(midi).length;
-      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
-
-      for (const packet of dataPackets(midi).slice(before)) {
-        expect(valueCount(packet)).toBe(0);
-      }
-    });
-
-    it('suppresses the recipe on a retime step already queued before the mode switches away', async () => {
-      engine.loadTune(silentTune());
-      await engine.play();
-      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
-
-      engine.setSpeed(1.2);
-      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
-      clock.tick(RETUNE_GATE_LEAD_FRAMES); // drains the gated lead; the 'retime' step is next
-
-      engine.setTimingMode('host-scheduled');
-      clock.tick(1); // runs the already-queued 'retime' step
-
-      // Nothing at this call site checks the mode — sendRecipe() itself does, which is what this
-      // proves: a step queued before the switch still reaches it and is still turned away.
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
-    });
-
-    it('re-sends the recipe on switching back into cartridge-timed while playing', async () => {
-      engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
-      await engine.play();
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(0);
-
-      engine.setTimingMode('cartridge-timed');
-
-      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(1);
-    });
-
-    it('schedules frame packets against the due time, even with no schedule-ahead offset', async () => {
-      engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
-      await engine.play();
-
-      clock.tick(1);
-
-      // No schedule-ahead is set; on the buffered arm this would send with no timestamp at all (see
-      // the cartridge-timed regression test below) — host-scheduled always anchors to the frame's
-      // own due time instead.
-      expect(typeof dataPackets(midi)[0].timestampMs).toBe('number');
-    });
-
-    it('still sends the buffered recipe with buffering requested, and schedules frames against performance.now(), in cartridge-timed', async () => {
-      engine.loadTune(silentTune());
-
-      await engine.play(); // cartridge-timed is the default
-
-      clock.tick(1);
-
-      const recipe = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE);
-      expect(recipe).toHaveLength(1);
-      expect(bufferingRequested(recipe[0])).toBe(true);
-      expect(dataPackets(midi)[0].timestampMs).toBeUndefined();
-    });
-  });
-
-  describe('reschedule on tempo change (host-scheduled cancellation)', () => {
-    // The cartridge-timed regression test below still queues a real retune debounce; fake timers
-    // keep that `setTimeout` from firing for real once the test (and its engine) has gone away.
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
+  describe('reschedule on tempo change', () => {
     it('cancels and re-times every still-committed send once, at the new interval, with a port that can cancel', async () => {
       midi.supportsCancel.set(true);
       midi.cancelPendingReturns = true;
       engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
       engine.setScheduleAhead(200); // supportsCancel lifts setScheduleAhead's 40 ms ceiling
 
       await engine.play();
@@ -1283,7 +811,7 @@ describe('DjPlayerEngine', () => {
       expect(midi.cancelPendingCallCount).toBe(1);
       const resent = dataPackets(midi).slice(-2);
       // Re-timed, not regenerated: the same bytes the tick already computed, only the delivery times
-      // move — resending under a new tempo would be the recipe-and-retune shape this mode has none of.
+      // move.
       expect(resent.map((packet) => packet.bytes)).toEqual(committed);
       const newIntervalMs = PAL_FRAME_INTERVAL_US / 1.2 / 1000;
       expect((resent[1].timestampMs ?? 0) - (resent[0].timestampMs ?? 0)).toBeCloseTo(newIntervalMs, 6);
@@ -1291,7 +819,6 @@ describe('DjPlayerEngine', () => {
 
     it('leaves committed sends untouched and never calls cancelPending with a port that cannot cancel', async () => {
       engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
       engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
 
       await engine.play();
@@ -1310,7 +837,6 @@ describe('DjPlayerEngine', () => {
       midi.supportsCancel.set(true);
       midi.cancelPendingReturns = false; // detected as capable, but the call itself reports failure
       engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
       engine.setScheduleAhead(200);
 
       await engine.play();
@@ -1323,17 +849,47 @@ describe('DjPlayerEngine', () => {
       expect(midi.sent.length).toBe(before);
     });
 
-    it('never calls cancelPending on a speed change in cartridge-timed', async () => {
+    it('measures the cancel and anchors the resend against one and the same clock reading', async () => {
       midi.supportsCancel.set(true);
       midi.cancelPendingReturns = true;
-      engine.loadTune(silentTune()); // cartridge-timed is the default
-
+      engine.loadTune(silentTune());
+      engine.setScheduleAhead(200);
       await engine.play();
-      clock.tick(1);
+      clock.tickWithDueAt(1_000_000);
+      const committedAtMs = lastDataPacket(midi).timestampMs ?? 0;
+
+      // A clock that moves a full second between readings, so two readings inside the reschedule
+      // would put the measurement and the first re-sent packet a second apart.
+      let nowMs = 900_000;
+      const movingClock = vi.spyOn(performance, 'now').mockImplementation(() => (nowMs += 1000));
+      engine.setSpeed(1.2);
+      movingClock.mockRestore();
+
+      // Both derivations of "when the cancel happened" have to land on the same instant: one from
+      // the reported reach of the furthest committed send, one from where the resend was placed.
+      const anchorBehindMeasurement = committedAtMs - engine.stats().lastCancelLatencyMs;
+      const anchorBehindResend = (lastDataPacket(midi).timestampMs ?? 0) - 200;
+      expect(anchorBehindResend).toBe(anchorBehindMeasurement);
+    });
+
+    it('re-times only the sends still in the future, never one whose delivery time has already passed', async () => {
+      midi.supportsCancel.set(true);
+      midi.cancelPendingReturns = true;
+      engine.loadTune(silentTune());
+      engine.setScheduleAhead(200);
+      await engine.play();
+
+      // A main-thread stall between the frame falling due and the packet reaching the transport
+      // leaves it past its delivery time even with the window applied.
+      clock.tickWithDueAt(performance.now() - 1000);
+      clock.tickWithDueAt(1_000_000);
+      const before = midi.sent.length;
 
       engine.setSpeed(1.2);
 
-      expect(midi.cancelPendingCallCount).toBe(0);
+      // One resend, not two: the stalled frame has already been delivered, and re-sending it would
+      // play it a second time rather than move it.
+      expect(midi.sent.length).toBe(before + 1);
     });
   });
 
@@ -1365,7 +921,6 @@ describe('DjPlayerEngine', () => {
     it('re-clamps the window actually sent on a mid-session loss of cancel support, without a fresh setScheduleAhead() call', async () => {
       midi.supportsCancel.set(true);
       engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
       engine.setScheduleAhead(200); // a deep window, allowed while the port can cancel
 
       await engine.play();
@@ -1419,9 +974,8 @@ describe('DjPlayerEngine', () => {
       expect(stats.lateFrames).toBe(1);
     });
 
-    it('counts a frame scheduled earlier than its predecessor as reordered, in host-scheduled mode', async () => {
+    it('counts a frame scheduled earlier than its predecessor as reordered', async () => {
       engine.loadTune(silentTune());
-      engine.setTimingMode('host-scheduled');
       await engine.play();
 
       clock.tickWithDueAt(1_000_000); // nothing to compare against yet
@@ -1465,8 +1019,7 @@ describe('DjPlayerEngine', () => {
         midi.supportsCancel.set(true);
         midi.cancelPendingReturns = true;
         engine.loadTune(silentTune());
-        engine.setTimingMode('host-scheduled');
-        engine.setScheduleAhead(200);
+          engine.setScheduleAhead(200);
 
         await engine.play();
         clock.tick(2);
@@ -1483,8 +1036,7 @@ describe('DjPlayerEngine', () => {
 
       it('leaves the latency at -1 when the selected port cannot cancel', async () => {
         engine.loadTune(silentTune());
-        engine.setTimingMode('host-scheduled');
-        engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+          engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
 
         await engine.play();
         clock.tick(1);
@@ -1497,8 +1049,7 @@ describe('DjPlayerEngine', () => {
         midi.supportsCancel.set(true);
         midi.cancelPendingReturns = true;
         engine.loadTune(silentTune());
-        engine.setTimingMode('host-scheduled');
-        engine.setScheduleAhead(200);
+          engine.setScheduleAhead(200);
 
         await engine.play();
         clock.tick(2);
