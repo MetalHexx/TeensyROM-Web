@@ -13,6 +13,7 @@ import {
   NOMINAL_INTERVAL_OPTIONS_US,
   SPEED_INPUT_SPAN,
   SpeedMode,
+  TimingMode,
 } from '../engine/dj-player-engine';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
@@ -74,6 +75,7 @@ export class DjPocViewComponent {
   protected readonly subtuneCount = this.engine.subtuneCount;
   protected readonly speedMultiplier = this.engine.speedMultiplier;
   protected readonly speedMode = this.engine.speedMode;
+  protected readonly timingMode = this.engine.timingMode;
   protected readonly recipeEnabled = this.engine.recipeEnabled;
   protected readonly nominalIntervalUs = this.engine.nominalIntervalUs;
   protected readonly scheduleAheadMs = this.engine.scheduleAheadMs;
@@ -290,6 +292,10 @@ export class DjPocViewComponent {
 
   onSpeedModeChange(event: Event): void {
     this.engine.setSpeedMode((event.target as HTMLSelectElement).value as SpeedMode);
+  }
+
+  onTimingModeChange(event: Event): void {
+    this.engine.setTimingMode((event.target as HTMLSelectElement).value as TimingMode);
   }
 
   onRecipeToggle(event: Event): void {

@@ -1110,6 +1110,130 @@ describe('DjPlayerEngine', () => {
     });
   });
 
+  describe('timing mode', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Bit 0x40 of the recipe's settings byte (byte index 3 — see `buildFramerateRecipePacket`),
+     *  checked directly rather than via a full packet comparison since only this one flag matters
+     *  here; the byte layout itself is already covered where the packet is built. */
+    function bufferingRequested(packet: SentPacket): boolean {
+      return (packet.bytes[3] & 0x40) !== 0;
+    }
+
+    it('sends no recipe packet across play(), the recipe checkbox and repeated speed changes', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+
+      await engine.play(); // real call site 1: play()
+
+      engine.setRecipeEnabled(false);
+      engine.setRecipeEnabled(true); // real call site 2: the recipe checkbox, while playing
+
+      engine.setSpeed(1.1);
+      engine.setSpeed(1.2);
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
+      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
+
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(0);
+    });
+
+    it('reaches the clock at once on a speed change, never scheduling the debounced retune', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      await engine.play();
+      clock.tick(1); // consumes the tune's initial full-dirty snapshot
+
+      engine.setSpeed(1.2);
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
+      const before = dataPackets(midi).length;
+      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
+
+      // No gated lead was ever queued — every packet since stays an ordinary, undirtied delta
+      // rather than the all-dirty gated frames a retune's lead would have sent.
+      for (const packet of dataPackets(midi).slice(before)) {
+        expect(valueCount(packet)).toBe(0);
+      }
+    });
+
+    it('drops a resend already pending in cartridge-timed once the mode switches to host-scheduled', async () => {
+      engine.loadTune(silentTune());
+      await engine.play(); // defaults: cartridge-timed, clock-and-recipe
+      clock.tick(1); // consumes the tune's initial full-dirty snapshot
+      engine.setSpeed(1.2); // schedules the debounce timer
+
+      engine.setTimingMode('host-scheduled');
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
+      const before = dataPackets(midi).length;
+      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
+
+      for (const packet of dataPackets(midi).slice(before)) {
+        expect(valueCount(packet)).toBe(0);
+      }
+    });
+
+    it('suppresses the recipe on a retime step already queued before the mode switches away', async () => {
+      engine.loadTune(silentTune());
+      await engine.play();
+      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
+
+      engine.setSpeed(1.2);
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+      clock.tick(RETUNE_GATE_LEAD_FRAMES); // drains the gated lead; the 'retime' step is next
+
+      engine.setTimingMode('host-scheduled');
+      clock.tick(1); // runs the already-queued 'retime' step
+
+      // Nothing at this call site checks the mode — sendRecipe() itself does, which is what this
+      // proves: a step queued before the switch still reaches it and is still turned away.
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
+    });
+
+    it('re-sends the recipe on switching back into cartridge-timed while playing', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      await engine.play();
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(0);
+
+      engine.setTimingMode('cartridge-timed');
+
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(1);
+    });
+
+    it('schedules frame packets against the due time, even with no schedule-ahead offset', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      await engine.play();
+
+      clock.tick(1);
+
+      // No schedule-ahead is set; on the buffered arm this would send with no timestamp at all (see
+      // the cartridge-timed regression test below) — host-scheduled always anchors to the frame's
+      // own due time instead.
+      expect(typeof dataPackets(midi)[0].timestampMs).toBe('number');
+    });
+
+    it('still sends the buffered recipe with buffering requested, and schedules frames against performance.now(), in cartridge-timed', async () => {
+      engine.loadTune(silentTune());
+
+      await engine.play(); // cartridge-timed is the default
+
+      clock.tick(1);
+
+      const recipe = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE);
+      expect(recipe).toHaveLength(1);
+      expect(bufferingRequested(recipe[0])).toBe(true);
+      expect(dataPackets(midi)[0].timestampMs).toBeUndefined();
+    });
+  });
+
   describe('the jump primitive: cue, loop and scrub', () => {
     it('produces byte-identical replayed output when jumping to the same frame twice', async () => {
       engine.loadTune(counterTune());

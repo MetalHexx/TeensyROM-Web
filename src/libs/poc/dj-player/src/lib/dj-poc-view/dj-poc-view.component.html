@@ -301,7 +301,12 @@
               </div>
             </div>
 
-            <select class="speed-mode" (change)="onSpeedModeChange($event)">
+            <select
+              class="speed-mode"
+              [disabled]="timingMode() === 'host-scheduled'"
+              title="Inert while Timing mode is host-scheduled — the fader drives the clock directly there."
+              (change)="onSpeedModeChange($event)"
+            >
               <option value="clock-only" [selected]="speedMode() === 'clock-only'">
                 clock-only
               </option>
@@ -361,7 +366,25 @@
 
         <div class="timing-commands">
           <label class="control">
-            <input type="checkbox" [checked]="recipeEnabled()" (change)="onRecipeToggle($event)" />
+            Timing mode
+            <select class="timing-mode" (change)="onTimingModeChange($event)">
+              <option value="cartridge-timed" [selected]="timingMode() === 'cartridge-timed'">
+                cartridge-timed
+              </option>
+              <option value="host-scheduled" [selected]="timingMode() === 'host-scheduled'">
+                host-scheduled
+              </option>
+            </select>
+          </label>
+
+          <label class="control">
+            <input
+              type="checkbox"
+              [checked]="recipeEnabled()"
+              [disabled]="timingMode() === 'host-scheduled'"
+              title="Inert while Timing mode is host-scheduled — the recipe never goes out there."
+              (change)="onRecipeToggle($event)"
+            />
             Send recipe packet
           </label>
 

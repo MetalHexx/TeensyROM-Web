@@ -33,6 +33,12 @@ import type { ReplayRequest, ReplayResponse } from '../replay/replay-runner';
 
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
 export type SpeedMode = 'clock-only' | 'clock-and-recipe';
+/**
+ * `cartridge-timed` sends the framerate recipe and lets the cartridge's own timer pace the stream —
+ * today's behaviour. `host-scheduled` never sends it: the cartridge's timer stays off and runs
+ * pass-through, while the host paces delivery itself against each frame's own due time.
+ */
+export type TimingMode = 'cartridge-timed' | 'host-scheduled';
 
 /** The nudge window in real time. Frames are derived from the tune's rate so the felt range is
  *  the same on a 1x tune and a 2x-multispeed one. */
@@ -272,6 +278,7 @@ export class DjPlayerEngine implements OnDestroy {
    * multiplier's value alone once a jump has clamped. */
   private excursionDirection: 'up' | 'down' | null = null;
   readonly speedMode = signal<SpeedMode>('clock-and-recipe');
+  readonly timingMode = signal<TimingMode>('cartridge-timed');
   readonly recipeEnabled = signal<boolean>(true);
   /**
    * Whether a recipe packet has gone out since this engine was constructed — which means the
@@ -670,6 +677,29 @@ export class DjPlayerEngine implements OnDestroy {
    */
   setSpeedMode(mode: SpeedMode): void {
     this.speedMode.set(mode);
+  }
+
+  /**
+   * Switching mid-session never needs a reload. Switching *into* `cartridge-timed` re-sends the
+   * recipe so the cartridge is told the rate it may have missed while pass-through was live;
+   * switching *out* of it cannot un-send one — the cartridge's timer stays on until the operator's
+   * own toggle at the C64 or a cartridge reset turns it off, which this browser has no way to do for
+   * them.
+   *
+   * Clears any pending resend timer regardless of direction: a debounce left running from
+   * `cartridge-timed` would otherwise fire after the switch and queue a gated lead — silence this
+   * mode has no reason to pay for — even though the recipe itself is separately suppressed inside
+   * `sendRecipe()`.
+   */
+  setTimingMode(mode: TimingMode): void {
+    if (mode === this.timingMode()) {
+      return;
+    }
+    this.clearRecipeResend();
+    this.timingMode.set(mode);
+    if (mode === 'cartridge-timed' && this.recipeEnabled() && this.state() === 'playing') {
+      this.sendRecipe();
+    }
   }
 
   /** One of `NOMINAL_INTERVAL_OPTIONS_US` for a PAL tune; NTSC tunes load their own default. */
@@ -1491,6 +1521,8 @@ export class DjPlayerEngine implements OnDestroy {
   /**
    * Where the "one instant" rule lives: in `clock-and-recipe` the clock is *not* moved here, so the
    * host never feeds a rate the cartridge is not pacing. `beginRetune`'s `retime` step moves both.
+   * `host-scheduled` sends no recipe at all, so it has no cartridge-side rate to agree with and
+   * takes the same direct route as `clock-only` — otherwise the fader would move nothing.
    */
   private applyIntervalChange(): void {
     if (this.state() !== 'playing') {
@@ -1498,7 +1530,11 @@ export class DjPlayerEngine implements OnDestroy {
       this.publishStats();
       return;
     }
-    if (this.speedMode() === 'clock-only' || !this.recipeEnabled()) {
+    if (
+      this.timingMode() === 'host-scheduled' ||
+      this.speedMode() === 'clock-only' ||
+      !this.recipeEnabled()
+    ) {
       // No recipe goes out in these modes, so there is no cartridge-side rate to disagree with and
       // the clock can follow the fader live. That is the whole point of `clock-only`.
       this.setClockIntervalUs(this.effectiveIntervalUs());
@@ -1533,7 +1569,15 @@ export class DjPlayerEngine implements OnDestroy {
     }
   }
 
+  /**
+   * The only place that suppresses `host-scheduled`: every caller — `play()`, the recipe checkbox,
+   * and the retune's `retime` step — funnels through here, so none of them can leak a packet by
+   * being added later without also checking the mode.
+   */
   private sendRecipe(): void {
+    if (this.timingMode() === 'host-scheduled') {
+      return;
+    }
     const file = this.file;
     const machine = this.machine;
     if (file === null || machine === null) {
@@ -1565,20 +1609,21 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
-   * Sends one frame packet on the buffered delivery arm: `performance.now() + scheduleAheadMs()`,
-   * where the offset means "this far from now" and 0 means immediately.
+   * Sends one frame packet, on whichever arm `timingMode` selects.
    *
-   * `dueAtMs` — when the clock says the frame fell due, always at or before now — is carried this
-   * far because the host-scheduled arm releases against the frame grid (`dueAtMs` plus the same
-   * offset) rather than against whenever the main thread reached the packet, which is what makes
-   * packet spacing independent of callback timing. That arm lands with the control that selects
-   * between the two, and cannot be applied here in the meantime: the buffered arm is the comparison
-   * these are measured against, so re-anchoring it would quietly redefine what its own
-   * schedule-ahead does.
+   * `cartridge-timed` schedules against `performance.now() + scheduleAheadMs()` — unchanged from
+   * before this mode existed — where the offset means "this far from now" and 0 means immediately.
+   *
+   * `host-scheduled` schedules against `dueAtMs + scheduleAheadMs()` instead: `dueAtMs` is when the
+   * clock says this frame fell due, always at or before now, so anchoring to it rather than to
+   * whenever the main thread reached the packet is what makes packet spacing independent of
+   * callback timing.
    */
   private sendFramePacket(packet: Uint8Array, dueAtMs: number): void {
     const aheadMs = this.scheduleAheadMs();
-    if (aheadMs > 0) {
+    if (this.timingMode() === 'host-scheduled') {
+      this.midi.send(packet, dueAtMs + aheadMs);
+    } else if (aheadMs > 0) {
       this.midi.send(packet, performance.now() + aheadMs);
     } else {
       this.midi.send(packet);

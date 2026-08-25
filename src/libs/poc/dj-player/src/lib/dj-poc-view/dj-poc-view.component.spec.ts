@@ -10,6 +10,7 @@ import {
   EngineStats,
   LoopSlot,
   SpeedMode,
+  TimingMode,
 } from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
@@ -48,6 +49,7 @@ interface MockDjPlayerEngine {
   subtuneCount: WritableSignal<number>;
   speedMultiplier: WritableSignal<number>;
   speedMode: WritableSignal<SpeedMode>;
+  timingMode: WritableSignal<TimingMode>;
   recipeEnabled: WritableSignal<boolean>;
   recipeSent: WritableSignal<boolean>;
   nominalIntervalUs: WritableSignal<number>;
@@ -72,6 +74,7 @@ interface MockDjPlayerEngine {
   jumpSpeedDown: ReturnType<typeof vi.fn>;
   homeSpeed: ReturnType<typeof vi.fn>;
   setSpeedMode: ReturnType<typeof vi.fn>;
+  setTimingMode: ReturnType<typeof vi.fn>;
   setRecipeEnabled: ReturnType<typeof vi.fn>;
   setNominalIntervalUs: ReturnType<typeof vi.fn>;
   setScheduleAhead: ReturnType<typeof vi.fn>;
@@ -120,6 +123,7 @@ function makeEngine(): MockDjPlayerEngine {
     subtuneCount: signal(1),
     speedMultiplier: signal(1),
     speedMode: signal<SpeedMode>('clock-only'),
+    timingMode: signal<TimingMode>('cartridge-timed'),
     recipeEnabled: signal(true),
     recipeSent: signal(false),
     nominalIntervalUs: signal(19950),
@@ -144,6 +148,7 @@ function makeEngine(): MockDjPlayerEngine {
     jumpSpeedDown: vi.fn(),
     homeSpeed: vi.fn(),
     setSpeedMode: vi.fn(),
+    setTimingMode: vi.fn(),
     setRecipeEnabled: vi.fn(),
     setNominalIntervalUs: vi.fn(),
     setScheduleAhead: vi.fn(),
@@ -446,6 +451,54 @@ describe('DjPocViewComponent', () => {
       expect(selects.some((select) => select.value === 'medium' || select.value === 'tiny')).toBe(
         false
       );
+    });
+  });
+
+  describe('timing mode', () => {
+    function timingModeSelect(): HTMLSelectElement {
+      return fixture.nativeElement.querySelector('[aria-label="Timing"] select.timing-mode');
+    }
+
+    function recipeCheckbox(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('[aria-label="Timing"] input[type="checkbox"]');
+    }
+
+    function speedModeSelect(): HTMLSelectElement {
+      return fixture.nativeElement.querySelector('[aria-label="Speed"] select.speed-mode');
+    }
+
+    it('calls engine.setTimingMode with the chosen mode', () => {
+      const select = timingModeSelect();
+      select.value = 'host-scheduled';
+      select.dispatchEvent(new Event('change'));
+
+      expect(engine.setTimingMode).toHaveBeenCalledWith('host-scheduled');
+    });
+
+    it('shows which mode is live', () => {
+      engine.timingMode.set('host-scheduled');
+      fixture.detectChanges();
+      expect(timingModeSelect().value).toBe('host-scheduled');
+
+      engine.timingMode.set('cartridge-timed');
+      fixture.detectChanges();
+      expect(timingModeSelect().value).toBe('cartridge-timed');
+    });
+
+    it('disables the recipe checkbox and the speed-mode select once host-scheduled is live', () => {
+      engine.timingMode.set('host-scheduled');
+      fixture.detectChanges();
+
+      expect(recipeCheckbox().disabled).toBe(true);
+      expect(speedModeSelect().disabled).toBe(true);
+    });
+
+    it('leaves the recipe checkbox and the speed-mode select enabled in cartridge-timed', () => {
+      engine.timingMode.set('cartridge-timed');
+      fixture.detectChanges();
+
+      expect(recipeCheckbox().disabled).toBe(false);
+      expect(speedModeSelect().disabled).toBe(false);
     });
   });
 
