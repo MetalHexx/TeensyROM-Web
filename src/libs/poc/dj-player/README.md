@@ -12,7 +12,7 @@ The spike makes a C64 play a SID tune whose player code runs in this browser tab
 2. Navigate to `http://localhost:4200/dev/dj-poc` (the route is unlinked from navigation — type the URL)
 3. Grant Web MIDI SysEx permission when prompted
 4. Connect a TeensyROM cartridge in ASID player mode via USB
-5. Cartridge firmware must be 0.6.7 or later (recipe packet support). Current release is 0.7.2.
+5. Any recent cartridge firmware version is compatible. Current release is 0.7.2.
 6. Use Chrome or Edge. Web MIDI with SysEx is unavailable in Safari and prompt-gated in Firefox.
 
 ## The Yank — Deleting the Iteration
@@ -61,6 +61,8 @@ Only the first two are committed (with artist permission). The other seven load 
 
 ## The Listening Protocol
 
+As of version `-0.6`, the host sends no recipe packet and the cartridge runs in pass-through mode. The configuration matrix and comparison results below are historical, preserved as the record of how the `-0` through `-0.5` sessions were run.
+
 ### Procedure
 
 Run several minutes per configuration, not seconds. The firmware's published starting points come from `docs/ASID_Player.md` in the TeensyROM hardware repository. Fixed 50 Hz with tiny-to-small buffers is what low-jitter sources use; Web MIDI has historically needed small-to-large on auto, and medium-to-XXL once multispeed is involved.
@@ -107,7 +109,7 @@ Record observations as they happen during the session. Findings cannot be recons
 
 *This is the binding risk in the whole initiative. Everything downstream assumes yes.*
 
-**Observations:**
+**Observations:** Yes.
 
 ---
 
@@ -115,7 +117,7 @@ Record observations as they happen during the session. Findings cannot be recons
 
 *Whether the transport choice survives contact with hardware.*
 
-**Observations:**
+**Observations:** Moot: the recipe is no longer in the path, because host-side timestamps closed the gap without it.
 
 ---
 
@@ -187,7 +189,7 @@ Record observations as they happen during the session. Findings cannot be recons
 
 *Potentially removes a whole class of jitter, and is not currently in the architecture.*
 
-**Observations:**
+**Observations:** Yes, and well enough that no schedule-ahead margin was required.
 
 ---
 
