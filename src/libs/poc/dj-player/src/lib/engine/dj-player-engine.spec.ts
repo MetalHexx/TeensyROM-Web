@@ -26,6 +26,7 @@ import {
   NUDGE_RANGE_MS,
   RECIPE_RESEND_DEBOUNCE_MS,
   RETUNE_GATE_LEAD_FRAMES,
+  UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS,
 } from './dj-player-engine';
 
 /** Bytes before the values in a SID data packet, plus the trailing `F7`. */
@@ -52,9 +53,12 @@ class FakeFrameClock implements FrameClock {
     lateCallbacks: 0,
   };
 
-  private onFrame: (() => void) | null = null;
+  private onFrame: ((dueAtMs: number, catchUpClamped: boolean) => void) | null = null;
 
-  start(intervalUs: number, onFrame: () => void): Promise<void> {
+  start(
+    intervalUs: number,
+    onFrame: (dueAtMs: number, catchUpClamped: boolean) => void
+  ): Promise<void> {
     this.startCount++;
     if (this.startError !== null) {
       return Promise.reject(this.startError);
@@ -75,7 +79,18 @@ class FakeFrameClock implements FrameClock {
 
   tick(count = 1): void {
     for (let i = 0; i < count && this.running; i++) {
-      this.onFrame?.();
+      // No measured time runs behind a hand-driven tick, so each frame is due as it is released —
+      // and none of them comes out of a clamped catch-up.
+      this.onFrame?.(performance.now(), false);
+    }
+  }
+
+  /** Releases one frame with a caller-chosen due time and clamp flag — the only way a test gets a
+   *  known lag, an out-of-order delivery time, or a catch-up-clamped frame, all of which `tick()`
+   *  deliberately never produces. */
+  tickWithDueAt(dueAtMs: number, catchUpClamped = false): void {
+    if (this.running) {
+      this.onFrame?.(dueAtMs, catchUpClamped);
     }
   }
 }
@@ -161,10 +176,22 @@ interface SentPacket {
  */
 class FakeMidiOutputService {
   readonly selectedPortId = signal<string | null>('port-1');
+  /** The transport double for `MidiOutputService.supportsCancel` — see the file header comment on
+   *  why this and `MIDIOutputLike.clear` are two separate fakes, not one. */
+  readonly supportsCancel = signal<boolean>(false);
   readonly sent: SentPacket[] = [];
+  cancelPendingCallCount = 0;
+  /** What `cancelPending()` reports back — mirrors the real service's "true only if it actually
+   *  cancelled" contract, so a test simulating a capable port sets this alongside `supportsCancel`. */
+  cancelPendingReturns = false;
 
   send(bytes: Uint8Array, timestampMs?: number): void {
     this.sent.push({ bytes: Uint8Array.from(bytes), timestampMs });
+  }
+
+  cancelPending(): boolean {
+    this.cancelPendingCallCount++;
+    return this.cancelPendingReturns;
   }
 }
 
@@ -1102,6 +1129,388 @@ describe('DjPlayerEngine', () => {
       for (const packet of dataPackets(midi).slice(before)) {
         expect(valueCount(packet)).toBe(1);
       }
+    });
+  });
+
+  describe('timing mode', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Bit 0x40 of the recipe's settings byte (byte index 3 — see `buildFramerateRecipePacket`),
+     *  checked directly rather than via a full packet comparison since only this one flag matters
+     *  here; the byte layout itself is already covered where the packet is built. */
+    function bufferingRequested(packet: SentPacket): boolean {
+      return (packet.bytes[3] & 0x40) !== 0;
+    }
+
+    it('sends no recipe packet across play(), the recipe checkbox and repeated speed changes', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+
+      await engine.play(); // real call site 1: play()
+
+      engine.setRecipeEnabled(false);
+      engine.setRecipeEnabled(true); // real call site 2: the recipe checkbox, while playing
+
+      engine.setSpeed(1.1);
+      engine.setSpeed(1.2);
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
+      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
+
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(0);
+    });
+
+    it('reaches the clock at once on a speed change, never scheduling the debounced retune', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      await engine.play();
+      clock.tick(1); // consumes the tune's initial full-dirty snapshot
+
+      engine.setSpeed(1.2);
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
+      const before = dataPackets(midi).length;
+      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
+
+      // No gated lead was ever queued — every packet since stays an ordinary, undirtied delta
+      // rather than the all-dirty gated frames a retune's lead would have sent.
+      for (const packet of dataPackets(midi).slice(before)) {
+        expect(valueCount(packet)).toBe(0);
+      }
+    });
+
+    it('drops a resend already pending in cartridge-timed once the mode switches to host-scheduled', async () => {
+      engine.loadTune(silentTune());
+      await engine.play(); // defaults: cartridge-timed, clock-and-recipe
+      clock.tick(1); // consumes the tune's initial full-dirty snapshot
+      engine.setSpeed(1.2); // schedules the debounce timer
+
+      engine.setTimingMode('host-scheduled');
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS * 4);
+      const before = dataPackets(midi).length;
+      clock.tick(RETUNE_GATE_LEAD_FRAMES + 2);
+
+      for (const packet of dataPackets(midi).slice(before)) {
+        expect(valueCount(packet)).toBe(0);
+      }
+    });
+
+    it('suppresses the recipe on a retime step already queued before the mode switches away', async () => {
+      engine.loadTune(silentTune());
+      await engine.play();
+      const recipesBefore = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE).length;
+
+      engine.setSpeed(1.2);
+      vi.advanceTimersByTime(RECIPE_RESEND_DEBOUNCE_MS);
+      clock.tick(RETUNE_GATE_LEAD_FRAMES); // drains the gated lead; the 'retime' step is next
+
+      engine.setTimingMode('host-scheduled');
+      clock.tick(1); // runs the already-queued 'retime' step
+
+      // Nothing at this call site checks the mode — sendRecipe() itself does, which is what this
+      // proves: a step queued before the switch still reaches it and is still turned away.
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(recipesBefore);
+    });
+
+    it('re-sends the recipe on switching back into cartridge-timed while playing', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      await engine.play();
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(0);
+
+      engine.setTimingMode('cartridge-timed');
+
+      expect(packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE)).toHaveLength(1);
+    });
+
+    it('schedules frame packets against the due time, even with no schedule-ahead offset', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      await engine.play();
+
+      clock.tick(1);
+
+      // No schedule-ahead is set; on the buffered arm this would send with no timestamp at all (see
+      // the cartridge-timed regression test below) — host-scheduled always anchors to the frame's
+      // own due time instead.
+      expect(typeof dataPackets(midi)[0].timestampMs).toBe('number');
+    });
+
+    it('still sends the buffered recipe with buffering requested, and schedules frames against performance.now(), in cartridge-timed', async () => {
+      engine.loadTune(silentTune());
+
+      await engine.play(); // cartridge-timed is the default
+
+      clock.tick(1);
+
+      const recipe = packetsOfType(midi, ASID_MSG_FRAMERATE_RECIPE);
+      expect(recipe).toHaveLength(1);
+      expect(bufferingRequested(recipe[0])).toBe(true);
+      expect(dataPackets(midi)[0].timestampMs).toBeUndefined();
+    });
+  });
+
+  describe('reschedule on tempo change (host-scheduled cancellation)', () => {
+    // The cartridge-timed regression test below still queues a real retune debounce; fake timers
+    // keep that `setTimeout` from firing for real once the test (and its engine) has gone away.
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('cancels and re-times every still-committed send once, at the new interval, with a port that can cancel', async () => {
+      midi.supportsCancel.set(true);
+      midi.cancelPendingReturns = true;
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      engine.setScheduleAhead(200); // supportsCancel lifts setScheduleAhead's 40 ms ceiling
+
+      await engine.play();
+      clock.tick(2);
+      const committed = dataPackets(midi).slice(-2).map((packet) => packet.bytes);
+
+      engine.setSpeed(1.2);
+
+      expect(midi.cancelPendingCallCount).toBe(1);
+      const resent = dataPackets(midi).slice(-2);
+      // Re-timed, not regenerated: the same bytes the tick already computed, only the delivery times
+      // move — resending under a new tempo would be the recipe-and-retune shape this mode has none of.
+      expect(resent.map((packet) => packet.bytes)).toEqual(committed);
+      const newIntervalMs = PAL_FRAME_INTERVAL_US / 1.2 / 1000;
+      expect((resent[1].timestampMs ?? 0) - (resent[0].timestampMs ?? 0)).toBeCloseTo(newIntervalMs, 6);
+    });
+
+    it('leaves committed sends untouched and never calls cancelPending with a port that cannot cancel', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+
+      await engine.play();
+      clock.tick(1);
+      const before = midi.sent.length;
+
+      expect(() => engine.setSpeed(1.2)).not.toThrow();
+
+      expect(midi.cancelPendingCallCount).toBe(0);
+      expect(midi.sent.length).toBe(before);
+      // The change still applies going forward — only the already-committed frame is left alone.
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+    });
+
+    it('does not resend when cancelPending() reports it did not actually cancel anything', async () => {
+      midi.supportsCancel.set(true);
+      midi.cancelPendingReturns = false; // detected as capable, but the call itself reports failure
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      engine.setScheduleAhead(200);
+
+      await engine.play();
+      clock.tick(1);
+      const before = midi.sent.length;
+
+      expect(() => engine.setSpeed(1.2)).not.toThrow();
+
+      expect(midi.cancelPendingCallCount).toBe(1);
+      expect(midi.sent.length).toBe(before);
+    });
+
+    it('never calls cancelPending on a speed change in cartridge-timed', async () => {
+      midi.supportsCancel.set(true);
+      midi.cancelPendingReturns = true;
+      engine.loadTune(silentTune()); // cartridge-timed is the default
+
+      await engine.play();
+      clock.tick(1);
+
+      engine.setSpeed(1.2);
+
+      expect(midi.cancelPendingCallCount).toBe(0);
+    });
+  });
+
+  describe('setScheduleAhead ceiling', () => {
+    it('clamps to the uncancellable ceiling when the selected port cannot cancel pending sends', () => {
+      midi.supportsCancel.set(false);
+
+      engine.setScheduleAhead(500);
+
+      expect(engine.scheduleAheadMs()).toBe(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+    });
+
+    it('does not clamp when the selected port can cancel pending sends', () => {
+      midi.supportsCancel.set(true);
+
+      engine.setScheduleAhead(500);
+
+      expect(engine.scheduleAheadMs()).toBe(500);
+    });
+
+    it('leaves a value already within the ceiling untouched regardless of cancel support', () => {
+      midi.supportsCancel.set(false);
+
+      engine.setScheduleAhead(10);
+
+      expect(engine.scheduleAheadMs()).toBe(10);
+    });
+
+    it('re-clamps the window actually sent on a mid-session loss of cancel support, without a fresh setScheduleAhead() call', async () => {
+      midi.supportsCancel.set(true);
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      engine.setScheduleAhead(200); // a deep window, allowed while the port can cancel
+
+      await engine.play();
+      clock.tickWithDueAt(1_000_000);
+      expect(lastDataPacket(midi).timestampMs).toBeCloseTo(1_000_000 + 200, 6);
+
+      // Simulates a port swap or a same-device reconnect: the capability signal changes on its own,
+      // with nobody re-touching the schedule-ahead control.
+      midi.supportsCancel.set(false);
+      // The stored value is untouched — this is exactly what a stale, unbounded window would look
+      // like if the ceiling were only enforced back when setScheduleAhead() last ran.
+      expect(engine.scheduleAheadMs()).toBe(200);
+
+      clock.tickWithDueAt(1_001_000);
+      expect(lastDataPacket(midi).timestampMs).toBeCloseTo(
+        1_001_000 + UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS,
+        6
+      );
+    });
+  });
+
+  describe('delivery-against-due-time stats', () => {
+    it('starts with a complete, zeroed empty state before any tune loads', () => {
+      const stats = engine.stats();
+
+      expect(stats.scheduledFrames).toBe(0);
+      expect(stats.lateFrames).toBe(0);
+      expect(stats.meanLagMs).toBe(0);
+      expect(stats.worstLagMs).toBe(0);
+      expect(stats.reorderedFrames).toBe(0);
+      expect(stats.clampedFrames).toBe(0);
+      expect(stats.cancelSupported).toBe(false);
+      expect(stats.lastCancelLatencyMs).toBe(-1);
+    });
+
+    it('computes mean and worst lag from known due/hand-off pairs, and flags a frame late past one interval', async () => {
+      vi.spyOn(performance, 'now').mockReturnValue(100_000);
+      engine.loadTune(silentTune());
+      await engine.play();
+      clock.tick(1); // due "now" on the mocked clock — zero lag
+
+      // PAL_FRAME_INTERVAL_US is ~19950 µs (≈19.95 ms): 10 ms sits under one interval, 30 ms over it.
+      clock.tickWithDueAt(100_000 - 10);
+      clock.tickWithDueAt(100_000 - 30);
+      engine.pause(); // forces a fresh publish through the existing path, adding no scheduled frame
+
+      const stats = engine.stats();
+      expect(stats.scheduledFrames).toBe(3);
+      expect(stats.worstLagMs).toBeCloseTo(30, 6);
+      expect(stats.meanLagMs).toBeCloseTo((0 + 10 + 30) / 3, 6);
+      expect(stats.lateFrames).toBe(1);
+    });
+
+    it('counts a frame scheduled earlier than its predecessor as reordered, in host-scheduled mode', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      await engine.play();
+
+      clock.tickWithDueAt(1_000_000); // nothing to compare against yet
+      clock.tickWithDueAt(1_001_000); // later — in order
+      clock.tickWithDueAt(1_000_500); // earlier than its predecessor's — an inversion
+      engine.pause();
+
+      expect(engine.stats().reorderedFrames).toBe(1);
+    });
+
+    it('flags a frame emitted from a catch-up-clamped advance, without excluding it from the lag figures', async () => {
+      engine.loadTune(silentTune());
+      await engine.play();
+
+      clock.tickWithDueAt(performance.now(), true);
+      engine.pause();
+
+      const stats = engine.stats();
+      expect(stats.clampedFrames).toBe(1);
+      expect(stats.scheduledFrames).toBe(1);
+    });
+
+    it("reports the transport's cancel support once a stats publish reads it", () => {
+      midi.supportsCancel.set(true);
+      engine.loadTune(silentTune()); // loadTune() publishes on the existing path
+
+      expect(engine.stats().cancelSupported).toBe(true);
+      expect(engine.stats().lastCancelLatencyMs).toBe(-1);
+    });
+
+    describe('cancel latency', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('records how far the furthest-out committed send reached past the cancel request', async () => {
+        midi.supportsCancel.set(true);
+        midi.cancelPendingReturns = true;
+        engine.loadTune(silentTune());
+        engine.setTimingMode('host-scheduled');
+        engine.setScheduleAhead(200);
+
+        await engine.play();
+        clock.tick(2);
+
+        engine.setSpeed(1.2); // triggers retimeCommittedHostSends() -> cancelPending()
+
+        const stats = engine.stats();
+        expect(stats.cancelSupported).toBe(true);
+        // Both committed sends carried a ~200 ms window; the cancel landed practically at once, so
+        // the furthest reach should sit close to that 200 ms rather than at 0 or wildly beyond it.
+        expect(stats.lastCancelLatencyMs).toBeGreaterThan(100);
+        expect(stats.lastCancelLatencyMs).toBeLessThan(300);
+      });
+
+      it('leaves the latency at -1 when the selected port cannot cancel', async () => {
+        engine.loadTune(silentTune());
+        engine.setTimingMode('host-scheduled');
+        engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+
+        await engine.play();
+        clock.tick(1);
+        engine.setSpeed(1.2);
+
+        expect(engine.stats().lastCancelLatencyMs).toBe(-1);
+      });
+
+      it('falls back to -1 on a mid-session swap to a port that cannot cancel, without a tune reload', async () => {
+        midi.supportsCancel.set(true);
+        midi.cancelPendingReturns = true;
+        engine.loadTune(silentTune());
+        engine.setTimingMode('host-scheduled');
+        engine.setScheduleAhead(200);
+
+        await engine.play();
+        clock.tick(2);
+        engine.setSpeed(1.2); // records a real cancel latency
+
+        expect(engine.stats().lastCancelLatencyMs).toBeGreaterThan(-1);
+
+        midi.supportsCancel.set(false); // simulates a port swap mid-session, no tune reload
+        engine.pause(); // forces a fresh publish through the existing path, no tune reload involved
+
+        expect(engine.stats().lastCancelLatencyMs).toBe(-1);
+      });
     });
   });
 

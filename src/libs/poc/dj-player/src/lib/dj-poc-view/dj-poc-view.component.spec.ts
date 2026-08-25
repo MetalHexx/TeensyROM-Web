@@ -10,6 +10,7 @@ import {
   EngineStats,
   LoopSlot,
   SpeedMode,
+  TimingMode,
 } from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
@@ -28,6 +29,14 @@ const EMPTY_STATS: EngineStats = {
   jitterMs: 0,
   worstGapMs: 0,
   lateCallbacks: 0,
+  scheduledFrames: 0,
+  lateFrames: 0,
+  meanLagMs: 0,
+  worstLagMs: 0,
+  reorderedFrames: 0,
+  clampedFrames: 0,
+  cancelSupported: false,
+  lastCancelLatencyMs: -1,
 };
 
 interface MockMidiOutputService {
@@ -48,6 +57,7 @@ interface MockDjPlayerEngine {
   subtuneCount: WritableSignal<number>;
   speedMultiplier: WritableSignal<number>;
   speedMode: WritableSignal<SpeedMode>;
+  timingMode: WritableSignal<TimingMode>;
   recipeEnabled: WritableSignal<boolean>;
   recipeSent: WritableSignal<boolean>;
   nominalIntervalUs: WritableSignal<number>;
@@ -72,6 +82,7 @@ interface MockDjPlayerEngine {
   jumpSpeedDown: ReturnType<typeof vi.fn>;
   homeSpeed: ReturnType<typeof vi.fn>;
   setSpeedMode: ReturnType<typeof vi.fn>;
+  setTimingMode: ReturnType<typeof vi.fn>;
   setRecipeEnabled: ReturnType<typeof vi.fn>;
   setNominalIntervalUs: ReturnType<typeof vi.fn>;
   setScheduleAhead: ReturnType<typeof vi.fn>;
@@ -120,6 +131,7 @@ function makeEngine(): MockDjPlayerEngine {
     subtuneCount: signal(1),
     speedMultiplier: signal(1),
     speedMode: signal<SpeedMode>('clock-only'),
+    timingMode: signal<TimingMode>('cartridge-timed'),
     recipeEnabled: signal(true),
     recipeSent: signal(false),
     nominalIntervalUs: signal(19950),
@@ -144,6 +156,7 @@ function makeEngine(): MockDjPlayerEngine {
     jumpSpeedDown: vi.fn(),
     homeSpeed: vi.fn(),
     setSpeedMode: vi.fn(),
+    setTimingMode: vi.fn(),
     setRecipeEnabled: vi.fn(),
     setNominalIntervalUs: vi.fn(),
     setScheduleAhead: vi.fn(),
@@ -446,6 +459,54 @@ describe('DjPocViewComponent', () => {
       expect(selects.some((select) => select.value === 'medium' || select.value === 'tiny')).toBe(
         false
       );
+    });
+  });
+
+  describe('timing mode', () => {
+    function timingModeSelect(): HTMLSelectElement {
+      return fixture.nativeElement.querySelector('[aria-label="Timing"] select.timing-mode');
+    }
+
+    function recipeCheckbox(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('[aria-label="Timing"] input[type="checkbox"]');
+    }
+
+    function speedModeSelect(): HTMLSelectElement {
+      return fixture.nativeElement.querySelector('[aria-label="Speed"] select.speed-mode');
+    }
+
+    it('calls engine.setTimingMode with the chosen mode', () => {
+      const select = timingModeSelect();
+      select.value = 'host-scheduled';
+      select.dispatchEvent(new Event('change'));
+
+      expect(engine.setTimingMode).toHaveBeenCalledWith('host-scheduled');
+    });
+
+    it('shows which mode is live', () => {
+      engine.timingMode.set('host-scheduled');
+      fixture.detectChanges();
+      expect(timingModeSelect().value).toBe('host-scheduled');
+
+      engine.timingMode.set('cartridge-timed');
+      fixture.detectChanges();
+      expect(timingModeSelect().value).toBe('cartridge-timed');
+    });
+
+    it('disables the recipe checkbox and the speed-mode select once host-scheduled is live', () => {
+      engine.timingMode.set('host-scheduled');
+      fixture.detectChanges();
+
+      expect(recipeCheckbox().disabled).toBe(true);
+      expect(speedModeSelect().disabled).toBe(true);
+    });
+
+    it('leaves the recipe checkbox and the speed-mode select enabled in cartridge-timed', () => {
+      engine.timingMode.set('cartridge-timed');
+      fixture.detectChanges();
+
+      expect(recipeCheckbox().disabled).toBe(false);
+      expect(speedModeSelect().disabled).toBe(false);
     });
   });
 
@@ -1129,6 +1190,113 @@ describe('DjPocViewComponent', () => {
       fixture.detectChanges();
 
       expect(scrubInput().value).toBe('77');
+    });
+  });
+
+  describe('delivery diagnostics readout', () => {
+    function sectionText(label: string): string {
+      const section = fixture.nativeElement.querySelector(`[aria-label="${label}"]`) as HTMLElement;
+      return section?.textContent ?? '';
+    }
+
+    it('makes the live timing mode and schedule-ahead offset unmistakable', () => {
+      engine.timingMode.set('host-scheduled');
+      engine.scheduleAheadMs.set(40);
+      fixture.detectChanges();
+
+      const text = sectionText('Diagnostics');
+      expect(text).toContain('host-scheduled');
+      expect(text).toContain('40 ms');
+    });
+
+    it("binds the delivery numbers to the engine's stats signal", () => {
+      engine.stats.set({
+        ...EMPTY_STATS,
+        scheduledFrames: 321,
+        lateFrames: 9,
+        reorderedFrames: 2,
+        clampedFrames: 4,
+        meanLagMs: 5.5,
+        worstLagMs: 42.5,
+        cancelSupported: true,
+        lastCancelLatencyMs: 12.5,
+      });
+      fixture.detectChanges();
+
+      const text = sectionText('Delivery');
+      expect(text).toContain('321');
+      expect(text).toContain('5.5 ms');
+      expect(text).toContain('42.5 ms');
+      expect(text).toContain('yes');
+      expect(text).toContain('12.5 ms');
+    });
+
+    it('shows an em dash for cancel latency until a cancel has actually happened', () => {
+      const text = sectionText('Delivery');
+      expect(text).toContain('—');
+    });
+
+    it("binds the clock's own figures to the engine's stats signal, kept apart from delivery", () => {
+      engine.stats.set({ ...EMPTY_STATS, driftMs: 3.5, lateCallbacks: 6, worstGapMs: 77.5 });
+      fixture.detectChanges();
+
+      const text = sectionText('Clock');
+      expect(text).toContain('3.5 ms');
+      expect(text).toContain('6');
+      expect(text).toContain('77.5 ms');
+    });
+  });
+
+  describe('schedule-ahead range', () => {
+    function scheduleAheadSelect(): HTMLSelectElement {
+      const labels: HTMLLabelElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Timing"] label.control')
+      );
+      const label = labels.find((item) => (item.textContent ?? '').trim().startsWith('Schedule ahead'));
+      return label?.querySelector('select') as HTMLSelectElement;
+    }
+
+    it('widens the offered range past a single frame interval, so a shorter-than-window stall can be demonstrated', () => {
+      const values = Array.from(scheduleAheadSelect().options).map((option) => Number(option.value));
+
+      expect(values).toEqual([0, 5, 20, 40, 80, 160]);
+    });
+  });
+
+  describe('main-thread stall control', () => {
+    function stallButton(): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Diagnostics"] button')
+      );
+      return buttons.find((button) => button.textContent?.trim() === 'Stall') as HTMLButtonElement;
+    }
+
+    function stallDurationInput(): HTMLInputElement {
+      return fixture.nativeElement.querySelector(
+        'input[aria-label="Stall duration in milliseconds"]'
+      );
+    }
+
+    it('updates the configured duration from its own input, reflected back through the bound value', () => {
+      const input = stallDurationInput();
+      input.value = '300';
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(stallDurationInput().value).toBe('300');
+    });
+
+    it('blocks the main thread synchronously for at least the configured duration', () => {
+      const input = stallDurationInput();
+      input.value = '20'; // short, to keep the test itself fast
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      const before = performance.now();
+      stallButton().click();
+      const elapsed = performance.now() - before;
+
+      expect(elapsed).toBeGreaterThanOrEqual(20);
     });
   });
 });

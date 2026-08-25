@@ -224,6 +224,13 @@
   margin-left: 0;
 }
 
+// The stall duration field is a plain number input, not a select, so it needs its own width — left
+// unset it would size to the browser's spinner-button default rather than to the two or three digits
+// this control actually needs.
+.stall-control input[type='number'] {
+  width: 4.5rem;
+}
+
 .tune-sources {
   display: flex;
   flex-wrap: wrap;

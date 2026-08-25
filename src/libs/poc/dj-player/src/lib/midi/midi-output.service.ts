@@ -23,6 +23,12 @@ interface MIDIOutputLike {
   name: string | null;
   manufacturer: string | null;
   send(data: Uint8Array, timestamp?: number): void;
+  /**
+   * Specified by Web MIDI, but the API is not baseline — Chrome's implementation tracked a draft
+   * that omitted it. Detected on the port object itself (see `updateSupportsCancel`), never assumed
+   * from a browser check, and `cancelPending()` never calls it without confirming it exists first.
+   */
+  clear?: () => void;
 }
 interface MIDIAccessLike {
   outputs: Map<string, MIDIOutputLike>;
@@ -43,6 +49,13 @@ export class MidiOutputService {
   readonly ports = signal<readonly MidiPortOption[]>([]);
   readonly selectedPortId = signal<string | null>(null);
   readonly lastError = signal<string | null>(null);
+  /**
+   * Whether the currently selected port exposes `clear()`. Kept current by every path that can
+   * change the selection — `selectPort()`, `restoreSelectedPort()` and `refreshPorts()` — rather than
+   * resolved lazily, so a remembered port's capability is known as soon as it is restored rather than
+   * waiting on the first `send()`.
+   */
+  readonly supportsCancel = signal<boolean>(false);
 
   private access: MIDIAccessLike | null = null;
 
@@ -91,6 +104,7 @@ export class MidiOutputService {
 
     this.selectedPortId.set(id);
     this.lastError.set(null);
+    this.updateSupportsCancel();
 
     try {
       localStorage.setItem(SELECTED_PORT_STORAGE_KEY, id);
@@ -112,6 +126,27 @@ export class MidiOutputService {
       output.send(bytes);
     } else {
       output.send(bytes, timestampMs);
+    }
+  }
+
+  /**
+   * Cancels whatever is still sitting in the selected port's timestamped send queue, if the browser
+   * exposes a way to. Returns whether it actually cancelled — `false` covers "no port selected" and
+   * "the port has no `clear()`" alike, so a caller never has to separately check `supportsCancel()`
+   * before trusting the result. Never throws: a `clear()` that misbehaves despite being detected as
+   * present is swallowed and reported as "did not cancel", not propagated.
+   */
+  cancelPending(): boolean {
+    const output = this.selectedOutput();
+    if (typeof output?.clear !== 'function') {
+      return false;
+    }
+    try {
+      output.clear();
+      return true;
+    } catch (error) {
+      logWarn(`MIDI: output.clear() threw despite being detected as supported — ${error}`);
+      return false;
     }
   }
 
@@ -151,6 +186,9 @@ export class MidiOutputService {
       this.lastError.set('The selected MIDI port disappeared — check the connection and re-select it.');
       logWarn(`MIDI: selected port "${selectedId}" is no longer present; selection cleared.`);
     }
+    // `onstatechange` can replace a port object in place (e.g. a reconnect) without the selection
+    // itself changing, so this re-checks unconditionally rather than only on the branch above.
+    this.updateSupportsCancel();
   }
 
   /**
@@ -174,7 +212,17 @@ export class MidiOutputService {
 
     if (storedId !== null && this.ports().some((port) => port.id === storedId)) {
       this.selectedPortId.set(storedId);
+      this.updateSupportsCancel();
     }
+  }
+
+  /**
+   * Re-derives `supportsCancel` from the selected port object, on demand rather than lazily — see
+   * the field's own doc comment for why every selection-changing path calls this instead of leaving
+   * it to the next `send()`.
+   */
+  private updateSupportsCancel(): void {
+    this.supportsCancel.set(typeof this.selectedOutput()?.clear === 'function');
   }
 }
 

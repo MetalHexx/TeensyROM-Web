@@ -301,7 +301,12 @@
               </div>
             </div>
 
-            <select class="speed-mode" (change)="onSpeedModeChange($event)">
+            <select
+              class="speed-mode"
+              [disabled]="timingMode() === 'host-scheduled'"
+              title="Inert while Timing mode is host-scheduled — the fader drives the clock directly there."
+              (change)="onSpeedModeChange($event)"
+            >
               <option value="clock-only" [selected]="speedMode() === 'clock-only'">
                 clock-only
               </option>
@@ -361,7 +366,25 @@
 
         <div class="timing-commands">
           <label class="control">
-            <input type="checkbox" [checked]="recipeEnabled()" (change)="onRecipeToggle($event)" />
+            Timing mode
+            <select class="timing-mode" (change)="onTimingModeChange($event)">
+              <option value="cartridge-timed" [selected]="timingMode() === 'cartridge-timed'">
+                cartridge-timed
+              </option>
+              <option value="host-scheduled" [selected]="timingMode() === 'host-scheduled'">
+                host-scheduled
+              </option>
+            </select>
+          </label>
+
+          <label class="control">
+            <input
+              type="checkbox"
+              [checked]="recipeEnabled()"
+              [disabled]="timingMode() === 'host-scheduled'"
+              title="Inert while Timing mode is host-scheduled — the recipe never goes out there."
+              (change)="onRecipeToggle($event)"
+            />
             Send recipe packet
           </label>
 
@@ -481,10 +504,33 @@
     <section class="panel diagnostics-panel" aria-label="Diagnostics">
       <h2>Diagnostics</h2>
 
+      <div class="control-row stall-control">
+        <label class="control">
+          Stall main thread for
+          <input
+            type="number"
+            min="0"
+            step="50"
+            aria-label="Stall duration in milliseconds"
+            [value]="stallDurationMs()"
+            (change)="onStallDurationInput($event)"
+          />
+          ms
+        </label>
+        <button type="button" (click)="onStallMainThread()">Stall</button>
+      </div>
+
       <dl class="field-list diagnostic-fields">
         <div class="field-row field-row--wide">
           <dt>Frame timer</dt>
           <dd>{{ frameTimerStatus() }}</dd>
+        </div>
+        <div class="field-row field-row--wide">
+          <dt>Mode</dt>
+          <dd>
+            {{ timingMode() }}, schedule-ahead
+            {{ scheduleAheadMs() === 0 ? 'off' : scheduleAheadMs() + ' ms' }}
+          </dd>
         </div>
         <div class="field-row">
           <dt>Frames emitted</dt>
@@ -497,27 +543,6 @@
         <div class="field-row">
           <dt>Bytes / s</dt>
           <dd>{{ bytesPerSecond().toFixed(0) }}</dd>
-        </div>
-        <div class="field-row">
-          <dt>Drift</dt>
-          <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
-        </div>
-        <div class="field-row field-row--wide">
-          <dt>Interval (nominal)</dt>
-          <dd>
-            {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)
-          </dd>
-        </div>
-        <div class="field-row field-row--wide">
-          <dt>Jitter σ / worst gap</dt>
-          <dd>
-            {{ engineStats().jitterMs.toFixed(2) }} ms /
-            {{ engineStats().worstGapMs.toFixed(1) }} ms
-          </dd>
-        </div>
-        <div class="field-row">
-          <dt>Late callbacks</dt>
-          <dd>{{ engineStats().lateCallbacks }}</dd>
         </div>
         <div class="field-row">
           <dt>Suppressed writes</dt>
@@ -536,6 +561,80 @@
           <dd>{{ engineError() ?? '—' }}</dd>
         </div>
       </dl>
+
+      <!-- The clock's own figures, kept apart from delivery below: a negative delivery result is
+           only diagnosable once it's clear whether the clock or the transport handoff produced it. -->
+      <div class="subsection" aria-label="Clock">
+        <h3 class="subsection-title">Clock</h3>
+        <dl class="field-list diagnostic-fields">
+          <div class="field-row">
+            <dt>Drift</dt>
+            <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
+          </div>
+          <div class="field-row">
+            <dt>Late callbacks</dt>
+            <dd>{{ engineStats().lateCallbacks }}</dd>
+          </div>
+          <div class="field-row field-row--wide">
+            <dt>Interval (nominal)</dt>
+            <dd>
+              {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)
+            </dd>
+          </div>
+          <div class="field-row field-row--wide">
+            <dt>Jitter σ / worst gap</dt>
+            <dd>
+              {{ engineStats().jitterMs.toFixed(2) }} ms /
+              {{ engineStats().worstGapMs.toFixed(1) }} ms
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Instrument delivery against due time — this is the answer R5 asks for, not the clock's own
+           health above it. -->
+      <div class="subsection" aria-label="Delivery">
+        <h3 class="subsection-title">Delivery</h3>
+        <dl class="field-list diagnostic-fields">
+          <div class="field-row">
+            <dt>Scheduled</dt>
+            <dd>{{ engineStats().scheduledFrames }}</dd>
+          </div>
+          <div class="field-row">
+            <dt>Late</dt>
+            <dd>{{ engineStats().lateFrames }}</dd>
+          </div>
+          <div class="field-row">
+            <dt>Reordered</dt>
+            <dd>{{ engineStats().reorderedFrames }}</dd>
+          </div>
+          <div class="field-row">
+            <dt>Clamped</dt>
+            <dd>{{ engineStats().clampedFrames }}</dd>
+          </div>
+          <div class="field-row field-row--wide">
+            <dt>Lag mean / worst</dt>
+            <dd>
+              {{ engineStats().meanLagMs.toFixed(1) }} ms /
+              {{ engineStats().worstLagMs.toFixed(1) }} ms
+            </dd>
+          </div>
+          <div class="field-row">
+            <dt>Cancel support</dt>
+            <dd>{{ engineStats().cancelSupported ? 'yes' : 'no' }}</dd>
+          </div>
+          <div class="field-row">
+            <dt>Cancel latency</dt>
+            <dd>
+              {{
+                engineStats().lastCancelLatencyMs < 0
+                  ? '—'
+                  : engineStats().lastCancelLatencyMs.toFixed(1) + ' ms'
+              }}
+            </dd>
+          </div>
+        </dl>
+      </div>
     </section>
   </aside>
 </div>

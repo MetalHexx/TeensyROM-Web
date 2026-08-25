@@ -10,6 +10,7 @@ interface FakeMidiOutput {
   readonly name: string | null;
   readonly manufacturer: string | null;
   readonly send: (data: Uint8Array, timestamp?: number) => void;
+  readonly clear?: () => void;
 }
 
 interface FakeMidiAccess {
@@ -17,8 +18,16 @@ interface FakeMidiAccess {
   onstatechange: ((e: unknown) => void) | null;
 }
 
-function makeOutput(id: string, name: string | null, manufacturer: string | null): FakeMidiOutput {
-  return { id, name, manufacturer, send: vi.fn() };
+/** `withClear` attaches a spy `clear()` — the unsupported path is the default, since that is the one
+ *  the whole feature has to survive rather than merely benefit from. */
+function makeOutput(
+  id: string,
+  name: string | null,
+  manufacturer: string | null,
+  withClear = false
+): FakeMidiOutput {
+  const output: FakeMidiOutput = { id, name, manufacturer, send: vi.fn() };
+  return withClear ? { ...output, clear: vi.fn() } : output;
 }
 
 function makeAccess(outputs: FakeMidiOutput[]): FakeMidiAccess {
@@ -189,5 +198,96 @@ describe('MidiOutputService', () => {
     service.identify('TEST');
 
     expect(output.send).toHaveBeenCalledWith(buildDisplayCharsPacket('TEST'));
+  });
+
+  describe('cancellation', () => {
+    it('reports supportsCancel true once a port exposing clear() is selected', async () => {
+      const access = makeAccess([makeOutput('port-1', 'TeensyROM Cart', 'Acme', true)]);
+      stubRequestMidiAccess(() => Promise.resolve(access));
+
+      await service.requestAccess();
+      expect(service.supportsCancel()).toBe(false); // nothing selected yet
+
+      service.selectPort('port-1');
+
+      expect(service.supportsCancel()).toBe(true);
+    });
+
+    it('reports supportsCancel false for a port that omits clear(), never assuming support', async () => {
+      const access = makeAccess([makeOutput('port-1', 'TeensyROM Cart', 'Acme', false)]);
+      stubRequestMidiAccess(() => Promise.resolve(access));
+
+      await service.requestAccess();
+      service.selectPort('port-1');
+
+      expect(service.supportsCancel()).toBe(false);
+    });
+
+    it('reports supportsCancel on a port restored from a previous session, without a send() first', async () => {
+      const access = makeAccess([makeOutput('port-1', 'TeensyROM Cart', 'Acme', true)]);
+      stubRequestMidiAccess(() => Promise.resolve(access));
+      await service.requestAccess();
+      service.selectPort('port-1');
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [MidiOutputService] });
+      const reloaded = TestBed.inject(MidiOutputService);
+      stubRequestMidiAccess(() =>
+        Promise.resolve(makeAccess([makeOutput('port-1', 'TeensyROM Cart', 'Acme', true)]))
+      );
+
+      await reloaded.requestAccess(); // requestAccess() -> refreshPorts() -> restoreSelectedPort()
+
+      expect(reloaded.selectedPortId()).toBe('port-1');
+      expect(reloaded.supportsCancel()).toBe(true);
+    });
+
+    it('cancelPending() calls the port\'s clear() and reports true when the port supports it', async () => {
+      const output = makeOutput('port-1', 'TeensyROM Cart', 'Acme', true);
+      const access = makeAccess([output]);
+      stubRequestMidiAccess(() => Promise.resolve(access));
+      await service.requestAccess();
+      service.selectPort('port-1');
+
+      const result = service.cancelPending();
+
+      expect(output.clear).toHaveBeenCalledTimes(1);
+      expect(result).toBe(true);
+    });
+
+    it('cancelPending() reports false and does not throw when the port has no clear()', async () => {
+      const access = makeAccess([makeOutput('port-1', 'TeensyROM Cart', 'Acme', false)]);
+      stubRequestMidiAccess(() => Promise.resolve(access));
+      await service.requestAccess();
+      service.selectPort('port-1');
+
+      let result: boolean | undefined;
+      expect(() => {
+        result = service.cancelPending();
+      }).not.toThrow();
+      expect(result).toBe(false);
+    });
+
+    it('cancelPending() reports false and does not throw when no port is selected', () => {
+      expect(() => service.cancelPending()).not.toThrow();
+      expect(service.cancelPending()).toBe(false);
+    });
+
+    it('cancelPending() reports false rather than throwing when a detected clear() itself throws', async () => {
+      const output = makeOutput('port-1', 'TeensyROM Cart', 'Acme', true);
+      (output.clear as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error('boom');
+      });
+      const access = makeAccess([output]);
+      stubRequestMidiAccess(() => Promise.resolve(access));
+      await service.requestAccess();
+      service.selectPort('port-1');
+
+      let result: boolean | undefined;
+      expect(() => {
+        result = service.cancelPending();
+      }).not.toThrow();
+      expect(result).toBe(false);
+    });
   });
 });
