@@ -29,6 +29,14 @@ const EMPTY_STATS: EngineStats = {
   jitterMs: 0,
   worstGapMs: 0,
   lateCallbacks: 0,
+  scheduledFrames: 0,
+  lateFrames: 0,
+  meanLagMs: 0,
+  worstLagMs: 0,
+  reorderedFrames: 0,
+  clampedFrames: 0,
+  cancelSupported: false,
+  lastCancelLatencyMs: -1,
 };
 
 interface MockMidiOutputService {
@@ -1182,6 +1190,113 @@ describe('DjPocViewComponent', () => {
       fixture.detectChanges();
 
       expect(scrubInput().value).toBe('77');
+    });
+  });
+
+  describe('delivery diagnostics readout', () => {
+    function sectionText(label: string): string {
+      const section = fixture.nativeElement.querySelector(`[aria-label="${label}"]`) as HTMLElement;
+      return section?.textContent ?? '';
+    }
+
+    it('makes the live timing mode and schedule-ahead offset unmistakable', () => {
+      engine.timingMode.set('host-scheduled');
+      engine.scheduleAheadMs.set(40);
+      fixture.detectChanges();
+
+      const text = sectionText('Diagnostics');
+      expect(text).toContain('host-scheduled');
+      expect(text).toContain('40 ms');
+    });
+
+    it("binds the delivery numbers to the engine's stats signal", () => {
+      engine.stats.set({
+        ...EMPTY_STATS,
+        scheduledFrames: 321,
+        lateFrames: 9,
+        reorderedFrames: 2,
+        clampedFrames: 4,
+        meanLagMs: 5.5,
+        worstLagMs: 42.5,
+        cancelSupported: true,
+        lastCancelLatencyMs: 12.5,
+      });
+      fixture.detectChanges();
+
+      const text = sectionText('Delivery');
+      expect(text).toContain('321');
+      expect(text).toContain('5.5 ms');
+      expect(text).toContain('42.5 ms');
+      expect(text).toContain('yes');
+      expect(text).toContain('12.5 ms');
+    });
+
+    it('shows an em dash for cancel latency until a cancel has actually happened', () => {
+      const text = sectionText('Delivery');
+      expect(text).toContain('—');
+    });
+
+    it("binds the clock's own figures to the engine's stats signal, kept apart from delivery", () => {
+      engine.stats.set({ ...EMPTY_STATS, driftMs: 3.5, lateCallbacks: 6, worstGapMs: 77.5 });
+      fixture.detectChanges();
+
+      const text = sectionText('Clock');
+      expect(text).toContain('3.5 ms');
+      expect(text).toContain('6');
+      expect(text).toContain('77.5 ms');
+    });
+  });
+
+  describe('schedule-ahead range', () => {
+    function scheduleAheadSelect(): HTMLSelectElement {
+      const labels: HTMLLabelElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Timing"] label.control')
+      );
+      const label = labels.find((item) => (item.textContent ?? '').trim().startsWith('Schedule ahead'));
+      return label?.querySelector('select') as HTMLSelectElement;
+    }
+
+    it('widens the offered range past a single frame interval, so a shorter-than-window stall can be demonstrated', () => {
+      const values = Array.from(scheduleAheadSelect().options).map((option) => Number(option.value));
+
+      expect(values).toEqual([0, 5, 20, 40, 80, 160]);
+    });
+  });
+
+  describe('main-thread stall control', () => {
+    function stallButton(): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('[aria-label="Diagnostics"] button')
+      );
+      return buttons.find((button) => button.textContent?.trim() === 'Stall') as HTMLButtonElement;
+    }
+
+    function stallDurationInput(): HTMLInputElement {
+      return fixture.nativeElement.querySelector(
+        'input[aria-label="Stall duration in milliseconds"]'
+      );
+    }
+
+    it('updates the configured duration from its own input, reflected back through the bound value', () => {
+      const input = stallDurationInput();
+      input.value = '300';
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      expect(stallDurationInput().value).toBe('300');
+    });
+
+    it('blocks the main thread synchronously for at least the configured duration', () => {
+      const input = stallDurationInput();
+      input.value = '20'; // short, to keep the test itself fast
+      input.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+
+      const before = performance.now();
+      stallButton().click();
+      const elapsed = performance.now() - before;
+
+      expect(elapsed).toBeGreaterThanOrEqual(20);
     });
   });
 });

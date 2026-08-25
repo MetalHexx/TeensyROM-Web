@@ -84,6 +84,15 @@ class FakeFrameClock implements FrameClock {
       this.onFrame?.(performance.now(), false);
     }
   }
+
+  /** Releases one frame with a caller-chosen due time and clamp flag — the only way a test gets a
+   *  known lag, an out-of-order delivery time, or a catch-up-clamped frame, all of which `tick()`
+   *  deliberately never produces. */
+  tickWithDueAt(dueAtMs: number, catchUpClamped = false): void {
+    if (this.running) {
+      this.onFrame?.(dueAtMs, catchUpClamped);
+    }
+  }
 }
 
 /**
@@ -1351,6 +1360,114 @@ describe('DjPlayerEngine', () => {
       engine.setScheduleAhead(10);
 
       expect(engine.scheduleAheadMs()).toBe(10);
+    });
+  });
+
+  describe('delivery-against-due-time stats', () => {
+    it('starts with a complete, zeroed empty state before any tune loads', () => {
+      const stats = engine.stats();
+
+      expect(stats.scheduledFrames).toBe(0);
+      expect(stats.lateFrames).toBe(0);
+      expect(stats.meanLagMs).toBe(0);
+      expect(stats.worstLagMs).toBe(0);
+      expect(stats.reorderedFrames).toBe(0);
+      expect(stats.clampedFrames).toBe(0);
+      expect(stats.cancelSupported).toBe(false);
+      expect(stats.lastCancelLatencyMs).toBe(-1);
+    });
+
+    it('computes mean and worst lag from known due/hand-off pairs, and flags a frame late past one interval', async () => {
+      vi.spyOn(performance, 'now').mockReturnValue(100_000);
+      engine.loadTune(silentTune());
+      await engine.play();
+      clock.tick(1); // due "now" on the mocked clock — zero lag
+
+      // PAL_FRAME_INTERVAL_US is ~19950 µs (≈19.95 ms): 10 ms sits under one interval, 30 ms over it.
+      clock.tickWithDueAt(100_000 - 10);
+      clock.tickWithDueAt(100_000 - 30);
+      engine.pause(); // forces a fresh publish through the existing path, adding no scheduled frame
+
+      const stats = engine.stats();
+      expect(stats.scheduledFrames).toBe(3);
+      expect(stats.worstLagMs).toBeCloseTo(30, 6);
+      expect(stats.meanLagMs).toBeCloseTo((0 + 10 + 30) / 3, 6);
+      expect(stats.lateFrames).toBe(1);
+    });
+
+    it('counts a frame scheduled earlier than its predecessor as reordered, in host-scheduled mode', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      await engine.play();
+
+      clock.tickWithDueAt(1_000_000); // nothing to compare against yet
+      clock.tickWithDueAt(1_001_000); // later — in order
+      clock.tickWithDueAt(1_000_500); // earlier than its predecessor's — an inversion
+      engine.pause();
+
+      expect(engine.stats().reorderedFrames).toBe(1);
+    });
+
+    it('flags a frame emitted from a catch-up-clamped advance, without excluding it from the lag figures', async () => {
+      engine.loadTune(silentTune());
+      await engine.play();
+
+      clock.tickWithDueAt(performance.now(), true);
+      engine.pause();
+
+      const stats = engine.stats();
+      expect(stats.clampedFrames).toBe(1);
+      expect(stats.scheduledFrames).toBe(1);
+    });
+
+    it("reports the transport's cancel support once a stats publish reads it", () => {
+      midi.supportsCancel.set(true);
+      engine.loadTune(silentTune()); // loadTune() publishes on the existing path
+
+      expect(engine.stats().cancelSupported).toBe(true);
+      expect(engine.stats().lastCancelLatencyMs).toBe(-1);
+    });
+
+    describe('cancel latency', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('records how far the furthest-out committed send reached past the cancel request', async () => {
+        midi.supportsCancel.set(true);
+        midi.cancelPendingReturns = true;
+        engine.loadTune(silentTune());
+        engine.setTimingMode('host-scheduled');
+        engine.setScheduleAhead(200);
+
+        await engine.play();
+        clock.tick(2);
+
+        engine.setSpeed(1.2); // triggers retimeCommittedHostSends() -> cancelPending()
+
+        const stats = engine.stats();
+        expect(stats.cancelSupported).toBe(true);
+        // Both committed sends carried a ~200 ms window; the cancel landed practically at once, so
+        // the furthest reach should sit close to that 200 ms rather than at 0 or wildly beyond it.
+        expect(stats.lastCancelLatencyMs).toBeGreaterThan(100);
+        expect(stats.lastCancelLatencyMs).toBeLessThan(300);
+      });
+
+      it('leaves the latency at -1 when the selected port cannot cancel', async () => {
+        engine.loadTune(silentTune());
+        engine.setTimingMode('host-scheduled');
+        engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+
+        await engine.play();
+        clock.tick(1);
+        engine.setSpeed(1.2);
+
+        expect(engine.stats().lastCancelLatencyMs).toBe(-1);
+      });
     });
   });
 

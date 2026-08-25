@@ -150,6 +150,28 @@ export interface EngineStats {
   readonly worstGapMs: number;
   /** Callbacks that arrived more than 2x the nominal buffer duration late. */
   readonly lateCallbacks: number;
+  /** Frame packets handed to the transport with a delivery time — the population every other
+   *  delivery figure below is measured over. */
+  readonly scheduledFrames: number;
+  /** Of `scheduledFrames`, how many were already more than one frame interval past due at the
+   *  moment they were handed to the transport. */
+  readonly lateFrames: number;
+  /** Mean of (hand-off time − due time) across `scheduledFrames`, in ms. */
+  readonly meanLagMs: number;
+  /** The single worst (hand-off time − due time) across `scheduledFrames`, in ms. */
+  readonly worstLagMs: number;
+  /** Frames handed to the transport at a delivery time earlier than the previous frame's — an
+   *  inversion in the stream a well-behaved schedule should never produce. */
+  readonly reorderedFrames: number;
+  /** Of `scheduledFrames`, how many rode a clock advance clamped by its catch-up ceiling — their
+   *  due time is later than the truth, so the lag figures above under-report for them. */
+  readonly clampedFrames: number;
+  /** Whether the selected MIDI port can cancel a pending send, per `MidiOutputService`'s own
+   *  feature detection. */
+  readonly cancelSupported: boolean;
+  /** How long the furthest-out stale send reached past a cancel request before it was preempted,
+   *  in ms. −1 when cancellation is unsupported, or none has happened yet this session. */
+  readonly lastCancelLatencyMs: number;
 }
 
 /**
@@ -239,6 +261,14 @@ const EMPTY_STATS: EngineStats = {
   jitterMs: 0,
   worstGapMs: 0,
   lateCallbacks: 0,
+  scheduledFrames: 0,
+  lateFrames: 0,
+  meanLagMs: 0,
+  worstLagMs: 0,
+  reorderedFrames: 0,
+  clampedFrames: 0,
+  cancelSupported: false,
+  lastCancelLatencyMs: -1,
 };
 
 /**
@@ -372,6 +402,18 @@ export class DjPlayerEngine implements OnDestroy {
   private bytesSent = 0;
   private recipeResends = 0;
   private framesSincePublish = 0;
+  /** The delivery-against-due-time counters `sendFramePacket` maintains — see `recordDeliveryStats`
+   *  and the matching fields on `EngineStats` for what each one means. */
+  private scheduledFrames = 0;
+  private lateFrames = 0;
+  private sumLagMs = 0;
+  private worstLagMs = 0;
+  private reorderedFrames = 0;
+  private clampedFrames = 0;
+  private lastCancelLatencyMs = -1;
+  /** The previous frame's delivery time, so `recordDeliveryStats` can detect an inversion. Null
+   *  before the first frame of a run — there is nothing yet to be earlier than. */
+  private lastScheduledAtMs: number | null = null;
   /** Steps a jump or a retune still owes the stream, drained one per tick by `onTick`. */
   private pending: PendingStep[] = [];
   /**
@@ -486,7 +528,9 @@ export class DjPlayerEngine implements OnDestroy {
 
     const intervalUs = this.effectiveIntervalUs();
     try {
-      await this.clock.start(intervalUs, (dueAtMs) => this.onTick(dueAtMs));
+      await this.clock.start(intervalUs, (dueAtMs, catchUpClamped) =>
+        this.onTick(dueAtMs, catchUpClamped)
+      );
     } catch (error) {
       // The cartridge is already in ASID mode waiting on a frame stream that will never start, so
       // close the session rather than leaving it open for the tester to notice and stop by hand.
@@ -1121,9 +1165,10 @@ export class DjPlayerEngine implements OnDestroy {
    * `dueAtMs` is when the clock says this frame fell due, which is before now and one interval apart
    * from its neighbour when a callback releases several at once. It rides the tick through to the
    * transport so delivery can be anchored to the frame grid rather than to whenever the main thread
-   * reached it.
+   * reached it. `catchUpClamped` rides alongside it — see `FrameClock.start` — and is threaded to
+   * `sendFramePacket` so the delivery stats can flag a frame whose due time under-reports its lag.
    */
-  private onTick(dueAtMs: number): void {
+  private onTick(dueAtMs: number, catchUpClamped: boolean): void {
     const machine = this.machine;
     const frame = this.frame;
     if (machine === null || frame === null) {
@@ -1140,7 +1185,7 @@ export class DjPlayerEngine implements OnDestroy {
     // ticks is a frame it never asked for and never drains. See `queueResync` and `beginRetune`.
     const step = this.pending.shift();
     if (step?.kind === 'packet') {
-      this.sendFramePacket(buildSidDataPacket(step.snapshot), dueAtMs);
+      this.sendFramePacket(buildSidDataPacket(step.snapshot), dueAtMs, catchUpClamped);
       this.publishStats();
       return;
     }
@@ -1168,7 +1213,11 @@ export class DjPlayerEngine implements OnDestroy {
         // snapshot puts slot n at values[n]. Re-sending a single gate-off packet instead would not
         // work either: the tune rewrites its own control registers every frame.
         frame.markAllDirty();
-        this.sendFramePacket(buildSidDataPacket(withVoiceGatesOff(frame.takeSnapshot())), dueAtMs);
+        this.sendFramePacket(
+          buildSidDataPacket(withVoiceGatesOff(frame.takeSnapshot())),
+          dueAtMs,
+          catchUpClamped
+        );
         break;
       case 'retime':
         // No SID packet: the recipe flushes the cartridge's queue on receipt, so a frame sent on
@@ -1179,10 +1228,10 @@ export class DjPlayerEngine implements OnDestroy {
         break;
       case 'resync':
         frame.markAllDirty();
-        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs);
+        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs, catchUpClamped);
         break;
       default:
-        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs);
+        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs, catchUpClamped);
     }
     this.framesRendered++;
     if (this.framesRendered % this.anchorSnapshotFrameInterval() === 0) {
@@ -1520,8 +1569,9 @@ export class DjPlayerEngine implements OnDestroy {
       // branch (`markAllDirty()`) restores the real state on the next Play. Stopped needs none of
       // that: nothing is sounding to silence, and the true state is what the chip should hold.
       const outgoing = this.state() === 'paused' ? withVoiceGatesOff(snapshot) : snapshot;
-      // No tick released this one, so there is no frame grid to place it on: it is due now.
-      this.sendFramePacket(buildSidDataPacket(outgoing), performance.now());
+      // No tick released this one, so there is no frame grid to place it on: it is due now, and it
+      // never rode a catch-up-clamped advance because it never rode the clock at all.
+      this.sendFramePacket(buildSidDataPacket(outgoing), performance.now(), false);
       this.publishStats();
       return;
     }
@@ -1599,7 +1649,8 @@ export class DjPlayerEngine implements OnDestroy {
    * duplicate them, so `setScheduleAhead()`'s clamp is what keeps that window inaudible instead.
    */
   private retimeCommittedHostSends(): void {
-    this.pruneCommittedHostSends(performance.now());
+    const nowMs = performance.now();
+    this.pruneCommittedHostSends(nowMs);
     if (this.committedHostSends.length === 0 || !this.midi.supportsCancel()) {
       return;
     }
@@ -1608,6 +1659,10 @@ export class DjPlayerEngine implements OnDestroy {
     }
 
     const outstanding = this.committedHostSends;
+    // The furthest-out entry is the one that would have kept arriving longest without the cancel —
+    // how far past this request it was still committed to land is the cancel's measured reach.
+    this.lastCancelLatencyMs =
+      Math.max(...outstanding.map((entry) => entry.scheduledAtMs)) - nowMs;
     this.committedHostSends = [];
     const aheadMs = this.scheduleAheadMs();
     const newIntervalMs = this.effectiveIntervalUs() / (MICROSECONDS_PER_SECOND / 1000);
@@ -1693,19 +1748,56 @@ export class DjPlayerEngine implements OnDestroy {
    * whenever the main thread reached the packet is what makes packet spacing independent of
    * callback timing.
    */
-  private sendFramePacket(packet: Uint8Array, dueAtMs: number): void {
+  private sendFramePacket(packet: Uint8Array, dueAtMs: number, catchUpClamped: boolean): void {
     const aheadMs = this.scheduleAheadMs();
+    const handOffMs = performance.now();
+    let scheduledAtMs: number;
     if (this.timingMode() === 'host-scheduled') {
-      const scheduledAtMs = dueAtMs + aheadMs;
+      scheduledAtMs = dueAtMs + aheadMs;
       this.midi.send(packet, scheduledAtMs);
       this.recordCommittedHostSend(packet, scheduledAtMs);
     } else if (aheadMs > 0) {
-      this.midi.send(packet, performance.now() + aheadMs);
+      scheduledAtMs = handOffMs + aheadMs;
+      this.midi.send(packet, scheduledAtMs);
     } else {
+      // No timestamp reaches the transport here — "now" is the closest thing this frame has to a
+      // delivery time, and is what the reorder check below compares it against.
+      scheduledAtMs = handOffMs;
       this.midi.send(packet);
     }
     this.packetsSent++;
     this.bytesSent += packet.length;
+    this.recordDeliveryStats(dueAtMs, handOffMs, scheduledAtMs, catchUpClamped);
+  }
+
+  /**
+   * Updates the delivery-against-due-time counters `publishStats()` reports. Runs on every frame
+   * packet, in both timing modes, so `cartridge-timed` and `host-scheduled` can be compared against
+   * the same instrument rather than each against memory.
+   */
+  private recordDeliveryStats(
+    dueAtMs: number,
+    handOffMs: number,
+    scheduledAtMs: number,
+    catchUpClamped: boolean
+  ): void {
+    this.scheduledFrames++;
+    const lagMs = handOffMs - dueAtMs;
+    this.sumLagMs += lagMs;
+    if (lagMs > this.worstLagMs) {
+      this.worstLagMs = lagMs;
+    }
+    const oneIntervalMs = this.effectiveIntervalUs() / (MICROSECONDS_PER_SECOND / 1000);
+    if (lagMs > oneIntervalMs) {
+      this.lateFrames++;
+    }
+    if (catchUpClamped) {
+      this.clampedFrames++;
+    }
+    if (this.lastScheduledAtMs !== null && scheduledAtMs < this.lastScheduledAtMs) {
+      this.reorderedFrames++;
+    }
+    this.lastScheduledAtMs = scheduledAtMs;
   }
 
   /** Drops whatever has already reached its scheduled delivery time before recording the newest
@@ -1742,6 +1834,14 @@ export class DjPlayerEngine implements OnDestroy {
     this.recipeResends = 0;
     this.pending = [];
     this.committedHostSends = [];
+    this.scheduledFrames = 0;
+    this.lateFrames = 0;
+    this.sumLagMs = 0;
+    this.worstLagMs = 0;
+    this.reorderedFrames = 0;
+    this.clampedFrames = 0;
+    this.lastCancelLatencyMs = -1;
+    this.lastScheduledAtMs = null;
   }
 
   /**
@@ -1774,6 +1874,14 @@ export class DjPlayerEngine implements OnDestroy {
       jitterMs: clockStats.jitterMs,
       worstGapMs: clockStats.worstGapMs,
       lateCallbacks: clockStats.lateCallbacks,
+      scheduledFrames: this.scheduledFrames,
+      lateFrames: this.lateFrames,
+      meanLagMs: this.scheduledFrames === 0 ? 0 : this.sumLagMs / this.scheduledFrames,
+      worstLagMs: this.worstLagMs,
+      reorderedFrames: this.reorderedFrames,
+      clampedFrames: this.clampedFrames,
+      cancelSupported: this.midi.supportsCancel(),
+      lastCancelLatencyMs: this.lastCancelLatencyMs,
     });
   }
 }

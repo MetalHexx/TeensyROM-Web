@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { ThemeService } from '@teensyrom-nx/ui/styles';
 import { SidFile, SidParseError } from '../sid/sid-file.model';
 import { parseSidFile } from '../sid/sid-file.parser';
@@ -25,9 +26,18 @@ interface TuneSource {
 
 const MICROSECONDS_PER_SECOND = 1_000_000;
 
-/** off / 5 ms / 20 ms — the schedule-ahead choices this experiment needs to answer whether a
- * timestamped `send()` is honoured at all in this browser. */
-const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20];
+/** The stall control's starting span — long enough to be heard, short enough not to trip
+ *  `MAX_CATCH_UP_US`'s catch-up ceiling in the frame clock on a single press. */
+const DEFAULT_STALL_DURATION_MS = 150;
+
+/**
+ * Off, two sub-frame probes, then a ceiling that reaches well past a single PAL frame (~19.95 ms).
+ * `R5` needs a stall shorter than the window to be demonstrably inaudible, which a ceiling of one
+ * frame cannot show — `setScheduleAhead()` still clamps the selectable depth to
+ * `UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS` whenever the selected port cannot cancel a pending send;
+ * this list is the shipping-depth question the clamp does not answer on its own.
+ */
+const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
 
 /**
  * The DJ player control panel — reachable only by typing `/dev/dj-poc` in the browser. A
@@ -110,6 +120,9 @@ export class DjPocViewComponent {
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
   protected readonly voiceIndices: readonly number[] = [0, 1, 2];
   protected readonly nudgeRange = this.engine.nudgeRangeFrames;
+
+  /** The main-thread stall control's configured span, ms — see `onStallMainThread`. */
+  protected readonly stallDurationMs = signal<number>(DEFAULT_STALL_DURATION_MS);
 
   // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
   // own position updates (which fire from stats publishes, not from the drag) can't fight it and
@@ -308,6 +321,29 @@ export class DjPocViewComponent {
 
   onScheduleAheadChange(event: Event): void {
     this.engine.setScheduleAhead(Number((event.target as HTMLSelectElement).value));
+  }
+
+  onStallDurationInput(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value);
+    if (Number.isFinite(value) && value >= 0) {
+      this.stallDurationMs.set(value);
+    }
+  }
+
+  /**
+   * Blocks the main thread synchronously for `stallDurationMs()` — the deliberate stall `R5` needs
+   * to put the resilience claim on demand rather than waiting for a real one to land during a
+   * session. The frame clock's audio callback rides this same thread, so nothing it paces can run
+   * until the loop below returns; the delivery stats afterward are what say whether that gap was
+   * heard.
+   */
+  onStallMainThread(): void {
+    const ms = this.stallDurationMs();
+    logInfo(LogType.Debug, `DJ POC: stalling the main thread for ${ms} ms.`);
+    const until = performance.now() + ms;
+    while (performance.now() < until) {
+      // Deliberately empty — a busy-wait is the point, not a bug.
+    }
   }
 
   onVoiceMuteToggle(voice: number, event: Event): void {
