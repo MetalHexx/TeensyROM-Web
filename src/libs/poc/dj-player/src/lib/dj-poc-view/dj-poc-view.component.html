@@ -39,161 +39,115 @@
         <section class="panel" aria-label="Cues">
           <div class="panel-header">
             <h2>Cues</h2>
-            <button type="button" (click)="onAddCue()">Add Cue</button>
-          </div>
-
-          <div class="cue-rows">
-            @for (cue of cues(); track $index) {
-            <div class="cue-row">
-              <span class="cue-tag">Cue {{ $index + 1 }}</span>
-              <div class="cue-btns">
-                @if (cue) {
-                <button type="button" (click)="onHopToCue($index)">Hop</button>
-                } @else {
-                <button
-                  type="button"
-                  class="cue-btn-wide"
-                  [attr.aria-label]="'Capture cue ' + ($index + 1)"
-                  (click)="onCaptureCue($index)"
-                >
-                  Capture
-                </button>
-                }
-              </div>
-              @if (cue) {
-              <span class="cue-frame">frame {{ cue.frame }}</span>
-              } @else {
-              <span class="cue-frame cue-frame--empty">empty</span>
-              } @if (cue) {
-              <div class="cue-nudge">
-                <div class="cue-nudge-centre"></div>
-                <input
-                  type="range"
-                  [min]="-nudgeRange()"
-                  [max]="nudgeRange()"
-                  step="1"
-                  [attr.aria-label]="'Nudge cue ' + ($index + 1)"
-                  [value]="displayedCueOffset($index)"
-                  (input)="onCueNudgeInput($index, $event)"
-                  (change)="onCueNudgeChange($index, $event)"
-                />
-              </div>
-              <span class="cue-offset">{{ cueOffsetLabel($index) }}</span>
-              } @else {
-              <div class="cue-nudge cue-nudge--empty" aria-hidden="true">
-                <div class="cue-nudge-centre"></div>
-              </div>
-              <span class="cue-offset cue-offset--empty">—</span>
-              }
-              <div class="row-actions">
-                <button
-                  type="button"
-                  [attr.aria-label]="'Clear cue ' + ($index + 1)"
-                  (click)="onClearCue($index)"
-                >
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  [attr.aria-label]="'Delete cue ' + ($index + 1)"
-                  (click)="onDeleteCue($index)"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-            }
-          </div>
-        </section>
-
-        <section class="panel" aria-label="Loops">
-          <div class="loop-panel-header">
-            <h2>Loops</h2>
             <div class="panel-header-actions">
-              <button type="button" (click)="onAddLoop()">Add Loop</button>
+              <button type="button" (click)="onAddMarker()">Add</button>
               <button type="button" aria-label="Stop loop" (click)="onStopLoop()">Stop</button>
             </div>
           </div>
 
-          <div class="loop-slots">
-            @for (slot of loopSlots(); track $index) {
-            <div class="loop-slot-row" [attr.data-loop-state]="loopSlotState($index)">
-              <div class="loop-slot-main">
+          <div class="marker-rows">
+            @for (marker of markers(); track $index) {
+            <div class="marker-row" [attr.data-marker-state]="markerState($index)">
+              <div class="marker-row-main">
+                <span class="marker-tag">Cue {{ $index + 1 }}</span>
+
+                @if (marker.start) {
                 <button
                   type="button"
-                  class="loop-slot-punch"
-                  [attr.aria-label]="'Punch slot ' + ($index + 1)"
-                  (click)="onPunchLoop($index)"
+                  class="marker-trigger"
+                  [attr.aria-label]="'Trigger marker ' + ($index + 1)"
+                  (click)="onTriggerMarker($index)"
                 >
-                  {{ $index + 1 }}
+                  Trigger
                 </button>
+                } @else {
+                <button
+                  type="button"
+                  class="marker-trigger"
+                  [attr.aria-label]="'Capture cue ' + ($index + 1)"
+                  (click)="onCaptureMarkerStart($index)"
+                >
+                  Capture
+                </button>
+                }
 
-                <div class="loop-slot-ends">
-                  <div class="loop-end">
-                    <span class="loop-tag">In</span>
-                    <button
-                      type="button"
-                      [attr.aria-label]="'Tap in for slot ' + ($index + 1)"
-                      (click)="onTapLoopIn($index)"
-                    >
-                      Tap In
-                    </button>
-                    @if (slot.in; as point) {
-                    <span class="loop-frame">frame {{ loopInFrame($index) }}</span>
-                    <div class="loop-nudge">
-                      <div class="loop-nudge-centre"></div>
+                <div class="marker-ends">
+                  <div class="marker-start">
+                    <span class="marker-sub-tag">Start</span>
+                    @if (marker.start) {
+                    <span class="marker-frame">frame {{ markerStartFrame($index) }}</span>
+                    <div class="marker-nudge">
+                      <div class="marker-nudge-centre"></div>
                       <input
                         type="range"
                         [min]="-nudgeRange()"
                         [max]="nudgeRange()"
                         step="1"
-                        [attr.aria-label]="'Nudge loop ' + ($index + 1) + ' in'"
-                        [value]="displayedLoopInOffset($index)"
-                        (input)="onLoopInNudgeInput($index, $event)"
-                        (change)="onLoopInNudgeChange($index, $event)"
+                        [attr.aria-label]="'Nudge marker ' + ($index + 1) + ' start'"
+                        [value]="displayedMarkerStartOffset($index)"
+                        (input)="onMarkerStartNudgeInput($index, $event)"
+                        (change)="onMarkerStartNudgeChange($index, $event)"
                       />
                     </div>
-                    <span class="loop-offset">{{ loopInOffsetLabel($index) }}</span>
+                    <span class="marker-offset">{{ markerStartOffsetLabel($index) }}</span>
                     } @else {
-                    <span class="loop-frame loop-frame--empty">unmarked</span>
-                    <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
-                      <div class="loop-nudge-centre"></div>
+                    <span class="marker-frame marker-frame--empty">empty</span>
+                    <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
+                      <div class="marker-nudge-centre"></div>
                     </div>
-                    <span class="loop-offset loop-offset--empty">—</span>
+                    <span class="marker-offset marker-offset--empty">—</span>
                     }
                   </div>
 
-                  <div class="loop-end">
-                    <span class="loop-tag">Out</span>
+                  <div class="marker-end">
+                    <span class="marker-sub-tag">End</span>
                     <button
                       type="button"
-                      [attr.aria-label]="'Tap out for slot ' + ($index + 1)"
-                      (click)="onTapLoopOut($index)"
+                      class="marker-end-set"
+                      [attr.aria-label]="'Set end for marker ' + ($index + 1)"
+                      (click)="onSetMarkerEnd($index)"
                     >
-                      Tap Out
+                      Set End
                     </button>
-                    @if (slot.out; as point) {
-                    <span class="loop-frame">frame {{ loopOutFrame($index) }}</span>
-                    <div class="loop-nudge">
-                      <div class="loop-nudge-centre"></div>
+                    @if (marker.end; as end) {
+                    <span class="marker-frame">frame {{ markerEndFrame($index) }}</span>
+                    <div class="marker-nudge">
+                      <div class="marker-nudge-centre"></div>
                       <input
                         type="range"
                         [min]="-nudgeRange()"
                         [max]="nudgeRange()"
                         step="1"
-                        [attr.aria-label]="'Nudge loop ' + ($index + 1) + ' out'"
-                        [value]="displayedLoopOutOffset($index)"
-                        (input)="onLoopOutNudgeInput($index, $event)"
-                        (change)="onLoopOutNudgeChange($index, $event)"
+                        [attr.aria-label]="'Nudge marker ' + ($index + 1) + ' end'"
+                        [value]="displayedMarkerEndOffset($index)"
+                        (input)="onMarkerEndNudgeInput($index, $event)"
+                        (change)="onMarkerEndNudgeChange($index, $event)"
                       />
                     </div>
-                    <span class="loop-offset">{{ loopOutOffsetLabel($index) }}</span>
+                    <span class="marker-offset">{{ markerEndOffsetLabel($index) }}</span>
+                    <button
+                      type="button"
+                      class="marker-end-revert"
+                      [attr.aria-label]="'Revert marker ' + ($index + 1) + ' to cue'"
+                      (click)="onClearMarkerEnd($index)"
+                    >
+                      Revert
+                    </button>
                     } @else {
-                    <span class="loop-frame loop-frame--empty">unmarked</span>
-                    <div class="loop-nudge loop-nudge--empty" aria-hidden="true">
-                      <div class="loop-nudge-centre"></div>
+                    <span class="marker-frame marker-frame--empty" aria-hidden="true">empty</span>
+                    <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
+                      <div class="marker-nudge-centre"></div>
                     </div>
-                    <span class="loop-offset loop-offset--empty">—</span>
+                    <span class="marker-offset marker-offset--empty" aria-hidden="true">—</span>
+                    <button
+                      type="button"
+                      class="marker-end-revert marker-end-revert--empty"
+                      aria-hidden="true"
+                      tabindex="-1"
+                      disabled
+                    >
+                      Revert
+                    </button>
                     }
                   </div>
                 </div>
@@ -201,27 +155,23 @@
                 <div class="row-actions">
                   <button
                     type="button"
-                    class="loop-slot-clear"
-                    [attr.aria-label]="'Clear slot ' + ($index + 1)"
-                    (click)="onClearLoopSlot($index)"
+                    [attr.aria-label]="'Clear marker ' + ($index + 1)"
+                    (click)="onClearMarker($index)"
                   >
                     Clear
                   </button>
                   <button
                     type="button"
-                    [attr.aria-label]="'Delete slot ' + ($index + 1)"
-                    (click)="onDeleteLoop($index)"
+                    [attr.aria-label]="'Delete marker ' + ($index + 1)"
+                    (click)="onDeleteMarker($index)"
                   >
                     Delete
                   </button>
                 </div>
               </div>
 
-              <div class="loop-slot-progress" aria-hidden="true">
-                <div
-                  class="loop-slot-progress-fill"
-                  [style.width.%]="progressPercentFor($index)"
-                ></div>
+              <div class="marker-progress" aria-hidden="true">
+                <div class="marker-progress-fill" [style.width.%]="progressPercentFor($index)"></div>
               </div>
             </div>
             }

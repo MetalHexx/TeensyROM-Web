@@ -14,20 +14,17 @@
 }
 
 .dj-poc-page {
-  // Shared column widths so the cue rows and the loop rows land on one rhythm rather than each panel
-  // inventing its own. They are chosen so both panels' leading columns add up to the same width and
-  // the nudge tracks start on one line down the whole stage:
-  //   cue   3 + 8 + tag + 8 + btns + 8 + frame + 8
-  //   loop  3 + 8 + 2rem + 8 + tag + 8 + tap + 8 + frame + 8
-  // Every control on the performance surface is this tall. The browser's default button height is
-  // around 19px, which is a fine form control and a poor thing to hit mid-tune.
+  // Shared column widths so every marker row's start and end blocks land on one rhythm. Every
+  // control on the performance surface is this tall. The browser's default button height is around
+  // 19px, which is a fine form control and a poor thing to hit mid-tune.
   --perf-control-height: 2rem;
 
   --slot-tag-width: 3.5rem;
   --slot-frame-width: 6rem;
   --slot-offset-width: 3.25rem;
-  --cue-btns-width: 7rem;
-  --loop-tap-width: 4.5rem;
+  --marker-trigger-width: 7rem;
+  --marker-action-width: 4.5rem;
+  --marker-revert-width: 4rem;
 
   display: flex;
   gap: var(--spacing-lg);
@@ -74,8 +71,8 @@
   border-radius: var(--border-radius-md);
   min-height: 0;
 
-  // Descendant, not direct child: the Loop panel wraps its heading in a header row beside the Stop
-  // control, and a `>` here left that one heading unstyled.
+  // Descendant, not direct child: the Cues panel wraps its heading in a header row beside the Stop
+  // control, and a `>` here left that heading unstyled.
   h2 {
     flex: 0 0 auto;
     margin: 0;
@@ -365,13 +362,12 @@
   }
 }
 
-// Rows are sized by their own content (`.cue-row`/`.loop-slot-row` are `flex: 0 0 auto`) and stack
-// from the top rather than stretching to fill the panel, so density comes from the real gap below
-// rather than from each row silently absorbing the panel's slack. Once rows stop growing this also
-// becomes the scroll container: a bounded height (inherited from the panel's own flex sizing) plus
+// Rows are sized by their own content (`.marker-row` is `flex: 0 0 auto`) and stack from the top
+// rather than stretching to fill the panel, so density comes from the real gap below rather than
+// from each row silently absorbing the panel's slack. Once rows stop growing this also becomes the
+// scroll container: a bounded height (inherited from the panel's own flex sizing) plus
 // `overflow-y: auto` lets the list scroll instead of pushing the page.
-.cue-rows,
-.loop-slots {
+.marker-rows {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -381,60 +377,120 @@
   overflow-y: auto;
 }
 
-// label | button pair | captured frame | nudge track | offset readout. Every column but the track
-// stays fixed width across the empty/filled states so filling or clearing a slot never moves
-// anything else in the row. No separator rule: the even pitch and the tracks' own outlines already
-// group each row, and a line per row only added noise.
-// The transparent left border has no state to report as the loop rows' does — it is here so the cue
-// rows and the loop rows indent identically and their nudge tracks share one left edge.
-.cue-row {
+// Two lines per row, as the wireframe has it: number/trigger, then the start and end blocks, then
+// clear/delete, with the progress strip spanning underneath. A left border reports active/queued
+// state so the row reads without a text label — solid and lit for active, dashed and dimmer for
+// queued, invisible for idle. Every row carries this state now: a cue queues and plays exactly like
+// a loop, it just has nothing to wrap against.
+.marker-row {
   display: flex;
   flex: 0 0 auto;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
   border-left: 3px solid transparent;
+
+  &[data-marker-state='active'] {
+    border-left-color: var(--color-primary);
+  }
+
+  &[data-marker-state='queued'] {
+    border-left-style: dashed;
+    border-left-color: var(--color-dimmed);
+  }
 }
 
-.cue-tag,
-.loop-tag {
+.marker-row-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.marker-tag,
+.marker-sub-tag {
   flex: 0 0 var(--slot-tag-width);
   color: var(--color-dimmed);
   font-size: var(--font-size-sm);
 }
 
-// Fixed-width column reserved whether the row shows one wide button or two — a hopped-to slot's
-// extra Clear button must never widen the row.
-.cue-btns {
-  display: flex;
-  gap: var(--spacing-sm);
-  flex: 0 0 var(--cue-btns-width);
+// Fixed width so a row's leading control never resizes between "Capture" and "Trigger" — the
+// button collapses the old Hop, Capture and Punch controls into one.
+.marker-trigger {
+  flex: 0 0 var(--marker-trigger-width);
+  height: var(--perf-control-height);
+}
 
-  button {
-    flex: 1 1 0;
-    min-width: 0;
+// Start and end sit side by side, as the wireframe has them — stacking them doubled the height of
+// every row. They fall back to stacking only once the pair genuinely can't fit.
+.marker-ends {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: var(--spacing-sm);
+}
+
+// tag | frame | nudge track | offset readout. Capturing the start is the leading trigger/capture
+// button's job, so this block carries no button of its own — only the start's own readout.
+.marker-start {
+  display: flex;
+  align-items: center;
+  flex: 1 1 15rem;
+  min-width: 0;
+  gap: var(--spacing-sm);
+}
+
+// tag | set-end button | frame | nudge track | offset readout | revert-to-cue button. The set-end
+// button is always present — it is what turns a cue into a loop — so a row of cues never loses its
+// one way to grow an end.
+.marker-end {
+  display: flex;
+  align-items: center;
+  flex: 1 1 15rem;
+  min-width: 0;
+  gap: var(--spacing-sm);
+
+  // Fixed widths so a filled-in end's extra revert button, and the set-end label itself, never
+  // resize the row around them.
+  .marker-end-set {
+    flex: 0 0 var(--marker-action-width);
+    height: var(--perf-control-height);
+  }
+
+  .marker-end-revert {
+    flex: 0 0 var(--marker-revert-width);
     height: var(--perf-control-height);
   }
 }
 
-.cue-frame,
-.loop-frame {
+// Reserves the revert button's column even with no end to revert, so setting one never shifts the
+// offset readout beside it — the same dimmed-placeholder technique the frame/nudge/offset triplet
+// already uses.
+.marker-end-revert--empty {
+  opacity: 0.4;
+}
+
+// label | button pair | captured frame | nudge track | offset readout. Every column but the track
+// stays fixed width across the empty/filled states so filling or clearing a marker never moves
+// anything else in the row.
+.marker-frame {
   flex: 0 1 var(--slot-frame-width);
   min-width: 0;
   font-size: var(--font-size-sm);
   white-space: nowrap;
 }
 
-.cue-frame--empty,
-.loop-frame--empty {
+.marker-frame--empty {
   color: var(--color-dimmed);
 }
 
 // The nudge track: a centred range input over a zero marker, the same transparent-background
 // stacking as .scrub-track. It takes every pixel the row has left over — travel is what makes a
 // one-frame step hittable — and it is also the column that gives first as the viewport narrows.
-.cue-nudge,
-.loop-nudge {
+.marker-nudge {
   position: relative;
   flex: 1 1 auto;
   min-width: 2.5rem;
@@ -452,15 +508,14 @@
   }
 }
 
-// An unmarked point keeps the track's space so marking one never moves the row, but dims it to read
-// as inactive.
-.cue-nudge--empty,
-.loop-nudge--empty {
+// An unset point keeps the track's space so setting one never moves the row, but dims it to read as
+// inactive. Extended to the whole end group: an end-less row (a cue) still reserves its end block's
+// full width, so gaining an end never reflows the row or the rows below it.
+.marker-nudge--empty {
   opacity: 0.4;
 }
 
-.cue-nudge-centre,
-.loop-nudge-centre {
+.marker-nudge-centre {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -471,23 +526,20 @@
 }
 
 // Monospaced and fixed-width so the signed value doesn't shuffle the row as it crosses ±10.
-.cue-offset,
-.loop-offset {
+.marker-offset {
   flex: 0 0 var(--slot-offset-width);
   font-family: 'Roboto Mono', monospace;
   font-size: var(--font-size-sm);
   text-align: center;
 }
 
-.cue-offset--empty,
-.loop-offset--empty {
+.marker-offset--empty {
   color: var(--color-dimmed);
 }
 
-// Heading plus the panel-level add control. Loops adds the panel-level Stop control beside them —
-// one control ends whichever slot is looping, rather than a per-row stop.
-.panel-header,
-.loop-panel-header {
+// Heading plus the panel-level Add control, and the single panel-level Stop beside it — one control
+// ends whichever marker is looping, rather than a per-row stop.
+.panel-header {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -507,81 +559,17 @@
   gap: var(--spacing-sm);
 }
 
-// Two lines per slot, as the wireframe has it: punch target | In end | Out end | clear, with the
-// progress strip spanning underneath them. A left border reports active/queued state so the row
-// reads without a text label — solid and lit for active, dashed and dimmer for queued, invisible
-// for idle.
-.loop-slot-row {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-left: 3px solid transparent;
-
-  &[data-loop-state='active'] {
-    border-left-color: var(--color-primary);
-  }
-
-  &[data-loop-state='queued'] {
-    border-left-style: dashed;
-    border-left-color: var(--color-dimmed);
-  }
-}
-
-.loop-slot-main {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-sm);
-  min-width: 0;
-}
-
-.loop-slot-punch {
-  flex: 0 0 auto;
-  width: 2rem;
-  height: var(--perf-control-height);
-}
-
-// In and Out sit side by side, as the wireframe has them — stacking them doubled the height of
-// every slot row. They fall back to stacking only once the pair genuinely can't fit.
-.loop-slot-ends {
-  display: flex;
-  flex-wrap: wrap;
-  flex: 1 1 auto;
-  min-width: 0;
-  gap: var(--spacing-sm);
-}
-
-// tag | tap button | frame | nudge track | offset readout — the cue row's rhythm, once per loop end.
-.loop-end {
-  display: flex;
-  align-items: center;
-  flex: 1 1 15rem;
-  min-width: 0;
-  gap: var(--spacing-sm);
-
-  // A fixed width, or "Tap Out" would sit a few pixels wider than "Tap In" and knock the Out half of
-  // every row out of step with the In half. It also makes the columns' total width computable,
-  // which is what lets the progress strip below line up with the first nudge track.
-  > button {
-    flex: 0 0 var(--loop-tap-width);
-    height: var(--perf-control-height);
-  }
-}
-
-// Runs beneath its slot's controls, starting exactly where the In nudge track above it starts —
-// past the punch target, tag, tap button and frame readout — so it reads as that slot's lap rather
-// than a fifth column. Deliberately thinner than .scrub-track: it reports the pass rather than
-// inviting a drag. Stays empty for every slot but the active one — the engine only returns non-zero
-// progress for it.
-.loop-slot-progress {
+// Runs beneath its row's controls, starting exactly where the start block's nudge track starts —
+// past the marker tag, trigger button, sub-tag and frame readout — so it reads as that row's lap
+// rather than an extra column. Deliberately thinner than .scrub-track: it reports the pass rather
+// than inviting a drag. Stays empty for every row but the looping one — the engine only returns
+// non-zero progress for it.
+.marker-progress {
   position: relative;
   flex: 0 0 auto;
   margin-left: calc(
-    2rem + var(--slot-tag-width) + var(--loop-tap-width) + var(--slot-frame-width) + 4 *
-      var(--spacing-sm)
+    var(--slot-tag-width) + var(--marker-trigger-width) + var(--slot-tag-width) +
+      var(--slot-frame-width) + 4 * var(--spacing-sm)
   );
   height: 0.375rem;
   border: 1px solid var(--color-dimmed);
@@ -589,16 +577,16 @@
   overflow: hidden;
 }
 
-.loop-slot-progress-fill {
+.marker-progress-fill {
   position: absolute;
   inset: 0;
   width: 0;
   background: var(--color-dimmed);
 }
 
-// The right-edge action cluster, identical in both panels: Clear then Delete, Delete outermost. It
-// is each row's last flex child, so it lands at the row's right edge on whatever space the earlier
-// (flex-growing) columns left behind rather than needing a margin-left of its own.
+// The right-edge action cluster: Clear then Delete, Delete outermost. It is each row's last flex
+// child, so it lands at the row's right edge on whatever space the earlier (flex-growing) columns
+// left behind rather than needing a margin-left of its own.
 .row-actions {
   flex: 0 0 auto;
   display: flex;
@@ -608,10 +596,6 @@
     height: var(--perf-control-height);
     min-width: 4rem;
   }
-}
-
-.loop-slot-clear {
-  flex: 0 0 auto;
 }
 
 .error-text {
@@ -629,7 +613,7 @@
 }
 
 // The elapsed fill sits behind a transparent-background range input, the same stacking technique
-// as .cue-nudge above — the fill shows the played portion, the native thumb still handles drag.
+// as .marker-nudge above — the fill shows the played portion, the native thumb still handles drag.
 .scrub-track {
   position: relative;
   flex: 1 1 auto;
