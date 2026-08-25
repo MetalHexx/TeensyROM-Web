@@ -531,20 +531,28 @@ export class DjPlayerEngine implements OnDestroy {
 
   /**
    * Launches (or resumes) playback first if it is not already running, then hops — see
-   * `MarkerState.hopToCue` for the restore itself.
+   * `MarkerState.restoreCapturedPoint` for the restore itself.
    *
    * The playing check is inlined rather than routed through a shared `async` helper: when already
    * playing, skipping straight to the hop must stay perfectly synchronous with the call — awaiting
    * even an already-resolved promise yields a microtask, which would land the hop's restore a tick
    * later than a caller that never awaits this method (as the existing tests do not) expects.
+   *
+   * The cue is captured *before* the `play()` await, not re-read by index afterward: `play()` awaits
+   * a real async gap (`context.resume()`), and the view fires this call without disabling cue/loop
+   * controls while it is in flight, so the row can be cleared or re-captured before it lands. The
+   * pre-await capture restores whatever was there at click time regardless — the same stale-but-
+   * deterministic behaviour as a direct hop while already playing.
    */
   async hopToCue(index: number): Promise<void> {
     if (!this.markerState.hasCue(index)) return;
+    const cue = this.cues()[index];
+    if (cue === null) return;
     if (this.state() !== 'playing') {
       await this.play();
       if (this.state() !== 'playing') return;
     }
-    this.markerState.hopToCue(index);
+    this.markerState.restoreCapturedPoint(cue);
   }
 
   clearCue(index: number): void {

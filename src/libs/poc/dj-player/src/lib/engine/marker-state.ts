@@ -366,15 +366,28 @@ export class MarkerState {
    * Returns to a captured cue row; a no-op for an empty or out-of-range row. See `restorePoint` for
    * why the hop itself costs no emulation.
    *
-   * Escapes a running loop immediately rather than waiting out its lap — the same effect as
-   * `stopLoop()`, called rather than reimplemented — and leaves both slots' points untouched.
+   * Reads the row fresh from the live signal — safe here because nothing awaits between the check
+   * and the restore. The coordinator's async `hopToCue` cannot make that assumption (it may await a
+   * `play()` first) and calls `restoreCapturedPoint` with a point captured before that await instead.
    */
   hopToCue(index: number): void {
     if (!this.hasCue(index)) return;
     const cue = this.cues()[index];
     if (cue === null) return;
+    this.restoreCapturedPoint(cue);
+  }
+
+  /**
+   * Restores a point handed in directly rather than looked up by index — what the coordinator's
+   * async `hopToCue` uses so a cue captured before its `play()` await is restored verbatim, even if
+   * the row was cleared or re-captured while that await was in flight.
+   *
+   * Escapes a running loop immediately rather than waiting out its lap — the same effect as
+   * `stopLoop()`, called rather than reimplemented — and leaves both slots' points untouched.
+   */
+  restoreCapturedPoint(point: CapturedPoint): void {
     this.stopLoop();
-    this.restorePoint(cue);
+    this.restorePoint(point);
   }
 
   /** Empties a cue row, returning it to "Add", and keeps the row itself in place. */
