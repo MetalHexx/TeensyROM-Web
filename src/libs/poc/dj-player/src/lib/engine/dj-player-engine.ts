@@ -33,14 +33,13 @@ import { clamp, describeError } from './engine-utils';
 
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
 
-// The cue/loop/nudge types are Marker State's, but they are part of this module's public shape —
-// the view and its spec import them from here, so they flow through unchanged rather than moving
-// their import path.
+// The marker/nudge types are Marker State's, but they are part of this module's public shape — the
+// view and its spec import them from here, so they flow through unchanged rather than moving their
+// import path.
 export type {
   CapturedPoint,
-  CueSlot,
-  LoopOutPoint,
-  LoopSlot,
+  Marker,
+  MarkerEnd,
   PositionAnchor,
 } from './marker-state';
 export { LOOP_AUDITION_PREROLL_MS, NUDGE_RANGE_MS } from './marker-state';
@@ -152,7 +151,7 @@ const EMPTY_STATS: EngineStats = {
  * The coordinator: it owns the tick loop, the pending queue, the play/pause/stop state machine,
  * speed, voices and stats publication, and sequences three collaborators for everything else —
  * `DeliveryTransport` (packet delivery), `TuneSession` (the loaded tune, its machine/frame pair and
- * the off-thread jump), and `MarkerState` (cues, loops and the nudge machinery). Each collaborator
+ * the off-thread jump), and `MarkerState` (markers and the nudge machinery). Each collaborator
  * is a plain class built with `new`, not an Angular service, for the same reason `C64Machine` and
  * `RegisterFrame` are: it is scoped to this engine instance, not the app injector.
  */
@@ -221,10 +220,9 @@ export class DjPlayerEngine implements OnDestroy {
   readonly effectiveMutes = computed<readonly boolean[]>(() =>
     this.mutedVoices().map((latched, i) => latched !== this.heldVoices()[i])
   );
-  readonly cues = this.markerState.cues;
-  readonly loopSlots = this.markerState.loopSlots;
-  readonly activeLoopSlot = this.markerState.activeLoopSlot;
-  readonly queuedLoopSlot = this.markerState.queuedLoopSlot;
+  readonly markers = this.markerState.markers;
+  readonly loopingMarker = this.markerState.loopingMarker;
+  readonly queuedMarker = this.markerState.queuedMarker;
   readonly nudgeRangeFrames = this.markerState.nudgeRangeFrames;
   readonly ceilingFrames = this.tuneSession.ceilingFrames;
 
@@ -262,10 +260,10 @@ export class DjPlayerEngine implements OnDestroy {
       file.clock === 'ntsc' ? NTSC_FRAME_INTERVAL_US : PAL_FRAME_INTERVAL_US
     );
     this.resetCounters();
-    // Cues and loop entries hold machine state, not frame numbers, so a new tune invalidates every
+    // A marker's start holds machine state, not a frame number, so a new tune invalidates every
     // captured snapshot — this is the only path that clears them. Stop, play-from-stopped and
-    // subtune changes reuse the same machine and must leave captured points alone. Whatever was
-    // looping goes with the points: there is nothing left to loop against.
+    // subtune changes reuse the same machine and must leave captured markers alone. Whatever was
+    // looping goes with them: there is nothing left to loop against.
     this.markerState.clear();
 
     if (this.tuneSession.initSubtune(file.startSong)) {
@@ -517,109 +515,77 @@ export class DjPlayerEngine implements OnDestroy {
     this.delivery.setScheduleAhead(ms);
   }
 
-  addCue(): number {
-    return this.markerState.addCue();
+  addMarker(): number {
+    return this.markerState.addMarker();
   }
 
-  captureCue(index: number): void {
-    this.markerState.captureCue(index);
+  captureMarkerStart(index: number): void {
+    this.markerState.captureMarkerStart(index);
   }
 
-  setCueOffset(index: number, offset: number): void {
-    this.markerState.setCueOffset(index, offset);
+  setMarkerStartOffset(index: number, offset: number): void {
+    this.markerState.setMarkerStartOffset(index, offset);
+  }
+
+  setMarkerEnd(index: number): void {
+    this.markerState.setMarkerEnd(index);
+  }
+
+  clearMarkerEnd(index: number): void {
+    this.markerState.clearMarkerEnd(index);
+  }
+
+  setMarkerEndOffset(index: number, offset: number): void {
+    this.markerState.setMarkerEndOffset(index, offset);
   }
 
   /**
-   * Launches (or resumes) playback first if it is not already running, then hops — see
-   * `MarkerState.restoreCapturedPoint` for the restore itself.
+   * Launches (or resumes) playback first if it is not already running, then triggers — see
+   * `MarkerState.triggerMarker` for the engage-now-or-queue decision.
    *
-   * The playing check is inlined rather than routed through a shared `async` helper: when already
-   * playing, skipping straight to the hop must stay perfectly synchronous with the call — awaiting
-   * even an already-resolved promise yields a microtask, which would land the hop's restore a tick
-   * later than a caller that never awaits this method (as the existing tests do not) expects.
+   * The bounds check runs before the launch, so a launch is never spent on a row with no start. The
+   * playing check is inlined rather than routed through a shared `async` helper: when already
+   * playing, skipping straight to the trigger must stay perfectly synchronous with the call —
+   * awaiting even an already-resolved promise yields a microtask, which would land the restore a
+   * tick later than a caller that never awaits this method (as the existing tests do not) expects.
    *
-   * The cue is captured *before* the `play()` await, not re-read by index afterward: `play()` awaits
-   * a real async gap (`context.resume()`), and the view fires this call without disabling cue/loop
-   * controls while it is in flight, so the row can be cleared or re-captured before it lands. The
-   * pre-await capture restores whatever was there at click time regardless — the same stale-but-
-   * deterministic behaviour as a direct hop while already playing.
+   * The restore is issued *after* the `play()` await, by index rather than by a value captured
+   * before it: `play()` awaits a real async gap (`context.resume()`), and `MarkerState.triggerMarker`
+   * re-validates the row at that point, so a row cleared or re-captured while the await was in
+   * flight is handled correctly rather than replayed stale.
    */
-  async hopToCue(index: number): Promise<void> {
-    if (!this.markerState.hasCue(index)) return;
-    const cue = this.cues()[index];
-    if (cue === null) return;
+  async triggerMarker(index: number): Promise<void> {
+    const marker = this.markers()[index];
+    if (marker === undefined || marker.start === null) return;
     if (this.state() !== 'playing') {
       await this.play();
       if (this.state() !== 'playing') return;
     }
-    this.markerState.restoreCapturedPoint(cue);
+    this.markerState.triggerMarker(index);
   }
 
-  clearCue(index: number): void {
-    this.markerState.clearCue(index);
+  auditionMarkerStart(index: number): void {
+    this.markerState.auditionMarkerStart(index);
   }
 
-  deleteCue(index: number): void {
-    this.markerState.deleteCue(index);
-  }
-
-  addLoop(): number {
-    return this.markerState.addLoop();
-  }
-
-  tapLoopIn(index: number): void {
-    this.markerState.tapLoopIn(index);
-  }
-
-  tapLoopOut(index: number): void {
-    this.markerState.tapLoopOut(index);
-  }
-
-  setLoopInOffset(index: number, frames: number): void {
-    this.markerState.setLoopInOffset(index, frames);
-  }
-
-  setLoopOutOffset(index: number, frames: number): void {
-    this.markerState.setLoopOutOffset(index, frames);
-  }
-
-  /**
-   * Launches (or resumes) playback first if it is not already running, then punches — see
-   * `MarkerState.punchLoop` for the engage-now-or-queue decision. The playability check runs before
-   * the launch, so a launch is never spent on a row with nothing to play. See `hopToCue` for why the
-   * playing check is inlined rather than shared.
-   */
-  async punchLoop(index: number): Promise<void> {
-    if (!this.markerState.isLoopPlayable(index)) return;
-    if (this.state() !== 'playing') {
-      await this.play();
-      if (this.state() !== 'playing') return;
-    }
-    this.markerState.punchLoop(index);
-  }
-
-  auditionLoopIn(index: number): void {
-    this.markerState.auditionLoopIn(index);
-  }
-
-  auditionLoopOut(index: number): void {
-    this.markerState.auditionLoopOut(index);
+  auditionMarkerEnd(index: number): void {
+    this.markerState.auditionMarkerEnd(index);
   }
 
   stopLoop(): void {
     this.markerState.stopLoop();
   }
 
-  clearLoopSlot(index: number): void {
-    this.markerState.clearLoopSlot(index);
+  clearMarker(index: number): void {
+    this.markerState.clearMarker(index);
   }
 
-  deleteLoop(index: number): void {
-    this.markerState.deleteLoop(index);
+  deleteMarker(index: number): void {
+    this.markerState.deleteMarker(index);
   }
 
-  progressPercentFor(slot: number): number {
-    return this.markerState.progressPercentFor(slot, this.stats().framesRendered);
+  progressPercentFor(index: number): number {
+    return this.markerState.progressPercentFor(index, this.stats().framesRendered);
   }
 
   /**
@@ -740,15 +706,15 @@ export class DjPlayerEngine implements OnDestroy {
    *
    * The host paces the stream one frame per tick, so a packet injected between ticks lands inside a
    * frame slot another packet already owns — two frames' worth of register writes arriving as one,
-   * however hard the cue buttons are hit. Riding the tick gives each packet a slot and a due time of
-   * its own.
+   * however hard the marker buttons are hit. Riding the tick gives each packet a slot and a due time
+   * of its own.
    *
    * The gate-off leads in a packet of its own so it lands a whole frame ahead of the resync, giving
    * every voice a real release window before it re-attacks. Folding both into one packet via the
    * ASID secondary gate slots would halve the frames but collapse that window to a few cycles.
    *
    * Costs the hop up to two frames of latency (~40 ms at 50 Hz), which is well under what a hand
-   * hitting a cue button can hear.
+   * hitting a marker button can hear.
    */
   private queueResync(): void {
     const frame = this.tuneSession.frame;

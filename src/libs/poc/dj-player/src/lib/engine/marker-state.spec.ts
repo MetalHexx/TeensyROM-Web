@@ -133,20 +133,29 @@ describe('MarkerState', () => {
     markerState.recordAnchor(harness.machine(), harness.frame(), harness.framesRendered());
   });
 
-  describe('cue capture and restore', () => {
-    it('captures the machine/frame state at the current position, and hopping to it hands that exact snapshot back for a restore', () => {
+  /** Adds a marker, then marks its end `length` frames later — a loop candidate whose start sits
+   *  wherever the harness's position was when this ran. */
+  function markLoopMarker(length: number): number {
+    const index = markerState.addMarker();
+    harness.tickBy(length);
+    markerState.setMarkerEnd(index);
+    return index;
+  }
+
+  describe('marker capture and restore', () => {
+    it('captures the machine/frame state at the current position, and triggering it hands that exact snapshot back for a restore', () => {
       harness.tickBy(5);
       const snapshotAtCapture = harness.machine().snapshot();
       const registersAtCapture = harness.frame().snapshotValues();
 
-      const index = markerState.addCue();
+      const index = markerState.addMarker();
 
-      expect(markerState.cues()).toHaveLength(1);
-      expect(markerState.cues()[0]?.frame).toBe(5);
+      expect(markerState.markers()).toHaveLength(1);
+      expect(markerState.markers()[0].start?.frame).toBe(5);
 
       harness.tickBy(10); // play on past the capture
 
-      markerState.hopToCue(index);
+      markerState.triggerMarker(index);
 
       expect(harness.restores).toHaveLength(1);
       expect(harness.restores[0].frame).toBe(5);
@@ -170,97 +179,97 @@ describe('MarkerState', () => {
       };
       const marker = new MarkerState(noTuneHarness);
 
-      const index = marker.addCue();
+      const index = marker.addMarker();
 
-      expect(marker.cues()).toEqual([null]);
+      expect(marker.markers()).toEqual([{ start: null, end: null }]);
       expect(index).toBe(0);
     });
 
-    it('is a no-op to hop to an empty or out-of-range cue', () => {
-      markerState.addCue();
-      markerState.clearCue(0);
+    it('is a no-op to trigger an empty or out-of-range row', () => {
+      markerState.addMarker();
+      markerState.clearMarker(0);
 
-      markerState.hopToCue(0);
-      markerState.hopToCue(5);
+      markerState.triggerMarker(0);
+      markerState.triggerMarker(5);
 
       expect(harness.restores).toHaveLength(0);
     });
 
     it('refills a cleared row by capturing into it again, landing at the new position', () => {
       harness.tickBy(5);
-      markerState.addCue();
-      markerState.clearCue(0);
+      markerState.addMarker();
+      markerState.clearMarker(0);
 
       harness.tickBy(5);
-      markerState.captureCue(0);
+      markerState.captureMarkerStart(0);
 
-      expect(markerState.cues()[0]?.frame).toBe(10);
+      expect(markerState.markers()[0].start?.frame).toBe(10);
     });
 
     it('deletes a row outright, shifting later indices down', () => {
-      markerState.addCue();
-      markerState.addCue();
+      markerState.addMarker();
+      markerState.addMarker();
 
-      markerState.deleteCue(0);
+      markerState.deleteMarker(0);
 
-      expect(markerState.cues()).toHaveLength(1);
+      expect(markerState.markers()).toHaveLength(1);
     });
   });
 
-  describe('the cue nudge', () => {
-    it('walks a cue backward onto an earlier frame', () => {
+  describe('the start nudge', () => {
+    it('walks a marker backward onto an earlier frame', () => {
       harness.tickBy(60);
-      const index = markerState.addCue();
+      const index = markerState.addMarker();
 
-      markerState.setCueOffset(index, -10);
+      markerState.setMarkerStartOffset(index, -10);
 
-      markerState.hopToCue(index);
+      markerState.triggerMarker(index);
       expect(harness.restores.at(-1)?.frame).toBe(50);
     });
 
-    it('hops to a nudged cue without emulating a frame, however deep it was captured', () => {
+    it('triggers a nudged marker without emulating a frame, however deep it was captured', () => {
       harness.tickBy(200);
-      const index = markerState.addCue();
-      markerState.setCueOffset(index, -20); // the replay this runs happens before the spy below attaches
+      const index = markerState.addMarker();
+      markerState.setMarkerStartOffset(index, -20); // the replay this runs happens before the spy below attaches
       const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
 
-      markerState.hopToCue(index);
+      markerState.triggerMarker(index);
 
-      // The stall this design exists to avoid: a hop that re-derived the nudged point would run
+      // The stall this design exists to avoid: a trigger that re-derived the nudged point would run
       // frames on the live machine, blocking whatever else rides the same thread.
       expect(runFrame).not.toHaveBeenCalled();
       expect(harness.restores.at(-1)?.frame).toBe(180);
     });
 
-    it('walks a cue forward onto a later frame', () => {
+    it('walks a marker forward onto a later frame', () => {
       harness.tickBy(60);
-      const index = markerState.addCue();
+      const index = markerState.addMarker();
 
-      markerState.setCueOffset(index, 10);
+      markerState.setMarkerStartOffset(index, 10);
 
-      markerState.hopToCue(index);
+      markerState.triggerMarker(index);
       expect(harness.restores.at(-1)?.frame).toBe(70);
     });
 
     it('clamps the offset to the nudge range in both directions', () => {
       harness.tickBy(60);
-      const index = markerState.addCue();
+      const index = markerState.addMarker();
       const range = markerState.nudgeRangeFrames();
 
-      markerState.setCueOffset(index, 999);
-      expect(markerState.cues()[index]?.offset).toBe(range);
+      markerState.setMarkerStartOffset(index, 999);
+      expect(markerState.markers()[index].start?.offset).toBe(range);
 
-      markerState.setCueOffset(index, -999);
-      expect(markerState.cues()[index]?.offset).toBe(-range);
+      markerState.setMarkerStartOffset(index, -999);
+      expect(markerState.markers()[index].start?.offset).toBe(-range);
     });
 
-    it('falls back to the frame-0 anchor for a cue captured before the ring has filled', () => {
+    it('falls back to the frame-0 anchor for a marker captured before the ring has filled', () => {
       harness.tickBy(5);
-      const index = markerState.addCue();
+      const index = markerState.addMarker();
 
-      markerState.setCueOffset(index, -5);
+      markerState.setMarkerStartOffset(index, -5);
 
-      markerState.hopToCue(index);
+      markerState.triggerMarker(index);
       expect(harness.restores.at(-1)?.frame).toBe(0);
     });
 
@@ -279,10 +288,10 @@ describe('MarkerState', () => {
         harness.tick();
         markerState.maybeRecordAnchor(harness.machine(), harness.frame(), harness.framesRendered());
       }
-      const index = markerState.addCue();
+      const index = markerState.addMarker();
       const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
 
-      markerState.setCueOffset(index, -markerState.nudgeRangeFrames());
+      markerState.setMarkerStartOffset(index, -markerState.nudgeRangeFrames());
 
       // A replay from the frame-0 seed would run ~400 frames; one from a recent anchor is bounded by
       // the anchor spacing plus the nudge range, well under that.
@@ -294,70 +303,179 @@ describe('MarkerState', () => {
       markerState.maybeRecordAnchor(harness.machine(), harness.frame(), harness.framesRendered());
 
       markerState.resetAnchorRing();
-      const strandedIndex = markerState.addCue();
-      expect(markerState.cues()[strandedIndex]).toBeNull(); // nothing left in the ring to pair it with
+      const strandedIndex = markerState.addMarker();
+      expect(markerState.markers()[strandedIndex].start).toBeNull(); // nothing left in the ring to pair it with
 
       markerState.recordAnchor(harness.machine(), harness.frame(), harness.framesRendered());
-      const reseededIndex = markerState.addCue();
-      expect(markerState.cues()[reseededIndex]).not.toBeNull();
+      const reseededIndex = markerState.addMarker();
+      expect(markerState.markers()[reseededIndex].start).not.toBeNull();
     });
   });
 
-  describe('loops', () => {
-    it('creates a slot from whichever end is tapped first, and becomes playable once both are marked in order', () => {
-      markerState.addLoop();
+  describe('converting between cue and loop shape', () => {
+    it('an end at or before the start does not resolve to a loop', () => {
+      const index = markerState.addMarker(); // start at frame 0
+      markerState.setMarkerEnd(index); // end also at frame 0 — no pass
 
-      markerState.tapLoopOut(0);
-      expect(markerState.loopSlots()[0].out?.frame).toBe(0);
-      expect(markerState.loopSlots()[0].in).toBeNull();
-      expect(markerState.isLoopPlayable(0)).toBe(false); // only one end marked
+      markerState.triggerMarker(index);
 
-      harness.tickBy(10);
-      markerState.tapLoopIn(0); // the wrong order for a playable pass — in now sits after out
-      expect(markerState.isLoopPlayable(0)).toBe(false);
-
-      harness.tickBy(10);
-      markerState.tapLoopOut(0); // re-tapping out ahead of in makes the pass playable
-      expect(markerState.isLoopPlayable(0)).toBe(true);
+      expect(markerState.loopingMarker()).toBeNull();
     });
 
-    it('engages a playable slot at once when nothing is looping', () => {
-      markerState.addLoop();
-      markerState.tapLoopIn(0);
+    it('an end that resolves after the start turns the marker into a loop', () => {
+      const index = markerState.addMarker(); // start at frame 0
       harness.tickBy(10);
-      markerState.tapLoopOut(0);
+      markerState.setMarkerEnd(index); // end at frame 10
 
-      markerState.punchLoop(0);
+      markerState.triggerMarker(index);
 
-      expect(markerState.activeLoopSlot()).toBe(0);
+      expect(markerState.loopingMarker()).toBe(index);
+    });
+
+    it('setMarkerEnd and clearMarkerEnd convert a row in both directions, preserving its start and its index', () => {
+      markerState.addMarker(); // a filler row ahead of the one under test
+      harness.tickBy(5);
+      const index = markerState.addMarker();
+      const startFrame = markerState.markers()[index].start?.frame;
+
+      markerState.setMarkerEnd(index);
+      expect(markerState.markers()[index].end).not.toBeNull();
+      expect(markerState.markers()[index].start?.frame).toBe(startFrame);
+
+      markerState.clearMarkerEnd(index);
+      expect(markerState.markers()[index].end).toBeNull();
+      expect(markerState.markers()[index].start?.frame).toBe(startFrame);
+    });
+
+    it('a loop whose end is cleared mid-lap behaves as a cue rather than erroring at the tick wrap', () => {
+      const index = markLoopMarker(10); // start 0, end 10
+      markerState.triggerMarker(index);
+      expect(markerState.loopingMarker()).toBe(index);
+
+      markerState.clearMarkerEnd(index);
+      const wrapped = markerState.advanceLoop(999);
+
+      expect(wrapped).toBe(false); // no pass describes it — dropped out rather than erroring
+      expect(markerState.loopingMarker()).toBeNull();
+    });
+
+    it('setMarkerEndOffset nudges the end arithmetically, without touching the start', () => {
+      const index = markLoopMarker(30); // start 0, end 30
+      const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
+      const startBefore = markerState.markers()[index].start;
+
+      markerState.setMarkerEndOffset(index, -20);
+
+      expect(runFrame).not.toHaveBeenCalled();
+      expect(markerState.markers()[index].end?.offset).toBe(-20);
+      expect(markerState.markers()[index].start).toBe(startBefore);
+    });
+
+    it('clamps the end offset to the nudge range in both directions', () => {
+      const index = markLoopMarker(30);
+      const range = markerState.nudgeRangeFrames();
+
+      markerState.setMarkerEndOffset(index, 999);
+      expect(markerState.markers()[index].end?.offset).toBe(range);
+
+      markerState.setMarkerEndOffset(index, -999);
+      expect(markerState.markers()[index].end?.offset).toBe(-range);
+    });
+
+    it('clearMarker blanks both points and keeps the row in place', () => {
+      const index = markLoopMarker(10);
+
+      markerState.clearMarker(index);
+
+      expect(markerState.markers()[index]).toEqual({ start: null, end: null });
+      expect(markerState.markers()).toHaveLength(1);
+    });
+  });
+
+  describe('triggering and the lap queue', () => {
+    it('engages a marker at once when nothing is looping', () => {
+      const index = markLoopMarker(10);
+
+      markerState.triggerMarker(index);
+
+      expect(markerState.loopingMarker()).toBe(index);
       expect(harness.restores.at(-1)?.frame).toBe(0);
     });
 
-    it('queues a punch behind the active slot rather than switching immediately', () => {
-      markerState.addLoop();
-      markerState.tapLoopIn(0);
-      harness.tickBy(10);
-      markerState.tapLoopOut(0);
-      markerState.addLoop();
-      harness.tickBy(10);
-      markerState.tapLoopIn(1);
-      harness.tickBy(10);
-      markerState.tapLoopOut(1);
+    it('a marker triggered while a loop runs waits for the lap, then plays on linearly once it lands', () => {
+      const loop = markLoopMarker(10); // start 0, end 10
+      markerState.triggerMarker(loop);
+      harness.tickBy(3);
+      const cue = markerState.addMarker(); // a plain cue at frame 3
 
-      markerState.punchLoop(0);
-      markerState.punchLoop(1);
+      markerState.triggerMarker(cue);
 
-      expect(markerState.activeLoopSlot()).toBe(0);
-      expect(markerState.queuedLoopSlot()).toBe(1);
+      expect(markerState.loopingMarker()).toBe(loop); // the running lap is unaffected
+      expect(markerState.queuedMarker()).toBe(cue);
+
+      const wrapped = markerState.advanceLoop(10);
+
+      expect(wrapped).toBe(true);
+      expect(markerState.loopingMarker()).toBeNull(); // the cue leaves the loop, deferred to the lap
+      expect(markerState.queuedMarker()).toBeNull();
+      expect(harness.restores.at(-1)?.frame).toBe(3);
     });
 
-    it('advanceLoop re-enters the in-point once the tick reaches the out-point, and reports it happened', () => {
-      markerState.addLoop();
-      markerState.tapLoopIn(0);
-      harness.tickBy(10);
-      markerState.tapLoopOut(0); // in 0, out 10
-      markerState.punchLoop(0);
-      harness.setFramesRendered(0);
+    it('a third trigger replaces a queued marker without disturbing the running lap', () => {
+      const loop = markLoopMarker(10);
+      markerState.triggerMarker(loop);
+      const cueA = markerState.addMarker();
+      const cueB = markerState.addMarker();
+
+      markerState.triggerMarker(cueA);
+      markerState.triggerMarker(cueB);
+
+      expect(markerState.loopingMarker()).toBe(loop);
+      expect(markerState.queuedMarker()).toBe(cueB);
+    });
+
+    it('re-triggering the marker already looping, with nothing queued, restarts its lap', () => {
+      const loop = markLoopMarker(10); // start 0, end 10
+      markerState.triggerMarker(loop);
+      harness.tickBy(5);
+      const restoresBefore = harness.restores.length;
+
+      markerState.triggerMarker(loop);
+
+      expect(harness.restores.length).toBe(restoresBefore + 1);
+      expect(harness.restores.at(-1)?.frame).toBe(0);
+      expect(markerState.loopingMarker()).toBe(loop);
+      expect(markerState.queuedMarker()).toBeNull();
+    });
+
+    it('stopLoop escapes on the spot, dropping the queue and leaving playback running linearly', () => {
+      const loop = markLoopMarker(10);
+      markerState.triggerMarker(loop);
+      const cue = markerState.addMarker();
+      markerState.triggerMarker(cue); // queued behind the running lap
+
+      markerState.stopLoop();
+
+      expect(markerState.loopingMarker()).toBeNull();
+      expect(markerState.queuedMarker()).toBeNull();
+    });
+  });
+
+  describe('the tick wrap boundary', () => {
+    it('does not wrap the frame before the resolved end is reached', () => {
+      const index = markLoopMarker(10); // start 0, end 10
+      markerState.triggerMarker(index);
+      const restoresBefore = harness.restores.length;
+
+      const wrapped = markerState.advanceLoop(9);
+
+      expect(wrapped).toBe(false);
+      expect(harness.restores).toHaveLength(restoresBefore);
+    });
+
+    it('wraps exactly on the frame the resolved end is reached, restoring the start', () => {
+      const index = markLoopMarker(10);
+      markerState.triggerMarker(index);
 
       const wrapped = markerState.advanceLoop(10);
 
@@ -365,89 +483,82 @@ describe('MarkerState', () => {
       expect(harness.restores.at(-1)?.frame).toBe(0);
     });
 
-    it('advanceLoop is a no-op before the out-point is reached', () => {
-      markerState.addLoop();
-      markerState.tapLoopIn(0);
-      harness.tickBy(10);
-      markerState.tapLoopOut(0);
-      markerState.punchLoop(0);
-      const restoresBefore = harness.restores.length;
+    it('a queued marker engages exactly on the boundary frame, not a tick early or late', () => {
+      const loop = markLoopMarker(10); // start 0, end 10
+      markerState.triggerMarker(loop);
+      harness.tickBy(3);
+      const cue = markerState.addMarker(); // start frame 3
+      markerState.triggerMarker(cue);
 
-      const wrapped = markerState.advanceLoop(5);
+      const early = markerState.advanceLoop(9);
+      expect(early).toBe(false);
+      expect(markerState.queuedMarker()).toBe(cue);
 
-      expect(wrapped).toBe(false);
-      expect(harness.restores).toHaveLength(restoresBefore);
+      const onBoundary = markerState.advanceLoop(10);
+      expect(onBoundary).toBe(true);
+      expect(markerState.queuedMarker()).toBeNull();
+      expect(harness.restores.at(-1)?.frame).toBe(3);
     });
 
-    it('advanceLoop drops out, without restoring, once a nudge crosses the ends', () => {
-      markerState.addLoop();
-      markerState.tapLoopIn(0);
-      harness.tickBy(10);
-      markerState.tapLoopOut(0);
-      markerState.punchLoop(0);
-      markerState.setLoopOutOffset(0, -markerState.nudgeRangeFrames());
+    it('drops out, without restoring, once a nudge crosses the ends', () => {
+      const index = markLoopMarker(10); // start 0, end 10
+      markerState.triggerMarker(index);
+      markerState.setMarkerEndOffset(index, -markerState.nudgeRangeFrames());
       const restoresBefore = harness.restores.length;
 
       const wrapped = markerState.advanceLoop(10);
 
       expect(wrapped).toBe(false);
-      expect(markerState.activeLoopSlot()).toBeNull();
+      expect(markerState.loopingMarker()).toBeNull();
       expect(harness.restores).toHaveLength(restoresBefore);
-    });
-
-    it('deleteLoop shifts a later active index down, and clears it outright when it names the deleted row', () => {
-      markerState.addLoop();
-      markerState.addLoop();
-      markerState.activeLoopSlot.set(1);
-
-      markerState.deleteLoop(0);
-      expect(markerState.activeLoopSlot()).toBe(0);
-
-      markerState.deleteLoop(0);
-      expect(markerState.activeLoopSlot()).toBeNull();
-    });
-
-    it('clear empties both collections and lets go of whatever was looping', () => {
-      markerState.addLoop();
-      markerState.tapLoopIn(0);
-      harness.tickBy(10);
-      markerState.tapLoopOut(0);
-      markerState.punchLoop(0);
-      markerState.addCue();
-
-      markerState.clear();
-
-      expect(markerState.cues()).toEqual([]);
-      expect(markerState.loopSlots()).toEqual([]);
-      expect(markerState.activeLoopSlot()).toBeNull();
     });
   });
 
-  describe('the loop audition', () => {
-    it('resumes pre-roll frames before the out-point and queues a resync, without touching activeLoopSlot via the queue', () => {
-      markerState.addLoop();
-      harness.tickBy(10);
-      markerState.tapLoopIn(0);
-      harness.tickBy(200);
-      markerState.tapLoopOut(0); // in 10, out 210
+  describe('the marker audition', () => {
+    it('auditionMarkerStart restores the row to its start immediately, bypassing the queue', () => {
+      const loop = markLoopMarker(10);
+      markerState.triggerMarker(loop); // engages the loop
+      harness.tickBy(5);
+      const cue = markerState.addMarker(); // a plain cue, further along
 
-      markerState.auditionLoopOut(0);
+      markerState.auditionMarkerStart(cue);
+
+      expect(harness.restores.at(-1)?.frame).toBe(5);
+      expect(markerState.loopingMarker()).toBeNull(); // a cue leaves the loop, same as engaging one does
+      expect(markerState.queuedMarker()).toBeNull();
+    });
+
+    it('auditionMarkerStart is a no-op for a row with no start', () => {
+      const index = markerState.addMarker();
+      markerState.clearMarker(index);
+
+      markerState.auditionMarkerStart(index);
+
+      expect(harness.restores).toHaveLength(0);
+    });
+
+    it('auditionMarkerEnd resumes pre-roll frames before the end and queues a resync, without touching the queue', () => {
+      harness.tickBy(10);
+      const index = markerState.addMarker(); // start frame 10
+      harness.tickBy(200);
+      markerState.setMarkerEnd(index); // end frame 210
+
+      markerState.auditionMarkerEnd(index);
 
       const prerollFrames = Math.round(
         (LOOP_AUDITION_PREROLL_MS * 1000) / harness.nominalIntervalUs()
       );
       expect(harness.framesRendered()).toBe(210 - prerollFrames);
-      expect(markerState.activeLoopSlot()).toBe(0);
-      expect(markerState.queuedLoopSlot()).toBeNull();
+      expect(markerState.loopingMarker()).toBe(index);
+      expect(markerState.queuedMarker()).toBeNull();
     });
 
-    it('is a no-op for a slot that is not playable', () => {
-      markerState.addLoop();
-      markerState.tapLoopIn(0); // no out marked
+    it('auditionMarkerEnd is a no-op for a row that does not resolve to a loop', () => {
+      const index = markerState.addMarker(); // no end marked
 
-      markerState.auditionLoopOut(0);
+      markerState.auditionMarkerEnd(index);
 
-      expect(markerState.activeLoopSlot()).toBeNull();
+      expect(markerState.loopingMarker()).toBeNull();
     });
   });
 });

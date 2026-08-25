@@ -10,7 +10,7 @@ import { clamp, describeError } from './engine-utils';
  *  the same on a 1x tune and a 2x-multispeed one. */
 export const NUDGE_RANGE_MS = 1000;
 
-/** How much music plays into the seam when a loop's out-point is auditioned. A feel default —
+/** How much music plays into the seam when a marker's end is auditioned. A feel default —
  *  confirm by ear on hardware. */
 export const LOOP_AUDITION_PREROLL_MS = 2000;
 
@@ -47,35 +47,37 @@ export interface CapturedPoint {
   readonly anchor: PositionAnchor;
 }
 
-export type CueSlot = CapturedPoint;
-
 /**
- * The loop's exit point: a frame plus its nudge, and nothing else. It is compared against the
- * position counter once per tick rather than restored, so it needs no machine image — which is what
- * keeps a whole loop costing the memory of a single cue.
+ * A marker's end: a frame plus its nudge, and nothing else. It is compared against the position
+ * counter once per tick rather than restored, so it needs no machine image — which is what keeps a
+ * whole loop costing the memory of a single cue.
  */
-export interface LoopOutPoint {
+export interface MarkerEnd {
   readonly frame: number;
   /** −nudgeRangeFrames()..+nudgeRangeFrames(). */
   readonly offset: number;
 }
 
 /**
- * One punch-in loop: a loop's two ends held together, appended and removed freely, so any number of
- * loops can be marked up independently and engaged against each other.
+ * A captured position, optionally with an end.
  *
- * A row comes into being on its first tap, whichever end that is, and only *plays* once both ends
- * are marked and still in order with their nudges applied. `addLoop`/`clearLoopSlot` both start it
- * at `{ in: null, out: null }`, so `null` never occurs in the collection itself — only inside a row.
+ * With no end the marker is a cue: triggering it restores `start` and leaves playback running on
+ * linearly. With an end that resolves after `start` it is a loop: triggering it restores `start` and
+ * makes the marker the one the tick wrap plays against. An end that does not resolve after `start` —
+ * absent, or nudged to or before it — describes no pass, so the marker behaves as a cue rather than
+ * erroring; see `resolveLoop`.
+ *
+ * The asymmetry between the two fields is load-bearing: `start` carries a full machine image so
+ * re-entry is a restore rather than a replay, while `end` is a bare frame number only ever compared
+ * against the counter. That is what makes a loop cost the memory of a cue.
  */
-export interface LoopSlot {
-  /** Restorable state, exactly as a cue holds it — re-entry is a restore, never a replay. */
-  readonly in: CapturedPoint | null;
-  /** A frame plus its nudge; compared against the counter, never restored. */
-  readonly out: LoopOutPoint | null;
+export interface Marker {
+  readonly start: CapturedPoint | null;
+  readonly end: MarkerEnd | null;
 }
 
-/** A slot whose ends are both marked and still in order — a pass there is something to play. */
+/** A marker whose start and end are both present and still in order — a pass there is something to
+ *  play. */
 interface ResolvedLoop {
   readonly start: CapturedPoint;
   readonly outFrame: number;
@@ -106,7 +108,7 @@ export interface MarkerHost {
    *  chip resync the restore owes the stream. */
   restoreState(machine: MachineSnapshot, registers: RegisterValuesSnapshot, frameNumber: number): void;
   /** Queues the chip resync directly, for a restore that never left the live machine — see
-   *  `auditionLoopOut`. */
+   *  `auditionMarkerEnd`. */
   queueResync(): void;
   /** Whichever voices are silenced right now, latched XOR held — seeds a replay's throwaway frame. */
   effectiveMutes(): readonly boolean[];
@@ -115,29 +117,28 @@ export interface MarkerHost {
 }
 
 /**
- * Cues, loops and the nudge machinery behind both: capture, restore and walk a position without
+ * Markers and the nudge machinery behind them: capture, restore and walk a position without
  * re-emulating the tune, and the anchor ring that makes a deep nudge affordable.
  *
- * Every public cue/loop method here is synchronous — "launch playback first if it is not already
- * running" is the coordinator's job (`ensurePlaying()`), sequenced around a call into this class
- * rather than folded into it.
+ * Every public marker method here is synchronous — "launch playback first if it is not already
+ * running" is the coordinator's job (`play()`), sequenced around a call into this class rather than
+ * folded into it.
  */
 export class MarkerState {
   constructor(private readonly host: MarkerHost) {}
 
-  readonly cues: WritableSignal<readonly (CueSlot | null)[]> = signal([]);
   /**
-   * Loops marked up side by side, appended and removed freely. Each holds its entry as restorable
+   * Markers marked up side by side, appended and removed freely. Each holds its start as restorable
    * state — re-entry is a snapshot restore, so a pass costs the same whether the point sits at frame
-   * 10 or frame 10,000 — and its exit as a frame number alone, which is only ever compared against
-   * the position counter. Never holds `null`: an empty row is `{ in: null, out: null }`, so there is
+   * 10 or frame 10,000 — and its end, if any, as a frame number alone, only ever compared against the
+   * position counter. Never holds `null`: an empty row is `{ start: null, end: null }`, so there is
    * exactly one representation for "nothing marked" rather than two that mean the same thing.
    */
-  readonly loopSlots: WritableSignal<readonly LoopSlot[]> = signal([]);
-  /** The slot currently looping, or null. */
-  readonly activeLoopSlot: WritableSignal<number | null> = signal(null);
-  /** The slot that takes over when the active one finishes its lap, or null. */
-  readonly queuedLoopSlot: WritableSignal<number | null> = signal(null);
+  readonly markers: WritableSignal<readonly Marker[]> = signal([]);
+  /** The marker currently looping, or null. */
+  readonly loopingMarker: WritableSignal<number | null> = signal(null);
+  /** The marker that takes over when the looping one finishes its lap, or null. */
+  readonly queuedMarker: WritableSignal<number | null> = signal(null);
 
   /**
    * The nudge range in frames for the loaded tune.
@@ -183,17 +184,16 @@ export class MarkerState {
     return Math.round((ms * 1000) / tuneIntervalUs);
   }
 
-  /** Clears every cue and loop row, and lets go of whatever was looping — a new tune invalidates
-   *  every captured snapshot, since cues and loop entries hold machine state, not frame numbers. */
+  /** Clears every marker, and lets go of whatever was looping — a new tune invalidates every
+   *  captured snapshot, since a marker's start holds machine state, not a frame number. */
   clear(): void {
-    this.cues.set([]);
-    this.loopSlots.set([]);
+    this.markers.set([]);
     this.stopLoop();
   }
 
   /** Drops the anchor ring — its entries describe a machine that no longer exists, at frame numbers
-   *  a subtune re-init has just invalidated. Cues and a loop's entry survive this deliberately: each
-   *  owns its own anchor, so neither needs the ring to persist. */
+   *  a subtune re-init has just invalidated. A marker's start survives this deliberately: it owns
+   *  its own anchor, so it needs no ring to persist. */
   resetAnchorRing(): void {
     this.anchorRing = [];
   }
@@ -280,11 +280,11 @@ export class MarkerState {
       try {
         result = replayMachine.runFrame();
       } catch (error) {
-        this.host.fail(`the cue nudge to frame ${target} failed during replay — ${describeError(error)}`);
+        this.host.fail(`the marker nudge to frame ${target} failed during replay — ${describeError(error)}`);
         return null;
       }
       if (!result.completed) {
-        this.host.fail(`the cue nudge to frame ${target} exceeded its cycle budget during replay`);
+        this.host.fail(`the marker nudge to frame ${target} exceeded its cycle budget during replay`);
         return null;
       }
       replayFrame.takeSnapshot(); // discarded — clears per-frame duplicate-write tracking only
@@ -306,203 +306,134 @@ export class MarkerState {
   }
 
   /**
-   * Appends a new cue row, capturing the current position into it — as machine state, not as a
-   * frame number. Returns the row's index.
-   *
-   * The whole point: you are already *at* this position, so there is nothing to re-derive. Storing
-   * the state itself is what lets `hopToCue` skip the replay a frame-number jump cannot avoid.
+   * Appends a new marker, capturing the current position into its start — as machine state, not as
+   * a frame number. Returns the row's index.
    *
    * The point is paired with an anchor from the ring on the way in, which is what makes a later
    * backward nudge of it possible at all. With no tune loaded the capture comes back null and the
-   * row is still appended, empty — `captureCue` is what fills it in once a tune exists.
+   * row is still appended, empty — `captureMarkerStart` is what fills it in once a tune exists.
    */
-  addCue(): number {
-    const cue = this.captureAnchoredPoint();
-    const index = this.cues().length;
-    this.cues.update((cues) => [...cues, cue]);
+  addMarker(): number {
+    const start = this.captureAnchoredPoint();
+    const index = this.markers().length;
+    this.markers.update((markers) => [...markers, { start, end: null }]);
     return index;
   }
 
   /**
-   * (Re)captures the current position into an existing cue row, exactly as `addCue` captures a new
-   * one. The only way back into a row `clearCue` has blanked, since cues are otherwise append-only.
+   * (Re)captures the current position into an existing row's start, exactly as `addMarker` captures
+   * a new one. Leaves whatever end the row already holds untouched. The only way back into a start
+   * `clearMarker` has blanked, since markers are otherwise append-only.
    */
-  captureCue(index: number): void {
-    if (index < 0 || index >= this.cues().length) return;
-    const cue = this.captureAnchoredPoint();
-    if (cue === null) return;
-    this.cues.update((cues) => cues.map((c, i) => (i === index ? cue : c)));
+  captureMarkerStart(index: number): void {
+    if (index < 0 || index >= this.markers().length) return;
+    const start = this.captureAnchoredPoint();
+    if (start === null) return;
+    this.updateMarker(index, (current) => ({ ...current, start }));
   }
 
   /**
-   * Walks a captured cue up to ±`nudgeRangeFrames()` onto the exact transient; a no-op for an empty
-   * row. Clamped to that range, and rounded — a frame is the finest position there is.
-   *
-   * Re-derives the row's resolved snapshot by replaying from its anchor, which is why this is a
-   * setup gesture and `hopToCue` is not: the cost here is bounded by the anchor distance plus the
-   * nudge range, never by how deep into the tune the point was taken.
+   * Marks a row's end at the current frame, which is what turns it into a loop candidate — see
+   * `resolveLoop` for when it actually resolves to one. No snapshot: the end is only ever compared.
    */
-  setCueOffset(index: number, offset: number): void {
-    if (index < 0 || index >= this.cues().length || !Number.isFinite(offset)) return;
-    const cue = this.cues()[index];
-    if (cue === null) return;
+  setMarkerEnd(index: number): void {
+    if (index < 0 || index >= this.markers().length || this.host.machine() === null) return;
+    const end: MarkerEnd = { frame: this.host.framesRendered(), offset: 0 };
+    this.updateMarker(index, (current) => ({ ...current, end }));
+  }
+
+  /** Drops a row's end, which is what turns a loop back into a cue. Leaves the start untouched. */
+  clearMarkerEnd(index: number): void {
+    if (index < 0 || index >= this.markers().length) return;
+    this.updateMarker(index, (current) => ({ ...current, end: null }));
+  }
+
+  /**
+   * Walks a row's start up to ±`nudgeRangeFrames()` onto the exact transient, re-deriving its
+   * snapshot from the point's anchor; a no-op with no start marked. A setup gesture, for the same
+   * reason the capture itself is not: the re-derivation replays frames, so it must not run per drag
+   * tick.
+   */
+  setMarkerStartOffset(index: number, offset: number): void {
+    if (index < 0 || index >= this.markers().length || !Number.isFinite(offset)) return;
+    const start = this.markers()[index].start;
+    if (start === null) return;
 
     const range = this.nudgeRangeFrames();
     const clamped = clamp(Math.round(offset), -range, range);
-    if (clamped === cue.offset) return;
+    if (clamped === start.offset) return;
 
-    const resolved = this.resolvePoint(cue, clamped);
+    const resolved = this.resolvePoint(start, clamped);
     if (resolved === null) return;
-    this.cues.update((cues) => cues.map((c, i) => (i === index ? resolved : c)));
-  }
-
-  /** Whether `index` names a cue row that has something captured — the bounds-and-emptiness half of
-   *  `hopToCue`, split out so the coordinator can check it before deciding whether to launch. */
-  hasCue(index: number): boolean {
-    return index >= 0 && index < this.cues().length && this.cues()[index] !== null;
+    this.updateMarker(index, (current) => ({ ...current, start: resolved }));
   }
 
   /**
-   * Returns to a captured cue row; a no-op for an empty or out-of-range row. See `restorePoint` for
-   * why the hop itself costs no emulation.
-   *
-   * Reads the row fresh from the live signal — safe here because nothing awaits between the check
-   * and the restore. The coordinator's async `hopToCue` cannot make that assumption (it may await a
-   * `play()` first) and calls `restoreCapturedPoint` with a point captured before that await instead.
+   * Walks a row's end up to ±`nudgeRangeFrames()`; a no-op with no end marked. Arithmetic alone —
+   * the end is a number the tick compares, so moving it replays nothing.
    */
-  hopToCue(index: number): void {
-    if (!this.hasCue(index)) return;
-    const cue = this.cues()[index];
-    if (cue === null) return;
-    this.restoreCapturedPoint(cue);
-  }
-
-  /**
-   * Restores a point handed in directly rather than looked up by index — what the coordinator's
-   * async `hopToCue` uses so a cue captured before its `play()` await is restored verbatim, even if
-   * the row was cleared or re-captured while that await was in flight.
-   *
-   * Escapes a running loop immediately rather than waiting out its lap — the same effect as
-   * `stopLoop()`, called rather than reimplemented — and leaves both slots' points untouched.
-   */
-  restoreCapturedPoint(point: CapturedPoint): void {
-    this.stopLoop();
-    this.restorePoint(point);
-  }
-
-  /** Empties a cue row, returning it to "Add", and keeps the row itself in place. */
-  clearCue(index: number): void {
-    if (index < 0 || index >= this.cues().length) return;
-    this.cues.update((cues) => cues.map((c, i) => (i === index ? null : c)));
-  }
-
-  /** Removes a cue row outright, shifting every later index down by one. */
-  deleteCue(index: number): void {
-    if (index < 0 || index >= this.cues().length) return;
-    this.cues.update((cues) => cues.filter((_, i) => i !== index));
-  }
-
-  /**
-   * Marks a row's entry at the current position, capturing it exactly as `addCue` does — the
-   * snapshot is what lets every later pass re-enter without replaying the tune. Leaves whatever
-   * exit the row already holds.
-   */
-  tapLoopIn(index: number): void {
-    if (index < 0 || index >= this.loopSlots().length) return;
-    const point = this.captureAnchoredPoint();
-    if (point === null) return;
-    this.updateLoopSlot(index, (current) => ({ in: point, out: current.out }));
-  }
-
-  /** Marks a row's exit at the current frame. No snapshot: the exit is only ever compared. */
-  tapLoopOut(index: number): void {
-    if (index < 0 || index >= this.loopSlots().length || this.host.machine() === null) return;
-    const point: LoopOutPoint = { frame: this.host.framesRendered(), offset: 0 };
-    this.updateLoopSlot(index, (current) => ({ in: current.in, out: point }));
-  }
-
-  /**
-   * Walks a row's entry up to ±`nudgeRangeFrames()` onto the transient, re-deriving its snapshot
-   * from the point's anchor; a no-op with no entry marked. A setup gesture, for the same reason
-   * `setCueOffset` is: the re-derivation replays frames, so it must not run per drag tick.
-   */
-  setLoopInOffset(index: number, frames: number): void {
-    if (index < 0 || index >= this.loopSlots().length || !Number.isFinite(frames)) return;
-    const point = this.loopSlots()[index].in;
-    if (point === null) return;
+  setMarkerEndOffset(index: number, offset: number): void {
+    if (index < 0 || index >= this.markers().length || !Number.isFinite(offset)) return;
+    const end = this.markers()[index].end;
+    if (end === null) return;
 
     const range = this.nudgeRangeFrames();
-    const clamped = clamp(Math.round(frames), -range, range);
-    if (clamped === point.offset) return;
-
-    const resolved = this.resolvePoint(point, clamped);
-    if (resolved === null) return;
-    this.updateLoopSlot(index, (current) => ({ ...current, in: resolved }));
+    const nudged: MarkerEnd = { ...end, offset: clamp(Math.round(offset), -range, range) };
+    this.updateMarker(index, (current) => ({ ...current, end: nudged }));
   }
 
   /**
-   * Walks a row's exit up to ±`nudgeRangeFrames()`; a no-op with no exit marked. Arithmetic
-   * alone — the exit is a number the tick compares, so moving it replays nothing.
-   */
-  setLoopOutOffset(index: number, frames: number): void {
-    if (index < 0 || index >= this.loopSlots().length || !Number.isFinite(frames)) return;
-    const point = this.loopSlots()[index].out;
-    if (point === null) return;
-
-    const range = this.nudgeRangeFrames();
-    const nudged: LoopOutPoint = { ...point, offset: clamp(Math.round(frames), -range, range) };
-    this.updateLoopSlot(index, (current) => ({ ...current, out: nudged }));
-  }
-
-  /** Whether `index` names a row whose ends are both marked and still in order — the punch-time
-   *  playability half of `punchLoop`, split out so the coordinator can check it before launching. */
-  isLoopPlayable(index: number): boolean {
-    return (
-      index >= 0 && index < this.loopSlots().length && this.resolveLoopSlot(this.loopSlots()[index]) !== null
-    );
-  }
-
-  /**
-   * Engages `index` now if nothing is looping, or queues it behind the current lap if something is.
-   * Assumes playability has already been checked (`isLoopPlayable`) and playback is already running.
+   * Engages `index` now if nothing is looping, or queues it behind the current lap if something is
+   * — the sync half of the trigger. The coordinator's async `triggerMarker` launches playback first
+   * if it is not already running, then calls this once it is.
    *
-   * The asymmetry with `stopLoop` is the point of the gesture: a punch is musical and waits for the
-   * bar it is already in to finish, so the switch lands where the operator hears it land.
+   * A no-op for a row with no start. Re-triggering the marker already looping, with nothing queued
+   * behind it, restarts its lap rather than queueing behind itself.
    */
-  punchLoop(index: number): void {
-    const active = this.activeLoopSlot();
-    // Punching the row already playing, with nothing waiting behind it, is a re-trigger — the same
-    // gesture as re-hopping a cue.
-    if (active === null || (active === index && this.queuedLoopSlot() === null)) {
-      this.engageLoop(index);
+  triggerMarker(index: number): void {
+    if (index < 0 || index >= this.markers().length) return;
+    if (this.markers()[index].start === null) return;
+
+    const active = this.loopingMarker();
+    if (active === null || (active === index && this.queuedMarker() === null)) {
+      this.engageMarker(index);
       return;
     }
-    // Newest punch wins, and playback is left alone to finish its lap.
-    this.queuedLoopSlot.set(index);
+    // Newest trigger wins, and playback is left alone to finish its lap.
+    this.queuedMarker.set(index);
   }
 
   /**
-   * Re-enters `index` far enough before its out-point to hear the loop-back seam, and makes it the
-   * active loop so the wrap actually happens. No-op for a row that is not playable.
-   *
-   * Re-entry is a restore, not a replay — see `engageLoop` — and the pre-roll itself replays forward
-   * on the live machine from that restored in-point, so the cost is bounded by the loop's own length
-   * however deep the loop sits in the tune.
+   * Re-enters `index` at its start and makes it the active marker, immediately and without going
+   * through the queue — a setup gesture on a specific row, not a performance trigger. No-op for a
+   * row with no start.
    */
-  auditionLoopOut(index: number): void {
-    if (index < 0 || index >= this.loopSlots().length) return;
-    const loop = this.resolveLoopSlot(this.loopSlots()[index]);
+  auditionMarkerStart(index: number): void {
+    this.engageMarker(index);
+  }
+
+  /**
+   * Re-enters `index` far enough before its end to hear the loop-back seam, and makes it the active
+   * marker so the wrap actually happens. No-op for a row that does not resolve to a loop.
+   *
+   * Re-entry is a restore, not a replay — see `engageMarker` — and the pre-roll itself replays
+   * forward on the live machine from that restored start, so the cost is bounded by the loop's own
+   * length however deep the marker sits in the tune.
+   */
+  auditionMarkerEnd(index: number): void {
+    if (index < 0 || index >= this.markers().length) return;
+    const loop = this.resolveLoop(this.markers()[index]);
     if (loop === null) return;
     const machine = this.host.machine();
     const frame = this.host.frame();
     if (machine === null || frame === null) return;
 
-    this.engageLoop(index);
+    this.engageMarker(index);
 
-    const inFrame = resolvedFrame(loop.start);
+    const startFrame = resolvedFrame(loop.start);
     const prerollFrames = this.msToFrames(LOOP_AUDITION_PREROLL_MS);
-    const target = Math.max(inFrame, loop.outFrame - prerollFrames);
-    const framesToReplay = target - inFrame;
+    const target = Math.max(startFrame, loop.outFrame - prerollFrames);
+    const framesToReplay = target - startFrame;
     if (framesToReplay <= 0) return;
 
     for (let i = 0; i < framesToReplay; i++) {
@@ -510,11 +441,11 @@ export class MarkerState {
       try {
         result = machine.runFrame();
       } catch (error) {
-        this.host.fail(`the loop audition for slot ${index} failed during replay — ${describeError(error)}`);
+        this.host.fail(`the marker audition for row ${index} failed during replay — ${describeError(error)}`);
         return;
       }
       if (!result.completed) {
-        this.host.fail(`the loop audition for slot ${index} exceeded its cycle budget during replay`);
+        this.host.fail(`the marker audition for row ${index} exceeded its cycle budget during replay`);
         return;
       }
       frame.takeSnapshot(); // discarded — resets per-frame duplicate-write tracking only;
@@ -526,88 +457,67 @@ export class MarkerState {
   }
 
   /**
-   * Re-enters `index` at its in-point and makes it the active loop, immediately and without going
-   * through the queue — a setup gesture on a specific row, not a performance punch, mirroring
-   * `auditionLoopOut`. Unlike the out-point audition there is no seam ahead to pre-roll toward:
-   * restoring the in-point snapshot is itself the audible feedback. No-op for a row that is not
-   * playable.
-   */
-  auditionLoopIn(index: number): void {
-    if (index < 0 || index >= this.loopSlots().length) return;
-    if (this.resolveLoopSlot(this.loopSlots()[index]) === null) return;
-    this.engageLoop(index);
-  }
-
-  /** Empties a row, and lets go of it if it was the one playing or the one waiting to. */
-  clearLoopSlot(index: number): void {
-    if (index < 0 || index >= this.loopSlots().length) return;
-    this.updateLoopSlot(index, () => ({ in: null, out: null }));
-    if (this.activeLoopSlot() === index) {
-      this.activeLoopSlot.set(null);
-    }
-    if (this.queuedLoopSlot() === index) {
-      this.queuedLoopSlot.set(null);
-    }
-  }
-
-  /**
-   * Appends an empty loop row — `{ in: null, out: null }`, the same shape `clearLoopSlot` blanks a
-   * row back to, so an empty row has exactly one representation. Returns the row's index.
-   */
-  addLoop(): number {
-    const index = this.loopSlots().length;
-    this.loopSlots.update((slots) => [...slots, { in: null, out: null }]);
-    return index;
-  }
-
-  /**
-   * Removes a loop row outright, shifting every later index down by one. `activeLoopSlot` and
-   * `queuedLoopSlot` are indices into this same array, so each is cleared if it names the deleted
-   * row and decremented if it names one that just shifted — getting this wrong silently loops the
-   * wrong row, which is worse than an error.
-   */
-  deleteLoop(index: number): void {
-    if (index < 0 || index >= this.loopSlots().length) return;
-    this.loopSlots.update((slots) => slots.filter((_, i) => i !== index));
-
-    const active = this.activeLoopSlot();
-    if (active === index) {
-      this.activeLoopSlot.set(null); // the row playing is gone — stop looping
-    } else if (active !== null && active > index) {
-      this.activeLoopSlot.set(active - 1);
-    }
-
-    const queued = this.queuedLoopSlot();
-    if (queued === index) {
-      this.queuedLoopSlot.set(null);
-    } else if (queued !== null && queued > index) {
-      this.queuedLoopSlot.set(queued - 1);
-    }
-  }
-
-  /**
    * Drops out of the loop at once, leaving playback running on linearly from wherever it is, and
    * forgets anything queued behind it.
    *
-   * Deliberately immediate where a punched switch waits for the lap: stopping is a get-out, not a
-   * musical transition.
+   * Deliberately immediate where a trigger waits for the lap: stopping is a get-out, not a musical
+   * transition.
    */
   stopLoop(): void {
-    this.activeLoopSlot.set(null);
-    this.queuedLoopSlot.set(null);
+    this.loopingMarker.set(null);
+    this.queuedMarker.set(null);
+  }
+
+  /** Empties a row's start and end, returning it to "Add", and keeps the row itself in place. Lets
+   *  go of it if it was the one looping or the one queued behind it. */
+  clearMarker(index: number): void {
+    if (index < 0 || index >= this.markers().length) return;
+    this.updateMarker(index, () => ({ start: null, end: null }));
+    if (this.loopingMarker() === index) {
+      this.loopingMarker.set(null);
+    }
+    if (this.queuedMarker() === index) {
+      this.queuedMarker.set(null);
+    }
   }
 
   /**
-   * How far the active row is through its bounds, 0–100; 0 for every other row, playable or not.
+   * Removes a row outright, shifting every later index down by one. `loopingMarker` and
+   * `queuedMarker` are indices into this same array, so each is cleared if it names the deleted row
+   * and decremented if it names one that just shifted — getting this wrong silently loops the wrong
+   * row, which is worse than an error.
+   */
+  deleteMarker(index: number): void {
+    if (index < 0 || index >= this.markers().length) return;
+    this.markers.update((markers) => markers.filter((_, i) => i !== index));
+
+    const active = this.loopingMarker();
+    if (active === index) {
+      this.loopingMarker.set(null); // the row looping is gone — stop looping
+    } else if (active !== null && active > index) {
+      this.loopingMarker.set(active - 1);
+    }
+
+    const queued = this.queuedMarker();
+    if (queued === index) {
+      this.queuedMarker.set(null);
+    } else if (queued !== null && queued > index) {
+      this.queuedMarker.set(queued - 1);
+    }
+  }
+
+  /**
+   * How far the looping marker is through its bounds, 0–100; 0 for every other row, whatever shape
+   * it is.
    *
    * `framesRendered` is the coordinator's *published* stats figure, not the live counter, so
    * progress moves with the same every-25-frames cadence the playhead does instead of demanding
    * change detection per frame.
    */
-  progressPercentFor(slot: number, framesRendered: number): number {
-    if (slot !== this.activeLoopSlot()) return 0;
-    if (slot < 0 || slot >= this.loopSlots().length) return 0;
-    const loop = this.resolveLoopSlot(this.loopSlots()[slot]);
+  progressPercentFor(index: number, framesRendered: number): number {
+    if (index !== this.loopingMarker()) return 0;
+    if (index < 0 || index >= this.markers().length) return 0;
+    const loop = this.resolveLoop(this.markers()[index]);
     if (loop === null) return 0;
 
     const startFrame = resolvedFrame(loop.start);
@@ -616,30 +526,31 @@ export class MarkerState {
   }
 
   /**
-   * Advances the active loop against the position the tick loop just reached: drops out when a
-   * nudge has crossed its ends, or re-enters/switches once the out-point is reached. Returns
-   * whether a restore was just queued — the tick loop must not publish stats twice on that tick,
-   * since the resync it queued goes out on the next one.
+   * Advances the looping marker against the position the tick loop just reached: drops out when a
+   * nudge has crossed its ends (or its end was dropped), or re-enters/switches once the end is
+   * reached. Returns whether a restore was just queued — the tick loop must not publish stats twice
+   * on that tick, since the resync it queued goes out on the next one.
    */
   advanceLoop(framesRendered: number): boolean {
-    const active = this.activeLoopSlot();
+    const active = this.loopingMarker();
     if (active === null) return false;
 
-    const loop = this.resolveLoopSlot(this.loopSlots()[active]);
+    const loop = this.resolveLoop(this.markers()[active]);
     if (loop === null) {
-      // Ends nudged until they crossed describe no pass — drop out rather than re-enter every tick.
+      // Ends nudged until they crossed (or an end dropped mid-lap) describe no pass — drop out
+      // rather than re-enter every tick.
       this.stopLoop();
       return false;
     }
     if (framesRendered < loop.outFrame) return false;
 
-    const queued = this.queuedLoopSlot();
+    const queued = this.queuedMarker();
     if (queued === null) {
-      // A restore, not a replay: the pass costs nothing per frame however deep the entry sits.
+      // A restore, not a replay: the pass costs nothing per frame however deep the start sits.
       this.restorePoint(loop.start);
-    } else if (!this.engageLoop(queued)) {
-      // The lap the punch waited for is over, but the queued slot's ends were nudged across
-      // each other while it waited — nothing playable to switch to, so drop out.
+    } else if (!this.engageMarker(queued)) {
+      // The lap the trigger waited for is over, but the queued marker lost its start (or its end
+      // was nudged across it) while it waited — nothing to switch to, so drop out.
       this.stopLoop();
     }
     return true;
@@ -647,38 +558,42 @@ export class MarkerState {
 
   /**
    * The row as `advanceLoop` needs it: the point to restore, and the frame that triggers the
-   * restore. Null unless both ends are marked and, with their nudges applied, still in order — ends
-   * that have crossed or met describe no pass at all, and a loop running on them would re-enter on
-   * every tick rather than play anything.
+   * restore. Null unless start and end are both present and, with their nudges applied, still in
+   * order — an absent end, or one that has crossed or met the start, describes no pass at all, and a
+   * loop running on it would re-enter on every tick rather than play anything. A marker in this
+   * state is not broken, it is a cue.
    */
-  private resolveLoopSlot(slot: LoopSlot): ResolvedLoop | null {
-    if (slot.in === null || slot.out === null) return null;
-    const outFrame = resolvedFrame(slot.out);
-    return outFrame > resolvedFrame(slot.in) ? { start: slot.in, outFrame } : null;
+  private resolveLoop(marker: Marker): ResolvedLoop | null {
+    if (marker.start === null || marker.end === null) return null;
+    const outFrame = resolvedFrame(marker.end);
+    return outFrame > resolvedFrame(marker.start) ? { start: marker.start, outFrame } : null;
   }
 
   /**
-   * Re-enters a row and makes it the one playing, dropping whatever was queued behind it.
-   * Re-checks playability at the point of engagement — a queued row's ends can be nudged across
-   * each other while it waits, so the punch-time check alone isn't enough. Returns whether the
-   * engage actually happened.
+   * Re-enters a row at its start and makes it the one running, dropping whatever was queued behind
+   * it. `loopingMarker` only ends up naming it when the row resolves to a loop — a cue's engagement
+   * restores its start and leaves the loop, exactly as it must. Re-checks the resolved shape at the
+   * point of engagement — a queued row's end can be nudged across its start while it waits, so the
+   * trigger-time check alone isn't enough. Returns false when the row has no start.
    */
-  private engageLoop(index: number): boolean {
-    if (index < 0 || index >= this.loopSlots().length) return false;
-    const resolved = this.resolveLoopSlot(this.loopSlots()[index]);
-    if (resolved === null) return false;
-    this.restorePoint(resolved.start);
-    this.activeLoopSlot.set(index);
-    this.queuedLoopSlot.set(null);
+  private engageMarker(index: number): boolean {
+    if (index < 0 || index >= this.markers().length) return false;
+    const marker = this.markers()[index];
+    if (marker.start === null) return false;
+    this.restorePoint(marker.start);
+    this.loopingMarker.set(this.resolveLoop(marker) === null ? null : index);
+    this.queuedMarker.set(null);
     return true;
   }
 
-  private updateLoopSlot(index: number, next: (current: LoopSlot) => LoopSlot): void {
-    this.loopSlots.update((slots) => slots.map((s, i) => (i === index ? next(s) : s)));
+  private updateMarker(index: number, next: (current: Marker) => Marker): void {
+    this.markers.update((markers) => markers.map((m, i) => (i === index ? next(m) : m)));
   }
 }
 
-/** Where a point actually sits once its nudge is applied — never before the start of the tune. */
+/** Where a point actually sits once its nudge is applied — never before the start of the tune.
+ *  Applies equally to a `CapturedPoint`'s start and a `MarkerEnd`, which is why this stays one
+ *  implementation over their common shape rather than two. */
 function resolvedFrame(point: { readonly frame: number; readonly offset: number }): number {
   return Math.max(0, point.frame + point.offset);
 }
