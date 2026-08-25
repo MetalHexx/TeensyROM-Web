@@ -95,7 +95,10 @@ function installFakeAudioContext(): void {
   vi.stubGlobal('AudioContext', FakeAudioContext);
 }
 
-async function startedClock(intervalUs: number, onFrame: () => void) {
+async function startedClock(
+  intervalUs: number,
+  onFrame: (dueAtMs: number, catchUpClamped: boolean) => void
+) {
   installFakeAudioContext();
   const clock = new ScriptProcessorFrameClock();
   await clock.start(intervalUs, onFrame);
@@ -170,6 +173,61 @@ describe('FrameAccumulator', () => {
 
     expect(accumulator.framesEmitted).toBe(4);
     expect(accumulator.nominalElapsedUs).toBe(2000 + 1000);
+  });
+
+  it('reports a frame that lands on the end of the credited span as due right then', () => {
+    const accumulator = new FrameAccumulator(20000);
+    const lags: number[] = [];
+
+    accumulator.advance(20000, (lagUs) => lags.push(lagUs));
+
+    expect(lags).toEqual([0]);
+  });
+
+  it('reports how late a frame already was when the advance that released it ran', () => {
+    const accumulator = new FrameAccumulator(20000);
+    const lags: number[] = [];
+
+    accumulator.advance(25000, (lagUs) => lags.push(lagUs));
+
+    expect(lags).toEqual([5000]);
+  });
+
+  it('spaces two frames released by one advance an interval apart, both in the past', () => {
+    const accumulator = new FrameAccumulator(20000);
+    const lags: number[] = [];
+
+    // 45 ms banked at a 20 ms interval: the first frame fell due 25 ms before this advance ran, the
+    // second 5 ms before it. They burst out together, but they describe two instants 20 ms apart —
+    // which is what lets the transport hand them to the cartridge that far apart.
+    accumulator.advance(45000, (lagUs) => lags.push(lagUs));
+
+    expect(lags).toEqual([25000, 5000]);
+    expect(lags[0] - lags[1]).toBe(20000);
+  });
+
+  it('measures lag against the interval in force when each frame fell due', () => {
+    const accumulator = new FrameAccumulator(1000);
+    const lags: number[] = [];
+    const record = (lagUs: number) => lags.push(lagUs);
+
+    accumulator.advance(900, record);
+    accumulator.setIntervalUs(500);
+    accumulator.advance(200, record);
+
+    // The 1100 µs banked releases two 500 µs frames, so they sit 500 µs apart rather than 1000.
+    expect(lags).toEqual([600, 100]);
+  });
+
+  it('spreads the catch-up a stall owes across the gap instead of stacking it at the end', () => {
+    const accumulator = new FrameAccumulator(10000);
+    const lags: number[] = [];
+
+    // The shape a long callback gap hands over: four frames owed, oldest first, evenly spaced and
+    // every one of them already due.
+    accumulator.advance(45000, (lagUs) => lags.push(lagUs));
+
+    expect(lags).toEqual([35000, 25000, 15000, 5000]);
   });
 
   it('rejects an interval that would never elapse', () => {
@@ -368,6 +426,82 @@ describe('ScriptProcessorFrameClock', () => {
       // Separates one spike from a recurring one, which the running-maximum worst gap cannot.
       expect(clock.stats.lateCallbacks).toBe(2);
       expect(clock.stats.worstGapMs).toBeCloseTo(40);
+    });
+  });
+
+  describe('due times', () => {
+    it('places a frame inside the span the callback that released it credited', async () => {
+      const advance = installFakeNow();
+      const dueTimes: number[] = [];
+      const { node } = await startedClock(20000, (dueAtMs) => dueTimes.push(dueAtMs));
+
+      fireEvenly(node, advance, 3, 10);
+
+      // The frame fell due during the third callback's 10 ms span, not at the instant that callback
+      // got around to releasing it — which is the whole difference this carries to the transport.
+      expect(dueTimes).toHaveLength(1);
+      expect(dueTimes[0]).toBeGreaterThan(20);
+      expect(dueTimes[0]).toBeLessThan(30);
+    });
+
+    it('releases a burst from one callback at times one interval apart, all already past', async () => {
+      const advance = installFakeNow();
+      const dueTimes: number[] = [];
+      const { node } = await startedClock(10000, (dueAtMs) => dueTimes.push(dueAtMs));
+
+      fireEvenly(node, advance, 1, 5);
+      advance(45); // one gap wide enough to owe several frames at once
+      node.fireBuffers(1);
+
+      expect(dueTimes).toHaveLength(5);
+      const spacings = dueTimes.slice(1).map((due, i) => due - dueTimes[i]);
+      spacings.forEach((spacing) => expect(spacing).toBeCloseTo(10));
+      // In the past, so the transport treats them as "send now" until a schedule-ahead is dialled
+      // in — and inside the gap they were owed for, never before it.
+      expect(dueTimes[0]).toBeGreaterThan(5);
+      expect(dueTimes[dueTimes.length - 1]).toBeLessThanOrEqual(50);
+    });
+
+    it('tracks measured time over a long run rather than walking away from it', async () => {
+      const advance = installFakeNow();
+      const dueTimes: number[] = [];
+      const { node } = await startedClock(20000, (dueAtMs) => dueTimes.push(dueAtMs));
+
+      fireEvenly(node, advance, 500, 10); // ~5 s of measured time
+
+      // Anchoring on the nominal grid instead would drift by the difference between the interval
+      // and the rate frames actually come due at; re-anchoring every callback holds each due time
+      // within one interval of the callback that released it, however long the run.
+      const lastCallbackMs = 5000;
+      expect(dueTimes[dueTimes.length - 1]).toBeGreaterThan(lastCallbackMs - 20);
+      expect(dueTimes[dueTimes.length - 1]).toBeLessThanOrEqual(lastCallbackMs);
+    });
+
+    it('flags the frames a clamped catch-up releases, and only those', async () => {
+      const advance = installFakeNow();
+      const flags: boolean[] = [];
+      const { node } = await startedClock(10000, (dueAtMs, catchUpClamped) =>
+        flags.push(catchUpClamped)
+      );
+
+      fireEvenly(node, advance, 3, 10);
+      const healthy = flags.length;
+      expect(flags.every((flagged) => !flagged)).toBe(true);
+
+      // Five seconds: the advance credits only its 250 ms cap, so every frame it releases is
+      // anchored later than it truly fell due and any lag read off it under-reports.
+      advance(5000);
+      node.fireBuffers(1);
+      const burst = flags.slice(healthy);
+
+      expect(burst).toHaveLength(25);
+      expect(burst.every((flagged) => flagged)).toBe(true);
+
+      advance(10);
+      node.fireBuffers(1);
+
+      // The next healthy callback is trustworthy again — the flag describes the advance, not the run.
+      expect(flags[flags.length - 1]).toBe(false);
     });
   });
 

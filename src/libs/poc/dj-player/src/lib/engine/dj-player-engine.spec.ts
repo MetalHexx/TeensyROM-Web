@@ -52,9 +52,12 @@ class FakeFrameClock implements FrameClock {
     lateCallbacks: 0,
   };
 
-  private onFrame: (() => void) | null = null;
+  private onFrame: ((dueAtMs: number, catchUpClamped: boolean) => void) | null = null;
 
-  start(intervalUs: number, onFrame: () => void): Promise<void> {
+  start(
+    intervalUs: number,
+    onFrame: (dueAtMs: number, catchUpClamped: boolean) => void
+  ): Promise<void> {
     this.startCount++;
     if (this.startError !== null) {
       return Promise.reject(this.startError);
@@ -75,7 +78,9 @@ class FakeFrameClock implements FrameClock {
 
   tick(count = 1): void {
     for (let i = 0; i < count && this.running; i++) {
-      this.onFrame?.();
+      // No measured time runs behind a hand-driven tick, so each frame is due as it is released —
+      // and none of them comes out of a clamped catch-up.
+      this.onFrame?.(performance.now(), false);
     }
   }
 }

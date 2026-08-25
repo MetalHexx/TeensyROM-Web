@@ -462,7 +462,7 @@ export class DjPlayerEngine implements OnDestroy {
 
     const intervalUs = this.effectiveIntervalUs();
     try {
-      await this.clock.start(intervalUs, () => this.onTick());
+      await this.clock.start(intervalUs, (dueAtMs) => this.onTick(dueAtMs));
     } catch (error) {
       // The cartridge is already in ASID mode waiting on a frame stream that will never start, so
       // close the session rather than leaving it open for the tester to notice and stop by hand.
@@ -1050,8 +1050,13 @@ export class DjPlayerEngine implements OnDestroy {
   /**
    * One emulated frame, one packet — including frames where nothing changed. A skipped packet loses
    * a frame on the cartridge's queue and the timing drifts.
+   *
+   * `dueAtMs` is when the clock says this frame fell due, which is before now and one interval apart
+   * from its neighbour when a callback releases several at once. It rides the tick through to the
+   * transport so delivery can be anchored to the frame grid rather than to whenever the main thread
+   * reached it.
    */
-  private onTick(): void {
+  private onTick(dueAtMs: number): void {
     const machine = this.machine;
     const frame = this.frame;
     if (machine === null || frame === null) {
@@ -1068,7 +1073,7 @@ export class DjPlayerEngine implements OnDestroy {
     // ticks is a frame it never asked for and never drains. See `queueResync` and `beginRetune`.
     const step = this.pending.shift();
     if (step?.kind === 'packet') {
-      this.sendFramePacket(buildSidDataPacket(step.snapshot));
+      this.sendFramePacket(buildSidDataPacket(step.snapshot), dueAtMs);
       this.publishStats();
       return;
     }
@@ -1096,7 +1101,7 @@ export class DjPlayerEngine implements OnDestroy {
         // snapshot puts slot n at values[n]. Re-sending a single gate-off packet instead would not
         // work either: the tune rewrites its own control registers every frame.
         frame.markAllDirty();
-        this.sendFramePacket(buildSidDataPacket(withVoiceGatesOff(frame.takeSnapshot())));
+        this.sendFramePacket(buildSidDataPacket(withVoiceGatesOff(frame.takeSnapshot())), dueAtMs);
         break;
       case 'retime':
         // No SID packet: the recipe flushes the cartridge's queue on receipt, so a frame sent on
@@ -1107,10 +1112,10 @@ export class DjPlayerEngine implements OnDestroy {
         break;
       case 'resync':
         frame.markAllDirty();
-        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()));
+        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs);
         break;
       default:
-        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()));
+        this.sendFramePacket(buildSidDataPacket(frame.takeSnapshot()), dueAtMs);
     }
     this.framesRendered++;
     if (this.framesRendered % this.anchorSnapshotFrameInterval() === 0) {
@@ -1448,7 +1453,8 @@ export class DjPlayerEngine implements OnDestroy {
       // branch (`markAllDirty()`) restores the real state on the next Play. Stopped needs none of
       // that: nothing is sounding to silence, and the true state is what the chip should hold.
       const outgoing = this.state() === 'paused' ? withVoiceGatesOff(snapshot) : snapshot;
-      this.sendFramePacket(buildSidDataPacket(outgoing));
+      // No tick released this one, so there is no frame grid to place it on: it is due now.
+      this.sendFramePacket(buildSidDataPacket(outgoing), performance.now());
       this.publishStats();
       return;
     }
@@ -1558,7 +1564,19 @@ export class DjPlayerEngine implements OnDestroy {
     return this.nominalIntervalUs() / this.speedMultiplier() / callsPerFrame;
   }
 
-  private sendFramePacket(packet: Uint8Array): void {
+  /**
+   * Sends one frame packet on the buffered delivery arm: `performance.now() + scheduleAheadMs()`,
+   * where the offset means "this far from now" and 0 means immediately.
+   *
+   * `dueAtMs` — when the clock says the frame fell due, always at or before now — is carried this
+   * far because the host-scheduled arm releases against the frame grid (`dueAtMs` plus the same
+   * offset) rather than against whenever the main thread reached the packet, which is what makes
+   * packet spacing independent of callback timing. That arm lands with the control that selects
+   * between the two, and cannot be applied here in the meantime: the buffered arm is the comparison
+   * these are measured against, so re-anchoring it would quietly redefine what its own
+   * schedule-ahead does.
+   */
+  private sendFramePacket(packet: Uint8Array, dueAtMs: number): void {
     const aheadMs = this.scheduleAheadMs();
     if (aheadMs > 0) {
       this.midi.send(packet, performance.now() + aheadMs);
