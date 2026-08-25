@@ -1468,6 +1468,25 @@ describe('DjPlayerEngine', () => {
 
         expect(engine.stats().lastCancelLatencyMs).toBe(-1);
       });
+
+      it('falls back to -1 on a mid-session swap to a port that cannot cancel, without a tune reload', async () => {
+        midi.supportsCancel.set(true);
+        midi.cancelPendingReturns = true;
+        engine.loadTune(silentTune());
+        engine.setTimingMode('host-scheduled');
+        engine.setScheduleAhead(200);
+
+        await engine.play();
+        clock.tick(2);
+        engine.setSpeed(1.2); // records a real cancel latency
+
+        expect(engine.stats().lastCancelLatencyMs).toBeGreaterThan(-1);
+
+        midi.supportsCancel.set(false); // simulates a port swap mid-session, no tune reload
+        engine.pause(); // forces a fresh publish through the existing path, no tune reload involved
+
+        expect(engine.stats().lastCancelLatencyMs).toBe(-1);
+      });
     });
   });
 

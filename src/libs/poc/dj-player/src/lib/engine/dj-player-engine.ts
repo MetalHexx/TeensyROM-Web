@@ -1881,7 +1881,10 @@ export class DjPlayerEngine implements OnDestroy {
       reorderedFrames: this.reorderedFrames,
       clampedFrames: this.clampedFrames,
       cancelSupported: this.midi.supportsCancel(),
-      lastCancelLatencyMs: this.lastCancelLatencyMs,
+      // Derived rather than read straight off the field: `this.lastCancelLatencyMs` is sticky
+      // across a mid-session port swap, so a swap to a non-cancelling port must force this back to
+      // -1 rather than surface a stale reading from the port it replaced.
+      lastCancelLatencyMs: this.midi.supportsCancel() ? this.lastCancelLatencyMs : -1,
     });
   }
 }
