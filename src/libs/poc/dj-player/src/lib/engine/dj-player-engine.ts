@@ -215,6 +215,16 @@ const ANCHOR_RING_SIZE = 4;
 
 const RECIPE_MAX_INTERVAL_US = 0xffff;
 
+/**
+ * The `scheduleAheadMs` ceiling `setScheduleAhead()` enforces once the selected MIDI port cannot
+ * cancel a pending send — two PAL frames. That is the whole of the fallback this iteration promises
+ * for a port without `clear()`: stale-tempo frames a tempo change can no longer catch still play out,
+ * so the window they can be stale for has to stay short enough to be inaudible. A port that *can*
+ * cancel has no need of this — `retimeCommittedHostSends()` re-times whatever is still outstanding
+ * instead of merely bounding it.
+ */
+export const UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS = 40;
+
 const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
   packetsSent: 0,
@@ -365,6 +375,13 @@ export class DjPlayerEngine implements OnDestroy {
   /** Steps a jump or a retune still owes the stream, drained one per tick by `onTick`. */
   private pending: PendingStep[] = [];
   /**
+   * Frame packets already handed to the transport with a future delivery time, `host-scheduled`
+   * only — pruned as each entry's delivery time passes. What a tempo change can still catch:
+   * `retimeCommittedHostSends()` cancels the transport's queue and re-sends exactly these, at the
+   * new spacing, rather than losing whatever they were carrying.
+   */
+  private committedHostSends: { readonly packet: Uint8Array; readonly scheduledAtMs: number }[] = [];
+  /**
    * What the frame clock is actually pacing at, or null before it has ever been started.
    *
    * Kept apart from `effectiveIntervalUs()` — which reads the *new* rate the moment the fader
@@ -497,6 +514,7 @@ export class DjPlayerEngine implements OnDestroy {
     this.clearRecipeResend();
     // No tick will come to drain them, and the gate-off below supersedes them anyway.
     this.pending = [];
+    this.committedHostSends = [];
     this.sendControl(buildSidDataPacket(buildVoiceGateOffSnapshot()));
     this.state.set('paused');
     this.publishStats();
@@ -511,6 +529,7 @@ export class DjPlayerEngine implements OnDestroy {
     // subtune re-init below invalidates whatever it was holding anyway. A jump still replaying is
     // owed the same treatment — landing it would restart playback at a position nobody asked for.
     this.pending = [];
+    this.committedHostSends = [];
     this.discardOutstandingJump();
     if (this.file !== null) {
       this.sendControl(buildStopPacket());
@@ -696,6 +715,10 @@ export class DjPlayerEngine implements OnDestroy {
       return;
     }
     this.clearRecipeResend();
+    // Whichever direction the switch runs, whatever this held no longer describes a live tempo to
+    // reconcile against — cartridge-timed never populates it, and stale entries left from a prior
+    // host-scheduled stretch must not be re-timed against a rate that moved for a different reason.
+    this.committedHostSends = [];
     this.timingMode.set(mode);
     if (mode === 'cartridge-timed' && this.recipeEnabled() && this.state() === 'playing') {
       this.sendRecipe();
@@ -716,13 +739,27 @@ export class DjPlayerEngine implements OnDestroy {
    * `0` sends every packet immediately; a positive value hands `performance.now() + ms` to Web MIDI
    * so the subsystem's own clock releases it. Applied to the frame stream only — control packets
    * still go out at once, so a stop is never queued behind music.
+   *
+   * Clamped to `UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS` whenever the selected MIDI port cannot
+   * cancel a pending send — checked here, once, so the ceiling holds no matter which control sets
+   * the value. A port that can cancel has no ceiling: `retimeCommittedHostSends()` is what keeps a
+   * deeper window honest on a tempo change instead.
    */
   setScheduleAhead(ms: number): void {
     if (!Number.isFinite(ms) || ms < 0) {
       logWarn(`DJ engine: ignoring a schedule-ahead of ${ms} ms.`);
       return;
     }
-    this.scheduleAheadMs.set(ms);
+    const clamped = this.midi.supportsCancel()
+      ? ms
+      : Math.min(ms, UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+    if (clamped !== ms) {
+      logWarn(
+        `DJ engine: clamped schedule-ahead from ${ms} ms to ${clamped} ms — the selected MIDI port ` +
+          `cannot cancel a pending send, so a deeper window would risk stale-tempo frames playing out audibly.`
+      );
+    }
+    this.scheduleAheadMs.set(clamped);
   }
 
   /**
@@ -1530,11 +1567,16 @@ export class DjPlayerEngine implements OnDestroy {
       this.publishStats();
       return;
     }
-    if (
-      this.timingMode() === 'host-scheduled' ||
-      this.speedMode() === 'clock-only' ||
-      !this.recipeEnabled()
-    ) {
+    if (this.timingMode() === 'host-scheduled') {
+      // No recipe, no cartridge-side rate to disagree with — the clock follows the fader live, same
+      // as `clock-only`. What is unique to this mode is what may already be sitting in the transport's
+      // queue at the old rate; `retimeCommittedHostSends()` is the cancel-and-reschedule half of that.
+      this.setClockIntervalUs(this.effectiveIntervalUs());
+      this.retimeCommittedHostSends();
+      this.publishStats();
+      return;
+    }
+    if (this.speedMode() === 'clock-only' || !this.recipeEnabled()) {
       // No recipe goes out in these modes, so there is no cartridge-side rate to disagree with and
       // the clock can follow the fader live. That is the whole point of `clock-only`.
       this.setClockIntervalUs(this.effectiveIntervalUs());
@@ -1543,6 +1585,38 @@ export class DjPlayerEngine implements OnDestroy {
     }
     this.publishStats();
     this.scheduleRetune();
+  }
+
+  /**
+   * The cancellation half of a `host-scheduled` tempo change. There is no recipe and no gate-off
+   * here — the cartridge holds nothing to flush, because this mode never told it to buffer anything.
+   *
+   * With a port that can cancel, whatever is still sitting in the transport's queue was scheduled
+   * against the old interval and would land at the wrong spacing; wiping it and re-sending the same
+   * packets at the new one is what "re-time" means here — the content is unchanged, only the
+   * delivery times move. Without cancellation, or when `cancelPending()` reports it did not actually
+   * cancel anything, this is a no-op: resending on top of sends the transport still holds would
+   * duplicate them, so `setScheduleAhead()`'s clamp is what keeps that window inaudible instead.
+   */
+  private retimeCommittedHostSends(): void {
+    this.pruneCommittedHostSends(performance.now());
+    if (this.committedHostSends.length === 0 || !this.midi.supportsCancel()) {
+      return;
+    }
+    if (!this.midi.cancelPending()) {
+      return;
+    }
+
+    const outstanding = this.committedHostSends;
+    this.committedHostSends = [];
+    const aheadMs = this.scheduleAheadMs();
+    const newIntervalMs = this.effectiveIntervalUs() / (MICROSECONDS_PER_SECOND / 1000);
+    let scheduledAtMs = performance.now() + aheadMs;
+    for (const { packet } of outstanding) {
+      this.midi.send(packet, scheduledAtMs);
+      this.committedHostSends.push({ packet, scheduledAtMs });
+      scheduledAtMs += newIntervalMs;
+    }
   }
 
   private scheduleRetune(): void {
@@ -1622,7 +1696,9 @@ export class DjPlayerEngine implements OnDestroy {
   private sendFramePacket(packet: Uint8Array, dueAtMs: number): void {
     const aheadMs = this.scheduleAheadMs();
     if (this.timingMode() === 'host-scheduled') {
-      this.midi.send(packet, dueAtMs + aheadMs);
+      const scheduledAtMs = dueAtMs + aheadMs;
+      this.midi.send(packet, scheduledAtMs);
+      this.recordCommittedHostSend(packet, scheduledAtMs);
     } else if (aheadMs > 0) {
       this.midi.send(packet, performance.now() + aheadMs);
     } else {
@@ -1630,6 +1706,17 @@ export class DjPlayerEngine implements OnDestroy {
     }
     this.packetsSent++;
     this.bytesSent += packet.length;
+  }
+
+  /** Drops whatever has already reached its scheduled delivery time before recording the newest
+   *  send, so `committedHostSends` never holds more than a tempo change could actually still catch. */
+  private pruneCommittedHostSends(nowMs: number): void {
+    this.committedHostSends = this.committedHostSends.filter((entry) => entry.scheduledAtMs > nowMs);
+  }
+
+  private recordCommittedHostSend(packet: Uint8Array, scheduledAtMs: number): void {
+    this.pruneCommittedHostSends(performance.now());
+    this.committedHostSends.push({ packet, scheduledAtMs });
   }
 
   private sendControl(packet: Uint8Array): void {
@@ -1654,6 +1741,7 @@ export class DjPlayerEngine implements OnDestroy {
     this.bytesSent = 0;
     this.recipeResends = 0;
     this.pending = [];
+    this.committedHostSends = [];
   }
 
   /**

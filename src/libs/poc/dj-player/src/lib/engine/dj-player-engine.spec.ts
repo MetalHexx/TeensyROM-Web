@@ -26,6 +26,7 @@ import {
   NUDGE_RANGE_MS,
   RECIPE_RESEND_DEBOUNCE_MS,
   RETUNE_GATE_LEAD_FRAMES,
+  UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS,
 } from './dj-player-engine';
 
 /** Bytes before the values in a SID data packet, plus the trailing `F7`. */
@@ -166,10 +167,22 @@ interface SentPacket {
  */
 class FakeMidiOutputService {
   readonly selectedPortId = signal<string | null>('port-1');
+  /** The transport double for `MidiOutputService.supportsCancel` — see the file header comment on
+   *  why this and `MIDIOutputLike.clear` are two separate fakes, not one. */
+  readonly supportsCancel = signal<boolean>(false);
   readonly sent: SentPacket[] = [];
+  cancelPendingCallCount = 0;
+  /** What `cancelPending()` reports back — mirrors the real service's "true only if it actually
+   *  cancelled" contract, so a test simulating a capable port sets this alongside `supportsCancel`. */
+  cancelPendingReturns = false;
 
   send(bytes: Uint8Array, timestampMs?: number): void {
     this.sent.push({ bytes: Uint8Array.from(bytes), timestampMs });
+  }
+
+  cancelPending(): boolean {
+    this.cancelPendingCallCount++;
+    return this.cancelPendingReturns;
   }
 }
 
@@ -1231,6 +1244,113 @@ describe('DjPlayerEngine', () => {
       expect(recipe).toHaveLength(1);
       expect(bufferingRequested(recipe[0])).toBe(true);
       expect(dataPackets(midi)[0].timestampMs).toBeUndefined();
+    });
+  });
+
+  describe('reschedule on tempo change (host-scheduled cancellation)', () => {
+    // The cartridge-timed regression test below still queues a real retune debounce; fake timers
+    // keep that `setTimeout` from firing for real once the test (and its engine) has gone away.
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('cancels and re-times every still-committed send once, at the new interval, with a port that can cancel', async () => {
+      midi.supportsCancel.set(true);
+      midi.cancelPendingReturns = true;
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      engine.setScheduleAhead(200); // supportsCancel lifts setScheduleAhead's 40 ms ceiling
+
+      await engine.play();
+      clock.tick(2);
+      const committed = dataPackets(midi).slice(-2).map((packet) => packet.bytes);
+
+      engine.setSpeed(1.2);
+
+      expect(midi.cancelPendingCallCount).toBe(1);
+      const resent = dataPackets(midi).slice(-2);
+      // Re-timed, not regenerated: the same bytes the tick already computed, only the delivery times
+      // move — resending under a new tempo would be the recipe-and-retune shape this mode has none of.
+      expect(resent.map((packet) => packet.bytes)).toEqual(committed);
+      const newIntervalMs = PAL_FRAME_INTERVAL_US / 1.2 / 1000;
+      expect((resent[1].timestampMs ?? 0) - (resent[0].timestampMs ?? 0)).toBeCloseTo(newIntervalMs, 6);
+    });
+
+    it('leaves committed sends untouched and never calls cancelPending with a port that cannot cancel', async () => {
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+
+      await engine.play();
+      clock.tick(1);
+      const before = midi.sent.length;
+
+      expect(() => engine.setSpeed(1.2)).not.toThrow();
+
+      expect(midi.cancelPendingCallCount).toBe(0);
+      expect(midi.sent.length).toBe(before);
+      // The change still applies going forward — only the already-committed frame is left alone.
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 1.2, 6);
+    });
+
+    it('does not resend when cancelPending() reports it did not actually cancel anything', async () => {
+      midi.supportsCancel.set(true);
+      midi.cancelPendingReturns = false; // detected as capable, but the call itself reports failure
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      engine.setScheduleAhead(200);
+
+      await engine.play();
+      clock.tick(1);
+      const before = midi.sent.length;
+
+      expect(() => engine.setSpeed(1.2)).not.toThrow();
+
+      expect(midi.cancelPendingCallCount).toBe(1);
+      expect(midi.sent.length).toBe(before);
+    });
+
+    it('never calls cancelPending on a speed change in cartridge-timed', async () => {
+      midi.supportsCancel.set(true);
+      midi.cancelPendingReturns = true;
+      engine.loadTune(silentTune()); // cartridge-timed is the default
+
+      await engine.play();
+      clock.tick(1);
+
+      engine.setSpeed(1.2);
+
+      expect(midi.cancelPendingCallCount).toBe(0);
+    });
+  });
+
+  describe('setScheduleAhead ceiling', () => {
+    it('clamps to the uncancellable ceiling when the selected port cannot cancel pending sends', () => {
+      midi.supportsCancel.set(false);
+
+      engine.setScheduleAhead(500);
+
+      expect(engine.scheduleAheadMs()).toBe(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+    });
+
+    it('does not clamp when the selected port can cancel pending sends', () => {
+      midi.supportsCancel.set(true);
+
+      engine.setScheduleAhead(500);
+
+      expect(engine.scheduleAheadMs()).toBe(500);
+    });
+
+    it('leaves a value already within the ceiling untouched regardless of cancel support', () => {
+      midi.supportsCancel.set(false);
+
+      engine.setScheduleAhead(10);
+
+      expect(engine.scheduleAheadMs()).toBe(10);
     });
   });
 
