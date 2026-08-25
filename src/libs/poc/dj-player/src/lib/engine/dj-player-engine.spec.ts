@@ -1361,6 +1361,30 @@ describe('DjPlayerEngine', () => {
 
       expect(engine.scheduleAheadMs()).toBe(10);
     });
+
+    it('re-clamps the window actually sent on a mid-session loss of cancel support, without a fresh setScheduleAhead() call', async () => {
+      midi.supportsCancel.set(true);
+      engine.loadTune(silentTune());
+      engine.setTimingMode('host-scheduled');
+      engine.setScheduleAhead(200); // a deep window, allowed while the port can cancel
+
+      await engine.play();
+      clock.tickWithDueAt(1_000_000);
+      expect(lastDataPacket(midi).timestampMs).toBeCloseTo(1_000_000 + 200, 6);
+
+      // Simulates a port swap or a same-device reconnect: the capability signal changes on its own,
+      // with nobody re-touching the schedule-ahead control.
+      midi.supportsCancel.set(false);
+      // The stored value is untouched — this is exactly what a stale, unbounded window would look
+      // like if the ceiling were only enforced back when setScheduleAhead() last ran.
+      expect(engine.scheduleAheadMs()).toBe(200);
+
+      clock.tickWithDueAt(1_001_000);
+      expect(lastDataPacket(midi).timestampMs).toBeCloseTo(
+        1_001_000 + UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS,
+        6
+      );
+    });
   });
 
   describe('delivery-against-due-time stats', () => {

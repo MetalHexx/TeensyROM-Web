@@ -238,12 +238,16 @@ const ANCHOR_RING_SIZE = 4;
 const RECIPE_MAX_INTERVAL_US = 0xffff;
 
 /**
- * The `scheduleAheadMs` ceiling `setScheduleAhead()` enforces once the selected MIDI port cannot
- * cancel a pending send — two PAL frames. That is the whole of the fallback this iteration promises
- * for a port without `clear()`: stale-tempo frames a tempo change can no longer catch still play out,
- * so the window they can be stale for has to stay short enough to be inaudible. A port that *can*
- * cancel has no need of this — `retimeCommittedHostSends()` re-times whatever is still outstanding
- * instead of merely bounding it.
+ * The `scheduleAheadMs` ceiling enforced whenever the selected MIDI port cannot cancel a pending
+ * send — two PAL frames. That is the whole of the fallback this iteration promises for a port
+ * without `clear()`: stale-tempo frames a tempo change can no longer catch still play out, so the
+ * window they can be stale for has to stay short enough to be inaudible. A port that *can* cancel has
+ * no need of this — `retimeCommittedHostSends()` re-times whatever is still outstanding instead of
+ * merely bounding it.
+ *
+ * Enforced live, at every send, via `effectiveScheduleAheadMs()` — not only at the moment
+ * `setScheduleAhead()` runs — because `supportsCancel()` is a signal `MidiOutputService` can flip on
+ * its own (a port swap, a same-device reconnect) with no call back into the engine.
  */
 export const UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS = 40;
 
@@ -784,10 +788,11 @@ export class DjPlayerEngine implements OnDestroy {
    * so the subsystem's own clock releases it. Applied to the frame stream only — control packets
    * still go out at once, so a stop is never queued behind music.
    *
-   * Clamped to `UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS` whenever the selected MIDI port cannot
-   * cancel a pending send — checked here, once, so the ceiling holds no matter which control sets
-   * the value. A port that can cancel has no ceiling: `retimeCommittedHostSends()` is what keeps a
-   * deeper window honest on a tempo change instead.
+   * Clamped to `UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS` here whenever the selected MIDI port cannot
+   * cancel a pending send, so the control itself never shows a deeper window than the current port
+   * can safely honour. This is a courtesy at selection time, not the enforcement: `supportsCancel()`
+   * can change on its own after this call returns, so `effectiveScheduleAheadMs()` re-derives the
+   * live ceiling on every send rather than trusting what got stored here.
    */
   setScheduleAhead(ms: number): void {
     if (!Number.isFinite(ms) || ms < 0) {
@@ -804,6 +809,19 @@ export class DjPlayerEngine implements OnDestroy {
       );
     }
     this.scheduleAheadMs.set(clamped);
+  }
+
+  /**
+   * The schedule-ahead window actually honoured for the next send, re-derived fresh against the
+   * live `supportsCancel()` signal rather than trusted from whatever `setScheduleAhead()` last
+   * stored. `scheduleAheadMs()` alone would go stale the moment capability changes without a
+   * matching call back into `setScheduleAhead()` — a port swap or a same-device reconnect — leaving
+   * a deep window in place with no cancellation left to bound its exposure. This is the read-time
+   * half of that guarantee; `setScheduleAhead()`'s own clamp is only the write-time courtesy.
+   */
+  private effectiveScheduleAheadMs(): number {
+    const ms = this.scheduleAheadMs();
+    return this.midi.supportsCancel() ? ms : Math.min(ms, UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
   }
 
   /**
@@ -1664,7 +1682,10 @@ export class DjPlayerEngine implements OnDestroy {
     this.lastCancelLatencyMs =
       Math.max(...outstanding.map((entry) => entry.scheduledAtMs)) - nowMs;
     this.committedHostSends = [];
-    const aheadMs = this.scheduleAheadMs();
+    // `supportsCancel()` is already confirmed true above, so this equals `scheduleAheadMs()` — read
+    // via the same helper `sendFramePacket` uses purely so both call sites agree on one source of
+    // truth for "the window actually in effect right now."
+    const aheadMs = this.effectiveScheduleAheadMs();
     const newIntervalMs = this.effectiveIntervalUs() / (MICROSECONDS_PER_SECOND / 1000);
     let scheduledAtMs = performance.now() + aheadMs;
     for (const { packet } of outstanding) {
@@ -1740,16 +1761,21 @@ export class DjPlayerEngine implements OnDestroy {
   /**
    * Sends one frame packet, on whichever arm `timingMode` selects.
    *
-   * `cartridge-timed` schedules against `performance.now() + scheduleAheadMs()` — unchanged from
-   * before this mode existed — where the offset means "this far from now" and 0 means immediately.
+   * `cartridge-timed` schedules against `performance.now() + effectiveScheduleAheadMs()` —
+   * unchanged in shape from before this mode existed — where the offset means "this far from now"
+   * and 0 means immediately.
    *
-   * `host-scheduled` schedules against `dueAtMs + scheduleAheadMs()` instead: `dueAtMs` is when the
-   * clock says this frame fell due, always at or before now, so anchoring to it rather than to
-   * whenever the main thread reached the packet is what makes packet spacing independent of
+   * `host-scheduled` schedules against `dueAtMs + effectiveScheduleAheadMs()` instead: `dueAtMs` is
+   * when the clock says this frame fell due, always at or before now, so anchoring to it rather than
+   * to whenever the main thread reached the packet is what makes packet spacing independent of
    * callback timing.
+   *
+   * Reads `effectiveScheduleAheadMs()` rather than `scheduleAheadMs()` directly so the uncancellable
+   * ceiling stays enforced against the port's *current* cancel support, not whatever it was the last
+   * time `setScheduleAhead()` ran.
    */
   private sendFramePacket(packet: Uint8Array, dueAtMs: number, catchUpClamped: boolean): void {
-    const aheadMs = this.scheduleAheadMs();
+    const aheadMs = this.effectiveScheduleAheadMs();
     const handOffMs = performance.now();
     let scheduledAtMs: number;
     if (this.timingMode() === 'host-scheduled') {
