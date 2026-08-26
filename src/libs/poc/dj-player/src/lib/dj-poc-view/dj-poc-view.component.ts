@@ -13,8 +13,6 @@ import {
   FRAME_CLOCK,
   NOMINAL_INTERVAL_OPTIONS_US,
   SPEED_INPUT_SPAN,
-  SpeedMode,
-  TimingMode,
 } from '../engine/dj-player-engine';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
@@ -29,6 +27,14 @@ const MICROSECONDS_PER_SECOND = 1_000_000;
 /** The stall control's starting span — long enough to be heard, short enough not to trip
  *  `MAX_CATCH_UP_US`'s catch-up ceiling in the frame clock on a single press. */
 const DEFAULT_STALL_DURATION_MS = 150;
+
+/**
+ * The longest stall the control will actually run. The busy-wait is synchronous and uncancellable,
+ * so a mistyped `150000` would freeze the tab for two and a half minutes with no way back. This
+ * still reaches well past the widest schedule-ahead option (160 ms), which is the span the stall
+ * has to out-last to prove anything.
+ */
+const MAX_STALL_DURATION_MS = 2000;
 
 /**
  * Off, two sub-frame probes, then a ceiling that reaches well past a single PAL frame (~19.95 ms).
@@ -84,29 +90,29 @@ export class DjPocViewComponent {
   protected readonly currentSubtune = this.engine.currentSubtune;
   protected readonly subtuneCount = this.engine.subtuneCount;
   protected readonly speedMultiplier = this.engine.speedMultiplier;
-  protected readonly speedMode = this.engine.speedMode;
-  protected readonly timingMode = this.engine.timingMode;
-  protected readonly recipeEnabled = this.engine.recipeEnabled;
   protected readonly nominalIntervalUs = this.engine.nominalIntervalUs;
   protected readonly scheduleAheadMs = this.engine.scheduleAheadMs;
   protected readonly mutedVoices = this.engine.mutedVoices;
   protected readonly heldVoices = this.engine.heldVoices;
   protected readonly effectiveMutes = this.engine.effectiveMutes;
-  protected readonly cues = this.engine.cues;
-  protected readonly loopSlots = this.engine.loopSlots;
-  protected readonly activeLoopSlot = this.engine.activeLoopSlot;
-  protected readonly queuedLoopSlot = this.engine.queuedLoopSlot;
+  protected readonly markers = this.engine.markers;
+  protected readonly loopingMarker = this.engine.loopingMarker;
+  protected readonly queuedMarker = this.engine.queuedMarker;
+  /** True while a `triggerMarker` launch is awaiting `play()` — trigger and delete are disabled on
+   *  every row for that span, since a delete racing the await would reindex out from under it. */
+  protected readonly markerLaunchPending = this.engine.markerLaunchPending;
 
-  /** 0–100, non-zero only for the active slot — the engine does the arithmetic. */
-  protected progressPercentFor(slot: number): number {
-    return this.engine.progressPercentFor(slot);
+  /** 0–100, non-zero only for the marker currently looping — the engine does the arithmetic. */
+  protected progressPercentFor(index: number): number {
+    return this.engine.progressPercentFor(index);
   }
 
-  /** Which of the three states a slot's row is in — drives the visual distinction between active,
-   * queued and idle without relying on a text label. */
-  protected loopSlotState(slot: number): 'active' | 'queued' | 'idle' {
-    if (this.activeLoopSlot() === slot) return 'active';
-    if (this.queuedLoopSlot() === slot) return 'queued';
+  /** Which of the three states a marker's row is in — drives the visual distinction between active,
+   * queued and idle without relying on a text label. Every marker can be queued now that a cue and
+   * a loop are the same kind of row. */
+  protected markerState(index: number): 'active' | 'queued' | 'idle' {
+    if (this.loopingMarker() === index) return 'active';
+    if (this.queuedMarker() === index) return 'queued';
     return 'idle';
   }
 
@@ -123,6 +129,7 @@ export class DjPocViewComponent {
 
   /** The main-thread stall control's configured span, ms — see `onStallMainThread`. */
   protected readonly stallDurationMs = signal<number>(DEFAULT_STALL_DURATION_MS);
+  protected readonly maxStallDurationMs = MAX_STALL_DURATION_MS;
 
   // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
   // own position updates (which fire from stats publishes, not from the drag) can't fight it and
@@ -133,33 +140,14 @@ export class DjPocViewComponent {
     () => this.scrubDragValue() ?? this.engine.positionPercent()
   );
 
-  /** Slot index → the offset being dragged right now. Absent means "not dragging that slot". */
-  private readonly cueDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
+  /** Marker index → the start offset being dragged right now. Absent means "not dragging that
+   * marker's start". Re-deriving a captured point replays frames, so the commit has to wait for the
+   * release rather than following every drag tick. */
+  private readonly startDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
 
-  /** Slot index → the in-point offset being dragged right now. Absent means "not dragging that
-   * slot's in-point". Re-deriving a loop's entry replays frames, the same reason the cue rows keep
-   * a drag offset, so it has to wait for the release. */
-  private readonly loopInDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
-
-  /** Slot index → the out-point offset being dragged right now. Kept purely so the readout tracks
-   * the thumb; the commit itself waits for release even though the arithmetic is cheap, because the
-   * commit now also auditions the seam. */
-  private readonly loopOutDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
-
-  // The cartridge's frame timer, stated rather than recorded: we know it is on once we have sent a
-  // recipe packet, because the firmware's handler forces `FrameTimerMode = true` on receipt.
-  //
-  // Buffer size has no equivalent and is deliberately absent. ASID is one-way host -> cartridge and
-  // Identify writes text to the C64 screen rather than querying it, so this browser has no way to
-  // read the buffer size back. A hand-kept record of it is only true while someone remembers to
-  // update two places at once, and a stale one is worse than nothing — the C64's own menu already
-  // displays the buffer size accurately, so that is where it is read.
-  protected readonly frameTimerForced = this.engine.recipeSent;
-  protected readonly frameTimerStatus = computed(() =>
-    this.frameTimerForced()
-      ? `on at ${Math.round(this.engineStats().effectiveIntervalUs)} µs`
-      : 'not set'
-  );
+  /** Marker index → the end offset being dragged right now. Kept purely so the readout tracks the
+   * thumb; the commit itself waits for release, because it also auditions the seam. */
+  private readonly endDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
 
   // Identify interrupts the stream on the cartridge, so it stays out of reach while a tune plays.
   protected readonly canIdentify = computed(
@@ -303,18 +291,6 @@ export class DjPocViewComponent {
     this.engine.homeSpeed();
   }
 
-  onSpeedModeChange(event: Event): void {
-    this.engine.setSpeedMode((event.target as HTMLSelectElement).value as SpeedMode);
-  }
-
-  onTimingModeChange(event: Event): void {
-    this.engine.setTimingMode((event.target as HTMLSelectElement).value as TimingMode);
-  }
-
-  onRecipeToggle(event: Event): void {
-    this.engine.setRecipeEnabled((event.target as HTMLInputElement).checked);
-  }
-
   onNominalIntervalChange(event: Event): void {
     this.engine.setNominalIntervalUs(Number((event.target as HTMLSelectElement).value));
   }
@@ -331,14 +307,17 @@ export class DjPocViewComponent {
   }
 
   /**
-   * Blocks the main thread synchronously for `stallDurationMs()` — the deliberate stall `R5` needs
-   * to put the resilience claim on demand rather than waiting for a real one to land during a
-   * session. The frame clock's audio callback rides this same thread, so nothing it paces can run
-   * until the loop below returns; the delivery stats afterward are what say whether that gap was
-   * heard.
+   * Blocks the main thread synchronously for `stallDurationMs()`, capped at
+   * `MAX_STALL_DURATION_MS` — the deliberate stall the resilience claim needs on demand rather than
+   * waiting for a real one to land during a session. The frame clock's audio callback rides this
+   * same thread, so nothing it paces can run until the loop below returns; the delivery stats
+   * afterward are what say whether that gap was heard.
+   *
+   * The log line carries the duration actually run, so a clamped value reads as the override it is
+   * rather than as the control silently ignoring what was typed.
    */
   onStallMainThread(): void {
-    const ms = this.stallDurationMs();
+    const ms = Math.min(this.stallDurationMs(), MAX_STALL_DURATION_MS);
     logInfo(LogType.Debug, `DJ POC: stalling the main thread for ${ms} ms.`);
     const until = performance.now() + ms;
     while (performance.now() < until) {
@@ -390,152 +369,107 @@ export class DjPocViewComponent {
     this.engine.clearVoiceMutes();
   }
 
-  onAddCue(): void {
-    this.engine.addCue();
+  onAddMarker(): void {
+    this.engine.addMarker();
   }
 
-  onCaptureCue(slot: number): void {
-    this.engine.captureCue(slot);
+  onCaptureMarkerStart(index: number): void {
+    this.engine.captureMarkerStart(index);
   }
 
-  onHopToCue(slot: number): void {
-    void this.engine.hopToCue(slot);
+  onTriggerMarker(index: number): void {
+    void this.engine.triggerMarker(index);
   }
 
-  onClearCue(slot: number): void {
-    this.engine.clearCue(slot);
+  onSetMarkerEnd(index: number): void {
+    this.engine.setMarkerEnd(index);
   }
 
-  onDeleteCue(slot: number): void {
-    this.engine.deleteCue(slot);
+  onClearMarkerEnd(index: number): void {
+    this.engine.clearMarkerEnd(index);
   }
 
-  /** The offset the row shows: the live drag while one is in flight, the committed value otherwise. */
-  protected displayedCueOffset(slot: number): number {
-    return this.cueDragOffsets().get(slot) ?? this.cues()[slot]?.offset ?? 0;
+  onClearMarker(index: number): void {
+    this.engine.clearMarker(index);
   }
 
-  /** Signed and unit-suffixed, as the row reads it: `+0 fr`, `−7 fr`. */
-  protected cueOffsetLabel(slot: number): string {
-    return offsetLabel(this.displayedCueOffset(slot));
-  }
-
-  // Moves the readout only. Every re-derivation replays up to ~50 frames of emulation on the thread
-  // the frame clock rides, so running one per drag tick would put steady replay load beside the
-  // audio callback.
-  onCueNudgeInput(slot: number, event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
-    this.cueDragOffsets.update((offsets) => new Map(offsets).set(slot, value));
-  }
-
-  // (change) fires on release: commit the offset, then hop so the operator hears where the point
-  // landed. The drag entry is dropped only after the commit, so the readout falls back to an engine
-  // value that already agrees with it rather than snapping back through the old one.
-  onCueNudgeChange(slot: number, event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
-    this.engine.setCueOffset(slot, value);
-    void this.engine.hopToCue(slot);
-    this.cueDragOffsets.update((offsets) => {
-      const next = new Map(offsets);
-      next.delete(slot);
-      return next;
-    });
-  }
-
-  onTapLoopIn(slot: number): void {
-    this.engine.tapLoopIn(slot);
-  }
-
-  onTapLoopOut(slot: number): void {
-    this.engine.tapLoopOut(slot);
-  }
-
-  onPunchLoop(slot: number): void {
-    void this.engine.punchLoop(slot);
-  }
-
-  onClearLoopSlot(slot: number): void {
-    this.engine.clearLoopSlot(slot);
-  }
-
-  onDeleteLoop(slot: number): void {
-    this.engine.deleteLoop(slot);
-  }
-
-  onAddLoop(): void {
-    this.engine.addLoop();
+  onDeleteMarker(index: number): void {
+    this.engine.deleteMarker(index);
   }
 
   onStopLoop(): void {
     this.engine.stopLoop();
   }
 
-  /** The in-point offset a slot's row shows: the live drag while one is in flight, the committed
+  /** The start offset a marker's row shows: the live drag while one is in flight, the committed
    * value otherwise. */
-  protected displayedLoopInOffset(slot: number): number {
-    return this.loopInDragOffsets().get(slot) ?? this.loopSlots()[slot]?.in?.offset ?? 0;
+  protected displayedMarkerStartOffset(index: number): number {
+    return this.startDragOffsets().get(index) ?? this.markers()[index]?.start?.offset ?? 0;
   }
 
-  /** The out-point offset a slot's row shows — mirrors `displayedLoopInOffset`. */
-  protected displayedLoopOutOffset(slot: number): number {
-    return this.loopOutDragOffsets().get(slot) ?? this.loopSlots()[slot]?.out?.offset ?? 0;
+  /** The end offset a marker's row shows — mirrors `displayedMarkerStartOffset`. */
+  protected displayedMarkerEndOffset(index: number): number {
+    return this.endDragOffsets().get(index) ?? this.markers()[index]?.end?.offset ?? 0;
   }
 
-  /** The In row's frame readout: the captured frame plus whichever offset is currently displayed. */
-  protected loopInFrame(slot: number): number | null {
-    const point = this.loopSlots()[slot]?.in ?? null;
-    return point === null ? null : point.frame + this.displayedLoopInOffset(slot);
+  /** The start's frame readout: the captured frame plus whichever offset is currently displayed —
+   * the nudged frame, since that is where the marker actually lands. */
+  protected markerStartFrame(index: number): number | null {
+    const point = this.markers()[index]?.start ?? null;
+    return point === null ? null : point.frame + this.displayedMarkerStartOffset(index);
   }
 
-  /** The Out row's frame readout — mirrors `loopInFrame`. */
-  protected loopOutFrame(slot: number): number | null {
-    const point = this.loopSlots()[slot]?.out ?? null;
-    return point === null ? null : point.frame + this.displayedLoopOutOffset(slot);
+  /** The end's frame readout — mirrors `markerStartFrame`. */
+  protected markerEndFrame(index: number): number | null {
+    const end = this.markers()[index]?.end ?? null;
+    return end === null ? null : end.frame + this.displayedMarkerEndOffset(index);
   }
 
-  protected loopInOffsetLabel(slot: number): string {
-    return offsetLabel(this.displayedLoopInOffset(slot));
+  protected markerStartOffsetLabel(index: number): string {
+    return offsetLabel(this.displayedMarkerStartOffset(index));
   }
 
-  protected loopOutOffsetLabel(slot: number): string {
-    return offsetLabel(this.displayedLoopOutOffset(slot));
+  protected markerEndOffsetLabel(index: number): string {
+    return offsetLabel(this.displayedMarkerEndOffset(index));
   }
 
-  // Moves the readout only — see `onCueNudgeInput`.
-  onLoopInNudgeInput(slot: number, event: Event): void {
+  // Moves the readout only. Every re-derivation replays up to ~50 frames of emulation on the thread
+  // the frame clock rides, so running one per drag tick would put steady replay load beside the
+  // audio callback.
+  onMarkerStartNudgeInput(index: number, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.loopInDragOffsets.update((offsets) => new Map(offsets).set(slot, value));
+    this.startDragOffsets.update((offsets) => new Map(offsets).set(index, value));
   }
 
   // (change) fires on release: commit the offset, then audition so the operator hears where the
-  // entry now lands — bypasses the queue, same as the out-point audition.
-  onLoopInNudgeChange(slot: number, event: Event): void {
+  // point now lands. Auditions bypass the queue by design — a setup gesture, not a performance
+  // trigger — and must stay immediate even while a loop is already running.
+  onMarkerStartNudgeChange(index: number, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.engine.setLoopInOffset(slot, value);
-    this.engine.auditionLoopIn(slot);
-    this.loopInDragOffsets.update((offsets) => {
+    this.engine.setMarkerStartOffset(index, value);
+    this.engine.auditionMarkerStart(index);
+    this.startDragOffsets.update((offsets) => {
       const next = new Map(offsets);
-      next.delete(slot);
+      next.delete(index);
       return next;
     });
   }
 
-  // Moves the readout only, same as the in-point drag: now that there is an audition to run, moving
-  // the exit on every tick would put replay-adjacent work on the frame clock's own thread.
-  onLoopOutNudgeInput(slot: number, event: Event): void {
+  // Moves the readout only, same as the start drag.
+  onMarkerEndNudgeInput(index: number, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.loopOutDragOffsets.update((offsets) => new Map(offsets).set(slot, value));
+    this.endDragOffsets.update((offsets) => new Map(offsets).set(index, value));
   }
 
   // (change) fires on release: commit the offset, then audition so the operator hears where the
-  // seam now lands.
-  onLoopOutNudgeChange(slot: number, event: Event): void {
+  // seam now lands — see `onMarkerStartNudgeChange`.
+  onMarkerEndNudgeChange(index: number, event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    this.engine.setLoopOutOffset(slot, value);
-    this.engine.auditionLoopOut(slot);
-    this.loopOutDragOffsets.update((offsets) => {
+    this.engine.setMarkerEndOffset(index, value);
+    this.engine.auditionMarkerEnd(index);
+    this.endDragOffsets.update((offsets) => {
       const next = new Map(offsets);
-      next.delete(slot);
+      next.delete(index);
       return next;
     });
   }

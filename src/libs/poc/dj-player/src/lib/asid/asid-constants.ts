@@ -12,7 +12,6 @@ export const ASID_MSG_STOP = 0x4d;
 export const ASID_MSG_SID_DATA = 0x4e;
 export const ASID_MSG_DISPLAY_CHARS = 0x4f;
 export const ASID_MSG_SID_TYPE = 0x32;
-export const ASID_MSG_FRAMERATE_RECIPE = 0x31;
 
 export const SID_REGISTER_COUNT = 25;
 export const ASID_SLOT_COUNT = 28;

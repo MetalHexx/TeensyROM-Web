@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildDisplayCharsPacket,
-  buildFramerateRecipePacket,
   buildSidDataPacket,
   buildSidTypePacket,
   buildStartPacket,
@@ -42,60 +41,6 @@ describe('buildDisplayCharsPacket', () => {
 
     expect(Array.from(dataBytes)).toEqual([0x41, 0x42]); // A, B — é dropped
     expect(Array.from(dataBytes).every((byte) => byte < 0x80)).toBe(true);
-  });
-});
-
-describe('buildFramerateRecipePacket', () => {
-  it('matches the worked example from the firmware decoder', () => {
-    const packet = buildFramerateRecipePacket({
-      ntsc: false,
-      speedMultiplier: 1,
-      bufferingRequested: true,
-      frameIntervalUs: 19950,
-    });
-
-    expect(packet).toEqual(Uint8Array.from([0xf0, 0x2d, 0x31, 0x40, 0x6e, 0x1b, 0x01, 0xf7]));
-  });
-
-  it.each([
-    { ntsc: false, speedMultiplier: 1, bufferingRequested: true, frameIntervalUs: 19950 },
-    { ntsc: true, speedMultiplier: 16, bufferingRequested: false, frameIntervalUs: 0 },
-    { ntsc: true, speedMultiplier: 4, bufferingRequested: true, frameIntervalUs: 16715 },
-    { ntsc: false, speedMultiplier: 8, bufferingRequested: false, frameIntervalUs: 65535 },
-  ])(
-    "round-trips frameIntervalUs and packs settings correctly through the cartridge decoder's bit formula",
-    (opts) => {
-      const packet = buildFramerateRecipePacket(opts);
-      const [, , , settings, us0, us1, us2] = packet;
-
-      expect(packet).toHaveLength(8);
-      expect(((us2 & 3) << 14) | (us1 << 7) | us0).toBe(opts.frameIntervalUs);
-      expect(settings & 1).toBe(opts.ntsc ? 1 : 0);
-      expect((settings >> 1) & 0xf).toBe(opts.speedMultiplier - 1);
-      expect((settings & 0x40) !== 0).toBe(opts.bufferingRequested);
-    }
-  );
-
-  it('rejects a speed multiplier outside 1..16', () => {
-    expect(() =>
-      buildFramerateRecipePacket({
-        ntsc: false,
-        speedMultiplier: 17,
-        bufferingRequested: false,
-        frameIntervalUs: 0,
-      })
-    ).toThrow(RangeError);
-  });
-
-  it('rejects a frame interval outside 0..65535', () => {
-    expect(() =>
-      buildFramerateRecipePacket({
-        ntsc: false,
-        speedMultiplier: 1,
-        bufferingRequested: false,
-        frameIntervalUs: 65536,
-      })
-    ).toThrow(RangeError);
   });
 });
 
