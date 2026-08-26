@@ -23,11 +23,16 @@ export interface RegisterValuesSnapshot {
   readonly values: Uint8Array;
 }
 
-const PRIMARY_SLOT_FOR_REGISTER = buildPrimarySlotTable();
+/**
+ * `ASID_SLOT_TO_REGISTER` inverted over its first 25 (non-duplicate) entries: register -> its
+ * primary slot. Exported as the single decode point for this mapping — every slot-indexed reader
+ * (this class and the analysis scan's frame-feature decoder alike) crosses this same table rather
+ * than re-deriving it.
+ */
+export const PRIMARY_SLOT_FOR_REGISTER = buildPrimarySlotTable();
 const SECONDARY_SLOT_FOR_REGISTER = buildSecondarySlotTable();
 const VOICE_INDEX_FOR_REGISTER = buildVoiceIndexTable();
 
-/** `ASID_SLOT_TO_REGISTER` inverted over its first 25 (non-duplicate) entries. */
 function buildPrimarySlotTable(): readonly number[] {
   const table = new Array<number>(SID_REGISTER_COUNT).fill(-1);
   for (let slot = 0; slot < SID_REGISTER_COUNT; slot++) {

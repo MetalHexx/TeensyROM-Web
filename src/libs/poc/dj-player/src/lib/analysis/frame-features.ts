@@ -1,18 +1,6 @@
-import { ASID_SLOT_COUNT, ASID_SLOT_TO_REGISTER, SID_REGISTER_COUNT } from '../asid/asid-constants';
+import { ASID_SLOT_COUNT } from '../asid/asid-constants';
+import { PRIMARY_SLOT_FOR_REGISTER } from '../asid/register-frame';
 import type { ScanOutput } from './scan-tune';
-
-/** register -> ASID slot, built once. `RegisterValuesSnapshot.values` is slot-indexed, not
- *  register-indexed, so every read has to cross this table first — reading `values[register]`
- *  directly is the bug this table exists to prevent. */
-const REGISTER_TO_SLOT = buildRegisterToSlot();
-
-function buildRegisterToSlot(): number[] {
-  const table = new Array<number>(SID_REGISTER_COUNT);
-  for (let slot = 0; slot < SID_REGISTER_COUNT; slot++) {
-    table[ASID_SLOT_TO_REGISTER[slot]] = slot;
-  }
-  return table;
-}
 
 export interface VoiceFeatures {
   readonly frequency: number; // 0..65535, from the register pair
@@ -80,7 +68,7 @@ function readVoiceFeatures(scan: ScanOutput, frame: number, voice: number): Voic
 }
 
 function readRegister(scan: ScanOutput, frame: number, register: number): number {
-  const slot = REGISTER_TO_SLOT[register];
+  const slot = PRIMARY_SLOT_FOR_REGISTER[register];
   return scan.slotValues[frame * ASID_SLOT_COUNT + slot];
 }
 
