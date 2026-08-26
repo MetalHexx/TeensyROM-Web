@@ -103,7 +103,7 @@ The cartridge's diagnostics are your oracle. Watch all of these as you play:
 
 Record observations as they happen during the session. Findings cannot be reconstructed from memory afterwards. For each question below, note what you heard, which tunes showed the phenomenon, and which configuration was under test.
 
-### The Seventeen Questions
+### The Questions
 
 #### 1. Does the browser hold musical timing over a long playback?
 
@@ -236,6 +236,36 @@ Record observations as they happen during the session. Findings cannot be recons
 #### 17. Does snapshot-based loop re-entry produce an audible seam?
 
 *Confirms whether a loop can engage without a seam, which is the precondition for hopping between multiple loops later.*
+
+**Observations:**
+
+---
+
+#### 18. Does change detection land on musically real moments across a range of tunes?
+
+**Observations:**
+
+---
+
+#### 19. Does the candidate strength ladder sort the way a listener would?
+
+**Observations:**
+
+---
+
+#### 20. Do the tunes in the library have findable regular pulses, and how often?
+
+**Observations:**
+
+---
+
+#### 21. Does key detection hold up, and on what proportion of tunes does it decline to answer?
+
+**Observations:**
+
+---
+
+#### 22. Does the similarity square reveal real structure, and does the loop point match the ear?
 
 **Observations:**
 
