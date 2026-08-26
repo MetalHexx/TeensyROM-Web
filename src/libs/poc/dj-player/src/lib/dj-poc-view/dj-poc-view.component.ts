@@ -98,6 +98,9 @@ export class DjPocViewComponent {
   protected readonly markers = this.engine.markers;
   protected readonly loopingMarker = this.engine.loopingMarker;
   protected readonly queuedMarker = this.engine.queuedMarker;
+  /** True while a `triggerMarker` launch is awaiting `play()` — trigger and delete are disabled on
+   *  every row for that span, since a delete racing the await would reindex out from under it. */
+  protected readonly markerLaunchPending = this.engine.markerLaunchPending;
 
   /** 0–100, non-zero only for the marker currently looping — the engine does the arithmetic. */
   protected progressPercentFor(index: number): number {

@@ -56,6 +56,7 @@
                   type="button"
                   class="marker-trigger"
                   [attr.aria-label]="'Trigger marker ' + ($index + 1)"
+                  [disabled]="markerLaunchPending()"
                   (click)="onTriggerMarker($index)"
                 >
                   Trigger
@@ -163,6 +164,7 @@
                   <button
                     type="button"
                     [attr.aria-label]="'Delete marker ' + ($index + 1)"
+                    [disabled]="markerLaunchPending()"
                     (click)="onDeleteMarker($index)"
                   >
                     Delete

@@ -223,6 +223,9 @@ export class DjPlayerEngine implements OnDestroy {
   readonly markers = this.markerState.markers;
   readonly loopingMarker = this.markerState.loopingMarker;
   readonly queuedMarker = this.markerState.queuedMarker;
+  /** True for the span of `triggerMarker`'s `play()` await — see `triggerMarker` for why the view
+   *  must gate trigger/delete on this rather than trust the index across that gap. */
+  readonly markerLaunchPending = signal<boolean>(false);
   readonly nudgeRangeFrames = this.markerState.nudgeRangeFrames;
   readonly ceilingFrames = this.tuneSession.ceilingFrames;
 
@@ -552,13 +555,24 @@ export class DjPlayerEngine implements OnDestroy {
    * The restore is issued *after* the `play()` await, by index rather than by a value captured
    * before it: `play()` awaits a real async gap (`context.resume()`), and `MarkerState.triggerMarker`
    * re-validates the row at that point, so a row cleared or re-captured while the await was in
-   * flight is handled correctly rather than replayed stale.
+   * flight is handled correctly rather than replayed stale. That re-validation is position-based,
+   * though, and `deleteMarker` reindexes — a delete elsewhere in the array racing this await would
+   * retarget the trigger onto whatever now sits at `index`, not merely replay a stale one. Rather
+   * than restore-by-identity (which the array's plain index scheme has no stable id for), the window
+   * is closed at the UI: `markerLaunchPending` is true for exactly this await, and the view gates
+   * every row's trigger and delete controls on it, so the reindexing delete this re-validation can't
+   * see is never reachable while the read it would corrupt is in flight.
    */
   async triggerMarker(index: number): Promise<void> {
     const marker = this.markers()[index];
     if (marker === undefined || marker.start === null) return;
     if (this.state() !== 'playing') {
-      await this.play();
+      this.markerLaunchPending.set(true);
+      try {
+        await this.play();
+      } finally {
+        this.markerLaunchPending.set(false);
+      }
       if (this.state() !== 'playing') return;
     }
     this.markerState.triggerMarker(index);

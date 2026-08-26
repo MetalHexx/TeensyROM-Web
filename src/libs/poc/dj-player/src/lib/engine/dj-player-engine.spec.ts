@@ -2135,6 +2135,31 @@ describe('DjPlayerEngine', () => {
   });
 
   describe('launching from stopped or paused', () => {
+    it('holds markerLaunchPending true for exactly the span of the play() await', async () => {
+      engine.loadTune(counterTune());
+      engine.addMarker();
+      engine.stop();
+      expect(engine.state()).toBe('stopped');
+      expect(engine.markerLaunchPending()).toBe(false);
+
+      const trigger = engine.triggerMarker(0);
+      expect(engine.markerLaunchPending()).toBe(true);
+
+      await trigger;
+      expect(engine.markerLaunchPending()).toBe(false);
+    });
+
+    it('never sets markerLaunchPending when already playing, since the trigger stays synchronous', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      engine.addMarker();
+
+      const trigger = engine.triggerMarker(0);
+      expect(engine.markerLaunchPending()).toBe(false);
+      await trigger;
+      expect(engine.markerLaunchPending()).toBe(false);
+    });
+
     it('triggers a cue-shaped marker from stopped, launching playback and landing on it rather than frame 0', async () => {
       engine.loadTune(counterTune());
       await engine.play();

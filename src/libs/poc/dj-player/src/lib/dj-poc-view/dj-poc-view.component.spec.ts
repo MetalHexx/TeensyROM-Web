@@ -60,6 +60,7 @@ interface MockDjPlayerEngine {
   markers: WritableSignal<readonly Marker[]>;
   loopingMarker: WritableSignal<number | null>;
   queuedMarker: WritableSignal<number | null>;
+  markerLaunchPending: WritableSignal<boolean>;
   progressPercentFor: ReturnType<typeof vi.fn>;
   positionPercent: WritableSignal<number>;
   nudgeRangeFrames: WritableSignal<number>;
@@ -121,6 +122,7 @@ function makeEngine(): MockDjPlayerEngine {
     markers: signal<readonly Marker[]>([]),
     loopingMarker: signal<number | null>(null),
     queuedMarker: signal<number | null>(null),
+    markerLaunchPending: signal<boolean>(false),
     progressPercentFor: vi.fn(() => 0),
     positionPercent: signal(0),
     nudgeRangeFrames: signal(50),
@@ -717,6 +719,25 @@ describe('DjPocViewComponent', () => {
       expect(engine.deleteMarker).toHaveBeenCalledWith(1);
       fixture.detectChanges();
       expect(rows()).toHaveLength(1);
+    });
+
+    it("disables every row's trigger and delete controls while a marker launch is pending", () => {
+      setMarkers([markerWithStart(1234), markerWithStart(5678)]);
+      engine.markerLaunchPending.set(true);
+      fixture.detectChanges();
+
+      for (const [index] of rows().entries()) {
+        expect(triggerOrCaptureButton(index).disabled).toBe(true);
+        expect(rowActionButton(index, 'Delete').disabled).toBe(true);
+      }
+
+      engine.markerLaunchPending.set(false);
+      fixture.detectChanges();
+
+      for (const [index] of rows().entries()) {
+        expect(triggerOrCaptureButton(index).disabled).toBe(false);
+        expect(rowActionButton(index, 'Delete').disabled).toBe(false);
+      }
     });
 
     it('stops the loop from the single panel-level Stop control', () => {
