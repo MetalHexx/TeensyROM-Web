@@ -22,6 +22,8 @@ import { computeNovelty, candidatesAbove, DEFAULT_FEATURE_WEIGHTS } from '../nov
 import type { Candidate, FeatureWeights, NoveltyResult } from '../novelty';
 import { computeStructure } from '../structure';
 import type { StructureResult } from '../structure';
+import { computePulse, impliedTempo } from '../pulse';
+import type { PulseResult } from '../pulse';
 
 /** Buckets the whole scanned frame range into this many horizontal columns, regardless of how many
  *  frames were scanned — the aggregation that keeps a tune with tens of thousands of frames from
@@ -35,6 +37,7 @@ const VOLUME_LANE_HEIGHT = 20;
 const DENSITY_LANE_HEIGHT = 16;
 const NOVELTY_LANE_HEIGHT = 40;
 const CANDIDATE_LANE_HEIGHT = 16;
+const PULSE_LANE_HEIGHT = 40;
 const LANE_GAP = 2;
 const VOICE_BLOCK_HEIGHT = Math.max(2, VOICE_LANE_HEIGHT * 0.16);
 
@@ -119,6 +122,7 @@ interface LaneOffsets {
   readonly volumeY: number | null;
   readonly densityY: number | null;
   readonly noveltyY: number | null;
+  readonly pulseY: number | null;
   readonly candidateY: number;
   readonly totalHeight: number;
 }
@@ -314,6 +318,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly featureMatrix = signal<FeatureMatrix | null>(null);
   protected readonly noveltyResult = signal<NoveltyResult | null>(null);
   protected readonly structureResult = signal<StructureResult | null>(null);
+  protected readonly pulseResult = signal<PulseResult | null>(null);
   protected readonly threshold = signal<number>(DEFAULT_THRESHOLD);
   protected readonly weights = signal<FeatureWeights>(DEFAULT_FEATURE_WEIGHTS);
   protected readonly selectedCandidate = signal<Candidate | null>(null);
@@ -340,6 +345,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly densityLaneHeight = DENSITY_LANE_HEIGHT;
   protected readonly noveltyLaneHeight = NOVELTY_LANE_HEIGHT;
   protected readonly candidateLaneHeight = CANDIDATE_LANE_HEIGHT;
+  protected readonly pulseLaneHeight = PULSE_LANE_HEIGHT;
 
   private readonly structureCanvas = viewChild<ElementRef<HTMLCanvasElement>>('structureCanvas');
 
@@ -485,6 +491,53 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     return polylinePoints(values, NOVELTY_LANE_HEIGHT);
   });
 
+  protected readonly pulseHistogramBars = computed<readonly { readonly interval: number; readonly x: number; readonly height: number; readonly isDominant: boolean }[]>(() => {
+    const pulse = this.pulseResult();
+    if (pulse === null || pulse.histogram.length === 0) return [];
+
+    const histogram = pulse.histogram;
+    const dominantInterval = pulse.dominantInterval;
+
+    // Find max histogram value for scaling
+    let maxCount = 0;
+    for (let i = 0; i < histogram.length; i++) {
+      if (histogram[i] > maxCount) {
+        maxCount = histogram[i];
+      }
+    }
+
+    if (maxCount === 0) return [];
+
+    // Map histogram to bars, one per column
+    const bars: HistogramBar[] = [];
+    const barsPerInterval = Math.max(1, Math.ceil(histogram.length / COLUMN_COUNT));
+
+    for (let col = 0; col < COLUMN_COUNT; col++) {
+      const startInterval = col * barsPerInterval;
+      const endInterval = Math.min(startInterval + barsPerInterval, histogram.length);
+
+      let maxInRange = 0;
+      let representativeInterval = startInterval;
+      for (let i = startInterval; i < endInterval; i++) {
+        if (histogram[i] > maxInRange) {
+          maxInRange = histogram[i];
+          representativeInterval = i;
+        }
+      }
+
+      if (maxInRange > 0) {
+        bars.push({
+          interval: representativeInterval,
+          x: col,
+          height: (maxInRange / maxCount) * PULSE_LANE_HEIGHT,
+          isDominant: representativeInterval === dominantInterval,
+        });
+      }
+    }
+
+    return bars;
+  });
+
   protected readonly rulerTicks = computed<readonly { readonly x: number; readonly label: string }[]>(
     () => {
       const scan = this.scanOutput();
@@ -532,9 +585,16 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       noveltyY = y;
       y += NOVELTY_LANE_HEIGHT + LANE_GAP;
     }
+    let pulseY: number | null = null;
+    // Pulse lane is always shown if there's analysis, not toggleable yet
+    // (in future versions it can be added to LANE_TOGGLES for user control)
+    if (this.pulseResult() !== null) {
+      pulseY = y;
+      y += PULSE_LANE_HEIGHT + LANE_GAP;
+    }
     const candidateY = y;
     y += CANDIDATE_LANE_HEIGHT;
-    return { voiceY, filterY, volumeY, densityY, noveltyY, candidateY, totalHeight: y };
+    return { voiceY, filterY, volumeY, densityY, noveltyY, pulseY, candidateY, totalHeight: y };
   });
 
   /** Distinct from the selected candidate on purpose: right after a jump lands they sit at the same
@@ -622,6 +682,32 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     return structure === null ? '—' : structure.sectionBoundaries.length.toLocaleString();
   });
 
+  protected readonly pulseIntervalLabel = computed<string>(() => {
+    const pulse = this.pulseResult();
+    return pulse === null || pulse.dominantInterval === null ? '—' : pulse.dominantInterval.toLocaleString();
+  });
+
+  protected readonly pulseNativeTempoLabel = computed<string>(() => {
+    const pulse = this.pulseResult();
+    const scan = this.scanOutput();
+    if (pulse === null || pulse.dominantInterval === null || scan === null) return '—';
+    const { native } = impliedTempo(pulse.dominantInterval, this.engine.nominalIntervalUs(), scan.callsPerFrame, 1.0);
+    return native === null ? '—' : native.toFixed(1);
+  });
+
+  protected readonly pulseSoundingTempoLabel = computed<string>(() => {
+    const pulse = this.pulseResult();
+    const scan = this.scanOutput();
+    if (pulse === null || pulse.dominantInterval === null || scan === null) return '—';
+    const { sounding } = impliedTempo(pulse.dominantInterval, this.engine.nominalIntervalUs(), scan.callsPerFrame, this.engine.speedMultiplier);
+    return sounding === null ? '—' : sounding.toFixed(1);
+  });
+
+  protected readonly pulseConfidenceLabel = computed<string>(() => {
+    const pulse = this.pulseResult();
+    return pulse === null ? '—' : pulse.confidence;
+  });
+
   protected toggleCollapsed(): void {
     this.collapsed.update((value) => !value);
   }
@@ -658,8 +744,10 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.weights.set(nextWeights);
     const matrix = this.featureMatrix();
     if (matrix !== null) {
-      this.noveltyResult.set(computeNovelty(matrix, nextWeights));
+      const novelty = computeNovelty(matrix, nextWeights);
+      this.noveltyResult.set(novelty);
       this.structureResult.set(computeStructure(matrix, nextWeights));
+      this.pulseResult.set(computePulse(novelty.candidates));
     }
   }
 
@@ -716,8 +804,10 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.scanOutput.set(result.output);
     const matrix = buildFeatureMatrix(result.output);
     this.featureMatrix.set(matrix);
-    this.noveltyResult.set(computeNovelty(matrix, this.weights()));
+    const novelty = computeNovelty(matrix, this.weights());
+    this.noveltyResult.set(novelty);
     this.structureResult.set(computeStructure(matrix, this.weights()));
+    this.pulseResult.set(computePulse(novelty.candidates));
   }
 
   protected onLaneClick(event: MouseEvent): void {
@@ -850,6 +940,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.featureMatrix.set(null);
     this.noveltyResult.set(null);
     this.structureResult.set(null);
+    this.pulseResult.set(null);
     this.selectedCandidate.set(null);
     this.scanning.set(false);
     this.scanProgressFrame.set(0);

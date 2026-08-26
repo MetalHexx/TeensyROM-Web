@@ -220,6 +220,22 @@
           }
         </g>
 
+        @if (laneOffsets().pulseY !== null) {
+        <g [attr.transform]="'translate(0,' + laneOffsets().pulseY + ')'">
+          <rect class="lane-bg" x="0" y="0" [attr.width]="viewWidth" [attr.height]="pulseLaneHeight" />
+          @for (bar of pulseHistogramBars(); track bar.x) {
+          <rect
+            class="pulse-bar"
+            [class.pulse-bar--dominant]="bar.isDominant"
+            [attr.x]="bar.x"
+            width="1"
+            [attr.y]="pulseLaneHeight - bar.height"
+            [attr.height]="bar.height"
+          />
+          }
+        </g>
+        }
+
         @if (playheadX(); as x) {
         <line class="playhead-line" [attr.x1]="x" [attr.x2]="x" y1="0" [attr.y2]="laneOffsets().totalHeight" />
         } @if (selectedX(); as x) {
@@ -282,6 +298,18 @@
       </div>
       <div class="readout-row">
         <span>Sections</span><span>{{ structureSectionsLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Pulse interval</span><span>{{ pulseIntervalLabel() }} frames</span>
+      </div>
+      <div class="readout-row">
+        <span>Tempo (native)</span><span>{{ pulseNativeTempoLabel() }} BPM</span>
+      </div>
+      <div class="readout-row">
+        <span>Tempo (sounding)</span><span>{{ pulseSoundingTempoLabel() }} BPM</span>
+      </div>
+      <div class="readout-row">
+        <span>Pulse confidence</span><span>{{ pulseConfidenceLabel() }}</span>
       </div>
 
       <div class="readout-actions">
