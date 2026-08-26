@@ -81,12 +81,33 @@ export function candidatesAbove(result: NoveltyResult, threshold: number): reado
   return result.candidates.filter((candidate) => candidate.strength >= threshold);
 }
 
-function dimensionWeightsFor(weights: FeatureWeights): Float64Array {
+/** Expands the ten user-facing weights into one entry per matrix dimension — shared with structure.ts
+ *  so a block or frame comparison there weighs each dimension exactly as the curve does. */
+export function dimensionWeightsFor(weights: FeatureWeights): Float64Array {
   const result = new Float64Array(FEATURE_DIMENSION_COUNT);
   for (let d = 0; d < FEATURE_DIMENSION_COUNT; d++) {
     result[d] = weightForDimension(FEATURE_DIMENSIONS[d], weights);
   }
   return result;
+}
+
+/** The weighted distance between any two rows of the shared feature matrix — the primitive the curve
+ *  applies to consecutive frames and structure.ts applies to arbitrary block or frame pairs. Reusing
+ *  this rather than re-deriving it is what keeps the two readers from drifting into different notions
+ *  of "how different are these two moments." */
+export function rowDistance(
+  matrix: FeatureMatrix,
+  rowAFrame: number,
+  rowBFrame: number,
+  dimensionWeights: Float64Array
+): number {
+  const rowA = rowAFrame * FEATURE_DIMENSION_COUNT;
+  const rowB = rowBFrame * FEATURE_DIMENSION_COUNT;
+  let sum = 0;
+  for (let d = 0; d < FEATURE_DIMENSION_COUNT; d++) {
+    sum += dimensionWeights[d] * Math.abs(matrix.values[rowA + d] - matrix.values[rowB + d]);
+  }
+  return sum;
 }
 
 /** Dimension names are `voiceN.<feature>` for per-voice dimensions and bare for global ones — both
@@ -122,14 +143,8 @@ function weightForDimension(dimension: string, weights: FeatureWeights): number 
 function rawNoveltyCurve(matrix: FeatureMatrix, dimensionWeights: Float64Array): Float32Array {
   const { frames } = matrix;
   const raw = new Float32Array(frames);
-  const contribution = new Float64Array(FEATURE_DIMENSION_COUNT);
   for (let f = 1; f < frames; f++) {
-    frameContributions(matrix, f, dimensionWeights, contribution);
-    let sum = 0;
-    for (let d = 0; d < FEATURE_DIMENSION_COUNT; d++) {
-      sum += contribution[d];
-    }
-    raw[f] = sum;
+    raw[f] = rowDistance(matrix, f, f - 1, dimensionWeights);
   }
   return raw;
 }

@@ -3,9 +3,11 @@ import {
   Component,
   computed,
   effect,
+  ElementRef,
   inject,
   input,
   signal,
+  viewChild,
   type OnDestroy,
 } from '@angular/core';
 import { DjPlayerEngine } from '../../engine/dj-player-engine';
@@ -18,6 +20,8 @@ import { buildFeatureMatrix, framesToSeconds, readFrameFeatures } from '../frame
 import type { FeatureMatrix } from '../frame-features';
 import { computeNovelty, candidatesAbove, DEFAULT_FEATURE_WEIGHTS } from '../novelty';
 import type { Candidate, FeatureWeights, NoveltyResult } from '../novelty';
+import { computeStructure } from '../structure';
+import type { StructureResult } from '../structure';
 
 /** Buckets the whole scanned frame range into this many horizontal columns, regardless of how many
  *  frames were scanned — the aggregation that keeps a tune with tens of thousands of frames from
@@ -244,6 +248,42 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+/** Paints the similarity matrix as one pixel per block — origin top-left, so the main diagonal runs
+ *  from the canvas's own corner — then overlays section boundaries as faint grid lines. A canvas
+ *  rather than SVG nodes: at up to 256×256 cells, one rect per cell would blow the DOM-node budget
+ *  the lane stack elsewhere in this panel is careful to stay under. */
+function paintStructureCanvas(canvas: HTMLCanvasElement, structure: StructureResult): void {
+  const { blockCount, matrix, sectionBoundaries, blockFrames } = structure;
+  if (blockCount === 0) return;
+  const ctx = canvas.getContext('2d');
+  if (ctx === null) return;
+
+  const imageData = ctx.createImageData(blockCount, blockCount);
+  for (let i = 0; i < matrix.length; i++) {
+    const value = Math.min(255, Math.max(0, Math.round(matrix[i] * 255)));
+    const offset = i * 4;
+    imageData.data[offset] = value;
+    imageData.data[offset + 1] = value;
+    imageData.data[offset + 2] = value;
+    imageData.data[offset + 3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  ctx.strokeStyle = 'rgba(147, 164, 180, 0.35)';
+  ctx.lineWidth = 1;
+  for (const boundaryFrame of sectionBoundaries) {
+    const block = boundaryFrame / blockFrames;
+    ctx.beginPath();
+    ctx.moveTo(block, 0);
+    ctx.lineTo(block, blockCount);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, block);
+    ctx.lineTo(blockCount, block);
+    ctx.stroke();
+  }
+}
+
 /**
  * The Track Analysis section: a collapsible lane stack over a scanned tune, a candidate rail driven
  * by the novelty curve, and the readout P03 adds its own rows to. Everything here is click-to-audition
@@ -273,6 +313,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly scanOutput = signal<ScanOutput | null>(null);
   protected readonly featureMatrix = signal<FeatureMatrix | null>(null);
   protected readonly noveltyResult = signal<NoveltyResult | null>(null);
+  protected readonly structureResult = signal<StructureResult | null>(null);
   protected readonly threshold = signal<number>(DEFAULT_THRESHOLD);
   protected readonly weights = signal<FeatureWeights>(DEFAULT_FEATURE_WEIGHTS);
   protected readonly selectedCandidate = signal<Candidate | null>(null);
@@ -300,6 +341,8 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly noveltyLaneHeight = NOVELTY_LANE_HEIGHT;
   protected readonly candidateLaneHeight = CANDIDATE_LANE_HEIGHT;
 
+  private readonly structureCanvas = viewChild<ElementRef<HTMLCanvasElement>>('structureCanvas');
+
   private generation = 0;
   private nextRequestId = 0;
 
@@ -311,6 +354,15 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       this.file();
       this.engine.currentSubtune();
       this.clearAnalysis();
+    });
+
+    // Repaints whenever the structure result changes (a fresh analysis or a weight edit) and again
+    // once the canvas itself exists — jsdom has no 2D context, so painting is a no-op under test.
+    effect(() => {
+      const structure = this.structureResult();
+      const canvasRef = this.structureCanvas();
+      if (structure === null || canvasRef === undefined) return;
+      paintStructureCanvas(canvasRef.nativeElement, structure);
     });
   }
 
@@ -539,6 +591,37 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     return ceiling > 0 ? Math.min(100, (this.scanProgressFrame() / ceiling) * 100) : 0;
   });
 
+  protected readonly structureStartTimeLabel = computed<string>(() => formatDuration(0));
+
+  protected readonly structureEndTimeLabel = computed<string>(() => {
+    const scan = this.scanOutput();
+    if (scan === null) return '—';
+    const seconds = framesToSeconds(scan.frames, this.engine.nominalIntervalUs(), scan.callsPerFrame);
+    return formatDuration(seconds);
+  });
+
+  protected readonly structureLoopFrameLabel = computed<string>(() => {
+    const structure = this.structureResult();
+    return structure === null || structure.loopFrame === null ? '—' : structure.loopFrame.toLocaleString();
+  });
+
+  /** "not determined" rather than falling back to the ceiling or any fixed duration — a tune whose
+   *  agreement never sustains genuinely has no known length. */
+  protected readonly structureLengthLabel = computed<string>(() => {
+    const structure = this.structureResult();
+    const scan = this.scanOutput();
+    if (structure === null || scan === null || structure.loopFrame === null) {
+      return 'not determined';
+    }
+    const seconds = framesToSeconds(structure.loopFrame, this.engine.nominalIntervalUs(), scan.callsPerFrame);
+    return formatDuration(seconds);
+  });
+
+  protected readonly structureSectionsLabel = computed<string>(() => {
+    const structure = this.structureResult();
+    return structure === null ? '—' : structure.sectionBoundaries.length.toLocaleString();
+  });
+
   protected toggleCollapsed(): void {
     this.collapsed.update((value) => !value);
   }
@@ -576,6 +659,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     const matrix = this.featureMatrix();
     if (matrix !== null) {
       this.noveltyResult.set(computeNovelty(matrix, nextWeights));
+      this.structureResult.set(computeStructure(matrix, nextWeights));
     }
   }
 
@@ -633,6 +717,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     const matrix = buildFeatureMatrix(result.output);
     this.featureMatrix.set(matrix);
     this.noveltyResult.set(computeNovelty(matrix, this.weights()));
+    this.structureResult.set(computeStructure(matrix, this.weights()));
   }
 
   protected onLaneClick(event: MouseEvent): void {
@@ -764,6 +849,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.scanOutput.set(null);
     this.featureMatrix.set(null);
     this.noveltyResult.set(null);
+    this.structureResult.set(null);
     this.selectedCandidate.set(null);
     this.scanning.set(false);
     this.scanProgressFrame.set(0);

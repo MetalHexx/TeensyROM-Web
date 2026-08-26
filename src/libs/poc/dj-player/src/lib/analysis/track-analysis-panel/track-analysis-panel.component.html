@@ -245,6 +245,21 @@
       </span>
     </div>
 
+    @if (structureResult(); as structure) {
+    <div class="structure-panel">
+      <span class="structure-time-label">{{ structureStartTimeLabel() }}</span>
+      <canvas
+        #structureCanvas
+        class="structure-square"
+        [attr.width]="structure.blockCount"
+        [attr.height]="structure.blockCount"
+        role="img"
+        aria-label="Tune self-similarity matrix"
+      ></canvas>
+      <span class="structure-time-label">{{ structureEndTimeLabel() }}</span>
+    </div>
+    }
+
     <div class="readout-panel">
       <div class="readout-row">
         <span>Frames analysed</span><span>{{ framesAnalysedLabel() }}</span>
@@ -258,6 +273,15 @@
       </div>
       <div class="readout-row">
         <span>Cause</span><span>{{ selectedCauseLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Loop point</span><span>{{ structureLoopFrameLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Length</span><span>{{ structureLengthLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Sections</span><span>{{ structureSectionsLabel() }}</span>
       </div>
 
       <div class="readout-actions">
