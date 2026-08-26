@@ -14,6 +14,7 @@ import {
   NOMINAL_INTERVAL_OPTIONS_US,
   SPEED_INPUT_SPAN,
 } from '../engine/dj-player-engine';
+import { TrackAnalysisPanelComponent } from '../analysis/track-analysis-panel/track-analysis-panel.component';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
 interface TuneSource {
@@ -55,6 +56,7 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
   templateUrl: './dj-poc-view.component.html',
   styleUrl: './dj-poc-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TrackAnalysisPanelComponent],
   // Provided here rather than root: this is a quarantined POC surface and neither its
   // permission-holding service nor its audio graph should register in the app injector.
   providers: [

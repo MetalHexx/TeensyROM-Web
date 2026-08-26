@@ -1,0 +1,305 @@
+<section class="analysis-panel">
+  <div class="analysis-header">
+    <button
+      type="button"
+      class="analysis-toggle"
+      [attr.aria-expanded]="!collapsed()"
+      (click)="toggleCollapsed()"
+    >
+      <span class="analysis-chevron">{{ collapsed() ? '▸' : '▾' }}</span>
+      <span>Track Analysis</span>
+    </button>
+
+    @if (!collapsed()) {
+    <div class="analysis-header-status">
+      @if (scanning()) {
+      <span class="analysis-caption">scanning… {{ scanProgressPercent().toFixed(0) }}%</span>
+      } @else if (hasAnalysis()) {
+      <span class="analysis-caption">{{ framesAnalysedLabel() }} frames</span>
+      }
+      <button
+        type="button"
+        class="analysis-run"
+        [disabled]="!canRunAnalysis()"
+        (click)="runAnalysis()"
+      >
+        Analyse
+      </button>
+    </div>
+    }
+  </div>
+
+  @if (!collapsed()) {
+  <div class="analysis-body">
+    @if (scanError()) {
+    <p class="error-text" role="alert">{{ scanError() }}</p>
+    }
+
+    <div class="ctrl-bar">
+      <div class="ctrl-group">
+        <span class="ctrl-label">Lanes</span>
+        @for (lane of laneToggles; track lane.key) {
+        <button
+          type="button"
+          class="lane-toggle"
+          [class.lane-toggle--active]="isLaneVisible(lane.key)"
+          (click)="toggleLane(lane.key)"
+        >
+          {{ lane.label }}
+        </button>
+        }
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <div class="ctrl-group">
+        <span class="ctrl-label">Threshold</span>
+        <input
+          type="range"
+          class="threshold-input"
+          min="0"
+          max="1"
+          step="0.01"
+          [value]="threshold()"
+          (input)="onThresholdInput($event)"
+          aria-label="Candidate threshold"
+        />
+        <span class="ctrl-caption">
+          {{ threshold().toFixed(2) }} · {{ peaksAboveThresholdLabel() }} peaks
+        </span>
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <div class="ctrl-group">
+        <span class="ctrl-label">Zoom</span>
+        <button type="button" (click)="zoomOut()" [disabled]="isZoomedFull()">−</button>
+        <span class="ctrl-caption">{{ isZoomedFull() ? 'full track' : 'zoomed' }}</span>
+        <button type="button" (click)="zoomIn()" [disabled]="!hasAnalysis()">+</button>
+        <button type="button" (click)="panLeft()" [disabled]="isZoomedFull()">◀</button>
+        <button type="button" (click)="panRight()" [disabled]="isZoomedFull()">▶</button>
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <div class="ctrl-group">
+        <button type="button" class="weights-toggle" (click)="toggleWeightsPanel()">
+          {{ weightsOpen() ? 'Hide weights' : 'Weights…' }}
+        </button>
+      </div>
+    </div>
+
+    @if (weightsOpen()) {
+    <div class="weights-panel">
+      @for (field of weightFields; track field.key) {
+      <label class="weight-row">
+        <span class="weight-label">{{ field.label }}</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          [value]="weights()[field.key]"
+          (input)="onWeightInput(field.key, $event)"
+        />
+        <span class="weight-value">{{ weights()[field.key].toFixed(2) }}</span>
+      </label>
+      }
+    </div>
+    }
+
+    @if (hasAnalysis()) {
+    <div class="lane-stack">
+      <svg
+        [attr.viewBox]="'0 0 ' + viewWidth + ' ' + laneOffsets().totalHeight"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Analysis lane stack"
+        tabindex="0"
+        (click)="onLaneClick($event)"
+        (keydown)="onLaneKeyDown($event)"
+      >
+        <rect class="ruler-bg" x="0" y="0" [attr.width]="viewWidth" [attr.height]="rulerHeight" />
+        @for (tick of rulerTicks(); track tick.x) {
+        <text class="ruler-label" [attr.x]="tick.x + 2" [attr.y]="rulerHeight - 3">
+          {{ tick.label }}
+        </text>
+        <line class="ruler-tick" [attr.x1]="tick.x" [attr.x2]="tick.x" y1="0" [attr.y2]="rulerHeight" />
+        }
+
+        @for (voice of voiceIndices; track voice) {
+        @if (laneOffsets().voiceY[voice] !== null) {
+        <g [attr.transform]="'translate(0,' + laneOffsets().voiceY[voice] + ')'">
+          <rect class="lane-bg" x="0" y="0" [attr.width]="viewWidth" [attr.height]="voiceLaneHeight" />
+          @for (block of voiceBlocks()[voice]; track $index) {
+          <rect
+            class="voice-block"
+            [attr.x]="block.x"
+            width="1"
+            [attr.y]="block.y"
+            [attr.height]="voiceBlockHeight"
+            [attr.fill]="block.color"
+          />
+          }
+        </g>
+        }
+        }
+
+        @if (laneOffsets().filterY !== null) {
+        <g [attr.transform]="'translate(0,' + laneOffsets().filterY + ')'">
+          <rect class="lane-bg" x="0" y="0" [attr.width]="viewWidth" [attr.height]="filterLaneHeight" />
+          <polyline class="filter-line" [attr.points]="filterPoints()" />
+        </g>
+        }
+
+        @if (laneOffsets().volumeY !== null) {
+        <g [attr.transform]="'translate(0,' + laneOffsets().volumeY + ')'">
+          <rect class="lane-bg" x="0" y="0" [attr.width]="viewWidth" [attr.height]="volumeLaneHeight" />
+          <polyline class="volume-line" [attr.points]="volumePoints()" />
+        </g>
+        }
+
+        @if (laneOffsets().densityY !== null) {
+        <g [attr.transform]="'translate(0,' + laneOffsets().densityY + ')'">
+          <rect class="lane-bg" x="0" y="0" [attr.width]="viewWidth" [attr.height]="densityLaneHeight" />
+          @for (bar of densityBars(); track bar.x) {
+          <rect
+            class="density-bar"
+            [attr.x]="bar.x"
+            width="1"
+            [attr.y]="bar.y"
+            [attr.height]="bar.height"
+          />
+          }
+        </g>
+        }
+
+        @if (laneOffsets().noveltyY !== null) {
+        <g [attr.transform]="'translate(0,' + laneOffsets().noveltyY + ')'">
+          <rect class="lane-bg" x="0" y="0" [attr.width]="viewWidth" [attr.height]="noveltyLaneHeight" />
+          <polyline class="novelty-line" [attr.points]="noveltyPoints()" />
+          @for (mark of candidateMarks(); track mark.candidate.frame) {
+          <circle
+            class="novelty-mark"
+            [class.novelty-mark--above]="mark.above"
+            [class.novelty-mark--selected]="mark.selected"
+            [attr.cx]="mark.x"
+            [attr.cy]="(1 - mark.candidate.strength) * noveltyLaneHeight"
+            r="2"
+          />
+          }
+        </g>
+        }
+
+        <g [attr.transform]="'translate(0,' + laneOffsets().candidateY + ')'">
+          <rect
+            class="lane-bg candidate-bg"
+            x="0"
+            y="0"
+            [attr.width]="viewWidth"
+            [attr.height]="candidateLaneHeight"
+          />
+          @for (mark of candidateMarks(); track mark.candidate.frame) {
+          <rect
+            class="candidate-hit"
+            [attr.x]="mark.x - 2"
+            y="0"
+            width="4"
+            [attr.height]="candidateLaneHeight"
+            (click)="onCandidateClick(mark.candidate, $event)"
+          />
+          <line
+            class="candidate-tick"
+            [class.candidate-tick--above]="mark.above"
+            [class.candidate-tick--selected]="mark.selected"
+            [attr.x1]="mark.x"
+            [attr.x2]="mark.x"
+            y1="2"
+            [attr.y2]="candidateLaneHeight - 2"
+          />
+          }
+        </g>
+
+        @if (playheadX(); as x) {
+        <line class="playhead-line" [attr.x1]="x" [attr.x2]="x" y1="0" [attr.y2]="laneOffsets().totalHeight" />
+        } @if (selectedX(); as x) {
+        <line class="selected-line" [attr.x1]="x" [attr.x2]="x" y1="0" [attr.y2]="laneOffsets().totalHeight" />
+        }
+      </svg>
+    </div>
+
+    <div class="lane-legend">
+      <span class="legend-item"><span class="legend-swatch legend-swatch--pulse"></span>pulse</span>
+      <span class="legend-item">
+        <span class="legend-swatch legend-swatch--tone"></span>triangle / saw
+      </span>
+      <span class="legend-item"><span class="legend-swatch legend-swatch--noise"></span>noise</span>
+      <span class="legend-item">
+        <span class="legend-swatch legend-swatch--above"></span>above threshold
+      </span>
+      <span class="legend-item">
+        <span class="legend-swatch legend-swatch--below"></span>below threshold
+      </span>
+      <span class="legend-item">
+        <span class="legend-swatch legend-swatch--selected"></span>auditioning
+      </span>
+    </div>
+
+    <div class="readout-panel">
+      <div class="readout-row">
+        <span>Frames analysed</span><span>{{ framesAnalysedLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Peaks above threshold</span><span>{{ peaksAboveThresholdLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Selected candidate</span>
+        <span>frame {{ selectedFrameLabel() }} · {{ selectedTimeLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Cause</span><span>{{ selectedCauseLabel() }}</span>
+      </div>
+
+      <div class="readout-actions">
+        <button
+          type="button"
+          class="jump-to-selected"
+          [disabled]="selectedCandidate() === null"
+          (click)="onJumpToSelected()"
+        >
+          Jump to selected
+        </button>
+        <button
+          type="button"
+          class="prev-candidate"
+          [disabled]="candidates().length === 0"
+          (click)="onPreviousCandidate()"
+        >
+          ◀ prev peak
+        </button>
+        <button
+          type="button"
+          class="next-candidate"
+          [disabled]="candidates().length === 0"
+          (click)="onNextCandidate()"
+        >
+          next peak ▶
+        </button>
+      </div>
+      <div class="readout-actions">
+        <button
+          type="button"
+          class="copy-to-marker"
+          [disabled]="selectedCandidate() === null"
+          (click)="onCopyToMarker()"
+        >
+          Copy to marker
+        </button>
+      </div>
+    </div>
+    } @else {
+    <p class="analysis-empty">Run an analysis to see the lane stack, candidates and readout.</p>
+    }
+  </div>
+  }
+</section>
