@@ -24,6 +24,17 @@ import { computeStructure } from '../structure';
 import type { StructureResult } from '../structure';
 import { computePulse, impliedTempo } from '../pulse';
 import type { PulseResult } from '../pulse';
+import { segmentNotes } from '../notes';
+import type { Note } from '../notes';
+import {
+  detectKey,
+  detectKeyPerSection,
+  isOutOfScale,
+  keyName,
+  PITCH_CLASS_NAMES,
+  soundingKey,
+} from '../key';
+import type { KeyResult } from '../key';
 
 /** Buckets the whole scanned frame range into this many horizontal columns, regardless of how many
  *  frames were scanned — the aggregation that keeps a tune with tens of thousands of frames from
@@ -40,6 +51,14 @@ const CANDIDATE_LANE_HEIGHT = 16;
 const PULSE_LANE_HEIGHT = 40;
 const LANE_GAP = 2;
 const VOICE_BLOCK_HEIGHT = Math.max(2, VOICE_LANE_HEIGHT * 0.16);
+
+/** A thin strip along the top of each voice lane, so an out-of-scale mark never hides the pitch
+ *  block it is describing. */
+const OUT_OF_SCALE_TICK_HEIGHT = 4;
+
+const CHROMA_BAR_WIDTH = 10;
+const CHROMA_BAR_GAP = 2;
+const CHROMA_LANE_HEIGHT = 44;
 
 const MIN_WINDOW_FRAMES = 50;
 const DEFAULT_THRESHOLD = 0.5;
@@ -105,6 +124,20 @@ interface CandidateMark {
   readonly x: number;
   readonly above: boolean;
   readonly selected: boolean;
+}
+
+interface HistogramBar {
+  readonly interval: number;
+  readonly x: number;
+  readonly height: number;
+  readonly isDominant: boolean;
+}
+
+interface ChromaBar {
+  readonly name: string;
+  readonly height: number;
+  readonly inScale: boolean;
+  readonly isTonic: boolean;
 }
 
 interface ColumnAggregate {
@@ -245,6 +278,35 @@ function polylinePoints(values: readonly number[], laneHeight: number): string {
   return values.map((value, index) => `${index + 0.5},${(1 - value) * laneHeight}`).join(' ');
 }
 
+/** Contiguous marked columns become one filled run, so a lane's worth of ticks costs one node. */
+function tickPath(columns: readonly boolean[], height: number): string {
+  const runs: string[] = [];
+  let runStart: number | null = null;
+  for (let column = 0; column <= columns.length; column++) {
+    const marked = column < columns.length && columns[column];
+    if (marked && runStart === null) {
+      runStart = column;
+    } else if (!marked && runStart !== null) {
+      const width = column - runStart;
+      runs.push(`M${runStart} 0h${width}v${height}h${-width}z`);
+      runStart = null;
+    }
+  }
+  return runs.join('');
+}
+
+/** 'C major · 8B', or the honest answer. Never a key name without the Camelot number beside it: the
+ *  wheel is what a DJ mixes on. */
+function keyLabel(key: KeyResult | null): string {
+  if (key === null) return '—';
+  const name = keyName(key);
+  return name === null || key.camelot === null ? 'no clear key' : `${name} · ${key.camelot}`;
+}
+
+function formatCents(cents: number): string {
+  return `${cents >= 0 ? '+' : '−'}${Math.abs(cents).toFixed(1)} cents`;
+}
+
 function formatDuration(totalSeconds: number): string {
   const clamped = Math.max(0, totalSeconds);
   const minutes = Math.floor(clamped / 60);
@@ -319,6 +381,9 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly noveltyResult = signal<NoveltyResult | null>(null);
   protected readonly structureResult = signal<StructureResult | null>(null);
   protected readonly pulseResult = signal<PulseResult | null>(null);
+  protected readonly notes = signal<readonly Note[]>([]);
+  protected readonly keyResult = signal<KeyResult | null>(null);
+  protected readonly sectionKeys = signal<readonly KeyResult[]>([]);
   protected readonly threshold = signal<number>(DEFAULT_THRESHOLD);
   protected readonly weights = signal<FeatureWeights>(DEFAULT_FEATURE_WEIGHTS);
   protected readonly selectedCandidate = signal<Candidate | null>(null);
@@ -346,6 +411,10 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly noveltyLaneHeight = NOVELTY_LANE_HEIGHT;
   protected readonly candidateLaneHeight = CANDIDATE_LANE_HEIGHT;
   protected readonly pulseLaneHeight = PULSE_LANE_HEIGHT;
+  protected readonly chromaLaneHeight = CHROMA_LANE_HEIGHT;
+  protected readonly chromaBarWidth = CHROMA_BAR_WIDTH;
+  protected readonly chromaBarPitch = CHROMA_BAR_WIDTH + CHROMA_BAR_GAP;
+  protected readonly chromaWidth = PITCH_CLASS_NAMES.length * (CHROMA_BAR_WIDTH + CHROMA_BAR_GAP);
 
   private readonly structureCanvas = viewChild<ElementRef<HTMLCanvasElement>>('structureCanvas');
 
@@ -454,6 +523,49 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     });
   });
 
+  /**
+   * One tick per column holding a note outside the detected scale, drawn as a single path per voice
+   * rather than a rect per column — the lane stack's DOM-node budget is the reason every other lane
+   * aggregates to columns, and this overlay must not be the one that blows it.
+   *
+   * This is the key detection's own validation: sparse ticks mean the answer is probably right, a
+   * lane full of them means it is not, and neither requires listening.
+   */
+  protected readonly outOfScalePaths = computed<readonly string[]>(() => {
+    const key = this.keyResult();
+    const ranges = this.bucketRangesForWindow();
+    if (key === null || key.scalePitchClasses.length === 0 || ranges.length === 0) {
+      return ['', '', ''];
+    }
+
+    const marked = [0, 1, 2].map(() => new Array<boolean>(ranges.length).fill(false));
+    for (const note of this.notes()) {
+      if (!isOutOfScale(note.hz, key)) continue;
+      const from = this.frameToColumn(note.startFrame);
+      const to = this.frameToColumn(note.endFrame - 1);
+      if (from === null || to === null) continue;
+      for (let column = from; column <= to; column++) {
+        marked[note.voice][column] = true;
+      }
+    }
+    return marked.map((columns) => tickPath(columns, OUT_OF_SCALE_TICK_HEIGHT));
+  });
+
+  protected readonly chromaBars = computed<readonly ChromaBar[]>(() => {
+    const key = this.keyResult();
+    if (key === null) return [];
+    let peak = 0;
+    for (let pc = 0; pc < key.chroma.length; pc++) {
+      peak = Math.max(peak, key.chroma[pc]);
+    }
+    return PITCH_CLASS_NAMES.map((name, pc) => ({
+      name,
+      height: peak > 0 ? (key.chroma[pc] / peak) * CHROMA_LANE_HEIGHT : 0,
+      inScale: key.scalePitchClasses.includes(pc),
+      isTonic: key.tonic === pc,
+    }));
+  });
+
   protected readonly filterPoints = computed<string>(() => {
     const columns = this.columns();
     return columns === null
@@ -491,7 +603,14 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     return polylinePoints(values, NOVELTY_LANE_HEIGHT);
   });
 
-  protected readonly pulseHistogramBars = computed<readonly { readonly interval: number; readonly x: number; readonly height: number; readonly isDominant: boolean }[]>(() => {
+  protected readonly pulseHistogramBars = computed<
+    readonly {
+      readonly interval: number;
+      readonly x: number;
+      readonly height: number;
+      readonly isDominant: boolean;
+    }[]
+  >(() => {
     const pulse = this.pulseResult();
     if (pulse === null || pulse.histogram.length === 0) return [];
 
@@ -508,7 +627,6 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
     if (maxCount === 0) return [];
 
-    // Map histogram to bars, one per column
     const bars: HistogramBar[] = [];
     const barsPerInterval = Math.max(1, Math.ceil(histogram.length / COLUMN_COUNT));
 
@@ -538,22 +656,22 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     return bars;
   });
 
-  protected readonly rulerTicks = computed<readonly { readonly x: number; readonly label: string }[]>(
-    () => {
-      const scan = this.scanOutput();
-      if (scan === null) return [];
-      const window = this.effectiveWindow();
-      const span = window.end - window.start;
-      const tickCount = 6;
-      const ticks: { x: number; label: string }[] = [];
-      for (let i = 0; i <= tickCount; i++) {
-        const frame = window.start + (span * i) / tickCount;
-        const seconds = framesToSeconds(frame, this.engine.nominalIntervalUs(), scan.callsPerFrame);
-        ticks.push({ x: (i / tickCount) * COLUMN_COUNT, label: formatDuration(seconds) });
-      }
-      return ticks;
+  protected readonly rulerTicks = computed<
+    readonly { readonly x: number; readonly label: string }[]
+  >(() => {
+    const scan = this.scanOutput();
+    if (scan === null) return [];
+    const window = this.effectiveWindow();
+    const span = window.end - window.start;
+    const tickCount = 6;
+    const ticks: { x: number; label: string }[] = [];
+    for (let i = 0; i <= tickCount; i++) {
+      const frame = window.start + (span * i) / tickCount;
+      const seconds = framesToSeconds(frame, this.engine.nominalIntervalUs(), scan.callsPerFrame);
+      ticks.push({ x: (i / tickCount) * COLUMN_COUNT, label: formatDuration(seconds) });
     }
-  );
+    return ticks;
+  });
 
   protected readonly laneOffsets = computed<LaneOffsets>(() => {
     const visible = this.visibleLanes();
@@ -634,7 +752,11 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     const candidate = this.selectedCandidate();
     const scan = this.scanOutput();
     if (candidate === null || scan === null) return '—';
-    const seconds = framesToSeconds(candidate.frame, this.engine.nominalIntervalUs(), scan.callsPerFrame);
+    const seconds = framesToSeconds(
+      candidate.frame,
+      this.engine.nominalIntervalUs(),
+      scan.callsPerFrame
+    );
     return formatDuration(seconds);
   });
 
@@ -656,13 +778,19 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly structureEndTimeLabel = computed<string>(() => {
     const scan = this.scanOutput();
     if (scan === null) return '—';
-    const seconds = framesToSeconds(scan.frames, this.engine.nominalIntervalUs(), scan.callsPerFrame);
+    const seconds = framesToSeconds(
+      scan.frames,
+      this.engine.nominalIntervalUs(),
+      scan.callsPerFrame
+    );
     return formatDuration(seconds);
   });
 
   protected readonly structureLoopFrameLabel = computed<string>(() => {
     const structure = this.structureResult();
-    return structure === null || structure.loopFrame === null ? '—' : structure.loopFrame.toLocaleString();
+    return structure === null || structure.loopFrame === null
+      ? '—'
+      : structure.loopFrame.toLocaleString();
   });
 
   /** "not determined" rather than falling back to the ceiling or any fixed duration — a tune whose
@@ -673,7 +801,11 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     if (structure === null || scan === null || structure.loopFrame === null) {
       return 'not determined';
     }
-    const seconds = framesToSeconds(structure.loopFrame, this.engine.nominalIntervalUs(), scan.callsPerFrame);
+    const seconds = framesToSeconds(
+      structure.loopFrame,
+      this.engine.nominalIntervalUs(),
+      scan.callsPerFrame
+    );
     return formatDuration(seconds);
   });
 
@@ -684,14 +816,21 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
   protected readonly pulseIntervalLabel = computed<string>(() => {
     const pulse = this.pulseResult();
-    return pulse === null || pulse.dominantInterval === null ? '—' : pulse.dominantInterval.toLocaleString();
+    return pulse === null || pulse.dominantInterval === null
+      ? '—'
+      : pulse.dominantInterval.toLocaleString();
   });
 
   protected readonly pulseNativeTempoLabel = computed<string>(() => {
     const pulse = this.pulseResult();
     const scan = this.scanOutput();
     if (pulse === null || pulse.dominantInterval === null || scan === null) return '—';
-    const { native } = impliedTempo(pulse.dominantInterval, this.engine.nominalIntervalUs(), scan.callsPerFrame, 1.0);
+    const { native } = impliedTempo(
+      pulse.dominantInterval,
+      this.engine.nominalIntervalUs(),
+      scan.callsPerFrame,
+      1.0
+    );
     return native === null ? '—' : native.toFixed(1);
   });
 
@@ -699,13 +838,54 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     const pulse = this.pulseResult();
     const scan = this.scanOutput();
     if (pulse === null || pulse.dominantInterval === null || scan === null) return '—';
-    const { sounding } = impliedTempo(pulse.dominantInterval, this.engine.nominalIntervalUs(), scan.callsPerFrame, this.engine.speedMultiplier);
+    const { sounding } = impliedTempo(
+      pulse.dominantInterval,
+      this.engine.nominalIntervalUs(),
+      scan.callsPerFrame,
+      this.engine.speedMultiplier()
+    );
     return sounding === null ? '—' : sounding.toFixed(1);
   });
 
   protected readonly pulseConfidenceLabel = computed<string>(() => {
     const pulse = this.pulseResult();
     return pulse === null ? '—' : pulse.confidence;
+  });
+
+  /** The key a pitched deck is actually sounding in. Reported beside the native key exactly as the
+   *  tempo readout reports both figures — a deck at +6% is sounding roughly a semitone up. */
+  protected readonly soundingKeyResult = computed<KeyResult | null>(() => {
+    const key = this.keyResult();
+    return key === null ? null : soundingKey(key, this.engine.speedMultiplier());
+  });
+
+  protected readonly keyNativeLabel = computed<string>(() => keyLabel(this.keyResult()));
+
+  protected readonly keySoundingLabel = computed<string>(() => {
+    const sounding = this.soundingKeyResult();
+    if (sounding === null || sounding.tuning === null) return keyLabel(sounding);
+    return `${keyLabel(sounding)} · ${formatCents(sounding.tuning.cents)}`;
+  });
+
+  protected readonly keyConfidenceLabel = computed<string>(
+    () => this.keyResult()?.confidence ?? '—'
+  );
+
+  protected readonly keyTuningLabel = computed<string>(() => {
+    const tuning = this.keyResult()?.tuning ?? null;
+    if (this.keyResult() === null) return '—';
+    return tuning === null
+      ? 'not recovered'
+      : `${tuning.referenceHz.toFixed(1)} Hz · ${formatCents(tuning.cents)}`;
+  });
+
+  /** Surfaced only when the sections disagree, so a tune that never modulates shows one answer
+   *  rather than a list of identical ones. */
+  protected readonly modulationLabels = computed<readonly string[]>(() => {
+    const sections = this.sectionKeys();
+    if (sections.length < 2) return [];
+    const labels = sections.map((section) => keyLabel(section));
+    return new Set(labels).size < 2 ? [] : labels;
   });
 
   protected toggleCollapsed(): void {
@@ -746,8 +926,12 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     if (matrix !== null) {
       const novelty = computeNovelty(matrix, nextWeights);
       this.noveltyResult.set(novelty);
-      this.structureResult.set(computeStructure(matrix, nextWeights));
+      const structure = computeStructure(matrix, nextWeights);
+      this.structureResult.set(structure);
       this.pulseResult.set(computePulse(novelty.candidates));
+      // The notes did not move, but the section boundaries did, so the per-section keys would
+      // otherwise describe sections the redrawn structure no longer has.
+      this.sectionKeys.set(detectKeyPerSection(this.notes(), structure.sectionBoundaries));
     }
   }
 
@@ -806,8 +990,14 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.featureMatrix.set(matrix);
     const novelty = computeNovelty(matrix, this.weights());
     this.noveltyResult.set(novelty);
-    this.structureResult.set(computeStructure(matrix, this.weights()));
+    const structure = computeStructure(matrix, this.weights());
+    this.structureResult.set(structure);
     this.pulseResult.set(computePulse(novelty.candidates));
+
+    const notes = segmentNotes(result.output, file.clock);
+    this.notes.set(notes);
+    this.keyResult.set(detectKey(notes));
+    this.sectionKeys.set(detectKeyPerSection(notes, structure.sectionBoundaries));
   }
 
   protected onLaneClick(event: MouseEvent): void {
@@ -891,6 +1081,16 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     return ((clamped - window.start) / span) * COLUMN_COUNT;
   }
 
+  /** null when the frame falls outside the visible window — an overlay must not mark a column for a
+   *  note that is not on screen. */
+  private frameToColumn(frame: number): number | null {
+    const window = this.effectiveWindow();
+    const span = window.end - window.start;
+    if (span <= 0 || frame < window.start || frame >= window.end) return null;
+    const column = Math.floor(((frame - window.start) / span) * COLUMN_COUNT);
+    return Math.min(COLUMN_COUNT - 1, Math.max(0, column));
+  }
+
   private pointerFraction(event: MouseEvent, svg: SVGSVGElement): number | null {
     const rect = svg.getBoundingClientRect();
     if (rect.width <= 0) return null;
@@ -941,6 +1141,9 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.noveltyResult.set(null);
     this.structureResult.set(null);
     this.pulseResult.set(null);
+    this.notes.set([]);
+    this.keyResult.set(null);
+    this.sectionKeys.set([]);
     this.selectedCandidate.set(null);
     this.scanning.set(false);
     this.scanProgressFrame.set(0);

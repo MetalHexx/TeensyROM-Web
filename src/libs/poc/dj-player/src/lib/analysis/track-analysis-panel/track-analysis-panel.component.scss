@@ -266,6 +266,11 @@
   }
 }
 
+.out-of-scale {
+  fill: #b5533f;
+  opacity: 0.85;
+}
+
 .playhead-line {
   stroke: #d8dee4;
   stroke-width: 1;
@@ -321,6 +326,10 @@
   &--selected {
     background: #c9a227;
   }
+
+  &--out-of-scale {
+    background: #b5533f;
+  }
 }
 
 .structure-panel {
@@ -342,6 +351,64 @@
   font-size: 0.625rem;
   font-family: 'Roboto Mono', monospace;
   color: #6f6f6f;
+}
+
+.key-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  background: #202020;
+  border: 1px solid #363636;
+  border-radius: 3px;
+}
+
+.key-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 8rem;
+}
+
+.key-name {
+  font-size: 0.875rem;
+  color: #e8eef2;
+}
+
+.key-confidence {
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7d7d7d;
+
+  &--none {
+    color: #b5533f;
+  }
+}
+
+.key-chroma {
+  display: block;
+  height: 3.25rem;
+  width: auto;
+}
+
+.chroma-bar {
+  fill: #3f4750;
+
+  &--in-scale {
+    fill: #93a4b4;
+  }
+
+  &--tonic {
+    fill: #c9a227;
+  }
+}
+
+.chroma-label {
+  fill: #6f6f6f;
+  font-size: 5px;
+  font-family: 'Roboto Mono', monospace;
+  text-anchor: middle;
 }
 
 .analysis-empty {

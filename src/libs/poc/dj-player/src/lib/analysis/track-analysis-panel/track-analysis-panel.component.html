@@ -140,6 +140,8 @@
             [attr.height]="voiceBlockHeight"
             [attr.fill]="block.color"
           />
+          } @if (outOfScalePaths()[voice]) {
+          <path class="out-of-scale" [attr.d]="outOfScalePaths()[voice]" />
           }
         </g>
         }
@@ -259,6 +261,9 @@
       <span class="legend-item">
         <span class="legend-swatch legend-swatch--selected"></span>auditioning
       </span>
+      <span class="legend-item">
+        <span class="legend-swatch legend-swatch--out-of-scale"></span>out of scale
+      </span>
     </div>
 
     @if (structureResult(); as structure) {
@@ -273,6 +278,43 @@
         aria-label="Tune self-similarity matrix"
       ></canvas>
       <span class="structure-time-label">{{ structureEndTimeLabel() }}</span>
+    </div>
+    }
+
+    @if (keyResult(); as key) {
+    <div class="key-panel">
+      <div class="key-headline">
+        <span class="key-name">{{ keyNativeLabel() }}</span>
+        <span class="key-confidence" [class.key-confidence--none]="key.confidence === 'none'">
+          {{ key.confidence }}
+        </span>
+      </div>
+      <svg
+        class="key-chroma"
+        [attr.viewBox]="'0 0 ' + chromaWidth + ' ' + (chromaLaneHeight + 9)"
+        preserveAspectRatio="xMinYMid meet"
+        role="img"
+        aria-label="Duration-weighted pitch classes"
+      >
+        @for (bar of chromaBars(); track bar.name; let index = $index) {
+        <rect
+          class="chroma-bar"
+          [class.chroma-bar--in-scale]="bar.inScale"
+          [class.chroma-bar--tonic]="bar.isTonic"
+          [attr.x]="index * chromaBarPitch"
+          [attr.width]="chromaBarWidth"
+          [attr.y]="chromaLaneHeight - bar.height"
+          [attr.height]="bar.height"
+        />
+        <text
+          class="chroma-label"
+          [attr.x]="index * chromaBarPitch + chromaBarWidth / 2"
+          [attr.y]="chromaLaneHeight + 7"
+        >
+          {{ bar.name }}
+        </text>
+        }
+      </svg>
     </div>
     }
 
@@ -311,6 +353,23 @@
       <div class="readout-row">
         <span>Pulse confidence</span><span>{{ pulseConfidenceLabel() }}</span>
       </div>
+      <div class="readout-row">
+        <span>Key (native)</span><span>{{ keyNativeLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Key (sounding)</span><span>{{ keySoundingLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Key confidence</span><span>{{ keyConfidenceLabel() }}</span>
+      </div>
+      <div class="readout-row">
+        <span>Tuning</span><span>{{ keyTuningLabel() }}</span>
+      </div>
+      @if (modulationLabels().length > 0) {
+      <div class="readout-row">
+        <span>Modulates</span><span>{{ modulationLabels().join(' → ') }}</span>
+      </div>
+      }
 
       <div class="readout-actions">
         <button

@@ -9,6 +9,7 @@ import type { ScanOutput } from '../scan-tune';
 import { PRIMARY_SLOT_FOR_REGISTER } from '../../asid/register-frame';
 import { ASID_SLOT_COUNT } from '../../asid/asid-constants';
 import type { SidFile } from '../../sid/sid-file.model';
+import { PAL_CPU_CLOCK_HZ } from '../notes';
 
 const BASE_STATS: EngineStats = {
   framesRendered: 0,
@@ -38,6 +39,7 @@ interface StubEngine {
   ceilingFrames: WritableSignal<number>;
   stats: WritableSignal<EngineStats>;
   nominalIntervalUs: WritableSignal<number>;
+  speedMultiplier: WritableSignal<number>;
   scrubTo: ReturnType<typeof vi.fn>;
   addMarker: ReturnType<typeof vi.fn>;
 }
@@ -53,6 +55,7 @@ function makeEngine(): StubEngine {
     ceilingFrames: signal(10_000),
     stats: signal<EngineStats>(BASE_STATS),
     nominalIntervalUs: signal(19_950),
+    speedMultiplier: signal(1),
     scrubTo: vi.fn().mockResolvedValue(undefined),
     addMarker: vi.fn(() => 0),
   };
@@ -123,6 +126,51 @@ function buildTwoSpikeScan(frames = 60): ScanOutput {
   }
   for (let f = 40; f < frames; f++) {
     setRegister(scan, f, 24, 0x0f);
+  }
+  return scan;
+}
+
+const REGISTERS_PER_VOICE = 7;
+const PULSE_GATE = 0x41;
+
+/** The register a PAL player's frequency table holds for a pitch, given as semitones from A4. */
+function registerFor(semitonesFromA4: number): number {
+  return Math.round((440 * Math.pow(2, semitonesFromA4 / 12) * 2 ** 24) / PAL_CPU_CLOCK_HZ);
+}
+
+function writeVoice(scan: ScanOutput, frame: number, voice: number, semitone: number): void {
+  const base = voice * REGISTERS_PER_VOICE;
+  const frequency = registerFor(semitone);
+  setRegister(scan, frame, base + 0, frequency & 0xff);
+  setRegister(scan, frame, base + 1, (frequency >> 8) & 0xff);
+  setRegister(scan, frame, base + 4, PULSE_GATE);
+}
+
+/** A I–IV–V–I in C major held as sustained chords, one tone per voice — pitches given as semitones
+ *  from A4. `intruder` swaps voice 2 onto an out-of-scale pitch for the frames it names. */
+function buildCMajorScan(intruder?: {
+  readonly semitone: number;
+  readonly frames: number;
+}): ScanOutput {
+  const progression: readonly (readonly [readonly number[], number])[] = [
+    [[-9, -5, -2], 48], // C E G
+    [[-4, 0, 3], 24], // F A C
+    [[-2, 2, 5], 24], // G B D
+    [[-9, -5, -2], 48], // C E G
+  ];
+  const frames = progression.reduce((total, [, length]) => total + length, 0);
+  const scan = makeScan(frames);
+  let frame = 0;
+  for (const [chord, length] of progression) {
+    for (let step = 0; step < length; step++) {
+      chord.forEach((semitone, voice) => writeVoice(scan, frame, voice, semitone));
+      frame++;
+    }
+  }
+  if (intruder !== undefined) {
+    for (let offset = 0; offset < intruder.frames; offset++) {
+      writeVoice(scan, frames - 1 - offset, 2, intruder.semitone);
+    }
   }
   return scan;
 }
@@ -328,6 +376,43 @@ describe('TrackAnalysisPanelComponent', () => {
 
     expect(candidateHits().length).toBe(0);
     expect(fixture.nativeElement.querySelector('.analysis-empty')).not.toBeNull();
+  });
+
+  it('reports the key and its Camelot number, and charts the chroma it came from', async () => {
+    await completeAnalysis(buildCMajorScan());
+
+    expect(readoutValue('Key (native)')).toContain('C major');
+    expect(readoutValue('Key (native)')).toContain('8B');
+    expect(readoutValue('Key confidence')).toBe('strong');
+    expect(fixture.nativeElement.querySelectorAll('.key-panel .chroma-bar').length).toBe(12);
+  });
+
+  it('reports a sounding key above the native key when the deck is pitched up', async () => {
+    await completeAnalysis(buildCMajorScan());
+    expect(readoutValue('Key (sounding)')).toContain('C major');
+
+    engine.speedMultiplier.set(1.06);
+    fixture.detectChanges();
+
+    expect(readoutValue('Key (native)')).toContain('C major');
+    expect(readoutValue('Key (sounding)')).toContain('C# major');
+  });
+
+  it('marks notes outside the detected scale in the voice lanes', async () => {
+    await completeAnalysis(buildCMajorScan({ semitone: -3, frames: 12 })); // F#, outside C major
+
+    const marked = Array.from(
+      fixture.nativeElement.querySelectorAll('.out-of-scale')
+    ) as SVGPathElement[];
+
+    expect(readoutValue('Key (native)')).toContain('C major');
+    expect(marked.some((path) => (path.getAttribute('d') ?? '').length > 0)).toBe(true);
+  });
+
+  it('leaves the voice lanes unmarked when every note is in the key', async () => {
+    await completeAnalysis(buildCMajorScan());
+
+    expect(fixture.nativeElement.querySelectorAll('.out-of-scale')).toHaveLength(0);
   });
 
   it('bounds the rendered element count for a long tune, regardless of frame count', async () => {
