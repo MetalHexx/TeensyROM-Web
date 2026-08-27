@@ -129,9 +129,9 @@ const getDecoderMock = async () => {
 };
 
 const mockApiConfig: IApiConfig = {
-  basePath: 'http://localhost:213',
-  signalRBasePath: 'http://localhost:213',
-  getBaseUrl: () => 'http://localhost:213',
+  basePath: 'http://127.0.0.1:45123',
+  signalRBasePath: 'http://127.0.0.1:45123',
+  getBaseUrl: () => 'http://127.0.0.1:45123',
 };
 
 describe('AudioStreamService', () => {
@@ -327,7 +327,7 @@ describe('AudioStreamService', () => {
     it('should construct hub URL from API config', async () => {
       await service.connect('test-device-id');
 
-      expect(mocks.__mockBuilder.withUrl).toHaveBeenCalledWith('http://localhost:213/api/audioHub');
+      expect(mocks.__mockBuilder.withUrl).toHaveBeenCalledWith('http://127.0.0.1:45123/api/audioHub');
     });
 
     it('should configure automatic reconnect', async () => {

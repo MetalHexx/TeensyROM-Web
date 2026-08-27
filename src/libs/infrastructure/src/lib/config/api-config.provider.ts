@@ -5,7 +5,8 @@ import { API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
  * Factory function that provides API configuration based on the current environment.
  *
  * - **Development mode** (`isDevMode() === true`):
- *   Returns absolute URLs for local development server
+ *   Uses an explicitly supplied `apiUrl` query parameter when the API and UI
+ *   are launched separately. Without one, requests remain same-origin.
  *
  * - **Production mode** (`isDevMode() === false`):
  *   Returns empty strings for relative URLs (same-origin requests)
@@ -13,9 +14,12 @@ import { API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
  * @returns {IApiConfig} Configuration object with base paths
  */
 export function provideApiConfig(): IApiConfig {
-  const basePath = isDevMode() ? `http://${window.location.hostname}:213` : '';
-  const signalRBasePath = isDevMode() ? `http://${window.location.hostname}:213` : '';
-  
+  const developmentApiUrl = isDevMode()
+    ? new URLSearchParams(window.location.search).get('apiUrl')?.replace(/\/+$/, '') ?? ''
+    : '';
+  const basePath = developmentApiUrl;
+  const signalRBasePath = developmentApiUrl;
+
   return {
     basePath,
     signalRBasePath,

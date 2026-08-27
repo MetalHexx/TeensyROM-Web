@@ -29,9 +29,9 @@ import {
 } from '@teensyrom-nx/domain';
 
 const createMockApiConfig = (): IApiConfig => ({
-  basePath: 'http://localhost:213',
-  signalRBasePath: 'http://localhost:213',
-  getBaseUrl: () => 'http://localhost:213',
+  basePath: 'http://127.0.0.1:45123',
+  signalRBasePath: 'http://127.0.0.1:45123',
+  getBaseUrl: () => 'http://127.0.0.1:45123',
 });
 
 const createFileItemDto = (): FileItemDto => ({

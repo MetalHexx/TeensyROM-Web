@@ -1,8 +1,8 @@
 # TeensyROM Web
 
-A mashup of ancient hardware and modern technology, this cross-platform web app controls your Commodore 64/128 using the [TeensyROM Hardware Cartridge](https://github.com/SensoriumEmbedded/TeensyROM). Unlock lightning-fast exploration and instant remote launching of your favorite games, SID music, scene demos, and images—all from massive file collections stored on your TeensyROM cartridge.
+A mashup of ancient hardware and modern technology, this cross-platform desktop app controls your Commodore 64/128 using the [TeensyROM Hardware Cartridge](https://github.com/SensoriumEmbedded/TeensyROM). Unlock lightning-fast exploration and instant remote launching of your favorite games, SID music, scene demos, and images—all from massive file collections stored on your TeensyROM cartridge.
 
-> **Note**: This project is the spiritual successor to the original [TeensyROM-UI WPF desktop application](https://github.com/MetalHexx/TeensyROM-UI). While the original application provided a Windows-only desktop experience, this new implementation offers cross-platform compatibility through a modern web architecture that can run on Windows, macOS, and Linux.
+> **Note**: This project is the spiritual successor to the original [TeensyROM-UI WPF desktop application](https://github.com/MetalHexx/TeensyROM-UI). It is a cross-platform Electron desktop app for Windows, macOS, and Linux. Electron owns the application window and runs the local .NET device service privately; there is no browser or fixed localhost port to manage.
 
 <img width="2557" height="1301" alt="image" src=".github/images/hero-screenshot.png" />
 
@@ -144,20 +144,30 @@ Features planned for future releases:
 
 ## 🏗️ Architecture
 
-TeensyROM Web is built as a hybrid application combining:
+TeensyROM is a desktop application combining:
 
-- **Backend**: .NET 9 Web API 
-  - Cross-platform serial port management
+- **Desktop shell**: Electron
+  - Starts and stops the bundled backend, selects an ephemeral loopback port, and opens the application window
+  - Keeps the Angular renderer sandboxed with no Node.js APIs exposed
+
+- **Backend**: .NET 9 local API
+  - Cross-platform serial and network device management
+  - Stores user-writable settings and transfer staging in the OS application-data directory
 
 - **Frontend**: Angular 19 with Nx monorepo architecture
-  - Frontend Web Application that communicates with API
+  - Renderer served by the local API and displayed by Electron
 
-## 🎯 Deployment Modes
+## 🎯 Desktop packaging
 
-This application can be deployed in two ways:
+The Electron package bundles the Angular app and the self-contained .NET backend into one desktop application. Build it from `src/` on each target platform:
 
-1. **Standalone Web Application** - Full-stack application with integrated API and web UI
-2. **API-Only Mode** - Headless API server for integration with custom clients or automation
+```bash
+pnpm desktop:start        # local desktop development run
+pnpm desktop:package      # host-platform installer/package
+pnpm desktop:package:dir  # unpacked smoke-test build
+```
+
+The API remains independently runnable for automation and integrations, but the supported interactive experience is the desktop app.
 
 ## 🚀 Quick Start
 
@@ -170,51 +180,22 @@ This application can be deployed in two ways:
 
 #### Windows
 
-1. Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest) (`TeensyROM-Web-{version}-win-x64.zip`)
-2. Extract the zip file to a location of your choice
-3. Run the application:
-
-```
-TeensyRom.Api.exe
-```
-
-4. Open your browser to `http://localhost:213`
+1. Download the Windows installer (`.exe`) from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest).
+2. Run the installer and open `TeensyROM` from the Start menu.
 
 > **Note**: Windows may show a security warning. Click "More info" then "Run anyway".
 
 #### macOS
 
-1. Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest)
-2. Install using Homebrew:
-
-```bash
-brew tap MetalHexx/TeensyROM-Web https://github.com/MetalHexx/TeensyROM-Web
-brew install teensyrom-web
-```
-
-3. Run the application:
-
-```bash
-teensyrom-web
-```
-
-4. Open your browser to `http://localhost:213`
+1. Download the `.dmg` matching your Mac from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest).
+2. Drag `TeensyROM` to Applications, then open it from Applications.
 
 > **Note**: macOS may block the app on first run. Go to System Settings > Privacy & Security and click "Open Anyway".
 
 #### Linux
 
-1. Download the latest release from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest)
-2. Extract and run:
-
-```bash
-tar -xzf TeensyROM-Web-*-linux-x64.tar.gz
-cd TeensyROM-Web
-chmod +x TeensyRom.Api
-./TeensyRom.Api
-```
-
-3. Open your browser to `http://localhost:213`
+1. Download the `.AppImage` or `.deb` package from the [Releases page](https://github.com/MetalHexx/TeensyROM-Web/releases/latest).
+2. Install or mark the AppImage executable, then run `TeensyROM` from your application launcher.
 
 ## 🔌 Device Discovery & Connectivity
 
@@ -269,17 +250,11 @@ The TeensyROM Web application supports connecting to and interacting with multip
 
 ### Accessing the Application
 
-Once running, open your browser to access:
-
-**Web UI:**
-```
-http://localhost:213
-```
-
-**API Documentation (Scalar):**
-```
-http://localhost:213/scalar/v1
-```
+The desktop application opens its own window and does not expose a fixed port.
+For an API-only development run, the startup log prints the random loopback URL;
+append `/scalar/v1` to that address for Scalar API documentation. To use a
+specific local endpoint for automation, set `TEENSYROM_URL` explicitly (for
+example, `http://127.0.0.1:45123`).
 
 ## 🤝 Contributing
 
@@ -321,4 +296,3 @@ See [LICENSE.md](LICENSE.md) for details.
     width="25%"
   />
 </p>
-
