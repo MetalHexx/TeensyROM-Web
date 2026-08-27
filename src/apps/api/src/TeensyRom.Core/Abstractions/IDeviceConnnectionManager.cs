@@ -6,6 +6,7 @@ namespace TeensyRom.Core.Abstractions
     public interface IDeviceConnectionManager
     {   
         Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false);
+        Task<TeensyRomDevice?> ConnectTcpDevice(string ipAddress, int port, CancellationToken ct);
         List<TeensyRomDevice> GetAvailableDevices();
         TeensyRomDevice? GetAvailableDevice(string deviceId);
     }

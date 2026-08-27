@@ -32,6 +32,12 @@ export class DeviceToolbarComponent {
     position: TooltipPosition.Top
   };
 
+  readonly directConnectTooltip: TooltipConfig = {
+    title: 'Connect by IP address',
+    body: 'Connect directly to a TeensyROM at this address without scanning the local network. The address is remembered after a successful connection.',
+    position: TooltipPosition.Top,
+  };
+
   readonly resetTooltip = computed<TooltipConfig>(() => ({
     title: 'Reset Devices',
     body: this.hasEnabledDevices() 
@@ -63,6 +69,13 @@ export class DeviceToolbarComponent {
   onRefreshDevices() {
     // Full network scan when user manually triggers discovery
     this.deviceStore.findDevices(true);
+  }
+
+  onConnectByIp(ipAddress: string) {
+    const trimmedAddress = ipAddress.trim();
+    if (trimmedAddress) {
+      this.deviceStore.connectTcpDevice(trimmedAddress);
+    }
   }
 
   onResetDevices() {

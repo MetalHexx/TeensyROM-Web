@@ -13,6 +13,7 @@ namespace TeensyRom.Core.Device
 	public interface ICartFinder
 	{
 		Task<List<TeensyRomDevice>> FindDevices(CancellationToken ct, bool fullScan = false);
+		Task<TeensyRomDevice?> CreateDevice(DiscoveredEndpoint endpoint, CancellationToken ct);
 	}
 
 	public class CartFinder(
@@ -51,7 +52,7 @@ namespace TeensyRom.Core.Device
 				{
 					ct.ThrowIfCancellationRequested();
 
-					var device = await ValidateAndCreateDevice(endpoint, ct);
+					var device = await CreateDevice(endpoint, ct);
 					if (device != null)
 					{
 						if (string.IsNullOrWhiteSpace(device.Cart.DeviceId))
@@ -91,6 +92,21 @@ namespace TeensyRom.Core.Device
 				throw;
 			}
 			return foundDevices;
+		}
+
+		/// <summary>
+		/// Creates a device from a validated transport endpoint. The manual TCP
+		/// connection path uses this same initialization pipeline as discovery.
+		/// </summary>
+		public async Task<TeensyRomDevice?> CreateDevice(DiscoveredEndpoint endpoint, CancellationToken ct)
+		{
+			var device = await ValidateAndCreateDevice(endpoint, ct);
+			if (device?.Cart.DeviceId is { Length: > 0 } deviceId)
+			{
+				EnsureDeviceInSettings(deviceId);
+			}
+
+			return device;
 		}
 
 		/// <summary>

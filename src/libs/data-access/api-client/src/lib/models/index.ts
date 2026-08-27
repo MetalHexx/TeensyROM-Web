@@ -8,6 +8,8 @@ export * from './CartDto';
 export * from './CartStorageDto';
 export * from './ChannelConfigDto';
 export * from './CompetitionDto';
+export * from './ConnectTcpDeviceRequest';
+export * from './ConnectTcpDeviceResponse';
 export * from './ConnectionType';
 export * from './CreateJobBody';
 export * from './CreateJobResponse';
