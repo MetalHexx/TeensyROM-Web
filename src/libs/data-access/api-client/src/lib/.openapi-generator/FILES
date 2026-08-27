@@ -16,6 +16,8 @@ models/CartDto.ts
 models/CartStorageDto.ts
 models/ChannelConfigDto.ts
 models/CompetitionDto.ts
+models/ConnectTcpDeviceRequest.ts
+models/ConnectTcpDeviceResponse.ts
 models/ConnectionType.ts
 models/CreateJobBody.ts
 models/CreateJobResponse.ts

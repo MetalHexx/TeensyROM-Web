@@ -12,6 +12,12 @@ using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Device;
 
+/// <summary>Connects to a known TCP endpoint without scanning the local network.</summary>
+public interface ITcpDeviceConnector
+{
+	Task<DiscoveredEndpoint?> ConnectAsync(string ipAddress, int port, CancellationToken ct);
+}
+
 /// <summary>
 /// Cache structure for storing discovered device IP addresses.
 /// </summary>
@@ -38,7 +44,7 @@ public record CachedDeviceIp
 /// </summary>
 public class TcpDiscoveryStrategy(
 	ILoggingService log,
-	IDeviceTransportFactory transportFactory) : IDiscoveryStrategy
+	IDeviceTransportFactory transportFactory) : IDiscoveryStrategy, ITcpDeviceConnector
 {
 	private const int _maxDegreeOfParallelism = 256;  // High parallelism safe with true async I/O (no thread blocking)
 	private readonly string _cacheFilePath = Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), "Assets/System/Config/DeviceIps.json");
@@ -73,6 +79,28 @@ public class TcpDiscoveryStrategy(
 
 		log.Internal("TcpDiscoveryStrategy: No cached devices found, falling back to full subnet scan");
 		return await PerformFullScan(ct);
+	}
+
+	/// <summary>
+	/// Connects directly to a user-supplied IP address. Successful connections are
+	/// cached so automatic discovery can reconnect without another subnet scan.
+	/// </summary>
+	public async Task<DiscoveredEndpoint?> ConnectAsync(string ipAddress, int port, CancellationToken ct)
+	{
+		ct.ThrowIfCancellationRequested();
+		if (!IPAddress.TryParse(ipAddress, out var ip))
+		{
+			return null;
+		}
+
+		var device = await TryDiscoverDeviceAsync(ip, port);
+		if (device is null)
+		{
+			return null;
+		}
+
+		SaveManualEndpoint(device);
+		return new DiscoveredEndpoint(ConnectionType.Tcp, device.IpAddress, device.Port, device.Response, device.CommunicationPort);
 	}
 
 	/// <summary>
@@ -378,6 +406,38 @@ public class TcpDiscoveryStrategy(
 			catch (Exception ex)
 			{
 				log.InternalError($"TcpDiscoveryStrategy: Failed to save device cache: {ex.Message}");
+			}
+		}
+	}
+
+	private void SaveManualEndpoint(TcpDiscoveredDevice device)
+	{
+		lock (_lock)
+		{
+			try
+			{
+				var endpoints = LoadKnownIps()?.KnownEndpoints ?? [];
+				endpoints.RemoveAll(endpoint => endpoint.IpAddress == device.IpAddress && endpoint.Port == device.Port);
+				endpoints.Add(new CachedDeviceIp
+				{
+					IpAddress = device.IpAddress,
+					Port = device.Port,
+					LastSeen = device.DiscoveredAt
+				});
+
+				var cache = new DeviceIpCache { LastUpdated = DateTime.UtcNow, KnownEndpoints = endpoints };
+				var directory = Path.GetDirectoryName(_cacheFilePath);
+				if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+				{
+					Directory.CreateDirectory(directory);
+				}
+
+				File.WriteAllText(_cacheFilePath, JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true }));
+				log.Internal($"TcpDiscoveryStrategy: Saved manual endpoint {device.IpAddress}:{device.Port} to cache");
+			}
+			catch (Exception ex)
+			{
+				log.InternalError($"TcpDiscoveryStrategy: Failed to save manual endpoint: {ex.Message}");
 			}
 		}
 	}

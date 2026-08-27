@@ -15,7 +15,10 @@
 
 import * as runtime from '../runtime';
 import type {
+  ConnectTcpDeviceRequest,
+  ConnectTcpDeviceResponse,
   FindDevicesResponse,
+  HttpValidationProblemDetails,
   PingDeviceResponse,
   ProblemDetails,
   ResetDeviceResponse,
@@ -23,8 +26,14 @@ import type {
   StopLogsResponse,
 } from '../models/index';
 import {
+    ConnectTcpDeviceRequestFromJSON,
+    ConnectTcpDeviceRequestToJSON,
+    ConnectTcpDeviceResponseFromJSON,
+    ConnectTcpDeviceResponseToJSON,
     FindDevicesResponseFromJSON,
     FindDevicesResponseToJSON,
+    HttpValidationProblemDetailsFromJSON,
+    HttpValidationProblemDetailsToJSON,
     PingDeviceResponseFromJSON,
     PingDeviceResponseToJSON,
     ProblemDetailsFromJSON,
@@ -36,6 +45,10 @@ import {
     StopLogsResponseFromJSON,
     StopLogsResponseToJSON,
 } from '../models/index';
+
+export interface ConnectTcpDeviceOperationRequest {
+    connectTcpDeviceRequest: ConnectTcpDeviceRequest;
+}
 
 export interface FindDevicesRequest {
     fullScan: boolean;
@@ -53,6 +66,44 @@ export interface ResetDeviceRequest {
  * 
  */
 export class DevicesApiService extends runtime.BaseAPI {
+
+    /**
+     * Connects directly to a TeensyROM device at a supplied IP address and TCP port. No subnet scan is performed. Successful addresses are saved for future automatic reconnection.
+     * Connect to a device by IP address
+     */
+    async connectTcpDeviceRaw(requestParameters: ConnectTcpDeviceOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ConnectTcpDeviceResponse>> {
+        if (requestParameters['connectTcpDeviceRequest'] == null) {
+            throw new runtime.RequiredError(
+                'connectTcpDeviceRequest',
+                'Required parameter "connectTcpDeviceRequest" was null or undefined when calling connectTcpDevice().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        const response = await this.request({
+            path: `/api/devices/connect`,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ConnectTcpDeviceRequestToJSON(requestParameters['connectTcpDeviceRequest']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ConnectTcpDeviceResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Connects directly to a TeensyROM device at a supplied IP address and TCP port. No subnet scan is performed. Successful addresses are saved for future automatic reconnection.
+     * Connect to a device by IP address
+     */
+    async connectTcpDevice(requestParameters: ConnectTcpDeviceOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ConnectTcpDeviceResponse> {
+        const response = await this.connectTcpDeviceRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - TCP devices use cached IPs by default (fullScan=false) for fast discovery. - Set fullScan=true to perform a complete network scan for TCP devices. - Devices with auto-connect enabled will reconnect automatically.

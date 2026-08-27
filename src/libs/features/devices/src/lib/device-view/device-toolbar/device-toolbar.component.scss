@@ -28,6 +28,38 @@
   width: 100%;
 }
 
+.direct-connect {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 220px;
+}
+
+.direct-connect label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.direct-connect-controls {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.direct-connect input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  padding: 0.55rem 0.7rem;
+}
+
+.direct-connect-controls lib-action-button {
+  flex: 0 0 auto;
+}
+
 .toolbar-button-container button,
 .toolbar-button-container .mat-mdc-button-base {
   flex: 1 1 0;

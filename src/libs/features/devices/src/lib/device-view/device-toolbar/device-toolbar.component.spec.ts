@@ -21,6 +21,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
  */
 interface MockDeviceStoreContract {
   findDevices: ReturnType<typeof vi.fn>;
+  connectTcpDevice: ReturnType<typeof vi.fn>;
   indexStorageAllStorage: ReturnType<typeof vi.fn>;
   resetAllDevices: ReturnType<typeof vi.fn>;
   pingAllDevices: ReturnType<typeof vi.fn>;
@@ -66,6 +67,7 @@ describe('DeviceToolbarComponent', () => {
     // Create a mock DeviceStore with spy methods and a computed property based on the signal
     mockDeviceStore = {
       findDevices: vi.fn(),
+      connectTcpDevice: vi.fn(),
       indexStorageAllStorage: vi.fn(),
       resetAllDevices: vi.fn(),
       pingAllDevices: vi.fn(),
@@ -96,6 +98,28 @@ describe('DeviceToolbarComponent', () => {
     it('should render toolbar in the DOM', () => {
       const toolbar = fixture.nativeElement.querySelector('[data-testid="device-toolbar"]');
       expect(toolbar).toBeTruthy();
+    });
+  });
+
+  describe('direct IP connection', () => {
+    it('connects to the trimmed address entered by the user', () => {
+      const input = fixture.nativeElement.querySelector(
+        '[data-testid="device-ip-connect"] input'
+      ) as HTMLInputElement;
+      input.value = ' 192.168.1.42 ';
+
+      const button = fixture.nativeElement.querySelector(
+        '[data-testid="toolbar-button-connect-ip"] button'
+      ) as HTMLButtonElement;
+      button.click();
+
+      expect(mockDeviceStore.connectTcpDevice).toHaveBeenCalledWith('192.168.1.42');
+    });
+
+    it('does not connect when the address field is empty', () => {
+      component.onConnectByIp('   ');
+
+      expect(mockDeviceStore.connectTcpDevice).not.toHaveBeenCalled();
     });
   });
 
