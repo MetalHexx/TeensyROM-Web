@@ -53,6 +53,20 @@
       <div class="ctrl-divider"></div>
 
       <div class="ctrl-group">
+        <span class="ctrl-label">Overlays</span>
+        <button
+          type="button"
+          class="lane-toggle"
+          [class.lane-toggle--active]="overlaysVisible()"
+          (click)="toggleOverlays()"
+        >
+          Out-of-scale
+        </button>
+      </div>
+
+      <div class="ctrl-divider"></div>
+
+      <div class="ctrl-group">
         <span class="ctrl-label">Threshold</span>
         <input
           type="range"
@@ -140,7 +154,7 @@
             [attr.height]="voiceBlockHeight"
             [attr.fill]="block.color"
           />
-          } @if (outOfScalePaths()[voice]) {
+          } @if (overlaysVisible() && outOfScalePaths()[voice]) {
           <path class="out-of-scale" [attr.d]="outOfScalePaths()[voice]" />
           }
         </g>

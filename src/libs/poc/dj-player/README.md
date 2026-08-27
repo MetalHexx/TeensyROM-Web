@@ -251,7 +251,7 @@ Record observations as they happen during the session. Findings cannot be recons
 
 #### 19. Does the candidate strength ladder sort the way a listener would?
 
-*Confirms that the scoring heuristic for change candidates (F74) ranks high-confidence structural moments above noise, matching human judgment across genres.*
+*Confirms that the scoring heuristic for change candidates ranks high-confidence structural moments above noise, matching human judgment across genres.*
 
 **Observations:**
 
@@ -259,7 +259,7 @@ Record observations as they happen during the session. Findings cannot be recons
 
 #### 20. Do the tunes in the library have findable regular pulses, and how often?
 
-*Determines what proportion of the HVSC repertoire yields a stable tempo signal (F73/F75), sizing the applicability of pulse-based navigation and quantization features.*
+*Determines what proportion of the HVSC repertoire yields a stable tempo signal (F76), sizing the applicability of pulse-based navigation and quantization features.*
 
 **Observations:**
 
@@ -267,7 +267,7 @@ Record observations as they happen during the session. Findings cannot be recons
 
 #### 21. Does key detection hold up, and on what proportion of tunes does it decline to answer?
 
-*Sizes the reliability of harmonic-content analysis (F76) as a foundation for pitch-shifted mashup matching, and what proportion of tunes need manual override.*
+*Sizes the reliability of harmonic-content analysis (F73) as a foundation for pitch-shifted mashup matching, and what proportion of tunes need manual override.*
 
 **Observations:**
 

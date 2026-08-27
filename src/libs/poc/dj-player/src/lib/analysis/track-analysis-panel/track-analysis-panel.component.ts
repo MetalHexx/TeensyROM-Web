@@ -396,6 +396,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     new Set(LANE_TOGGLES.map((lane) => lane.key))
   );
   protected readonly weightsOpen = signal<boolean>(false);
+  protected readonly overlaysVisible = signal<boolean>(true);
 
   protected readonly laneToggles = LANE_TOGGLES;
   protected readonly weightFields = WEIGHT_FIELDS;
@@ -910,6 +911,10 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
   protected toggleWeightsPanel(): void {
     this.weightsOpen.update((open) => !open);
+  }
+
+  protected toggleOverlays(): void {
+    this.overlaysVisible.update((visible) => !visible);
   }
 
   protected onThresholdInput(event: Event): void {

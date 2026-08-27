@@ -415,6 +415,24 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.out-of-scale')).toHaveLength(0);
   });
 
+  it('hides the out-of-scale overlay independently of the voice lanes it lives in', async () => {
+    await completeAnalysis(buildCMajorScan({ semitone: -3, frames: 12 })); // F#, outside C major
+
+    expect(fixture.nativeElement.querySelectorAll('.out-of-scale').length).toBeGreaterThan(0);
+    const voiceBlocksBefore = fixture.nativeElement.querySelectorAll('.voice-block').length;
+    expect(voiceBlocksBefore).toBeGreaterThan(0);
+
+    const overlayToggle = Array.from(
+      fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.lane-toggle')
+    ).find((button) => button.textContent?.trim() === 'Out-of-scale');
+    expect(overlayToggle).toBeTruthy();
+    overlayToggle?.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.out-of-scale')).toHaveLength(0);
+    expect(fixture.nativeElement.querySelectorAll('.voice-block').length).toBe(voiceBlocksBefore);
+  });
+
   it('bounds the rendered element count for a long tune, regardless of frame count', async () => {
     await completeAnalysis(buildConstantlyActiveScan(50_000));
 
