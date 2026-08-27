@@ -415,7 +415,7 @@ The backend API specification is the source of truth for endpoint structures, re
 
 **Key Information**:
 
-- **Base Path**: `http://localhost:213` (cross-origin from Angular app at `localhost:4200`)
+- **Base Path**: `http://127.0.0.1:45123` (cross-origin from Angular app at `localhost:4200`)
 - **Endpoint Paths**: No `/api` prefix (e.g., `/devices`, not `/api/devices`)
 - **Response Schemas**: Detailed type definitions for all DTOs
 - **HTTP Methods**: GET, POST, DELETE patterns
@@ -427,7 +427,7 @@ The backend API specification is the source of truth for endpoint structures, re
 cy.intercept('GET', '/api/devices*', ...)
 
 // ✅ Correct - use full URL for cross-origin
-cy.intercept('GET', 'http://localhost:213/devices*', ...)
+cy.intercept('GET', 'http://127.0.0.1:45123/devices*', ...)
 ```
 
 ### Generated API Client
@@ -465,7 +465,7 @@ All E2E tests **MUST** use centralized constants from the constants layer - hard
 
 ```typescript
 // ❌ Hardcoded - not allowed
-cy.intercept('GET', 'http://localhost:213/devices*', ...)
+cy.intercept('GET', 'http://127.0.0.1:45123/devices*', ...)
 
 // ✅ Correct - uses centralized constant
 cy.intercept(DEVICE_ENDPOINTS.FIND_DEVICES.method, DEVICE_ENDPOINTS.FIND_DEVICES.pattern, ...)

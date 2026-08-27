@@ -17,6 +17,12 @@ AssetStartupHelper.UnpackAssets();
 
 var builder = WebApplication.CreateBuilder(args);
 
+// The desktop shell provides a private, ephemeral loopback URL. When the API
+// runs on its own it still binds only to loopback and asks Kestrel to select a
+// free port, avoiding a fixed listener or public network exposure.
+var listeningUrl = Environment.GetEnvironmentVariable("TEENSYROM_URL") ?? "http://127.0.0.1:0";
+builder.WebHost.UseUrls(listeningUrl);
+
 builder.Logging.AddFilter("Microsoft.AspNetCore.SignalR", LogLevel.Debug);
 builder.Logging.AddFilter("Microsoft.AspNetCore.Http.Connections", LogLevel.Debug);
 
@@ -77,6 +83,11 @@ app.MapHub<TransferHub>("/api/transferHub");
 // SPA fallback routing - must be AFTER all API routes and SignalR hubs
 // This allows Angular to handle client-side routing for unknown routes
 app.MapFallbackToFile("index.html");
+
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    app.Logger.LogInformation("TeensyROM API listening at {Urls}", string.Join(", ", app.Urls));
+});
 
 app.Run();
 

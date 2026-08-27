@@ -5,10 +5,11 @@
       "launchBrowser": true,
       "launchUrl": "scalar",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "TEENSYROM_URL": "http://127.0.0.1:0"
       },
       "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:213"
+      "applicationUrl": "http://127.0.0.1:0"
     },
     "IIS Express": {
       "commandName": "IISExpress",

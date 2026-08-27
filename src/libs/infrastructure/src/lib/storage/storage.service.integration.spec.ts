@@ -49,15 +49,15 @@ describe('StorageService Integration Tests', () => {
 
     // Create Configuration for the typescript-fetch client
     const config = new Configuration({
-      basePath: 'http://localhost:213',
+      basePath: 'http://127.0.0.1:45123',
       fetchApi: fetch, // Use standard fetch API for MSW interception
     });
 
     // Mock API config
     const mockApiConfig: IApiConfig = {
-      basePath: 'http://localhost:213',
-      signalRBasePath: 'http://localhost:213',
-      getBaseUrl: () => 'http://localhost:213',
+      basePath: 'http://127.0.0.1:45123',
+      signalRBasePath: 'http://127.0.0.1:45123',
+      getBaseUrl: () => 'http://127.0.0.1:45123',
     };
 
     // Configure TestBed with all required providers
@@ -134,7 +134,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:213/api/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://127.0.0.1:45123/api/devices/${deviceId}/storage/${storageType}/directories`,
           ({ request }) => {
             const url = new URL(request.url);
             const pathParam = url.searchParams.get('Path');
@@ -188,7 +188,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:213/api/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://127.0.0.1:45123/api/devices/${deviceId}/storage/${storageType}/directories`,
           ({ request }) => {
             const url = new URL(request.url);
             const pathParam = url.searchParams.get('Path');
@@ -215,7 +215,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:213/api/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://127.0.0.1:45123/api/devices/${deviceId}/storage/${storageType}/directories`,
           () => {
             return HttpResponse.json(
               {
@@ -251,7 +251,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:213/api/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://127.0.0.1:45123/api/devices/${deviceId}/storage/${storageType}/directories`,
           () => HttpResponse.json(mockResponse)
         )
       );
@@ -277,7 +277,7 @@ describe('StorageService Integration Tests', () => {
 
       server.use(
         http.get(
-          `http://localhost:213/api/devices/${deviceId}/storage/${storageType}/directories`,
+          `http://127.0.0.1:45123/api/devices/${deviceId}/storage/${storageType}/directories`,
           () => HttpResponse.json(mockResponse)
         )
       );
@@ -303,10 +303,10 @@ describe('StorageService Integration Tests', () => {
 
       // Setup handlers for both storage types
       server.use(
-        http.get(`http://localhost:213/api/devices/${deviceId}/storage/SD/directories`, () =>
+        http.get(`http://127.0.0.1:45123/api/devices/${deviceId}/storage/SD/directories`, () =>
           HttpResponse.json(createMockResponse('sd'))
         ),
-        http.get(`http://localhost:213/api/devices/${deviceId}/storage/USB/directories`, () =>
+        http.get(`http://127.0.0.1:45123/api/devices/${deviceId}/storage/USB/directories`, () =>
           HttpResponse.json(createMockResponse('usb'))
         )
       );
