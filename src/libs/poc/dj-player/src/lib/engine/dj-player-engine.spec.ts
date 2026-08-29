@@ -374,9 +374,9 @@ function voiceGateValues(packet: SentPacket): number[] {
   return [22, 23, 24].map((slot) => slotValue(packet, slot));
 }
 
-/** A minimal, otherwise-unused record — only its identity as an object matters to the round-trip
- *  test below. */
-function fakeTuneIndexRecord(): TuneIndexRecord {
+/** A minimal record, otherwise unused beyond `overrides` — its base identity as an object is what
+ *  the round-trip test below cares about. */
+function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
     filename: 'Test.sid',
     subtune: 1,
@@ -397,6 +397,7 @@ function fakeTuneIndexRecord(): TuneIndexRecord {
     callsPerFrame: 1,
     formatVersion: TUNE_INDEX_FORMAT_VERSION,
     computedAt: '2026-08-29T00:00:00.000Z',
+    ...overrides,
   };
 }
 
@@ -2605,6 +2606,67 @@ describe('DjPlayerEngine', () => {
       engine.nominalIntervalUs.set(0);
 
       expect(engine.positionPercent()).toBe(0);
+    });
+  });
+
+  describe('positionBasisFrames', () => {
+    it('keeps the fixed ceiling as the basis with no tune index set', () => {
+      engine.loadTune(counterTune());
+
+      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
+    });
+
+    it('keeps the fixed ceiling when the record carries a null loop frame', () => {
+      engine.loadTune(counterTune());
+
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: null }));
+
+      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
+    });
+
+    it('keeps the fixed ceiling for a zero or negative loop frame', () => {
+      engine.loadTune(counterTune());
+
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 0 }));
+      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
+
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: -10 }));
+      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
+    });
+
+    it('adopts the loop frame as the basis, and positionPercent reads 0/50/100 against it', async () => {
+      engine.loadTune(counterTune());
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 2_500 }));
+
+      expect(engine.positionBasisFrames()).toBe(2_500);
+
+      engine.scrubTo(0);
+      await replay.settle();
+      expect(engine.positionPercent()).toBe(0);
+
+      engine.scrubTo(50);
+      await replay.settle();
+      expect(engine.stats().framesRendered).toBe(1_250);
+      expect(engine.positionPercent()).toBeCloseTo(50, 6);
+
+      engine.scrubTo(100);
+      await replay.settle();
+      expect(engine.positionPercent()).toBe(100);
+    });
+
+    it('moves the basis while a tune is already playing, with no reload', async () => {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(1);
+      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
+
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 100 }));
+
+      expect(engine.positionBasisFrames()).toBe(100);
+      expect(engine.positionPercent()).toBeCloseTo(
+        (engine.stats().framesRendered / 100) * 100,
+        6
+      );
     });
   });
 });

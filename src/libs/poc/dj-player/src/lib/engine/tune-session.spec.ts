@@ -253,6 +253,45 @@ describe('TuneSession', () => {
     });
   });
 
+  describe('positionBasisFrames', () => {
+    it('keeps the fixed ceiling as the basis when no indexed length has been set', () => {
+      const session = new TuneSession(new FakeReplayRunner(), fakeHost());
+      session.load(silentTune());
+
+      expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+    });
+
+    it('keeps the fixed ceiling when a length is set back to null', () => {
+      const session = new TuneSession(new FakeReplayRunner(), fakeHost());
+      session.load(silentTune());
+      session.setIndexedLengthFrames(2_500);
+
+      session.setIndexedLengthFrames(null);
+
+      expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+    });
+
+    it('adopts a usable indexed length as the basis', () => {
+      const session = new TuneSession(new FakeReplayRunner(), fakeHost());
+      session.load(silentTune());
+
+      session.setIndexedLengthFrames(2_500);
+
+      expect(session.positionBasisFrames()).toBe(2_500);
+    });
+
+    it('rejects a zero or negative length, falling back to the ceiling', () => {
+      const session = new TuneSession(new FakeReplayRunner(), fakeHost());
+      session.load(silentTune());
+
+      session.setIndexedLengthFrames(0);
+      expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+
+      session.setIndexedLengthFrames(-100);
+      expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+    });
+  });
+
   describe('scrubTo', () => {
     it('lands on the requested percentage of the jump ceiling and queues a resync', async () => {
       const host = fakeHost();
@@ -266,6 +305,19 @@ describe('TuneSession', () => {
       const expectedCeiling = Math.round((JUMP_CEILING_SECONDS * 1_000_000) / host.nominalIntervalUs());
       expect(session.framesRendered).toBe(Math.round(expectedCeiling * 0.5));
       expect(host.resyncCount.count).toBe(1);
+    });
+
+    it('lands on the requested percentage of an indexed basis rather than the ceiling', async () => {
+      const host = fakeHost();
+      replay = new FakeReplayRunner();
+      const session = new TuneSession(replay, host);
+      session.load(counterTune());
+      session.initSubtune(1);
+      session.setIndexedLengthFrames(2_500);
+
+      await session.scrubTo(50);
+
+      expect(session.framesRendered).toBe(1_250);
     });
 
     it('resolves without a request when no machine is loaded', async () => {

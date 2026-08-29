@@ -1072,9 +1072,9 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   }
 
   private async jumpToFrame(frame: number): Promise<void> {
-    const ceiling = this.engine.ceilingFrames();
-    if (ceiling <= 0) return;
-    const percent = (frame / ceiling) * 100;
+    const basis = this.engine.positionBasisFrames();
+    if (basis <= 0) return;
+    const percent = (frame / basis) * 100;
     await this.engine.scrubTo(percent);
   }
 

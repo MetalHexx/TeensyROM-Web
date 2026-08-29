@@ -37,6 +37,7 @@ const BASE_STATS: EngineStats = {
 interface StubEngine {
   currentSubtune: WritableSignal<number>;
   ceilingFrames: WritableSignal<number>;
+  positionBasisFrames: WritableSignal<number>;
   stats: WritableSignal<EngineStats>;
   nominalIntervalUs: WritableSignal<number>;
   speedMultiplier: WritableSignal<number>;
@@ -53,6 +54,9 @@ function makeEngine(): StubEngine {
   return {
     currentSubtune: signal(1),
     ceilingFrames: signal(10_000),
+    // Deliberately distinct from ceilingFrames, so a test that reads this rather than the ceiling
+    // proves jumpToFrame actually moved onto the basis.
+    positionBasisFrames: signal(8_000),
     stats: signal<EngineStats>(BASE_STATS),
     nominalIntervalUs: signal(19_950),
     speedMultiplier: signal(1),
@@ -318,7 +322,7 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(scanner.scan).toHaveBeenCalledTimes(1);
   });
 
-  it('converts a clicked candidate into a scrub percentage against ceilingFrames', async () => {
+  it('converts a clicked candidate into a scrub percentage against positionBasisFrames', async () => {
     await completeAnalysis(buildSpikeScan());
     const hit = candidateHits()[0];
     expect(hit).toBeTruthy();
@@ -330,7 +334,7 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(match).not.toBeNull();
     const frame = Number((match as RegExpMatchArray)[1].replace(/,/g, ''));
 
-    expect(engine.scrubTo).toHaveBeenCalledWith((frame / engine.ceilingFrames()) * 100);
+    expect(engine.scrubTo).toHaveBeenCalledWith((frame / engine.positionBasisFrames()) * 100);
   });
 
   it('awaits the jump landing before adding a marker from Copy to marker', async () => {

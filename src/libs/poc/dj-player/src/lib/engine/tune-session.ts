@@ -60,6 +60,16 @@ export class TuneSession {
     Math.round((JUMP_CEILING_SECONDS * MICROSECONDS_PER_SECOND) / this.host.nominalIntervalUs())
   );
 
+  /** The indexed length, when one was found and is usable; null falls back to the fixed ceiling. */
+  private readonly _indexedLengthFrames = signal<number | null>(null);
+
+  /** What a position percentage is measured against, in both directions. A `computed` over a signal
+   *  rather than a value snapshotted at load time, so a record landing mid-play moves the playhead's
+   *  meaning on the next stats publish with no further wiring. */
+  readonly positionBasisFrames: Signal<number> = computed(
+    () => this._indexedLengthFrames() ?? this.ceilingFrames()
+  );
+
   private _file: SidFile | null = null;
   private _machine: C64Machine | null = null;
   private _frame: RegisterFrame | null = null;
@@ -108,6 +118,15 @@ export class TuneSession {
   /** Zeroes the position counter — what a fresh play run or a fresh load starts from. */
   resetPosition(): void {
     this._framesRendered = 0;
+  }
+
+  /** Stores the tune-index's measured length as the position basis. Anything that is not a finite
+   *  number greater than zero is stored as null instead — a zero or negative basis would divide the
+   *  playhead by nothing — which makes `positionBasisFrames` fall back to `ceilingFrames`. */
+  setIndexedLengthFrames(frames: number | null): void {
+    this._indexedLengthFrames.set(
+      frames !== null && Number.isFinite(frames) && frames > 0 ? frames : null
+    );
   }
 
   /** Re-inits the machine and marks every register dirty, so the chip cannot inherit the old state. */
@@ -169,10 +188,10 @@ export class TuneSession {
   }
 
   /**
-   * Asks for `percent` of `ceilingFrames()`. The position does not move as soon as this returns — the
-   * replay runs off this thread and lands a moment later, and a second scrub issued in the meantime
-   * supersedes this one. The returned promise resolves once this request has settled — landed,
-   * failed, or been superseded/discarded.
+   * Asks for `percent` of `positionBasisFrames()`. The position does not move as soon as this
+   * returns — the replay runs off this thread and lands a moment later, and a second scrub issued in
+   * the meantime supersedes this one. The returned promise resolves once this request has settled —
+   * landed, failed, or been superseded/discarded.
    */
   scrubTo(percent: number): Promise<void> {
     if (this._machine === null) return Promise.resolve();
@@ -181,7 +200,7 @@ export class TuneSession {
 
   private frameForPercent(percent: number): number {
     const clamped = clamp(percent, 0, 100);
-    return Math.round((clamped / 100) * this.ceilingFrames());
+    return Math.round((clamped / 100) * this.positionBasisFrames());
   }
 
   /**

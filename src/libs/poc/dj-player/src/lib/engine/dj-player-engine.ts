@@ -229,19 +229,20 @@ export class DjPlayerEngine implements OnDestroy {
   readonly markerLaunchPending = signal<boolean>(false);
   readonly nudgeRangeFrames = this.markerState.nudgeRangeFrames;
   readonly ceilingFrames = this.tuneSession.ceilingFrames;
+  readonly positionBasisFrames = this.tuneSession.positionBasisFrames;
 
   private readonly _tuneIndex = signal<TuneIndexRecord | null>(null);
   /** The current tune's cached or freshly scanned index record, published by `TuneIndexService`.
-   *  Stored here and left inert until P02 wires it into transport. */
+   *  See `setTuneIndex` for the one thing it currently drives — the position basis. */
   readonly tuneIndex: Signal<TuneIndexRecord | null> = this._tuneIndex.asReadonly();
 
-  /** Current playback position as a percentage of the ceiling, for the playhead. Clamped to 0–100
-   * because JUMP_CEILING_SECONDS is a fixed fiction, not the tune's real length — past ~5 PAL minutes
-   * of continuous play framesRendered/ceilingFrames exceeds 100% and the thumb should pin, not
-   * overflow. */
+  /** Current playback position as a percentage of `positionBasisFrames`, for the playhead: the
+   * tune's own measured length once one has been indexed, the fixed ceiling otherwise. Clamped to
+   * 0–100 because a tune played past its basis — a loop with looping disarmed, or JUMP_CEILING_SECONDS'
+   * fixed fiction when no length was found — must still pin the thumb rather than overflow it. */
   readonly positionPercent = computed<number>(() => {
-    const ceiling = this.ceilingFrames();
-    return ceiling === 0 ? 0 : clamp((this.stats().framesRendered / ceiling) * 100, 0, 100);
+    const basis = this.positionBasisFrames();
+    return basis === 0 ? 0 : clamp((this.stats().framesRendered / basis) * 100, 0, 100);
   });
 
   private framesSincePublish = 0;
@@ -524,10 +525,21 @@ export class DjPlayerEngine implements OnDestroy {
     this.delivery.setScheduleAhead(ms);
   }
 
-  /** Stores the current tune's index record — or clears it — as published by `TuneIndexService`.
-   *  P02 adds the transport wiring that reads it back. */
+  /**
+   * Stores the current tune's index record — or clears it — as published by `TuneIndexService`, and
+   * feeds its loop frame to the session as the position basis.
+   *
+   * `loopFrame !== null` is the confidence gate here, deliberately — `structureConfidence` gates
+   * nothing. The detector already refuses to return a loop point until a block-level agreement run
+   * clears its minimum sustained-run threshold, so a non-null `loopFrame` has by construction passed
+   * the bar the detector requires; a `'weak'` label only distinguishes a bare-minimum run from a long
+   * one, for the operator to see, not a reason to suppress the answer. Do not add a second confidence
+   * threshold here — `null` is the whole "declined to answer" case, and it is the one that keeps
+   * today's behaviour.
+   */
   setTuneIndex(record: TuneIndexRecord | null): void {
     this._tuneIndex.set(record);
+    this.tuneSession.setIndexedLengthFrames(record?.loopFrame ?? null);
   }
 
   addMarker(): number {
