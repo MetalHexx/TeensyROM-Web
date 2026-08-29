@@ -281,6 +281,10 @@ Record observations as they happen during the session. Findings cannot be recons
 
 ---
 
+**Note on ASID-DJ-0.8:** This iteration makes the transport act on the loop point and the key without the listening session having been run, so questions 18–22 remain open. The first real sessions under `-0.8` are informal evidence toward them — a consistently early or late loop point will now be *more* audible, not less.
+
+---
+
 ### Transcription
 
 When the session is complete, transcribe the findings into `ASID-DJ-ITERATIONS.md`'s decision log, superseding any entries in place where these findings overturn something.
