@@ -91,6 +91,7 @@ describe('computeStructure — loop point', () => {
 
     expect(result.loopFrame).toBe(trueOffset);
     expect(result.loopFrame).not.toBe(offsetBlocks * blockFrames); // not merely the block-quantized guess
+    expect(result.loopConfidence).toBe('strong'); // the repeat holds for nearly the whole tune
     expect(result.matrix.length).toBe(result.blockCount * result.blockCount);
     expect(diagonalIsMaximal(result.matrix, result.blockCount)).toBe(true);
     expect(result.sectionBoundaries.length).toBeLessThan(result.blockCount);
@@ -104,6 +105,7 @@ describe('computeStructure — loop point', () => {
     const result = computeStructure(matrix, UNIFORM_WEIGHTS);
 
     expect(result.loopFrame).toBeNull();
+    expect(result.loopConfidence).toBe('none');
   });
 
   it('does not report a loop point when the agreement is brief rather than sustained', () => {
@@ -126,6 +128,30 @@ describe('computeStructure — loop point', () => {
     const result = computeStructure(matrix, UNIFORM_WEIGHTS);
 
     expect(result.loopFrame).toBeNull();
+    expect(result.loopConfidence).toBe('none');
+  });
+
+  it('reports weak confidence when the sustained run only just clears the guard', () => {
+    const frames = 2000;
+    const blockFrames = discoverBlockFrames(frames);
+    const values = buildNonRepeatingValues(frames, blockFrames);
+
+    // Copies ten blocks' worth of frames from earlier in the tune to a later position — long enough
+    // to clear MIN_SUSTAINED_RUN_BLOCKS but well short of twice that, the 'strong' cutoff.
+    const runOffsetFrames = 40 * blockFrames;
+    const runLengthFrames = 10 * blockFrames;
+    const copyStart = 55 * blockFrames;
+    for (let i = 0; i < runLengthFrames; i++) {
+      const src = (copyStart - runOffsetFrames + i) * FEATURE_DIMENSION_COUNT;
+      const dst = (copyStart + i) * FEATURE_DIMENSION_COUNT;
+      values.copyWithin(dst, src, src + FEATURE_DIMENSION_COUNT);
+    }
+    const matrix: FeatureMatrix = { values, frames };
+
+    const result = computeStructure(matrix, UNIFORM_WEIGHTS);
+
+    expect(result.loopFrame).not.toBeNull();
+    expect(result.loopConfidence).toBe('weak');
   });
 
   it('halves the reported duration for a multispeed tune with callsPerFrame doubled', () => {

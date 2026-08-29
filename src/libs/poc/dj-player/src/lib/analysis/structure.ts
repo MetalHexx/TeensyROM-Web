@@ -9,6 +9,7 @@ export interface StructureResult {
   readonly matrix: Float32Array; // blockCount * blockCount, 0..1 similarity
   readonly sectionBoundaries: readonly number[]; // frame numbers
   readonly loopFrame: number | null; // frame-refined; null = no repeat found
+  readonly loopConfidence: 'strong' | 'weak' | 'none'; // 'none' whenever loopFrame is null
 }
 
 /** A ceiling-length scan is roughly 15,000 frames; comparing every frame against every other is
@@ -46,15 +47,22 @@ export function computeStructure(matrix: FeatureMatrix, weights: FeatureWeights)
   const maxDistance = sumOf(dimensionWeights);
 
   if (blockCount === 0) {
-    return { blockCount: 0, blockFrames: 0, matrix: new Float32Array(0), sectionBoundaries: [], loopFrame: null };
+    return {
+      blockCount: 0,
+      blockFrames: 0,
+      matrix: new Float32Array(0),
+      sectionBoundaries: [],
+      loopFrame: null,
+      loopConfidence: 'none',
+    };
   }
 
   const blockMatrix = buildBlockMatrix(matrix, blockCount, blockFrames);
   const similarity = buildSimilarityMatrix(blockMatrix, blockCount, dimensionWeights, maxDistance);
   const sectionBoundaries = computeSectionBoundaries(similarity, blockCount, blockFrames);
-  const loopFrame = findLoopFrame(similarity, matrix, blockCount, blockFrames, dimensionWeights);
+  const { loopFrame, loopConfidence } = findLoopFrame(similarity, matrix, blockCount, blockFrames, dimensionWeights);
 
-  return { blockCount, blockFrames, matrix: similarity, sectionBoundaries, loopFrame };
+  return { blockCount, blockFrames, matrix: similarity, sectionBoundaries, loopFrame, loopConfidence };
 }
 
 /** Aggregates however many frames were scanned into a fixed number of blocks — the aggregation that
@@ -145,11 +153,20 @@ function longestRunAtOffset(
   return { length: longest, start: longestStart };
 }
 
+interface LoopSearchResult {
+  readonly loopFrame: number | null;
+  readonly loopConfidence: 'strong' | 'weak' | 'none';
+}
+
 /**
  * The coarse-then-refine search the loop point comes from. The block comparison finds the smallest
  * offset at which the block sequence starts matching itself over a sustained run; that offset is only
  * accurate to `blockFrames`, so refinement then scans every individual frame offset within one block
  * width of it and takes whichever compares closest — a few hundred comparisons, not thousands.
+ *
+ * Confidence rides along with the frame rather than a second search pass: it reads off the same
+ * sustained run that produced the accepted offset — `strong` once that run clears twice the sustained
+ * guard, `weak` once it merely clears the guard itself.
  */
 function findLoopFrame(
   similarity: Float32Array,
@@ -157,7 +174,7 @@ function findLoopFrame(
   blockCount: number,
   blockFrames: number,
   dimensionWeights: Float64Array
-): number | null {
+): LoopSearchResult {
   for (let offsetBlocks = 1; offsetBlocks < blockCount; offsetBlocks++) {
     const run = longestRunAtOffset(similarity, blockCount, offsetBlocks, LOOP_SIMILARITY_THRESHOLD);
     if (run.length < MIN_SUSTAINED_RUN_BLOCKS) {
@@ -166,10 +183,11 @@ function findLoopFrame(
     const anchorFrame = run.start * blockFrames;
     const refined = refineLoopOffset(matrix, anchorFrame, offsetBlocks * blockFrames, blockFrames, dimensionWeights);
     if (refined !== null) {
-      return refined;
+      const loopConfidence = run.length >= 2 * MIN_SUSTAINED_RUN_BLOCKS ? 'strong' : 'weak';
+      return { loopFrame: refined, loopConfidence };
     }
   }
-  return null;
+  return { loopFrame: null, loopConfidence: 'none' };
 }
 
 /** Picks the frame offset with the smallest weighted distance within `±blockFrames` of the coarse
