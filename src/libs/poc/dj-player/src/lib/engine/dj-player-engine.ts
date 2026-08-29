@@ -272,6 +272,11 @@ export class DjPlayerEngine implements OnDestroy {
       file.clock === 'ntsc' ? NTSC_FRAME_INTERVAL_US : PAL_FRAME_INTERVAL_US
     );
     this.resetCounters();
+    // The outgoing tune's index record — its measured length and detected loop frame — describes a
+    // file this session no longer holds. Routing through setTuneIndex(null) rather than reaching into
+    // its three targets directly keeps this the same single seam TuneIndexService itself writes
+    // through, so the incoming tune's basis is the fixed ceiling until its own index (if any) arrives.
+    this.setTuneIndex(null);
     // A marker's start holds machine state, not a frame number, so a new tune invalidates every
     // captured snapshot — this is the only path that clears them. Stop, play-from-stopped and
     // subtune changes reuse the same machine and must leave captured markers alone. Whatever was

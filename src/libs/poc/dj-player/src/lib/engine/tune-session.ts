@@ -5,7 +5,7 @@ import { RegisterFrame } from '../asid/register-frame';
 import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '../replay/replay-runner';
-import { clamp, describeError, MICROSECONDS_PER_SECOND } from './engine-utils';
+import { clamp, describeError, MICROSECONDS_PER_SECOND, sanitizePositiveFrame } from './engine-utils';
 
 /** The assumed length the scrub and playhead percentages are measured against — not the tune's real,
  * unmeasured length. A single tunable constant, not derived from anything about the file. */
@@ -124,9 +124,7 @@ export class TuneSession {
    *  number greater than zero is stored as null instead — a zero or negative basis would divide the
    *  playhead by nothing — which makes `positionBasisFrames` fall back to `ceilingFrames`. */
   setIndexedLengthFrames(frames: number | null): void {
-    this._indexedLengthFrames.set(
-      frames !== null && Number.isFinite(frames) && frames > 0 ? frames : null
-    );
+    this._indexedLengthFrames.set(sanitizePositiveFrame(frames));
   }
 
   /** Re-inits the machine and marks every register dirty, so the chip cannot inherit the old state. */

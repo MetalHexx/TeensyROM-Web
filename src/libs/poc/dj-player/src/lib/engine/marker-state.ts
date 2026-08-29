@@ -4,7 +4,7 @@ import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import { C64Machine, FrameResult, MachineSnapshot } from '../cpu/c64-machine';
 import { RegisterFrame } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
-import { clamp, describeError } from './engine-utils';
+import { clamp, describeError, sanitizePositiveFrame } from './engine-utils';
 
 /** The nudge window in real time. Frames are derived from the tune's rate so the felt range is
  *  the same on a 1x tune and a 2x-multispeed one. */
@@ -204,7 +204,7 @@ export class MarkerState {
    * to withhold the loop. See `DjPlayerEngine.setTuneIndex`.
    */
   setTuneLoop(frame: number | null): void {
-    const valid = typeof frame === 'number' && Number.isFinite(frame) && frame > 0 ? frame : null;
+    const valid = sanitizePositiveFrame(frame);
     this.tuneLoopFrame.set(valid);
     this.tuneLoopArmed.set(valid !== null);
   }

@@ -2786,5 +2786,18 @@ describe('DjPlayerEngine', () => {
         6
       );
     });
+
+    it('reverts to the fixed ceiling and drops the detected loop point when a fresh tune replaces the indexed one', () => {
+      engine.loadTune(counterTune());
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 2_500 }));
+      expect(engine.positionBasisFrames()).toBe(2_500);
+      expect(engine.tuneLoopArmed()).toBe(true);
+
+      engine.loadTune(counterTune());
+
+      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
+      expect(engine.tuneLoopArmed()).toBe(false);
+      expect(engine.tuneLoopFrame()).toBeNull();
+    });
   });
 });
