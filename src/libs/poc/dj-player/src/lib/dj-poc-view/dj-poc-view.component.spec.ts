@@ -494,6 +494,33 @@ describe('DjPocViewComponent', () => {
     });
   });
 
+  describe('tune-index hand-off', () => {
+    it('passes the bundled label to the tune-index service on selectTune', () => {
+      const setTune = vi.spyOn(component['tuneIndex'], 'setTune');
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      expect(setTune).toHaveBeenCalledTimes(1);
+      expect(setTune).toHaveBeenCalledWith(engine.loadTune.mock.calls[0][0], 'Auto tune');
+    });
+
+    it("passes the picked file's name to the tune-index service on file pick", async () => {
+      const setTune = vi.spyOn(component['tuneIndex'], 'setTune');
+      // jsdom's File has no working arrayBuffer(); a minimal stand-in is enough since only the
+      // hand-off — not File parsing itself — is under test here.
+      const pickedFile = {
+        name: 'mytune.sid',
+        arrayBuffer: () => Promise.resolve(validSidBytes().buffer),
+      } as unknown as File;
+      const input = { files: [pickedFile], value: '' } as unknown as HTMLInputElement;
+
+      await component.onFilePicked({ target: input } as unknown as Event);
+
+      expect(setTune).toHaveBeenCalledTimes(1);
+      expect(setTune).toHaveBeenCalledWith(engine.loadTune.mock.calls[0][0], 'mytune.sid');
+    });
+  });
+
   describe('voice mute toggles', () => {
     it('calls engine.setVoiceMuted with the voice index and the checkbox state', () => {
       const checkbox = fixture.nativeElement.querySelector(

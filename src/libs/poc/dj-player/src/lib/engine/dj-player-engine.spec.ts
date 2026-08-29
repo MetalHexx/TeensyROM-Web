@@ -9,6 +9,8 @@ import {
   PAL_FRAME_INTERVAL_US,
 } from '../asid/asid-constants';
 import { MidiOutputService } from '../midi/midi-output.service';
+import { TUNE_INDEX_FORMAT_VERSION } from '../analysis/tune-index.model';
+import type { TuneIndexRecord } from '../analysis/tune-index.model';
 import type { SidClock, SidFile, SidModel } from '../sid/sid-file.model';
 import type { FrameClock, FrameClockStats } from '../clock/frame-clock';
 import { C64Machine } from '../cpu/c64-machine';
@@ -372,6 +374,32 @@ function voiceGateValues(packet: SentPacket): number[] {
   return [22, 23, 24].map((slot) => slotValue(packet, slot));
 }
 
+/** A minimal, otherwise-unused record — only its identity as an object matters to the round-trip
+ *  test below. */
+function fakeTuneIndexRecord(): TuneIndexRecord {
+  return {
+    filename: 'Test.sid',
+    subtune: 1,
+    nativeLengthSeconds: null,
+    loopFrame: null,
+    structureConfidence: 'none',
+    sectionBoundaries: [],
+    tonic: null,
+    mode: null,
+    camelot: null,
+    tuningReferenceHz: null,
+    tuningCents: null,
+    keyConfidence: 'none',
+    scalePitchClasses: [],
+    dominantIntervalFrames: null,
+    pulseConfidence: 'none',
+    nativeTempo: null,
+    callsPerFrame: 1,
+    formatVersion: TUNE_INDEX_FORMAT_VERSION,
+    computedAt: '2026-08-29T00:00:00.000Z',
+  };
+}
+
 describe('DjPlayerEngine', () => {
   let engine: DjPlayerEngine;
   let clock: FakeFrameClock;
@@ -466,6 +494,17 @@ describe('DjPlayerEngine', () => {
     engine.loadTune(silentTune());
 
     expect(engine.mutedVoices()).toEqual([false, false, false]);
+  });
+
+  it('tuneIndex reflects whatever setTuneIndex was last given, including a reset to null', () => {
+    const record = fakeTuneIndexRecord();
+    expect(engine.tuneIndex()).toBeNull();
+
+    engine.setTuneIndex(record);
+    expect(engine.tuneIndex()).toBe(record);
+
+    engine.setTuneIndex(null);
+    expect(engine.tuneIndex()).toBeNull();
   });
 
   describe('momentary voice hold', () => {
