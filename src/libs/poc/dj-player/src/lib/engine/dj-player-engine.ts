@@ -23,6 +23,7 @@ import { RegisterFrame } from '../asid/register-frame';
 import type { FrameSnapshot } from '../asid/register-frame';
 import type { FrameResult } from '../cpu/c64-machine';
 import type { SidFile } from '../sid/sid-file.model';
+import type { TuneIndexRecord } from '../analysis/tune-index.model';
 import { MidiOutputService } from '../midi/midi-output.service';
 import type { FrameClock } from '../clock/frame-clock';
 import { REPLAY_RUNNER } from '../replay/replay-runner';
@@ -228,6 +229,11 @@ export class DjPlayerEngine implements OnDestroy {
   readonly markerLaunchPending = signal<boolean>(false);
   readonly nudgeRangeFrames = this.markerState.nudgeRangeFrames;
   readonly ceilingFrames = this.tuneSession.ceilingFrames;
+
+  private readonly _tuneIndex = signal<TuneIndexRecord | null>(null);
+  /** The current tune's cached or freshly scanned index record, published by `TuneIndexService`.
+   *  Stored here and left inert until P02 wires it into transport. */
+  readonly tuneIndex: Signal<TuneIndexRecord | null> = this._tuneIndex.asReadonly();
 
   /** Current playback position as a percentage of the ceiling, for the playhead. Clamped to 0–100
    * because JUMP_CEILING_SECONDS is a fixed fiction, not the tune's real length — past ~5 PAL minutes
@@ -516,6 +522,12 @@ export class DjPlayerEngine implements OnDestroy {
   /** Delegates to `DeliveryTransport` — see its own doc for the clamp/enforcement split. */
   setScheduleAhead(ms: number): void {
     this.delivery.setScheduleAhead(ms);
+  }
+
+  /** Stores the current tune's index record — or clears it — as published by `TuneIndexService`.
+   *  P02 adds the transport wiring that reads it back. */
+  setTuneIndex(record: TuneIndexRecord | null): void {
+    this._tuneIndex.set(record);
   }
 
   addMarker(): number {

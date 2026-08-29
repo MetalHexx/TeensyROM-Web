@@ -15,6 +15,10 @@ import {
   SPEED_INPUT_SPAN,
 } from '../engine/dj-player-engine';
 import { TrackAnalysisPanelComponent } from '../analysis/track-analysis-panel/track-analysis-panel.component';
+import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
+import { WorkerAnalysisScanner } from '../analysis/worker-analysis-scanner';
+import { TUNE_INDEX_STORAGE, LocalStorageTuneIndexStorage } from '../analysis/tune-index-storage';
+import { TuneIndexService } from '../analysis/tune-index.service';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
 interface TuneSource {
@@ -64,6 +68,12 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
     DjPlayerEngine,
     { provide: FRAME_CLOCK, useFactory: () => new ScriptProcessorFrameClock() },
     { provide: REPLAY_RUNNER, useFactory: () => new WorkerReplayRunner() },
+    TuneIndexService,
+    { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
+    // Its own worker thread, deliberately separate from TrackAnalysisPanelComponent's own
+    // ANALYSIS_SCANNER provider (which wins for that subtree): the panel's on-demand scan and this
+    // service's automatic one must never contend for the same thread.
+    { provide: ANALYSIS_SCANNER, useFactory: () => new WorkerAnalysisScanner() },
   ],
 })
 export class DjPocViewComponent {
@@ -86,6 +96,7 @@ export class DjPocViewComponent {
   );
 
   private readonly engine = inject(DjPlayerEngine);
+  private readonly tuneIndex = inject(TuneIndexService);
   protected readonly engineState = this.engine.state;
   protected readonly engineError = this.engine.lastError;
   protected readonly engineStats = this.engine.stats;
@@ -209,7 +220,7 @@ export class DjPocViewComponent {
 
   selectTune(source: TuneSource): void {
     try {
-      this.loadTune(parseSidFile(source.getBytes()));
+      this.loadTune(parseSidFile(source.getBytes()), source.label);
     } catch (error) {
       this.currentTune.set(null);
       this.tuneError.set(describeParseError(error));
@@ -234,7 +245,7 @@ export class DjPocViewComponent {
         getBytes: () => bytes,
       };
       this.diskSources.update((sources) => [...sources, source]);
-      this.loadTune(parsed);
+      this.loadTune(parsed, file.name);
     } catch (error) {
       this.currentTune.set(null);
       this.tuneError.set(describeParseError(error));
@@ -499,10 +510,13 @@ export class DjPocViewComponent {
     return (MICROSECONDS_PER_SECOND / intervalUs).toFixed(3);
   }
 
-  private loadTune(file: SidFile): void {
+  private loadTune(file: SidFile, filename: string): void {
     this.currentTune.set(file);
     this.tuneError.set(null);
     this.engine.loadTune(file);
+    // Called after loadTune, so the tune-index effect reads the subtune the load has already
+    // settled on.
+    this.tuneIndex.setTune(file, filename);
     // play() already no-ops into the engine's "no MIDI output port selected" error path when no
     // port is chosen, so no separate guard is needed here.
     void this.engine.play();

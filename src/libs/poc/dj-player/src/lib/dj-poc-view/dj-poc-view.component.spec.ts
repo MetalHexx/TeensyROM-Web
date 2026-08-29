@@ -11,6 +11,11 @@ import {
 } from '../engine/dj-player-engine';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
+import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
+import type { AnalysisScanner, ScanResult } from '../analysis/scan-runner';
+import { TUNE_INDEX_STORAGE } from '../analysis/tune-index-storage';
+import type { ITuneIndexStorage } from '../analysis/tune-index-storage';
+import { TuneIndexService } from '../analysis/tune-index.service';
 
 const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
@@ -64,6 +69,8 @@ interface MockDjPlayerEngine {
   progressPercentFor: ReturnType<typeof vi.fn>;
   positionPercent: WritableSignal<number>;
   nudgeRangeFrames: WritableSignal<number>;
+  ceilingFrames: WritableSignal<number>;
+  setTuneIndex: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -126,6 +133,8 @@ function makeEngine(): MockDjPlayerEngine {
     progressPercentFor: vi.fn(() => 0),
     positionPercent: signal(0),
     nudgeRangeFrames: signal(50),
+    ceilingFrames: signal(10_000),
+    setTuneIndex: vi.fn(),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
@@ -155,6 +164,17 @@ function makeEngine(): MockDjPlayerEngine {
     deleteMarker: vi.fn(),
     scrubTo: vi.fn(),
   };
+}
+
+/** A cache that never holds a record and swallows every save — `TuneIndexService` is wired up here
+ *  only so its DI graph resolves; nothing under this suite asserts on the index it produces. */
+function makeTuneIndexStorage(): ITuneIndexStorage {
+  return { load: vi.fn(() => null), save: vi.fn() };
+}
+
+/** A scan that never resolves — safe for a suite that never flushes far enough to await it. */
+function makeAnalysisScanner(): AnalysisScanner {
+  return { scan: vi.fn(() => new Promise<ScanResult>(() => undefined)), dispose: vi.fn() };
 }
 
 const PSID_HEADER_SIZE = 0x7c;
@@ -243,6 +263,9 @@ describe('DjPocViewComponent', () => {
           providers: [
             { provide: MidiOutputService, useValue: midi as unknown as MidiOutputService },
             { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+            TuneIndexService,
+            { provide: TUNE_INDEX_STORAGE, useValue: makeTuneIndexStorage() },
+            { provide: ANALYSIS_SCANNER, useValue: makeAnalysisScanner() },
           ],
         },
       })
