@@ -306,6 +306,32 @@ function keyLabel(key: KeyResult | null): string {
   return name === null || key.camelot === null ? 'no clear key' : `${name} · ${key.camelot}`;
 }
 
+/** 'C major · 8B · +3.2 cents', appending the sounding tuning's deviation beside the label exactly as
+ *  the live-scan path does — the single formatting rule both `keySoundingLabel` branches share. */
+function soundingKeyLabel(sounding: KeyResult | null): string {
+  if (sounding === null || sounding.tuning === null) return keyLabel(sounding);
+  return `${keyLabel(sounding)} · ${formatCents(sounding.tuning.cents)}`;
+}
+
+/** Rebuilds the `KeyResult` shape `soundingKey()` expects from a cached record's own fields, so the
+ *  cached-record fallback can share the exact same native-to-sounding transposition the live path
+ *  uses. Chroma is a zero-filled placeholder: `soundingKey()` only reads it to build a rotated chroma,
+ *  and nothing in the label path ever looks at that rotated chroma. */
+function keyResultFromRecord(record: TuneIndexRecord): KeyResult {
+  return {
+    chroma: new Float32Array(PITCH_CLASS_NAMES.length),
+    tonic: record.tonic,
+    mode: record.mode,
+    camelot: record.camelot,
+    confidence: record.keyConfidence,
+    tuning:
+      record.tuningReferenceHz === null || record.tuningCents === null
+        ? null
+        : { referenceHz: record.tuningReferenceHz, cents: record.tuningCents },
+    scalePitchClasses: record.scalePitchClasses,
+  };
+}
+
 /** Paints the similarity matrix as one pixel per block — origin top-left, so the main diagonal runs
  *  from the canvas's own corner — then overlays section boundaries as faint grid lines. A canvas
  *  rather than SVG nodes: at up to 256×256 cells, one rect per cell would blow the DOM-node budget
@@ -863,16 +889,22 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   });
 
   protected readonly pulseSoundingTempoLabel = computed<string>(() => {
-    const pulse = this.pulseResult();
     const scan = this.scanOutput();
-    if (pulse === null || pulse.dominantInterval === null || scan === null) return '—';
-    const { sounding } = impliedTempo(
-      pulse.dominantInterval,
-      this.engine.nominalIntervalUs(),
-      scan.callsPerFrame,
-      this.engine.speedMultiplier()
-    );
-    return sounding === null ? '—' : sounding.toFixed(1);
+    if (scan !== null) {
+      const pulse = this.pulseResult();
+      if (pulse === null || pulse.dominantInterval === null) return '—';
+      const { sounding } = impliedTempo(
+        pulse.dominantInterval,
+        this.engine.nominalIntervalUs(),
+        scan.callsPerFrame,
+        this.engine.speedMultiplier()
+      );
+      return sounding === null ? '—' : sounding.toFixed(1);
+    }
+    const record = this.cachedRecord();
+    return record === null || record.nativeTempo === null
+      ? '—'
+      : (record.nativeTempo * this.engine.speedMultiplier()).toFixed(1);
   });
 
   protected readonly pulseConfidenceLabel = computed<string>(() => {
@@ -885,7 +917,9 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   });
 
   /** The key a pitched deck is actually sounding in. Reported beside the native key exactly as the
-   *  tempo readout reports both figures — a deck at +6% is sounding roughly a semitone up. */
+   *  tempo readout reports both figures — a deck at +6% is sounding roughly a semitone up. Live-scan
+   *  only: the cached-record fallback in `keySoundingLabel` builds its own transposed key rather than
+   *  routing through this signal, since it has no live `keyResult()` to transpose. */
   protected readonly soundingKeyResult = computed<KeyResult | null>(() => {
     const key = this.keyResult();
     return key === null ? null : soundingKey(key, this.engine.speedMultiplier());
@@ -901,9 +935,12 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   });
 
   protected readonly keySoundingLabel = computed<string>(() => {
-    const sounding = this.soundingKeyResult();
-    if (sounding === null || sounding.tuning === null) return keyLabel(sounding);
-    return `${keyLabel(sounding)} · ${formatCents(sounding.tuning.cents)}`;
+    if (this.scanOutput() !== null) {
+      return soundingKeyLabel(this.soundingKeyResult());
+    }
+    const record = this.cachedRecord();
+    if (record === null) return '—';
+    return soundingKeyLabel(soundingKey(keyResultFromRecord(record), this.engine.speedMultiplier()));
   });
 
   protected readonly keyConfidenceLabel = computed<string>(() => {

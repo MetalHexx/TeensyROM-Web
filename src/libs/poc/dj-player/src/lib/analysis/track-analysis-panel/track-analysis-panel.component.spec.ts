@@ -487,10 +487,12 @@ describe('TrackAnalysisPanelComponent', () => {
 
   it('reads a structure, pulse and key row from a cached index record while no scan has run', () => {
     expand();
+    engine.speedMultiplier.set(1.06);
     tuneIndex.record.set(
       fakeTuneIndexRecord({
         nativeLengthSeconds: 130.4,
         dominantIntervalFrames: 24,
+        nativeTempo: 120,
         tonic: 2,
         mode: 'minor',
         camelot: '5A',
@@ -506,6 +508,8 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(readoutValue('Pulse interval')).toBe(`${(24).toLocaleString()} frames`);
     expect(readoutValue('Key (native)')).toContain('D minor');
     expect(readoutValue('Key (native)')).toContain('5A');
+    expect(readoutValue('Tempo (sounding)')).toBe(`${(120 * 1.06).toFixed(1)} BPM`);
+    expect(readoutValue('Key (sounding)')).toContain('D# minor');
   });
 
   it('prefers a completed live scan over a cached index record describing the same tune', async () => {
