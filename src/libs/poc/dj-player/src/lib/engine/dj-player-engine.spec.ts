@@ -2048,6 +2048,124 @@ describe('DjPlayerEngine', () => {
     });
   });
 
+  describe('the whole-tune loop, and a manual scrub that always wins', () => {
+    /** `counterTune` stores its play-call count into $D400, so slot 0 of a resync packet names the
+     * frame whatever was restored actually came from. */
+    const COUNTER_SLOT = 0;
+
+    /** SysEx data bytes carry seven bits, so the counter reads back modulo 128. */
+    function counterAt(frame: number): number {
+      return frame % 128;
+    }
+
+    async function playTo(frames: number): Promise<void> {
+      engine.loadTune(counterTune());
+      await engine.play();
+      clock.tick(frames);
+    }
+
+    it('re-enters at the tune start once the detected loop frame is reached, and loops again a lap later', async () => {
+      await playTo(0);
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 20 }));
+
+      clock.tick(20); // reaches the loop point, queuing a restore
+      clock.tick(2); // gate-off, then the resync — drains the queued pair and publishes stats
+
+      expect(engine.stats().framesRendered).toBe(0);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(0));
+      expect(engine.tuneLoopArmed()).toBe(true); // an indefinite loop, not a one-shot
+
+      clock.tick(20); // a lap later, crosses the same point again
+      clock.tick(2);
+
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+
+    it('leaves an unarmed loop untouched, running straight past the frame that would otherwise trigger it', async () => {
+      await playTo(0);
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: null }));
+
+      clock.tick(25);
+
+      expect(engine.tuneLoopArmed()).toBe(false);
+      expect(engine.stats().framesRendered).toBe(25);
+    });
+
+    it('a manual scrub always wins: it stops a running marker loop, which then never pulls playback back', async () => {
+      await playTo(10);
+      engine.addMarker(); // start frame 10
+      clock.tick(10); // frame 20
+      engine.setMarkerEnd(0); // end frame 20
+      await engine.triggerMarker(0);
+      clock.tick(2); // drains the trigger's gate-off/resync
+      expect(engine.loopingMarker()).toBe(0);
+
+      await engine.scrubTo(50);
+      clock.tick(2); // drains the scrub's gate-off/resync while still playing
+
+      expect(engine.loopingMarker()).toBeNull();
+      const afterScrub = engine.stats().framesRendered;
+      expect(afterScrub).toBeGreaterThan(20); // well clear of the marker's out-frame
+
+      clock.tick(30); // drives well past the marker's former out-frame at 20
+
+      expect(engine.stats().framesRendered).toBeGreaterThan(afterScrub); // never pulled back
+      expect(engine.loopingMarker()).toBeNull();
+    });
+
+    it('a manual scrub disarms an armed whole-tune loop, and it does not re-fire on its own', async () => {
+      await playTo(0);
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 20 }));
+      expect(engine.tuneLoopArmed()).toBe(true);
+
+      await engine.scrubTo(100); // lands exactly on the detected loop frame
+      clock.tick(2); // drains the scrub's gate-off/resync while still playing
+
+      expect(engine.tuneLoopArmed()).toBe(false);
+      expect(engine.stats().framesRendered).toBe(20);
+
+      clock.tick(5); // past the frame that would otherwise have re-triggered the loop
+
+      expect(engine.tuneLoopArmed()).toBe(false);
+      // Climbs on rather than snapping back to 0 — a still-armed loop would have restored here.
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(25));
+    });
+
+    it('an audition click in the Track Analysis panel shares scrubTo, so it inherits the same override', async () => {
+      await playTo(10);
+      engine.addMarker();
+      clock.tick(10);
+      engine.setMarkerEnd(0);
+      await engine.triggerMarker(0);
+      clock.tick(2);
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 20 }));
+
+      await engine.scrubTo(50); // the audition click's own call site
+
+      expect(engine.loopingMarker()).toBeNull();
+      expect(engine.tuneLoopArmed()).toBe(false);
+    });
+
+    it('armTuneLoop(true) re-arms after a scrub, against the still-known loop frame, and it fires again', async () => {
+      await playTo(0);
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 20 }));
+      clock.tick(5);
+      await engine.scrubTo(0); // disengages — the point survives, only the arm drops
+      clock.tick(2); // drains the scrub's gate-off/resync while still playing
+      expect(engine.tuneLoopArmed()).toBe(false);
+      expect(engine.tuneLoopFrame()).toBe(20);
+      expect(engine.stats().framesRendered).toBe(0);
+
+      engine.armTuneLoop(true);
+      expect(engine.tuneLoopArmed()).toBe(true);
+
+      clock.tick(20); // crosses frame 20 again, now re-armed
+      clock.tick(2); // drains the loop's own gate-off/resync
+
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+  });
+
   describe('appending and deleting markers', () => {
     async function playTo(frames: number): Promise<void> {
       engine.loadTune(counterTune());

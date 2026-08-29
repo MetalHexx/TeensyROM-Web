@@ -139,6 +139,10 @@ export class MarkerState {
   readonly loopingMarker: WritableSignal<number | null> = signal(null);
   /** The marker that takes over when the looping one finishes its lap, or null. */
   readonly queuedMarker: WritableSignal<number | null> = signal(null);
+  /** The detected loop point, in rendered frames; null when the detector found none. */
+  readonly tuneLoopFrame: WritableSignal<number | null> = signal(null);
+  /** Whether the whole-tune loop is currently allowed to fire. */
+  readonly tuneLoopArmed: WritableSignal<boolean> = signal(false);
 
   /**
    * The nudge range in frames for the loaded tune.
@@ -189,6 +193,25 @@ export class MarkerState {
   clear(): void {
     this.markers.set([]);
     this.stopLoop();
+  }
+
+  /**
+   * Sets the detected whole-tune loop point and arms the loop when one exists; a null point (or
+   * anything that is not a finite number greater than zero) disarms it instead.
+   *
+   * Gates on the frame alone, never on `structureConfidence` — the detector has already applied its
+   * own bar before returning a point, and a `'weak'` label is reported for the operator, not a reason
+   * to withhold the loop. See `DjPlayerEngine.setTuneIndex`.
+   */
+  setTuneLoop(frame: number | null): void {
+    const valid = typeof frame === 'number' && Number.isFinite(frame) && frame > 0 ? frame : null;
+    this.tuneLoopFrame.set(valid);
+    this.tuneLoopArmed.set(valid !== null);
+  }
+
+  /** The operator's explicit re-arm after a scrub disengaged it. */
+  setTuneLoopArmed(armed: boolean): void {
+    this.tuneLoopArmed.set(armed);
   }
 
   /** Drops the anchor ring — its entries describe a machine that no longer exists, at frame numbers
@@ -457,13 +480,25 @@ export class MarkerState {
   }
 
   /**
-   * Drops out of the loop at once, leaving playback running on linearly from wherever it is, and
-   * forgets anything queued behind it.
+   * The get-out: drops every loop kind, marker and whole-tune alike. The operator's Stop Loop
+   * button, and a manual scrub — see `DjPlayerEngine.scrubTo`.
    *
    * Deliberately immediate where a trigger waits for the lap: stopping is a get-out, not a musical
-   * transition.
+   * transition. `tuneLoopFrame` survives this: the detected point is still true, only the operator's
+   * permission to act on it is withdrawn.
    */
   stopLoop(): void {
+    this.stopMarkerLoop();
+    this.tuneLoopArmed.set(false);
+  }
+
+  /**
+   * Drops only the marker loop and whatever was queued behind it, leaving the whole-tune loop's arm
+   * state untouched — what `advanceLoop` reaches for when the marker loop notices its own state has
+   * gone incoherent mid-lap. Not the operator getting out, so it must not disarm an independent
+   * whole-tune loop; see `stopLoop` for that get-out.
+   */
+  private stopMarkerLoop(): void {
     this.loopingMarker.set(null);
     this.queuedMarker.set(null);
   }
@@ -530,16 +565,20 @@ export class MarkerState {
    * nudge has crossed its ends (or its end was dropped), or re-enters/switches once the end is
    * reached. Returns whether a restore was just queued — the tick loop must not publish stats twice
    * on that tick, since the resync it queued goes out on the next one.
+   *
+   * The whole-tune loop is only ever reached when no marker is looping, so the two kinds can never
+   * fire on the same tick.
    */
   advanceLoop(framesRendered: number): boolean {
     const active = this.loopingMarker();
-    if (active === null) return false;
+    if (active === null) return this.advanceTuneLoop(framesRendered);
 
     const loop = this.resolveLoop(this.markers()[active]);
     if (loop === null) {
       // Ends nudged until they crossed (or an end dropped mid-lap) describe no pass — drop out
-      // rather than re-enter every tick.
-      this.stopLoop();
+      // rather than re-enter every tick. The marker loop noticing its own state is incoherent, not
+      // the operator getting out, so an independent whole-tune loop must survive this.
+      this.stopMarkerLoop();
       return false;
     }
     if (framesRendered < loop.outFrame) return false;
@@ -551,8 +590,33 @@ export class MarkerState {
     } else if (!this.engageMarker(queued)) {
       // The lap the trigger waited for is over, but the queued marker lost its start (or its end
       // was nudged across it) while it waited — nothing to switch to, so drop out.
-      this.stopLoop();
+      this.stopMarkerLoop();
     }
+    return true;
+  }
+
+  /**
+   * The whole-tune loop's own advance, reached only when no marker is looping: re-enters at the
+   * tune's start once the detected loop point is passed, indefinitely, as long as the loop is armed.
+   *
+   * Restores `anchorRing[0]` — the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor`
+   * never evicts — through the same `MarkerHost.restoreState` primitive a marker restores through,
+   * with `frameNumber: 0`. No second re-entry path, and no snapshot of its own: resetting the
+   * rendered-frame count to 0 is what makes the scrubber visibly snap back rather than the audio
+   * looping while the position bar keeps climbing off the end.
+   */
+  private advanceTuneLoop(framesRendered: number): boolean {
+    if (!this.tuneLoopArmed()) return false;
+    const loopFrame = this.tuneLoopFrame();
+    if (loopFrame === null) return false;
+    if (framesRendered < loopFrame) return false;
+
+    const seed = this.anchorRing[0] ?? null;
+    if (seed === null) {
+      this.tuneLoopArmed.set(false);
+      return false;
+    }
+    this.host.restoreState(seed.machine, seed.registers, 0);
     return true;
   }
 

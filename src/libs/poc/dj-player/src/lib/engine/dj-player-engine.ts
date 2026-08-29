@@ -224,6 +224,8 @@ export class DjPlayerEngine implements OnDestroy {
   readonly markers = this.markerState.markers;
   readonly loopingMarker = this.markerState.loopingMarker;
   readonly queuedMarker = this.markerState.queuedMarker;
+  readonly tuneLoopFrame = this.markerState.tuneLoopFrame;
+  readonly tuneLoopArmed = this.markerState.tuneLoopArmed;
   /** True for the span of `triggerMarker`'s `play()` await — see `triggerMarker` for why the view
    *  must gate trigger/delete on this rather than trust the index across that gap. */
   readonly markerLaunchPending = signal<boolean>(false);
@@ -540,6 +542,7 @@ export class DjPlayerEngine implements OnDestroy {
   setTuneIndex(record: TuneIndexRecord | null): void {
     this._tuneIndex.set(record);
     this.tuneSession.setIndexedLengthFrames(record?.loopFrame ?? null);
+    this.markerState.setTuneLoop(record?.loopFrame ?? null);
   }
 
   addMarker(): number {
@@ -614,6 +617,12 @@ export class DjPlayerEngine implements OnDestroy {
     this.markerState.stopLoop();
   }
 
+  /** The rail panel's whole-tune loop toggle — arms or disarms against the still-known
+   *  `tuneLoopFrame()`, with no re-scan. */
+  armTuneLoop(armed: boolean): void {
+    this.markerState.setTuneLoopArmed(armed);
+  }
+
   clearMarker(index: number): void {
     this.markerState.clearMarker(index);
   }
@@ -630,8 +639,14 @@ export class DjPlayerEngine implements OnDestroy {
    * Asks for `percent` of the jump ceiling — see `TuneSession.scrubTo`. The returned promise
    * resolves once the request has settled — landed, failed, or been superseded/discarded — so a
    * caller that needs to know when the jump is done (rather than merely requested) can await it.
+   *
+   * Drops every active loop first — a manual scrub always wins over a marker or whole-tune loop that
+   * would otherwise drag playback back to wherever it was looping. Nothing re-arms on its own after
+   * this; the operator re-arms explicitly. The Track Analysis panel's click-to-audition routes
+   * through here too, so it inherits the same rule with no separate call site.
    */
   scrubTo(percent: number): Promise<void> {
+    this.markerState.stopLoop();
     return this.tuneSession.scrubTo(percent);
   }
 

@@ -561,4 +561,117 @@ describe('MarkerState', () => {
       expect(markerState.loopingMarker()).toBeNull();
     });
   });
+
+  describe('the whole-tune loop', () => {
+    it('re-enters at the frame-0 seed once the detected point is reached, and does so again a lap later', () => {
+      markerState.setTuneLoop(1000);
+      expect(markerState.tuneLoopArmed()).toBe(true);
+
+      const wrapped = markerState.advanceLoop(1000);
+
+      expect(wrapped).toBe(true);
+      expect(harness.restores).toHaveLength(1);
+      // Through MarkerHost.restoreState, exactly like a marker's re-entry — not a private field, and
+      // not a second resync of its own.
+      expect(harness.restores[0].frame).toBe(0);
+      expect(harness.resyncCount).toBe(1);
+
+      const wrappedAgain = markerState.advanceLoop(1000);
+
+      expect(wrappedAgain).toBe(true);
+      expect(harness.restores).toHaveLength(2);
+      expect(harness.restores[1].frame).toBe(0);
+    });
+
+    it('does not fire while disarmed, even past the detected point', () => {
+      markerState.setTuneLoop(1000);
+      markerState.setTuneLoopArmed(false);
+
+      const wrapped = markerState.advanceLoop(1000);
+
+      expect(wrapped).toBe(false);
+      expect(harness.restores).toHaveLength(0);
+    });
+
+    it('does not fire with no detected loop point', () => {
+      markerState.setTuneLoop(null);
+
+      const wrapped = markerState.advanceLoop(1_000_000);
+
+      expect(wrapped).toBe(false);
+      expect(harness.restores).toHaveLength(0);
+    });
+
+    it('treats a zero, negative or non-finite frame as null, disarming rather than throwing', () => {
+      markerState.setTuneLoop(1000);
+      expect(markerState.tuneLoopArmed()).toBe(true);
+
+      markerState.setTuneLoop(0);
+      expect(markerState.tuneLoopFrame()).toBeNull();
+      expect(markerState.tuneLoopArmed()).toBe(false);
+
+      markerState.setTuneLoop(-5);
+      expect(markerState.tuneLoopFrame()).toBeNull();
+
+      markerState.setTuneLoop(Number.NaN);
+      expect(markerState.tuneLoopFrame()).toBeNull();
+    });
+
+    it('a marker loop and the whole-tune loop never both fire on one tick — the marker wins', () => {
+      markerState.addMarker(); // a filler row, start frame 0
+      harness.tickBy(5);
+      const index = markerState.addMarker(); // start frame 5
+      harness.tickBy(5); // now at frame 10
+      markerState.setMarkerEnd(index); // end frame 10
+      markerState.triggerMarker(index); // engages, restoring to frame 5
+      markerState.setTuneLoop(10); // armed against the same out-frame as the marker's end
+      const restoresBeforeWrap = harness.restores.length;
+
+      const wrapped = markerState.advanceLoop(10);
+
+      expect(wrapped).toBe(true);
+      expect(harness.restores).toHaveLength(restoresBeforeWrap + 1);
+      // The marker's own start, not the whole-tune loop's frame-0 seed — proof only one branch ran.
+      expect(harness.restores.at(-1)?.frame).toBe(5);
+      expect(markerState.loopingMarker()).toBe(index);
+    });
+
+    it('a marker whose ends have been nudged across each other drops its own loop mid-lap, leaving the whole-tune arm untouched', () => {
+      const index = markLoopMarker(10); // start 0, end 10
+      markerState.triggerMarker(index);
+      markerState.setTuneLoop(1000);
+      expect(markerState.tuneLoopArmed()).toBe(true);
+
+      markerState.setMarkerEndOffset(index, -markerState.nudgeRangeFrames()); // crosses the start
+
+      const wrapped = markerState.advanceLoop(10);
+
+      expect(wrapped).toBe(false);
+      expect(markerState.loopingMarker()).toBeNull(); // the marker loop's own get-out
+      expect(markerState.tuneLoopArmed()).toBe(true); // untouched — not the operator getting out
+    });
+
+    it('the public stopLoop() clears both loop kinds, while leaving the detected point in place', () => {
+      const index = markLoopMarker(10);
+      markerState.triggerMarker(index);
+      markerState.setTuneLoop(1000);
+      expect(markerState.loopingMarker()).toBe(index);
+      expect(markerState.tuneLoopArmed()).toBe(true);
+
+      markerState.stopLoop();
+
+      expect(markerState.loopingMarker()).toBeNull();
+      expect(markerState.tuneLoopArmed()).toBe(false);
+      expect(markerState.tuneLoopFrame()).toBe(1000); // still true, only the permission to act is gone
+    });
+
+    it('clear() disarms the whole-tune loop but leaves the detected point in place', () => {
+      markerState.setTuneLoop(1000);
+
+      markerState.clear();
+
+      expect(markerState.tuneLoopArmed()).toBe(false);
+      expect(markerState.tuneLoopFrame()).toBe(1000);
+    });
+  });
 });
