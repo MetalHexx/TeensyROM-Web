@@ -36,6 +36,8 @@ import {
 } from '../key';
 import type { KeyResult } from '../key';
 import { formatCents, formatDuration } from '../format';
+import { TuneIndexService } from '../tune-index.service';
+import type { TuneIndexRecord } from '../tune-index.model';
 
 /** Buckets the whole scanned frame range into this many horizontal columns, regardless of how many
  *  frames were scanned — the aggregation that keeps a tune with tens of thousands of frames from
@@ -363,6 +365,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
   private readonly scanner = inject(ANALYSIS_SCANNER);
   private readonly engine = inject(DjPlayerEngine);
+  private readonly tuneIndexService = inject(TuneIndexService);
 
   protected readonly collapsed = signal<boolean>(true);
 
@@ -441,6 +444,15 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   );
 
   protected readonly hasAnalysis = computed<boolean>(() => this.scanOutput() !== null);
+
+  private readonly cachedRecord = computed<TuneIndexRecord | null>(() =>
+    this.tuneIndexService.record()
+  );
+
+  /** True once either a live scan or a cached index record can back the readout — the signal the
+   *  template uses to show the readout panel independently of the visual lane stack, which only a
+   *  live scan can ever supply. */
+  protected readonly hasCachedRecord = computed<boolean>(() => this.cachedRecord() !== null);
 
   protected readonly effectiveWindow = computed<FrameWindow>(() => {
     const scan = this.scanOutput();
@@ -778,51 +790,76 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   });
 
   protected readonly structureLoopFrameLabel = computed<string>(() => {
-    const structure = this.structureResult();
-    return structure === null || structure.loopFrame === null
-      ? '—'
-      : structure.loopFrame.toLocaleString();
+    if (this.scanOutput() !== null) {
+      const structure = this.structureResult();
+      return structure === null || structure.loopFrame === null
+        ? '—'
+        : structure.loopFrame.toLocaleString();
+    }
+    const record = this.cachedRecord();
+    return record === null || record.loopFrame === null ? '—' : record.loopFrame.toLocaleString();
   });
 
   /** "not determined" rather than falling back to the ceiling or any fixed duration — a tune whose
-   *  agreement never sustains genuinely has no known length. */
+   *  agreement never sustains genuinely has no known length. The record's own `nativeLengthSeconds`
+   *  is used as-is rather than re-derived from its `loopFrame`: it was computed under the interval in
+   *  force at scan time, and re-deriving it under the engine's live `nominalIntervalUs` would report
+   *  a different length after the Timing selector moves. */
   protected readonly structureLengthLabel = computed<string>(() => {
-    const structure = this.structureResult();
     const scan = this.scanOutput();
-    if (structure === null || scan === null || structure.loopFrame === null) {
-      return 'not determined';
+    if (scan !== null) {
+      const structure = this.structureResult();
+      if (structure === null || structure.loopFrame === null) return 'not determined';
+      const seconds = framesToSeconds(
+        structure.loopFrame,
+        this.engine.nominalIntervalUs(),
+        scan.callsPerFrame
+      );
+      return formatDuration(seconds);
     }
-    const seconds = framesToSeconds(
-      structure.loopFrame,
-      this.engine.nominalIntervalUs(),
-      scan.callsPerFrame
-    );
-    return formatDuration(seconds);
+    const record = this.cachedRecord();
+    return record === null || record.nativeLengthSeconds === null
+      ? 'not determined'
+      : formatDuration(record.nativeLengthSeconds);
   });
 
   protected readonly structureSectionsLabel = computed<string>(() => {
-    const structure = this.structureResult();
-    return structure === null ? '—' : structure.sectionBoundaries.length.toLocaleString();
+    if (this.scanOutput() !== null) {
+      const structure = this.structureResult();
+      return structure === null ? '—' : structure.sectionBoundaries.length.toLocaleString();
+    }
+    const record = this.cachedRecord();
+    return record === null ? '—' : record.sectionBoundaries.length.toLocaleString();
   });
 
   protected readonly pulseIntervalLabel = computed<string>(() => {
-    const pulse = this.pulseResult();
-    return pulse === null || pulse.dominantInterval === null
+    if (this.scanOutput() !== null) {
+      const pulse = this.pulseResult();
+      return pulse === null || pulse.dominantInterval === null
+        ? '—'
+        : pulse.dominantInterval.toLocaleString();
+    }
+    const record = this.cachedRecord();
+    return record === null || record.dominantIntervalFrames === null
       ? '—'
-      : pulse.dominantInterval.toLocaleString();
+      : record.dominantIntervalFrames.toLocaleString();
   });
 
   protected readonly pulseNativeTempoLabel = computed<string>(() => {
-    const pulse = this.pulseResult();
     const scan = this.scanOutput();
-    if (pulse === null || pulse.dominantInterval === null || scan === null) return '—';
-    const { native } = impliedTempo(
-      pulse.dominantInterval,
-      this.engine.nominalIntervalUs(),
-      scan.callsPerFrame,
-      1.0
-    );
-    return native === null ? '—' : native.toFixed(1);
+    if (scan !== null) {
+      const pulse = this.pulseResult();
+      if (pulse === null || pulse.dominantInterval === null) return '—';
+      const { native } = impliedTempo(
+        pulse.dominantInterval,
+        this.engine.nominalIntervalUs(),
+        scan.callsPerFrame,
+        1.0
+      );
+      return native === null ? '—' : native.toFixed(1);
+    }
+    const record = this.cachedRecord();
+    return record === null || record.nativeTempo === null ? '—' : record.nativeTempo.toFixed(1);
   });
 
   protected readonly pulseSoundingTempoLabel = computed<string>(() => {
@@ -839,8 +876,12 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   });
 
   protected readonly pulseConfidenceLabel = computed<string>(() => {
-    const pulse = this.pulseResult();
-    return pulse === null ? '—' : pulse.confidence;
+    if (this.scanOutput() !== null) {
+      const pulse = this.pulseResult();
+      return pulse === null ? '—' : pulse.confidence;
+    }
+    const record = this.cachedRecord();
+    return record === null ? '—' : record.pulseConfidence;
   });
 
   /** The key a pitched deck is actually sounding in. Reported beside the native key exactly as the
@@ -850,7 +891,14 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     return key === null ? null : soundingKey(key, this.engine.speedMultiplier());
   });
 
-  protected readonly keyNativeLabel = computed<string>(() => keyLabel(this.keyResult()));
+  protected readonly keyNativeLabel = computed<string>(() => {
+    if (this.scanOutput() !== null) return keyLabel(this.keyResult());
+    const record = this.cachedRecord();
+    if (record === null) return '—';
+    return record.tonic === null || record.mode === null || record.camelot === null
+      ? 'no clear key'
+      : `${PITCH_CLASS_NAMES[record.tonic]} ${record.mode} · ${record.camelot}`;
+  });
 
   protected readonly keySoundingLabel = computed<string>(() => {
     const sounding = this.soundingKeyResult();
@@ -858,16 +906,25 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     return `${keyLabel(sounding)} · ${formatCents(sounding.tuning.cents)}`;
   });
 
-  protected readonly keyConfidenceLabel = computed<string>(
-    () => this.keyResult()?.confidence ?? '—'
-  );
+  protected readonly keyConfidenceLabel = computed<string>(() => {
+    if (this.scanOutput() !== null) return this.keyResult()?.confidence ?? '—';
+    const record = this.cachedRecord();
+    return record === null ? '—' : record.keyConfidence;
+  });
 
   protected readonly keyTuningLabel = computed<string>(() => {
-    const tuning = this.keyResult()?.tuning ?? null;
-    if (this.keyResult() === null) return '—';
-    return tuning === null
+    if (this.scanOutput() !== null) {
+      const tuning = this.keyResult()?.tuning ?? null;
+      if (this.keyResult() === null) return '—';
+      return tuning === null
+        ? 'not recovered'
+        : `${tuning.referenceHz.toFixed(1)} Hz · ${formatCents(tuning.cents)}`;
+    }
+    const record = this.cachedRecord();
+    if (record === null) return '—';
+    return record.tuningReferenceHz === null || record.tuningCents === null
       ? 'not recovered'
-      : `${tuning.referenceHz.toFixed(1)} Hz · ${formatCents(tuning.cents)}`;
+      : `${record.tuningReferenceHz.toFixed(1)} Hz · ${formatCents(record.tuningCents)}`;
   });
 
   /** Surfaced only when the sections disagree, so a tune that never modulates shows one answer

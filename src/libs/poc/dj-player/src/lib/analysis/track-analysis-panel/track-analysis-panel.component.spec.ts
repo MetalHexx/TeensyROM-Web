@@ -10,6 +10,9 @@ import { PRIMARY_SLOT_FOR_REGISTER } from '../../asid/register-frame';
 import { ASID_SLOT_COUNT } from '../../asid/asid-constants';
 import type { SidFile } from '../../sid/sid-file.model';
 import { PAL_CPU_CLOCK_HZ } from '../notes';
+import { TuneIndexService } from '../tune-index.service';
+import type { TuneIndexRecord } from '../tune-index.model';
+import { formatDuration } from '../format';
 
 const BASE_STATS: EngineStats = {
   framesRendered: 0,
@@ -48,6 +51,40 @@ interface StubEngine {
 interface StubScanner {
   scan: ReturnType<typeof vi.fn>;
   dispose: ReturnType<typeof vi.fn>;
+}
+
+interface StubTuneIndexService {
+  record: WritableSignal<TuneIndexRecord | null>;
+  pending: WritableSignal<boolean>;
+}
+
+function makeTuneIndexService(): StubTuneIndexService {
+  return { record: signal<TuneIndexRecord | null>(null), pending: signal(false) };
+}
+
+function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
+  return {
+    filename: 'Test Tune',
+    subtune: 1,
+    nativeLengthSeconds: 125,
+    loopFrame: 6250,
+    structureConfidence: 'strong',
+    sectionBoundaries: [0, 1200, 2400, 3600],
+    tonic: 0,
+    mode: 'major',
+    camelot: '8B',
+    tuningReferenceHz: 440,
+    tuningCents: 3.2,
+    keyConfidence: 'strong',
+    scalePitchClasses: [0, 2, 4, 5, 7, 9, 11],
+    dominantIntervalFrames: 25,
+    pulseConfidence: 'strong',
+    nativeTempo: 120,
+    callsPerFrame: 1,
+    formatVersion: 1,
+    computedAt: new Date().toISOString(),
+    ...overrides,
+  };
 }
 
 function makeEngine(): StubEngine {
@@ -197,10 +234,12 @@ describe('TrackAnalysisPanelComponent', () => {
   let component: TrackAnalysisPanelComponent;
   let engine: StubEngine;
   let scanner: StubScanner;
+  let tuneIndex: StubTuneIndexService;
 
   async function setup(file: SidFile | null = fakeSidFile()): Promise<void> {
     engine = makeEngine();
     scanner = makeScanner();
+    tuneIndex = makeTuneIndexService();
 
     await TestBed.configureTestingModule({
       imports: [TrackAnalysisPanelComponent],
@@ -210,6 +249,7 @@ describe('TrackAnalysisPanelComponent', () => {
           providers: [
             { provide: ANALYSIS_SCANNER, useValue: scanner as unknown as AnalysisScanner },
             { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+            { provide: TuneIndexService, useValue: tuneIndex as unknown as TuneIndexService },
           ],
         },
       })
@@ -443,5 +483,46 @@ describe('TrackAnalysisPanelComponent', () => {
     const svg = fixture.nativeElement.querySelector('.lane-stack svg') as SVGSVGElement;
     expect(svg).not.toBeNull();
     expect(svg.querySelectorAll('*').length).toBeLessThan(2000);
+  });
+
+  it('reads a structure, pulse and key row from a cached index record while no scan has run', () => {
+    expand();
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({
+        nativeLengthSeconds: 130.4,
+        dominantIntervalFrames: 24,
+        tonic: 2,
+        mode: 'minor',
+        camelot: '5A',
+      })
+    );
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.analysis-caption')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.lane-stack')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.structure-square')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.readout-panel')).not.toBeNull();
+    expect(readoutValue('Length')).toBe(formatDuration(130.4));
+    expect(readoutValue('Pulse interval')).toBe(`${(24).toLocaleString()} frames`);
+    expect(readoutValue('Key (native)')).toContain('D minor');
+    expect(readoutValue('Key (native)')).toContain('5A');
+  });
+
+  it('prefers a completed live scan over a cached index record describing the same tune', async () => {
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({
+        nativeLengthSeconds: 999,
+        dominantIntervalFrames: 999,
+        tonic: 2,
+        mode: 'minor',
+        camelot: '5A',
+      })
+    );
+    await completeAnalysis(buildCMajorScan());
+
+    expect(readoutValue('Length')).not.toBe(formatDuration(999));
+    expect(readoutValue('Pulse interval')).not.toBe(`${(999).toLocaleString()} frames`);
+    expect(readoutValue('Key (native)')).toContain('C major');
+    expect(readoutValue('Key (native)')).not.toContain('D minor');
   });
 });
