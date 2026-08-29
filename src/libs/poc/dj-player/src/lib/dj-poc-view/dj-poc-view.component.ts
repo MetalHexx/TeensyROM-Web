@@ -15,6 +15,7 @@ import {
   SPEED_INPUT_SPAN,
 } from '../engine/dj-player-engine';
 import { TrackAnalysisPanelComponent } from '../analysis/track-analysis-panel/track-analysis-panel.component';
+import { TuneIndexPanelComponent } from '../analysis/tune-index-panel/tune-index-panel.component';
 import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
 import { WorkerAnalysisScanner } from '../analysis/worker-analysis-scanner';
 import { TUNE_INDEX_STORAGE, LocalStorageTuneIndexStorage } from '../analysis/tune-index-storage';
@@ -60,7 +61,7 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
   templateUrl: './dj-poc-view.component.html',
   styleUrl: './dj-poc-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TrackAnalysisPanelComponent],
+  imports: [TrackAnalysisPanelComponent, TuneIndexPanelComponent],
   // Provided here rather than root: this is a quarantined POC surface and neither its
   // permission-holding service nor its audio graph should register in the app injector.
   providers: [

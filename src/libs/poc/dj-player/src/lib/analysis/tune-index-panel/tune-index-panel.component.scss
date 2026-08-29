@@ -1,0 +1,56 @@
+// Angular's emulated encapsulation scopes dj-poc-view.component.scss's shared `.panel` rule to that
+// component's own template, so it can't reach into this one — this reproduces the same box model
+// (spacing, border, radius, heading treatment) with the app's shared tokens instead of restyling.
+:host {
+  display: block;
+  flex: 0 0 auto;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.tune-index-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  min-height: 0;
+
+  h2 {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: var(--font-size-md);
+  }
+}
+
+.tune-index-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.tune-index-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.tune-index-label {
+  color: var(--color-dimmed);
+}
+
+.tune-index-loop {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+
+  input[type='checkbox'] {
+    margin: 0;
+  }
+}

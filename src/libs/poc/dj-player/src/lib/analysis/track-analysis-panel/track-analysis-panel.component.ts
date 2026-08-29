@@ -35,6 +35,7 @@ import {
   soundingKey,
 } from '../key';
 import type { KeyResult } from '../key';
+import { formatCents, formatDuration } from '../format';
 
 /** Buckets the whole scanned frame range into this many horizontal columns, regardless of how many
  *  frames were scanned — the aggregation that keeps a tune with tens of thousands of frames from
@@ -301,17 +302,6 @@ function keyLabel(key: KeyResult | null): string {
   if (key === null) return '—';
   const name = keyName(key);
   return name === null || key.camelot === null ? 'no clear key' : `${name} · ${key.camelot}`;
-}
-
-function formatCents(cents: number): string {
-  return `${cents >= 0 ? '+' : '−'}${Math.abs(cents).toFixed(1)} cents`;
-}
-
-function formatDuration(totalSeconds: number): string {
-  const clamped = Math.max(0, totalSeconds);
-  const minutes = Math.floor(clamped / 60);
-  const seconds = Math.floor(clamped % 60);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 /** Paints the similarity matrix as one pixel per block — origin top-left, so the main diagonal runs

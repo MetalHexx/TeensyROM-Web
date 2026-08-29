@@ -1,0 +1,33 @@
+<section class="panel tune-index-panel" aria-label="Tune Index">
+  <h2>Tune Index</h2>
+
+  <div class="tune-index-rows">
+    <div class="tune-index-row">
+      <span class="tune-index-label">Length</span>
+      <span class="tune-index-value">{{ lengthLabel() }}</span>
+    </div>
+    <div class="tune-index-row">
+      <span class="tune-index-label">Loop confidence</span>
+      <span class="tune-index-value">{{ loopConfidenceLabel() }}</span>
+    </div>
+    <div class="tune-index-row">
+      <span class="tune-index-label">Key</span>
+      <span class="tune-index-value">{{ keyLabel() }}</span>
+    </div>
+    <div class="tune-index-row">
+      <span class="tune-index-label">Key confidence</span>
+      <span class="tune-index-value">{{ keyConfidenceLabel() }}</span>
+    </div>
+  </div>
+
+  <label class="tune-index-loop">
+    <input
+      type="checkbox"
+      aria-label="Loop whole tune"
+      [checked]="tuneLoopArmed()"
+      [disabled]="!canLoop()"
+      (change)="onLoopToggle($event)"
+    />
+    Loop whole tune
+  </label>
+</section>

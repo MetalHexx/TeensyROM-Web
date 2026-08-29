@@ -65,6 +65,9 @@ interface MockDjPlayerEngine {
   markers: WritableSignal<readonly Marker[]>;
   loopingMarker: WritableSignal<number | null>;
   queuedMarker: WritableSignal<number | null>;
+  tuneLoopFrame: WritableSignal<number | null>;
+  tuneLoopArmed: WritableSignal<boolean>;
+  armTuneLoop: ReturnType<typeof vi.fn>;
   markerLaunchPending: WritableSignal<boolean>;
   progressPercentFor: ReturnType<typeof vi.fn>;
   positionPercent: WritableSignal<number>;
@@ -129,6 +132,9 @@ function makeEngine(): MockDjPlayerEngine {
     markers: signal<readonly Marker[]>([]),
     loopingMarker: signal<number | null>(null),
     queuedMarker: signal<number | null>(null),
+    tuneLoopFrame: signal<number | null>(null),
+    tuneLoopArmed: signal<boolean>(false),
+    armTuneLoop: vi.fn(),
     markerLaunchPending: signal<boolean>(false),
     progressPercentFor: vi.fn(() => 0),
     positionPercent: signal(0),
