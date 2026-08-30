@@ -14,7 +14,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md);
+  // Tighter than the shared .panel default — this panel now sits between Setup and Diagnostics,
+  // both styled by dj-poc-view.component.scss's `.sidebar .panel` rule, which emulated encapsulation
+  // keeps from reaching in here. Matching its padding by hand is what keeps the three panels at one
+  // visual weight.
+  padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
   min-height: 0;
@@ -44,6 +48,18 @@
   color: var(--color-dimmed);
 }
 
+// A warning about the detection, not an error in the tune — --color-highlight draws attention
+// without implying failure, unlike --color-error. Never disables or alters the loop toggle below it.
+.tune-index-implausible {
+  margin: 0;
+  padding: 2px var(--spacing-xs);
+  align-self: flex-start;
+  border: 1px solid var(--color-highlight);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-highlight);
+  font-size: var(--font-size-sm);
+}
+
 .tune-index-loop {
   display: flex;
   align-items: center;
@@ -52,5 +68,20 @@
 
   input[type='checkbox'] {
     margin: 0;
+  }
+}
+
+// A property of the tune, not the transport — placed with the tune's description so it persists
+// with it. Mirrors dj-poc-view.component.scss's `.control` rhythm (label left, control pushed
+// right); reproduced locally for the same encapsulation reason as `.tune-index-panel` above.
+.tune-index-timing {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+
+  > select {
+    margin-left: auto;
+    min-width: 0;
   }
 }

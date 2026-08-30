@@ -539,6 +539,15 @@ describe('DjPocViewComponent', () => {
     });
   });
 
+  describe('tune index panel placement', () => {
+    it('renders the tune index panel in the sidebar, not the stage rail', () => {
+      expect(
+        fixture.nativeElement.querySelector('aside.sidebar lib-tune-index-panel')
+      ).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('.stage-rail lib-tune-index-panel')).toBeNull();
+    });
+  });
+
   describe('voice mute toggles', () => {
     it('calls engine.setVoiceMuted with the voice index and the checkbox state', () => {
       const checkbox = fixture.nativeElement.querySelector(

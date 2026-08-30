@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, Signal } from '@a
 import { DjPlayerEngine } from '../../engine/dj-player-engine';
 import { positionBasisFor } from '../../engine/engine-utils';
 import { playCallsToSeconds } from '../../engine/play-rate';
+import type { TimingMode } from '../../engine/play-rate';
 import { TuneIndexService } from '../tune-index.service';
 import { PITCH_CLASS_NAMES } from '../key';
 import type { TuneIndexRecord } from '../tune-index.model';
@@ -13,6 +14,13 @@ const NOT_FOUND_LABEL = 'not found';
 /** A tune detection proved stops rather than repeats. A completed answer, and a different one from
  *  "no answer" — the two must not both collapse to the same text. */
 const ENDED_LABEL = 'ends, no loop';
+
+/** Below this, a byte-verified repeat is almost certainly an ostinato or an idle cycle rather than
+ *  the tune's musical loop. Informational only — the loop still arms; see R3's rule in
+ *  DjPlayerEngine.setTuneIndex. The bar sits at the top of the range investigation pointed at,
+ *  because showing the label on a genuine loop costs nothing and missing one costs the diagnosis
+ *  the label exists to give. */
+const IMPLAUSIBLE_PERIOD_SECONDS = 15;
 
 /** Either a verified loop worth rendering field by field, or the one placeholder both loop rows show
  *  for every other outcome. */
@@ -88,6 +96,15 @@ export class TuneIndexPanelComponent {
       : formatDuration(this.toSeconds(readout.periodFrames));
   });
 
+  /** R4: a verified loop whose period is short enough to read as an ostinato or an idle cycle rather
+   *  than the tune's arrangement. Purely informational — see IMPLAUSIBLE_PERIOD_SECONDS above. */
+  protected readonly loopImplausible = computed<boolean>(() => {
+    const readout = this.loopReadout();
+    return (
+      readout.kind === 'loop' && this.toSeconds(readout.periodFrames) < IMPLAUSIBLE_PERIOD_SECONDS
+    );
+  });
+
   protected readonly keyLabel = computed<string>(() => {
     if (this.analysing()) return ANALYSING_LABEL;
     const record = this.tuneIndexService.record();
@@ -100,8 +117,19 @@ export class TuneIndexPanelComponent {
     return record === null ? UNKNOWN_LABEL : record.keyConfidence;
   });
 
+  /** R6's toggle reflects the persisted record — a property of the tune, not the live transport —
+   *  and has nothing to show while none is loaded. */
+  protected readonly timingMode = computed<TimingMode | null>(
+    () => this.tuneIndexService.record()?.timingMode ?? null
+  );
+
   protected onLoopToggle(event: Event): void {
     this.engine.armTuneLoop((event.target as HTMLInputElement).checked);
+  }
+
+  protected onTimingModeChange(event: Event): void {
+    const mode = (event.target as HTMLSelectElement).value as TimingMode;
+    this.tuneIndexService.setTimingMode(mode);
   }
 
   private toSeconds(frames: number): number {

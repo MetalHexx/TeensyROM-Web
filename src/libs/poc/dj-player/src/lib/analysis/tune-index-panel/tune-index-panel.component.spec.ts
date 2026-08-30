@@ -11,6 +11,7 @@ import type { TuneIndexRecord } from '../tune-index.model';
 interface StubTuneIndexService {
   record: WritableSignal<TuneIndexRecord | null>;
   pending: WritableSignal<boolean>;
+  setTimingMode: ReturnType<typeof vi.fn>;
 }
 
 interface StubEngine {
@@ -33,6 +34,7 @@ function makeTuneIndexService(): StubTuneIndexService {
   return {
     record: signal<TuneIndexRecord | null>(null),
     pending: signal<boolean>(false),
+    setTimingMode: vi.fn(),
   };
 }
 
@@ -215,5 +217,74 @@ describe('TuneIndexPanelComponent', () => {
     component['onLoopToggle']({ target: input } as unknown as Event);
 
     expect(engine.armTuneLoop).toHaveBeenCalledWith(true);
+  });
+
+  it('flags a verified loop whose period is under fifteen seconds as implausible', () => {
+    // 500 frames at 50 per second is 10 seconds — under the bar.
+    tuneIndexService.record.set(fakeRecord({ loopStartFrame: 0, loopPeriodFrames: 500 }));
+    fixture.detectChanges();
+
+    expect(component['loopImplausible']()).toBe(true);
+  });
+
+  it('does not flag a verified loop whose period is at or above fifteen seconds', () => {
+    // 800 frames at 50 per second is 16 seconds — above the bar.
+    tuneIndexService.record.set(fakeRecord({ loopStartFrame: 0, loopPeriodFrames: 800 }));
+    fixture.detectChanges();
+
+    expect(component['loopImplausible']()).toBe(false);
+  });
+
+  it('flags neither a null record nor a tune that only ends', () => {
+    expect(component['loopImplausible']()).toBe(false);
+
+    tuneIndexService.record.set(
+      fakeRecord({ loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: 100 })
+    );
+    fixture.detectChanges();
+
+    expect(component['loopImplausible']()).toBe(false);
+  });
+
+  it('does not disable or alter the loop toggle when the implausible label shows', () => {
+    tuneIndexService.record.set(fakeRecord({ loopStartFrame: 0, loopPeriodFrames: 500 }));
+    engine.tuneLoopOutFrame.set(500);
+    fixture.detectChanges();
+
+    expect(component['loopImplausible']()).toBe(true);
+    expect(component['canLoop']()).toBe(true);
+  });
+
+  it('has no timing mode to reflect while no record is indexed', () => {
+    expect(component['timingMode']()).toBeNull();
+  });
+
+  it('disables the timing select with no record, and enables it once one lands', () => {
+    const timingSelect = () =>
+      fixture.nativeElement.querySelector('[aria-label="Timing mode"]') as HTMLSelectElement;
+
+    expect(timingSelect().disabled).toBe(true);
+
+    tuneIndexService.record.set(fakeRecord({ timingMode: 'exact' }));
+    fixture.detectChanges();
+
+    expect(timingSelect().disabled).toBe(false);
+  });
+
+  it("reflects the record's persisted timing mode", () => {
+    tuneIndexService.record.set(fakeRecord({ timingMode: 'rounded' }));
+    fixture.detectChanges();
+
+    expect(component['timingMode']()).toBe('rounded');
+  });
+
+  it('sends the selected timing mode to the service on change', () => {
+    tuneIndexService.record.set(fakeRecord({ timingMode: 'exact' }));
+    fixture.detectChanges();
+    const select = { value: 'rounded' } as unknown as HTMLSelectElement;
+
+    component['onTimingModeChange']({ target: select } as unknown as Event);
+
+    expect(tuneIndexService.setTimingMode).toHaveBeenCalledWith('rounded');
   });
 });

@@ -14,6 +14,11 @@
       <span class="tune-index-label">Loop period</span>
       <span class="tune-index-value">{{ loopPeriodLabel() }}</span>
     </div>
+    @if (loopImplausible()) {
+    <p class="tune-index-implausible" role="note">
+      Short repeat — likely an ostinato or idle cycle, not the tune's loop
+    </p>
+    }
     <div class="tune-index-row">
       <span class="tune-index-label">Key</span>
       <span class="tune-index-value">{{ keyLabel() }}</span>
@@ -33,5 +38,17 @@
       (change)="onLoopToggle($event)"
     />
     Loop whole tune
+  </label>
+
+  <label class="tune-index-timing">
+    Timing
+    <select
+      aria-label="Timing mode"
+      [disabled]="timingMode() === null"
+      (change)="onTimingModeChange($event)"
+    >
+      <option value="exact" [selected]="timingMode() === 'exact'">Exact</option>
+      <option value="rounded" [selected]="timingMode() === 'rounded'">Rounded</option>
+    </select>
   </label>
 </section>
