@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, Signal } from '@angular/core';
 import { DjPlayerEngine } from '../../engine/dj-player-engine';
+import { positionBasisFor } from '../../engine/engine-utils';
+import { playCallsToSeconds } from '../../engine/play-rate';
 import { TuneIndexService } from '../tune-index.service';
 import { PITCH_CLASS_NAMES } from '../key';
 import type { TuneIndexRecord } from '../tune-index.model';
@@ -7,6 +9,16 @@ import { formatDuration } from '../format';
 
 const ANALYSING_LABEL = 'analysing…';
 const UNKNOWN_LABEL = '—';
+const NOT_FOUND_LABEL = 'not found';
+/** A tune detection proved stops rather than repeats. A completed answer, and a different one from
+ *  "no answer" — the two must not both collapse to the same text. */
+const ENDED_LABEL = 'ends, no loop';
+
+/** Either a verified loop worth rendering field by field, or the one placeholder both loop rows show
+ *  for every other outcome. */
+type LoopReadout =
+  | { readonly kind: 'placeholder'; readonly label: string }
+  | { readonly kind: 'loop'; readonly startFrame: number; readonly periodFrames: number };
 
 /** '{tonic} {mode} · {camelot}', or the honest answer. Never a key name without the Camelot number
  *  beside it — the wheel is what a DJ mixes on. Reports the native key only; the sounding key stays
@@ -19,10 +31,14 @@ function keyLabelFor(record: TuneIndexRecord): string {
 }
 
 /**
- * The rail's compact, always-visible tune index readout: native length, key and Camelot number, a
- * confidence for each, and the explicit re-arm the scrub-beats-loop rule requires. Reads the same
- * `TuneIndexService` record the engine's own tune index draws from, so this panel and the Track
- * Analysis panel it sits beside can never disagree about the answer.
+ * The rail's compact, always-visible tune index readout: native length, the detected loop's start and
+ * period, key and Camelot number, and the explicit re-arm the scrub-beats-loop rule requires. Reads
+ * the same `TuneIndexService` record the engine's own tune index draws from, so this panel and the
+ * Track Analysis panel it sits beside can never disagree about the answer.
+ *
+ * Every duration is derived at display time from the record's frames and the rate currently in force,
+ * never from a stored number of seconds — which is what makes the readout follow the Timing selector
+ * rather than freeze whatever was in force when the tune was scanned.
  */
 @Component({
   selector: 'lib-tune-index-panel',
@@ -37,15 +53,39 @@ export class TuneIndexPanelComponent {
   protected readonly analysing: Signal<boolean> = this.tuneIndexService.pending;
   protected readonly tuneLoopArmed = this.engine.tuneLoopArmed;
 
-  protected readonly canLoop = computed<boolean>(() => this.engine.tuneLoopFrame() !== null);
+  protected readonly canLoop = computed<boolean>(() => this.engine.tuneLoopOutFrame() !== null);
+
+  private readonly loopReadout = computed<LoopReadout>(() => {
+    if (this.analysing()) return { kind: 'placeholder', label: ANALYSING_LABEL };
+    const record = this.tuneIndexService.record();
+    if (record === null) return { kind: 'placeholder', label: UNKNOWN_LABEL };
+
+    const { loopStartFrame, loopPeriodFrames } = record;
+    if (loopStartFrame === null || loopPeriodFrames === null) {
+      const label = record.endedAtFrame === null ? NOT_FOUND_LABEL : ENDED_LABEL;
+      return { kind: 'placeholder', label };
+    }
+    return { kind: 'loop', startFrame: loopStartFrame, periodFrames: loopPeriodFrames };
+  });
 
   protected readonly lengthLabel = computed<string>(() => {
     if (this.analysing()) return ANALYSING_LABEL;
     const record = this.tuneIndexService.record();
     if (record === null) return UNKNOWN_LABEL;
-    return record.nativeLengthSeconds === null
-      ? 'not found'
-      : formatDuration(record.nativeLengthSeconds);
+    const basis = positionBasisFor(record);
+    return basis === null ? NOT_FOUND_LABEL : formatDuration(this.toSeconds(basis));
+  });
+
+  protected readonly loopStartLabel = computed<string>(() => {
+    const readout = this.loopReadout();
+    return readout.kind === 'placeholder' ? readout.label : readout.startFrame.toLocaleString();
+  });
+
+  protected readonly loopPeriodLabel = computed<string>(() => {
+    const readout = this.loopReadout();
+    return readout.kind === 'placeholder'
+      ? readout.label
+      : formatDuration(this.toSeconds(readout.periodFrames));
   });
 
   protected readonly keyLabel = computed<string>(() => {
@@ -54,21 +94,17 @@ export class TuneIndexPanelComponent {
     return record === null ? UNKNOWN_LABEL : keyLabelFor(record);
   });
 
-  protected readonly loopConfidenceLabel = computed<string>(() =>
-    this.confidenceLabel((record) => record.structureConfidence)
-  );
-
-  protected readonly keyConfidenceLabel = computed<string>(() =>
-    this.confidenceLabel((record) => record.keyConfidence)
-  );
+  protected readonly keyConfidenceLabel = computed<string>(() => {
+    if (this.analysing()) return ANALYSING_LABEL;
+    const record = this.tuneIndexService.record();
+    return record === null ? UNKNOWN_LABEL : record.keyConfidence;
+  });
 
   protected onLoopToggle(event: Event): void {
     this.engine.armTuneLoop((event.target as HTMLInputElement).checked);
   }
 
-  private confidenceLabel(pick: (record: TuneIndexRecord) => string): string {
-    if (this.analysing()) return ANALYSING_LABEL;
-    const record = this.tuneIndexService.record();
-    return record === null ? UNKNOWN_LABEL : pick(record);
+  private toSeconds(frames: number): number {
+    return playCallsToSeconds(frames, this.engine.nominalIntervalUs(), this.engine.playRate());
   }
 }

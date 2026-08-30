@@ -7,9 +7,9 @@ function buildRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord 
   return {
     filename: 'Still_Time.sid',
     subtune: 1,
-    nativeLengthSeconds: null,
-    loopFrame: null,
-    structureConfidence: 'none',
+    loopStartFrame: null,
+    loopPeriodFrames: null,
+    endedAtFrame: null,
     sectionBoundaries: [],
     tonic: null,
     mode: null,
@@ -22,6 +22,8 @@ function buildRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord 
     pulseConfidence: 'none',
     nativeTempo: null,
     callsPerFrame: 1,
+    exactCallsPerFrame: 1,
+    timingMode: 'exact',
     formatVersion: TUNE_INDEX_FORMAT_VERSION,
     computedAt: '2026-08-29T00:00:00.000Z',
     ...overrides,
@@ -51,9 +53,9 @@ describe('LocalStorageTuneIndexStorage', () => {
 
   it('preserves non-null detector outcomes across a save/load round trip', () => {
     const record = buildRecord({
-      nativeLengthSeconds: 123.4,
-      loopFrame: 4567,
-      structureConfidence: 'strong',
+      loopStartFrame: 1200,
+      loopPeriodFrames: 4567,
+      endedAtFrame: null,
       sectionBoundaries: [0, 512, 1024],
       tonic: 9,
       mode: 'minor',
@@ -66,6 +68,8 @@ describe('LocalStorageTuneIndexStorage', () => {
       pulseConfidence: 'strong',
       nativeTempo: 128,
       callsPerFrame: 2,
+      exactCallsPerFrame: 2.4,
+      timingMode: 'rounded',
     });
 
     storage.save(record);
@@ -87,8 +91,8 @@ describe('LocalStorageTuneIndexStorage', () => {
     expect(storage.load('Never_Played.sid', 1)).toBeNull();
   });
 
-  it('returns null for a stored record whose formatVersion does not match', () => {
-    const record = buildRecord({ formatVersion: 0 });
+  it('reads a record written under the previous format version as a cache miss, so it is re-scanned', () => {
+    const record = buildRecord({ formatVersion: TUNE_INDEX_FORMAT_VERSION - 1 });
     localStorage.setItem(`teensyrom_dj_tune_index_${record.filename}:${record.subtune}`, JSON.stringify(record));
 
     expect(storage.load(record.filename, record.subtune)).toBeNull();

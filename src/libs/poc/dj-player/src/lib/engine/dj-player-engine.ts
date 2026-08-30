@@ -30,7 +30,7 @@ import { REPLAY_RUNNER } from '../replay/replay-runner';
 import { DeliveryTransport } from './delivery';
 import { MarkerState } from './marker-state';
 import { TuneSession } from './tune-session';
-import { clamp, describeError } from './engine-utils';
+import { clamp, describeError, positionBasisFor } from './engine-utils';
 import { DEFAULT_TIMING_MODE, playCallIntervalUs, playRateFor } from './play-rate';
 import type { PlayRate, TimingMode } from './play-rate';
 
@@ -250,7 +250,9 @@ export class DjPlayerEngine implements OnDestroy {
   readonly markers = this.markerState.markers;
   readonly loopingMarker = this.markerState.loopingMarker;
   readonly queuedMarker = this.markerState.queuedMarker;
-  readonly tuneLoopFrame = this.markerState.tuneLoopFrame;
+  readonly tuneLoopStartFrame = this.markerState.tuneLoopStartFrame;
+  readonly tuneLoopPeriodFrames = this.markerState.tuneLoopPeriodFrames;
+  readonly tuneLoopOutFrame = this.markerState.tuneLoopOutFrame;
   readonly tuneLoopArmed = this.markerState.tuneLoopArmed;
   /** True for the span of `triggerMarker`'s `play()` await — see `triggerMarker` for why the view
    *  must gate trigger/delete on this rather than trust the index across that gap. */
@@ -261,7 +263,8 @@ export class DjPlayerEngine implements OnDestroy {
 
   private readonly _tuneIndex = signal<TuneIndexRecord | null>(null);
   /** The current tune's cached or freshly scanned index record, published by `TuneIndexService`.
-   *  See `setTuneIndex` for the one thing it currently drives — the position basis. */
+   *  See `setTuneIndex` for what it drives — the position basis, the whole-tune loop and the clock's
+   *  timing mode. */
   readonly tuneIndex: Signal<TuneIndexRecord | null> = this._tuneIndex.asReadonly();
 
   /** Current playback position as a percentage of `positionBasisFrames`, for the playhead: the
@@ -298,8 +301,8 @@ export class DjPlayerEngine implements OnDestroy {
       file.clock === 'ntsc' ? NTSC_FRAME_INTERVAL_US : PAL_FRAME_INTERVAL_US
     );
     this.resetCounters();
-    // The outgoing tune's index record — its measured length and detected loop frame — describes a
-    // file this session no longer holds. Routing through setTuneIndex(null) rather than reaching into
+    // The outgoing tune's index record — its detected loop and its play rate — describes a file this
+    // session no longer holds. Routing through setTuneIndex(null) rather than reaching into
     // its three targets directly keeps this the same single seam TuneIndexService itself writes
     // through, so the incoming tune's basis is the fixed ceiling until its own index (if any) arrives.
     this.setTuneIndex(null);
@@ -568,20 +571,25 @@ export class DjPlayerEngine implements OnDestroy {
 
   /**
    * Stores the current tune's index record — or clears it — as published by `TuneIndexService`, and
-   * feeds its loop frame to the session as the position basis.
+   * feeds the same record to the three things it drives: the session's position basis, the
+   * whole-tune loop, and the clock's timing mode.
    *
-   * `loopFrame !== null` is the confidence gate here, deliberately — `structureConfidence` gates
-   * nothing. The detector already refuses to return a loop point until a block-level agreement run
-   * clears its minimum sustained-run threshold, so a non-null `loopFrame` has by construction passed
-   * the bar the detector requires; a `'weak'` label only distinguishes a bare-minimum run from a long
-   * one, for the operator to see, not a reason to suppress the answer. Do not add a second confidence
-   * threshold here — `null` is the whole "declined to answer" case, and it is the one that keeps
-   * today's behaviour.
+   * **Any verified loop arms, including an implausibly short one — deliberately.** Detection is
+   * byte-exact: it has already compared every frame of the tail against its counterpart one period
+   * earlier, so a loop it reports is a repeat that was proven, not one that scored well. There is no
+   * plausibility gate here, and none should be added: a detection fault must stay audible rather than
+   * hide behind a guard that would also mask a future regression. `null` is the whole "declined to
+   * answer" case.
+   *
+   * `setTimingMode` rather than `timingMode.set` — the public method is what re-resolves the clock
+   * through `applyIntervalChange()`, and setting the signal alone would change the mode without
+   * changing the audio.
    */
   setTuneIndex(record: TuneIndexRecord | null): void {
     this._tuneIndex.set(record);
-    this.tuneSession.setIndexedLengthFrames(record?.loopFrame ?? null);
-    this.markerState.setTuneLoop(record?.loopFrame ?? null);
+    this.tuneSession.setIndexedLengthFrames(positionBasisFor(record));
+    this.markerState.setTuneLoop(record?.loopStartFrame ?? null, record?.loopPeriodFrames ?? null);
+    this.setTimingMode(record?.timingMode ?? DEFAULT_TIMING_MODE);
   }
 
   addMarker(): number {
@@ -656,8 +664,8 @@ export class DjPlayerEngine implements OnDestroy {
     this.markerState.stopLoop();
   }
 
-  /** The rail panel's whole-tune loop toggle — arms or disarms against the still-known
-   *  `tuneLoopFrame()`, with no re-scan. */
+  /** The rail panel's whole-tune loop toggle — arms or disarms against the still-known loop start
+   *  and period, with no re-scan. */
   armTuneLoop(armed: boolean): void {
     this.markerState.setTuneLoopArmed(armed);
   }

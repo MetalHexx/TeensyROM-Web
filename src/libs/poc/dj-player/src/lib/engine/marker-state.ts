@@ -3,7 +3,7 @@ import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import { C64Machine, FrameResult, MachineSnapshot } from '../cpu/c64-machine';
 import { RegisterFrame } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
-import { clamp, describeError, sanitizePositiveFrame } from './engine-utils';
+import { clamp, describeError, sanitizePositiveFrame, sanitizeStartFrame } from './engine-utils';
 import { msToPlayCalls } from './play-rate';
 import type { PlayRate } from './play-rate';
 
@@ -143,10 +143,19 @@ export class MarkerState {
   readonly loopingMarker: WritableSignal<number | null> = signal(null);
   /** The marker that takes over when the looping one finishes its lap, or null. */
   readonly queuedMarker: WritableSignal<number | null> = signal(null);
-  /** The detected loop point, in rendered frames; null when the detector found none. */
-  readonly tuneLoopFrame: WritableSignal<number | null> = signal(null);
+  /** Where the detected loop begins, in rendered frames — 0 for a tune that repeats from the top,
+   *  null when detection found no loop. */
+  readonly tuneLoopStartFrame: WritableSignal<number | null> = signal(null);
+  /** One lap of the detected loop, in frames; null when detection found no loop. */
+  readonly tuneLoopPeriodFrames: WritableSignal<number | null> = signal(null);
   /** Whether the whole-tune loop is currently allowed to fire. */
   readonly tuneLoopArmed: WritableSignal<boolean> = signal(false);
+  /** start + period — the frame the tick compares against. Null unless both are usable. */
+  readonly tuneLoopOutFrame: Signal<number | null> = computed<number | null>(() => {
+    const start = this.tuneLoopStartFrame();
+    const period = this.tuneLoopPeriodFrames();
+    return start === null || period === null ? null : start + period;
+  });
 
   /**
    * The nudge range in frames for the loaded tune.
@@ -197,17 +206,18 @@ export class MarkerState {
   }
 
   /**
-   * Sets the detected whole-tune loop point and arms the loop when one exists; a null point (or
-   * anything that is not a finite number greater than zero) disarms it instead.
+   * Adopts the detected whole-tune loop and arms it whenever a usable period exists; a period that is
+   * not a finite number greater than zero describes no lap, so it disarms instead.
    *
-   * Gates on the frame alone, never on `structureConfidence` — the detector has already applied its
-   * own bar before returning a point, and a `'weak'` label is reported for the operator, not a reason
-   * to withhold the loop. See `DjPlayerEngine.setTuneIndex`.
+   * A `startFrame` of 0 — a tune that repeats from its very first frame — is valid and must survive
+   * validation, which is why the start is checked for `>= 0` rather than through
+   * `sanitizePositiveFrame`. No plausibility bar beyond that: see `DjPlayerEngine.setTuneIndex`.
    */
-  setTuneLoop(frame: number | null): void {
-    const valid = sanitizePositiveFrame(frame);
-    this.tuneLoopFrame.set(valid);
-    this.tuneLoopArmed.set(valid !== null);
+  setTuneLoop(startFrame: number | null, periodFrames: number | null): void {
+    const period = sanitizePositiveFrame(periodFrames);
+    this.tuneLoopStartFrame.set(period === null ? null : sanitizeStartFrame(startFrame));
+    this.tuneLoopPeriodFrames.set(period);
+    this.tuneLoopArmed.set(period !== null);
   }
 
   /** The operator's explicit re-arm after a scrub disengaged it. */
@@ -485,8 +495,8 @@ export class MarkerState {
    * button, and a manual scrub — see `DjPlayerEngine.scrubTo`.
    *
    * Deliberately immediate where a trigger waits for the lap: stopping is a get-out, not a musical
-   * transition. `tuneLoopFrame` survives this: the detected point is still true, only the operator's
-   * permission to act on it is withdrawn.
+   * transition. The detected start and period survive this: they are still true, only the operator's
+   * permission to act on them is withdrawn.
    */
   stopLoop(): void {
     this.stopMarkerLoop();
@@ -598,7 +608,8 @@ export class MarkerState {
 
   /**
    * The whole-tune loop's own advance, reached only when no marker is looping: re-enters at the
-   * tune's start once the detected loop point is passed, indefinitely, as long as the loop is armed.
+   * tune's start once `tuneLoopOutFrame()` — the end of the first lap — is passed, indefinitely, as
+   * long as the loop is armed.
    *
    * Restores `anchorRing[0]` — the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor`
    * never evicts — through the same `MarkerHost.restoreState` primitive a marker restores through,
@@ -608,9 +619,9 @@ export class MarkerState {
    */
   private advanceTuneLoop(framesRendered: number): boolean {
     if (!this.tuneLoopArmed()) return false;
-    const loopFrame = this.tuneLoopFrame();
-    if (loopFrame === null) return false;
-    if (framesRendered < loopFrame) return false;
+    const outFrame = this.tuneLoopOutFrame();
+    if (outFrame === null) return false;
+    if (framesRendered < outFrame) return false;
 
     const seed = this.anchorRing[0] ?? null;
     if (seed === null) {

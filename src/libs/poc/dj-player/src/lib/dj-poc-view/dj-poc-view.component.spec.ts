@@ -9,6 +9,7 @@ import {
   EngineStats,
   Marker,
 } from '../engine/dj-player-engine';
+import type { PlayRate } from '../engine/play-rate';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
 import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
@@ -58,6 +59,7 @@ interface MockDjPlayerEngine {
   subtuneCount: WritableSignal<number>;
   speedMultiplier: WritableSignal<number>;
   nominalIntervalUs: WritableSignal<number>;
+  playRate: WritableSignal<PlayRate>;
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
   heldVoices: WritableSignal<readonly boolean[]>;
@@ -65,7 +67,9 @@ interface MockDjPlayerEngine {
   markers: WritableSignal<readonly Marker[]>;
   loopingMarker: WritableSignal<number | null>;
   queuedMarker: WritableSignal<number | null>;
-  tuneLoopFrame: WritableSignal<number | null>;
+  tuneLoopStartFrame: WritableSignal<number | null>;
+  tuneLoopPeriodFrames: WritableSignal<number | null>;
+  tuneLoopOutFrame: WritableSignal<number | null>;
   tuneLoopArmed: WritableSignal<boolean>;
   armTuneLoop: ReturnType<typeof vi.fn>;
   markerLaunchPending: WritableSignal<boolean>;
@@ -125,6 +129,12 @@ function makeEngine(): MockDjPlayerEngine {
     subtuneCount: signal(1),
     speedMultiplier: signal(1),
     nominalIntervalUs: signal(19950),
+    playRate: signal<PlayRate>({
+      callsPerFrame: 1,
+      exactCallsPerFrame: 1,
+      roundedCallsPerFrame: 1,
+      mode: 'exact',
+    }),
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
     heldVoices: signal<readonly boolean[]>([false, false, false]),
@@ -132,7 +142,9 @@ function makeEngine(): MockDjPlayerEngine {
     markers: signal<readonly Marker[]>([]),
     loopingMarker: signal<number | null>(null),
     queuedMarker: signal<number | null>(null),
-    tuneLoopFrame: signal<number | null>(null),
+    tuneLoopStartFrame: signal<number | null>(null),
+    tuneLoopPeriodFrames: signal<number | null>(null),
+    tuneLoopOutFrame: signal<number | null>(null),
     tuneLoopArmed: signal<boolean>(false),
     armTuneLoop: vi.fn(),
     markerLaunchPending: signal<boolean>(false),

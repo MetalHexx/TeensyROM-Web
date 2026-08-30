@@ -10,9 +10,11 @@ import {
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import { ANALYSIS_SCANNER } from './scan-runner';
 import type { ScanRequest, ScanResult } from './scan-runner';
-import { buildFeatureMatrix, framesToSeconds } from './frame-features';
+import { buildFeatureMatrix } from './frame-features';
 import { computeNovelty, DEFAULT_FEATURE_WEIGHTS } from './novelty';
 import { computeStructure } from './structure';
+import { detectLoop, IDLE_PERIOD_SECONDS, MIN_TAIL_SECONDS } from './loop-detect';
+import type { LoopDetectOptions } from './loop-detect';
 import { computePulse, impliedTempo } from './pulse';
 import { segmentNotes } from './notes';
 import { detectKey } from './key';
@@ -20,6 +22,7 @@ import { TUNE_INDEX_STORAGE } from './tune-index-storage';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
 import { DjPlayerEngine } from '../engine/dj-player-engine';
+import { asRounded, playCallsPerSecond } from '../engine/play-rate';
 import type { SidFile } from '../sid/sid-file.model';
 
 /** What a load establishes: which file, under which name. `setTune` always writes a fresh object, so
@@ -134,8 +137,10 @@ export class TuneIndexService implements OnDestroy {
     const matrix = buildFeatureMatrix(output);
     const novelty = computeNovelty(matrix, DEFAULT_FEATURE_WEIGHTS);
     const structure = computeStructure(matrix, DEFAULT_FEATURE_WEIGHTS);
+    const loop = detectLoop(output, this.loopDetectOptions());
     const pulse = computePulse(novelty.candidates);
     const key = detectKey(segmentNotes(output, file.clock));
+    const playRate = this.engine.playRate();
     const { native } = impliedTempo(
       pulse.dominantInterval,
       this.engine.nominalIntervalUs(),
@@ -146,12 +151,9 @@ export class TuneIndexService implements OnDestroy {
     const record: TuneIndexRecord = {
       filename,
       subtune,
-      nativeLengthSeconds:
-        structure.loopFrame === null
-          ? null
-          : framesToSeconds(structure.loopFrame, this.engine.nominalIntervalUs(), output.callsPerFrame),
-      loopFrame: structure.loopFrame,
-      structureConfidence: structure.loopConfidence,
+      loopStartFrame: loop.kind === 'loop' ? loop.startFrame : null,
+      loopPeriodFrames: loop.kind === 'loop' ? loop.periodFrames : null,
+      endedAtFrame: loop.kind === 'ended' ? loop.endFrame : null,
       sectionBoundaries: structure.sectionBoundaries,
       tonic: key.tonic,
       mode: key.mode,
@@ -167,6 +169,10 @@ export class TuneIndexService implements OnDestroy {
       pulseConfidence: pulse.confidence,
       nativeTempo: native,
       callsPerFrame: output.callsPerFrame,
+      // The ScanOutput carries only the rounded rate, so the un-rounded one has to come off the
+      // engine — without it the Timing toggle could not flip a cached tune without a re-scan.
+      exactCallsPerFrame: playRate.exactCallsPerFrame,
+      timingMode: this.engine.timingMode(),
       formatVersion: TUNE_INDEX_FORMAT_VERSION,
       computedAt: new Date().toISOString(),
     };
@@ -175,5 +181,24 @@ export class TuneIndexService implements OnDestroy {
     this._record.set(record);
     this.engine.setTuneIndex(record);
     logInfo(LogType.Success, `TuneIndexService: indexed ${filename}:${subtune}.`);
+  }
+
+  /**
+   * The detector's seconds-valued constants in frames.
+   *
+   * Converted against the **rounded** rate, never the mode-selected one. Both guards are emulation
+   * budgets rather than real-time durations, and the measured detection baseline was produced against
+   * the rounded rate — converting through the exact rate would shift the effective thresholds by up to
+   * ~20% on a CIA-timer tune and quietly invalidate the numbers the detector is graded against.
+   */
+  private loopDetectOptions(): LoopDetectOptions {
+    const perSecond = playCallsPerSecond(
+      this.engine.nominalIntervalUs(),
+      asRounded(this.engine.playRate())
+    );
+    return {
+      minTailFrames: Math.round(MIN_TAIL_SECONDS * perSecond),
+      idlePeriodFrames: Math.round(IDLE_PERIOD_SECONDS * perSecond),
+    };
   }
 }

@@ -11,12 +11,15 @@ import type { ITuneIndexStorage } from './tune-index-storage';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
 import { ASID_SLOT_COUNT } from '../asid/asid-constants';
+import type { PlayRate, TimingMode } from '../engine/play-rate';
 import type { SidFile } from '../sid/sid-file.model';
 
 interface StubEngine {
   currentSubtune: WritableSignal<number>;
   nominalIntervalUs: WritableSignal<number>;
   ceilingFrames: WritableSignal<number>;
+  playRate: WritableSignal<PlayRate>;
+  timingMode: WritableSignal<TimingMode>;
   setTuneIndex: ReturnType<typeof vi.fn>;
 }
 
@@ -35,6 +38,15 @@ function makeEngine(): StubEngine {
     currentSubtune: signal(1),
     nominalIntervalUs: signal(19_950),
     ceilingFrames: signal(10_000),
+    // A CIA-timer tune: the two rates differ, which is what makes "which rate did the record store"
+    // and "which rate were the detector's thresholds converted through" separable questions.
+    playRate: signal<PlayRate>({
+      callsPerFrame: 2.4,
+      exactCallsPerFrame: 2.4,
+      roundedCallsPerFrame: 2,
+      mode: 'exact',
+    }),
+    timingMode: signal<TimingMode>('exact'),
     setTuneIndex: vi.fn(),
   };
 }
@@ -80,13 +92,36 @@ function makeScan(frames: number, callsPerFrame: number): ScanOutput {
   };
 }
 
+/** A scan whose register stream is unique for `introFrames` and then repeats on a `periodFrames` lap,
+ *  long enough for the detector's tail guard to be satisfied at this spec's engine rate. */
+function makeLoopingScan(
+  frames: number,
+  introFrames: number,
+  periodFrames: number,
+  callsPerFrame: number
+): ScanOutput {
+  const scan = makeScan(frames, callsPerFrame);
+  for (let f = 0; f < frames; f++) {
+    const seed = f < introFrames ? 1_000_000 + f : (f - introFrames) % periodFrames;
+    const base = f * ASID_SLOT_COUNT;
+    // Three bytes of the seed, so two frames a multiple of 256 apart are never byte-identical.
+    scan.slotValues[base] = seed & 0xff;
+    scan.slotValues[base + 1] = (seed >>> 8) & 0xff;
+    scan.slotValues[base + 2] = (seed >>> 16) & 0xff;
+    for (let slot = 3; slot < ASID_SLOT_COUNT; slot++) {
+      scan.slotValues[base + slot] = (seed + slot * 13) & 0xff;
+    }
+  }
+  return scan;
+}
+
 function buildStoredRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
     filename: 'Still_Time.sid',
     subtune: 1,
-    nativeLengthSeconds: null,
-    loopFrame: null,
-    structureConfidence: 'none',
+    loopStartFrame: null,
+    loopPeriodFrames: null,
+    endedAtFrame: null,
     sectionBoundaries: [],
     tonic: null,
     mode: null,
@@ -99,6 +134,8 @@ function buildStoredRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexR
     pulseConfidence: 'none',
     nativeTempo: null,
     callsPerFrame: 1,
+    exactCallsPerFrame: 1,
+    timingMode: 'exact',
     formatVersion: TUNE_INDEX_FORMAT_VERSION,
     computedAt: '2026-08-29T00:00:00.000Z',
     ...overrides,
@@ -168,6 +205,34 @@ describe('TuneIndexService', () => {
     expect(storage.save).toHaveBeenCalledTimes(1);
     expect(storage.save).toHaveBeenCalledWith(service.record());
     expect(engine.setTuneIndex).toHaveBeenLastCalledWith(service.record());
+  });
+
+  it('records the detected loop as a start and a period, alongside the rate it was scanned at', async () => {
+    let resolveScan!: (result: ScanResult) => void;
+    scanner.scan.mockImplementation(
+      () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+    );
+
+    service.setTune(fakeSidFile(), 'Looping.sid');
+    TestBed.flushEffects();
+
+    resolveScan({
+      id: 1,
+      kind: 'done',
+      output: makeLoopingScan(2500, 100, 400, 2),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const record = service.record();
+    expect(record?.loopStartFrame).toBe(100);
+    expect(record?.loopPeriodFrames).toBe(400);
+    expect(record?.endedAtFrame).toBeNull();
+    // Both rates ride along: the rounded one off the scan, the exact one off the engine, so the
+    // Timing toggle can flip this tune later without re-scanning it.
+    expect(record?.callsPerFrame).toBe(2);
+    expect(record?.exactCallsPerFrame).toBe(2.4);
+    expect(record?.timingMode).toBe('exact');
   });
 
   it('publishes a stored record immediately and starts no scan on a cache hit', () => {

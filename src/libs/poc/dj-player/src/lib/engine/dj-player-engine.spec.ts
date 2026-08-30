@@ -17,6 +17,7 @@ import { C64Machine } from '../cpu/c64-machine';
 import { REPLAY_RUNNER } from '../replay/replay-runner';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '../replay/replay-runner';
 import { replayToFrame } from '../replay/replay-to-frame';
+import { DEFAULT_TIMING_MODE } from './play-rate';
 import {
   DjPlayerEngine,
   FRAME_CLOCK,
@@ -392,9 +393,9 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
   return {
     filename: 'Test.sid',
     subtune: 1,
-    nativeLengthSeconds: null,
-    loopFrame: null,
-    structureConfidence: 'none',
+    loopStartFrame: null,
+    loopPeriodFrames: null,
+    endedAtFrame: null,
     sectionBoundaries: [],
     tonic: null,
     mode: null,
@@ -407,6 +408,8 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
     pulseConfidence: 'none',
     nativeTempo: null,
     callsPerFrame: 1,
+    exactCallsPerFrame: 1,
+    timingMode: DEFAULT_TIMING_MODE,
     formatVersion: TUNE_INDEX_FORMAT_VERSION,
     computedAt: '2026-08-29T00:00:00.000Z',
     ...overrides,
@@ -2091,9 +2094,9 @@ describe('DjPlayerEngine', () => {
       clock.tick(frames);
     }
 
-    it('re-enters at the tune start once the detected loop frame is reached, and loops again a lap later', async () => {
+    it('re-enters at the tune start once the first lap ends, and loops again a lap later', async () => {
       await playTo(0);
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 20 }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 20 }));
 
       clock.tick(20); // reaches the loop point, queuing a restore
       clock.tick(2); // gate-off, then the resync — drains the queued pair and publishes stats
@@ -2110,12 +2113,51 @@ describe('DjPlayerEngine', () => {
 
     it('leaves an unarmed loop untouched, running straight past the frame that would otherwise trigger it', async () => {
       await playTo(0);
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: null }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: null, loopPeriodFrames: null }));
 
       clock.tick(25);
 
       expect(engine.tuneLoopArmed()).toBe(false);
       expect(engine.stats().framesRendered).toBe(25);
+    });
+
+    it('arms a loop that starts after an intro against the end of its first lap, not against the period', async () => {
+      await playTo(0);
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 10, loopPeriodFrames: 20 }));
+
+      expect(engine.tuneLoopOutFrame()).toBe(30);
+
+      clock.tick(25); // past the bare period, still short of the intro plus a lap
+      expect(engine.stats().framesRendered).toBe(25);
+
+      clock.tick(5); // reaches frame 30, queuing a restore
+      clock.tick(2); // gate-off, then the resync
+
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+
+    it('arms nothing for a record that says the tune ends, and measures the playhead against the end point', async () => {
+      await playTo(0);
+      engine.setTuneIndex(fakeTuneIndexRecord({ endedAtFrame: 40 }));
+
+      // Basis and arm state are fed from one record, so they are asserted together — drifting apart
+      // is the failure mode.
+      expect(engine.positionBasisFrames()).toBe(40);
+      expect(engine.tuneLoopArmed()).toBe(false);
+      expect(engine.tuneLoopOutFrame()).toBeNull();
+
+      clock.tick(50); // straight past the end point, since nothing is armed
+
+      expect(engine.stats().framesRendered).toBe(50);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(50));
+    });
+
+    it('arms a verified loop however short it is — no plausibility gate', async () => {
+      await playTo(0);
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 2 }));
+
+      expect(engine.tuneLoopArmed()).toBe(true);
+      expect(engine.positionBasisFrames()).toBe(2);
     });
 
     it('a manual scrub always wins: it stops a running marker loop, which then never pulls playback back', async () => {
@@ -2142,7 +2184,7 @@ describe('DjPlayerEngine', () => {
 
     it('a manual scrub disarms an armed whole-tune loop, and it does not re-fire on its own', async () => {
       await playTo(0);
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 20 }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 20 }));
       expect(engine.tuneLoopArmed()).toBe(true);
 
       await engine.scrubTo(100); // lands exactly on the detected loop frame
@@ -2165,7 +2207,7 @@ describe('DjPlayerEngine', () => {
       engine.setMarkerEnd(0);
       await engine.triggerMarker(0);
       clock.tick(2);
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 20 }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 20 }));
 
       await engine.scrubTo(50); // the audition click's own call site
 
@@ -2173,14 +2215,14 @@ describe('DjPlayerEngine', () => {
       expect(engine.tuneLoopArmed()).toBe(false);
     });
 
-    it('armTuneLoop(true) re-arms after a scrub, against the still-known loop frame, and it fires again', async () => {
+    it('armTuneLoop(true) re-arms after a scrub, against the still-known loop, and it fires again', async () => {
       await playTo(0);
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 20 }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 20 }));
       clock.tick(5);
       await engine.scrubTo(0); // disengages — the point survives, only the arm drops
       clock.tick(2); // drains the scrub's gate-off/resync while still playing
       expect(engine.tuneLoopArmed()).toBe(false);
-      expect(engine.tuneLoopFrame()).toBe(20);
+      expect(engine.tuneLoopOutFrame()).toBe(20);
       expect(engine.stats().framesRendered).toBe(0);
 
       engine.armTuneLoop(true);
@@ -2761,27 +2803,28 @@ describe('DjPlayerEngine', () => {
       expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
     });
 
-    it('keeps the fixed ceiling when the record carries a null loop frame', () => {
+    it('keeps the fixed ceiling when the record carries no loop and no end point', () => {
       engine.loadTune(counterTune());
 
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: null }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: null, loopPeriodFrames: null }));
 
+      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
+      expect(engine.tuneLoopArmed()).toBe(false);
+    });
+
+    it('keeps the fixed ceiling for a zero or negative loop period', () => {
+      engine.loadTune(counterTune());
+
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 0 }));
+      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
+
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: -10 }));
       expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
     });
 
-    it('keeps the fixed ceiling for a zero or negative loop frame', () => {
+    it('adopts one intro plus one lap as the basis, and positionPercent reads 0/50/100 against it', async () => {
       engine.loadTune(counterTune());
-
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 0 }));
-      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
-
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: -10 }));
-      expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
-    });
-
-    it('adopts the loop frame as the basis, and positionPercent reads 0/50/100 against it', async () => {
-      engine.loadTune(counterTune());
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 2_500 }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 2_500 }));
 
       expect(engine.positionBasisFrames()).toBe(2_500);
 
@@ -2805,7 +2848,7 @@ describe('DjPlayerEngine', () => {
       clock.tick(1);
       expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
 
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 100 }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 100 }));
 
       expect(engine.positionBasisFrames()).toBe(100);
       expect(engine.positionPercent()).toBeCloseTo(
@@ -2814,9 +2857,9 @@ describe('DjPlayerEngine', () => {
       );
     });
 
-    it('reverts to the fixed ceiling and drops the detected loop point when a fresh tune replaces the indexed one', () => {
+    it('reverts to the fixed ceiling and drops the detected loop when a fresh tune replaces the indexed one', () => {
       engine.loadTune(counterTune());
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopFrame: 2_500 }));
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 2_500 }));
       expect(engine.positionBasisFrames()).toBe(2_500);
       expect(engine.tuneLoopArmed()).toBe(true);
 
@@ -2824,7 +2867,19 @@ describe('DjPlayerEngine', () => {
 
       expect(engine.positionBasisFrames()).toBe(engine.ceilingFrames());
       expect(engine.tuneLoopArmed()).toBe(false);
-      expect(engine.tuneLoopFrame()).toBeNull();
+      expect(engine.tuneLoopOutFrame()).toBeNull();
+    });
+
+    it("adopts the record's timing mode through the public setter, so the clock moves with it", () => {
+      engine.loadTune(counterTune());
+      expect(engine.timingMode()).toBe(DEFAULT_TIMING_MODE);
+
+      engine.setTuneIndex(fakeTuneIndexRecord({ timingMode: 'rounded' }));
+      expect(engine.timingMode()).toBe('rounded');
+      expect(engine.playRate().mode).toBe('rounded');
+
+      engine.setTuneIndex(null);
+      expect(engine.timingMode()).toBe(DEFAULT_TIMING_MODE);
     });
   });
 });

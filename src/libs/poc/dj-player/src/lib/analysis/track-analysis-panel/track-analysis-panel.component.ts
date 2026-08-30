@@ -11,17 +11,22 @@ import {
   type OnDestroy,
 } from '@angular/core';
 import { DjPlayerEngine } from '../../engine/dj-player-engine';
+import { positionBasisFor } from '../../engine/engine-utils';
+import type { DetectedLoopFrames } from '../../engine/engine-utils';
+import { asRounded, playCallsPerSecond, playCallsToSeconds } from '../../engine/play-rate';
 import type { SidFile } from '../../sid/sid-file.model';
 import { ANALYSIS_SCANNER } from '../scan-runner';
 import type { ScanRequest, ScanResult } from '../scan-runner';
 import { WorkerAnalysisScanner } from '../worker-analysis-scanner';
 import type { ScanOutput } from '../scan-tune';
-import { buildFeatureMatrix, framesToSeconds, readFrameFeatures } from '../frame-features';
+import { buildFeatureMatrix, readFrameFeatures } from '../frame-features';
 import type { FeatureMatrix } from '../frame-features';
 import { computeNovelty, candidatesAbove, DEFAULT_FEATURE_WEIGHTS } from '../novelty';
 import type { Candidate, FeatureWeights, NoveltyResult } from '../novelty';
 import { computeStructure } from '../structure';
 import type { StructureResult } from '../structure';
+import { detectLoop, IDLE_PERIOD_SECONDS, MIN_TAIL_SECONDS } from '../loop-detect';
+import type { LoopDetection, LoopDetectOptions } from '../loop-detect';
 import { computePulse, impliedTempo } from '../pulse';
 import type { PulseResult } from '../pulse';
 import { segmentNotes } from '../notes';
@@ -332,6 +337,27 @@ function keyResultFromRecord(record: TuneIndexRecord): KeyResult {
   };
 }
 
+/** The three nullable loop fields a record stores, read back as the one shape the readout renders —
+ *  the inverse of the mapping `TuneIndexService` applies on the way in. */
+function loopDetectionFor(record: TuneIndexRecord | null): LoopDetection | null {
+  if (record === null) return null;
+  const { loopStartFrame, loopPeriodFrames, endedAtFrame } = record;
+  if (loopStartFrame !== null && loopPeriodFrames !== null) {
+    return { kind: 'loop', startFrame: loopStartFrame, periodFrames: loopPeriodFrames };
+  }
+  return endedAtFrame === null ? { kind: 'none' } : { kind: 'ended', endFrame: endedAtFrame };
+}
+
+/** A live detection in the field shape a record stores it in, so the length below runs through the
+ *  same `positionBasisFor` a cached record does rather than a second rule that could drift from it. */
+function loopFramesOf(detection: LoopDetection): DetectedLoopFrames {
+  return {
+    loopStartFrame: detection.kind === 'loop' ? detection.startFrame : null,
+    loopPeriodFrames: detection.kind === 'loop' ? detection.periodFrames : null,
+    endedAtFrame: detection.kind === 'ended' ? detection.endFrame : null,
+  };
+}
+
 /** Paints the similarity matrix as one pixel per block — origin top-left, so the main diagonal runs
  *  from the canvas's own corner — then overlays section boundaries as faint grid lines. A canvas
  *  rather than SVG nodes: at up to 256×256 cells, one rect per cell would blow the DOM-node budget
@@ -373,7 +399,8 @@ function paintStructureCanvas(canvas: HTMLCanvasElement, structure: StructureRes
  * by the novelty curve, and the readout P03 adds its own rows to. Everything here is click-to-audition
  * — the workbench only earns its keep once what it finds can be heard.
  *
- * Deliberately dependency-light: it reaches only into `engine/dj-player-engine` and its own
+ * Deliberately dependency-light: it reaches only into `engine/dj-player-engine`, the two leaf engine
+ * modules it shares arithmetic with (`engine/play-rate`, `engine/engine-utils`) and its own
  * `analysis/*` siblings, never into `replay/`, `clock/`, `midi/` or `engine/marker-state` — the whole
  * section can be deleted with the route it lives on.
  */
@@ -399,6 +426,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly featureMatrix = signal<FeatureMatrix | null>(null);
   protected readonly noveltyResult = signal<NoveltyResult | null>(null);
   protected readonly structureResult = signal<StructureResult | null>(null);
+  protected readonly loopDetection = signal<LoopDetection | null>(null);
   protected readonly pulseResult = signal<PulseResult | null>(null);
   protected readonly notes = signal<readonly Note[]>([]);
   protected readonly keyResult = signal<KeyResult | null>(null);
@@ -696,8 +724,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     const ticks: { x: number; label: string }[] = [];
     for (let i = 0; i <= tickCount; i++) {
       const frame = window.start + (span * i) / tickCount;
-      const seconds = framesToSeconds(frame, this.engine.nominalIntervalUs(), scan.callsPerFrame);
-      ticks.push({ x: (i / tickCount) * COLUMN_COUNT, label: formatDuration(seconds) });
+      ticks.push({ x: (i / tickCount) * COLUMN_COUNT, label: formatDuration(this.toSeconds(frame)) });
     }
     return ticks;
   });
@@ -779,14 +806,8 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
   protected readonly selectedTimeLabel = computed<string>(() => {
     const candidate = this.selectedCandidate();
-    const scan = this.scanOutput();
-    if (candidate === null || scan === null) return '—';
-    const seconds = framesToSeconds(
-      candidate.frame,
-      this.engine.nominalIntervalUs(),
-      scan.callsPerFrame
-    );
-    return formatDuration(seconds);
+    if (candidate === null || this.scanOutput() === null) return '—';
+    return formatDuration(this.toSeconds(candidate.frame));
   });
 
   protected readonly selectedCauseLabel = computed<string>(() => {
@@ -806,47 +827,40 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
   protected readonly structureEndTimeLabel = computed<string>(() => {
     const scan = this.scanOutput();
-    if (scan === null) return '—';
-    const seconds = framesToSeconds(
-      scan.frames,
-      this.engine.nominalIntervalUs(),
-      scan.callsPerFrame
-    );
-    return formatDuration(seconds);
+    return scan === null ? '—' : formatDuration(this.toSeconds(scan.frames));
   });
 
-  protected readonly structureLoopFrameLabel = computed<string>(() => {
-    if (this.scanOutput() !== null) {
-      const structure = this.structureResult();
-      return structure === null || structure.loopFrame === null
-        ? '—'
-        : structure.loopFrame.toLocaleString();
+  /** The detected loop, however it was reached: a live scan runs the detector itself, a cached record
+   *  replays the answer it stored, and everything downstream reads this one signal. */
+  private readonly effectiveLoop = computed<LoopDetection | null>(() =>
+    this.scanOutput() !== null ? this.loopDetection() : loopDetectionFor(this.cachedRecord())
+  );
+
+  /** `ended` and `none` are different findings and read differently — a tune that provably stops is
+   *  not a tune nothing could be decided about. */
+  protected readonly structureLoopLabel = computed<string>(() => {
+    const detection = this.effectiveLoop();
+    if (detection === null) return '—';
+    switch (detection.kind) {
+      case 'loop':
+        return `frame ${detection.startFrame.toLocaleString()} · every ${formatDuration(
+          this.toSeconds(detection.periodFrames)
+        )}`;
+      case 'ended':
+        return `ends at frame ${detection.endFrame.toLocaleString()}`;
+      default:
+        return 'not found';
     }
-    const record = this.cachedRecord();
-    return record === null || record.loopFrame === null ? '—' : record.loopFrame.toLocaleString();
   });
 
-  /** "not determined" rather than falling back to the ceiling or any fixed duration — a tune whose
-   *  agreement never sustains genuinely has no known length. The record's own `nativeLengthSeconds`
-   *  is used as-is rather than re-derived from its `loopFrame`: it was computed under the interval in
-   *  force at scan time, and re-deriving it under the engine's live `nominalIntervalUs` would report
-   *  a different length after the Timing selector moves. */
+  /** "not determined" rather than falling back to the ceiling or any fixed duration — a tune detection
+   *  could not answer for genuinely has no known length. Derived from frames at display time through
+   *  the rate in force, so this panel and the rail's Tune Index panel cannot report different lengths
+   *  for the same tune, and both follow the Timing selector. */
   protected readonly structureLengthLabel = computed<string>(() => {
-    const scan = this.scanOutput();
-    if (scan !== null) {
-      const structure = this.structureResult();
-      if (structure === null || structure.loopFrame === null) return 'not determined';
-      const seconds = framesToSeconds(
-        structure.loopFrame,
-        this.engine.nominalIntervalUs(),
-        scan.callsPerFrame
-      );
-      return formatDuration(seconds);
-    }
-    const record = this.cachedRecord();
-    return record === null || record.nativeLengthSeconds === null
-      ? 'not determined'
-      : formatDuration(record.nativeLengthSeconds);
+    const detection = this.effectiveLoop();
+    const frames = detection === null ? null : positionBasisFor(loopFramesOf(detection));
+    return frames === null ? 'not determined' : formatDuration(this.toSeconds(frames));
   });
 
   protected readonly structureSectionsLabel = computed<string>(() => {
@@ -1081,6 +1095,8 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.noveltyResult.set(novelty);
     const structure = computeStructure(matrix, this.weights());
     this.structureResult.set(structure);
+    // Independent of the weights, so — unlike the structure square — a weight edit never re-runs it.
+    this.loopDetection.set(detectLoop(result.output, this.loopDetectOptions()));
     this.pulseResult.set(computePulse(novelty.candidates));
 
     const notes = segmentNotes(result.output, file.clock);
@@ -1155,11 +1171,38 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     await this.jumpToFrame(candidate.frame);
   }
 
+  /**
+   * The detector's seconds-valued constants in frames.
+   *
+   * Converted against the **rounded** rate, never the mode-selected one — the same conversion
+   * `TuneIndexService` makes, so this panel's live scan and the background index agree. Both guards
+   * are emulation budgets rather than real-time durations, and the measured detection baseline was
+   * produced against the rounded rate; the exact rate would shift them by up to ~20% on a CIA-timer
+   * tune.
+   */
+  private loopDetectOptions(): LoopDetectOptions {
+    const perSecond = playCallsPerSecond(
+      this.engine.nominalIntervalUs(),
+      asRounded(this.engine.playRate())
+    );
+    return {
+      minTailFrames: Math.round(MIN_TAIL_SECONDS * perSecond),
+      idlePeriodFrames: Math.round(IDLE_PERIOD_SECONDS * perSecond),
+    };
+  }
+
   private async jumpToFrame(frame: number): Promise<void> {
     const basis = this.engine.positionBasisFrames();
     if (basis <= 0) return;
     const percent = (frame / basis) * 100;
     await this.engine.scrubTo(percent);
+  }
+
+  /** Frames as seconds of music through the rate currently in force — the single conversion every
+   *  duration in this panel goes through, so the readout and the ruler can never disagree with each
+   *  other or with the rail's Tune Index panel. */
+  private toSeconds(frames: number): number {
+    return playCallsToSeconds(frames, this.engine.nominalIntervalUs(), this.engine.playRate());
   }
 
   private frameToX(frame: number): number {
@@ -1229,6 +1272,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.featureMatrix.set(null);
     this.noveltyResult.set(null);
     this.structureResult.set(null);
+    this.loopDetection.set(null);
     this.pulseResult.set(null);
     this.notes.set([]);
     this.keyResult.set(null);

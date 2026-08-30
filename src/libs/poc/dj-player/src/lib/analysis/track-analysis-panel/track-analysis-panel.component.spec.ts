@@ -11,7 +11,9 @@ import { ASID_SLOT_COUNT } from '../../asid/asid-constants';
 import type { SidFile } from '../../sid/sid-file.model';
 import { PAL_CPU_CLOCK_HZ } from '../notes';
 import { TuneIndexService } from '../tune-index.service';
+import { TUNE_INDEX_FORMAT_VERSION } from '../tune-index.model';
 import type { TuneIndexRecord } from '../tune-index.model';
+import type { PlayRate } from '../../engine/play-rate';
 import { formatDuration } from '../format';
 
 const BASE_STATS: EngineStats = {
@@ -43,6 +45,7 @@ interface StubEngine {
   positionBasisFrames: WritableSignal<number>;
   stats: WritableSignal<EngineStats>;
   nominalIntervalUs: WritableSignal<number>;
+  playRate: WritableSignal<PlayRate>;
   speedMultiplier: WritableSignal<number>;
   scrubTo: ReturnType<typeof vi.fn>;
   addMarker: ReturnType<typeof vi.fn>;
@@ -66,9 +69,9 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
   return {
     filename: 'Test Tune',
     subtune: 1,
-    nativeLengthSeconds: 125,
-    loopFrame: 6250,
-    structureConfidence: 'strong',
+    loopStartFrame: 0,
+    loopPeriodFrames: 6250,
+    endedAtFrame: null,
     sectionBoundaries: [0, 1200, 2400, 3600],
     tonic: 0,
     mode: 'major',
@@ -81,7 +84,9 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
     pulseConfidence: 'strong',
     nativeTempo: 120,
     callsPerFrame: 1,
-    formatVersion: 1,
+    exactCallsPerFrame: 1,
+    timingMode: 'exact',
+    formatVersion: TUNE_INDEX_FORMAT_VERSION,
     computedAt: new Date().toISOString(),
     ...overrides,
   };
@@ -96,6 +101,12 @@ function makeEngine(): StubEngine {
     positionBasisFrames: signal(8_000),
     stats: signal<EngineStats>(BASE_STATS),
     nominalIntervalUs: signal(19_950),
+    playRate: signal<PlayRate>({
+      callsPerFrame: 1,
+      exactCallsPerFrame: 1,
+      roundedCallsPerFrame: 1,
+      mode: 'exact',
+    }),
     speedMultiplier: signal(1),
     scrubTo: vi.fn().mockResolvedValue(undefined),
     addMarker: vi.fn(() => 0),
@@ -490,7 +501,8 @@ describe('TrackAnalysisPanelComponent', () => {
     engine.speedMultiplier.set(1.06);
     tuneIndex.record.set(
       fakeTuneIndexRecord({
-        nativeLengthSeconds: 130.4,
+        loopStartFrame: 500,
+        loopPeriodFrames: 6250,
         dominantIntervalFrames: 24,
         nativeTempo: 120,
         tonic: 2,
@@ -504,7 +516,11 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(fixture.nativeElement.querySelector('.lane-stack')).toBeNull();
     expect(fixture.nativeElement.querySelector('.structure-square')).toBeNull();
     expect(fixture.nativeElement.querySelector('.readout-panel')).not.toBeNull();
-    expect(readoutValue('Length')).toBe(formatDuration(130.4));
+    // Derived from the record's frames at the engine's live rate — one intro plus one lap — rather
+    // than from a duration frozen into the record at scan time.
+    expect(readoutValue('Length')).toBe(formatDuration(((500 + 6250) * 19_950) / 1_000_000));
+    expect(readoutValue('Loop')).toContain((500).toLocaleString());
+    expect(readoutValue('Loop')).toContain(formatDuration((6250 * 19_950) / 1_000_000));
     expect(readoutValue('Pulse interval')).toBe(`${(24).toLocaleString()} frames`);
     expect(readoutValue('Key (native)')).toContain('D minor');
     expect(readoutValue('Key (native)')).toContain('5A');
@@ -512,10 +528,41 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(readoutValue('Key (sounding)')).toContain('D# minor');
   });
 
+  it('follows the rate in force when reporting a cached length, rather than the one it was scanned at', () => {
+    expand();
+    tuneIndex.record.set(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 6000 }));
+    fixture.detectChanges();
+    const atSingleSpeed = readoutValue('Length');
+
+    engine.playRate.set({
+      callsPerFrame: 2,
+      exactCallsPerFrame: 2.4,
+      roundedCallsPerFrame: 2,
+      mode: 'rounded',
+    });
+    fixture.detectChanges();
+
+    expect(readoutValue('Length')).toBe(formatDuration((6000 * (19_950 / 2)) / 1_000_000));
+    expect(readoutValue('Length')).not.toBe(atSingleSpeed);
+  });
+
+  it('reads a cached record that ends rather than loops as an end point, not as no answer', () => {
+    expand();
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({ loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: 4000 })
+    );
+    fixture.detectChanges();
+
+    expect(readoutValue('Length')).toBe(formatDuration((4000 * 19_950) / 1_000_000));
+    expect(readoutValue('Loop')).toContain((4000).toLocaleString());
+    expect(readoutValue('Loop')).not.toBe('not found');
+  });
+
   it('prefers a completed live scan over a cached index record describing the same tune', async () => {
     tuneIndex.record.set(
       fakeTuneIndexRecord({
-        nativeLengthSeconds: 999,
+        loopStartFrame: 0,
+        loopPeriodFrames: 99_999,
         dominantIntervalFrames: 999,
         tonic: 2,
         mode: 'minor',
@@ -524,7 +571,7 @@ describe('TrackAnalysisPanelComponent', () => {
     );
     await completeAnalysis(buildCMajorScan());
 
-    expect(readoutValue('Length')).not.toBe(formatDuration(999));
+    expect(readoutValue('Length')).not.toBe(formatDuration((99_999 * 19_950) / 1_000_000));
     expect(readoutValue('Pulse interval')).not.toBe(`${(999).toLocaleString()} frames`);
     expect(readoutValue('Key (native)')).toContain('C major');
     expect(readoutValue('Key (native)')).not.toContain('D minor');

@@ -25,8 +25,8 @@ export interface ScanOutput {
  * answer whether it runs on a worker or on the calling thread.
  *
  * There is deliberately no tune-end detection: the scan always runs exactly `maxFrames` frames, and
- * distinguishing "ceiling reached" from "tune ended" belongs to the self-similarity reader that
- * consumes this output, not to this loop.
+ * distinguishing "ceiling reached" from "tune ended" belongs to `detectLoop`, which reads this
+ * output, not to this loop.
  *
  * @param onProgress called at a coarse interval, not per frame.
  * @throws when a frame exceeds its cycle budget. The message names the frame it failed at.
