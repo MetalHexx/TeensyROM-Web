@@ -75,6 +75,7 @@ export class TuneIndexService implements OnDestroy {
 
   private generation = 0;
   private nextRequestId = 0;
+  private nextSessionId = 0;
 
   constructor() {
     // A subtune step is different music from the tune it steps away from, and a fresh load replaces
@@ -211,10 +212,15 @@ export class TuneIndexService implements OnDestroy {
   }
 
   /**
-   * Scans `SCAN_DEPTH_SECONDS` deepest-first-stopping-shallowest: each rung re-emulates from init —
-   * `scanTune` has no resume — and hands its output to `detectLoop`, stopping at the first rung that
-   * answers. Exhausting every rung without an answer still counts as answered, with `loop.kind`
-   * `'none'`, so the caller writes a null record rather than looping forever.
+   * Scans `SCAN_DEPTH_SECONDS` deepest-first-stopping-shallowest: each rung hands its output to
+   * `detectLoop`, and the ladder stops at the first rung that answers. Exhausting every rung without
+   * an answer still counts as answered, with `loop.kind` `'none'`, so the caller writes a null record
+   * rather than looping forever.
+   *
+   * Every rung carries one session id, which is what lets the scanner continue the previous rung's
+   * emulation rather than replaying from init — the id, not the file, because the file crosses the
+   * thread boundary as a fresh copy each time. A new ladder means a new session, so a rung can never
+   * deepen a scan of different music.
    *
    * The generation guard and a failed scan are both checked after every rung, not only the first: a
    * tune or subtune change mid-ladder must abandon the whole ladder, or a stale answer lands on the
@@ -227,10 +233,12 @@ export class TuneIndexService implements OnDestroy {
   ): Promise<LadderOutcome> {
     let lastOutput: ScanOutput | undefined;
     let lastLoop: LoopDetection = { kind: 'none' };
+    const session = ++this.nextSessionId;
 
     for (const depthSeconds of SCAN_DEPTH_SECONDS) {
       const request: ScanRequest = {
         id: ++this.nextRequestId,
+        session,
         file,
         subtune,
         maxFrames: this.scanDepthFrames(depthSeconds),

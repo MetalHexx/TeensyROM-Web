@@ -7,6 +7,10 @@ import type { SidFile } from '../sid/sid-file.model';
 export interface ScanRequest {
   /** Correlates the response, and decides whether it is still the one the caller is waiting on. */
   readonly id: number;
+  /** Groups the rungs of one ladder. A request whose session matches the held one — same file, same
+   *  subtune — deepens it; anything else starts from a clean init. Required rather than optional so
+   *  neither caller can silently opt out of saying which ladder its request belongs to. */
+  readonly session: number;
   readonly file: SidFile;
   readonly subtune: number;
   readonly maxFrames: number;

@@ -3,7 +3,8 @@ import type { SidFile } from '../sid/sid-file.model';
 import { RegisterFrame } from '../asid/register-frame';
 import { C64Machine } from '../cpu/c64-machine';
 import { ASID_SLOT_COUNT } from '../asid/asid-constants';
-import { scanTune } from './scan-tune';
+import { scanTune, TuneScan } from './scan-tune';
+import { detectLoop } from './loop-detect';
 
 interface CodeBlock {
   readonly at: number;
@@ -121,5 +122,64 @@ describe('scanTune', () => {
 
     expect(progressFrames.length).toBeGreaterThan(0);
     expect(progressFrames.length).toBeLessThan(frames / 10);
+  });
+});
+
+describe('TuneScan', () => {
+  /** Deep enough for counterTune's $D400 counter to wrap and repeat, so `detectLoop` has a real
+   *  verdict to reach rather than the trivial "nothing found" both paths would agree on. */
+  const DEEP = 700;
+  const DETECT_OPTIONS = { minTailFrames: 100, idlePeriodFrames: 50 };
+
+  it('deepened through intermediate depths, produces the same scan as one shot to the same depth', () => {
+    const oneShot = scanTune(counterTune, 1, DEEP);
+
+    const scan = new TuneScan(counterTune, 1);
+    for (const depth of [37, 256, 257, DEEP]) {
+      scan.advanceTo(depth);
+    }
+    const deepened = scan.output();
+
+    expect(deepened.frames).toBe(oneShot.frames);
+    expect(deepened.callsPerFrame).toBe(oneShot.callsPerFrame);
+    expect(deepened.writeCounts).toEqual(oneShot.writeCounts);
+    expect(deepened.slotValues).toEqual(oneShot.slotValues);
+    // Resumption is an efficiency property: the detector must reach the identical verdict either way.
+    expect(detectLoop(deepened, DETECT_OPTIONS)).toEqual(detectLoop(oneShot, DETECT_OPTIONS));
+  });
+
+  it('treats a depth it has already reached as a no-op', () => {
+    const scan = new TuneScan(counterTune, 1);
+    scan.advanceTo(20);
+    const reached = scan.output();
+
+    scan.advanceTo(20);
+    scan.advanceTo(5);
+
+    expect(scan.frames).toBe(20);
+    expect(scan.output()).toEqual(reached);
+  });
+
+  it('hands out a copy, so deepening never rewrites an output already returned', () => {
+    const scan = new TuneScan(counterTune, 1);
+    scan.advanceTo(10);
+    const shallow = scan.output();
+
+    scan.advanceTo(40);
+
+    expect(shallow).toEqual(scanTune(counterTune, 1, 10));
+  });
+
+  it('records nothing past the frame a cycle-budget failure stopped at', () => {
+    const scan = new TuneScan(runawayTune, 1);
+
+    expect(() => scan.advanceTo(5)).toThrow(
+      'analysis scan exceeded its cycle budget at frame 0'
+    );
+
+    // Sized to what was recorded, not to the depth that was reserved for the attempt.
+    expect(scan.frames).toBe(0);
+    expect(scan.output().slotValues.length).toBe(0);
+    expect(scan.output().writeCounts.length).toBe(0);
   });
 });

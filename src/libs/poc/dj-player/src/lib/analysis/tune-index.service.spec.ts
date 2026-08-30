@@ -420,6 +420,35 @@ describe('TuneIndexService', () => {
       expect(storage.save).toHaveBeenCalledTimes(1);
     });
 
+    it('stamps every rung of one ladder with a single session, and a new ladder with a different one', async () => {
+      const resolvers: ((result: ScanResult) => void)[] = [];
+      scanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
+      );
+
+      service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
+      TestBed.flushEffects();
+
+      // Two rungs that find nothing, so the ladder deepens twice under the one session.
+      for (const rung of [0, 1]) {
+        resolvers[rung]({ id: rung + 1, kind: 'done', output: makeScan(40, 2) });
+        await Promise.resolve();
+        await Promise.resolve();
+      }
+      expect(scanner.scan).toHaveBeenCalledTimes(3);
+
+      const sessions = scanner.scan.mock.calls.map(([request]) => request.session);
+      expect(new Set(sessions).size).toBe(1);
+
+      // Different music is a different ladder: reusing the session would let its first rung continue
+      // the scan the outgoing tune left behind.
+      service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
+      TestBed.flushEffects();
+
+      const [latest] = scanner.scan.mock.calls[scanner.scan.mock.calls.length - 1];
+      expect(latest.session).not.toBe(sessions[0]);
+    });
+
     it('abandons the whole ladder mid-flight when the tune changes, publishing nothing for the outgoing tune', async () => {
       const resolvers: ((result: ScanResult) => void)[] = [];
       scanner.scan.mockImplementation(

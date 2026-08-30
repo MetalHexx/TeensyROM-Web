@@ -468,6 +468,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
   private generation = 0;
   private nextRequestId = 0;
+  private nextSessionId = 0;
 
   constructor() {
     // A subtune switch — or a different tune entirely — is different music: leaving a stale scan,
@@ -1067,6 +1068,9 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
     const request: ScanRequest = {
       id: ++this.nextRequestId,
+      // A fresh session every run: this panel scans once, to the ceiling, and never deepens, so it
+      // must never continue whatever scan the scanner happens to be holding.
+      session: ++this.nextSessionId,
       file,
       subtune: this.engine.currentSubtune(),
       maxFrames: this.engine.ceilingFrames(),
