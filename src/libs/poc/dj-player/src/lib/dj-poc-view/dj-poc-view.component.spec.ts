@@ -9,14 +9,18 @@ import {
   EngineStats,
   Marker,
 } from '../engine/dj-player-engine';
-import type { PlayRate } from '../engine/play-rate';
+import type { PlayRate, TimingMode } from '../engine/play-rate';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
 import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
 import type { AnalysisScanner, ScanResult } from '../analysis/scan-runner';
+import type { ScanOutput } from '../analysis/scan-tune';
 import { TUNE_INDEX_STORAGE } from '../analysis/tune-index-storage';
 import type { ITuneIndexStorage } from '../analysis/tune-index-storage';
 import { TuneIndexService } from '../analysis/tune-index.service';
+import { TUNE_INDEX_FORMAT_VERSION } from '../analysis/tune-index.model';
+import type { TuneIndexRecord } from '../analysis/tune-index.model';
+import { ASID_SLOT_COUNT } from '../asid/asid-constants';
 
 const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
@@ -60,6 +64,9 @@ interface MockDjPlayerEngine {
   speedMultiplier: WritableSignal<number>;
   nominalIntervalUs: WritableSignal<number>;
   playRate: WritableSignal<PlayRate>;
+  // Read by TuneIndexService's own ladder completion when a scan under this suite is let run to a
+  // full answer — not otherwise touched by anything else in this component's own surface.
+  timingMode: WritableSignal<TimingMode>;
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
   heldVoices: WritableSignal<readonly boolean[]>;
@@ -135,6 +142,7 @@ function makeEngine(): MockDjPlayerEngine {
       roundedCallsPerFrame: 1,
       mode: 'exact',
     }),
+    timingMode: signal<TimingMode>('exact'),
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
     heldVoices: signal<readonly boolean[]>([false, false, false]),
@@ -184,15 +192,68 @@ function makeEngine(): MockDjPlayerEngine {
   };
 }
 
-/** A cache that never holds a record and swallows every save — `TuneIndexService` is wired up here
- *  only so its DI graph resolves; nothing under this suite asserts on the index it produces. */
-function makeTuneIndexStorage(): ITuneIndexStorage {
+interface StubTuneIndexStorage {
+  load: ReturnType<typeof vi.fn>;
+  save: ReturnType<typeof vi.fn>;
+}
+
+interface StubAnalysisScanner {
+  scan: ReturnType<typeof vi.fn>;
+  dispose: ReturnType<typeof vi.fn>;
+}
+
+/** A cache that never holds a record and swallows every save by default — `TuneIndexService` is
+ *  wired up here so its DI graph resolves, and so the play-sequencing suite can drive its own
+ *  settle outcomes by overriding `load`'s return value per test. */
+function makeTuneIndexStorage(): StubTuneIndexStorage {
   return { load: vi.fn(() => null), save: vi.fn() };
 }
 
-/** A scan that never resolves — safe for a suite that never flushes far enough to await it. */
-function makeAnalysisScanner(): AnalysisScanner {
+/** A scan that never resolves by default — safe for a suite that never flushes far enough to await
+ *  it, and overridable per test for the suite that does. */
+function makeAnalysisScanner(): StubAnalysisScanner {
   return { scan: vi.fn(() => new Promise<ScanResult>(() => undefined)), dispose: vi.fn() };
+}
+
+/** A silent, all-zero scan long enough to answer conclusively on the ladder's very first rung — the
+ *  detector math is out of scope here, only whether `play()` waited on it. */
+function makeScan(frames: number, callsPerFrame: number): ScanOutput {
+  return {
+    slotValues: new Uint8Array(frames * ASID_SLOT_COUNT),
+    writeCounts: new Uint8Array(frames),
+    frames,
+    callsPerFrame,
+  };
+}
+
+/** A fully-shaped record for a cache-hit fixture — `TuneIndexPanelComponent` renders whatever
+ *  `TuneIndexService.record()` publishes, so a partial stand-in crashes its template instead of
+ *  exercising the play-sequencing behavior this suite is actually after. */
+function buildTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
+  return {
+    filename: 'Cached.sid',
+    subtune: 1,
+    loopStartFrame: null,
+    loopPeriodFrames: null,
+    endedAtFrame: null,
+    sectionBoundaries: [],
+    tonic: null,
+    mode: null,
+    camelot: null,
+    tuningReferenceHz: null,
+    tuningCents: null,
+    keyConfidence: 'none',
+    scalePitchClasses: [],
+    dominantIntervalFrames: null,
+    pulseConfidence: 'none',
+    nativeTempo: null,
+    callsPerFrame: 1,
+    exactCallsPerFrame: 1,
+    timingMode: 'exact',
+    formatVersion: TUNE_INDEX_FORMAT_VERSION,
+    computedAt: '2026-08-29T00:00:00.000Z',
+    ...overrides,
+  };
 }
 
 const PSID_HEADER_SIZE = 0x7c;
@@ -268,10 +329,14 @@ describe('DjPocViewComponent', () => {
   let component: DjPocViewComponent;
   let midi: MockMidiOutputService;
   let engine: MockDjPlayerEngine;
+  let tuneIndexStorage: StubTuneIndexStorage;
+  let analysisScanner: StubAnalysisScanner;
 
   async function setup(): Promise<void> {
     midi = makeMidiService();
     engine = makeEngine();
+    tuneIndexStorage = makeTuneIndexStorage();
+    analysisScanner = makeAnalysisScanner();
 
     await TestBed.configureTestingModule({
       imports: [DjPocViewComponent],
@@ -282,8 +347,11 @@ describe('DjPocViewComponent', () => {
             { provide: MidiOutputService, useValue: midi as unknown as MidiOutputService },
             { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
             TuneIndexService,
-            { provide: TUNE_INDEX_STORAGE, useValue: makeTuneIndexStorage() },
-            { provide: ANALYSIS_SCANNER, useValue: makeAnalysisScanner() },
+            {
+              provide: TUNE_INDEX_STORAGE,
+              useValue: tuneIndexStorage as unknown as ITuneIndexStorage,
+            },
+            { provide: ANALYSIS_SCANNER, useValue: analysisScanner as unknown as AnalysisScanner },
           ],
         },
       })
@@ -504,11 +572,69 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('auto-play', () => {
-    it('plays automatically once a tune is selected', () => {
+    // The tune-index effect lives on TuneIndexService, provided at this component's own level: it is
+    // flushed as part of this fixture's own change detection, not `TestBed.flushEffects()` (that
+    // flushes the root scheduler, which a view-scoped effect is never queued on). Polling — rather
+    // than a single flush — lets the ladder's own `await`s and the settle's continuation interleave
+    // between attempts instead of deadlocking on one pass.
+    async function waitForPlay(): Promise<void> {
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(engine.play).toHaveBeenCalled();
+      });
+    }
+
+    it('withholds play until a cache hit publishes the record, requesting no scan at all', async () => {
+      tuneIndexStorage.load.mockReturnValue(buildTuneIndexRecord({ filename: 'Auto tune' }));
+
       component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
 
       expect(engine.loadTune).toHaveBeenCalled();
-      expect(engine.play).toHaveBeenCalled();
+      expect(engine.play).not.toHaveBeenCalled();
+
+      await waitForPlay();
+
+      expect(analysisScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('withholds play while a genuinely new tune scans, and releases it once the scan completes', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      analysisScanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+      expect(engine.play).not.toHaveBeenCalled();
+
+      // Long and silent enough to answer conclusively on the ladder's very first rung.
+      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+
+      await waitForPlay();
+    });
+
+    it('releases play once a failed scan settles the load, without indexing the tune', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      analysisScanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      resolveScan({ id: 1, kind: 'failed', error: 'the analysis scan worker stopped responding' });
+
+      await waitForPlay();
+
+      expect(tuneIndexStorage.save).not.toHaveBeenCalled();
     });
   });
 
@@ -532,9 +658,16 @@ describe('DjPocViewComponent', () => {
       } as unknown as File;
       const input = { files: [pickedFile], value: '' } as unknown as HTMLInputElement;
 
-      await component.onFilePicked({ target: input } as unknown as Event);
+      // Not awaited directly: `onFilePicked` now stays pending behind the tune-index settle, which
+      // (on the default cache-miss, never-resolving scanner double) never arrives. `setTune` is
+      // already called by the time the hand-off happens, so polling for that call is enough.
+      void component.onFilePicked({ target: input } as unknown as Event);
 
-      expect(setTune).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(setTune).toHaveBeenCalledTimes(1);
+      });
+
       expect(setTune).toHaveBeenCalledWith(engine.loadTune.mock.calls[0][0], 'mytune.sid');
     });
   });

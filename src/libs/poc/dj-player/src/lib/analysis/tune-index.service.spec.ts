@@ -490,6 +490,80 @@ describe('TuneIndexService', () => {
     });
   });
 
+  describe("setTune's returned promise", () => {
+    it('resolves once a cache hit publishes the record, without requesting a scan', async () => {
+      const hit = buildStoredRecord({ filename: 'Cached.sid' });
+      storage.load.mockReturnValue(hit);
+
+      const settled = service.setTune(fakeSidFile(), 'Cached.sid');
+      TestBed.flushEffects();
+      await expect(settled).resolves.toBeUndefined();
+
+      expect(scanner.scan).not.toHaveBeenCalled();
+      expect(service.record()).toEqual(hit);
+    });
+
+    it('stays unresolved while a genuinely new tune scans, and resolves once the scan completes', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      scanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+      let settledFlag = false;
+
+      const settled = service
+        .setTune(fakeSidFile(), 'Still_Time.sid')
+        .then(() => (settledFlag = true));
+      TestBed.flushEffects();
+      await Promise.resolve();
+      expect(settledFlag).toBe(false);
+
+      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 2) });
+      await settled;
+
+      expect(settledFlag).toBe(true);
+      expect(service.record()).not.toBeNull();
+    });
+
+    it('resolves — never rejects — when the scan fails', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      scanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+
+      const settled = service.setTune(fakeSidFile(), 'Failing.sid');
+      TestBed.flushEffects();
+
+      resolveScan({ id: 1, kind: 'failed', error: 'the analysis scan worker stopped responding' });
+      await expect(settled).resolves.toBeUndefined();
+
+      expect(service.record()).toBeNull();
+    });
+
+    it('resolves the superseded load once its ladder is abandoned, without waiting on the newer one', async () => {
+      const resolvers: ((result: ScanResult) => void)[] = [];
+      scanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
+      );
+
+      const settledA = service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
+      TestBed.flushEffects();
+      expect(scanner.scan).toHaveBeenCalledTimes(1);
+
+      const settledB = service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
+      TestBed.flushEffects();
+      expect(scanner.scan).toHaveBeenCalledTimes(2);
+
+      // A's own rung resolves only after B has already taken over — abandoned, but still released.
+      resolvers[0]({ id: 1, kind: 'done', output: makeScan(20, 1) });
+      await expect(settledA).resolves.toBeUndefined();
+      expect(service.record()).toBeNull(); // B's own ladder is still running
+
+      resolvers[1]({ id: 2, kind: 'done', output: makeScan(2_000, 4) });
+      await expect(settledB).resolves.toBeUndefined();
+      expect(service.record()?.filename).toBe('B.sid');
+    });
+  });
+
   describe('setTimingMode', () => {
     it('does nothing when no record has been indexed yet', () => {
       engine.setTuneIndex.mockClear(); // the constructor's own initial refresh already called it once

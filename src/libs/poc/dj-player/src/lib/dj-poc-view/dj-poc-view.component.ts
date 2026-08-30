@@ -221,7 +221,7 @@ export class DjPocViewComponent {
 
   selectTune(source: TuneSource): void {
     try {
-      this.loadTune(parseSidFile(source.getBytes()), source.label);
+      void this.loadTune(parseSidFile(source.getBytes()), source.label);
     } catch (error) {
       this.currentTune.set(null);
       this.tuneError.set(describeParseError(error));
@@ -246,7 +246,7 @@ export class DjPocViewComponent {
         getBytes: () => bytes,
       };
       this.diskSources.update((sources) => [...sources, source]);
-      this.loadTune(parsed, file.name);
+      await this.loadTune(parsed, file.name);
     } catch (error) {
       this.currentTune.set(null);
       this.tuneError.set(describeParseError(error));
@@ -511,13 +511,14 @@ export class DjPocViewComponent {
     return (MICROSECONDS_PER_SECOND / intervalUs).toFixed(3);
   }
 
-  private loadTune(file: SidFile, filename: string): void {
+  private async loadTune(file: SidFile, filename: string): Promise<void> {
     this.currentTune.set(file);
     this.tuneError.set(null);
     this.engine.loadTune(file);
     // Called after loadTune, so the tune-index effect reads the subtune the load has already
-    // settled on.
-    this.tuneIndex.setTune(file, filename);
+    // settled on. Awaited so playback never races a background scan for the frame clock's thread —
+    // a cache hit or a failed/abandoned scan releases this just as promptly as a completed one.
+    await this.tuneIndex.setTune(file, filename);
     // play() already no-ops into the engine's "no MIDI output port selected" error path when no
     // port is chosen, so no separate guard is needed here.
     void this.engine.play();

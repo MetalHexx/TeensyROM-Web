@@ -77,6 +77,11 @@ export class TuneIndexService implements OnDestroy {
   private nextRequestId = 0;
   private nextSessionId = 0;
 
+  /** The current `setTune` caller's resolve function, handed to the next effect run and cleared the
+   *  moment it is taken — a subtune-only trigger (no `setTune` in between) always finds this `null`,
+   *  so it never resolves a promise it wasn't asked to settle. */
+  private pendingSettle: (() => void) | null = null;
+
   constructor() {
     // A subtune step is different music from the tune it steps away from, and a fresh load replaces
     // the file outright; play, pause and stop touch neither signal below, so this effect stays inert
@@ -88,14 +93,21 @@ export class TuneIndexService implements OnDestroy {
       // both signals the Timing selector writes on every speed change. Read outside `untracked`,
       // that becomes a third, unwanted trigger for this effect.
       untracked(() => {
-        void this.refresh(tune.file, tune.filename, subtune);
+        const settle = this.pendingSettle;
+        this.pendingSettle = null;
+        void this.refresh(tune.file, tune.filename, subtune, settle);
       });
     });
   }
 
-  /** Called by the view on every tune load; `filename` is the bundled label or the picker's file.name. */
-  setTune(file: SidFile | null, filename: string | null): void {
-    this.identity.set({ file, filename });
+  /** Called by the view on every tune load. Resolves once the record for this tune has been published —
+   *  on a cache hit, on a completed scan, and equally on a failed or abandoned one. Never rejects: a load
+   *  path that hangs on a failed scan is worse than one that starts playback with no index. */
+  setTune(file: SidFile | null, filename: string | null): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.pendingSettle = resolve;
+      this.identity.set({ file, filename });
+    });
   }
 
   /**
@@ -123,7 +135,8 @@ export class TuneIndexService implements OnDestroy {
   private async refresh(
     file: SidFile | null,
     filename: string | null,
-    subtune: number
+    subtune: number,
+    settle: (() => void) | null
   ): Promise<void> {
     this.generation++;
     const generation = this.generation;
@@ -133,6 +146,7 @@ export class TuneIndexService implements OnDestroy {
     this.engine.setTuneIndex(null);
 
     if (file === null || filename === null) {
+      settle?.();
       return;
     }
 
@@ -140,7 +154,8 @@ export class TuneIndexService implements OnDestroy {
     if (hit !== null) {
       this._record.set(hit);
       this.engine.setTuneIndex(hit);
-      return; // a cache hit hydrates instantly — no scan at all
+      settle?.(); // a cache hit hydrates instantly — no scan at all
+      return;
     }
 
     this._pending.set(true);
@@ -149,7 +164,9 @@ export class TuneIndexService implements OnDestroy {
     if (ladder.kind === 'abandoned') {
       // The tune or subtune changed while a rung was in flight; this answer describes music that is
       // no longer loaded. A newer refresh has already reset `pending` for its own tune, so this one
-      // must not touch it.
+      // must not touch it. The caller that awaited this load is still released, though — it is
+      // superseded, not stuck.
+      settle?.();
       return;
     }
     this._pending.set(false);
@@ -157,6 +174,7 @@ export class TuneIndexService implements OnDestroy {
     if (ladder.kind === 'failed') {
       // A failed scan is not a cached "no answer" — the next load of this tune should try again.
       logWarn(`TuneIndexService: scan failed for ${filename}:${subtune}: ${ladder.error}`);
+      settle?.();
       return;
     }
 
@@ -209,6 +227,7 @@ export class TuneIndexService implements OnDestroy {
     this._record.set(record);
     this.engine.setTuneIndex(record);
     logInfo(LogType.Success, `TuneIndexService: indexed ${filename}:${subtune}.`);
+    settle?.();
   }
 
   /**
