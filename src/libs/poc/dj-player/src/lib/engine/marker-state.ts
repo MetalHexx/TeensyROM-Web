@@ -182,7 +182,9 @@ export class MarkerState {
    *  `callsPerFrame`), never the live speed multiplier — shared by the nudge range and the loop
    *  audition pre-roll so both breathe with the tune, never the speed fader. */
   private msToFrames(ms: number): number {
-    const callsPerFrame = this.host.machine()?.callsPerFrame ?? 1;
+    // Unrounded, for the same reason `DjPlayerEngine.effectiveIntervalUs` is: this converts a real
+    // duration, and a CIA-timer tune's play rate need not divide the frame evenly.
+    const callsPerFrame = this.host.machine()?.exactCallsPerFrame ?? 1;
     const nominalUs = this.host.nominalIntervalUs();
     const tuneIntervalUs = nominalUs > 0 ? nominalUs / callsPerFrame : PAL_FRAME_INTERVAL_US;
     return Math.round((ms * 1000) / tuneIntervalUs);

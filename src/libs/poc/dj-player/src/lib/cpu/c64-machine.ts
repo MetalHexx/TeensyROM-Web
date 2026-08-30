@@ -249,6 +249,25 @@ export class C64Machine {
     return Math.min(MAX_CALLS_PER_FRAME, Math.max(1, Math.round(this.cyclesPerFrame / rate)));
   }
 
+  /**
+   * The same rate as `callsPerFrame`, but unrounded — the fractional play rate the CIA timer latch
+   * actually describes.
+   *
+   * A tune programs timer A to whatever period it wants, and that period is under no obligation to
+   * divide the frame evenly: rates like 2.4 calls per frame are ordinary. `callsPerFrame` rounds,
+   * which is right for the integer "how many calls does a frame want" question its name asks, but
+   * wrong as a divisor for the inter-call interval — rounding 2.4 to 2 paces the stream 20% slow, and
+   * the tune plays at the wrong tempo. Use this wherever the answer feeds a duration or a clock; use
+   * `callsPerFrame` only where an integer count is genuinely what is wanted.
+   */
+  get exactCallsPerFrame(): number {
+    const rate = this.cyclesPerPlayCall;
+    if (rate === null || rate <= 0 || rate >= this.cyclesPerFrame) {
+      return 1;
+    }
+    return Math.min(MAX_CALLS_PER_FRAME, this.cyclesPerFrame / rate);
+  }
+
   /** The address `runFrame` calls: the header's play address, or the vector an RSID installed. */
   get resolvedPlayAddress(): number {
     return this.playAddress;

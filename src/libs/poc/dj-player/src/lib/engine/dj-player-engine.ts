@@ -753,9 +753,13 @@ export class DjPlayerEngine implements OnDestroy {
   /**
    * The real inter-packet time. Multispeed is a tick rate, never a batch: `runFrame` plays the
    * routine once, so a 2x tune ticks twice per video frame at half the interval.
+   *
+   * Divides by the *unrounded* rate: a CIA-timer tune's play period need not divide the frame
+   * evenly, and rounding it here paces the whole stream wrong — a 2.4-calls-per-frame tune rounded
+   * to 2 plays 20% slow. See `C64Machine.exactCallsPerFrame`.
    */
   private effectiveIntervalUs(): number {
-    const callsPerFrame = this.tuneSession.machine?.callsPerFrame ?? 1;
+    const callsPerFrame = this.tuneSession.machine?.exactCallsPerFrame ?? 1;
     return this.nominalIntervalUs() / this.speedMultiplier() / callsPerFrame;
   }
 

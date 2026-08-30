@@ -208,6 +208,28 @@ describe('C64Machine', () => {
     expect(machine.callsPerFrame).toBe(Math.round(PAL_CYCLES_PER_FRAME / (0x1331 + 1)));
   });
 
+  it('keeps a fractional play rate unrounded, so a duration derived from it is not paced wrong', () => {
+    // LDA #$FD / STA $DC04 / LDA #$1F / STA $DC05 / RTS — latch $1FFD, so 8190 cycles per call.
+    // 19656 / 8190 is exactly 2.4: a rate that does not divide the frame evenly, which is ordinary
+    // for a CIA-timer tune and is precisely the case rounding gets wrong.
+    const file = tune({
+      playAddress: 0x100b,
+      blocks: [
+        { at: 0x1000, bytes: [0xa9, 0xfd, 0x8d, 0x04, 0xdc, 0xa9, 0x1f, 0x8d, 0x05, 0xdc, 0x60] },
+        { at: 0x100b, bytes: [0x60] },
+      ],
+    });
+    const machine = new C64Machine(file, new RecordingSink());
+
+    machine.initSubtune(1);
+
+    expect(machine.cyclesPerPlayCall).toBe(0x1ffd + 1);
+    expect(machine.exactCallsPerFrame).toBeCloseTo(2.4, 5);
+    // The integer form still answers its own question, and the two genuinely disagree here — an
+    // interval divided by the rounded rate would run this tune 20% slow.
+    expect(machine.callsPerFrame).toBe(2);
+  });
+
   it('reports one call per frame for a tune that never programs the timer', () => {
     const file = tune({ playAddress: 0x1001, blocks: [{ at: 0x1000, bytes: [0x60, 0x60] }] });
     const machine = new C64Machine(file, new RecordingSink());
