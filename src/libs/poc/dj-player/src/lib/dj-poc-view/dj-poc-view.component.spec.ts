@@ -84,6 +84,7 @@ interface MockDjPlayerEngine {
   positionPercent: WritableSignal<number>;
   nudgeRangeFrames: WritableSignal<number>;
   ceilingFrames: WritableSignal<number>;
+  tuneIndex: WritableSignal<TuneIndexRecord | null>;
   setTuneIndex: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
@@ -160,6 +161,7 @@ function makeEngine(): MockDjPlayerEngine {
     positionPercent: signal(0),
     nudgeRangeFrames: signal(50),
     ceilingFrames: signal(10_000),
+    tuneIndex: signal<TuneIndexRecord | null>(null),
     setTuneIndex: vi.fn(),
     play: vi.fn(),
     pause: vi.fn(),
@@ -1024,9 +1026,7 @@ describe('DjPocViewComponent', () => {
         engine.markers.set(markers);
       });
 
-      (
-        fixture.nativeElement.querySelector('.marker-end-revert') as HTMLButtonElement
-      ).click();
+      (fixture.nativeElement.querySelector('.marker-end-revert') as HTMLButtonElement).click();
       fixture.detectChanges();
 
       expect(engine.clearMarkerEnd).toHaveBeenCalledWith(0);
@@ -1285,6 +1285,76 @@ describe('DjPocViewComponent', () => {
     });
   });
 
+  describe('position bar structure', () => {
+    function scrubRegions(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.scrub-bar .scrub-region'));
+    }
+
+    function regionClasses(): string[][] {
+      return scrubRegions().map((region) => Array.from(region.classList));
+    }
+
+    function scrubTick(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('.scrub-tick');
+    }
+
+    function scrubInput(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('.scrub-row input[type="range"]');
+    }
+
+    it('renders one music region across the full bar for a loop-from-top record, with the tick at the left edge', () => {
+      engine.tuneIndex.set(buildTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 2_000 }));
+      fixture.detectChanges();
+
+      expect(regionClasses()).toEqual([['scrub-region', 'scrub-region--music']]);
+      expect(scrubTick()).not.toBeNull();
+      expect((scrubTick() as HTMLElement).style.left).toBe('0%');
+    });
+
+    it('renders an intro region then a music region for an intro-then-loop record, with the tick at the boundary', () => {
+      engine.tuneIndex.set(buildTuneIndexRecord({ loopStartFrame: 400, loopPeriodFrames: 1_600 }));
+      fixture.detectChanges();
+
+      expect(regionClasses()).toEqual([
+        ['scrub-region', 'scrub-region--intro'],
+        ['scrub-region', 'scrub-region--music'],
+      ]);
+      expect((scrubTick() as HTMLElement).style.left).toBe('20%'); // 400 / (400 + 1_600)
+    });
+
+    it('renders a music region — the same class as the loop case — up to the end point, then a dead region, with no tick', () => {
+      engine.tuneIndex.set(buildTuneIndexRecord({ endedAtFrame: 4_000 }));
+      fixture.detectChanges();
+
+      expect(regionClasses()).toEqual([
+        ['scrub-region', 'scrub-region--music'],
+        ['scrub-region', 'scrub-region--dead'],
+      ]);
+      expect(scrubTick()).toBeNull();
+    });
+
+    it('renders hatched across the fallback ceiling for a record that answered nothing', () => {
+      engine.tuneIndex.set(buildTuneIndexRecord());
+      fixture.detectChanges();
+
+      expect(regionClasses()).toEqual([['scrub-region', 'scrub-region--unknown']]);
+      expect(scrubTick()).toBeNull();
+    });
+
+    it('renders a distinct, disabled bar while analyzing — no tick, and a different class from unknown', async () => {
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      expect(regionClasses()).toEqual([['scrub-region', 'scrub-region--pending']]);
+      expect(scrubTick()).toBeNull();
+      expect(scrubInput().disabled).toBe(true);
+    });
+  });
+
   describe('delivery diagnostics readout', () => {
     function sectionText(label: string): string {
       const section = fixture.nativeElement.querySelector(`[aria-label="${label}"]`) as HTMLElement;
@@ -1341,12 +1411,16 @@ describe('DjPocViewComponent', () => {
       const labels: HTMLLabelElement[] = Array.from(
         fixture.nativeElement.querySelectorAll('[aria-label="Timing"] label.control')
       );
-      const label = labels.find((item) => (item.textContent ?? '').trim().startsWith('Schedule ahead'));
+      const label = labels.find((item) =>
+        (item.textContent ?? '').trim().startsWith('Schedule ahead')
+      );
       return label?.querySelector('select') as HTMLSelectElement;
     }
 
     it('widens the offered range past a single frame interval, so a shorter-than-window stall can be demonstrated', () => {
-      const values = Array.from(scheduleAheadSelect().options).map((option) => Number(option.value));
+      const values = Array.from(scheduleAheadSelect().options).map((option) =>
+        Number(option.value)
+      );
 
       expect(values).toEqual([0, 5, 20, 40, 80, 160]);
     });

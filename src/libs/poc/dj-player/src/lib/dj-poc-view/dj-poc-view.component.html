@@ -6,12 +6,41 @@
       <div class="control-row scrub-row">
         <span class="caption">Position</span>
         <div class="scrub-track">
-          <div class="scrub-track-fill" [style.width.%]="scrubDisplayPercent()"></div>
+          <div class="scrub-bar">
+            @switch (barState().kind) { @case ('loop') { @if (introRegionPercent() > 0) {
+            <div
+              class="scrub-region scrub-region--intro"
+              [style.width.%]="introRegionPercent()"
+            ></div>
+            }
+            <div
+              class="scrub-region scrub-region--music"
+              [style.width.%]="musicRegionPercent()"
+            ></div>
+            } @case ('ended') {
+            <div
+              class="scrub-region scrub-region--music"
+              [style.width.%]="musicRegionPercent()"
+            ></div>
+            <div
+              class="scrub-region scrub-region--dead"
+              [style.width.%]="deadRegionPercent()"
+            ></div>
+            } @case ('unknown') {
+            <div class="scrub-region scrub-region--unknown"></div>
+            } @case ('analyzing') {
+            <div class="scrub-region scrub-region--pending"></div>
+            } }
+          </div>
+          @if (barState().kind === 'loop') {
+          <div class="scrub-tick" [style.left.%]="introRegionPercent()"></div>
+          }
           <input
             type="range"
             min="0"
             max="100"
             [value]="scrubDisplayPercent()"
+            [disabled]="barState().kind === 'analyzing'"
             (input)="onScrubInput($event)"
             (change)="onScrubChange($event)"
           />
@@ -173,7 +202,10 @@
               </div>
 
               <div class="marker-progress" aria-hidden="true">
-                <div class="marker-progress-fill" [style.width.%]="progressPercentFor($index)"></div>
+                <div
+                  class="marker-progress-fill"
+                  [style.width.%]="progressPercentFor($index)"
+                ></div>
               </div>
             </div>
             }
@@ -487,7 +519,10 @@
           <div class="field-row field-row--wide">
             <dt>Interval (nominal)</dt>
             <dd>
-              {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)
+              {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{
+                nominalIntervalUs()
+              }}
+              µs)
             </dd>
           </div>
           <div class="field-row field-row--wide">

@@ -26,6 +26,8 @@ import {
   NUDGE_RANGE_MS,
   UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS,
 } from './dj-player-engine';
+import { timelineBasisFor } from './engine-utils';
+import type { DetectedLoopFrames } from './engine-utils';
 
 /** Bytes before the values in a SID data packet, plus the trailing `F7`. */
 const SID_DATA_PACKET_OVERHEAD = 12;
@@ -286,19 +288,30 @@ function counterTune(songs = 1): SidFile {
       {
         at: 0x1000,
         bytes: [
-          0xa9, 0x11, // LDA #$11
-          0x8d, 0x04, 0xd4, // STA $D404 (voice 1 control)
-          0x8d, 0x0b, 0xd4, // STA $D40B (voice 2 control)
-          0x8d, 0x12, 0xd4, // STA $D412 (voice 3 control)
+          0xa9,
+          0x11, // LDA #$11
+          0x8d,
+          0x04,
+          0xd4, // STA $D404 (voice 1 control)
+          0x8d,
+          0x0b,
+          0xd4, // STA $D40B (voice 2 control)
+          0x8d,
+          0x12,
+          0xd4, // STA $D412 (voice 3 control)
           RTS,
         ],
       },
       {
         at: 0x1010,
         bytes: [
-          0xe6, 0xfb, // INC $FB
-          0xa5, 0xfb, // LDA $FB
-          0x8d, 0x00, 0xd4, // STA $D400
+          0xe6,
+          0xfb, // INC $FB
+          0xa5,
+          0xfb, // LDA $FB
+          0x8d,
+          0x00,
+          0xd4, // STA $D400
           RTS,
         ],
       },
@@ -315,9 +328,13 @@ function doubleSpeedCounterTune(): SidFile {
       {
         at: 0x1010,
         bytes: [
-          0xe6, 0xfb, // INC $FB
-          0xa5, 0xfb, // LDA $FB
-          0x8d, 0x00, 0xd4, // STA $D400
+          0xe6,
+          0xfb, // INC $FB
+          0xa5,
+          0xfb, // LDA $FB
+          0x8d,
+          0x00,
+          0xd4, // STA $D400
           RTS,
         ],
       },
@@ -865,7 +882,6 @@ describe('DjPlayerEngine', () => {
     }
   });
 
-
   describe('reschedule on tempo change', () => {
     it('cancels and re-times every still-committed send once, at the new interval, with a port that can cancel', async () => {
       midi.supportsCancel.set(true);
@@ -875,7 +891,9 @@ describe('DjPlayerEngine', () => {
 
       await engine.play();
       clock.tick(2);
-      const committed = dataPackets(midi).slice(-2).map((packet) => packet.bytes);
+      const committed = dataPackets(midi)
+        .slice(-2)
+        .map((packet) => packet.bytes);
 
       engine.setSpeed(1.2);
 
@@ -885,7 +903,10 @@ describe('DjPlayerEngine', () => {
       // move.
       expect(resent.map((packet) => packet.bytes)).toEqual(committed);
       const newIntervalMs = PAL_FRAME_INTERVAL_US / 1.2 / 1000;
-      expect((resent[1].timestampMs ?? 0) - (resent[0].timestampMs ?? 0)).toBeCloseTo(newIntervalMs, 6);
+      expect((resent[1].timestampMs ?? 0) - (resent[0].timestampMs ?? 0)).toBeCloseTo(
+        newIntervalMs,
+        6
+      );
     });
 
     it('leaves committed sends untouched and never calls cancelPending with a port that cannot cancel', async () => {
@@ -1090,7 +1111,7 @@ describe('DjPlayerEngine', () => {
         midi.supportsCancel.set(true);
         midi.cancelPendingReturns = true;
         engine.loadTune(silentTune());
-          engine.setScheduleAhead(200);
+        engine.setScheduleAhead(200);
 
         await engine.play();
         clock.tick(2);
@@ -1107,7 +1128,7 @@ describe('DjPlayerEngine', () => {
 
       it('leaves the latency at -1 when the selected port cannot cancel', async () => {
         engine.loadTune(silentTune());
-          engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
+        engine.setScheduleAhead(UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS);
 
         await engine.play();
         clock.tick(1);
@@ -1120,7 +1141,7 @@ describe('DjPlayerEngine', () => {
         midi.supportsCancel.set(true);
         midi.cancelPendingReturns = true;
         engine.loadTune(silentTune());
-          engine.setScheduleAhead(200);
+        engine.setScheduleAhead(200);
 
         await engine.play();
         clock.tick(2);
@@ -1608,7 +1629,9 @@ describe('DjPlayerEngine', () => {
       engine.setMarkerStartOffset(0, -10);
       engine.triggerMarker(0);
       clock.tick(5); // the resync, then three frames played on from it
-      const nudged = dataPackets(midi).slice(-4).map((packet) => packet.bytes);
+      const nudged = dataPackets(midi)
+        .slice(-4)
+        .map((packet) => packet.bytes);
 
       const freshClock = new FakeFrameClock();
       const freshMidi = new FakeMidiOutputService();
@@ -1628,7 +1651,11 @@ describe('DjPlayerEngine', () => {
       freshEngine.triggerMarker(0);
       freshClock.tick(5);
 
-      expect(nudged).toEqual(dataPackets(freshMidi).slice(-4).map((packet) => packet.bytes));
+      expect(nudged).toEqual(
+        dataPackets(freshMidi)
+          .slice(-4)
+          .map((packet) => packet.bytes)
+      );
     });
 
     it('triggers a nudged marker without emulating a frame, however deep it was captured', async () => {
@@ -2240,9 +2267,9 @@ describe('DjPlayerEngine', () => {
       await playTo(0);
       engine.setTuneIndex(fakeTuneIndexRecord({ endedAtFrame: 40 }));
 
-      // Basis and the end-of-track routing are fed from one record, so they are asserted together —
-      // drifting apart is the failure mode.
-      expect(engine.positionBasisFrames()).toBe(40);
+      // The end-of-track routing still reads the raw end point, but the basis now runs a fixed
+      // fraction past it — see `timelineBasisFor` — so the two deliberately diverge for an ended tune.
+      expect(engine.positionBasisFrames()).toBe(50);
       expect(engine.trackEndFrame()).toBe(40);
 
       clock.tick(40); // reaches the end point, queuing a restore
@@ -2433,7 +2460,10 @@ describe('DjPlayerEngine', () => {
         providers: [
           DjPlayerEngine,
           { provide: FRAME_CLOCK, useValue: new FakeFrameClock() },
-          { provide: MidiOutputService, useValue: new FakeMidiOutputService() as unknown as MidiOutputService },
+          {
+            provide: MidiOutputService,
+            useValue: new FakeMidiOutputService() as unknown as MidiOutputService,
+          },
           { provide: REPLAY_RUNNER, useValue: new FakeReplayRunner() },
         ],
       });
@@ -2452,7 +2482,10 @@ describe('DjPlayerEngine', () => {
         providers: [
           DjPlayerEngine,
           { provide: FRAME_CLOCK, useValue: new FakeFrameClock() },
-          { provide: MidiOutputService, useValue: new FakeMidiOutputService() as unknown as MidiOutputService },
+          {
+            provide: MidiOutputService,
+            useValue: new FakeMidiOutputService() as unknown as MidiOutputService,
+          },
           { provide: REPLAY_RUNNER, useValue: new FakeReplayRunner() },
         ],
       });
@@ -3004,7 +3037,10 @@ describe('DjPlayerEngine', () => {
       const ceiling = expectedCeilingFrames();
       clock.tick(Math.round(ceiling * 0.1));
 
-      expect(engine.positionPercent()).toBeCloseTo(engine.stats().framesRendered / ceiling * 100, 6);
+      expect(engine.positionPercent()).toBeCloseTo(
+        (engine.stats().framesRendered / ceiling) * 100,
+        6
+      );
     });
 
     it('clamps to 100 past the fixed ceiling rather than overflowing', async () => {
@@ -3081,10 +3117,7 @@ describe('DjPlayerEngine', () => {
       engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 100 }));
 
       expect(engine.positionBasisFrames()).toBe(100);
-      expect(engine.positionPercent()).toBeCloseTo(
-        (engine.stats().framesRendered / 100) * 100,
-        6
-      );
+      expect(engine.positionPercent()).toBeCloseTo((engine.stats().framesRendered / 100) * 100, 6);
     });
 
     it('reverts to the fixed ceiling and drops the detected loop when a fresh tune replaces the indexed one', () => {
@@ -3110,5 +3143,40 @@ describe('DjPlayerEngine', () => {
       engine.setTuneIndex(null);
       expect(engine.timingMode()).toBe(DEFAULT_TIMING_MODE);
     });
+  });
+});
+
+describe('timelineBasisFor', () => {
+  /** The fraction baked into `timelineBasisFor`'s ended branch — duplicated only to compute the
+   *  expected span, not a re-test of the constant itself. */
+  const ENDED_MUSIC_FRACTION = 0.8;
+
+  function detection(overrides: Partial<DetectedLoopFrames>): DetectedLoopFrames {
+    return { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null, ...overrides };
+  }
+
+  it('answers a verified loop with intro plus one lap, exactly as positionBasisFor does', () => {
+    expect(timelineBasisFor(detection({ loopStartFrame: 10, loopPeriodFrames: 20 }))).toBe(30);
+    expect(timelineBasisFor(detection({ loopStartFrame: 0, loopPeriodFrames: 2_500 }))).toBe(2_500);
+  });
+
+  it('puts an ended tune’s music at the fixed fraction, whether it ends well under or well over the jump ceiling', () => {
+    const wellUnderCeiling = 2_000; // ~40 s at PAL, far short of the 300 s jump ceiling
+    const wellOverCeiling = 40_000; // ~800 s at PAL, well past it
+
+    const underSpan = timelineBasisFor(detection({ endedAtFrame: wellUnderCeiling }));
+    const overSpan = timelineBasisFor(detection({ endedAtFrame: wellOverCeiling }));
+
+    expect(underSpan).toBe(Math.round(wellUnderCeiling / ENDED_MUSIC_FRACTION));
+    expect(overSpan).toBe(Math.round(wellOverCeiling / ENDED_MUSIC_FRACTION));
+    expect(wellUnderCeiling / (underSpan ?? 1)).toBeCloseTo(ENDED_MUSIC_FRACTION, 6);
+    expect(wellOverCeiling / (overSpan ?? 1)).toBeCloseTo(ENDED_MUSIC_FRACTION, 6);
+  });
+
+  it('falls back to null for a record that answered nothing, same as positionBasisFor', () => {
+    expect(timelineBasisFor(null)).toBeNull();
+    expect(timelineBasisFor(detection({}))).toBeNull();
+    expect(timelineBasisFor(detection({ loopStartFrame: 0, loopPeriodFrames: 0 }))).toBeNull();
+    expect(timelineBasisFor(detection({ loopStartFrame: 0, loopPeriodFrames: -10 }))).toBeNull();
   });
 });

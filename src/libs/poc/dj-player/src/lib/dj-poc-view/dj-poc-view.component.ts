@@ -14,12 +14,15 @@ import {
   NOMINAL_INTERVAL_OPTIONS_US,
   SPEED_INPUT_SPAN,
 } from '../engine/dj-player-engine';
+import { positionBasisFor, timelineBasisFor } from '../engine/engine-utils';
+import type { DetectedLoopFrames } from '../engine/engine-utils';
 import { TrackAnalysisPanelComponent } from '../analysis/track-analysis-panel/track-analysis-panel.component';
 import { TuneIndexPanelComponent } from '../analysis/tune-index-panel/tune-index-panel.component';
 import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
 import { WorkerAnalysisScanner } from '../analysis/worker-analysis-scanner';
 import { TUNE_INDEX_STORAGE, LocalStorageTuneIndexStorage } from '../analysis/tune-index-storage';
 import { TuneIndexService } from '../analysis/tune-index.service';
+import type { TuneIndexRecord } from '../analysis/tune-index.model';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
 interface TuneSource {
@@ -27,6 +30,16 @@ interface TuneSource {
   readonly label: string;
   readonly getBytes: () => Uint8Array;
 }
+
+/** What the position bar draws. `unknown` is a verdict, not a waiting room — a record that answered
+ *  nothing renders hatched and never falls back to another state. `analyzing` is a transient that
+ *  looks different on purpose: hatched means "we looked and verified nothing", dimmed means "nothing
+ *  has been looked for yet". Neither `analyzing` nor `unknown` carries a tick or a playhead. */
+type BarState =
+  | { kind: 'analyzing' }
+  | { kind: 'unknown' }
+  | { kind: 'loop'; introPercent: number } // 0 for loop-from-top; the tick sits at introPercent
+  | { kind: 'ended'; musicPercent: number }; // no tick — there is no loop point
 
 const MICROSECONDS_PER_SECOND = 1_000_000;
 
@@ -153,6 +166,53 @@ export class DjPocViewComponent {
   protected readonly scrubDisplayPercent = computed<number>(
     () => this.scrubDragValue() ?? this.engine.positionPercent()
   );
+
+  /** What the position bar draws, over the index record and the pending signal — the one place that
+   *  decides loop vs. ended vs. unknown vs. analyzing, so the regions, the tick and the disabled state
+   *  can never disagree about it. `timelineBasisFor` gates whether the record answered anything at
+   *  all; `positionBasisFor` supplies the ended case's music length, exactly as it does for both
+   *  analysis panels' Length rows. */
+  protected readonly barState = computed<BarState>(() => {
+    if (this.tuneIndex.pending()) {
+      return { kind: 'analyzing' };
+    }
+    const record: TuneIndexRecord | null = this.engine.tuneIndex();
+    if (record === null) {
+      return { kind: 'unknown' };
+    }
+    const detected: DetectedLoopFrames = record;
+    const timeline = timelineBasisFor(detected);
+    if (timeline === null) {
+      return { kind: 'unknown' };
+    }
+    if (detected.loopStartFrame !== null && detected.loopPeriodFrames !== null) {
+      return { kind: 'loop', introPercent: (detected.loopStartFrame / timeline) * 100 };
+    }
+    return { kind: 'ended', musicPercent: ((positionBasisFor(detected) ?? 0) / timeline) * 100 };
+  });
+
+  /** The intro region's share of the bar, and the tick's left offset — 0 for a loop that repeats from
+   *  the top. Zero outside the 'loop' state, where the template never reads it. */
+  protected readonly introRegionPercent = computed<number>(() => {
+    const state = this.barState();
+    return state.kind === 'loop' ? state.introPercent : 0;
+  });
+
+  /** The music region's share of the bar: the loop case's remainder after the intro, or the ended
+   *  case's own share. Zero outside those two states. */
+  protected readonly musicRegionPercent = computed<number>(() => {
+    const state = this.barState();
+    if (state.kind === 'loop') return 100 - state.introPercent;
+    if (state.kind === 'ended') return state.musicPercent;
+    return 0;
+  });
+
+  /** The dead-tail region's share for an ended tune — the remainder after the music. Zero outside
+   *  'ended', where the template never reads it. */
+  protected readonly deadRegionPercent = computed<number>(() => {
+    const state = this.barState();
+    return state.kind === 'ended' ? 100 - state.musicPercent : 0;
+  });
 
   /** Marker index → the start offset being dragged right now. Absent means "not dragging that
    * marker's start". Re-deriving a captured point replays frames, so the commit has to wait for the

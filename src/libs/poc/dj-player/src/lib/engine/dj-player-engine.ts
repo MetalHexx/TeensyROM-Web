@@ -30,7 +30,7 @@ import { REPLAY_RUNNER } from '../replay/replay-runner';
 import { DeliveryTransport } from './delivery';
 import { MarkerState } from './marker-state';
 import { TuneSession } from './tune-session';
-import { clamp, describeError, positionBasisFor } from './engine-utils';
+import { clamp, describeError, timelineBasisFor } from './engine-utils';
 import { DEFAULT_TIMING_MODE, playCallIntervalUs, playRateFor } from './play-rate';
 import type { PlayRate, TimingMode } from './play-rate';
 
@@ -44,12 +44,7 @@ export type EngineState = 'stopped' | 'playing' | 'paused' | 'ended' | 'error';
 // The marker/nudge types are Marker State's, but they are part of this module's public shape — the
 // view and its spec import them from here, so they flow through unchanged rather than moving their
 // import path.
-export type {
-  CapturedPoint,
-  Marker,
-  MarkerEnd,
-  PositionAnchor,
-} from './marker-state';
+export type { CapturedPoint, Marker, MarkerEnd, PositionAnchor } from './marker-state';
 export { LOOP_AUDITION_PREROLL_MS, NUDGE_RANGE_MS } from './marker-state';
 export { JUMP_CEILING_SECONDS } from './tune-session';
 export { UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS } from './delivery';
@@ -245,7 +240,10 @@ export class DjPlayerEngine implements OnDestroy {
   readonly timingMode = signal<TimingMode>(DEFAULT_TIMING_MODE);
   /** The machine's two rates, refreshed on every subtune init — the CIA latch is only meaningful
    *  after init has run, so this cannot be read at load time. */
-  private readonly machineRates = signal<{ exact: number; rounded: number }>({ exact: 1, rounded: 1 });
+  private readonly machineRates = signal<{ exact: number; rounded: number }>({
+    exact: 1,
+    rounded: 1,
+  });
   /** The rate in force for every duration in the player — `ceilingFrames`, the nudge range, the loop
    *  pre-roll and the clock interval all read this rather than choosing between `callsPerFrame` and
    *  `exactCallsPerFrame` themselves. A `computed` over `machineRates()` rather than a read of
@@ -573,7 +571,11 @@ export class DjPlayerEngine implements OnDestroy {
       this._rememberedSpeed.set(this.speedMultiplier());
       this.excursionDirection = direction;
       const delta = direction === 'up' ? SPEED_JUMP_STEP : -SPEED_JUMP_STEP;
-      this.applySpeedBounded(this.speedMultiplier() + delta, this.slowestSpeed(), this.fastestSpeed());
+      this.applySpeedBounded(
+        this.speedMultiplier() + delta,
+        this.slowestSpeed(),
+        this.fastestSpeed()
+      );
       return;
     }
     if (this.excursionDirection === direction) {
@@ -641,7 +643,12 @@ export class DjPlayerEngine implements OnDestroy {
    */
   setTuneIndex(record: TuneIndexRecord | null): void {
     this._tuneIndex.set(record);
-    this.tuneSession.setIndexedLengthFrames(positionBasisFor(record));
+    // The session's own position basis — what the playhead and the drawn structure are measured
+    // against — is `timelineBasisFor`, not `positionBasisFor`: an ended tune needs a bar that runs
+    // past its end point for the dead tail to be drawable. `positionBasisFor` itself is untouched and
+    // still drives both analysis panels' Length rows and the track end the deck stops at, through
+    // `setTrackStructure` below.
+    this.tuneSession.setIndexedLengthFrames(timelineBasisFor(record));
     this.markerState.setTrackStructure(
       record?.loopStartFrame ?? null,
       record?.loopPeriodFrames ?? null,
@@ -764,7 +771,9 @@ export class DjPlayerEngine implements OnDestroy {
     try {
       localStorage.setItem(REPEAT_TRACK_STORAGE_KEY, String(enabled));
     } catch (error) {
-      logWarn(`DJ engine: could not persist the repeat-track preference to localStorage — ${error}`);
+      logWarn(
+        `DJ engine: could not persist the repeat-track preference to localStorage — ${error}`
+      );
     }
   }
 

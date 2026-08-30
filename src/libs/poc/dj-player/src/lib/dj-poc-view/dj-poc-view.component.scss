@@ -26,6 +26,29 @@
   --marker-action-width: 4.5rem;
   --marker-revert-width: 4rem;
 
+  // POC-local semantic aliases over the app's theme tokens, so the drawn structure reads as one
+  // instrument with the rest of the surface while staying self-contained here. Values come from the
+  // theme where a theme ancestor exists.
+  --structure-music: var(--color-highlight); // #00f7ff
+  --structure-intro: #7b2d8e; // the one value with no theme ancestor — between --color-primary and
+  // --color-primary-bright
+  --structure-dead: #1c1c26;
+  --structure-pending: #191922;
+  --structure-unknown-a: #2e2e42;
+  --structure-unknown-b: #22222f;
+  --structure-tick: var(--color-directory); // #f5e29e — chosen for contrast against both the purple
+  // intro and the cyan music
+  --structure-border: #33334a;
+
+  // Chrome greys — no theme ancestor, POC-local by nature. Defined here rather than at each use site
+  // because the transport row's indicator and toggle consume them in a later task.
+  --chrome-inset: #2e2e3e; // an unlit indicator's body
+  --chrome-inset-border: #3d3d52; // its rim, and the toggle pill's rim
+  --chrome-raised: #2a2a3a; // the toggle pill, off
+  --chrome-knob: #6a6a80; // the toggle knob, off
+  --chrome-dark: #33334a; // the deliberately-dark `stopped` light
+  --chrome-dark-border: #44445c;
+
   display: flex;
   gap: var(--spacing-lg);
   height: 100%;
@@ -612,30 +635,120 @@
   }
 }
 
-// The elapsed fill sits behind a transparent-background range input, the same stacking technique
-// as .marker-nudge above — the fill shows the played portion, the native thumb still handles drag.
+// The row wrapper: the hit target, sized to the control's full reach rather than shrinking to the
+// drawn bar, and the tick's own positioning context — the tick has to sit outside the bar below,
+// whose `overflow: hidden` would otherwise clip it. The transparent-background range input on top is
+// the same stacking technique `.marker-nudge` uses; the native thumb still handles drag.
 .scrub-track {
   position: relative;
   flex: 1 1 auto;
+  display: flex;
+  align-items: center;
   height: var(--perf-control-height);
-  border: 1px solid var(--color-dimmed);
-  border-radius: var(--border-radius-md);
-  overflow: hidden;
 
   input[type='range'] {
     position: absolute;
     inset: 0;
     margin: 0;
     background: transparent;
+
+    &::-webkit-slider-thumb {
+      appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #f2f2fa;
+      border: 1px solid var(--color-primary-bright);
+      box-shadow: 0 0 7px rgba(179, 51, 179, 0.75);
+    }
+
+    &::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #f2f2fa;
+      border: 1px solid var(--color-primary-bright);
+      box-shadow: 0 0 7px rgba(179, 51, 179, 0.75);
+    }
+
+    // No span exists to scrub against while analyzing, and playback has not started — see
+    // `barState` in the component. Hidden rather than removed: the input itself stays disabled, not
+    // absent, so the row's layout never shifts.
+    &:disabled::-webkit-slider-thumb {
+      visibility: hidden;
+    }
+
+    &:disabled::-moz-range-thumb {
+      visibility: hidden;
+    }
   }
 }
 
-.scrub-track-fill {
+// The drawn bar — 12px tall regardless of the row's own height, centred in it by the flex
+// `align-items: center` above. `overflow: hidden` is what gives the regions their rounded ends.
+.scrub-bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 12px;
+  display: flex;
+  border: 1px solid var(--structure-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--structure-dead);
+}
+
+.scrub-region {
+  height: 100%;
+
+  &--music {
+    background: var(--structure-music);
+    box-shadow: inset 0 0 8px rgba(0, 247, 255, 0.45);
+  }
+
+  &--intro {
+    background: var(--structure-intro);
+    box-shadow: inset 0 0 8px rgba(179, 51, 179, 0.4);
+  }
+
+  &--dead {
+    background: var(--structure-dead);
+  }
+
+  &--unknown {
+    width: 100%;
+    background: repeating-linear-gradient(
+      45deg,
+      var(--structure-unknown-a) 0 5px,
+      var(--structure-unknown-b) 5px 10px
+    );
+  }
+
+  &--pending {
+    width: 100%;
+    background: var(--structure-pending);
+  }
+}
+
+// The loop point — outside `.scrub-bar`'s clipped box, positioned against `.scrub-track` instead, so
+// it reads over the bar rather than being cut off at its edge.
+.scrub-tick {
   position: absolute;
-  inset: 0;
-  width: 0;
-  background: var(--color-dimmed);
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  background: var(--structure-tick);
+  box-shadow: 0 0 7px rgba(245, 226, 158, 0.95);
   pointer-events: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--structure-tick);
+  }
 }
 
 // Speed: multiplier readout above the fader, mode selector below it. The fader is vertical — a
