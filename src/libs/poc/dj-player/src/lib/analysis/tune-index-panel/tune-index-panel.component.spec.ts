@@ -15,11 +15,10 @@ interface StubTuneIndexService {
 }
 
 interface StubEngine {
-  tuneLoopOutFrame: WritableSignal<number | null>;
-  tuneLoopArmed: WritableSignal<boolean>;
+  repeatTrack: WritableSignal<boolean>;
   nominalIntervalUs: WritableSignal<number>;
   playRate: WritableSignal<PlayRate>;
-  armTuneLoop: ReturnType<typeof vi.fn>;
+  setRepeatTrack: ReturnType<typeof vi.fn>;
 }
 
 /** One play call per 20 ms, so a frame count converts to seconds by a round factor of 50. */
@@ -40,11 +39,10 @@ function makeTuneIndexService(): StubTuneIndexService {
 
 function makeEngine(): StubEngine {
   return {
-    tuneLoopOutFrame: signal<number | null>(null),
-    tuneLoopArmed: signal<boolean>(false),
+    repeatTrack: signal<boolean>(true),
     nominalIntervalUs: signal<number>(20_000),
     playRate: signal<PlayRate>(SINGLE_SPEED),
-    armTuneLoop: vi.fn(),
+    setRepeatTrack: vi.fn(),
   };
 }
 
@@ -202,21 +200,35 @@ describe('TuneIndexPanelComponent', () => {
     expect(component['lengthLabel']()).toBe('2:14');
   });
 
-  it('disables the loop toggle with no armable loop, and enables it once one exists', () => {
-    expect(component['canLoop']()).toBe(false);
+  it('reflects the repeatTrack signal regardless of whether a loop was detected', () => {
+    expect(component['repeatTrack']()).toBe(true);
 
-    engine.tuneLoopOutFrame.set(6700);
+    engine.repeatTrack.set(false);
     fixture.detectChanges();
 
-    expect(component['canLoop']()).toBe(true);
+    expect(component['repeatTrack']()).toBe(false);
   });
 
-  it('re-arms the loop through the engine when the toggle is switched on', () => {
-    const input = { checked: true } as unknown as HTMLInputElement;
+  it('writes the preference through the engine when the toggle is switched', () => {
+    const input = { checked: false } as unknown as HTMLInputElement;
 
-    component['onLoopToggle']({ target: input } as unknown as Event);
+    component['onRepeatToggle']({ target: input } as unknown as Event);
 
-    expect(engine.armTuneLoop).toHaveBeenCalledWith(true);
+    expect(engine.setRepeatTrack).toHaveBeenCalledWith(false);
+  });
+
+  it('is never disabled — repeat is a property of the player, not of the tune', () => {
+    const repeatCheckbox = () =>
+      fixture.nativeElement.querySelector('[aria-label="Repeat track"]') as HTMLInputElement;
+
+    expect(repeatCheckbox().disabled).toBe(false);
+
+    tuneIndexService.record.set(
+      fakeRecord({ loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null })
+    );
+    fixture.detectChanges();
+
+    expect(repeatCheckbox().disabled).toBe(false);
   });
 
   it('flags a verified loop whose period is under fifteen seconds as implausible', () => {
@@ -246,13 +258,12 @@ describe('TuneIndexPanelComponent', () => {
     expect(component['loopImplausible']()).toBe(false);
   });
 
-  it('does not disable or alter the loop toggle when the implausible label shows', () => {
+  it('does not alter the repeat preference when the implausible label shows', () => {
     tuneIndexService.record.set(fakeRecord({ loopStartFrame: 0, loopPeriodFrames: 500 }));
-    engine.tuneLoopOutFrame.set(500);
     fixture.detectChanges();
 
     expect(component['loopImplausible']()).toBe(true);
-    expect(component['canLoop']()).toBe(true);
+    expect(component['repeatTrack']()).toBe(true);
   });
 
   it('has no timing mode to reflect while no record is indexed', () => {

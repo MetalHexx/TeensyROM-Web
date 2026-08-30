@@ -16,10 +16,10 @@ const NOT_FOUND_LABEL = 'not found';
 const ENDED_LABEL = 'ends, no loop';
 
 /** Below this, a byte-verified repeat is almost certainly an ostinato or an idle cycle rather than
- *  the tune's musical loop. Informational only — the loop still arms; see R3's rule in
- *  DjPlayerEngine.setTuneIndex. The bar sits at the top of the range investigation pointed at,
- *  because showing the label on a genuine loop costs nothing and missing one costs the diagnosis
- *  the label exists to give. */
+ *  the tune's musical loop. Informational only — the loop still drives playback unsuppressed; see
+ *  the note in DjPlayerEngine.setTuneIndex. The bar sits at the top of the range investigation
+ *  pointed at, because showing the label on a genuine loop costs nothing and missing one costs the
+ *  diagnosis the label exists to give. */
 const IMPLAUSIBLE_PERIOD_SECONDS = 15;
 
 /** Either a verified loop worth rendering field by field, or the one placeholder both loop rows show
@@ -40,9 +40,9 @@ function keyLabelFor(record: TuneIndexRecord): string {
 
 /**
  * The rail's compact, always-visible tune index readout: native length, the detected loop's start and
- * period, key and Camelot number, and the explicit re-arm the scrub-beats-loop rule requires. Reads
- * the same `TuneIndexService` record the engine's own tune index draws from, so this panel and the
- * Track Analysis panel it sits beside can never disagree about the answer.
+ * period, key and Camelot number, and the Repeat track preference. Reads the same `TuneIndexService`
+ * record the engine's own tune index draws from, so this panel and the Track Analysis panel it sits
+ * beside can never disagree about the answer.
  *
  * Every duration is derived at display time from the record's frames and the rate currently in force,
  * never from a stored number of seconds — which is what makes the readout follow the Timing selector
@@ -59,9 +59,7 @@ export class TuneIndexPanelComponent {
   private readonly engine = inject(DjPlayerEngine);
 
   protected readonly analysing: Signal<boolean> = this.tuneIndexService.pending;
-  protected readonly tuneLoopArmed = this.engine.tuneLoopArmed;
-
-  protected readonly canLoop = computed<boolean>(() => this.engine.tuneLoopOutFrame() !== null);
+  protected readonly repeatTrack = this.engine.repeatTrack;
 
   private readonly loopReadout = computed<LoopReadout>(() => {
     if (this.analysing()) return { kind: 'placeholder', label: ANALYSING_LABEL };
@@ -123,8 +121,8 @@ export class TuneIndexPanelComponent {
     () => this.tuneIndexService.record()?.timingMode ?? null
   );
 
-  protected onLoopToggle(event: Event): void {
-    this.engine.armTuneLoop((event.target as HTMLInputElement).checked);
+  protected onRepeatToggle(event: Event): void {
+    this.engine.setRepeatTrack((event.target as HTMLInputElement).checked);
   }
 
   protected onTimingModeChange(event: Event): void {

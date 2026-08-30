@@ -3,7 +3,13 @@ import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import { C64Machine, FrameResult, MachineSnapshot } from '../cpu/c64-machine';
 import { RegisterFrame } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
-import { clamp, describeError, sanitizePositiveFrame, sanitizeStartFrame } from './engine-utils';
+import {
+  clamp,
+  describeError,
+  positionBasisFor,
+  sanitizePositiveFrame,
+  sanitizeStartFrame,
+} from './engine-utils';
 import { msToPlayCalls } from './play-rate';
 import type { PlayRate } from './play-rate';
 
@@ -116,6 +122,11 @@ export interface MarkerHost {
   queueResync(): void;
   /** Whichever voices are silenced right now, latched XOR held — seeds a replay's throwaway frame. */
   effectiveMutes(): readonly boolean[];
+  /** The player-level preference the end-of-track routing decides against — whether a track plays
+   *  forever or once. */
+  repeatEnabled(): boolean;
+  /** Stops the track in place once its end is reached with `repeatEnabled()` false. */
+  endTrack(): void;
   /** Marks the engine's failure state and logs why. */
   fail(reason: string): void;
 }
@@ -148,14 +159,19 @@ export class MarkerState {
   readonly tuneLoopStartFrame: WritableSignal<number | null> = signal(null);
   /** One lap of the detected loop, in frames; null when detection found no loop. */
   readonly tuneLoopPeriodFrames: WritableSignal<number | null> = signal(null);
-  /** Whether the whole-tune loop is currently allowed to fire. */
-  readonly tuneLoopArmed: WritableSignal<boolean> = signal(false);
-  /** start + period — the frame the tick compares against. Null unless both are usable. */
-  readonly tuneLoopOutFrame: Signal<number | null> = computed<number | null>(() => {
-    const start = this.tuneLoopStartFrame();
-    const period = this.tuneLoopPeriodFrames();
-    return start === null || period === null ? null : start + period;
-  });
+  /** Where an ended-detection track stops, in rendered frames; null when detection found no such
+   *  point. Mutually exclusive with a detected loop — a record carries one outcome or the other. */
+  private readonly endedAtFrame: WritableSignal<number | null> = signal(null);
+  /** Where the track ends: loop start + period for a looping tune, the end point for an ended one,
+   *  null when detection declined to answer. Computed through `positionBasisFor` rather than a
+   *  second rule, so this and the length readouts never disagree about what "the end" means. */
+  readonly trackEndFrame: Signal<number | null> = computed<number | null>(() =>
+    positionBasisFor({
+      loopStartFrame: this.tuneLoopStartFrame(),
+      loopPeriodFrames: this.tuneLoopPeriodFrames(),
+      endedAtFrame: this.endedAtFrame(),
+    })
+  );
 
   /**
    * The nudge range in frames for the loaded tune.
@@ -207,8 +223,9 @@ export class MarkerState {
    * Clears every marker, and lets go of whatever was looping — a new tune invalidates every captured
    * snapshot, since a marker's start holds machine state, not a frame number.
    *
-   * Only the marker loop: the whole-tune loop is disarmed on the load path by `setTuneLoop`, which
-   * `DjPlayerEngine.loadTune` reaches through `setTuneIndex(null)` before it gets here.
+   * Only the marker loop: the whole-tune structure is cleared on the load path by
+   * `setTrackStructure`, which `DjPlayerEngine.loadTune` reaches through `setTuneIndex(null)` before
+   * it gets here.
    */
   clear(): void {
     this.markers.set([]);
@@ -216,27 +233,28 @@ export class MarkerState {
   }
 
   /**
-   * Adopts the detected whole-tune loop and arms it whenever a usable period exists; a period that is
-   * not a finite number greater than zero describes no lap, so it disarms instead.
+   * Adopts the detected track structure — the three nullable fields the index record stores it in.
+   * A loop period that is not a finite number greater than zero describes no lap, so the loop start
+   * is dropped alongside it; an ended point that is not a finite number greater than zero is
+   * likewise treated as no answer.
    *
-   * A `startFrame` of 0 — a tune that repeats from its very first frame — is valid and must survive
-   * validation, which is why the start is checked for `>= 0` rather than through
+   * A `loopStartFrame` of 0 — a tune that repeats from its very first frame — is valid and must
+   * survive validation, which is why the start is checked for `>= 0` rather than through
    * `sanitizePositiveFrame`. No plausibility bar beyond that: see `DjPlayerEngine.setTuneIndex`.
    *
    * Drops whatever entry image was held: it was produced for the previous detection's start frame,
    * so a new detection has nothing to say about it.
    */
-  setTuneLoop(startFrame: number | null, periodFrames: number | null): void {
-    const period = sanitizePositiveFrame(periodFrames);
-    this.tuneLoopStartFrame.set(period === null ? null : sanitizeStartFrame(startFrame));
+  setTrackStructure(
+    loopStartFrame: number | null,
+    loopPeriodFrames: number | null,
+    endedAtFrame: number | null
+  ): void {
+    const period = sanitizePositiveFrame(loopPeriodFrames);
+    this.tuneLoopStartFrame.set(period === null ? null : sanitizeStartFrame(loopStartFrame));
     this.tuneLoopPeriodFrames.set(period);
-    this.tuneLoopArmed.set(period !== null);
+    this.endedAtFrame.set(sanitizePositiveFrame(endedAtFrame));
     this.tuneLoopEntry = null;
-  }
-
-  /** The operator's explicit arm/disarm — the only thing that writes it once a detection has landed. */
-  setTuneLoopArmed(armed: boolean): void {
-    this.tuneLoopArmed.set(armed);
   }
 
   /** Drops the anchor ring and the whole-tune loop's entry image — each describes a machine that no
@@ -616,32 +634,38 @@ export class MarkerState {
   }
 
   /**
-   * The whole-tune loop's own advance, reached only when no marker is looping: re-enters at the
-   * loop start once `tuneLoopOutFrame()` — the end of the first lap — is passed, indefinitely, as
-   * long as the loop is armed.
+   * The end-of-track routing, reached only when no marker is looping: acts once `trackEndFrame()` is
+   * passed, deciding what "the end" means against `MarkerHost.repeatEnabled()`.
    *
-   * Restores `tuneLoopEntry` — the image `setTuneLoopEntry` was handed for the loop start — so a
-   * tune with an unrepeating intro plays that intro once. With none held it restores
-   * `anchorRing[0]`, the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor` never
-   * evicts: right for a start of 0, and the honest degradation for a non-zero start whose image has
-   * not landed.
+   * With repeat off, an ended-detection tune stops just the same as a looping one — its own program
+   * sits in a static idle cycle forever, so declining to wrap would leave the audio cycling while the
+   * position counter climbed past the end of the bar. Off must actively stop, via
+   * `MarkerHost.endTrack()`.
    *
-   * Either way through the same `MarkerHost.restoreState` primitive a marker restores through, and
-   * with the frame number the restored image actually names: winding the rendered-frame count back
-   * is what makes the scrubber visibly snap back rather than the audio looping while the position
-   * bar keeps climbing off the end.
+   * With repeat on, a looping tune restores `tuneLoopEntry` — the image `setTuneLoopEntry` was handed
+   * for the loop start — so a tune with an unrepeating intro plays that intro once; with none held it
+   * restores `anchorRing[0]`, the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor`
+   * never evicts. An ended-detection tune always restores the frame-0 seed instead: it has no loop
+   * start of its own, so repeating it means replaying the whole track, intro included.
+   *
+   * Either restore goes through the same `MarkerHost.restoreState` primitive a marker restores
+   * through, and with the frame number the restored image actually names: winding the rendered-frame
+   * count back is what makes the scrubber visibly snap back rather than the audio looping while the
+   * position bar keeps climbing off the end.
    */
   private advanceTuneLoop(framesRendered: number): boolean {
-    if (!this.tuneLoopArmed()) return false;
-    const outFrame = this.tuneLoopOutFrame();
+    const outFrame = this.trackEndFrame();
     if (outFrame === null) return false;
     if (framesRendered < outFrame) return false;
 
-    const entry = this.tuneLoopEntry ?? this.anchorRing[0] ?? null;
-    if (entry === null) {
-      this.tuneLoopArmed.set(false);
-      return false;
+    if (!this.host.repeatEnabled()) {
+      this.host.endTrack();
+      return true;
     }
+
+    const looping = this.tuneLoopPeriodFrames() !== null;
+    const entry = looping ? this.tuneLoopEntry ?? this.anchorRing[0] ?? null : this.anchorRing[0] ?? null;
+    if (entry === null) return false;
     this.host.restoreState(entry.machine, entry.registers, entry.frame);
     return true;
   }

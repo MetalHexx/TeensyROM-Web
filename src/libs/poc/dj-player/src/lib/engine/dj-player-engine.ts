@@ -34,7 +34,12 @@ import { clamp, describeError, positionBasisFor } from './engine-utils';
 import { DEFAULT_TIMING_MODE, playCallIntervalUs, playRateFor } from './play-rate';
 import type { PlayRate, TimingMode } from './play-rate';
 
-export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
+/**
+ * `ended` is engine-owned: the track played through to its detected end and the engine stopped it
+ * itself. Deliberately distinct from `stopped` — the operator stopped it — even though both are
+ * silent: the two mean opposite things about why nothing is sounding.
+ */
+export type EngineState = 'stopped' | 'playing' | 'paused' | 'ended' | 'error';
 
 // The marker/nudge types are Marker State's, but they are part of this module's public shape — the
 // view and its spec import them from here, so they flow through unchanged rather than moving their
@@ -62,6 +67,22 @@ export const FRAME_CLOCK = new InjectionToken<FrameClock>('FRAME_CLOCK');
  * split-the-difference default, and 50.0 Hz (what DeepSID uses).
  */
 export const NOMINAL_INTERVAL_OPTIONS_US: readonly number[] = [PAL_FRAME_INTERVAL_US, 19975, 20000];
+
+/** Namespaced so a later POC or app feature reusing `localStorage` can't collide with this key. */
+const REPEAT_TRACK_STORAGE_KEY = 'asid-dj-0.repeat-track';
+
+/** Reads the persisted repeat-track preference: true when nothing is stored (or the read throws) —
+ *  a track plays forever until the operator turns repeat off, not the other way round. Mirrors
+ *  `MidiOutputService`'s own namespaced, try/catch-wrapped `localStorage` preference. */
+function loadRepeatTrackPreference(): boolean {
+  try {
+    const stored = localStorage.getItem(REPEAT_TRACK_STORAGE_KEY);
+    return stored === null ? true : stored === 'true';
+  } catch (error) {
+    logWarn(`DJ engine: could not read the repeat-track preference from localStorage — ${error}`);
+    return true;
+  }
+}
 
 /** What the fader and any typed value may reach: 0.5x–1.5x. */
 export const SPEED_INPUT_SPAN = 0.5;
@@ -197,6 +218,8 @@ export class DjPlayerEngine implements OnDestroy {
       this.tuneSession.restoreState(machine, registers, frameNumber),
     queueResync: () => this.queueResync(),
     effectiveMutes: () => this.effectiveMutes(),
+    repeatEnabled: () => this.repeatTrack(),
+    endTrack: () => this.endTrack(),
     fail: (reason) => this.fail(reason),
   });
 
@@ -252,14 +275,21 @@ export class DjPlayerEngine implements OnDestroy {
   readonly queuedMarker = this.markerState.queuedMarker;
   readonly tuneLoopStartFrame = this.markerState.tuneLoopStartFrame;
   readonly tuneLoopPeriodFrames = this.markerState.tuneLoopPeriodFrames;
-  readonly tuneLoopOutFrame = this.markerState.tuneLoopOutFrame;
-  readonly tuneLoopArmed = this.markerState.tuneLoopArmed;
+  /** Where the track ends — re-exported exactly as the marker-state signals above are, so the
+   *  diagnostics and analysis panels never reach into `MarkerState` directly. */
+  readonly trackEndFrame = this.markerState.trackEndFrame;
   /** True for the span of `triggerMarker`'s `play()` await — see `triggerMarker` for why the view
    *  must gate trigger/delete on this rather than trust the index across that gap. */
   readonly markerLaunchPending = signal<boolean>(false);
   readonly nudgeRangeFrames = this.markerState.nudgeRangeFrames;
   readonly ceilingFrames = this.tuneSession.ceilingFrames;
   readonly positionBasisFrames = this.tuneSession.positionBasisFrames;
+
+  private readonly _repeatTrack = signal<boolean>(loadRepeatTrackPreference());
+  /** The player-level preference persisted under `REPEAT_TRACK_STORAGE_KEY`: whether a track plays
+   *  forever or stops once it reaches its detected end. Read once at construction; rides a tune
+   *  change unchanged — `loadTune` never resets it, and it is not a field on `TuneIndexRecord`. */
+  readonly repeatTrack: Signal<boolean> = this._repeatTrack.asReadonly();
 
   private readonly _tuneIndex = signal<TuneIndexRecord | null>(null);
   /** The current tune's cached or freshly scanned index record, published by `TuneIndexService`.
@@ -408,6 +438,30 @@ export class DjPlayerEngine implements OnDestroy {
     if (this.tuneSession.machine !== null) {
       this.tuneSession.initSubtune(this.currentSubtune());
     }
+    this.publishStats();
+  }
+
+  /**
+   * The track played through and stopped. Silences the cartridge and leaves the playhead at the
+   * track's end rather than snapping it to zero — the operator can see where the deck finished.
+   *
+   * Deliberately unlike `stop()` in exactly one respect: it does not re-init the subtune, because
+   * that would reset the position counter — `play()` from `'ended'` falls through its existing
+   * non-paused branch, which re-inits and resets the counters, and that is the restart-from-the-
+   * beginning behaviour, for free.
+   *
+   * Discards the outstanding jump for the same reason `stop()` does: a scrub still in flight would
+   * otherwise land after this reports `ended`, restore a position, and queue a resync that — with the
+   * clock stopped — goes out at once rather than riding a tick, so the deck would report `ended` and
+   * then audibly resume.
+   */
+  private endTrack(): void {
+    this.clock.stop();
+    this.pending = [];
+    this.delivery.clearCommitted();
+    this.tuneSession.discardOutstandingJump();
+    this.delivery.sendControl(buildStopPacket());
+    this.state.set('ended');
     this.publishStats();
   }
 
@@ -588,11 +642,15 @@ export class DjPlayerEngine implements OnDestroy {
   setTuneIndex(record: TuneIndexRecord | null): void {
     this._tuneIndex.set(record);
     this.tuneSession.setIndexedLengthFrames(positionBasisFor(record));
-    this.markerState.setTuneLoop(record?.loopStartFrame ?? null, record?.loopPeriodFrames ?? null);
+    this.markerState.setTrackStructure(
+      record?.loopStartFrame ?? null,
+      record?.loopPeriodFrames ?? null,
+      record?.endedAtFrame ?? null
+    );
     this.setTimingMode(record?.timingMode ?? DEFAULT_TIMING_MODE);
-    // `setTuneLoop` has just dropped whatever entry image was held, so this is the one place that
-    // owes a fresh one. Not awaited: nothing on this path needs the image, and playback cannot reach
-    // the loop's out-frame for a whole lap yet.
+    // `setTrackStructure` has just dropped whatever entry image was held, so this is the one place
+    // that owes a fresh one. Not awaited: nothing on this path needs the image, and playback cannot
+    // reach the loop's out-frame for a whole lap yet.
     void this.captureTuneLoopEntry();
   }
 
@@ -692,15 +750,22 @@ export class DjPlayerEngine implements OnDestroy {
     this.markerState.auditionMarkerEnd(index);
   }
 
-  /** The Cues panel's Stop: drops the marker loop only. The whole-tune loop has its own toggle. */
+  /** The Cues panel's Stop: drops the marker loop only. Whether the track itself repeats is the
+   *  `repeatTrack` preference, not something this touches. */
   stopLoop(): void {
     this.markerState.stopMarkerLoop();
   }
 
-  /** The rail panel's whole-tune loop toggle — arms or disarms against the still-known loop start
-   *  and period, with no re-scan. */
-  armTuneLoop(armed: boolean): void {
-    this.markerState.setTuneLoopArmed(armed);
+  /** Writes the repeat-track preference and persists it under `REPEAT_TRACK_STORAGE_KEY`, never
+   *  allowed to throw into the caller — mirrors `MidiOutputService.selectPort`'s own
+   *  try/catch-wrapped write. */
+  setRepeatTrack(enabled: boolean): void {
+    this._repeatTrack.set(enabled);
+    try {
+      localStorage.setItem(REPEAT_TRACK_STORAGE_KEY, String(enabled));
+    } catch (error) {
+      logWarn(`DJ engine: could not persist the repeat-track preference to localStorage — ${error}`);
+    }
   }
 
   clearMarker(index: number): void {
@@ -722,9 +787,9 @@ export class DjPlayerEngine implements OnDestroy {
    *
    * Drops the marker loop first — a manual scrub always wins over a passage the operator built
    * against a marker, which would otherwise drag playback straight back to wherever it was looping.
-   * The whole-tune loop survives: it is the tune's own repeat behaviour, and only its own toggle
-   * turns it off. The Track Analysis panel's click-to-audition routes through here too, so it
-   * inherits the same rule with no separate call site.
+   * The whole-tune structure survives: repeating is the track's own behaviour, governed by
+   * `repeatTrack`, not something a scrub touches. The Track Analysis panel's click-to-audition routes
+   * through here too, so it inherits the same rule with no separate call site.
    */
   scrubTo(percent: number): Promise<void> {
     this.markerState.stopMarkerLoop();

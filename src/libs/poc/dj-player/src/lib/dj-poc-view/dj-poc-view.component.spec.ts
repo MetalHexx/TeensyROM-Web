@@ -69,9 +69,9 @@ interface MockDjPlayerEngine {
   queuedMarker: WritableSignal<number | null>;
   tuneLoopStartFrame: WritableSignal<number | null>;
   tuneLoopPeriodFrames: WritableSignal<number | null>;
-  tuneLoopOutFrame: WritableSignal<number | null>;
-  tuneLoopArmed: WritableSignal<boolean>;
-  armTuneLoop: ReturnType<typeof vi.fn>;
+  trackEndFrame: WritableSignal<number | null>;
+  repeatTrack: WritableSignal<boolean>;
+  setRepeatTrack: ReturnType<typeof vi.fn>;
   markerLaunchPending: WritableSignal<boolean>;
   progressPercentFor: ReturnType<typeof vi.fn>;
   positionPercent: WritableSignal<number>;
@@ -144,9 +144,9 @@ function makeEngine(): MockDjPlayerEngine {
     queuedMarker: signal<number | null>(null),
     tuneLoopStartFrame: signal<number | null>(null),
     tuneLoopPeriodFrames: signal<number | null>(null),
-    tuneLoopOutFrame: signal<number | null>(null),
-    tuneLoopArmed: signal<boolean>(false),
-    armTuneLoop: vi.fn(),
+    trackEndFrame: signal<number | null>(null),
+    repeatTrack: signal<boolean>(true),
+    setRepeatTrack: vi.fn(),
     markerLaunchPending: signal<boolean>(false),
     progressPercentFor: vi.fn(() => 0),
     positionPercent: signal(0),

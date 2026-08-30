@@ -61,6 +61,9 @@ class Harness implements MarkerHost {
   resyncCount = 0;
   readonly failures: string[] = [];
   mutes: readonly boolean[] = [false, false, false];
+  /** The `repeatTrack` preference this harness stands in for — defaults to the engine's own default. */
+  repeat = true;
+  endTrackCallCount = 0;
 
   constructor() {
     this.cpuMachine.initSubtune(1);
@@ -108,6 +111,14 @@ class Harness implements MarkerHost {
 
   effectiveMutes(): readonly boolean[] {
     return this.mutes;
+  }
+
+  repeatEnabled(): boolean {
+    return this.repeat;
+  }
+
+  endTrack(): void {
+    this.endTrackCallCount++;
   }
 
   fail(reason: string): void {
@@ -182,6 +193,8 @@ describe('MarkerState', () => {
         restoreState: () => undefined,
         queueResync: () => undefined,
         effectiveMutes: () => [false, false, false],
+        repeatEnabled: () => true,
+        endTrack: () => undefined,
         fail: () => undefined,
       };
       const marker = new MarkerState(noTuneHarness);
@@ -581,9 +594,8 @@ describe('MarkerState', () => {
     }
 
     it('re-enters at the frame-0 seed once the first lap ends, and does so again a lap later', () => {
-      markerState.setTuneLoop(0, 1000);
-      expect(markerState.tuneLoopArmed()).toBe(true);
-      expect(markerState.tuneLoopOutFrame()).toBe(1000);
+      markerState.setTrackStructure(0, 1000, null);
+      expect(markerState.trackEndFrame()).toBe(1000);
 
       const wrapped = markerState.advanceLoop(1000);
 
@@ -602,9 +614,9 @@ describe('MarkerState', () => {
     });
 
     it('waits out the intro as well as the lap for a loop that starts partway in', () => {
-      markerState.setTuneLoop(200, 1000);
+      markerState.setTrackStructure(200, 1000, null);
 
-      expect(markerState.tuneLoopOutFrame()).toBe(1200);
+      expect(markerState.trackEndFrame()).toBe(1200);
       expect(markerState.advanceLoop(1000)).toBe(false); // one lap in, but the intro has not been paid
       expect(harness.restores).toHaveLength(0);
 
@@ -613,7 +625,7 @@ describe('MarkerState', () => {
     });
 
     it('re-enters at a non-zero loop start, so an unrepeating intro plays once', () => {
-      markerState.setTuneLoop(20, 40);
+      markerState.setTrackStructure(20, 40, null);
 
       harness.tickBy(20); // the intro, ending on the loop start
       const machineAtStart = harness.machine().snapshot();
@@ -631,7 +643,7 @@ describe('MarkerState', () => {
 
     it('re-enters a tune that repeats from the top at the frame-0 seed, which needs no image of its own', () => {
       const machineAtZero = harness.machine().snapshot();
-      markerState.setTuneLoop(0, 40);
+      markerState.setTrackStructure(0, 40, null);
 
       harness.tickBy(40);
 
@@ -643,7 +655,7 @@ describe('MarkerState', () => {
     });
 
     it('falls back to the tune start for a non-zero loop start no entry image has arrived for', () => {
-      markerState.setTuneLoop(20, 40);
+      markerState.setTrackStructure(20, 40, null);
 
       harness.tickBy(60); // on to the out-frame with nothing handed over
 
@@ -652,7 +664,7 @@ describe('MarkerState', () => {
     });
 
     it('drops the entry image on a subtune re-init, falling back to the reseeded tune start', () => {
-      markerState.setTuneLoop(20, 40);
+      markerState.setTrackStructure(20, 40, null);
       harness.tickBy(20);
       handEntryImage(20);
       harness.tickBy(40);
@@ -669,67 +681,93 @@ describe('MarkerState', () => {
     });
 
     it('drops the entry image when a new detection arrives', () => {
-      markerState.setTuneLoop(20, 40);
+      markerState.setTrackStructure(20, 40, null);
       harness.tickBy(20);
       handEntryImage(20);
 
-      markerState.setTuneLoop(0, 40); // a fresh detection — the held image describes the old start
+      markerState.setTrackStructure(0, 40, null); // a fresh detection — the held image describes the old start
       harness.tickBy(40);
 
       expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
       expect(harness.restores.at(-1)?.frame).toBe(0);
     });
 
-    it('does not fire while disarmed, even past the detected point', () => {
-      markerState.setTuneLoop(0, 1000);
-      markerState.setTuneLoopArmed(false);
+    it('ends the track rather than restoring the loop start once repeat is off', () => {
+      markerState.setTrackStructure(0, 1000, null);
+      harness.repeat = false;
 
       const wrapped = markerState.advanceLoop(1000);
 
-      expect(wrapped).toBe(false);
+      expect(wrapped).toBe(true); // acted — the tick loop must not publish stats twice
+      expect(harness.endTrackCallCount).toBe(1);
+      expect(harness.restores).toHaveLength(0); // off actively stops rather than wrapping
+    });
+
+    it('replays an ended-detection track from the frame-0 seed when repeat is on, intro included', () => {
+      const machineAtZero = harness.machine().snapshot();
+      markerState.setTrackStructure(null, null, 40);
+
+      harness.tickBy(40);
+      const wrapped = markerState.advanceLoop(harness.framesRendered());
+
+      expect(wrapped).toBe(true);
+      expect(harness.restores.at(-1)?.frame).toBe(0);
+      expect(harness.restores.at(-1)?.machine).toEqual(machineAtZero);
+      expect(harness.endTrackCallCount).toBe(0);
+    });
+
+    it('ends an ended-detection track once repeat is off, instead of replaying it', () => {
+      markerState.setTrackStructure(null, null, 40);
+      harness.repeat = false;
+
+      const wrapped = markerState.advanceLoop(40);
+
+      expect(wrapped).toBe(true);
+      expect(harness.endTrackCallCount).toBe(1);
       expect(harness.restores).toHaveLength(0);
     });
 
-    it('does not fire with no detected loop', () => {
-      markerState.setTuneLoop(null, null);
+    it('does not fire with no detected structure, on or off repeat', () => {
+      markerState.setTrackStructure(null, null, null);
 
-      const wrapped = markerState.advanceLoop(1_000_000);
-
-      expect(wrapped).toBe(false);
+      expect(markerState.advanceLoop(1_000_000)).toBe(false);
       expect(harness.restores).toHaveLength(0);
+      expect(harness.endTrackCallCount).toBe(0);
+
+      harness.repeat = false;
+      expect(markerState.advanceLoop(1_000_000)).toBe(false);
+      expect(harness.endTrackCallCount).toBe(0);
     });
 
-    it('treats a zero, negative or non-finite period as null, disarming rather than throwing', () => {
-      markerState.setTuneLoop(0, 1000);
-      expect(markerState.tuneLoopArmed()).toBe(true);
+    it('treats a zero, negative or non-finite period as null rather than throwing', () => {
+      markerState.setTrackStructure(0, 1000, null);
+      expect(markerState.trackEndFrame()).toBe(1000);
 
-      markerState.setTuneLoop(0, 0);
-      expect(markerState.tuneLoopOutFrame()).toBeNull();
-      expect(markerState.tuneLoopArmed()).toBe(false);
+      markerState.setTrackStructure(0, 0, null);
+      expect(markerState.trackEndFrame()).toBeNull();
 
-      markerState.setTuneLoop(0, -5);
-      expect(markerState.tuneLoopOutFrame()).toBeNull();
+      markerState.setTrackStructure(0, -5, null);
+      expect(markerState.trackEndFrame()).toBeNull();
 
-      markerState.setTuneLoop(0, Number.NaN);
-      expect(markerState.tuneLoopOutFrame()).toBeNull();
+      markerState.setTrackStructure(0, Number.NaN, null);
+      expect(markerState.trackEndFrame()).toBeNull();
     });
 
     it('keeps a start of zero — a tune that repeats from its very first frame is not a rejected one', () => {
-      markerState.setTuneLoop(0, 1000);
+      markerState.setTrackStructure(0, 1000, null);
 
       expect(markerState.tuneLoopStartFrame()).toBe(0);
-      expect(markerState.tuneLoopArmed()).toBe(true);
-      expect(markerState.tuneLoopOutFrame()).toBe(1000);
+      expect(markerState.trackEndFrame()).toBe(1000);
     });
 
-    it('a marker loop and the whole-tune loop never both fire on one tick — the marker wins', () => {
+    it('a marker loop and the whole-tune structure never both fire on one tick — the marker wins', () => {
       markerState.addMarker(); // a filler row, start frame 0
       harness.tickBy(5);
       const index = markerState.addMarker(); // start frame 5
       harness.tickBy(5); // now at frame 10
       markerState.setMarkerEnd(index); // end frame 10
       markerState.triggerMarker(index); // engages, restoring to frame 5
-      markerState.setTuneLoop(0, 10); // armed against the same out-frame as the marker's end
+      markerState.setTrackStructure(0, 10, null); // same out-frame as the marker's end
       const restoresBeforeWrap = harness.restores.length;
 
       const wrapped = markerState.advanceLoop(10);
@@ -741,11 +779,11 @@ describe('MarkerState', () => {
       expect(markerState.loopingMarker()).toBe(index);
     });
 
-    it('a marker whose ends have been nudged across each other drops its own loop mid-lap, leaving the whole-tune arm untouched', () => {
+    it('a marker whose ends have been nudged across each other drops its own loop mid-lap, leaving the whole-tune structure untouched', () => {
       const index = markLoopMarker(10); // start 0, end 10
       markerState.triggerMarker(index);
-      markerState.setTuneLoop(0, 1000);
-      expect(markerState.tuneLoopArmed()).toBe(true);
+      markerState.setTrackStructure(0, 1000, null);
+      expect(markerState.trackEndFrame()).toBe(1000);
 
       markerState.setMarkerEndOffset(index, -markerState.nudgeRangeFrames()); // crosses the start
 
@@ -753,13 +791,13 @@ describe('MarkerState', () => {
 
       expect(wrapped).toBe(false);
       expect(markerState.loopingMarker()).toBeNull(); // the marker loop's own get-out
-      expect(markerState.tuneLoopArmed()).toBe(true); // untouched — not the operator getting out
+      expect(markerState.trackEndFrame()).toBe(1000); // untouched — not the operator getting out
     });
 
-    it('stopMarkerLoop drops an engaged marker loop and its queue, leaving the whole-tune arm and the playhead alone', () => {
+    it('stopMarkerLoop drops an engaged marker loop and its queue, leaving the whole-tune structure and the playhead alone', () => {
       const index = markLoopMarker(10);
       markerState.triggerMarker(index);
-      markerState.setTuneLoop(0, 1000);
+      markerState.setTrackStructure(0, 1000, null);
       harness.tickBy(4);
       expect(markerState.loopingMarker()).toBe(index);
 
@@ -767,23 +805,22 @@ describe('MarkerState', () => {
 
       expect(markerState.loopingMarker()).toBeNull();
       expect(markerState.queuedMarker()).toBeNull();
-      expect(markerState.tuneLoopArmed()).toBe(true);
+      expect(markerState.trackEndFrame()).toBe(1000);
       expect(harness.framesRendered()).toBe(4); // a get-out, not a move
     });
 
-    it('stopMarkerLoop with only the whole-tune loop armed leaves it armed and the playhead where it is', () => {
-      markerState.setTuneLoop(0, 1000);
+    it('stopMarkerLoop with only the whole-tune structure set leaves it in place and the playhead where it is', () => {
+      markerState.setTrackStructure(0, 1000, null);
       harness.tickBy(7);
 
       markerState.stopMarkerLoop();
 
-      expect(markerState.tuneLoopArmed()).toBe(true);
-      expect(markerState.tuneLoopOutFrame()).toBe(1000);
+      expect(markerState.trackEndFrame()).toBe(1000);
       expect(harness.framesRendered()).toBe(7);
     });
 
-    it('clear() drops the marker loop and leaves the whole-tune arm to the load path', () => {
-      markerState.setTuneLoop(0, 1000);
+    it('clear() drops the marker loop and leaves the whole-tune structure to the load path', () => {
+      markerState.setTrackStructure(0, 1000, null);
       const index = markLoopMarker(10);
       markerState.triggerMarker(index);
 
@@ -791,9 +828,8 @@ describe('MarkerState', () => {
 
       expect(markerState.markers()).toEqual([]);
       expect(markerState.loopingMarker()).toBeNull();
-      // `DjPlayerEngine.loadTune` disarms through `setTuneIndex(null)` before it gets here.
-      expect(markerState.tuneLoopArmed()).toBe(true);
-      expect(markerState.tuneLoopOutFrame()).toBe(1000);
+      // `DjPlayerEngine.loadTune` clears the structure through `setTuneIndex(null)` before it gets here.
+      expect(markerState.trackEndFrame()).toBe(1000);
     });
   });
 });

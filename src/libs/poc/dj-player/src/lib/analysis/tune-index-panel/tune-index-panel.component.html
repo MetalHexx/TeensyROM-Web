@@ -32,12 +32,11 @@
   <label class="tune-index-loop">
     <input
       type="checkbox"
-      aria-label="Loop whole tune"
-      [checked]="tuneLoopArmed()"
-      [disabled]="!canLoop()"
-      (change)="onLoopToggle($event)"
+      aria-label="Repeat track"
+      [checked]="repeatTrack()"
+      (change)="onRepeatToggle($event)"
     />
-    Loop whole tune
+    Repeat track
   </label>
 
   <label class="tune-index-timing">
