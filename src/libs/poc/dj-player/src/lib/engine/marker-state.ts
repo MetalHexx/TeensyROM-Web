@@ -191,6 +191,10 @@ export class MarkerState {
    */
   private anchorRing: PositionAnchor[] = [];
 
+  /** The machine as it stood the first time playback reached the loop start — what a lap re-enters
+   *  through. Captured live rather than replayed, the same trade every marker start makes. */
+  private tuneLoopEntry: PositionAnchor | null = null;
+
   /** Converts a real-time duration to frames at the tune's own rate (`nominalIntervalUs` divided by
    *  the rate in force), never the live speed multiplier — shared by the nudge range and the loop
    *  audition pre-roll so both breathe with the tune, never the speed fader. */
@@ -212,12 +216,16 @@ export class MarkerState {
    * A `startFrame` of 0 — a tune that repeats from its very first frame — is valid and must survive
    * validation, which is why the start is checked for `>= 0` rather than through
    * `sanitizePositiveFrame`. No plausibility bar beyond that: see `DjPlayerEngine.setTuneIndex`.
+   *
+   * Drops whatever entry image was held: it was captured at the previous detection's start frame, so
+   * a new detection has nothing to say about it.
    */
   setTuneLoop(startFrame: number | null, periodFrames: number | null): void {
     const period = sanitizePositiveFrame(periodFrames);
     this.tuneLoopStartFrame.set(period === null ? null : sanitizeStartFrame(startFrame));
     this.tuneLoopPeriodFrames.set(period);
     this.tuneLoopArmed.set(period !== null);
+    this.tuneLoopEntry = null;
   }
 
   /** The operator's explicit re-arm after a scrub disengaged it. */
@@ -225,11 +233,12 @@ export class MarkerState {
     this.tuneLoopArmed.set(armed);
   }
 
-  /** Drops the anchor ring — its entries describe a machine that no longer exists, at frame numbers
-   *  a subtune re-init has just invalidated. A marker's start survives this deliberately: it owns
-   *  its own anchor, so it needs no ring to persist. */
+  /** Drops the anchor ring and the whole-tune loop's entry image — each describes a machine that no
+   *  longer exists, at a frame number a subtune re-init has just invalidated. A marker's start
+   *  survives this deliberately: it owns its own anchor, so it needs no ring to persist. */
   resetAnchorRing(): void {
     this.anchorRing = [];
+    this.tuneLoopEntry = null;
   }
 
   /** Adds the live machine to the ring, dropping the oldest non-seed entry once it is full. */
@@ -250,6 +259,28 @@ export class MarkerState {
     if (framesRendered % this.anchorSnapshotFrameInterval() === 0) {
       this.recordAnchor(machine, frame, framesRendered);
     }
+  }
+
+  /**
+   * Holds the live machine as the whole-tune loop's re-entry image the first time playback reaches a
+   * non-zero loop start — what the tick loop calls every frame, beside `maybeRecordAnchor`, so the
+   * one image a lap re-enters through is taken while playback passes through it rather than replayed
+   * back to later.
+   *
+   * Exact equality, and never for a start of 0. The tick loop calls this after incrementing its
+   * counter, so `framesRendered` is never 0 here: a `>=` test would capture a frame-1 image for a
+   * start of 0 and then restore it labelled frame 0. A start of 0 needs no image of its own — the
+   * frame-0 seed at `anchorRing[0]` already is one, and `advanceTuneLoop` falls back to it.
+   */
+  maybeCaptureTuneLoopEntry(machine: C64Machine, frame: RegisterFrame, framesRendered: number): void {
+    if (this.tuneLoopEntry !== null) return;
+    const startFrame = this.tuneLoopStartFrame();
+    if (startFrame === null || startFrame === 0 || framesRendered !== startFrame) return;
+    this.tuneLoopEntry = {
+      frame: startFrame,
+      machine: machine.snapshot(),
+      registers: frame.snapshotValues(),
+    };
   }
 
   /**
@@ -608,14 +639,19 @@ export class MarkerState {
 
   /**
    * The whole-tune loop's own advance, reached only when no marker is looping: re-enters at the
-   * tune's start once `tuneLoopOutFrame()` — the end of the first lap — is passed, indefinitely, as
+   * loop start once `tuneLoopOutFrame()` — the end of the first lap — is passed, indefinitely, as
    * long as the loop is armed.
    *
-   * Restores `anchorRing[0]` — the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor`
-   * never evicts — through the same `MarkerHost.restoreState` primitive a marker restores through,
-   * with `frameNumber: 0`. No second re-entry path, and no snapshot of its own: resetting the
-   * rendered-frame count to 0 is what makes the scrubber visibly snap back rather than the audio
-   * looping while the position bar keeps climbing off the end.
+   * Restores `tuneLoopEntry` — the image `maybeCaptureTuneLoopEntry` took as playback passed the
+   * loop start — so a tune with an unrepeating intro plays that intro once. With none held it
+   * restores `anchorRing[0]`, the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor`
+   * never evicts: right for a start of 0, and the honest degradation for a non-zero start playback
+   * never passed through.
+   *
+   * Either way through the same `MarkerHost.restoreState` primitive a marker restores through, and
+   * with the frame number the restored image actually names: winding the rendered-frame count back
+   * is what makes the scrubber visibly snap back rather than the audio looping while the position
+   * bar keeps climbing off the end.
    */
   private advanceTuneLoop(framesRendered: number): boolean {
     if (!this.tuneLoopArmed()) return false;
@@ -623,12 +659,12 @@ export class MarkerState {
     if (outFrame === null) return false;
     if (framesRendered < outFrame) return false;
 
-    const seed = this.anchorRing[0] ?? null;
-    if (seed === null) {
+    const entry = this.tuneLoopEntry ?? this.anchorRing[0] ?? null;
+    if (entry === null) {
       this.tuneLoopArmed.set(false);
       return false;
     }
-    this.host.restoreState(seed.machine, seed.registers, 0);
+    this.host.restoreState(entry.machine, entry.registers, entry.frame);
     return true;
   }
 

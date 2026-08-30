@@ -758,6 +758,7 @@ export class DjPlayerEngine implements OnDestroy {
     );
     this.tuneSession.framesRendered++;
     this.markerState.maybeRecordAnchor(machine, frame, this.tuneSession.framesRendered);
+    this.markerState.maybeCaptureTuneLoopEntry(machine, frame, this.tuneSession.framesRendered);
     if (this.markerState.advanceLoop(this.tuneSession.framesRendered)) {
       return; // the resync it queued goes out on the next tick; don't publish stats twice
     }

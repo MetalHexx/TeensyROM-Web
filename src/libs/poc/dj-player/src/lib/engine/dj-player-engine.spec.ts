@@ -2133,7 +2133,36 @@ describe('DjPlayerEngine', () => {
       clock.tick(5); // reaches frame 30, queuing a restore
       clock.tick(2); // gate-off, then the resync
 
+      expect(engine.stats().framesRendered).toBe(10); // back to the loop start, not to the top
+    });
+
+    it('re-enters an intro tune at its loop start, so the intro plays once and the lap repeats', async () => {
+      await playTo(0);
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 10, loopPeriodFrames: 20 }));
+
+      clock.tick(30); // through the intro and the first lap, queuing a restore
+      clock.tick(2); // gate-off, then the resync
+
+      expect(engine.stats().framesRendered).toBe(10);
+      // The machine as it stood at frame 10 — the intro is behind it, not about to replay.
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(10));
+
+      clock.tick(20); // a lap later, reaching the same out-frame from the loop start
+      clock.tick(2);
+
+      expect(engine.stats().framesRendered).toBe(10);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(10));
+    });
+
+    it('falls back to the tune start when playback never passed through the loop start', async () => {
+      await playTo(20); // already past the start the record is about to name
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 10, loopPeriodFrames: 20 }));
+
+      clock.tick(10); // reaches frame 30, queuing a restore
+      clock.tick(2); // gate-off, then the resync
+
       expect(engine.stats().framesRendered).toBe(0);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(0));
     });
 
     it('arms nothing for a record that says the tune ends, and measures the playhead against the end point', async () => {

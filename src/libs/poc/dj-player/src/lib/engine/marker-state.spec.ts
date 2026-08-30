@@ -570,6 +570,19 @@ describe('MarkerState', () => {
   });
 
   describe('the whole-tune loop', () => {
+    /** Plays forward the way the coordinator's tick loop does — one entry-capture check per frame,
+     *  after the position it is checked against has been incremented. */
+    function playThrough(frames: number): void {
+      for (let i = 0; i < frames; i++) {
+        harness.tick();
+        markerState.maybeCaptureTuneLoopEntry(
+          harness.machine(),
+          harness.frame(),
+          harness.framesRendered()
+        );
+      }
+    }
+
     it('re-enters at the frame-0 seed once the first lap ends, and does so again a lap later', () => {
       markerState.setTuneLoop(0, 1000);
       expect(markerState.tuneLoopArmed()).toBe(true);
@@ -599,6 +612,71 @@ describe('MarkerState', () => {
       expect(harness.restores).toHaveLength(0);
 
       expect(markerState.advanceLoop(1200)).toBe(true);
+      expect(harness.restores.at(-1)?.frame).toBe(0); // the start was never played through — the seed
+    });
+
+    it('re-enters at a non-zero loop start, so an unrepeating intro plays once', () => {
+      markerState.setTuneLoop(20, 40);
+
+      playThrough(20); // the intro, ending on the loop start
+      const machineAtStart = harness.machine().snapshot();
+      const registersAtStart = harness.frame().snapshotValues();
+      playThrough(40); // the first lap, ending on the out-frame
+
+      expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
+      expect(harness.restores.at(-1)?.frame).toBe(20);
+      // The machine as it stood at the loop start, so the lap resumes mid-tune rather than replaying
+      // the intro it just paid for.
+      expect(harness.restores.at(-1)?.machine).toEqual(machineAtStart);
+      expect(harness.restores.at(-1)?.registers).toEqual(registersAtStart);
+    });
+
+    it('re-enters a tune that repeats from the top at the frame-0 image, not the frame after it', () => {
+      const machineAtZero = harness.machine().snapshot();
+      markerState.setTuneLoop(0, 40);
+
+      playThrough(40);
+
+      expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
+      expect(harness.restores.at(-1)?.frame).toBe(0);
+      // The counter tune advances every play call, so a frame-1 image restored under frame 0 —
+      // what capturing on `>=` would produce — reads as a different machine here.
+      expect(harness.restores.at(-1)?.machine).toEqual(machineAtZero);
+    });
+
+    it('falls back to the tune start for a non-zero loop start playback never passed through', () => {
+      playThrough(30); // already past the start the detection is about to name
+      markerState.setTuneLoop(20, 40);
+
+      playThrough(30); // on to the out-frame at 60, without ever crossing frame 20 again
+
+      expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
+      expect(harness.restores.at(-1)?.frame).toBe(0);
+    });
+
+    it('drops the entry image on a subtune re-init, falling back to the reseeded tune start', () => {
+      markerState.setTuneLoop(20, 40);
+      playThrough(60);
+
+      // What TuneSession.initSubtune does around a re-init: drop the ring, then seed a frame-0
+      // anchor on the machine it has just re-initialised.
+      markerState.resetAnchorRing();
+      markerState.recordAnchor(harness.machine(), harness.frame(), 0);
+
+      expect(markerState.advanceLoop(60)).toBe(true);
+      // A stale image restored onto a re-initialised machine would sound like noise rather than
+      // fail, which is why the entry goes with the ring.
+      expect(harness.restores.at(-1)?.frame).toBe(0);
+    });
+
+    it('drops the entry image when a new detection arrives', () => {
+      markerState.setTuneLoop(20, 40);
+      playThrough(20); // holds the image at frame 20
+
+      markerState.setTuneLoop(0, 40); // a fresh detection — the held image describes the old start
+      playThrough(40);
+
+      expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
       expect(harness.restores.at(-1)?.frame).toBe(0);
     });
 

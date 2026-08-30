@@ -162,8 +162,9 @@ export class TuneSession {
     frame.markAllDirty();
     this._framesRendered = 0;
     // The ring is dropped rather than carried: its entries describe a machine that no longer exists,
-    // at frame numbers the reset counter has just invalidated. Cues and the loop's entry survive
-    // this deliberately — each owns its own anchor, so none of them needs the ring to persist.
+    // at frame numbers the reset counter has just invalidated. Marker cues and marker loop starts
+    // survive this deliberately — each owns its own anchor, so none of them needs the ring to
+    // persist.
     this.host.resetAnchors();
     this.host.recordAnchor(machine, frame, this._framesRendered);
     // Init just ran, so this is the moment the CIA latch becomes meaningful — mirroring it any
