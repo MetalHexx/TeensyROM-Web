@@ -77,10 +77,12 @@ export class TuneIndexService implements OnDestroy {
   private nextRequestId = 0;
   private nextSessionId = 0;
 
-  /** The current `setTune` caller's resolve function, handed to the next effect run and cleared the
-   *  moment it is taken — a subtune-only trigger (no `setTune` in between) always finds this `null`,
-   *  so it never resolves a promise it wasn't asked to settle. */
-  private pendingSettle: (() => void) | null = null;
+  /** Every `setTune` caller still waiting for an effect run to pick their load up, drained the moment
+   *  one does. A list rather than a slot because signal writes coalesce: two loads issued in the same
+   *  turn share a single effect run, and a slot would let the second silently displace the first
+   *  caller's resolver — hanging it forever. A subtune-only trigger (no `setTune` in between) finds
+   *  this empty, so it never resolves a promise it wasn't asked to settle. */
+  private pendingSettles: (() => void)[] = [];
 
   constructor() {
     // A subtune step is different music from the tune it steps away from, and a fresh load replaces
@@ -93,19 +95,21 @@ export class TuneIndexService implements OnDestroy {
       // both signals the Timing selector writes on every speed change. Read outside `untracked`,
       // that becomes a third, unwanted trigger for this effect.
       untracked(() => {
-        const settle = this.pendingSettle;
-        this.pendingSettle = null;
-        void this.refresh(tune.file, tune.filename, subtune, settle);
+        const settles = this.pendingSettles;
+        this.pendingSettles = [];
+        void this.refresh(tune.file, tune.filename, subtune, settles);
       });
     });
   }
 
   /** Called by the view on every tune load. Resolves once the record for this tune has been published —
-   *  on a cache hit, on a completed scan, and equally on a failed or abandoned one. Never rejects: a load
-   *  path that hangs on a failed scan is worse than one that starts playback with no index. */
+   *  on a cache hit, on a completed scan, and equally on a failed or abandoned one. Loads issued so close
+   *  together that they coalesce into one effect run resolve together, on the outcome of the last one.
+   *  Never rejects: a load path that hangs on a failed scan is worse than one that starts playback with
+   *  no index. */
   setTune(file: SidFile | null, filename: string | null): Promise<void> {
     return new Promise<void>((resolve) => {
-      this.pendingSettle = resolve;
+      this.pendingSettles.push(resolve);
       this.identity.set({ file, filename });
     });
   }
@@ -132,11 +136,34 @@ export class TuneIndexService implements OnDestroy {
     this.scanner.dispose();
   }
 
+  /**
+   * Refreshes the index for the incoming tune and releases every caller that was waiting on this run,
+   * whatever it concluded — a hit, a completed scan, a failed one, an abandoned one, or a throw out of
+   * a detector or storage. The release sits in a `finally` rather than on each of the outcome paths so
+   * that a new one cannot be added that forgets it: a hung load path is silent, has no error and no
+   * timeout, and is worse than playback that starts with no index.
+   */
   private async refresh(
     file: SidFile | null,
     filename: string | null,
     subtune: number,
-    settle: (() => void) | null
+    settles: readonly (() => void)[]
+  ): Promise<void> {
+    try {
+      await this.refreshIndex(file, filename, subtune);
+    } finally {
+      for (const settle of settles) {
+        settle();
+      }
+    }
+  }
+
+  /** The refresh itself: retire the outgoing tune's answer, then hydrate from cache or run the ladder
+   *  for the incoming one. Every exit is an outcome its caller releases the load path on. */
+  private async refreshIndex(
+    file: SidFile | null,
+    filename: string | null,
+    subtune: number
   ): Promise<void> {
     this.generation++;
     const generation = this.generation;
@@ -146,15 +173,14 @@ export class TuneIndexService implements OnDestroy {
     this.engine.setTuneIndex(null);
 
     if (file === null || filename === null) {
-      settle?.();
       return;
     }
 
     const hit = this.storage.load(filename, subtune);
     if (hit !== null) {
+      // A cache hit hydrates instantly — no scan at all, so the waiting load is released this turn.
       this._record.set(hit);
       this.engine.setTuneIndex(hit);
-      settle?.(); // a cache hit hydrates instantly — no scan at all
       return;
     }
 
@@ -166,7 +192,6 @@ export class TuneIndexService implements OnDestroy {
       // no longer loaded. A newer refresh has already reset `pending` for its own tune, so this one
       // must not touch it. The caller that awaited this load is still released, though — it is
       // superseded, not stuck.
-      settle?.();
       return;
     }
     this._pending.set(false);
@@ -174,7 +199,6 @@ export class TuneIndexService implements OnDestroy {
     if (ladder.kind === 'failed') {
       // A failed scan is not a cached "no answer" — the next load of this tune should try again.
       logWarn(`TuneIndexService: scan failed for ${filename}:${subtune}: ${ladder.error}`);
-      settle?.();
       return;
     }
 
@@ -227,7 +251,6 @@ export class TuneIndexService implements OnDestroy {
     this._record.set(record);
     this.engine.setTuneIndex(record);
     logInfo(LogType.Success, `TuneIndexService: indexed ${filename}:${subtune}.`);
-    settle?.();
   }
 
   /**

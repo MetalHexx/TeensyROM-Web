@@ -562,6 +562,49 @@ describe('TuneIndexService', () => {
       await expect(settledB).resolves.toBeUndefined();
       expect(service.record()?.filename).toBe('B.sid');
     });
+
+    it('releases every caller when two loads coalesce into one effect run, on a cache hit', async () => {
+      const hit = buildStoredRecord({ filename: 'B.sid' });
+      storage.load.mockReturnValue(hit);
+      const settled: string[] = [];
+
+      // No flush between the two calls: Angular coalesces the two identity writes into a single
+      // effect run that reads only B, so both callers ride on the one refresh it starts.
+      void service.setTune(fakeSidFile({ name: 'A' }), 'A.sid').then(() => settled.push('A'));
+      void service.setTune(fakeSidFile({ name: 'B' }), 'B.sid').then(() => settled.push('B'));
+      TestBed.flushEffects();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect([...settled].sort()).toEqual(['A', 'B']);
+      expect(scanner.scan).not.toHaveBeenCalled();
+      expect(service.record()).toEqual(hit);
+    });
+
+    it('releases every caller when two loads coalesce into one effect run, once the scan settles', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      scanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+      const settled: string[] = [];
+
+      void service.setTune(fakeSidFile({ name: 'A' }), 'A.sid').then(() => settled.push('A'));
+      void service.setTune(fakeSidFile({ name: 'B' }), 'B.sid').then(() => settled.push('B'));
+      TestBed.flushEffects();
+      await Promise.resolve();
+
+      // A never reached a ladder of its own — it was superseded before the effect ever ran — so the
+      // single scan in flight is B's, and it holds both callers.
+      expect(scanner.scan).toHaveBeenCalledTimes(1);
+      expect(settled).toEqual([]);
+
+      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 2) });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect([...settled].sort()).toEqual(['A', 'B']);
+      expect(service.record()?.filename).toBe('B.sid');
+    });
   });
 
   describe('setTimingMode', () => {
