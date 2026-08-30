@@ -54,7 +54,7 @@
           <button type="button" (click)="onPause()" [disabled]="engineState() !== 'playing'">
             Pause
           </button>
-          <button type="button" (click)="onStop()" [disabled]="currentTune() === null">Stop</button>
+          <button type="button" (click)="onStop()" [disabled]="!canStop()">Stop</button>
           <span class="transport-spacer"></span>
           <label class="repeat-toggle">
             <input

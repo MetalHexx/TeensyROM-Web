@@ -10,7 +10,7 @@ export function describeError(error: unknown): string {
 }
 
 /** A usable frame span: a finite number greater than zero, else null. Shared by the loop period
- *  `MarkerState.setTuneLoop` arms against and the basis `TuneSession.setIndexedLengthFrames` divides
+ *  `MarkerState.setTrackStructure` arms against and the basis `TuneSession.setIndexedLengthFrames` divides
  *  by, which are derived from the same record and must agree on what counts as usable. */
 export function sanitizePositiveFrame(value: number | null): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;

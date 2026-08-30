@@ -403,6 +403,17 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('transport buttons', () => {
+    function transportButton(label: string): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.transport-controls button')
+      );
+      const button = buttons.find((candidate) => candidate.textContent?.trim() === label);
+      if (button === undefined) {
+        throw new Error(`no ${label} transport button rendered`);
+      }
+      return button;
+    }
+
     it('calls engine.play, pause and stop', () => {
       midi.selectedPortId.set('port-1');
       component.currentTune.set(fakeSidFile());
@@ -424,6 +435,53 @@ describe('DjPocViewComponent', () => {
       const stopButton = buttons.find((button) => button.textContent?.trim() === 'Stop');
       stopButton?.click();
       expect(engine.stop).toHaveBeenCalled();
+    });
+
+    it('holds Play and Stop disabled for the whole of a new tune scan, and releases them once it settles', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      analysisScanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+      midi.selectedPortId.set('port-1');
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      expect(transportButton('Play').disabled).toBe(true);
+      expect(transportButton('Stop').disabled).toBe(true);
+
+      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(transportButton('Play').disabled).toBe(false);
+      });
+      expect(transportButton('Stop').disabled).toBe(false);
+    });
+
+    it('leaves Stop reachable while a subtune step scans mid-playback', async () => {
+      tuneIndexStorage.load.mockReturnValueOnce(buildTuneIndexRecord({ filename: 'Auto tune' }));
+      midi.selectedPortId.set('port-1');
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(engine.play).toHaveBeenCalled();
+      });
+
+      engine.state.set('playing');
+      engine.currentSubtune.set(2);
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      expect(transportButton('Stop').disabled).toBe(false);
     });
   });
 

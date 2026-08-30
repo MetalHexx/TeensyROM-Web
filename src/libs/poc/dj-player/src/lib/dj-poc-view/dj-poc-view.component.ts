@@ -262,11 +262,24 @@ export class DjPocViewComponent {
       this.selectedMidiPortId() !== null &&
       this.engineState() !== 'playing'
   );
+  /** Play stays out of reach for the whole of a scan, whichever load started it: a manual start would
+   *  put the frame clock beside the analysis worker on the same tune, which is the contention the
+   *  awaited load exists to avoid. */
   protected readonly canPlay = computed(
     () =>
       this.currentTune() !== null &&
       this.selectedMidiPortId() !== null &&
-      this.engineState() !== 'playing'
+      this.engineState() !== 'playing' &&
+      !this.analyzing()
+  );
+
+  /** Stop goes out of reach only while a freshly loaded tune scans — the deck is stopped at the
+   *  position the load just established, and the load starts it itself once the scan settles, so
+   *  there is nothing there to stop. A scan a subtune step raised mid-playback leaves Stop reachable:
+   *  that deck is running, and taking Stop from it would strand it with no way to silence the
+   *  cartridge. */
+  protected readonly canStop = computed(
+    () => this.currentTune() !== null && !(this.analyzing() && this.engineState() === 'stopped')
   );
   protected readonly canStepSubtune = computed(
     () => this.currentTune() !== null && this.subtuneCount() > 1
