@@ -15,10 +15,8 @@ interface StubTuneIndexService {
 }
 
 interface StubEngine {
-  repeatTrack: WritableSignal<boolean>;
   nominalIntervalUs: WritableSignal<number>;
   playRate: WritableSignal<PlayRate>;
-  setRepeatTrack: ReturnType<typeof vi.fn>;
 }
 
 /** One play call per 20 ms, so a frame count converts to seconds by a round factor of 50. */
@@ -39,10 +37,8 @@ function makeTuneIndexService(): StubTuneIndexService {
 
 function makeEngine(): StubEngine {
   return {
-    repeatTrack: signal<boolean>(true),
     nominalIntervalUs: signal<number>(20_000),
     playRate: signal<PlayRate>(SINGLE_SPEED),
-    setRepeatTrack: vi.fn(),
   };
 }
 
@@ -200,35 +196,8 @@ describe('TuneIndexPanelComponent', () => {
     expect(component['lengthLabel']()).toBe('2:14');
   });
 
-  it('reflects the repeatTrack signal regardless of whether a loop was detected', () => {
-    expect(component['repeatTrack']()).toBe(true);
-
-    engine.repeatTrack.set(false);
-    fixture.detectChanges();
-
-    expect(component['repeatTrack']()).toBe(false);
-  });
-
-  it('writes the preference through the engine when the toggle is switched', () => {
-    const input = { checked: false } as unknown as HTMLInputElement;
-
-    component['onRepeatToggle']({ target: input } as unknown as Event);
-
-    expect(engine.setRepeatTrack).toHaveBeenCalledWith(false);
-  });
-
-  it('is never disabled — repeat is a property of the player, not of the tune', () => {
-    const repeatCheckbox = () =>
-      fixture.nativeElement.querySelector('[aria-label="Repeat track"]') as HTMLInputElement;
-
-    expect(repeatCheckbox().disabled).toBe(false);
-
-    tuneIndexService.record.set(
-      fakeRecord({ loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null })
-    );
-    fixture.detectChanges();
-
-    expect(repeatCheckbox().disabled).toBe(false);
+  it('renders no repeat control — it is a transport concern now, not the tune index panel\'s', () => {
+    expect(fixture.nativeElement.querySelector('[aria-label="Repeat track"]')).toBeNull();
   });
 
   it('flags a verified loop whose period is under fifteen seconds as implausible', () => {
@@ -256,14 +225,6 @@ describe('TuneIndexPanelComponent', () => {
     fixture.detectChanges();
 
     expect(component['loopImplausible']()).toBe(false);
-  });
-
-  it('does not alter the repeat preference when the implausible label shows', () => {
-    tuneIndexService.record.set(fakeRecord({ loopStartFrame: 0, loopPeriodFrames: 500 }));
-    fixture.detectChanges();
-
-    expect(component['loopImplausible']()).toBe(true);
-    expect(component['repeatTrack']()).toBe(true);
   });
 
   it('has no timing mode to reflect while no record is indexed', () => {

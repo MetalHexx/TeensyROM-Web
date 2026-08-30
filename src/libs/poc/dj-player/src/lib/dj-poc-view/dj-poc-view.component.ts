@@ -14,6 +14,7 @@ import {
   NOMINAL_INTERVAL_OPTIONS_US,
   SPEED_INPUT_SPAN,
 } from '../engine/dj-player-engine';
+import type { EngineState } from '../engine/dj-player-engine';
 import { positionBasisFor, timelineBasisFor } from '../engine/engine-utils';
 import type { DetectedLoopFrames } from '../engine/engine-utils';
 import { TrackAnalysisPanelComponent } from '../analysis/track-analysis-panel/track-analysis-panel.component';
@@ -40,6 +41,20 @@ type BarState =
   | { kind: 'unknown' }
   | { kind: 'loop'; introPercent: number } // 0 for loop-from-top; the tick sits at introPercent
   | { kind: 'ended'; musicPercent: number }; // no tick — there is no loop point
+
+/** The transport's own six-state readout. `analyzing` is spliced in here, in the view, over the
+ *  engine's own four-plus-one — the engine never learns about scanning. */
+type TransportState = EngineState | 'analyzing';
+
+/** Text for the LED's adjacent label — the colour reinforces this, it never replaces it. */
+const TRANSPORT_STATE_LABELS: Record<TransportState, string> = {
+  stopped: 'Stopped',
+  playing: 'Playing',
+  paused: 'Paused',
+  ended: 'Ended',
+  error: 'Error',
+  analyzing: 'Analyzing…',
+};
 
 const MICROSECONDS_PER_SECOND = 1_000_000;
 
@@ -114,6 +129,22 @@ export class DjPocViewComponent {
   protected readonly engineState = this.engine.state;
   protected readonly engineError = this.engine.lastError;
   protected readonly engineStats = this.engine.stats;
+  protected readonly repeatTrack = this.engine.repeatTrack;
+
+  /** True while the tune-index service is scanning a genuinely new tune — never true for a cache
+   *  hit, which publishes its record without ever setting this. */
+  protected readonly analyzing = this.tuneIndex.pending;
+
+  /** The composed transport readout the LED and its label draw from. Keeps the dependency running
+   *  one way — the tune-index service already depends on the engine, and the engine never on it. */
+  protected readonly transportState = computed<TransportState>(() =>
+    this.analyzing() ? 'analyzing' : this.engineState()
+  );
+
+  protected readonly transportStateLabel = computed<string>(
+    () => TRANSPORT_STATE_LABELS[this.transportState()]
+  );
+
   protected readonly currentSubtune = this.engine.currentSubtune;
   protected readonly subtuneCount = this.engine.subtuneCount;
   protected readonly speedMultiplier = this.engine.speedMultiplier;
@@ -339,6 +370,10 @@ export class DjPocViewComponent {
 
   onStop(): void {
     this.engine.stop();
+  }
+
+  onRepeatToggle(event: Event): void {
+    this.engine.setRepeatTrack((event.target as HTMLInputElement).checked);
   }
 
   onPreviousSubtune(): void {

@@ -40,9 +40,10 @@ function keyLabelFor(record: TuneIndexRecord): string {
 
 /**
  * The rail's compact, always-visible tune index readout: native length, the detected loop's start and
- * period, key and Camelot number, and the Repeat track preference. Reads the same `TuneIndexService`
- * record the engine's own tune index draws from, so this panel and the Track Analysis panel it sits
- * beside can never disagree about the answer.
+ * period, and key and Camelot number. Reads the same `TuneIndexService` record the engine's own tune
+ * index draws from, so this panel and the Track Analysis panel it sits beside can never disagree about
+ * the answer. Repeat track lives in the transport row now — a live-transport control, not a property
+ * of the indexed tune.
  *
  * Every duration is derived at display time from the record's frames and the rate currently in force,
  * never from a stored number of seconds — which is what makes the readout follow the Timing selector
@@ -59,7 +60,6 @@ export class TuneIndexPanelComponent {
   private readonly engine = inject(DjPlayerEngine);
 
   protected readonly analysing: Signal<boolean> = this.tuneIndexService.pending;
-  protected readonly repeatTrack = this.engine.repeatTrack;
 
   private readonly loopReadout = computed<LoopReadout>(() => {
     if (this.analysing()) return { kind: 'placeholder', label: ANALYSING_LABEL };
@@ -120,10 +120,6 @@ export class TuneIndexPanelComponent {
   protected readonly timingMode = computed<TimingMode | null>(
     () => this.tuneIndexService.record()?.timingMode ?? null
   );
-
-  protected onRepeatToggle(event: Event): void {
-    this.engine.setRepeatTrack((event.target as HTMLInputElement).checked);
-  }
 
   protected onTimingModeChange(event: Event): void {
     const mode = (event.target as HTMLSelectElement).value as TimingMode;

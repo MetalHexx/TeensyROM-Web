@@ -427,6 +427,95 @@ describe('DjPocViewComponent', () => {
     });
   });
 
+  describe('transport state readout', () => {
+    function led(): HTMLElement {
+      return fixture.nativeElement.querySelector('.transport-row .led');
+    }
+
+    it('removes the old "State:" text line from the template', () => {
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).not.toContain('State:');
+    });
+
+    it.each([
+      ['stopped', 'Stopped'],
+      ['playing', 'Playing'],
+      ['paused', 'Paused'],
+      ['ended', 'Ended'],
+      ['error', 'Error'],
+    ] as const)(
+      "carries the led--%s class and label for the engine's own %s state",
+      (state, label) => {
+        engine.state.set(state);
+        fixture.detectChanges();
+
+        expect(led().classList.contains(`led--${state}`)).toBe(true);
+        expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain(label);
+      }
+    );
+
+    it('lights analyzing, over whatever the engine itself reports, while a genuinely new tune scans', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      analysisScanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+      engine.state.set('playing');
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      expect(led().classList.contains('led--analyzing')).toBe(true);
+      expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain('Analyzing…');
+
+      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(led().classList.contains('led--analyzing')).toBe(false);
+      });
+    });
+
+    it('never lights analyzing for a cache hit', async () => {
+      tuneIndexStorage.load.mockReturnValue(buildTuneIndexRecord({ filename: 'Auto tune' }));
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(engine.play).toHaveBeenCalled();
+      });
+
+      expect(led().classList.contains('led--analyzing')).toBe(false);
+      expect(analysisScanner.scan).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('repeat toggle', () => {
+    function repeatToggle(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('[aria-label="Repeat track"]');
+    }
+
+    it("reflects the engine's repeatTrack signal", () => {
+      expect(repeatToggle().checked).toBe(true);
+
+      engine.repeatTrack.set(false);
+      fixture.detectChanges();
+
+      expect(repeatToggle().checked).toBe(false);
+    });
+
+    it('writes the setting through the engine when switched', () => {
+      const toggle = repeatToggle();
+      toggle.checked = false;
+      toggle.dispatchEvent(new Event('change'));
+
+      expect(engine.setRepeatTrack).toHaveBeenCalledWith(false);
+    });
+  });
+
   describe('speed input', () => {
     function speedFader(): HTMLInputElement {
       return fixture.nativeElement.querySelector('[aria-label="Speed"] input[type="range"]');

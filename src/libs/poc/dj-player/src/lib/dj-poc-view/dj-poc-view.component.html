@@ -49,14 +49,30 @@
       </div>
 
       <div class="transport-row">
-        <div class="control-row">
+        <div class="control-row transport-controls">
           <button type="button" (click)="onPlay()" [disabled]="!canPlay()">Play</button>
           <button type="button" (click)="onPause()" [disabled]="engineState() !== 'playing'">
             Pause
           </button>
           <button type="button" (click)="onStop()" [disabled]="currentTune() === null">Stop</button>
+          <span class="transport-spacer"></span>
+          <label class="repeat-toggle">
+            <input
+              type="checkbox"
+              class="repeat-toggle-input"
+              aria-label="Repeat track"
+              [checked]="repeatTrack()"
+              (change)="onRepeatToggle($event)"
+            />
+            Repeat track
+          </label>
         </div>
-        <p class="engine-status">State: {{ engineState() }}</p>
+
+        <div class="transport-state">
+          <span class="led" [class]="'led--' + transportState()" aria-hidden="true"></span>
+          {{ transportStateLabel() }}
+        </div>
+
         @if (engineError()) {
         <p class="error-text" role="alert">{{ engineError() }}</p>
         }

@@ -123,8 +123,117 @@
   }
 }
 
-.engine-status {
+// nowrap so the spacer reliably pushes the toggle to the row's right edge instead of it dropping to
+// its own line the moment the stage narrows.
+.transport-controls {
+  flex-wrap: nowrap;
+}
+
+.transport-spacer {
+  flex: 1 1 auto;
+}
+
+.repeat-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-dimmed);
+}
+
+// A real checkbox styled with appearance: none and a pseudo-element knob, not a hidden input beside
+// a div — the POC's accessibility posture is whatever the platform gives a native control for free.
+.repeat-toggle-input {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 15px;
   margin: 0;
+  border-radius: 8px;
+  background: var(--chrome-raised);
+  border: 1px solid var(--chrome-inset-border);
+  cursor: pointer;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--chrome-knob);
+  }
+
+  &:checked {
+    background: rgba(0, 247, 255, 0.18);
+    border-color: var(--color-highlight);
+
+    &::after {
+      left: auto;
+      right: 1px;
+      background: var(--color-highlight);
+      box-shadow: 0 0 6px rgba(0, 247, 255, 0.9);
+    }
+  }
+}
+
+.transport-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+// Unlit by default — the same chrome-inset body every state but stopped starts from. Lit states set
+// both fill and border to the state's colour and add a glow; stopped goes to chrome-dark instead of
+// this default so it never reads as a merely-tinted variant of "off".
+.led {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--chrome-inset);
+  border: 1px solid var(--chrome-inset-border);
+
+  &--playing {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    box-shadow: 0 0 8px rgba(111, 220, 140, 0.95);
+  }
+
+  &--paused {
+    background: var(--color-directory);
+    border-color: var(--color-directory);
+    box-shadow: 0 0 8px rgba(245, 226, 158, 0.9);
+  }
+
+  &--ended {
+    background: var(--color-highlight);
+    border-color: var(--color-highlight);
+    box-shadow: 0 0 8px rgba(0, 247, 255, 0.95);
+  }
+
+  &--analyzing {
+    background: var(--color-primary-bright);
+    border-color: var(--color-primary-bright);
+    box-shadow: 0 0 9px rgba(179, 51, 179, 1);
+  }
+
+  &--error {
+    background: var(--color-error);
+    border-color: var(--color-error);
+    box-shadow: 0 0 8px rgba(255, 111, 111, 0.95);
+  }
+
+  // stopped and ended are the two silent states and must stay visibly distinct — this is dark like
+  // real hardware, not the default unlit body tinted toward a colour.
+  &--stopped {
+    background: var(--chrome-dark);
+    border-color: var(--chrome-dark-border);
+  }
 }
 
 // Cues and Loop dominate the stage width; Voice and Speed sit in a narrow rail beside them whose
