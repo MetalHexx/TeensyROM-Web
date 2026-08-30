@@ -14,15 +14,17 @@ import { buildFeatureMatrix } from './frame-features';
 import { computeNovelty, DEFAULT_FEATURE_WEIGHTS } from './novelty';
 import { computeStructure } from './structure';
 import { detectLoop, IDLE_PERIOD_SECONDS, MIN_TAIL_SECONDS } from './loop-detect';
-import type { LoopDetectOptions } from './loop-detect';
+import type { LoopDetectOptions, LoopDetection } from './loop-detect';
 import { computePulse, impliedTempo } from './pulse';
 import { segmentNotes } from './notes';
 import { detectKey } from './key';
 import { TUNE_INDEX_STORAGE } from './tune-index-storage';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
+import type { ScanOutput } from './scan-tune';
 import { DjPlayerEngine } from '../engine/dj-player-engine';
 import { asRounded, playCallsPerSecond } from '../engine/play-rate';
+import type { TimingMode } from '../engine/play-rate';
 import type { SidFile } from '../sid/sid-file.model';
 
 /** What a load establishes: which file, under which name. `setTune` always writes a fresh object, so
@@ -33,6 +35,18 @@ interface TuneIdentity {
 }
 
 const EMPTY_IDENTITY: TuneIdentity = { file: null, filename: null };
+
+/** Seconds of music per rung. A loop needs roughly two laps to confirm, so the deepest rung sits
+ *  well past JUMP_CEILING_SECONDS — the ceiling is the scrub basis, not the detection depth. These
+ *  are the depths the Requirements' measured baseline was produced at. */
+const SCAN_DEPTH_SECONDS = [90, 210, 450, 750];
+
+/** What one pass down the ladder concludes with: an output to hand the detectors, an abandonment
+ *  that must publish nothing, or a scan failure the caller should log and let the next load retry. */
+type LadderOutcome =
+  | { readonly kind: 'answered'; readonly output: ScanOutput; readonly loop: LoopDetection }
+  | { readonly kind: 'abandoned' }
+  | { readonly kind: 'failed'; readonly error: string };
 
 /**
  * Owns the tune index's whole lifecycle for the tune currently loaded in `DjPlayerEngine`: look up
@@ -69,9 +83,9 @@ export class TuneIndexService implements OnDestroy {
     effect(() => {
       const tune = this.identity();
       const subtune = this.engine.currentSubtune();
-      // The refresh reads `engine.ceilingFrames()`, a computed over `nominalIntervalUs` — a signal
-      // the Timing selector writes on every speed change. Read outside `untracked`, that becomes a
-      // third, unwanted trigger for this effect.
+      // The refresh reads `engine.nominalIntervalUs()` and `engine.playRate()` to size each rung —
+      // both signals the Timing selector writes on every speed change. Read outside `untracked`,
+      // that becomes a third, unwanted trigger for this effect.
       untracked(() => {
         void this.refresh(tune.file, tune.filename, subtune);
       });
@@ -81,6 +95,24 @@ export class TuneIndexService implements OnDestroy {
   /** Called by the view on every tune load; `filename` is the bundled label or the picker's file.name. */
   setTune(file: SidFile | null, filename: string | null): void {
     this.identity.set({ file, filename });
+  }
+
+  /**
+   * R6's timing escape hatch: rewrites the current record with `mode` and republishes it — no
+   * re-scan, since the record already carries both rates. A no-op when nothing is indexed yet.
+   *
+   * Goes through `engine.setTuneIndex`, never `engine.timingMode.set` or `engine.setTimingMode`
+   * directly — `setTuneIndex` is what re-resolves the clock, so it is what makes the change audible.
+   */
+  setTimingMode(mode: TimingMode): void {
+    const current = this.record();
+    if (current === null) {
+      return;
+    }
+    const updated: TuneIndexRecord = { ...current, timingMode: mode };
+    this.storage.save(updated);
+    this._record.set(updated);
+    this.engine.setTuneIndex(updated);
   }
 
   ngOnDestroy(): void {
@@ -111,33 +143,28 @@ export class TuneIndexService implements OnDestroy {
     }
 
     this._pending.set(true);
-    const request: ScanRequest = {
-      id: ++this.nextRequestId,
-      file,
-      subtune,
-      maxFrames: this.engine.ceilingFrames(),
-    };
-    const result: ScanResult = await this.scanner.scan(request);
+    const ladder = await this.runLadder(file, subtune, generation);
 
-    if (generation !== this.generation) {
-      // The tune or subtune changed while the scan was in flight; this answer describes music that
-      // is no longer loaded.
+    if (ladder.kind === 'abandoned') {
+      // The tune or subtune changed while a rung was in flight; this answer describes music that is
+      // no longer loaded. A newer refresh has already reset `pending` for its own tune, so this one
+      // must not touch it.
       return;
     }
     this._pending.set(false);
 
-    if (result.kind === 'failed') {
+    if (ladder.kind === 'failed') {
       // A failed scan is not a cached "no answer" — the next load of this tune should try again.
-      logWarn(`TuneIndexService: scan failed for ${filename}:${subtune}: ${result.error}`);
+      logWarn(`TuneIndexService: scan failed for ${filename}:${subtune}: ${ladder.error}`);
       return;
     }
 
     // The detectors run in the same order TrackAnalysisPanelComponent.runAnalysis uses.
-    const output = result.output;
+    const output = ladder.output;
     const matrix = buildFeatureMatrix(output);
     const novelty = computeNovelty(matrix, DEFAULT_FEATURE_WEIGHTS);
     const structure = computeStructure(matrix, DEFAULT_FEATURE_WEIGHTS);
-    const loop = detectLoop(output, this.loopDetectOptions());
+    const loop = ladder.loop;
     const pulse = computePulse(novelty.candidates);
     const key = detectKey(segmentNotes(output, file.clock));
     const playRate = this.engine.playRate();
@@ -181,6 +208,65 @@ export class TuneIndexService implements OnDestroy {
     this._record.set(record);
     this.engine.setTuneIndex(record);
     logInfo(LogType.Success, `TuneIndexService: indexed ${filename}:${subtune}.`);
+  }
+
+  /**
+   * Scans `SCAN_DEPTH_SECONDS` deepest-first-stopping-shallowest: each rung re-emulates from init —
+   * `scanTune` has no resume — and hands its output to `detectLoop`, stopping at the first rung that
+   * answers. Exhausting every rung without an answer still counts as answered, with `loop.kind`
+   * `'none'`, so the caller writes a null record rather than looping forever.
+   *
+   * The generation guard and a failed scan are both checked after every rung, not only the first: a
+   * tune or subtune change mid-ladder must abandon the whole ladder, or a stale answer lands on the
+   * tune that replaced it.
+   */
+  private async runLadder(
+    file: SidFile,
+    subtune: number,
+    generation: number
+  ): Promise<LadderOutcome> {
+    let lastOutput: ScanOutput | undefined;
+    let lastLoop: LoopDetection = { kind: 'none' };
+
+    for (const depthSeconds of SCAN_DEPTH_SECONDS) {
+      const request: ScanRequest = {
+        id: ++this.nextRequestId,
+        file,
+        subtune,
+        maxFrames: this.scanDepthFrames(depthSeconds),
+      };
+      const result: ScanResult = await this.scanner.scan(request);
+
+      if (generation !== this.generation) {
+        return { kind: 'abandoned' };
+      }
+      if (result.kind === 'failed') {
+        return { kind: 'failed', error: result.error };
+      }
+
+      lastOutput = result.output;
+      lastLoop = detectLoop(lastOutput, this.loopDetectOptions());
+      if (lastLoop.kind !== 'none') {
+        break;
+      }
+    }
+
+    if (lastOutput === undefined) {
+      // SCAN_DEPTH_SECONDS is never empty, so this never actually happens — the guard exists only to
+      // satisfy narrowing.
+      return { kind: 'abandoned' };
+    }
+    return { kind: 'answered', output: lastOutput, loop: lastLoop };
+  }
+
+  /** One rung's depth, in play calls. Converted against the **rounded** rate, for the same reason
+   *  `loopDetectOptions` is — the ladder's depths are emulation budgets, not real-time durations. */
+  private scanDepthFrames(seconds: number): number {
+    const perSecond = playCallsPerSecond(
+      this.engine.nominalIntervalUs(),
+      asRounded(this.engine.playRate())
+    );
+    return Math.round(seconds * perSecond);
   }
 
   /**

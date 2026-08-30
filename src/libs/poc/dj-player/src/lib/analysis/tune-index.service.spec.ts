@@ -188,11 +188,13 @@ describe('TuneIndexService', () => {
     const [request] = scanner.scan.mock.calls[0];
     expect(request.file).toBe(file);
     expect(request.subtune).toBe(1);
-    expect(request.maxFrames).toBe(10_000);
+    expect(request.maxFrames).toBeGreaterThan(0);
     expect(service.pending()).toBe(true);
     expect(service.record()).toBeNull();
 
-    const scan = makeScan(40, 2);
+    // Long and silent enough to answer conclusively on the ladder's very first rung, so exactly one
+    // scan is expected below.
+    const scan = makeScan(2_000, 2);
     resolveScan({ id: request.id, kind: 'done', output: scan });
     await Promise.resolve();
     await Promise.resolve();
@@ -310,7 +312,8 @@ describe('TuneIndexService', () => {
     TestBed.flushEffects();
     expect(scanner.scan).toHaveBeenCalledTimes(2);
 
-    // The stale scan for the outgoing tune resolves only after B has already taken over.
+    // The stale scan for the outgoing tune resolves only after B has already taken over. Its output
+    // is discarded by the generation guard before detection ever runs, so its shape doesn't matter.
     resolvers[0]({ id: 1, kind: 'done', output: makeScan(20, 1) });
     await Promise.resolve();
     await Promise.resolve();
@@ -318,8 +321,10 @@ describe('TuneIndexService', () => {
     expect(service.record()).toBeNull();
     expect(service.pending()).toBe(true); // B's own scan is still in flight
     expect(storage.save).not.toHaveBeenCalled();
+    expect(scanner.scan).toHaveBeenCalledTimes(2); // A's abandoned ladder requested no further rung
 
-    resolvers[1]({ id: 2, kind: 'done', output: makeScan(20, 4) });
+    // Long and silent enough to answer conclusively on B's very first rung.
+    resolvers[1]({ id: 2, kind: 'done', output: makeScan(2_000, 4) });
     await Promise.resolve();
     await Promise.resolve();
 
@@ -345,5 +350,146 @@ describe('TuneIndexService', () => {
     expect(service.record()).toBeNull();
     expect(storage.save).not.toHaveBeenCalled();
     expect(engine.setTuneIndex.mock.calls.every(([record]) => record === null)).toBe(true);
+  });
+
+  describe('the scan ladder', () => {
+    it('deepens the scan when a rung finds no loop, and stops at the first rung that answers', async () => {
+      const resolvers: ((result: ScanResult) => void)[] = [];
+      scanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
+      );
+
+      service.setTune(fakeSidFile(), 'Deepens.sid');
+      TestBed.flushEffects();
+      expect(scanner.scan).toHaveBeenCalledTimes(1);
+
+      // The shallowest rung finds nothing to work with — too short a tail to confirm a repeat.
+      resolvers[0]({ id: 1, kind: 'done', output: makeScan(40, 2) });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(scanner.scan).toHaveBeenCalledTimes(2);
+      expect(service.pending()).toBe(true); // still deepening, not yet an answer
+
+      // Neither does the second rung.
+      resolvers[1]({ id: 2, kind: 'done', output: makeScan(40, 2) });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(scanner.scan).toHaveBeenCalledTimes(3);
+      // Each rung reaches further into the tune than the one before it.
+      const [first, second, third] = scanner.scan.mock.calls.map(([request]) => request.maxFrames);
+      expect(second).toBeGreaterThan(first);
+      expect(third).toBeGreaterThan(second);
+
+      // The third rung finally answers.
+      resolvers[2]({ id: 3, kind: 'done', output: makeLoopingScan(2500, 100, 400, 2) });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(scanner.scan).toHaveBeenCalledTimes(3); // the ladder stopped — no fourth rung
+      expect(service.pending()).toBe(false);
+      expect(service.record()?.loopStartFrame).toBe(100);
+      expect(service.record()?.loopPeriodFrames).toBe(400);
+    });
+
+    it('scans all the way to the deepest rung and writes a null record when no rung finds a loop', async () => {
+      scanner.scan.mockImplementation(() =>
+        Promise.resolve<ScanResult>({ id: 0, kind: 'done', output: makeScan(40, 2) })
+      );
+
+      service.setTune(fakeSidFile(), 'NoLoop.sid');
+      TestBed.flushEffects();
+
+      // Enough microtask turns for every rung's await to settle in sequence.
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      expect(scanner.scan.mock.calls.length).toBeGreaterThan(1); // more than one rung was tried
+      const callsOnceSettled = scanner.scan.mock.calls.length;
+      for (let i = 0; i < 5; i++) {
+        await Promise.resolve();
+      }
+      expect(scanner.scan.mock.calls.length).toBe(callsOnceSettled); // the ladder terminates
+
+      expect(service.pending()).toBe(false);
+      const record = service.record();
+      expect(record).not.toBeNull();
+      expect(record?.loopStartFrame).toBeNull();
+      expect(record?.loopPeriodFrames).toBeNull();
+      expect(record?.endedAtFrame).toBeNull();
+      expect(storage.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('abandons the whole ladder mid-flight when the tune changes, publishing nothing for the outgoing tune', async () => {
+      const resolvers: ((result: ScanResult) => void)[] = [];
+      scanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
+      );
+
+      service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
+      TestBed.flushEffects();
+      expect(scanner.scan).toHaveBeenCalledTimes(1);
+
+      // A's shallowest rung finds nothing, so the ladder deepens.
+      resolvers[0]({ id: 1, kind: 'done', output: makeScan(40, 2) });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(scanner.scan).toHaveBeenCalledTimes(2); // A's second rung now in flight
+
+      // The tune changes before A's second rung resolves.
+      service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
+      TestBed.flushEffects();
+      expect(scanner.scan).toHaveBeenCalledTimes(3); // B's own first rung
+
+      // A's stale rung resolves after B has already taken over — even with a loop-shaped output, it
+      // must not be believed.
+      resolvers[1]({ id: 2, kind: 'done', output: makeLoopingScan(2500, 100, 400, 2) });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(service.record()).toBeNull(); // B's own ladder is still running
+      expect(storage.save).not.toHaveBeenCalled();
+      expect(scanner.scan).toHaveBeenCalledTimes(3); // A's ladder did not continue to a third rung
+
+      // B's first rung answers.
+      resolvers[2]({ id: 3, kind: 'done', output: makeLoopingScan(2500, 60, 400, 4) });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(service.record()?.filename).toBe('B.sid');
+      expect(service.record()?.loopStartFrame).toBe(60);
+    });
+  });
+
+  describe('setTimingMode', () => {
+    it('does nothing when no record has been indexed yet', () => {
+      engine.setTuneIndex.mockClear(); // the constructor's own initial refresh already called it once
+
+      service.setTimingMode('rounded');
+
+      expect(storage.save).not.toHaveBeenCalled();
+      expect(engine.setTuneIndex).not.toHaveBeenCalled();
+      expect(service.record()).toBeNull();
+    });
+
+    it('rewrites and republishes the current record with the new mode, without touching the scanner', () => {
+      const hit = buildStoredRecord({ filename: 'Cached.sid', timingMode: 'exact' });
+      storage.load.mockReturnValue(hit);
+      service.setTune(fakeSidFile(), 'Cached.sid');
+      TestBed.flushEffects();
+      storage.save.mockClear();
+      engine.setTuneIndex.mockClear();
+
+      service.setTimingMode('rounded');
+
+      expect(scanner.scan).not.toHaveBeenCalled();
+      const record = service.record();
+      expect(record?.timingMode).toBe('rounded');
+      // The rest of the record rides along untouched — this is a rewrite, not a re-scan.
+      expect(record?.filename).toBe('Cached.sid');
+      expect(storage.save).toHaveBeenCalledTimes(1);
+      expect(storage.save).toHaveBeenCalledWith(record);
+      expect(engine.setTuneIndex).toHaveBeenCalledWith(record);
+    });
   });
 });
