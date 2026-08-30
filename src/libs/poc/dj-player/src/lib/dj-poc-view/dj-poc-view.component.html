@@ -498,6 +498,10 @@
           <dd>{{ engineStats().framesRendered }}</dd>
         </div>
         <div class="field-row">
+          <dt>Track end frame</dt>
+          <dd>{{ trackEndFrame() ?? '—' }}</dd>
+        </div>
+        <div class="field-row">
           <dt>Packets / s</dt>
           <dd>{{ packetsPerSecond().toFixed(1) }}</dd>
         </div>

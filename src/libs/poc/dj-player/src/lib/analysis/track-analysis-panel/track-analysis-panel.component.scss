@@ -1,6 +1,8 @@
-// Deliberately local and unshared: no @teensyrom-nx/ui components, no design tokens, no ::ng-deep.
-// This section can be deleted with the route it lives on, so its styling carries no dependency on
-// the rest of the app either.
+// Draws from the app's shared design tokens and this route's own `.dj-poc-page` token block wherever
+// a literal matches one exactly; the chart's remaining accent and chrome greys have no counterpart
+// there and stay local, declared alongside the rest of that block. Still no @teensyrom-nx/ui
+// components and no ::ng-deep: this section can be deleted with the route it lives on without
+// carrying any dependency out of it.
 :host {
   display: block;
   flex: 0 0 auto;
@@ -14,26 +16,26 @@
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
-  margin-top: 0.75rem;
-  padding: 0.625rem 0.75rem;
+  margin-top: var(--spacing-md);
+  padding: 0.625rem var(--spacing-md);
   background: #2a2a2a;
   border: 1px solid #4a5560;
   border-radius: 4px;
   font-size: 0.75rem;
-  color: #cccccc;
+  color: var(--analysis-text);
 }
 
 .analysis-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--spacing-md);
 }
 
 .analysis-toggle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
   background: transparent;
   border: none;
   color: #a8b4be;
@@ -45,26 +47,26 @@
 }
 
 .analysis-chevron {
-  color: #888888;
+  color: var(--analysis-text-dim);
 }
 
 .analysis-header-status {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--spacing-md);
 }
 
 .analysis-caption {
-  color: #888888;
+  color: var(--analysis-text-dim);
   font-size: 0.6875rem;
 }
 
 .analysis-run {
   background: #55606a;
-  color: #e8eef2;
+  color: var(--analysis-text-bright);
   border: 1px solid #626f7a;
   border-radius: 3px;
-  padding: 0.25rem 0.625rem;
+  padding: var(--spacing-xs) 0.625rem;
   font-size: 0.6875rem;
   cursor: pointer;
 
@@ -90,10 +92,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 0.625rem;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-sm) 0.625rem;
   background: #242424;
-  border: 1px solid #363636;
+  border: 1px solid var(--analysis-panel-border);
   border-radius: 3px;
 }
 
@@ -107,12 +109,12 @@
   font-size: 0.625rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6f6f6f;
+  color: var(--analysis-text-faint);
 }
 
 .ctrl-caption {
   font-size: 0.6875rem;
-  color: #888888;
+  color: var(--analysis-text-dim);
   white-space: nowrap;
 }
 
@@ -125,10 +127,10 @@
 .ctrl-bar button,
 .weights-toggle {
   background: #444444;
-  color: #cccccc;
-  border: 1px solid #4a4a4a;
+  color: var(--analysis-text);
+  border: 1px solid var(--analysis-control-border);
   border-radius: 3px;
-  padding: 0.2rem 0.5rem;
+  padding: 0.2rem var(--spacing-sm);
   font-size: 0.6875rem;
   cursor: pointer;
 
@@ -146,10 +148,10 @@
 .weights-panel {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-  gap: 0.375rem 0.75rem;
-  padding: 0.5rem 0.625rem;
-  background: #202020;
-  border: 1px solid #363636;
+  gap: 0.375rem var(--spacing-md);
+  padding: var(--spacing-sm) 0.625rem;
+  background: var(--analysis-panel-fill);
+  border: 1px solid var(--analysis-panel-border);
   border-radius: 3px;
 }
 
@@ -169,12 +171,12 @@
   width: 2rem;
   text-align: right;
   font-family: 'Roboto Mono', monospace;
-  color: #cccccc;
+  color: var(--analysis-text);
 }
 
 .lane-stack {
-  background: #161616;
-  border: 1px solid #333333;
+  background: var(--analysis-canvas-fill);
+  border: 1px solid var(--analysis-grid-line);
   border-radius: 3px;
 
   svg {
@@ -186,7 +188,7 @@
 }
 
 .ruler-bg {
-  fill: #1b1b1b;
+  fill: var(--analysis-lane-fill);
 }
 
 .ruler-label {
@@ -196,7 +198,7 @@
 }
 
 .ruler-tick {
-  stroke: #333333;
+  stroke: var(--analysis-grid-line);
   stroke-width: 1;
 }
 
@@ -205,7 +207,7 @@
 }
 
 .candidate-bg {
-  fill: #1b1b1b;
+  fill: var(--analysis-lane-fill);
 }
 
 .voice-block {
@@ -230,19 +232,19 @@
 
 .novelty-line {
   fill: none;
-  stroke: #93a4b4;
+  stroke: var(--analysis-accent-blue);
   stroke-width: 1.2;
 }
 
 .novelty-mark {
-  fill: #4e5761;
+  fill: var(--analysis-below);
 
   &--above {
-    fill: #c8d4de;
+    fill: var(--analysis-above);
   }
 
   &--selected {
-    fill: #c9a227;
+    fill: var(--analysis-accent);
   }
 }
 
@@ -252,22 +254,22 @@
 }
 
 .candidate-tick {
-  stroke: #4e5761;
+  stroke: var(--analysis-below);
   stroke-width: 1.5;
 
   &--above {
-    stroke: #c8d4de;
+    stroke: var(--analysis-above);
     stroke-width: 2;
   }
 
   &--selected {
-    stroke: #c9a227;
+    stroke: var(--analysis-accent);
     stroke-width: 2.5;
   }
 }
 
 .out-of-scale {
-  fill: #b5533f;
+  fill: var(--analysis-warn);
   opacity: 0.85;
 }
 
@@ -277,7 +279,7 @@
 }
 
 .selected-line {
-  stroke: #c9a227;
+  stroke: var(--analysis-accent);
   stroke-width: 1.4;
   stroke-dasharray: 4 3;
 }
@@ -285,7 +287,7 @@
 .lane-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: var(--spacing-md);
 }
 
 .legend-item {
@@ -293,7 +295,7 @@
   align-items: center;
   gap: 0.3rem;
   font-size: 0.625rem;
-  color: #7d7d7d;
+  color: var(--analysis-text-muted);
 }
 
 .legend-swatch {
@@ -301,7 +303,7 @@
   width: 0.625rem;
   height: 0.625rem;
   border-radius: 2px;
-  border: 1px solid #4a4a4a;
+  border: 1px solid var(--analysis-control-border);
 
   &--pulse {
     background: #7f8fa0;
@@ -316,33 +318,33 @@
   }
 
   &--above {
-    background: #c8d4de;
+    background: var(--analysis-above);
   }
 
   &--below {
-    background: #4e5761;
+    background: var(--analysis-below);
   }
 
   &--selected {
-    background: #c9a227;
+    background: var(--analysis-accent);
   }
 
   &--out-of-scale {
-    background: #b5533f;
+    background: var(--analysis-warn);
   }
 }
 
 .structure-panel {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
 }
 
 .structure-square {
   width: 200px;
   height: 200px;
-  background: #161616;
-  border: 1px solid #333333;
+  background: var(--analysis-canvas-fill);
+  border: 1px solid var(--analysis-grid-line);
   border-radius: 3px;
   image-rendering: pixelated;
 }
@@ -350,16 +352,16 @@
 .structure-time-label {
   font-size: 0.625rem;
   font-family: 'Roboto Mono', monospace;
-  color: #6f6f6f;
+  color: var(--analysis-text-faint);
 }
 
 .key-panel {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.625rem;
-  background: #202020;
-  border: 1px solid #363636;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) 0.625rem;
+  background: var(--analysis-panel-fill);
+  border: 1px solid var(--analysis-panel-border);
   border-radius: 3px;
 }
 
@@ -371,18 +373,18 @@
 }
 
 .key-name {
-  font-size: 0.875rem;
-  color: #e8eef2;
+  font-size: var(--font-size-sm);
+  color: var(--analysis-text-bright);
 }
 
 .key-confidence {
   font-size: 0.625rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #7d7d7d;
+  color: var(--analysis-text-muted);
 
   &--none {
-    color: #b5533f;
+    color: var(--analysis-warn);
   }
 }
 
@@ -396,16 +398,16 @@
   fill: #3f4750;
 
   &--in-scale {
-    fill: #93a4b4;
+    fill: var(--analysis-accent-blue);
   }
 
   &--tonic {
-    fill: #c9a227;
+    fill: var(--analysis-accent);
   }
 }
 
 .chroma-label {
-  fill: #6f6f6f;
+  fill: var(--analysis-text-faint);
   font-size: 5px;
   font-family: 'Roboto Mono', monospace;
   text-anchor: middle;
@@ -413,23 +415,23 @@
 
 .analysis-empty {
   margin: 0;
-  color: #6f6f6f;
+  color: var(--analysis-text-faint);
   font-size: 0.6875rem;
 }
 
 .readout-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--spacing-xs);
 }
 
 .readout-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
   padding: 0.15rem 0;
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid var(--analysis-grid-line);
   font-size: 0.6875rem;
   color: #aaaaaa;
 

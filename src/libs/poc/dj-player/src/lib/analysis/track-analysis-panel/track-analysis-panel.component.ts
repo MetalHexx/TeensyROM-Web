@@ -854,14 +854,15 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     }
   });
 
-  /** "not determined" rather than falling back to the ceiling or any fixed duration — a tune detection
-   *  could not answer for genuinely has no known length. Derived from frames at display time through
-   *  the rate in force, so this panel and the rail's Tune Index panel cannot report different lengths
-   *  for the same tune, and both follow the Timing selector. */
+  /** "not found" rather than falling back to the ceiling or any fixed duration — a tune detection
+   *  could not answer for genuinely has no known length, the same declined answer the Loop row above
+   *  reports, not a second word for it. Derived from frames at display time through the rate in force,
+   *  so this panel and the rail's Tune Index panel cannot report different lengths for the same tune,
+   *  and both follow the Timing selector. */
   protected readonly structureLengthLabel = computed<string>(() => {
     const detection = this.effectiveLoop();
     const frames = detection === null ? null : positionBasisFor(loopFramesOf(detection));
-    return frames === null ? 'not determined' : formatDuration(this.toSeconds(frames));
+    return frames === null ? 'not found' : formatDuration(this.toSeconds(frames));
   });
 
   protected readonly structureSectionsLabel = computed<string>(() => {

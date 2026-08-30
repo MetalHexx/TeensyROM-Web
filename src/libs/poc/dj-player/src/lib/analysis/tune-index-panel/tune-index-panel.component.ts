@@ -8,7 +8,7 @@ import { PITCH_CLASS_NAMES } from '../key';
 import type { TuneIndexRecord } from '../tune-index.model';
 import { formatDuration } from '../format';
 
-const ANALYSING_LABEL = 'analysing…';
+const ANALYZING_LABEL = 'analyzing…';
 const UNKNOWN_LABEL = '—';
 const NOT_FOUND_LABEL = 'not found';
 /** A tune detection proved stops rather than repeats. A completed answer, and a different one from
@@ -59,10 +59,10 @@ export class TuneIndexPanelComponent {
   private readonly tuneIndexService = inject(TuneIndexService);
   private readonly engine = inject(DjPlayerEngine);
 
-  protected readonly analysing: Signal<boolean> = this.tuneIndexService.pending;
+  protected readonly analyzing: Signal<boolean> = this.tuneIndexService.pending;
 
   private readonly loopReadout = computed<LoopReadout>(() => {
-    if (this.analysing()) return { kind: 'placeholder', label: ANALYSING_LABEL };
+    if (this.analyzing()) return { kind: 'placeholder', label: ANALYZING_LABEL };
     const record = this.tuneIndexService.record();
     if (record === null) return { kind: 'placeholder', label: UNKNOWN_LABEL };
 
@@ -75,7 +75,7 @@ export class TuneIndexPanelComponent {
   });
 
   protected readonly lengthLabel = computed<string>(() => {
-    if (this.analysing()) return ANALYSING_LABEL;
+    if (this.analyzing()) return ANALYZING_LABEL;
     const record = this.tuneIndexService.record();
     if (record === null) return UNKNOWN_LABEL;
     const basis = positionBasisFor(record);
@@ -104,13 +104,13 @@ export class TuneIndexPanelComponent {
   });
 
   protected readonly keyLabel = computed<string>(() => {
-    if (this.analysing()) return ANALYSING_LABEL;
+    if (this.analyzing()) return ANALYZING_LABEL;
     const record = this.tuneIndexService.record();
     return record === null ? UNKNOWN_LABEL : keyLabelFor(record);
   });
 
   protected readonly keyConfidenceLabel = computed<string>(() => {
-    if (this.analysing()) return ANALYSING_LABEL;
+    if (this.analyzing()) return ANALYZING_LABEL;
     const record = this.tuneIndexService.record();
     return record === null ? UNKNOWN_LABEL : record.keyConfidence;
   });

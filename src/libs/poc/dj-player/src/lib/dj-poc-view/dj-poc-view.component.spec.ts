@@ -1457,6 +1457,13 @@ describe('DjPocViewComponent', () => {
       expect(sectionText('Diagnostics')).toContain('40 ms');
     });
 
+    it("reads the track end frame from the engine's own signal", () => {
+      engine.trackEndFrame.set(6_700);
+      fixture.detectChanges();
+
+      expect(sectionText('Diagnostics')).toContain('6700');
+    });
+
     it("binds the delivery numbers to the engine's stats signal", () => {
       engine.stats.set({
         ...EMPTY_STATS,

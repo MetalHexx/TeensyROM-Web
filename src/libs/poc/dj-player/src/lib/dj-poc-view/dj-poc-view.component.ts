@@ -130,6 +130,7 @@ export class DjPocViewComponent {
   protected readonly engineError = this.engine.lastError;
   protected readonly engineStats = this.engine.stats;
   protected readonly repeatTrack = this.engine.repeatTrack;
+  protected readonly trackEndFrame = this.engine.trackEndFrame;
 
   /** True while the tune-index service is scanning a genuinely new tune — never true for a cache
    *  hit, which publishes its record without ever setting this. */

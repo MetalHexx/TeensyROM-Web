@@ -49,6 +49,26 @@
   --chrome-dark: #33334a; // the deliberately-dark `stopped` light
   --chrome-dark-border: #44445c;
 
+  // Track Analysis panel's own dark chrome — no theme ancestor either, and distinct from the
+  // structure/chrome values above (this widget's own palette predates them). Named here, not at each
+  // use site, because each value repeats across several of that panel's own rules.
+  --analysis-panel-fill: #202020; // the weights and key sub-panels' background
+  --analysis-canvas-fill: #161616; // the lane stack and the structure square's background
+  --analysis-lane-fill: #1b1b1b; // the ruler and candidate lanes' background
+  --analysis-panel-border: #363636; // the ctrl bar and the weights/key sub-panels' border
+  --analysis-grid-line: #333333; // lane stack, ruler tick, structure square and readout dividers
+  --analysis-control-border: #4a4a4a; // ctrl bar buttons and the legend swatches' border
+  --analysis-text: #cccccc; // default body text on the panel's dark chrome
+  --analysis-text-bright: #e8eef2; // emphasised text — the run button and the key name
+  --analysis-text-dim: #888888; // secondary captions
+  --analysis-text-faint: #6f6f6f; // mono labels — ctrl labels, axis ticks, chroma labels
+  --analysis-text-muted: #7d7d7d; // tertiary text — key confidence and legend items
+  --analysis-accent: #c9a227; // the selected candidate, the tonic chroma bar, the auditioning legend
+  --analysis-accent-blue: #93a4b4; // the novelty curve and the in-scale chroma bars
+  --analysis-above: #c8d4de; // above-threshold candidates
+  --analysis-below: #4e5761; // below-threshold candidates and idle novelty marks
+  --analysis-warn: #b5533f; // out-of-scale notes and an unresolved key
+
   display: flex;
   gap: var(--spacing-lg);
   height: 100%;

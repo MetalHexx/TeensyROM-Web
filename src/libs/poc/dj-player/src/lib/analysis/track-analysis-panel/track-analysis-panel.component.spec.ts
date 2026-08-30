@@ -558,6 +558,18 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(readoutValue('Loop')).not.toBe('not found');
   });
 
+  it('reads a cached record that answers nothing as a declined answer, distinct from ended', () => {
+    expand();
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({ loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null })
+    );
+    fixture.detectChanges();
+
+    // Both rows report the same declined answer — one word for the same finding, not two.
+    expect(readoutValue('Loop')).toBe('not found');
+    expect(readoutValue('Length')).toBe('not found');
+  });
+
   it('prefers a completed live scan over a cached index record describing the same tune', async () => {
     tuneIndex.record.set(
       fakeTuneIndexRecord({

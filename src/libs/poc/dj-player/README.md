@@ -285,6 +285,30 @@ Record observations as they happen during the session. Findings cannot be recons
 
 ---
 
+#### 23. Does the intro play exactly once before the loop takes over?
+
+*Confirms the loop lifecycle split by ear — an unrepeating intro followed by a repeating lap — rather than only in the frame arithmetic that drives it.*
+
+**Observations:**
+
+---
+
+#### 24. Does the deck stop exactly where the position bar says it will, with repeat off?
+
+*Confirms the ended state and the track end frame it renders agree with what a listener actually hears the deck do.*
+
+**Observations:**
+
+---
+
+#### 25. Is the pre-playback wait tolerable, weighed against the stutter it replaces?
+
+*Weighs the resumable indexing ladder's fixed wait before a tune starts against the mid-tune stutter the previous scan-on-demand design produced.*
+
+**Observations:**
+
+---
+
 ### Validation Harnesses And The Measured Baseline
 
 Three scratch harnesses that informed the loop-detection regression and its replacement are committed under `validation/` (a sibling of `src/`, so `pnpm nx test dj-player` never collects them — see that directory's own README for exact commands, inputs, and how to read each one's output). They are diagnostic and grading tools, not part of the suite that gates a commit; running one is always an explicit act.
