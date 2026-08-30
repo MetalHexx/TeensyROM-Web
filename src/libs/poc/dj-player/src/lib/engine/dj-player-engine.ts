@@ -590,6 +590,38 @@ export class DjPlayerEngine implements OnDestroy {
     this.tuneSession.setIndexedLengthFrames(positionBasisFor(record));
     this.markerState.setTuneLoop(record?.loopStartFrame ?? null, record?.loopPeriodFrames ?? null);
     this.setTimingMode(record?.timingMode ?? DEFAULT_TIMING_MODE);
+    // `setTuneLoop` has just dropped whatever entry image was held, so this is the one place that
+    // owes a fresh one. Not awaited: nothing on this path needs the image, and playback cannot reach
+    // the loop's out-frame for a whole lap yet.
+    void this.captureTuneLoopEntry();
+  }
+
+  /**
+   * Produces the whole-tune loop's re-entry image once, off-thread. A loop start of 0 needs none —
+   * the frame-0 seed already is one — and neither does a tune with no detected loop.
+   *
+   * The replay outlives the state it was asked against, so the file, the subtune and the loop start
+   * are all re-checked on the way back. Landing a stale image is worse than landing none: the
+   * fallback to the frame-0 seed is correct and audible, where a foreign machine image is neither.
+   */
+  async captureTuneLoopEntry(): Promise<void> {
+    const startFrame = this.tuneLoopStartFrame();
+    if (startFrame === null || startFrame === 0) return;
+
+    const file = this.tuneSession.file;
+    if (file === null) return;
+    const subtune = this.currentSubtune();
+
+    const result = await this.tuneSession.replayImage(startFrame);
+    if (result === null) return;
+    if (this.tuneSession.file !== file || this.currentSubtune() !== subtune) return;
+    if (this.tuneLoopStartFrame() !== startFrame) return;
+
+    this.markerState.setTuneLoopEntry({
+      frame: result.frame,
+      machine: result.machine,
+      registers: result.registers,
+    });
   }
 
   addMarker(): number {
@@ -660,8 +692,9 @@ export class DjPlayerEngine implements OnDestroy {
     this.markerState.auditionMarkerEnd(index);
   }
 
+  /** The Cues panel's Stop: drops the marker loop only. The whole-tune loop has its own toggle. */
   stopLoop(): void {
-    this.markerState.stopLoop();
+    this.markerState.stopMarkerLoop();
   }
 
   /** The rail panel's whole-tune loop toggle — arms or disarms against the still-known loop start
@@ -687,13 +720,14 @@ export class DjPlayerEngine implements OnDestroy {
    * resolves once the request has settled — landed, failed, or been superseded/discarded — so a
    * caller that needs to know when the jump is done (rather than merely requested) can await it.
    *
-   * Drops every active loop first — a manual scrub always wins over a marker or whole-tune loop that
-   * would otherwise drag playback back to wherever it was looping. Nothing re-arms on its own after
-   * this; the operator re-arms explicitly. The Track Analysis panel's click-to-audition routes
-   * through here too, so it inherits the same rule with no separate call site.
+   * Drops the marker loop first — a manual scrub always wins over a passage the operator built
+   * against a marker, which would otherwise drag playback straight back to wherever it was looping.
+   * The whole-tune loop survives: it is the tune's own repeat behaviour, and only its own toggle
+   * turns it off. The Track Analysis panel's click-to-audition routes through here too, so it
+   * inherits the same rule with no separate call site.
    */
   scrubTo(percent: number): Promise<void> {
-    this.markerState.stopLoop();
+    this.markerState.stopMarkerLoop();
     return this.tuneSession.scrubTo(percent);
   }
 
@@ -758,7 +792,6 @@ export class DjPlayerEngine implements OnDestroy {
     );
     this.tuneSession.framesRendered++;
     this.markerState.maybeRecordAnchor(machine, frame, this.tuneSession.framesRendered);
-    this.markerState.maybeCaptureTuneLoopEntry(machine, frame, this.tuneSession.framesRendered);
     if (this.markerState.advanceLoop(this.tuneSession.framesRendered)) {
       return; // the resync it queued goes out on the next tick; don't publish stats twice
     }

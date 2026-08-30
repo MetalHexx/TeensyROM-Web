@@ -455,13 +455,13 @@ describe('MarkerState', () => {
       expect(markerState.queuedMarker()).toBeNull();
     });
 
-    it('stopLoop escapes on the spot, dropping the queue and leaving playback running linearly', () => {
+    it('stopMarkerLoop escapes on the spot, dropping the queue and leaving playback running linearly', () => {
       const loop = markLoopMarker(10);
       markerState.triggerMarker(loop);
       const cue = markerState.addMarker();
       markerState.triggerMarker(cue); // queued behind the running lap
 
-      markerState.stopLoop();
+      markerState.stopMarkerLoop();
 
       expect(markerState.loopingMarker()).toBeNull();
       expect(markerState.queuedMarker()).toBeNull();
@@ -570,17 +570,14 @@ describe('MarkerState', () => {
   });
 
   describe('the whole-tune loop', () => {
-    /** Plays forward the way the coordinator's tick loop does — one entry-capture check per frame,
-     *  after the position it is checked against has been incremented. */
-    function playThrough(frames: number): void {
-      for (let i = 0; i < frames; i++) {
-        harness.tick();
-        markerState.maybeCaptureTuneLoopEntry(
-          harness.machine(),
-          harness.frame(),
-          harness.framesRendered()
-        );
-      }
+    /** Hands over the live machine as the loop's re-entry image, standing in for the coordinator's
+     *  off-thread replay to the loop start. */
+    function handEntryImage(frame: number): void {
+      markerState.setTuneLoopEntry({
+        frame,
+        machine: harness.machine().snapshot(),
+        registers: harness.frame().snapshotValues(),
+      });
     }
 
     it('re-enters at the frame-0 seed once the first lap ends, and does so again a lap later', () => {
@@ -618,10 +615,11 @@ describe('MarkerState', () => {
     it('re-enters at a non-zero loop start, so an unrepeating intro plays once', () => {
       markerState.setTuneLoop(20, 40);
 
-      playThrough(20); // the intro, ending on the loop start
+      harness.tickBy(20); // the intro, ending on the loop start
       const machineAtStart = harness.machine().snapshot();
       const registersAtStart = harness.frame().snapshotValues();
-      playThrough(40); // the first lap, ending on the out-frame
+      handEntryImage(20);
+      harness.tickBy(40); // the first lap, ending on the out-frame
 
       expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
       expect(harness.restores.at(-1)?.frame).toBe(20);
@@ -631,24 +629,23 @@ describe('MarkerState', () => {
       expect(harness.restores.at(-1)?.registers).toEqual(registersAtStart);
     });
 
-    it('re-enters a tune that repeats from the top at the frame-0 image, not the frame after it', () => {
+    it('re-enters a tune that repeats from the top at the frame-0 seed, which needs no image of its own', () => {
       const machineAtZero = harness.machine().snapshot();
       markerState.setTuneLoop(0, 40);
 
-      playThrough(40);
+      harness.tickBy(40);
 
       expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
       expect(harness.restores.at(-1)?.frame).toBe(0);
-      // The counter tune advances every play call, so a frame-1 image restored under frame 0 —
-      // what capturing on `>=` would produce — reads as a different machine here.
+      // The counter tune advances every play call, so any later image restored under frame 0 would
+      // read as a different machine here.
       expect(harness.restores.at(-1)?.machine).toEqual(machineAtZero);
     });
 
-    it('falls back to the tune start for a non-zero loop start playback never passed through', () => {
-      playThrough(30); // already past the start the detection is about to name
+    it('falls back to the tune start for a non-zero loop start no entry image has arrived for', () => {
       markerState.setTuneLoop(20, 40);
 
-      playThrough(30); // on to the out-frame at 60, without ever crossing frame 20 again
+      harness.tickBy(60); // on to the out-frame with nothing handed over
 
       expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
       expect(harness.restores.at(-1)?.frame).toBe(0);
@@ -656,7 +653,9 @@ describe('MarkerState', () => {
 
     it('drops the entry image on a subtune re-init, falling back to the reseeded tune start', () => {
       markerState.setTuneLoop(20, 40);
-      playThrough(60);
+      harness.tickBy(20);
+      handEntryImage(20);
+      harness.tickBy(40);
 
       // What TuneSession.initSubtune does around a re-init: drop the ring, then seed a frame-0
       // anchor on the machine it has just re-initialised.
@@ -671,10 +670,11 @@ describe('MarkerState', () => {
 
     it('drops the entry image when a new detection arrives', () => {
       markerState.setTuneLoop(20, 40);
-      playThrough(20); // holds the image at frame 20
+      harness.tickBy(20);
+      handEntryImage(20);
 
       markerState.setTuneLoop(0, 40); // a fresh detection — the held image describes the old start
-      playThrough(40);
+      harness.tickBy(40);
 
       expect(markerState.advanceLoop(harness.framesRendered())).toBe(true);
       expect(harness.restores.at(-1)?.frame).toBe(0);
@@ -756,26 +756,43 @@ describe('MarkerState', () => {
       expect(markerState.tuneLoopArmed()).toBe(true); // untouched — not the operator getting out
     });
 
-    it('the public stopLoop() clears both loop kinds, while leaving the detected point in place', () => {
+    it('stopMarkerLoop drops an engaged marker loop and its queue, leaving the whole-tune arm and the playhead alone', () => {
       const index = markLoopMarker(10);
       markerState.triggerMarker(index);
       markerState.setTuneLoop(0, 1000);
+      harness.tickBy(4);
       expect(markerState.loopingMarker()).toBe(index);
-      expect(markerState.tuneLoopArmed()).toBe(true);
 
-      markerState.stopLoop();
+      markerState.stopMarkerLoop();
 
       expect(markerState.loopingMarker()).toBeNull();
-      expect(markerState.tuneLoopArmed()).toBe(false);
-      expect(markerState.tuneLoopOutFrame()).toBe(1000); // still true, only the permission to act is gone
+      expect(markerState.queuedMarker()).toBeNull();
+      expect(markerState.tuneLoopArmed()).toBe(true);
+      expect(harness.framesRendered()).toBe(4); // a get-out, not a move
     });
 
-    it('clear() disarms the whole-tune loop but leaves the detected point in place', () => {
+    it('stopMarkerLoop with only the whole-tune loop armed leaves it armed and the playhead where it is', () => {
       markerState.setTuneLoop(0, 1000);
+      harness.tickBy(7);
+
+      markerState.stopMarkerLoop();
+
+      expect(markerState.tuneLoopArmed()).toBe(true);
+      expect(markerState.tuneLoopOutFrame()).toBe(1000);
+      expect(harness.framesRendered()).toBe(7);
+    });
+
+    it('clear() drops the marker loop and leaves the whole-tune arm to the load path', () => {
+      markerState.setTuneLoop(0, 1000);
+      const index = markLoopMarker(10);
+      markerState.triggerMarker(index);
 
       markerState.clear();
 
-      expect(markerState.tuneLoopArmed()).toBe(false);
+      expect(markerState.markers()).toEqual([]);
+      expect(markerState.loopingMarker()).toBeNull();
+      // `DjPlayerEngine.loadTune` disarms through `setTuneIndex(null)` before it gets here.
+      expect(markerState.tuneLoopArmed()).toBe(true);
       expect(markerState.tuneLoopOutFrame()).toBe(1000);
     });
   });

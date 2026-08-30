@@ -2094,6 +2094,14 @@ describe('DjPlayerEngine', () => {
       clock.tick(frames);
     }
 
+    /** Publishes a record and waits out the off-thread re-entry image it asks for — the tick path no
+     *  longer produces one, so a non-zero loop start has nothing to re-enter through until this
+     *  settles. */
+    async function publishIndex(overrides: Partial<TuneIndexRecord>): Promise<void> {
+      engine.setTuneIndex(fakeTuneIndexRecord(overrides));
+      await engine.captureTuneLoopEntry();
+    }
+
     it('re-enters at the tune start once the first lap ends, and loops again a lap later', async () => {
       await playTo(0);
       engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 20 }));
@@ -2123,7 +2131,7 @@ describe('DjPlayerEngine', () => {
 
     it('arms a loop that starts after an intro against the end of its first lap, not against the period', async () => {
       await playTo(0);
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 10, loopPeriodFrames: 20 }));
+      await publishIndex({ loopStartFrame: 10, loopPeriodFrames: 20 });
 
       expect(engine.tuneLoopOutFrame()).toBe(30);
 
@@ -2138,7 +2146,7 @@ describe('DjPlayerEngine', () => {
 
     it('re-enters an intro tune at its loop start, so the intro plays once and the lap repeats', async () => {
       await playTo(0);
-      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 10, loopPeriodFrames: 20 }));
+      await publishIndex({ loopStartFrame: 10, loopPeriodFrames: 20 });
 
       clock.tick(30); // through the intro and the first lap, queuing a restore
       clock.tick(2); // gate-off, then the resync
@@ -2154,15 +2162,69 @@ describe('DjPlayerEngine', () => {
       expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(10));
     });
 
-    it('falls back to the tune start when playback never passed through the loop start', async () => {
-      await playTo(20); // already past the start the record is about to name
+    it('re-enters at the loop start after a scrub past it, with no frame of playback ever crossing it', async () => {
+      await playTo(0);
+      await publishIndex({ loopStartFrame: 10, loopPeriodFrames: 20 });
+
+      await engine.scrubTo(50); // frame 15 — past the loop start, which playback never reached
+      clock.tick(2); // drains the scrub's gate-off/resync while still playing
+      expect(engine.stats().framesRendered).toBe(15);
+
+      clock.tick(15); // on to the out-frame at 30, queuing a restore
+      clock.tick(2); // gate-off, then the resync
+
+      // Straight-through playback cannot reach this: the loop start was skipped over, and only the
+      // replayed image makes the wrap land on it rather than degrading to the top of the tune.
+      expect(engine.stats().framesRendered).toBe(10);
+      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(10));
+    });
+
+    it('falls back to the tune start while the entry image is still in flight', async () => {
+      await playTo(0);
+      replay.manual = true;
       engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 10, loopPeriodFrames: 20 }));
 
-      clock.tick(10); // reaches frame 30, queuing a restore
+      clock.tick(30); // reaches the out-frame with nothing to re-enter through yet
       clock.tick(2); // gate-off, then the resync
 
       expect(engine.stats().framesRendered).toBe(0);
       expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(0));
+    });
+
+    it('leaves the incoming tune without an entry image when a tune change lands mid-capture', async () => {
+      await playTo(0);
+      replay.manual = true;
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 10, loopPeriodFrames: 20 }));
+      const capture = engine.captureTuneLoopEntry();
+
+      engine.loadTune(silentTune()); // the held replay describes the tune that just left
+      await engine.play();
+      // A start of 0 asks for no image of its own, so only a stale adoption could put one here.
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 20 }));
+      replay.resolveAll();
+      await capture;
+
+      clock.tick(20); // reaches the out-frame, queuing a restore
+      clock.tick(2);
+
+      expect(engine.stats().framesRendered).toBe(0);
+    });
+
+    it('drops the entry image when the subtune changes mid-capture, falling back to the reseeded tune start', async () => {
+      engine.loadTune(counterTune(2));
+      await engine.play();
+      replay.manual = true;
+      engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 10, loopPeriodFrames: 20 }));
+      const capture = engine.captureTuneLoopEntry();
+
+      engine.nextSubtune(); // re-inits the machine the held replay describes
+      replay.resolveAll();
+      await capture;
+
+      clock.tick(30); // through the intro and the first lap of the new subtune
+      clock.tick(2);
+
+      expect(engine.stats().framesRendered).toBe(0);
     });
 
     it('arms nothing for a record that says the tune ends, and measures the playhead against the end point', async () => {
@@ -2211,25 +2273,24 @@ describe('DjPlayerEngine', () => {
       expect(engine.loopingMarker()).toBeNull();
     });
 
-    it('a manual scrub disarms an armed whole-tune loop, and it does not re-fire on its own', async () => {
+    it('a manual scrub leaves an armed whole-tune loop armed, and it still wraps a lap later', async () => {
       await playTo(0);
       engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 20 }));
       expect(engine.tuneLoopArmed()).toBe(true);
 
-      await engine.scrubTo(100); // lands exactly on the detected loop frame
+      await engine.scrubTo(50); // frame 10, halfway through the lap
       clock.tick(2); // drains the scrub's gate-off/resync while still playing
 
-      expect(engine.tuneLoopArmed()).toBe(false);
-      expect(engine.stats().framesRendered).toBe(20);
+      expect(engine.tuneLoopArmed()).toBe(true);
+      expect(engine.stats().framesRendered).toBe(10);
 
-      clock.tick(5); // past the frame that would otherwise have re-triggered the loop
+      clock.tick(10); // on to the out-frame at 20
+      clock.tick(2);
 
-      expect(engine.tuneLoopArmed()).toBe(false);
-      // Climbs on rather than snapping back to 0 — a still-armed loop would have restored here.
-      expect(slotValue(lastDataPacket(midi), COUNTER_SLOT)).toBe(counterAt(25));
+      expect(engine.stats().framesRendered).toBe(0);
     });
 
-    it('an audition click in the Track Analysis panel shares scrubTo, so it inherits the same override', async () => {
+    it('an audition click in the Track Analysis panel shares scrubTo, so it drops the marker loop and spares the track loop', async () => {
       await playTo(10);
       engine.addMarker();
       clock.tick(10);
@@ -2241,23 +2302,21 @@ describe('DjPlayerEngine', () => {
       await engine.scrubTo(50); // the audition click's own call site
 
       expect(engine.loopingMarker()).toBeNull();
-      expect(engine.tuneLoopArmed()).toBe(false);
+      expect(engine.tuneLoopArmed()).toBe(true);
     });
 
-    it('armTuneLoop(true) re-arms after a scrub, against the still-known loop, and it fires again', async () => {
+    it('armTuneLoop is the only get-out, and re-arming against the still-known loop fires it again', async () => {
       await playTo(0);
       engine.setTuneIndex(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 20 }));
-      clock.tick(5);
-      await engine.scrubTo(0); // disengages — the point survives, only the arm drops
-      clock.tick(2); // drains the scrub's gate-off/resync while still playing
-      expect(engine.tuneLoopArmed()).toBe(false);
-      expect(engine.tuneLoopOutFrame()).toBe(20);
-      expect(engine.stats().framesRendered).toBe(0);
+
+      engine.armTuneLoop(false);
+      expect(engine.tuneLoopOutFrame()).toBe(20); // still true, only the permission to act is gone
+
+      clock.tick(25); // straight past the frame that would otherwise have wrapped
+      expect(engine.stats().framesRendered).toBe(25);
 
       engine.armTuneLoop(true);
-      expect(engine.tuneLoopArmed()).toBe(true);
-
-      clock.tick(20); // crosses frame 20 again, now re-armed
+      clock.tick(1); // the first tick with the permission back
       clock.tick(2); // drains the loop's own gate-off/resync
 
       expect(engine.stats().framesRendered).toBe(0);

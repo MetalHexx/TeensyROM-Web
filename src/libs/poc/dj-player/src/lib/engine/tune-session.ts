@@ -5,6 +5,7 @@ import { RegisterFrame } from '../asid/register-frame';
 import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '../replay/replay-runner';
+import type { ReplayResult } from '../replay/replay-to-frame';
 import { clamp, describeError, sanitizePositiveFrame } from './engine-utils';
 import { playCallsPerSecond } from './play-rate';
 import type { PlayRate } from './play-rate';
@@ -82,7 +83,9 @@ export class TuneSession {
   private _machine: C64Machine | null = null;
   private _frame: RegisterFrame | null = null;
   private _framesRendered = 0;
-  /** Stamped onto every jump request, so responses can be told apart by age. */
+  /** Stamped onto every request this session hands the runner, so responses can be told apart by age.
+   *  Shared with `replayImage` rather than counted separately: the runner is one shared worker, and
+   *  two counters could stamp two live requests with the same id. */
   private jumpRequestId = 0;
   /**
    * The id of the only jump whose result may still be applied, or null when none may.
@@ -240,6 +243,44 @@ export class TuneSession {
     };
     this.outstandingJumpId = request.id;
     return this.awaitJump(request);
+  }
+
+  /**
+   * Replays off-thread to `targetFrame` and hands the result back instead of adopting it onto the
+   * live pair. Shares the jump's runner but none of its outstanding-id gating: nothing about the live
+   * machine changes, so a scrub in flight is neither superseded by this nor supersedes it.
+   *
+   * Null with no file loaded, or when the replay could not complete — the caller is asking for an
+   * image it can do without, so a failure degrades rather than failing the engine.
+   */
+  async replayImage(targetFrame: number): Promise<ReplayResult | null> {
+    const file = this._file;
+    if (file === null) return null;
+
+    const request: ReplayRequest = {
+      id: ++this.jumpRequestId,
+      file,
+      subtune: this.currentSubtune(),
+      targetFrame,
+      mutes: this.host.effectiveMutes(),
+    };
+
+    let response: ReplayResponse;
+    try {
+      response = await this.replayRunner.run(request);
+    } catch (error) {
+      response = {
+        id: request.id,
+        ok: false,
+        error: `replay to frame ${targetFrame} failed — ${describeError(error)}`,
+      };
+    }
+
+    if (!response.ok) {
+      logWarn(`DJ engine: ${response.error}`);
+      return null;
+    }
+    return response.result;
   }
 
   /** Waits out one replay request and applies its result if it is still the one being waited on. */

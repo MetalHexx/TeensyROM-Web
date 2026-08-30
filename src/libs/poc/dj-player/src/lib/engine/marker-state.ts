@@ -191,8 +191,9 @@ export class MarkerState {
    */
   private anchorRing: PositionAnchor[] = [];
 
-  /** The machine as it stood the first time playback reached the loop start — what a lap re-enters
-   *  through. Captured live rather than replayed, the same trade every marker start makes. */
+  /** The machine image a lap re-enters through, produced off-thread by the coordinator as soon as a
+   *  detection lands. Null until one arrives, and again whenever the detection or the machine
+   *  underneath it is replaced. */
   private tuneLoopEntry: PositionAnchor | null = null;
 
   /** Converts a real-time duration to frames at the tune's own rate (`nominalIntervalUs` divided by
@@ -202,11 +203,16 @@ export class MarkerState {
     return msToPlayCalls(ms, this.host.nominalIntervalUs(), this.host.playRate());
   }
 
-  /** Clears every marker, and lets go of whatever was looping — a new tune invalidates every
-   *  captured snapshot, since a marker's start holds machine state, not a frame number. */
+  /**
+   * Clears every marker, and lets go of whatever was looping — a new tune invalidates every captured
+   * snapshot, since a marker's start holds machine state, not a frame number.
+   *
+   * Only the marker loop: the whole-tune loop is disarmed on the load path by `setTuneLoop`, which
+   * `DjPlayerEngine.loadTune` reaches through `setTuneIndex(null)` before it gets here.
+   */
   clear(): void {
     this.markers.set([]);
-    this.stopLoop();
+    this.stopMarkerLoop();
   }
 
   /**
@@ -217,8 +223,8 @@ export class MarkerState {
    * validation, which is why the start is checked for `>= 0` rather than through
    * `sanitizePositiveFrame`. No plausibility bar beyond that: see `DjPlayerEngine.setTuneIndex`.
    *
-   * Drops whatever entry image was held: it was captured at the previous detection's start frame, so
-   * a new detection has nothing to say about it.
+   * Drops whatever entry image was held: it was produced for the previous detection's start frame,
+   * so a new detection has nothing to say about it.
    */
   setTuneLoop(startFrame: number | null, periodFrames: number | null): void {
     const period = sanitizePositiveFrame(periodFrames);
@@ -228,7 +234,7 @@ export class MarkerState {
     this.tuneLoopEntry = null;
   }
 
-  /** The operator's explicit re-arm after a scrub disengaged it. */
+  /** The operator's explicit arm/disarm — the only thing that writes it once a detection has landed. */
   setTuneLoopArmed(armed: boolean): void {
     this.tuneLoopArmed.set(armed);
   }
@@ -261,26 +267,9 @@ export class MarkerState {
     }
   }
 
-  /**
-   * Holds the live machine as the whole-tune loop's re-entry image the first time playback reaches a
-   * non-zero loop start — what the tick loop calls every frame, beside `maybeRecordAnchor`, so the
-   * one image a lap re-enters through is taken while playback passes through it rather than replayed
-   * back to later.
-   *
-   * Exact equality, and never for a start of 0. The tick loop calls this after incrementing its
-   * counter, so `framesRendered` is never 0 here: a `>=` test would capture a frame-1 image for a
-   * start of 0 and then restore it labelled frame 0. A start of 0 needs no image of its own — the
-   * frame-0 seed at `anchorRing[0]` already is one, and `advanceTuneLoop` falls back to it.
-   */
-  maybeCaptureTuneLoopEntry(machine: C64Machine, frame: RegisterFrame, framesRendered: number): void {
-    if (this.tuneLoopEntry !== null) return;
-    const startFrame = this.tuneLoopStartFrame();
-    if (startFrame === null || startFrame === 0 || framesRendered !== startFrame) return;
-    this.tuneLoopEntry = {
-      frame: startFrame,
-      machine: machine.snapshot(),
-      registers: frame.snapshotValues(),
-    };
+  /** The image a lap re-enters through, or null to fall back to the frame-0 seed. */
+  setTuneLoopEntry(entry: PositionAnchor | null): void {
+    this.tuneLoopEntry = entry;
   }
 
   /**
@@ -522,25 +511,15 @@ export class MarkerState {
   }
 
   /**
-   * The get-out: drops every loop kind, marker and whole-tune alike. The operator's Stop Loop
-   * button, and a manual scrub — see `DjPlayerEngine.scrubTo`.
+   * Drops the marker loop and whatever was queued behind it. The whole-tune loop is untouched — it is
+   * the tune's own repeat behaviour, not something the operator built against a passage.
    *
    * Deliberately immediate where a trigger waits for the lap: stopping is a get-out, not a musical
-   * transition. The detected start and period survive this: they are still true, only the operator's
-   * permission to act on them is withdrawn.
+   * transition. Nothing about the playhead moves, and neither does the marker whose loop this drops:
+   * the row keeps its start and its end, so re-triggering it is all it takes to play the passage
+   * again.
    */
-  stopLoop(): void {
-    this.stopMarkerLoop();
-    this.tuneLoopArmed.set(false);
-  }
-
-  /**
-   * Drops only the marker loop and whatever was queued behind it, leaving the whole-tune loop's arm
-   * state untouched — what `advanceLoop` reaches for when the marker loop notices its own state has
-   * gone incoherent mid-lap. Not the operator getting out, so it must not disarm an independent
-   * whole-tune loop; see `stopLoop` for that get-out.
-   */
-  private stopMarkerLoop(): void {
+  stopMarkerLoop(): void {
     this.loopingMarker.set(null);
     this.queuedMarker.set(null);
   }
@@ -618,8 +597,7 @@ export class MarkerState {
     const loop = this.resolveLoop(this.markers()[active]);
     if (loop === null) {
       // Ends nudged until they crossed (or an end dropped mid-lap) describe no pass — drop out
-      // rather than re-enter every tick. The marker loop noticing its own state is incoherent, not
-      // the operator getting out, so an independent whole-tune loop must survive this.
+      // rather than re-enter every tick.
       this.stopMarkerLoop();
       return false;
     }
@@ -642,11 +620,11 @@ export class MarkerState {
    * loop start once `tuneLoopOutFrame()` — the end of the first lap — is passed, indefinitely, as
    * long as the loop is armed.
    *
-   * Restores `tuneLoopEntry` — the image `maybeCaptureTuneLoopEntry` took as playback passed the
-   * loop start — so a tune with an unrepeating intro plays that intro once. With none held it
-   * restores `anchorRing[0]`, the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor`
-   * never evicts: right for a start of 0, and the honest degradation for a non-zero start playback
-   * never passed through.
+   * Restores `tuneLoopEntry` — the image `setTuneLoopEntry` was handed for the loop start — so a
+   * tune with an unrepeating intro plays that intro once. With none held it restores
+   * `anchorRing[0]`, the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor` never
+   * evicts: right for a start of 0, and the honest degradation for a non-zero start whose image has
+   * not landed.
    *
    * Either way through the same `MarkerHost.restoreState` primitive a marker restores through, and
    * with the frame number the restored image actually names: winding the rendered-frame count back

@@ -436,6 +436,61 @@ describe('TuneSession', () => {
     });
   });
 
+  describe('replayImage', () => {
+    it('hands the image back at the requested frame, leaving the live pair exactly where it was', async () => {
+      const host = fakeHost();
+      replay = new FakeReplayRunner();
+      const session = new TuneSession(replay, host);
+      session.load(counterTune());
+      session.initSubtune(1);
+      session.framesRendered = 40;
+
+      const result = await session.replayImage(10);
+
+      expect(result?.frame).toBe(10);
+      expect(session.framesRendered).toBe(40);
+      expect(host.resyncCount.count).toBe(0);
+    });
+
+    it('resolves to null without asking the runner when no file is loaded', async () => {
+      replay = new FakeReplayRunner();
+      const session = new TuneSession(replay, fakeHost());
+
+      expect(await session.replayImage(10)).toBeNull();
+      expect(replay.requests).toHaveLength(0);
+    });
+
+    it('degrades to null rather than failing the engine when the replay cannot complete', async () => {
+      const host = fakeHost();
+      replay = new FakeReplayRunner();
+      const session = new TuneSession(replay, host);
+      session.load(runawayTune());
+      session.initSubtune(1);
+
+      expect(await session.replayImage(1)).toBeNull();
+      expect(host.failures).toHaveLength(0);
+    });
+
+    it('takes no part in the jump gating: a scrub issued alongside it still lands, under an id of its own', async () => {
+      const host = fakeHost();
+      replay = new FakeReplayRunner();
+      replay.manual = true;
+      const session = new TuneSession(replay, host);
+      session.load(counterTune());
+      session.initSubtune(1);
+      session.setIndexedLengthFrames(100);
+
+      const jump = session.scrubTo(50);
+      const image = session.replayImage(10);
+      replay.resolveAll();
+      const [, result] = await Promise.all([jump, image]);
+
+      expect(session.framesRendered).toBe(50);
+      expect(result?.frame).toBe(10);
+      expect(replay.requests[0].id).not.toBe(replay.requests[1].id);
+    });
+  });
+
   describe('restoreState', () => {
     it('adopts the frame number and queues a resync', () => {
       const host = fakeHost();
