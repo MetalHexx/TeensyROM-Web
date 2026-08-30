@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { computed, signal } from '@angular/core';
 import type { SidFile, SidClock } from '../sid/sid-file.model';
 import { C64Machine } from '../cpu/c64-machine';
 import type { RegisterFrame } from '../asid/register-frame';
@@ -6,6 +7,7 @@ import type { ReplayRequest, ReplayResponse, ReplayRunner } from '../replay/repl
 import { replayToFrame } from '../replay/replay-to-frame';
 import { JUMP_CEILING_SECONDS, TuneSession } from './tune-session';
 import type { TuneSessionHost } from './tune-session';
+import type { PlayRate } from './play-rate';
 
 /**
  * Answers every request against the real `replayToFrame`, immediately — enough for the landing
@@ -120,6 +122,17 @@ function counterTune(songs = 1): SidFile {
   });
 }
 
+/** init programs CIA 1 timer A for exactly two play calls per frame; play still writes nothing. */
+function doubleSpeedTune(): SidFile {
+  // LDA #$63 / STA $DC04 / LDA #$26 / STA $DC05 / RTS — a latch of 9827, half a PAL frame.
+  return tune({
+    blocks: [
+      { at: 0x1000, bytes: [0xa9, 0x63, 0x8d, 0x04, 0xdc, 0xa9, 0x26, 0x8d, 0x05, 0xdc, RTS] },
+      { at: 0x1010, bytes: [RTS] },
+    ],
+  });
+}
+
 /** init returns at once, but the play routine never does — a replay to any frame past 0 burns its
  *  whole cycle budget on the first frame it steps. */
 function runawayTune(): SidFile {
@@ -141,15 +154,29 @@ function unplayableTune(): SidFile {
 }
 
 /** A `TuneSessionHost` that records every call, so a test can assert on what the session asked of
- *  its coordinator without standing up the coordinator itself. */
+ *  its coordinator without standing up the coordinator itself.
+ *
+ * `playRate`/`syncPlayRate` default to a real signal-backed pair, mirroring how `DjPlayerEngine`
+ * wires them — a `computed` `playRate()` over a `machineRates` signal `syncPlayRate` writes to —
+ * rather than a static stub, so a test can assert on `ceilingFrames` staying reactive across a
+ * subtune init with no override needed. */
 function fakeHost(overrides: Partial<TuneSessionHost> = {}): TuneSessionHost & {
   readonly failures: string[];
   readonly resyncCount: { count: number };
 } {
   const failures: string[] = [];
   const resyncCount = { count: 0 };
+  const machineRates = signal<{ exact: number; rounded: number }>({ exact: 1, rounded: 1 });
+  const playRate = computed<PlayRate>(() => {
+    const { exact, rounded } = machineRates();
+    return { callsPerFrame: exact, exactCallsPerFrame: exact, roundedCallsPerFrame: rounded, mode: 'exact' };
+  });
   return {
     nominalIntervalUs: () => 20_000,
+    playRate: () => playRate(),
+    syncPlayRate: (machine) => {
+      machineRates.set({ exact: machine?.exactCallsPerFrame ?? 1, rounded: machine?.callsPerFrame ?? 1 });
+    },
     effectiveMutes: () => [false, false, false],
     clearError: () => undefined,
     fail: (reason: string) => failures.push(reason),
@@ -289,6 +316,38 @@ describe('TuneSession', () => {
 
       session.setIndexedLengthFrames(-100);
       expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+    });
+  });
+
+  describe('ceilingFrames and the play rate', () => {
+    it('doubles for a callsPerFrame 2 tune versus a callsPerFrame 1 tune at the same nominal interval', () => {
+      const host1x = fakeHost();
+      const session1x = new TuneSession(new FakeReplayRunner(), host1x);
+      session1x.load(silentTune());
+      session1x.initSubtune(1);
+
+      const host2x = fakeHost();
+      const session2x = new TuneSession(new FakeReplayRunner(), host2x);
+      session2x.load(doubleSpeedTune());
+      session2x.initSubtune(1);
+
+      expect(session2x.ceilingFrames()).toBe(session1x.ceilingFrames() * 2);
+    });
+
+    it('stays reactive to a subtune init that changes the rate without the nominal interval changing — the stale-computed trap', () => {
+      const host = fakeHost();
+      const session = new TuneSession(new FakeReplayRunner(), host);
+      session.load(silentTune());
+      session.initSubtune(1);
+      const before = session.ceilingFrames();
+
+      session.load(doubleSpeedTune());
+      session.initSubtune(1);
+
+      // Same nominal interval throughout — only the rate mirrored off the freshly-initialised
+      // machine changed. A `ceilingFrames` that read `machine.exactCallsPerFrame` directly inside
+      // its `computed` would still report the stale, pre-init value here.
+      expect(session.ceilingFrames()).toBe(before * 2);
     });
   });
 

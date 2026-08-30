@@ -5,7 +5,9 @@ import { RegisterFrame } from '../asid/register-frame';
 import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '../replay/replay-runner';
-import { clamp, describeError, MICROSECONDS_PER_SECOND, sanitizePositiveFrame } from './engine-utils';
+import { clamp, describeError, sanitizePositiveFrame } from './engine-utils';
+import { playCallsPerSecond } from './play-rate';
+import type { PlayRate } from './play-rate';
 
 /** The assumed length the scrub and playhead percentages are measured against — not the tune's real,
  * unmeasured length. A single tunable constant, not derived from anything about the file. */
@@ -20,6 +22,13 @@ export const JUMP_CEILING_SECONDS = 300;
  */
 export interface TuneSessionHost {
   nominalIntervalUs(): number;
+  /** The rate in force — a `computed` mirror of `machineRates()`, never a direct read of
+   *  `machine.exactCallsPerFrame`/`callsPerFrame`, so `ceilingFrames` stays reactive to a subtune
+   *  init that leaves the nominal interval unchanged. */
+  playRate(): PlayRate;
+  /** Mirrors `machine`'s two rates into that signal — the CIA latch is only meaningful once init has
+   *  run, so this is called from `initSubtune`, not from `load`. */
+  syncPlayRate(machine: C64Machine | null): void;
   effectiveMutes(): readonly boolean[];
   /** Clears the engine's error state — the tell that a subtune init succeeded. */
   clearError(): void;
@@ -52,12 +61,11 @@ export class TuneSession {
   readonly currentSubtune: WritableSignal<number> = signal(1);
   readonly subtuneCount: WritableSignal<number> = signal(1);
 
-  /** Frames in the fixed jump ceiling at the current nominal interval. Ignores multispeed
-   *  deliberately: for a callsPerFrame > 1 tune the ceiling represents a shorter real-world duration
-   *  than JUMP_CEILING_SECONDS, since more play-calls land in the same frame count. Acceptable
-   *  simplification for this iteration — most of the tune list is callsPerFrame 1. */
+  /** Frames in the fixed jump ceiling at the current nominal interval and play rate: seconds of
+   *  music times play calls per second, so a callsPerFrame 2 tune gets twice the frame count of the
+   *  same nominal interval at callsPerFrame 1 — the same 300 seconds of music either way. */
   readonly ceilingFrames: Signal<number> = computed<number>(() =>
-    Math.round((JUMP_CEILING_SECONDS * MICROSECONDS_PER_SECOND) / this.host.nominalIntervalUs())
+    Math.round(JUMP_CEILING_SECONDS * playCallsPerSecond(this.host.nominalIntervalUs(), this.host.playRate()))
   );
 
   /** The indexed length, when one was found and is usable; null falls back to the fixed ceiling. */
@@ -113,6 +121,9 @@ export class TuneSession {
     this._frame = new RegisterFrame();
     this._machine = new C64Machine(file, this._frame);
     this.subtuneCount.set(Math.max(1, file.songs));
+    // The outgoing tune's rate must not survive into this one — initSubtune() re-syncs it once the
+    // incoming tune's own init has run.
+    this.host.syncPlayRate(null);
   }
 
   /** Zeroes the position counter — what a fresh play run or a fresh load starts from. */
@@ -155,6 +166,9 @@ export class TuneSession {
     // this deliberately — each owns its own anchor, so none of them needs the ring to persist.
     this.host.resetAnchors();
     this.host.recordAnchor(machine, frame, this._framesRendered);
+    // Init just ran, so this is the moment the CIA latch becomes meaningful — mirroring it any
+    // earlier would read a rate the tune hasn't actually programmed yet.
+    this.host.syncPlayRate(machine);
     this.currentSubtune.set(clamped);
     this.host.clearError();
     return true;

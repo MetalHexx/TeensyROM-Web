@@ -262,6 +262,18 @@ function doubleSpeedTune(): SidFile {
   });
 }
 
+/** init programs CIA 1 timer A for exactly 2.4 play calls per frame — a rate that does not divide
+ *  the frame evenly, ordinary for a CIA-timer tune and precisely the case rounding gets wrong. */
+function fractionalSpeedTune(): SidFile {
+  // LDA #$FD / STA $DC04 / LDA #$1F / STA $DC05 / RTS — latch $1FFD, 8190 cycles per call.
+  return tune({
+    blocks: [
+      { at: 0x1000, bytes: [0xa9, 0xfd, 0x8d, 0x04, 0xdc, 0xa9, 0x1f, 0x8d, 0x05, 0xdc, RTS] },
+      { at: 0x1010, bytes: [RTS] },
+    ],
+  });
+}
+
 /** init sets each voice's control register once, non-zero, and never touches it again; play
  * increments a zero-page counter and stores it into $D400 every frame. Mirrors `doubleSpeedTune`'s
  * hand-assembled-bytes style, but — unlike `silentTune` — its output actually depends on how many
@@ -595,6 +607,21 @@ describe('DjPlayerEngine', () => {
 
     expect(clock.intervalUs).toBe(PAL_FRAME_INTERVAL_US / 2);
     expect(dataPackets(midi)).toHaveLength(1);
+  });
+
+  describe('timing mode', () => {
+    it('paces a fractional-rate tune at the exact rate by default, and re-resolves the running clock to the rounded rate live, with no reload', async () => {
+      engine.loadTune(fractionalSpeedTune());
+      await engine.play();
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 2.4, 6);
+
+      engine.setTimingMode('rounded');
+
+      // The clock itself moved to the rounded rate, not merely `timingMode()` flipping — proof this
+      // re-resolves the clock rather than only setting a signal.
+      expect(engine.timingMode()).toBe('rounded');
+      expect(clock.intervalUs).toBeCloseTo(PAL_FRAME_INTERVAL_US / 2, 6);
+    });
   });
 
   it('divides the clock interval by the speed multiplier, clamped to the input span', async () => {

@@ -6,6 +6,8 @@ import { C64Machine } from '../cpu/c64-machine';
 import type { MachineSnapshot } from '../cpu/c64-machine';
 import { LOOP_AUDITION_PREROLL_MS, MarkerState, NUDGE_RANGE_MS } from './marker-state';
 import type { MarkerHost } from './marker-state';
+import { playRateFor } from './play-rate';
+import type { PlayRate } from './play-rate';
 
 interface CodeBlock {
   readonly at: number;
@@ -86,6 +88,10 @@ class Harness implements MarkerHost {
 
   nominalIntervalUs(): number {
     return 20_000;
+  }
+
+  playRate(): PlayRate {
+    return playRateFor(this.cpuMachine, 'exact');
   }
 
   restoreState(machine: MachineSnapshot, registers: RegisterValuesSnapshot, frame: number): void {
@@ -172,6 +178,7 @@ describe('MarkerState', () => {
         framesRendered: () => 0,
         setFramesRendered: () => undefined,
         nominalIntervalUs: () => 20_000,
+        playRate: () => playRateFor(null, 'exact'),
         restoreState: () => undefined,
         queueResync: () => undefined,
         effectiveMutes: () => [false, false, false],

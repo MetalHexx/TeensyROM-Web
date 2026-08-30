@@ -1,10 +1,11 @@
 import { computed, signal, Signal, WritableSignal } from '@angular/core';
-import { PAL_FRAME_INTERVAL_US } from '../asid/asid-constants';
 import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import { C64Machine, FrameResult, MachineSnapshot } from '../cpu/c64-machine';
 import { RegisterFrame } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
 import { clamp, describeError, sanitizePositiveFrame } from './engine-utils';
+import { msToPlayCalls } from './play-rate';
+import type { PlayRate } from './play-rate';
 
 /** The nudge window in real time. Frames are derived from the tune's rate so the felt range is
  *  the same on a 1x tune and a 2x-multispeed one. */
@@ -104,6 +105,9 @@ export interface MarkerHost {
   setFramesRendered(value: number): void;
   /** The tune's nominal frame interval, feeding the same rate `msToFrames` converts against. */
   nominalIntervalUs(): number;
+  /** The rate in force — a `computed` mirror of the coordinator's `machineRates()`, never a direct
+   *  read of `machine()?.exactCallsPerFrame`. */
+  playRate(): PlayRate;
   /** Puts machine + register state back onto the live pair, adopts the frame number, and queues the
    *  chip resync the restore owes the stream. */
   restoreState(machine: MachineSnapshot, registers: RegisterValuesSnapshot, frameNumber: number): void;
@@ -179,15 +183,10 @@ export class MarkerState {
   private anchorRing: PositionAnchor[] = [];
 
   /** Converts a real-time duration to frames at the tune's own rate (`nominalIntervalUs` divided by
-   *  `callsPerFrame`), never the live speed multiplier — shared by the nudge range and the loop
+   *  the rate in force), never the live speed multiplier — shared by the nudge range and the loop
    *  audition pre-roll so both breathe with the tune, never the speed fader. */
   private msToFrames(ms: number): number {
-    // Unrounded, for the same reason `DjPlayerEngine.effectiveIntervalUs` is: this converts a real
-    // duration, and a CIA-timer tune's play rate need not divide the frame evenly.
-    const callsPerFrame = this.host.machine()?.exactCallsPerFrame ?? 1;
-    const nominalUs = this.host.nominalIntervalUs();
-    const tuneIntervalUs = nominalUs > 0 ? nominalUs / callsPerFrame : PAL_FRAME_INTERVAL_US;
-    return Math.round((ms * 1000) / tuneIntervalUs);
+    return msToPlayCalls(ms, this.host.nominalIntervalUs(), this.host.playRate());
   }
 
   /** Clears every marker, and lets go of whatever was looping — a new tune invalidates every

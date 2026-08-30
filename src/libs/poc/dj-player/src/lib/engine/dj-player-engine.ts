@@ -31,6 +31,8 @@ import { DeliveryTransport } from './delivery';
 import { MarkerState } from './marker-state';
 import { TuneSession } from './tune-session';
 import { clamp, describeError } from './engine-utils';
+import { DEFAULT_TIMING_MODE, playCallIntervalUs, playRateFor } from './play-rate';
+import type { PlayRate, TimingMode } from './play-rate';
 
 export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
 
@@ -174,6 +176,11 @@ export class DjPlayerEngine implements OnDestroy {
     recordAnchor: (machine, frame, framesRendered) =>
       this.markerState.recordAnchor(machine, frame, framesRendered),
     applyIntervalChange: () => this.applyIntervalChange(),
+    playRate: () => this.playRate(),
+    syncPlayRate: (machine) => {
+      const rate = playRateFor(machine, this.timingMode());
+      this.machineRates.set({ exact: rate.exactCallsPerFrame, rounded: rate.roundedCallsPerFrame });
+    },
   });
 
   private readonly markerState: MarkerState = new MarkerState({
@@ -185,6 +192,7 @@ export class DjPlayerEngine implements OnDestroy {
       this.tuneSession.framesRendered = value;
     },
     nominalIntervalUs: () => this.nominalIntervalUs(),
+    playRate: () => this.playRate(),
     restoreState: (machine, registers, frameNumber) =>
       this.tuneSession.restoreState(machine, registers, frameNumber),
     queueResync: () => this.queueResync(),
@@ -211,6 +219,24 @@ export class DjPlayerEngine implements OnDestroy {
    * multiplier's value alone once a jump has clamped. */
   private excursionDirection: 'up' | 'down' | null = null;
   readonly nominalIntervalUs = signal<number>(PAL_FRAME_INTERVAL_US);
+  readonly timingMode = signal<TimingMode>(DEFAULT_TIMING_MODE);
+  /** The machine's two rates, refreshed on every subtune init — the CIA latch is only meaningful
+   *  after init has run, so this cannot be read at load time. */
+  private readonly machineRates = signal<{ exact: number; rounded: number }>({ exact: 1, rounded: 1 });
+  /** The rate in force for every duration in the player — `ceilingFrames`, the nudge range, the loop
+   *  pre-roll and the clock interval all read this rather than choosing between `callsPerFrame` and
+   *  `exactCallsPerFrame` themselves. A `computed` over `machineRates()` rather than a read of
+   *  `tuneSession.machine` directly — see `machineRates`' own doc for why that would go stale. */
+  readonly playRate: Signal<PlayRate> = computed<PlayRate>(() => {
+    const { exact, rounded } = this.machineRates();
+    const mode = this.timingMode();
+    return {
+      callsPerFrame: mode === 'exact' ? exact : rounded,
+      exactCallsPerFrame: exact,
+      roundedCallsPerFrame: rounded,
+      mode,
+    };
+  });
   readonly scheduleAheadMs = this.delivery.scheduleAheadMs;
   readonly lastError = signal<string | null>(null);
   readonly stats = signal<EngineStats>(EMPTY_STATS);
@@ -527,6 +553,14 @@ export class DjPlayerEngine implements OnDestroy {
     this.applyIntervalChange();
   }
 
+  /** Sets the mode and re-resolves the clock. Public because it is the only path that makes a mode
+   *  change audible — `timingMode.set()` alone changes the signal and nothing else. */
+  setTimingMode(mode: TimingMode): void {
+    if (this.timingMode() === mode) return;
+    this.timingMode.set(mode);
+    this.applyIntervalChange();
+  }
+
   /** Delegates to `DeliveryTransport` — see its own doc for the clamp/enforcement split. */
   setScheduleAhead(ms: number): void {
     this.delivery.setScheduleAhead(ms);
@@ -754,13 +788,13 @@ export class DjPlayerEngine implements OnDestroy {
    * The real inter-packet time. Multispeed is a tick rate, never a batch: `runFrame` plays the
    * routine once, so a 2x tune ticks twice per video frame at half the interval.
    *
-   * Divides by the *unrounded* rate: a CIA-timer tune's play period need not divide the frame
-   * evenly, and rounding it here paces the whole stream wrong — a 2.4-calls-per-frame tune rounded
-   * to 2 plays 20% slow. See `C64Machine.exactCallsPerFrame`.
+   * Divides by whichever rate `playRate()` is currently in force — `'exact'` by default, since a
+   * CIA-timer tune's play period need not divide the frame evenly and rounding it here paces the
+   * whole stream wrong (a 2.4-calls-per-frame tune rounded to 2 plays 20% slow). `setTimingMode` is
+   * the only thing that changes which rate that is.
    */
   private effectiveIntervalUs(): number {
-    const callsPerFrame = this.tuneSession.machine?.exactCallsPerFrame ?? 1;
-    return this.nominalIntervalUs() / this.speedMultiplier() / callsPerFrame;
+    return playCallIntervalUs(this.nominalIntervalUs(), this.playRate()) / this.speedMultiplier();
   }
 
   /**
@@ -850,7 +884,7 @@ export class DjPlayerEngine implements OnDestroy {
       bytesSent: delivery.bytesSent,
       suppressedWrites: this.tuneSession.frame?.suppressedWriteCount ?? 0,
       illegalOpcodeCount: this.tuneSession.machine?.illegalOpcodeCount ?? 0,
-      callsPerFrame: this.tuneSession.machine?.callsPerFrame ?? 1,
+      callsPerFrame: this.playRate().roundedCallsPerFrame,
       effectiveIntervalUs: this.reportedIntervalUs(),
       measuredMeanIntervalUs: clockStats.measuredMeanIntervalUs,
       driftMs: clockStats.driftMs,
