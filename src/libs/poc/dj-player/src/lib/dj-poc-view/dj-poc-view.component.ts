@@ -176,6 +176,14 @@ export class DjPocViewComponent {
     return decks.find((deck) => deck.descriptor.id === pickedId) ?? decks[0];
   });
 
+  /** The selected deck's own id, split out from `selectedTrackAnalysisDeck` so the template's
+   *  `[selected]` comparison never chains a property access off an optional call — the deepest
+   *  Angular's strictTemplates type-checker can follow through `?.` before it loses the narrowing
+   *  and reports the object as possibly `undefined`. */
+  protected readonly selectedTrackAnalysisDeckId = computed<string | null>(
+    () => this.selectedTrackAnalysisDeck()?.descriptor.id ?? null
+  );
+
   protected onTrackAnalysisDeckChange(event: Event): void {
     this.pickedTrackAnalysisDeckId.set((event.target as HTMLSelectElement).value);
   }

@@ -18,6 +18,15 @@ export const VIEWPORT = {
     width: 1400,
     height: 900,
   },
+
+  /**
+   * Tablet viewport used to prove a page holds together at narrow widths — below the DJ Poc
+   * view's 1000px deck-stacking breakpoint (see `dj-poc-view.component.scss`).
+   */
+  TABLET: {
+    width: 768,
+    height: 1024,
+  },
 } as const;
 
 /**

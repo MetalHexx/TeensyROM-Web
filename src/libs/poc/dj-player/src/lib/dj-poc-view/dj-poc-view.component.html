@@ -26,7 +26,7 @@
         @for (deck of decks(); track deck.descriptor.id) {
         <option
           [value]="deck.descriptor.id"
-          [selected]="deck.descriptor.id === selectedTrackAnalysisDeck()?.descriptor.id"
+          [selected]="deck.descriptor.id === selectedTrackAnalysisDeckId()"
         >
           Deck {{ deck.descriptor.label }}
         </option>
