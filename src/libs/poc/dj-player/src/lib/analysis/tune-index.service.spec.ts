@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { signal, WritableSignal } from '@angular/core';
+import { createEnvironmentInjector, EnvironmentInjector, signal, WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TuneIndexService } from './tune-index.service';
+import { SharedTuneIndex } from './shared-tune-index';
 import { DjPlayerEngine } from '../engine/dj-player-engine';
 import { ANALYSIS_SCANNER } from './scan-runner';
 import type { ScanResult } from './scan-runner';
@@ -115,6 +116,16 @@ function makeLoopingScan(
   return scan;
 }
 
+/** Drains the microtask queue several turns deep — a resolved scan now crosses more than one
+ *  `await` before it reaches `record()`: the ladder, `produceRecord`, `SharedTuneIndex.produceOnce`
+ *  and finally `refreshIndex`'s own await all sit between them. A single `await Promise.resolve()`
+ *  settles only the innermost of those. */
+async function settleTicks(times = 6): Promise<void> {
+  for (let i = 0; i < times; i++) {
+    await Promise.resolve();
+  }
+}
+
 function buildStoredRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
     filename: 'Still_Time.sid',
@@ -156,6 +167,7 @@ describe('TuneIndexService', () => {
     TestBed.configureTestingModule({
       providers: [
         TuneIndexService,
+        SharedTuneIndex,
         { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
         { provide: ANALYSIS_SCANNER, useValue: scanner },
         { provide: TUNE_INDEX_STORAGE, useValue: storage as unknown as ITuneIndexStorage },
@@ -196,8 +208,7 @@ describe('TuneIndexService', () => {
     // scan is expected below.
     const scan = makeScan(2_000, 2);
     resolveScan({ id: request.id, kind: 'done', output: scan });
-    await Promise.resolve();
-    await Promise.resolve();
+    await settleTicks();
 
     expect(service.pending()).toBe(false);
     expect(service.record()).not.toBeNull();
@@ -223,8 +234,7 @@ describe('TuneIndexService', () => {
       kind: 'done',
       output: makeLoopingScan(2500, 100, 400, 2),
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    await settleTicks();
 
     const record = service.record();
     expect(record?.loopStartFrame).toBe(100);
@@ -298,7 +308,7 @@ describe('TuneIndexService', () => {
     expect(service.record()).toEqual(hit2);
   });
 
-  it('discards a scan that resolves after the tune changed while it was in flight', async () => {
+  it('discards a scan that resolves after the tune changed while it was in flight, but still persists what it found', async () => {
     const resolvers: ((result: ScanResult) => void)[] = [];
     scanner.scan.mockImplementation(
       () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
@@ -312,21 +322,23 @@ describe('TuneIndexService', () => {
     TestBed.flushEffects();
     expect(scanner.scan).toHaveBeenCalledTimes(2);
 
-    // The stale scan for the outgoing tune resolves only after B has already taken over. Its output
-    // is discarded by the generation guard before detection ever runs, so its shape doesn't matter.
-    resolvers[0]({ id: 1, kind: 'done', output: makeScan(20, 1) });
-    await Promise.resolve();
-    await Promise.resolve();
+    // The stale scan for the outgoing tune resolves only after B has already taken over. The ladder
+    // is guard-free, so it still runs detection and answers — long and silent enough to answer
+    // conclusively on this very first rung.
+    resolvers[0]({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+    await settleTicks();
 
+    // Discarded here — this deck's own generation moved on — but persisted for whichever deck (or
+    // later load) asks for A.sid next.
     expect(service.record()).toBeNull();
     expect(service.pending()).toBe(true); // B's own scan is still in flight
-    expect(storage.save).not.toHaveBeenCalled();
-    expect(scanner.scan).toHaveBeenCalledTimes(2); // A's abandoned ladder requested no further rung
+    expect(storage.save).toHaveBeenCalledTimes(1);
+    expect(storage.save).toHaveBeenCalledWith(expect.objectContaining({ filename: 'A.sid' }));
+    expect(scanner.scan).toHaveBeenCalledTimes(2); // A's ladder answered on its own first rung
 
     // Long and silent enough to answer conclusively on B's very first rung.
     resolvers[1]({ id: 2, kind: 'done', output: makeScan(2_000, 4) });
-    await Promise.resolve();
-    await Promise.resolve();
+    await settleTicks();
 
     expect(service.record()?.filename).toBe('B.sid');
     expect(service.record()?.callsPerFrame).toBe(4);
@@ -343,8 +355,7 @@ describe('TuneIndexService', () => {
     expect(service.pending()).toBe(true);
 
     resolveScan({ id: 1, kind: 'failed', error: 'the analysis scan worker stopped responding' });
-    await Promise.resolve();
-    await Promise.resolve();
+    await settleTicks();
 
     expect(service.pending()).toBe(false);
     expect(service.record()).toBeNull();
@@ -382,8 +393,7 @@ describe('TuneIndexService', () => {
 
       // The third rung finally answers.
       resolvers[2]({ id: 3, kind: 'done', output: makeLoopingScan(2500, 100, 400, 2) });
-      await Promise.resolve();
-      await Promise.resolve();
+      await settleTicks();
 
       expect(scanner.scan).toHaveBeenCalledTimes(3); // the ladder stopped — no fourth rung
       expect(service.pending()).toBe(false);
@@ -449,7 +459,7 @@ describe('TuneIndexService', () => {
       expect(latest.session).not.toBe(sessions[0]);
     });
 
-    it('abandons the whole ladder mid-flight when the tune changes, publishing nothing for the outgoing tune', async () => {
+    it('keeps a ladder running to completion for a tune this deck has moved past, discarding the record here but persisting it', async () => {
       const resolvers: ((result: ScanResult) => void)[] = [];
       scanner.scan.mockImplementation(
         () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
@@ -470,23 +480,108 @@ describe('TuneIndexService', () => {
       TestBed.flushEffects();
       expect(scanner.scan).toHaveBeenCalledTimes(3); // B's own first rung
 
-      // A's stale rung resolves after B has already taken over — even with a loop-shaped output, it
-      // must not be believed.
+      // A's stale rung resolves after B has already taken over. The ladder is guard-free, so it
+      // still concludes on this loop-shaped answer and persists it — even though this deck's own
+      // generation has already moved on and will not publish it.
       resolvers[1]({ id: 2, kind: 'done', output: makeLoopingScan(2500, 100, 400, 2) });
-      await Promise.resolve();
-      await Promise.resolve();
+      await settleTicks();
 
       expect(service.record()).toBeNull(); // B's own ladder is still running
-      expect(storage.save).not.toHaveBeenCalled();
-      expect(scanner.scan).toHaveBeenCalledTimes(3); // A's ladder did not continue to a third rung
+      expect(storage.save).toHaveBeenCalledTimes(1);
+      expect(storage.save).toHaveBeenCalledWith(
+        expect.objectContaining({ filename: 'A.sid', loopStartFrame: 100 })
+      );
+      expect(scanner.scan).toHaveBeenCalledTimes(3); // A's ladder answered at its second rung
 
       // B's first rung answers.
       resolvers[2]({ id: 3, kind: 'done', output: makeLoopingScan(2500, 60, 400, 4) });
-      await Promise.resolve();
-      await Promise.resolve();
+      await settleTicks();
 
       expect(service.record()?.filename).toBe('B.sid');
       expect(service.record()?.loopStartFrame).toBe(60);
+    });
+  });
+
+  describe('sharing across decks', () => {
+    it('discards the produced record for the deck whose own generation moved on, but resolves it for another caller of the same run', async () => {
+      const resolvers: ((result: ScanResult) => void)[] = [];
+      scanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
+      );
+
+      service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
+      TestBed.flushEffects();
+      expect(scanner.scan).toHaveBeenCalledTimes(1);
+
+      // A second caller for the exact same (filename, subtune) joins the run already in flight — the
+      // shared collaborator hands it the same promise instead of starting a second scan.
+      const shared = TestBed.inject(SharedTuneIndex);
+      const otherCallerRun = vi.fn(() => Promise.resolve(null));
+      const otherCallerRecord = shared.produceOnce('A.sid', 1, otherCallerRun);
+      expect(otherCallerRun).not.toHaveBeenCalled();
+
+      // This deck's own tune moves on mid-scan; the shared run is guard-free and keeps running.
+      service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
+      TestBed.flushEffects();
+      expect(scanner.scan).toHaveBeenCalledTimes(2); // B's own ladder, independent of A's still-running one
+
+      resolvers[0]({ id: 1, kind: 'done', output: makeScan(2_000, 2) });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The deck that moved on discarded the record for the tune it left behind.
+      expect(service.record()).toBeNull();
+      // The other caller of the same run — its own generation untouched — still receives it.
+      const resolved = await otherCallerRecord;
+      expect(resolved?.filename).toBe('A.sid');
+    });
+
+    it('produces one record for two decks loading the same unindexed tune, each through its own scanner instance', async () => {
+      // Deck A is `service`, already wired in `setup()`. Deck B gets its own engine and scanner but
+      // shares the same `SharedTuneIndex` and `TUNE_INDEX_STORAGE` from the parent injector — the DI
+      // topology `DeckHostComponent` and `DjPocViewComponent` establish in production.
+      const engineB = makeEngine();
+      const scannerB = makeScanner();
+      const parentInjector = TestBed.inject(EnvironmentInjector);
+      const deckBInjector = createEnvironmentInjector(
+        [
+          TuneIndexService,
+          { provide: DjPlayerEngine, useValue: engineB as unknown as DjPlayerEngine },
+          { provide: ANALYSIS_SCANNER, useValue: scannerB },
+        ],
+        parentInjector
+      );
+
+      try {
+        let resolveScan!: (result: ScanResult) => void;
+        scanner.scan.mockImplementation(
+          () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+        );
+
+        service.setTune(fakeSidFile(), 'Shared.sid');
+        TestBed.flushEffects();
+        expect(scanner.scan).toHaveBeenCalledTimes(1); // deck A produces
+
+        const serviceB = deckBInjector.get(TuneIndexService);
+        const settledB = serviceB.setTune(fakeSidFile(), 'Shared.sid');
+        TestBed.flushEffects();
+
+        // Deck B rode deck A's in-flight production — its own scanner was never touched.
+        expect(scannerB.scan).not.toHaveBeenCalled();
+
+        resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 3) });
+        await settledB;
+
+        expect(service.record()?.filename).toBe('Shared.sid');
+        expect(serviceB.record()?.filename).toBe('Shared.sid');
+        expect(serviceB.record()?.callsPerFrame).toBe(3);
+        expect(storage.save).toHaveBeenCalledTimes(1); // one scan, one persisted record
+        expect(scanner.scan).toHaveBeenCalledTimes(1);
+        expect(scannerB.scan).not.toHaveBeenCalled();
+      } finally {
+        deckBInjector.destroy();
+      }
     });
   });
 
@@ -539,7 +634,7 @@ describe('TuneIndexService', () => {
       expect(service.record()).toBeNull();
     });
 
-    it('resolves the superseded load once its ladder is abandoned, without waiting on the newer one', async () => {
+    it('resolves the superseded load once its own ladder concludes, without waiting on the newer one', async () => {
       const resolvers: ((result: ScanResult) => void)[] = [];
       scanner.scan.mockImplementation(
         () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
@@ -553,8 +648,9 @@ describe('TuneIndexService', () => {
       TestBed.flushEffects();
       expect(scanner.scan).toHaveBeenCalledTimes(2);
 
-      // A's own rung resolves only after B has already taken over — abandoned, but still released.
-      resolvers[0]({ id: 1, kind: 'done', output: makeScan(20, 1) });
+      // A's own rung resolves only after B has already taken over — discarded by A's own generation
+      // check, but still released, and still persisted.
+      resolvers[0]({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
       await expect(settledA).resolves.toBeUndefined();
       expect(service.record()).toBeNull(); // B's own ladder is still running
 
@@ -599,8 +695,7 @@ describe('TuneIndexService', () => {
       expect(settled).toEqual([]);
 
       resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 2) });
-      await Promise.resolve();
-      await Promise.resolve();
+      await settleTicks();
 
       expect([...settled].sort()).toEqual(['A', 'B']);
       expect(service.record()?.filename).toBe('B.sid');

@@ -3,6 +3,7 @@ import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { ThemeService } from '@teensyrom-nx/ui/styles';
 import { MidiAccessService } from '../midi/midi-access.service';
 import { TUNE_INDEX_STORAGE, LocalStorageTuneIndexStorage } from '../analysis/tune-index-storage';
+import { SharedTuneIndex } from '../analysis/shared-tune-index';
 import { DeckHostComponent } from '../deck/deck-host/deck-host.component';
 import { DeckRegistry } from '../deck/deck-registry';
 import type { DeckHandle } from '../deck/deck-registry';
@@ -26,6 +27,12 @@ const MAX_STALL_DURATION_MS = 2000;
  * the Web MIDI permission grant, the tune-index cache, and the registry a page-level surface reaches
  * a deck's own collaborators through.
  *
+ * `SharedTuneIndex` lives here, not in `DeckHostComponent`: a loop point, a key, a length are facts
+ * about the tune, not about the deck that found them, so every deck's own `TuneIndexService` reaches
+ * up to this one page-level instance for storage and single-flight scan production. `TUNE_INDEX_STORAGE`
+ * still stays the injectable seam beneath it, unchanged, so a test still substitutes its own in-memory
+ * double for `SharedTuneIndex` to sit on.
+ *
  * Provisional arrangement: the MIDI subsection and the main-thread stall control are the two pieces
  * of markup that stay here rather than moving into `DeckHostComponent` — see its own doc for the
  * rest of what moved. P03 replaces every line of this.
@@ -43,6 +50,7 @@ const MAX_STALL_DURATION_MS = 2000;
   providers: [
     MidiAccessService,
     { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
+    SharedTuneIndex,
     DeckRegistry,
   ],
 })

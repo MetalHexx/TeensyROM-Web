@@ -18,6 +18,7 @@ import type { PlayRate } from '../../engine/play-rate';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
 import { MidiAccessService } from '../../midi/midi-access.service';
 import { TuneIndexService } from '../../analysis/tune-index.service';
+import { SharedTuneIndex } from '../../analysis/shared-tune-index';
 import {
   TUNE_INDEX_STORAGE,
   LocalStorageTuneIndexStorage,
@@ -106,9 +107,11 @@ describe('DeckHostComponent', () => {
         providers: [
           MidiAccessService,
           DeckRegistry,
-          // TUNE_INDEX_STORAGE is page-level in production (`DjPocViewComponent` provides it) — a
-          // deck host under test has no page above it, so it has to come from here instead.
+          // TUNE_INDEX_STORAGE and SharedTuneIndex are page-level in production (`DjPocViewComponent`
+          // provides them) — a deck host under test has no page above it, so they have to come from
+          // here instead.
           { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
+          SharedTuneIndex,
         ],
       });
     });
