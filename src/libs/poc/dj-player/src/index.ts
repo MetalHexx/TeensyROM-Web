@@ -11,3 +11,8 @@ export * from './lib/midi/midi-access.service';
 export * from './lib/midi/deck-midi-binding';
 export * from './lib/clock/frame-clock';
 export * from './lib/engine/dj-player-engine';
+export * from './lib/deck/deck.config';
+export * from './lib/deck/deck-context';
+export * from './lib/deck/deck-registry';
+export * from './lib/deck/deck-tune-loader';
+export * from './lib/deck/deck-host/deck-host.component';

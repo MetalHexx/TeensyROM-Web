@@ -51,9 +51,9 @@ type LadderOutcome =
 /**
  * Owns the tune index's whole lifecycle for the tune currently loaded in `DjPlayerEngine`: look up
  * the stored record on every genuinely new tune or subtune load, scan in the background on a miss,
- * persist what the scan finds, and publish the answer onto `record()` and into the engine. View-
- * provided, so its scanner and generation counter are scoped to one player instance — the same
- * reasoning `TrackAnalysisPanelComponent` uses for its own `ANALYSIS_SCANNER`.
+ * persist what the scan finds, and publish the answer onto `record()` and into the engine. Deck-
+ * host-provided, so its scanner and generation counter are scoped to one deck's own player instance
+ * — the same reasoning `TrackAnalysisPanelComponent` uses for its own `ANALYSIS_SCANNER`.
  *
  * Depends on the engine, never the other way around: the engine only stores what this service hands
  * it through `setTuneIndex`, so the dependency runs one way and a back-edge can never form a cycle.

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createEnvironmentInjector, EnvironmentInjector, signal } from '@angular/core';
+import { createEnvironmentInjector, EnvironmentInjector, signal, type Provider } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import {
   ASID_MSG_SID_DATA,
@@ -9,6 +9,7 @@ import {
   PAL_FRAME_INTERVAL_US,
 } from '../asid/asid-constants';
 import { DeckMidiBinding } from '../midi/deck-midi-binding';
+import { DeckContext } from '../deck/deck-context';
 import { TUNE_INDEX_FORMAT_VERSION } from '../analysis/tune-index.model';
 import type { TuneIndexRecord } from '../analysis/tune-index.model';
 import type { SidClock, SidFile, SidModel } from '../sid/sid-file.model';
@@ -453,6 +454,7 @@ describe('DjPlayerEngine', () => {
     TestBed.configureTestingModule({
       providers: [
         DjPlayerEngine,
+        DeckContext,
         { provide: FRAME_CLOCK, useValue: clock },
         { provide: DeckMidiBinding, useValue: midi as unknown as DeckMidiBinding },
         { provide: REPLAY_RUNNER, useValue: replay },
@@ -2432,19 +2434,40 @@ describe('DjPlayerEngine', () => {
   });
 
   describe('the repeat-track preference', () => {
-    const REPEAT_TRACK_STORAGE_KEY = 'asid-dj-0.repeat-track';
+    function storageKeyFor(deckId: string): string {
+      return `asid-dj-0.deck-${deckId}.repeat-track`;
+    }
 
-    it('defaults to true when nothing is stored', () => {
+    /** Builds a provider list for a fresh engine over its own doubles — mirrors the main
+     *  `beforeEach`'s own shape, since several cases below need a construction the outer `engine`
+     *  cannot stand in for. */
+    function freshEngineProviders(): Provider[] {
+      return [
+        DjPlayerEngine,
+        DeckContext,
+        { provide: FRAME_CLOCK, useValue: new FakeFrameClock() },
+        {
+          provide: DeckMidiBinding,
+          useValue: new FakeDeckMidiBinding() as unknown as DeckMidiBinding,
+        },
+        { provide: REPLAY_RUNNER, useValue: new FakeReplayRunner() },
+      ];
+    }
+
+    it('defaults to true before any restore is requested', () => {
       expect(engine.repeatTrack()).toBe(true);
     });
 
-    it('persists a toggled value under the namespaced key', () => {
+    it("persists a toggled value under this deck's own namespaced key", () => {
+      TestBed.inject(DeckContext).adopt({ id: 'a', label: 'A' });
+
       engine.setRepeatTrack(false);
 
-      expect(localStorage.getItem(REPEAT_TRACK_STORAGE_KEY)).toBe('false');
+      expect(localStorage.getItem(storageKeyFor('a'))).toBe('false');
     });
 
     it('rides a tune change unchanged, and is not reset by loadTune', () => {
+      TestBed.inject(DeckContext).adopt({ id: 'a', label: 'A' });
       engine.setRepeatTrack(false);
 
       engine.loadTune(silentTune());
@@ -2452,49 +2475,105 @@ describe('DjPlayerEngine', () => {
       expect(engine.repeatTrack()).toBe(false);
     });
 
-    it('round-trips through localStorage across a fresh construction of the engine, standing in for a reload', () => {
+    it('round-trips through localStorage once restored, standing in for a reload', () => {
+      TestBed.inject(DeckContext).adopt({ id: 'a', label: 'A' });
       engine.setRepeatTrack(false);
 
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [
-          DjPlayerEngine,
-          { provide: FRAME_CLOCK, useValue: new FakeFrameClock() },
-          {
-            provide: DeckMidiBinding,
-            useValue: new FakeDeckMidiBinding() as unknown as DeckMidiBinding,
-          },
-          { provide: REPLAY_RUNNER, useValue: new FakeReplayRunner() },
-        ],
-      });
+      TestBed.configureTestingModule({ providers: freshEngineProviders() });
+      TestBed.inject(DeckContext).adopt({ id: 'a', label: 'A' });
       const reloaded = TestBed.inject(DjPlayerEngine);
+      // Mirrors `DeckMidiBinding.restore()`: nothing reads storage until this deck's identity is
+      // known, so a reload's own deck host calls this explicitly from `ngOnInit`.
+      reloaded.restoreRepeatTrackPreference();
 
       expect(reloaded.repeatTrack()).toBe(false);
     });
 
-    it('constructs on the default when localStorage throws on read', () => {
+    it('restores to the default, without throwing, when localStorage throws on read', () => {
       const getItemSpy = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
         throw new Error('boom');
       });
 
       TestBed.resetTestingModule();
-      TestBed.configureTestingModule({
-        providers: [
-          DjPlayerEngine,
-          { provide: FRAME_CLOCK, useValue: new FakeFrameClock() },
-          {
-            provide: DeckMidiBinding,
-            useValue: new FakeDeckMidiBinding() as unknown as DeckMidiBinding,
-          },
-          { provide: REPLAY_RUNNER, useValue: new FakeReplayRunner() },
-        ],
-      });
+      TestBed.configureTestingModule({ providers: freshEngineProviders() });
+      TestBed.inject(DeckContext).adopt({ id: 'a', label: 'A' });
 
-      let freshEngine!: DjPlayerEngine;
-      expect(() => (freshEngine = TestBed.inject(DjPlayerEngine))).not.toThrow();
+      const freshEngine = TestBed.inject(DjPlayerEngine);
+      expect(freshEngine.repeatTrack()).toBe(true);
+      expect(() => freshEngine.restoreRepeatTrackPreference()).not.toThrow();
       expect(freshEngine.repeatTrack()).toBe(true);
 
       getItemSpy.mockRestore();
+    });
+
+    describe('per-deck isolation', () => {
+      function buildDeckEngine(deckId: string): DjPlayerEngine {
+        const injector = createEnvironmentInjector(
+          freshEngineProviders(),
+          TestBed.inject(EnvironmentInjector)
+        );
+        injector.get(DeckContext).adopt({ id: deckId, label: deckId });
+        const deckEngine = injector.get(DjPlayerEngine);
+        deckEngine.restoreRepeatTrackPreference();
+        return deckEngine;
+      }
+
+      it("toggling one deck's preference leaves the other deck's value and stored key unchanged", () => {
+        const deckA = buildDeckEngine('a');
+        const deckB = buildDeckEngine('b');
+
+        deckA.setRepeatTrack(false);
+
+        expect(deckA.repeatTrack()).toBe(false);
+        expect(deckB.repeatTrack()).toBe(true);
+        expect(localStorage.getItem(storageKeyFor('a'))).toBe('false');
+        expect(localStorage.getItem(storageKeyFor('b'))).toBeNull();
+      });
+    });
+  });
+
+  describe('multi-deck structural isolation', () => {
+    function buildDeck(): {
+      engine: DjPlayerEngine;
+      clock: FakeFrameClock;
+      midi: FakeDeckMidiBinding;
+    } {
+      const deckClock = new FakeFrameClock();
+      const deckMidi = new FakeDeckMidiBinding();
+      const injector = createEnvironmentInjector(
+        [
+          DjPlayerEngine,
+          DeckContext,
+          { provide: FRAME_CLOCK, useValue: deckClock },
+          { provide: DeckMidiBinding, useValue: deckMidi as unknown as DeckMidiBinding },
+          { provide: REPLAY_RUNNER, useValue: new FakeReplayRunner() },
+        ],
+        TestBed.inject(EnvironmentInjector)
+      );
+      return { engine: injector.get(DjPlayerEngine), clock: deckClock, midi: deckMidi };
+    }
+
+    it('a deck driven into error by a lost MIDI port never interrupts the other, still-playing deck', async () => {
+      const deckA = buildDeck();
+      const deckB = buildDeck();
+
+      deckA.engine.loadTune(silentTune());
+      deckB.engine.loadTune(silentTune());
+      await deckA.engine.play();
+      await deckB.engine.play();
+
+      deckA.midi.selectedPortId.set(null);
+      deckA.clock.tick(1);
+      expect(deckA.engine.state()).toBe('error');
+
+      // Stats publish every `STATS_PUBLISH_FRAME_INTERVAL` frames, not on every tick — enough ticks
+      // to cross that boundary is what makes the counter actually move here.
+      const framesBefore = deckB.engine.stats().framesRendered;
+      deckB.clock.tick(30);
+
+      expect(deckB.engine.state()).toBe('playing');
+      expect(deckB.engine.stats().framesRendered).toBeGreaterThan(framesBefore);
     });
   });
 

@@ -1,314 +1,13 @@
 <div class="dj-poc-page">
-  <div class="stage">
-    <h1 class="page-heading">ASID DJ Player (spike)</h1>
+  <h1 class="page-heading">ASID DJ Player (spike)</h1>
 
-    <div class="player-block">
-      <div class="control-row scrub-row">
-        <span class="caption">Position</span>
-        <div class="scrub-track">
-          <div class="scrub-bar">
-            @switch (barState().kind) { @case ('loop') { @if (introRegionPercent() > 0) {
-            <div
-              class="scrub-region scrub-region--intro"
-              [style.width.%]="introRegionPercent()"
-            ></div>
-            }
-            <div
-              class="scrub-region scrub-region--music"
-              [style.width.%]="musicRegionPercent()"
-            ></div>
-            } @case ('ended') {
-            <div
-              class="scrub-region scrub-region--music"
-              [style.width.%]="musicRegionPercent()"
-            ></div>
-            <div
-              class="scrub-region scrub-region--dead"
-              [style.width.%]="deadRegionPercent()"
-            ></div>
-            } @case ('unknown') {
-            <div class="scrub-region scrub-region--unknown"></div>
-            } @case ('analyzing') {
-            <div class="scrub-region scrub-region--pending"></div>
-            } }
-          </div>
-          @if (barState().kind === 'loop') {
-          <div class="scrub-tick" [style.left.%]="introRegionPercent()"></div>
-          }
-          <input
-            type="range"
-            min="0"
-            max="100"
-            [value]="scrubDisplayPercent()"
-            [disabled]="barState().kind === 'analyzing'"
-            (input)="onScrubInput($event)"
-            (change)="onScrubChange($event)"
-          />
-        </div>
-        <span class="caption">frame {{ engineStats().framesRendered }}</span>
-      </div>
-
-      <div class="transport-row">
-        <div class="control-row transport-controls">
-          <button type="button" (click)="onPlay()" [disabled]="!canPlay()">Play</button>
-          <button type="button" (click)="onPause()" [disabled]="engineState() !== 'playing'">
-            Pause
-          </button>
-          <button type="button" (click)="onStop()" [disabled]="!canStop()">Stop</button>
-          <span class="transport-spacer"></span>
-          <label class="repeat-toggle">
-            <input
-              type="checkbox"
-              class="repeat-toggle-input"
-              aria-label="Repeat track"
-              [checked]="repeatTrack()"
-              (change)="onRepeatToggle($event)"
-            />
-            Repeat track
-          </label>
-        </div>
-
-        <div class="transport-state">
-          <span class="led" [class]="'led--' + transportState()" aria-hidden="true"></span>
-          {{ transportStateLabel() }}
-        </div>
-
-        @if (engineError()) {
-        <p class="error-text" role="alert">{{ engineError() }}</p>
-        }
-      </div>
-    </div>
-
-    <div class="performance-cluster">
-      <div class="stage-main">
-        <section class="panel" aria-label="Cues">
-          <div class="panel-header">
-            <h2>Cues</h2>
-            <div class="panel-header-actions">
-              <button type="button" (click)="onAddMarker()">Add</button>
-              <button type="button" aria-label="Stop loop" (click)="onStopLoop()">Stop</button>
-            </div>
-          </div>
-
-          <div class="marker-rows">
-            @for (marker of markers(); track $index) {
-            <div class="marker-row" [attr.data-marker-state]="markerState($index)">
-              <div class="marker-row-main">
-                <span class="marker-tag">Cue {{ $index + 1 }}</span>
-
-                @if (marker.start) {
-                <button
-                  type="button"
-                  class="marker-trigger"
-                  [attr.aria-label]="'Trigger marker ' + ($index + 1)"
-                  [disabled]="markerLaunchPending()"
-                  (click)="onTriggerMarker($index)"
-                >
-                  Trigger
-                </button>
-                } @else {
-                <button
-                  type="button"
-                  class="marker-trigger"
-                  [attr.aria-label]="'Capture cue ' + ($index + 1)"
-                  (click)="onCaptureMarkerStart($index)"
-                >
-                  Capture
-                </button>
-                }
-
-                <div class="marker-ends">
-                  <div class="marker-start">
-                    <span class="marker-sub-tag">Start</span>
-                    @if (marker.start) {
-                    <span class="marker-frame">frame {{ markerStartFrame($index) }}</span>
-                    <div class="marker-nudge">
-                      <div class="marker-nudge-centre"></div>
-                      <input
-                        type="range"
-                        [min]="-nudgeRange()"
-                        [max]="nudgeRange()"
-                        step="1"
-                        [attr.aria-label]="'Nudge marker ' + ($index + 1) + ' start'"
-                        [value]="displayedMarkerStartOffset($index)"
-                        (input)="onMarkerStartNudgeInput($index, $event)"
-                        (change)="onMarkerStartNudgeChange($index, $event)"
-                      />
-                    </div>
-                    <span class="marker-offset">{{ markerStartOffsetLabel($index) }}</span>
-                    } @else {
-                    <span class="marker-frame marker-frame--empty">empty</span>
-                    <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
-                      <div class="marker-nudge-centre"></div>
-                    </div>
-                    <span class="marker-offset marker-offset--empty">—</span>
-                    }
-                  </div>
-
-                  <div class="marker-end">
-                    <span class="marker-sub-tag">End</span>
-                    <button
-                      type="button"
-                      class="marker-end-set"
-                      [attr.aria-label]="'Set end for marker ' + ($index + 1)"
-                      (click)="onSetMarkerEnd($index)"
-                    >
-                      Set End
-                    </button>
-                    @if (marker.end; as end) {
-                    <span class="marker-frame">frame {{ markerEndFrame($index) }}</span>
-                    <div class="marker-nudge">
-                      <div class="marker-nudge-centre"></div>
-                      <input
-                        type="range"
-                        [min]="-nudgeRange()"
-                        [max]="nudgeRange()"
-                        step="1"
-                        [attr.aria-label]="'Nudge marker ' + ($index + 1) + ' end'"
-                        [value]="displayedMarkerEndOffset($index)"
-                        (input)="onMarkerEndNudgeInput($index, $event)"
-                        (change)="onMarkerEndNudgeChange($index, $event)"
-                      />
-                    </div>
-                    <span class="marker-offset">{{ markerEndOffsetLabel($index) }}</span>
-                    <button
-                      type="button"
-                      class="marker-end-revert"
-                      [attr.aria-label]="'Revert marker ' + ($index + 1) + ' to cue'"
-                      (click)="onClearMarkerEnd($index)"
-                    >
-                      Revert
-                    </button>
-                    } @else {
-                    <span class="marker-frame marker-frame--empty" aria-hidden="true">empty</span>
-                    <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
-                      <div class="marker-nudge-centre"></div>
-                    </div>
-                    <span class="marker-offset marker-offset--empty" aria-hidden="true">—</span>
-                    <button
-                      type="button"
-                      class="marker-end-revert marker-end-revert--empty"
-                      aria-hidden="true"
-                      tabindex="-1"
-                      disabled
-                    >
-                      Revert
-                    </button>
-                    }
-                  </div>
-                </div>
-
-                <div class="row-actions">
-                  <button
-                    type="button"
-                    [attr.aria-label]="'Clear marker ' + ($index + 1)"
-                    (click)="onClearMarker($index)"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    type="button"
-                    [attr.aria-label]="'Delete marker ' + ($index + 1)"
-                    [disabled]="markerLaunchPending()"
-                    (click)="onDeleteMarker($index)"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-
-              <div class="marker-progress" aria-hidden="true">
-                <div
-                  class="marker-progress-fill"
-                  [style.width.%]="progressPercentFor($index)"
-                ></div>
-              </div>
-            </div>
-            }
-          </div>
-        </section>
-      </div>
-
-      <div class="stage-rail">
-        <section class="panel voice-panel" aria-label="Voice">
-          <h2>Voice</h2>
-
-          <div class="voice-rows">
-            @for (voice of voiceIndices; track voice) {
-            <div class="voice-row">
-              <input
-                type="checkbox"
-                [id]="'voice-mute-' + voice"
-                [attr.aria-label]="'Mute voice ' + (voice + 1)"
-                [checked]="mutedVoices()[voice]"
-                (change)="onVoiceMuteToggle(voice, $event)"
-              />
-              <label [for]="'voice-mute-' + voice">V{{ voice + 1 }}</label>
-
-              <button
-                type="button"
-                class="voice-hold"
-                [attr.aria-label]="
-                  (mutedVoices()[voice] ? 'Punch in voice ' : 'Kill voice ') + (voice + 1)
-                "
-                (pointerdown)="onVoiceHoldStart(voice, $event)"
-                (pointerup)="onVoiceHoldEnd(voice)"
-                (pointercancel)="onVoiceHoldEnd(voice)"
-                (keydown)="onVoiceHoldKeyDown(voice, $event)"
-                (keyup)="onVoiceHoldKeyUp(voice, $event)"
-              >
-                {{ mutedVoices()[voice] ? 'Punch In' : 'Kill' }}
-              </button>
-
-              <span class="voice-state">{{ effectiveMutes()[voice] ? 'muted' : 'audible' }}</span>
-            </div>
-            }
-          </div>
-
-          <div class="voice-clear">
-            <button type="button" aria-label="Clear all voice mutes" (click)="onClearVoiceMutes()">
-              Clear
-            </button>
-          </div>
-        </section>
-
-        <section class="panel speed-panel" aria-label="Speed">
-          <h2>Speed</h2>
-
-          <div class="speed-body">
-            <span class="speed-value">{{ speedMultiplier().toFixed(3) }}x</span>
-
-            <div class="speed-fader-row">
-              <input
-                type="range"
-                class="speed-fader"
-                [min]="minSpeed"
-                [max]="maxSpeed"
-                step="0.001"
-                [value]="speedFaderValue()"
-                (input)="onSpeedInput($event)"
-                aria-label="Speed multiplier"
-              />
-
-              <div class="speed-jump-buttons">
-                <button type="button" aria-label="Speed up 50%" (click)="onSpeedJumpUp()">
-                  +50%
-                </button>
-                <button type="button" aria-label="Speed down 50%" (click)="onSpeedJumpDown()">
-                  −50%
-                </button>
-                <button type="button" aria-label="Speed home" (click)="onSpeedHome()">Home</button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-
-    <lib-track-analysis-panel [file]="currentTune()" />
+  <div class="decks">
+    @for (deck of decksConfig; track deck.id) {
+    <lib-deck-host [deck]="deck" />
+    }
   </div>
 
-  <aside class="sidebar">
+  <aside class="page-sidebar">
     <section class="panel setup-panel" aria-label="Setup">
       <h2>Setup</h2>
 
@@ -323,152 +22,55 @@
           >
             Enable MIDI
           </button>
-        </div>
-
-        <label class="control">
-          Output port
-          <select [disabled]="midiPorts().length === 0" (change)="onSelectMidiPort($event)">
-            <option value="" [selected]="selectedMidiPortId() === null">— select a port —</option>
-            @for (port of midiPorts(); track port.id) {
-            <option [value]="port.id" [selected]="port.id === selectedMidiPortId()">
-              {{ port.name }} ({{ port.manufacturer }})
-            </option>
-            }
-          </select>
-        </label>
-
-        <div class="control-row">
-          <button type="button" (click)="onIdentify()" [disabled]="!canIdentify()">Identify</button>
           <p class="midi-status">Status: {{ midiAccessState() }}</p>
         </div>
 
-        @if (midiError()) {
-        <p class="error-text" role="alert">{{ midiError() }}</p>
+        @if (midiAccessError()) {
+        <p class="error-text" role="alert">{{ midiAccessError() }}</p>
         } @if (noPortsFoundError()) {
         <p class="error-text" role="alert">{{ noPortsFoundError() }}</p>
         }
-      </div>
 
-      <div class="subsection" aria-label="Timing">
-        <h3 class="subsection-title">Timing</h3>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <div class="deck-midi-row" [attr.aria-label]="'MIDI deck ' + deck.descriptor.label">
+          <span class="deck-midi-label">Deck {{ deck.descriptor.label }}</span>
 
-        <div class="timing-commands">
           <label class="control">
-            Nominal frame interval
-            <select (change)="onNominalIntervalChange($event)">
-              @for (option of intervalOptions(); track option) {
-              <option [value]="option" [selected]="option === nominalIntervalUs()">
-                {{ option }} µs ({{ frameRateHz(option) }} Hz)
+            Output port
+            <select
+              [disabled]="midiPorts().length === 0"
+              (change)="onSelectMidiPort(deck, $event)"
+            >
+              <option value="" [selected]="deck.binding.selectedPortId() === null">
+                — select a port —
+              </option>
+              @for (port of midiPorts(); track port.id) {
+              <option [value]="port.id" [selected]="port.id === deck.binding.selectedPortId()">
+                {{ port.name }} ({{ port.manufacturer }})
               </option>
               }
             </select>
           </label>
 
-          <label class="control">
-            Schedule ahead
-            <select (change)="onScheduleAheadChange($event)">
-              @for (option of scheduleAheadOptionsMs; track option) {
-              <option [value]="option" [selected]="option === scheduleAheadMs()">
-                {{ option === 0 ? 'off' : option + ' ms' }}
-              </option>
-              }
-            </select>
-          </label>
+          <div class="control-row">
+            <button
+              type="button"
+              (click)="onIdentify(deck)"
+              [disabled]="!canIdentify(deck)"
+            >
+              Identify
+            </button>
+          </div>
 
-          @if (engineStats().effectiveIntervalUs > 0) {
-          <p class="timing-effective">
-            Effective interval: {{ engineStats().effectiveIntervalUs.toFixed(1) }} µs ({{
-              frameRateHz(engineStats().effectiveIntervalUs)
-            }}
-            Hz), {{ engineStats().callsPerFrame }}x multispeed
-          </p>
-          } @else {
-          <p class="timing-effective">Effective interval: — (load a tune to compute)</p>
+          @if (deck.binding.lastError()) {
+          <p class="error-text" role="alert">{{ deck.binding.lastError() }}</p>
           }
-        </div>
-      </div>
-
-      <div class="subsection" aria-label="Tune">
-        <h3 class="subsection-title">Tune</h3>
-
-        <div class="tune-sources">
-          @for (source of availableTunes(); track source.id) {
-          <button type="button" (click)="selectTune(source)">{{ source.label }}</button>
-          }
-
-          <label class="file-picker">
-            Open from disk…
-            <input type="file" accept=".sid" (change)="onFilePicked($event)" />
-          </label>
-        </div>
-
-        @if (tuneError()) {
-        <p class="error-text" role="alert">{{ tuneError() }}</p>
-        } @if (currentTune(); as tune) {
-        <dl class="field-list tune-fields">
-          <div class="field-row field-row--wide">
-            <dt>Name</dt>
-            <dd>{{ tune.name }}</dd>
-          </div>
-          <div class="field-row field-row--wide">
-            <dt>Author</dt>
-            <dd>{{ tune.author }}</dd>
-          </div>
-          <div class="field-row">
-            <dt>Format</dt>
-            <dd>{{ tune.format }} v{{ tune.version }}</dd>
-          </div>
-          <div class="field-row">
-            <dt>Released</dt>
-            <dd>{{ tune.released }}</dd>
-          </div>
-          <div class="field-row">
-            <dt>Subtunes</dt>
-            <dd>{{ tune.songs }} (starts at {{ tune.startSong }})</dd>
-          </div>
-          <div class="field-row">
-            <dt>Clock / model</dt>
-            <dd>{{ tune.clock }} / {{ tune.model }}</dd>
-          </div>
-          <div class="field-row field-row--wide">
-            <dt>Load / init / play</dt>
-            <dd>
-              ${{ tune.loadAddress.toString(16) }} / ${{ tune.initAddress.toString(16) }} / ${{
-                tune.playAddress.toString(16)
-              }}
-            </dd>
-          </div>
-          @if (tune.secondSidAddress !== null) {
-          <div class="field-row">
-            <dt>Second SID</dt>
-            <dd>${{ tune.secondSidAddress.toString(16) }}</dd>
-          </div>
-          } @if (tune.thirdSidAddress !== null) {
-          <div class="field-row">
-            <dt>Third SID</dt>
-            <dd>${{ tune.thirdSidAddress.toString(16) }}</dd>
-          </div>
-          }
-          <div class="field-row">
-            <dt>Data size</dt>
-            <dd>{{ tune.data.length }} bytes</dd>
-          </div>
-        </dl>
-
-        <div class="subtune-nav control-row">
-          <button type="button" (click)="onPreviousSubtune()" [disabled]="!canStepSubtune()">
-            ◀
-          </button>
-          <span>Subtune {{ currentSubtune() }} of {{ subtuneCount() }}</span>
-          <button type="button" (click)="onNextSubtune()" [disabled]="!canStepSubtune()">▶</button>
         </div>
         }
       </div>
     </section>
 
-    <lib-tune-index-panel />
-
-    <section class="panel diagnostics-panel" aria-label="Diagnostics">
+    <section class="panel stall-panel" aria-label="Diagnostics">
       <h2>Diagnostics</h2>
 
       <div class="control-row stall-control">
@@ -486,118 +88,6 @@
           ms
         </label>
         <button type="button" (click)="onStallMainThread()">Stall</button>
-      </div>
-
-      <dl class="field-list diagnostic-fields">
-        <div class="field-row field-row--wide">
-          <dt>Schedule ahead</dt>
-          <dd>{{ scheduleAheadMs() === 0 ? 'off' : scheduleAheadMs() + ' ms' }}</dd>
-        </div>
-        <div class="field-row">
-          <dt>Frames emitted</dt>
-          <dd>{{ engineStats().framesRendered }}</dd>
-        </div>
-        <div class="field-row">
-          <dt>Track end frame</dt>
-          <dd>{{ trackEndFrame() ?? '—' }}</dd>
-        </div>
-        <div class="field-row">
-          <dt>Packets / s</dt>
-          <dd>{{ packetsPerSecond().toFixed(1) }}</dd>
-        </div>
-        <div class="field-row">
-          <dt>Bytes / s</dt>
-          <dd>{{ bytesPerSecond().toFixed(0) }}</dd>
-        </div>
-        <div class="field-row">
-          <dt>Suppressed writes</dt>
-          <dd>{{ engineStats().suppressedWrites }}</dd>
-        </div>
-        <div class="field-row">
-          <dt>Illegal opcodes</dt>
-          <dd>{{ engineStats().illegalOpcodeCount }}</dd>
-        </div>
-        <div class="field-row field-row--wide">
-          <dt>Last error</dt>
-          <dd>{{ engineError() ?? '—' }}</dd>
-        </div>
-      </dl>
-
-      <!-- The clock's own figures, kept apart from delivery below: a negative delivery result is
-           only diagnosable once it's clear whether the clock or the transport handoff produced it. -->
-      <div class="subsection" aria-label="Clock">
-        <h3 class="subsection-title">Clock</h3>
-        <dl class="field-list diagnostic-fields">
-          <div class="field-row">
-            <dt>Drift</dt>
-            <dd>{{ engineStats().driftMs.toFixed(1) }} ms</dd>
-          </div>
-          <div class="field-row">
-            <dt>Late callbacks</dt>
-            <dd>{{ engineStats().lateCallbacks }}</dd>
-          </div>
-          <div class="field-row field-row--wide">
-            <dt>Interval (nominal)</dt>
-            <dd>
-              {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{
-                nominalIntervalUs()
-              }}
-              µs)
-            </dd>
-          </div>
-          <div class="field-row field-row--wide">
-            <dt>Jitter σ / worst gap</dt>
-            <dd>
-              {{ engineStats().jitterMs.toFixed(2) }} ms /
-              {{ engineStats().worstGapMs.toFixed(1) }} ms
-            </dd>
-          </div>
-        </dl>
-      </div>
-
-      <!-- Instrument delivery against due time — this is the answer R5 asks for, not the clock's own
-           health above it. -->
-      <div class="subsection" aria-label="Delivery">
-        <h3 class="subsection-title">Delivery</h3>
-        <dl class="field-list diagnostic-fields">
-          <div class="field-row">
-            <dt>Scheduled</dt>
-            <dd>{{ engineStats().scheduledFrames }}</dd>
-          </div>
-          <div class="field-row">
-            <dt>Late</dt>
-            <dd>{{ engineStats().lateFrames }}</dd>
-          </div>
-          <div class="field-row">
-            <dt>Reordered</dt>
-            <dd>{{ engineStats().reorderedFrames }}</dd>
-          </div>
-          <div class="field-row">
-            <dt>Clamped</dt>
-            <dd>{{ engineStats().clampedFrames }}</dd>
-          </div>
-          <div class="field-row field-row--wide">
-            <dt>Lag mean / worst</dt>
-            <dd>
-              {{ engineStats().meanLagMs.toFixed(1) }} ms /
-              {{ engineStats().worstLagMs.toFixed(1) }} ms
-            </dd>
-          </div>
-          <div class="field-row">
-            <dt>Cancel support</dt>
-            <dd>{{ engineStats().cancelSupported ? 'yes' : 'no' }}</dd>
-          </div>
-          <div class="field-row">
-            <dt>Cancel latency</dt>
-            <dd>
-              {{
-                engineStats().lastCancelLatencyMs < 0
-                  ? '—'
-                  : engineStats().lastCancelLatencyMs.toFixed(1) + ' ms'
-              }}
-            </dd>
-          </div>
-        </dl>
       </div>
     </section>
   </aside>

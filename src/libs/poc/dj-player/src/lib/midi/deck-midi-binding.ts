@@ -25,9 +25,9 @@ function storageKeyFor(deckId: string): string {
  * can hold two different ports at once, and neither's loss, error or persisted key touches the
  * other's.
  *
- * `deckId` is a constructor-free field rather than a constructor parameter: `DeckContext` (P01-T02)
- * will supply it once that scope exists, so until then whoever provides this binding sets it right
- * after construction. Every read of it here is lazy — nothing in this class needs the identity to
+ * `deckId` is a constructor-free field rather than a constructor parameter: `DeckHostComponent`
+ * sets it from `DeckContext` right after `context.adopt(...)`, since providers resolve before that
+ * adoption ever runs. Every read of it here is lazy — nothing in this class needs the identity to
  * be known before its first method call.
  */
 @Injectable()
