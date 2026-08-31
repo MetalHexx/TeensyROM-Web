@@ -8,7 +8,7 @@ import {
   ASID_MSG_STOP,
   PAL_FRAME_INTERVAL_US,
 } from '../asid/asid-constants';
-import { MidiOutputService } from '../midi/midi-output.service';
+import { DeckMidiBinding } from '../midi/deck-midi-binding';
 import { TUNE_INDEX_FORMAT_VERSION } from '../analysis/tune-index.model';
 import type { TuneIndexRecord } from '../analysis/tune-index.model';
 import type { SidClock, SidFile, SidModel } from '../sid/sid-file.model';
@@ -171,12 +171,12 @@ interface SentPacket {
 }
 
 /**
- * Replaces `MidiOutputService`, the boundary onto Web MIDI. It keeps the one piece of state the
+ * Replaces `DeckMidiBinding`, the boundary onto Web MIDI. It keeps the one piece of state the
  * engine reads back — the selected port — so a port disappearing mid-playback can be simulated.
  */
-class FakeMidiOutputService {
+class FakeDeckMidiBinding {
   readonly selectedPortId = signal<string | null>('port-1');
-  /** The transport double for `MidiOutputService.supportsCancel` — see the file header comment on
+  /** The transport double for `DeckMidiBinding.supportsCancel` — see the file header comment on
    *  why this and `MIDIOutputLike.clear` are two separate fakes, not one. */
   readonly supportsCancel = signal<boolean>(false);
   readonly sent: SentPacket[] = [];
@@ -352,15 +352,15 @@ function runawayTune(): SidFile {
   });
 }
 
-function packetsOfType(midi: FakeMidiOutputService, message: number): SentPacket[] {
+function packetsOfType(midi: FakeDeckMidiBinding, message: number): SentPacket[] {
   return midi.sent.filter((packet) => packet.bytes[2] === message);
 }
 
-function dataPackets(midi: FakeMidiOutputService): SentPacket[] {
+function dataPackets(midi: FakeDeckMidiBinding): SentPacket[] {
   return packetsOfType(midi, ASID_MSG_SID_DATA);
 }
 
-function lastDataPacket(midi: FakeMidiOutputService): SentPacket {
+function lastDataPacket(midi: FakeDeckMidiBinding): SentPacket {
   const packets = dataPackets(midi);
   if (packets.length === 0) {
     throw new Error('no SID data packet has been sent');
@@ -373,7 +373,7 @@ function valueCount(packet: SentPacket): number {
   return packet.bytes.length - SID_DATA_PACKET_OVERHEAD;
 }
 
-function messageSequence(midi: FakeMidiOutputService): number[] {
+function messageSequence(midi: FakeDeckMidiBinding): number[] {
   return midi.sent.map((packet) => packet.bytes[2]);
 }
 
@@ -436,7 +436,7 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
 describe('DjPlayerEngine', () => {
   let engine: DjPlayerEngine;
   let clock: FakeFrameClock;
-  let midi: FakeMidiOutputService;
+  let midi: FakeDeckMidiBinding;
   let replay: FakeReplayRunner;
 
   beforeEach(() => {
@@ -446,7 +446,7 @@ describe('DjPlayerEngine', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     clock = new FakeFrameClock();
-    midi = new FakeMidiOutputService();
+    midi = new FakeDeckMidiBinding();
     replay = new FakeReplayRunner();
 
     TestBed.resetTestingModule();
@@ -454,7 +454,7 @@ describe('DjPlayerEngine', () => {
       providers: [
         DjPlayerEngine,
         { provide: FRAME_CLOCK, useValue: clock },
-        { provide: MidiOutputService, useValue: midi as unknown as MidiOutputService },
+        { provide: DeckMidiBinding, useValue: midi as unknown as DeckMidiBinding },
         { provide: REPLAY_RUNNER, useValue: replay },
       ],
     });
@@ -827,7 +827,7 @@ describe('DjPlayerEngine', () => {
       [
         DjPlayerEngine,
         { provide: FRAME_CLOCK, useValue: clock },
-        { provide: MidiOutputService, useValue: midi as unknown as MidiOutputService },
+        { provide: DeckMidiBinding, useValue: midi as unknown as DeckMidiBinding },
       ],
       TestBed.inject(EnvironmentInjector)
     );
@@ -1186,12 +1186,12 @@ describe('DjPlayerEngine', () => {
       const triggered = lastDataPacket(midi).bytes;
 
       const freshClock = new FakeFrameClock();
-      const freshMidi = new FakeMidiOutputService();
+      const freshMidi = new FakeDeckMidiBinding();
       const freshInjector = createEnvironmentInjector(
         [
           DjPlayerEngine,
           { provide: FRAME_CLOCK, useValue: freshClock },
-          { provide: MidiOutputService, useValue: freshMidi as unknown as MidiOutputService },
+          { provide: DeckMidiBinding, useValue: freshMidi as unknown as DeckMidiBinding },
         ],
         TestBed.inject(EnvironmentInjector)
       );
@@ -1634,12 +1634,12 @@ describe('DjPlayerEngine', () => {
         .map((packet) => packet.bytes);
 
       const freshClock = new FakeFrameClock();
-      const freshMidi = new FakeMidiOutputService();
+      const freshMidi = new FakeDeckMidiBinding();
       const freshInjector = createEnvironmentInjector(
         [
           DjPlayerEngine,
           { provide: FRAME_CLOCK, useValue: freshClock },
-          { provide: MidiOutputService, useValue: freshMidi as unknown as MidiOutputService },
+          { provide: DeckMidiBinding, useValue: freshMidi as unknown as DeckMidiBinding },
         ],
         TestBed.inject(EnvironmentInjector)
       );
@@ -2461,8 +2461,8 @@ describe('DjPlayerEngine', () => {
           DjPlayerEngine,
           { provide: FRAME_CLOCK, useValue: new FakeFrameClock() },
           {
-            provide: MidiOutputService,
-            useValue: new FakeMidiOutputService() as unknown as MidiOutputService,
+            provide: DeckMidiBinding,
+            useValue: new FakeDeckMidiBinding() as unknown as DeckMidiBinding,
           },
           { provide: REPLAY_RUNNER, useValue: new FakeReplayRunner() },
         ],
@@ -2483,8 +2483,8 @@ describe('DjPlayerEngine', () => {
           DjPlayerEngine,
           { provide: FRAME_CLOCK, useValue: new FakeFrameClock() },
           {
-            provide: MidiOutputService,
-            useValue: new FakeMidiOutputService() as unknown as MidiOutputService,
+            provide: DeckMidiBinding,
+            useValue: new FakeDeckMidiBinding() as unknown as DeckMidiBinding,
           },
           { provide: REPLAY_RUNNER, useValue: new FakeReplayRunner() },
         ],

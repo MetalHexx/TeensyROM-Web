@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MidiOutputService } from '../midi/midi-output.service';
+import type { DeckMidiPort } from '../midi/deck-midi-binding';
 import { DeliveryTransport, UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS } from './delivery';
 
 interface SentPacket {
@@ -9,7 +9,7 @@ interface SentPacket {
 
 /** The transport double `DeliveryTransport` is built against — see the engine spec's own copy for
  *  why capability and the cancel call are two separate fakes, not one. */
-class FakeMidiOutputService {
+class FakeDeckMidiPort {
   supportsCancel = false;
   readonly sent: SentPacket[] = [];
   cancelPendingCallCount = 0;
@@ -25,12 +25,13 @@ class FakeMidiOutputService {
   }
 }
 
-function midiOutputService(midi: FakeMidiOutputService): MidiOutputService {
+function deckMidiPort(midi: FakeDeckMidiPort): DeckMidiPort {
   return {
+    selectedPortId: () => 'port-1',
     supportsCancel: () => midi.supportsCancel,
     send: (bytes: Uint8Array, timestampMs?: number) => midi.send(bytes, timestampMs),
     cancelPending: () => midi.cancelPending(),
-  } as unknown as MidiOutputService;
+  } as unknown as DeckMidiPort;
 }
 
 const ONE_INTERVAL_US = 20_000; // 20 ms, a round PAL-ish frame for arithmetic that reads cleanly
@@ -40,13 +41,13 @@ function packet(byte: number): Uint8Array {
 }
 
 describe('DeliveryTransport', () => {
-  let midi: FakeMidiOutputService;
+  let midi: FakeDeckMidiPort;
   let delivery: DeliveryTransport;
 
   beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    midi = new FakeMidiOutputService();
-    delivery = new DeliveryTransport(midiOutputService(midi));
+    midi = new FakeDeckMidiPort();
+    delivery = new DeliveryTransport(deckMidiPort(midi));
   });
 
   afterEach(() => {

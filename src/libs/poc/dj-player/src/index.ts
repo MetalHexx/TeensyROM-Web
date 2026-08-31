@@ -7,6 +7,7 @@ export * from './lib/cpu/c64-machine';
 export * from './lib/asid/asid-constants';
 export * from './lib/asid/register-frame';
 export * from './lib/asid/asid-encoder';
-export * from './lib/midi/midi-output.service';
+export * from './lib/midi/midi-access.service';
+export * from './lib/midi/deck-midi-binding';
 export * from './lib/clock/frame-clock';
 export * from './lib/engine/dj-player-engine';

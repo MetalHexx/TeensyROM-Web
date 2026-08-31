@@ -4,7 +4,8 @@ import { ThemeService } from '@teensyrom-nx/ui/styles';
 import { SidFile, SidParseError } from '../sid/sid-file.model';
 import { parseSidFile } from '../sid/sid-file.parser';
 import { BUNDLED_TUNES, decodeBundledTune } from '../sid/bundled';
-import { MidiOutputService } from '../midi/midi-output.service';
+import { MidiAccessService } from '../midi/midi-access.service';
+import { DeckMidiBinding } from '../midi/deck-midi-binding';
 import { ScriptProcessorFrameClock } from '../clock/frame-clock';
 import { REPLAY_RUNNER } from '../replay/replay-runner';
 import { WorkerReplayRunner } from '../replay/worker-replay-runner';
@@ -93,7 +94,8 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
   // Provided here rather than root: this is a quarantined POC surface and neither its
   // permission-holding service nor its audio graph should register in the app injector.
   providers: [
-    MidiOutputService,
+    MidiAccessService,
+    DeckMidiBinding,
     DjPlayerEngine,
     { provide: FRAME_CLOCK, useFactory: () => new ScriptProcessorFrameClock() },
     { provide: REPLAY_RUNNER, useFactory: () => new WorkerReplayRunner() },
@@ -110,11 +112,25 @@ export class DjPocViewComponent {
   // without this, ThemeService never constructs and the app's dark-mode class never applies.
   private readonly themeService = inject(ThemeService);
 
-  private readonly midiService = inject(MidiOutputService);
-  protected readonly midiAccessState = this.midiService.accessState;
-  protected readonly midiPorts = this.midiService.ports;
-  protected readonly selectedMidiPortId = this.midiService.selectedPortId;
-  protected readonly midiError = this.midiService.lastError;
+  private readonly midiAccess = inject(MidiAccessService);
+  private readonly deckMidi = inject(DeckMidiBinding);
+  protected readonly midiAccessState = this.midiAccess.accessState;
+  protected readonly midiPorts = this.midiAccess.ports;
+  protected readonly selectedMidiPortId = this.deckMidi.selectedPortId;
+  /** Either signal can carry the visible explanation — a claim refusal or a port loss from
+   *  `DeckMidiBinding`, or a denied/unsupported grant from `MidiAccessService` — and the two are
+   *  never both true at once in this single-deck composition, so surfacing whichever is set is
+   *  enough until the binding card in P03-T01 gives each its own row. */
+  protected readonly midiError = computed<string | null>(
+    () => this.deckMidi.lastError() ?? this.midiAccess.lastError()
+  );
+
+  constructor() {
+    // Only one deck is composed until P01-T02 supplies `DeckContext` and assigns real per-deck
+    // identity — a single fixed id is this task's stand-in, set immediately so every later read of
+    // it (claims, persistence, the refusal message) is never against an empty string.
+    this.deckMidi.deckId = 'A';
+  }
 
   // Web MIDI enumerates zero ports for a granted-but-empty session (no cartridge attached, or the
   // OS hasn't surfaced it yet) without the service itself treating that as an error.
@@ -358,20 +374,24 @@ export class DjPocViewComponent {
     }
   }
 
+  /** Requests the page-level grant, then attempts this deck's restore — mirrors the old service's
+   *  own "grant, then restore" sequence, just split across the two collaborators that now own each
+   *  half of it. `restore()` no-ops once this deck already holds a selection, so a second press
+   *  from either deck's button is harmless. */
   onEnableMidi(): void {
-    void this.midiService.requestAccess();
+    void this.midiAccess.requestAccess().then(() => this.deckMidi.restore());
   }
 
   onSelectMidiPort(event: Event): void {
     const select = event.target as HTMLSelectElement;
-    this.midiService.selectPort(select.value);
+    this.deckMidi.selectPort(select.value);
   }
 
   onIdentify(): void {
     const ports = this.midiPorts();
     const index = ports.findIndex((port) => port.id === this.selectedMidiPortId());
     const label = index === -1 ? 'ASID-DJ-0 PORT ?' : `ASID-DJ-0 PORT ${index + 1}`;
-    this.midiService.identify(label);
+    this.deckMidi.identify(label);
   }
 
   onPlay(): void {

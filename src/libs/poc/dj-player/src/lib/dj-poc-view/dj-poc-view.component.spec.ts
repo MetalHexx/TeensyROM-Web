@@ -10,7 +10,9 @@ import {
   Marker,
 } from '../engine/dj-player-engine';
 import type { PlayRate, TimingMode } from '../engine/play-rate';
-import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
+import { MidiAccessService } from '../midi/midi-access.service';
+import type { MidiAccessState, MidiPortOption } from '../midi/midi-access.service';
+import { DeckMidiBinding } from '../midi/deck-midi-binding';
 import type { SidFile } from '../sid/sid-file.model';
 import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
 import type { AnalysisScanner, ScanResult } from '../analysis/scan-runner';
@@ -45,14 +47,19 @@ const EMPTY_STATS: EngineStats = {
   lastCancelLatencyMs: -1,
 };
 
-interface MockMidiOutputService {
+interface MockMidiAccessService {
   accessState: WritableSignal<MidiAccessState>;
   ports: WritableSignal<readonly MidiPortOption[]>;
-  selectedPortId: WritableSignal<string | null>;
   lastError: WritableSignal<string | null>;
   requestAccess: ReturnType<typeof vi.fn>;
+}
+
+interface MockDeckMidiBinding {
+  selectedPortId: WritableSignal<string | null>;
+  lastError: WritableSignal<string | null>;
   selectPort: ReturnType<typeof vi.fn>;
   identify: ReturnType<typeof vi.fn>;
+  restore: ReturnType<typeof vi.fn>;
 }
 
 interface MockDjPlayerEngine {
@@ -116,15 +123,22 @@ interface MockDjPlayerEngine {
   scrubTo: ReturnType<typeof vi.fn>;
 }
 
-function makeMidiService(): MockMidiOutputService {
+function makeMidiAccessService(): MockMidiAccessService {
   return {
     accessState: signal<MidiAccessState>('idle'),
     ports: signal<readonly MidiPortOption[]>([]),
+    lastError: signal<string | null>(null),
+    requestAccess: vi.fn(() => Promise.resolve()),
+  };
+}
+
+function makeDeckMidiBinding(): MockDeckMidiBinding {
+  return {
     selectedPortId: signal<string | null>(null),
     lastError: signal<string | null>(null),
-    requestAccess: vi.fn(),
     selectPort: vi.fn(),
     identify: vi.fn(),
+    restore: vi.fn(),
   };
 }
 
@@ -329,13 +343,15 @@ const EMPTY_MARKER: Marker = { start: null, end: null };
 describe('DjPocViewComponent', () => {
   let fixture: ComponentFixture<DjPocViewComponent>;
   let component: DjPocViewComponent;
-  let midi: MockMidiOutputService;
+  let midiAccess: MockMidiAccessService;
+  let deckMidi: MockDeckMidiBinding;
   let engine: MockDjPlayerEngine;
   let tuneIndexStorage: StubTuneIndexStorage;
   let analysisScanner: StubAnalysisScanner;
 
   async function setup(): Promise<void> {
-    midi = makeMidiService();
+    midiAccess = makeMidiAccessService();
+    deckMidi = makeDeckMidiBinding();
     engine = makeEngine();
     tuneIndexStorage = makeTuneIndexStorage();
     analysisScanner = makeAnalysisScanner();
@@ -346,7 +362,8 @@ describe('DjPocViewComponent', () => {
       .overrideComponent(DjPocViewComponent, {
         set: {
           providers: [
-            { provide: MidiOutputService, useValue: midi as unknown as MidiOutputService },
+            { provide: MidiAccessService, useValue: midiAccess as unknown as MidiAccessService },
+            { provide: DeckMidiBinding, useValue: deckMidi as unknown as DeckMidiBinding },
             { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
             TuneIndexService,
             {
@@ -374,7 +391,7 @@ describe('DjPocViewComponent', () => {
 
   describe('MIDI port select', () => {
     it('renders an option per port from the service', () => {
-      midi.ports.set([
+      midiAccess.ports.set([
         { id: 'port-1', name: 'Cart A', manufacturer: 'Acme' },
         { id: 'port-2', name: 'Cart B', manufacturer: 'Acme' },
       ]);
@@ -389,7 +406,7 @@ describe('DjPocViewComponent', () => {
     });
 
     it('calls selectPort with the chosen id on change', () => {
-      midi.ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+      midiAccess.ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
       fixture.detectChanges();
 
       const portSelect = fixture.nativeElement.querySelector(
@@ -398,7 +415,7 @@ describe('DjPocViewComponent', () => {
       portSelect.value = 'port-1';
       portSelect.dispatchEvent(new Event('change'));
 
-      expect(midi.selectPort).toHaveBeenCalledWith('port-1');
+      expect(deckMidi.selectPort).toHaveBeenCalledWith('port-1');
     });
   });
 
@@ -415,7 +432,7 @@ describe('DjPocViewComponent', () => {
     }
 
     it('calls engine.play, pause and stop', () => {
-      midi.selectedPortId.set('port-1');
+      deckMidi.selectedPortId.set('port-1');
       component.currentTune.set(fakeSidFile());
       fixture.detectChanges();
 
@@ -442,7 +459,7 @@ describe('DjPocViewComponent', () => {
       analysisScanner.scan.mockImplementation(
         () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
       );
-      midi.selectedPortId.set('port-1');
+      deckMidi.selectedPortId.set('port-1');
 
       component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
 
@@ -465,7 +482,7 @@ describe('DjPocViewComponent', () => {
 
     it('leaves Stop reachable while a subtune step scans mid-playback', async () => {
       tuneIndexStorage.load.mockReturnValueOnce(buildTuneIndexRecord({ filename: 'Auto tune' }));
-      midi.selectedPortId.set('port-1');
+      deckMidi.selectedPortId.set('port-1');
 
       component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
       await vi.waitFor(() => {
@@ -629,7 +646,7 @@ describe('DjPocViewComponent', () => {
 
   describe('error states', () => {
     it('renders the MIDI last error', () => {
-      midi.lastError.set('MIDI SysEx access was denied: dismissed');
+      midiAccess.lastError.set('MIDI SysEx access was denied: dismissed');
       fixture.detectChanges();
 
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -660,8 +677,8 @@ describe('DjPocViewComponent', () => {
     });
 
     it('renders a no-ports-found error once access is granted with an empty port list', () => {
-      midi.accessState.set('granted');
-      midi.ports.set([]);
+      midiAccess.accessState.set('granted');
+      midiAccess.ports.set([]);
       fixture.detectChanges();
 
       const text = (fixture.nativeElement as HTMLElement).textContent ?? '';

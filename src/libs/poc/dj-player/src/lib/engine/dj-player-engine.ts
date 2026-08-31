@@ -24,7 +24,7 @@ import type { FrameSnapshot } from '../asid/register-frame';
 import type { FrameResult } from '../cpu/c64-machine';
 import type { SidFile } from '../sid/sid-file.model';
 import type { TuneIndexRecord } from '../analysis/tune-index.model';
-import { MidiOutputService } from '../midi/midi-output.service';
+import { DeckMidiBinding } from '../midi/deck-midi-binding';
 import type { FrameClock } from '../clock/frame-clock';
 import { REPLAY_RUNNER } from '../replay/replay-runner';
 import { DeliveryTransport } from './delivery';
@@ -68,7 +68,7 @@ const REPEAT_TRACK_STORAGE_KEY = 'asid-dj-0.repeat-track';
 
 /** Reads the persisted repeat-track preference: true when nothing is stored (or the read throws) —
  *  a track plays forever until the operator turns repeat off, not the other way round. Mirrors
- *  `MidiOutputService`'s own namespaced, try/catch-wrapped `localStorage` preference. */
+ *  `DeckMidiBinding`'s own namespaced, try/catch-wrapped `localStorage` preference. */
 function loadRepeatTrackPreference(): boolean {
   try {
     const stored = localStorage.getItem(REPEAT_TRACK_STORAGE_KEY);
@@ -129,7 +129,7 @@ export interface EngineStats {
   /** Of `scheduledFrames`, how many rode a clock advance clamped by its catch-up ceiling — their
    *  due time is later than the truth, so the lag figures above under-report for them. */
   readonly clampedFrames: number;
-  /** Whether the selected MIDI port can cancel a pending send, per `MidiOutputService`'s own
+  /** Whether the selected MIDI port can cancel a pending send, per `DeckMidiBinding`'s own
    *  feature detection. */
   readonly cancelSupported: boolean;
   /** How long the furthest-out stale send reached past a cancel request before it was preempted,
@@ -164,7 +164,7 @@ const EMPTY_STATS: EngineStats = {
  * Drives a tune out to the cartridge: one emulated frame and one ASID SID-data packet per clock
  * tick, plus the transport, speed and timing controls the listening session needs.
  *
- * Injectable rather than `providedIn: 'root'` so the view can provide it beside `MidiOutputService`
+ * Injectable rather than `providedIn: 'root'` so the view can provide it beside `DeckMidiBinding`
  * and keep both out of the app injector.
  *
  * The coordinator: it owns the tick loop, the pending queue, the play/pause/stop state machine,
@@ -176,7 +176,7 @@ const EMPTY_STATS: EngineStats = {
  */
 @Injectable()
 export class DjPlayerEngine implements OnDestroy {
-  private readonly midi = inject(MidiOutputService);
+  private readonly midi = inject(DeckMidiBinding);
   private readonly clock = inject(FRAME_CLOCK);
   private readonly replayRunner = inject(REPLAY_RUNNER);
 
@@ -764,7 +764,7 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /** Writes the repeat-track preference and persists it under `REPEAT_TRACK_STORAGE_KEY`, never
-   *  allowed to throw into the caller — mirrors `MidiOutputService.selectPort`'s own
+   *  allowed to throw into the caller — mirrors `DeckMidiBinding.selectPort`'s own
    *  try/catch-wrapped write. */
   setRepeatTrack(enabled: boolean): void {
     this._repeatTrack.set(enabled);
