@@ -22,6 +22,10 @@
   padding: var(--spacing-md);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
+
+  @media (max-width: 1500px) {
+    padding: var(--spacing-sm);
+  }
 }
 
 // The three lines the wireframe draws, nothing more.
@@ -37,6 +41,17 @@
   margin: 0;
   color: var(--color-dimmed);
   font-size: var(--font-size-sm);
+}
+
+// The frame readout — the position line's own reserved label. Narrowed rather than left free-width,
+// so it stops competing with the scrub track for space as the deck column tightens.
+.line-position .caption:last-child {
+  @media (max-width: 1500px) {
+    max-width: 4.5rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }
 
 // The row wrapper: the hit target, sized to the control's full reach rather than shrinking to the
@@ -156,9 +171,15 @@
 }
 
 // Line 2: transport buttons, the repeat toggle directly right of Stop, a spacer, then the state
-// indicator pinned to the row's far right.
+// indicator pinned to the row's far right. Below 1240px there is no longer room for all of that on
+// one line, so the row gives up the spacer and wraps instead, with the state indicator's own
+// `margin-left: auto` keeping it pinned right whichever line it lands on.
 .line-transport {
   justify-content: space-between;
+
+  @media (max-width: 1240px) {
+    flex-wrap: wrap;
+  }
 }
 
 .transport-controls {
@@ -175,6 +196,10 @@
 
 .transport-spacer {
   flex: 1 1 auto;
+
+  @media (max-width: 1240px) {
+    display: none;
+  }
 }
 
 .repeat-toggle {
@@ -230,6 +255,10 @@
   flex: 0 0 auto;
   gap: var(--spacing-sm);
   font-size: var(--font-size-sm);
+
+  @media (max-width: 1240px) {
+    margin-left: auto;
+  }
 }
 
 // Unlit by default — the same chrome-inset body every state but stopped starts from. Lit states set
@@ -282,8 +311,14 @@
 }
 
 // Line 3: this deck's tune buttons and Choose File, with the subtune stepper pinned to the right.
+// Gives up the same ground the transport row does below 1240px: it wraps, and the stepper's own
+// `margin-left: auto` is what keeps it pinned right once it does.
 .line-tunes {
   justify-content: space-between;
+
+  @media (max-width: 1240px) {
+    flex-wrap: wrap;
+  }
 }
 
 .tune-sources {
@@ -319,6 +354,10 @@
   gap: var(--spacing-sm);
   font-size: var(--font-size-sm);
   white-space: nowrap;
+
+  @media (max-width: 1240px) {
+    margin-left: auto;
+  }
 
   button {
     height: var(--perf-control-height, 2rem);

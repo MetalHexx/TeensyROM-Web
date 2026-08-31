@@ -19,6 +19,11 @@
   flex-direction: column;
   gap: var(--spacing-lg);
   padding: var(--spacing-lg);
+
+  @media (max-width: 1500px) {
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+  }
 }
 
 .page-heading {
@@ -36,6 +41,28 @@
   display: grid;
   gap: 8px;
   min-height: min(640px, 74vh);
+
+  @media (max-width: 1500px) {
+    gap: 6px;
+  }
+
+  // Tablet: the decks stack — deck A, then the mixer band, then deck B, each deck keeping its own
+  // voice/speed column beside it. `t0/vs0/c0/b0` and `t1/vs1/c1/b1` are `panelAreasFor`'s own area
+  // names for DECKS' two entries (see the component); this only ever matches the two-deck arrangement
+  // `computeGridLayout` draws, same as `TWO_DECK_COLUMN_TEMPLATE` above it.
+  //
+  // `grid-template-columns/-rows/-areas` are also bound as inline styles from `gridLayout` (see the
+  // component's own doc) — an inline style always wins the cascade over an external rule, so
+  // overriding them here needs `!important`.
+  @media (max-width: 1000px) {
+    grid-template-columns: minmax(0, 1fr) 64px !important;
+    grid-template-rows: auto !important; // drop the desktop row template
+    grid-template-areas:
+      't0 vs0' 'c0 vs0' 'b0 vs0'
+      'mx mx'
+      't1 vs1' 'c1 vs1' 'b1 vs1' !important;
+    min-height: 0; // drop the desktop min(640px, 74vh) floor
+  }
 }
 
 // Label-left, control-pushed-right rhythm — the Track Analysis deck selector's own rule. The stall

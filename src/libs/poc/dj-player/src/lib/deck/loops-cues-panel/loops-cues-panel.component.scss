@@ -22,6 +22,10 @@
   border-radius: var(--border-radius-md);
   min-height: 0;
 
+  @media (max-width: 1500px) {
+    padding: var(--spacing-sm);
+  }
+
   h2 {
     margin: 0;
     color: var(--color-primary);
@@ -113,11 +117,15 @@
   text-align: center;
 }
 
+// `margin-left: auto` (rather than relying solely on `.marker-row-header`'s `space-between`) is what
+// keeps this right-aligned even when it wraps onto a row of its own: `space-between` only spaces
+// *between* items sharing a line, so a lone wrapped item would otherwise land at the line's start.
 .marker-row-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
+  margin-left: auto;
 
   button {
     height: calc(var(--perf-control-height, 2rem) * 0.8);
@@ -135,9 +143,12 @@
 }
 
 // tag | frame | nudge track (full width) | offset readout — Start and End now share this exact
-// shape, which is what makes their nudge sliders equal by construction.
+// shape, which is what makes their nudge sliders equal by construction. Wraps rather than overflows
+// sideways when the panel is too narrow for all four in one line — the nudge track, the only item
+// that can shrink to nothing, is what ends up alone on its own full-width line.
 .marker-slot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   width: 100%;
   min-width: 0;
@@ -155,6 +166,10 @@
   min-width: 0;
   font-size: var(--font-size-sm);
   white-space: nowrap;
+
+  @media (max-width: 1500px) {
+    flex-basis: 4.5rem;
+  }
 }
 
 .marker-frame--empty {
