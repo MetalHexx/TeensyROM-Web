@@ -10,7 +10,8 @@ import {
   viewChild,
   type OnDestroy,
 } from '@angular/core';
-import { DjPlayerEngine } from '../../engine/dj-player-engine';
+import type { DeckHandle } from '../../deck/deck-registry';
+import type { DjPlayerEngine } from '../../engine/dj-player-engine';
 import { positionBasisFor } from '../../engine/engine-utils';
 import type { DetectedLoopFrames } from '../../engine/engine-utils';
 import { asRounded, playCallsPerSecond, playCallsToSeconds } from '../../engine/play-rate';
@@ -41,7 +42,7 @@ import {
 } from '../key';
 import type { KeyResult } from '../key';
 import { formatCents, formatDuration } from '../format';
-import { TuneIndexService } from '../tune-index.service';
+import type { TuneIndexService } from '../tune-index.service';
 import type { TuneIndexRecord } from '../tune-index.model';
 
 /** Buckets the whole scanned frame range into this many horizontal columns, regardless of how many
@@ -399,6 +400,12 @@ function paintStructureCanvas(canvas: HTMLCanvasElement, structure: StructureRes
  * by the novelty curve, and the readout P03 adds its own rows to. Everything here is click-to-audition
  * — the workbench only earns its keep once what it finds can be heard.
  *
+ * Exempt from the drawer's column-per-deck rule: it is a graphical analysis surface, not a field
+ * list, and duplicating it would double an already expensive panel. It carries a deck selector
+ * instead — `DjPocViewComponent` owns which deck is selected and hands this panel that deck's own
+ * handle through `deck`, so switching the selector retargets every computed below onto the newly
+ * chosen deck.
+ *
  * Deliberately dependency-light: it reaches only into `engine/dj-player-engine`, the two leaf engine
  * modules it shares arithmetic with (`engine/play-rate`, `engine/engine-utils`) and its own
  * `analysis/*` siblings, never into `replay/`, `clock/`, `midi/` or `engine/marker-state` — the whole
@@ -414,11 +421,22 @@ function paintStructureCanvas(canvas: HTMLCanvasElement, structure: StructureRes
   providers: [{ provide: ANALYSIS_SCANNER, useFactory: () => new WorkerAnalysisScanner() }],
 })
 export class TrackAnalysisPanelComponent implements OnDestroy {
-  readonly file = input.required<SidFile | null>();
+  readonly deck = input.required<DeckHandle>();
 
   private readonly scanner = inject(ANALYSIS_SCANNER);
-  private readonly engine = inject(DjPlayerEngine);
-  private readonly tuneIndexService = inject(TuneIndexService);
+
+  /** This deck's own engine — re-read on every access rather than captured once, since `deck` itself
+   *  can change while this panel stays mounted (see the class doc). */
+  private get engine(): DjPlayerEngine {
+    return this.deck().engine;
+  }
+
+  private get tuneIndexService(): TuneIndexService {
+    return this.deck().tuneIndex;
+  }
+
+  /** The tune this deck currently has loaded — what the retired `file` input used to carry directly. */
+  protected readonly file = computed<SidFile | null>(() => this.deck().tuneLoader.currentTune());
 
   protected readonly collapsed = signal<boolean>(true);
 

@@ -1,7 +1,7 @@
 // This route bypasses LayoutComponent, so the page is the only thing on screen and owns the whole
-// viewport. The grid itself is height-capped (see `.grid` below) and the drawers and diagnostics
-// beneath it can run past the fold, so — unlike the grid's own performance surface — the page as a
-// whole scrolls rather than clipping them.
+// viewport. The grid itself is height-capped (see `.grid` below) and the two drawers beneath it can
+// run past the fold, so — unlike the grid's own performance surface — the page as a whole scrolls
+// rather than clipping them.
 :host {
   display: block;
   height: 100%;
@@ -9,8 +9,7 @@
   overflow-x: hidden;
 }
 
-// The app has no global box-sizing reset, and every panel here is sized by its border box (padding
-// and border sit inside a flex basis). Angular's emulated encapsulation keeps this local.
+// The app has no global box-sizing reset. Angular's emulated encapsulation keeps this local.
 * {
   box-sizing: border-box;
 }
@@ -39,38 +38,13 @@
   min-height: min(640px, 74vh);
 }
 
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-dimmed);
-  border-radius: var(--border-radius-md);
-
-  h2 {
-    margin: 0;
-    color: var(--color-primary);
-    font-size: var(--font-size-md);
-  }
-}
-
-.control-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
+// Label-left, control-pushed-right rhythm — the Track Analysis deck selector's own rule. The stall
+// control and Setup & Diagnostics' own field rows used to read this too; both moved into
+// `SetupDrawerComponent`, which reproduces this rule locally since emulated encapsulation keeps this
+// file's rules from reaching into a different component's template.
 .control {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   font-size: var(--font-size-sm);
-}
-
-// The stall duration field is a plain number input, not a select, so it needs its own width — left
-// unset it would size to the browser's spinner-button default rather than to the two or three digits
-// this control actually needs.
-.stall-control input[type='number'] {
-  width: 4.5rem;
 }

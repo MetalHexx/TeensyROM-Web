@@ -14,27 +14,27 @@
     <lib-mixer-column />
   </div>
 
-  <lib-drawer title="SETUP & DIAGNOSTICS" />
-  <lib-drawer title="TRACK ANALYSIS" />
+  <lib-drawer title="SETUP & DIAGNOSTICS">
+    <lib-setup-drawer />
+  </lib-drawer>
 
-  <section class="panel stall-panel" aria-label="Diagnostics">
-    <h2>Diagnostics</h2>
-
-    <div class="control-row stall-control">
-      <label class="control">
-        Stall main thread for
-        <input
-          type="number"
-          min="0"
-          [max]="maxStallDurationMs"
-          step="50"
-          aria-label="Stall duration in milliseconds"
-          [value]="stallDurationMs()"
-          (change)="onStallDurationInput($event)"
-        />
-        ms
-      </label>
-      <button type="button" (click)="onStallMainThread()">Stall</button>
-    </div>
-  </section>
+  <lib-drawer title="TRACK ANALYSIS">
+    @if (decks().length > 0) {
+    <label class="control track-analysis-deck-select">
+      Deck
+      <select aria-label="Track Analysis deck" (change)="onTrackAnalysisDeckChange($event)">
+        @for (deck of decks(); track deck.descriptor.id) {
+        <option
+          [value]="deck.descriptor.id"
+          [selected]="deck.descriptor.id === selectedTrackAnalysisDeck()?.descriptor.id"
+        >
+          Deck {{ deck.descriptor.label }}
+        </option>
+        }
+      </select>
+    </label>
+    } @if (selectedTrackAnalysisDeck(); as deck) {
+    <lib-track-analysis-panel [deck]="deck" />
+    }
+  </lib-drawer>
 </div>

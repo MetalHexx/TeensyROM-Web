@@ -1,29 +1,19 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { logInfo, LogType } from '@teensyrom-nx/utils';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ThemeService } from '@teensyrom-nx/ui/styles';
 import { MidiAccessService } from '../midi/midi-access.service';
 import { TUNE_INDEX_STORAGE, LocalStorageTuneIndexStorage } from '../analysis/tune-index-storage';
 import { SharedTuneIndex } from '../analysis/shared-tune-index';
+import { TrackAnalysisPanelComponent } from '../analysis/track-analysis-panel/track-analysis-panel.component';
 import { DeckHostComponent } from '../deck/deck-host/deck-host.component';
 import type { DeckPanelAreas } from '../deck/deck-host/deck-host.component';
 import { DeckRegistry } from '../deck/deck-registry';
+import type { DeckHandle } from '../deck/deck-registry';
 import { DECKS } from '../deck/deck.config';
 import type { DeckDescriptor } from '../deck/deck.config';
 import { MixerService } from '../mixer/mixer.service';
 import { MixerColumnComponent } from '../mixer/mixer-column/mixer-column.component';
 import { DrawerComponent } from '../ui/drawer/drawer.component';
-
-/** The stall control's starting span — long enough to be heard, short enough not to trip
- *  `MAX_CATCH_UP_US`'s catch-up ceiling in the frame clock on a single press. */
-const DEFAULT_STALL_DURATION_MS = 150;
-
-/**
- * The longest stall the control will actually run. The busy-wait is synchronous and uncancellable,
- * so a mistyped `150000` would freeze the tab for two and a half minutes with no way back. This
- * still reaches well past the widest schedule-ahead option (160 ms), which is the span the stall
- * has to out-last to prove anything.
- */
-const MAX_STALL_DURATION_MS = 2000;
+import { SetupDrawerComponent } from '../diagnostics/setup-drawer/setup-drawer.component';
 
 /** The wireframe's own two-deck layout — five columns, three rows, transport/cues/binding stacked
  *  inside each deck's own outer column either side of the voice/speed and mixer columns, which run
@@ -130,18 +120,25 @@ function computeGridLayout(decks: readonly DeckDescriptor[]): DeckGridLayout {
  * names as an input; nothing about which column is whose lives in `DeckHostComponent` or any panel
  * beneath it.
  *
- * Provisional arrangement: the main-thread stall control is the one piece of markup that stays here
- * rather than moving into a deck-owned component or the setup drawer — every MIDI-facing control
- * moved into each deck's own `BindingCardComponent` in P03-T01, and the rest of Setup & Diagnostics
- * moves into the setup drawer in P03-T03, which is also the task that fills both drawers this one
- * only places.
+ * This component fills both drawers rather than owning either one's content: `SetupDrawerComponent`
+ * carries the whole of Setup & Diagnostics — including the main-thread stall control, moved in from
+ * here — over `DeckRegistry.decks()` on its own, needing nothing threaded down to it. The Track
+ * Analysis drawer is different only because which deck it inspects is a page-level choice: this
+ * component owns the deck selector and hands the selected deck's own handle to
+ * `TrackAnalysisPanelComponent`, which reads everything else it needs straight off that handle.
  */
 @Component({
   selector: 'lib-dj-poc-view',
   templateUrl: './dj-poc-view.component.html',
   styleUrl: './dj-poc-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DeckHostComponent, MixerColumnComponent, DrawerComponent],
+  imports: [
+    DeckHostComponent,
+    MixerColumnComponent,
+    DrawerComponent,
+    SetupDrawerComponent,
+    TrackAnalysisPanelComponent,
+  ],
   // Provided here rather than root: this is a quarantined POC surface, and neither the permission-
   // holding MIDI service nor any deck's own audio graph should register in the app injector. Each
   // deck's own engine, clock, replay worker and scanner are provided one level down, in
@@ -158,40 +155,28 @@ export class DjPocViewComponent {
   // This route bypasses LayoutComponent, the only place ThemeService is normally injected —
   // without this, ThemeService never constructs and the app's dark-mode class never applies.
   private readonly themeService = inject(ThemeService);
+  private readonly deckRegistry = inject(DeckRegistry);
 
   protected readonly decksConfig = DECKS;
   protected readonly gridLayout: DeckGridLayout = computeGridLayout(DECKS);
 
-  /** The main-thread stall control's configured span, ms — see `onStallMainThread`. Page-level and
-   *  singular: it is the isolation test's negative control, so it disturbs every deck together
-   *  rather than one at a time. */
-  protected readonly stallDurationMs = signal<number>(DEFAULT_STALL_DURATION_MS);
-  protected readonly maxStallDurationMs = MAX_STALL_DURATION_MS;
+  protected readonly decks = this.deckRegistry.decks;
 
-  onStallDurationInput(event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
-    if (Number.isFinite(value) && value >= 0) {
-      this.stallDurationMs.set(value);
-    }
-  }
+  /** An explicit pick from the Track Analysis deck selector — null until the operator chooses one,
+   *  which is when `selectedTrackAnalysisDeck` falls back to the first registered deck. */
+  private readonly pickedTrackAnalysisDeckId = signal<string | null>(null);
 
-  /**
-   * Blocks the main thread synchronously for `stallDurationMs()`, capped at
-   * `MAX_STALL_DURATION_MS` — the deliberate stall the resilience claim needs on demand rather than
-   * waiting for a real one to land during a session. Every deck's frame clock rides this same
-   * thread, so nothing any of them paces can run until the loop below returns — this is the
-   * isolation test's negative control: it disturbs every deck together, where a fault confined to
-   * one deck must not touch the others.
-   *
-   * The log line carries the duration actually run, so a clamped value reads as the override it is
-   * rather than as the control silently ignoring what was typed.
-   */
-  onStallMainThread(): void {
-    const ms = Math.min(this.stallDurationMs(), MAX_STALL_DURATION_MS);
-    logInfo(LogType.Debug, `DJ POC: stalling the main thread for ${ms} ms.`);
-    const until = performance.now() + ms;
-    while (performance.now() < until) {
-      // Deliberately empty — a busy-wait is the point, not a bug.
-    }
+  /** Which deck `TrackAnalysisPanelComponent` inspects. Computed rather than defaulted once at
+   *  construction, so a deck that registers after this page's first render (or unregisters) is
+   *  still reflected rather than leaving the selector pointed at nothing. */
+  protected readonly selectedTrackAnalysisDeck = computed<DeckHandle | null>(() => {
+    const decks = this.decks();
+    if (decks.length === 0) return null;
+    const pickedId = this.pickedTrackAnalysisDeckId();
+    return decks.find((deck) => deck.descriptor.id === pickedId) ?? decks[0];
+  });
+
+  protected onTrackAnalysisDeckChange(event: Event): void {
+    this.pickedTrackAnalysisDeckId.set((event.target as HTMLSelectElement).value);
   }
 }
