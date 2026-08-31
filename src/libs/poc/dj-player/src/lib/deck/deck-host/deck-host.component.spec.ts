@@ -25,6 +25,7 @@ import {
 } from '../../analysis/tune-index-storage';
 import type { TuneIndexRecord } from '../../analysis/tune-index.model';
 import type { SidFile } from '../../sid/sid-file.model';
+import { MixerService } from '../../mixer/mixer.service';
 
 const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
@@ -107,11 +108,12 @@ describe('DeckHostComponent', () => {
         providers: [
           MidiAccessService,
           DeckRegistry,
-          // TUNE_INDEX_STORAGE and SharedTuneIndex are page-level in production (`DjPocViewComponent`
-          // provides them) — a deck host under test has no page above it, so they have to come from
-          // here instead.
+          // TUNE_INDEX_STORAGE, SharedTuneIndex and MixerService are page-level in production
+          // (`DjPocViewComponent` provides them) — a deck host under test has no page above it, so
+          // they have to come from here instead.
           { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
           SharedTuneIndex,
+          MixerService,
         ],
       });
     });
@@ -197,6 +199,7 @@ describe('DeckHostComponent', () => {
       play: ReturnType<typeof vi.fn>;
       pause: ReturnType<typeof vi.fn>;
       stop: ReturnType<typeof vi.fn>;
+      setOutputGain: ReturnType<typeof vi.fn>;
       setRepeatTrack: ReturnType<typeof vi.fn>;
       restoreRepeatTrackPreference: ReturnType<typeof vi.fn>;
       addMarker: ReturnType<typeof vi.fn>;
@@ -236,6 +239,7 @@ describe('DeckHostComponent', () => {
         play: vi.fn(),
         pause: vi.fn(),
         stop: vi.fn(),
+        setOutputGain: vi.fn(),
         setRepeatTrack: vi.fn(),
         restoreRepeatTrackPreference: vi.fn(),
         addMarker: vi.fn(),
@@ -277,7 +281,9 @@ describe('DeckHostComponent', () => {
 
       await TestBed.configureTestingModule({
         imports: [DeckHostComponent],
-        providers: [DeckRegistry],
+        // Page-level in production; stands in here the same way DeckRegistry does, since this suite
+        // has no page above the component under test.
+        providers: [DeckRegistry, MixerService],
       })
         .overrideComponent(DeckHostComponent, {
           set: {

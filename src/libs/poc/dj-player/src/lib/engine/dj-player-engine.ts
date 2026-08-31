@@ -319,6 +319,9 @@ export class DjPlayerEngine implements OnDestroy {
   private framesSincePublish = 0;
   /** Snapshots a jump still owes the stream, drained one per tick by `onTick`. */
   private pending: FrameSnapshot[] = [];
+  /** Held so a fresh `RegisterFrame` built by `loadTune()` inherits it — otherwise every tune load
+   *  would silently reset the deck to full regardless of where the fader sits. */
+  private outputGain = 1;
   /** What the frame clock was last handed, or null before it has ever been started — the rate
    *  diagnostics report, rather than one derived from a fader that may have moved while stopped. */
   private runningIntervalUs: number | null = null;
@@ -333,6 +336,9 @@ export class DjPlayerEngine implements OnDestroy {
     this.tuneSession.discardOutstandingJump();
 
     this.tuneSession.load(file);
+    // A fresh RegisterFrame defaults to full — re-apply the held gain at once, before anything else
+    // about this load can emit a packet at the wrong level.
+    this.tuneSession.frame?.setOutputGain(this.outputGain);
     this.mutedVoices.set([false, false, false]);
     // A fresh RegisterFrame starts fully unmuted, so a held button must not survive into a tune it
     // never pressed against — otherwise effectiveMutes would disagree with the chip it just replaced.
@@ -499,6 +505,16 @@ export class DjPlayerEngine implements OnDestroy {
 
   previousSubtune(): void {
     this.tuneSession.previousSubtune();
+  }
+
+  /**
+   * The deck's own gain, 0…1 — `MixerService`'s composed per-deck figure (`P02-T01`), pushed here by
+   * `DeckHostComponent`'s effect. Held on the engine, not merely on the frame, so it survives a
+   * `loadTune()` rebuild; `RegisterFrame.setOutputGain`'s own doc covers how it is applied.
+   */
+  setOutputGain(gain: number): void {
+    this.outputGain = gain;
+    this.tuneSession.frame?.setOutputGain(gain);
   }
 
   /**

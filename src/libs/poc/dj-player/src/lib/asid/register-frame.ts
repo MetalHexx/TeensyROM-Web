@@ -3,8 +3,10 @@ import {
   ASID_SLOT_COUNT,
   ASID_SLOT_TO_REGISTER,
   SID_REGISTER_COUNT,
+  SID_VOLUME_REGISTER,
   VOICE_CONTROL_REGISTERS,
 } from './asid-constants';
+import { clamp } from '../engine/engine-utils';
 
 /** The present/MSB mask bytes and present-slot values a SID data packet is built from. */
 export interface FrameSnapshot {
@@ -73,6 +75,13 @@ export class RegisterFrame implements SidWriteSink {
   private suppressedWrites = 0;
   private readonly mutedVoices = new Set<number>(); // voice index 0..2
 
+  private readonly volumeSlot = PRIMARY_SLOT_FOR_REGISTER[SID_VOLUME_REGISTER];
+  private outputGain = 1;
+  /** One-shot: the standing `outputGain !== 1` check stops covering the volume slot the instant gain
+   *  returns to exactly 1, so this is what forces one more presence on that transition — the
+   *  level-restoring write the standing condition can no longer produce. */
+  private restoreVolumeOnNextSnapshot = false;
+
   /** Voice 0/1/2. Muting forces that voice's control register to 0 once, then drops every further
    * write the tune's code makes to it until unmuted — every other register for that voice keeps
    * updating live throughout, exactly matching `IOH_ASID.c`'s hardware-mute technique. */
@@ -85,6 +94,24 @@ export class RegisterFrame implements SidWriteSink {
     } else {
       this.mutedVoices.delete(voice);
     }
+  }
+
+  /**
+   * 0…1, full resolution. Applied to `$D418`'s low nibble in `takeSnapshot()`, never at the write —
+   * scaling here rather than in `onSidWrite` is what keeps `snapshotValues()`/`restoreValues()` raw
+   * (so a cue re-entered at a different fader position never double-applies gain), keeps quantization
+   * to a single rounding at the packet boundary, and keeps this stage out of `suppressedWrites`
+   * entirely, since register 24 never routes through the write path here.
+   *
+   * A no-op call (the same gain as already held) leaves the one-shot restore below untouched, so
+   * repeatedly setting the same value can never manufacture a spurious extra write.
+   */
+  setOutputGain(gain: number): void {
+    if (gain === this.outputGain) return;
+    if (this.outputGain !== 1 && gain === 1) {
+      this.restoreVolumeOnNextSnapshot = true;
+    }
+    this.outputGain = gain;
   }
 
   onSidWrite(register: number, value: number): void {
@@ -134,8 +161,20 @@ export class RegisterFrame implements SidWriteSink {
   /**
    * Packs the present slots into the SID data packet's mask/value shape, then clears dirty state —
    * including the per-frame second-write tracking — so the next frame starts empty.
+   *
+   * The one exception to "packs what's present": the volume slot is forced present whenever gain is
+   * off unity (a standing condition re-checked live on every call, so a snapshot a caller discards —
+   * `auditionMarkerEnd`'s reset pass, chiefly — can never swallow a fader move on a tune that does not
+   * keep rewriting `$D418` itself) or has just returned to exactly 1 (`setOutputGain`'s one-shot
+   * restore). Either way the slot's own value is scaled here, from whatever raw value the tune last
+   * wrote — see `scaledVolume`.
    */
   takeSnapshot(): FrameSnapshot {
+    if (this.outputGain !== 1 || this.restoreVolumeOnNextSnapshot) {
+      this.present[this.volumeSlot] = 1;
+    }
+    this.restoreVolumeOnNextSnapshot = false;
+
     const presentMask = [0, 0, 0, 0];
     const msbMask = [0, 0, 0, 0];
     const values: number[] = [];
@@ -149,7 +188,7 @@ export class RegisterFrame implements SidWriteSink {
       const bit = 1 << slot % 7;
       presentMask[byteIndex] |= bit;
 
-      const value = this.values[slot];
+      const value = slot === this.volumeSlot ? this.scaledVolume() : this.values[slot];
       if (value & 0x80) {
         msbMask[byteIndex] |= bit;
       }
@@ -160,6 +199,14 @@ export class RegisterFrame implements SidWriteSink {
     this.writtenThisFrame.fill(0);
 
     return { presentMask, msbMask, values };
+  }
+
+  /** The volume slot's raw value with `outputGain` applied to its low nibble only — bits 4-6 (filter
+   *  mode) and bit 7 (voice-3 mute) pass through untouched. `Math.round` at the boundaries: gain 0
+   *  silences it, gain 1 leaves it byte-for-byte unchanged. */
+  private scaledVolume(): number {
+    const raw = this.values[this.volumeSlot];
+    return (raw & 0xf0) | clamp(Math.round((raw & 0x0f) * this.outputGain), 0, 15);
   }
 
   /**

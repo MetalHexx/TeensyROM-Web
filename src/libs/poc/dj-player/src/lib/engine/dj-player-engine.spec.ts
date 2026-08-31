@@ -320,6 +320,30 @@ function counterTune(songs = 1): SidFile {
   });
 }
 
+/** init sets $D418 once to `rawValue` and never touches it again; play writes nothing. The
+ *  self-emission case: the volume slot has to be forced present by gain alone, since nothing ever
+ *  rewrites the register after init. */
+function volumeTune(rawValue: number, songs = 1): SidFile {
+  return tune({
+    songs,
+    blocks: [
+      { at: 0x1000, bytes: [0xa9, rawValue, 0x8d, 0x18, 0xd4, RTS] }, // LDA #rawValue / STA $D418 / RTS
+      { at: 0x1010, bytes: [RTS] },
+    ],
+  });
+}
+
+/** play rewrites $D418 to the same fixed `rawValue` every call; init writes nothing. The primary-
+ *  interception case: the volume slot is already present every frame regardless of gain. */
+function volumeEveryFrameTune(rawValue: number): SidFile {
+  return tune({
+    blocks: [
+      { at: 0x1000, bytes: [RTS] },
+      { at: 0x1010, bytes: [0xa9, rawValue, 0x8d, 0x18, 0xd4, RTS] }, // LDA #rawValue / STA $D418 / RTS
+    ],
+  });
+}
+
 /** Combines `doubleSpeedTune`'s CIA-programmed 2x rate with `counterTune`'s per-play-call counter,
  * so a nudge test can identify exactly which frame a 2x-multispeed tune landed on. */
 function doubleSpeedCounterTune(): SidFile {
@@ -520,6 +544,70 @@ describe('DjPlayerEngine', () => {
     engine.nextSubtune();
     engine.nextSubtune();
     expect(engine.currentSubtune()).toBe(2);
+  });
+
+  describe('output gain', () => {
+    it("emits the tune's own $D418 value unchanged with the fader at centre", async () => {
+      engine.loadTune(volumeTune(0x3f)); // mode 3, low nibble full — no MSB involved
+      await engine.play();
+      clock.tick(1); // the fresh subtune's all-dirty snapshot
+
+      // The all-dirty snapshot carries one entry per slot in ascending order, so position 21 names
+      // register 24's primary slot directly.
+      expect(slotValue(lastDataPacket(midi), 21)).toBe(0x3f);
+    });
+
+    it('tracks the fader within one frame on a tune that rewrites $D418 every call', async () => {
+      engine.loadTune(volumeEveryFrameTune(0x0f));
+      await engine.play();
+      clock.tick(1); // the all-dirty init frame
+
+      engine.setOutputGain(0.5);
+      clock.tick(1);
+
+      const packet = lastDataPacket(midi);
+      expect(valueCount(packet)).toBe(1); // only the register the play routine itself rewrites
+      expect(slotValue(packet, 0) & 0x0f).toBe(Math.round(0x0f * 0.5));
+    });
+
+    it('still changes the level via self-emission on a tune that never rewrites $D418 after init', async () => {
+      engine.loadTune(volumeTune(0x0f));
+      await engine.play();
+      clock.tick(1); // the all-dirty init frame
+
+      engine.setOutputGain(0.5);
+      clock.tick(1);
+
+      const packet = lastDataPacket(midi);
+      // Nothing else is dirty this frame — the volume slot is present purely because gain is off
+      // unity, not because the tune wrote anything.
+      expect(valueCount(packet)).toBe(1);
+      expect(slotValue(packet, 0) & 0x0f).toBe(Math.round(0x0f * 0.5));
+    });
+
+    it('does not inflate suppressedWrites while the fader is swept', async () => {
+      engine.loadTune(volumeEveryFrameTune(0x0f));
+      await engine.play();
+      clock.tick(1);
+
+      for (let i = 0; i <= 10; i++) {
+        engine.setOutputGain(i / 10);
+        clock.tick(1);
+      }
+
+      expect(engine.stats().suppressedWrites).toBe(0);
+    });
+
+    it('re-applies a held gain after loadTune rebuilds the frame, rather than resetting the deck to full', async () => {
+      engine.loadTune(volumeTune(0x0f));
+      engine.setOutputGain(0.5);
+
+      engine.loadTune(volumeTune(0x0f));
+      await engine.play();
+      clock.tick(1); // the fresh subtune's all-dirty snapshot
+
+      expect(slotValue(lastDataPacket(midi), 21) & 0x0f).toBe(Math.round(0x0f * 0.5));
+    });
   });
 
   it('resets mutedVoices to all-unmuted when a new tune loads', () => {

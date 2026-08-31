@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   signal,
@@ -27,6 +28,7 @@ import type { TuneIndexRecord } from '../../analysis/tune-index.model';
 import { TrackAnalysisPanelComponent } from '../../analysis/track-analysis-panel/track-analysis-panel.component';
 import { TuneIndexPanelComponent } from '../../analysis/tune-index-panel/tune-index-panel.component';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
+import { MixerService } from '../../mixer/mixer.service';
 import { DeckContext } from '../deck-context';
 import { DeckRegistry } from '../deck-registry';
 import { DeckTuneLoader } from '../deck-tune-loader';
@@ -108,6 +110,18 @@ export class DeckHostComponent implements OnInit, OnDestroy {
   private readonly engine = inject(DjPlayerEngine);
   private readonly tuneIndex = inject(TuneIndexService);
   private readonly tuneLoader = inject(DeckTuneLoader);
+  // Page-level, one level up (`DjPocViewComponent`) — every deck reads the same composed model
+  // rather than holding its own, so the crossfader moves both decks' gain from one instance.
+  private readonly mixer = inject(MixerService);
+
+  constructor() {
+    // Pushed at the packet boundary, never at the write — see `RegisterFrame.setOutputGain`. Fires
+    // once at construction against `context.id()`'s pre-adoption `''` (a no-op gain of 1, since the
+    // mixer knows no such deck) and again once `ngOnInit` adopts the real id.
+    effect(() => {
+      this.engine.setOutputGain(this.mixer.gainFor(this.context.id())());
+    });
+  }
 
   ngOnInit(): void {
     const descriptor = this.deck();
