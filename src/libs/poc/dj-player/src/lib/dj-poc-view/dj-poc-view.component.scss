@@ -1,10 +1,12 @@
 // This route bypasses LayoutComponent, so the page is the only thing on screen and owns the whole
-// viewport. It frames itself to that height and never scrolls — a performance surface that scrolls
-// hides controls the operator is reaching for mid-tune.
+// viewport. The grid itself is height-capped (see `.grid` below) and the drawers and diagnostics
+// beneath it can run past the fold, so — unlike the grid's own performance surface — the page as a
+// whole scrolls rather than clipping them.
 :host {
   display: block;
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 // The app has no global box-sizing reset, and every panel here is sized by its border box (padding
@@ -15,43 +17,26 @@
 
 .dj-poc-page {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--spacing-lg);
-  height: 100%;
   padding: var(--spacing-lg);
-  overflow: hidden;
 }
 
 .page-heading {
-  flex: 0 0 100%;
   margin: 0;
   color: var(--color-primary);
   font-size: var(--font-size-md);
 }
 
-// One deck host per `DECKS` entry, side by side — adding an entry to `DECKS` is the only edit that
-// grows this row. Each host takes an equal share; see `deck-host.component.scss` for its own
-// internal two-column (stage + sidebar) layout.
-.decks {
-  flex: 1 1 auto;
-  display: flex;
-  gap: var(--spacing-lg);
-  min-width: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-// What stays page-level: the stall control. Everything else that used to sit in this sidebar —
-// including the MIDI subsection, moved into each deck's own `BindingCardComponent` in P03-T01 — is
-// deck-scoped now.
-.page-sidebar {
-  flex: 0 0 clamp(18rem, 22%, 24rem);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  min-height: 0;
-  overflow-y: auto;
+// The five-column, three-row layout the wireframe draws — or, for any deck count but two, the
+// stacked fallback. `grid-template-columns/-rows/-areas` are bound from `gridLayout`, computed in
+// the component from `DECKS`: a stylesheet cannot itself branch on how many decks composed. The
+// voice/speed and mixer columns run the full height of this grid because their own `grid-area`s span
+// every row `gridLayout` produces, not because of anything declared here.
+.grid {
+  display: grid;
+  gap: 8px;
+  min-height: min(640px, 74vh);
 }
 
 .panel {
@@ -61,10 +46,8 @@
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
-  min-height: 0;
 
   h2 {
-    flex: 0 0 auto;
     margin: 0;
     color: var(--color-primary);
     font-size: var(--font-size-md);

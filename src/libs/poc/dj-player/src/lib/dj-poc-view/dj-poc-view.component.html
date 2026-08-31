@@ -1,35 +1,40 @@
 <div class="dj-poc-page">
-  <!-- Provisional: P03-T02 moves this into a dedicated mixer column. -->
-  <lib-crossfader />
-
   <h1 class="page-heading">ASID DJ Player (spike)</h1>
 
-  <div class="decks">
-    @for (deck of decksConfig; track deck.id) {
-    <lib-deck-host [deck]="deck" />
+  <div
+    class="grid"
+    [style.gridTemplateColumns]="gridLayout.columns"
+    [style.gridTemplateRows]="gridLayout.rows"
+    [style.gridTemplateAreas]="gridLayout.areas"
+  >
+    @for (entry of gridLayout.entries; track entry.deck.id) {
+    <lib-deck-host [deck]="entry.deck" [areas]="entry.areas" />
     }
+
+    <lib-mixer-column />
   </div>
 
-  <aside class="page-sidebar">
-    <section class="panel stall-panel" aria-label="Diagnostics">
-      <h2>Diagnostics</h2>
+  <lib-drawer title="SETUP & DIAGNOSTICS" />
+  <lib-drawer title="TRACK ANALYSIS" />
 
-      <div class="control-row stall-control">
-        <label class="control">
-          Stall main thread for
-          <input
-            type="number"
-            min="0"
-            [max]="maxStallDurationMs"
-            step="50"
-            aria-label="Stall duration in milliseconds"
-            [value]="stallDurationMs()"
-            (change)="onStallDurationInput($event)"
-          />
-          ms
-        </label>
-        <button type="button" (click)="onStallMainThread()">Stall</button>
-      </div>
-    </section>
-  </aside>
+  <section class="panel stall-panel" aria-label="Diagnostics">
+    <h2>Diagnostics</h2>
+
+    <div class="control-row stall-control">
+      <label class="control">
+        Stall main thread for
+        <input
+          type="number"
+          min="0"
+          [max]="maxStallDurationMs"
+          step="50"
+          aria-label="Stall duration in milliseconds"
+          [value]="stallDurationMs()"
+          (change)="onStallDurationInput($event)"
+        />
+        ms
+      </label>
+      <button type="button" (click)="onStallMainThread()">Stall</button>
+    </div>
+  </section>
 </div>

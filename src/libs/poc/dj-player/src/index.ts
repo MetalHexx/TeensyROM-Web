@@ -19,3 +19,5 @@ export * from './lib/deck/deck-host/deck-host.component';
 export * from './lib/mixer/crossfader-curve';
 export * from './lib/mixer/mixer.service';
 export * from './lib/mixer/crossfader/crossfader.component';
+export * from './lib/mixer/mixer-column/mixer-column.component';
+export * from './lib/ui/drawer/drawer.component';

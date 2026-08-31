@@ -1,22 +1,19 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   effect,
   inject,
   input,
   type OnDestroy,
   type OnInit,
 } from '@angular/core';
-import { DjPlayerEngine, FRAME_CLOCK, NOMINAL_INTERVAL_OPTIONS_US } from '../../engine/dj-player-engine';
+import { DjPlayerEngine, FRAME_CLOCK } from '../../engine/dj-player-engine';
 import { ScriptProcessorFrameClock } from '../../clock/frame-clock';
 import { REPLAY_RUNNER } from '../../replay/replay-runner';
 import { WorkerReplayRunner } from '../../replay/worker-replay-runner';
 import { ANALYSIS_SCANNER } from '../../analysis/scan-runner';
 import { WorkerAnalysisScanner } from '../../analysis/worker-analysis-scanner';
 import { TuneIndexService } from '../../analysis/tune-index.service';
-import { TrackAnalysisPanelComponent } from '../../analysis/track-analysis-panel/track-analysis-panel.component';
-import { TuneIndexPanelComponent } from '../../analysis/tune-index-panel/tune-index-panel.component';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
 import { MixerService } from '../../mixer/mixer.service';
 import { DeckContext } from '../deck-context';
@@ -28,16 +25,15 @@ import { VoiceSpeedColumnComponent } from '../voice-speed-column/voice-speed-col
 import { LoopsCuesPanelComponent } from '../loops-cues-panel/loops-cues-panel.component';
 import { BindingCardComponent } from '../binding-card/binding-card.component';
 
-const MICROSECONDS_PER_SECOND = 1_000_000;
-
-/**
- * Off, two sub-frame probes, then a ceiling that reaches well past a single PAL frame (~19.95 ms).
- * `R5` needs a stall shorter than the window to be demonstrably inaudible, which a ceiling of one
- * frame cannot show — `setScheduleAhead()` still clamps the selectable depth to
- * `UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS` whenever the selected port cannot cancel a pending send;
- * this list is the shipping-depth question the clamp does not answer on its own.
- */
-const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
+/** The `grid-area` name each of this deck's four panels claims in the page's own `.grid` — computed
+ *  page-level, from `DECKS`' own order, and handed down whole. Nothing in this file decides what any
+ *  of these strings are; it only applies whichever it is given. */
+export interface DeckPanelAreas {
+  readonly transport: string;
+  readonly voiceSpeed: string;
+  readonly loopsCues: string;
+  readonly binding: string;
+}
 
 /**
  * One deck: the whole of what "a deck owns" — its own engine, clock, replay worker, analysis
@@ -45,12 +41,19 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
  * `DeckRegistry` is how a page-level surface reaches any of it; nothing here is looked up by any
  * sibling deck.
  *
- * The performance surface itself — transport, voice/speed, loops/cues, and the MIDI binding card —
- * is four presentational panels (`TransportPanelComponent`, `VoiceSpeedColumnComponent`,
- * `LoopsCuesPanelComponent`, `BindingCardComponent`) rendered flat here with no wrapper around any
- * two of them: each reaches this deck's collaborators straight from this component's own injector,
- * with no inputs threaded down. What stays here instead is the sidebar (Timing, the loaded tune's own
- * read-only fields, and Diagnostics) and the collaborator wiring `ngOnInit`/`ngOnDestroy` perform.
+ * `:host { display: contents }` — this component renders no box of its own. Its whole template is
+ * the four performance-surface panels (`TransportPanelComponent`, `VoiceSpeedColumnComponent`,
+ * `LoopsCuesPanelComponent`, `BindingCardComponent`), each reaching this deck's collaborators
+ * straight from this component's own injector with no inputs threaded down, and each carrying its
+ * own `grid-area` from the `areas` input — so they render as direct items of the page's own `.grid`
+ * (see `dj-poc-view.component.scss`) rather than of a box this component would otherwise draw. No
+ * deck-owned code decides what those area names are: the page computes them from `DECKS`' own order
+ * and this component only applies whichever it is handed.
+ *
+ * Everything that used to sit in this component's own sidebar — Timing, the loaded tune's own
+ * read-only fields, Tune Index and Diagnostics — and the Track Analysis panel beside it, are gone
+ * from here: neither has a grid area of its own to land in yet. P03-T03 gives both a home in the
+ * page's own drawers.
  */
 @Component({
   selector: 'lib-deck-host',
@@ -62,8 +65,6 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
     VoiceSpeedColumnComponent,
     LoopsCuesPanelComponent,
     BindingCardComponent,
-    TrackAnalysisPanelComponent,
-    TuneIndexPanelComponent,
   ],
   // Provided here, one level down from where the POC's audio graph and permission-holding services
   // used to stay out of the app injector: two frame clocks, two replay workers and two scan workers
@@ -82,6 +83,7 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
 })
 export class DeckHostComponent implements OnInit, OnDestroy {
   readonly deck = input.required<DeckDescriptor>();
+  readonly areas = input.required<DeckPanelAreas>();
 
   private readonly context = inject(DeckContext);
   private readonly registry = inject(DeckRegistry);
@@ -121,47 +123,5 @@ export class DeckHostComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.registry.unregister(this.deck().id);
-  }
-
-  protected readonly engineStats = this.engine.stats;
-  protected readonly engineError = this.engine.lastError;
-  protected readonly trackEndFrame = this.engine.trackEndFrame;
-  protected readonly nominalIntervalUs = this.engine.nominalIntervalUs;
-  protected readonly scheduleAheadMs = this.engine.scheduleAheadMs;
-  protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
-
-  protected readonly currentTune = this.tuneLoader.currentTune;
-
-  /** An NTSC tune loads an interval of its own, so the selector has to be able to show it. */
-  protected readonly intervalOptions = computed<readonly number[]>(() => {
-    const current = this.nominalIntervalUs();
-    return NOMINAL_INTERVAL_OPTIONS_US.includes(current)
-      ? NOMINAL_INTERVAL_OPTIONS_US
-      : [current, ...NOMINAL_INTERVAL_OPTIONS_US];
-  });
-
-  // One SID-data packet goes out per clock tick, so the clock's own measured tick rate is the
-  // frame-packet rate; the occasional Start/Stop/Identify control packet is noise against it.
-  protected readonly packetsPerSecond = computed(() => {
-    const intervalUs = this.engineStats().measuredMeanIntervalUs;
-    return intervalUs > 0 ? MICROSECONDS_PER_SECOND / intervalUs : 0;
-  });
-  protected readonly bytesPerSecond = computed(() => {
-    const stats = this.engineStats();
-    return stats.packetsSent > 0
-      ? this.packetsPerSecond() * (stats.bytesSent / stats.packetsSent)
-      : 0;
-  });
-
-  protected onNominalIntervalChange(event: Event): void {
-    this.engine.setNominalIntervalUs(Number((event.target as HTMLSelectElement).value));
-  }
-
-  protected onScheduleAheadChange(event: Event): void {
-    this.engine.setScheduleAhead(Number((event.target as HTMLSelectElement).value));
-  }
-
-  protected frameRateHz(intervalUs: number): string {
-    return (MICROSECONDS_PER_SECOND / intervalUs).toFixed(3);
   }
 }

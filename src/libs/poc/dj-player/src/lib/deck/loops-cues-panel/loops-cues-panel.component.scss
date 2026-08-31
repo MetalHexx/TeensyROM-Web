@@ -1,5 +1,6 @@
-// One grid area in the deck's own layout (see `deck-host.component.scss`) — this host renders no
-// wrapper of its own around any sibling panel.
+// One grid area in the page's own `.grid` — `deck-host.component.html` sets `grid-area` inline, from
+// the `areas` input the page computes; this host renders no wrapper of its own around any sibling
+// panel.
 :host {
   display: flex;
   flex-direction: column;

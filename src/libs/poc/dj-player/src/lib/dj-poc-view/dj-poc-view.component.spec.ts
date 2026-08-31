@@ -22,15 +22,25 @@ describe('DjPocViewComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('composes one deck host per DECKS entry, each registered under its own descriptor', () => {
+  it('composes one deck host per DECKS entry, each carrying its own deck descriptor', () => {
     const hosts: HTMLElement[] = Array.from(
       fixture.nativeElement.querySelectorAll('lib-deck-host')
     );
 
     expect(hosts).toHaveLength(DECKS.length);
 
-    const headings = hosts.map((host) => host.querySelector('.deck-heading')?.textContent?.trim());
-    expect(headings).toEqual(DECKS.map((deck) => `Deck ${deck.label}`));
+    const labels = hosts.map((host) =>
+      host.querySelector('.binding-deck-label')?.textContent?.trim()
+    );
+    expect(labels).toEqual(DECKS.map((deck) => `Deck ${deck.label}`));
+  });
+
+  it('offers no control to add a deck — N-readiness is proved by DECKS, never a button on the page', () => {
+    const controls: HTMLElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll('button, [role="button"]')
+    );
+
+    expect(controls.some((control) => /add deck/i.test(control.textContent ?? ''))).toBe(false);
   });
 
   describe('main-thread stall control', () => {

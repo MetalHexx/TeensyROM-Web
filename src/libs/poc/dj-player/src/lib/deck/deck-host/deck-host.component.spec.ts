@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DeckHostComponent } from './deck-host.component';
+import type { DeckPanelAreas } from './deck-host.component';
 import { DeckContext } from '../deck-context';
 import { DeckRegistry } from '../deck-registry';
 import { DeckTuneLoader } from '../deck-tune-loader';
@@ -80,6 +81,15 @@ function markerWithStart(frame: number): Marker {
   return { start: startPoint(frame), end: null };
 }
 
+/** Deck-host under test carries no ancestor `.grid` for these to actually position anything against
+ *  — only that the component accepts and applies whatever it is handed. */
+const FAKE_AREAS: DeckPanelAreas = {
+  transport: 't0',
+  voiceSpeed: 'vs0',
+  loopsCues: 'c0',
+  binding: 'b0',
+};
+
 describe('DeckHostComponent', () => {
   describe('ngOnInit wiring, over real collaborators', () => {
     function build(descriptor = DECKS[0]): {
@@ -91,6 +101,7 @@ describe('DeckHostComponent', () => {
     } {
       const fixture = TestBed.createComponent(DeckHostComponent);
       fixture.componentRef.setInput('deck', descriptor);
+      fixture.componentRef.setInput('areas', FAKE_AREAS);
 
       const injector = fixture.debugElement.injector;
       return {
@@ -118,7 +129,7 @@ describe('DeckHostComponent', () => {
       });
     });
 
-    it("adopts its own descriptor, restores its MIDI and repeat-track preferences under its own id, then registers — in that order", () => {
+    it('adopts its own descriptor, restores its MIDI and repeat-track preferences under its own id, then registers — in that order', () => {
       const { fixture, context, binding, engine, registry } = build(DECKS[0]);
 
       const adoptSpy = vi.spyOn(context, 'adopt');
@@ -341,6 +352,7 @@ describe('DeckHostComponent', () => {
 
       fixture = TestBed.createComponent(DeckHostComponent);
       fixture.componentRef.setInput('deck', DECKS[0]);
+      fixture.componentRef.setInput('areas', FAKE_AREAS);
       fixture.detectChanges();
     });
 
@@ -370,9 +382,9 @@ describe('DeckHostComponent', () => {
 
     it('gates Play on a loaded tune, a selected MIDI port and an idle engine', () => {
       function playButton(): HTMLButtonElement {
-        return Array.from(
-          fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')
-        ).find((button) => button.textContent?.trim() === 'Play') as HTMLButtonElement;
+        return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
+          (button) => button.textContent?.trim() === 'Play'
+        ) as HTMLButtonElement;
       }
 
       expect(playButton().disabled).toBe(true);
@@ -386,7 +398,9 @@ describe('DeckHostComponent', () => {
 
     it("reflects and writes the engine's repeatTrack signal from the repeat toggle", () => {
       function repeatToggle(): HTMLInputElement {
-        return fixture.nativeElement.querySelector(`[aria-label="Repeat track deck ${DECKS[0].label}"]`);
+        return fixture.nativeElement.querySelector(
+          `[aria-label="Repeat track deck ${DECKS[0].label}"]`
+        );
       }
 
       expect(repeatToggle().checked).toBe(true);

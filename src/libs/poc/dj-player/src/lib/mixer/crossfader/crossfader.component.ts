@@ -7,8 +7,7 @@ import { MixerService } from '../mixer.service';
  * and no numeric readout of the resulting register value. `MixerService` is provided page-level, one
  * level up, so every deck's own gain reads the same crossfader position this writes.
  *
- * Provisional placement: rendered at the top of `DjPocViewComponent` — P03-T02 moves it into the
- * mixer column.
+ * Rendered inside `MixerColumnComponent`, beneath the reserved region.
  */
 @Component({
   selector: 'lib-crossfader',

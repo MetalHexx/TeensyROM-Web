@@ -1,6 +1,6 @@
-// One grid area in the deck's own layout (see `deck-host.component.scss`) — this host renders no
-// wrapper of its own around any sibling panel, so `:host` is a plain block, not a flex/grid item that
-// would need un-styling later.
+// One grid area in the page's own `.grid` — `deck-host.component.html` sets `grid-area` inline, from
+// the `areas` input the page computes, so `:host` only has to stay a plain block a grid-area style
+// can freely apply to.
 :host {
   display: block;
   min-width: 0;
@@ -11,9 +11,10 @@
 }
 
 // Deck-scoped custom properties (`--perf-control-height`, `--structure-*`, `--chrome-*`) are defined
-// on `.deck` in `deck-host.component.scss` and inherit down through the light DOM into this
+// on `:host` in `deck-host.component.scss` and inherit down through the light DOM into this
 // component's own render tree — Angular's emulated encapsulation scopes selectors, not custom
-// property inheritance.
+// property inheritance, and `display: contents` on that host only removes its own box, never its
+// place in that inheritance chain.
 .transport-panel {
   display: flex;
   flex-direction: column;

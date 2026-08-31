@@ -1,6 +1,7 @@
-// One grid area in the deck's own layout (see `deck-host.component.scss`). This host wraps both the
-// Voice and the Speed panel in one element — the pair the wireframe draws as a single full-height
-// column — but is still exactly one custom element from `deck-host.component.html`'s point of view.
+// One grid area in the page's own `.grid` — `deck-host.component.html` sets `grid-area` inline, from
+// the `areas` input the page computes. This host wraps both the Voice and the Speed panel in one
+// element — the pair the wireframe draws as a single full-height column — but is still exactly one
+// custom element from `deck-host.component.html`'s point of view.
 :host {
   display: flex;
   flex-direction: column;
