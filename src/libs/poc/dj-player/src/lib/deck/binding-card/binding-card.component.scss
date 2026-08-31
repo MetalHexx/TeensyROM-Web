@@ -1,0 +1,60 @@
+// One grid area in the deck's own layout (see `deck-host.component.scss`) — this host renders no
+// wrapper of its own around any sibling panel.
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.binding-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+}
+
+.binding-deck-label {
+  margin: 0;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height, 2rem);
+  }
+}
+
+// Label left, its control pushed right — both cards render the same port name in the same shape, so
+// the Identify gesture's whole point (confirming which physical port each card actually drives) is
+// never disguised by inconsistent formatting between them.
+.control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+
+  > select {
+    flex: 1 1 auto;
+    margin-left: auto;
+    min-width: 0;
+  }
+}
+
+.error-text {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}

@@ -1,0 +1,221 @@
+// One grid area in the deck's own layout (see `deck-host.component.scss`) — this host renders no
+// wrapper of its own around any sibling panel.
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  min-height: 0;
+
+  h2 {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: var(--font-size-md);
+  }
+}
+
+// Heading plus the panel-level Add control, and the single panel-level Stop beside it — one control
+// ends whichever marker is looping, rather than a per-row stop.
+.panel-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height, 2rem);
+    min-width: 4rem;
+  }
+}
+
+.panel-header-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+// Rows are sized by their own content and stack from the top rather than stretching to fill the
+// panel, so density comes from the real gap below rather than from each row silently absorbing the
+// panel's slack. Once rows stop growing this also becomes the scroll container.
+.marker-rows {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: var(--spacing-sm);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+// Stacked at every width: number/trigger + actions header, then Start, then End, then the progress
+// strip — each line running the panel's full width. A left border reports active/queued state so the
+// row reads without a text label — solid and lit for active, dashed and dimmer for queued, invisible
+// for idle.
+.marker-row {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-left: 3px solid transparent;
+
+  &[data-marker-state='active'] {
+    border-left-color: var(--color-primary);
+  }
+
+  &[data-marker-state='queued'] {
+    border-left-style: dashed;
+    border-left-color: var(--color-dimmed);
+  }
+}
+
+// Number/trigger on the left, Set End / Revert / Clear / Delete right-aligned — Set End sits here
+// now, beside the row's other actions, which is what gives the End line below the same shape as the
+// Start line.
+.marker-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.marker-row-lead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+// The bare numeral, heavier and larger than the rest of the row's text — this is the row's identity,
+// not a dim caption.
+.marker-number {
+  min-width: 1.25rem;
+  color: var(--color-primary-bright, var(--color-primary));
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  text-align: center;
+}
+
+.marker-row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+
+  button {
+    height: calc(var(--perf-control-height, 2rem) * 0.8);
+  }
+}
+
+// Fixed width so a row's leading control never resizes between "Capture" and "Trigger".
+.marker-trigger {
+  min-width: 6rem;
+  height: calc(var(--perf-control-height, 2rem) * 0.8);
+}
+
+.marker-end-revert--empty {
+  opacity: 0.4;
+}
+
+// tag | frame | nudge track (full width) | offset readout — Start and End now share this exact
+// shape, which is what makes their nudge sliders equal by construction.
+.marker-slot {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: var(--spacing-sm);
+}
+
+.marker-sub-tag {
+  flex: 0 0 3rem;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+.marker-frame {
+  flex: 0 1 6rem;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.marker-frame--empty {
+  color: var(--color-dimmed);
+}
+
+// A bare track with no bounding box — the centre detent is the only landmark a bipolar nudge slider
+// needs. Takes every pixel the row has left over so a one-frame step stays hittable.
+.marker-nudge {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 2.5rem;
+  height: var(--perf-control-height, 2rem);
+
+  input[type='range'] {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    background: transparent;
+  }
+}
+
+.marker-nudge--empty {
+  opacity: 0.4;
+}
+
+.marker-nudge-centre {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--color-dimmed);
+  pointer-events: none;
+}
+
+.marker-offset {
+  flex: 0 0 3.25rem;
+  font-family: 'Roboto Mono', monospace;
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.marker-offset--empty {
+  color: var(--color-dimmed);
+}
+
+// Spans the full panel width beneath its row's controls — decorative, and empty for every row but
+// the one currently looping.
+.marker-progress {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 0.375rem;
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+
+.marker-progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: var(--color-dimmed);
+}

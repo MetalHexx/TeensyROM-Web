@@ -1,0 +1,142 @@
+// One grid area in the deck's own layout (see `deck-host.component.scss`). This host wraps both the
+// Voice and the Speed panel in one element — the pair the wireframe draws as a single full-height
+// column — but is still exactly one custom element from `deck-host.component.html`'s point of view.
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-width: 0;
+  min-height: 0;
+  // Narrow by construction: every label, readout and button inside is centred rather than
+  // left-aligned, which is what lets this column stay this tight.
+  width: 4rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  min-height: 0;
+  text-align: center;
+
+  h2 {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: var(--font-size-md);
+  }
+}
+
+.voice-panel {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.speed-panel {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+}
+
+.voice-rows {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: var(--spacing-md);
+}
+
+// checkbox+name on one line, the audible/muted state stacked beneath it, then the hold button —
+// every line centred, as the wireframe draws it.
+.voice-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+
+.voice-row-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+
+  input[type='checkbox'] {
+    margin: 0;
+  }
+}
+
+.voice-state {
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+// `width: 100%` inside this fixed-width, centred column is what gives Kill, Punch In and Clear one
+// shared width without ever measuring the text.
+.voice-hold {
+  width: 100%;
+  height: var(--perf-control-height, 2rem);
+}
+
+.voice-clear {
+  width: 100%;
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-dimmed);
+
+  button {
+    width: 100%;
+    height: var(--perf-control-height, 2rem);
+  }
+}
+
+// Title, multiplier readout, then the vertical fader taking all remaining height, then the jump
+// buttons stacked beneath it — top to bottom, exactly as the wireframe draws Speed.
+.speed-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: var(--spacing-sm);
+}
+
+.speed-value {
+  flex: 0 0 auto;
+  font-size: var(--font-size-md);
+  color: var(--color-primary);
+}
+
+.speed-fader {
+  flex: 1 1 auto;
+  min-height: 6rem;
+  width: 1.5rem;
+  margin: 0;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+// Order in the DOM is the visual order top to bottom: +50%, Home, −50% — Home lands between the two
+// jumps, matching where it sits on the fader's own travel.
+.speed-jump-buttons {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 0 0 auto;
+  gap: var(--spacing-xs);
+
+  button {
+    width: 100%;
+    height: var(--perf-control-height, 2rem);
+  }
+}

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { ThemeService } from '@teensyrom-nx/ui/styles';
 import { MidiAccessService } from '../midi/midi-access.service';
@@ -6,7 +6,6 @@ import { TUNE_INDEX_STORAGE, LocalStorageTuneIndexStorage } from '../analysis/tu
 import { SharedTuneIndex } from '../analysis/shared-tune-index';
 import { DeckHostComponent } from '../deck/deck-host/deck-host.component';
 import { DeckRegistry } from '../deck/deck-registry';
-import type { DeckHandle } from '../deck/deck-registry';
 import { DECKS } from '../deck/deck.config';
 import { MixerService } from '../mixer/mixer.service';
 import { CrossfaderComponent } from '../mixer/crossfader/crossfader.component';
@@ -25,9 +24,10 @@ const MAX_STALL_DURATION_MS = 2000;
 
 /**
  * The DJ player page — reachable only by typing `/dev/dj-poc` in the browser. Composes one deck host
- * per entry in `DECKS`, side by side, and holds only what is genuinely shared across every deck:
- * the Web MIDI permission grant, the tune-index cache, the registry a page-level surface reaches
- * a deck's own collaborators through, and the mixer's per-deck gain model.
+ * per entry in `DECKS`, side by side, and holds only what is genuinely shared across every deck: the
+ * Web MIDI permission grant (each deck's own `BindingCardComponent` reaches up to it), the tune-index
+ * cache, the registry a page-level surface reaches a deck's own collaborators through, and the
+ * mixer's per-deck gain model.
  *
  * `SharedTuneIndex` lives here, not in `DeckHostComponent`: a loop point, a key, a length are facts
  * about the tune, not about the deck that found them, so every deck's own `TuneIndexService` reaches
@@ -39,10 +39,15 @@ const MAX_STALL_DURATION_MS = 2000;
  * a fact the crossfader and a future per-deck fader both write into, so every deck reads the one
  * page-level instance rather than each holding its own.
  *
- * Provisional arrangement: the MIDI subsection and the main-thread stall control are the two pieces
- * of markup that stay here rather than moving into `DeckHostComponent` — see its own doc for the
- * rest of what moved. `CrossfaderComponent` renders provisionally at the top of the page; P03-T02
- * moves it into a dedicated mixer column. P03 replaces every line of this.
+ * `MidiAccessService` lives here for the same reason again: the SysEx permission grant and the
+ * enumerated port list are facts about the page's one Web MIDI session, not about either deck, so
+ * both decks' own `BindingCardComponent`s read and drive the same instance rather than each holding
+ * its own.
+ *
+ * Provisional arrangement: the main-thread stall control is the one piece of markup that stays here
+ * rather than moving into a deck-owned component — every MIDI-facing control moved into each deck's
+ * own `BindingCardComponent` in P03-T01. `CrossfaderComponent` renders provisionally at the top of
+ * the page; P03-T02 moves it into a dedicated mixer column.
  */
 @Component({
   selector: 'lib-dj-poc-view',
@@ -69,59 +74,11 @@ export class DjPocViewComponent {
 
   protected readonly decksConfig = DECKS;
 
-  private readonly midiAccess = inject(MidiAccessService);
-  protected readonly midiAccessState = this.midiAccess.accessState;
-  protected readonly midiPorts = this.midiAccess.ports;
-  protected readonly midiAccessError = this.midiAccess.lastError;
-
-  private readonly registry = inject(DeckRegistry);
-  protected readonly decks = this.registry.decks;
-
-  // Web MIDI enumerates zero ports for a granted-but-empty session (no cartridge attached, or the
-  // OS hasn't surfaced it yet) without the service itself treating that as an error.
-  protected readonly noPortsFoundError = computed<string | null>(() =>
-    this.midiAccessState() === 'granted' && this.midiPorts().length === 0
-      ? 'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.'
-      : null
-  );
-
   /** The main-thread stall control's configured span, ms — see `onStallMainThread`. Page-level and
    *  singular: it is the isolation test's negative control, so it disturbs every deck together
    *  rather than one at a time. */
   protected readonly stallDurationMs = signal<number>(DEFAULT_STALL_DURATION_MS);
   protected readonly maxStallDurationMs = MAX_STALL_DURATION_MS;
-
-  /** Requests the page-level grant, then attempts every registered deck's own restore — mirrors the
-   *  old single-deck sequence, just fanned out to however many decks are composed. `restore()`
-   *  no-ops once a deck already holds a selection, so a second press is harmless. */
-  onEnableMidi(): void {
-    void this.midiAccess
-      .requestAccess()
-      .then(() => this.decks().forEach((deck) => deck.binding.restore()));
-  }
-
-  onSelectMidiPort(deck: DeckHandle, event: Event): void {
-    const select = event.target as HTMLSelectElement;
-    deck.binding.selectPort(select.value);
-  }
-
-  /** Whether `deck`'s Identify control is reachable: access must be granted, the deck must hold a
-   *  port, and identifying interrupts the stream on the cartridge, so it stays out of reach while
-   *  that deck plays. */
-  protected canIdentify(deck: DeckHandle): boolean {
-    return (
-      this.midiAccessState() === 'granted' &&
-      deck.binding.selectedPortId() !== null &&
-      deck.engine.state() !== 'playing'
-    );
-  }
-
-  onIdentify(deck: DeckHandle): void {
-    const ports = this.midiPorts();
-    const index = ports.findIndex((port) => port.id === deck.binding.selectedPortId());
-    const label = index === -1 ? 'ASID-DJ-0 PORT ?' : `ASID-DJ-0 PORT ${index + 1}`;
-    deck.binding.identify(label);
-  }
 
   onStallDurationInput(event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);

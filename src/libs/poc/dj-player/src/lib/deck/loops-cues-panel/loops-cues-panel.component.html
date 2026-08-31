@@ -1,0 +1,160 @@
+<section class="panel" [attr.aria-label]="'Loops/Cues deck ' + label()">
+  <div class="panel-header">
+    <h2>Loops/Cues</h2>
+    <div class="panel-header-actions">
+      <button
+        type="button"
+        [attr.aria-label]="'Add marker deck ' + label()"
+        (click)="onAddMarker()"
+      >
+        Add
+      </button>
+      <button
+        type="button"
+        [attr.aria-label]="'Stop loop deck ' + label()"
+        (click)="onStopLoop()"
+      >
+        Stop
+      </button>
+    </div>
+  </div>
+
+  <div class="marker-rows">
+    @for (marker of markers(); track $index) {
+    <div class="marker-row" [attr.data-marker-state]="markerState($index)">
+      <div class="marker-row-header">
+        <div class="marker-row-lead">
+          <span class="marker-number">{{ $index + 1 }}</span>
+
+          @if (marker.start) {
+          <button
+            type="button"
+            class="marker-trigger"
+            [attr.aria-label]="'Trigger marker ' + ($index + 1) + ' deck ' + label()"
+            [disabled]="markerLaunchPending()"
+            (click)="onTriggerMarker($index)"
+          >
+            Trigger
+          </button>
+          } @else {
+          <button
+            type="button"
+            class="marker-trigger"
+            [attr.aria-label]="'Capture cue ' + ($index + 1) + ' deck ' + label()"
+            (click)="onCaptureMarkerStart($index)"
+          >
+            Capture
+          </button>
+          }
+        </div>
+
+        <div class="marker-row-actions">
+          <button
+            type="button"
+            class="marker-end-set"
+            [attr.aria-label]="'Set end for marker ' + ($index + 1) + ' deck ' + label()"
+            (click)="onSetMarkerEnd($index)"
+          >
+            Set End
+          </button>
+
+          @if (marker.end) {
+          <button
+            type="button"
+            class="marker-end-revert"
+            [attr.aria-label]="'Revert marker ' + ($index + 1) + ' to cue deck ' + label()"
+            (click)="onClearMarkerEnd($index)"
+          >
+            Revert
+          </button>
+          } @else {
+          <button
+            type="button"
+            class="marker-end-revert marker-end-revert--empty"
+            aria-hidden="true"
+            tabindex="-1"
+            disabled
+          >
+            Revert
+          </button>
+          }
+
+          <button
+            type="button"
+            [attr.aria-label]="'Clear marker ' + ($index + 1) + ' deck ' + label()"
+            (click)="onClearMarker($index)"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            [attr.aria-label]="'Delete marker ' + ($index + 1) + ' deck ' + label()"
+            [disabled]="markerLaunchPending()"
+            (click)="onDeleteMarker($index)"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      <div class="marker-slot">
+        <span class="marker-sub-tag">Start</span>
+        @if (marker.start) {
+        <span class="marker-frame">frame {{ markerStartFrame($index) }}</span>
+        <div class="marker-nudge">
+          <div class="marker-nudge-centre"></div>
+          <input
+            type="range"
+            [min]="-nudgeRange()"
+            [max]="nudgeRange()"
+            step="1"
+            [attr.aria-label]="'Nudge marker ' + ($index + 1) + ' start deck ' + label()"
+            [value]="displayedMarkerStartOffset($index)"
+            (input)="onMarkerStartNudgeInput($index, $event)"
+            (change)="onMarkerStartNudgeChange($index, $event)"
+          />
+        </div>
+        <span class="marker-offset">{{ markerStartOffsetLabel($index) }}</span>
+        } @else {
+        <span class="marker-frame marker-frame--empty">empty</span>
+        <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
+          <div class="marker-nudge-centre"></div>
+        </div>
+        <span class="marker-offset marker-offset--empty">—</span>
+        }
+      </div>
+
+      <div class="marker-slot">
+        <span class="marker-sub-tag">End</span>
+        @if (marker.end; as end) {
+        <span class="marker-frame">frame {{ markerEndFrame($index) }}</span>
+        <div class="marker-nudge">
+          <div class="marker-nudge-centre"></div>
+          <input
+            type="range"
+            [min]="-nudgeRange()"
+            [max]="nudgeRange()"
+            step="1"
+            [attr.aria-label]="'Nudge marker ' + ($index + 1) + ' end deck ' + label()"
+            [value]="displayedMarkerEndOffset($index)"
+            (input)="onMarkerEndNudgeInput($index, $event)"
+            (change)="onMarkerEndNudgeChange($index, $event)"
+          />
+        </div>
+        <span class="marker-offset">{{ markerEndOffsetLabel($index) }}</span>
+        } @else {
+        <span class="marker-frame marker-frame--empty" aria-hidden="true">empty</span>
+        <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
+          <div class="marker-nudge-centre"></div>
+        </div>
+        <span class="marker-offset marker-offset--empty" aria-hidden="true">—</span>
+        }
+      </div>
+
+      <div class="marker-progress" aria-hidden="true">
+        <div class="marker-progress-fill" [style.width.%]="progressPercentFor($index)"></div>
+      </div>
+    </div>
+    }
+  </div>
+</section>

@@ -42,9 +42,9 @@
   overflow: hidden;
 }
 
-// What stays page-level: the MIDI subsection (one row per registered deck) and the stall control.
-// Everything else that used to sit in this sidebar is deck-scoped now and lives inside
-// `deck-host.component.html` instead — see `DjPocViewComponent`'s own doc.
+// What stays page-level: the stall control. Everything else that used to sit in this sidebar —
+// including the MIDI subsection, moved into each deck's own `BindingCardComponent` in P03-T01 — is
+// deck-scoped now.
 .page-sidebar {
   flex: 0 0 clamp(18rem, 22%, 24rem);
   display: flex;
@@ -71,20 +71,6 @@
   }
 }
 
-.subsection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.subsection-title {
-  margin: 0;
-  color: var(--color-dimmed);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
 .control-row {
   display: flex;
   flex-wrap: wrap;
@@ -97,35 +83,6 @@
   align-items: center;
   gap: var(--spacing-sm);
   font-size: var(--font-size-sm);
-
-  > select {
-    margin-left: auto;
-    min-width: 0;
-  }
-}
-
-.midi-status {
-  margin: 0;
-  margin-left: auto;
-  color: var(--color-dimmed);
-  font-size: var(--font-size-sm);
-}
-
-// One row per registered deck — `DeckMidiBinding` is deck-scoped, so each deck needs its own port
-// selector and its own Identify control; only the permission grant above this is shared.
-.deck-midi-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  padding-top: var(--spacing-sm);
-  border-top: 1px solid var(--color-dimmed);
-}
-
-.deck-midi-label {
-  color: var(--color-dimmed);
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 // The stall duration field is a plain number input, not a select, so it needs its own width — left
@@ -133,10 +90,4 @@
 // this control actually needs.
 .stall-control input[type='number'] {
   width: 4.5rem;
-}
-
-.error-text {
-  margin: 0;
-  color: var(--color-error);
-  font-size: var(--font-size-sm);
 }

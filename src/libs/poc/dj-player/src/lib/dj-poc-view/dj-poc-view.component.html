@@ -11,68 +11,6 @@
   </div>
 
   <aside class="page-sidebar">
-    <section class="panel setup-panel" aria-label="Setup">
-      <h2>Setup</h2>
-
-      <div class="subsection" aria-label="MIDI">
-        <h3 class="subsection-title">MIDI</h3>
-
-        <div class="control-row">
-          <button
-            type="button"
-            (click)="onEnableMidi()"
-            [disabled]="midiAccessState() === 'requesting'"
-          >
-            Enable MIDI
-          </button>
-          <p class="midi-status">Status: {{ midiAccessState() }}</p>
-        </div>
-
-        @if (midiAccessError()) {
-        <p class="error-text" role="alert">{{ midiAccessError() }}</p>
-        } @if (noPortsFoundError()) {
-        <p class="error-text" role="alert">{{ noPortsFoundError() }}</p>
-        }
-
-        @for (deck of decks(); track deck.descriptor.id) {
-        <div class="deck-midi-row" [attr.aria-label]="'MIDI deck ' + deck.descriptor.label">
-          <span class="deck-midi-label">Deck {{ deck.descriptor.label }}</span>
-
-          <label class="control">
-            Output port
-            <select
-              [disabled]="midiPorts().length === 0"
-              (change)="onSelectMidiPort(deck, $event)"
-            >
-              <option value="" [selected]="deck.binding.selectedPortId() === null">
-                — select a port —
-              </option>
-              @for (port of midiPorts(); track port.id) {
-              <option [value]="port.id" [selected]="port.id === deck.binding.selectedPortId()">
-                {{ port.name }} ({{ port.manufacturer }})
-              </option>
-              }
-            </select>
-          </label>
-
-          <div class="control-row">
-            <button
-              type="button"
-              (click)="onIdentify(deck)"
-              [disabled]="!canIdentify(deck)"
-            >
-              Identify
-            </button>
-          </div>
-
-          @if (deck.binding.lastError()) {
-          <p class="error-text" role="alert">{{ deck.binding.lastError() }}</p>
-          }
-        </div>
-        }
-      </div>
-    </section>
-
     <section class="panel stall-panel" aria-label="Diagnostics">
       <h2>Diagnostics</h2>
 

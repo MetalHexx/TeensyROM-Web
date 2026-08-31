@@ -277,7 +277,11 @@ describe('DeckHostComponent', () => {
 
     let fixture: ComponentFixture<DeckHostComponent>;
     let engine: MockEngine;
-    let binding: { selectedPortId: WritableSignal<string | null>; restore: ReturnType<typeof vi.fn> };
+    let binding: {
+      selectedPortId: WritableSignal<string | null>;
+      lastError: WritableSignal<string | null>;
+      restore: ReturnType<typeof vi.fn>;
+    };
     let tuneLoader: {
       availableTunes: WritableSignal<readonly TuneSource[]>;
       currentTune: WritableSignal<SidFile | null>;
@@ -292,7 +296,11 @@ describe('DeckHostComponent', () => {
 
     beforeEach(async () => {
       engine = makeEngine();
-      binding = { selectedPortId: signal<string | null>(null), restore: vi.fn() };
+      binding = {
+        selectedPortId: signal<string | null>(null),
+        lastError: signal<string | null>(null),
+        restore: vi.fn(),
+      };
       tuneLoader = {
         availableTunes: signal<readonly TuneSource[]>([
           { id: 'auto', label: 'Auto tune', getBytes: () => new Uint8Array() },
@@ -310,8 +318,10 @@ describe('DeckHostComponent', () => {
       await TestBed.configureTestingModule({
         imports: [DeckHostComponent],
         // Page-level in production; stands in here the same way DeckRegistry does, since this suite
-        // has no page above the component under test.
-        providers: [DeckRegistry, MixerService],
+        // has no page above the component under test. `MidiAccessService` is real (not mocked) —
+        // `BindingCardComponent` reaches it directly for the shared port list, and it has no browser
+        // API dependency until `requestAccess()` is actually invoked, which none of these tests do.
+        providers: [DeckRegistry, MixerService, MidiAccessService],
       })
         .overrideComponent(DeckHostComponent, {
           set: {
@@ -376,7 +386,7 @@ describe('DeckHostComponent', () => {
 
     it("reflects and writes the engine's repeatTrack signal from the repeat toggle", () => {
       function repeatToggle(): HTMLInputElement {
-        return fixture.nativeElement.querySelector('[aria-label="Repeat track"]');
+        return fixture.nativeElement.querySelector(`[aria-label="Repeat track deck ${DECKS[0].label}"]`);
       }
 
       expect(repeatToggle().checked).toBe(true);
@@ -397,14 +407,14 @@ describe('DeckHostComponent', () => {
       expect(tuneLoader.selectTune).toHaveBeenCalledWith(tuneLoader.availableTunes()[0]);
     });
 
-    it('calls engine.addMarker from the Cues panel Add control', () => {
+    it('calls engine.addMarker from the Loops/Cues panel Add control', () => {
       engine.addMarker.mockImplementation(() => {
         engine.markers.set([markerWithStart(0)]);
         return 0;
       });
 
       const addButton = fixture.nativeElement.querySelector(
-        '[aria-label="Cues"] .panel-header-actions button'
+        `[aria-label="Loops/Cues deck ${DECKS[0].label}"] .panel-header-actions button`
       ) as HTMLButtonElement;
       addButton.click();
 

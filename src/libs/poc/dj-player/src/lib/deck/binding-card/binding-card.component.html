@@ -1,0 +1,49 @@
+<section class="binding-card" [attr.aria-label]="'MIDI binding deck ' + label()">
+  <h2 class="binding-deck-label">Deck {{ label() }}</h2>
+
+  <label class="control">
+    Output port
+    <select
+      [disabled]="midiAccessState() !== 'granted' || midiPorts().length === 0"
+      [attr.aria-label]="'Output port deck ' + label()"
+      (change)="onSelectPort($event)"
+    >
+      @if (midiAccessState() === 'granted') {
+      <option value="" [selected]="selectedPortId() === null">— select a port —</option>
+      @for (port of midiPorts(); track port.id) {
+      <option [value]="port.id" [selected]="port.id === selectedPortId()">
+        {{ port.name }} ({{ port.manufacturer }})
+      </option>
+      } } @else {
+      <option value="" selected disabled>— MIDI not enabled —</option>
+      }
+    </select>
+  </label>
+
+  <div class="control-row">
+    <button
+      type="button"
+      [attr.aria-label]="'Enable MIDI deck ' + label()"
+      [disabled]="midiAccessState() === 'requesting'"
+      (click)="onEnableMidi()"
+    >
+      Enable MIDI
+    </button>
+    <button
+      type="button"
+      [attr.aria-label]="'Identify deck ' + label()"
+      [disabled]="!canIdentify()"
+      (click)="onIdentify()"
+    >
+      Identify
+    </button>
+  </div>
+
+  @if (midiAccessError()) {
+  <p class="error-text" role="alert">{{ midiAccessError() }}</p>
+  } @if (noPortsFoundError()) {
+  <p class="error-text" role="alert">{{ noPortsFoundError() }}</p>
+  } @if (bindingError()) {
+  <p class="error-text" role="alert">{{ bindingError() }}</p>
+  }
+</section>

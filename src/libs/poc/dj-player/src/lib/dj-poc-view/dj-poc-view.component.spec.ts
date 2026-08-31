@@ -1,15 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DjPocViewComponent } from './dj-poc-view.component';
-import { MidiAccessService } from '../midi/midi-access.service';
-import type { DeckHandle } from '../deck/deck-registry';
 import { DECKS } from '../deck/deck.config';
 
 describe('DjPocViewComponent', () => {
   let fixture: ComponentFixture<DjPocViewComponent>;
   let component: DjPocViewComponent;
-  let midiAccess: MidiAccessService;
-  let decks: readonly DeckHandle[];
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -19,17 +15,7 @@ describe('DjPocViewComponent', () => {
     fixture = TestBed.createComponent(DjPocViewComponent);
     component = fixture.componentInstance;
 
-    // The real service: `claim`/`release`/`send` are plain Map bookkeeping with no browser API
-    // dependency, so only the SysEx permission prompt itself needs stubbing.
-    midiAccess = fixture.debugElement.injector.get(MidiAccessService);
-    vi.spyOn(midiAccess, 'requestAccess').mockImplementation(() => Promise.resolve());
-
     fixture.detectChanges();
-    decks = component['decks']();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   it('creates', () => {
@@ -42,107 +28,9 @@ describe('DjPocViewComponent', () => {
     );
 
     expect(hosts).toHaveLength(DECKS.length);
-    expect(decks.map((deck) => deck.descriptor.id)).toEqual(DECKS.map((deck) => deck.id));
 
     const headings = hosts.map((host) => host.querySelector('.deck-heading')?.textContent?.trim());
     expect(headings).toEqual(DECKS.map((deck) => `Deck ${deck.label}`));
-  });
-
-  describe('MIDI', () => {
-    function enableMidiButton(): HTMLButtonElement {
-      return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
-        (button) => button.textContent?.trim() === 'Enable MIDI'
-      ) as HTMLButtonElement;
-    }
-
-    function deckRow(index: number): HTMLElement {
-      return fixture.nativeElement.querySelectorAll('.deck-midi-row')[index] as HTMLElement;
-    }
-
-    function identifyButton(index: number): HTMLButtonElement {
-      return Array.from(deckRow(index).querySelectorAll<HTMLButtonElement>('button')).find(
-        (button) => button.textContent?.trim() === 'Identify'
-      ) as HTMLButtonElement;
-    }
-
-    it('renders one row per registered deck', () => {
-      expect(fixture.nativeElement.querySelectorAll('.deck-midi-row')).toHaveLength(DECKS.length);
-    });
-
-    it("enabling MIDI requests access, then restores every registered deck's own binding", async () => {
-      const restoreSpies = decks.map((deck) => vi.spyOn(deck.binding, 'restore'));
-
-      enableMidiButton().click();
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(midiAccess.requestAccess).toHaveBeenCalled();
-      for (const spy of restoreSpies) {
-        expect(spy).toHaveBeenCalled();
-      }
-    });
-
-    it('selecting a port for one deck claims it for that deck only, leaving the other deck unselected', () => {
-      midiAccess.ports.set([
-        { id: 'port-1', name: 'Cart A', manufacturer: 'Acme' },
-        { id: 'port-2', name: 'Cart B', manufacturer: 'Acme' },
-      ]);
-      fixture.detectChanges();
-
-      const select = deckRow(0).querySelector('select') as HTMLSelectElement;
-      select.value = 'port-1';
-      select.dispatchEvent(new Event('change'));
-
-      expect(decks[0].binding.selectedPortId()).toBe('port-1');
-      expect(decks[1].binding.selectedPortId()).toBeNull();
-    });
-
-    it("renders a row's own binding error, never the other deck's", () => {
-      decks[0].binding.lastError.set('deck A exploded');
-      fixture.detectChanges();
-
-      expect(deckRow(0).textContent).toContain('deck A exploded');
-      expect(deckRow(1).textContent).not.toContain('deck A exploded');
-    });
-
-    it('gates Identify on granted access and a selected port for that deck, independent of the other', () => {
-      midiAccess.ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
-      midiAccess.accessState.set('granted');
-      fixture.detectChanges();
-      const select = deckRow(0).querySelector('select') as HTMLSelectElement;
-      select.value = 'port-1';
-      select.dispatchEvent(new Event('change'));
-      fixture.detectChanges();
-
-      expect(identifyButton(0).disabled).toBe(false);
-      expect(identifyButton(1).disabled).toBe(true);
-    });
-
-    it("identifying a deck sends through that deck's own binding", () => {
-      midiAccess.ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
-      midiAccess.accessState.set('granted');
-      fixture.detectChanges();
-      const select = deckRow(0).querySelector('select') as HTMLSelectElement;
-      select.value = 'port-1';
-      select.dispatchEvent(new Event('change'));
-      fixture.detectChanges();
-
-      const identifySpy = vi.spyOn(decks[0].binding, 'identify');
-
-      identifyButton(0).click();
-
-      expect(identifySpy).toHaveBeenCalledWith('ASID-DJ-0 PORT 1');
-    });
-
-    it('shows the no-ports-found message once access is granted with an empty port list', () => {
-      midiAccess.accessState.set('granted');
-      midiAccess.ports.set([]);
-      fixture.detectChanges();
-
-      expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain(
-        'no output ports were found'
-      );
-    });
   });
 
   describe('main-thread stall control', () => {
