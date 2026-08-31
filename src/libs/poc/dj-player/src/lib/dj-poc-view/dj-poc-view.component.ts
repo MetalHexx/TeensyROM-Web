@@ -8,6 +8,8 @@ import { DeckHostComponent } from '../deck/deck-host/deck-host.component';
 import { DeckRegistry } from '../deck/deck-registry';
 import type { DeckHandle } from '../deck/deck-registry';
 import { DECKS } from '../deck/deck.config';
+import { MixerService } from '../mixer/mixer.service';
+import { CrossfaderComponent } from '../mixer/crossfader/crossfader.component';
 
 /** The stall control's starting span — long enough to be heard, short enough not to trip
  *  `MAX_CATCH_UP_US`'s catch-up ceiling in the frame clock on a single press. */
@@ -24,8 +26,8 @@ const MAX_STALL_DURATION_MS = 2000;
 /**
  * The DJ player page — reachable only by typing `/dev/dj-poc` in the browser. Composes one deck host
  * per entry in `DECKS`, side by side, and holds only what is genuinely shared across every deck:
- * the Web MIDI permission grant, the tune-index cache, and the registry a page-level surface reaches
- * a deck's own collaborators through.
+ * the Web MIDI permission grant, the tune-index cache, the registry a page-level surface reaches
+ * a deck's own collaborators through, and the mixer's per-deck gain model.
  *
  * `SharedTuneIndex` lives here, not in `DeckHostComponent`: a loop point, a key, a length are facts
  * about the tune, not about the deck that found them, so every deck's own `TuneIndexService` reaches
@@ -33,16 +35,21 @@ const MAX_STALL_DURATION_MS = 2000;
  * still stays the injectable seam beneath it, unchanged, so a test still substitutes its own in-memory
  * double for `SharedTuneIndex` to sit on.
  *
+ * `MixerService` lives here for the same reason `SharedTuneIndex` does: a deck's composed gain is
+ * a fact the crossfader and a future per-deck fader both write into, so every deck reads the one
+ * page-level instance rather than each holding its own.
+ *
  * Provisional arrangement: the MIDI subsection and the main-thread stall control are the two pieces
  * of markup that stay here rather than moving into `DeckHostComponent` — see its own doc for the
- * rest of what moved. P03 replaces every line of this.
+ * rest of what moved. `CrossfaderComponent` renders provisionally at the top of the page; P03-T02
+ * moves it into a dedicated mixer column. P03 replaces every line of this.
  */
 @Component({
   selector: 'lib-dj-poc-view',
   templateUrl: './dj-poc-view.component.html',
   styleUrl: './dj-poc-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DeckHostComponent],
+  imports: [DeckHostComponent, CrossfaderComponent],
   // Provided here rather than root: this is a quarantined POC surface, and neither the permission-
   // holding MIDI service nor any deck's own audio graph should register in the app injector. Each
   // deck's own engine, clock, replay worker and scanner are provided one level down, in
@@ -52,6 +59,7 @@ const MAX_STALL_DURATION_MS = 2000;
     { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
     SharedTuneIndex,
     DeckRegistry,
+    MixerService,
   ],
 })
 export class DjPocViewComponent {
