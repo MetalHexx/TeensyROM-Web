@@ -10,13 +10,14 @@ namespace TeensyRom.Api.Tests.Integration.Common
     /// <summary>
     /// A sibling of <see cref="EndpointFixture"/> for transfer tests: additionally bypasses hardware
     /// discovery via <see cref="FakeDeviceConnectionManager"/> and registers a <see cref="TransferOptions"/>
-    /// backed by a fresh staging directory. Left as a separate fixture/collection so every existing
-    /// <see cref="EndpointFixture"/>-based test is untouched.
+    /// backed by fresh staging and scratch directories. Left as a separate fixture/collection so every
+    /// existing <see cref="EndpointFixture"/>-based test is untouched.
     /// </summary>
     public class TransferFixture : IDisposable
     {
         private readonly WebApplicationFactory<Program> _factory;
         private readonly string _stagingRoot;
+        private readonly string _scratchRoot;
 
         public TrClient Client
         {
@@ -83,10 +84,21 @@ namespace TeensyRom.Api.Tests.Integration.Common
         /// arguments, so a suite that needs different tuning derives its own fixture and collection
         /// instead of mutating <see cref="Options"/> on a host that already started.
         /// </summary>
-        protected TransferFixture(Action<TransferOptions>? configureOptions)
+        protected TransferFixture(Action<TransferOptions>? configureOptions) : this(configureOptions, null)
+        {
+        }
+
+        /// <summary>
+        /// As above, with an additional hook to override service registrations - e.g. substituting
+        /// <see cref="TeensyRom.Api.Transfers.Archives.IArchiveReader"/> with a test decorator - before
+        /// the host builds. Runs last, after every registration below, so a derived fixture's override
+        /// always wins.
+        /// </summary>
+        protected TransferFixture(Action<TransferOptions>? configureOptions, Action<IServiceCollection>? configureServices)
         {
             _stagingRoot = Directory.CreateTempSubdirectory("teensyrom-transfer-tests-").FullName;
-            Options = new TransferOptions { StagingRoot = _stagingRoot };
+            _scratchRoot = Directory.CreateTempSubdirectory("teensyrom-transfer-tests-scratch-").FullName;
+            Options = new TransferOptions { StagingRoot = _stagingRoot, ScratchRoot = _scratchRoot };
             configureOptions?.Invoke(Options);
 
             _factory = new WebApplicationFactory<Program>()
@@ -120,6 +132,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
                             new FakeDeviceConnectionManager(sp.GetRequiredService<IStorageFactory>()));
 
                         services.AddSingleton(Options);
+                        configureServices?.Invoke(services);
                     });
                 });
 
@@ -166,6 +179,11 @@ namespace TeensyRom.Api.Tests.Integration.Common
             if (Directory.Exists(_stagingRoot))
             {
                 Directory.Delete(_stagingRoot, recursive: true);
+            }
+
+            if (Directory.Exists(_scratchRoot))
+            {
+                Directory.Delete(_scratchRoot, recursive: true);
             }
         }
     }

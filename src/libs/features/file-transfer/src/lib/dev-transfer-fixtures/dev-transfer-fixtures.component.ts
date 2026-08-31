@@ -2,7 +2,10 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TransferFeedEntry } from '@teensyrom-nx/application';
 import { ConfirmationDialogComponent } from '@teensyrom-nx/ui/components';
 import { ThemeService } from '@teensyrom-nx/ui/styles';
-import { TransferProgressComponent, TransferProgressVm } from '../transfer-modal/transfer-progress/transfer-progress.component';
+import {
+  TransferProgressComponent,
+  TransferProgressVm,
+} from '../transfer-modal/transfer-progress/transfer-progress.component';
 import { DevDropzoneFixtureComponent } from './dev-dropzone-fixture.component';
 
 interface ProgressFixture {
@@ -36,7 +39,13 @@ function baseVm(overrides: Partial<TransferProgressVm> = {}): TransferProgressVm
     failed: 4,
     apiPercent: 67,
     devicePercent: 56,
+    hasArchive: false,
+    expansionPercent: 0,
+    expandingArchive: null,
+    expansionComplete: false,
+    expandedTotal: null,
     filesPerSecond: 9.8,
+    uploadBytesPerSecond: 1_800_000,
     bytesPerSecond: 1_400_000,
     feed: [feedEntry(1), feedEntry(2, false), feedEntry(3)],
     failures: [feedEntry(2, false)],
@@ -57,7 +66,7 @@ export const CONFIRM_CANCEL_FIXTURE = {
   showLabels: true,
 };
 
-const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
+const SCAN_THROUGH_DRAINING: ProgressFixture[] = [
   {
     label: 'scanning',
     vm: baseVm({
@@ -70,6 +79,7 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
       apiPercent: 0,
       devicePercent: 0,
       filesPerSecond: 0,
+      uploadBytesPerSecond: 0,
       bytesPerSecond: 0,
       feed: [],
       failures: [],
@@ -88,6 +98,7 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
       apiPercent: 0,
       devicePercent: 0,
       filesPerSecond: 0,
+      uploadBytesPerSecond: 0,
       bytesPerSecond: 0,
       feed: [],
       failures: [],
@@ -103,6 +114,7 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
       written: 0,
       failed: 0,
       filesPerSecond: 0,
+      uploadBytesPerSecond: 0,
       bytesPerSecond: 0,
       feed: [],
       failures: [],
@@ -119,6 +131,7 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
       written: 0,
       failed: 0,
       filesPerSecond: 0,
+      uploadBytesPerSecond: 0,
       bytesPerSecond: 0,
       feed: [],
       failures: [],
@@ -135,6 +148,24 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
       written: 0,
       failed: 0,
       filesPerSecond: 0,
+      uploadBytesPerSecond: 0,
+      bytesPerSecond: 0,
+      feed: [],
+      failures: [],
+      elapsedLabel: null,
+    }),
+  },
+  {
+    label: 'cancel-failed',
+    vm: baseVm({
+      state: 'cancel-failed',
+      reason: 'cancel endpoint unreachable',
+      scanTotal: 1204,
+      uploaded: 842,
+      written: 640,
+      failed: 0,
+      filesPerSecond: 0,
+      uploadBytesPerSecond: 0,
       bytesPerSecond: 0,
       feed: [],
       failures: [],
@@ -146,6 +177,112 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
     vm: baseVm(),
   },
   {
+    label: 'receiving — large single file, upload streaming ahead of the device',
+    vm: baseVm({
+      scanFound: 1,
+      scanTotal: 1,
+      uploaded: 0,
+      written: 0,
+      failed: 0,
+      apiPercent: 38,
+      devicePercent: 0,
+      filesPerSecond: 0,
+      uploadBytesPerSecond: 24_000_000,
+      bytesPerSecond: 0,
+      hasArchive: false,
+      feed: [],
+      failures: [],
+      elapsedLabel: '0:09 elapsed',
+    }),
+  },
+  {
+    label: 'receiving — expanding a top-level archive',
+    vm: baseVm({
+      scanTotal: 1204,
+      uploaded: 842,
+      written: 0,
+      failed: 0,
+      apiPercent: 69,
+      devicePercent: 0,
+      filesPerSecond: 0,
+      uploadBytesPerSecond: 1_600_000,
+      bytesPerSecond: 0,
+      hasArchive: true,
+      expansionPercent: 41,
+      expandingArchive: 'HVSC-79.zip',
+      feed: [],
+      failures: [],
+      elapsedLabel: '0:38 elapsed',
+    }),
+  },
+  {
+    label: 'receiving — expanding a nested archive',
+    vm: baseVm({
+      scanTotal: 1204,
+      uploaded: 1097,
+      written: 0,
+      failed: 1,
+      apiPercent: 91,
+      devicePercent: 0,
+      filesPerSecond: 0,
+      uploadBytesPerSecond: 900_000,
+      bytesPerSecond: 0,
+      hasArchive: true,
+      expansionPercent: 78,
+      expandingArchive: 'HVSC-79/DEMOS/oldschool-pack.rar',
+      feed: [],
+      failures: [],
+      elapsedLabel: '2:11 elapsed',
+    }),
+  },
+  {
+    label: 'receiving — expansion finished, device writing',
+    vm: baseVm({
+      scanTotal: 1204,
+      uploaded: 1168,
+      written: 4318,
+      failed: 2,
+      apiPercent: 97,
+      devicePercent: 34,
+      filesPerSecond: 9.8,
+      uploadBytesPerSecond: 200_000,
+      bytesPerSecond: 1_300_000,
+      hasArchive: true,
+      expansionPercent: 100,
+      expansionComplete: true,
+      expandedTotal: 12480,
+      feed: [
+        {
+          relativePath: 'HVSC-79/MUSICIANS/H/Hubbard_Rob/Commando.sid',
+          fileName: 'Commando.sid',
+          success: true,
+          reason: null,
+        },
+        {
+          relativePath: 'HVSC-79/DEMOS/oldschool-pack/intro.prg',
+          fileName: 'intro.prg',
+          success: true,
+          reason: null,
+        },
+        {
+          relativePath: 'HVSC-79/DEMOS/oldschool-pack/loader.prg',
+          fileName: 'loader.prg',
+          success: false,
+          reason: 'device write failed — timeout 1',
+        },
+      ],
+      failures: [
+        {
+          relativePath: 'HVSC-79/DEMOS/oldschool-pack/loader.prg',
+          fileName: 'loader.prg',
+          success: false,
+          reason: 'device write failed — timeout 1',
+        },
+      ],
+      elapsedLabel: '6:04 elapsed',
+    }),
+  },
+  {
     label: 'draining',
     vm: baseVm({
       state: 'draining',
@@ -155,22 +292,9 @@ const SCAN_THROUGH_CANCELLING: ProgressFixture[] = [
       apiPercent: 100,
       devicePercent: 96,
       filesPerSecond: 9.8,
+      uploadBytesPerSecond: 0,
       bytesPerSecond: 1_400_000,
       elapsedLabel: '21:03 elapsed',
-    }),
-  },
-  {
-    label: 'cancelling',
-    vm: baseVm({
-      state: 'cancelling',
-      uploaded: 8412,
-      written: 5544,
-      failed: 4,
-      // Uploads have stopped by the time cancelling kicks in — makes the zero-rate case
-      // visible without a device.
-      filesPerSecond: 0,
-      bytesPerSecond: 0,
-      elapsedLabel: '16:40 elapsed',
     }),
   },
 ];
@@ -187,6 +311,7 @@ const TERMINAL_STATES: ProgressFixture[] = [
       apiPercent: 100,
       devicePercent: 100,
       filesPerSecond: 8.6,
+      uploadBytesPerSecond: 1_450_000,
       bytesPerSecond: 1_300_000,
       elapsedLabel: '24:18 elapsed',
       failures: [feedEntry(2, false)],
@@ -204,6 +329,7 @@ const TERMINAL_STATES: ProgressFixture[] = [
       apiPercent: 67,
       devicePercent: 44,
       filesPerSecond: 5.5,
+      uploadBytesPerSecond: 900_000,
       bytesPerSecond: 825_000,
       elapsedLabel: '16:40 elapsed',
       failures: [feedEntry(2, false)],
@@ -221,6 +347,7 @@ const TERMINAL_STATES: ProgressFixture[] = [
       apiPercent: 42,
       devicePercent: 34,
       filesPerSecond: 7.1,
+      uploadBytesPerSecond: 1_100_000,
       bytesPerSecond: 1_050_000,
       elapsedLabel: '9:52 elapsed',
       failures: [feedEntry(7, false)],
@@ -239,10 +366,43 @@ const TERMINAL_STATES: ProgressFixture[] = [
       apiPercent: 16,
       devicePercent: 13,
       filesPerSecond: 6.5,
+      uploadBytesPerSecond: 980_000,
       bytesPerSecond: 950_000,
       elapsedLabel: '4:07 elapsed',
       failures: [feedEntry(3, false)],
       failureOverflow: 0,
+    }),
+  },
+];
+
+// Rendered inside `.phone-frame` (see the stylesheet), a fixed-width box below the `below-phone`
+// breakpoint — the reflow itself is still driven by the real browser viewport (`@media`, not a
+// container query), so this box only pins the two content-heaviest states together for a quick
+// look; confirming the reflow fires still requires the browser viewport itself to narrow.
+const PHONE_WIDTH_FIXTURES: ProgressFixture[] = [
+  {
+    label: 'active — with an expanding archive (phone width)',
+    vm: baseVm({
+      hasArchive: true,
+      expansionPercent: 78,
+      expandingArchive: 'HVSC-79/DEMOS/oldschool-pack.rar',
+      elapsedLabel: '6:04 elapsed',
+    }),
+  },
+  {
+    label: 'terminal — with failures and an overflow line (phone width)',
+    vm: baseVm({
+      state: 'completed',
+      reason: null,
+      uploaded: 12480,
+      written: 12476,
+      failed: 4,
+      apiPercent: 100,
+      devicePercent: 100,
+      filesPerSecond: 8.6,
+      elapsedLabel: '24:18 elapsed',
+      failures: [feedEntry(2, false), feedEntry(4, false), feedEntry(6, false)],
+      failureOverflow: 3,
     }),
   },
 ];
@@ -264,7 +424,8 @@ export class DevTransferFixturesComponent {
   // without this, ThemeService never constructs and the app's dark-mode class never applies.
   private readonly themeService = inject(ThemeService);
 
-  readonly scanThroughCancelling = SCAN_THROUGH_CANCELLING;
+  readonly scanThroughDraining = SCAN_THROUGH_DRAINING;
   readonly terminalStates = TERMINAL_STATES;
+  readonly phoneWidthFixtures = PHONE_WIDTH_FIXTURES;
   readonly confirmCancelFixture = CONFIRM_CANCEL_FIXTURE;
 }

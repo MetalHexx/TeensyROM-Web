@@ -4,24 +4,36 @@
 
 File transfers to TeensyROM devices involve two inherently slow network hops: HTTP upload from the client to the backend staging area, and then serial write from staging to the device over a single shared COM port. The transfer subsystem overlaps these two hops — **while the device is writing one file, the next is uploading in parallel** — via a per-device queue fed by an upload endpoint and drained by a dedicated background pump. This overlap is why we cannot simply serialize files to device memory in the endpoint itself: the endpoint must return immediately after staging, not wait for the slow serial write.
 
+Some files are archives and require expansion (unzipping, extraction) before writing to the device. The expansion stage runs after staging but before queueing, with the expanded children written as individual files to the queue. This order prevents expansion — a CPU and I/O intensive operation — from blocking the device-write loop, which is single-threaded per device and the only path that releases staging capacity. An expansion operation that waited on available queue space could deadlock: it would wait on capacity only its own thread could free.
+
 ---
 
 ## Component Chain
 
-Upload flows through: **endpoint → capacity gate → staging → queue → pump → device**.
+**Non-archive uploads** flow: **endpoint → capacity gate → staging → queue → pump → device**. **Archive uploads** flow: **endpoint → scratch → expansion → (expanded entries) → capacity gate → staging → queue → pump → device**. When the endpoint detects an archive, it bypasses the capacity gate and staging, writing the raw archive body directly to scratch. The expansion service then walks the archive tree; after all archives are expanded, every extracted entry (including those from nested archives) is admitted through the standard gate-and-staging pipeline, ensuring fair capacity accounting for expanded content.
 
 ```mermaid
 %%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
 graph TB
     Client["HTTP Client"]
     
-    subgraph Upload["Upload Endpoint & Capacity Control"]
+    subgraph Upload["Upload Endpoint"]
         UPLOAD["UploadFileEndpoint<br/>POST /api/transfers/{jobId}/files"]
-        GATE["TransferCapacityGate<br/>Disk quota + flow control"]
+    end
+    
+    subgraph Capacity["Capacity Control"]
+        GATE["TransferCapacityGate<br/>Staging quota + flow control"]
     end
     
     subgraph Staging["Staging Layer"]
         STORE["TransferStagingStore<br/>Raw file bytes to disk"]
+    end
+    
+    subgraph Expansion["Archive Expansion (if needed)"]
+        SCRATCH["ScratchStore<br/>Archive temp storage"]
+        READER["ArchiveReader<br/>Unzip/extract"]
+        RESOLVER["EntryPathResolver<br/>Entry path validation"]
+        EXPANDER["ArchiveExpansionService<br/>Orchestrate extraction"]
     end
     
     subgraph Queue["Transfer Queue"]
@@ -39,20 +51,32 @@ graph TB
     end
     
     Client -->|"1. HTTP POST<br/>raw body"| UPLOAD
-    UPLOAD -->|"2. Wait for<br/>capacity"| GATE
-    GATE -->|"3. Admit & reserve<br/>bytes"| GATE
-    UPLOAD -->|"4. Stream to disk"| STORE
-    UPLOAD -->|"5. Enqueue<br/>staged file"| TQ
+    
+    UPLOAD -->|"2a. Non-archive:<br/>check capacity"| GATE
+    UPLOAD -->|"2b. Archive:<br/>write to scratch"| SCRATCH
+    
+    GATE -->|"3. Wait for<br/>slot & quota"| GATE
+    GATE -->|"4. Stream to disk"| STORE
+    STORE -->|"5. Enqueue<br/>staged file"| TQ
+    
+    SCRATCH -->|"3. Extract archive"| EXPANDER
+    EXPANDER -->|"4a. Read entries"| READER
+    READER -->|"4b. Resolve paths"| RESOLVER
+    EXPANDER -->|"5. Each expanded entry:<br/>check capacity"| GATE
+    
     TQ -->|"6. Dequeue per device"| PUMP
     PUMP -->|"7. Lookup job<br/>state"| REGISTRY
     PUMP -->|"8. Check device<br/>lease"| LEASE
     PUMP -->|"9. Send file<br/>via serial"| SERIAL
-    PUMP -->|"10. Release capacity<br/>& slot"| GATE
+    PUMP -->|"10. Release<br/>capacity"| GATE
+    SERIAL -->|"file sent"| Device
     
-    style GATE fill:#ff9999
-    style PUMP fill:#99ccff
-    style REGISTRY fill:#99ff99
-    style TQ fill:#ffcc99
+    style GATE fill:#d4a574
+    style PUMP fill:#0066cc
+    style REGISTRY fill:#2d7a3e
+    style TQ fill:#d4a574
+    style SCRATCH fill:#d4a574
+    style EXPANDER fill:#7d3fa3
 ```
 
 ---
@@ -65,21 +89,18 @@ A `TransferJob` is a mutable, thread-safe aggregate managing one logical transfe
 %%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
 stateDiagram-v2
     Created --> Receiving: UploadFileEndpoint<br/>admits first file
-    Created --> Cancelling: Client cancels<br/>before upload
+    Created --> Cancelled: Client cancels<br/>before upload
     Created --> Abandoned: Idle sweep,<br/>no subscribers
     Created --> Aborted: Device vanished<br/>mid-pump
     
     Receiving --> Sealed: SealJobEndpoint<br/>stops accepting files
-    Receiving --> Cancelling: Client cancels<br/>during upload
+    Receiving --> Cancelled: Client cancels<br/>during upload
     Receiving --> Abandoned: Idle sweep,<br/>no activity
     Receiving --> Aborted: Device vanished<br/>mid-pump
     
     Sealed --> Completed: All pending<br/>files sent
-    Sealed --> Cancelling: Client cancels<br/>sealed job
+    Sealed --> Cancelled: Client cancels<br/>sealed job
     Sealed --> Aborted: Device vanished<br/>mid-pump
-    
-    Cancelling --> Cancelled: All pending<br/>files discarded
-    Cancelling --> Aborted: Device vanished<br/>mid-pump
     
     Completed --> [*]
     Cancelled --> [*]
@@ -142,6 +163,10 @@ This design allows long-running transfers to span multiple short-lived serial co
 
 **3. Abandonment Bound**: The gate bounds the maximum time an abandoned job can monopolize device staging space. When a client vanishes mid-transfer, the `TransferJobSweeper` detects idle >= 2 minutes with no subscribers and transitions the job to `Abandoned`. The sweeper then purges the staging directory and releases the gate capacity. **Without the gate enforcing a quota, an abandoned job could stall forever**, because the pump would have nothing to drain (an abandoned job has no sealing endpoint call to transition it), and without the pump draining, `PendingCount` never reaches zero.
 
+## Scratch Store Quota
+
+The scratch store holds intermediate data during archive expansion and has its own separate quota: `MaxScratchBytes` (default 8 GB). Unlike the staging gate (which **waits** for capacity), the scratch store **refuses** expansion if it would exceed quota — it returns an error to the client rather than blocking. This separation is deliberate: the staging gate is released only when the pump writes to the device, but archive expansion runs on the upload thread. If expansion waited on the staging gate for space, and expansion was slow enough that it blocked the pump's ability to drain staging, a deadlock would occur: expansion would wait on capacity only the pump could release, and the pump couldn't run because it couldn't release staging without first writing an expanded file that expansion hasn't finished yet. By refusing rather than waiting, expansion fails fast and signals the client to retry later, avoiding the deadlock.
+
 ---
 
 ## Abandonment: The Idle Sweep
@@ -167,7 +192,7 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | POST | `/api/transfers/{jobId}/seal` | SealTransferJob | Stop accepting uploads; let pump drain |
 | GET | `/api/transfers/{jobId}` | GetTransferJob | Query job snapshot |
 | GET | `/api/devices/{deviceId}/transfers/active` | GetActiveTransferJob | Get the job currently holding device lease |
-| POST | `/api/transfers/{jobId}/cancel` | CancelTransferJob | Transition to Cancelling; pump discards remaining files |
+| POST | `/api/transfers/{jobId}/cancel` | CancelTransferJob | Transition straight to Cancelled, releasing device/staging/scratch; pump discards remaining files |
 
 ### SignalR Hub: TransferHub
 
@@ -195,6 +220,10 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
   "startedUtc": "2026-08-04T10:30:00Z",
   "lastActivityUtc": "2026-08-04T10:31:45Z",
   "error": null,
+  "expandingArchive": "album.zip",
+  "expansionBytesWritten": 134217728,
+  "expansionBytesDeclared": 268435456,
+  "expandedFileCount": 42,
   "failures": [],
   "recentCompletions": [
     {
@@ -211,6 +240,8 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 }
 ```
 
+`expandingArchive` (string, nullable) — the filename of the archive currently being expanded; `null` if none. `expansionBytesWritten` (long) — bytes written to scratch so far in the current expansion. `expansionBytesDeclared` (long) — total bytes the archive claims it will expand to; compared against `MaxScratchBytes` to pre-reject expansion. `expandedFileCount` (int, nullable) — count of files extracted from the archive; the browser may compose this into per-entry progress UI.
+
 `failures` and `recentCompletions` are both bounded, most-recent-first lists of the same `TransferFileCompleted` shape — `failures` holds only failed files (oldest-evicted once `RetainedFailuresBound` is exceeded; `filesFailed` itself stays an unbounded lifetime counter), while `recentCompletions` holds the last `RecentCompletionsBound` outcomes of either kind, for a live feed. `bytesPerSecond`/`filesPerSecond` are a rolling rate over `RateWindow` while the job is active, falling back to a lifetime average once terminal and to zero after a quiet window.
 
 **Snapshots are authoritative**, not incremental: each broadcast is a complete job state. The client never needs to merge or track deltas — the latest snapshot is the ground truth. This buys simplicity and resilience: late subscribers and disconnected clients that reconnect both get a correct state immediately without needing to replay events.
@@ -225,6 +256,12 @@ Queued files are **delivered, not discarded**: the pump drains the queue normall
 | **Registry** | `apps/api/src/TeensyRom.Api/Transfers/TransferJobRegistry.cs` |
 | **Capacity Gate** | `apps/api/src/TeensyRom.Api/Transfers/TransferCapacityGate.cs` |
 | **Staging Store** | `apps/api/src/TeensyRom.Api/Transfers/TransferStagingStore.cs` |
+| **Scratch Store** | `apps/api/src/TeensyRom.Api/Transfers/TransferScratchStore.cs` |
+| **Archive Reader** | `apps/api/src/TeensyRom.Api/Transfers/Archives/SharpCompressArchiveReader.cs` |
+| **Entry Path Resolver** | `apps/api/src/TeensyRom.Api/Transfers/Archives/ArchiveEntryPathResolver.cs` |
+| **Expansion Service** | `apps/api/src/TeensyRom.Api/Transfers/Archives/ArchiveExpansionService.cs` |
+| **Expansion Queue** | `apps/api/src/TeensyRom.Api/Transfers/Archives/ArchiveExpansionQueue.cs` |
+| **Expansion Pump** | `apps/api/src/TeensyRom.Api/Transfers/Archives/ArchiveExpansionPump.cs` |
 | **Queue** | `apps/api/src/TeensyRom.Api/Transfers/TransferQueue.cs` |
 | **Pump** | `apps/api/src/TeensyRom.Api/Transfers/TransferPump.cs` |
 | **Lease Coordinator** | `apps/api/src/TeensyRom.Api/Transfers/DeviceLeaseCoordinator.cs` |
@@ -245,6 +282,9 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 | Setting | Default | Purpose |
 |---------|---------|---------|
 | `MaxStagedBytes` | 4 GB | Disk quota for staged files — the sole ceiling on staging disk usage; there is no separate file-count cap |
+| `MaxScratchBytes` | 8 GB | Disk quota for archive expansion scratch storage; separate from staging to prevent expansion from blocking the pump's ability to drain staging |
+| `MaxExpansionDepth` | 32 | Maximum nesting depth for archives within archives; prevents zip-bomb-style attacks and stack exhaustion |
+| `MaxExpandedBytesPerArchive` | 2 GB | Maximum total size an archive is allowed to expand to; checked before expansion begins and rejected if exceeded |
 | `BatchSize` | 25 | Number of staged files the pump batches into a single device write command |
 | `RecentCompletionsBound` | 5 | Number of most-recent completed files (success or failure) a job retains for the live feed |
 | `RetainedFailuresBound` | 50 | Number of most-recent failures a job retains; `FilesFailed` itself stays an unbounded lifetime counter |
@@ -255,9 +295,8 @@ All constants are centralized in `TransferOptions` (a singleton, settable for te
 | `TerminalJobRetention` | 5 minutes | How long a completed job stays queryable |
 | `DeviceChunkSize` | 16 KB | Chunk size for device write loop |
 | `StagingRoot` | `{AppDir}/staging` | Directory for staged uploads |
+| `ScratchRoot` | `{AppDir}/scratch` | Directory for archive expansion temporary storage |
 
 ---
 
-**Document Version**: 1.0  
-**Describes**: File transfer subsystem as shipped in P01–P04  
 **Maintainer**: Backend Engineering Team

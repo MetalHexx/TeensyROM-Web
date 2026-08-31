@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
 import { TransferFeedEntry, TransferModalState } from '@teensyrom-nx/application';
+import { formatFileSize } from '@teensyrom-nx/domain';
 import { TransferProgressComponent, TransferProgressVm } from './transfer-progress.component';
 
 function feedEntry(index: number, success = true): TransferFeedEntry {
@@ -26,7 +27,13 @@ function baseVm(overrides: Partial<TransferProgressVm> = {}): TransferProgressVm
     failed: 4,
     apiPercent: 67,
     devicePercent: 56,
+    hasArchive: false,
+    expansionPercent: 0,
+    expandingArchive: null,
+    expansionComplete: false,
+    expandedTotal: null,
     filesPerSecond: 9.8,
+    uploadBytesPerSecond: 1_200_000,
     bytesPerSecond: 1_500_000,
     feed: [feedEntry(1), feedEntry(2, false)],
     failures: [feedEntry(2, false)],
@@ -75,9 +82,9 @@ describe('TransferProgressComponent', () => {
       ['device-busy', 'Device Busy'],
       ['nothing-to-transfer', 'Nothing to transfer'],
       ['failed', "Transfer couldn't start"],
+      ['cancel-failed', "Transfer couldn't be cancelled"],
       ['receiving', 'Transferring to Unnamed'],
       ['draining', 'Transferring to Unnamed'],
-      ['cancelling', 'Cancelling'],
       ['completed', 'Transfer Completed'],
       ['cancelled', 'Transfer cancelled'],
       ['aborted', 'Transfer Stopped: Device Lost'],
@@ -128,6 +135,16 @@ describe('TransferProgressComponent', () => {
     });
   });
 
+  describe('cancel-failed', () => {
+    it('surfaces the cancel failure reason and offers only Close', async () => {
+      await setup(baseVm({ state: 'cancel-failed', reason: 'cancel endpoint unreachable' }));
+
+      expect(q('transfer-progress-banner')?.textContent).toContain('cancel endpoint unreachable');
+      expect(buttonByLabel('Close')).toBeTruthy();
+      expect(buttonByLabel('Retry')).toBeFalsy();
+    });
+  });
+
   describe('nothing-to-transfer', () => {
     it('renders a neutral banner and only Close', async () => {
       await setup(baseVm({ state: 'nothing-to-transfer' }));
@@ -152,59 +169,90 @@ describe('TransferProgressComponent', () => {
         })
       );
 
-      expect(q('metric-uploaded')?.textContent).toContain('8,412');
-      expect(q('metric-uploaded')?.textContent).toContain('12,480');
-      expect(q('metric-written')?.textContent).toContain('6,977');
+      expect(q('metric-upload-api')?.textContent).toContain('8,412');
+      expect(q('metric-upload-api')?.textContent).toContain('12,480');
+      expect(q('metric-upload-tr')?.textContent).toContain('6,977');
       expect(q('metric-failed')?.textContent?.trim()).toContain('4');
       expect(q('api-bar-pct')?.textContent?.trim()).toBe('67%');
       expect(q('device-bar-pct')?.textContent?.trim()).toBe('56%');
     });
 
-    it('orders the tiles Uploaded, Completed, Failed, Rate', async () => {
+    it('orders the tiles UPLOAD → API, UPLOAD → TR, Failed', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Rate']);
+      expect(labels).toEqual(['UPLOAD → API', 'UPLOAD → TR', 'Failed']);
     });
 
-    it('renders both rate figures, formatted', async () => {
-      await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
+    it('renders each hop card carrying its own byte rate, formatted', async () => {
+      await setup(baseVm({ state: 'receiving', uploadBytesPerSecond: 900_000, bytesPerSecond: 1_572_864 }));
 
-      expect(q('metric-rate')?.textContent).toContain('9.8 Files/s');
-      expect(q('metric-rate')?.textContent).toContain('1.5 MB/s');
+      expect(q('metric-upload-api')?.textContent).toContain(formatFileSize(900_000));
+      expect(q('metric-upload-tr')?.textContent).toContain(formatFileSize(1_572_864));
     });
 
-    it('reads 0.0/s and 0 B/s when stalled, not a held prior value', async () => {
-      await setup(baseVm({ state: 'receiving', filesPerSecond: 0, bytesPerSecond: 0 }));
+    it('reads a zero rate when stalled, not a held prior value', async () => {
+      await setup(baseVm({ state: 'receiving', uploadBytesPerSecond: 0, bytesPerSecond: 0 }));
 
-      expect(q('metric-rate')?.textContent).toContain('0.0 Files/s');
-      expect(q('metric-rate')?.textContent).toContain('0 B/s');
+      expect(q('metric-upload-api')?.querySelector('.metric-sub')?.textContent).toContain(formatFileSize(0));
+      expect(q('metric-upload-tr')?.querySelector('.metric-sub')?.textContent).toContain(formatFileSize(0));
     });
 
-    it('labels the rate tile "Rate" while running', async () => {
+    it('prefixes each hop rate with "Rate" while running', async () => {
       await setup(baseVm({ state: 'receiving' }));
-      expect(q('metric-rate')?.querySelector('.metric-label')?.textContent?.trim()).toBe('Rate');
+      expect(q('metric-upload-api')?.querySelector('.metric-sub')?.textContent).toContain('Rate');
+      expect(q('metric-upload-tr')?.querySelector('.metric-sub')?.textContent).toContain('Rate');
     });
 
-    it('labels the rate tile "Avg Rate" once terminal', async () => {
+    it('prefixes each hop rate with "Avg Rate" once terminal', async () => {
       await setup(baseVm({ state: 'completed' }));
-      expect(q('metric-rate')?.querySelector('.metric-label')?.textContent?.trim()).toBe('Avg Rate');
+      expect(q('metric-upload-api')?.querySelector('.metric-sub')?.textContent).toContain('Avg Rate');
+      expect(q('metric-upload-tr')?.querySelector('.metric-sub')?.textContent).toContain('Avg Rate');
     });
 
     it('renders a large uploaded-of-total value as one unbroken run', async () => {
       await setup(baseVm({ state: 'receiving', uploaded: 40000, scanTotal: 60000 }));
 
       // The gap before "/" is CSS margin, not a text character — the DOM text is unbroken.
-      const value = q('metric-uploaded')?.querySelector('.metric-value');
+      const value = q('metric-upload-api')?.querySelector('.metric-value');
       expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40,000/ 60,000');
     });
 
-    it('captions the device bar "Transferred to TR"', async () => {
+    it('carries no denominator on the UPLOAD → TR tile until expandedTotal exists', async () => {
+      await setup(baseVm({ state: 'receiving', written: 6977, expandedTotal: null }));
+
+      const value = q('metric-upload-tr')?.querySelector('.metric-value');
+      expect(value?.textContent?.trim()).toBe('6,977');
+      const spoken = q('metric-upload-tr')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent).toContain('6,977');
+      expect(spoken?.textContent).not.toContain('of');
+    });
+
+    it('carries the composed expandedTotal denominator on the UPLOAD → TR tile once it exists', async () => {
+      await setup(baseVm({ state: 'receiving', written: 842, expandedTotal: 1204 }));
+
+      const value = q('metric-upload-tr')?.querySelector('.metric-value');
+      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('842/ 1,204');
+      const spoken = q('metric-upload-tr')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent).toContain('842 of 1,204');
+    });
+
+    it('captions the device bar "UPLOAD → TR", matching its card', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
       const deviceCaption = q('device-bar-pct')?.parentElement;
-      expect(deviceCaption?.textContent).toContain('Transferred to TR');
-      expect(deviceCaption?.textContent).not.toContain('Transferred to TR Device');
+      const cardLabel = q('metric-upload-tr')?.querySelector('.metric-label')?.textContent?.trim();
+      expect(deviceCaption?.textContent).toContain('UPLOAD → TR');
+      expect(cardLabel).toBe('UPLOAD → TR');
+    });
+
+    it('captions the API bar "UPLOAD → API", matching its card', async () => {
+      await setup(baseVm({ state: 'receiving' }));
+
+      const apiCaption = q('api-bar-pct')?.parentElement;
+      const cardLabel = q('metric-upload-api')?.querySelector('.metric-label')?.textContent?.trim();
+      expect(apiCaption?.textContent).toContain('UPLOAD → API');
+      expect(cardLabel).toBe('UPLOAD → API');
     });
 
     it('gives draining the same title format as receiving, not "Writing to"', async () => {
@@ -246,10 +294,10 @@ describe('TransferProgressComponent', () => {
       expect(q('transfer-progress-elapsed')?.textContent).toContain('3:07 elapsed');
     });
 
-    it('gives the Uploaded tile and the API bar the success treatment while draining', async () => {
+    it('gives the UPLOAD → API tile and the API bar the success treatment while draining', async () => {
       await setup(baseVm({ state: 'draining', uploaded: 12480, scanTotal: 12480, apiPercent: 100 }));
 
-      expect(q('metric-uploaded')?.classList.contains('metric-success')).toBe(true);
+      expect(q('metric-upload-api')?.classList.contains('metric-success')).toBe(true);
       expect(q('api-bar')?.classList.contains('progress-success')).toBe(true);
       expect(q('api-bar-pct')?.textContent?.trim()).toBe('100%');
     });
@@ -277,21 +325,25 @@ describe('TransferProgressComponent', () => {
     it('associates each metric label with its value through dt/dd', async () => {
       await setup(baseVm({ state: 'receiving' }));
 
-      const tile = q('metric-uploaded');
+      const tile = q('metric-upload-api');
       expect(tile?.tagName).toBe('DIV');
       expect(tile?.querySelector('dt.metric-label')).toBeTruthy();
       expect(tile?.querySelector('dd.metric-value')).toBeTruthy();
       expect(q('transfer-progress-metrics')?.tagName).toBe('DL');
     });
 
-    it('gives the rate tile a spoken form for both figures with no raw slash-s glyph', async () => {
-      await setup(baseVm({ state: 'receiving', filesPerSecond: 9.8, bytesPerSecond: 1_572_864 }));
+    it('gives each hop card a spoken form for its count and rate, with no raw slash-s glyph', async () => {
+      await setup(baseVm({ state: 'receiving', uploadBytesPerSecond: 900_000, bytesPerSecond: 1_572_864 }));
 
-      const spoken = q('metric-rate')?.querySelector('.visually-hidden');
-      expect(spoken?.textContent).toBeTruthy();
-      expect(spoken?.textContent).not.toContain('/s');
-      expect(spoken?.textContent).toContain('9.8');
-      expect(spoken?.textContent).toContain('1.5');
+      const uploadSpoken = q('metric-upload-api')?.querySelector('.visually-hidden');
+      expect(uploadSpoken?.textContent).toBeTruthy();
+      expect(uploadSpoken?.textContent).not.toContain('/s');
+      expect(uploadSpoken?.textContent).toContain(formatFileSize(900_000));
+
+      const deviceSpoken = q('metric-upload-tr')?.querySelector('.visually-hidden');
+      expect(deviceSpoken?.textContent).toBeTruthy();
+      expect(deviceSpoken?.textContent).not.toContain('/s');
+      expect(deviceSpoken?.textContent).toContain(formatFileSize(1_572_864));
     });
 
     it('renders the recent feed as a named list of items matching the entries supplied', async () => {
@@ -304,42 +356,113 @@ describe('TransferProgressComponent', () => {
     });
   });
 
-  describe('cancelling', () => {
-    it('mutes the tiles, drops the feed, and disables the cancel control', async () => {
-      await setup(baseVm({ state: 'cancelling' }));
+  describe('expansion track', () => {
+    it('is absent when the job has no archive, leaving the view pixel-identical to today', async () => {
+      await setup(baseVm({ state: 'receiving', hasArchive: false }));
 
-      expect(q('transfer-progress-metrics')?.classList.contains('metrics-muted')).toBe(true);
-      expect(q('transfer-progress-feed')).toBeFalsy();
-
-      const cancelButton = buttonByLabel('Cancel transfer');
-      expect(cancelButton?.disabled).toBe(true);
-
-      const spy = vi.fn();
-      component.cancelRequested.subscribe(spy);
-      cancelButton?.click();
-      expect(spy).not.toHaveBeenCalled();
+      expect(q('expansion-bar')).toBeFalsy();
+      expect(q('expansion-bar-pct')).toBeFalsy();
+      const labels = Array.from(qAll('.write-bar-caption span')).map((el) => el.textContent?.trim());
+      expect(labels).not.toContain('Expanding archives');
     });
 
-    it('orders the tiles Uploaded, Completed, Failed, Rate, in step with the active shape', async () => {
-      await setup(baseVm({ state: 'cancelling' }));
+    it('renders as the first bar, showing the archive name while expanding', async () => {
+      await setup(
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expansionPercent: 41,
+          expandingArchive: 'HVSC-79.zip',
+          expansionComplete: false,
+        })
+      );
 
-      const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Rate']);
+      const bars = qAll('.write-bar-caption span:first-child');
+      expect(bars[0]?.textContent?.trim()).toBe('Expanding archives');
+
+      expect(q('expansion-bar-pct')?.textContent?.trim()).toBe('HVSC-79.zip');
+      expect(q('expansion-bar-pct')?.classList.contains('write-bar-pct-success')).toBe(false);
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('41');
+      expect(q('expansion-bar')?.getAttribute('aria-label')).toBe('Expanding archives');
     });
 
-    it('renders uploaded-of-total and completed-of-total as one unbroken run, matching the active shape', async () => {
-      await setup(baseVm({ state: 'cancelling', uploaded: 40000, scanTotal: 60000, written: 6977 }));
+    it('shows a success 100% once expansion is finished', async () => {
+      await setup(
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expansionPercent: 100,
+          expandingArchive: null,
+          expansionComplete: true,
+        })
+      );
 
-      const uploaded = q('metric-uploaded')?.querySelector('.metric-value');
-      expect(uploaded?.textContent?.replace(/\s+/g, ' ').trim()).toBe('40,000/ 60,000');
-      const written = q('metric-written')?.querySelector('.metric-value');
-      expect(written?.textContent?.replace(/\s+/g, ' ').trim()).toBe('6,977/ 60,000');
+      expect(q('expansion-bar-pct')?.textContent?.trim()).toBe('100%');
+      expect(q('expansion-bar-pct')?.classList.contains('write-bar-pct-success')).toBe(true);
+      expect(q('expansion-bar')?.classList.contains('progress-success')).toBe(true);
     });
 
-    it('renders no current-file element in the cancelling state', async () => {
-      await setup(baseVm({ state: 'cancelling' }));
+    it('shows the bar at 0%, not a success 100%, before the first archive has started', async () => {
+      await setup(
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expansionPercent: 0,
+          expandingArchive: null,
+          expansionComplete: false,
+        })
+      );
 
-      expect(q('transfer-progress-current-file')).toBeFalsy();
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('0');
+      expect(q('expansion-bar-pct')?.textContent?.trim()).not.toBe('100%');
+      expect(q('expansion-bar-pct')?.classList.contains('write-bar-pct-success')).toBe(false);
+    });
+
+    it('resets and never moves backwards within one archive, including across a nested archive', async () => {
+      await setup(
+        baseVm({ state: 'receiving', hasArchive: true, expandingArchive: 'HVSC-79.zip', expansionPercent: 41 })
+      );
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('41');
+
+      fixture.componentRef.setInput(
+        'vm',
+        baseVm({ state: 'receiving', hasArchive: true, expandingArchive: 'HVSC-79.zip', expansionPercent: 78 })
+      );
+      fixture.detectChanges();
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('78');
+
+      // A nested archive starts: the bar resets to that archive's own progress, not the job's.
+      fixture.componentRef.setInput(
+        'vm',
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expandingArchive: 'HVSC-79/DEMOS/oldschool-pack.rar',
+          expansionPercent: 12,
+        })
+      );
+      fixture.detectChanges();
+      expect(q('expansion-bar')?.getAttribute('aria-valuenow')).toBe('12');
+      expect(q('expansion-bar-pct')?.textContent?.trim()).toBe('HVSC-79/DEMOS/oldschool-pack.rar');
+    });
+
+    it('mentions expansion in the live region while expanding, on the existing throttle, not a second channel', async () => {
+      await setup(
+        baseVm({ state: 'receiving', hasArchive: true, expandingArchive: 'HVSC-79.zip', expansionComplete: false })
+      );
+
+      const region = q('transfer-progress-live-region');
+      expect(region?.textContent).toContain('Expanding archives');
+      // Still exactly one live region in the whole component.
+      expect(qAll('[aria-live]').length).toBe(1);
+    });
+
+    it('does not mention expansion once expansion has finished', async () => {
+      await setup(
+        baseVm({ state: 'receiving', hasArchive: true, expandingArchive: null, expansionComplete: true })
+      );
+
+      expect(q('transfer-progress-live-region')?.textContent).not.toContain('Expanding archives');
     });
   });
 
@@ -362,8 +485,8 @@ describe('TransferProgressComponent', () => {
 
       expect(q('transfer-progress-summary')).toBeFalsy();
       const labels = Array.from(qAll('.metric-label')).map((el) => el.textContent?.trim());
-      expect(labels).toEqual(['Uploaded', 'Completed', 'Failed', 'Avg Rate']);
-      expect(q('metric-written')?.textContent).toContain('12,474');
+      expect(labels).toEqual(['UPLOAD → API', 'UPLOAD → TR', 'Failed']);
+      expect(q('metric-upload-tr')?.textContent).toContain('12,474');
       expect(q('metric-failed')?.textContent).toContain('6');
       expect(q('api-bar')).toBeTruthy();
       expect(q('device-bar')).toBeTruthy();
@@ -373,6 +496,31 @@ describe('TransferProgressComponent', () => {
     it('omits the current-file row entirely — there is no current file in a terminal state', async () => {
       await setup(baseVm({ state: 'completed' }));
       expect(q('transfer-progress-current-file')).toBeFalsy();
+    });
+
+    // A wrong denominator here is the specific lie the separate denominators exist to prevent —
+    // the written count measured against the browser's upload total on the screen read longest.
+    it('carries the composed expandedTotal denominator, not the upload scanTotal, once an archive job settles', async () => {
+      await setup(baseVm({ state: 'completed', written: 12474, scanTotal: 12480, expandedTotal: 12474 }));
+
+      const value = q('metric-upload-tr')?.querySelector('.metric-value');
+      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('12,474/ 12,474');
+      const spoken = q('metric-upload-tr')?.querySelector('.visually-hidden');
+      expect(spoken?.textContent).toContain('12,474 of 12,474');
+    });
+
+    it('carries no denominator on the UPLOAD → TR tile for an archive-free job', async () => {
+      await setup(baseVm({ state: 'completed', written: 12474, scanTotal: 12480, expandedTotal: null }));
+
+      const value = q('metric-upload-tr')?.querySelector('.metric-value');
+      expect(value?.textContent?.trim()).toBe('12,474');
+    });
+
+    it('keeps the UPLOAD → API tile on the browser scan total even when expandedTotal exists', async () => {
+      await setup(baseVm({ state: 'completed', uploaded: 1204, scanTotal: 1204, expandedTotal: 1197 }));
+
+      const value = q('metric-upload-api')?.querySelector('.metric-value');
+      expect(value?.textContent?.replace(/\s+/g, ' ').trim()).toBe('1,204/ 1,204');
     });
 
     it('caps the failure list and shows the overflow remainder', async () => {
@@ -563,6 +711,44 @@ describe('TransferProgressComponent', () => {
       fixture.componentRef.setInput('vm', baseVm({ state: 'draining' }));
       fixture.detectChanges();
       expect(q('transfer-progress-live-region')?.textContent).not.toContain('per second');
+    });
+  });
+
+  // The phone-width reflow (below-phone.scss) is CSS-only — it never touches the template — so
+  // these guard the one thing a layout change could actually break: every figure and control
+  // that renders at desktop width is still present in the DOM, not dropped to make room.
+  describe('content survives a layout change — nothing removed', () => {
+    it('keeps every metric card, all three write bars, the elapsed readout, and the feed together while expanding an archive', async () => {
+      await setup(
+        baseVm({
+          state: 'receiving',
+          hasArchive: true,
+          expandingArchive: 'HVSC-79/DEMOS/oldschool-pack.rar',
+          expansionPercent: 78,
+          elapsedLabel: '6:04 elapsed',
+        })
+      );
+
+      expect(qAll('.metric-label').length).toBe(3);
+      expect(q('expansion-bar')).toBeTruthy();
+      expect(q('api-bar')).toBeTruthy();
+      expect(q('device-bar')).toBeTruthy();
+      expect(q('transfer-progress-elapsed')).toBeTruthy();
+      expect(qAll('.feed-row').length).toBeGreaterThan(0);
+      expect(buttonByLabel('Cancel transfer')).toBeTruthy();
+      expect(q('transfer-progress-live-region')).toBeTruthy();
+    });
+
+    it('keeps every metric card, both write bars, the full failure list, and its overflow line together in a terminal state', async () => {
+      const failures = [feedEntry(1, false), feedEntry(2, false), feedEntry(3, false)];
+      await setup(baseVm({ state: 'completed', failures, failureOverflow: 2 }));
+
+      expect(qAll('.metric-label').length).toBe(3);
+      expect(q('api-bar')).toBeTruthy();
+      expect(q('device-bar')).toBeTruthy();
+      expect(qAll('.failure-row').length).toBe(3);
+      expect(q('transfer-progress-failures-overflow')?.textContent?.trim()).toBe('and 2 more');
+      expect(buttonByLabel('Close')).toBeTruthy();
     });
   });
 });

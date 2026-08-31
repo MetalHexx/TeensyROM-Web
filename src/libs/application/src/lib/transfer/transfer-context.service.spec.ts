@@ -27,8 +27,8 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function createEntry(relativePath: string): TransferManifestEntry {
-  return { file: new File(['x'], relativePath), relativePath, sizeBytes: 1 };
+function createEntry(relativePath: string, sizeBytes = 1): TransferManifestEntry {
+  return { file: new File(['x'], relativePath), relativePath, sizeBytes };
 }
 
 function createSelectedDirectory(overrides: Partial<SelectedDirectory> = {}): SelectedDirectory {
@@ -95,8 +95,12 @@ describe('TransferContextService', () => {
   let callOrder: string[];
   let callTimes: Record<string, number>;
 
-  const oneFileScan: DropScanResult = { entries: [createEntry('games/a.prg')], rootName: 'games' };
-  const emptyScan: DropScanResult = { entries: [], rootName: null };
+  const oneFileScan: DropScanResult = {
+    entries: [createEntry('games/a.prg')],
+    rootName: 'games',
+    archiveCount: 0,
+  };
+  const emptyScan: DropScanResult = { entries: [], rootName: null, archiveCount: 0 };
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -145,7 +149,7 @@ describe('TransferContextService', () => {
       sealJob: vi.fn(async () => {
         record('seal-job');
       }),
-      cancelJob: vi.fn(async () => undefined),
+      cancelJob: vi.fn(async () => createSnapshot({ state: TransferJobState.Cancelled })),
       getActiveJob: vi.fn(async () => null),
     };
 
@@ -170,7 +174,10 @@ describe('TransferContextService', () => {
   });
 
   /** Starts a transfer and advances the fake clock past its state-display floors so it settles. */
-  async function runStartTransfer(deviceId: string, input: DataTransferItemList | FileList): Promise<void> {
+  async function runStartTransfer(
+    deviceId: string,
+    input: DataTransferItemList | FileList
+  ): Promise<void> {
     const promise = service.startTransfer(deviceId, input);
     await advancePastStateFloors();
     await promise;
@@ -190,7 +197,12 @@ describe('TransferContextService', () => {
       await runStartTransfer('device-1', asFileList([]));
 
       expect(mockStorageStore.getSelectedDirectoryForDevice).toHaveBeenCalledWith('device-1');
-      expect(mockTransferService.createJob).toHaveBeenCalledWith('device-1', StorageType.Sd, '/games');
+      expect(mockTransferService.createJob).toHaveBeenCalledWith(
+        'device-1',
+        StorageType.Sd,
+        '/games',
+        0
+      );
       expect(mockHubListener.start).toHaveBeenCalledWith('device-1', 'job-1');
       expect(mockUploadPool.run).toHaveBeenCalledWith(
         'job-1',
@@ -200,7 +212,14 @@ describe('TransferContextService', () => {
       );
       expect(mockTransferService.sealJob).toHaveBeenCalledWith('job-1');
 
-      expect(callOrder).toEqual(['capture-destination', 'scan', 'create-job', 'hub-start', 'upload', 'seal-job']);
+      expect(callOrder).toEqual([
+        'capture-destination',
+        'scan',
+        'create-job',
+        'hub-start',
+        'upload',
+        'seal-job',
+      ]);
     });
 
     it('subscribes the hub before the first upload, and seals only after the pool resolves', async () => {
@@ -249,6 +268,34 @@ describe('TransferContextService', () => {
     });
   });
 
+  describe('byte progress wiring', () => {
+    it('captures the manifest total bytes at scan completion', async () => {
+      mockDropScanner.scan.mockResolvedValue({
+        entries: [createEntry('games/a.prg', 100), createEntry('games/b.prg', 250)],
+        rootName: 'games',
+        archiveCount: 0,
+      });
+
+      await runStartTransfer('device-1', asFileList([]));
+
+      expect(store.transfers()['device-1'].scanTotalBytes).toBe(350);
+    });
+
+    it('wires the upload pool\'s onBytesProgress callback into the store', async () => {
+      mockUploadPool.run.mockImplementation(
+        async (_jobId: string, _manifest: unknown, callbacks: UploadPoolCallbacks) => {
+          callbacks.onBytesProgress({ bytesUploaded: 500, bytesPerSecond: 200 });
+        }
+      );
+
+      await runStartTransfer('device-1', asFileList([]));
+
+      const transfer = store.transfers()['device-1'];
+      expect(transfer.uploadedBytes).toBe(500);
+      expect(transfer.uploadBytesPerSecond).toBe(200);
+    });
+  });
+
   describe('zero-file scan', () => {
     it('creates no job and stops', async () => {
       mockDropScanner.scan.mockResolvedValue(emptyScan);
@@ -277,7 +324,12 @@ describe('TransferContextService', () => {
 
       expect(mockDropScanner.scan).toHaveBeenCalledTimes(1);
       expect(mockTransferService.createJob).toHaveBeenCalledTimes(2);
-      expect(mockTransferService.createJob).toHaveBeenLastCalledWith('device-1', StorageType.Sd, '/games');
+      expect(mockTransferService.createJob).toHaveBeenLastCalledWith(
+        'device-1',
+        StorageType.Sd,
+        '/games',
+        0
+      );
       expect(mockHubListener.start).toHaveBeenCalledWith('device-1', 'job-1');
     });
   });
@@ -300,10 +352,12 @@ describe('TransferContextService', () => {
     it('aborts the scan and issues no server call', async () => {
       const scanGate = deferred<DropScanResult>();
       let scanSignal: AbortSignal | undefined;
-      mockDropScanner.scan.mockImplementation((_input: unknown, _onProgress: unknown, signal: AbortSignal) => {
-        scanSignal = signal;
-        return scanGate.promise;
-      });
+      mockDropScanner.scan.mockImplementation(
+        (_input: unknown, _onProgress: unknown, signal: AbortSignal) => {
+          scanSignal = signal;
+          return scanGate.promise;
+        }
+      );
 
       const startPromise = service.startTransfer('device-1', asFileList([]));
       await flushMicrotasks();
@@ -345,6 +399,93 @@ describe('TransferContextService', () => {
       await startPromise;
 
       expect(mockTransferService.sealJob).not.toHaveBeenCalled();
+    });
+
+    it('reply-only: folds the cancel reply into the cancelled state with no hub snapshot arriving', async () => {
+      const uploadGate = deferred<void>();
+      mockUploadPool.run.mockImplementation(() => uploadGate.promise);
+
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await advancePastStateFloors();
+
+      await service.cancelTransfer('device-1');
+
+      expect(store.getTransferModalState('device-1')()).toBe('cancelled');
+
+      uploadGate.resolve();
+      await startPromise;
+    });
+
+    it('hub-only: a hub-pushed terminal snapshot lands cancelled even before the cancel reply resolves late', async () => {
+      const uploadGate = deferred<void>();
+      mockUploadPool.run.mockImplementation(() => uploadGate.promise);
+      const cancelReply = deferred<TransferJobSnapshot>();
+      mockTransferService.cancelJob.mockImplementation(() => cancelReply.promise);
+
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await advancePastStateFloors();
+
+      const cancelPromise = service.cancelTransfer('device-1');
+      await flushMicrotasks();
+
+      // The hub push arrives first, ahead of the (still pending) cancel reply.
+      store.applyJobSnapshot({
+        deviceId: 'device-1',
+        snapshot: createSnapshot({ state: TransferJobState.Cancelled }),
+      });
+      expect(store.getTransferModalState('device-1')()).toBe('cancelled');
+
+      cancelReply.resolve(createSnapshot({ state: TransferJobState.Cancelled }));
+      await cancelPromise;
+
+      expect(store.getTransferModalState('device-1')()).toBe('cancelled');
+
+      uploadGate.resolve();
+      await startPromise;
+    });
+
+    it('surfaces a rejected cancel call as a cancel failure, not a start failure', async () => {
+      const uploadGate = deferred<void>();
+      mockUploadPool.run.mockImplementation(() => uploadGate.promise);
+      mockTransferService.cancelJob.mockRejectedValueOnce(new Error('cancel endpoint unreachable'));
+
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await advancePastStateFloors();
+
+      await service.cancelTransfer('device-1');
+
+      expect(store.transfers()['device-1'].phase).toBe('cancel-failed');
+      expect(store.getTransferModalState('device-1')()).toBe('cancel-failed');
+      expect(store.getTransferSummary('device-1')().reason).toBe('cancel endpoint unreachable');
+
+      uploadGate.resolve();
+      await startPromise;
+    });
+
+    it('keeps the cancelled screen when the hub lands the cancellation before the reply rejects', async () => {
+      const uploadGate = deferred<void>();
+      mockUploadPool.run.mockImplementation(() => uploadGate.promise);
+      const cancelReply = deferred<TransferJobSnapshot>();
+      mockTransferService.cancelJob.mockImplementation(() => cancelReply.promise);
+
+      const startPromise = service.startTransfer('device-1', asFileList([]));
+      await advancePastStateFloors();
+
+      const cancelPromise = service.cancelTransfer('device-1');
+      await flushMicrotasks();
+
+      store.applyJobSnapshot({
+        deviceId: 'device-1',
+        snapshot: createSnapshot({ state: TransferJobState.Cancelled }),
+      });
+
+      cancelReply.reject(new Error('cancel reply lost on the way back'));
+      await cancelPromise;
+
+      expect(store.getTransferModalState('device-1')()).toBe('cancelled');
+
+      uploadGate.resolve();
+      await startPromise;
     });
   });
 

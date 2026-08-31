@@ -190,7 +190,7 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 var snapshot = await GetJobAsync(jobId);
 
                 // Cancelling mid-drain always leaves some backlog undelivered - the pump drops queued
-                // items for a cancelling job rather than writing them.
+                // items for a cancelled job rather than writing them.
                 snapshot.FilesSent.Should().BeLessThan(4);
 
                 // Every file the fake actually received arrived whole - a cancel mid-write does not

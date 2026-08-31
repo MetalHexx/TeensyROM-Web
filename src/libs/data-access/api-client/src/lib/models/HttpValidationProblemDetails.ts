@@ -74,11 +74,11 @@ export function HttpValidationProblemDetailsFromJSONTyped(json: any, ignoreDiscr
     }
     return {
         
-        'type': json['type'] == null ? undefined : json['type'],
-        'title': json['title'] == null ? undefined : json['title'],
-        'status': json['status'] == null ? undefined : json['status'],
-        'detail': json['detail'] == null ? undefined : json['detail'],
-        'instance': json['instance'] == null ? undefined : json['instance'],
+        'type': json['type'] === undefined ? undefined : json['type'] === null ? null : json['type'],
+        'title': json['title'] === undefined ? undefined : json['title'] === null ? null : json['title'],
+        'status': json['status'] === undefined ? undefined : json['status'] === null ? null : json['status'],
+        'detail': json['detail'] === undefined ? undefined : json['detail'] === null ? null : json['detail'],
+        'instance': json['instance'] === undefined ? undefined : json['instance'] === null ? null : json['instance'],
         'errors': json['errors'] == null ? undefined : json['errors'],
     };
 }

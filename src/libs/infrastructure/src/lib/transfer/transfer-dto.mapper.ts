@@ -41,6 +41,10 @@ export class TransferDtoMapper {
       recentCompletions: dto.recentCompletions.map((c) => this.toFileCompletion(c)),
       bytesPerSecond: dto.bytesPerSecond,
       filesPerSecond: dto.filesPerSecond,
+      expandingArchive: dto.expandingArchive ?? null,
+      expansionBytesWritten: dto.expansionBytesWritten,
+      expansionBytesDeclared: dto.expansionBytesDeclared,
+      expandedFileCount: dto.expandedFileCount ?? null,
     };
   }
 
@@ -77,8 +81,6 @@ export class TransferDtoMapper {
         return TransferJobState.Sealed;
       case ApiTransferJobState.Completed:
         return TransferJobState.Completed;
-      case ApiTransferJobState.Cancelling:
-        return TransferJobState.Cancelling;
       case ApiTransferJobState.Cancelled:
         return TransferJobState.Cancelled;
       case ApiTransferJobState.Abandoned:

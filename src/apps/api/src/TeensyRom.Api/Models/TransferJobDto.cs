@@ -29,6 +29,10 @@ namespace TeensyRom.Api.Models
         [Required] public List<TransferFileCompleted> RecentCompletions { get; set; } = [];
         [Required] public double BytesPerSecond { get; set; }
         [Required] public double FilesPerSecond { get; set; }
+        public string? ExpandingArchive { get; set; }
+        [Required] public long ExpansionBytesWritten { get; set; }
+        [Required] public long ExpansionBytesDeclared { get; set; }
+        public int? ExpandedFileCount { get; set; }
 
         /// <summary>
         /// Maps a domain snapshot to the wire shape. The only place a <see cref="TransferJobSnapshot"/>
@@ -53,7 +57,11 @@ namespace TeensyRom.Api.Models
             Failures = [.. snapshot.Failures],
             RecentCompletions = [.. snapshot.RecentCompletions],
             BytesPerSecond = snapshot.BytesPerSecond,
-            FilesPerSecond = snapshot.FilesPerSecond
+            FilesPerSecond = snapshot.FilesPerSecond,
+            ExpandingArchive = snapshot.ExpandingArchive,
+            ExpansionBytesWritten = snapshot.ExpansionBytesWritten,
+            ExpansionBytesDeclared = snapshot.ExpansionBytesDeclared,
+            ExpandedFileCount = snapshot.ExpandedFileCount
         };
     }
 }

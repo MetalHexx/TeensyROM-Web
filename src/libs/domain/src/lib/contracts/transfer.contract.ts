@@ -8,21 +8,36 @@ import { TransferJobSnapshot } from '../models/transfer-job-snapshot.model';
  * Implemented by the infrastructure layer against the transfer API.
  */
 export interface ITransferService {
-  /** Creates a new transfer job for the given device/storage/destination. */
+  /**
+   * Creates a new transfer job for the given device/storage/destination. `expectedArchiveCount`
+   * is the only thing the browser tells the server up front about the archives it's about to
+   * send — it's how the API tells "no archive has arrived yet" from "no archive is coming".
+   */
   createJob(
     deviceId: string,
     storageType: StorageType,
-    destinationDirectory: string
+    destinationDirectory: string,
+    expectedArchiveCount: number
   ): Promise<TransferJobSnapshot>;
 
-  /** Uploads a single file's raw bytes into an open transfer job. */
-  uploadFile(jobId: string, file: File, relativePath: string, signal: AbortSignal): Promise<void>;
+  /**
+   * Uploads a single file's raw bytes into an open transfer job. `onProgress`, when given, is
+   * called with the absolute bytes sent for THIS file so far — never a delta — so a retry
+   * restarting the same file at zero simply replaces its prior contribution.
+   */
+  uploadFile(
+    jobId: string,
+    file: File,
+    relativePath: string,
+    signal: AbortSignal,
+    onProgress?: (bytesUploaded: number) => void
+  ): Promise<void>;
 
   /** Marks a transfer job as sealed - no further files will be accepted. */
   sealJob(jobId: string): Promise<void>;
 
-  /** Requests cancellation of a transfer job. */
-  cancelJob(jobId: string): Promise<void>;
+  /** Requests cancellation of a transfer job; resolves with the job's post-cancel snapshot. */
+  cancelJob(jobId: string): Promise<TransferJobSnapshot>;
 
   /** Gets the device's currently active transfer job, or null when the device is idle. */
   getActiveJob(deviceId: string): Promise<TransferJobSnapshot | null>;

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using TeensyRom.Api.Services;
 using TeensyRom.Api.Transfers;
+using TeensyRom.Api.Transfers.Archives;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Settings;
 using TeensyRom.Core.Device;
@@ -53,17 +54,24 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IDeviceLeaseCoordinator, DeviceLeaseCoordinator>();
             services.AddSingleton(sp => TransferOptionsBinder.BindFrom(sp.GetRequiredService<IConfiguration>()));
             services.AddSingleton<ITransferStagingStore, TransferStagingStore>();
+            services.AddSingleton<ITransferScratchStore, TransferScratchStore>();
+            services.AddSingleton<IArchiveReader, SharpCompressArchiveReader>();
             services.AddSingleton<ITransferCapacityGate, TransferCapacityGate>();
             services.AddSingleton<ITransferQueue, TransferQueue>();
+            services.AddSingleton<ITransferAdmission, TransferAdmission>();
             services.AddSingleton<ITransferSubscriptionTracker, TransferSubscriptionTracker>();
             services.AddSingleton<TransferProgressNotifier>();
             services.AddSingleton<ITransferProgressNotifier>(sp => sp.GetRequiredService<TransferProgressNotifier>());
             services.AddSingleton<TransferPump>();
+            services.AddSingleton<IArchiveExpansionQueue, ArchiveExpansionQueue>();
+            services.AddSingleton<ArchiveExpansionService>();
+            services.AddSingleton<ArchiveExpansionPump>();
 
             // Register application bootstrap hosted service
             services.AddHostedService<ApplicationBootstrapService>();
             services.AddHostedService(sp => sp.GetRequiredService<TransferProgressNotifier>());
             services.AddHostedService(sp => sp.GetRequiredService<TransferPump>());
+            services.AddHostedService(sp => sp.GetRequiredService<ArchiveExpansionPump>());
             services.AddHostedService<TransferJobSweeper>();
 
             return services;

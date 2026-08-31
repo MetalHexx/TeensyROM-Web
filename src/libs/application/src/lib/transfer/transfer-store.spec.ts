@@ -1,7 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createAction } from '@teensyrom-nx/utils';
-import { TransferJobSnapshot, TransferFileCompletion, TransferJobState, StorageType } from '@teensyrom-nx/domain';
+import {
+  TransferJobSnapshot,
+  TransferFileCompletion,
+  TransferJobState,
+  StorageType,
+} from '@teensyrom-nx/domain';
 import { TransferStore, TransferModalState } from './transfer-store';
 import { TRANSFER_FEED_CAP, TRANSFER_FAILURE_CAP } from './transfer.constants';
 import { isTerminalJobState } from './transfer-helpers';
@@ -31,10 +36,16 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
   recentCompletions: [],
   bytesPerSecond: 0,
   filesPerSecond: 0,
+  expandingArchive: null,
+  expansionBytesWritten: 0,
+  expansionBytesDeclared: 0,
+  expandedFileCount: 0,
   ...overrides,
 });
 
-const createCompletion = (overrides: Partial<TransferFileCompletion> = {}): TransferFileCompletion => ({
+const createCompletion = (
+  overrides: Partial<TransferFileCompletion> = {}
+): TransferFileCompletion => ({
   jobId: 'job-1',
   relativePath: 'music/song.sid',
   targetPath: '/music/song.sid',
@@ -102,6 +113,7 @@ describe('TransferStore', () => {
       expect(transfer.job).toBeNull();
       expect(transfer.scanFound).toBe(0);
       expect(transfer.scanTotal).toBe(0);
+      expect(transfer.archivesSent).toBe(0);
       expect(transfer.isLoading).toBe(true);
     });
 
@@ -127,6 +139,22 @@ describe('TransferStore', () => {
       const transfer = store.transfers()[deviceId];
       expect(transfer.phase).not.toBe('nothing-to-transfer');
       expect(transfer.scanTotal).toBe(5);
+    });
+
+    it('stores archivesSent alongside scanTotal when the scan completes', () => {
+      store.beginScan({ deviceId, droppedRootName: 'Games', destinationLabel: '/games' });
+      store.completeScan({ deviceId, scanTotal: 5, archivesSent: 2 });
+
+      const transfer = store.transfers()[deviceId];
+      expect(transfer.scanTotal).toBe(5);
+      expect(transfer.archivesSent).toBe(2);
+    });
+
+    it('defaults archivesSent to 0 for an archive-free drop', () => {
+      store.beginScan({ deviceId, droppedRootName: 'Games', destinationLabel: '/games' });
+      store.completeScan({ deviceId, scanTotal: 5 });
+
+      expect(store.transfers()[deviceId].archivesSent).toBe(0);
     });
 
     it('moves to starting when job creation begins, retaining the manifest', () => {
@@ -219,7 +247,11 @@ describe('TransferStore', () => {
     });
 
     it('records a local upload failure without touching the server-facing job', () => {
-      store.recordUploadFailure({ deviceId, relativePath: 'music/c.sid', reason: 'network timeout' });
+      store.recordUploadFailure({
+        deviceId,
+        relativePath: 'music/c.sid',
+        reason: 'network timeout',
+      });
 
       const transfer = store.transfers()[deviceId];
       expect(transfer.uploadFailedCount).toBe(1);
@@ -310,6 +342,27 @@ describe('TransferStore', () => {
       expect(transfer.error).toBe('invalid destination');
     });
 
+    it('records a failed cancel under its own phase, distinct from a create failure', () => {
+      store.applyJobSnapshot({ deviceId, snapshot: createSnapshot() });
+      store.setCancelError({ deviceId, error: 'cancel endpoint unreachable' });
+
+      const transfer = store.transfers()[deviceId];
+      expect(transfer.phase).toBe('cancel-failed');
+      expect(transfer.error).toBe('cancel endpoint unreachable');
+    });
+
+    it('ignores a failed cancel once the job has already settled', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Cancelled }),
+      });
+      store.setCancelError({ deviceId, error: 'cancel endpoint unreachable' });
+
+      const transfer = store.transfers()[deviceId];
+      expect(transfer.phase).toBe('running');
+      expect(transfer.error).toBeNull();
+    });
+
     it('records the busy-device pre-check independent of phase', () => {
       store.setActiveForeignJob({ deviceId, activeForeignJobId: 'foreign-job' });
 
@@ -333,7 +386,11 @@ describe('TransferStore', () => {
   describe('getTransferModalState', () => {
     const cases: Array<[string, (deviceId: string) => void, TransferModalState | null]> = [
       ['idle', () => undefined, null],
-      ['scanning', (id) => store.beginScan({ deviceId: id, droppedRootName: 'r', destinationLabel: 'd' }), 'scanning'],
+      [
+        'scanning',
+        (id) => store.beginScan({ deviceId: id, droppedRootName: 'r', destinationLabel: 'd' }),
+        'scanning',
+      ],
       [
         'nothing-to-transfer',
         (id) => {
@@ -357,48 +414,71 @@ describe('TransferStore', () => {
       ],
       ['failed', (id) => store.setTransferError({ deviceId: id, error: 'nope' }), 'failed'],
       [
+        'cancel-failed',
+        (id) => store.setCancelError({ deviceId: id, error: 'nope' }),
+        'cancel-failed',
+      ],
+      [
         'running/Created -> receiving',
-        (id) => store.applyJobSnapshot({ deviceId: id, snapshot: createSnapshot({ state: TransferJobState.Created }) }),
+        (id) =>
+          store.applyJobSnapshot({
+            deviceId: id,
+            snapshot: createSnapshot({ state: TransferJobState.Created }),
+          }),
         'receiving',
       ],
       [
         'running/Receiving -> receiving',
         (id) =>
-          store.applyJobSnapshot({ deviceId: id, snapshot: createSnapshot({ state: TransferJobState.Receiving }) }),
+          store.applyJobSnapshot({
+            deviceId: id,
+            snapshot: createSnapshot({ state: TransferJobState.Receiving }),
+          }),
         'receiving',
       ],
       [
         'running/Sealed -> draining',
-        (id) => store.applyJobSnapshot({ deviceId: id, snapshot: createSnapshot({ state: TransferJobState.Sealed }) }),
-        'draining',
-      ],
-      [
-        'running/Cancelling -> cancelling',
         (id) =>
-          store.applyJobSnapshot({ deviceId: id, snapshot: createSnapshot({ state: TransferJobState.Cancelling }) }),
-        'cancelling',
+          store.applyJobSnapshot({
+            deviceId: id,
+            snapshot: createSnapshot({ state: TransferJobState.Sealed }),
+          }),
+        'draining',
       ],
       [
         'running/Completed -> completed',
         (id) =>
-          store.applyJobSnapshot({ deviceId: id, snapshot: createSnapshot({ state: TransferJobState.Completed }) }),
+          store.applyJobSnapshot({
+            deviceId: id,
+            snapshot: createSnapshot({ state: TransferJobState.Completed }),
+          }),
         'completed',
       ],
       [
         'running/Cancelled -> cancelled',
         (id) =>
-          store.applyJobSnapshot({ deviceId: id, snapshot: createSnapshot({ state: TransferJobState.Cancelled }) }),
+          store.applyJobSnapshot({
+            deviceId: id,
+            snapshot: createSnapshot({ state: TransferJobState.Cancelled }),
+          }),
         'cancelled',
       ],
       [
         'running/Aborted -> aborted',
-        (id) => store.applyJobSnapshot({ deviceId: id, snapshot: createSnapshot({ state: TransferJobState.Aborted }) }),
+        (id) =>
+          store.applyJobSnapshot({
+            deviceId: id,
+            snapshot: createSnapshot({ state: TransferJobState.Aborted }),
+          }),
         'aborted',
       ],
       [
         'running/Abandoned -> abandoned',
         (id) =>
-          store.applyJobSnapshot({ deviceId: id, snapshot: createSnapshot({ state: TransferJobState.Abandoned }) }),
+          store.applyJobSnapshot({
+            deviceId: id,
+            snapshot: createSnapshot({ state: TransferJobState.Abandoned }),
+          }),
         'abandoned',
       ],
     ];
@@ -422,6 +502,14 @@ describe('TransferStore', () => {
         failed: 1,
         apiPct: 0,
         devicePct: 0,
+        expandedTotal: null,
+        expansionPct: 0,
+        expandingArchive: null,
+        hasArchive: false,
+        expansionComplete: false,
+        uploadedBytes: 0,
+        uploadTotalBytes: 0,
+        uploadBytesPerSecond: 0,
       });
     });
 
@@ -442,7 +530,11 @@ describe('TransferStore', () => {
       store.completeScan({ deviceId, scanTotal: 100 });
       store.applyJobSnapshot({
         deviceId,
-        snapshot: createSnapshot({ state: TransferJobState.Sealed, filesReceived: 40, filesSent: 40 }),
+        snapshot: createSnapshot({
+          state: TransferJobState.Sealed,
+          filesReceived: 40,
+          filesSent: 40,
+        }),
       });
 
       const metrics = store.getTransferMetrics(deviceId)();
@@ -452,11 +544,16 @@ describe('TransferStore', () => {
 
     it('derives apiPct from the ratio while still Receiving', () => {
       store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
-      store.completeScan({ deviceId, scanTotal: 100 });
+      store.completeScan({ deviceId, scanTotal: 100, scanTotalBytes: 100 });
       store.applyJobSnapshot({
         deviceId,
-        snapshot: createSnapshot({ state: TransferJobState.Receiving, filesReceived: 40, filesSent: 20 }),
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesReceived: 40,
+          filesSent: 20,
+        }),
       });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 40, uploadBytesPerSecond: 0 });
 
       const metrics = store.getTransferMetrics(deviceId)();
       expect(metrics.apiPct).toBe(40);
@@ -468,7 +565,11 @@ describe('TransferStore', () => {
       store.completeScan({ deviceId, scanTotal: 60000 });
       store.applyJobSnapshot({
         deviceId,
-        snapshot: createSnapshot({ state: TransferJobState.Receiving, filesReceived: 60000, filesSent: 59997 }),
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesReceived: 60000,
+          filesSent: 59997,
+        }),
       });
 
       expect(store.getTransferMetrics(deviceId)().devicePct).toBeLessThan(100);
@@ -479,7 +580,11 @@ describe('TransferStore', () => {
       store.completeScan({ deviceId, scanTotal: 500 });
       store.applyJobSnapshot({
         deviceId,
-        snapshot: createSnapshot({ state: TransferJobState.Completed, filesReceived: 480, filesSent: 480 }),
+        snapshot: createSnapshot({
+          state: TransferJobState.Completed,
+          filesReceived: 480,
+          filesSent: 480,
+        }),
       });
 
       expect(store.getTransferMetrics(deviceId)().devicePct).toBe(100);
@@ -490,7 +595,11 @@ describe('TransferStore', () => {
       store.completeScan({ deviceId, scanTotal: 12480 });
       store.applyJobSnapshot({
         deviceId,
-        snapshot: createSnapshot({ state: TransferJobState.Cancelled, filesReceived: 7003, filesSent: 7003 }),
+        snapshot: createSnapshot({
+          state: TransferJobState.Cancelled,
+          filesReceived: 7003,
+          filesSent: 7003,
+        }),
       });
 
       expect(store.getTransferMetrics(deviceId)().devicePct).not.toBe(100);
@@ -501,7 +610,11 @@ describe('TransferStore', () => {
       store.completeScan({ deviceId, scanTotal: 100 });
       store.applyJobSnapshot({
         deviceId,
-        snapshot: createSnapshot({ state: TransferJobState.Sealed, filesReceived: 90, filesSent: 90 }),
+        snapshot: createSnapshot({
+          state: TransferJobState.Sealed,
+          filesReceived: 90,
+          filesSent: 90,
+        }),
       });
 
       expect(store.getTransferMetrics(deviceId)().devicePct).not.toBe(100);
@@ -510,12 +623,190 @@ describe('TransferStore', () => {
     it('yields 0 for both percentages when scanTotal is still 0', () => {
       store.applyJobSnapshot({
         deviceId,
-        snapshot: createSnapshot({ state: TransferJobState.Receiving, filesReceived: 3, filesSent: 1 }),
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesReceived: 3,
+          filesSent: 1,
+        }),
       });
 
       const metrics = store.getTransferMetrics(deviceId)();
       expect(metrics.apiPct).toBe(0);
       expect(metrics.devicePct).toBe(0);
+    });
+
+    it('reads devicePct against scanTotal while expandedTotal does not yet exist, then against the composed total once it does', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 100, archivesSent: 20 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesSent: 50,
+          expandedFileCount: null,
+        }),
+      });
+
+      const beforeExpansion = store.getTransferMetrics(deviceId)();
+      expect(beforeExpansion.expandedTotal).toBeNull();
+      expect(beforeExpansion.devicePct).toBe(50);
+
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesSent: 60,
+          expandedFileCount: 30,
+        }),
+      });
+
+      const afterExpansion = store.getTransferMetrics(deviceId)();
+      expect(afterExpansion.expandedTotal).toBe(110);
+      expect(afterExpansion.devicePct).toBe(54); // floor(60 / 110 * 100)
+      expect(afterExpansion.devicePct).toBeGreaterThanOrEqual(beforeExpansion.devicePct);
+    });
+
+    it('reports hasArchive and expansionComplete once every archive in the job has finished', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 100, archivesSent: 20 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ expandedFileCount: 30 }),
+      });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.hasArchive).toBe(true);
+      expect(metrics.expansionComplete).toBe(true);
+    });
+
+    it('clamps expansionPct at 100 for an archive stopped after exceeding its declared bytes', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          expandingArchive: 'games/big.zip',
+          expansionBytesWritten: 150,
+          expansionBytesDeclared: 100,
+          expandedFileCount: null,
+        }),
+      });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.expansionPct).toBe(100);
+      expect(metrics.expandingArchive).toBe('games/big.zip');
+    });
+
+    it('pins expansionPct to 100 once expandedFileCount is set, the state-driven pin', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          expansionBytesWritten: 10,
+          expansionBytesDeclared: 1000,
+          expandedFileCount: 5,
+        }),
+      });
+
+      expect(store.getTransferMetrics(deviceId)().expansionPct).toBe(100);
+    });
+
+    it('produces metrics identical to the archive-free arithmetic when no archive was sent', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 100, scanTotalBytes: 100 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({
+          state: TransferJobState.Receiving,
+          filesReceived: 40,
+          filesSent: 20,
+        }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 40, uploadBytesPerSecond: 0 });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.expandedTotal).toBe(100);
+      expect(metrics.apiPct).toBe(40);
+      expect(metrics.devicePct).toBe(20);
+      expect(metrics.hasArchive).toBe(false);
+      expect(metrics.expansionComplete).toBe(false);
+      expect(metrics.expansionPct).toBe(100); // the state-driven pin is trivially satisfied with no archives
+      expect(metrics.expandingArchive).toBeNull();
+    });
+
+    it('derives apiPct from uploaded bytes over scanTotalBytes while receiving', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 10, scanTotalBytes: 1000 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Receiving }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 400, uploadBytesPerSecond: 123 });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.apiPct).toBe(40);
+      expect(metrics.uploadedBytes).toBe(400);
+      expect(metrics.uploadTotalBytes).toBe(1000);
+      expect(metrics.uploadBytesPerSecond).toBe(123);
+    });
+
+    it('pins apiPct to 100 once Sealed, even when uploadedBytes trails scanTotalBytes', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 10, scanTotalBytes: 1000 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Sealed }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 400, uploadBytesPerSecond: 50 });
+
+      expect(store.getTransferMetrics(deviceId)().apiPct).toBe(100);
+    });
+
+    it('yields 0 apiPct for a zero scanTotalBytes denominator rather than a division artifact', () => {
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Receiving }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 400, uploadBytesPerSecond: 50 });
+
+      expect(store.getTransferMetrics(deviceId)().apiPct).toBe(0);
+    });
+
+    it('reports the live upload rate while running, then the lifetime average once the job is terminal', () => {
+      const start = new Date('2026-01-01T00:00:00Z');
+      vi.spyOn(Date, 'now').mockReturnValue(start.getTime());
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ startedUtc: start, state: TransferJobState.Receiving }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 500, uploadBytesPerSecond: 111 });
+
+      expect(store.getTransferMetrics(deviceId)().uploadBytesPerSecond).toBe(111);
+
+      vi.spyOn(Date, 'now').mockReturnValue(start.getTime() + 10_000);
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ startedUtc: start, state: TransferJobState.Completed }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 5000, uploadBytesPerSecond: 999 });
+
+      // The terminal average ignores the live figure just reported and instead derives from
+      // uploadedBytes over the elapsed seconds since startedAt: 5000 bytes / 10s.
+      expect(store.getTransferMetrics(deviceId)().uploadBytesPerSecond).toBe(500);
+    });
+
+    it('moves the upload byte figures while the device figures stay at zero and untouched', () => {
+      store.beginScan({ deviceId, droppedRootName: 'r', destinationLabel: 'd' });
+      store.completeScan({ deviceId, scanTotal: 10, scanTotalBytes: 1000 });
+      store.applyJobSnapshot({
+        deviceId,
+        snapshot: createSnapshot({ state: TransferJobState.Receiving, filesSent: 0 }),
+      });
+      store.reportUploadProgress({ deviceId, uploadedBytes: 900, uploadBytesPerSecond: 500 });
+
+      const metrics = store.getTransferMetrics(deviceId)();
+      expect(metrics.uploadedBytes).toBe(900);
+      expect(metrics.apiPct).toBe(90);
+      expect(metrics.written).toBe(0);
+      expect(metrics.devicePct).toBe(0);
+      expect(store.transfers()[deviceId].feed).toEqual([]);
     });
   });
 
@@ -561,7 +852,10 @@ describe('TransferStore', () => {
     });
 
     it.each([
-      [TransferJobState.Cancelled, 'Transfer stopped at your request. Files already written to the device remain.'],
+      [
+        TransferJobState.Cancelled,
+        'Transfer stopped at your request. Files already written to the device remain.',
+      ],
       [TransferJobState.Aborted, 'The device disconnected mid-transfer.'],
       [
         TransferJobState.Abandoned,
@@ -643,6 +937,7 @@ describe('TransferStore', () => {
       store.recordUploadFailure({ deviceId, relativePath: 'x.sid', reason: 'timeout' });
       store.setDeviceBusy({ deviceId, activeForeignJobId: 'x', error: 'busy' });
       store.setTransferError({ deviceId, error: 'nope' });
+      store.setCancelError({ deviceId, error: 'nope' });
       store.setActiveForeignJob({ deviceId, activeForeignJobId: null });
       store.clearTransfer({ deviceId });
       store.setTargetDevice({ deviceId });
@@ -658,6 +953,7 @@ describe('TransferStore', () => {
         'record-upload-failure',
         'set-device-busy',
         'set-transfer-error',
+        'set-cancel-error',
         'set-active-foreign-job',
         'clear-transfer',
         'set-target-device',

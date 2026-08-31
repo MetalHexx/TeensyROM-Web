@@ -2,22 +2,27 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { TRANSFER_SERVICE, ITransferService, TransferUploadError, TransferManifestEntry } from '@teensyrom-nx/domain';
 import { UploadPool, UploadPoolCallbacks } from './upload-pool';
+import { UPLOAD_PROGRESS_THROTTLE_MS, UPLOAD_RATE_WINDOW_MS } from './transfer.constants';
 
-function createEntry(relativePath: string): TransferManifestEntry {
-  return { file: new File(['x'], relativePath), relativePath, sizeBytes: 1 };
+function createEntry(relativePath: string, sizeBytes = 1): TransferManifestEntry {
+  return { file: new File(['x'], relativePath), relativePath, sizeBytes };
 }
 
 function createCallbacks(): UploadPoolCallbacks & {
   uploaded: TransferManifestEntry[];
   failed: Array<{ entry: TransferManifestEntry; reason: string }>;
+  progress: Array<{ bytesUploaded: number; bytesPerSecond: number }>;
 } {
   const uploaded: TransferManifestEntry[] = [];
   const failed: Array<{ entry: TransferManifestEntry; reason: string }> = [];
+  const progress: Array<{ bytesUploaded: number; bytesPerSecond: number }> = [];
   return {
     uploaded,
     failed,
+    progress,
     onFileUploaded: (entry) => uploaded.push(entry),
     onFileFailed: (entry, reason) => failed.push({ entry, reason }),
+    onBytesProgress: (p) => progress.push(p),
   };
 }
 
@@ -223,6 +228,134 @@ describe('UploadPool', () => {
       expect(callbacks.uploaded).toHaveLength(0);
       expect(callbacks.failed).toHaveLength(0);
       expect(uploadFile).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('byte progress aggregation', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('sums interleaved absolute per-file progress across concurrent uploads, settling on the full total once both complete', async () => {
+      const entryA = createEntry('a.sid', 100);
+      const entryB = createEntry('b.sid', 200);
+      const progressCallbacks: Record<string, (bytes: number) => void> = {};
+      const resolvers: Record<string, () => void> = {};
+
+      const uploadFile = vi.fn(
+        (
+          _jobId: string,
+          _file: File,
+          relativePath: string,
+          _signal: AbortSignal,
+          onProgress?: (bytesUploaded: number) => void
+        ) => {
+          if (onProgress) progressCallbacks[relativePath] = onProgress;
+          return new Promise<void>((resolve) => {
+            resolvers[relativePath] = resolve;
+          });
+        }
+      );
+
+      const pool = setupPool(uploadFile as unknown as ITransferService['uploadFile']);
+      const callbacks = createCallbacks();
+      const signal = new AbortController().signal;
+
+      const runPromise = pool.run('job-1', [entryA, entryB], callbacks, signal, {
+        concurrency: 2,
+        maxAttempts: 1,
+        baseBackoffMs: 0,
+      });
+
+      await flushMicrotasks();
+      progressCallbacks['a.sid'](40);
+      await vi.advanceTimersByTimeAsync(UPLOAD_PROGRESS_THROTTLE_MS);
+      progressCallbacks['b.sid'](50);
+      await vi.advanceTimersByTimeAsync(UPLOAD_PROGRESS_THROTTLE_MS);
+
+      const midRun = callbacks.progress[callbacks.progress.length - 1];
+      expect(midRun.bytesUploaded).toBe(90);
+
+      resolvers['a.sid']();
+      resolvers['b.sid']();
+      await runPromise;
+
+      const final = callbacks.progress[callbacks.progress.length - 1];
+      expect(final.bytesUploaded).toBe(300);
+    });
+
+    it('replaces a retried entry\'s contribution rather than adding to it, so a full-size success only counts once', async () => {
+      const entry = createEntry('a.sid', 1000);
+      let attempt = 0;
+
+      const uploadFile = vi.fn(
+        (
+          _jobId: string,
+          _file: File,
+          _relativePath: string,
+          _signal: AbortSignal,
+          onProgress?: (bytesUploaded: number) => void
+        ) => {
+          attempt++;
+          if (attempt === 1) {
+            onProgress?.(600);
+            return Promise.reject(new TransferUploadError(0, true, 'transport error'));
+          }
+          onProgress?.(1000);
+          return Promise.resolve();
+        }
+      );
+
+      const pool = setupPool(uploadFile as unknown as ITransferService['uploadFile']);
+      const callbacks = createCallbacks();
+      const signal = new AbortController().signal;
+
+      const runPromise = pool.run('job-1', [entry], callbacks, signal, {
+        concurrency: 1,
+        maxAttempts: 3,
+        baseBackoffMs: 10,
+      });
+
+      await vi.advanceTimersByTimeAsync(10);
+      await runPromise;
+
+      const final = callbacks.progress[callbacks.progress.length - 1];
+      expect(final.bytesUploaded).toBe(1000);
+    });
+
+    it('drops a rate sample once it falls outside the rate window, reporting zero rather than a stale figure', async () => {
+      let progressFn: ((bytesUploaded: number) => void) | undefined;
+
+      const uploadFile = vi.fn(
+        (
+          _jobId: string,
+          _file: File,
+          _relativePath: string,
+          _signal: AbortSignal,
+          onProgress?: (bytesUploaded: number) => void
+        ) => {
+          progressFn = onProgress;
+          return new Promise<void>(() => undefined);
+        }
+      );
+
+      const pool = setupPool(uploadFile as unknown as ITransferService['uploadFile']);
+      const callbacks = createCallbacks();
+      const signal = new AbortController().signal;
+
+      void pool.run('job-1', [createEntry('a.sid', 1000)], callbacks, signal, {
+        concurrency: 1,
+        maxAttempts: 1,
+        baseBackoffMs: 0,
+      });
+
+      await flushMicrotasks();
+      progressFn?.(100);
+
+      await vi.advanceTimersByTimeAsync(UPLOAD_RATE_WINDOW_MS + UPLOAD_PROGRESS_THROTTLE_MS);
+      progressFn?.(200);
+
+      const latest = callbacks.progress[callbacks.progress.length - 1];
+      expect(latest.bytesPerSecond).toBe(0);
     });
   });
 });

@@ -40,6 +40,13 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
         /// Unix-style directory path.
         /// </summary>
         public string DestinationDirectory { get; set; } = string.Empty;
+
+        /// <summary>
+        /// How many of the files this job will receive are archives the server must expand. The browser
+        /// knows this from its own drop scan; the server cannot discover it, and without it cannot tell
+        /// "no archive has arrived yet" from "no archive is coming". Zero for an ordinary transfer.
+        /// </summary>
+        public int ExpectedArchiveCount { get; set; }
     }
 
     public class CreateJobRequestValidator : AbstractValidator<CreateJobRequest>
@@ -55,6 +62,9 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
 
             RuleFor(x => x.Body.DestinationDirectory)
                 .NotEmpty().WithMessage("Destination directory is required.");
+
+            RuleFor(x => x.Body.ExpectedArchiveCount)
+                .GreaterThanOrEqualTo(0).WithMessage("Expected archive count must not be negative.");
         }
     }
 

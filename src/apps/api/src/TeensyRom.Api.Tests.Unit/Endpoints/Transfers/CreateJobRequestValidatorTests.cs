@@ -59,4 +59,27 @@ public class CreateJobRequestValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == "Body.DestinationDirectory");
     }
+
+    [Fact]
+    public void Validate_NegativeExpectedArchiveCount_FailsWithExpectedArchiveCountError()
+    {
+        var request = ValidRequest();
+        request.Body.ExpectedArchiveCount = -1;
+
+        var result = _validator.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == "Body.ExpectedArchiveCount");
+    }
+
+    [Fact]
+    public void Validate_ZeroExpectedArchiveCount_HasNoErrors()
+    {
+        var request = ValidRequest();
+        request.Body.ExpectedArchiveCount = 0;
+
+        var result = _validator.Validate(request);
+
+        result.IsValid.Should().BeTrue();
+    }
 }

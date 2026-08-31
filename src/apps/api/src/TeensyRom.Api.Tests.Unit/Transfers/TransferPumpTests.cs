@@ -9,24 +9,47 @@ using TeensyRom.Core.ValueObjects;
 namespace TeensyRom.Api.Tests.Unit.Transfers;
 
 /// <summary>
-/// TryFinalize is the single place a job reaches a terminal state, shared by the pump and the sweeper -
-/// exercised directly here rather than through the queue-draining loop.
+/// TryFinalize and Cancel are the two places a job reaches a terminal state under its own steam, shared
+/// by the pump, the sweeper, and the cancel endpoint - exercised directly here rather than through the
+/// queue-draining loop. <see cref="_scratch"/> is a real
+/// <see cref="TransferScratchStore"/> rather than a substitute so the release tests can assert the
+/// budget itself (<see cref="ITransferScratchStore.BytesInUse"/>) coming back, not just that a purge call
+/// was made.
 /// </summary>
-public class TransferPumpTests
+public class TransferPumpTests : IDisposable
 {
+    private const long MaxScratchBytes = 1000;
+
+    private readonly string _scratchRoot = Directory.CreateTempSubdirectory("teensyrom-pump-scratch-tests-").FullName;
     private readonly ITransferQueue _queue = Substitute.For<ITransferQueue>();
     private readonly ITransferJobRegistry _registry = Substitute.For<ITransferJobRegistry>();
     private readonly IDeviceLeaseCoordinator _leaseCoordinator = Substitute.For<IDeviceLeaseCoordinator>();
     private readonly ITransferCapacityGate _gate = Substitute.For<ITransferCapacityGate>();
     private readonly ITransferStagingStore _staging = Substitute.For<ITransferStagingStore>();
+    private readonly ITransferAdmission _admission = Substitute.For<ITransferAdmission>();
     private readonly IDeviceConnectionManager _deviceManager = Substitute.For<IDeviceConnectionManager>();
     private readonly IServiceScopeFactory _scopeFactory = Substitute.For<IServiceScopeFactory>();
     private readonly ITransferProgressNotifier _notifier = Substitute.For<ITransferProgressNotifier>();
     private readonly TransferOptions _options = new();
     private readonly ILoggingService _log = Substitute.For<ILoggingService>();
+    private readonly ITransferScratchStore _scratch;
+
+    public TransferPumpTests()
+    {
+        _scratch = new TransferScratchStore(
+            new TransferOptions { ScratchRoot = _scratchRoot, MaxScratchBytes = MaxScratchBytes }, Substitute.For<ILoggingService>());
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_scratchRoot))
+        {
+            Directory.Delete(_scratchRoot, recursive: true);
+        }
+    }
 
     private TransferPump NewPump() => new(
-        _queue, _registry, _leaseCoordinator, _gate, _staging, _deviceManager, _scopeFactory, _notifier, _options, _log);
+        _queue, _registry, _leaseCoordinator, _gate, _staging, _scratch, _admission, _deviceManager, _scopeFactory, _notifier, _options, _log);
 
     private static TransferJob NewJob() =>
         new("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"), new TransferOptions());
@@ -51,11 +74,7 @@ public class TransferPumpTests
                 job.TryTransitionTo(TransferJobState.Sealed);
                 job.TryTransitionTo(TransferJobState.Completed);
                 break;
-            case TransferJobState.Cancelling:
-                job.TryTransitionTo(TransferJobState.Cancelling);
-                break;
             case TransferJobState.Cancelled:
-                job.TryTransitionTo(TransferJobState.Cancelling);
                 job.TryTransitionTo(TransferJobState.Cancelled);
                 break;
             case TransferJobState.Abandoned:
@@ -81,7 +100,6 @@ public class TransferPumpTests
             var expectedNext = state switch
             {
                 TransferJobState.Sealed => TransferJobState.Completed,
-                TransferJobState.Cancelling => TransferJobState.Cancelled,
                 _ => state
             };
 
@@ -101,17 +119,15 @@ public class TransferPumpTests
         job.State.Should().Be(expectedState);
     }
 
-    [Theory]
-    [InlineData(TransferJobState.Sealed)]
-    [InlineData(TransferJobState.Cancelling)]
-    public void TryFinalize_SealedOrCancellingWithPendingFiles_DoesNotTransition(TransferJobState state)
+    [Fact]
+    public void TryFinalize_SealedWithPendingFiles_DoesNotTransition()
     {
-        var job = JobIn(state, pendingCount: 1);
+        var job = JobIn(TransferJobState.Sealed, pendingCount: 1);
         var pump = NewPump();
 
         pump.TryFinalize(job);
 
-        job.State.Should().Be(state);
+        job.State.Should().Be(TransferJobState.Sealed);
         _leaseCoordinator.DidNotReceiveWithAnyArgs().Release(default!, default!);
     }
 
@@ -128,17 +144,87 @@ public class TransferPumpTests
         _notifier.Received(1).JobChanged(job);
     }
 
+    /// <summary>
+    /// Asserts the scratch budget itself, not just that a purge call happened - a job that reserved
+    /// scratch space (as an archive upload would) must get every byte of it back on completion.
+    /// </summary>
     [Fact]
-    public void TryFinalize_CancellingToCancelled_ReleasesLeasePurgesStagingAndNotifies()
+    public void TryFinalize_SealedToCompleted_ReturnsScratchBudgetToPreJobValue()
     {
-        var job = JobIn(TransferJobState.Cancelling, pendingCount: 0);
+        var job = JobIn(TransferJobState.Sealed, pendingCount: 0);
+        _scratch.TryReserve(job.JobId, 400).Should().BeTrue();
         var pump = NewPump();
 
         pump.TryFinalize(job);
 
+        _scratch.BytesInUse.Should().Be(0);
+        _admission.DidNotReceiveWithAnyArgs().DiscardHeld(default!);
+    }
+
+    /// <summary>
+    /// The property the old drain could not offer: files still pending is exactly the state a cancel
+    /// has to survive, so the transition and every release run regardless of the count.
+    /// </summary>
+    [Theory]
+    [InlineData(TransferJobState.Created)]
+    [InlineData(TransferJobState.Receiving)]
+    [InlineData(TransferJobState.Sealed)]
+    public void Cancel_JobWithPendingFiles_IsCancelledAndReleasesEverythingImmediately(TransferJobState state)
+    {
+        var job = JobIn(state, pendingCount: 3);
+        var pump = NewPump();
+
+        pump.Cancel(job).Should().BeTrue();
+
+        job.State.Should().Be(TransferJobState.Cancelled);
         _leaseCoordinator.Received(1).Release("device-1", job.JobId);
         _staging.Received(1).PurgeJob(job.JobId);
         _notifier.Received(1).JobChanged(job);
+    }
+
+    /// <summary>
+    /// Cancelling releases the scratch budget exactly like completion, and additionally discards
+    /// anything still held for the job - a cancelled job will never drain a held file any other way.
+    /// </summary>
+    [Fact]
+    public void Cancel_JobHoldingScratch_ReturnsScratchBudgetAndDiscardsHeld()
+    {
+        var job = JobIn(TransferJobState.Receiving, pendingCount: 1);
+        _scratch.TryReserve(job.JobId, 250).Should().BeTrue();
+        var pump = NewPump();
+
+        pump.Cancel(job);
+
+        _scratch.BytesInUse.Should().Be(0);
+        _admission.Received(1).DiscardHeld(job.JobId);
+    }
+
+    [Theory]
+    [InlineData(TransferJobState.Completed)]
+    [InlineData(TransferJobState.Cancelled)]
+    [InlineData(TransferJobState.Abandoned)]
+    [InlineData(TransferJobState.Aborted)]
+    public void Cancel_AlreadyTerminalJob_ChangesNothing(TransferJobState state)
+    {
+        var job = JobIn(state, pendingCount: 0);
+        var pump = NewPump();
+
+        pump.Cancel(job).Should().BeFalse();
+
+        job.State.Should().Be(state);
+        _leaseCoordinator.DidNotReceiveWithAnyArgs().Release(default!, default!);
+        _staging.DidNotReceiveWithAnyArgs().PurgeJob(default!);
+        _admission.DidNotReceiveWithAnyArgs().DiscardHeld(default!);
+    }
+
+    [Fact]
+    public void Cancel_SignalsTheJobsCancellationTokenSoALiveExpansionCanStop()
+    {
+        var job = JobIn(TransferJobState.Receiving, pendingCount: 1);
+
+        NewPump().Cancel(job);
+
+        job.Cancellation.IsCancellationRequested.Should().BeTrue();
     }
 
     [Fact]

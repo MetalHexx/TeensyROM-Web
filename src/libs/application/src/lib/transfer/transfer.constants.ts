@@ -19,6 +19,15 @@ export const UPLOAD_POOL_MAX_ATTEMPTS = 3;
 /** Default base delay for exponential backoff between retried uploads, in milliseconds. */
 export const UPLOAD_POOL_BASE_BACKOFF_MS = 300;
 
+/** Cadence at which the upload pool reports aggregated byte progress — the server's own snapshot notifier cadence. */
+export const UPLOAD_PROGRESS_THROTTLE_MS = 250;
+
+/** Rolling window, in milliseconds, over which the upload pool's bytes-per-second figure is averaged. */
+export const UPLOAD_RATE_WINDOW_MS = 10_000;
+
+/** Minimum elapsed-time divisor, in milliseconds, for a rate calculation — stops an early burst from reading as an absurd figure. */
+export const UPLOAD_RATE_MIN_DIVISOR_MS = 100;
+
 /**
  * File extensions the scanner admits into a transfer manifest, matched case-insensitively.
  * Verbatim from the API's own file-type mapping.
@@ -38,4 +47,9 @@ export const TRANSFER_SUPPORTED_EXTENSIONS = new Set<string>([
   '.txt',
   '.d64',
   '.zip',
+  '.7z',
+  '.rar',
 ]);
+
+/** Extensions the server expands into their contents rather than transferring. Subset of the above. */
+export const TRANSFER_ARCHIVE_EXTENSIONS = new Set<string>(['.zip', '.7z', '.rar']);

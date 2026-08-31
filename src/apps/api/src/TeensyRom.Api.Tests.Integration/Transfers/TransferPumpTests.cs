@@ -135,8 +135,8 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             leaseCoordinator.TryAcquire(device.DeviceId, job.JobId).Should().BeTrue();
             job.TryTransitionTo(TransferJobState.Receiving);
 
-            // Slows the device write just enough that both files are still pending when Cancelling is
-            // set below, proving the job actually has a backlog to drain rather than an empty queue.
+            // Slows the device write just enough that both files are still pending when the cancel
+            // below lands, proving the job actually has a backlog rather than an empty queue.
             port.PerFileDelay = TimeSpan.FromMilliseconds(300);
 
             try
@@ -146,19 +146,14 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
 
                 job.PendingCount.Should().Be(2);
 
-                job.TryTransitionTo(TransferJobState.Cancelling).Should().BeTrue();
+                pump.Cancel(job).Should().BeTrue();
 
-                // Mirrors the cancel endpoint (P03-T01): finalize immediately in case the queue is
-                // already empty by the time cancellation is requested.
-                pump.TryFinalize(job);
+                job.State.Should().Be(TransferJobState.Cancelled);
+                leaseCoordinator.GetHolder(device.DeviceId).Should().BeNull();
 
-                // See Pump_EnqueuedFile_IsWrittenToDeviceBeforeJobIsSealed - the state transition is
-                // visible before the lease/gate release that follows it, so the wait covers both.
-                await WaitUntilAsync(() =>
-                    job.State == TransferJobState.Cancelled &&
-                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
-                    gate.Current == (0, 0),
-                    TimeSpan.FromSeconds(15));
+                // The backlog still has to unwind: the queued files reach the pump after the job is
+                // already terminal and are dropped, which is what returns their gate slots.
+                await WaitUntilAsync(() => gate.Current == (0, 0), TimeSpan.FromSeconds(15));
 
                 leaseCoordinator.GetHolder(device.DeviceId).Should().BeNull();
                 gate.Current.Should().Be((0, 0));
@@ -359,24 +354,22 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             var firstTarget = new FilePath("/games/cancelled-before-drain-1.prg");
             var secondTarget = new FilePath("/games/cancelled-before-drain-2.prg");
 
-            // Stage both fully before either is enqueued or the job is cancelled: dropping the first
-            // file alone would let TryFinalize purge the job's whole staging directory out from under
-            // the second file while it is still mid-stage, once both are pending. Cancelling before
-            // enqueueing mirrors files the upload endpoint already accepted moments before a concurrent
-            // cancel request landed, so the admission check inside the batch (evaluated per file, as
-            // each is taken off the queue) is guaranteed to see Cancelling for both.
+            // Stage both fully before either is enqueued or the job is cancelled: cancelling with only
+            // the first file staged would purge the job's whole staging directory out from under the
+            // second while it is still mid-stage. Cancelling before enqueueing mirrors files the upload
+            // endpoint already accepted moments before a concurrent cancel request landed, so the
+            // admission check inside the batch (evaluated per file, as each is taken off the queue) is
+            // guaranteed to see a terminal job for both.
             var firstStaged = await StageFileAsync(job, "cancelled-before-drain-1.prg", firstTarget, [1, 2, 3]);
             var secondStaged = await StageFileAsync(job, "cancelled-before-drain-2.prg", secondTarget, [4, 5, 6]);
 
-            job.TryTransitionTo(TransferJobState.Cancelling).Should().BeTrue();
+            pump.Cancel(job).Should().BeTrue();
+            job.State.Should().Be(TransferJobState.Cancelled);
 
             await queue.EnqueueAsync(device.DeviceId, firstStaged, CancellationToken.None);
             await queue.EnqueueAsync(device.DeviceId, secondStaged, CancellationToken.None);
 
-            pump.TryFinalize(job);
-
             await WaitUntilAsync(() =>
-                job.State == TransferJobState.Cancelled &&
                 leaseCoordinator.GetHolder(device.DeviceId) is null &&
                 gate.Current == (0, 0));
 
@@ -426,13 +419,15 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
                 // Cancel as soon as the first file of the batch has landed - the batch's single
                 // TransferFilesCommand is still in flight for the remaining four.
                 await WaitUntilAsync(() => port.Received.Any(r => r.Path == $"{pathPrefix}0.prg"));
-                job.TryTransitionTo(TransferJobState.Cancelling).Should().BeTrue();
 
-                await WaitUntilAsync(() =>
-                    job.State == TransferJobState.Cancelled &&
-                    leaseCoordinator.GetHolder(device.DeviceId) is null &&
-                    gate.Current == (0, 0),
-                    TimeSpan.FromSeconds(15));
+                var pump = f.Services.GetRequiredService<TransferPump>();
+                pump.Cancel(job).Should().BeTrue();
+
+                // Terminal the instant cancel returns - it never waits on the batch still in flight.
+                job.State.Should().Be(TransferJobState.Cancelled);
+                leaseCoordinator.GetHolder(device.DeviceId).Should().BeNull();
+
+                await WaitUntilAsync(() => gate.Current == (0, 0), TimeSpan.FromSeconds(15));
 
                 var landed = port.Received.Count(r => r.Path.StartsWith(pathPrefix, StringComparison.Ordinal));
 
