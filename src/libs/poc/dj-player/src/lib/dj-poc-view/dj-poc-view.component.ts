@@ -59,7 +59,7 @@ function panelAreasFor(index: number): DeckPanelAreas {
  * page code, not deck-owned: `DECKS.length` is the only thing that decides which shape renders, and
  * no deck reaches in to name a column of either one.
  */
-function computeGridLayout(decks: readonly DeckDescriptor[]): DeckGridLayout {
+export function computeGridLayout(decks: readonly DeckDescriptor[]): DeckGridLayout {
   const entries = decks.map((deck, index) => ({ deck, areas: panelAreasFor(index) }));
 
   if (entries.length === 2) {

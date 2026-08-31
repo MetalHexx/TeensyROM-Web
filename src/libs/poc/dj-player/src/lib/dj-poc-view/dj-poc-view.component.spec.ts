@@ -1,7 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DjPocViewComponent } from './dj-poc-view.component';
+import { DjPocViewComponent, computeGridLayout } from './dj-poc-view.component';
 import { DECKS } from '../deck/deck.config';
+
+/** Splits a `grid-template-areas` value into its rows, each row into its named cells — the same
+ *  shape a browser (or a reviewer) reads the string as. */
+function parseGridAreaRows(areas: string): string[][] {
+  return (areas.match(/"[^"]*"/g) ?? []).map((row) => row.slice(1, -1).split(' '));
+}
 
 describe('DjPocViewComponent', () => {
   let fixture: ComponentFixture<DjPocViewComponent>;
@@ -33,6 +39,45 @@ describe('DjPocViewComponent', () => {
       host.querySelector('.binding-deck-label')?.textContent?.trim()
     );
     expect(labels).toEqual(DECKS.map((deck) => `Deck ${deck.label}`));
+  });
+
+  describe('grid geometry', () => {
+    it("computes the wireframe's exact five-column, three-row template for today's two decks", () => {
+      const layout = computeGridLayout(DECKS);
+
+      expect(layout.columns).toBe('minmax(0, 1fr) 64px 208px 64px minmax(0, 1fr)');
+      expect(layout.rows).toBe('auto minmax(0, 1fr) auto');
+    });
+
+    it("spans voice/speed and the mixer the full height, and keeps each deck's panels confined to its own outer column", () => {
+      const layout = computeGridLayout(DECKS);
+      const rows = parseGridAreaRows(layout.areas);
+
+      expect(rows).toHaveLength(3);
+      for (const row of rows) {
+        expect(row).toHaveLength(5);
+        // vs0 (deck A voice/speed), mx (mixer) and vs1 (deck B voice/speed) run down every row —
+        // the full-height span the wireframe draws.
+        expect(row[1]).toBe('vs0');
+        expect(row[2]).toBe('mx');
+        expect(row[3]).toBe('vs1');
+      }
+
+      // Deck A's transport/loops-cues/binding stay in the leftmost column top-to-bottom, deck B's in
+      // the rightmost — never transposed into the other deck's column (which would reintroduce
+      // mirroring), and each area name appears exactly once.
+      expect(rows.map((row) => row[0])).toEqual(['t0', 'c0', 'b0']);
+      expect(rows.map((row) => row[4])).toEqual(['t1', 'c1', 'b1']);
+    });
+
+    it('binds the computed template straight onto .grid as inline grid-template styles', () => {
+      const expected = computeGridLayout(DECKS);
+      const gridEl: HTMLElement = fixture.nativeElement.querySelector('.grid');
+
+      expect(gridEl.style.gridTemplateColumns).toBe(expected.columns);
+      expect(gridEl.style.gridTemplateRows).toBe(expected.rows);
+      expect(gridEl.style.gridTemplateAreas).toBe(expected.areas);
+    });
   });
 
   it('offers no control to add a deck — N-readiness is proved by DECKS, never a button on the page', () => {

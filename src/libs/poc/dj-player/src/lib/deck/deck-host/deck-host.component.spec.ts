@@ -360,6 +360,23 @@ describe('DeckHostComponent', () => {
       expect(fixture.componentInstance).toBeTruthy();
     });
 
+    it("applies each of this deck's four grid-area names, from the areas input, onto that panel and no other", () => {
+      const panelSelectors: Record<keyof DeckPanelAreas, string> = {
+        transport: 'lib-transport-panel',
+        voiceSpeed: 'lib-voice-speed-column',
+        loopsCues: 'lib-loops-cues-panel',
+        binding: 'lib-binding-card',
+      };
+
+      for (const [areaKey, selector] of Object.entries(panelSelectors) as [
+        keyof DeckPanelAreas,
+        string,
+      ][]) {
+        const panelEl: HTMLElement = fixture.nativeElement.querySelector(selector);
+        expect(panelEl.style.gridArea).toBe(FAKE_AREAS[areaKey]);
+      }
+    });
+
     it('calls engine.play, pause and stop from the transport buttons', () => {
       binding.selectedPortId.set('port-1');
       tuneLoader.currentTune.set(fakeSidFile());
