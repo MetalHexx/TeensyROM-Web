@@ -1,0 +1,77 @@
+// Angular's emulated encapsulation scopes dj-poc-view.component.scss's shared `.panel` rule to that
+// component's own template, so it can't reach into this one — this reproduces the same box model
+// (spacing, border, radius, heading treatment) with the app's shared tokens instead of restyling.
+:host {
+  display: block;
+  flex: 0 0 auto;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.tune-index-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  // Tighter than the shared .panel default — this panel now sits between Setup and Diagnostics,
+  // both styled by dj-poc-view.component.scss's `.sidebar .panel` rule, which emulated encapsulation
+  // keeps from reaching in here. Matching its padding by hand is what keeps the three panels at one
+  // visual weight.
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  min-height: 0;
+
+  h2 {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: var(--font-size-md);
+  }
+}
+
+.tune-index-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.tune-index-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.tune-index-label {
+  color: var(--color-dimmed);
+}
+
+// A warning about the detection, not an error in the tune — --color-highlight draws attention
+// without implying failure, unlike --color-error. Purely informational: it never disables or alters
+// playback, which the loop it flags still drives unsuppressed.
+.tune-index-implausible {
+  margin: 0;
+  padding: 2px var(--spacing-xs);
+  align-self: flex-start;
+  border: 1px solid var(--color-highlight);
+  border-radius: var(--border-radius-sm);
+  color: var(--color-highlight);
+  font-size: var(--font-size-sm);
+}
+
+// A property of the tune, not the transport — placed with the tune's description so it persists
+// with it. Mirrors dj-poc-view.component.scss's `.control` rhythm (label left, control pushed
+// right); reproduced locally for the same encapsulation reason as `.tune-index-panel` above.
+.tune-index-timing {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+
+  > select {
+    margin-left: auto;
+    min-width: 0;
+  }
+}

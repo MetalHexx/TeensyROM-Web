@@ -10,6 +10,11 @@ import { PRIMARY_SLOT_FOR_REGISTER } from '../../asid/register-frame';
 import { ASID_SLOT_COUNT } from '../../asid/asid-constants';
 import type { SidFile } from '../../sid/sid-file.model';
 import { PAL_CPU_CLOCK_HZ } from '../notes';
+import { TuneIndexService } from '../tune-index.service';
+import { TUNE_INDEX_FORMAT_VERSION } from '../tune-index.model';
+import type { TuneIndexRecord } from '../tune-index.model';
+import type { PlayRate } from '../../engine/play-rate';
+import { formatDuration } from '../format';
 
 const BASE_STATS: EngineStats = {
   framesRendered: 0,
@@ -37,8 +42,10 @@ const BASE_STATS: EngineStats = {
 interface StubEngine {
   currentSubtune: WritableSignal<number>;
   ceilingFrames: WritableSignal<number>;
+  positionBasisFrames: WritableSignal<number>;
   stats: WritableSignal<EngineStats>;
   nominalIntervalUs: WritableSignal<number>;
+  playRate: WritableSignal<PlayRate>;
   speedMultiplier: WritableSignal<number>;
   scrubTo: ReturnType<typeof vi.fn>;
   addMarker: ReturnType<typeof vi.fn>;
@@ -49,12 +56,57 @@ interface StubScanner {
   dispose: ReturnType<typeof vi.fn>;
 }
 
+interface StubTuneIndexService {
+  record: WritableSignal<TuneIndexRecord | null>;
+  pending: WritableSignal<boolean>;
+}
+
+function makeTuneIndexService(): StubTuneIndexService {
+  return { record: signal<TuneIndexRecord | null>(null), pending: signal(false) };
+}
+
+function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
+  return {
+    filename: 'Test Tune',
+    subtune: 1,
+    loopStartFrame: 0,
+    loopPeriodFrames: 6250,
+    endedAtFrame: null,
+    sectionBoundaries: [0, 1200, 2400, 3600],
+    tonic: 0,
+    mode: 'major',
+    camelot: '8B',
+    tuningReferenceHz: 440,
+    tuningCents: 3.2,
+    keyConfidence: 'strong',
+    scalePitchClasses: [0, 2, 4, 5, 7, 9, 11],
+    dominantIntervalFrames: 25,
+    pulseConfidence: 'strong',
+    nativeTempo: 120,
+    callsPerFrame: 1,
+    exactCallsPerFrame: 1,
+    timingMode: 'exact',
+    formatVersion: TUNE_INDEX_FORMAT_VERSION,
+    computedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
 function makeEngine(): StubEngine {
   return {
     currentSubtune: signal(1),
     ceilingFrames: signal(10_000),
+    // Deliberately distinct from ceilingFrames, so a test that reads this rather than the ceiling
+    // proves jumpToFrame actually moved onto the basis.
+    positionBasisFrames: signal(8_000),
     stats: signal<EngineStats>(BASE_STATS),
     nominalIntervalUs: signal(19_950),
+    playRate: signal<PlayRate>({
+      callsPerFrame: 1,
+      exactCallsPerFrame: 1,
+      roundedCallsPerFrame: 1,
+      mode: 'exact',
+    }),
     speedMultiplier: signal(1),
     scrubTo: vi.fn().mockResolvedValue(undefined),
     addMarker: vi.fn(() => 0),
@@ -193,10 +245,12 @@ describe('TrackAnalysisPanelComponent', () => {
   let component: TrackAnalysisPanelComponent;
   let engine: StubEngine;
   let scanner: StubScanner;
+  let tuneIndex: StubTuneIndexService;
 
   async function setup(file: SidFile | null = fakeSidFile()): Promise<void> {
     engine = makeEngine();
     scanner = makeScanner();
+    tuneIndex = makeTuneIndexService();
 
     await TestBed.configureTestingModule({
       imports: [TrackAnalysisPanelComponent],
@@ -206,6 +260,7 @@ describe('TrackAnalysisPanelComponent', () => {
           providers: [
             { provide: ANALYSIS_SCANNER, useValue: scanner as unknown as AnalysisScanner },
             { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+            { provide: TuneIndexService, useValue: tuneIndex as unknown as TuneIndexService },
           ],
         },
       })
@@ -318,7 +373,7 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(scanner.scan).toHaveBeenCalledTimes(1);
   });
 
-  it('converts a clicked candidate into a scrub percentage against ceilingFrames', async () => {
+  it('converts a clicked candidate into a scrub percentage against positionBasisFrames', async () => {
     await completeAnalysis(buildSpikeScan());
     const hit = candidateHits()[0];
     expect(hit).toBeTruthy();
@@ -330,7 +385,7 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(match).not.toBeNull();
     const frame = Number((match as RegExpMatchArray)[1].replace(/,/g, ''));
 
-    expect(engine.scrubTo).toHaveBeenCalledWith((frame / engine.ceilingFrames()) * 100);
+    expect(engine.scrubTo).toHaveBeenCalledWith((frame / engine.positionBasisFrames()) * 100);
   });
 
   it('awaits the jump landing before adding a marker from Copy to marker', async () => {
@@ -439,5 +494,98 @@ describe('TrackAnalysisPanelComponent', () => {
     const svg = fixture.nativeElement.querySelector('.lane-stack svg') as SVGSVGElement;
     expect(svg).not.toBeNull();
     expect(svg.querySelectorAll('*').length).toBeLessThan(2000);
+  });
+
+  it('reads a structure, pulse and key row from a cached index record while no scan has run', () => {
+    expand();
+    engine.speedMultiplier.set(1.06);
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({
+        loopStartFrame: 500,
+        loopPeriodFrames: 6250,
+        dominantIntervalFrames: 24,
+        nativeTempo: 120,
+        tonic: 2,
+        mode: 'minor',
+        camelot: '5A',
+      })
+    );
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.analysis-caption')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.lane-stack')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.structure-square')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.readout-panel')).not.toBeNull();
+    // Derived from the record's frames at the engine's live rate — one intro plus one lap — rather
+    // than from a duration frozen into the record at scan time.
+    expect(readoutValue('Length')).toBe(formatDuration(((500 + 6250) * 19_950) / 1_000_000));
+    expect(readoutValue('Loop')).toContain((500).toLocaleString());
+    expect(readoutValue('Loop')).toContain(formatDuration((6250 * 19_950) / 1_000_000));
+    expect(readoutValue('Pulse interval')).toBe(`${(24).toLocaleString()} frames`);
+    expect(readoutValue('Key (native)')).toContain('D minor');
+    expect(readoutValue('Key (native)')).toContain('5A');
+    expect(readoutValue('Tempo (sounding)')).toBe(`${(120 * 1.06).toFixed(1)} BPM`);
+    expect(readoutValue('Key (sounding)')).toContain('D# minor');
+  });
+
+  it('follows the rate in force when reporting a cached length, rather than the one it was scanned at', () => {
+    expand();
+    tuneIndex.record.set(fakeTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 6000 }));
+    fixture.detectChanges();
+    const atSingleSpeed = readoutValue('Length');
+
+    engine.playRate.set({
+      callsPerFrame: 2,
+      exactCallsPerFrame: 2.4,
+      roundedCallsPerFrame: 2,
+      mode: 'rounded',
+    });
+    fixture.detectChanges();
+
+    expect(readoutValue('Length')).toBe(formatDuration((6000 * (19_950 / 2)) / 1_000_000));
+    expect(readoutValue('Length')).not.toBe(atSingleSpeed);
+  });
+
+  it('reads a cached record that ends rather than loops as an end point, not as no answer', () => {
+    expand();
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({ loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: 4000 })
+    );
+    fixture.detectChanges();
+
+    expect(readoutValue('Length')).toBe(formatDuration((4000 * 19_950) / 1_000_000));
+    expect(readoutValue('Loop')).toContain((4000).toLocaleString());
+    expect(readoutValue('Loop')).not.toBe('not found');
+  });
+
+  it('reads a cached record that answers nothing as a declined answer, distinct from ended', () => {
+    expand();
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({ loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null })
+    );
+    fixture.detectChanges();
+
+    // Both rows report the same declined answer — one word for the same finding, not two.
+    expect(readoutValue('Loop')).toBe('not found');
+    expect(readoutValue('Length')).toBe('not found');
+  });
+
+  it('prefers a completed live scan over a cached index record describing the same tune', async () => {
+    tuneIndex.record.set(
+      fakeTuneIndexRecord({
+        loopStartFrame: 0,
+        loopPeriodFrames: 99_999,
+        dominantIntervalFrames: 999,
+        tonic: 2,
+        mode: 'minor',
+        camelot: '5A',
+      })
+    );
+    await completeAnalysis(buildCMajorScan());
+
+    expect(readoutValue('Length')).not.toBe(formatDuration((99_999 * 19_950) / 1_000_000));
+    expect(readoutValue('Pulse interval')).not.toBe(`${(999).toLocaleString()} frames`);
+    expect(readoutValue('Key (native)')).toContain('C major');
+    expect(readoutValue('Key (native)')).not.toContain('D minor');
   });
 });

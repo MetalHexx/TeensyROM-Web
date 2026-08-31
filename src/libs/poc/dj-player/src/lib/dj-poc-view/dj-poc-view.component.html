@@ -6,12 +6,41 @@
       <div class="control-row scrub-row">
         <span class="caption">Position</span>
         <div class="scrub-track">
-          <div class="scrub-track-fill" [style.width.%]="scrubDisplayPercent()"></div>
+          <div class="scrub-bar">
+            @switch (barState().kind) { @case ('loop') { @if (introRegionPercent() > 0) {
+            <div
+              class="scrub-region scrub-region--intro"
+              [style.width.%]="introRegionPercent()"
+            ></div>
+            }
+            <div
+              class="scrub-region scrub-region--music"
+              [style.width.%]="musicRegionPercent()"
+            ></div>
+            } @case ('ended') {
+            <div
+              class="scrub-region scrub-region--music"
+              [style.width.%]="musicRegionPercent()"
+            ></div>
+            <div
+              class="scrub-region scrub-region--dead"
+              [style.width.%]="deadRegionPercent()"
+            ></div>
+            } @case ('unknown') {
+            <div class="scrub-region scrub-region--unknown"></div>
+            } @case ('analyzing') {
+            <div class="scrub-region scrub-region--pending"></div>
+            } }
+          </div>
+          @if (barState().kind === 'loop') {
+          <div class="scrub-tick" [style.left.%]="introRegionPercent()"></div>
+          }
           <input
             type="range"
             min="0"
             max="100"
             [value]="scrubDisplayPercent()"
+            [disabled]="barState().kind === 'analyzing'"
             (input)="onScrubInput($event)"
             (change)="onScrubChange($event)"
           />
@@ -20,14 +49,30 @@
       </div>
 
       <div class="transport-row">
-        <div class="control-row">
+        <div class="control-row transport-controls">
           <button type="button" (click)="onPlay()" [disabled]="!canPlay()">Play</button>
           <button type="button" (click)="onPause()" [disabled]="engineState() !== 'playing'">
             Pause
           </button>
-          <button type="button" (click)="onStop()" [disabled]="currentTune() === null">Stop</button>
+          <button type="button" (click)="onStop()" [disabled]="!canStop()">Stop</button>
+          <span class="transport-spacer"></span>
+          <label class="repeat-toggle">
+            <input
+              type="checkbox"
+              class="repeat-toggle-input"
+              aria-label="Repeat track"
+              [checked]="repeatTrack()"
+              (change)="onRepeatToggle($event)"
+            />
+            Repeat track
+          </label>
         </div>
-        <p class="engine-status">State: {{ engineState() }}</p>
+
+        <div class="transport-state">
+          <span class="led" [class]="'led--' + transportState()" aria-hidden="true"></span>
+          {{ transportStateLabel() }}
+        </div>
+
         @if (engineError()) {
         <p class="error-text" role="alert">{{ engineError() }}</p>
         }
@@ -173,7 +218,10 @@
               </div>
 
               <div class="marker-progress" aria-hidden="true">
-                <div class="marker-progress-fill" [style.width.%]="progressPercentFor($index)"></div>
+                <div
+                  class="marker-progress-fill"
+                  [style.width.%]="progressPercentFor($index)"
+                ></div>
               </div>
             </div>
             }
@@ -418,6 +466,8 @@
       </div>
     </section>
 
+    <lib-tune-index-panel />
+
     <section class="panel diagnostics-panel" aria-label="Diagnostics">
       <h2>Diagnostics</h2>
 
@@ -446,6 +496,10 @@
         <div class="field-row">
           <dt>Frames emitted</dt>
           <dd>{{ engineStats().framesRendered }}</dd>
+        </div>
+        <div class="field-row">
+          <dt>Track end frame</dt>
+          <dd>{{ trackEndFrame() ?? '—' }}</dd>
         </div>
         <div class="field-row">
           <dt>Packets / s</dt>
@@ -485,7 +539,10 @@
           <div class="field-row field-row--wide">
             <dt>Interval (nominal)</dt>
             <dd>
-              {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{ nominalIntervalUs() }} µs)
+              {{ engineStats().measuredMeanIntervalUs.toFixed(1) }} µs ({{
+                nominalIntervalUs()
+              }}
+              µs)
             </dd>
           </div>
           <div class="field-row field-row--wide">

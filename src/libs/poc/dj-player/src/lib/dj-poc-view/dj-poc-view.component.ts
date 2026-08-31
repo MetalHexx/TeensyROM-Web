@@ -14,7 +14,16 @@ import {
   NOMINAL_INTERVAL_OPTIONS_US,
   SPEED_INPUT_SPAN,
 } from '../engine/dj-player-engine';
+import type { EngineState } from '../engine/dj-player-engine';
+import { positionBasisFor, timelineBasisFor } from '../engine/engine-utils';
+import type { DetectedLoopFrames } from '../engine/engine-utils';
 import { TrackAnalysisPanelComponent } from '../analysis/track-analysis-panel/track-analysis-panel.component';
+import { TuneIndexPanelComponent } from '../analysis/tune-index-panel/tune-index-panel.component';
+import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
+import { WorkerAnalysisScanner } from '../analysis/worker-analysis-scanner';
+import { TUNE_INDEX_STORAGE, LocalStorageTuneIndexStorage } from '../analysis/tune-index-storage';
+import { TuneIndexService } from '../analysis/tune-index.service';
+import type { TuneIndexRecord } from '../analysis/tune-index.model';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
 interface TuneSource {
@@ -22,6 +31,30 @@ interface TuneSource {
   readonly label: string;
   readonly getBytes: () => Uint8Array;
 }
+
+/** What the position bar draws. `unknown` is a verdict, not a waiting room — a record that answered
+ *  nothing renders hatched and never falls back to another state. `analyzing` is a transient that
+ *  looks different on purpose: hatched means "we looked and verified nothing", dimmed means "nothing
+ *  has been looked for yet". Neither `analyzing` nor `unknown` carries a tick or a playhead. */
+type BarState =
+  | { kind: 'analyzing' }
+  | { kind: 'unknown' }
+  | { kind: 'loop'; introPercent: number } // 0 for loop-from-top; the tick sits at introPercent
+  | { kind: 'ended'; musicPercent: number }; // no tick — there is no loop point
+
+/** The transport's own six-state readout. `analyzing` is spliced in here, in the view, over the
+ *  engine's own four-plus-one — the engine never learns about scanning. */
+type TransportState = EngineState | 'analyzing';
+
+/** Text for the LED's adjacent label — the colour reinforces this, it never replaces it. */
+const TRANSPORT_STATE_LABELS: Record<TransportState, string> = {
+  stopped: 'Stopped',
+  playing: 'Playing',
+  paused: 'Paused',
+  ended: 'Ended',
+  error: 'Error',
+  analyzing: 'Analyzing…',
+};
 
 const MICROSECONDS_PER_SECOND = 1_000_000;
 
@@ -56,7 +89,7 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
   templateUrl: './dj-poc-view.component.html',
   styleUrl: './dj-poc-view.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TrackAnalysisPanelComponent],
+  imports: [TrackAnalysisPanelComponent, TuneIndexPanelComponent],
   // Provided here rather than root: this is a quarantined POC surface and neither its
   // permission-holding service nor its audio graph should register in the app injector.
   providers: [
@@ -64,6 +97,12 @@ const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
     DjPlayerEngine,
     { provide: FRAME_CLOCK, useFactory: () => new ScriptProcessorFrameClock() },
     { provide: REPLAY_RUNNER, useFactory: () => new WorkerReplayRunner() },
+    TuneIndexService,
+    { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
+    // Its own worker thread, deliberately separate from TrackAnalysisPanelComponent's own
+    // ANALYSIS_SCANNER provider (which wins for that subtree): the panel's on-demand scan and this
+    // service's automatic one must never contend for the same thread.
+    { provide: ANALYSIS_SCANNER, useFactory: () => new WorkerAnalysisScanner() },
   ],
 })
 export class DjPocViewComponent {
@@ -86,9 +125,27 @@ export class DjPocViewComponent {
   );
 
   private readonly engine = inject(DjPlayerEngine);
+  private readonly tuneIndex = inject(TuneIndexService);
   protected readonly engineState = this.engine.state;
   protected readonly engineError = this.engine.lastError;
   protected readonly engineStats = this.engine.stats;
+  protected readonly repeatTrack = this.engine.repeatTrack;
+  protected readonly trackEndFrame = this.engine.trackEndFrame;
+
+  /** True while the tune-index service is scanning a genuinely new tune — never true for a cache
+   *  hit, which publishes its record without ever setting this. */
+  protected readonly analyzing = this.tuneIndex.pending;
+
+  /** The composed transport readout the LED and its label draw from. Keeps the dependency running
+   *  one way — the tune-index service already depends on the engine, and the engine never on it. */
+  protected readonly transportState = computed<TransportState>(() =>
+    this.analyzing() ? 'analyzing' : this.engineState()
+  );
+
+  protected readonly transportStateLabel = computed<string>(
+    () => TRANSPORT_STATE_LABELS[this.transportState()]
+  );
+
   protected readonly currentSubtune = this.engine.currentSubtune;
   protected readonly subtuneCount = this.engine.subtuneCount;
   protected readonly speedMultiplier = this.engine.speedMultiplier;
@@ -142,6 +199,53 @@ export class DjPocViewComponent {
     () => this.scrubDragValue() ?? this.engine.positionPercent()
   );
 
+  /** What the position bar draws, over the index record and the pending signal — the one place that
+   *  decides loop vs. ended vs. unknown vs. analyzing, so the regions, the tick and the disabled state
+   *  can never disagree about it. `timelineBasisFor` gates whether the record answered anything at
+   *  all; `positionBasisFor` supplies the ended case's music length, exactly as it does for both
+   *  analysis panels' Length rows. */
+  protected readonly barState = computed<BarState>(() => {
+    if (this.tuneIndex.pending()) {
+      return { kind: 'analyzing' };
+    }
+    const record: TuneIndexRecord | null = this.engine.tuneIndex();
+    if (record === null) {
+      return { kind: 'unknown' };
+    }
+    const detected: DetectedLoopFrames = record;
+    const timeline = timelineBasisFor(detected);
+    if (timeline === null) {
+      return { kind: 'unknown' };
+    }
+    if (detected.loopStartFrame !== null && detected.loopPeriodFrames !== null) {
+      return { kind: 'loop', introPercent: (detected.loopStartFrame / timeline) * 100 };
+    }
+    return { kind: 'ended', musicPercent: ((positionBasisFor(detected) ?? 0) / timeline) * 100 };
+  });
+
+  /** The intro region's share of the bar, and the tick's left offset — 0 for a loop that repeats from
+   *  the top. Zero outside the 'loop' state, where the template never reads it. */
+  protected readonly introRegionPercent = computed<number>(() => {
+    const state = this.barState();
+    return state.kind === 'loop' ? state.introPercent : 0;
+  });
+
+  /** The music region's share of the bar: the loop case's remainder after the intro, or the ended
+   *  case's own share. Zero outside those two states. */
+  protected readonly musicRegionPercent = computed<number>(() => {
+    const state = this.barState();
+    if (state.kind === 'loop') return 100 - state.introPercent;
+    if (state.kind === 'ended') return state.musicPercent;
+    return 0;
+  });
+
+  /** The dead-tail region's share for an ended tune — the remainder after the music. Zero outside
+   *  'ended', where the template never reads it. */
+  protected readonly deadRegionPercent = computed<number>(() => {
+    const state = this.barState();
+    return state.kind === 'ended' ? 100 - state.musicPercent : 0;
+  });
+
   /** Marker index → the start offset being dragged right now. Absent means "not dragging that
    * marker's start". Re-deriving a captured point replays frames, so the commit has to wait for the
    * release rather than following every drag tick. */
@@ -158,11 +262,24 @@ export class DjPocViewComponent {
       this.selectedMidiPortId() !== null &&
       this.engineState() !== 'playing'
   );
+  /** Play stays out of reach for the whole of a scan, whichever load started it: a manual start would
+   *  put the frame clock beside the analysis worker on the same tune, which is the contention the
+   *  awaited load exists to avoid. */
   protected readonly canPlay = computed(
     () =>
       this.currentTune() !== null &&
       this.selectedMidiPortId() !== null &&
-      this.engineState() !== 'playing'
+      this.engineState() !== 'playing' &&
+      !this.analyzing()
+  );
+
+  /** Stop goes out of reach only while a freshly loaded tune scans — the deck is stopped at the
+   *  position the load just established, and the load starts it itself once the scan settles, so
+   *  there is nothing there to stop. A scan a subtune step raised mid-playback leaves Stop reachable:
+   *  that deck is running, and taking Stop from it would strand it with no way to silence the
+   *  cartridge. */
+  protected readonly canStop = computed(
+    () => this.currentTune() !== null && !(this.analyzing() && this.engineState() === 'stopped')
   );
   protected readonly canStepSubtune = computed(
     () => this.currentTune() !== null && this.subtuneCount() > 1
@@ -209,7 +326,7 @@ export class DjPocViewComponent {
 
   selectTune(source: TuneSource): void {
     try {
-      this.loadTune(parseSidFile(source.getBytes()));
+      void this.loadTune(parseSidFile(source.getBytes()), source.label);
     } catch (error) {
       this.currentTune.set(null);
       this.tuneError.set(describeParseError(error));
@@ -234,7 +351,7 @@ export class DjPocViewComponent {
         getBytes: () => bytes,
       };
       this.diskSources.update((sources) => [...sources, source]);
-      this.loadTune(parsed);
+      await this.loadTune(parsed, file.name);
     } catch (error) {
       this.currentTune.set(null);
       this.tuneError.set(describeParseError(error));
@@ -267,6 +384,10 @@ export class DjPocViewComponent {
 
   onStop(): void {
     this.engine.stop();
+  }
+
+  onRepeatToggle(event: Event): void {
+    this.engine.setRepeatTrack((event.target as HTMLInputElement).checked);
   }
 
   onPreviousSubtune(): void {
@@ -499,10 +620,14 @@ export class DjPocViewComponent {
     return (MICROSECONDS_PER_SECOND / intervalUs).toFixed(3);
   }
 
-  private loadTune(file: SidFile): void {
+  private async loadTune(file: SidFile, filename: string): Promise<void> {
     this.currentTune.set(file);
     this.tuneError.set(null);
     this.engine.loadTune(file);
+    // Called after loadTune, so the tune-index effect reads the subtune the load has already
+    // settled on. Awaited so playback never races a background scan for the frame clock's thread —
+    // a cache hit or a failed/abandoned scan releases this just as promptly as a completed one.
+    await this.tuneIndex.setTune(file, filename);
     // play() already no-ops into the engine's "no MIDI output port selected" error path when no
     // port is chosen, so no separate guard is needed here.
     void this.engine.play();

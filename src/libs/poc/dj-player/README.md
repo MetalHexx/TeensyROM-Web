@@ -281,6 +281,47 @@ Record observations as they happen during the session. Findings cannot be recons
 
 ---
 
+**Note on ASID-DJ-0.8:** This iteration makes the transport act on the loop point and the key without the listening session having been run, so questions 18–22 remain open. The first real sessions under `-0.8` are informal evidence toward them — a consistently early or late loop point will now be *more* audible, not less.
+
+---
+
+#### 23. Does the intro play exactly once before the loop takes over?
+
+*Confirms the loop lifecycle split by ear — an unrepeating intro followed by a repeating lap — rather than only in the frame arithmetic that drives it.*
+
+**Observations:**
+
+---
+
+#### 24. Does the deck stop exactly where the position bar says it will, with repeat off?
+
+*Confirms the ended state and the track end frame it renders agree with what a listener actually hears the deck do.*
+
+**Observations:**
+
+---
+
+#### 25. Is the pre-playback wait tolerable, weighed against the stutter it replaces?
+
+*Weighs the resumable indexing ladder's fixed wait before a tune starts against the mid-tune stutter the previous scan-on-demand design produced.*
+
+**Observations:**
+
+---
+
+### Validation Harnesses And The Measured Baseline
+
+Three scratch harnesses that informed the loop-detection regression and its replacement are committed under `validation/` (a sibling of `src/`, so `pnpm nx test dj-player` never collects them — see that directory's own README for exact commands, inputs, and how to read each one's output). They are diagnostic and grading tools, not part of the suite that gates a commit; running one is always an explicit act.
+
+The stratified-accuracy harness (`validation/stratified-accuracy.spec.ts`) is the closest thing to quantitative evidence toward question 22: across a seeded, stratified sample of 300 HVSC tunes, the shipped detection ladder landed within 5 seconds of the curated song length on **46%** of tunes, or **50%** counting an exact multiple/submultiple of the true length as defensible.
+
+That figure carries two caveats that must travel with it — quoting it alone misrepresents what was measured:
+
+- **The residual disagreement is systematically long, not random.** The detector is understating a real, direction-biased shortfall against the curated lengths, not scattering evenly around them.
+- **The recorded run predates a sampler fix.** `buildSample` drew each stratum with replacement at the time this number was measured, so a small stratum could yield the same tune more than once — 24 of the 300 sampled tunes were repeat picks (one tune six times), accounting for 42 of the 300 rows and collapsing the run to 258 distinct tunes, which skews whichever per-cluster breakdown those tunes fell into. The sampler now draws without replacement; this baseline has not been re-measured against the corrected sample and should be read as directional, not as a rerun-and-match target.
+
+---
+
 ### Transcription
 
 When the session is complete, transcribe the findings into `ASID-DJ-ITERATIONS.md`'s decision log, superseding any entries in place where these findings overturn something.

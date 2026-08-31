@@ -23,25 +23,28 @@ import { RegisterFrame } from '../asid/register-frame';
 import type { FrameSnapshot } from '../asid/register-frame';
 import type { FrameResult } from '../cpu/c64-machine';
 import type { SidFile } from '../sid/sid-file.model';
+import type { TuneIndexRecord } from '../analysis/tune-index.model';
 import { MidiOutputService } from '../midi/midi-output.service';
 import type { FrameClock } from '../clock/frame-clock';
 import { REPLAY_RUNNER } from '../replay/replay-runner';
 import { DeliveryTransport } from './delivery';
 import { MarkerState } from './marker-state';
 import { TuneSession } from './tune-session';
-import { clamp, describeError } from './engine-utils';
+import { clamp, describeError, timelineBasisFor } from './engine-utils';
+import { DEFAULT_TIMING_MODE, playCallIntervalUs, playRateFor } from './play-rate';
+import type { PlayRate, TimingMode } from './play-rate';
 
-export type EngineState = 'stopped' | 'playing' | 'paused' | 'error';
+/**
+ * `ended` is engine-owned: the track played through to its detected end and the engine stopped it
+ * itself. Deliberately distinct from `stopped` — the operator stopped it — even though both are
+ * silent: the two mean opposite things about why nothing is sounding.
+ */
+export type EngineState = 'stopped' | 'playing' | 'paused' | 'ended' | 'error';
 
 // The marker/nudge types are Marker State's, but they are part of this module's public shape — the
 // view and its spec import them from here, so they flow through unchanged rather than moving their
 // import path.
-export type {
-  CapturedPoint,
-  Marker,
-  MarkerEnd,
-  PositionAnchor,
-} from './marker-state';
+export type { CapturedPoint, Marker, MarkerEnd, PositionAnchor } from './marker-state';
 export { LOOP_AUDITION_PREROLL_MS, NUDGE_RANGE_MS } from './marker-state';
 export { JUMP_CEILING_SECONDS } from './tune-session';
 export { UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS } from './delivery';
@@ -59,6 +62,22 @@ export const FRAME_CLOCK = new InjectionToken<FrameClock>('FRAME_CLOCK');
  * split-the-difference default, and 50.0 Hz (what DeepSID uses).
  */
 export const NOMINAL_INTERVAL_OPTIONS_US: readonly number[] = [PAL_FRAME_INTERVAL_US, 19975, 20000];
+
+/** Namespaced so a later POC or app feature reusing `localStorage` can't collide with this key. */
+const REPEAT_TRACK_STORAGE_KEY = 'asid-dj-0.repeat-track';
+
+/** Reads the persisted repeat-track preference: true when nothing is stored (or the read throws) —
+ *  a track plays forever until the operator turns repeat off, not the other way round. Mirrors
+ *  `MidiOutputService`'s own namespaced, try/catch-wrapped `localStorage` preference. */
+function loadRepeatTrackPreference(): boolean {
+  try {
+    const stored = localStorage.getItem(REPEAT_TRACK_STORAGE_KEY);
+    return stored === null ? true : stored === 'true';
+  } catch (error) {
+    logWarn(`DJ engine: could not read the repeat-track preference from localStorage — ${error}`);
+    return true;
+  }
+}
 
 /** What the fader and any typed value may reach: 0.5x–1.5x. */
 export const SPEED_INPUT_SPAN = 0.5;
@@ -173,6 +192,11 @@ export class DjPlayerEngine implements OnDestroy {
     recordAnchor: (machine, frame, framesRendered) =>
       this.markerState.recordAnchor(machine, frame, framesRendered),
     applyIntervalChange: () => this.applyIntervalChange(),
+    playRate: () => this.playRate(),
+    syncPlayRate: (machine) => {
+      const rate = playRateFor(machine, this.timingMode());
+      this.machineRates.set({ exact: rate.exactCallsPerFrame, rounded: rate.roundedCallsPerFrame });
+    },
   });
 
   private readonly markerState: MarkerState = new MarkerState({
@@ -184,10 +208,13 @@ export class DjPlayerEngine implements OnDestroy {
       this.tuneSession.framesRendered = value;
     },
     nominalIntervalUs: () => this.nominalIntervalUs(),
+    playRate: () => this.playRate(),
     restoreState: (machine, registers, frameNumber) =>
       this.tuneSession.restoreState(machine, registers, frameNumber),
     queueResync: () => this.queueResync(),
     effectiveMutes: () => this.effectiveMutes(),
+    repeatEnabled: () => this.repeatTrack(),
+    endTrack: () => this.endTrack(),
     fail: (reason) => this.fail(reason),
   });
 
@@ -210,6 +237,27 @@ export class DjPlayerEngine implements OnDestroy {
    * multiplier's value alone once a jump has clamped. */
   private excursionDirection: 'up' | 'down' | null = null;
   readonly nominalIntervalUs = signal<number>(PAL_FRAME_INTERVAL_US);
+  readonly timingMode = signal<TimingMode>(DEFAULT_TIMING_MODE);
+  /** The machine's two rates, refreshed on every subtune init — the CIA latch is only meaningful
+   *  after init has run, so this cannot be read at load time. */
+  private readonly machineRates = signal<{ exact: number; rounded: number }>({
+    exact: 1,
+    rounded: 1,
+  });
+  /** The rate in force for every duration in the player — `ceilingFrames`, the nudge range, the loop
+   *  pre-roll and the clock interval all read this rather than choosing between `callsPerFrame` and
+   *  `exactCallsPerFrame` themselves. A `computed` over `machineRates()` rather than a read of
+   *  `tuneSession.machine` directly — see `machineRates`' own doc for why that would go stale. */
+  readonly playRate: Signal<PlayRate> = computed<PlayRate>(() => {
+    const { exact, rounded } = this.machineRates();
+    const mode = this.timingMode();
+    return {
+      callsPerFrame: mode === 'exact' ? exact : rounded,
+      exactCallsPerFrame: exact,
+      roundedCallsPerFrame: rounded,
+      mode,
+    };
+  });
   readonly scheduleAheadMs = this.delivery.scheduleAheadMs;
   readonly lastError = signal<string | null>(null);
   readonly stats = signal<EngineStats>(EMPTY_STATS);
@@ -223,19 +271,37 @@ export class DjPlayerEngine implements OnDestroy {
   readonly markers = this.markerState.markers;
   readonly loopingMarker = this.markerState.loopingMarker;
   readonly queuedMarker = this.markerState.queuedMarker;
+  readonly tuneLoopStartFrame = this.markerState.tuneLoopStartFrame;
+  readonly tuneLoopPeriodFrames = this.markerState.tuneLoopPeriodFrames;
+  /** Where the track ends — re-exported exactly as the marker-state signals above are, so the
+   *  diagnostics and analysis panels never reach into `MarkerState` directly. */
+  readonly trackEndFrame = this.markerState.trackEndFrame;
   /** True for the span of `triggerMarker`'s `play()` await — see `triggerMarker` for why the view
    *  must gate trigger/delete on this rather than trust the index across that gap. */
   readonly markerLaunchPending = signal<boolean>(false);
   readonly nudgeRangeFrames = this.markerState.nudgeRangeFrames;
   readonly ceilingFrames = this.tuneSession.ceilingFrames;
+  readonly positionBasisFrames = this.tuneSession.positionBasisFrames;
 
-  /** Current playback position as a percentage of the ceiling, for the playhead. Clamped to 0–100
-   * because JUMP_CEILING_SECONDS is a fixed fiction, not the tune's real length — past ~5 PAL minutes
-   * of continuous play framesRendered/ceilingFrames exceeds 100% and the thumb should pin, not
-   * overflow. */
+  private readonly _repeatTrack = signal<boolean>(loadRepeatTrackPreference());
+  /** The player-level preference persisted under `REPEAT_TRACK_STORAGE_KEY`: whether a track plays
+   *  forever or stops once it reaches its detected end. Read once at construction; rides a tune
+   *  change unchanged — `loadTune` never resets it, and it is not a field on `TuneIndexRecord`. */
+  readonly repeatTrack: Signal<boolean> = this._repeatTrack.asReadonly();
+
+  private readonly _tuneIndex = signal<TuneIndexRecord | null>(null);
+  /** The current tune's cached or freshly scanned index record, published by `TuneIndexService`.
+   *  See `setTuneIndex` for what it drives — the position basis, the whole-tune loop and the clock's
+   *  timing mode. */
+  readonly tuneIndex: Signal<TuneIndexRecord | null> = this._tuneIndex.asReadonly();
+
+  /** Current playback position as a percentage of `positionBasisFrames`, for the playhead: the
+   * tune's own measured length once one has been indexed, the fixed ceiling otherwise. Clamped to
+   * 0–100 because a tune played past its basis — a loop with looping disarmed, or JUMP_CEILING_SECONDS'
+   * fixed fiction when no length was found — must still pin the thumb rather than overflow it. */
   readonly positionPercent = computed<number>(() => {
-    const ceiling = this.ceilingFrames();
-    return ceiling === 0 ? 0 : clamp((this.stats().framesRendered / ceiling) * 100, 0, 100);
+    const basis = this.positionBasisFrames();
+    return basis === 0 ? 0 : clamp((this.stats().framesRendered / basis) * 100, 0, 100);
   });
 
   private framesSincePublish = 0;
@@ -263,6 +329,11 @@ export class DjPlayerEngine implements OnDestroy {
       file.clock === 'ntsc' ? NTSC_FRAME_INTERVAL_US : PAL_FRAME_INTERVAL_US
     );
     this.resetCounters();
+    // The outgoing tune's index record — its detected loop and its play rate — describes a file this
+    // session no longer holds. Routing through setTuneIndex(null) rather than reaching into
+    // its three targets directly keeps this the same single seam TuneIndexService itself writes
+    // through, so the incoming tune's basis is the fixed ceiling until its own index (if any) arrives.
+    this.setTuneIndex(null);
     // A marker's start holds machine state, not a frame number, so a new tune invalidates every
     // captured snapshot — this is the only path that clears them. Stop, play-from-stopped and
     // subtune changes reuse the same machine and must leave captured markers alone. Whatever was
@@ -365,6 +436,30 @@ export class DjPlayerEngine implements OnDestroy {
     if (this.tuneSession.machine !== null) {
       this.tuneSession.initSubtune(this.currentSubtune());
     }
+    this.publishStats();
+  }
+
+  /**
+   * The track played through and stopped. Silences the cartridge and leaves the playhead at the
+   * track's end rather than snapping it to zero — the operator can see where the deck finished.
+   *
+   * Deliberately unlike `stop()` in exactly one respect: it does not re-init the subtune, because
+   * that would reset the position counter — `play()` from `'ended'` falls through its existing
+   * non-paused branch, which re-inits and resets the counters, and that is the restart-from-the-
+   * beginning behaviour, for free.
+   *
+   * Discards the outstanding jump for the same reason `stop()` does: a scrub still in flight would
+   * otherwise land after this reports `ended`, restore a position, and queue a resync that — with the
+   * clock stopped — goes out at once rather than riding a tick, so the deck would report `ended` and
+   * then audibly resume.
+   */
+  private endTrack(): void {
+    this.clock.stop();
+    this.pending = [];
+    this.delivery.clearCommitted();
+    this.tuneSession.discardOutstandingJump();
+    this.delivery.sendControl(buildStopPacket());
+    this.state.set('ended');
     this.publishStats();
   }
 
@@ -476,7 +571,11 @@ export class DjPlayerEngine implements OnDestroy {
       this._rememberedSpeed.set(this.speedMultiplier());
       this.excursionDirection = direction;
       const delta = direction === 'up' ? SPEED_JUMP_STEP : -SPEED_JUMP_STEP;
-      this.applySpeedBounded(this.speedMultiplier() + delta, this.slowestSpeed(), this.fastestSpeed());
+      this.applySpeedBounded(
+        this.speedMultiplier() + delta,
+        this.slowestSpeed(),
+        this.fastestSpeed()
+      );
       return;
     }
     if (this.excursionDirection === direction) {
@@ -513,9 +612,81 @@ export class DjPlayerEngine implements OnDestroy {
     this.applyIntervalChange();
   }
 
+  /** Sets the mode and re-resolves the clock. Public because it is the only path that makes a mode
+   *  change audible — `timingMode.set()` alone changes the signal and nothing else. */
+  setTimingMode(mode: TimingMode): void {
+    if (this.timingMode() === mode) return;
+    this.timingMode.set(mode);
+    this.applyIntervalChange();
+  }
+
   /** Delegates to `DeliveryTransport` — see its own doc for the clamp/enforcement split. */
   setScheduleAhead(ms: number): void {
     this.delivery.setScheduleAhead(ms);
+  }
+
+  /**
+   * Stores the current tune's index record — or clears it — as published by `TuneIndexService`, and
+   * feeds the same record to the three things it drives: the session's position basis, the
+   * whole-tune loop, and the clock's timing mode.
+   *
+   * **Any verified loop arms, including an implausibly short one — deliberately.** Detection is
+   * byte-exact: it has already compared every frame of the tail against its counterpart one period
+   * earlier, so a loop it reports is a repeat that was proven, not one that scored well. There is no
+   * plausibility gate here, and none should be added: a detection fault must stay audible rather than
+   * hide behind a guard that would also mask a future regression. `null` is the whole "declined to
+   * answer" case.
+   *
+   * `setTimingMode` rather than `timingMode.set` — the public method is what re-resolves the clock
+   * through `applyIntervalChange()`, and setting the signal alone would change the mode without
+   * changing the audio.
+   */
+  setTuneIndex(record: TuneIndexRecord | null): void {
+    this._tuneIndex.set(record);
+    // The session's own position basis — what the playhead and the drawn structure are measured
+    // against — is `timelineBasisFor`, not `positionBasisFor`: an ended tune needs a bar that runs
+    // past its end point for the dead tail to be drawable. `positionBasisFor` itself is untouched and
+    // still drives both analysis panels' Length rows and the track end the deck stops at, through
+    // `setTrackStructure` below.
+    this.tuneSession.setIndexedLengthFrames(timelineBasisFor(record));
+    this.markerState.setTrackStructure(
+      record?.loopStartFrame ?? null,
+      record?.loopPeriodFrames ?? null,
+      record?.endedAtFrame ?? null
+    );
+    this.setTimingMode(record?.timingMode ?? DEFAULT_TIMING_MODE);
+    // `setTrackStructure` has just dropped whatever entry image was held, so this is the one place
+    // that owes a fresh one. Not awaited: nothing on this path needs the image, and playback cannot
+    // reach the loop's out-frame for a whole lap yet.
+    void this.captureTuneLoopEntry();
+  }
+
+  /**
+   * Produces the whole-tune loop's re-entry image once, off-thread. A loop start of 0 needs none —
+   * the frame-0 seed already is one — and neither does a tune with no detected loop.
+   *
+   * The replay outlives the state it was asked against, so the file, the subtune and the loop start
+   * are all re-checked on the way back. Landing a stale image is worse than landing none: the
+   * fallback to the frame-0 seed is correct and audible, where a foreign machine image is neither.
+   */
+  async captureTuneLoopEntry(): Promise<void> {
+    const startFrame = this.tuneLoopStartFrame();
+    if (startFrame === null || startFrame === 0) return;
+
+    const file = this.tuneSession.file;
+    if (file === null) return;
+    const subtune = this.currentSubtune();
+
+    const result = await this.tuneSession.replayImage(startFrame);
+    if (result === null) return;
+    if (this.tuneSession.file !== file || this.currentSubtune() !== subtune) return;
+    if (this.tuneLoopStartFrame() !== startFrame) return;
+
+    this.markerState.setTuneLoopEntry({
+      frame: result.frame,
+      machine: result.machine,
+      registers: result.registers,
+    });
   }
 
   addMarker(): number {
@@ -586,8 +757,24 @@ export class DjPlayerEngine implements OnDestroy {
     this.markerState.auditionMarkerEnd(index);
   }
 
+  /** The Cues panel's Stop: drops the marker loop only. Whether the track itself repeats is the
+   *  `repeatTrack` preference, not something this touches. */
   stopLoop(): void {
-    this.markerState.stopLoop();
+    this.markerState.stopMarkerLoop();
+  }
+
+  /** Writes the repeat-track preference and persists it under `REPEAT_TRACK_STORAGE_KEY`, never
+   *  allowed to throw into the caller — mirrors `MidiOutputService.selectPort`'s own
+   *  try/catch-wrapped write. */
+  setRepeatTrack(enabled: boolean): void {
+    this._repeatTrack.set(enabled);
+    try {
+      localStorage.setItem(REPEAT_TRACK_STORAGE_KEY, String(enabled));
+    } catch (error) {
+      logWarn(
+        `DJ engine: could not persist the repeat-track preference to localStorage — ${error}`
+      );
+    }
   }
 
   clearMarker(index: number): void {
@@ -606,8 +793,15 @@ export class DjPlayerEngine implements OnDestroy {
    * Asks for `percent` of the jump ceiling — see `TuneSession.scrubTo`. The returned promise
    * resolves once the request has settled — landed, failed, or been superseded/discarded — so a
    * caller that needs to know when the jump is done (rather than merely requested) can await it.
+   *
+   * Drops the marker loop first — a manual scrub always wins over a passage the operator built
+   * against a marker, which would otherwise drag playback straight back to wherever it was looping.
+   * The whole-tune structure survives: repeating is the track's own behaviour, governed by
+   * `repeatTrack`, not something a scrub touches. The Track Analysis panel's click-to-audition routes
+   * through here too, so it inherits the same rule with no separate call site.
    */
   scrubTo(percent: number): Promise<void> {
+    this.markerState.stopMarkerLoop();
     return this.tuneSession.scrubTo(percent);
   }
 
@@ -709,10 +903,14 @@ export class DjPlayerEngine implements OnDestroy {
   /**
    * The real inter-packet time. Multispeed is a tick rate, never a batch: `runFrame` plays the
    * routine once, so a 2x tune ticks twice per video frame at half the interval.
+   *
+   * Divides by whichever rate `playRate()` is currently in force — `'exact'` by default, since a
+   * CIA-timer tune's play period need not divide the frame evenly and rounding it here paces the
+   * whole stream wrong (a 2.4-calls-per-frame tune rounded to 2 plays 20% slow). `setTimingMode` is
+   * the only thing that changes which rate that is.
    */
   private effectiveIntervalUs(): number {
-    const callsPerFrame = this.tuneSession.machine?.callsPerFrame ?? 1;
-    return this.nominalIntervalUs() / this.speedMultiplier() / callsPerFrame;
+    return playCallIntervalUs(this.nominalIntervalUs(), this.playRate()) / this.speedMultiplier();
   }
 
   /**
@@ -802,7 +1000,7 @@ export class DjPlayerEngine implements OnDestroy {
       bytesSent: delivery.bytesSent,
       suppressedWrites: this.tuneSession.frame?.suppressedWriteCount ?? 0,
       illegalOpcodeCount: this.tuneSession.machine?.illegalOpcodeCount ?? 0,
-      callsPerFrame: this.tuneSession.machine?.callsPerFrame ?? 1,
+      callsPerFrame: this.playRate().roundedCallsPerFrame,
       effectiveIntervalUs: this.reportedIntervalUs(),
       measuredMeanIntervalUs: clockStats.measuredMeanIntervalUs,
       driftMs: clockStats.driftMs,

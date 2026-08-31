@@ -5,7 +5,10 @@ import { RegisterFrame } from '../asid/register-frame';
 import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
 import type { ReplayRequest, ReplayResponse, ReplayRunner } from '../replay/replay-runner';
-import { clamp, describeError, MICROSECONDS_PER_SECOND } from './engine-utils';
+import type { ReplayResult } from '../replay/replay-to-frame';
+import { clamp, describeError, sanitizePositiveFrame } from './engine-utils';
+import { playCallsPerSecond } from './play-rate';
+import type { PlayRate } from './play-rate';
 
 /** The assumed length the scrub and playhead percentages are measured against — not the tune's real,
  * unmeasured length. A single tunable constant, not derived from anything about the file. */
@@ -20,6 +23,13 @@ export const JUMP_CEILING_SECONDS = 300;
  */
 export interface TuneSessionHost {
   nominalIntervalUs(): number;
+  /** The rate in force — a `computed` mirror of `machineRates()`, never a direct read of
+   *  `machine.exactCallsPerFrame`/`callsPerFrame`, so `ceilingFrames` stays reactive to a subtune
+   *  init that leaves the nominal interval unchanged. */
+  playRate(): PlayRate;
+  /** Mirrors `machine`'s two rates into that signal — the CIA latch is only meaningful once init has
+   *  run, so this is called from `initSubtune`, not from `load`. */
+  syncPlayRate(machine: C64Machine | null): void;
   effectiveMutes(): readonly boolean[];
   /** Clears the engine's error state — the tell that a subtune init succeeded. */
   clearError(): void;
@@ -52,19 +62,30 @@ export class TuneSession {
   readonly currentSubtune: WritableSignal<number> = signal(1);
   readonly subtuneCount: WritableSignal<number> = signal(1);
 
-  /** Frames in the fixed jump ceiling at the current nominal interval. Ignores multispeed
-   *  deliberately: for a callsPerFrame > 1 tune the ceiling represents a shorter real-world duration
-   *  than JUMP_CEILING_SECONDS, since more play-calls land in the same frame count. Acceptable
-   *  simplification for this iteration — most of the tune list is callsPerFrame 1. */
+  /** Frames in the fixed jump ceiling at the current nominal interval and play rate: seconds of
+   *  music times play calls per second, so a callsPerFrame 2 tune gets twice the frame count of the
+   *  same nominal interval at callsPerFrame 1 — the same 300 seconds of music either way. */
   readonly ceilingFrames: Signal<number> = computed<number>(() =>
-    Math.round((JUMP_CEILING_SECONDS * MICROSECONDS_PER_SECOND) / this.host.nominalIntervalUs())
+    Math.round(JUMP_CEILING_SECONDS * playCallsPerSecond(this.host.nominalIntervalUs(), this.host.playRate()))
+  );
+
+  /** The indexed length, when one was found and is usable; null falls back to the fixed ceiling. */
+  private readonly _indexedLengthFrames = signal<number | null>(null);
+
+  /** What a position percentage is measured against, in both directions. A `computed` over a signal
+   *  rather than a value snapshotted at load time, so a record landing mid-play moves the playhead's
+   *  meaning on the next stats publish with no further wiring. */
+  readonly positionBasisFrames: Signal<number> = computed(
+    () => this._indexedLengthFrames() ?? this.ceilingFrames()
   );
 
   private _file: SidFile | null = null;
   private _machine: C64Machine | null = null;
   private _frame: RegisterFrame | null = null;
   private _framesRendered = 0;
-  /** Stamped onto every jump request, so responses can be told apart by age. */
+  /** Stamped onto every request this session hands the runner, so responses can be told apart by age.
+   *  Shared with `replayImage` rather than counted separately: the runner is one shared worker, and
+   *  two counters could stamp two live requests with the same id. */
   private jumpRequestId = 0;
   /**
    * The id of the only jump whose result may still be applied, or null when none may.
@@ -103,11 +124,21 @@ export class TuneSession {
     this._frame = new RegisterFrame();
     this._machine = new C64Machine(file, this._frame);
     this.subtuneCount.set(Math.max(1, file.songs));
+    // The outgoing tune's rate must not survive into this one — initSubtune() re-syncs it once the
+    // incoming tune's own init has run.
+    this.host.syncPlayRate(null);
   }
 
   /** Zeroes the position counter — what a fresh play run or a fresh load starts from. */
   resetPosition(): void {
     this._framesRendered = 0;
+  }
+
+  /** Stores the tune-index's measured length as the position basis. Anything that is not a finite
+   *  number greater than zero is stored as null instead — a zero or negative basis would divide the
+   *  playhead by nothing — which makes `positionBasisFrames` fall back to `ceilingFrames`. */
+  setIndexedLengthFrames(frames: number | null): void {
+    this._indexedLengthFrames.set(sanitizePositiveFrame(frames));
   }
 
   /** Re-inits the machine and marks every register dirty, so the chip cannot inherit the old state. */
@@ -134,10 +165,14 @@ export class TuneSession {
     frame.markAllDirty();
     this._framesRendered = 0;
     // The ring is dropped rather than carried: its entries describe a machine that no longer exists,
-    // at frame numbers the reset counter has just invalidated. Cues and the loop's entry survive
-    // this deliberately — each owns its own anchor, so none of them needs the ring to persist.
+    // at frame numbers the reset counter has just invalidated. Marker cues and marker loop starts
+    // survive this deliberately — each owns its own anchor, so none of them needs the ring to
+    // persist.
     this.host.resetAnchors();
     this.host.recordAnchor(machine, frame, this._framesRendered);
+    // Init just ran, so this is the moment the CIA latch becomes meaningful — mirroring it any
+    // earlier would read a rate the tune hasn't actually programmed yet.
+    this.host.syncPlayRate(machine);
     this.currentSubtune.set(clamped);
     this.host.clearError();
     return true;
@@ -169,10 +204,10 @@ export class TuneSession {
   }
 
   /**
-   * Asks for `percent` of `ceilingFrames()`. The position does not move as soon as this returns — the
-   * replay runs off this thread and lands a moment later, and a second scrub issued in the meantime
-   * supersedes this one. The returned promise resolves once this request has settled — landed,
-   * failed, or been superseded/discarded.
+   * Asks for `percent` of `positionBasisFrames()`. The position does not move as soon as this
+   * returns — the replay runs off this thread and lands a moment later, and a second scrub issued in
+   * the meantime supersedes this one. The returned promise resolves once this request has settled —
+   * landed, failed, or been superseded/discarded.
    */
   scrubTo(percent: number): Promise<void> {
     if (this._machine === null) return Promise.resolve();
@@ -181,7 +216,7 @@ export class TuneSession {
 
   private frameForPercent(percent: number): number {
     const clamped = clamp(percent, 0, 100);
-    return Math.round((clamped / 100) * this.ceilingFrames());
+    return Math.round((clamped / 100) * this.positionBasisFrames());
   }
 
   /**
@@ -208,6 +243,44 @@ export class TuneSession {
     };
     this.outstandingJumpId = request.id;
     return this.awaitJump(request);
+  }
+
+  /**
+   * Replays off-thread to `targetFrame` and hands the result back instead of adopting it onto the
+   * live pair. Shares the jump's runner but none of its outstanding-id gating: nothing about the live
+   * machine changes, so a scrub in flight is neither superseded by this nor supersedes it.
+   *
+   * Null with no file loaded, or when the replay could not complete — the caller is asking for an
+   * image it can do without, so a failure degrades rather than failing the engine.
+   */
+  async replayImage(targetFrame: number): Promise<ReplayResult | null> {
+    const file = this._file;
+    if (file === null) return null;
+
+    const request: ReplayRequest = {
+      id: ++this.jumpRequestId,
+      file,
+      subtune: this.currentSubtune(),
+      targetFrame,
+      mutes: this.host.effectiveMutes(),
+    };
+
+    let response: ReplayResponse;
+    try {
+      response = await this.replayRunner.run(request);
+    } catch (error) {
+      response = {
+        id: request.id,
+        ok: false,
+        error: `replay to frame ${targetFrame} failed — ${describeError(error)}`,
+      };
+    }
+
+    if (!response.ok) {
+      logWarn(`DJ engine: ${response.error}`);
+      return null;
+    }
+    return response.result;
   }
 
   /** Waits out one replay request and applies its result if it is still the one being waited on. */

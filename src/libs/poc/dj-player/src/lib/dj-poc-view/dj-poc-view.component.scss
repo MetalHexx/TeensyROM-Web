@@ -26,6 +26,49 @@
   --marker-action-width: 4.5rem;
   --marker-revert-width: 4rem;
 
+  // POC-local semantic aliases over the app's theme tokens, so the drawn structure reads as one
+  // instrument with the rest of the surface while staying self-contained here. Values come from the
+  // theme where a theme ancestor exists.
+  --structure-music: var(--color-highlight); // #00f7ff
+  --structure-intro: #7b2d8e; // the one value with no theme ancestor — between --color-primary and
+  // --color-primary-bright
+  --structure-dead: #1c1c26;
+  --structure-pending: #191922;
+  --structure-unknown-a: #2e2e42;
+  --structure-unknown-b: #22222f;
+  --structure-tick: var(--color-directory); // #f5e29e — chosen for contrast against both the purple
+  // intro and the cyan music
+  --structure-border: #33334a;
+
+  // Chrome greys — no theme ancestor, POC-local by nature. Defined here rather than at each use site
+  // because the transport row's indicator and toggle consume them in a later task.
+  --chrome-inset: #2e2e3e; // an unlit indicator's body
+  --chrome-inset-border: #3d3d52; // its rim, and the toggle pill's rim
+  --chrome-raised: #2a2a3a; // the toggle pill, off
+  --chrome-knob: #6a6a80; // the toggle knob, off
+  --chrome-dark: #33334a; // the deliberately-dark `stopped` light
+  --chrome-dark-border: #44445c;
+
+  // Track Analysis panel's own dark chrome — no theme ancestor either, and distinct from the
+  // structure/chrome values above (this widget's own palette predates them). Named here, not at each
+  // use site, because each value repeats across several of that panel's own rules.
+  --analysis-panel-fill: #202020; // the weights and key sub-panels' background
+  --analysis-canvas-fill: #161616; // the lane stack and the structure square's background
+  --analysis-lane-fill: #1b1b1b; // the ruler and candidate lanes' background
+  --analysis-panel-border: #363636; // the ctrl bar and the weights/key sub-panels' border
+  --analysis-grid-line: #333333; // lane stack, ruler tick, structure square and readout dividers
+  --analysis-control-border: #4a4a4a; // ctrl bar buttons and the legend swatches' border
+  --analysis-text: #cccccc; // default body text on the panel's dark chrome
+  --analysis-text-bright: #e8eef2; // emphasised text — the run button and the key name
+  --analysis-text-dim: #888888; // secondary captions
+  --analysis-text-faint: #6f6f6f; // mono labels — ctrl labels, axis ticks, chroma labels
+  --analysis-text-muted: #7d7d7d; // tertiary text — key confidence and legend items
+  --analysis-accent: #c9a227; // the selected candidate, the tonic chroma bar, the auditioning legend
+  --analysis-accent-blue: #93a4b4; // the novelty curve and the in-scale chroma bars
+  --analysis-above: #c8d4de; // above-threshold candidates
+  --analysis-below: #4e5761; // below-threshold candidates and idle novelty marks
+  --analysis-warn: #b5533f; // out-of-scale notes and an unresolved key
+
   display: flex;
   gap: var(--spacing-lg);
   height: 100%;
@@ -100,8 +143,117 @@
   }
 }
 
-.engine-status {
+// nowrap so the spacer reliably pushes the toggle to the row's right edge instead of it dropping to
+// its own line the moment the stage narrows.
+.transport-controls {
+  flex-wrap: nowrap;
+}
+
+.transport-spacer {
+  flex: 1 1 auto;
+}
+
+.repeat-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-dimmed);
+}
+
+// A real checkbox styled with appearance: none and a pseudo-element knob, not a hidden input beside
+// a div — the POC's accessibility posture is whatever the platform gives a native control for free.
+.repeat-toggle-input {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 15px;
   margin: 0;
+  border-radius: 8px;
+  background: var(--chrome-raised);
+  border: 1px solid var(--chrome-inset-border);
+  cursor: pointer;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--chrome-knob);
+  }
+
+  &:checked {
+    background: rgba(0, 247, 255, 0.18);
+    border-color: var(--color-highlight);
+
+    &::after {
+      left: auto;
+      right: 1px;
+      background: var(--color-highlight);
+      box-shadow: 0 0 6px rgba(0, 247, 255, 0.9);
+    }
+  }
+}
+
+.transport-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+// Unlit by default — the same chrome-inset body every state but stopped starts from. Lit states set
+// both fill and border to the state's colour and add a glow; stopped goes to chrome-dark instead of
+// this default so it never reads as a merely-tinted variant of "off".
+.led {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--chrome-inset);
+  border: 1px solid var(--chrome-inset-border);
+
+  &--playing {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    box-shadow: 0 0 8px rgba(111, 220, 140, 0.95);
+  }
+
+  &--paused {
+    background: var(--color-directory);
+    border-color: var(--color-directory);
+    box-shadow: 0 0 8px rgba(245, 226, 158, 0.9);
+  }
+
+  &--ended {
+    background: var(--color-highlight);
+    border-color: var(--color-highlight);
+    box-shadow: 0 0 8px rgba(0, 247, 255, 0.95);
+  }
+
+  &--analyzing {
+    background: var(--color-primary-bright);
+    border-color: var(--color-primary-bright);
+    box-shadow: 0 0 9px rgba(179, 51, 179, 1);
+  }
+
+  &--error {
+    background: var(--color-error);
+    border-color: var(--color-error);
+    box-shadow: 0 0 8px rgba(255, 111, 111, 0.95);
+  }
+
+  // stopped and ended are the two silent states and must stay visibly distinct — this is dark like
+  // real hardware, not the default unlit body tinted toward a colour.
+  &--stopped {
+    background: var(--chrome-dark);
+    border-color: var(--chrome-dark-border);
+  }
 }
 
 // Cues and Loop dominate the stage width; Voice and Speed sit in a narrow rail beside them whose
@@ -612,30 +764,120 @@
   }
 }
 
-// The elapsed fill sits behind a transparent-background range input, the same stacking technique
-// as .marker-nudge above — the fill shows the played portion, the native thumb still handles drag.
+// The row wrapper: the hit target, sized to the control's full reach rather than shrinking to the
+// drawn bar, and the tick's own positioning context — the tick has to sit outside the bar below,
+// whose `overflow: hidden` would otherwise clip it. The transparent-background range input on top is
+// the same stacking technique `.marker-nudge` uses; the native thumb still handles drag.
 .scrub-track {
   position: relative;
   flex: 1 1 auto;
+  display: flex;
+  align-items: center;
   height: var(--perf-control-height);
-  border: 1px solid var(--color-dimmed);
-  border-radius: var(--border-radius-md);
-  overflow: hidden;
 
   input[type='range'] {
     position: absolute;
     inset: 0;
     margin: 0;
     background: transparent;
+
+    &::-webkit-slider-thumb {
+      appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #f2f2fa;
+      border: 1px solid var(--color-primary-bright);
+      box-shadow: 0 0 7px rgba(179, 51, 179, 0.75);
+    }
+
+    &::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #f2f2fa;
+      border: 1px solid var(--color-primary-bright);
+      box-shadow: 0 0 7px rgba(179, 51, 179, 0.75);
+    }
+
+    // No span exists to scrub against while analyzing, and playback has not started — see
+    // `barState` in the component. Hidden rather than removed: the input itself stays disabled, not
+    // absent, so the row's layout never shifts.
+    &:disabled::-webkit-slider-thumb {
+      visibility: hidden;
+    }
+
+    &:disabled::-moz-range-thumb {
+      visibility: hidden;
+    }
   }
 }
 
-.scrub-track-fill {
+// The drawn bar — 12px tall regardless of the row's own height, centred in it by the flex
+// `align-items: center` above. `overflow: hidden` is what gives the regions their rounded ends.
+.scrub-bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 12px;
+  display: flex;
+  border: 1px solid var(--structure-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--structure-dead);
+}
+
+.scrub-region {
+  height: 100%;
+
+  &--music {
+    background: var(--structure-music);
+    box-shadow: inset 0 0 8px rgba(0, 247, 255, 0.45);
+  }
+
+  &--intro {
+    background: var(--structure-intro);
+    box-shadow: inset 0 0 8px rgba(179, 51, 179, 0.4);
+  }
+
+  &--dead {
+    background: var(--structure-dead);
+  }
+
+  &--unknown {
+    width: 100%;
+    background: repeating-linear-gradient(
+      45deg,
+      var(--structure-unknown-a) 0 5px,
+      var(--structure-unknown-b) 5px 10px
+    );
+  }
+
+  &--pending {
+    width: 100%;
+    background: var(--structure-pending);
+  }
+}
+
+// The loop point — outside `.scrub-bar`'s clipped box, positioned against `.scrub-track` instead, so
+// it reads over the bar rather than being cut off at its edge.
+.scrub-tick {
   position: absolute;
-  inset: 0;
-  width: 0;
-  background: var(--color-dimmed);
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  background: var(--structure-tick);
+  box-shadow: 0 0 7px rgba(245, 226, 158, 0.95);
   pointer-events: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--structure-tick);
+  }
 }
 
 // Speed: multiplier readout above the fader, mode selector below it. The fader is vertical — a

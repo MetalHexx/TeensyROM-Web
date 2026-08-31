@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { computed, signal } from '@angular/core';
 import type { SidFile, SidClock } from '../sid/sid-file.model';
 import { C64Machine } from '../cpu/c64-machine';
 import type { RegisterFrame } from '../asid/register-frame';
@@ -6,6 +7,7 @@ import type { ReplayRequest, ReplayResponse, ReplayRunner } from '../replay/repl
 import { replayToFrame } from '../replay/replay-to-frame';
 import { JUMP_CEILING_SECONDS, TuneSession } from './tune-session';
 import type { TuneSessionHost } from './tune-session';
+import type { PlayRate } from './play-rate';
 
 /**
  * Answers every request against the real `replayToFrame`, immediately — enough for the landing
@@ -120,6 +122,17 @@ function counterTune(songs = 1): SidFile {
   });
 }
 
+/** init programs CIA 1 timer A for exactly two play calls per frame; play still writes nothing. */
+function doubleSpeedTune(): SidFile {
+  // LDA #$63 / STA $DC04 / LDA #$26 / STA $DC05 / RTS — a latch of 9827, half a PAL frame.
+  return tune({
+    blocks: [
+      { at: 0x1000, bytes: [0xa9, 0x63, 0x8d, 0x04, 0xdc, 0xa9, 0x26, 0x8d, 0x05, 0xdc, RTS] },
+      { at: 0x1010, bytes: [RTS] },
+    ],
+  });
+}
+
 /** init returns at once, but the play routine never does — a replay to any frame past 0 burns its
  *  whole cycle budget on the first frame it steps. */
 function runawayTune(): SidFile {
@@ -141,15 +154,29 @@ function unplayableTune(): SidFile {
 }
 
 /** A `TuneSessionHost` that records every call, so a test can assert on what the session asked of
- *  its coordinator without standing up the coordinator itself. */
+ *  its coordinator without standing up the coordinator itself.
+ *
+ * `playRate`/`syncPlayRate` default to a real signal-backed pair, mirroring how `DjPlayerEngine`
+ * wires them — a `computed` `playRate()` over a `machineRates` signal `syncPlayRate` writes to —
+ * rather than a static stub, so a test can assert on `ceilingFrames` staying reactive across a
+ * subtune init with no override needed. */
 function fakeHost(overrides: Partial<TuneSessionHost> = {}): TuneSessionHost & {
   readonly failures: string[];
   readonly resyncCount: { count: number };
 } {
   const failures: string[] = [];
   const resyncCount = { count: 0 };
+  const machineRates = signal<{ exact: number; rounded: number }>({ exact: 1, rounded: 1 });
+  const playRate = computed<PlayRate>(() => {
+    const { exact, rounded } = machineRates();
+    return { callsPerFrame: exact, exactCallsPerFrame: exact, roundedCallsPerFrame: rounded, mode: 'exact' };
+  });
   return {
     nominalIntervalUs: () => 20_000,
+    playRate: () => playRate(),
+    syncPlayRate: (machine) => {
+      machineRates.set({ exact: machine?.exactCallsPerFrame ?? 1, rounded: machine?.callsPerFrame ?? 1 });
+    },
     effectiveMutes: () => [false, false, false],
     clearError: () => undefined,
     fail: (reason: string) => failures.push(reason),
@@ -253,6 +280,77 @@ describe('TuneSession', () => {
     });
   });
 
+  describe('positionBasisFrames', () => {
+    it('keeps the fixed ceiling as the basis when no indexed length has been set', () => {
+      const session = new TuneSession(new FakeReplayRunner(), fakeHost());
+      session.load(silentTune());
+
+      expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+    });
+
+    it('keeps the fixed ceiling when a length is set back to null', () => {
+      const session = new TuneSession(new FakeReplayRunner(), fakeHost());
+      session.load(silentTune());
+      session.setIndexedLengthFrames(2_500);
+
+      session.setIndexedLengthFrames(null);
+
+      expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+    });
+
+    it('adopts a usable indexed length as the basis', () => {
+      const session = new TuneSession(new FakeReplayRunner(), fakeHost());
+      session.load(silentTune());
+
+      session.setIndexedLengthFrames(2_500);
+
+      expect(session.positionBasisFrames()).toBe(2_500);
+    });
+
+    it('rejects a zero or negative length, falling back to the ceiling', () => {
+      const session = new TuneSession(new FakeReplayRunner(), fakeHost());
+      session.load(silentTune());
+
+      session.setIndexedLengthFrames(0);
+      expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+
+      session.setIndexedLengthFrames(-100);
+      expect(session.positionBasisFrames()).toBe(session.ceilingFrames());
+    });
+  });
+
+  describe('ceilingFrames and the play rate', () => {
+    it('doubles for a callsPerFrame 2 tune versus a callsPerFrame 1 tune at the same nominal interval', () => {
+      const host1x = fakeHost();
+      const session1x = new TuneSession(new FakeReplayRunner(), host1x);
+      session1x.load(silentTune());
+      session1x.initSubtune(1);
+
+      const host2x = fakeHost();
+      const session2x = new TuneSession(new FakeReplayRunner(), host2x);
+      session2x.load(doubleSpeedTune());
+      session2x.initSubtune(1);
+
+      expect(session2x.ceilingFrames()).toBe(session1x.ceilingFrames() * 2);
+    });
+
+    it('stays reactive to a subtune init that changes the rate without the nominal interval changing — the stale-computed trap', () => {
+      const host = fakeHost();
+      const session = new TuneSession(new FakeReplayRunner(), host);
+      session.load(silentTune());
+      session.initSubtune(1);
+      const before = session.ceilingFrames();
+
+      session.load(doubleSpeedTune());
+      session.initSubtune(1);
+
+      // Same nominal interval throughout — only the rate mirrored off the freshly-initialised
+      // machine changed. A `ceilingFrames` that read `machine.exactCallsPerFrame` directly inside
+      // its `computed` would still report the stale, pre-init value here.
+      expect(session.ceilingFrames()).toBe(before * 2);
+    });
+  });
+
   describe('scrubTo', () => {
     it('lands on the requested percentage of the jump ceiling and queues a resync', async () => {
       const host = fakeHost();
@@ -266,6 +364,19 @@ describe('TuneSession', () => {
       const expectedCeiling = Math.round((JUMP_CEILING_SECONDS * 1_000_000) / host.nominalIntervalUs());
       expect(session.framesRendered).toBe(Math.round(expectedCeiling * 0.5));
       expect(host.resyncCount.count).toBe(1);
+    });
+
+    it('lands on the requested percentage of an indexed basis rather than the ceiling', async () => {
+      const host = fakeHost();
+      replay = new FakeReplayRunner();
+      const session = new TuneSession(replay, host);
+      session.load(counterTune());
+      session.initSubtune(1);
+      session.setIndexedLengthFrames(2_500);
+
+      await session.scrubTo(50);
+
+      expect(session.framesRendered).toBe(1_250);
     });
 
     it('resolves without a request when no machine is loaded', async () => {
@@ -322,6 +433,61 @@ describe('TuneSession', () => {
       await session.scrubTo(1);
 
       expect(host.failures.some((reason) => reason.includes('during replay'))).toBe(true);
+    });
+  });
+
+  describe('replayImage', () => {
+    it('hands the image back at the requested frame, leaving the live pair exactly where it was', async () => {
+      const host = fakeHost();
+      replay = new FakeReplayRunner();
+      const session = new TuneSession(replay, host);
+      session.load(counterTune());
+      session.initSubtune(1);
+      session.framesRendered = 40;
+
+      const result = await session.replayImage(10);
+
+      expect(result?.frame).toBe(10);
+      expect(session.framesRendered).toBe(40);
+      expect(host.resyncCount.count).toBe(0);
+    });
+
+    it('resolves to null without asking the runner when no file is loaded', async () => {
+      replay = new FakeReplayRunner();
+      const session = new TuneSession(replay, fakeHost());
+
+      expect(await session.replayImage(10)).toBeNull();
+      expect(replay.requests).toHaveLength(0);
+    });
+
+    it('degrades to null rather than failing the engine when the replay cannot complete', async () => {
+      const host = fakeHost();
+      replay = new FakeReplayRunner();
+      const session = new TuneSession(replay, host);
+      session.load(runawayTune());
+      session.initSubtune(1);
+
+      expect(await session.replayImage(1)).toBeNull();
+      expect(host.failures).toHaveLength(0);
+    });
+
+    it('takes no part in the jump gating: a scrub issued alongside it still lands, under an id of its own', async () => {
+      const host = fakeHost();
+      replay = new FakeReplayRunner();
+      replay.manual = true;
+      const session = new TuneSession(replay, host);
+      session.load(counterTune());
+      session.initSubtune(1);
+      session.setIndexedLengthFrames(100);
+
+      const jump = session.scrubTo(50);
+      const image = session.replayImage(10);
+      replay.resolveAll();
+      const [, result] = await Promise.all([jump, image]);
+
+      expect(session.framesRendered).toBe(50);
+      expect(result?.frame).toBe(10);
+      expect(replay.requests[0].id).not.toBe(replay.requests[1].id);
     });
   });
 

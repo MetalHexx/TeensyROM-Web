@@ -9,8 +9,18 @@ import {
   EngineStats,
   Marker,
 } from '../engine/dj-player-engine';
+import type { PlayRate, TimingMode } from '../engine/play-rate';
 import { MidiAccessState, MidiOutputService, MidiPortOption } from '../midi/midi-output.service';
 import type { SidFile } from '../sid/sid-file.model';
+import { ANALYSIS_SCANNER } from '../analysis/scan-runner';
+import type { AnalysisScanner, ScanResult } from '../analysis/scan-runner';
+import type { ScanOutput } from '../analysis/scan-tune';
+import { TUNE_INDEX_STORAGE } from '../analysis/tune-index-storage';
+import type { ITuneIndexStorage } from '../analysis/tune-index-storage';
+import { TuneIndexService } from '../analysis/tune-index.service';
+import { TUNE_INDEX_FORMAT_VERSION } from '../analysis/tune-index.model';
+import type { TuneIndexRecord } from '../analysis/tune-index.model';
+import { ASID_SLOT_COUNT } from '../asid/asid-constants';
 
 const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
@@ -53,6 +63,10 @@ interface MockDjPlayerEngine {
   subtuneCount: WritableSignal<number>;
   speedMultiplier: WritableSignal<number>;
   nominalIntervalUs: WritableSignal<number>;
+  playRate: WritableSignal<PlayRate>;
+  // Read by TuneIndexService's own ladder completion when a scan under this suite is let run to a
+  // full answer — not otherwise touched by anything else in this component's own surface.
+  timingMode: WritableSignal<TimingMode>;
   scheduleAheadMs: WritableSignal<number>;
   mutedVoices: WritableSignal<readonly boolean[]>;
   heldVoices: WritableSignal<readonly boolean[]>;
@@ -60,10 +74,18 @@ interface MockDjPlayerEngine {
   markers: WritableSignal<readonly Marker[]>;
   loopingMarker: WritableSignal<number | null>;
   queuedMarker: WritableSignal<number | null>;
+  tuneLoopStartFrame: WritableSignal<number | null>;
+  tuneLoopPeriodFrames: WritableSignal<number | null>;
+  trackEndFrame: WritableSignal<number | null>;
+  repeatTrack: WritableSignal<boolean>;
+  setRepeatTrack: ReturnType<typeof vi.fn>;
   markerLaunchPending: WritableSignal<boolean>;
   progressPercentFor: ReturnType<typeof vi.fn>;
   positionPercent: WritableSignal<number>;
   nudgeRangeFrames: WritableSignal<number>;
+  ceilingFrames: WritableSignal<number>;
+  tuneIndex: WritableSignal<TuneIndexRecord | null>;
+  setTuneIndex: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
@@ -115,6 +137,13 @@ function makeEngine(): MockDjPlayerEngine {
     subtuneCount: signal(1),
     speedMultiplier: signal(1),
     nominalIntervalUs: signal(19950),
+    playRate: signal<PlayRate>({
+      callsPerFrame: 1,
+      exactCallsPerFrame: 1,
+      roundedCallsPerFrame: 1,
+      mode: 'exact',
+    }),
+    timingMode: signal<TimingMode>('exact'),
     scheduleAheadMs: signal(0),
     mutedVoices: signal<readonly boolean[]>([false, false, false]),
     heldVoices: signal<readonly boolean[]>([false, false, false]),
@@ -122,10 +151,18 @@ function makeEngine(): MockDjPlayerEngine {
     markers: signal<readonly Marker[]>([]),
     loopingMarker: signal<number | null>(null),
     queuedMarker: signal<number | null>(null),
+    tuneLoopStartFrame: signal<number | null>(null),
+    tuneLoopPeriodFrames: signal<number | null>(null),
+    trackEndFrame: signal<number | null>(null),
+    repeatTrack: signal<boolean>(true),
+    setRepeatTrack: vi.fn(),
     markerLaunchPending: signal<boolean>(false),
     progressPercentFor: vi.fn(() => 0),
     positionPercent: signal(0),
     nudgeRangeFrames: signal(50),
+    ceilingFrames: signal(10_000),
+    tuneIndex: signal<TuneIndexRecord | null>(null),
+    setTuneIndex: vi.fn(),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
@@ -154,6 +191,70 @@ function makeEngine(): MockDjPlayerEngine {
     clearMarker: vi.fn(),
     deleteMarker: vi.fn(),
     scrubTo: vi.fn(),
+  };
+}
+
+interface StubTuneIndexStorage {
+  load: ReturnType<typeof vi.fn>;
+  save: ReturnType<typeof vi.fn>;
+}
+
+interface StubAnalysisScanner {
+  scan: ReturnType<typeof vi.fn>;
+  dispose: ReturnType<typeof vi.fn>;
+}
+
+/** A cache that never holds a record and swallows every save by default — `TuneIndexService` is
+ *  wired up here so its DI graph resolves, and so the play-sequencing suite can drive its own
+ *  settle outcomes by overriding `load`'s return value per test. */
+function makeTuneIndexStorage(): StubTuneIndexStorage {
+  return { load: vi.fn(() => null), save: vi.fn() };
+}
+
+/** A scan that never resolves by default — safe for a suite that never flushes far enough to await
+ *  it, and overridable per test for the suite that does. */
+function makeAnalysisScanner(): StubAnalysisScanner {
+  return { scan: vi.fn(() => new Promise<ScanResult>(() => undefined)), dispose: vi.fn() };
+}
+
+/** A silent, all-zero scan long enough to answer conclusively on the ladder's very first rung — the
+ *  detector math is out of scope here, only whether `play()` waited on it. */
+function makeScan(frames: number, callsPerFrame: number): ScanOutput {
+  return {
+    slotValues: new Uint8Array(frames * ASID_SLOT_COUNT),
+    writeCounts: new Uint8Array(frames),
+    frames,
+    callsPerFrame,
+  };
+}
+
+/** A fully-shaped record for a cache-hit fixture — `TuneIndexPanelComponent` renders whatever
+ *  `TuneIndexService.record()` publishes, so a partial stand-in crashes its template instead of
+ *  exercising the play-sequencing behavior this suite is actually after. */
+function buildTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
+  return {
+    filename: 'Cached.sid',
+    subtune: 1,
+    loopStartFrame: null,
+    loopPeriodFrames: null,
+    endedAtFrame: null,
+    sectionBoundaries: [],
+    tonic: null,
+    mode: null,
+    camelot: null,
+    tuningReferenceHz: null,
+    tuningCents: null,
+    keyConfidence: 'none',
+    scalePitchClasses: [],
+    dominantIntervalFrames: null,
+    pulseConfidence: 'none',
+    nativeTempo: null,
+    callsPerFrame: 1,
+    exactCallsPerFrame: 1,
+    timingMode: 'exact',
+    formatVersion: TUNE_INDEX_FORMAT_VERSION,
+    computedAt: '2026-08-29T00:00:00.000Z',
+    ...overrides,
   };
 }
 
@@ -230,10 +331,14 @@ describe('DjPocViewComponent', () => {
   let component: DjPocViewComponent;
   let midi: MockMidiOutputService;
   let engine: MockDjPlayerEngine;
+  let tuneIndexStorage: StubTuneIndexStorage;
+  let analysisScanner: StubAnalysisScanner;
 
   async function setup(): Promise<void> {
     midi = makeMidiService();
     engine = makeEngine();
+    tuneIndexStorage = makeTuneIndexStorage();
+    analysisScanner = makeAnalysisScanner();
 
     await TestBed.configureTestingModule({
       imports: [DjPocViewComponent],
@@ -243,6 +348,12 @@ describe('DjPocViewComponent', () => {
           providers: [
             { provide: MidiOutputService, useValue: midi as unknown as MidiOutputService },
             { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+            TuneIndexService,
+            {
+              provide: TUNE_INDEX_STORAGE,
+              useValue: tuneIndexStorage as unknown as ITuneIndexStorage,
+            },
+            { provide: ANALYSIS_SCANNER, useValue: analysisScanner as unknown as AnalysisScanner },
           ],
         },
       })
@@ -292,6 +403,17 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('transport buttons', () => {
+    function transportButton(label: string): HTMLButtonElement {
+      const buttons: HTMLButtonElement[] = Array.from(
+        fixture.nativeElement.querySelectorAll('.transport-controls button')
+      );
+      const button = buttons.find((candidate) => candidate.textContent?.trim() === label);
+      if (button === undefined) {
+        throw new Error(`no ${label} transport button rendered`);
+      }
+      return button;
+    }
+
     it('calls engine.play, pause and stop', () => {
       midi.selectedPortId.set('port-1');
       component.currentTune.set(fakeSidFile());
@@ -313,6 +435,142 @@ describe('DjPocViewComponent', () => {
       const stopButton = buttons.find((button) => button.textContent?.trim() === 'Stop');
       stopButton?.click();
       expect(engine.stop).toHaveBeenCalled();
+    });
+
+    it('holds Play and Stop disabled for the whole of a new tune scan, and releases them once it settles', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      analysisScanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+      midi.selectedPortId.set('port-1');
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      expect(transportButton('Play').disabled).toBe(true);
+      expect(transportButton('Stop').disabled).toBe(true);
+
+      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(transportButton('Play').disabled).toBe(false);
+      });
+      expect(transportButton('Stop').disabled).toBe(false);
+    });
+
+    it('leaves Stop reachable while a subtune step scans mid-playback', async () => {
+      tuneIndexStorage.load.mockReturnValueOnce(buildTuneIndexRecord({ filename: 'Auto tune' }));
+      midi.selectedPortId.set('port-1');
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(engine.play).toHaveBeenCalled();
+      });
+
+      engine.state.set('playing');
+      engine.currentSubtune.set(2);
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      expect(transportButton('Stop').disabled).toBe(false);
+    });
+  });
+
+  describe('transport state readout', () => {
+    function led(): HTMLElement {
+      return fixture.nativeElement.querySelector('.transport-row .led');
+    }
+
+    it('removes the old "State:" text line from the template', () => {
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).not.toContain('State:');
+    });
+
+    it.each([
+      ['stopped', 'Stopped'],
+      ['playing', 'Playing'],
+      ['paused', 'Paused'],
+      ['ended', 'Ended'],
+      ['error', 'Error'],
+    ] as const)(
+      "carries the led--%s class and label for the engine's own %s state",
+      (state, label) => {
+        engine.state.set(state);
+        fixture.detectChanges();
+
+        expect(led().classList.contains(`led--${state}`)).toBe(true);
+        expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain(label);
+      }
+    );
+
+    it('lights analyzing, over whatever the engine itself reports, while a genuinely new tune scans', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      analysisScanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+      engine.state.set('playing');
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      expect(led().classList.contains('led--analyzing')).toBe(true);
+      expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain('Analyzing…');
+
+      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(led().classList.contains('led--analyzing')).toBe(false);
+      });
+    });
+
+    it('never lights analyzing for a cache hit', async () => {
+      tuneIndexStorage.load.mockReturnValue(buildTuneIndexRecord({ filename: 'Auto tune' }));
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(engine.play).toHaveBeenCalled();
+      });
+
+      expect(led().classList.contains('led--analyzing')).toBe(false);
+      expect(analysisScanner.scan).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('repeat toggle', () => {
+    function repeatToggle(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('[aria-label="Repeat track"]');
+    }
+
+    it("reflects the engine's repeatTrack signal", () => {
+      expect(repeatToggle().checked).toBe(true);
+
+      engine.repeatTrack.set(false);
+      fixture.detectChanges();
+
+      expect(repeatToggle().checked).toBe(false);
+    });
+
+    it('writes the setting through the engine when switched', () => {
+      const toggle = repeatToggle();
+      toggle.checked = false;
+      toggle.dispatchEvent(new Event('change'));
+
+      expect(engine.setRepeatTrack).toHaveBeenCalledWith(false);
     });
   });
 
@@ -463,11 +721,112 @@ describe('DjPocViewComponent', () => {
   });
 
   describe('auto-play', () => {
-    it('plays automatically once a tune is selected', () => {
+    // The tune-index effect lives on TuneIndexService, provided at this component's own level: it is
+    // flushed as part of this fixture's own change detection, not `TestBed.flushEffects()` (that
+    // flushes the root scheduler, which a view-scoped effect is never queued on). Polling — rather
+    // than a single flush — lets the ladder's own `await`s and the settle's continuation interleave
+    // between attempts instead of deadlocking on one pass.
+    async function waitForPlay(): Promise<void> {
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(engine.play).toHaveBeenCalled();
+      });
+    }
+
+    it('withholds play until a cache hit publishes the record, requesting no scan at all', async () => {
+      tuneIndexStorage.load.mockReturnValue(buildTuneIndexRecord({ filename: 'Auto tune' }));
+
       component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
 
       expect(engine.loadTune).toHaveBeenCalled();
-      expect(engine.play).toHaveBeenCalled();
+      expect(engine.play).not.toHaveBeenCalled();
+
+      await waitForPlay();
+
+      expect(analysisScanner.scan).not.toHaveBeenCalled();
+    });
+
+    it('withholds play while a genuinely new tune scans, and releases it once the scan completes', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      analysisScanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+      expect(engine.play).not.toHaveBeenCalled();
+
+      // Long and silent enough to answer conclusively on the ladder's very first rung.
+      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+
+      await waitForPlay();
+    });
+
+    it('releases play once a failed scan settles the load, without indexing the tune', async () => {
+      let resolveScan!: (result: ScanResult) => void;
+      analysisScanner.scan.mockImplementation(
+        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+      );
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      resolveScan({ id: 1, kind: 'failed', error: 'the analysis scan worker stopped responding' });
+
+      await waitForPlay();
+
+      expect(tuneIndexStorage.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('tune-index hand-off', () => {
+    it('passes the bundled label to the tune-index service on selectTune', () => {
+      const setTune = vi.spyOn(component['tuneIndex'], 'setTune');
+
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      expect(setTune).toHaveBeenCalledTimes(1);
+      expect(setTune).toHaveBeenCalledWith(engine.loadTune.mock.calls[0][0], 'Auto tune');
+    });
+
+    it("passes the picked file's name to the tune-index service on file pick", async () => {
+      const setTune = vi.spyOn(component['tuneIndex'], 'setTune');
+      // jsdom's File has no working arrayBuffer(); a minimal stand-in is enough since only the
+      // hand-off — not File parsing itself — is under test here.
+      const pickedFile = {
+        name: 'mytune.sid',
+        arrayBuffer: () => Promise.resolve(validSidBytes().buffer),
+      } as unknown as File;
+      const input = { files: [pickedFile], value: '' } as unknown as HTMLInputElement;
+
+      // Not awaited directly: `onFilePicked` now stays pending behind the tune-index settle, which
+      // (on the default cache-miss, never-resolving scanner double) never arrives. `setTune` is
+      // already called by the time the hand-off happens, so polling for that call is enough.
+      void component.onFilePicked({ target: input } as unknown as Event);
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(setTune).toHaveBeenCalledTimes(1);
+      });
+
+      expect(setTune).toHaveBeenCalledWith(engine.loadTune.mock.calls[0][0], 'mytune.sid');
+    });
+  });
+
+  describe('tune index panel placement', () => {
+    it('renders the tune index panel in the sidebar, not the stage rail', () => {
+      expect(
+        fixture.nativeElement.querySelector('aside.sidebar lib-tune-index-panel')
+      ).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('.stage-rail lib-tune-index-panel')).toBeNull();
     });
   });
 
@@ -814,9 +1173,7 @@ describe('DjPocViewComponent', () => {
         engine.markers.set(markers);
       });
 
-      (
-        fixture.nativeElement.querySelector('.marker-end-revert') as HTMLButtonElement
-      ).click();
+      (fixture.nativeElement.querySelector('.marker-end-revert') as HTMLButtonElement).click();
       fixture.detectChanges();
 
       expect(engine.clearMarkerEnd).toHaveBeenCalledWith(0);
@@ -1075,6 +1432,76 @@ describe('DjPocViewComponent', () => {
     });
   });
 
+  describe('position bar structure', () => {
+    function scrubRegions(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.scrub-bar .scrub-region'));
+    }
+
+    function regionClasses(): string[][] {
+      return scrubRegions().map((region) => Array.from(region.classList));
+    }
+
+    function scrubTick(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('.scrub-tick');
+    }
+
+    function scrubInput(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('.scrub-row input[type="range"]');
+    }
+
+    it('renders one music region across the full bar for a loop-from-top record, with the tick at the left edge', () => {
+      engine.tuneIndex.set(buildTuneIndexRecord({ loopStartFrame: 0, loopPeriodFrames: 2_000 }));
+      fixture.detectChanges();
+
+      expect(regionClasses()).toEqual([['scrub-region', 'scrub-region--music']]);
+      expect(scrubTick()).not.toBeNull();
+      expect((scrubTick() as HTMLElement).style.left).toBe('0%');
+    });
+
+    it('renders an intro region then a music region for an intro-then-loop record, with the tick at the boundary', () => {
+      engine.tuneIndex.set(buildTuneIndexRecord({ loopStartFrame: 400, loopPeriodFrames: 1_600 }));
+      fixture.detectChanges();
+
+      expect(regionClasses()).toEqual([
+        ['scrub-region', 'scrub-region--intro'],
+        ['scrub-region', 'scrub-region--music'],
+      ]);
+      expect((scrubTick() as HTMLElement).style.left).toBe('20%'); // 400 / (400 + 1_600)
+    });
+
+    it('renders a music region — the same class as the loop case — up to the end point, then a dead region, with no tick', () => {
+      engine.tuneIndex.set(buildTuneIndexRecord({ endedAtFrame: 4_000 }));
+      fixture.detectChanges();
+
+      expect(regionClasses()).toEqual([
+        ['scrub-region', 'scrub-region--music'],
+        ['scrub-region', 'scrub-region--dead'],
+      ]);
+      expect(scrubTick()).toBeNull();
+    });
+
+    it('renders hatched across the fallback ceiling for a record that answered nothing', () => {
+      engine.tuneIndex.set(buildTuneIndexRecord());
+      fixture.detectChanges();
+
+      expect(regionClasses()).toEqual([['scrub-region', 'scrub-region--unknown']]);
+      expect(scrubTick()).toBeNull();
+    });
+
+    it('renders a distinct, disabled bar while analyzing — no tick, and a different class from unknown', async () => {
+      component.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(analysisScanner.scan).toHaveBeenCalled();
+      });
+
+      expect(regionClasses()).toEqual([['scrub-region', 'scrub-region--pending']]);
+      expect(scrubTick()).toBeNull();
+      expect(scrubInput().disabled).toBe(true);
+    });
+  });
+
   describe('delivery diagnostics readout', () => {
     function sectionText(label: string): string {
       const section = fixture.nativeElement.querySelector(`[aria-label="${label}"]`) as HTMLElement;
@@ -1086,6 +1513,13 @@ describe('DjPocViewComponent', () => {
       fixture.detectChanges();
 
       expect(sectionText('Diagnostics')).toContain('40 ms');
+    });
+
+    it("reads the track end frame from the engine's own signal", () => {
+      engine.trackEndFrame.set(6_700);
+      fixture.detectChanges();
+
+      expect(sectionText('Diagnostics')).toContain('6700');
     });
 
     it("binds the delivery numbers to the engine's stats signal", () => {
@@ -1131,12 +1565,16 @@ describe('DjPocViewComponent', () => {
       const labels: HTMLLabelElement[] = Array.from(
         fixture.nativeElement.querySelectorAll('[aria-label="Timing"] label.control')
       );
-      const label = labels.find((item) => (item.textContent ?? '').trim().startsWith('Schedule ahead'));
+      const label = labels.find((item) =>
+        (item.textContent ?? '').trim().startsWith('Schedule ahead')
+      );
       return label?.querySelector('select') as HTMLSelectElement;
     }
 
     it('widens the offered range past a single frame interval, so a shorter-than-window stall can be demonstrated', () => {
-      const values = Array.from(scheduleAheadSelect().options).map((option) => Number(option.value));
+      const values = Array.from(scheduleAheadSelect().options).map((option) =>
+        Number(option.value)
+      );
 
       expect(values).toEqual([0, 5, 20, 40, 80, 160]);
     });

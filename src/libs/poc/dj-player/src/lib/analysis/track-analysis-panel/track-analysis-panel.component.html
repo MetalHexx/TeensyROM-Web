@@ -279,6 +279,7 @@
         <span class="legend-swatch legend-swatch--out-of-scale"></span>out of scale
       </span>
     </div>
+    }
 
     @if (structureResult(); as structure) {
     <div class="structure-panel">
@@ -332,6 +333,7 @@
     </div>
     }
 
+    @if (hasAnalysis() || hasCachedRecord()) {
     <div class="readout-panel">
       <div class="readout-row">
         <span>Frames analysed</span><span>{{ framesAnalysedLabel() }}</span>
@@ -347,7 +349,7 @@
         <span>Cause</span><span>{{ selectedCauseLabel() }}</span>
       </div>
       <div class="readout-row">
-        <span>Loop point</span><span>{{ structureLoopFrameLabel() }}</span>
+        <span>Loop</span><span>{{ structureLoopLabel() }}</span>
       </div>
       <div class="readout-row">
         <span>Length</span><span>{{ structureLengthLabel() }}</span>

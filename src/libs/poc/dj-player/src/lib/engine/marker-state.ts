@@ -1,10 +1,17 @@
 import { computed, signal, Signal, WritableSignal } from '@angular/core';
-import { PAL_FRAME_INTERVAL_US } from '../asid/asid-constants';
 import type { RegisterValuesSnapshot } from '../asid/register-frame';
 import { C64Machine, FrameResult, MachineSnapshot } from '../cpu/c64-machine';
 import { RegisterFrame } from '../asid/register-frame';
 import type { SidFile } from '../sid/sid-file.model';
-import { clamp, describeError } from './engine-utils';
+import {
+  clamp,
+  describeError,
+  positionBasisFor,
+  sanitizePositiveFrame,
+  sanitizeStartFrame,
+} from './engine-utils';
+import { msToPlayCalls } from './play-rate';
+import type { PlayRate } from './play-rate';
 
 /** The nudge window in real time. Frames are derived from the tune's rate so the felt range is
  *  the same on a 1x tune and a 2x-multispeed one. */
@@ -104,6 +111,9 @@ export interface MarkerHost {
   setFramesRendered(value: number): void;
   /** The tune's nominal frame interval, feeding the same rate `msToFrames` converts against. */
   nominalIntervalUs(): number;
+  /** The rate in force — a `computed` mirror of the coordinator's `machineRates()`, never a direct
+   *  read of `machine()?.exactCallsPerFrame`. */
+  playRate(): PlayRate;
   /** Puts machine + register state back onto the live pair, adopts the frame number, and queues the
    *  chip resync the restore owes the stream. */
   restoreState(machine: MachineSnapshot, registers: RegisterValuesSnapshot, frameNumber: number): void;
@@ -112,6 +122,11 @@ export interface MarkerHost {
   queueResync(): void;
   /** Whichever voices are silenced right now, latched XOR held — seeds a replay's throwaway frame. */
   effectiveMutes(): readonly boolean[];
+  /** The player-level preference the end-of-track routing decides against — whether a track plays
+   *  forever or once. */
+  repeatEnabled(): boolean;
+  /** Stops the track in place once its end is reached with `repeatEnabled()` false. */
+  endTrack(): void;
   /** Marks the engine's failure state and logs why. */
   fail(reason: string): void;
 }
@@ -139,6 +154,24 @@ export class MarkerState {
   readonly loopingMarker: WritableSignal<number | null> = signal(null);
   /** The marker that takes over when the looping one finishes its lap, or null. */
   readonly queuedMarker: WritableSignal<number | null> = signal(null);
+  /** Where the detected loop begins, in rendered frames — 0 for a tune that repeats from the top,
+   *  null when detection found no loop. */
+  readonly tuneLoopStartFrame: WritableSignal<number | null> = signal(null);
+  /** One lap of the detected loop, in frames; null when detection found no loop. */
+  readonly tuneLoopPeriodFrames: WritableSignal<number | null> = signal(null);
+  /** Where an ended-detection track stops, in rendered frames; null when detection found no such
+   *  point. Mutually exclusive with a detected loop — a record carries one outcome or the other. */
+  private readonly endedAtFrame: WritableSignal<number | null> = signal(null);
+  /** Where the track ends: loop start + period for a looping tune, the end point for an ended one,
+   *  null when detection declined to answer. Computed through `positionBasisFor` rather than a
+   *  second rule, so this and the length readouts never disagree about what "the end" means. */
+  readonly trackEndFrame: Signal<number | null> = computed<number | null>(() =>
+    positionBasisFor({
+      loopStartFrame: this.tuneLoopStartFrame(),
+      loopPeriodFrames: this.tuneLoopPeriodFrames(),
+      endedAtFrame: this.endedAtFrame(),
+    })
+  );
 
   /**
    * The nudge range in frames for the loaded tune.
@@ -174,28 +207,62 @@ export class MarkerState {
    */
   private anchorRing: PositionAnchor[] = [];
 
+  /** The machine image a lap re-enters through, produced off-thread by the coordinator as soon as a
+   *  detection lands. Null until one arrives, and again whenever the detection or the machine
+   *  underneath it is replaced. */
+  private tuneLoopEntry: PositionAnchor | null = null;
+
   /** Converts a real-time duration to frames at the tune's own rate (`nominalIntervalUs` divided by
-   *  `callsPerFrame`), never the live speed multiplier — shared by the nudge range and the loop
+   *  the rate in force), never the live speed multiplier — shared by the nudge range and the loop
    *  audition pre-roll so both breathe with the tune, never the speed fader. */
   private msToFrames(ms: number): number {
-    const callsPerFrame = this.host.machine()?.callsPerFrame ?? 1;
-    const nominalUs = this.host.nominalIntervalUs();
-    const tuneIntervalUs = nominalUs > 0 ? nominalUs / callsPerFrame : PAL_FRAME_INTERVAL_US;
-    return Math.round((ms * 1000) / tuneIntervalUs);
+    return msToPlayCalls(ms, this.host.nominalIntervalUs(), this.host.playRate());
   }
 
-  /** Clears every marker, and lets go of whatever was looping — a new tune invalidates every
-   *  captured snapshot, since a marker's start holds machine state, not a frame number. */
+  /**
+   * Clears every marker, and lets go of whatever was looping — a new tune invalidates every captured
+   * snapshot, since a marker's start holds machine state, not a frame number.
+   *
+   * Only the marker loop: the whole-tune structure is cleared on the load path by
+   * `setTrackStructure`, which `DjPlayerEngine.loadTune` reaches through `setTuneIndex(null)` before
+   * it gets here.
+   */
   clear(): void {
     this.markers.set([]);
-    this.stopLoop();
+    this.stopMarkerLoop();
   }
 
-  /** Drops the anchor ring — its entries describe a machine that no longer exists, at frame numbers
-   *  a subtune re-init has just invalidated. A marker's start survives this deliberately: it owns
-   *  its own anchor, so it needs no ring to persist. */
+  /**
+   * Adopts the detected track structure — the three nullable fields the index record stores it in.
+   * A loop period that is not a finite number greater than zero describes no lap, so the loop start
+   * is dropped alongside it; an ended point that is not a finite number greater than zero is
+   * likewise treated as no answer.
+   *
+   * A `loopStartFrame` of 0 — a tune that repeats from its very first frame — is valid and must
+   * survive validation, which is why the start is checked for `>= 0` rather than through
+   * `sanitizePositiveFrame`. No plausibility bar beyond that: see `DjPlayerEngine.setTuneIndex`.
+   *
+   * Drops whatever entry image was held: it was produced for the previous detection's start frame,
+   * so a new detection has nothing to say about it.
+   */
+  setTrackStructure(
+    loopStartFrame: number | null,
+    loopPeriodFrames: number | null,
+    endedAtFrame: number | null
+  ): void {
+    const period = sanitizePositiveFrame(loopPeriodFrames);
+    this.tuneLoopStartFrame.set(period === null ? null : sanitizeStartFrame(loopStartFrame));
+    this.tuneLoopPeriodFrames.set(period);
+    this.endedAtFrame.set(sanitizePositiveFrame(endedAtFrame));
+    this.tuneLoopEntry = null;
+  }
+
+  /** Drops the anchor ring and the whole-tune loop's entry image — each describes a machine that no
+   *  longer exists, at a frame number a subtune re-init has just invalidated. A marker's start
+   *  survives this deliberately: it owns its own anchor, so it needs no ring to persist. */
   resetAnchorRing(): void {
     this.anchorRing = [];
+    this.tuneLoopEntry = null;
   }
 
   /** Adds the live machine to the ring, dropping the oldest non-seed entry once it is full. */
@@ -216,6 +283,11 @@ export class MarkerState {
     if (framesRendered % this.anchorSnapshotFrameInterval() === 0) {
       this.recordAnchor(machine, frame, framesRendered);
     }
+  }
+
+  /** The image a lap re-enters through, or null to fall back to the frame-0 seed. */
+  setTuneLoopEntry(entry: PositionAnchor | null): void {
+    this.tuneLoopEntry = entry;
   }
 
   /**
@@ -457,13 +529,15 @@ export class MarkerState {
   }
 
   /**
-   * Drops out of the loop at once, leaving playback running on linearly from wherever it is, and
-   * forgets anything queued behind it.
+   * Drops the marker loop and whatever was queued behind it. The whole-tune loop is untouched — it is
+   * the tune's own repeat behaviour, not something the operator built against a passage.
    *
    * Deliberately immediate where a trigger waits for the lap: stopping is a get-out, not a musical
-   * transition.
+   * transition. Nothing about the playhead moves, and neither does the marker whose loop this drops:
+   * the row keeps its start and its end, so re-triggering it is all it takes to play the passage
+   * again.
    */
-  stopLoop(): void {
+  stopMarkerLoop(): void {
     this.loopingMarker.set(null);
     this.queuedMarker.set(null);
   }
@@ -530,16 +604,19 @@ export class MarkerState {
    * nudge has crossed its ends (or its end was dropped), or re-enters/switches once the end is
    * reached. Returns whether a restore was just queued — the tick loop must not publish stats twice
    * on that tick, since the resync it queued goes out on the next one.
+   *
+   * The whole-tune loop is only ever reached when no marker is looping, so the two kinds can never
+   * fire on the same tick.
    */
   advanceLoop(framesRendered: number): boolean {
     const active = this.loopingMarker();
-    if (active === null) return false;
+    if (active === null) return this.advanceTuneLoop(framesRendered);
 
     const loop = this.resolveLoop(this.markers()[active]);
     if (loop === null) {
       // Ends nudged until they crossed (or an end dropped mid-lap) describe no pass — drop out
       // rather than re-enter every tick.
-      this.stopLoop();
+      this.stopMarkerLoop();
       return false;
     }
     if (framesRendered < loop.outFrame) return false;
@@ -551,8 +628,45 @@ export class MarkerState {
     } else if (!this.engageMarker(queued)) {
       // The lap the trigger waited for is over, but the queued marker lost its start (or its end
       // was nudged across it) while it waited — nothing to switch to, so drop out.
-      this.stopLoop();
+      this.stopMarkerLoop();
     }
+    return true;
+  }
+
+  /**
+   * The end-of-track routing, reached only when no marker is looping: acts once `trackEndFrame()` is
+   * passed, deciding what "the end" means against `MarkerHost.repeatEnabled()`.
+   *
+   * With repeat off, an ended-detection tune stops just the same as a looping one — its own program
+   * sits in a static idle cycle forever, so declining to wrap would leave the audio cycling while the
+   * position counter climbed past the end of the bar. Off must actively stop, via
+   * `MarkerHost.endTrack()`.
+   *
+   * With repeat on, a looping tune restores `tuneLoopEntry` — the image `setTuneLoopEntry` was handed
+   * for the loop start — so a tune with an unrepeating intro plays that intro once; with none held it
+   * restores `anchorRing[0]`, the frame-0 seed `TuneSession.initSubtune` records and `recordAnchor`
+   * never evicts. An ended-detection tune always restores the frame-0 seed instead: it has no loop
+   * start of its own, so repeating it means replaying the whole track, intro included.
+   *
+   * Either restore goes through the same `MarkerHost.restoreState` primitive a marker restores
+   * through, and with the frame number the restored image actually names: winding the rendered-frame
+   * count back is what makes the scrubber visibly snap back rather than the audio looping while the
+   * position bar keeps climbing off the end.
+   */
+  private advanceTuneLoop(framesRendered: number): boolean {
+    const outFrame = this.trackEndFrame();
+    if (outFrame === null) return false;
+    if (framesRendered < outFrame) return false;
+
+    if (!this.host.repeatEnabled()) {
+      this.host.endTrack();
+      return true;
+    }
+
+    const looping = this.tuneLoopPeriodFrames() !== null;
+    const entry = looping ? this.tuneLoopEntry ?? this.anchorRing[0] ?? null : this.anchorRing[0] ?? null;
+    if (entry === null) return false;
+    this.host.restoreState(entry.machine, entry.registers, entry.frame);
     return true;
   }
 
