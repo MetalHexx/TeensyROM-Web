@@ -169,6 +169,34 @@ describe('DeckHostComponent', () => {
       expect(decks[0].engine).toBe(first.engine);
       expect(decks[1].engine).toBe(second.engine);
     });
+
+    it("pushes each deck's own mixer gain to that deck's own engine, and only that deck's own engine — over the single shared MixerService instance DjPocViewComponent provides page-level", () => {
+      const first = build(DECKS[0]);
+      const second = build(DECKS[1]);
+      first.fixture.detectChanges(); // runs ngOnInit, adopting DECKS[0].id
+      second.fixture.detectChanges(); // runs ngOnInit, adopting DECKS[1].id
+      TestBed.flushEffects();
+
+      // Both build()s resolve MixerService from this describe block's shared TestBed module (it is
+      // not among DeckHostComponent's own component-level providers) — the same one-instance-across-
+      // decks topology DjPocViewComponent wires in production.
+      const mixer = TestBed.inject(MixerService);
+      const firstGainSpy = vi.spyOn(first.engine, 'setOutputGain');
+      const secondGainSpy = vi.spyOn(second.engine, 'setOutputGain');
+
+      mixer.setCrossfaderPosition(1); // hard over to DECKS[1]'s side: fades DECKS[0] to silence
+      mixer.setDeckFader(DECKS[1].id, 0.25); // DECKS[1]'s own fader, independent of the crossfader
+      // This effect is created inside a component constructor, so it is tied to that component's own
+      // view rather than the environment injector — it flushes on that view's change detection, not
+      // on TestBed's global effect flush.
+      first.fixture.detectChanges();
+      second.fixture.detectChanges();
+
+      expect(firstGainSpy).toHaveBeenCalledWith(0);
+      expect(firstGainSpy).not.toHaveBeenCalledWith(0.25);
+      expect(secondGainSpy).toHaveBeenCalledWith(0.25);
+      expect(secondGainSpy).not.toHaveBeenCalledWith(0);
+    });
   });
 
   describe('template wiring, over mocked collaborators', () => {
