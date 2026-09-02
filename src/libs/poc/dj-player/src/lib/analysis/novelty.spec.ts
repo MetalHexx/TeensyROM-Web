@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { FEATURE_DIMENSIONS, FEATURE_DIMENSION_COUNT } from './frame-features';
 import type { FeatureMatrix } from './frame-features';
-import { computeNovelty, candidatesAbove, DEFAULT_FEATURE_WEIGHTS } from './novelty';
+import {
+  computeNovelty,
+  candidatesAbove,
+  DEFAULT_CANDIDATE_THRESHOLD,
+  DEFAULT_FEATURE_WEIGHTS,
+} from './novelty';
 import type { Candidate, FeatureWeights } from './novelty';
 
 /** A stable, mid-range value for every dimension — distinct from 0 or 1 so a dimension that never
@@ -127,6 +132,12 @@ describe('computeNovelty — filter sweep and weighting', () => {
 });
 
 describe('candidatesAbove', () => {
+  // The one place this constant's value is pinned — every other reader imports it rather than
+  // re-asserting the number.
+  it('defaults "strong enough to be a real moment" to 0.5', () => {
+    expect(DEFAULT_CANDIDATE_THRESHOLD).toBe(0.5);
+  });
+
   it('filters purely: the candidate count changes with the threshold, the curve never does', () => {
     const frames = 40;
     const rows: number[][] = [];

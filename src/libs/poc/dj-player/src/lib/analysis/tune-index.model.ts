@@ -3,9 +3,16 @@ import type { TimingMode } from '../engine/play-rate';
 /** Bumped whenever a detector's weights or algorithm changes in a way that would make a previously
  *  stored answer wrong rather than merely stale. A record whose `formatVersion` does not match this
  *  is treated as if it were never written, so it gets re-scanned and overwritten. */
-export const TUNE_INDEX_FORMAT_VERSION = 2;
+export const TUNE_INDEX_FORMAT_VERSION = 3;
 
 export type DetectorConfidence = 'strong' | 'weak' | 'none';
+
+/** One above-threshold peak of the change curve, as the indexing scan found it. Frame numbers are
+ *  absolute tune frames, on the same basis every other frame field on this record uses. */
+export interface DetectedMoment {
+  readonly frame: number;
+  readonly strength: number; // 0..1
+}
 
 /**
  * The compact, persisted answer for one `(filename, subtune)` pair. Every detector field is
@@ -32,6 +39,8 @@ export interface TuneIndexRecord {
   readonly endedAtFrame: number | null;
   // arrangement — from computeStructure()
   readonly sectionBoundaries: readonly number[]; // frame numbers
+  // moments — from computeNovelty(), filtered once at write time
+  readonly detectedMoments: readonly DetectedMoment[];
 
   // key — from detectKey()
   readonly tonic: number | null; // 0..11, null = no clear key

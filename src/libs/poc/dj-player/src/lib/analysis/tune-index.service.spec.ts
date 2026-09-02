@@ -11,7 +11,9 @@ import { TUNE_INDEX_STORAGE } from './tune-index-storage';
 import type { ITuneIndexStorage } from './tune-index-storage';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
+import { DEFAULT_CANDIDATE_THRESHOLD } from './novelty';
 import { ASID_SLOT_COUNT } from '../asid/asid-constants';
+import { PRIMARY_SLOT_FOR_REGISTER } from '../asid/register-frame';
 import type { PlayRate, TimingMode } from '../engine/play-rate';
 import type { SidFile } from '../sid/sid-file.model';
 
@@ -116,6 +118,32 @@ function makeLoopingScan(
   return scan;
 }
 
+/** Three well-separated events — a full voice-on transition at frame 20 and its voice-off mirror at
+ *  frame 70 (activity, gate and waveform all move at once each time, comfortably above
+ *  `DEFAULT_CANDIDATE_THRESHOLD` once normalised), with a volume-only swing at frame 45 in between
+ *  (one mid-weight dimension, comfortably below it) — so a single record exercises the filter's above-
+ *  and below-threshold sides together, with two surviving candidates to order. Short enough that no
+ *  lap of it ever satisfies the loop detector's minimum tail, so every rung the ladder tries sees the
+ *  same data. */
+function makeMomentsScan(): ScanOutput {
+  const scan = makeScan(100, 1);
+  const setRegister = (frame: number, register: number, value: number): void => {
+    scan.slotValues[frame * ASID_SLOT_COUNT + PRIMARY_SLOT_FOR_REGISTER[register]] = value;
+  };
+  for (let f = 20; f < 100; f++) {
+    setRegister(f, 0, 0x00); // voice0 freq lo
+    setRegister(f, 1, 0x20); // voice0 freq hi
+    setRegister(f, 4, 0x41); // voice0 control: pulse waveform, gate on
+  }
+  for (let f = 45; f < 100; f++) {
+    setRegister(f, 24, 0x0f); // master volume, alone
+  }
+  for (let f = 70; f < 100; f++) {
+    setRegister(f, 4, 0x00); // voice0 control: gate back off
+  }
+  return scan;
+}
+
 /** Drains the microtask queue several turns deep — a resolved scan now crosses more than one
  *  `await` before it reaches `record()`: the ladder, `produceRecord`, `SharedTuneIndex.produceOnce`
  *  and finally `refreshIndex`'s own await all sit between them. A single `await Promise.resolve()`
@@ -134,6 +162,7 @@ function buildStoredRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexR
     loopPeriodFrames: null,
     endedAtFrame: null,
     sectionBoundaries: [],
+    detectedMoments: [],
     tonic: null,
     mode: null,
     camelot: null,
@@ -731,6 +760,46 @@ describe('TuneIndexService', () => {
       expect(storage.save).toHaveBeenCalledTimes(1);
       expect(storage.save).toHaveBeenCalledWith(record);
       expect(engine.setTuneIndex).toHaveBeenCalledWith(record);
+    });
+  });
+
+  describe('detectedMoments', () => {
+    it('carries only the above-threshold candidates, in frame order, with no contributors on any stored entry', async () => {
+      scanner.scan.mockImplementation(() =>
+        Promise.resolve<ScanResult>({ id: 0, kind: 'done', output: makeMomentsScan() })
+      );
+
+      service.setTune(fakeSidFile(), 'Moments.sid');
+      TestBed.flushEffects();
+
+      // No lap of the controlled scan ever satisfies the loop detector's minimum tail, so the ladder
+      // deepens through every rung before answering — settle enough microtask turns for all four.
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      const moments = service.record()?.detectedMoments;
+      expect(moments).toBeDefined();
+      expect(moments?.map((moment) => moment.frame)).toEqual([20, 70]);
+      for (const moment of moments ?? []) {
+        expect(moment.strength).toBeGreaterThanOrEqual(DEFAULT_CANDIDATE_THRESHOLD);
+        expect(Object.keys(moment).sort()).toEqual(['frame', 'strength']);
+      }
+    });
+
+    it('stores an empty array when the curve produces no above-threshold peak', async () => {
+      scanner.scan.mockImplementation(() =>
+        Promise.resolve<ScanResult>({ id: 0, kind: 'done', output: makeScan(60, 1) })
+      );
+
+      service.setTune(fakeSidFile(), 'Silent.sid');
+      TestBed.flushEffects();
+
+      for (let i = 0; i < 20; i++) {
+        await Promise.resolve();
+      }
+
+      expect(service.record()?.detectedMoments).toEqual([]);
     });
   });
 });

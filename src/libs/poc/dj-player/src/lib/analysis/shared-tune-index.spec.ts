@@ -23,6 +23,7 @@ function buildRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord 
     loopPeriodFrames: null,
     endedAtFrame: null,
     sectionBoundaries: [],
+    detectedMoments: [],
     tonic: null,
     mode: null,
     camelot: null,

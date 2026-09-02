@@ -22,7 +22,12 @@ import { WorkerAnalysisScanner } from '../worker-analysis-scanner';
 import type { ScanOutput } from '../scan-tune';
 import { buildFeatureMatrix, readFrameFeatures } from '../frame-features';
 import type { FeatureMatrix } from '../frame-features';
-import { computeNovelty, candidatesAbove, DEFAULT_FEATURE_WEIGHTS } from '../novelty';
+import {
+  computeNovelty,
+  candidatesAbove,
+  DEFAULT_CANDIDATE_THRESHOLD,
+  DEFAULT_FEATURE_WEIGHTS,
+} from '../novelty';
 import type { Candidate, FeatureWeights, NoveltyResult } from '../novelty';
 import { computeStructure } from '../structure';
 import type { StructureResult } from '../structure';
@@ -70,7 +75,6 @@ const CHROMA_BAR_GAP = 2;
 const CHROMA_LANE_HEIGHT = 44;
 
 const MIN_WINDOW_FRAMES = 50;
-const DEFAULT_THRESHOLD = 0.5;
 
 const MAX_CUTOFF_VALUE = 0x07ff;
 const MAX_VOLUME_VALUE = 0x0f;
@@ -449,7 +453,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   protected readonly notes = signal<readonly Note[]>([]);
   protected readonly keyResult = signal<KeyResult | null>(null);
   protected readonly sectionKeys = signal<readonly KeyResult[]>([]);
-  protected readonly threshold = signal<number>(DEFAULT_THRESHOLD);
+  protected readonly threshold = signal<number>(DEFAULT_CANDIDATE_THRESHOLD);
   protected readonly weights = signal<FeatureWeights>(DEFAULT_FEATURE_WEIGHTS);
   protected readonly selectedCandidate = signal<Candidate | null>(null);
   protected readonly scanning = signal<boolean>(false);
@@ -1304,7 +1308,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     this.scanning.set(false);
     this.scanProgressFrame.set(0);
     this.scanError.set(null);
-    this.threshold.set(DEFAULT_THRESHOLD);
+    this.threshold.set(DEFAULT_CANDIDATE_THRESHOLD);
     this.weights.set(DEFAULT_FEATURE_WEIGHTS);
     this.viewWindow.set(null);
   }
