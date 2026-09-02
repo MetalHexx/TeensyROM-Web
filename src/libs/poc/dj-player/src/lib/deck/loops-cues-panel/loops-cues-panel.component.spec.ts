@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { LoopsCuesPanelComponent } from './loops-cues-panel.component';
 import { DeckContext } from '../deck-context';
 import { DjPlayerEngine } from '../../engine/dj-player-engine';
-import type { CapturedPoint, Marker } from '../../engine/dj-player-engine';
+import type { CapturedPoint, Marker, MarkerEnd } from '../../engine/dj-player-engine';
 
 function startPoint(frame: number): CapturedPoint {
   return { frame, offset: 0, machine: {}, registers: {}, anchor: {} } as unknown as CapturedPoint;
@@ -12,6 +12,11 @@ function startPoint(frame: number): CapturedPoint {
 
 function markerWithStart(frame: number): Marker {
   return { start: startPoint(frame), end: null };
+}
+
+function markerWithLoop(startFrame: number, endFrame: number): Marker {
+  const end: MarkerEnd = { frame: endFrame, offset: 0 };
+  return { start: startPoint(startFrame), end };
 }
 
 function emptyMarker(): Marker {
@@ -149,5 +154,36 @@ describe('LoopsCuesPanelComponent', () => {
     expect(addA).toBe('Add marker deck A');
     expect(addB).toBe('Add marker deck B');
     expect(addA).not.toBe(addB);
+  });
+
+  it('shows the Loop Length readout only once a marker holds an end', () => {
+    build('A');
+    engine.markers.set([markerWithStart(100)]);
+    fixture.detectChanges();
+
+    expect(rows()[0].querySelector('.marker-loop-length')).toBeNull();
+
+    engine.markers.set([markerWithLoop(100, 400)]);
+    fixture.detectChanges();
+
+    const length = rows()[0].querySelector('.marker-loop-length') as HTMLElement;
+    expect(length.textContent?.trim()).toBe('Loop Length: 300 fr');
+  });
+
+  it('tracks the end nudge slider live, before the drag commits', () => {
+    build('A');
+    engine.markers.set([markerWithLoop(100, 400)]);
+    fixture.detectChanges();
+
+    const endNudge = rows()[0].querySelector(
+      "[aria-label='Nudge marker 1 end deck A']"
+    ) as HTMLInputElement;
+    endNudge.value = '20';
+    endNudge.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const length = rows()[0].querySelector('.marker-loop-length') as HTMLElement;
+    expect(length.textContent?.trim()).toBe('Loop Length: 320 fr');
+    expect(engine.setMarkerEndOffset).not.toHaveBeenCalled();
   });
 });

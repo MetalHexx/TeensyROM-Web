@@ -138,6 +138,23 @@
   height: calc(var(--perf-control-height, 2rem) * 0.8);
 }
 
+// Backs out the width `.marker-number` + `.marker-trigger` + their two gaps already consume in
+// this row, so the label's left edge lands at the same absolute offset as the nudge track below
+// (past `.marker-sub-tag` + `.marker-frame`) rather than that offset plus this row's own width.
+.marker-loop-length {
+  margin-left: calc(
+    3rem + 6rem + var(--spacing-sm) - 1.25rem - 6rem - 2 * var(--spacing-sm)
+  );
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+
+  @media (max-width: 1500px) {
+    margin-left: calc(
+      3rem + 4.5rem + var(--spacing-sm) - 1.25rem - 6rem - 2 * var(--spacing-sm)
+    );
+  }
+}
+
 .marker-end-revert--empty {
   opacity: 0.4;
 }

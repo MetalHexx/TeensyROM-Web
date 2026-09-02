@@ -110,6 +110,16 @@ export class LoopsCuesPanelComponent {
     return end === null ? null : end.frame + this.displayedMarkerEndOffset(index);
   }
 
+  /** The row's loop length in frames — resolved end minus resolved start, tracking whichever
+   * nudge is currently being dragged. Null with no end marked, matching when the row has nothing
+   * to show. */
+  protected loopLengthFrames(index: number): number | null {
+    const end = this.markerEndFrame(index);
+    if (end === null) return null;
+    const start = this.markerStartFrame(index);
+    return start === null ? null : end - start;
+  }
+
   protected markerStartOffsetLabel(index: number): string {
     return offsetLabel(this.displayedMarkerStartOffset(index));
   }

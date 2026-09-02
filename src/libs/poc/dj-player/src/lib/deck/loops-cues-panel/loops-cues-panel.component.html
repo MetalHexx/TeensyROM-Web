@@ -46,6 +46,10 @@
             Capture
           </button>
           }
+
+          @if (marker.end) {
+          <span class="marker-loop-length">Loop Length: {{ loopLengthFrames($index) }} fr</span>
+          }
         </div>
 
         <div class="marker-row-actions">
