@@ -1,5 +1,9 @@
 <div class="mixer-column">
-  <div class="reserved">reserved for the mixing surface (future work)</div>
+  <div class="channel-faders">
+    @for (deck of decks; track deck.id) {
+      <lib-channel-fader [deck]="deck" />
+    }
+  </div>
 
   <lib-crossfader />
 </div>

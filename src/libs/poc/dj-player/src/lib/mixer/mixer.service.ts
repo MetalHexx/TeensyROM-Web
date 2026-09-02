@@ -33,6 +33,10 @@ export class MixerService {
    *  `effect` reading it must not re-subscribe on every read. */
   private readonly gainSignals = new Map<string, Signal<number>>();
 
+  /** Memoized for the same reason as `gainSignals` — an `effect` reading `deckFader` must not
+   *  re-subscribe on every read. */
+  private readonly deckFaderSignals = new Map<string, Signal<number>>();
+
   setCrossfaderPosition(position: CrossfaderPosition): void {
     this._crossfaderPosition.set(position);
   }
@@ -41,6 +45,17 @@ export class MixerService {
    *  drops in later. */
   setDeckFader(deckId: string, gain: number): void {
     this.deckFaders.update((faders) => new Map(faders).set(deckId, gain));
+  }
+
+  /** A deck's own fader contributor, full resolution — what the on-screen channel fader renders and
+   *  writes. 1 for a deck the model has not been told about, matching `deckFaderFor`. */
+  deckFader(deckId: string): Signal<number> {
+    let fader = this.deckFaderSignals.get(deckId);
+    if (fader === undefined) {
+      fader = computed(() => this.deckFaders().get(deckId) ?? 1);
+      this.deckFaderSignals.set(deckId, fader);
+    }
+    return fader;
   }
 
   /** The composed, full-resolution gain for a deck. 1 for a deck id the model does not know. */
