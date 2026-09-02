@@ -19,6 +19,13 @@
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
   min-height: 0;
+  // The channel faders' travel length, held here so both faders and the row that holds them agree on
+  // it. Matches the crossfader's own rendered width (this column's inner width is fixed at 208px by
+  // `TWO_DECK_COLUMN_TEMPLATE`, so that width barely moves across breakpoints) so the two controls
+  // read as the same size, per the wireframe. Without an explicit length here, `.channel-faders`'
+  // `flex: 1 1 auto` used to stretch the faders to fill however tall the grid happened to render —
+  // fine when the row held no content, but a runaway once a real input lived there.
+  --fader-length: 11.5rem;
 
   @media (max-width: 1500px) {
     padding: var(--spacing-xs) var(--spacing-sm);
@@ -34,10 +41,12 @@
   }
 }
 
-// The vertical space `.reserved` used to hold. A row of two, one per deck, with generous separation
-// — this is a surface reached for mid-mix, so the two must not be easy to confuse or hit together.
+// A row of two, one per deck, with generous separation — this is a surface reached for mid-mix, so
+// the two must not be easy to confuse or hit together. Fixed to `--fader-length` rather than
+// growing to fill the column: see that variable's own comment for why.
 .channel-faders {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  height: var(--fader-length);
   min-height: 0;
   display: flex;
   justify-content: center;
