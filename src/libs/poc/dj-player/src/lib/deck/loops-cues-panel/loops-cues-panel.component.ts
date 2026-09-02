@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { nextMomentOffset, reachableMomentOffsets } from '../../analysis/marker-moments';
+import type { DetectedMoment } from '../../analysis/tune-index.model';
 import { DjPlayerEngine } from '../../engine/dj-player-engine';
 import { DeckContext } from '../deck-context';
 
@@ -30,6 +32,13 @@ export class LoopsCuesPanelComponent {
    *  every row for that span, since a delete racing the await would reindex out from under it. */
   protected readonly markerLaunchPending = this.engine.markerLaunchPending;
   protected readonly nudgeRange = this.engine.nudgeRangeFrames;
+
+  /** Read off the engine's own tune index rather than injecting `TuneIndexService` as a second
+   *  source for the same fact — the engine is the one thing every write to that service also calls,
+   *  so the two can never disagree. Empty between loads and for a tune with no stored moments. */
+  private readonly moments = computed<readonly DetectedMoment[]>(
+    () => this.engine.tuneIndex()?.detectedMoments ?? []
+  );
 
   /** 0–100, non-zero only for the marker currently looping — the engine does the arithmetic. */
   protected progressPercentFor(index: number): number {
@@ -167,6 +176,90 @@ export class LoopsCuesPanelComponent {
       next.delete(index);
       return next;
     });
+  }
+
+  /** Every stored moment the start nudge can reach, as offsets — one tick per entry, positioned by
+   *  `tickLeftPercent`. Empty for an uncaptured slot, matching `.marker-nudge--empty` rendering no
+   *  ticks either. */
+  protected startTickOffsets(index: number): readonly number[] {
+    const point = this.markers()[index]?.start ?? null;
+    return point === null
+      ? []
+      : reachableMomentOffsets(this.moments(), point.frame, this.nudgeRange());
+  }
+
+  /** The end nudge's reachable moments — mirrors `startTickOffsets`. */
+  protected endTickOffsets(index: number): readonly number[] {
+    const end = this.markers()[index]?.end ?? null;
+    return end === null ? [] : reachableMomentOffsets(this.moments(), end.frame, this.nudgeRange());
+  }
+
+  /** Left-percent for a tick or the nudge centre inside `.marker-nudge` — offset `0` sits at 50%,
+   *  ±`nudgeRange()` sit at the two edges. */
+  protected tickLeftPercent(offset: number): number {
+    const range = this.nudgeRange();
+    return range === 0 ? 50 : ((offset + range) / (2 * range)) * 100;
+  }
+
+  protected snapMarkerStartDisabled(index: number, direction: -1 | 1): boolean {
+    return this.nextStartMomentOffset(index, direction) === null;
+  }
+
+  protected snapMarkerEndDisabled(index: number, direction: -1 | 1): boolean {
+    return this.nextEndMomentOffset(index, direction) === null;
+  }
+
+  // Routes through the same two engine calls `onMarkerStartNudgeChange` makes on slider release, in
+  // the same order: `setMarkerStartOffset` is what keeps a snapped start's machine-image handling
+  // byte-identical to a hand-nudged one, and clearing the drag-offset entry matters just as much — a
+  // stale entry there would otherwise win over the committed value in `displayedMarkerStartOffset`.
+  protected onSnapMarkerStart(index: number, direction: -1 | 1): void {
+    const next = this.nextStartMomentOffset(index, direction);
+    if (next === null) return;
+    this.engine.setMarkerStartOffset(index, next);
+    this.engine.auditionMarkerStart(index);
+    this.startDragOffsets.update((offsets) => {
+      const nextOffsets = new Map(offsets);
+      nextOffsets.delete(index);
+      return nextOffsets;
+    });
+  }
+
+  // Mirrors `onSnapMarkerStart` via `setMarkerEndOffset` + `auditionMarkerEnd`.
+  protected onSnapMarkerEnd(index: number, direction: -1 | 1): void {
+    const next = this.nextEndMomentOffset(index, direction);
+    if (next === null) return;
+    this.engine.setMarkerEndOffset(index, next);
+    this.engine.auditionMarkerEnd(index);
+    this.endDragOffsets.update((offsets) => {
+      const nextOffsets = new Map(offsets);
+      nextOffsets.delete(index);
+      return nextOffsets;
+    });
+  }
+
+  private nextStartMomentOffset(index: number, direction: -1 | 1): number | null {
+    const point = this.markers()[index]?.start ?? null;
+    if (point === null) return null;
+    return nextMomentOffset(
+      this.moments(),
+      point.frame,
+      this.displayedMarkerStartOffset(index),
+      this.nudgeRange(),
+      direction
+    );
+  }
+
+  private nextEndMomentOffset(index: number, direction: -1 | 1): number | null {
+    const end = this.markers()[index]?.end ?? null;
+    if (end === null) return null;
+    return nextMomentOffset(
+      this.moments(),
+      end.frame,
+      this.displayedMarkerEndOffset(index),
+      this.nudgeRange(),
+      direction
+    );
   }
 }
 
