@@ -24,7 +24,8 @@ import type { FrameSnapshot } from '../asid/register-frame';
 import type { FrameResult } from '../cpu/c64-machine';
 import type { SidFile } from '../sid/sid-file.model';
 import type { TuneIndexRecord } from '../analysis/tune-index.model';
-import { MidiOutputService } from '../midi/midi-output.service';
+import { DeckMidiBinding } from '../midi/deck-midi-binding';
+import { DeckContext } from '../deck/deck-context';
 import type { FrameClock } from '../clock/frame-clock';
 import { REPLAY_RUNNER } from '../replay/replay-runner';
 import { DeliveryTransport } from './delivery';
@@ -63,18 +64,23 @@ export const FRAME_CLOCK = new InjectionToken<FrameClock>('FRAME_CLOCK');
  */
 export const NOMINAL_INTERVAL_OPTIONS_US: readonly number[] = [PAL_FRAME_INTERVAL_US, 19975, 20000];
 
-/** Namespaced so a later POC or app feature reusing `localStorage` can't collide with this key. */
-const REPEAT_TRACK_STORAGE_KEY = 'asid-dj-0.repeat-track';
+/** Namespaces a deck's persisted repeat-track preference under its own key, mirroring
+ *  `DeckMidiBinding`'s own per-deck storage key — two decks toggling independently must never share
+ *  one preference or overwrite each other's stored value. */
+function repeatTrackStorageKeyFor(deckId: string): string {
+  return `asid-dj-0.deck-${deckId}.repeat-track`;
+}
 
-/** Reads the persisted repeat-track preference: true when nothing is stored (or the read throws) —
- *  a track plays forever until the operator turns repeat off, not the other way round. Mirrors
- *  `MidiOutputService`'s own namespaced, try/catch-wrapped `localStorage` preference. */
-function loadRepeatTrackPreference(): boolean {
+/** Reads deck `deckId`'s persisted repeat-track preference: true when nothing is stored (or the read
+ *  throws) — a track plays forever until the operator turns repeat off, not the other way round. */
+function loadRepeatTrackPreference(deckId: string): boolean {
   try {
-    const stored = localStorage.getItem(REPEAT_TRACK_STORAGE_KEY);
+    const stored = localStorage.getItem(repeatTrackStorageKeyFor(deckId));
     return stored === null ? true : stored === 'true';
   } catch (error) {
-    logWarn(`DJ engine: could not read the repeat-track preference from localStorage — ${error}`);
+    logWarn(
+      `DJ engine: could not read deck "${deckId}"'s repeat-track preference from localStorage — ${error}`
+    );
     return true;
   }
 }
@@ -129,7 +135,7 @@ export interface EngineStats {
   /** Of `scheduledFrames`, how many rode a clock advance clamped by its catch-up ceiling — their
    *  due time is later than the truth, so the lag figures above under-report for them. */
   readonly clampedFrames: number;
-  /** Whether the selected MIDI port can cancel a pending send, per `MidiOutputService`'s own
+  /** Whether the selected MIDI port can cancel a pending send, per `DeckMidiBinding`'s own
    *  feature detection. */
   readonly cancelSupported: boolean;
   /** How long the furthest-out stale send reached past a cancel request before it was preempted,
@@ -164,8 +170,8 @@ const EMPTY_STATS: EngineStats = {
  * Drives a tune out to the cartridge: one emulated frame and one ASID SID-data packet per clock
  * tick, plus the transport, speed and timing controls the listening session needs.
  *
- * Injectable rather than `providedIn: 'root'` so the view can provide it beside `MidiOutputService`
- * and keep both out of the app injector.
+ * Injectable rather than `providedIn: 'root'` so each deck host can provide its own instance beside
+ * its own `DeckMidiBinding`, keeping both out of the app injector.
  *
  * The coordinator: it owns the tick loop, the pending queue, the play/pause/stop state machine,
  * speed, voices and stats publication, and sequences three collaborators for everything else —
@@ -176,9 +182,10 @@ const EMPTY_STATS: EngineStats = {
  */
 @Injectable()
 export class DjPlayerEngine implements OnDestroy {
-  private readonly midi = inject(MidiOutputService);
+  private readonly midi = inject(DeckMidiBinding);
   private readonly clock = inject(FRAME_CLOCK);
   private readonly replayRunner = inject(REPLAY_RUNNER);
+  private readonly deckContext = inject(DeckContext);
 
   private readonly delivery = new DeliveryTransport(this.midi);
 
@@ -283,10 +290,15 @@ export class DjPlayerEngine implements OnDestroy {
   readonly ceilingFrames = this.tuneSession.ceilingFrames;
   readonly positionBasisFrames = this.tuneSession.positionBasisFrames;
 
-  private readonly _repeatTrack = signal<boolean>(loadRepeatTrackPreference());
-  /** The player-level preference persisted under `REPEAT_TRACK_STORAGE_KEY`: whether a track plays
-   *  forever or stops once it reaches its detected end. Read once at construction; rides a tune
-   *  change unchanged — `loadTune` never resets it, and it is not a field on `TuneIndexRecord`. */
+  // Starts on the fixed default rather than reading storage here: `DeckContext` has not been
+  // adopted yet at construction time (Angular resolves `providers` before `DeckHostComponent`'s own
+  // `ngOnInit` runs), so this deck's id is not known until `restoreRepeatTrackPreference()` is
+  // called explicitly — mirrors `DeckMidiBinding.restore()`'s own construction-time-identity
+  // workaround.
+  private readonly _repeatTrack = signal<boolean>(true);
+  /** This deck's own preference, namespaced under its id once adopted: whether a track plays
+   *  forever or stops once it reaches its detected end. Rides a tune change unchanged — `loadTune`
+   *  never resets it, and it is not a field on `TuneIndexRecord`. */
   readonly repeatTrack: Signal<boolean> = this._repeatTrack.asReadonly();
 
   private readonly _tuneIndex = signal<TuneIndexRecord | null>(null);
@@ -307,6 +319,9 @@ export class DjPlayerEngine implements OnDestroy {
   private framesSincePublish = 0;
   /** Snapshots a jump still owes the stream, drained one per tick by `onTick`. */
   private pending: FrameSnapshot[] = [];
+  /** Held so a fresh `RegisterFrame` built by `loadTune()` inherits it — otherwise every tune load
+   *  would silently reset the deck to full regardless of where the fader sits. */
+  private outputGain = 1;
   /** What the frame clock was last handed, or null before it has ever been started — the rate
    *  diagnostics report, rather than one derived from a fader that may have moved while stopped. */
   private runningIntervalUs: number | null = null;
@@ -321,6 +336,9 @@ export class DjPlayerEngine implements OnDestroy {
     this.tuneSession.discardOutstandingJump();
 
     this.tuneSession.load(file);
+    // A fresh RegisterFrame defaults to full — re-apply the held gain at once, before anything else
+    // about this load can emit a packet at the wrong level.
+    this.tuneSession.frame?.setOutputGain(this.outputGain);
     this.mutedVoices.set([false, false, false]);
     // A fresh RegisterFrame starts fully unmuted, so a held button must not survive into a tune it
     // never pressed against — otherwise effectiveMutes would disagree with the chip it just replaced.
@@ -487,6 +505,16 @@ export class DjPlayerEngine implements OnDestroy {
 
   previousSubtune(): void {
     this.tuneSession.previousSubtune();
+  }
+
+  /**
+   * The deck's own gain, 0…1 — `MixerService`'s composed per-deck figure (`P02-T01`), pushed here by
+   * `DeckHostComponent`'s effect. Held on the engine, not merely on the frame, so it survives a
+   * `loadTune()` rebuild; `RegisterFrame.setOutputGain`'s own doc covers how it is applied.
+   */
+  setOutputGain(gain: number): void {
+    this.outputGain = gain;
+    this.tuneSession.frame?.setOutputGain(gain);
   }
 
   /**
@@ -763,16 +791,25 @@ export class DjPlayerEngine implements OnDestroy {
     this.markerState.stopMarkerLoop();
   }
 
-  /** Writes the repeat-track preference and persists it under `REPEAT_TRACK_STORAGE_KEY`, never
-   *  allowed to throw into the caller — mirrors `MidiOutputService.selectPort`'s own
+  /**
+   * Reads this deck's persisted repeat-track preference and applies it. Called exactly once, by
+   * `DeckHostComponent.ngOnInit`, after `context.adopt(...)` — this deck's id is not known any
+   * earlier, so this cannot run from a field initialiser the way a page-level preference could.
+   */
+  restoreRepeatTrackPreference(): void {
+    this._repeatTrack.set(loadRepeatTrackPreference(this.deckContext.id()));
+  }
+
+  /** Writes the repeat-track preference and persists it under this deck's own namespaced key, never
+   *  allowed to throw into the caller — mirrors `DeckMidiBinding.selectPort`'s own
    *  try/catch-wrapped write. */
   setRepeatTrack(enabled: boolean): void {
     this._repeatTrack.set(enabled);
     try {
-      localStorage.setItem(REPEAT_TRACK_STORAGE_KEY, String(enabled));
+      localStorage.setItem(repeatTrackStorageKeyFor(this.deckContext.id()), String(enabled));
     } catch (error) {
       logWarn(
-        `DJ engine: could not persist the repeat-track preference to localStorage — ${error}`
+        `DJ engine: could not persist deck "${this.deckContext.id()}"'s repeat-track preference to localStorage — ${error}`
       );
     }
   }

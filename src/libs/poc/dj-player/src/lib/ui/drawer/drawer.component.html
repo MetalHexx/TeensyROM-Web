@@ -1,0 +1,12 @@
+<div class="drawer">
+  <button type="button" class="drawer-head" [attr.aria-expanded]="expanded()" (click)="toggle()">
+    <span class="chev" aria-hidden="true">{{ expanded() ? '▾' : '▸' }}</span>
+    <span class="drawer-title">{{ title() }}</span>
+  </button>
+
+  @if (expanded()) {
+  <div class="drawer-body">
+    <ng-content />
+  </div>
+  }
+</div>

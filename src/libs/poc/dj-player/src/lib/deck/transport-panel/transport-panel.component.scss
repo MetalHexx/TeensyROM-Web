@@ -1,0 +1,372 @@
+// One grid area in the page's own `.grid` — `deck-host.component.html` sets `grid-area` inline, from
+// the `areas` input the page computes, so `:host` only has to stay a plain block a grid-area style
+// can freely apply to.
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// Deck-scoped custom properties (`--perf-control-height`, `--structure-*`, `--chrome-*`) are defined
+// on `:host` in `deck-host.component.scss` and inherit down through the light DOM into this
+// component's own render tree — Angular's emulated encapsulation scopes selectors, not custom
+// property inheritance, and `display: contents` on that host only removes its own box, never its
+// place in that inheritance chain.
+.transport-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+
+  @media (max-width: 1500px) {
+    padding: var(--spacing-sm);
+  }
+}
+
+// The three lines the wireframe draws, nothing more.
+.line {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--spacing-sm);
+}
+
+.caption {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+// The frame readout — the position line's own reserved label. Narrowed rather than left free-width,
+// so it stops competing with the scrub track for space as the deck column tightens.
+.line-position .caption:last-child {
+  @media (max-width: 1500px) {
+    max-width: 4.5rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+// The row wrapper: the hit target, sized to the control's full reach rather than shrinking to the
+// drawn bar, and the tick's own positioning context — the tick has to sit outside the bar below,
+// whose `overflow: hidden` would otherwise clip it. The transparent-background range input on top is
+// the same stacking technique `.marker-nudge` uses; the native thumb still handles drag.
+.scrub-track {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  height: var(--perf-control-height, 2rem);
+
+  input[type='range'] {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    background: transparent;
+
+    &::-webkit-slider-thumb {
+      appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #f2f2fa;
+      border: 1px solid var(--color-primary-bright);
+      box-shadow: 0 0 7px rgba(179, 51, 179, 0.75);
+    }
+
+    &::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #f2f2fa;
+      border: 1px solid var(--color-primary-bright);
+      box-shadow: 0 0 7px rgba(179, 51, 179, 0.75);
+    }
+
+    // No span exists to scrub against while analyzing, and playback has not started — see
+    // `barState` in the component. Hidden rather than removed: the input itself stays disabled, not
+    // absent, so the row's layout never shifts.
+    &:disabled::-webkit-slider-thumb {
+      visibility: hidden;
+    }
+
+    &:disabled::-moz-range-thumb {
+      visibility: hidden;
+    }
+  }
+}
+
+// The drawn bar — 12px tall regardless of the row's own height, centred in it by the flex
+// `align-items: center` above. `overflow: hidden` is what gives the regions their rounded ends.
+.scrub-bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 12px;
+  display: flex;
+  border: 1px solid var(--structure-border, var(--color-dimmed));
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--structure-dead, #1c1c26);
+}
+
+.scrub-region {
+  height: 100%;
+
+  &--music {
+    background: var(--structure-music, var(--color-highlight));
+    box-shadow: inset 0 0 8px rgba(0, 247, 255, 0.45);
+  }
+
+  &--intro {
+    background: var(--structure-intro, #7b2d8e);
+    box-shadow: inset 0 0 8px rgba(179, 51, 179, 0.4);
+  }
+
+  &--dead {
+    background: var(--structure-dead, #1c1c26);
+  }
+
+  &--unknown {
+    width: 100%;
+    background: repeating-linear-gradient(
+      45deg,
+      var(--structure-unknown-a, #2e2e42) 0 5px,
+      var(--structure-unknown-b, #22222f) 5px 10px
+    );
+  }
+
+  &--pending {
+    width: 100%;
+    background: var(--structure-pending, #191922);
+  }
+}
+
+// The loop point — outside `.scrub-bar`'s clipped box, positioned against `.scrub-track` instead, so
+// it reads over the bar rather than being cut off at its edge.
+.scrub-tick {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  background: var(--structure-tick, var(--color-directory));
+  box-shadow: 0 0 7px rgba(245, 226, 158, 0.95);
+  pointer-events: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--structure-tick, var(--color-directory));
+  }
+}
+
+// Line 2: transport buttons, the repeat toggle directly right of Stop, a spacer, then the state
+// indicator pinned to the row's far right. Below 1240px there is no longer room for all of that on
+// one line, so the row gives up the spacer and wraps instead, with the state indicator's own
+// `margin-left: auto` keeping it pinned right whichever line it lands on.
+.line-transport {
+  justify-content: space-between;
+
+  @media (max-width: 1240px) {
+    flex-wrap: wrap;
+  }
+}
+
+.transport-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height, 2rem);
+    min-width: 4rem;
+  }
+}
+
+.transport-spacer {
+  flex: 1 1 auto;
+
+  @media (max-width: 1240px) {
+    display: none;
+  }
+}
+
+.repeat-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-dimmed);
+}
+
+// A real checkbox styled with appearance: none and a pseudo-element knob, not a hidden input beside
+// a div — the POC's accessibility posture is whatever the platform gives a native control for free.
+.repeat-toggle-input {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 15px;
+  margin: 0;
+  border-radius: 8px;
+  background: var(--chrome-raised, #2a2a3a);
+  border: 1px solid var(--chrome-inset-border, #3d3d52);
+  cursor: pointer;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--chrome-knob, #6a6a80);
+  }
+
+  &:checked {
+    background: rgba(0, 247, 255, 0.18);
+    border-color: var(--color-highlight);
+
+    &::after {
+      left: auto;
+      right: 1px;
+      background: var(--color-highlight);
+      box-shadow: 0 0 6px rgba(0, 247, 255, 0.9);
+    }
+  }
+}
+
+.transport-state {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+
+  @media (max-width: 1240px) {
+    margin-left: auto;
+  }
+}
+
+// Unlit by default — the same chrome-inset body every state but stopped starts from. Lit states set
+// both fill and border to the state's colour and add a glow; stopped goes to chrome-dark instead of
+// this default so it never reads as a merely-tinted variant of "off".
+.led {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--chrome-inset, #2e2e3e);
+  border: 1px solid var(--chrome-inset-border, #3d3d52);
+
+  &--playing {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    box-shadow: 0 0 8px rgba(111, 220, 140, 0.95);
+  }
+
+  &--paused {
+    background: var(--color-directory);
+    border-color: var(--color-directory);
+    box-shadow: 0 0 8px rgba(245, 226, 158, 0.9);
+  }
+
+  &--ended {
+    background: var(--color-highlight);
+    border-color: var(--color-highlight);
+    box-shadow: 0 0 8px rgba(0, 247, 255, 0.95);
+  }
+
+  &--analyzing {
+    background: var(--color-primary-bright);
+    border-color: var(--color-primary-bright);
+    box-shadow: 0 0 9px rgba(179, 51, 179, 1);
+  }
+
+  &--error {
+    background: var(--color-error);
+    border-color: var(--color-error);
+    box-shadow: 0 0 8px rgba(255, 111, 111, 0.95);
+  }
+
+  // stopped and ended are the two silent states and must stay visibly distinct — this is dark like
+  // real hardware, not the default unlit body tinted toward a colour.
+  &--stopped {
+    background: var(--chrome-dark, #33334a);
+    border-color: var(--chrome-dark-border, #44445c);
+  }
+}
+
+// Line 3: this deck's tune buttons and Choose File, with the subtune stepper pinned to the right.
+// Gives up the same ground the transport row does below 1240px: it wraps, and the stepper's own
+// `margin-left: auto` is what keeps it pinned right once it does.
+.line-tunes {
+  justify-content: space-between;
+
+  @media (max-width: 1240px) {
+    flex-wrap: wrap;
+  }
+}
+
+.tune-sources {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height, 2rem);
+  }
+}
+
+.file-picker {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+
+  input[type='file'] {
+    max-width: 9rem;
+    font-size: var(--font-size-sm);
+  }
+}
+
+.subtune-stepper {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+
+  @media (max-width: 1240px) {
+    margin-left: auto;
+  }
+
+  button {
+    height: var(--perf-control-height, 2rem);
+    min-width: 2rem;
+  }
+}
+
+.error-text {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}

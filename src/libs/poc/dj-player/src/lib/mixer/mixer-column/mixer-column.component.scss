@@ -1,0 +1,69 @@
+// Claims the fixed `mx` grid area directly — see the component's own doc for why that is not a deck
+// naming a column.
+:host {
+  display: block;
+  grid-area: mx;
+  min-width: 0;
+  min-height: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.mixer-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  min-height: 0;
+
+  @media (max-width: 1500px) {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  // The band form: once the decks stack, this column becomes a full-width horizontal band rather
+  // than the desktop's full-height vertical strip, so the reserved region and the crossfader sit
+  // side by side instead of stacked — that's what keeps the band shallow.
+  @media (max-width: 1000px) {
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+  }
+}
+
+// Obviously empty — a dashed frame, not a panel that could be mistaken for a control nobody wired
+// up yet.
+.reserved {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px dashed var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+  text-align: center;
+
+  @media (max-width: 1000px) {
+    margin-bottom: 0;
+    margin-right: var(--spacing-md);
+    padding: var(--spacing-sm);
+  }
+}
+
+// `lib-crossfader`'s own host sets `width: 100%` for the desktop column form, where it is the sole
+// full-width row beneath `.reserved`. The band form needs it to share the row instead of claiming
+// the whole width — this reaches into the child's host element the same way other parent stylesheets
+// in this workspace size a child component's outer box.
+lib-crossfader {
+  @media (max-width: 1000px) {
+    width: auto;
+    flex: 1 1 0;
+  }
+}

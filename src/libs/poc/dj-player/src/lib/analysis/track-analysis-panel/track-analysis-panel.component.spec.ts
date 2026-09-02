@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TrackAnalysisPanelComponent } from './track-analysis-panel.component';
-import { DjPlayerEngine, EngineStats } from '../../engine/dj-player-engine';
+import type { DjPlayerEngine, EngineStats } from '../../engine/dj-player-engine';
 import { ANALYSIS_SCANNER } from '../scan-runner';
 import type { AnalysisScanner, ScanResult } from '../scan-runner';
 import type { ScanOutput } from '../scan-tune';
@@ -10,11 +10,13 @@ import { PRIMARY_SLOT_FOR_REGISTER } from '../../asid/register-frame';
 import { ASID_SLOT_COUNT } from '../../asid/asid-constants';
 import type { SidFile } from '../../sid/sid-file.model';
 import { PAL_CPU_CLOCK_HZ } from '../notes';
-import { TuneIndexService } from '../tune-index.service';
+import type { TuneIndexService } from '../tune-index.service';
 import { TUNE_INDEX_FORMAT_VERSION } from '../tune-index.model';
 import type { TuneIndexRecord } from '../tune-index.model';
 import type { PlayRate } from '../../engine/play-rate';
 import { formatDuration } from '../format';
+import type { DeckHandle } from '../../deck/deck-registry';
+import type { DeckTuneLoader } from '../../deck/deck-tune-loader';
 
 const BASE_STATS: EngineStats = {
   framesRendered: 0,
@@ -61,8 +63,32 @@ interface StubTuneIndexService {
   pending: WritableSignal<boolean>;
 }
 
+interface StubTuneLoader {
+  currentTune: WritableSignal<SidFile | null>;
+}
+
 function makeTuneIndexService(): StubTuneIndexService {
   return { record: signal<TuneIndexRecord | null>(null), pending: signal(false) };
+}
+
+function makeTuneLoader(file: SidFile | null): StubTuneLoader {
+  return { currentTune: signal<SidFile | null>(file) };
+}
+
+function fakeDeckHandle(
+  id: string,
+  label: string,
+  engine: StubEngine,
+  tuneIndex: StubTuneIndexService,
+  tuneLoader: StubTuneLoader
+): DeckHandle {
+  return {
+    descriptor: { id, label },
+    engine: engine as unknown as DjPlayerEngine,
+    binding: {} as DeckHandle['binding'],
+    tuneIndex: tuneIndex as unknown as TuneIndexService,
+    tuneLoader: tuneLoader as unknown as DeckTuneLoader,
+  };
 }
 
 function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
@@ -246,29 +272,27 @@ describe('TrackAnalysisPanelComponent', () => {
   let engine: StubEngine;
   let scanner: StubScanner;
   let tuneIndex: StubTuneIndexService;
+  let tuneLoader: StubTuneLoader;
 
   async function setup(file: SidFile | null = fakeSidFile()): Promise<void> {
     engine = makeEngine();
     scanner = makeScanner();
     tuneIndex = makeTuneIndexService();
+    tuneLoader = makeTuneLoader(file);
 
     await TestBed.configureTestingModule({
       imports: [TrackAnalysisPanelComponent],
     })
       .overrideComponent(TrackAnalysisPanelComponent, {
         set: {
-          providers: [
-            { provide: ANALYSIS_SCANNER, useValue: scanner as unknown as AnalysisScanner },
-            { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
-            { provide: TuneIndexService, useValue: tuneIndex as unknown as TuneIndexService },
-          ],
+          providers: [{ provide: ANALYSIS_SCANNER, useValue: scanner as unknown as AnalysisScanner }],
         },
       })
       .compileComponents();
 
     fixture = TestBed.createComponent(TrackAnalysisPanelComponent);
     component = fixture.componentInstance;
-    fixture.componentRef.setInput('file', file);
+    fixture.componentRef.setInput('deck', fakeDeckHandle('a', 'A', engine, tuneIndex, tuneLoader));
     fixture.detectChanges();
   }
 
@@ -411,11 +435,11 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(engine.addMarker).toHaveBeenCalled();
   });
 
-  it('clears the analysis when the file input changes', async () => {
+  it("clears the analysis when the deck's loaded tune changes", async () => {
     await completeAnalysis(buildSpikeScan());
     expect(candidateHits().length).toBeGreaterThan(0);
 
-    fixture.componentRef.setInput('file', fakeSidFile({ name: 'Another tune' }));
+    tuneLoader.currentTune.set(fakeSidFile({ name: 'Another tune' }));
     fixture.detectChanges();
 
     expect(candidateHits().length).toBe(0);
@@ -431,6 +455,35 @@ describe('TrackAnalysisPanelComponent', () => {
 
     expect(candidateHits().length).toBe(0);
     expect(fixture.nativeElement.querySelector('.analysis-empty')).not.toBeNull();
+  });
+
+  it("retargets onto the newly selected deck's own engine, tune index and loaded tune when the deck input changes", async () => {
+    await completeAnalysis(buildSpikeScan());
+    expect(candidateHits().length).toBeGreaterThan(0);
+    engine.ceilingFrames.set(999); // proves the outgoing deck's own engine is no longer read
+
+    const otherEngine = makeEngine();
+    const otherTuneIndex = makeTuneIndexService();
+    const otherTuneLoader = makeTuneLoader(fakeSidFile({ name: 'Deck B tune' }));
+
+    fixture.componentRef.setInput(
+      'deck',
+      fakeDeckHandle('b', 'B', otherEngine, otherTuneIndex, otherTuneLoader)
+    );
+    fixture.detectChanges();
+
+    // A different deck is a different tune loaded: the outgoing deck's analysis is cleared rather
+    // than surviving the switch.
+    expect(candidateHits().length).toBe(0);
+    expect(fixture.nativeElement.querySelector('.analysis-empty')).not.toBeNull();
+
+    otherEngine.ceilingFrames.set(54_321);
+    scanner.scan.mockReturnValue(new Promise<ScanResult>(() => undefined));
+    (fixture.nativeElement.querySelector('.analysis-run') as HTMLButtonElement).click();
+
+    // The scan request the new deck's own engine drives, not the outgoing deck's ceiling.
+    const [request] = scanner.scan.mock.calls[scanner.scan.mock.calls.length - 1];
+    expect(request.maxFrames).toBe(54_321);
   });
 
   it('reports the key and its Camelot number, and charts the chroma it came from', async () => {

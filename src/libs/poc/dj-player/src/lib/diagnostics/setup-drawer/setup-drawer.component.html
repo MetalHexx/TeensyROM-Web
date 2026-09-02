@@ -1,0 +1,401 @@
+<section class="panel timing-panel" aria-label="Timing">
+  <h2>Timing</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="figure-col"></th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <th scope="col">Deck {{ deck.descriptor.label }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Nominal frame interval</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>
+          <select
+            [attr.aria-label]="'Nominal frame interval deck ' + deck.descriptor.label"
+            (change)="onNominalIntervalChange(deck, $event)"
+          >
+            @for (option of intervalOptionsFor(deck); track option) {
+            <option [value]="option" [selected]="option === deck.engine.nominalIntervalUs()">
+              {{ option }} µs ({{ frameRateHz(option) }} Hz)
+            </option>
+            }
+          </select>
+        </td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Schedule ahead</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>
+          <select
+            [attr.aria-label]="'Schedule ahead deck ' + deck.descriptor.label"
+            (change)="onScheduleAheadChange(deck, $event)"
+          >
+            @for (option of scheduleAheadOptionsMs; track option) {
+            <option [value]="option" [selected]="option === deck.engine.scheduleAheadMs()">
+              {{ option === 0 ? 'off' : option + ' ms' }}
+            </option>
+            }
+          </select>
+        </td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Effective interval</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>
+          @if (deck.engine.stats().effectiveIntervalUs > 0) {
+          {{ deck.engine.stats().effectiveIntervalUs.toFixed(1) }} µs ({{
+            frameRateHz(deck.engine.stats().effectiveIntervalUs)
+          }}
+          Hz), {{ deck.engine.stats().callsPerFrame }}x multispeed
+          } @else {
+          — (load a tune to compute)
+          }
+        </td>
+        }
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="panel tune-panel" aria-label="Tune">
+  <h2>Tune</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="figure-col"></th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <th scope="col">Deck {{ deck.descriptor.label }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Name</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ tuneFor(deck)?.name ?? '—' }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Author</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ tuneFor(deck)?.author ?? '—' }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Format</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ formatLabelFor(deck) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Released</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ tuneFor(deck)?.released ?? '—' }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Subtunes</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ subtunesLabelFor(deck) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Clock / model</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ clockModelLabelFor(deck) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Load / init / play</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ loadInitPlayLabelFor(deck) }}</td>
+        }
+      </tr>
+      @if (anyTuneHasSecondSid()) {
+      <tr>
+        <th scope="row">Second SID</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ secondSidLabelFor(deck) }}</td>
+        }
+      </tr>
+      } @if (anyTuneHasThirdSid()) {
+      <tr>
+        <th scope="row">Third SID</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ thirdSidLabelFor(deck) }}</td>
+        }
+      </tr>
+      }
+      <tr>
+        <th scope="row">Data size</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ dataSizeLabelFor(deck) }}</td>
+        }
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="panel tune-index-panel" aria-label="Tune Index">
+  <h2>Tune Index</h2>
+  <table>
+    <thead>
+      <tr>
+        <th class="figure-col"></th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <th scope="col">Deck {{ deck.descriptor.label }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Length</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ tuneIndexLengthLabelFor(deck) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Loop point</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ tuneIndexLoopStartLabelFor(deck) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Loop period</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>
+          {{ tuneIndexLoopPeriodLabelFor(deck) }}
+          @if (tuneIndexLoopIsImplausibleFor(deck)) {
+          <p class="tune-index-implausible" role="note">
+            Short repeat — likely an ostinato or idle cycle, not the tune's loop
+          </p>
+          }
+        </td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Key</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ tuneIndexKeyLabelFor(deck) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Key confidence</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>{{ tuneIndexKeyConfidenceLabelFor(deck) }}</td>
+        }
+      </tr>
+      <tr>
+        <th scope="row">Timing</th>
+        @for (deck of decks(); track deck.descriptor.id) {
+        <td>
+          <select
+            [attr.aria-label]="'Timing mode deck ' + deck.descriptor.label"
+            [disabled]="tuneIndexTimingModeFor(deck) === null"
+            (change)="onTuneIndexTimingModeChange(deck, $event)"
+          >
+            <option value="exact" [selected]="tuneIndexTimingModeFor(deck) === 'exact'">Exact</option>
+            <option value="rounded" [selected]="tuneIndexTimingModeFor(deck) === 'rounded'">
+              Rounded
+            </option>
+          </select>
+        </td>
+        }
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="panel diagnostics-panel" aria-label="Diagnostics">
+  <h2>Diagnostics</h2>
+
+  <p class="cross-deck-drift">{{ crossDeckDriftLabel() }}</p>
+
+  <div class="diagnostics-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="figure-col"></th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <th scope="col">Deck {{ deck.descriptor.label }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Schedule ahead</th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <td>{{ scheduleAheadLabelFor(deck) }}</td>
+          }
+        </tr>
+        <tr>
+          <th scope="row">Frames emitted</th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <td>{{ deck.engine.stats().framesRendered }}</td>
+          }
+        </tr>
+        <tr>
+          <th scope="row">Track end frame</th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <td>{{ deck.engine.trackEndFrame() ?? '—' }}</td>
+          }
+        </tr>
+        <tr>
+          <th scope="row">Packets / s</th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <td>{{ packetsPerSecond(deck.engine.stats()).toFixed(1) }}</td>
+          }
+        </tr>
+        <tr>
+          <th scope="row">Bytes / s</th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <td>{{ bytesPerSecond(deck.engine.stats()).toFixed(0) }}</td>
+          }
+        </tr>
+        <tr>
+          <th scope="row">Suppressed writes</th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <td>{{ deck.engine.stats().suppressedWrites }}</td>
+          }
+        </tr>
+        <tr>
+          <th scope="row">Illegal opcodes</th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <td>{{ deck.engine.stats().illegalOpcodeCount }}</td>
+          }
+        </tr>
+        <tr>
+          <th scope="row">Last error</th>
+          @for (deck of decks(); track deck.descriptor.id) {
+          <td>{{ deck.engine.lastError() ?? '—' }}</td>
+          }
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- The clock's own figures, kept apart from delivery below: a negative delivery result is only
+         diagnosable once it's clear whether the clock or the transport handoff produced it. -->
+    <div class="subsection" aria-label="Clock">
+      <h3 class="subsection-title">Clock</h3>
+      <table>
+        <thead>
+          <tr>
+            <th class="figure-col"></th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <th scope="col">Deck {{ deck.descriptor.label }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Drift</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ deck.engine.stats().driftMs.toFixed(1) }} ms</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Late callbacks</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ deck.engine.stats().lateCallbacks }}</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Interval (nominal)</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ intervalMeasuredLabelFor(deck) }}</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Jitter σ / worst gap</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ jitterLabelFor(deck) }}</td>
+            }
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Instrument delivery against due time — this is the answer R5 asks for, not the clock's own
+         health above it. -->
+    <div class="subsection" aria-label="Delivery">
+      <h3 class="subsection-title">Delivery</h3>
+      <table>
+        <thead>
+          <tr>
+            <th class="figure-col"></th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <th scope="col">Deck {{ deck.descriptor.label }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Scheduled</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ deck.engine.stats().scheduledFrames }}</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Late</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ deck.engine.stats().lateFrames }}</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Reordered</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ deck.engine.stats().reorderedFrames }}</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Clamped</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ deck.engine.stats().clampedFrames }}</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Lag mean / worst</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ lagLabelFor(deck) }}</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Cancel support</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ deck.engine.stats().cancelSupported ? 'yes' : 'no' }}</td>
+            }
+          </tr>
+          <tr>
+            <th scope="row">Cancel latency</th>
+            @for (deck of decks(); track deck.descriptor.id) {
+            <td>{{ cancelLatencyLabelFor(deck) }}</td>
+            }
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="control-row stall-control">
+    <label class="control">
+      Stall main thread for
+      <input
+        type="number"
+        min="0"
+        [max]="maxStallDurationMs"
+        step="50"
+        aria-label="Stall duration in milliseconds"
+        [value]="stallDurationMs()"
+        (change)="onStallDurationInput($event)"
+      />
+      ms
+    </label>
+    <button type="button" (click)="onStallMainThread()">Stall</button>
+  </div>
+</section>

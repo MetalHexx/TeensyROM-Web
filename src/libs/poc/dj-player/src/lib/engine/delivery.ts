@@ -1,6 +1,6 @@
 import { signal, WritableSignal } from '@angular/core';
 import { logWarn } from '@teensyrom-nx/utils';
-import { MidiOutputService } from '../midi/midi-output.service';
+import type { DeckMidiPort } from '../midi/deck-midi-binding';
 import { MICROSECONDS_PER_SECOND } from './engine-utils';
 
 /**
@@ -12,8 +12,8 @@ import { MICROSECONDS_PER_SECOND } from './engine-utils';
  * merely bounding it.
  *
  * Enforced live, at every send, via `effectiveScheduleAheadMs()` — not only at the moment
- * `setScheduleAhead()` runs — because `supportsCancel()` is a signal `MidiOutputService` can flip on
- * its own (a port swap, a same-device reconnect) with no call back into the engine.
+ * `setScheduleAhead()` runs — because `supportsCancel()` is a signal the deck's `DeckMidiPort` can
+ * flip on its own (a port swap, a same-device reconnect) with no call back into the engine.
  */
 export const UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS = 40;
 
@@ -40,7 +40,7 @@ export interface DeliveryStats {
  * write through the engine's field reaches the same clamp logic `setScheduleAhead()` enforces here.
  */
 export class DeliveryTransport {
-  constructor(private readonly midi: MidiOutputService) {}
+  constructor(private readonly midi: DeckMidiPort) {}
 
   readonly scheduleAheadMs: WritableSignal<number> = signal<number>(0);
 

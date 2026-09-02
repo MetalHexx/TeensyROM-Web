@@ -1,4 +1,4 @@
-import mos6502, { decode } from 'mos6502';
+import * as Mos6502Module from 'mos6502';
 import { SidFile } from '../sid/sid-file.model';
 import {
   CIA1_INTERRUPT_CONTROL,
@@ -69,12 +69,43 @@ const ILLEGAL_OPCODES = buildIllegalOpcodeTable();
 function buildIllegalOpcodeTable(): Uint8Array {
   const table = new Uint8Array(256);
   for (let opcode = 0; opcode < table.length; opcode++) {
-    table[opcode] = decode(opcode).instruction === ILLEGAL_OPCODE_MNEMONIC ? 1 : 0;
+    table[opcode] = Mos6502Module.decode(opcode).instruction === ILLEGAL_OPCODE_MNEMONIC ? 1 : 0;
   }
   return table;
 }
 
 const IDLE_PROCESSOR_STATUS = { info: [], registers: null };
+
+/**
+ * The real `mos6502` constructor.
+ *
+ * `mos6502` ships as CommonJS, and its default export is not unwrapped the same way by every
+ * bundler: Vitest and `nx serve`'s dev server both hand back the class directly from
+ * `Mos6502Module.default`, but a production, code-split build of this route resolves the
+ * namespace import's `default` one level too shallow — to the whole required CJS module object
+ * (`{ default: <class>, decode, ... }`) rather than the class inside it — because esbuild's
+ * Node-compatible CJS interop always synthesizes `default` as the raw `module.exports`, ignoring
+ * the module's own `__esModule`/`exports.default` split. Checking both shapes at runtime, instead
+ * of trusting either import form alone, keeps `QuietMos6502` constructible under all three.
+ */
+function resolveMos6502Constructor(): typeof Mos6502Module.default {
+  const exported: unknown = Mos6502Module.default;
+  if (typeof exported === 'function') {
+    return exported as typeof Mos6502Module.default;
+  }
+  const nested = (exported as { default?: unknown } | null)?.default;
+  if (typeof nested === 'function') {
+    return nested as typeof Mos6502Module.default;
+  }
+  throw new Error(
+    "mos6502's default export did not resolve to a constructor under this bundler's CJS interop"
+  );
+}
+
+const Mos6502 = resolveMos6502Constructor();
+
+/** The instance shape `mos6502` describes — the CJS import only gives us the constructor's type. */
+type Mos6502Instance = InstanceType<typeof Mos6502>;
 
 /**
  * `mos6502` with its per-instruction debug work removed.
@@ -85,7 +116,7 @@ const IDLE_PROCESSOR_STATUS = { info: [], registers: null };
  * subclass prototype removes the whole path. It is shadowed rather than declared as an `override`
  * because the base class types it `private`, so TypeScript will not let a subclass redeclare it.
  */
-class QuietMos6502 extends mos6502 {}
+class QuietMos6502 extends Mos6502 {}
 Object.defineProperty(QuietMos6502.prototype, 'getProcessorStatus', {
   value: () => IDLE_PROCESSOR_STATUS,
 });
@@ -112,7 +143,7 @@ const CPU_STATE_KEYS = [
   'cycle',
 ] as const;
 
-function assertCpuStateKeys(cpu: mos6502): void {
+function assertCpuStateKeys(cpu: Mos6502Instance): void {
   const record = cpu as unknown as Record<string, unknown>;
   const missing = CPU_STATE_KEYS.filter((key) => !(key in record));
   if (missing.length > 0) {
@@ -151,7 +182,7 @@ export class C64Machine {
   private readonly file: SidFile;
   private readonly sink: SidWriteSink;
   private readonly memory: Uint8Array;
-  private readonly cpu: mos6502;
+  private readonly cpu: Mos6502Instance;
   private readonly cyclesPerFrame: number;
   private readonly cyclesPerRasterLine: number;
   private readonly rasterLineCount: number;

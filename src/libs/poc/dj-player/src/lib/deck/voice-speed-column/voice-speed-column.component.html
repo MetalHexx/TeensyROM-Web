@@ -1,0 +1,89 @@
+<section class="panel voice-panel" [attr.aria-label]="'Voice deck ' + label()">
+  <h2>Voice</h2>
+
+  <div class="voice-rows">
+    @for (voice of voiceIndices; track voice) {
+    <div class="voice-row">
+      <div class="voice-row-line">
+        <input
+          type="checkbox"
+          [id]="'voice-mute-' + voice + '-' + label()"
+          [attr.aria-label]="'Mute voice ' + (voice + 1) + ' deck ' + label()"
+          [checked]="mutedVoices()[voice]"
+          (change)="onVoiceMuteToggle(voice, $event)"
+        />
+        <label [for]="'voice-mute-' + voice + '-' + label()">V{{ voice + 1 }}</label>
+      </div>
+
+      <span class="voice-state">{{ effectiveMutes()[voice] ? 'muted' : 'audible' }}</span>
+
+      <button
+        type="button"
+        class="voice-hold"
+        [attr.aria-label]="
+          (mutedVoices()[voice] ? 'Punch in voice ' : 'Kill voice ') +
+          (voice + 1) +
+          ' deck ' +
+          label()
+        "
+        (pointerdown)="onVoiceHoldStart(voice, $event)"
+        (pointerup)="onVoiceHoldEnd(voice)"
+        (pointercancel)="onVoiceHoldEnd(voice)"
+        (keydown)="onVoiceHoldKeyDown(voice, $event)"
+        (keyup)="onVoiceHoldKeyUp(voice, $event)"
+      >
+        {{ mutedVoices()[voice] ? 'Punch In' : 'Kill' }}
+      </button>
+    </div>
+    }
+  </div>
+
+  <div class="voice-clear">
+    <button
+      type="button"
+      [attr.aria-label]="'Clear all voice mutes deck ' + label()"
+      (click)="onClearVoiceMutes()"
+    >
+      Clear
+    </button>
+  </div>
+</section>
+
+<section class="panel speed-panel" [attr.aria-label]="'Speed deck ' + label()">
+  <h2>Speed</h2>
+
+  <div class="speed-body">
+    <span class="speed-value">{{ speedMultiplier().toFixed(3) }}x</span>
+
+    <input
+      type="range"
+      class="speed-fader"
+      [min]="minSpeed"
+      [max]="maxSpeed"
+      step="0.001"
+      [value]="speedFaderValue()"
+      (input)="onSpeedInput($event)"
+      [attr.aria-label]="'Speed multiplier deck ' + label()"
+    />
+
+    <div class="speed-jump-buttons">
+      <button
+        type="button"
+        [attr.aria-label]="'Speed up 50% deck ' + label()"
+        (click)="onSpeedJumpUp()"
+      >
+        +50%
+      </button>
+      <button type="button" [attr.aria-label]="'Speed home deck ' + label()" (click)="onSpeedHome()">
+        Home
+      </button>
+      <button
+        type="button"
+        [attr.aria-label]="'Speed down 50% deck ' + label()"
+        (click)="onSpeedJumpDown()"
+      >
+        −50%
+      </button>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,132 @@
+<section class="transport-panel" [attr.aria-label]="'Transport deck ' + label()">
+  <div class="line line-position">
+    <span class="caption">Position</span>
+    <div class="scrub-track">
+      <div class="scrub-bar">
+        @switch (barState().kind) { @case ('loop') { @if (introRegionPercent() > 0) {
+        <div class="scrub-region scrub-region--intro" [style.width.%]="introRegionPercent()"></div>
+        }
+        <div class="scrub-region scrub-region--music" [style.width.%]="musicRegionPercent()"></div>
+        } @case ('ended') {
+        <div class="scrub-region scrub-region--music" [style.width.%]="musicRegionPercent()"></div>
+        <div class="scrub-region scrub-region--dead" [style.width.%]="deadRegionPercent()"></div>
+        } @case ('unknown') {
+        <div class="scrub-region scrub-region--unknown"></div>
+        } @case ('analyzing') {
+        <div class="scrub-region scrub-region--pending"></div>
+        } }
+      </div>
+      @if (barState().kind === 'loop') {
+      <div class="scrub-tick" [style.left.%]="introRegionPercent()"></div>
+      }
+      <input
+        type="range"
+        min="0"
+        max="100"
+        [value]="scrubDisplayPercent()"
+        [disabled]="barState().kind === 'analyzing'"
+        [attr.aria-label]="'Position deck ' + label()"
+        (input)="onScrubInput($event)"
+        (change)="onScrubChange($event)"
+      />
+    </div>
+    <span class="caption">frame {{ engineStats().framesRendered }}</span>
+  </div>
+
+  <div class="line line-transport">
+    <div class="transport-controls">
+      <button
+        type="button"
+        [attr.aria-label]="'Play deck ' + label()"
+        (click)="onPlay()"
+        [disabled]="!canPlay()"
+      >
+        Play
+      </button>
+      <button
+        type="button"
+        [attr.aria-label]="'Pause deck ' + label()"
+        (click)="onPause()"
+        [disabled]="engineState() !== 'playing'"
+      >
+        Pause
+      </button>
+      <button
+        type="button"
+        [attr.aria-label]="'Stop deck ' + label()"
+        (click)="onStop()"
+        [disabled]="!canStop()"
+      >
+        Stop
+      </button>
+
+      <label class="repeat-toggle">
+        <input
+          type="checkbox"
+          class="repeat-toggle-input"
+          [attr.aria-label]="'Repeat track deck ' + label()"
+          [checked]="repeatTrack()"
+          (change)="onRepeatToggle($event)"
+        />
+        Repeat track
+      </label>
+    </div>
+
+    <span class="transport-spacer"></span>
+
+    <div class="transport-state">
+      <span class="led" [class]="'led--' + transportState()" aria-hidden="true"></span>
+      {{ transportStateLabel() }}
+    </div>
+  </div>
+
+  <div class="line line-tunes">
+    <div class="tune-sources">
+      @for (source of availableTunes(); track source.id) {
+      <button
+        type="button"
+        [attr.aria-label]="source.label + ' deck ' + label()"
+        (click)="selectTune(source)"
+      >
+        {{ source.label }}
+      </button>
+      }
+
+      <label class="file-picker">
+        Choose File
+        <input
+          type="file"
+          accept=".sid"
+          [attr.aria-label]="'Choose file deck ' + label()"
+          (change)="onFilePicked($event)"
+        />
+      </label>
+    </div>
+
+    <div class="subtune-stepper">
+      <button
+        type="button"
+        [attr.aria-label]="'Previous subtune deck ' + label()"
+        (click)="onPreviousSubtune()"
+        [disabled]="!canStepSubtune()"
+      >
+        ◀
+      </button>
+      <span>Subtune {{ currentSubtune() }} of {{ subtuneCount() }}</span>
+      <button
+        type="button"
+        [attr.aria-label]="'Next subtune deck ' + label()"
+        (click)="onNextSubtune()"
+        [disabled]="!canStepSubtune()"
+      >
+        ▶
+      </button>
+    </div>
+  </div>
+
+  @if (engineError()) {
+  <p class="error-text" role="alert">{{ engineError() }}</p>
+  } @if (tuneError()) {
+  <p class="error-text" role="alert">{{ tuneError() }}</p>
+  }
+</section>

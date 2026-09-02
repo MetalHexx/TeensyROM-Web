@@ -18,7 +18,7 @@ import type { LoopDetectOptions, LoopDetection } from './loop-detect';
 import { computePulse, impliedTempo } from './pulse';
 import { segmentNotes } from './notes';
 import { detectKey } from './key';
-import { TUNE_INDEX_STORAGE } from './tune-index-storage';
+import { SharedTuneIndex } from './shared-tune-index';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
 import type { ScanOutput } from './scan-tune';
@@ -41,26 +41,35 @@ const EMPTY_IDENTITY: TuneIdentity = { file: null, filename: null };
  *  are the depths the Requirements' measured baseline was produced at. */
 const SCAN_DEPTH_SECONDS = [90, 210, 450, 750];
 
-/** What one pass down the ladder concludes with: an output to hand the detectors, an abandonment
- *  that must publish nothing, or a scan failure the caller should log and let the next load retry. */
+/** What one pass down the ladder concludes with: an output to hand the detectors, or a scan failure
+ *  the caller should log and let the next load retry. Guard-free — the ladder always runs to
+ *  completion, so there is no "abandoned" outcome here; a caller whose own tune moved on mid-run
+ *  discards the resolved record itself, after `produceRecord` returns it. */
 type LadderOutcome =
   | { readonly kind: 'answered'; readonly output: ScanOutput; readonly loop: LoopDetection }
-  | { readonly kind: 'abandoned' }
   | { readonly kind: 'failed'; readonly error: string };
 
 /**
  * Owns the tune index's whole lifecycle for the tune currently loaded in `DjPlayerEngine`: look up
  * the stored record on every genuinely new tune or subtune load, scan in the background on a miss,
- * persist what the scan finds, and publish the answer onto `record()` and into the engine. View-
- * provided, so its scanner and generation counter are scoped to one player instance — the same
- * reasoning `TrackAnalysisPanelComponent` uses for its own `ANALYSIS_SCANNER`.
+ * persist what the scan finds, and publish the answer onto `record()` and into the engine. Deck-
+ * host-provided, so its scanner and generation counter are scoped to one deck's own player instance
+ * — the same reasoning `TrackAnalysisPanelComponent` uses for its own `ANALYSIS_SCANNER`.
+ *
+ * Storage reads/writes and the scan ladder itself run through `SharedTuneIndex`, the page-level
+ * collaborator every deck shares — that is what lets one deck's scan answer for another deck loading
+ * the same tune. The generation guard stays here, on this side of that collaborator: `produceRecord`
+ * is guard-free and always runs to completion, and `refreshIndex` applies this instance's own
+ * generation check to the record it resolves with, discarding it if this deck's own tune moved on
+ * while the shared run was in flight. A second deck awaiting the same run is unaffected — it applies
+ * its own generation, not this one's.
  *
  * Depends on the engine, never the other way around: the engine only stores what this service hands
  * it through `setTuneIndex`, so the dependency runs one way and a back-edge can never form a cycle.
  */
 @Injectable()
 export class TuneIndexService implements OnDestroy {
-  private readonly storage = inject(TUNE_INDEX_STORAGE);
+  private readonly shared = inject(SharedTuneIndex);
   private readonly scanner = inject(ANALYSIS_SCANNER);
   private readonly engine = inject(DjPlayerEngine);
 
@@ -127,7 +136,7 @@ export class TuneIndexService implements OnDestroy {
       return;
     }
     const updated: TuneIndexRecord = { ...current, timingMode: mode };
-    this.storage.save(updated);
+    this.shared.save(updated);
     this._record.set(updated);
     this.engine.setTuneIndex(updated);
   }
@@ -158,8 +167,9 @@ export class TuneIndexService implements OnDestroy {
     }
   }
 
-  /** The refresh itself: retire the outgoing tune's answer, then hydrate from cache or run the ladder
-   *  for the incoming one. Every exit is an outcome its caller releases the load path on. */
+  /** The refresh itself: retire the outgoing tune's answer, then hydrate from cache or produce the
+   *  record for the incoming one — shared with every other deck loading the same tune. Every exit is
+   *  an outcome its caller releases the load path on. */
   private async refreshIndex(
     file: SidFile | null,
     filename: string | null,
@@ -176,7 +186,7 @@ export class TuneIndexService implements OnDestroy {
       return;
     }
 
-    const hit = this.storage.load(filename, subtune);
+    const hit = this.shared.load(filename, subtune);
     if (hit !== null) {
       // A cache hit hydrates instantly — no scan at all, so the waiting load is released this turn.
       this._record.set(hit);
@@ -185,21 +195,50 @@ export class TuneIndexService implements OnDestroy {
     }
 
     this._pending.set(true);
-    const ladder = await this.runLadder(file, subtune, generation);
+    const record = await this.shared.produceOnce(filename, subtune, () =>
+      this.produceRecord(file, filename, subtune)
+    );
 
-    if (ladder.kind === 'abandoned') {
-      // The tune or subtune changed while a rung was in flight; this answer describes music that is
-      // no longer loaded. A newer refresh has already reset `pending` for its own tune, so this one
-      // must not touch it. The caller that awaited this load is still released, though — it is
-      // superseded, not stuck.
+    if (generation !== this.generation) {
+      // This deck's own tune or subtune changed while the shared run was in flight; the record it
+      // resolved with describes music that is no longer loaded here. A newer refresh has already
+      // reset `pending` for its own tune, so this one must not touch it. The caller that awaited this
+      // load is still released, though — it is superseded, not stuck. Any other deck still awaiting
+      // this exact run applies its own generation check and is unaffected by this one moving on.
       return;
     }
     this._pending.set(false);
 
-    if (ladder.kind === 'failed') {
+    if (record === null) {
       // A failed scan is not a cached "no answer" — the next load of this tune should try again.
-      logWarn(`TuneIndexService: scan failed for ${filename}:${subtune}: ${ladder.error}`);
       return;
+    }
+
+    this._record.set(record);
+    this.engine.setTuneIndex(record);
+  }
+
+  /**
+   * Runs the scan ladder to conclusion and builds the `TuneIndexRecord` it answers with, persisting
+   * it through the shared collaborator — or returns `null` when the ladder failed. This is the
+   * function `refreshIndex` hands to `SharedTuneIndex.produceOnce`, so it runs at most once per
+   * `(filename, subtune)` no matter how many decks are waiting on it.
+   *
+   * Deliberately guard-free: unlike `refreshIndex`, nothing here checks whether *this* deck's own
+   * tune has since moved on, because another deck may be genuinely still waiting on this exact
+   * answer for a tune it never abandoned. The generation check that discards a superseded answer
+   * lives in `refreshIndex`, on the resolved record, once each caller's own wait is over.
+   */
+  private async produceRecord(
+    file: SidFile,
+    filename: string,
+    subtune: number
+  ): Promise<TuneIndexRecord | null> {
+    const ladder = await this.runLadder(file, subtune);
+
+    if (ladder.kind === 'failed') {
+      logWarn(`TuneIndexService: scan failed for ${filename}:${subtune}: ${ladder.error}`);
+      return null;
     }
 
     // The detectors run in the same order TrackAnalysisPanelComponent.runAnalysis uses.
@@ -240,17 +279,18 @@ export class TuneIndexService implements OnDestroy {
       nativeTempo: native,
       callsPerFrame: output.callsPerFrame,
       // The ScanOutput carries only the rounded rate, so the un-rounded one has to come off the
-      // engine — without it the Timing toggle could not flip a cached tune without a re-scan.
+      // engine — without it the Timing toggle could not flip a cached tune without a re-scan. Read
+      // off this producing deck's engine, but valid for either deck: see the class doc's note on
+      // rate-derived fields.
       exactCallsPerFrame: playRate.exactCallsPerFrame,
       timingMode: this.engine.timingMode(),
       formatVersion: TUNE_INDEX_FORMAT_VERSION,
       computedAt: new Date().toISOString(),
     };
 
-    this.storage.save(record);
-    this._record.set(record);
-    this.engine.setTuneIndex(record);
+    this.shared.save(record);
     logInfo(LogType.Success, `TuneIndexService: indexed ${filename}:${subtune}.`);
+    return record;
   }
 
   /**
@@ -264,15 +304,10 @@ export class TuneIndexService implements OnDestroy {
    * thread boundary as a fresh copy each time. A new ladder means a new session, so a rung can never
    * deepen a scan of different music.
    *
-   * The generation guard and a failed scan are both checked after every rung, not only the first: a
-   * tune or subtune change mid-ladder must abandon the whole ladder, or a stale answer lands on the
-   * tune that replaced it.
+   * Guard-free: a run here always continues to the deepest rung it needs, whatever any deck's own
+   * generation does meanwhile — see the class doc. Only a genuine scan failure ends it early.
    */
-  private async runLadder(
-    file: SidFile,
-    subtune: number,
-    generation: number
-  ): Promise<LadderOutcome> {
+  private async runLadder(file: SidFile, subtune: number): Promise<LadderOutcome> {
     let lastOutput: ScanOutput | undefined;
     let lastLoop: LoopDetection = { kind: 'none' };
     const session = ++this.nextSessionId;
@@ -287,9 +322,6 @@ export class TuneIndexService implements OnDestroy {
       };
       const result: ScanResult = await this.scanner.scan(request);
 
-      if (generation !== this.generation) {
-        return { kind: 'abandoned' };
-      }
       if (result.kind === 'failed') {
         return { kind: 'failed', error: result.error };
       }
@@ -304,7 +336,7 @@ export class TuneIndexService implements OnDestroy {
     if (lastOutput === undefined) {
       // SCAN_DEPTH_SECONDS is never empty, so this never actually happens — the guard exists only to
       // satisfy narrowing.
-      return { kind: 'abandoned' };
+      return { kind: 'failed', error: 'the scan ladder produced no output' };
     }
     return { kind: 'answered', output: lastOutput, loop: lastLoop };
   }

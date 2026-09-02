@@ -4,7 +4,7 @@
 
 This is a throwaway spike proving that a browser tab can hold musical timing over Web MIDI well enough to stream SID tunes to a real Commodore 64. The entire codebase is disposable and expected to be replaced by `ASID-DJ-1`; its only permanent value is the written findings in the listening protocol below.
 
-The spike makes a C64 play a SID tune whose player code runs in this browser tab, with an audio-rate frame clock, ASID SysEx encoding over Web MIDI, and a frame-timer recipe packet to measure whether the ASID protocol closes the jitter gap that Web MIDI is known to have.
+The spike makes a C64 play a SID tune whose player code runs in this browser tab, with an audio-rate frame clock, ASID SysEx encoding over Web MIDI, and host-side timestamped delivery to measure whether the ASID protocol closes the jitter gap that Web MIDI is known to have — eliminating the cartridge's timed queue and running it in pass-through mode.
 
 ## How to Run It
 

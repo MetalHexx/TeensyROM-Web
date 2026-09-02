@@ -1,0 +1,41 @@
+// This component draws no box: `display: contents` promotes its four panels — each carrying its own
+// `[style.gridArea]`, set in the template from the `areas` input — to direct items of the page's own
+// `.grid` (see `dj-poc-view.component.scss`). There is nothing left here to lay out.
+:host {
+  display: contents;
+
+  // Shared column widths so every marker row's start and end blocks land on one rhythm. Every
+  // control on the performance surface is this tall. The browser's default button height is around
+  // 19px, which is a fine form control and a poor thing to hit mid-tune.
+  //
+  // These custom properties, and the POC-local semantic aliases below them, are defined here rather
+  // than in each of the four panel components: CSS custom properties inherit through the light DOM
+  // regardless of Angular's emulated view encapsulation — and regardless of `display: contents`,
+  // which only removes this host's own box, never its place in that inheritance chain — so `:host`
+  // stays the one place a deck-wide design token is declared, and `lib-transport-panel`,
+  // `lib-voice-speed-column`, `lib-loops-cues-panel` and `lib-binding-card` all read the same values
+  // from here.
+  --perf-control-height: 2rem;
+
+  // POC-local semantic aliases over the app's theme tokens, so the drawn structure reads as one
+  // instrument with the rest of the surface while staying self-contained here. Values come from the
+  // theme where a theme ancestor exists.
+  --structure-music: var(--color-highlight); // #00f7ff
+  --structure-intro: #7b2d8e; // the one value with no theme ancestor — between --color-primary and
+  // --color-primary-bright
+  --structure-dead: #1c1c26;
+  --structure-pending: #191922;
+  --structure-unknown-a: #2e2e42;
+  --structure-unknown-b: #22222f;
+  --structure-tick: var(--color-directory); // #f5e29e — chosen for contrast against both the purple
+  // intro and the cyan music
+  --structure-border: #33334a;
+
+  // Chrome greys — no theme ancestor, POC-local by nature.
+  --chrome-inset: #2e2e3e; // an unlit indicator's body
+  --chrome-inset-border: #3d3d52; // its rim, and the toggle pill's rim
+  --chrome-raised: #2a2a3a; // the toggle pill, off
+  --chrome-knob: #6a6a80; // the toggle knob, off
+  --chrome-dark: #33334a; // the deliberately-dark `stopped` light
+  --chrome-dark-border: #44445c;
+}

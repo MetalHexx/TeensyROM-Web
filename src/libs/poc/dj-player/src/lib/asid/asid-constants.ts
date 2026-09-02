@@ -34,3 +34,8 @@ export const NTSC_FRAME_INTERVAL_US = 16715;
 
 /** `$D404`, `$D40B`, `$D412` — the per-voice control registers, indexed by voice (0..2). */
 export const VOICE_CONTROL_REGISTERS: readonly number[] = [4, 11, 18];
+
+/** `$D418` — SID master volume. Low nibble is the only volume control the chip has; bits 4-6 select
+ *  the filter mode and bit 7 silences voice 3. `register-frame.ts` scales the low nibble by the
+ *  deck's gain at the packet boundary, leaving the other four bits untouched. */
+export const SID_VOLUME_REGISTER = 24;
