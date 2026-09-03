@@ -11,7 +11,12 @@ import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import { ANALYSIS_SCANNER } from './scan-runner';
 import type { ScanRequest, ScanResult } from './scan-runner';
 import { buildFeatureMatrix } from './frame-features';
-import { computeNovelty, candidatesAbove, DEFAULT_CANDIDATE_THRESHOLD, DEFAULT_FEATURE_WEIGHTS } from './novelty';
+import {
+  computeNovelty,
+  candidatesAbove,
+  DEFAULT_CANDIDATE_THRESHOLD,
+  DEFAULT_FEATURE_WEIGHTS,
+} from './novelty';
 import { computeStructure } from './structure';
 import { detectLoop, IDLE_PERIOD_SECONDS, MIN_TAIL_SECONDS } from './loop-detect';
 import type { LoopDetectOptions, LoopDetection } from './loop-detect';
@@ -264,10 +269,12 @@ export class TuneIndexService implements OnDestroy {
       loopPeriodFrames: loop.kind === 'loop' ? loop.periodFrames : null,
       endedAtFrame: loop.kind === 'ended' ? loop.endFrame : null,
       sectionBoundaries: structure.sectionBoundaries,
-      detectedMoments: candidatesAbove(novelty, DEFAULT_CANDIDATE_THRESHOLD).map(({ frame, strength }) => ({
-        frame,
-        strength,
-      })),
+      detectedMoments: candidatesAbove(novelty, DEFAULT_CANDIDATE_THRESHOLD).map(
+        ({ frame, strength }) => ({
+          frame,
+          strength,
+        })
+      ),
       tonic: key.tonic,
       mode: key.mode,
       camelot: key.camelot,

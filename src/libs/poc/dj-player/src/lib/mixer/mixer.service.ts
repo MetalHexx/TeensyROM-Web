@@ -52,7 +52,7 @@ export class MixerService {
   deckFader(deckId: string): Signal<number> {
     let fader = this.deckFaderSignals.get(deckId);
     if (fader === undefined) {
-      fader = computed(() => this.deckFaders().get(deckId) ?? 1);
+      fader = computed(() => this.deckFaderFor(deckId));
       this.deckFaderSignals.set(deckId, fader);
     }
     return fader;
