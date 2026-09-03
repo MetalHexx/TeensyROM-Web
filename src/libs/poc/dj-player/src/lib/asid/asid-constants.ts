@@ -39,3 +39,30 @@ export const VOICE_CONTROL_REGISTERS: readonly number[] = [4, 11, 18];
  *  the filter mode and bit 7 silences voice 3. `register-frame.ts` scales the low nibble by the
  *  deck's gain at the packet boundary, leaving the other four bits untouched. */
 export const SID_VOLUME_REGISTER = 24;
+
+/** `$D415` — filter cutoff low bits, in bits 0-2 only; bits 3-7 are unused and must survive a write. */
+export const SID_FILTER_CUTOFF_LOW_REGISTER = 21;
+/** `$D416` — filter cutoff high 8 bits, completing the 11-bit cutoff. */
+export const SID_FILTER_CUTOFF_HIGH_REGISTER = 22;
+/** `$D417` — filter resonance in bits 4-7, voice/external filter routing in bits 0-3. */
+export const SID_FILTER_RESONANCE_REGISTER = 23;
+
+/** Voice n's seven registers start at `n * REGISTERS_PER_VOICE`. */
+export const REGISTERS_PER_VOICE = 7;
+export const VOICE_COUNT = 3;
+
+/**
+ * `$D418` bits 4-6 select the filter mode — one bit per pass band, and they combine. All three
+ * clear means the filter is out of the signal path.
+ */
+export const SID_FILTER_MODE_OFF = 0b000;
+export const SID_FILTER_MODE_LOW_PASS = 0b001;
+export const SID_FILTER_MODE_BAND_PASS = 0b010;
+export const SID_FILTER_MODE_HIGH_PASS = 0b100;
+export const SID_FILTER_MODE_SHIFT = 4;
+export const SID_FILTER_MODE_MASK = 0b111;
+
+// The four filter/voice register numbers above and REGISTERS_PER_VOICE/VOICE_COUNT are also declared
+// module-privately in `analysis/frame-features.ts`. The duplication is deliberate, not an oversight:
+// analysis already imports from the ASID layer (`PRIMARY_SLOT_FOR_REGISTER`), so sourcing these from
+// there would invert the dependency. Consolidating the two is a separate change.
