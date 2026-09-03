@@ -1,0 +1,12 @@
+<div class="channel-fader">
+  <input
+    type="range"
+    min="0"
+    max="1"
+    step="0.01"
+    [value]="gain()"
+    (input)="onGainInput($event)"
+    [attr.aria-label]="accessibleName()"
+  />
+  <span class="channel-fader-label">{{ deck().label }}</span>
+</div>

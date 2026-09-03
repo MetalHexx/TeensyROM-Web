@@ -105,8 +105,24 @@
         <span class="marker-sub-tag">Start</span>
         @if (marker.start) {
         <span class="marker-frame">frame {{ markerStartFrame($index) }}</span>
+        <button
+          type="button"
+          class="marker-snap marker-snap-prev"
+          [attr.aria-label]="
+            'Snap marker ' + ($index + 1) + ' start to previous moment deck ' + label()
+          "
+          [disabled]="snapMarkerStartDisabled($index, -1)"
+          (click)="onSnapMarkerStart($index, -1)"
+        >
+          ◂
+        </button>
         <div class="marker-nudge">
           <div class="marker-nudge-centre"></div>
+          <div class="marker-ticks" aria-hidden="true">
+            @for (offset of startTickOffsets($index); track offset) {
+            <div class="marker-tick" [style.left.%]="tickLeftPercent(offset)"></div>
+            }
+          </div>
           <input
             type="range"
             [min]="-nudgeRange()"
@@ -118,12 +134,41 @@
             (change)="onMarkerStartNudgeChange($index, $event)"
           />
         </div>
+        <button
+          type="button"
+          class="marker-snap marker-snap-next"
+          [attr.aria-label]="
+            'Snap marker ' + ($index + 1) + ' start to next moment deck ' + label()
+          "
+          [disabled]="snapMarkerStartDisabled($index, 1)"
+          (click)="onSnapMarkerStart($index, 1)"
+        >
+          ▸
+        </button>
         <span class="marker-offset">{{ markerStartOffsetLabel($index) }}</span>
         } @else {
         <span class="marker-frame marker-frame--empty">empty</span>
+        <button
+          type="button"
+          class="marker-snap marker-snap-prev marker-snap--empty"
+          aria-hidden="true"
+          tabindex="-1"
+          disabled
+        >
+          ◂
+        </button>
         <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
           <div class="marker-nudge-centre"></div>
         </div>
+        <button
+          type="button"
+          class="marker-snap marker-snap-next marker-snap--empty"
+          aria-hidden="true"
+          tabindex="-1"
+          disabled
+        >
+          ▸
+        </button>
         <span class="marker-offset marker-offset--empty">—</span>
         }
       </div>
@@ -132,8 +177,24 @@
         <span class="marker-sub-tag">End</span>
         @if (marker.end; as end) {
         <span class="marker-frame">frame {{ markerEndFrame($index) }}</span>
+        <button
+          type="button"
+          class="marker-snap marker-snap-prev"
+          [attr.aria-label]="
+            'Snap marker ' + ($index + 1) + ' end to previous moment deck ' + label()
+          "
+          [disabled]="snapMarkerEndDisabled($index, -1)"
+          (click)="onSnapMarkerEnd($index, -1)"
+        >
+          ◂
+        </button>
         <div class="marker-nudge">
           <div class="marker-nudge-centre"></div>
+          <div class="marker-ticks" aria-hidden="true">
+            @for (offset of endTickOffsets($index); track offset) {
+            <div class="marker-tick" [style.left.%]="tickLeftPercent(offset)"></div>
+            }
+          </div>
           <input
             type="range"
             [min]="-nudgeRange()"
@@ -145,12 +206,39 @@
             (change)="onMarkerEndNudgeChange($index, $event)"
           />
         </div>
+        <button
+          type="button"
+          class="marker-snap marker-snap-next"
+          [attr.aria-label]="'Snap marker ' + ($index + 1) + ' end to next moment deck ' + label()"
+          [disabled]="snapMarkerEndDisabled($index, 1)"
+          (click)="onSnapMarkerEnd($index, 1)"
+        >
+          ▸
+        </button>
         <span class="marker-offset">{{ markerEndOffsetLabel($index) }}</span>
         } @else {
         <span class="marker-frame marker-frame--empty" aria-hidden="true">empty</span>
+        <button
+          type="button"
+          class="marker-snap marker-snap-prev marker-snap--empty"
+          aria-hidden="true"
+          tabindex="-1"
+          disabled
+        >
+          ◂
+        </button>
         <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
           <div class="marker-nudge-centre"></div>
         </div>
+        <button
+          type="button"
+          class="marker-snap marker-snap-next marker-snap--empty"
+          aria-hidden="true"
+          tabindex="-1"
+          disabled
+        >
+          ▸
+        </button>
         <span class="marker-offset marker-offset--empty" aria-hidden="true">—</span>
         }
       </div>

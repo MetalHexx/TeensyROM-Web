@@ -76,6 +76,10 @@ export function computeNovelty(matrix: FeatureMatrix, weights: FeatureWeights): 
   return { curve, candidates };
 }
 
+/** What "strong enough to be a real moment" means, shared by every reader of the candidate list so
+ *  a moment the analysis panel steps to is a moment the marker rows step to. */
+export const DEFAULT_CANDIDATE_THRESHOLD = 0.5;
+
 /** A pure filter over already-computed candidates, so moving a threshold never recomputes the curve. */
 export function candidatesAbove(result: NoveltyResult, threshold: number): readonly Candidate[] {
   return result.candidates.filter((candidate) => candidate.strength >= threshold);

@@ -223,6 +223,39 @@
   pointer-events: none;
 }
 
+// One tick per reachable moment, positioned by the same left-percent geometry as the centre rule
+// above. `pointer-events: none` on the layer keeps a tick from ever intercepting the drag the range
+// input beneath it handles.
+.marker-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.marker-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-primary-bright, var(--color-primary));
+}
+
+// Fixed square footprint so a captured row's pair and an empty row's placeholder pair occupy exactly
+// the same width — the reason an uncaptured slot never widens its nudge track relative to a captured
+// one.
+.marker-snap {
+  flex: 0 0 auto;
+  width: var(--perf-control-height, 2rem);
+  height: var(--perf-control-height, 2rem);
+  padding: 0;
+  font-size: var(--font-size-md);
+  line-height: 1;
+}
+
+.marker-snap--empty {
+  opacity: 0.4;
+}
+
 .marker-offset {
   flex: 0 0 3.25rem;
   font-family: 'Roboto Mono', monospace;

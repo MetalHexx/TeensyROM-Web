@@ -439,6 +439,7 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
     loopPeriodFrames: null,
     endedAtFrame: null,
     sectionBoundaries: [],
+    detectedMoments: [],
     tonic: null,
     mode: null,
     camelot: null,

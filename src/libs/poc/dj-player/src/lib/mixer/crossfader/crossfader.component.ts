@@ -7,7 +7,7 @@ import { MixerService } from '../mixer.service';
  * and no numeric readout of the resulting register value. `MixerService` is provided page-level, one
  * level up, so every deck's own gain reads the same crossfader position this writes.
  *
- * Rendered inside `MixerColumnComponent`, beneath the reserved region.
+ * Rendered inside `MixerColumnComponent`, beneath the channel faders.
  */
 @Component({
   selector: 'lib-crossfader',

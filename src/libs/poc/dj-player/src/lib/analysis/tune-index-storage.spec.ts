@@ -11,6 +11,7 @@ function buildRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord 
     loopPeriodFrames: null,
     endedAtFrame: null,
     sectionBoundaries: [],
+    detectedMoments: [],
     tonic: null,
     mode: null,
     camelot: null,
@@ -57,6 +58,10 @@ describe('LocalStorageTuneIndexStorage', () => {
       loopPeriodFrames: 4567,
       endedAtFrame: null,
       sectionBoundaries: [0, 512, 1024],
+      detectedMoments: [
+        { frame: 512, strength: 0.72 },
+        { frame: 4096, strength: 0.91 },
+      ],
       tonic: 9,
       mode: 'minor',
       camelot: '5A',

@@ -13,6 +13,7 @@ import { PAL_CPU_CLOCK_HZ } from '../notes';
 import type { TuneIndexService } from '../tune-index.service';
 import { TUNE_INDEX_FORMAT_VERSION } from '../tune-index.model';
 import type { TuneIndexRecord } from '../tune-index.model';
+import { DEFAULT_CANDIDATE_THRESHOLD } from '../novelty';
 import type { PlayRate } from '../../engine/play-rate';
 import { formatDuration } from '../format';
 import type { DeckHandle } from '../../deck/deck-registry';
@@ -99,6 +100,7 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
     loopPeriodFrames: 6250,
     endedAtFrame: null,
     sectionBoundaries: [0, 1200, 2400, 3600],
+    detectedMoments: [],
     tonic: 0,
     mode: 'major',
     camelot: '8B',
@@ -395,6 +397,20 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(aboveTickCount()).toBe(1);
 
     expect(scanner.scan).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts and resets the threshold slider at the shared default candidate threshold', () => {
+    expand();
+    expect(Number(thresholdInput().value)).toBe(DEFAULT_CANDIDATE_THRESHOLD);
+
+    setThreshold(0.9);
+    expect(Number(thresholdInput().value)).toBe(0.9);
+
+    // A different tune is different music: the threshold reset is part of what clearAnalysis discards.
+    tuneLoader.currentTune.set(fakeSidFile({ name: 'Another tune' }));
+    fixture.detectChanges();
+
+    expect(Number(thresholdInput().value)).toBe(DEFAULT_CANDIDATE_THRESHOLD);
   });
 
   it('converts a clicked candidate into a scrub percentage against positionBasisFrames', async () => {
