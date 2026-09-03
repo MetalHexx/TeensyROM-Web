@@ -102,6 +102,32 @@ export class DeckHostComponent implements OnInit, OnDestroy {
     effect(() => {
       this.engine.setOutputGain(this.mixer.gainFor(this.context.id())());
     });
+    // One effect per control, same fire-twice pattern as the gain effect above: once at construction
+    // against the pre-adoption '' id (a no-op, since the mixer knows no such deck) and again once
+    // ngOnInit adopts the real id.
+    effect(() => {
+      this.engine.setRegisterScale('cutoff', this.mixer.scaleCoefficient(this.context.id(), 'cutoff')());
+    });
+    effect(() => {
+      this.engine.setRegisterScale(
+        'resonance',
+        this.mixer.scaleCoefficient(this.context.id(), 'resonance')()
+      );
+    });
+    effect(() => {
+      this.engine.setRegisterScale(
+        'pulseWidth',
+        this.mixer.scaleCoefficient(this.context.id(), 'pulseWidth')()
+      );
+    });
+    // Key is the one place the control name and the register group differ — 'key' is the UI's word
+    // for it, 'frequency' is the register group it drives. There is no 'key' group.
+    effect(() => {
+      this.engine.setRegisterScale('frequency', this.mixer.keyCoefficient(this.context.id())());
+    });
+    effect(() => {
+      this.engine.setFilterMode(this.mixer.filterMode(this.context.id())());
+    });
   }
 
   ngOnInit(): void {

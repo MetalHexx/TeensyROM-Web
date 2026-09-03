@@ -208,6 +208,33 @@ describe('DeckHostComponent', () => {
       expect(secondGainSpy).toHaveBeenCalledWith(0.25);
       expect(secondGainSpy).not.toHaveBeenCalledWith(0);
     });
+
+    it("pushes each deck's own mixer scale controls, key and filter mode to that deck's own engine, and only that deck's own engine", () => {
+      const first = build(DECKS[0]);
+      const second = build(DECKS[1]);
+      first.fixture.detectChanges(); // runs ngOnInit, adopting DECKS[0].id
+      second.fixture.detectChanges(); // runs ngOnInit, adopting DECKS[1].id
+      TestBed.flushEffects();
+
+      const mixer = TestBed.inject(MixerService);
+      const firstScaleSpy = vi.spyOn(first.engine, 'setRegisterScale');
+      const secondScaleSpy = vi.spyOn(second.engine, 'setRegisterScale');
+      const firstFilterSpy = vi.spyOn(first.engine, 'setFilterMode');
+      const secondFilterSpy = vi.spyOn(second.engine, 'setFilterMode');
+
+      mixer.setScalePosition(DECKS[0].id, 'cutoff', 1);
+      mixer.setKeySemitones(DECKS[0].id, 12);
+      mixer.setFilterMode(DECKS[0].id, 'lowPass');
+      first.fixture.detectChanges();
+      second.fixture.detectChanges();
+
+      expect(firstScaleSpy).toHaveBeenCalledWith('cutoff', 16);
+      expect(firstScaleSpy).toHaveBeenCalledWith('frequency', 2);
+      expect(firstFilterSpy).toHaveBeenCalledWith('lowPass');
+      expect(secondScaleSpy).not.toHaveBeenCalledWith('cutoff', 16);
+      expect(secondScaleSpy).not.toHaveBeenCalledWith('frequency', 2);
+      expect(secondFilterSpy).not.toHaveBeenCalledWith('lowPass');
+    });
   });
 
   describe('template wiring, over mocked collaborators', () => {
@@ -239,6 +266,8 @@ describe('DeckHostComponent', () => {
       pause: ReturnType<typeof vi.fn>;
       stop: ReturnType<typeof vi.fn>;
       setOutputGain: ReturnType<typeof vi.fn>;
+      setRegisterScale: ReturnType<typeof vi.fn>;
+      setFilterMode: ReturnType<typeof vi.fn>;
       setRepeatTrack: ReturnType<typeof vi.fn>;
       restoreRepeatTrackPreference: ReturnType<typeof vi.fn>;
       addMarker: ReturnType<typeof vi.fn>;
@@ -279,6 +308,8 @@ describe('DeckHostComponent', () => {
         pause: vi.fn(),
         stop: vi.fn(),
         setOutputGain: vi.fn(),
+        setRegisterScale: vi.fn(),
+        setFilterMode: vi.fn(),
         setRepeatTrack: vi.fn(),
         restoreRepeatTrackPreference: vi.fn(),
         addMarker: vi.fn(),

@@ -7,6 +7,8 @@ import {
   ASID_MSG_START,
   ASID_MSG_STOP,
   PAL_FRAME_INTERVAL_US,
+  SID_FILTER_MODE_LOW_PASS,
+  SID_FILTER_MODE_SHIFT,
 } from '../asid/asid-constants';
 import { DeckMidiBinding } from '../midi/deck-midi-binding';
 import { DeckContext } from '../deck/deck-context';
@@ -344,6 +346,18 @@ function volumeEveryFrameTune(rawValue: number): SidFile {
   });
 }
 
+/** init sets $D417 once to `rawValue` and never touches it again; play writes nothing. Mirrors
+ *  `volumeTune`'s self-emission shape, but on the resonance register — the high nibble is what
+ *  `RegisterFrame.setRegisterScale('resonance', ...)` scales. */
+function resonanceTune(rawValue: number): SidFile {
+  return tune({
+    blocks: [
+      { at: 0x1000, bytes: [0xa9, rawValue, 0x8d, 0x17, 0xd4, RTS] }, // LDA #rawValue / STA $D417 / RTS
+      { at: 0x1010, bytes: [RTS] },
+    ],
+  });
+}
+
 /** Combines `doubleSpeedTune`'s CIA-programmed 2x rate with `counterTune`'s per-play-call counter,
  * so a nudge test can identify exactly which frame a 2x-multispeed tune landed on. */
 function doubleSpeedCounterTune(): SidFile {
@@ -608,6 +622,58 @@ describe('DjPlayerEngine', () => {
       clock.tick(1); // the fresh subtune's all-dirty snapshot
 
       expect(slotValue(lastDataPacket(midi), 21) & 0x0f).toBe(Math.round(0x0f * 0.5));
+    });
+  });
+
+  describe('register scale and filter mode', () => {
+    it('scales a register group at the packet boundary, mirroring the fader gain path', async () => {
+      engine.loadTune(resonanceTune(0x20)); // high nibble 2, low nibble 0
+      await engine.play();
+      clock.tick(1); // the all-dirty init frame
+
+      engine.setRegisterScale('resonance', 0.5);
+      clock.tick(1);
+
+      const packet = lastDataPacket(midi);
+      expect(valueCount(packet)).toBe(1); // only the resonance slot, forced present by the scale
+      expect(slotValue(packet, 0)).toBe(0x10); // (2 * 0.5) rounded into the high nibble
+    });
+
+    it('re-applies a held register scale after loadTune rebuilds the frame', async () => {
+      engine.loadTune(resonanceTune(0x20));
+      engine.setRegisterScale('resonance', 0.5);
+
+      engine.loadTune(resonanceTune(0x20));
+      await engine.play();
+      clock.tick(1); // the fresh subtune's all-dirty snapshot
+
+      expect(slotValue(lastDataPacket(midi), 20)).toBe(0x10);
+    });
+
+    it('forwards a filter mode override to the current frame', async () => {
+      engine.loadTune(silentTune());
+      await engine.play();
+      clock.tick(1); // the all-dirty init frame
+
+      engine.setFilterMode('lowPass');
+      clock.tick(1);
+
+      const packet = lastDataPacket(midi);
+      expect(valueCount(packet)).toBe(1); // only the volume slot, forced present by the held mode
+      expect(slotValue(packet, 0)).toBe(SID_FILTER_MODE_LOW_PASS << SID_FILTER_MODE_SHIFT);
+    });
+
+    it('re-applies a held filter mode after loadTune rebuilds the frame', async () => {
+      engine.loadTune(silentTune());
+      engine.setFilterMode('lowPass');
+
+      engine.loadTune(silentTune());
+      await engine.play();
+      clock.tick(1); // the fresh subtune's all-dirty snapshot
+
+      expect(slotValue(lastDataPacket(midi), 21)).toBe(
+        SID_FILTER_MODE_LOW_PASS << SID_FILTER_MODE_SHIFT
+      );
     });
   });
 
