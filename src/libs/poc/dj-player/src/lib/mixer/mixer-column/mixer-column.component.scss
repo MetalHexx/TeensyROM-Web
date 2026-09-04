@@ -14,54 +14,51 @@
 .mixer-column {
   display: flex;
   flex-direction: column;
-  // The channel faders and crossfader are now a fixed-height group (see `--fader-length` below),
-  // not something that grows to fill the column — pin the group to the column's bottom edge, same
-  // as the wireframe, rather than letting it default to the top with open space beneath it.
+  // The two deck strips and the crossfader are a fixed-content-height group, not something that
+  // grows to fill the column — pin the group to the column's bottom edge, same as the wireframe,
+  // rather than letting it default to the top with open space beneath it. The column spans the
+  // page's full height (see `dj-poc-view.component.ts`'s row template); the strips do not.
   justify-content: flex-end;
   height: 100%;
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
   min-height: 0;
-  // The channel faders' travel length, held here so both faders and the row that holds them agree on
-  // it. Matches the crossfader's own rendered width (this column's inner width is fixed at 208px by
-  // `TWO_DECK_COLUMN_TEMPLATE`, so that width barely moves across breakpoints) so the two controls
-  // read as the same size, per the wireframe. Without an explicit length here, `.channel-faders`'
-  // `flex: 1 1 auto` used to stretch the faders to fill however tall the grid happened to render —
-  // fine when the row held no content, but a runaway once a real input lived there.
-  --fader-length: 11.5rem;
 
   @media (max-width: 1500px) {
     padding: var(--spacing-xs) var(--spacing-sm);
   }
 
   // The band form: once the decks stack, this column becomes a full-width horizontal band rather
-  // than the desktop's full-height vertical strip, so the channel faders and the crossfader sit
-  // side by side instead of stacked — that's what keeps the band shallow.
+  // than the desktop's full-height vertical strip. A shallow band is no longer possible with six
+  // controls per deck strip, so this wraps rather than clips if the strips and the crossfader don't
+  // fit on one line.
   @media (max-width: 1000px) {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-start;
     height: auto;
   }
 }
 
-// A row of two, one per deck, with generous separation — this is a surface reached for mid-mix, so
-// the two must not be easy to confuse or hit together. Fixed to `--fader-length` rather than
-// growing to fill the column: see that variable's own comment for why.
+// Two deck strips, one per deck, with generous separation — this is a surface reached for mid-mix,
+// so the two must not be easy to confuse or hit together. Each strip sizes its own height from its
+// own content now (see `DeckStripComponent`); this row no longer pins a fixed `--fader-length` the
+// way it did when it held bare faders directly, since a strip's several controls don't share one
+// travel length the way two faders did.
 .channel-faders {
   flex: 0 0 auto;
-  height: var(--fader-length);
   min-height: 0;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: stretch;
   gap: var(--spacing-xl);
   margin-bottom: var(--spacing-md);
 
   @media (max-width: 1000px) {
-    flex: 1 1 0;
-    height: 64px;
+    flex: 1 1 auto;
     margin-bottom: 0;
     margin-right: var(--spacing-md);
   }
