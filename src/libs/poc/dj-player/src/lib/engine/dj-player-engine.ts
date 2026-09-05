@@ -20,7 +20,7 @@ import {
   buildStopPacket,
 } from '../asid/asid-encoder';
 import { RegisterFrame } from '../asid/register-frame';
-import type { FrameSnapshot } from '../asid/register-frame';
+import type { FrameSnapshot, ScaledRegisterGroup, SidFilterMode } from '../asid/register-frame';
 import type { FrameResult } from '../cpu/c64-machine';
 import type { SidFile } from '../sid/sid-file.model';
 import type { TuneIndexRecord } from '../analysis/tune-index.model';
@@ -322,6 +322,13 @@ export class DjPlayerEngine implements OnDestroy {
   /** Held so a fresh `RegisterFrame` built by `loadTune()` inherits it — otherwise every tune load
    *  would silently reset the deck to full regardless of where the fader sits. */
   private outputGain = 1;
+  /** Held for the same reason as `outputGain`, one entry per group actually set by
+   *  `setRegisterScale` — cutoff, resonance, pulse width and frequency (Key). A group never set is
+   *  simply absent; a fresh frame already starts every group at its own home coefficient of 1, so
+   *  `loadTune()`'s re-apply loop can skip it. */
+  private readonly registerScales = new Map<ScaledRegisterGroup, number>();
+  /** Held for the same reason as `outputGain` — see `setFilterMode`. */
+  private filterMode: SidFilterMode | null = null;
   /** What the frame clock was last handed, or null before it has ever been started — the rate
    *  diagnostics report, rather than one derived from a fader that may have moved while stopped. */
   private runningIntervalUs: number | null = null;
@@ -339,6 +346,13 @@ export class DjPlayerEngine implements OnDestroy {
     // A fresh RegisterFrame defaults to full — re-apply the held gain at once, before anything else
     // about this load can emit a packet at the wrong level.
     this.tuneSession.frame?.setOutputGain(this.outputGain);
+    // Same reasoning as the gain above: a fresh frame starts every scaled group and the filter mode
+    // at home, so every other held control is re-applied here too, before this load can emit a packet
+    // at the wrong setting.
+    for (const [group, coefficient] of this.registerScales) {
+      this.tuneSession.frame?.setRegisterScale(group, coefficient);
+    }
+    this.tuneSession.frame?.setFilterMode(this.filterMode);
     this.mutedVoices.set([false, false, false]);
     // A fresh RegisterFrame starts fully unmuted, so a held button must not survive into a tune it
     // never pressed against — otherwise effectiveMutes would disagree with the chip it just replaced.
@@ -515,6 +529,24 @@ export class DjPlayerEngine implements OnDestroy {
   setOutputGain(gain: number): void {
     this.outputGain = gain;
     this.tuneSession.frame?.setOutputGain(gain);
+  }
+
+  /**
+   * A held knob or Key coefficient — `MixerService.scaleCoefficient`/`keyCoefficient` composed
+   * through the shared taper, pushed here by `DeckHostComponent`'s effects. Held on the engine, not
+   * only on the frame, for the same reason `outputGain` is: `loadTune()` builds a fresh
+   * `RegisterFrame` that starts every group at home, and this is what survives the rebuild.
+   */
+  setRegisterScale(group: ScaledRegisterGroup, coefficient: number): void {
+    this.registerScales.set(group, coefficient);
+    this.tuneSession.frame?.setRegisterScale(group, coefficient);
+  }
+
+  /** The deck's own forced filter mode — see `RegisterFrame.setFilterMode`'s own doc for what `null`
+   *  means. Held on the engine for the same reason as `setRegisterScale`. */
+  setFilterMode(mode: SidFilterMode | null): void {
+    this.filterMode = mode;
+    this.tuneSession.frame?.setFilterMode(mode);
   }
 
   /**

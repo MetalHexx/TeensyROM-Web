@@ -1,0 +1,93 @@
+:host {
+  display: inline-flex;
+}
+
+.scale-knob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.scale-knob-dial {
+  position: relative;
+
+  &:focus-within {
+    outline: 2px solid var(--color-primary-bright);
+    outline-offset: 2px;
+  }
+}
+
+svg {
+  display: block;
+  width: var(--scale-knob-size, 64px);
+  height: var(--scale-knob-size, 64px);
+}
+
+.ring-track {
+  fill: none;
+  stroke: var(--color-dimmed);
+  stroke-width: 4;
+}
+
+.value-ring {
+  fill: none;
+  stroke: var(--color-primary-bright);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.body {
+  fill: none;
+  stroke: var(--color-dimmed);
+  stroke-width: 1.5;
+}
+
+.end-tick {
+  stroke: var(--color-dimmed);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.home-tick {
+  stroke: var(--color-primary-bright);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.pointer {
+  stroke: var(--color-primary-bright);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.hub {
+  fill: var(--color-primary-bright);
+}
+
+// Invisible but present: the dial's SVG is the whole visual, this is only what makes the control
+// operable — keyboard, drag and assistive-technology state all come from the native element beneath.
+.scale-knob-range {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.scale-knob-readout {
+  color: var(--color-dimmed-light);
+  font-size: var(--font-size-sm);
+  font-family: 'Roboto Mono', monospace;
+}
+
+.scale-knob-label {
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  text-align: center;
+}

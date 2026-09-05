@@ -1,0 +1,50 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.filter-mode-selector {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+// LP | BP | HP: three equal cells sharing the row's width, divided by 1px rules.
+.filter-mode-row {
+  display: flex;
+  border-bottom: 1px solid var(--color-dimmed);
+
+  .filter-mode-option {
+    flex: 1 1 0;
+    min-width: 0;
+    border-right: 1px solid var(--color-dimmed);
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+}
+
+.filter-mode-option {
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+// The engaged cell, filled and brightened — the same rest/engaged contrast `lib-scale-knob` draws
+// between its dimmed ring-track and its brightened value-ring.
+.filter-mode-option--engaged {
+  background: var(--color-primary);
+  color: var(--color-dimmed-light);
+}

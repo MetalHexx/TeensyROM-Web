@@ -1,0 +1,33 @@
+:host {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  // The filter mode selector and the fader wrapper both claim the strip's full width themselves
+  // (see their own `width: 100%`); `center` rather than the flex default `stretch` is what leaves
+  // the knobs' own shrink-to-fit width — 64px — centred with air either side instead of stretched
+  // and left-aligned against the strip's 80px.
+  align-items: center;
+  gap: var(--spacing-md);
+  min-width: 0;
+  min-height: 0;
+}
+
+// The strip's own sizing budget for every knob it renders — 64px leaves 8px of air either side of
+// the 80px strip. Reaches into the child's host element the same way `MixerColumnComponent` sizes
+// `lib-crossfader`'s.
+lib-scale-knob {
+  --scale-knob-size: 64px;
+}
+
+// The fader used to stretch to whatever height `MixerColumnComponent`'s row rendered at; now it
+// shares the strip with five other controls above it, so it gets a fixed height of its own instead.
+// A `display: flex` row of one item reproduces the exact mechanism `ChannelFaderComponent`'s own
+// host already relies on (`flex: 1 1 0` / `height: 100%`), just scoped to this wrapper rather than
+// the whole row — keeping the "fixed, never `flex: 1 1 auto`" rule that stopped the fader running
+// away in the first place.
+.deck-strip-fader {
+  display: flex;
+  width: 100%;
+  height: 7.5rem;
+  min-height: 0;
+}

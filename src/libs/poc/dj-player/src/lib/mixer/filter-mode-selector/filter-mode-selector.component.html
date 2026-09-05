@@ -1,0 +1,30 @@
+<div
+  class="filter-mode-selector"
+  role="group"
+  [attr.aria-label]="'Filter mode deck ' + deck().label"
+>
+  <div class="filter-mode-row">
+    @for (option of topRow; track option.mode) {
+    <button
+      type="button"
+      class="filter-mode-option"
+      [class.filter-mode-option--engaged]="isEngaged(option)"
+      [attr.aria-pressed]="isEngaged(option)"
+      [attr.aria-label]="accessibleName(option)"
+      (click)="onSelect(option)"
+    >
+      {{ option.label }}
+    </button>
+    }
+  </div>
+  <button
+    type="button"
+    class="filter-mode-option"
+    [class.filter-mode-option--engaged]="isEngaged(offOption)"
+    [attr.aria-pressed]="isEngaged(offOption)"
+    [attr.aria-label]="accessibleName(offOption)"
+    (click)="onSelect(offOption)"
+  >
+    {{ offOption.label }}
+  </button>
+</div>

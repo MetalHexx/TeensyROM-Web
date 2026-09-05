@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { DECKS } from '../../deck/deck.config';
-import { ChannelFaderComponent } from '../channel-fader/channel-fader.component';
 import { CrossfaderComponent } from '../crossfader/crossfader.component';
+import { DeckStripComponent } from '../deck-strip/deck-strip.component';
 
 /**
- * The mixer column: one vertical channel fader per `DECKS` entry, and the crossfader beneath them.
- * No curve selector, no curve-shape preview, and no numeric readout of the resulting register value.
+ * The mixer column: one deck strip per `DECKS` entry — filter mode, the four scale knobs and the
+ * channel fader — and the crossfader beneath them both.
  *
  * `:host` claims the fixed `mx` grid area directly, in both the page's two-deck layout and its
  * N-deck fallback: there is exactly one mixer column regardless of how many decks compose, so naming
@@ -17,7 +17,7 @@ import { CrossfaderComponent } from '../crossfader/crossfader.component';
   templateUrl: './mixer-column.component.html',
   styleUrl: './mixer-column.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ChannelFaderComponent, CrossfaderComponent],
+  imports: [DeckStripComponent, CrossfaderComponent],
 })
 export class MixerColumnComponent {
   protected readonly decks = DECKS;

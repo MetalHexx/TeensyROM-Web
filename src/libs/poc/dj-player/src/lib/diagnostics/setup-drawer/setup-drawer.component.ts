@@ -5,6 +5,8 @@ import type { DeckHandle } from '../../deck/deck-registry';
 import { NOMINAL_INTERVAL_OPTIONS_US } from '../../engine/dj-player-engine';
 import type { EngineStats } from '../../engine/dj-player-engine';
 import type { TimingMode } from '../../engine/play-rate';
+import { MixerService } from '../../mixer/mixer.service';
+import type { KeyDisplayFormat } from '../../mixer/key-display';
 import type { SidFile } from '../../sid/sid-file.model';
 import {
   tuneIndexKeyConfidenceLabel,
@@ -62,9 +64,11 @@ const EM_DASH = '—';
 })
 export class SetupDrawerComponent {
   private readonly registry = inject(DeckRegistry);
+  private readonly mixer = inject(MixerService);
 
   protected readonly decks = this.registry.decks;
   protected readonly scheduleAheadOptionsMs = SCHEDULE_AHEAD_OPTIONS_MS;
+  protected readonly keyDisplayFormat = this.mixer.keyDisplayFormat;
 
   protected readonly stallDurationMs = signal<number>(DEFAULT_STALL_DURATION_MS);
   protected readonly maxStallDurationMs = MAX_STALL_DURATION_MS;
@@ -226,6 +230,12 @@ export class SetupDrawerComponent {
   protected onTuneIndexTimingModeChange(deck: DeckHandle, event: Event): void {
     const mode = (event.target as HTMLSelectElement).value as TimingMode;
     deck.tuneIndex.setTimingMode(mode);
+  }
+
+  /** Page-level, not per-deck — see `MixerService.keyDisplayFormat`'s own doc. */
+  protected onKeyDisplayFormatChange(event: Event): void {
+    const format = (event.target as HTMLSelectElement).value as KeyDisplayFormat;
+    this.mixer.setKeyDisplayFormat(format);
   }
 
   // --- Diagnostics --------------------------------------------------------------------------------

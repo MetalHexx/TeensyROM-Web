@@ -1,0 +1,37 @@
+<lib-filter-mode-selector [deck]="deck()" />
+
+<lib-scale-knob
+  label="Cutoff"
+  [accessibleName]="accessibleName('Cutoff')"
+  [value]="cutoff()"
+  (valueChange)="onScaleChange('cutoff', $event)"
+/>
+
+<lib-scale-knob
+  label="Resonance"
+  [accessibleName]="accessibleName('Resonance')"
+  [value]="resonance()"
+  (valueChange)="onScaleChange('resonance', $event)"
+/>
+
+<lib-scale-knob
+  label="Pulse Width"
+  [accessibleName]="accessibleName('Pulse Width')"
+  [value]="pulseWidth()"
+  (valueChange)="onScaleChange('pulseWidth', $event)"
+/>
+
+<lib-scale-knob
+  label="Key"
+  [accessibleName]="accessibleName('Key')"
+  [value]="keySemitones()"
+  [min]="keyMin"
+  [max]="keyMax"
+  [step]="1"
+  [readout]="keyReadout()"
+  (valueChange)="onKeyChange($event)"
+/>
+
+<div class="deck-strip-fader">
+  <lib-channel-fader [deck]="deck()" />
+</div>
