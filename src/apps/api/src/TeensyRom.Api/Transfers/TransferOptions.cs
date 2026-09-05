@@ -43,6 +43,6 @@ namespace TeensyRom.Api.Transfers
 
         /// Root directory for staged uploads. Overridable so tests can redirect to a temp directory.
         public string StagingRoot { get; set; } =
-            Path.Combine(Assembly.GetExecutingAssembly().GetPath(), "staging");
+            Path.Combine(Assembly.GetExecutingAssembly().GetDataPath(), "staging");
     }
 }

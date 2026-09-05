@@ -47,20 +47,20 @@ jobs:
           echo "::notice::Building version $VERSION"
 
   build:
-    name: Build ${{ matrix.rid }}
+    name: Build ${{ matrix.name }} desktop app
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          - rid: win-x64
-            extension: zip
-          - rid: osx-x64
-            extension: tar.gz
-          - rid: osx-arm64
-            extension: tar.gz
-          - rid: linux-x64
-            extension: tar.gz
+          - name: Windows x64
+            os: windows-latest
+          - name: macOS Intel
+            os: macos-13
+          - name: macOS Apple Silicon
+            os: macos-14
+          - name: Linux x64
+            os: ubuntu-latest
     
     steps:
       - name: Checkout code
@@ -86,126 +86,26 @@ jobs:
           cd src
           pnpm install --frozen-lockfile
       
-      - name: Build frontend (production)
+      - name: Set desktop version
         run: |
           cd src
-          pnpm nx build teensyrom-ui --configuration=production
+          pnpm pkg set version=${{ needs.validate.outputs.version }}
       
-      - name: Copy frontend to wwwroot
+      - name: Build desktop package
         run: |
-          mkdir -p src/apps/api/src/TeensyRom.Api/wwwroot
-          rm -rf src/apps/api/src/TeensyRom.Api/wwwroot/*
-          cp -r src/dist/apps/teensyrom-ui/browser/* src/apps/api/src/TeensyRom.Api/wwwroot/
-      
-      - name: Restore .NET dependencies
-        run: |
-          dotnet restore src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
-            -p:OpenApiGenerateDocuments=false \
-            -p:OpenApiGenerateDocumentsOnBuild=false
-      
-      - name: Publish for ${{ matrix.rid }}
-        run: |
-          dotnet publish src/apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj \
-            -c Release \
-            -r ${{ matrix.rid }} \
-            --self-contained true \
-            -p:PublishSingleFile=true \
-            -p:SkipBuildFrontend=true \
-            -p:OpenApiGenerateDocuments=false \
-            -p:OpenApiGenerateDocumentsOnBuild=false \
-            -o ./publish/${{ matrix.rid }}
-
-      - name: Unpack Assets (avoid runtime extraction in read-only directories)
-        run: |
-          cd publish/${{ matrix.rid }}/Assets
-          # Recursively unpack all zip files in place
-          find . -name "*.zip" -type f | while read zip; do
-            dir=$(dirname "$zip")
-            echo "Extracting $zip to $dir..."
-            unzip -o "$zip" -d "$dir"
-            rm "$zip"
-          done
-
-      - name: Package (zip)
-        if: matrix.extension == 'zip'
-        run: |
-          cd publish/${{ matrix.rid }}
-          zip -r ../../TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.zip .
-      
-      - name: Package (tar.gz)
-        if: matrix.extension == 'tar.gz'
-        run: |
-          cd publish/${{ matrix.rid }}
-          chmod +x TeensyRom.Api
-          tar -czvf ../../TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.tar.gz .
+          cd src
+          pnpm desktop:package
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}
-          path: TeensyROM-Web-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.${{ matrix.extension }}
+          name: TeensyROM-${{ needs.validate.outputs.version }}-${{ matrix.name }}
+          path: src/dist/desktop/*
           retention-days: 5
-
-  update-formula:
-    name: Update Homebrew Formula
-    needs: [validate, build]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Download macOS artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: TeensyROM-Web-*-osx-*
-          path: artifacts
-          merge-multiple: true
-      
-      - name: Calculate SHA256 checksums
-        id: sha256
-        run: |
-          VERSION="${{ needs.validate.outputs.version }}"
-          SHA_ARM64=$(sha256sum artifacts/TeensyROM-Web-${VERSION}-osx-arm64.tar.gz | cut -d ' ' -f1)
-          SHA_X64=$(sha256sum artifacts/TeensyROM-Web-${VERSION}-osx-x64.tar.gz | cut -d ' ' -f1)
-          echo "arm64=$SHA_ARM64" >> $GITHUB_OUTPUT
-          echo "x64=$SHA_X64" >> $GITHUB_OUTPUT
-          echo "ARM64 SHA256: $SHA_ARM64"
-          echo "x64 SHA256: $SHA_X64"
-      
-      - name: Update Homebrew formula
-        run: |
-          VERSION="${{ needs.validate.outputs.version }}"
-          FORMULA="Formula/teensyrom-web.rb"
-          
-          # Update version
-          sed -i 's/version ".*"/version "'$VERSION'"/' $FORMULA
-          
-          # Update ARM64 SHA256 (in on_arm block)
-          sed -i '/on_arm do/,/end/ s/sha256 ".*"/sha256 "${{ steps.sha256.outputs.arm64 }}"/' $FORMULA
-          
-          # Update x64 SHA256 (in on_intel block)  
-          sed -i '/on_intel do/,/end/ s/sha256 ".*"/sha256 "${{ steps.sha256.outputs.x64 }}"/' $FORMULA
-          
-          echo "Updated formula:"
-          cat $FORMULA
-      
-      - name: Commit formula changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/teensyrom-web.rb
-          git commit -m "chore: update Homebrew formula for v${{ needs.validate.outputs.version }}"
-          git push origin HEAD:main
 
   release:
     name: Create GitHub Release
-    needs: [validate, build, update-formula]
+    needs: [validate, build]
     if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -232,7 +132,8 @@ jobs:
           draft: false
           prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
           files: |
-            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-win-x64.zip
-            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-osx-x64.tar.gz
-            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-osx-arm64.tar.gz
-            artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-linux-x64.tar.gz
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb

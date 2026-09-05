@@ -10,7 +10,7 @@ namespace TeensyRom.Api.Services
     /// Executes after DI container is built but before API accepts requests.
     /// Add additional startup operations here as needed.
     /// </summary>
-    public class ApplicationBootstrapService : IHostedService
+    public class ApplicationBootstrapService : BackgroundService
     {
         private readonly IDeviceConnectionManager _deviceManager;
         private readonly ITransferStagingStore _stagingStore;
@@ -27,15 +27,20 @@ namespace TeensyRom.Api.Services
             _log = log;
         }
 
-        public async Task StartAsync(CancellationToken cancellationToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            // Device discovery includes synchronous serial probes. Yielding before
+            // that work lets Kestrel bind and makes the desktop shell responsive
+            // while discovery continues in the background.
+            await Task.Yield();
+
             _log.Internal("ApplicationBootstrap: Starting application bootstrap...");
 
             try
             {
                 _stagingStore.SweepAll();
 
-                await PerformDeviceAutoDiscovery(cancellationToken);
+                await PerformDeviceAutoDiscovery(stoppingToken);
 
 
                 _log.Internal("ApplicationBootstrap: Bootstrap complete");
@@ -50,7 +55,7 @@ namespace TeensyRom.Api.Services
             }
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
+        public override Task StopAsync(CancellationToken cancellationToken)
         {
             _log.Internal("ApplicationBootstrap: Stopping...");
             return Task.CompletedTask;

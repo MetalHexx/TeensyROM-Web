@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "type": "module",
+  "main": "apps/teensyrom-desktop/main.cjs",
   "scripts": {
     "start": "nx run teensyrom-ui:serve",
     "generate:api-client": "nx run api-client:generate",
@@ -13,7 +14,11 @@
     "format": "prettier --write \"**/*.{ts,js,json,md,html,scss}\"",
     "lint": "nx lint",
     "precommit:lintstaged": "pnpm dlx lint-staged",
-    "audit:code": "node --no-warnings --loader ts-node/esm tools/audit-code.ts"
+    "audit:code": "node --no-warnings --loader ts-node/esm tools/audit-code.ts",
+    "desktop:prepare": "node apps/teensyrom-desktop/scripts/prepare-backend.cjs",
+    "desktop:start": "pnpm desktop:prepare && electron .",
+    "desktop:package": "pnpm desktop:prepare && electron-builder --config apps/teensyrom-desktop/electron-builder.yml",
+    "desktop:package:dir": "pnpm desktop:prepare && electron-builder --dir --config apps/teensyrom-desktop/electron-builder.yml"
   },
   "lint-staged": {
     "*.{ts,js}": [
@@ -71,6 +76,8 @@
     "angular-eslint": "^19.2.0",
     "cypress": "^14.5.4",
     "cypress-mochawesome-reporter": "^4.0.2",
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.0",
     "eslint": "^9.8.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-cypress": "^3.5.0",
