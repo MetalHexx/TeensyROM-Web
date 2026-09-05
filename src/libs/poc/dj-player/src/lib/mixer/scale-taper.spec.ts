@@ -24,6 +24,11 @@ describe('scaleCoefficientFor', () => {
       expect(coefficients[i]).toBeGreaterThan(coefficients[i - 1]);
     }
   });
+
+  it('clamps a position past ±1 to the bound', () => {
+    expect(scaleCoefficientFor(2)).toBe(scaleCoefficientFor(1));
+    expect(scaleCoefficientFor(-2)).toBe(scaleCoefficientFor(-1));
+  });
 });
 
 describe('keyCoefficientFor', () => {

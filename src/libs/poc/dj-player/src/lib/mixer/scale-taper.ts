@@ -13,9 +13,12 @@ export const SCALE_TAPER_OCTAVES = 4;
 
 /** Converts a knob's position to the multiplicative coefficient `RegisterFrame.setRegisterScale`
  *  applies. Ratio-symmetric about home: equal travel either way multiplies and divides by the same
- *  factor, so the same taper serves cutoff, resonance and pulse width identically under the hand. */
+ *  factor, so the same taper serves cutoff, resonance and pulse width identically under the hand.
+ *  Clamps to ±1 itself — the same defensive bound `keyCoefficientFor` applies below — so this
+ *  conversion never depends on a caller having applied it first. */
 export function scaleCoefficientFor(position: ScalePosition): number {
-  return Math.pow(2, position * SCALE_TAPER_OCTAVES);
+  const bounded = clamp(position, -1, 1);
+  return Math.pow(2, bounded * SCALE_TAPER_OCTAVES);
 }
 
 /** ±12 semitones, integer. 0 → exactly 1 (`Math.pow(2, 0) === 1`). */

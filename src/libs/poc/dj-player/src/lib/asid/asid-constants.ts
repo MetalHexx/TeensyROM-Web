@@ -37,7 +37,9 @@ export const VOICE_CONTROL_REGISTERS: readonly number[] = [4, 11, 18];
 
 /** `$D418` — SID master volume. Low nibble is the only volume control the chip has; bits 4-6 select
  *  the filter mode and bit 7 silences voice 3. `register-frame.ts` scales the low nibble by the
- *  deck's gain at the packet boundary, leaving the other four bits untouched. */
+ *  deck's gain at the packet boundary; bits 4-6 pass through untouched unless a filter mode is
+ *  forced, in which case they're replaced with the forced mode's bits instead. Bit 7 always passes
+ *  through raw, belonging to neither control. */
 export const SID_VOLUME_REGISTER = 24;
 
 /** `$D415` — filter cutoff low bits, in bits 0-2 only; bits 3-7 are unused and must survive a write. */
