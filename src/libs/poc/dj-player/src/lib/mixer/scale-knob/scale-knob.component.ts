@@ -5,6 +5,11 @@ const HOME_ANGLE_DEG = -90;
 const TRAVEL_DEG = 135;
 const POINTER_RADIUS = 26;
 const RING_RADIUS = 34;
+/** Vertical pixels of drag for a full min→max sweep — DAW convention (Ableton etc.), not the
+ * native range's own horizontal click-and-drag. Tunable by ear, same spirit as `scale-taper.ts`. */
+const PIXELS_PER_FULL_RANGE = 200;
+/** Shift held while dragging quarters the sensitivity for fine adjustment. */
+const FINE_ADJUST_MULTIPLIER = 4;
 
 interface Point {
   readonly x: number;
@@ -93,5 +98,48 @@ export class ScaleKnobComponent {
 
   protected onDoubleClick(): void {
     this.valueChange.emit(this.home());
+  }
+
+  /** Active drag's pointer id, last seen `clientY`, and a running *unrounded* value, or `null` when
+   * no drag is in progress. Tracked per-move (not from a fixed drag-start point) so toggling Shift
+   * mid-drag — which changes the pixels-per-value ratio — never causes the value to jump.
+   *
+   * `rawValue` is why this isn't just `this.value() + delta`: a stepped knob (Key, `step=1`) has its
+   * emitted value rounded before it comes back through `value()`, so re-deriving each move's delta
+   * from that already-rounded input would throw away every sub-step fraction of the drag — most
+   * small mouse movements would round back to the same integer and do nothing, only occasionally
+   * lining up into a jump. Accumulating locally instead means the same physical drag distance always
+   * produces the same result, continuous knobs and stepped ones alike. */
+  private drag: { pointerId: number; lastY: number; rawValue: number } | null = null;
+
+  /** `preventDefault()` suppresses the native range's own click-to-position jump on `mousedown` —
+   * that jump is what made the first click of a double-click move the knob before it landed home. */
+  protected onPointerDown(event: PointerEvent): void {
+    event.preventDefault();
+    const target = event.target as HTMLElement;
+    target.setPointerCapture?.(event.pointerId);
+    target.focus();
+    this.drag = { pointerId: event.pointerId, lastY: event.clientY, rawValue: this.value() };
+  }
+
+  protected onPointerMove(event: PointerEvent): void {
+    if (!this.drag || this.drag.pointerId !== event.pointerId) {
+      return;
+    }
+    const dy = this.drag.lastY - event.clientY;
+    this.drag.lastY = event.clientY;
+
+    const pixelsForFullRange = event.shiftKey
+      ? PIXELS_PER_FULL_RANGE * FINE_ADJUST_MULTIPLIER
+      : PIXELS_PER_FULL_RANGE;
+    const delta = (dy / pixelsForFullRange) * (this.max() - this.min());
+    this.drag.rawValue = Math.min(Math.max(this.drag.rawValue + delta, this.min()), this.max());
+    this.valueChange.emit(this.drag.rawValue);
+  }
+
+  protected onPointerUp(event: PointerEvent): void {
+    if (this.drag?.pointerId === event.pointerId) {
+      this.drag = null;
+    }
   }
 }

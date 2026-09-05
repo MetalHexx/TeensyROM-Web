@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SetupDrawerComponent } from './setup-drawer.component';
 import { DeckRegistry } from '../../deck/deck-registry';
 import type { DeckHandle } from '../../deck/deck-registry';
+import { MixerService } from '../../mixer/mixer.service';
 import type { EngineStats, DjPlayerEngine } from '../../engine/dj-player-engine';
 import type { PlayRate, TimingMode } from '../../engine/play-rate';
 import type { TuneIndexService } from '../../analysis/tune-index.service';
@@ -156,7 +157,7 @@ describe('SetupDrawerComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [SetupDrawerComponent],
-      providers: [{ provide: DeckRegistry, useValue: registry }],
+      providers: [{ provide: DeckRegistry, useValue: registry }, MixerService],
     }).compileComponents();
 
     fixture = TestBed.createComponent(SetupDrawerComponent);
@@ -246,7 +247,7 @@ describe('SetupDrawerComponent', () => {
     await TestBed.resetTestingModule()
       .configureTestingModule({
         imports: [SetupDrawerComponent],
-        providers: [{ provide: DeckRegistry, useValue: singleDeckRegistry }],
+        providers: [{ provide: DeckRegistry, useValue: singleDeckRegistry }, MixerService],
       })
       .compileComponents();
 
@@ -255,6 +256,21 @@ describe('SetupDrawerComponent', () => {
 
     const label = singleDeckFixture.nativeElement.querySelector('.cross-deck-drift') as HTMLElement;
     expect(label.textContent?.trim()).toBe('—');
+  });
+
+  it('switches the Key knob display format via a single page-level select', () => {
+    const mixer = fixture.debugElement.injector.get(MixerService);
+    const select = fixture.nativeElement.querySelector(
+      '[aria-label="Key display format"]'
+    ) as HTMLSelectElement;
+
+    expect(select.tagName).toBe('SELECT');
+    expect(select.value).toBe('camelot');
+
+    select.value = 'note';
+    select.dispatchEvent(new Event('change'));
+
+    expect(mixer.keyDisplayFormat()).toBe('note');
   });
 
   it('keeps the stall control singular, with its own editable duration field and button', () => {

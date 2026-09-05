@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MixerColumnComponent } from './mixer-column.component';
 import { MixerService } from '../mixer.service';
+import { DeckRegistry } from '../../deck/deck-registry';
 import { DECKS } from '../../deck/deck.config';
 
 describe('MixerColumnComponent', () => {
@@ -10,7 +11,7 @@ describe('MixerColumnComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [MixerColumnComponent],
-      providers: [MixerService],
+      providers: [MixerService, DeckRegistry],
     }).compileComponents();
 
     fixture = TestBed.createComponent(MixerColumnComponent);

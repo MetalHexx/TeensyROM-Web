@@ -129,4 +129,127 @@ describe('ScaleKnobComponent', () => {
       '+2'
     );
   });
+
+  describe('vertical pointer drag', () => {
+    // jsdom (this workspace's version) has no `PointerEvent` constructor — a `MouseEvent` carries
+    // every field the component's handlers actually read (`clientY`, `shiftKey`, `target`) except
+    // `pointerId`, which is added directly since dispatch matches on the event's `type` string, not
+    // its constructor.
+    function pointerEvent(
+      type: string,
+      init: { clientY: number; pointerId?: number; shiftKey?: boolean }
+    ): PointerEvent {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        clientY: init.clientY,
+        shiftKey: init.shiftKey ?? false,
+      });
+      Object.defineProperty(event, 'pointerId', { value: init.pointerId ?? 1 });
+      return event as unknown as PointerEvent;
+    }
+
+    it('increases the value when dragging up (decreasing clientY)', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', { clientY: 100 }));
+      input.dispatchEvent(pointerEvent('pointermove', { clientY: 50 }));
+
+      // 50px up over a 200px full-range span, on a [-1, 1] range: delta = (50/200) * 2 = 0.5.
+      expect(emitted).toEqual([0.5]);
+    });
+
+    it('decreases the value when dragging down (increasing clientY)', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', { clientY: 100 }));
+      input.dispatchEvent(pointerEvent('pointermove', { clientY: 150 }));
+
+      expect(emitted).toEqual([-0.5]);
+    });
+
+    it('reduces sensitivity while shift is held', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', { clientY: 100 }));
+      input.dispatchEvent(pointerEvent('pointermove', { clientY: 50, shiftKey: true }));
+
+      // Same 50px delta, but shift quarters sensitivity (800px full range instead of 200px):
+      // delta = (50/800) * 2 = 0.125.
+      expect(emitted).toEqual([0.125]);
+    });
+
+    it('emits nothing for a plain click with no intervening move', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', { clientY: 100 }));
+      input.dispatchEvent(pointerEvent('pointerup', { clientY: 100 }));
+
+      expect(emitted).toEqual([]);
+    });
+
+    it('tracks drag incrementally, so a value change mid-drag does not cause a jump', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', { clientY: 100 }));
+      input.dispatchEvent(pointerEvent('pointermove', { clientY: 80 }));
+      fixture.componentRef.setInput('value', emitted[0]);
+      fixture.detectChanges();
+      input.dispatchEvent(pointerEvent('pointermove', { clientY: 50, shiftKey: true }));
+
+      // Second move: 30px delta at fine sensitivity from the already-updated value.
+      expect(emitted[0]).toBeCloseTo(0.2, 5);
+      expect(emitted[1]).toBeCloseTo(0.2 + (30 / 800) * 2, 5);
+    });
+
+    it('accumulates drag distance internally, so a stepped knob whose bound value rounds every move (e.g. Key, step=1) still tracks the full physical drag instead of losing sub-step fractions each time', () => {
+      // Reproduces the Key knob's reported jank: a parent that rounds the emitted value before
+      // feeding it back (`MixerService.setKeySemitones`) must not cause the component to forget
+      // the fractional progress between two whole-number steps on every single pointermove.
+      fixture.componentRef.setInput('min', -12);
+      fixture.componentRef.setInput('max', 12);
+      fixture.componentRef.setInput('value', 0);
+      fixture.detectChanges();
+
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', { clientY: 100 }));
+      let clientY = 100;
+      for (let i = 0; i < 10; i++) {
+        clientY -= 1; // 1px up per move, 10px total.
+        input.dispatchEvent(pointerEvent('pointermove', { clientY }));
+        // The parent rounds before echoing the value back, exactly like `setKeySemitones` does.
+        fixture.componentRef.setInput('value', Math.round(emitted[emitted.length - 1]));
+        fixture.detectChanges();
+      }
+
+      // 10px over a 200px span on a [-12, 12] (24-wide) range: 10 * (24/200) = 1.2 total — enough to
+      // cross a whole semitone. A component that re-derives each move from the rounded bound value
+      // would re-emit ~0.12 every time and never accumulate past it.
+      expect(emitted[emitted.length - 1]).toBeCloseTo(1.2, 5);
+    });
+
+    it('ignores pointermove once the drag has ended', () => {
+      const emitted: number[] = [];
+      component.valueChange.subscribe((v) => emitted.push(v));
+
+      const input = rangeInput();
+      input.dispatchEvent(pointerEvent('pointerdown', { clientY: 100 }));
+      input.dispatchEvent(pointerEvent('pointerup', { clientY: 100 }));
+      input.dispatchEvent(pointerEvent('pointermove', { clientY: 50 }));
+
+      expect(emitted).toEqual([]);
+    });
+  });
 });

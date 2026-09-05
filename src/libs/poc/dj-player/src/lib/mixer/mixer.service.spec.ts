@@ -70,6 +70,22 @@ describe('MixerService', () => {
     expect(Number.isInteger(gain * 15)).toBe(false);
   });
 
+  describe('key display format', () => {
+    it('defaults to Camelot', () => {
+      const mixer = new MixerService();
+
+      expect(mixer.keyDisplayFormat()).toBe('camelot');
+    });
+
+    it('is page-level, not keyed to any one deck', () => {
+      const mixer = new MixerService();
+
+      mixer.setKeyDisplayFormat('note');
+
+      expect(mixer.keyDisplayFormat()).toBe('note');
+    });
+  });
+
   describe('per-deck scale controls', () => {
     it('rests every scale control at home for a deck it has never been told about', () => {
       const mixer = new MixerService();

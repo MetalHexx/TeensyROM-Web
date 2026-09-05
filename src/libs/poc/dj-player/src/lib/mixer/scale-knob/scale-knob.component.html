@@ -11,6 +11,10 @@
       [attr.aria-valuetext]="valueText()"
       (input)="onRangeInput($event)"
       (dblclick)="onDoubleClick()"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
     />
     <svg viewBox="0 0 80 80" aria-hidden="true">
       <path class="ring-track" d="M 15.96,64.04 A 34,34 0 1,1 64.04,64.04" />

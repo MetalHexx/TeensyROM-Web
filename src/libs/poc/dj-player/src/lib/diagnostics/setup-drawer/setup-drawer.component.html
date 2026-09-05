@@ -382,6 +382,16 @@
     </div>
   </div>
 
+  <div class="control-row key-display-format-control">
+    <label class="control">
+      Key knob format
+      <select aria-label="Key display format" (change)="onKeyDisplayFormatChange($event)">
+        <option value="camelot" [selected]="keyDisplayFormat() === 'camelot'">Camelot</option>
+        <option value="note" [selected]="keyDisplayFormat() === 'note'">Note</option>
+      </select>
+    </label>
+  </div>
+
   <div class="control-row stall-control">
     <label class="control">
       Stall main thread for

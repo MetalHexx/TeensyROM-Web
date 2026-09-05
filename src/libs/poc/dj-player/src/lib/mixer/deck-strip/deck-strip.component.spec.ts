@@ -1,17 +1,63 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DeckStripComponent } from './deck-strip.component';
 import { MixerService } from '../mixer.service';
+import { DeckRegistry } from '../../deck/deck-registry';
+import type { DeckHandle } from '../../deck/deck-registry';
+import type { TuneIndexService } from '../../analysis/tune-index.service';
+import type { TuneIndexRecord } from '../../analysis/tune-index.model';
+import { TUNE_INDEX_FORMAT_VERSION } from '../../analysis/tune-index.model';
 import { DECKS } from '../../deck/deck.config';
+
+function fakeRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
+  return {
+    filename: 'test.sid',
+    subtune: 1,
+    loopStartFrame: null,
+    loopPeriodFrames: null,
+    endedAtFrame: null,
+    sectionBoundaries: [],
+    detectedMoments: [],
+    tonic: 1,
+    mode: 'minor',
+    camelot: '8B',
+    tuningReferenceHz: 440,
+    tuningCents: 0,
+    keyConfidence: 'strong',
+    scalePitchClasses: [],
+    dominantIntervalFrames: null,
+    pulseConfidence: 'none',
+    nativeTempo: null,
+    callsPerFrame: 1,
+    exactCallsPerFrame: 1,
+    timingMode: 'exact',
+    formatVersion: TUNE_INDEX_FORMAT_VERSION,
+    computedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('DeckStripComponent', () => {
   let fixture: ComponentFixture<DeckStripComponent>;
   let mixer: MixerService;
+  let registry: DeckRegistry;
+  let deckARecord: WritableSignal<TuneIndexRecord | null>;
 
   beforeEach(async () => {
+    registry = new DeckRegistry();
+    deckARecord = signal<TuneIndexRecord | null>(null);
+    registry.register({
+      descriptor: DECKS[0],
+      engine: {} as DeckHandle['engine'],
+      binding: {} as DeckHandle['binding'],
+      tuneIndex: { record: deckARecord } as unknown as TuneIndexService,
+      tuneLoader: {} as DeckHandle['tuneLoader'],
+    });
+
     await TestBed.configureTestingModule({
       imports: [DeckStripComponent],
-      providers: [MixerService],
+      providers: [MixerService, { provide: DeckRegistry, useValue: registry }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DeckStripComponent);
@@ -105,6 +151,40 @@ describe('DeckStripComponent', () => {
     expect(readoutFor('Key')).toBe('-5');
 
     expect(fixture.nativeElement.querySelectorAll('.scale-knob-readout')).toHaveLength(1);
+  });
+
+  it("shows the tune's detected key at home, in the operator's chosen format", () => {
+    deckARecord.set(fakeRecord({ tonic: 1, mode: 'minor', camelot: '8B' }));
+    fixture.detectChanges();
+
+    expect(readoutFor('Key')).toBe('8B');
+
+    mixer.setKeyDisplayFormat('note');
+    fixture.detectChanges();
+
+    expect(readoutFor('Key')).toBe('C#m');
+  });
+
+  it('falls back to "0" at home when the deck has no confident key detection', () => {
+    deckARecord.set(fakeRecord({ tonic: null, mode: null, camelot: null }));
+    fixture.detectChanges();
+
+    expect(readoutFor('Key')).toBe('0');
+  });
+
+  it('shows the detected key transposed by the knob once off home, not the raw semitone count', () => {
+    deckARecord.set(fakeRecord({ tonic: 1, mode: 'minor', camelot: '8B' }));
+    mixer.setKeySemitones(DECKS[0].id, 3);
+    fixture.detectChanges();
+
+    // C# minor (tonic 1) + 3 semitones = E minor, 9A on the wheel — so two decks can be dialed to
+    // the same Camelot code and read as harmonically matched, the whole point of the knob.
+    expect(readoutFor('Key')).toBe('9A');
+
+    mixer.setKeyDisplayFormat('note');
+    fixture.detectChanges();
+
+    expect(readoutFor('Key')).toBe('Em');
   });
 
   it("does not move the other deck's channel fader", () => {

@@ -6,6 +6,7 @@ import type { CrossfaderPosition } from './crossfader-curve';
 import { keyCoefficientFor, KEY_SEMITONE_RANGE, scaleCoefficientFor } from './scale-taper';
 import type { ScalePosition } from './scale-taper';
 import type { SidFilterMode } from '../asid/register-frame';
+import type { KeyDisplayFormat } from './key-display';
 
 /** The three tapered knobs. Key is separate — it is stored in semitones, not a position. */
 export type ScaleControl = 'cutoff' | 'resonance' | 'pulseWidth';
@@ -68,6 +69,11 @@ export class MixerService {
 
   private readonly filterModes = signal<ReadonlyMap<string, SidFilterMode | null>>(new Map());
   private readonly filterModeSignals = new Map<string, Signal<SidFilterMode | null>>();
+
+  /** Page-level, not per-deck — one operator preference for how the Key knob's home readout shows
+   *  a tune's detected key. Session state only, same as everything else on this service. */
+  private readonly _keyDisplayFormat = signal<KeyDisplayFormat>('camelot');
+  readonly keyDisplayFormat: Signal<KeyDisplayFormat> = this._keyDisplayFormat.asReadonly();
 
   setCrossfaderPosition(position: CrossfaderPosition): void {
     this._crossfaderPosition.set(position);
@@ -177,6 +183,10 @@ export class MixerService {
       this.filterModeSignals.set(deckId, mode);
     }
     return mode;
+  }
+
+  setKeyDisplayFormat(format: KeyDisplayFormat): void {
+    this._keyDisplayFormat.set(format);
   }
 
   private deckFaderFor(deckId: string): number {
