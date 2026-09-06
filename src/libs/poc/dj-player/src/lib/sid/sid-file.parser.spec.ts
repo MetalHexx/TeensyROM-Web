@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSidFile, isCiaTimed } from './sid-file.parser';
+import { parseSidFile } from './sid-file.parser';
 import { SidFile, SidParseError } from './sid-file.model';
 import { BUNDLED_TUNES, decodeBundledTune } from './bundled';
 
@@ -64,27 +64,6 @@ function writeAscii(buffer: Uint8Array, offset: number, text: string): void {
   for (let i = 0; i < text.length; i++) {
     buffer[offset + i] = text.charCodeAt(i);
   }
-}
-
-function fakeSidFile(speedFlags: number): SidFile {
-  return {
-    format: 'PSID',
-    version: 2,
-    loadAddress: 0x1000,
-    initAddress: 0x1000,
-    playAddress: 0x1003,
-    songs: 32,
-    startSong: 1,
-    speedFlags,
-    name: '',
-    author: '',
-    released: '',
-    clock: 'unknown',
-    model: 'unknown',
-    secondSidAddress: null,
-    thirdSidAddress: null,
-    data: new Uint8Array(),
-  };
 }
 
 describe('parseSidFile', () => {
@@ -230,27 +209,8 @@ describe('parseSidFile', () => {
   });
 });
 
-describe('isCiaTimed', () => {
-  it('reads the bit for each 1-based song', () => {
-    const file = fakeSidFile(0b101); // songs 1 and 3 are CIA-timed
-    expect(isCiaTimed(file, 1)).toBe(true);
-    expect(isCiaTimed(file, 2)).toBe(false);
-    expect(isCiaTimed(file, 3)).toBe(true);
-  });
-
-  it('reuses bit 31 for songs past 31', () => {
-    const ciaFile = fakeSidFile(0x80000000); // bit 31 set
-    expect(isCiaTimed(ciaFile, 32)).toBe(true);
-    expect(isCiaTimed(ciaFile, 100)).toBe(true);
-
-    const vbiFile = fakeSidFile(0x7fffffff); // every bit except 31 set
-    expect(isCiaTimed(vbiFile, 32)).toBe(false);
-    expect(isCiaTimed(vbiFile, 100)).toBe(false);
-  });
-});
-
 describe('bundled tunes', () => {
-  it('parses InSID3 Out as PSID v2, 1 subtune, CIA-timed, PAL/6581', () => {
+  it('parses InSID3 Out as PSID v2, 1 subtune, PAL/6581', () => {
     const tune = BUNDLED_TUNES.find((t) => t.id === 'insid3-out');
     if (!tune) {
       throw new Error('bundled tune "insid3-out" not found');
@@ -261,12 +221,11 @@ describe('bundled tunes', () => {
     expect(file.format).toBe('PSID');
     expect(file.version).toBe(2);
     expect(file.songs).toBe(1);
-    expect(isCiaTimed(file, 1)).toBe(true);
     expect(file.clock).toBe('pal');
     expect(file.model).toBe('mos6581');
   });
 
-  it('parses Still Time as PSID v2, 1 subtune, VBI-timed, PAL/8580', () => {
+  it('parses Still Time as PSID v2, 1 subtune, PAL/8580', () => {
     const tune = BUNDLED_TUNES.find((t) => t.id === 'still-time');
     if (!tune) {
       throw new Error('bundled tune "still-time" not found');
@@ -277,7 +236,6 @@ describe('bundled tunes', () => {
     expect(file.format).toBe('PSID');
     expect(file.version).toBe(2);
     expect(file.songs).toBe(1);
-    expect(isCiaTimed(file, 1)).toBe(false);
     expect(file.clock).toBe('pal');
     expect(file.model).toBe('mos8580');
   });

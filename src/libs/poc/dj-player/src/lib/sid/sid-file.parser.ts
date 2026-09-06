@@ -107,12 +107,6 @@ export function parseSidFile(bytes: Uint8Array): SidFile {
   };
 }
 
-/** Whether `song` (1-based) is CIA-timed rather than vertical-blank-timed. Songs past 31 reuse bit 31. */
-export function isCiaTimed(file: SidFile, song: number): boolean {
-  const bitIndex = Math.min(song - 1, 31);
-  return ((file.speedFlags >>> bitIndex) & 1) === 1;
-}
-
 function isSidFormat(value: string): value is 'PSID' | 'RSID' {
   return value === 'PSID' || value === 'RSID';
 }
