@@ -1,6 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// The real `@sidablist/core` runs a dedicated worker, which jsdom cannot start — and the drawer's
+// job is to render whatever the job settles to, not to run one. The stub stands in for the linked
+// package's whole entry point.
+const runSmokeJobMock = vi.hoisted(() =>
+  vi.fn<(value: number, workerFactory?: () => Worker) => Promise<number>>()
+);
+vi.mock('@sidablist/core', () => ({
+  CORE_BUILD_ID: 'core-build-under-test',
+  runSmokeJob: runSmokeJobMock,
+}));
+
+import { CORE_BUILD_ID } from '@sidablist/core';
 import { SetupDrawerComponent } from './setup-drawer.component';
 import { DeckRegistry } from '../../deck/deck-registry';
 import type { DeckHandle } from '../../deck/deck-registry';
@@ -165,8 +178,23 @@ describe('SetupDrawerComponent', () => {
   }
 
   beforeEach(async () => {
+    runSmokeJobMock.mockReset();
     await setup();
   });
+
+  function buttonLabelled(label: string): HTMLButtonElement {
+    return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
+      (candidate) => candidate.textContent?.trim() === label
+    ) as HTMLButtonElement;
+  }
+
+  async function pressSmokeButton(): Promise<string> {
+    buttonLabelled('Run core smoke job').click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const readout = fixture.nativeElement.querySelector('.linked-core-result') as HTMLElement;
+    return readout.textContent?.trim() ?? '';
+  }
 
   it('carries every registered deck label as a column header, across every panel', () => {
     const headers: string[] = Array.from(
@@ -341,5 +369,23 @@ describe('SetupDrawerComponent', () => {
 
     expect(elapsed).toBeGreaterThanOrEqual(ceilingMs);
     expect(elapsed).toBeLessThan(ceilingMs * 2);
+  });
+
+  it("reads the build id off the linked package rather than a value of its own", () => {
+    const readout = fixture.nativeElement.querySelector('.linked-core-build') as HTMLElement;
+
+    expect(readout.textContent).toContain(CORE_BUILD_ID);
+  });
+
+  it('renders whatever the smoke job resolves to', async () => {
+    runSmokeJobMock.mockResolvedValue(84);
+
+    expect(await pressSmokeButton()).toContain('84');
+  });
+
+  it('renders a rejected smoke job as a failure instead of leaving the readout as it was', async () => {
+    runSmokeJobMock.mockRejectedValue(new Error('the core worker never started'));
+
+    expect(await pressSmokeButton()).toContain('the core worker never started');
   });
 });

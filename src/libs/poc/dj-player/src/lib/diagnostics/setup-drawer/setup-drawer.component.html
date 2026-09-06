@@ -408,4 +408,10 @@
     </label>
     <button type="button" (click)="onStallMainThread()">Stall</button>
   </div>
+
+  <div class="control-row linked-core-control">
+    <span class="linked-core-build">Linked core build: {{ coreBuildId }}</span>
+    <button type="button" (click)="onRunSmokeJob()">Run core smoke job</button>
+    <span class="linked-core-result" role="status">{{ smokeJobResult() }}</span>
+  </div>
 </section>

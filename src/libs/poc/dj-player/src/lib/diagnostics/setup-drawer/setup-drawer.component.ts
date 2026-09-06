@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { CORE_BUILD_ID, runSmokeJob } from '@sidablist/core';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { DeckRegistry } from '../../deck/deck-registry';
 import type { DeckHandle } from '../../deck/deck-registry';
@@ -41,6 +42,17 @@ const MAX_STALL_DURATION_MS = 2000;
 
 const EM_DASH = '—';
 
+/** The value handed to the linked package's smoke job — arbitrary, but it has to come back doubled
+ *  for the round trip through its worker to count as proven. */
+const SMOKE_JOB_INPUT = 21;
+
+/**
+ * Starts the linked package's worker from first-party code, which is the only place this build will
+ * rewrite a worker URL — see `core-smoke.worker.ts` for why the package cannot start its own.
+ */
+const createCoreSmokeWorker = (): Worker =>
+  new Worker(new URL('../core-smoke.worker', import.meta.url), { type: 'module' });
+
 /**
  * The setup drawer: every field the old per-deck sidebar carried, re-laid as one row per figure with
  * one column per deck — Timing, Tune, Tune Index and Diagnostics, in that order, each a `<table>`
@@ -55,6 +67,11 @@ const EM_DASH = '—';
  *
  * The cross-deck drift figure sits at the top of the Diagnostics table, over the first two registered
  * decks — see `crossDeckDriftMs`'s own doc for why no correction is attempted.
+ *
+ * Diagnostics also carries the linked `@sidablist/core` readout: the build id of the package that
+ * actually loaded, and a button that runs its worker-backed smoke job. Together they answer the two
+ * questions a linked `file:` dependency raises at run time and nowhere else — which build is in the
+ * page, and whether the worker inside it resolves once the app is bundled.
  */
 @Component({
   selector: 'lib-setup-drawer',
@@ -275,5 +292,26 @@ export class SetupDrawerComponent {
   protected cancelLatencyLabelFor(deck: DeckHandle): string {
     const ms = deck.engine.stats().lastCancelLatencyMs;
     return ms < 0 ? EM_DASH : `${ms.toFixed(1)} ms`;
+  }
+
+  // --- Linked core ----------------------------------------------------------------------------
+
+  protected readonly coreBuildId = CORE_BUILD_ID;
+  protected readonly smokeJobResult = signal<string>(EM_DASH);
+
+  /**
+   * Runs the linked package's smoke job and renders whatever comes back. The worker is what is under
+   * test here, and a worker that fails to resolve rejects rather than throwing synchronously — so the
+   * rejection has to reach the readout, or the failure this button exists to catch would look
+   * identical to never having pressed it.
+   */
+  protected async onRunSmokeJob(): Promise<void> {
+    this.smokeJobResult.set('running…');
+    try {
+      const doubled = await runSmokeJob(SMOKE_JOB_INPUT, createCoreSmokeWorker);
+      this.smokeJobResult.set(`${SMOKE_JOB_INPUT} → ${doubled}`);
+    } catch (error) {
+      this.smokeJobResult.set(`failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }

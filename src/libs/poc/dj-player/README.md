@@ -15,6 +15,97 @@ The spike makes a C64 play a SID tune whose player code runs in this browser tab
 5. Any recent cartridge firmware version is compatible. Current release is 0.7.2.
 6. Use Chrome or Edge. Web MIDI with SysEx is unavailable in Safari and prompt-gated in Firefox.
 
+## The Linked `@sidablist/core` Package
+
+The POC consumes `@sidablist/core` from the sibling `SIDablist` repository through a relative `file:`
+dependency in `src/package.json`.
+
+**Both repositories must be cloned side by side under the same parent.** The specifier resolves
+`../../SIDablist/libs/core` from `TeensyROM-Web/src`, so a clone of only this repository fails at
+`pnpm install` with a resolution error and no further explanation. Clone both:
+
+```
+<parent>/
+  SIDablist/
+  TeensyROM-Web/
+```
+
+### The Inner Loop
+
+```
+# in SIDablist
+pnpm --filter @sidablist/core build
+
+# in TeensyROM-Web/src — nothing to reinstall
+pnpm nx serve teensyrom-ui
+```
+
+The dev server picks the rebuilt package up on its next reload.
+
+No reinstall is needed, but not for the reason you would expect. pnpm 10 does **not** symlink a
+`file:` directory dependency — it hard-links each file into `node_modules/.pnpm`. The loop stays
+fast because `tsc` rewrites its outputs in place, so the hard links survive a rebuild and both
+repositories keep pointing at the same bytes. **If core's build ever starts by deleting `dist`, that
+breaks**: the new files are different inodes, the old hard links are orphaned, and this workspace
+silently keeps serving the previous build until you `pnpm install` again. Check the build id in the
+setup drawer before you conclude a core change did nothing.
+
+### Why the Package Declares `main` and `types`
+
+`@sidablist/core` is ESM-only and its `exports` map is the real entry-point contract. It also
+declares `main` and `types` pointing at the same files, purely so this workspace can resolve it:
+`tsconfig.base.json` sets `"moduleResolution": "node"`, which predates `exports` and would otherwise
+fail with `TS2307: Cannot find module '@sidablist/core'` even though the bundler resolves it fine.
+Removing either field breaks the type-check here; switching this workspace to `bundler` resolution
+would be the alternative, and is a far larger change than the POC justifies.
+
+### Why the Worker Goes Through a First-Party Shim
+
+`diagnostics/core-smoke.worker.ts` is one line — `import '@sidablist/core/smoke.worker';` — and the
+setup drawer starts the worker from it rather than letting the package start its own.
+
+The package can start its own worker under a plain ESM loader, but not under this build. Angular
+rewrites `new Worker(new URL(..., import.meta.url))` specifiers with a **TypeScript transformer**
+(`@angular/build`'s `web-worker-transformer`), which only walks sources in its own program — so the
+copy already compiled into the package's `dist` is never rewritten. Worse, it fails silently: the
+build stays green, the untouched specifier lands in the bundle, and at run time it resolves against
+the emitted chunk's own URL and 404s. Nothing in `dist/apps/teensyrom-ui/browser/` corresponds to it.
+
+Two constraints force the shape. The Worker must be constructed in first-party TypeScript, because
+that is all the transformer sees; and the specifier must be a **relative path**, because the builder
+resolves it with a plain `path.join` rather than module resolution — a bare package specifier cannot
+work there. The shim is the smallest thing satisfying both.
+
+The package's `runSmokeJob(value, workerFactory?)` takes the worker as its second argument, so no
+part of this leaks back into the library — `@sidablist/core` exposes `./smoke.worker` as a public
+subpath export and knows nothing about who consumes it. That is the same mechanism a real published
+npm package would use, so nothing here needs rework when these libraries stop being `file:` links.
+
+**Passing the factory is not optional here.** Calling `runSmokeJob(value)` bare falls back to the
+package's own worker and reproduces the silent 404 above. Every linked worker this app grows needs
+its own one-line shim; there is no build setting that makes the fallback work.
+
+### Why `prebundle.exclude` Exists
+
+The **serve** target in `apps/teensyrom-ui/project.json` excludes the `@sidablist/*` packages from
+the dev server's dependency pre-bundling. Pre-bundling rewrites a module into the dev server's own
+cache directory, and the package starts its worker from a `new URL('./smoke.worker.js',
+import.meta.url)` specifier that would then resolve against that cache, where no worker file exists.
+The failure is silent — the build stays green and the worker simply never starts — so the exclusion
+is load-bearing rather than an optimisation.
+
+It is a `dev-server` option, not a build option and not a Vite setting. The
+`@angular/build:application` schema rejects `prebundle` outright (`additionalProperties: false`), and
+`vite.config.mts` is read only by the `@nx/vite:test` executor — so writing the exclusion in either
+place fails loudly or does nothing at all.
+
+### Verifying the Link
+
+The setup drawer's Diagnostics panel shows the linked build id and carries a **Run core smoke job**
+button. The build id proves which build loaded; the smoke result proves the worker inside it
+actually started. Both need checking against a production build served statically as well as against
+the dev server — pre-bundling and linking faults only show up in one of the two.
+
 ## The Yank — Deleting the Iteration
 
 The spike is quarantined in one folder and four registration lines. To delete it completely:
@@ -34,12 +125,17 @@ The spike is quarantined in one folder and four registration lines. To delete it
 4. **Drop the path alias** from `tsconfig.base.json`:
    - Delete the line `"@teensyrom-nx/poc/dj-player": ["libs/poc/dj-player/src/index.ts"]`
 
-5. **Remove the dependency:**
+5. **Remove the dependencies:**
    ```
-   pnpm remove mos6502
+   pnpm remove mos6502 @sidablist/core
    ```
 
-After these five edits, run `pnpm nx lint` and `pnpm nx test` to verify the workspace is clean. This yank has been rehearsed on a scratch branch and reverted successfully.
+6. **Drop the pre-bundling exclusion** from `apps/teensyrom-ui/project.json`:
+   - Delete the `prebundle` entry under `targets.serve.options` — it exists only for the linked
+     `@sidablist/*` packages
+
+After these six edits, run `pnpm nx lint` and `pnpm nx test` to verify the workspace is clean. The
+five-edit form of this yank was rehearsed on a scratch branch and reverted successfully.
 
 ## The Tune List
 

@@ -47,6 +47,9 @@ importers:
       '@ngrx/signals':
         specifier: ^19.2.0
         version: 19.2.1(@angular/core@19.2.15(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@sidablist/core':
+        specifier: file:../../SIDablist/libs/core
+        version: file:../../SIDablist/libs/core
       mos6502:
         specifier: 1.1.1
         version: 1.1.1
@@ -3223,6 +3226,9 @@ packages:
   '@schematics/angular@19.2.19':
     resolution: {integrity: sha512-6/0pvbPCY4UHeB4lnM/5r250QX5gcLgOYbR5FdhFu+22mOPHfWpRc5tNuY9kCephDHzAHjo6fTW1vefOOmA4jw==}
     engines: {node: ^18.19.1 || ^20.11.1 || >=22.0.0, npm: ^6.11.0 || ^7.5.6 || >=8.0.0, yarn: '>= 1.13.0'}
+
+  '@sidablist/core@file:../../SIDablist/libs/core':
+    resolution: {directory: ../../SIDablist/libs/core, type: directory}
 
   '@sigstore/bundle@3.1.0':
     resolution: {integrity: sha512-Mm1E3/CmDDCz3nDhFKTuYdB47EdRFRQMOE/EAbiG1MJW77/w1b3P7Qx7JSrVJs8PfwOLOVcKQCHErIwCTyPbag==}
@@ -13858,6 +13864,8 @@ snapshots:
       jsonc-parser: 3.3.1
     transitivePeerDependencies:
       - chokidar
+
+  '@sidablist/core@file:../../SIDablist/libs/core': {}
 
   '@sigstore/bundle@3.1.0':
     dependencies:
