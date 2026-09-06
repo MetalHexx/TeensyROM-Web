@@ -371,7 +371,7 @@ describe('SetupDrawerComponent', () => {
     expect(elapsed).toBeLessThan(ceilingMs * 2);
   });
 
-  it("reads the build id off the linked package rather than a value of its own", () => {
+  it('reads the build id off the linked package rather than a value of its own', () => {
     const readout = fixture.nativeElement.querySelector('.linked-core-build') as HTMLElement;
 
     expect(readout.textContent).toContain(CORE_BUILD_ID);
