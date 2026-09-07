@@ -1,5 +1,5 @@
 import { InjectionToken, type Signal } from '@angular/core';
-import { frames } from '@sidablist/core';
+import { clamp, frames } from '@sidablist/core';
 import type {
   Frames,
   FrameClock,
@@ -65,13 +65,19 @@ export function createDeckPlayerView(player: SidPlayer): DeckPlayerView {
 }
 
 /**
- * Jumps to `percent` of the ceiling the player measures a scrub against, dropping whatever marker
- * loop was running first.
+ * Jumps to `percent` of `positionBasisFrames` — the very basis the playhead percentage is read
+ * against — dropping whatever marker loop was running first.
  *
- * That drop is a performance rule, not a timeline one, which is why it lives here rather than in
- * core: a manual scrub always wins over a passage the operator built against a marker, which would
- * otherwise drag playback straight back to wherever it was looping. The whole-tune structure
- * survives — repeating is the track's own behaviour, not something a scrub touches.
+ * The basis, not `ceilingFrames`: the ceiling is a fixed 300 s stand-in that only applies when
+ * detection answered nothing, at which point the basis already falls back to it. Measuring a scrub
+ * against the ceiling while every caller hands in a percentage of the basis sends the seek to a
+ * frame the operator never asked for, by exactly the ratio between the tune's length and 300 s.
+ *
+ * Dropping the marker loop is a performance rule, not a timeline one, which is why it lives here
+ * rather than in core: a manual scrub always wins over a passage the operator built against a
+ * marker, which would otherwise drag playback straight back to wherever it was looping. The
+ * whole-tune structure survives — repeating is the track's own behaviour, not something a scrub
+ * touches.
  */
 export function scrubToPercent(
   player: SidPlayer,
@@ -79,6 +85,6 @@ export function scrubToPercent(
   percent: number
 ): Promise<void> {
   markers.stopMarkerLoop();
-  const ceiling = player.getSnapshot().basis.ceilingFrames;
-  return player.seek(frames(Math.round((percent / 100) * ceiling)));
+  const basis = player.getSnapshot().basis.positionBasisFrames;
+  return player.seek(frames(Math.round((clamp(percent, 0, 100) / 100) * basis)));
 }

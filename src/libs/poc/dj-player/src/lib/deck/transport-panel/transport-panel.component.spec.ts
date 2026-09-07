@@ -10,9 +10,15 @@ import { DECK_PLAYER_VIEW, SID_PLAYER } from '../deck-player';
 import { MarkerCollection } from '../marker-collection';
 import { TuneIndexService } from '../../analysis/tune-index.service';
 import type { TuneIndexRecord } from '../../analysis/tune-index.model';
-import type { SidFile } from '@sidablist/core';
+import { frames } from '@sidablist/core';
+import type { Frames, SidFile } from '@sidablist/core';
 import { createFakeDeckPlayer, fakeSidFile } from '../../../testing/player-doubles';
 import type { FakeDeckPlayer } from '../../../testing/player-doubles';
+
+// An 80-second tune at 50 Hz, against the fixed 300-second jump ceiling. Deliberately unequal: a
+// scrub resolved against the wrong one of the two lands 3.75x away from where it was dragged.
+const POSITION_BASIS_FRAMES = 4_000;
+const CEILING_FRAMES = 15_000;
 
 describe('TransportPanelComponent', () => {
   let fixture: ComponentFixture<TransportPanelComponent>;
@@ -135,6 +141,59 @@ describe('TransportPanelComponent', () => {
       expect(aName).toBe('Play deck A');
       expect(bName).toBe('Play deck B');
       expect(aName).not.toBe(bName);
+    });
+  });
+
+  describe('scrubbing', () => {
+    beforeEach(() => {
+      build('A');
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        basis: {
+          ...snapshot.basis,
+          positionBasisFrames: frames(POSITION_BASIS_FRAMES),
+          ceilingFrames: frames(CEILING_FRAMES),
+        },
+      }));
+      fixture.detectChanges();
+    });
+
+    function scrubTrack(): HTMLInputElement {
+      return fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement;
+    }
+
+    /** Drags the thumb to `percent` and releases it, then settles the awaited seek. */
+    async function dragTo(percent: number): Promise<void> {
+      const track = scrubTrack();
+      track.value = String(percent);
+      track.dispatchEvent(new Event('input', { bubbles: true }));
+      track.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+      fixture.detectChanges();
+    }
+
+    /** The frame the player was last asked to seek to. */
+    function lastSeekFrame(): Frames {
+      return vi.mocked(player.player.seek).mock.calls.at(-1)?.[0] as Frames;
+    }
+
+    it.each([0, 25, 50, 87.5, 100])(
+      'seeks to %s%% of the basis the playhead is read against',
+      async (percent) => {
+        await dragTo(percent);
+
+        expect(lastSeekFrame()).toBe(frames(Math.round((percent / 100) * POSITION_BASIS_FRAMES)));
+      }
+    );
+
+    it('leaves the thumb where it was dragged once the seek lands', async () => {
+      await dragTo(25);
+
+      // What the real player does when the jump lands: the playhead adopts the frame it was sent to.
+      player.position.set(lastSeekFrame());
+      fixture.detectChanges();
+
+      expect(Number(scrubTrack().value)).toBe(25);
     });
   });
 

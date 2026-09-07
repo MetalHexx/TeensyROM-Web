@@ -434,7 +434,7 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(Number(thresholdInput().value)).toBe(DEFAULT_CANDIDATE_THRESHOLD);
   });
 
-  it('converts a clicked candidate into a scrub percentage against positionBasisFrames', async () => {
+  it('seeks a clicked candidate to the very frame it is labelled with', async () => {
     await completeAnalysis(buildSpikeScan());
     const hit = candidateHits()[0];
     expect(hit).toBeTruthy();
@@ -445,12 +445,12 @@ describe('TrackAnalysisPanelComponent', () => {
     const match = readoutValue('Selected candidate').match(/frame ([\d,]+)/);
     expect(match).not.toBeNull();
     const frame = Number((match as RegExpMatchArray)[1].replace(/,/g, ''));
+    expect(frame).toBeGreaterThan(0);
 
-    // A percentage of the basis, resolved onto the ceiling the player measures a seek against.
-    const percent = (frame / POSITION_BASIS_FRAMES) * 100;
-    expect(player.player.seek).toHaveBeenCalledWith(
-      frames(Math.round((percent / 100) * CEILING_FRAMES))
-    );
+    // The click goes out as a percentage of the basis and comes back through the same basis, so the
+    // round trip has to land on the frame itself — not on the fixed ceiling, which is a different
+    // number here precisely so a seek measured against it would miss.
+    expect(player.player.seek).toHaveBeenCalledWith(frames(frame));
   });
 
   it('awaits the jump landing before adding a marker from Copy to marker', async () => {
