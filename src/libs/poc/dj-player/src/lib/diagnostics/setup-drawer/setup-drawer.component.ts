@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { CORE_BUILD_ID, runSmokeJob } from '@sidablist/core';
+import { createWorkerReplayRunner, frames } from '@sidablist/core';
+import type { SidFile as CoreSidFile } from '@sidablist/core';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { DeckRegistry } from '../../deck/deck-registry';
 import type { DeckHandle } from '../../deck/deck-registry';
@@ -42,16 +43,49 @@ const MAX_STALL_DURATION_MS = 2000;
 
 const EM_DASH = '—';
 
-/** The value handed to the linked package's smoke job — arbitrary, but it has to come back doubled
- *  for the round trip through its worker to count as proven. */
-const SMOKE_JOB_INPUT = 21;
+const RTS = 0x60;
+const SMOKE_TUNE_LOAD_ADDRESS = 0x1000;
+const SMOKE_TUNE_PLAY_ADDRESS = 0x1010;
+
+/** init and play both return at once and touch no register — enough to prove the worker actually
+ *  ran the tune's own 6502 code, not merely echoed a message. Mirrors the `silentTune` fixture
+ *  `@sidablist/core`'s own replay specs build the same way. */
+function buildSmokeTune(): CoreSidFile {
+  const data = new Uint8Array(SMOKE_TUNE_PLAY_ADDRESS - SMOKE_TUNE_LOAD_ADDRESS + 1);
+  data[0] = RTS;
+  data[SMOKE_TUNE_PLAY_ADDRESS - SMOKE_TUNE_LOAD_ADDRESS] = RTS;
+  return {
+    format: 'PSID',
+    version: 2,
+    loadAddress: SMOKE_TUNE_LOAD_ADDRESS,
+    initAddress: SMOKE_TUNE_LOAD_ADDRESS,
+    playAddress: SMOKE_TUNE_PLAY_ADDRESS,
+    songs: 1,
+    startSong: 1,
+    speedFlags: 0,
+    name: '',
+    author: '',
+    released: '',
+    clock: 'pal',
+    model: 'unknown',
+    secondSidAddress: null,
+    thirdSidAddress: null,
+    data,
+  };
+}
+
+const SMOKE_TUNE = buildSmokeTune();
+
+/** The frame the smoke job's replay targets — arbitrary, but it has to come back unchanged for the
+ *  round trip through the worker to count as proven. */
+const SMOKE_TARGET_FRAME = frames(5);
 
 /**
  * Starts the linked package's worker from first-party code, which is the only place this build will
- * rewrite a worker URL — see `core-smoke.worker.ts` for why the package cannot start its own.
+ * rewrite a worker URL — see `core-replay.worker.ts` for why the package cannot start its own.
  */
-const createCoreSmokeWorker = (): Worker =>
-  new Worker(new URL('../core-smoke.worker', import.meta.url), { type: 'module' });
+const createCoreReplayWorker = (): Worker =>
+  new Worker(new URL('../core-replay.worker', import.meta.url), { type: 'module' });
 
 /**
  * The setup drawer: every field the old per-deck sidebar carried, re-laid as one row per figure with
@@ -68,10 +102,10 @@ const createCoreSmokeWorker = (): Worker =>
  * The cross-deck drift figure sits at the top of the Diagnostics table, over the first two registered
  * decks — see `crossDeckDriftMs`'s own doc for why no correction is attempted.
  *
- * Diagnostics also carries the linked `@sidablist/core` readout: the build id of the package that
- * actually loaded, and a button that runs its worker-backed smoke job. Together they answer the two
- * questions a linked `file:` dependency raises at run time and nowhere else — which build is in the
- * page, and whether the worker inside it resolves once the app is bundled.
+ * Diagnostics also carries a button that runs the linked `@sidablist/core`'s replay worker against a
+ * tiny fixture tune and renders whatever frame it lands on. That answers the question a linked
+ * `file:` dependency raises at run time and nowhere else — whether the worker inside the currently
+ * linked build actually resolves once the app is bundled.
  */
 @Component({
   selector: 'lib-setup-drawer',
@@ -296,22 +330,34 @@ export class SetupDrawerComponent {
 
   // --- Linked core ----------------------------------------------------------------------------
 
-  protected readonly coreBuildId = CORE_BUILD_ID;
   protected readonly smokeJobResult = signal<string>(EM_DASH);
 
   /**
-   * Runs the linked package's smoke job and renders whatever comes back. The worker is what is under
-   * test here, and a worker that fails to resolve rejects rather than throwing synchronously — so the
-   * rejection has to reach the readout, or the failure this button exists to catch would look
-   * identical to never having pressed it.
+   * Runs the linked package's replay worker against `SMOKE_TUNE` and renders whatever frame it
+   * lands on. The worker is what is under test here, and a worker that fails to resolve rejects
+   * rather than throwing synchronously — so the rejection has to reach the readout, or the failure
+   * this button exists to catch would look identical to never having pressed it.
    */
   protected async onRunSmokeJob(): Promise<void> {
     this.smokeJobResult.set('running…');
+    const runner = createWorkerReplayRunner(createCoreReplayWorker);
     try {
-      const doubled = await runSmokeJob(SMOKE_JOB_INPUT, createCoreSmokeWorker);
-      this.smokeJobResult.set(`${SMOKE_JOB_INPUT} → ${doubled}`);
+      const response = await runner.run({
+        id: 1,
+        file: SMOKE_TUNE,
+        subtune: 1,
+        targetFrame: SMOKE_TARGET_FRAME,
+        mutes: [false, false, false],
+      });
+      this.smokeJobResult.set(
+        response.ok
+          ? `frame ${SMOKE_TARGET_FRAME} → landed at frame ${response.result.frame}`
+          : `failed: ${response.error}`,
+      );
     } catch (error) {
       this.smokeJobResult.set(`failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      runner.dispose();
     }
   }
 }

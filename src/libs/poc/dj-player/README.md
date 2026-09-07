@@ -47,8 +47,9 @@ No reinstall is needed, but not for the reason you would expect. pnpm 10 does **
 fast because `tsc` rewrites its outputs in place, so the hard links survive a rebuild and both
 repositories keep pointing at the same bytes. **If core's build ever starts by deleting `dist`, that
 breaks**: the new files are different inodes, the old hard links are orphaned, and this workspace
-silently keeps serving the previous build until you `pnpm install` again. Check the build id in the
-setup drawer before you conclude a core change did nothing.
+silently keeps serving the previous build until you `pnpm install` again. Run the core smoke job in
+the setup drawer before you conclude a core change did nothing — `pnpm install` and retry if it still
+disagrees with what you just built.
 
 ### Why the Package Declares `main` and `types`
 
@@ -61,7 +62,7 @@ would be the alternative, and is a far larger change than the POC justifies.
 
 ### Why the Worker Goes Through a First-Party Shim
 
-`diagnostics/core-smoke.worker.ts` is one line — `import '@sidablist/core/smoke.worker';` — and the
+`diagnostics/core-replay.worker.ts` is one line — `import '@sidablist/core/replay.worker';` — and the
 setup drawer starts the worker from it rather than letting the package start its own.
 
 The package can start its own worker under a plain ESM loader, but not under this build. Angular
@@ -76,20 +77,20 @@ that is all the transformer sees; and the specifier must be a **relative path**,
 resolves it with a plain `path.join` rather than module resolution — a bare package specifier cannot
 work there. The shim is the smallest thing satisfying both.
 
-The package's `runSmokeJob(value, workerFactory?)` takes the worker as its second argument, so no
-part of this leaks back into the library — `@sidablist/core` exposes `./smoke.worker` as a public
+The package's `createWorkerReplayRunner(workerFactory?)` takes the worker as its argument, so no
+part of this leaks back into the library — `@sidablist/core` exposes `./replay.worker` as a public
 subpath export and knows nothing about who consumes it. That is the same mechanism a real published
 npm package would use, so nothing here needs rework when these libraries stop being `file:` links.
 
-**Passing the factory is not optional here.** Calling `runSmokeJob(value)` bare falls back to the
-package's own worker and reproduces the silent 404 above. Every linked worker this app grows needs
-its own one-line shim; there is no build setting that makes the fallback work.
+**Passing the factory is not optional here.** Calling `createWorkerReplayRunner()` bare falls back to
+the package's own worker and reproduces the silent 404 above. Every linked worker this app grows
+needs its own one-line shim; there is no build setting that makes the fallback work.
 
 ### Why `prebundle.exclude` Exists
 
 The **serve** target in `apps/teensyrom-ui/project.json` excludes the `@sidablist/*` packages from
 the dev server's dependency pre-bundling. Pre-bundling rewrites a module into the dev server's own
-cache directory, and the package starts its worker from a `new URL('./smoke.worker.js',
+cache directory, and the package starts its worker from a `new URL('./replay.worker.js',
 import.meta.url)` specifier that would then resolve against that cache, where no worker file exists.
 The failure is silent — the build stays green and the worker simply never starts — so the exclusion
 is load-bearing rather than an optimisation.
@@ -101,10 +102,12 @@ place fails loudly or does nothing at all.
 
 ### Verifying the Link
 
-The setup drawer's Diagnostics panel shows the linked build id and carries a **Run core smoke job**
-button. The build id proves which build loaded; the smoke result proves the worker inside it
-actually started. Both need checking against a production build served statically as well as against
-the dev server — pre-bundling and linking faults only show up in one of the two.
+The setup drawer's Diagnostics panel carries a **Run core smoke job** button: it drives the linked
+`@sidablist/core`'s replay worker over a tiny fixture tune and renders the frame the round trip
+landed on. A worker that fails to resolve renders the failure instead, which is what proves the
+worker inside the currently linked build actually started. Check it against a production build
+served statically as well as against the dev server — pre-bundling and linking faults only show up
+in one of the two.
 
 ## The Yank — Deleting the Iteration
 

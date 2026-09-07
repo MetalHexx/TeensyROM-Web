@@ -3,17 +3,19 @@ import { signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // The real `@sidablist/core` runs a dedicated worker, which jsdom cannot start — and the drawer's
-// job is to render whatever the job settles to, not to run one. The stub stands in for the linked
-// package's whole entry point.
-const runSmokeJobMock = vi.hoisted(() =>
-  vi.fn<(value: number, workerFactory?: () => Worker) => Promise<number>>()
+// job is to render whatever the replay settles to, not to run one. The stub stands in for the
+// linked package's whole entry point; `runMock` stands in for the runner `createWorkerReplayRunner`
+// hands back.
+const runMock = vi.hoisted(() => vi.fn());
+const disposeMock = vi.hoisted(() => vi.fn());
+const createWorkerReplayRunnerMock = vi.hoisted(() =>
+  vi.fn(() => ({ run: runMock, dispose: disposeMock }))
 );
 vi.mock('@sidablist/core', () => ({
-  CORE_BUILD_ID: 'core-build-under-test',
-  runSmokeJob: runSmokeJobMock,
+  createWorkerReplayRunner: createWorkerReplayRunnerMock,
+  frames: (value: number) => value,
 }));
 
-import { CORE_BUILD_ID } from '@sidablist/core';
 import { SetupDrawerComponent } from './setup-drawer.component';
 import { DeckRegistry } from '../../deck/deck-registry';
 import type { DeckHandle } from '../../deck/deck-registry';
@@ -178,7 +180,9 @@ describe('SetupDrawerComponent', () => {
   }
 
   beforeEach(async () => {
-    runSmokeJobMock.mockReset();
+    createWorkerReplayRunnerMock.mockClear();
+    runMock.mockReset();
+    disposeMock.mockReset();
     await setup();
   });
 
@@ -371,20 +375,21 @@ describe('SetupDrawerComponent', () => {
     expect(elapsed).toBeLessThan(ceilingMs * 2);
   });
 
-  it('reads the build id off the linked package rather than a value of its own', () => {
-    const readout = fixture.nativeElement.querySelector('.linked-core-build') as HTMLElement;
-
-    expect(readout.textContent).toContain(CORE_BUILD_ID);
-  });
-
-  it('renders whatever the smoke job resolves to', async () => {
-    runSmokeJobMock.mockResolvedValue(84);
+  it('renders whatever frame the replay worker lands on', async () => {
+    runMock.mockResolvedValue({ id: 1, ok: true, result: { frame: 84 } });
 
     expect(await pressSmokeButton()).toContain('84');
+    expect(disposeMock).toHaveBeenCalledTimes(1);
   });
 
-  it('renders a rejected smoke job as a failure instead of leaving the readout as it was', async () => {
-    runSmokeJobMock.mockRejectedValue(new Error('the core worker never started'));
+  it('renders a failed replay response as a failure instead of leaving the readout as it was', async () => {
+    runMock.mockResolvedValue({ id: 1, ok: false, error: 'the core worker never started' });
+
+    expect(await pressSmokeButton()).toContain('the core worker never started');
+  });
+
+  it('renders a rejected replay run as a failure instead of leaving the readout as it was', async () => {
+    runMock.mockRejectedValue(new Error('the core worker never started'));
 
     expect(await pressSmokeButton()).toContain('the core worker never started');
   });
