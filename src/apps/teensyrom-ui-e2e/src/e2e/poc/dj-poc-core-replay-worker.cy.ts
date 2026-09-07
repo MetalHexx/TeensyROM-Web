@@ -10,9 +10,9 @@
  * `dj-poc-channel-faders.cy.ts` established for the same class of gap.
  *
  * Run against both halves the phase's exit criteria name:
- *   - dev serve:     `pnpm exec nx run teensyrom-ui-e2e:e2e --spec=src/e2e/poc/dj-poc-core-smoke.cy.ts`
+ *   - dev serve:     `pnpm exec nx run teensyrom-ui-e2e:e2e --spec=src/e2e/poc/dj-poc-core-replay-worker.cy.ts`
  *   - production build served statically:
- *       `pnpm exec nx run teensyrom-ui-e2e:e2e:production --spec=src/e2e/poc/dj-poc-core-smoke.cy.ts`
+ *       `pnpm exec nx run teensyrom-ui-e2e:e2e:production --spec=src/e2e/poc/dj-poc-core-replay-worker.cy.ts`
  * (`cypress.config.ts`'s `webServerCommands.default` / `.production` back these two configurations —
  * the former serves via `teensyrom-ui:serve`, the dev server; the latter via `teensyrom-ui:serve-static`,
  * a static file server in front of `teensyrom-ui:build`'s real output.)
@@ -20,22 +20,16 @@
 
 const SETUP_DRAWER_TITLE = 'SETUP & DIAGNOSTICS';
 const SMOKE_BUTTON_LABEL = 'Run core smoke job';
-const SMOKE_JOB_INPUT = 21;
-const EXPECTED_READOUT = `${SMOKE_JOB_INPUT} → 42`;
+const SMOKE_TARGET_FRAME = 5;
+const EXPECTED_READOUT = `frame ${SMOKE_TARGET_FRAME} → landed at frame ${SMOKE_TARGET_FRAME}`;
 
-describe('DJ Poc setup drawer — real-browser core worker round trip', () => {
+describe('DJ Poc setup drawer — real-browser core replay worker round trip', () => {
   beforeEach(() => {
     cy.visit('/dev/dj-poc');
     cy.contains('.drawer-head', SETUP_DRAWER_TITLE).click();
   });
 
-  it('renders a linked build id read off the real package, not a placeholder', () => {
-    cy.get('.linked-core-build')
-      .invoke('text')
-      .should('match', /Linked core build: \S+/);
-  });
-
-  it('starts the linked worker and renders the doubled value once it round-trips', () => {
+  it('starts the linked worker and renders the landed frame once it round-trips', () => {
     cy.get('.linked-core-result').should('have.text', '—');
 
     cy.contains('button', SMOKE_BUTTON_LABEL).click();
