@@ -11,7 +11,7 @@ describe('FilterModeSelectorComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [FilterModeSelectorComponent],
-      providers: [MixerService],
+      providers: [{ provide: MixerService, useFactory: () => new MixerService(DECKS) }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(FilterModeSelectorComponent);

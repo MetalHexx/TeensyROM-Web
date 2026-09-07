@@ -148,7 +148,9 @@ export function computeGridLayout(decks: readonly DeckDescriptor[]): DeckGridLay
     { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
     SharedTuneIndex,
     DeckRegistry,
-    MixerService,
+    // A factory, not a bare class provider: `MixerService` takes its decks through the constructor
+    // rather than reaching for `DECKS` itself, so this composition root is what hands them over.
+    { provide: MixerService, useFactory: () => new MixerService(DECKS) },
   ],
 })
 export class DjPocViewComponent {

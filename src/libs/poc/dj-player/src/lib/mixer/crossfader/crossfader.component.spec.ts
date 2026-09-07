@@ -11,7 +11,7 @@ describe('CrossfaderComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [CrossfaderComponent],
-      providers: [MixerService],
+      providers: [{ provide: MixerService, useFactory: () => new MixerService(DECKS) }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CrossfaderComponent);

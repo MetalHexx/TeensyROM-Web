@@ -13,9 +13,9 @@ interface MockEngine {
   setVoiceHeld: ReturnType<typeof vi.fn>;
   clearVoiceMutes: ReturnType<typeof vi.fn>;
   setSpeed: ReturnType<typeof vi.fn>;
-  jumpSpeedUp: ReturnType<typeof vi.fn>;
-  jumpSpeedDown: ReturnType<typeof vi.fn>;
-  homeSpeed: ReturnType<typeof vi.fn>;
+  setTempo: ReturnType<typeof vi.fn>;
+  slowestSpeed: ReturnType<typeof vi.fn>;
+  fastestSpeed: ReturnType<typeof vi.fn>;
 }
 
 function makeEngine(): MockEngine {
@@ -27,9 +27,9 @@ function makeEngine(): MockEngine {
     setVoiceHeld: vi.fn(),
     clearVoiceMutes: vi.fn(),
     setSpeed: vi.fn(),
-    jumpSpeedUp: vi.fn(),
-    jumpSpeedDown: vi.fn(),
-    homeSpeed: vi.fn(),
+    setTempo: vi.fn(),
+    slowestSpeed: vi.fn(() => 0.3),
+    fastestSpeed: vi.fn(() => 1.7),
   };
 }
 
@@ -60,6 +60,12 @@ describe('VoiceSpeedColumnComponent', () => {
 
   function holdButton(voice: number): HTMLButtonElement {
     return fixture.nativeElement.querySelectorAll('.voice-hold')[voice] as HTMLButtonElement;
+  }
+
+  function speedButton(label: string): HTMLButtonElement {
+    return Array.from(
+      fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.speed-jump-buttons button')
+    ).find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
   }
 
   it("reads 'Kill' for an audible voice and 'Punch In' once that voice is muted", () => {
@@ -94,5 +100,34 @@ describe('VoiceSpeedColumnComponent', () => {
     expect(aKill).toBe('Kill voice 1 deck A');
     expect(bKill).toBe('Kill voice 1 deck B');
     expect(aKill).not.toBe(bKill);
+  });
+
+  describe('the speed jump excursion, drawn from the extracted state machine rather than the engine', () => {
+    it('drives the jump buttons through engine.setTempo, clamped to the bounds the engine reports', () => {
+      build('A');
+
+      speedButton('+50%').click();
+
+      expect(engine.setTempo).toHaveBeenLastCalledWith(1.5);
+      expect(engine.setSpeed).not.toHaveBeenCalled();
+    });
+
+    it('restores home exactly on the opposite button, closing the excursion', () => {
+      build('A');
+
+      speedButton('+50%').click();
+      speedButton('−50%').click();
+
+      expect(engine.setTempo).toHaveBeenLastCalledWith(1);
+    });
+
+    it('routes Home through the same excursion module', () => {
+      build('A');
+
+      speedButton('+50%').click();
+      speedButton('Home').click();
+
+      expect(engine.setTempo).toHaveBeenLastCalledWith(1);
+    });
   });
 });

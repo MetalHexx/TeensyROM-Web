@@ -594,6 +594,21 @@ export class DjPlayerEngine implements OnDestroy {
   }
 
   /**
+   * Sets the multiplier exactly as given and retimes the clock — no clamp of its own, because the
+   * caller already bounded it (`createSpeedExcursion` clamps to the hard span before calling this).
+   * Unlike `setSpeed`, which re-clamps to the narrower input span and would silently cut off a jump
+   * excursion's reach into the hard span.
+   *
+   * Temporary: this is what `VoiceSpeedColumnComponent`'s extracted excursion module is wired to
+   * while the old engine still stands; `P09-T05` points the same call at the player's own `setTempo`
+   * instead.
+   */
+  setTempo(multiplier: number): void {
+    this.speedMultiplier.set(multiplier);
+    this.applyIntervalChange();
+  }
+
+  /**
    * Moves the multiplier up by `SPEED_JUMP_STEP` from wherever it currently sits, clamped to the
    * hard range. See `jump` for the excursion state machine this and `jumpSpeedDown` share.
    */

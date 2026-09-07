@@ -1,11 +1,9 @@
 import { describe, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSidFile } from '../src/lib/sid/sid-file.parser';
+import { parseSidFile, PAL_FRAME_INTERVAL_US, playCallsPerSecond, type PlayRate } from '@sidablist/core';
 import { scanTune } from '../src/lib/analysis/scan-tune';
 import { detectLoop, MIN_TAIL_SECONDS, IDLE_PERIOD_SECONDS } from '../src/lib/analysis/loop-detect';
-import { PAL_FRAME_INTERVAL_US } from '../src/lib/asid/asid-constants';
-import { playCallsPerSecond, type PlayRate } from '../src/lib/engine/play-rate';
 
 /** Musical seconds deep enough to reach a verified repeat on both bundled tunes — matches the depth
  *  the production `TuneIndexService.SCAN_DEPTH_SECONDS` ladder ultimately reaches for them. */

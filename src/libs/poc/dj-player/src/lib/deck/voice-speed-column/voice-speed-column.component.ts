@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DjPlayerEngine, SPEED_INPUT_SPAN } from '../../engine/dj-player-engine';
 import { DeckContext } from '../deck-context';
+import { createSpeedExcursion } from '../speed-excursion';
 
 /**
  * Voice and Speed share one full-height, centre-aligned column — the narrowest of the deck's four
@@ -80,19 +81,29 @@ export class VoiceSpeedColumnComponent {
     Math.min(Math.max(this.speedMultiplier(), this.minSpeed), this.maxSpeed)
   );
 
+  /** Drives the extracted excursion state machine rather than the engine's own (still-standing)
+   *  copy — see `speed-excursion.ts`. Wired to `DjPlayerEngine.setTempo`, a raw set-and-retime with
+   *  no clamp of its own, so the excursion's hard-span clamp is the only one in force; `P09-T05`
+   *  points this same wiring at the player instead. */
+  private readonly speedExcursion = createSpeedExcursion({
+    setTempo: (multiplier) => this.engine.setTempo(multiplier),
+    slowest: this.engine.slowestSpeed(),
+    fastest: this.engine.fastestSpeed(),
+  });
+
   protected onSpeedInput(event: Event): void {
     this.engine.setSpeed(Number((event.target as HTMLInputElement).value));
   }
 
   protected onSpeedJumpUp(): void {
-    this.engine.jumpSpeedUp();
+    this.speedExcursion.jumpUp();
   }
 
   protected onSpeedJumpDown(): void {
-    this.engine.jumpSpeedDown();
+    this.speedExcursion.jumpDown();
   }
 
   protected onSpeedHome(): void {
-    this.engine.homeSpeed();
+    this.speedExcursion.home();
   }
 }

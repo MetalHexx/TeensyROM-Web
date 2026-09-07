@@ -843,87 +843,10 @@ describe('DjPlayerEngine', () => {
     });
   });
 
-  describe('the speed jump excursion', () => {
-    it('jumps additively from the current value, clamped to the hard range', () => {
-      engine.loadTune(silentTune());
-      engine.setSpeed(1.15);
-
-      engine.jumpSpeedUp();
-      expect(engine.speedMultiplier()).toBeCloseTo(1.65, 6);
-
-      engine.homeSpeed(); // close the excursion before the next one opens
-      engine.setSpeed(1.15);
-      engine.jumpSpeedDown();
-      expect(engine.speedMultiplier()).toBeCloseTo(0.65, 6);
-    });
-
-    it('records the pre-jump speed into rememberedSpeed on the first jump of an excursion', () => {
-      engine.loadTune(silentTune());
-      engine.setSpeed(1.15);
-
-      expect(engine.rememberedSpeed()).toBeNull();
-      engine.jumpSpeedUp();
-      expect(engine.rememberedSpeed()).toBeCloseTo(1.15, 6);
-    });
-
-    it('returns to the remembered speed exactly on the opposite button, and clears the excursion', () => {
-      engine.loadTune(silentTune());
-      engine.setSpeed(1.15);
-      engine.jumpSpeedUp();
-
-      engine.jumpSpeedDown();
-
-      expect(engine.speedMultiplier()).toBeCloseTo(1.15, 6);
-      expect(engine.rememberedSpeed()).toBeNull();
-    });
-
-    it('is a no-op to press the same button again mid-excursion', () => {
-      engine.loadTune(silentTune());
-      engine.setSpeed(1);
-      engine.jumpSpeedUp();
-      const afterFirstJump = engine.speedMultiplier();
-
-      engine.jumpSpeedUp();
-
-      expect(engine.speedMultiplier()).toBe(afterFirstJump);
-      expect(engine.rememberedSpeed()).toBe(1);
-    });
-
-    it('returns exactly to the remembered speed even when the outbound jump clamped, never by re-deriving with arithmetic', () => {
-      engine.loadTune(silentTune());
-      engine.setSpeed(1.5); // the fader maximum
-
-      engine.jumpSpeedUp(); // 1.5 + 0.5 = 2.0, clamped to the 1.7 hard ceiling
-      expect(engine.speedMultiplier()).toBeCloseTo(1.7, 6);
-
-      engine.jumpSpeedDown(); // the opposite button — must land exactly on 1.5, not 1.7 - 0.5 = 1.2
-
-      expect(engine.speedMultiplier()).toBeCloseTo(1.5, 6);
-    });
-
-    it('is dual-purpose: Home sets 1.0 with no excursion open, or restores the ridden speed and closes it', () => {
-      engine.loadTune(silentTune());
-      engine.setSpeed(1.15);
-      engine.jumpSpeedUp();
-
-      engine.homeSpeed();
-      expect(engine.speedMultiplier()).toBeCloseTo(1.15, 6);
-      expect(engine.rememberedSpeed()).toBeNull();
-
-      engine.homeSpeed();
-      expect(engine.speedMultiplier()).toBe(1);
-    });
-
-    it('reaches the hard span rather than the input span, unlike setSpeed', () => {
-      engine.loadTune(silentTune());
-      engine.setSpeed(1.6); // beyond the input span
-      expect(engine.speedMultiplier()).toBe(1.5);
-
-      engine.jumpSpeedUp(); // additive from 1.5 -> 2.0, clamped to the 1.7 hard span
-
-      expect(engine.speedMultiplier()).toBeCloseTo(1.7, 6);
-    });
-  });
+  // The speed jump excursion (jumpSpeedUp/jumpSpeedDown/homeSpeed/rememberedSpeed) moved to
+  // `deck/speed-excursion.ts` and its own spec — DJ apparatus, not timeline. The engine's own copy
+  // is untouched and still exercised indirectly above (`the speed floor`), but its excursion
+  // semantics are now proven against the extracted module, not here.
 
   it('stops and reports why when a frame runs out of cycles', async () => {
     engine.loadTune(runawayTune());

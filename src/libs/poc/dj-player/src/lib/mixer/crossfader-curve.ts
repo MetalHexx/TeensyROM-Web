@@ -1,4 +1,4 @@
-import { clamp } from '../engine/engine-utils';
+import { clamp } from '@sidablist/core';
 
 /** −1 = hard A, 0 = centre (both full), +1 = hard B. */
 export type CrossfaderPosition = number;

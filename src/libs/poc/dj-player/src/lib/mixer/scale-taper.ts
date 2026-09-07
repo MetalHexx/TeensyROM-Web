@@ -1,4 +1,4 @@
-import { clamp } from '../engine/engine-utils';
+import { clamp } from '@sidablist/core';
 
 /** A knob's position: −1 … +1, resting at 0. Full resolution; never rounded. */
 export type ScalePosition = number;

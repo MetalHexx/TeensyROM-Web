@@ -124,7 +124,7 @@ describe('DeckHostComponent', () => {
           // they have to come from here instead.
           { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
           SharedTuneIndex,
-          MixerService,
+          { provide: MixerService, useFactory: () => new MixerService(DECKS) },
         ],
       });
     });
@@ -247,6 +247,8 @@ describe('DeckHostComponent', () => {
       currentSubtune: WritableSignal<number>;
       subtuneCount: WritableSignal<number>;
       speedMultiplier: WritableSignal<number>;
+      slowestSpeed: WritableSignal<number>;
+      fastestSpeed: WritableSignal<number>;
       nominalIntervalUs: WritableSignal<number>;
       playRate: WritableSignal<PlayRate>;
       scheduleAheadMs: WritableSignal<number>;
@@ -272,6 +274,7 @@ describe('DeckHostComponent', () => {
       restoreRepeatTrackPreference: ReturnType<typeof vi.fn>;
       addMarker: ReturnType<typeof vi.fn>;
       progressPercentFor: ReturnType<typeof vi.fn>;
+      setTempo: ReturnType<typeof vi.fn>;
     }
 
     function makeEngine(): MockEngine {
@@ -284,6 +287,8 @@ describe('DeckHostComponent', () => {
         currentSubtune: signal(1),
         subtuneCount: signal(1),
         speedMultiplier: signal(1),
+        slowestSpeed: signal(0.3),
+        fastestSpeed: signal(1.7),
         nominalIntervalUs: signal(19950),
         playRate: signal<PlayRate>({
           callsPerFrame: 1,
@@ -314,6 +319,7 @@ describe('DeckHostComponent', () => {
         restoreRepeatTrackPreference: vi.fn(),
         addMarker: vi.fn(),
         progressPercentFor: vi.fn(() => 0),
+        setTempo: vi.fn(),
       };
     }
 
@@ -363,7 +369,11 @@ describe('DeckHostComponent', () => {
         // has no page above the component under test. `MidiAccessService` is real (not mocked) —
         // `BindingCardComponent` reaches it directly for the shared port list, and it has no browser
         // API dependency until `requestAccess()` is actually invoked, which none of these tests do.
-        providers: [DeckRegistry, MixerService, MidiAccessService],
+        providers: [
+          DeckRegistry,
+          { provide: MixerService, useFactory: () => new MixerService(DECKS) },
+          MidiAccessService,
+        ],
       })
         .overrideComponent(DeckHostComponent, {
           set: {

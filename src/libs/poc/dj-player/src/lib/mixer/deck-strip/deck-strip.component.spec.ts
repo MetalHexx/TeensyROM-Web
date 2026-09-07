@@ -57,7 +57,10 @@ describe('DeckStripComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [DeckStripComponent],
-      providers: [MixerService, { provide: DeckRegistry, useValue: registry }],
+      providers: [
+        { provide: MixerService, useFactory: () => new MixerService(DECKS) },
+        { provide: DeckRegistry, useValue: registry },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DeckStripComponent);

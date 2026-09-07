@@ -29,6 +29,10 @@ import { TUNE_INDEX_FORMAT_VERSION } from '../../analysis/tune-index.model';
 import type { DeckTuneLoader } from '../../deck/deck-tune-loader';
 import type { SidFile } from '../../sid/sid-file.model';
 
+/** Matches the deck ids `fakeDeck` registers below — `MixerService` only needs a shape to compose
+ *  from here, not the production `DECKS` list from `deck/deck.config`. */
+const MIXER_DECKS = [{ id: 'a' }, { id: 'b' }];
+
 const EMPTY_STATS: EngineStats = {
   framesRendered: 0,
   packetsSent: 0,
@@ -173,7 +177,10 @@ describe('SetupDrawerComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [SetupDrawerComponent],
-      providers: [{ provide: DeckRegistry, useValue: registry }, MixerService],
+      providers: [
+        { provide: DeckRegistry, useValue: registry },
+        { provide: MixerService, useFactory: () => new MixerService(MIXER_DECKS) },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(SetupDrawerComponent);
@@ -280,7 +287,10 @@ describe('SetupDrawerComponent', () => {
     await TestBed.resetTestingModule()
       .configureTestingModule({
         imports: [SetupDrawerComponent],
-        providers: [{ provide: DeckRegistry, useValue: singleDeckRegistry }, MixerService],
+        providers: [
+          { provide: DeckRegistry, useValue: singleDeckRegistry },
+          { provide: MixerService, useFactory: () => new MixerService(MIXER_DECKS) },
+        ],
       })
       .compileComponents();
 

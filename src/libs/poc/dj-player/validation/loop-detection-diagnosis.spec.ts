@@ -1,7 +1,7 @@
 import { describe, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSidFile } from '../src/lib/sid/sid-file.parser';
+import { parseSidFile } from '@sidablist/core';
 import { scanTune } from '../src/lib/analysis/scan-tune';
 import { buildFeatureMatrix } from '../src/lib/analysis/frame-features';
 import { computeStructure } from '../src/lib/analysis/structure';

@@ -11,7 +11,7 @@ describe('MixerColumnComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [MixerColumnComponent],
-      providers: [MixerService, DeckRegistry],
+      providers: [{ provide: MixerService, useFactory: () => new MixerService(DECKS) }, DeckRegistry],
     }).compileComponents();
 
     fixture = TestBed.createComponent(MixerColumnComponent);

@@ -1,15 +1,21 @@
 import { computed, Injectable, signal, type Signal } from '@angular/core';
-import { clamp } from '../engine/engine-utils';
-import { DECKS } from '../deck/deck.config';
+import { clamp } from '@sidablist/core';
+import type { SidFilterMode } from '@sidablist/core';
 import { linearCrossfaderGain } from './crossfader-curve';
 import type { CrossfaderPosition } from './crossfader-curve';
 import { keyCoefficientFor, KEY_SEMITONE_RANGE, scaleCoefficientFor } from './scale-taper';
 import type { ScalePosition } from './scale-taper';
-import type { SidFilterMode } from '../asid/register-frame';
 import type { KeyDisplayFormat } from './key-display';
 
 /** The three tapered knobs. Key is separate — it is stored in semitones, not a position. */
 export type ScaleControl = 'cutoff' | 'resonance' | 'pulseWidth';
+
+/** The minimal deck identity the mixer needs — decoupled from `deck/deck.config` so this service
+ *  composes from whatever list its constructor is handed, rather than reaching into deck config
+ *  itself. A real `DeckDescriptor` satisfies this structurally; nothing here imports that type. */
+export interface MixerDeck {
+  readonly id: string;
+}
 
 /** Joins a deck id and a control name into one map key — the composite identity `scalePositions`
  *  (and its memoized signal caches) are keyed by. */
@@ -26,6 +32,10 @@ function scaleKey(deckId: string, control: ScaleControl): string {
  * 0, 1)` — and no contributor is rounded here. Quantization to the sixteen-step output register
  * happens exactly once, downstream of this service, because rounding each contributor separately
  * would compound two roundings and cost levels that cannot be spared.
+ *
+ * Takes its decks through the constructor rather than reaching for `deck/deck.config` itself — the
+ * page-level composition root hands it whatever list is composing, so this service never depends on
+ * that module.
  */
 @Injectable()
 export class MixerService {
@@ -33,10 +43,13 @@ export class MixerService {
   /** Continuous, −1…+1, rests at 0. Never reduced to output steps. */
   readonly crossfaderPosition: Signal<CrossfaderPosition> = this._crossfaderPosition.asReadonly();
 
-  /** The two decks the fader spans — the first two entries of DECKS. Null if DECKS ever composes
-   *  fewer than two decks. */
-  readonly crossfaderPair: readonly [string, string] | null =
-    DECKS.length >= 2 ? [DECKS[0].id, DECKS[1].id] : null;
+  /** The two decks the fader spans — the first two entries of whatever list the constructor is
+   *  handed. Null if fewer than two decks compose. */
+  readonly crossfaderPair: readonly [string, string] | null;
+
+  constructor(decks: readonly MixerDeck[]) {
+    this.crossfaderPair = decks.length >= 2 ? [decks[0].id, decks[1].id] : null;
+  }
 
   /** A deck's own fader contributor, keyed by deck id. Absent means full — the seam for an on-screen
    *  per-deck fader that does not exist yet. */
