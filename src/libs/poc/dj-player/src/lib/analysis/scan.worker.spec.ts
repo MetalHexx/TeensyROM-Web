@@ -3,10 +3,50 @@ import { handleScanRequest } from './scan.worker';
 import type { ScanMessage, ScanResult } from './scan-runner';
 import { scanTune } from './scan-tune';
 import type { ScanOutput } from './scan-tune';
-import { C64Machine, parseSidFile } from '@sidablist/core';
+import { parseSidFile } from '@sidablist/core';
 import type { SidFile } from '@sidablist/core';
 import { decodeBundledTune } from '../sid/bundled';
 import { STILL_TIME_BASE64 } from '../sid/bundled/still-time.sid';
+
+/**
+ * Counts every `runFrame()`/`initSubtune()` call across every `C64Machine` this file's code
+ * creates — the same cross-instance visibility `C64Machine.prototype` spying gave before the class
+ * became a factory-built, unexported internal. Reset with `.mockClear()` at the point a test wants
+ * to start counting from.
+ */
+const { runFrameSpy, initSubtuneSpy } = vi.hoisted(() => ({
+  runFrameSpy: vi.fn(),
+  initSubtuneSpy: vi.fn(),
+}));
+
+vi.mock('@sidablist/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@sidablist/core')>();
+  return {
+    ...actual,
+    createC64Machine: (
+      ...args: Parameters<typeof actual.createC64Machine>
+    ): ReturnType<typeof actual.createC64Machine> => {
+      const machine = actual.createC64Machine(...args);
+      return new Proxy(machine, {
+        get(target, prop) {
+          if (prop === 'runFrame') {
+            return () => {
+              runFrameSpy();
+              return target.runFrame();
+            };
+          }
+          if (prop === 'initSubtune') {
+            return (song: number) => {
+              initSubtuneSpy(song);
+              return target.initSubtune(song);
+            };
+          }
+          return Reflect.get(target, prop, target);
+        },
+      });
+    },
+  };
+});
 
 const RTS = 0x60;
 
@@ -98,16 +138,16 @@ describe('the scan worker', () => {
   it('emulates each frame exactly once across a four-rung ladder over one session', () => {
     const session = newSession();
     const rungs = [40, 80, 120, 160];
-    const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
-    const initSubtune = vi.spyOn(C64Machine.prototype, 'initSubtune');
+    runFrameSpy.mockClear();
+    initSubtuneSpy.mockClear();
 
     for (const maxFrames of rungs) {
       expect(outputOf(drive(bundledTune(), session, 1, maxFrames)).frames).toBe(maxFrames);
     }
 
     // The whole ladder costs one clean init and one pass over the deepest rung's frames.
-    expect(initSubtune).toHaveBeenCalledTimes(1);
-    expect(runFrame).toHaveBeenCalledTimes(160);
+    expect(initSubtuneSpy).toHaveBeenCalledTimes(1);
+    expect(runFrameSpy).toHaveBeenCalledTimes(160);
   });
 
   it('deepened across rungs, answers with the scan a single deep request would have produced', () => {
@@ -122,26 +162,26 @@ describe('the scan worker', () => {
 
   it('starts a clean scan when the session changes', () => {
     drive(counterTune, newSession(), 1, 30);
-    const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
-    const initSubtune = vi.spyOn(C64Machine.prototype, 'initSubtune');
+    runFrameSpy.mockClear();
+    initSubtuneSpy.mockClear();
 
     const messages = drive(counterTune, newSession(), 1, 30);
 
-    expect(initSubtune).toHaveBeenCalledTimes(1);
-    expect(runFrame).toHaveBeenCalledTimes(30);
+    expect(initSubtuneSpy).toHaveBeenCalledTimes(1);
+    expect(runFrameSpy).toHaveBeenCalledTimes(30);
     expect(outputOf(messages).frames).toBe(30);
   });
 
   it('starts a clean scan when the subtune changes under the same session', () => {
     const session = newSession();
     drive(counterTune, session, 1, 30);
-    const runFrame = vi.spyOn(C64Machine.prototype, 'runFrame');
-    const initSubtune = vi.spyOn(C64Machine.prototype, 'initSubtune');
+    runFrameSpy.mockClear();
+    initSubtuneSpy.mockClear();
 
     const messages = drive(counterTune, session, 2, 30);
 
-    expect(initSubtune).toHaveBeenCalledWith(2);
-    expect(runFrame).toHaveBeenCalledTimes(30);
+    expect(initSubtuneSpy).toHaveBeenCalledWith(2);
+    expect(runFrameSpy).toHaveBeenCalledTimes(30);
     expect(outputOf(messages).frames).toBe(30);
   });
 

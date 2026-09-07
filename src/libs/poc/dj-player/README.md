@@ -30,6 +30,10 @@ dependency in `src/package.json`.
   TeensyROM-Web/
 ```
 
+### Why `@sidablist/core` Is `file:` and `@sidablist/asid` Is `link:`
+
+Both point at a sibling checkout, but the two specifiers are not interchangeable here. `@sidablist/asid`'s own `package.json` depends on `@sidablist/core` via `workspace:*` — meaningful only inside `SIDablist`'s own pnpm workspace, where that protocol resolves to the sibling package pnpm already linked when `SIDablist` was installed. `link:` from this workspace simply symlinks the already-built `SIDablist/libs/asid` directory as-is and never re-resolves its manifest's own dependencies, so that `workspace:*` entry is never touched. `file:`, by contrast, has pnpm treat the target as a package it needs to install into *this* workspace, which means resolving every dependency in its manifest against packages this workspace's `pnpm-workspace.yaml` lists — and `@sidablist/core` is not one of them here, so `pnpm install` fails outright with `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND`. `@sidablist/core` itself has zero runtime dependencies (`SIDablist`'s own invariant), so it never hits this: `file:` and `link:` behave identically for it, and `file:` was kept as the more literal, unambiguous specifier of the two. Switching `asid` to `file:` to match is not available without either dropping its `workspace:*` dependency on core (a change that belongs to `SIDablist`, not here) or folding `SIDablist`'s libraries into this workspace's own `pnpm-workspace.yaml` (a much larger topology change than a POC linking two sibling repos calls for).
+
 ### The Inner Loop
 
 ```

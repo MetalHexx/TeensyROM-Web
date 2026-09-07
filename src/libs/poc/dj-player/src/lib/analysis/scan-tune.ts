@@ -1,5 +1,5 @@
-import { C64Machine, RegisterFrame, SID_REGISTER_COUNT } from '@sidablist/core';
-import type { FrameResult, SidFile } from '@sidablist/core';
+import { createC64Machine, createRegisterFrame, SID_REGISTER_COUNT } from '@sidablist/core';
+import type { C64Machine, FrameResult, SidFile } from '@sidablist/core';
 
 /** A postMessage per scanned frame would cost more than the emulation itself. */
 const PROGRESS_INTERVAL_FRAMES = 256;
@@ -32,7 +32,7 @@ export interface ScanOutput {
  * output, not to this loop.
  */
 export class TuneScan {
-  private readonly frame = new RegisterFrame();
+  private readonly frame = createRegisterFrame();
   private readonly machine: C64Machine;
   private registerValues = new Uint8Array(0);
   private writeCounts = new Uint8Array(0);
@@ -41,7 +41,7 @@ export class TuneScan {
   constructor(file: SidFile, subtune: number) {
     // Voices are never muted during a scan — a muted voice's control register would be forced to 0
     // and its writes dropped, erasing it from the analysis.
-    this.machine = new C64Machine(file, this.frame);
+    this.machine = createC64Machine(file, this.frame);
     this.machine.initSubtune(subtune);
   }
 

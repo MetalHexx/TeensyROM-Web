@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { C64Machine, RegisterFrame, SID_REGISTER_COUNT } from '@sidablist/core';
+import { createC64Machine, createRegisterFrame, SID_REGISTER_COUNT } from '@sidablist/core';
 import type { SidFile } from '@sidablist/core';
 import { scanTune, TuneScan } from './scan-tune';
 import { detectLoop } from './loop-detect';
@@ -107,7 +107,7 @@ describe('scanTune', () => {
   it('reports the calls-per-frame the machine actually used', () => {
     const output = scanTune(counterTune, 1, 5);
 
-    const machine = new C64Machine(counterTune, new RegisterFrame());
+    const machine = createC64Machine(counterTune, createRegisterFrame());
     machine.initSubtune(1);
     expect(output.callsPerFrame).toBe(machine.callsPerFrame);
   });
