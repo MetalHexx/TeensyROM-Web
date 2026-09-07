@@ -109,6 +109,94 @@ worker inside the currently linked build actually started. Check it against a pr
 served statically as well as against the dev server — pre-bundling and linking faults only show up
 in one of the two.
 
+## Verifying The Build, The Browser, And The Hardware
+
+The failure modes in this spike are runtime ones — a linking or pre-bundling fault is silent at
+build time and only audible (sometimes literally) once a real browser or a real cartridge is in the
+loop. A green build and a green suite are necessary but not sufficient. Run all seven of these before
+trusting a change; each was last run end to end for `P09-T06`, with results below.
+
+1. **Fresh clone, both repos side by side, install, build core, then build the app.**
+
+   ```
+   # in SIDablist
+   pnpm --filter @sidablist/core build
+
+   # in TeensyROM-Web/src
+   pnpm install
+   pnpm nx build teensyrom-ui
+   ```
+
+   No linking incantation beyond the sibling-checkout layout above (`pnpm install` alone resolves
+   `@sidablist/core`/`@sidablist/asid` via the `file:`/`link:` specifiers in `src/package.json`).
+
+2. **The production bundle, served statically.**
+
+   ```
+   pnpm nx run teensyrom-ui:serve-static
+   # in a second shell, once it's listening:
+   pnpm exec cypress run --project apps/teensyrom-ui-e2e \
+     --config baseUrl=http://localhost:<port> --spec="apps/teensyrom-ui-e2e/src/e2e/poc/**/*.cy.ts"
+   ```
+
+   `serve-static` prints the port it actually bound (it falls back past 4200 if something else already
+   holds it — check the printed URL rather than assuming 4200). This drives a genuine browser (not
+   jsdom) through the `/dev/dj-poc` route, the lazy-loaded POC chunk behind it, a captured cue, and a
+   real worker round trip (`dj-poc-core-replay-worker.cy.ts`) against the exact static output a user
+   would be served — the one build a `pnpm nx test` run never touches.
+
+3. **The dev server**, same specs, against `pnpm nx serve teensyrom-ui` (or `pnpm start`) and
+   `http://localhost:4200` instead — this is what actually exercises `prebundle.exclude` (see above);
+   confirm it's still present in `apps/teensyrom-ui/project.json`'s `serve` target before assuming a
+   pass here means anything.
+
+   Running via `pnpm exec nx run teensyrom-ui-e2e:e2e[:production]` also works but has been flaky in
+   this workspace about which server it actually waits on; starting the target server yourself first
+   and pointing `cypress run --config baseUrl=...` at it directly is the reliable path if that
+   happens.
+
+4. **`pnpm exec nx run-many -t lint`, `-t test`, and a Prettier check.** Scope the format check to
+   what the task actually touched — `git config core.autocrlf` being `true` on a Windows checkout
+   makes a bare `prettier --check` over the whole tree report nearly every file over line endings
+   alone, and separately from that, this workspace carries pre-existing formatting and lint drift in
+   libraries this POC never touches (`libs/data-access/asm-64-client`, `libs/ui/*`, and others) — none
+   of it gates CI (`.github/workflows/pr-frontend-checks.yml` runs lint/typecheck/test only against
+   `nx affected`, always excludes `teensyrom-ui-e2e` and every `TeensyRom.*` backend project, and has
+   no format step at all). Treat a clean `dj-player`/`teensyrom-ui`/`teensyrom-ui-e2e` result as the
+   bar, not a clean whole-workspace one.
+
+5. **A real browser session over the POC.** Loading a tune on each deck, capturing/triggering a cue,
+   arming/clearing a loop, and the layout/reflow checks above all run with no MIDI device attached —
+   the Cypress specs in step 2/3 cover exactly this and are real evidence, not a stand-in.
+
+   Play, scrub during playback, tempo, voice mute, subtune stepping and "identify" all sit behind
+   `canPlay()`/a selected MIDI port (`transport-panel.component.ts`), which in turn sits behind
+   `navigator.requestMIDIAccess()` actually reporting a port. **This only exercises for real with a
+   MIDI-capable browser session** — a connected TeensyROM cartridge, at minimum a virtual MIDI port on
+   the host. A plain CI runner or a sandboxed agent has neither (confirmed here:
+   `requestMIDIAccess({ sysex: true })` resolves with zero inputs and zero outputs), so this half of
+   the session cannot be exercised or faked from such an environment — it needs a human at a real
+   machine with the cartridge attached, watching the console for a worker error surfacing (the
+   replay worker and the analysis scan worker are the two that can fail silently) while running
+   through every control above.
+
+6. **The analysis migration on a cleared cache.** `scan-pipeline.spec.ts` runs the real emulation,
+   loop detector and key detector over a bundled tune's actual bytes and asserts the exact
+   pre-extraction loop start/period and key — "the answer for this tune", not a threshold — so a
+   passing run _is_ the proof the register-model migration (`P09-T03`) changed nothing observable.
+   `tune-index-storage.spec.ts`'s "discards a version-3 record" case is the other half: it proves a
+   cache entry stamped with the pre-migration `formatVersion` is read back as a cache miss rather than
+   trusted, which is what makes a stale cache re-scan instead of lying. Together these two suites are
+   the cleared-cache migration check; there is no separate manual step because both halves already run
+   against real bytes/real logic rather than a hand-built fixture.
+
+7. **A listening session on real hardware.** Timing, the gate-off window and the PAL/NTSC pitch
+   correction are judged by ear, against a real cartridge over USB MIDI — nothing above substitutes
+   for it, and nothing in a sandboxed or CI environment can. Before blaming the host for drift,
+   glitching or dropouts, confirm the C64's frame timer reads **Off** — a cartridge left in a
+   frame-timed mode by an earlier session fights this player silently, and the host can neither
+   un-send that recipe nor read the flag back.
+
 ## The Yank — Deleting the Iteration
 
 The spike is quarantined in one folder and four registration lines. To delete it completely:

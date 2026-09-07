@@ -1,4 +1,4 @@
-import { computed, Injectable, signal, type Signal } from '@angular/core';
+import { computed, signal, type Signal } from '@angular/core';
 import { clamp } from '@sidablist/core';
 import type { SidFilterMode } from '@sidablist/core';
 import { linearCrossfaderGain } from './crossfader-curve';
@@ -36,8 +36,12 @@ function scaleKey(deckId: string, control: ScaleControl): string {
  * Takes its decks through the constructor rather than reaching for `deck/deck.config` itself — the
  * page-level composition root hands it whatever list is composing, so this service never depends on
  * that module.
+ *
+ * Deliberately undecorated: every provision is `useFactory: () => new MixerService(DECKS)` (see
+ * `dj-poc-view.component.ts`), never a bare class provider, so Angular's DI never needs to construct
+ * this itself. `@Injectable()` would make the AOT compiler try to generate a factory anyway and fail
+ * on the plain `decks` array, which is not an injection token.
  */
-@Injectable()
 export class MixerService {
   private readonly _crossfaderPosition = signal<CrossfaderPosition>(0);
   /** Continuous, −1…+1, rests at 0. Never reduced to output steps. */
@@ -159,7 +163,9 @@ export class MixerService {
    *  bound. */
   setKeySemitones(deckId: string, semitones: number): void {
     const clamped = clamp(Math.round(semitones), -KEY_SEMITONE_RANGE, KEY_SEMITONE_RANGE);
-    this.keySemitonesByDeck.update((semitonesByDeck) => new Map(semitonesByDeck).set(deckId, clamped));
+    this.keySemitonesByDeck.update((semitonesByDeck) =>
+      new Map(semitonesByDeck).set(deckId, clamped)
+    );
   }
 
   /** 0 (home) for a deck the model has not been told about. */

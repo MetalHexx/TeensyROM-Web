@@ -81,9 +81,11 @@ function seededRecord(): SeededTuneIndexRecord {
     callsPerFrame: 1,
     exactCallsPerFrame: 1,
     timingMode: 'exact',
-    // Must match `TUNE_INDEX_FORMAT_VERSION` (`tune-index.model.ts`) or the app discards this seed as
-    // stale and falls back to a real background scan instead of the deterministic moments above.
-    formatVersion: 3,
+    // Must match `TUNE_INDEX_FORMAT_VERSION` (`tune-index.model.ts`, currently 4) or the app
+    // discards this seed as stale and falls back to a real background scan instead of the
+    // deterministic moments above — not imported, to keep this spec at arm's length from the app's
+    // own source (see this file's own header comment).
+    formatVersion: 4,
     computedAt: new Date().toISOString(),
   };
 }
@@ -183,12 +185,16 @@ describe('DJ Poc marker rows — real-browser tick alignment and reflow', () => 
 
     it(`does not reflow an empty row's placeholder marker-slot at ${width}px wide`, () => {
       cy.viewport(width, 900);
+      // `addMarker()` (`loops-cues-panel.component.ts`) captures marker 2 with no end already set,
+      // so its End sub-slot (the second `.marker-slot`, per the `@else` branch in
+      // `loops-cues-panel.component.html`) renders the empty placeholder markup by construction —
+      // no separate clear step exists or is needed. The Start slot (the first `.marker-slot`) has
+      // no empty variant at all; it always renders a captured frame.
       cy.get('[aria-label="Add marker deck A"]').click();
-      cy.get('[aria-label="Clear marker 2 deck A"]').click();
-      cy.get('[aria-label="Capture cue 2 deck A"]')
+      cy.get('[aria-label="Trigger marker 2 deck A"]')
         .closest('.marker-row')
         .find('.marker-slot')
-        .first()
+        .last()
         .then(($slot) => assertSingleLine($slot));
     });
   });
