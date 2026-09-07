@@ -4,6 +4,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "prestart": "rimraf .angular/cache .nx/cache",
     "start": "nx run teensyrom-ui:serve",
     "generate:api-client": "nx run api-client:generate",
     "generate:asm-64-client": "nx run asm-64-client:generate",
