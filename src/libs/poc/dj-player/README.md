@@ -197,6 +197,15 @@ trusting a change; each was last run end to end for `P09-T06`, with results belo
    frame-timed mode by an earlier session fights this player silently, and the host can neither
    un-send that recipe nor read the flag back.
 
+**Known limitation: a tune whose `init` never returns.** Loading
+`MUSICIANS/T/Tjelta_Geir/Brain_Artifice.sid` fails with `the play routine did not return within its
+cycle budget`. This is not a regression and is specific to that tune, not this app: `sidablist`'s CPU
+emulation delivers no interrupts at all (the `Cpu6502` port exposes no `irq()`/`nmi()`, and
+`init`/`play` run synchronously per the standard PSID convention), and this tune's `init` busy-waits
+on a RAM flag that only a real IRQ/NMI handler would ever set — so the wait never ends. It is rare
+(the only tune among those exercised here that hits it) and pre-existing; `Brain_Artifice.sid` is the
+known reproducing example if this error surfaces again on some other tune.
+
 ## The Yank — Deleting the Iteration
 
 The spike is quarantined in one folder and four registration lines. To delete it completely:
