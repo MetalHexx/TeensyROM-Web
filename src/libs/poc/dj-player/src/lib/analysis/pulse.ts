@@ -1,5 +1,5 @@
 import type { Candidate } from './novelty';
-import { framesToSeconds } from './frame-features';
+import { framesToSeconds } from '@sidablist/core';
 
 export interface PulseResult {
   readonly histogram: Uint32Array;

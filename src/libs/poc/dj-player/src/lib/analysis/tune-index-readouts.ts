@@ -1,6 +1,6 @@
+import { playCallsToSeconds } from '@sidablist/core';
+import type { PlayRate } from '@sidablist/core';
 import { positionBasisFor } from '../engine/engine-utils';
-import { playCallsToSeconds } from '../engine/play-rate';
-import type { PlayRate } from '../engine/play-rate';
 import { PITCH_CLASS_NAMES } from './key';
 import { formatDuration } from './format';
 import type { TuneIndexRecord } from './tune-index.model';

@@ -12,10 +12,8 @@ import type { ITuneIndexStorage } from './tune-index-storage';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
 import { DEFAULT_CANDIDATE_THRESHOLD } from './novelty';
-import { ASID_SLOT_COUNT } from '../asid/asid-constants';
-import { PRIMARY_SLOT_FOR_REGISTER } from '../asid/register-frame';
-import type { PlayRate, TimingMode } from '../engine/play-rate';
-import type { SidFile } from '../sid/sid-file.model';
+import { SID_REGISTER_COUNT } from '@sidablist/core';
+import type { PlayRate, SidFile, TimingMode } from '@sidablist/core';
 
 interface StubEngine {
   currentSubtune: WritableSignal<number>;
@@ -88,7 +86,7 @@ function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
  *  loop), so only the wiring — not the detector math — is under test here. */
 function makeScan(frames: number, callsPerFrame: number): ScanOutput {
   return {
-    slotValues: new Uint8Array(frames * ASID_SLOT_COUNT),
+    registerValues: new Uint8Array(frames * SID_REGISTER_COUNT),
     writeCounts: new Uint8Array(frames),
     frames,
     callsPerFrame,
@@ -106,13 +104,13 @@ function makeLoopingScan(
   const scan = makeScan(frames, callsPerFrame);
   for (let f = 0; f < frames; f++) {
     const seed = f < introFrames ? 1_000_000 + f : (f - introFrames) % periodFrames;
-    const base = f * ASID_SLOT_COUNT;
+    const base = f * SID_REGISTER_COUNT;
     // Three bytes of the seed, so two frames a multiple of 256 apart are never byte-identical.
-    scan.slotValues[base] = seed & 0xff;
-    scan.slotValues[base + 1] = (seed >>> 8) & 0xff;
-    scan.slotValues[base + 2] = (seed >>> 16) & 0xff;
-    for (let slot = 3; slot < ASID_SLOT_COUNT; slot++) {
-      scan.slotValues[base + slot] = (seed + slot * 13) & 0xff;
+    scan.registerValues[base] = seed & 0xff;
+    scan.registerValues[base + 1] = (seed >>> 8) & 0xff;
+    scan.registerValues[base + 2] = (seed >>> 16) & 0xff;
+    for (let register = 3; register < SID_REGISTER_COUNT; register++) {
+      scan.registerValues[base + register] = (seed + register * 13) & 0xff;
     }
   }
   return scan;
@@ -128,7 +126,7 @@ function makeLoopingScan(
 function makeMomentsScan(): ScanOutput {
   const scan = makeScan(100, 1);
   const setRegister = (frame: number, register: number, value: number): void => {
-    scan.slotValues[frame * ASID_SLOT_COUNT + PRIMARY_SLOT_FOR_REGISTER[register]] = value;
+    scan.registerValues[frame * SID_REGISTER_COUNT + register] = value;
   };
   for (let f = 20; f < 100; f++) {
     setRegister(f, 0, 0x00); // voice0 freq lo

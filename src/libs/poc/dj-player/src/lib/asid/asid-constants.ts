@@ -65,6 +65,6 @@ export const SID_FILTER_MODE_SHIFT = 4;
 export const SID_FILTER_MODE_MASK = 0b111;
 
 // The four filter/voice register numbers above and REGISTERS_PER_VOICE/VOICE_COUNT are also declared
-// module-privately in `analysis/frame-features.ts`. The duplication is deliberate, not an oversight:
-// analysis already imports from the ASID layer (`PRIMARY_SLOT_FOR_REGISTER`), so sourcing these from
-// there would invert the dependency. Consolidating the two is a separate change.
+// module-privately in `analysis/frame-features.ts`. They are facts about the SID chip rather than
+// about this wire format, and `@sidablist/core` now owns the authoritative copy — analysis depends on
+// core and never on this sink layer, so neither declaration should outlive the move onto core's.

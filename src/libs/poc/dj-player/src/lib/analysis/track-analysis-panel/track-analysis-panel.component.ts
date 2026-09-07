@@ -10,12 +10,12 @@ import {
   viewChild,
   type OnDestroy,
 } from '@angular/core';
+import { asRounded, playCallsPerSecond, playCallsToSeconds } from '@sidablist/core';
+import type { SidFile } from '@sidablist/core';
 import type { DeckHandle } from '../../deck/deck-registry';
 import type { DjPlayerEngine } from '../../engine/dj-player-engine';
 import { positionBasisFor } from '../../engine/engine-utils';
 import type { DetectedLoopFrames } from '../../engine/engine-utils';
-import { asRounded, playCallsPerSecond, playCallsToSeconds } from '../../engine/play-rate';
-import type { SidFile } from '../../sid/sid-file.model';
 import { ANALYSIS_SCANNER } from '../scan-runner';
 import type { ScanRequest, ScanResult } from '../scan-runner';
 import { WorkerAnalysisScanner } from '../worker-analysis-scanner';
@@ -410,8 +410,8 @@ function paintStructureCanvas(canvas: HTMLCanvasElement, structure: StructureRes
  * handle through `deck`, so switching the selector retargets every computed below onto the newly
  * chosen deck.
  *
- * Deliberately dependency-light: it reaches only into `engine/dj-player-engine`, the two leaf engine
- * modules it shares arithmetic with (`engine/play-rate`, `engine/engine-utils`) and its own
+ * Deliberately dependency-light: it reaches only into `engine/dj-player-engine`, the leaf engine
+ * module it shares the length rule with (`engine/engine-utils`), `@sidablist/core` and its own
  * `analysis/*` siblings, never into `replay/`, `clock/`, `midi/` or `engine/marker-state` — the whole
  * section can be deleted with the route it lives on.
  */

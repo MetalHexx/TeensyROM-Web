@@ -38,9 +38,8 @@ export interface RegisterValuesSnapshot {
 
 /**
  * `ASID_SLOT_TO_REGISTER` inverted over its first 25 (non-duplicate) entries: register -> its
- * primary slot. Exported as the single decode point for this mapping — every slot-indexed reader
- * (this class and the analysis scan's frame-feature decoder alike) crosses this same table rather
- * than re-deriving it.
+ * primary slot. Exported as the single decode point for this mapping, so a reader of these slots
+ * crosses this table rather than re-deriving it.
  */
 export const PRIMARY_SLOT_FOR_REGISTER = buildPrimarySlotTable();
 const SECONDARY_SLOT_FOR_REGISTER = buildSecondarySlotTable();

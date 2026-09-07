@@ -27,10 +27,9 @@ import { SharedTuneIndex } from './shared-tune-index';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
 import type { ScanOutput } from './scan-tune';
+import { asRounded, playCallsPerSecond } from '@sidablist/core';
+import type { SidFile, TimingMode } from '@sidablist/core';
 import { DjPlayerEngine } from '../engine/dj-player-engine';
-import { asRounded, playCallsPerSecond } from '../engine/play-rate';
-import type { TimingMode } from '../engine/play-rate';
-import type { SidFile } from '../sid/sid-file.model';
 
 /** What a load establishes: which file, under which name. `setTune` always writes a fresh object, so
  *  the effect below re-triggers even when the same tune is loaded twice in a session. */

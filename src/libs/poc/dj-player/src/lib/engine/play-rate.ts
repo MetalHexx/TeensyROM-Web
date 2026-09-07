@@ -1,7 +1,7 @@
 import { C64Machine } from '../cpu/c64-machine';
 import { PAL_FRAME_INTERVAL_US } from '../asid/asid-constants';
+import { framesToSeconds } from '@sidablist/core';
 import { MICROSECONDS_PER_SECOND } from './engine-utils';
-import { framesToSeconds } from '../analysis/frame-features';
 
 /** Which of a tune's two play rates a conversion divides by. `'exact'` is what a real-time duration
  *  must use — see `PlayRate.callsPerFrame`; `'rounded'` is what R6's toggle switches to. */

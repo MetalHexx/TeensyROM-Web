@@ -1,4 +1,4 @@
-import { ASID_SLOT_COUNT } from '../asid/asid-constants';
+import { SID_REGISTER_COUNT } from '@sidablist/core';
 import type { ScanOutput } from './scan-tune';
 
 /** What the detector found: a verified repeat, a tune that settled into a static idle cycle, or no
@@ -34,8 +34,8 @@ const FNV_PRIME = 0x01000193;
  * Finds the frame the recorded chip state starts repeating from, by byte-identical comparison rather
  * than by similarity.
  *
- * For an ASID player the 28-slot register stream is the entire output, so a byte-identical repeat is
- * an identical-sounding repeat: this is an identity, not a heuristic, and it carries no threshold to
+ * The SID's 25 writable registers are the tune's entire output, so a byte-identical repeat is an
+ * identical-sounding repeat: this is an identity, not a heuristic, and it carries no threshold to
  * miscalibrate. A candidate is only believed once *every* frame of the remaining tail has been
  * verified against its counterpart one period earlier — a repeat that holds for a handful of frames
  * is what a held note looks like, and one that holds only because the scan ran out of buffer is not
@@ -48,7 +48,7 @@ const FNV_PRIME = 0x01000193;
  * `scanTune` keeps, so it produces the same answer on a worker or on the calling thread.
  */
 export function detectLoop(scan: ScanOutput, options: LoopDetectOptions): LoopDetection {
-  const { slotValues, frames } = scan;
+  const { registerValues, frames } = scan;
   if (frames <= 0) {
     return { kind: 'none' };
   }
@@ -56,7 +56,7 @@ export function detectLoop(scan: ScanOutput, options: LoopDetectOptions): LoopDe
   const hashes = new Uint32Array(frames);
   const buckets = new Map<number, number[]>();
   for (let f = 0; f < frames; f++) {
-    const hash = hashFrame(slotValues, f);
+    const hash = hashFrame(registerValues, f);
     hashes[f] = hash;
     const bucket = buckets.get(hash);
     if (bucket === undefined) {
@@ -79,8 +79,8 @@ export function detectLoop(scan: ScanOutput, options: LoopDetectOptions): LoopDe
       // out rather than the tune repeating.
       if (period < 2 || tail < period || tail < options.minTailFrames) continue;
       // Clears the hash collision before paying for the tail.
-      if (!framesEqual(slotValues, f, later)) continue;
-      if (!tailRepeats(slotValues, f, later, tail)) continue;
+      if (!framesEqual(registerValues, f, later)) continue;
+      if (!tailRepeats(registerValues, f, later, tail)) continue;
 
       return period < options.idlePeriodFrames
         ? { kind: 'ended', endFrame: f }
@@ -91,31 +91,31 @@ export function detectLoop(scan: ScanOutput, options: LoopDetectOptions): LoopDe
   return { kind: 'none' };
 }
 
-/** FNV-1a over the frame's 28 slot bytes, as an unsigned 32-bit value. */
-function hashFrame(slotValues: Uint8Array, frame: number): number {
-  const base = frame * ASID_SLOT_COUNT;
+/** FNV-1a over the frame's 25 register bytes, as an unsigned 32-bit value. */
+function hashFrame(registerValues: Uint8Array, frame: number): number {
+  const base = frame * SID_REGISTER_COUNT;
   let hash = FNV_OFFSET_BASIS;
-  for (let i = 0; i < ASID_SLOT_COUNT; i++) {
-    hash ^= slotValues[base + i];
+  for (let i = 0; i < SID_REGISTER_COUNT; i++) {
+    hash ^= registerValues[base + i];
     hash = Math.imul(hash, FNV_PRIME);
   }
   return hash >>> 0;
 }
 
-function framesEqual(slotValues: Uint8Array, a: number, b: number): boolean {
-  const aBase = a * ASID_SLOT_COUNT;
-  const bBase = b * ASID_SLOT_COUNT;
-  for (let i = 0; i < ASID_SLOT_COUNT; i++) {
-    if (slotValues[aBase + i] !== slotValues[bBase + i]) return false;
+function framesEqual(registerValues: Uint8Array, a: number, b: number): boolean {
+  const aBase = a * SID_REGISTER_COUNT;
+  const bBase = b * SID_REGISTER_COUNT;
+  for (let i = 0; i < SID_REGISTER_COUNT; i++) {
+    if (registerValues[aBase + i] !== registerValues[bBase + i]) return false;
   }
   return true;
 }
 
 /** Every frame of the tail, never a sample of it — bailing on the first mismatch. Sampling is how a
  *  held note passes for a loop. */
-function tailRepeats(slotValues: Uint8Array, f: number, later: number, tail: number): boolean {
+function tailRepeats(registerValues: Uint8Array, f: number, later: number, tail: number): boolean {
   for (let k = 0; k < tail; k++) {
-    if (!framesEqual(slotValues, f + k, later + k)) return false;
+    if (!framesEqual(registerValues, f + k, later + k)) return false;
   }
   return true;
 }

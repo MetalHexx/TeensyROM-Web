@@ -3,11 +3,10 @@ import { handleScanRequest } from './scan.worker';
 import type { ScanMessage, ScanResult } from './scan-runner';
 import { scanTune } from './scan-tune';
 import type { ScanOutput } from './scan-tune';
-import { C64Machine } from '../cpu/c64-machine';
-import { parseSidFile } from '../sid/sid-file.parser';
+import { C64Machine, parseSidFile } from '@sidablist/core';
+import type { SidFile } from '@sidablist/core';
 import { decodeBundledTune } from '../sid/bundled';
 import { STILL_TIME_BASE64 } from '../sid/bundled/still-time.sid';
-import type { SidFile } from '../sid/sid-file.model';
 
 const RTS = 0x60;
 

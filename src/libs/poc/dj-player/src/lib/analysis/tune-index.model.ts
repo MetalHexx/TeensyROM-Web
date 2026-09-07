@@ -1,9 +1,13 @@
-import type { TimingMode } from '../engine/play-rate';
+import type { TimingMode } from '@sidablist/core';
 
 /** Bumped whenever a detector's weights or algorithm changes in a way that would make a previously
  *  stored answer wrong rather than merely stale. A record whose `formatVersion` does not match this
- *  is treated as if it were never written, so it gets re-scanned and overwritten. */
-export const TUNE_INDEX_FORMAT_VERSION = 3;
+ *  is treated as if it were never written, so it gets re-scanned and overwritten.
+ *
+ *  Version 4 is the move off the 28-slot ASID stream onto the SID's 25 registers: every frame number
+ *  a version-3 record holds was measured against a different byte stream, so reading one back would
+ *  quietly hand out loop points for a comparison that no longer happens. */
+export const TUNE_INDEX_FORMAT_VERSION = 4;
 
 export type DetectorConfidence = 'strong' | 'weak' | 'none';
 

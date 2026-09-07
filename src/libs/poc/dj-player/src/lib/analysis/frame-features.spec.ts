@@ -1,13 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { SidFile } from '../sid/sid-file.model';
-import { ASID_SLOT_COUNT } from '../asid/asid-constants';
+import { SID_REGISTER_COUNT } from '@sidablist/core';
+import type { SidFile } from '@sidablist/core';
 import { scanTune } from './scan-tune';
 import type { ScanOutput } from './scan-tune';
 import {
   buildFeatureMatrix,
   FEATURE_DIMENSIONS,
   FEATURE_DIMENSION_COUNT,
-  framesToSeconds,
   readFrameFeatures,
 } from './frame-features';
 
@@ -90,12 +89,15 @@ const voiceDetailTune: SidFile = tune([
 
 function emptyScan(frames: number, writeCounts?: Uint8Array): ScanOutput {
   return {
-    slotValues: new Uint8Array(frames * ASID_SLOT_COUNT),
+    registerValues: new Uint8Array(frames * SID_REGISTER_COUNT),
     writeCounts: writeCounts ?? new Uint8Array(frames),
     frames,
     callsPerFrame: 1,
   };
 }
+
+/** The per-voice control registers — `$D404`, `$D40B`, `$D412` — by register number. */
+const VOICE_CONTROL_REGISTERS = [4, 11, 18];
 
 describe('readFrameFeatures', () => {
   it('decodes gate, waveform, filter cutoff, resonance, routing and volume from known register writes', () => {
@@ -125,24 +127,19 @@ describe('readFrameFeatures', () => {
     expect(voice.sustainRelease).toBe(0x63);
   });
 
-  it('reads a register from its ASID slot rather than its register number — register 4 lives at slot 22', () => {
+  it('reads each voice control register at its own register number', () => {
+    // Gate on with a waveform the other two voices do not select, so a voice reading a neighbour's
+    // control register — or any register other than its own — shows up as the wrong waveform.
+    const controls = [0x11, 0x21, 0x41]; // triangle+gate, saw+gate, pulse+gate
     const scan = emptyScan(1);
-    scan.slotValues[22] = 0x11; // triangle + gate, if placed at the register's real slot
+    VOICE_CONTROL_REGISTERS.forEach((register, voice) => {
+      scan.registerValues[register] = controls[voice];
+    });
 
     const features = readFrameFeatures(scan, 0);
 
-    expect(features.voices[0].gate).toBe(true);
-    expect(features.voices[0].waveform).toBe(0x1);
-  });
-
-  it('does not read slot 4 as if it were register 4 — the confusion the slot seam guards against', () => {
-    const scan = emptyScan(1);
-    scan.slotValues[4] = 0x11; // would be misread as voice 1's control register under an identity mapping
-
-    const features = readFrameFeatures(scan, 0);
-
-    expect(features.voices[0].gate).toBe(false);
-    expect(features.voices[0].waveform).toBe(0);
+    expect(features.voices.map((voice) => voice.gate)).toEqual([true, true, true]);
+    expect(features.voices.map((voice) => voice.waveform)).toEqual([0x1, 0x2, 0x4]);
   });
 });
 
@@ -174,21 +171,15 @@ describe('buildFeatureMatrix', () => {
   });
 
   it('moves the activity dimension as far for a voice dropping out as for one starting', () => {
+    const voice0Control = VOICE_CONTROL_REGISTERS[0];
     const scan = emptyScan(2);
-    scan.slotValues[22] = 0x01; // frame 0: voice 1 gate on
-    scan.slotValues[ASID_SLOT_COUNT + 22] = 0x00; // frame 1: gate off
+    scan.registerValues[voice0Control] = 0x01; // frame 0: voice 1 gate on
+    scan.registerValues[SID_REGISTER_COUNT + voice0Control] = 0x00; // frame 1: gate off
 
     const matrix = buildFeatureMatrix(scan);
     const activityIndex = FEATURE_DIMENSIONS.indexOf('voice0.activity');
 
     expect(matrix.values[activityIndex]).toBe(1);
     expect(matrix.values[FEATURE_DIMENSION_COUNT + activityIndex]).toBe(0);
-  });
-});
-
-describe('framesToSeconds', () => {
-  it('converts using the nominal interval divided by calls-per-frame', () => {
-    expect(framesToSeconds(50, 20_000, 1)).toBeCloseTo(1);
-    expect(framesToSeconds(50, 20_000, 2)).toBeCloseTo(0.5);
   });
 });

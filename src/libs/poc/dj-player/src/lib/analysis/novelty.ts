@@ -1,4 +1,5 @@
-import { FEATURE_DIMENSIONS, FEATURE_DIMENSION_COUNT, framesToSeconds } from './frame-features';
+import { framesToSeconds } from '@sidablist/core';
+import { FEATURE_DIMENSIONS, FEATURE_DIMENSION_COUNT } from './frame-features';
 import type { FeatureMatrix } from './frame-features';
 
 export interface FeatureWeights {

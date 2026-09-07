@@ -6,15 +6,14 @@ import type { DjPlayerEngine, EngineStats } from '../../engine/dj-player-engine'
 import { ANALYSIS_SCANNER } from '../scan-runner';
 import type { AnalysisScanner, ScanResult } from '../scan-runner';
 import type { ScanOutput } from '../scan-tune';
-import { PRIMARY_SLOT_FOR_REGISTER } from '../../asid/register-frame';
-import { ASID_SLOT_COUNT } from '../../asid/asid-constants';
-import type { SidFile } from '../../sid/sid-file.model';
+import { SID_REGISTER_COUNT } from '@sidablist/core';
+import type { SidFile } from '@sidablist/core';
 import { PAL_CPU_CLOCK_HZ } from '../notes';
 import type { TuneIndexService } from '../tune-index.service';
 import { TUNE_INDEX_FORMAT_VERSION } from '../tune-index.model';
 import type { TuneIndexRecord } from '../tune-index.model';
 import { DEFAULT_CANDIDATE_THRESHOLD } from '../novelty';
-import type { PlayRate } from '../../engine/play-rate';
+import type { PlayRate } from '@sidablist/core';
 import { formatDuration } from '../format';
 import type { DeckHandle } from '../../deck/deck-registry';
 import type { DeckTuneLoader } from '../../deck/deck-tune-loader';
@@ -169,7 +168,7 @@ function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
 
 function makeScan(frames: number): ScanOutput {
   return {
-    slotValues: new Uint8Array(frames * ASID_SLOT_COUNT),
+    registerValues: new Uint8Array(frames * SID_REGISTER_COUNT),
     writeCounts: new Uint8Array(frames),
     frames,
     callsPerFrame: 1,
@@ -177,8 +176,7 @@ function makeScan(frames: number): ScanOutput {
 }
 
 function setRegister(scan: ScanOutput, frame: number, register: number, value: number): void {
-  const slot = PRIMARY_SLOT_FOR_REGISTER[register];
-  scan.slotValues[frame * ASID_SLOT_COUNT + slot] = value;
+  scan.registerValues[frame * SID_REGISTER_COUNT + register] = value;
 }
 
 /** A tiny scan with one unmistakable event: voice 0 is silent for the first half, then gates on at a

@@ -2,18 +2,19 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// The real `@sidablist/core` runs a dedicated worker, which jsdom cannot start — and the drawer's
-// job is to render whatever the replay settles to, not to run one. The stub stands in for the
-// linked package's whole entry point; `runMock` stands in for the runner `createWorkerReplayRunner`
-// hands back.
+// `createWorkerReplayRunner` starts a dedicated worker, which jsdom cannot — and the drawer's job is
+// to render whatever the replay settles to, not to run one. Only that one factory is replaced;
+// everything else the drawer reaches for through the package (the rate arithmetic its readouts run
+// on, chiefly) stays real, so a stub can never quietly answer for it. `runMock` stands in for the
+// runner the factory hands back.
 const runMock = vi.hoisted(() => vi.fn());
 const disposeMock = vi.hoisted(() => vi.fn());
 const createWorkerReplayRunnerMock = vi.hoisted(() =>
   vi.fn(() => ({ run: runMock, dispose: disposeMock }))
 );
-vi.mock('@sidablist/core', () => ({
+vi.mock('@sidablist/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sidablist/core')>()),
   createWorkerReplayRunner: createWorkerReplayRunnerMock,
-  frames: (value: number) => value,
 }));
 
 import { SetupDrawerComponent } from './setup-drawer.component';
