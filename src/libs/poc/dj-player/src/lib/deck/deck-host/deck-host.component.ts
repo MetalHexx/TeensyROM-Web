@@ -170,6 +170,12 @@ export class DeckHostComponent implements OnInit, OnDestroy {
     effect(() => {
       this.player.setFilterMode(this.mixer.filterMode(this.context.id())());
     });
+    // The lap hand-off: `SidPlayer` notifies on no wrap of its own, so `MarkerCollection` infers one
+    // from the polled playhead going backward — see `noticeLoopPosition`. Fed from this deck's own
+    // per-frame position signal, the same one every panel already reads.
+    effect(() => {
+      this.markers.noticeLoopPosition(this.view.position());
+    });
   }
 
   ngOnInit(): void {

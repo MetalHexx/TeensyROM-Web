@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Injector, signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { frames } from '@sidablist/core';
 import type { SidFile, SidPlayer } from '@sidablist/core';
 import { DeckHostComponent } from './deck-host.component';
 import type { DeckPanelAreas } from './deck-host.component';
@@ -267,6 +268,7 @@ describe('DeckHostComponent', () => {
       addMarker: ReturnType<typeof vi.fn>;
       progressPercentFor: ReturnType<typeof vi.fn>;
       stopMarkerLoop: ReturnType<typeof vi.fn>;
+      noticeLoopPosition: ReturnType<typeof vi.fn>;
     };
     let binding: {
       sink: FakeAsidSink | null;
@@ -298,6 +300,7 @@ describe('DeckHostComponent', () => {
         addMarker: vi.fn(),
         progressPercentFor: vi.fn(() => 0),
         stopMarkerLoop: vi.fn(),
+        noticeLoopPosition: vi.fn(),
       };
       binding = {
         sink: null,
@@ -358,6 +361,13 @@ describe('DeckHostComponent', () => {
 
     it('creates', () => {
       expect(fixture.componentInstance).toBeTruthy();
+    });
+
+    it("feeds this deck's own polled position into the marker collection, for the lap hand-off", () => {
+      player.position.set(frames(42));
+      fixture.detectChanges();
+
+      expect(collection.noticeLoopPosition).toHaveBeenCalledWith(frames(42));
     });
 
     it("applies each of this deck's four grid-area names, from the areas input, onto that panel and no other", () => {

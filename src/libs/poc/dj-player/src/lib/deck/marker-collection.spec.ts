@@ -335,6 +335,102 @@ describe('MarkerCollection', () => {
     });
   });
 
+  describe('the lap-boundary hand-off', () => {
+    it('is a no-op while nothing is looping, even when the reading goes backward', () => {
+      collection.addMarker(); // start at frame 0, never looped
+
+      collection.noticeLoopPosition(frames(20));
+      collection.noticeLoopPosition(frames(5)); // would read as a wrap if a loop were armed
+
+      expect(collection.queuedMarker()).toBeNull();
+      expect(player.seeks).toHaveLength(0);
+    });
+
+    it('engages the queued loop the instant the running one wraps, clearing the queue', async () => {
+      const loop = collection.addMarker(); // start frame 0
+      player.setPosition(10);
+      collection.setMarkerEnd(loop); // end frame 10
+      await collection.triggerMarker(loop);
+      const seeksBeforeWrap = player.seeks.length;
+
+      player.setPosition(100);
+      const next = collection.addMarker(); // start frame 100
+      player.setPosition(120);
+      collection.setMarkerEnd(next); // end frame 120 — a second loop, queued behind the first
+      await collection.triggerMarker(next);
+      expect(collection.queuedMarker()).toBe(next);
+
+      // The lap advances toward the loop's end, sampled once per frame...
+      collection.noticeLoopPosition(frames(6));
+      collection.noticeLoopPosition(frames(9));
+      // ...then core re-enters the loop's start, which the next sample reads as a drop.
+      collection.noticeLoopPosition(frames(0));
+
+      expect(collection.loopingMarker()).toBe(next);
+      expect(collection.queuedMarker()).toBeNull();
+      expect(player.seeks).toHaveLength(seeksBeforeWrap + 1);
+      expect(player.seeks.at(-1)).toBe(100); // next's own resolved start
+      expect(player.armedLoops.at(-1)).toEqual({ startFrame: 100, endFrame: 120 });
+    });
+
+    it('leaves the running lap alone on a wrap with nothing queued', async () => {
+      const loop = collection.addMarker();
+      player.setPosition(10);
+      collection.setMarkerEnd(loop);
+      await collection.triggerMarker(loop);
+
+      collection.noticeLoopPosition(frames(9));
+      const seeksBeforeWrap = player.seeks.length;
+      collection.noticeLoopPosition(frames(0)); // wraps, but nothing is queued behind it
+
+      expect(collection.loopingMarker()).toBe(loop);
+      expect(collection.queuedMarker()).toBeNull();
+      expect(player.seeks).toHaveLength(seeksBeforeWrap);
+    });
+
+    it('does not mistake a steady or advancing reading for a wrap', async () => {
+      const loop = collection.addMarker();
+      player.setPosition(10);
+      collection.setMarkerEnd(loop);
+      await collection.triggerMarker(loop);
+      const next = collection.addMarker();
+      await collection.triggerMarker(next);
+      const seeksBeforeWrap = player.seeks.length;
+
+      collection.noticeLoopPosition(frames(3));
+      collection.noticeLoopPosition(frames(3)); // repeats the same frame — not a wrap
+      collection.noticeLoopPosition(frames(7)); // still advancing
+
+      expect(collection.queuedMarker()).toBe(next);
+      expect(player.seeks).toHaveLength(seeksBeforeWrap);
+    });
+
+    it('starts a fresh loop with no stale reading from whatever looped before it', async () => {
+      const loopA = collection.addMarker(); // start frame 0
+      player.setPosition(10);
+      collection.setMarkerEnd(loopA); // end frame 10
+      await collection.triggerMarker(loopA);
+      collection.noticeLoopPosition(frames(8)); // loopA mid-lap, priming lastLoopPosition
+
+      collection.stopMarkerLoop();
+      player.setPosition(20);
+      const loopB = collection.addMarker(); // start frame 20
+      player.setPosition(30);
+      collection.setMarkerEnd(loopB); // end frame 30
+      await collection.triggerMarker(loopB); // nothing looping — engages at once
+      const cue = collection.addMarker();
+      await collection.triggerMarker(cue); // queued behind loopB
+      const seeksBeforeFirstSample = player.seeks.length;
+
+      // loopB's first sample lands below loopA's last one (8), which would misread as a wrap if that
+      // stale reading survived the loop change. It must not: nothing has looped in loopB yet.
+      collection.noticeLoopPosition(frames(1));
+
+      expect(collection.queuedMarker()).toBe(cue);
+      expect(player.seeks).toHaveLength(seeksBeforeFirstSample);
+    });
+  });
+
   describe('the launch gate', () => {
     it('spans triggerMarker’s play() await, then engages once it resolves', async () => {
       player.playResolvesImmediately = false;

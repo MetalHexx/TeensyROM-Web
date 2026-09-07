@@ -85,9 +85,9 @@ interface ResolvedLoop {
  * position it is at fresh from `player` on every call rather than holding a copy of either, so this
  * can never disagree with what is actually playing.
  *
- * Queuing a marker behind one already looping only ever records the intent (`queuedMarker`): nothing
- * here advances it on a lap boundary, since `MarkerPlayer` carries no notification for one — the hand-
- * off a later task adds once core exposes that signal.
+ * Queuing a marker behind one already looping only ever records the intent (`queuedMarker`) here;
+ * advancing it on a lap boundary is `noticeLoopPosition`'s job, since `MarkerPlayer` carries no wrap
+ * notification of its own — see that method's doc for how the wrap is inferred instead.
  */
 export class MarkerCollection {
   constructor(private readonly player: MarkerPlayer) {}
@@ -209,7 +209,7 @@ export class MarkerCollection {
     const target = frames(Math.max(loop.startFrame, loop.outFrame - prerollFrames));
 
     this.player.setActiveLoop({ startFrame: loop.startFrame, endFrame: loop.outFrame });
-    this.loopingMarker.set(index);
+    this.setLoopingMarker(index);
     this.queuedMarker.set(null);
     await this.player.seek(target);
   }
@@ -252,7 +252,7 @@ export class MarkerCollection {
    */
   stopMarkerLoop(): void {
     this.player.setActiveLoop(null);
-    this.loopingMarker.set(null);
+    this.setLoopingMarker(null);
     this.queuedMarker.set(null);
   }
 
@@ -269,9 +269,9 @@ export class MarkerCollection {
     const active = this.loopingMarker();
     if (active === index) {
       this.player.setActiveLoop(null);
-      this.loopingMarker.set(null);
+      this.setLoopingMarker(null);
     } else if (active !== null && active > index) {
-      this.loopingMarker.set(active - 1);
+      this.loopingMarker.set(active - 1); // same enforced loop, just renumbered
     }
 
     const queued = this.queuedMarker();
@@ -280,6 +280,41 @@ export class MarkerCollection {
     } else if (queued !== null && queued > index) {
       this.queuedMarker.set(queued - 1);
     }
+  }
+
+  /** The looping marker's own position, as of the last `noticeLoopPosition` sample — `null` whenever
+   *  nothing is looping, so a fresh loop never compares against a stale reading from a previous one. */
+  private lastLoopPosition: Frames | null = null;
+
+  /** Every place `loopingMarker` changes to a different loop (armed, cleared, or swapped for another)
+   *  routes through here, so `lastLoopPosition` never survives past the loop it was sampled against —
+   *  `deleteMarker`'s pure-reindex branch is the one exception, since the enforced loop itself has not
+   *  changed there. */
+  private setLoopingMarker(index: number | null): void {
+    this.loopingMarker.set(index);
+    this.lastLoopPosition = null;
+  }
+
+  /**
+   * Feeds one polled playhead reading in — call this on every sample (the deck's own per-frame
+   * position signal, in practice) for a queued marker to ever hand off. A no-op unless a marker is
+   * presently looping.
+   *
+   * `MarkerPlayer` notifies on nothing here (see the class doc), so a lap wrap has to be inferred:
+   * core re-enters the loop's `startFrame` the instant playback reaches its `endFrame`, and that is
+   * the only time the playhead moves anywhere but forward, so this reading landing behind the
+   * previous one is the wrap. When it is, and a marker is queued behind the one that just wrapped,
+   * this engages it at once — clearing the queue and reproducing "wait for the lap to finish, then
+   * jump" for the operator.
+   */
+  noticeLoopPosition(position: Frames): void {
+    if (this.loopingMarker() === null) return;
+    const previous = this.lastLoopPosition;
+    this.lastLoopPosition = position;
+    if (previous === null || position >= previous) return; // no wrap yet
+
+    const queued = this.queuedMarker();
+    if (queued !== null) void this.engageMarker(queued);
   }
 
   /**
@@ -311,7 +346,7 @@ export class MarkerCollection {
     this.player.setActiveLoop(
       loop === null ? null : { startFrame: loop.startFrame, endFrame: loop.outFrame }
     );
-    this.loopingMarker.set(loop === null ? null : index);
+    this.setLoopingMarker(loop === null ? null : index);
     this.queuedMarker.set(null);
     await this.player.seek(startFrame);
   }
