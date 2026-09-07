@@ -1,3 +1,5 @@
+export * from './lib/bridge/external-store';
+export * from './lib/bridge/animation-frame';
 export * from './lib/dj-poc-view/dj-poc-view.component';
 export * from './lib/sid/sid-file.model';
 export * from './lib/sid/sid-file.parser';
