@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import type { DeckDescriptor } from '../../deck/deck.config';
-import type { SidFilterMode } from '../../asid/register-frame';
+import type { SidFilterMode } from '@sidablist/core';
 import { MixerService } from '../mixer.service';
 
 interface FilterModeOption {

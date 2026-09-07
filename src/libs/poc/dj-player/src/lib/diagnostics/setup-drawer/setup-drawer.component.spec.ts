@@ -21,58 +21,22 @@ import { SetupDrawerComponent } from './setup-drawer.component';
 import { DeckRegistry } from '../../deck/deck-registry';
 import type { DeckHandle } from '../../deck/deck-registry';
 import { MixerService } from '../../mixer/mixer.service';
-import type { EngineStats, DjPlayerEngine } from '../../engine/dj-player-engine';
-import type { PlayRate, TimingMode } from '../../engine/play-rate';
+import { microseconds, milliseconds } from '@sidablist/core';
+import type { SidFile, TimingMode } from '@sidablist/core';
 import type { TuneIndexService } from '../../analysis/tune-index.service';
 import type { TuneIndexRecord } from '../../analysis/tune-index.model';
 import { TUNE_INDEX_FORMAT_VERSION } from '../../analysis/tune-index.model';
 import type { DeckTuneLoader } from '../../deck/deck-tune-loader';
-import type { SidFile } from '../../sid/sid-file.model';
+import {
+  createFakeAsidSink,
+  createFakeDeckPlayer,
+  fakeDeckHandle,
+} from '../../../testing/player-doubles';
+import type { FakeAsidSink, FakeDeckPlayer } from '../../../testing/player-doubles';
 
 /** Matches the deck ids `fakeDeck` registers below — `MixerService` only needs a shape to compose
  *  from here, not the production `DECKS` list from `deck/deck.config`. */
 const MIXER_DECKS = [{ id: 'a' }, { id: 'b' }];
-
-const EMPTY_STATS: EngineStats = {
-  framesRendered: 0,
-  packetsSent: 0,
-  bytesSent: 0,
-  suppressedWrites: 0,
-  illegalOpcodeCount: 0,
-  callsPerFrame: 1,
-  effectiveIntervalUs: 0,
-  measuredMeanIntervalUs: 0,
-  driftMs: 0,
-  jitterMs: 0,
-  worstGapMs: 0,
-  lateCallbacks: 0,
-  scheduledFrames: 0,
-  lateFrames: 0,
-  meanLagMs: 0,
-  worstLagMs: 0,
-  reorderedFrames: 0,
-  clampedFrames: 0,
-  cancelSupported: false,
-  lastCancelLatencyMs: -1,
-};
-
-const SINGLE_SPEED: PlayRate = {
-  callsPerFrame: 1,
-  exactCallsPerFrame: 1,
-  roundedCallsPerFrame: 1,
-  mode: 'exact',
-};
-
-interface StubEngine {
-  nominalIntervalUs: WritableSignal<number>;
-  scheduleAheadMs: WritableSignal<number>;
-  stats: WritableSignal<EngineStats>;
-  trackEndFrame: WritableSignal<number | null>;
-  lastError: WritableSignal<string | null>;
-  playRate: WritableSignal<PlayRate>;
-  setNominalIntervalUs: ReturnType<typeof vi.fn>;
-  setScheduleAhead: ReturnType<typeof vi.fn>;
-}
 
 interface StubTuneIndex {
   record: WritableSignal<TuneIndexRecord | null>;
@@ -84,17 +48,14 @@ interface StubTuneLoader {
   currentTune: WritableSignal<SidFile | null>;
 }
 
-function fakeEngine(): StubEngine {
-  return {
-    nominalIntervalUs: signal(19_950),
-    scheduleAheadMs: signal(0),
-    stats: signal<EngineStats>(EMPTY_STATS),
-    trackEndFrame: signal<number | null>(null),
-    lastError: signal<string | null>(null),
-    playRate: signal<PlayRate>(SINGLE_SPEED),
-    setNominalIntervalUs: vi.fn(),
-    setScheduleAhead: vi.fn(),
-  };
+/** One deck's player and sink, at the nominal PAL interval every readout below is stated against. */
+function fakePlayer(): FakeDeckPlayer {
+  const fake = createFakeDeckPlayer();
+  fake.snapshot.update((snapshot) => ({
+    ...snapshot,
+    tempo: { ...snapshot.tempo, nominalIntervalUs: microseconds(19_950) },
+  }));
+  return fake;
 }
 
 function fakeTuneIndex(): StubTuneIndex {
@@ -140,24 +101,30 @@ function fakeRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
 function fakeDeck(
   id: string,
   label: string,
-  engine: StubEngine,
+  player: FakeDeckPlayer,
+  sink: FakeAsidSink,
   tuneIndex: StubTuneIndex,
   tuneLoader: StubTuneLoader
 ): DeckHandle {
-  return {
-    descriptor: { id, label },
-    engine: engine as unknown as DjPlayerEngine,
-    binding: {} as DeckHandle['binding'],
-    tuneIndex: tuneIndex as unknown as TuneIndexService,
-    tuneLoader: tuneLoader as unknown as DeckTuneLoader,
-  };
+  return fakeDeckHandle(
+    { id, label },
+    {
+      player: player.player,
+      view: player.view,
+      sink,
+      tuneIndex: tuneIndex as unknown as TuneIndexService,
+      tuneLoader: tuneLoader as unknown as DeckTuneLoader,
+    }
+  );
 }
 
 describe('SetupDrawerComponent', () => {
   let fixture: ComponentFixture<SetupDrawerComponent>;
   let registry: DeckRegistry;
-  let engineA: StubEngine;
-  let engineB: StubEngine;
+  let playerA: FakeDeckPlayer;
+  let playerB: FakeDeckPlayer;
+  let sinkA: FakeAsidSink;
+  let sinkB: FakeAsidSink;
   let tuneIndexA: StubTuneIndex;
   let tuneIndexB: StubTuneIndex;
   let tuneLoaderA: StubTuneLoader;
@@ -165,15 +132,17 @@ describe('SetupDrawerComponent', () => {
 
   async function setup(): Promise<void> {
     registry = new DeckRegistry();
-    engineA = fakeEngine();
-    engineB = fakeEngine();
+    playerA = fakePlayer();
+    playerB = fakePlayer();
+    sinkA = createFakeAsidSink();
+    sinkB = createFakeAsidSink();
     tuneIndexA = fakeTuneIndex();
     tuneIndexB = fakeTuneIndex();
     tuneLoaderA = fakeTuneLoader();
     tuneLoaderB = fakeTuneLoader();
 
-    registry.register(fakeDeck('a', 'A', engineA, tuneIndexA, tuneLoaderA));
-    registry.register(fakeDeck('b', 'B', engineB, tuneIndexB, tuneLoaderB));
+    registry.register(fakeDeck('a', 'A', playerA, sinkA, tuneIndexA, tuneLoaderA));
+    registry.register(fakeDeck('b', 'B', playerB, sinkB, tuneIndexB, tuneLoaderB));
 
     await TestBed.configureTestingModule({
       imports: [SetupDrawerComponent],
@@ -209,9 +178,7 @@ describe('SetupDrawerComponent', () => {
   }
 
   it('carries every registered deck label as a column header, across every panel', () => {
-    const headers: string[] = Array.from(
-      fixture.nativeElement.querySelectorAll('th[scope="col"]')
-    )
+    const headers: string[] = Array.from(fixture.nativeElement.querySelectorAll('th[scope="col"]'))
       .map((th) => (th as HTMLElement).textContent?.trim() ?? '')
       .filter((text) => text.length > 0);
 
@@ -219,7 +186,7 @@ describe('SetupDrawerComponent', () => {
     expect(headers.filter((text) => text === 'Deck B').length).toBeGreaterThan(0);
   });
 
-  it("renders the nominal frame interval as a per-deck select, writing only to that deck's engine", () => {
+  it("renders the nominal frame interval as a per-deck select, writing only to that deck's player", () => {
     const selectA = fixture.nativeElement.querySelector(
       '[aria-label="Nominal frame interval deck A"]'
     ) as HTMLSelectElement;
@@ -228,11 +195,11 @@ describe('SetupDrawerComponent', () => {
     selectA.value = '19975';
     selectA.dispatchEvent(new Event('change'));
 
-    expect(engineA.setNominalIntervalUs).toHaveBeenCalledWith(19975);
-    expect(engineB.setNominalIntervalUs).not.toHaveBeenCalled();
+    expect(playerA.player.setNominalIntervalUs).toHaveBeenCalledWith(microseconds(19975));
+    expect(playerB.player.setNominalIntervalUs).not.toHaveBeenCalled();
   });
 
-  it("renders Schedule ahead as a per-deck select, writing only to that deck's engine", () => {
+  it("renders Schedule ahead as a per-deck select, writing only to that deck's own sink", () => {
     const selectB = fixture.nativeElement.querySelector(
       '[aria-label="Schedule ahead deck B"]'
     ) as HTMLSelectElement;
@@ -241,8 +208,8 @@ describe('SetupDrawerComponent', () => {
     selectB.value = '40';
     selectB.dispatchEvent(new Event('change'));
 
-    expect(engineB.setScheduleAhead).toHaveBeenCalledWith(40);
-    expect(engineA.setScheduleAhead).not.toHaveBeenCalled();
+    expect(sinkB.setScheduleAhead).toHaveBeenCalledWith(milliseconds(40));
+    expect(sinkA.setScheduleAhead).not.toHaveBeenCalled();
   });
 
   it("renders the Tune Index Timing toggle as a per-deck select, writing only to that deck's tune index", () => {
@@ -272,8 +239,14 @@ describe('SetupDrawerComponent', () => {
   });
 
   it('reads the cross-deck drift figure over the two registered decks', () => {
-    engineA.stats.set({ ...EMPTY_STATS, driftMs: 12.4 });
-    engineB.stats.set({ ...EMPTY_STATS, driftMs: 4.0 });
+    playerA.stats.update((stats) => ({
+      ...stats,
+      clock: { ...stats.clock, driftMs: milliseconds(12.4) },
+    }));
+    playerB.stats.update((stats) => ({
+      ...stats,
+      clock: { ...stats.clock, driftMs: milliseconds(4.0) },
+    }));
     fixture.detectChanges();
 
     const label = fixture.nativeElement.querySelector('.cross-deck-drift') as HTMLElement;
@@ -282,7 +255,9 @@ describe('SetupDrawerComponent', () => {
 
   it('reads the cross-deck drift figure as an em dash before a second deck exists', async () => {
     const singleDeckRegistry = new DeckRegistry();
-    singleDeckRegistry.register(fakeDeck('a', 'A', fakeEngine(), fakeTuneIndex(), fakeTuneLoader()));
+    singleDeckRegistry.register(
+      fakeDeck('a', 'A', fakePlayer(), createFakeAsidSink(), fakeTuneIndex(), fakeTuneLoader())
+    );
 
     await TestBed.resetTestingModule()
       .configureTestingModule({

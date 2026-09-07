@@ -1,17 +1,11 @@
-import { computed, effect, Injectable, signal, type Signal } from '@angular/core';
+import { effect, Injectable, signal, type Signal } from '@angular/core';
 import { logWarn } from '@teensyrom-nx/utils';
-import { buildDisplayCharsPacket } from '../asid/asid-encoder';
+import type { AsidSink, MidiOutputPort } from '@sidablist/asid';
+// The `./web-midi` subpath, not the package root — the browser adapter is deliberately kept out of
+// the entry point every non-browser consumer imports.
+import { midiOutputPortFrom } from '@sidablist/asid/web-midi';
 import { MidiAccessService } from './midi-access.service';
-
-/** The three members `DeliveryTransport` and `DjPlayerEngine` actually use — deliberately narrower
- *  than `DeckMidiBinding` itself, so a plain test double can stand in for either collaborator
- *  without implementing selection, persistence or identify. */
-export interface DeckMidiPort {
-  readonly selectedPortId: Signal<string | null>;
-  readonly supportsCancel: Signal<boolean>;
-  send(bytes: Uint8Array, timestampMs?: number): void;
-  cancelPending(): boolean;
-}
+import type { MIDIOutputLike } from './midi-access.service';
 
 /** Namespaces a deck's persisted selection under its own key, so two decks sharing the browser's
  *  `localStorage` never collide and restoring one can never touch the other's. */
@@ -31,24 +25,34 @@ function storageKeyFor(deckId: string): string {
  * be known before its first method call.
  */
 @Injectable()
-export class DeckMidiBinding implements DeckMidiPort {
+export class DeckMidiBinding {
   deckId = '';
+
+  /**
+   * The deck's ASID sink, set by `DeckHostComponent` right after the deck's injector resolves.
+   *
+   * A constructor-free field for the same reason `deckId` is, and for one more: the sink is built
+   * over *this binding's own* `outputPort`, so injecting it here would close a construction-time
+   * cycle. Nothing in this class reads it before `identify` is called.
+   */
+  sink: AsidSink | null = null;
 
   private readonly _selectedPortId = signal<string | null>(null);
   readonly selectedPortId: Signal<string | null> = this._selectedPortId.asReadonly();
   readonly lastError = signal<string | null>(null);
+
   /**
-   * Resolved against *this deck's* selected port, not "whichever port is selected somewhere" —
-   * `DeliveryTransport` re-derives its cancel ceiling from this on every send, so it has to track
-   * this deck and no other. Reads `access.ports()` unconditionally alongside the selection so a
-   * port object replaced in place by a reconnect (same id, new capability) is picked up even though
-   * the selection itself never changed.
+   * This deck's selected output as the port an ASID sink schedules against — a stable façade that
+   * re-resolves the selection on every call, so a port swap needs no rebuild of the sink above it.
+   *
+   * Reports `portId: null` and drops writes while nothing is selected, which is what lets the sink
+   * be built at provider time, before the operator has chosen anything.
    */
-  readonly supportsCancel = computed<boolean>(() => {
-    this.access.ports();
-    const id = this._selectedPortId();
-    return id === null ? false : this.access.supportsCancel(id);
-  });
+  readonly outputPort: MidiOutputPort = this.createOutputPort();
+
+  /** The most recently wrapped output and the wrapper built over it — see `resolvePort`. */
+  private wrappedOutput: MIDIOutputLike | null = null;
+  private wrappedPort: MidiOutputPort | null = null;
 
   constructor(private readonly access: MidiAccessService) {
     effect(() => {
@@ -92,37 +96,77 @@ export class DeckMidiBinding implements DeckMidiPort {
     try {
       localStorage.setItem(storageKeyFor(this.deckId), id);
     } catch (error) {
-      logWarn(`MIDI: could not persist deck "${this.deckId}"'s selected port to localStorage — ${error}`);
+      logWarn(
+        `MIDI: could not persist deck "${this.deckId}"'s selected port to localStorage — ${error}`
+      );
     }
   }
 
-  /** No-op with a warning when this deck has no port selected. `timestampMs` passes straight
-   *  through to `MidiAccessService.send`; omitting it sends immediately. */
-  send(bytes: Uint8Array, timestampMs?: number): void {
-    const id = this._selectedPortId();
-    if (id === null) {
-      logWarn('MIDI: send() called with no MIDI port selected — bytes dropped.');
-      return;
-    }
-    this.access.send(id, bytes, timestampMs);
+  private createOutputPort(): MidiOutputPort {
+    // Closed over rather than reached through `this`: the object below needs its own `this` for the
+    // two getters `MidiOutputPort` declares as properties.
+    const selectedPortId = this._selectedPortId;
+    const resolve = (): MidiOutputPort | null => this.resolvePort();
+
+    return {
+      get portId(): string | null {
+        return selectedPortId();
+      },
+      get supportsCancel(): boolean {
+        return resolve()?.supportsCancel ?? false;
+      },
+      send(bytes: Uint8Array, timestampMs?: number): void {
+        const port = resolve();
+        if (port === null) {
+          logWarn('MIDI: send() called with no MIDI port selected — bytes dropped.');
+          return;
+        }
+        port.send(bytes, timestampMs);
+      },
+      cancelPending(): boolean {
+        return resolve()?.cancelPending() ?? false;
+      },
+    };
   }
 
-  /** Reports false, never throws, when this deck has no port selected — mirrors
-   *  `MidiAccessService.cancelPending`'s own "false covers every reason it didn't cancel" contract. */
-  cancelPending(): boolean {
+  /** The wrapped output for whatever this deck currently holds, or null. Memoised on the output
+   *  object's identity rather than its id, so a same-id reconnect that replaces the object re-wraps
+   *  instead of sending into the detached one — and a steady stream costs one map lookup per frame
+   *  rather than a fresh wrapper. */
+  private resolvePort(): MidiOutputPort | null {
     const id = this._selectedPortId();
-    return id === null ? false : this.access.cancelPending(id);
+    const output = id === null ? null : this.access.outputFor(id);
+    if (output === null) {
+      this.wrappedOutput = null;
+      this.wrappedPort = null;
+      return null;
+    }
+    if (output !== this.wrappedOutput) {
+      this.wrappedOutput = output;
+      // The service works against its own minimal shape of the output; `midiOutputPortFrom` works
+      // against the DOM lib's. Both describe the same object — this is where they meet.
+      this.wrappedPort = midiOutputPortFrom(output as unknown as MIDIOutput);
+    }
+    return this.wrappedPort;
   }
 
   /**
-   * Sends a display-chars packet so the tester can see which physical C64 this deck's port drives.
-   * Web MIDI exposes nothing that distinguishes two identical cartridges, so this is a confirmation
-   * gesture, not a lookup — and it is not free: the firmware's `PrintflnToASID()` stops the playback
-   * timer, drains the queue with a blocking wait, and re-initialises it, so sending this mid-tune
-   * audibly interrupts the music.
+   * Shows this deck's label on the cartridge so the tester can see which physical C64 its port
+   * drives. Web MIDI exposes nothing that distinguishes two identical cartridges, so this is a
+   * confirmation gesture, not a lookup — and it is not free: the firmware's `PrintflnToASID()` stops
+   * the playback timer, drains the queue with a blocking wait, and re-initialises it, so sending
+   * this mid-tune audibly interrupts the music.
+   *
+   * Routed through the sink rather than encoded here: building the display-chars packet in this
+   * repository is the one thing that would put a SysEx byte back on the application's side of the
+   * boundary.
    */
   identify(text: string): void {
-    this.send(buildDisplayCharsPacket(text));
+    if (this.sink === null) {
+      logWarn(`MIDI: identify() called for deck "${this.deckId}" before its sink was set.`);
+      return;
+    }
+    this.sink.showText(text);
   }
 
   /**

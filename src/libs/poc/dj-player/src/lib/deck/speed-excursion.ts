@@ -1,10 +1,15 @@
 import { signal, type Signal } from '@angular/core';
 import { clamp } from '@sidablist/core';
 
-/** One press of a jump button moves the multiplier by this much, additively — mirrors
- *  `dj-player-engine.ts`'s own `SPEED_JUMP_STEP` until the old engine's copy of this state machine
- *  is deleted. */
+/** One press of a jump button moves the multiplier by this much, additively. */
 const JUMP_STEP = 0.5;
+
+/** What the fader and any typed value may reach: 0.5x–1.5x. Core divides by whatever multiplier it
+ *  is handed, so every span a control honours is stated on this side of the seam. */
+export const SPEED_INPUT_SPAN = 0.5;
+
+/** What the jump buttons may reach: 0.3x–1.7x. */
+export const SPEED_HARD_SPAN = 0.7;
 
 /** A remembered-speed excursion the jump buttons drive. DJ apparatus, not timeline: the first press
  *  of either button opens an excursion by remembering the pre-jump multiplier, then moves the
@@ -16,9 +21,9 @@ const JUMP_STEP = 0.5;
  *
  *  Tracks the multiplier itself, seeded at home (1) — `setTempo` is a pure sink here, not also a
  *  source, so nothing in this module observes a tempo change made outside `jumpUp`/`jumpDown`/
- *  `home` (the fader, while the old engine still stands as the wiring for `P09-T05` to replace).
- *  Direction is tracked separately from the multiplier because "same button again" versus "opposite
- *  button" cannot be told apart from the multiplier's value alone once a jump has clamped.
+ *  `home` (the fader). Direction is tracked separately from the multiplier because "same button
+ *  again" versus "opposite button" cannot be told apart from the multiplier's value alone once a
+ *  jump has clamped.
  */
 export function createSpeedExcursion(opts: {
   setTempo: (multiplier: number) => void;

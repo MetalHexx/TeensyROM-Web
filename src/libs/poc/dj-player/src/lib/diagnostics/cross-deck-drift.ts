@@ -1,4 +1,4 @@
-import type { EngineStats } from '../engine/dj-player-engine';
+import type { PlayerStats } from '@sidablist/core';
 
 /**
  * How far two independently-clocked decks have walked apart: the difference between each deck's own
@@ -12,8 +12,8 @@ import type { EngineStats } from '../engine/dj-player-engine';
  * walking apart is the honest cost of independence, and how fast it happens is what this figure
  * exists to find out.
  */
-export function crossDeckDriftMs(a: EngineStats | null, b: EngineStats | null): number | null {
-  return a === null || b === null ? null : a.driftMs - b.driftMs;
+export function crossDeckDriftMs(a: PlayerStats | null, b: PlayerStats | null): number | null {
+  return a === null || b === null ? null : a.clock.driftMs - b.clock.driftMs;
 }
 
 /** 'A−B: +12.4 ms', or '—' when there is nothing to compare. */

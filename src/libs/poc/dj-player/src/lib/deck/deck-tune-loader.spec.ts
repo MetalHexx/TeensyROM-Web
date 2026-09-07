@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DeckTuneLoader } from './deck-tune-loader';
-import { DjPlayerEngine } from '../engine/dj-player-engine';
+import { SID_PLAYER } from './deck-player';
 import { TuneIndexService } from '../analysis/tune-index.service';
 
 const PSID_HEADER_SIZE = 0x7c;
@@ -24,7 +24,7 @@ function validSidBytes(): Uint8Array {
   return buffer;
 }
 
-interface FakeEngine {
+interface FakePlayer {
   loadTune: ReturnType<typeof vi.fn>;
   play: ReturnType<typeof vi.fn>;
 }
@@ -35,12 +35,12 @@ interface FakeTuneIndex {
 
 describe('DeckTuneLoader', () => {
   let loader: DeckTuneLoader;
-  let engine: FakeEngine;
+  let player: FakePlayer;
   let tuneIndex: FakeTuneIndex;
   let resolveSetTune: () => void;
 
   beforeEach(() => {
-    engine = { loadTune: vi.fn(), play: vi.fn(() => Promise.resolve()) };
+    player = { loadTune: vi.fn(), play: vi.fn(() => Promise.resolve()) };
     // Held until the test resolves it, so the load-order assertion can observe `play()` withheld
     // for the whole span of the await — mirrors the view's own withheld-play suite.
     tuneIndex = {
@@ -50,7 +50,7 @@ describe('DeckTuneLoader', () => {
     TestBed.configureTestingModule({
       providers: [
         DeckTuneLoader,
-        { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+        { provide: SID_PLAYER, useValue: player },
         { provide: TuneIndexService, useValue: tuneIndex as unknown as TuneIndexService },
       ],
     });
@@ -62,30 +62,27 @@ describe('DeckTuneLoader', () => {
   });
 
   describe('selectTune', () => {
-    it('loads the engine, then awaits the tune index, then plays — never out of that order', async () => {
+    it('loads the player, then awaits the tune index, then plays — never out of that order', async () => {
       loader.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
 
-      expect(engine.loadTune).toHaveBeenCalledTimes(1);
+      expect(player.loadTune).toHaveBeenCalledTimes(1);
       expect(tuneIndex.setTune).toHaveBeenCalledTimes(1);
-      expect(engine.play).not.toHaveBeenCalled();
+      expect(player.play).not.toHaveBeenCalled();
 
       resolveSetTune();
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(engine.play).toHaveBeenCalledTimes(1);
+      expect(player.play).toHaveBeenCalledTimes(1);
     });
 
     it('passes the parsed file and the source label to the tune index', () => {
       loader.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
 
-      expect(tuneIndex.setTune).toHaveBeenCalledWith(
-        engine.loadTune.mock.calls[0][0],
-        'Auto tune'
-      );
+      expect(tuneIndex.setTune).toHaveBeenCalledWith(player.loadTune.mock.calls[0][0], 'Auto tune');
     });
 
-    it('sets a tune error and clears currentTune when the bytes do not parse, without touching the engine', () => {
+    it('sets a tune error and clears currentTune when the bytes do not parse, without touching the player', () => {
       loader.selectTune({
         id: 'bad',
         label: 'Bad tune',
@@ -94,7 +91,7 @@ describe('DeckTuneLoader', () => {
 
       expect(loader.tuneError()).toBeTruthy();
       expect(loader.currentTune()).toBeNull();
-      expect(engine.loadTune).not.toHaveBeenCalled();
+      expect(player.loadTune).not.toHaveBeenCalled();
     });
   });
 
@@ -117,7 +114,7 @@ describe('DeckTuneLoader', () => {
 
       expect(loader.availableTunes().length).toBe(before + 1);
       expect(tuneIndex.setTune).toHaveBeenCalledWith(
-        engine.loadTune.mock.calls[0][0],
+        player.loadTune.mock.calls[0][0],
         'mytune.sid'
       );
     });
@@ -148,7 +145,7 @@ describe('DeckTuneLoader', () => {
 
       await loader.onFilePicked({ target: input } as unknown as Event);
 
-      expect(engine.loadTune).not.toHaveBeenCalled();
+      expect(player.loadTune).not.toHaveBeenCalled();
     });
   });
 });

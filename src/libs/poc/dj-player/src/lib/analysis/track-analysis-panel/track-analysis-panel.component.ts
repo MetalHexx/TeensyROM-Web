@@ -13,9 +13,10 @@ import {
 import { asRounded, playCallsPerSecond, playCallsToSeconds } from '@sidablist/core';
 import type { SidFile } from '@sidablist/core';
 import type { DeckHandle } from '../../deck/deck-registry';
-import type { DjPlayerEngine } from '../../engine/dj-player-engine';
-import { positionBasisFor } from '../../engine/engine-utils';
-import type { DetectedLoopFrames } from '../../engine/engine-utils';
+import type { DeckPlayerView } from '../../deck/deck-player';
+import { scrubToPercent } from '../../deck/deck-player';
+import { positionBasisFor } from '../tune-length';
+import type { DetectedLoopFrames } from '../tune-length';
 import { ANALYSIS_SCANNER } from '../scan-runner';
 import type { ScanRequest, ScanResult } from '../scan-runner';
 import { WorkerAnalysisScanner } from '../worker-analysis-scanner';
@@ -410,10 +411,10 @@ function paintStructureCanvas(canvas: HTMLCanvasElement, structure: StructureRes
  * handle through `deck`, so switching the selector retargets every computed below onto the newly
  * chosen deck.
  *
- * Deliberately dependency-light: it reaches only into `engine/dj-player-engine`, the leaf engine
- * module it shares the length rule with (`engine/engine-utils`), `@sidablist/core` and its own
- * `analysis/*` siblings, never into `replay/`, `clock/`, `midi/` or `engine/marker-state` — the whole
- * section can be deleted with the route it lives on.
+ * Deliberately dependency-light: it reaches only into the deck handle it is given, the leaf module
+ * it shares the length rule with (`analysis/tune-length`), `@sidablist/core` and its own
+ * `analysis/*` siblings, never into `clock/` or `midi/` — the whole section can be deleted with the
+ * route it lives on.
  */
 @Component({
   selector: 'lib-track-analysis-panel',
@@ -429,11 +430,17 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
   private readonly scanner = inject(ANALYSIS_SCANNER);
 
-  /** This deck's own engine — re-read on every access rather than captured once, since `deck` itself
-   *  can change while this panel stays mounted (see the class doc). */
-  private get engine(): DjPlayerEngine {
-    return this.deck().engine;
+  /** This deck's own player read side — re-read on every access rather than captured once, since
+   *  `deck` itself can change while this panel stays mounted (see the class doc). */
+  private get view(): DeckPlayerView {
+    return this.deck().view;
   }
+
+  /** Narrowed off the snapshot: the effect below must fire on a subtune step, not on every discrete
+   *  state change the snapshot's identity also tracks. */
+  private readonly currentSubtune = computed<number>(
+    () => this.deck().view.snapshot().tune?.subtune ?? 0
+  );
 
   private get tuneIndexService(): TuneIndexService {
     return this.deck().tuneIndex;
@@ -498,7 +505,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     // nothing.
     effect(() => {
       this.file();
-      this.engine.currentSubtune();
+      this.currentSubtune();
       this.clearAnalysis();
     });
 
@@ -747,7 +754,10 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     const ticks: { x: number; label: string }[] = [];
     for (let i = 0; i <= tickCount; i++) {
       const frame = window.start + (span * i) / tickCount;
-      ticks.push({ x: (i / tickCount) * COLUMN_COUNT, label: formatDuration(this.toSeconds(frame)) });
+      ticks.push({
+        x: (i / tickCount) * COLUMN_COUNT,
+        label: formatDuration(this.toSeconds(frame)),
+      });
     }
     return ticks;
   });
@@ -800,7 +810,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     const scan = this.scanOutput();
     if (scan === null) return null;
     const window = this.effectiveWindow();
-    const frame = this.engine.stats().framesRendered;
+    const frame = this.view.position();
     if (frame < window.start || frame > window.end) return null;
     return this.frameToX(frame);
   });
@@ -842,7 +852,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
 
   protected readonly scanProgressPercent = computed<number>(() => {
     if (!this.scanning()) return 0;
-    const ceiling = this.engine.ceilingFrames();
+    const ceiling = this.view.snapshot().basis.ceilingFrames;
     return ceiling > 0 ? Math.min(100, (this.scanProgressFrame() / ceiling) * 100) : 0;
   });
 
@@ -916,7 +926,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       if (pulse === null || pulse.dominantInterval === null) return '—';
       const { native } = impliedTempo(
         pulse.dominantInterval,
-        this.engine.nominalIntervalUs(),
+        this.view.snapshot().tempo.nominalIntervalUs,
         scan.callsPerFrame,
         1.0
       );
@@ -933,16 +943,16 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       if (pulse === null || pulse.dominantInterval === null) return '—';
       const { sounding } = impliedTempo(
         pulse.dominantInterval,
-        this.engine.nominalIntervalUs(),
+        this.view.snapshot().tempo.nominalIntervalUs,
         scan.callsPerFrame,
-        this.engine.speedMultiplier()
+        this.view.snapshot().tempo.multiplier
       );
       return sounding === null ? '—' : sounding.toFixed(1);
     }
     const record = this.cachedRecord();
     return record === null || record.nativeTempo === null
       ? '—'
-      : (record.nativeTempo * this.engine.speedMultiplier()).toFixed(1);
+      : (record.nativeTempo * this.view.snapshot().tempo.multiplier).toFixed(1);
   });
 
   protected readonly pulseConfidenceLabel = computed<string>(() => {
@@ -960,7 +970,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
    *  routing through this signal, since it has no live `keyResult()` to transpose. */
   protected readonly soundingKeyResult = computed<KeyResult | null>(() => {
     const key = this.keyResult();
-    return key === null ? null : soundingKey(key, this.engine.speedMultiplier());
+    return key === null ? null : soundingKey(key, this.view.snapshot().tempo.multiplier);
   });
 
   protected readonly keyNativeLabel = computed<string>(() => {
@@ -978,7 +988,9 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     }
     const record = this.cachedRecord();
     if (record === null) return '—';
-    return soundingKeyLabel(soundingKey(keyResultFromRecord(record), this.engine.speedMultiplier()));
+    return soundingKeyLabel(
+      soundingKey(keyResultFromRecord(record), this.view.snapshot().tempo.multiplier)
+    );
   });
 
   protected readonly keyConfidenceLabel = computed<string>(() => {
@@ -1095,8 +1107,8 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
       // must never continue whatever scan the scanner happens to be holding.
       session: ++this.nextSessionId,
       file,
-      subtune: this.engine.currentSubtune(),
-      maxFrames: this.engine.ceilingFrames(),
+      subtune: this.currentSubtune(),
+      maxFrames: this.view.snapshot().basis.ceilingFrames,
     };
 
     const result: ScanResult = await this.scanner.scan(request, (frame) => {
@@ -1179,7 +1191,7 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
     const candidate = this.selectedCandidate();
     if (candidate === null) return;
     await this.jumpToFrame(candidate.frame);
-    this.engine.addMarker();
+    this.deck().markers.addMarker();
   }
 
   private async stepCandidate(direction: -1 | 1): Promise<void> {
@@ -1209,8 +1221,8 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
    */
   private loopDetectOptions(): LoopDetectOptions {
     const perSecond = playCallsPerSecond(
-      this.engine.nominalIntervalUs(),
-      asRounded(this.engine.playRate())
+      this.view.snapshot().tempo.nominalIntervalUs,
+      asRounded(this.view.snapshot().tempo.rate)
     );
     return {
       minTailFrames: Math.round(MIN_TAIL_SECONDS * perSecond),
@@ -1219,17 +1231,20 @@ export class TrackAnalysisPanelComponent implements OnDestroy {
   }
 
   private async jumpToFrame(frame: number): Promise<void> {
-    const basis = this.engine.positionBasisFrames();
+    const basis = this.view.snapshot().basis.positionBasisFrames;
     if (basis <= 0) return;
-    const percent = (frame / basis) * 100;
-    await this.engine.scrubTo(percent);
+    await scrubToPercent(this.deck().player, this.deck().markers, (frame / basis) * 100);
   }
 
   /** Frames as seconds of music through the rate currently in force — the single conversion every
    *  duration in this panel goes through, so the readout and the ruler can never disagree with each
    *  other or with the rail's Tune Index panel. */
   private toSeconds(frames: number): number {
-    return playCallsToSeconds(frames, this.engine.nominalIntervalUs(), this.engine.playRate());
+    return playCallsToSeconds(
+      frames,
+      this.view.snapshot().tempo.nominalIntervalUs,
+      this.view.snapshot().tempo.rate
+    );
   }
 
   private frameToX(frame: number): number {

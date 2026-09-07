@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { DjPlayerEngine } from '../../engine/dj-player-engine';
 import { DeckContext } from '../deck-context';
+import { DECK_PLAYER_VIEW } from '../deck-player';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
 import { MidiAccessService } from '../../midi/midi-access.service';
 
@@ -27,7 +27,7 @@ export class BindingCardComponent {
   private readonly context = inject(DeckContext);
   private readonly binding = inject(DeckMidiBinding);
   private readonly midiAccess = inject(MidiAccessService);
-  private readonly engine = inject(DjPlayerEngine);
+  private readonly view = inject(DECK_PLAYER_VIEW);
 
   protected readonly label = this.context.label;
 
@@ -52,7 +52,7 @@ export class BindingCardComponent {
     () =>
       this.midiAccessState() === 'granted' &&
       this.selectedPortId() !== null &&
-      this.engine.state() !== 'playing'
+      this.view.snapshot().transport !== 'playing'
   );
 
   /** Requests the page-level grant, then restores this deck's own persisted selection — mirrors the

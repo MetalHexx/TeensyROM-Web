@@ -1,21 +1,23 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal, type WritableSignal } from '@angular/core';
+import { Injector, signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { SidFile, SidPlayer } from '@sidablist/core';
 import { DeckHostComponent } from './deck-host.component';
 import type { DeckPanelAreas } from './deck-host.component';
 import { DeckContext } from '../deck-context';
+import {
+  ASID_SINK,
+  DECK_PLAYER_VIEW,
+  FRAME_CLOCK,
+  REPLAY_RUNNER,
+  SID_PLAYER,
+} from '../deck-player';
 import { DeckRegistry } from '../deck-registry';
 import { DeckTuneLoader } from '../deck-tune-loader';
 import type { TuneSource } from '../deck-tune-loader';
+import { MarkerCollection } from '../marker-collection';
+import type { SavedMarker } from '../marker-collection';
 import { DECKS } from '../deck.config';
-import { DjPlayerEngine } from '../../engine/dj-player-engine';
-import type {
-  CapturedPoint,
-  EngineState,
-  EngineStats,
-  Marker,
-} from '../../engine/dj-player-engine';
-import type { PlayRate } from '../../engine/play-rate';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
 import { MidiAccessService } from '../../midi/midi-access.service';
 import { TuneIndexService } from '../../analysis/tune-index.service';
@@ -25,60 +27,27 @@ import {
   LocalStorageTuneIndexStorage,
 } from '../../analysis/tune-index-storage';
 import type { TuneIndexRecord } from '../../analysis/tune-index.model';
-import type { SidFile } from '../../sid/sid-file.model';
 import { MixerService } from '../../mixer/mixer.service';
+import {
+  createFakeAsidSink,
+  createFakeDeckPlayer,
+  fakeSidFile,
+} from '../../../testing/player-doubles';
+import type { FakeAsidSink, FakeDeckPlayer } from '../../../testing/player-doubles';
 
-const EMPTY_STATS: EngineStats = {
-  framesRendered: 0,
-  packetsSent: 0,
-  bytesSent: 0,
-  suppressedWrites: 0,
-  illegalOpcodeCount: 0,
-  callsPerFrame: 1,
-  effectiveIntervalUs: 0,
-  measuredMeanIntervalUs: 0,
-  driftMs: 0,
-  jitterMs: 0,
-  worstGapMs: 0,
-  lateCallbacks: 0,
-  scheduledFrames: 0,
-  lateFrames: 0,
-  meanLagMs: 0,
-  worstLagMs: 0,
-  reorderedFrames: 0,
-  clampedFrames: 0,
-  cancelSupported: false,
-  lastCancelLatencyMs: -1,
-};
+const RTS = 0x60;
 
-function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
-  return {
-    format: 'PSID',
-    version: 2,
-    loadAddress: 0x1000,
-    initAddress: 0x1000,
-    playAddress: 0x1003,
-    songs: 1,
-    startSong: 1,
-    speedFlags: 0,
-    name: 'Test Tune',
-    author: 'Test Author',
-    released: '2026',
-    clock: 'pal',
-    model: 'mos6581',
-    secondSidAddress: null,
-    thirdSidAddress: null,
-    data: new Uint8Array([0]),
-    ...overrides,
-  };
+/** init and play both return at once and touch no register — enough for a real player to load and
+ *  start it without emulating anything worth asserting on. */
+function silentTune(): SidFile {
+  const data = new Uint8Array(4);
+  data[0] = RTS;
+  data[3] = RTS;
+  return fakeSidFile({ loadAddress: 0x1000, initAddress: 0x1000, playAddress: 0x1003, data });
 }
 
-function startPoint(frame: number): CapturedPoint {
-  return { frame, offset: 0, machine: {}, registers: {}, anchor: {} } as unknown as CapturedPoint;
-}
-
-function markerWithStart(frame: number): Marker {
-  return { start: startPoint(frame), end: null };
+function markerWithStart(frame: number): SavedMarker {
+  return { startFrame: frame as SavedMarker['startFrame'], startOffsetMs: 0, end: null };
 }
 
 /** Deck-host under test carries no ancestor `.grid` for these to actually position anything against
@@ -94,9 +63,10 @@ describe('DeckHostComponent', () => {
   describe('ngOnInit wiring, over real collaborators', () => {
     function build(descriptor = DECKS[0]): {
       fixture: ComponentFixture<DeckHostComponent>;
+      injector: Injector;
       context: DeckContext;
       binding: DeckMidiBinding;
-      engine: DjPlayerEngine;
+      player: SidPlayer;
       registry: DeckRegistry;
     } {
       const fixture = TestBed.createComponent(DeckHostComponent);
@@ -106,14 +76,16 @@ describe('DeckHostComponent', () => {
       const injector = fixture.debugElement.injector;
       return {
         fixture,
+        injector,
         context: injector.get(DeckContext),
         binding: injector.get(DeckMidiBinding),
-        engine: injector.get(DjPlayerEngine),
+        player: injector.get(SID_PLAYER),
         registry: TestBed.inject(DeckRegistry),
       };
     }
 
     beforeEach(() => {
+      localStorage.clear();
       TestBed.configureTestingModule({
         imports: [DeckHostComponent],
         providers: [
@@ -130,14 +102,15 @@ describe('DeckHostComponent', () => {
     });
 
     it('adopts its own descriptor, restores its MIDI and repeat-track preferences under its own id, then registers — in that order', () => {
-      const { fixture, context, binding, engine, registry } = build(DECKS[0]);
+      const { fixture, context, binding, player, registry } = build(DECKS[0]);
+      localStorage.setItem(`asid-dj-0.deck-${DECKS[0].id}.repeat-track`, 'false');
 
       const adoptSpy = vi.spyOn(context, 'adopt');
       let deckIdAtRestore = '';
       const restoreSpy = vi.spyOn(binding, 'restore').mockImplementation(() => {
         deckIdAtRestore = binding.deckId;
       });
-      const restoreRepeatSpy = vi.spyOn(engine, 'restoreRepeatTrackPreference');
+      const repeatSpy = vi.spyOn(player, 'setRepeatTrack');
       const registerSpy = vi.spyOn(registry, 'register');
 
       fixture.detectChanges(); // runs ngOnInit
@@ -145,15 +118,49 @@ describe('DeckHostComponent', () => {
       expect(adoptSpy).toHaveBeenCalledWith(DECKS[0]);
       expect(deckIdAtRestore).toBe(DECKS[0].id);
       expect(binding.deckId).toBe(DECKS[0].id);
-      expect(restoreRepeatSpy).toHaveBeenCalledTimes(1);
+      // The persisted preference under this deck's own key, applied to the player core holds it on.
+      expect(repeatSpy).toHaveBeenCalledWith(false);
       expect(registerSpy).toHaveBeenCalledTimes(1);
       expect(registerSpy.mock.calls[0][0].descriptor).toEqual(DECKS[0]);
-      expect(registerSpy.mock.calls[0][0].engine).toBe(engine);
+      expect(registerSpy.mock.calls[0][0].player).toBe(player);
 
       const orderOf = (spy: { mock: { invocationCallOrder: number[] } }) =>
         spy.mock.invocationCallOrder[0];
       expect(orderOf(adoptSpy)).toBeLessThan(orderOf(restoreSpy));
       expect(orderOf(restoreSpy)).toBeLessThan(orderOf(registerSpy));
+    });
+
+    it("hands this deck's own sink to its binding, so identify never encodes anything here", () => {
+      const { fixture, binding, injector } = build(DECKS[0]);
+      fixture.detectChanges();
+
+      expect(binding.sink).toBe(injector.get(ASID_SINK));
+    });
+
+    it("builds its player over this deck's own sink and clock", async () => {
+      const { fixture, injector, player } = build(DECKS[0]);
+      fixture.detectChanges();
+
+      const sink = injector.get(ASID_SINK);
+      const clock = injector.get(FRAME_CLOCK);
+      const beginSpy = vi.spyOn(sink, 'begin');
+      const startSpy = vi.spyOn(clock, 'start').mockResolvedValue(undefined);
+
+      player.loadTune(silentTune());
+      await player.play();
+
+      expect(beginSpy).toHaveBeenCalledWith({ chipModel: 'mos6581' });
+      expect(startSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("releases this deck's own replay thread when the host is destroyed", () => {
+      const { fixture, injector } = build(DECKS[0]);
+      fixture.detectChanges();
+      const disposeSpy = vi.spyOn(injector.get(REPLAY_RUNNER), 'dispose');
+
+      fixture.destroy();
+
+      expect(disposeSpy).toHaveBeenCalledTimes(1);
     });
 
     it('unregisters its own descriptor id on destroy', () => {
@@ -166,22 +173,26 @@ describe('DeckHostComponent', () => {
       expect(registry.decks()).toHaveLength(0);
     });
 
-    it('gives each deck host its own DjPlayerEngine instance, registered under its own descriptor', () => {
+    it('gives each deck host its own player, sink, clock and replay runner, registered under its own descriptor', () => {
       const first = build(DECKS[0]);
       first.fixture.detectChanges();
 
       const second = build(DECKS[1]);
       second.fixture.detectChanges();
 
-      expect(first.engine).not.toBe(second.engine);
+      expect(first.player).not.toBe(second.player);
+      // Two frame clocks and two replay workers per two decks is the design, not something to hoist.
+      expect(first.injector.get(ASID_SINK)).not.toBe(second.injector.get(ASID_SINK));
+      expect(first.injector.get(FRAME_CLOCK)).not.toBe(second.injector.get(FRAME_CLOCK));
+      expect(first.injector.get(REPLAY_RUNNER)).not.toBe(second.injector.get(REPLAY_RUNNER));
 
       const decks = TestBed.inject(DeckRegistry).decks();
       expect(decks.map((deck) => deck.descriptor.id)).toEqual([DECKS[0].id, DECKS[1].id]);
-      expect(decks[0].engine).toBe(first.engine);
-      expect(decks[1].engine).toBe(second.engine);
+      expect(decks[0].player).toBe(first.player);
+      expect(decks[1].player).toBe(second.player);
     });
 
-    it("pushes each deck's own mixer gain to that deck's own engine, and only that deck's own engine — over the single shared MixerService instance DjPocViewComponent provides page-level", () => {
+    it("pushes each deck's own mixer gain to that deck's own player, and only that deck's own player — over the single shared MixerService instance DjPocViewComponent provides page-level", () => {
       const first = build(DECKS[0]);
       const second = build(DECKS[1]);
       first.fixture.detectChanges(); // runs ngOnInit, adopting DECKS[0].id
@@ -192,8 +203,8 @@ describe('DeckHostComponent', () => {
       // not among DeckHostComponent's own component-level providers) — the same one-instance-across-
       // decks topology DjPocViewComponent wires in production.
       const mixer = TestBed.inject(MixerService);
-      const firstGainSpy = vi.spyOn(first.engine, 'setOutputGain');
-      const secondGainSpy = vi.spyOn(second.engine, 'setOutputGain');
+      const firstGainSpy = vi.spyOn(first.player, 'setOutputGain');
+      const secondGainSpy = vi.spyOn(second.player, 'setOutputGain');
 
       mixer.setCrossfaderPosition(1); // hard over to DECKS[1]'s side: fades DECKS[0] to silence
       mixer.setDeckFader(DECKS[1].id, 0.25); // DECKS[1]'s own fader, independent of the crossfader
@@ -209,7 +220,7 @@ describe('DeckHostComponent', () => {
       expect(secondGainSpy).not.toHaveBeenCalledWith(0);
     });
 
-    it("pushes each deck's own mixer scale controls, key and filter mode to that deck's own engine, and only that deck's own engine", () => {
+    it("pushes each deck's own mixer scale controls, key and filter mode to that deck's own player, and only that deck's own player", () => {
       const first = build(DECKS[0]);
       const second = build(DECKS[1]);
       first.fixture.detectChanges(); // runs ngOnInit, adopting DECKS[0].id
@@ -217,10 +228,12 @@ describe('DeckHostComponent', () => {
       TestBed.flushEffects();
 
       const mixer = TestBed.inject(MixerService);
-      const firstScaleSpy = vi.spyOn(first.engine, 'setRegisterScale');
-      const secondScaleSpy = vi.spyOn(second.engine, 'setRegisterScale');
-      const firstFilterSpy = vi.spyOn(first.engine, 'setFilterMode');
-      const secondFilterSpy = vi.spyOn(second.engine, 'setFilterMode');
+      const firstScaleSpy = vi.spyOn(first.player, 'setRegisterScale');
+      const secondScaleSpy = vi.spyOn(second.player, 'setRegisterScale');
+      const firstPitchSpy = vi.spyOn(first.player, 'setVoicePitch');
+      const secondPitchSpy = vi.spyOn(second.player, 'setVoicePitch');
+      const firstFilterSpy = vi.spyOn(first.player, 'setFilterMode');
+      const secondFilterSpy = vi.spyOn(second.player, 'setFilterMode');
 
       mixer.setScalePosition(DECKS[0].id, 'cutoff', 1);
       mixer.setKeySemitones(DECKS[0].id, 12);
@@ -229,103 +242,34 @@ describe('DeckHostComponent', () => {
       second.fixture.detectChanges();
 
       expect(firstScaleSpy).toHaveBeenCalledWith('cutoff', 16);
-      expect(firstScaleSpy).toHaveBeenCalledWith('frequency', 2);
       expect(firstFilterSpy).toHaveBeenCalledWith('lowPass');
       expect(secondScaleSpy).not.toHaveBeenCalledWith('cutoff', 16);
-      expect(secondScaleSpy).not.toHaveBeenCalledWith('frequency', 2);
       expect(secondFilterSpy).not.toHaveBeenCalledWith('lowPass');
+
+      // The Key knob is one control ganged to all three voices — the application is where ganging
+      // is defined, and core carries no frequency-scale group to do it for us.
+      expect(firstPitchSpy).toHaveBeenCalledWith(0, 2);
+      expect(firstPitchSpy).toHaveBeenCalledWith(1, 2);
+      expect(firstPitchSpy).toHaveBeenCalledWith(2, 2);
+      expect(secondPitchSpy).not.toHaveBeenCalledWith(0, 2);
     });
   });
 
   describe('template wiring, over mocked collaborators', () => {
-    interface MockEngine {
-      state: WritableSignal<EngineState>;
-      lastError: WritableSignal<string | null>;
-      stats: WritableSignal<EngineStats>;
-      repeatTrack: WritableSignal<boolean>;
-      trackEndFrame: WritableSignal<number | null>;
-      currentSubtune: WritableSignal<number>;
-      subtuneCount: WritableSignal<number>;
-      speedMultiplier: WritableSignal<number>;
-      slowestSpeed: WritableSignal<number>;
-      fastestSpeed: WritableSignal<number>;
-      nominalIntervalUs: WritableSignal<number>;
-      playRate: WritableSignal<PlayRate>;
-      scheduleAheadMs: WritableSignal<number>;
-      ceilingFrames: WritableSignal<number>;
-      positionBasisFrames: WritableSignal<number>;
-      mutedVoices: WritableSignal<readonly boolean[]>;
-      heldVoices: WritableSignal<readonly boolean[]>;
-      effectiveMutes: WritableSignal<readonly boolean[]>;
-      markers: WritableSignal<readonly Marker[]>;
+    let fixture: ComponentFixture<DeckHostComponent>;
+    let player: FakeDeckPlayer;
+    let sink: FakeAsidSink;
+    let collection: {
+      markers: WritableSignal<readonly SavedMarker[]>;
       loopingMarker: WritableSignal<number | null>;
       queuedMarker: WritableSignal<number | null>;
       markerLaunchPending: WritableSignal<boolean>;
-      nudgeRangeFrames: WritableSignal<number>;
-      positionPercent: WritableSignal<number>;
-      tuneIndex: WritableSignal<null>;
-      play: ReturnType<typeof vi.fn>;
-      pause: ReturnType<typeof vi.fn>;
-      stop: ReturnType<typeof vi.fn>;
-      setOutputGain: ReturnType<typeof vi.fn>;
-      setRegisterScale: ReturnType<typeof vi.fn>;
-      setFilterMode: ReturnType<typeof vi.fn>;
-      setRepeatTrack: ReturnType<typeof vi.fn>;
-      restoreRepeatTrackPreference: ReturnType<typeof vi.fn>;
       addMarker: ReturnType<typeof vi.fn>;
       progressPercentFor: ReturnType<typeof vi.fn>;
-      setTempo: ReturnType<typeof vi.fn>;
-    }
-
-    function makeEngine(): MockEngine {
-      return {
-        state: signal<EngineState>('stopped'),
-        lastError: signal<string | null>(null),
-        stats: signal<EngineStats>(EMPTY_STATS),
-        repeatTrack: signal<boolean>(true),
-        trackEndFrame: signal<number | null>(null),
-        currentSubtune: signal(1),
-        subtuneCount: signal(1),
-        speedMultiplier: signal(1),
-        slowestSpeed: signal(0.3),
-        fastestSpeed: signal(1.7),
-        nominalIntervalUs: signal(19950),
-        playRate: signal<PlayRate>({
-          callsPerFrame: 1,
-          exactCallsPerFrame: 1,
-          roundedCallsPerFrame: 1,
-          mode: 'exact',
-        }),
-        scheduleAheadMs: signal(0),
-        ceilingFrames: signal(10_000),
-        positionBasisFrames: signal(10_000),
-        mutedVoices: signal<readonly boolean[]>([false, false, false]),
-        heldVoices: signal<readonly boolean[]>([false, false, false]),
-        effectiveMutes: signal<readonly boolean[]>([false, false, false]),
-        markers: signal<readonly Marker[]>([]),
-        loopingMarker: signal<number | null>(null),
-        queuedMarker: signal<number | null>(null),
-        markerLaunchPending: signal<boolean>(false),
-        nudgeRangeFrames: signal(50),
-        positionPercent: signal(0),
-        tuneIndex: signal(null),
-        play: vi.fn(),
-        pause: vi.fn(),
-        stop: vi.fn(),
-        setOutputGain: vi.fn(),
-        setRegisterScale: vi.fn(),
-        setFilterMode: vi.fn(),
-        setRepeatTrack: vi.fn(),
-        restoreRepeatTrackPreference: vi.fn(),
-        addMarker: vi.fn(),
-        progressPercentFor: vi.fn(() => 0),
-        setTempo: vi.fn(),
-      };
-    }
-
-    let fixture: ComponentFixture<DeckHostComponent>;
-    let engine: MockEngine;
+      stopMarkerLoop: ReturnType<typeof vi.fn>;
+    };
     let binding: {
+      sink: FakeAsidSink | null;
       selectedPortId: WritableSignal<string | null>;
       lastError: WritableSignal<string | null>;
       restore: ReturnType<typeof vi.fn>;
@@ -343,8 +287,20 @@ describe('DeckHostComponent', () => {
     };
 
     beforeEach(async () => {
-      engine = makeEngine();
+      player = createFakeDeckPlayer();
+      player.snapshot.update((snapshot) => ({ ...snapshot, repeatTrack: true }));
+      sink = createFakeAsidSink();
+      collection = {
+        markers: signal<readonly SavedMarker[]>([]),
+        loopingMarker: signal<number | null>(null),
+        queuedMarker: signal<number | null>(null),
+        markerLaunchPending: signal<boolean>(false),
+        addMarker: vi.fn(),
+        progressPercentFor: vi.fn(() => 0),
+        stopMarkerLoop: vi.fn(),
+      };
       binding = {
+        sink: null,
         selectedPortId: signal<string | null>(null),
         lastError: signal<string | null>(null),
         restore: vi.fn(),
@@ -380,7 +336,10 @@ describe('DeckHostComponent', () => {
             providers: [
               DeckContext,
               { provide: DeckMidiBinding, useValue: binding as unknown as DeckMidiBinding },
-              { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+              { provide: ASID_SINK, useValue: sink },
+              { provide: SID_PLAYER, useValue: player.player },
+              { provide: DECK_PLAYER_VIEW, useValue: player.view },
+              { provide: MarkerCollection, useValue: collection as unknown as MarkerCollection },
               { provide: DeckTuneLoader, useValue: tuneLoader as unknown as DeckTuneLoader },
               {
                 provide: TuneIndexService,
@@ -411,14 +370,14 @@ describe('DeckHostComponent', () => {
 
       for (const [areaKey, selector] of Object.entries(panelSelectors) as [
         keyof DeckPanelAreas,
-        string,
+        string
       ][]) {
         const panelEl: HTMLElement = fixture.nativeElement.querySelector(selector);
         expect(panelEl.style.gridArea).toBe(FAKE_AREAS[areaKey]);
       }
     });
 
-    it('calls engine.play, pause and stop from the transport buttons', () => {
+    it('calls play, pause and stop on the player from the transport buttons', () => {
       binding.selectedPortId.set('port-1');
       tuneLoader.currentTune.set(fakeSidFile());
       fixture.detectChanges();
@@ -427,18 +386,18 @@ describe('DeckHostComponent', () => {
         fixture.nativeElement.querySelectorAll('button')
       );
       buttons.find((button) => button.textContent?.trim() === 'Play')?.click();
-      expect(engine.play).toHaveBeenCalled();
+      expect(player.player.play).toHaveBeenCalled();
 
-      engine.state.set('playing');
+      player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
       fixture.detectChanges();
       buttons.find((button) => button.textContent?.trim() === 'Pause')?.click();
-      expect(engine.pause).toHaveBeenCalled();
+      expect(player.player.pause).toHaveBeenCalled();
 
       buttons.find((button) => button.textContent?.trim() === 'Stop')?.click();
-      expect(engine.stop).toHaveBeenCalled();
+      expect(player.player.stop).toHaveBeenCalled();
     });
 
-    it('gates Play on a loaded tune, a selected MIDI port and an idle engine', () => {
+    it('gates Play on a loaded tune, a selected MIDI port and an idle deck', () => {
       function playButton(): HTMLButtonElement {
         return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
           (button) => button.textContent?.trim() === 'Play'
@@ -454,7 +413,7 @@ describe('DeckHostComponent', () => {
       expect(playButton().disabled).toBe(false);
     });
 
-    it("reflects and writes the engine's repeatTrack signal from the repeat toggle", () => {
+    it("reflects and writes the player's repeatTrack from the repeat toggle, persisting it under this deck's own key", () => {
       function repeatToggle(): HTMLInputElement {
         return fixture.nativeElement.querySelector(
           `[aria-label="Repeat track deck ${DECKS[0].label}"]`
@@ -466,7 +425,8 @@ describe('DeckHostComponent', () => {
       repeatToggle().checked = false;
       repeatToggle().dispatchEvent(new Event('change'));
 
-      expect(engine.setRepeatTrack).toHaveBeenCalledWith(false);
+      expect(player.player.setRepeatTrack).toHaveBeenCalledWith(false);
+      expect(localStorage.getItem(`asid-dj-0.deck-${DECKS[0].id}.repeat-track`)).toBe('false');
     });
 
     it('delegates a tune-source click to the tune loader', () => {
@@ -479,9 +439,9 @@ describe('DeckHostComponent', () => {
       expect(tuneLoader.selectTune).toHaveBeenCalledWith(tuneLoader.availableTunes()[0]);
     });
 
-    it('calls engine.addMarker from the Loops/Cues panel Add control', () => {
-      engine.addMarker.mockImplementation(() => {
-        engine.markers.set([markerWithStart(0)]);
+    it('adds a marker to the collection from the Loops/Cues panel Add control', () => {
+      collection.addMarker.mockImplementation(() => {
+        collection.markers.set([markerWithStart(0)]);
         return 0;
       });
 
@@ -490,7 +450,7 @@ describe('DeckHostComponent', () => {
       ) as HTMLButtonElement;
       addButton.click();
 
-      expect(engine.addMarker).toHaveBeenCalled();
+      expect(collection.addMarker).toHaveBeenCalled();
     });
   });
 });

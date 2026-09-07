@@ -8,8 +8,7 @@ type Transport = 'stopped' | 'playing' | 'paused' | 'ended' | 'error';
 
 /**
  * Stands in for `SidPlayer`'s seek and active-loop operations — enough to exercise the collection
- * without a real timeline. PAL's nominal interval and an unmultiplied rate, so 1 frame is 20 ms and
- * the numbers read the same as `engine/marker-state.spec.ts`'s own harness.
+ * without a real timeline. PAL's nominal interval and an unmultiplied rate, so 1 frame is 20 ms.
  */
 class FakePlayer implements MarkerPlayer {
   private frame: Frames = frames(0);

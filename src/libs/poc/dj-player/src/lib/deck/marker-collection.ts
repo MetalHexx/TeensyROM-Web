@@ -3,8 +3,8 @@ import { clamp, frames, milliseconds, msToPlayCalls } from '@sidablist/core';
 import type { Frames, PlayRate } from '@sidablist/core';
 
 /** The nudge window in real time. An application ergonomic, not a timeline fact, so it lives here
- *  rather than in core — see `engine/marker-state.ts`'s own copy for the felt-range rationale this
- *  inherits unchanged. */
+ *  rather than in core: frames are derived from the tune's own rate, so the felt range is the same
+ *  on a 1x tune and a 2x-multispeed one. */
 export const NUDGE_RANGE_MS = 1000;
 
 /** How much music plays into the seam when a marker's end is auditioned. A feel default — confirm
@@ -22,8 +22,8 @@ export interface MarkerLoopBounds {
  * What `MarkerCollection` needs from the player: core's seek and active-loop operations, plus enough
  * of its read side to size a nudge in frames and read a loop's progress against the bounds core is
  * actually enforcing. Named narrowly and taken as a constructor argument rather than reaching for a
- * coordinator — the same reasoning as `MarkerHost` in `engine/marker-state.ts` — and shaped as a
- * structural subset of `SidPlayer`, so a real one satisfies this with no adapter once one exists.
+ * coordinator — and shaped as a structural subset of `SidPlayer`, so a real one satisfies this
+ * with no adapter.
  */
 export interface MarkerPlayer {
   /** Pulled, not pushed — mirrors `SidPlayer.getSnapshot()`'s own contract for the fields this reads. */
@@ -99,7 +99,7 @@ export class MarkerCollection {
   /** The marker queued behind the one currently looping, or null. */
   readonly queuedMarker: WritableSignal<number | null> = signal(null);
   /** True for the span of `triggerMarker`'s `play()` await — the view must gate trigger and delete on
-   *  this rather than trust an index across that gap, exactly as it did against the old engine. */
+   *  this rather than trust an index across that gap. */
   readonly markerLaunchPending: WritableSignal<boolean> = signal(false);
 
   /** Converts a real-time duration to frames at the tune's own rate, read fresh from the player
@@ -135,7 +135,11 @@ export class MarkerCollection {
   /** Appends a new marker, capturing the current position into its start. Returns the row's index. */
   addMarker(): number {
     const index = this.markers().length;
-    const marker: SavedMarker = { startFrame: this.player.getPosition(), startOffsetMs: 0, end: null };
+    const marker: SavedMarker = {
+      startFrame: this.player.getPosition(),
+      startOffsetMs: 0,
+      end: null,
+    };
     this.markers.update((markers) => [...markers, marker]);
     return index;
   }

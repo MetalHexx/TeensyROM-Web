@@ -1,53 +1,27 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal, type WritableSignal } from '@angular/core';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { VoiceSpeedColumnComponent } from './voice-speed-column.component';
 import { DeckContext } from '../deck-context';
-import { DjPlayerEngine } from '../../engine/dj-player-engine';
-
-interface MockEngine {
-  mutedVoices: WritableSignal<readonly boolean[]>;
-  effectiveMutes: WritableSignal<readonly boolean[]>;
-  speedMultiplier: WritableSignal<number>;
-  setVoiceMuted: ReturnType<typeof vi.fn>;
-  setVoiceHeld: ReturnType<typeof vi.fn>;
-  clearVoiceMutes: ReturnType<typeof vi.fn>;
-  setSpeed: ReturnType<typeof vi.fn>;
-  setTempo: ReturnType<typeof vi.fn>;
-  slowestSpeed: ReturnType<typeof vi.fn>;
-  fastestSpeed: ReturnType<typeof vi.fn>;
-}
-
-function makeEngine(): MockEngine {
-  return {
-    mutedVoices: signal<readonly boolean[]>([false, false, false]),
-    effectiveMutes: signal<readonly boolean[]>([false, false, false]),
-    speedMultiplier: signal<number>(1),
-    setVoiceMuted: vi.fn(),
-    setVoiceHeld: vi.fn(),
-    clearVoiceMutes: vi.fn(),
-    setSpeed: vi.fn(),
-    setTempo: vi.fn(),
-    slowestSpeed: vi.fn(() => 0.3),
-    fastestSpeed: vi.fn(() => 1.7),
-  };
-}
+import { DECK_PLAYER_VIEW, SID_PLAYER } from '../deck-player';
+import { createFakeDeckPlayer } from '../../../testing/player-doubles';
+import type { FakeDeckPlayer } from '../../../testing/player-doubles';
 
 describe('VoiceSpeedColumnComponent', () => {
   let fixture: ComponentFixture<VoiceSpeedColumnComponent>;
-  let engine: MockEngine;
+  let player: FakeDeckPlayer;
 
   function build(deckLabel: string): void {
     // Lets a single test build two decks in sequence (to compare their accessible names) without
     // TestBed refusing a second `configureTestingModule` call against an already-instantiated module.
     TestBed.resetTestingModule();
-    engine = makeEngine();
+    player = createFakeDeckPlayer();
 
     TestBed.configureTestingModule({
       imports: [VoiceSpeedColumnComponent],
       providers: [
         DeckContext,
-        { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+        { provide: SID_PLAYER, useValue: player.player },
+        { provide: DECK_PLAYER_VIEW, useValue: player.view },
       ],
     });
 
@@ -73,13 +47,20 @@ describe('VoiceSpeedColumnComponent', () => {
 
     expect(holdButton(0).textContent?.trim()).toBe('Kill');
 
-    engine.mutedVoices.set([true, false, false]);
+    player.snapshot.update((snapshot) => ({
+      ...snapshot,
+      voices: [
+        { muted: true, held: false },
+        { muted: false, held: false },
+        { muted: false, held: false },
+      ],
+    }));
     fixture.detectChanges();
 
     expect(holdButton(0).textContent?.trim()).toBe('Punch In');
   });
 
-  it("orders the speed buttons +50% / Home / −50% top to bottom", () => {
+  it('orders the speed buttons +50% / Home / −50% top to bottom', () => {
     build('A');
 
     const labels = Array.from(
@@ -89,7 +70,7 @@ describe('VoiceSpeedColumnComponent', () => {
     expect(labels).toEqual(['+50%', 'Home', '−50%']);
   });
 
-  it("suffix voice and speed control names with their own deck, distinct from the other deck", () => {
+  it('suffix voice and speed control names with their own deck, distinct from the other deck', () => {
     build('A');
     const aKill = holdButton(0).getAttribute('aria-label');
     fixture.destroy();
@@ -102,14 +83,13 @@ describe('VoiceSpeedColumnComponent', () => {
     expect(aKill).not.toBe(bKill);
   });
 
-  describe('the speed jump excursion, drawn from the extracted state machine rather than the engine', () => {
-    it('drives the jump buttons through engine.setTempo, clamped to the bounds the engine reports', () => {
+  describe('the speed jump excursion', () => {
+    it("drives the jump buttons through the player's setTempo, clamped to the hard span", () => {
       build('A');
 
       speedButton('+50%').click();
 
-      expect(engine.setTempo).toHaveBeenLastCalledWith(1.5);
-      expect(engine.setSpeed).not.toHaveBeenCalled();
+      expect(player.player.setTempo).toHaveBeenLastCalledWith(1.5);
     });
 
     it('restores home exactly on the opposite button, closing the excursion', () => {
@@ -118,7 +98,7 @@ describe('VoiceSpeedColumnComponent', () => {
       speedButton('+50%').click();
       speedButton('−50%').click();
 
-      expect(engine.setTempo).toHaveBeenLastCalledWith(1);
+      expect(player.player.setTempo).toHaveBeenLastCalledWith(1);
     });
 
     it('routes Home through the same excursion module', () => {
@@ -127,7 +107,7 @@ describe('VoiceSpeedColumnComponent', () => {
       speedButton('+50%').click();
       speedButton('Home').click();
 
-      expect(engine.setTempo).toHaveBeenLastCalledWith(1);
+      expect(player.player.setTempo).toHaveBeenLastCalledWith(1);
     });
   });
 });

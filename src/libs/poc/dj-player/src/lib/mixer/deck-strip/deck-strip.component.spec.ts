@@ -4,11 +4,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { DeckStripComponent } from './deck-strip.component';
 import { MixerService } from '../mixer.service';
 import { DeckRegistry } from '../../deck/deck-registry';
-import type { DeckHandle } from '../../deck/deck-registry';
 import type { TuneIndexService } from '../../analysis/tune-index.service';
 import type { TuneIndexRecord } from '../../analysis/tune-index.model';
 import { TUNE_INDEX_FORMAT_VERSION } from '../../analysis/tune-index.model';
 import { DECKS } from '../../deck/deck.config';
+import { fakeDeckHandle } from '../../../testing/player-doubles';
 
 function fakeRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
@@ -47,13 +47,11 @@ describe('DeckStripComponent', () => {
   beforeEach(async () => {
     registry = new DeckRegistry();
     deckARecord = signal<TuneIndexRecord | null>(null);
-    registry.register({
-      descriptor: DECKS[0],
-      engine: {} as DeckHandle['engine'],
-      binding: {} as DeckHandle['binding'],
-      tuneIndex: { record: deckARecord } as unknown as TuneIndexService,
-      tuneLoader: {} as DeckHandle['tuneLoader'],
-    });
+    registry.register(
+      fakeDeckHandle(DECKS[0], {
+        tuneIndex: { record: deckARecord } as unknown as TuneIndexService,
+      })
+    );
 
     await TestBed.configureTestingModule({
       imports: [DeckStripComponent],
@@ -89,7 +87,9 @@ describe('DeckStripComponent', () => {
     expect(knobInput('Pulse Width')).not.toBeNull();
     expect(knobInput('Key')).not.toBeNull();
     expect(
-      fixture.nativeElement.querySelector(`input[aria-label="Channel fader deck ${DECKS[0].label}"]`)
+      fixture.nativeElement.querySelector(
+        `input[aria-label="Channel fader deck ${DECKS[0].label}"]`
+      )
     ).not.toBeNull();
   });
 

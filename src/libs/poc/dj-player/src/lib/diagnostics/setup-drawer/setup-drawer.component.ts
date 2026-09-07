@@ -1,15 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { createWorkerReplayRunner, frames } from '@sidablist/core';
-import type { SidFile as CoreSidFile } from '@sidablist/core';
+import {
+  createWorkerReplayRunner,
+  frames,
+  microseconds,
+  milliseconds,
+  PAL_FRAME_INTERVAL_US,
+} from '@sidablist/core';
+import type { SidFile, TimingMode } from '@sidablist/core';
 import { logInfo, LogType } from '@teensyrom-nx/utils';
 import { DeckRegistry } from '../../deck/deck-registry';
 import type { DeckHandle } from '../../deck/deck-registry';
-import { NOMINAL_INTERVAL_OPTIONS_US } from '../../engine/dj-player-engine';
-import type { EngineStats } from '../../engine/dj-player-engine';
-import type { TimingMode } from '../../engine/play-rate';
 import { MixerService } from '../../mixer/mixer.service';
 import type { KeyDisplayFormat } from '../../mixer/key-display';
-import type { SidFile } from '../../sid/sid-file.model';
 import {
   tuneIndexKeyConfidenceLabel,
   tuneIndexKeyLabel,
@@ -24,8 +26,14 @@ import { crossDeckDriftMs, formatCrossDeckDrift } from '../cross-deck-drift';
 const MICROSECONDS_PER_SECOND = 1_000_000;
 
 /**
+ * The three nominal PAL intervals worth comparing: 50.125 Hz (real hardware), the firmware's own
+ * split-the-difference default, and 50.0 Hz (what DeepSID uses).
+ */
+const NOMINAL_INTERVAL_OPTIONS_US: readonly number[] = [PAL_FRAME_INTERVAL_US, 19975, 20000];
+
+/**
  * Off, two sub-frame probes, then a ceiling that reaches well past a single PAL frame (~19.95 ms).
- * Carried over verbatim from the retired per-deck sidebar — see `DjPlayerEngine.setScheduleAhead`.
+ * Carried over verbatim from the retired per-deck sidebar — see `AsidSink.setScheduleAhead`.
  */
 const SCHEDULE_AHEAD_OPTIONS_MS: readonly number[] = [0, 5, 20, 40, 80, 160];
 
@@ -50,7 +58,7 @@ const SMOKE_TUNE_PLAY_ADDRESS = 0x1010;
 /** init and play both return at once and touch no register — enough to prove the worker actually
  *  ran the tune's own 6502 code, not merely echoed a message. Mirrors the `silentTune` fixture
  *  `@sidablist/core`'s own replay specs build the same way. */
-function buildSmokeTune(): CoreSidFile {
+function buildSmokeTune(): SidFile {
   const data = new Uint8Array(SMOKE_TUNE_PLAY_ADDRESS - SMOKE_TUNE_LOAD_ADDRESS + 1);
   data[0] = RTS;
   data[SMOKE_TUNE_PLAY_ADDRESS - SMOKE_TUNE_LOAD_ADDRESS] = RTS;
@@ -93,7 +101,7 @@ const createCoreReplayWorker = (): Worker =>
  * reading `DeckRegistry.decks()` in `DECKS` order so two decks can be compared at a glance.
  *
  * A settable figure still renders as its control, never demoted to a readout: the nominal frame
- * interval and Schedule ahead are per-deck `<select>`s — the engine derives the interval from each
+ * interval and Schedule ahead are per-deck `<select>`s — the player derives the interval from each
  * tune's own PAL/NTSC clock, so it cannot be page-level — and the Tune Index Timing toggle is a
  * `<select>` too. The one page-level exception is the main-thread stall control, moved in here from
  * `DjPocViewComponent`: it is singular because it stalls the one main thread both decks share, and
@@ -131,7 +139,7 @@ export class SetupDrawerComponent {
     const [a, b] = decks;
     return formatCrossDeckDrift(
       [a.descriptor.label, b.descriptor.label],
-      crossDeckDriftMs(a.engine.stats(), b.engine.stats())
+      crossDeckDriftMs(a.view.stats(), b.view.stats())
     );
   });
 
@@ -167,18 +175,25 @@ export class SetupDrawerComponent {
   /** An NTSC tune loads an interval of its own, so the selector has to be able to show it even when
    *  it is not one of the fixed PAL options. */
   protected intervalOptionsFor(deck: DeckHandle): readonly number[] {
-    const current = deck.engine.nominalIntervalUs();
+    const current = this.nominalIntervalUsFor(deck);
     return NOMINAL_INTERVAL_OPTIONS_US.includes(current)
       ? NOMINAL_INTERVAL_OPTIONS_US
       : [current, ...NOMINAL_INTERVAL_OPTIONS_US];
   }
 
-  protected onNominalIntervalChange(deck: DeckHandle, event: Event): void {
-    deck.engine.setNominalIntervalUs(Number((event.target as HTMLSelectElement).value));
+  protected nominalIntervalUsFor(deck: DeckHandle): number {
+    return deck.view.snapshot().tempo.nominalIntervalUs;
   }
 
+  protected onNominalIntervalChange(deck: DeckHandle, event: Event): void {
+    deck.player.setNominalIntervalUs(
+      microseconds(Number((event.target as HTMLSelectElement).value))
+    );
+  }
+
+  /** The schedule-ahead window is the sink's, not the player's — see `AsidSink.setScheduleAhead`. */
   protected onScheduleAheadChange(deck: DeckHandle, event: Event): void {
-    deck.engine.setScheduleAhead(Number((event.target as HTMLSelectElement).value));
+    deck.sink.setScheduleAhead(milliseconds(Number((event.target as HTMLSelectElement).value)));
   }
 
   protected frameRateHz(intervalUs: number): string {
@@ -218,7 +233,9 @@ export class SetupDrawerComponent {
     const tune = this.tuneFor(deck);
     return tune === null
       ? EM_DASH
-      : `$${tune.loadAddress.toString(16)} / $${tune.initAddress.toString(16)} / $${tune.playAddress.toString(16)}`;
+      : `$${tune.loadAddress.toString(16)} / $${tune.initAddress.toString(
+          16
+        )} / $${tune.playAddress.toString(16)}`;
   }
 
   protected secondSidLabelFor(deck: DeckHandle): string {
@@ -239,11 +256,16 @@ export class SetupDrawerComponent {
   // --- Tune Index ---------------------------------------------------------------------------------
 
   private rateFor(deck: DeckHandle): TuneIndexRate {
-    return { nominalIntervalUs: deck.engine.nominalIntervalUs(), playRate: deck.engine.playRate() };
+    const { nominalIntervalUs, rate } = deck.view.snapshot().tempo;
+    return { nominalIntervalUs, playRate: rate };
   }
 
   protected tuneIndexLengthLabelFor(deck: DeckHandle): string {
-    return tuneIndexLengthLabel(deck.tuneIndex.record(), deck.tuneIndex.pending(), this.rateFor(deck));
+    return tuneIndexLengthLabel(
+      deck.tuneIndex.record(),
+      deck.tuneIndex.pending(),
+      this.rateFor(deck)
+    );
   }
 
   protected tuneIndexLoopStartLabelFor(deck: DeckHandle): string {
@@ -291,40 +313,44 @@ export class SetupDrawerComponent {
 
   // --- Diagnostics --------------------------------------------------------------------------------
 
+  /** Reads back what the sink actually holds, which is clamped when the port cannot cancel — see
+   *  `UNCANCELLABLE_SCHEDULE_AHEAD_CEILING_MS`. */
   protected scheduleAheadLabelFor(deck: DeckHandle): string {
-    const ms = deck.engine.scheduleAheadMs();
-    return ms === 0 ? 'off' : `${ms} ms`;
+    const ms = deck.sink.capabilities.scheduleAheadMs;
+    return ms === null || ms === 0 ? 'off' : `${ms} ms`;
   }
 
   // One SID-data packet goes out per clock tick, so the clock's own measured tick rate is the
   // frame-packet rate; the occasional Start/Stop/Identify control packet is noise against it.
-  protected packetsPerSecond(stats: EngineStats): number {
-    return stats.measuredMeanIntervalUs > 0 ? MICROSECONDS_PER_SECOND / stats.measuredMeanIntervalUs : 0;
+  protected packetsPerSecond(deck: DeckHandle): number {
+    const measured = deck.view.stats().clock.measuredMeanIntervalUs;
+    return measured > 0 ? MICROSECONDS_PER_SECOND / measured : 0;
   }
 
-  protected bytesPerSecond(stats: EngineStats): number {
-    return stats.packetsSent > 0
-      ? this.packetsPerSecond(stats) * (stats.bytesSent / stats.packetsSent)
-      : 0;
+  /** Packets and bytes are the sink's own counters — core measures delivery against the frame grid
+   *  and leaves what went on the wire to whatever put it there. */
+  protected bytesPerSecond(deck: DeckHandle): number {
+    const { packetsSent, bytesSent } = deck.sink.stats;
+    return packetsSent > 0 ? this.packetsPerSecond(deck) * (bytesSent / packetsSent) : 0;
   }
 
   protected intervalMeasuredLabelFor(deck: DeckHandle): string {
-    const stats = deck.engine.stats();
-    return `${stats.measuredMeanIntervalUs.toFixed(1)} µs (${deck.engine.nominalIntervalUs()} µs)`;
+    const measured = deck.view.stats().clock.measuredMeanIntervalUs;
+    return `${measured.toFixed(1)} µs (${this.nominalIntervalUsFor(deck)} µs)`;
   }
 
   protected jitterLabelFor(deck: DeckHandle): string {
-    const stats = deck.engine.stats();
-    return `${stats.jitterMs.toFixed(2)} ms / ${stats.worstGapMs.toFixed(1)} ms`;
+    const clock = deck.view.stats().clock;
+    return `${clock.jitterMs.toFixed(2)} ms / ${clock.worstGapMs.toFixed(1)} ms`;
   }
 
   protected lagLabelFor(deck: DeckHandle): string {
-    const stats = deck.engine.stats();
-    return `${stats.meanLagMs.toFixed(1)} ms / ${stats.worstLagMs.toFixed(1)} ms`;
+    const delivery = deck.view.stats().delivery;
+    return `${delivery.meanLagMs.toFixed(1)} ms / ${delivery.worstLagMs.toFixed(1)} ms`;
   }
 
   protected cancelLatencyLabelFor(deck: DeckHandle): string {
-    const ms = deck.engine.stats().lastCancelLatencyMs;
+    const ms = deck.sink.stats.lastCancelLatencyMs;
     return ms < 0 ? EM_DASH : `${ms.toFixed(1)} ms`;
   }
 
@@ -352,7 +378,7 @@ export class SetupDrawerComponent {
       this.smokeJobResult.set(
         response.ok
           ? `frame ${SMOKE_TARGET_FRAME} → landed at frame ${response.result.frame}`
-          : `failed: ${response.error}`,
+          : `failed: ${response.error}`
       );
     } catch (error) {
       this.smokeJobResult.set(`failed: ${error instanceof Error ? error.message : String(error)}`);

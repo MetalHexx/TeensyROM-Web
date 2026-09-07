@@ -24,7 +24,7 @@ export interface ScanOutput {
  * on the same objects — rather than restoring a serialised snapshot — is what makes a deepened scan
  * bit-identical to one that never stopped.
  *
- * Free of Angular and of the engine for the same reason `replayToFrame` is — it must produce the same
+ * Free of Angular and of the player for the same reason core's `replayToFrame` is — it must produce the same
  * answer whether it runs on a worker or on the calling thread.
  *
  * There is deliberately no tune-end detection: `advanceTo` runs exactly the frames it is asked for,

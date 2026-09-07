@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TrackAnalysisPanelComponent } from './track-analysis-panel.component';
-import type { DjPlayerEngine, EngineStats } from '../../engine/dj-player-engine';
+import { frames, microseconds } from '@sidablist/core';
 import { ANALYSIS_SCANNER } from '../scan-runner';
 import type { AnalysisScanner, ScanResult } from '../scan-runner';
 import type { ScanOutput } from '../scan-tune';
@@ -17,40 +17,21 @@ import type { PlayRate } from '@sidablist/core';
 import { formatDuration } from '../format';
 import type { DeckHandle } from '../../deck/deck-registry';
 import type { DeckTuneLoader } from '../../deck/deck-tune-loader';
+import type { MarkerCollection } from '../../deck/marker-collection';
+import {
+  createFakeDeckPlayer,
+  fakeDeckHandle as buildDeckHandle,
+} from '../../../testing/player-doubles';
+import type { FakeDeckPlayer } from '../../../testing/player-doubles';
 
-const BASE_STATS: EngineStats = {
-  framesRendered: 0,
-  packetsSent: 0,
-  bytesSent: 0,
-  suppressedWrites: 0,
-  illegalOpcodeCount: 0,
-  callsPerFrame: 1,
-  effectiveIntervalUs: 0,
-  measuredMeanIntervalUs: 0,
-  driftMs: 0,
-  jitterMs: 0,
-  worstGapMs: 0,
-  lateCallbacks: 0,
-  scheduledFrames: 0,
-  lateFrames: 0,
-  meanLagMs: 0,
-  worstLagMs: 0,
-  reorderedFrames: 0,
-  clampedFrames: 0,
-  cancelSupported: false,
-  lastCancelLatencyMs: -1,
-};
+/** Deliberately distinct from the ceiling, so a test that reads this rather than the ceiling proves
+ *  jumpToFrame() actually moved onto the basis. */
+const POSITION_BASIS_FRAMES = 8_000;
+const CEILING_FRAMES = 10_000;
 
-interface StubEngine {
-  currentSubtune: WritableSignal<number>;
-  ceilingFrames: WritableSignal<number>;
-  positionBasisFrames: WritableSignal<number>;
-  stats: WritableSignal<EngineStats>;
-  nominalIntervalUs: WritableSignal<number>;
-  playRate: WritableSignal<PlayRate>;
-  speedMultiplier: WritableSignal<number>;
-  scrubTo: ReturnType<typeof vi.fn>;
+interface StubMarkers {
   addMarker: ReturnType<typeof vi.fn>;
+  stopMarkerLoop: ReturnType<typeof vi.fn>;
 }
 
 interface StubScanner {
@@ -78,17 +59,54 @@ function makeTuneLoader(file: SidFile | null): StubTuneLoader {
 function fakeDeckHandle(
   id: string,
   label: string,
-  engine: StubEngine,
+  player: FakeDeckPlayer,
+  markers: StubMarkers,
   tuneIndex: StubTuneIndexService,
   tuneLoader: StubTuneLoader
 ): DeckHandle {
-  return {
-    descriptor: { id, label },
-    engine: engine as unknown as DjPlayerEngine,
-    binding: {} as DeckHandle['binding'],
-    tuneIndex: tuneIndex as unknown as TuneIndexService,
-    tuneLoader: tuneLoader as unknown as DeckTuneLoader,
-  };
+  return buildDeckHandle(
+    { id, label },
+    {
+      player: player.player,
+      view: player.view,
+      markers: markers as unknown as MarkerCollection,
+      tuneIndex: tuneIndex as unknown as TuneIndexService,
+      tuneLoader: tuneLoader as unknown as DeckTuneLoader,
+    }
+  );
+}
+
+/** Moves this deck's basis figures — the two the panel reads apart from the rate. */
+function setBasis(player: FakeDeckPlayer, patch: { ceiling?: number; basis?: number }): void {
+  player.snapshot.update((snapshot) => ({
+    ...snapshot,
+    basis: {
+      ...snapshot.basis,
+      ceilingFrames: frames(patch.ceiling ?? snapshot.basis.ceilingFrames),
+      positionBasisFrames: frames(patch.basis ?? snapshot.basis.positionBasisFrames),
+    },
+  }));
+}
+
+function setSubtune(player: FakeDeckPlayer, subtune: number): void {
+  player.snapshot.update((snapshot) => ({
+    ...snapshot,
+    tune: { subtune, subtuneCount: 4, lengthFrames: null },
+  }));
+}
+
+function setTempoMultiplier(player: FakeDeckPlayer, multiplier: number): void {
+  player.snapshot.update((snapshot) => ({
+    ...snapshot,
+    tempo: { ...snapshot.tempo, multiplier },
+  }));
+}
+
+function setPlayRate(player: FakeDeckPlayer, rate: PlayRate): void {
+  player.snapshot.update((snapshot) => ({
+    ...snapshot,
+    tempo: { ...snapshot.tempo, rate, callsPerFrame: rate.roundedCallsPerFrame },
+  }));
 }
 
 function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
@@ -119,25 +137,23 @@ function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneInde
   };
 }
 
-function makeEngine(): StubEngine {
-  return {
-    currentSubtune: signal(1),
-    ceilingFrames: signal(10_000),
-    // Deliberately distinct from ceilingFrames, so a test that reads this rather than the ceiling
-    // proves jumpToFrame actually moved onto the basis.
-    positionBasisFrames: signal(8_000),
-    stats: signal<EngineStats>(BASE_STATS),
-    nominalIntervalUs: signal(19_950),
-    playRate: signal<PlayRate>({
-      callsPerFrame: 1,
-      exactCallsPerFrame: 1,
-      roundedCallsPerFrame: 1,
-      mode: 'exact',
-    }),
-    speedMultiplier: signal(1),
-    scrubTo: vi.fn().mockResolvedValue(undefined),
-    addMarker: vi.fn(() => 0),
-  };
+function makePlayer(): FakeDeckPlayer {
+  const fake = createFakeDeckPlayer();
+  fake.snapshot.update((snapshot) => ({
+    ...snapshot,
+    tune: { subtune: 1, subtuneCount: 4, lengthFrames: null },
+    tempo: { ...snapshot.tempo, nominalIntervalUs: microseconds(19_950) },
+    basis: {
+      ...snapshot.basis,
+      ceilingFrames: frames(CEILING_FRAMES),
+      positionBasisFrames: frames(POSITION_BASIS_FRAMES),
+    },
+  }));
+  return fake;
+}
+
+function makeMarkers(): StubMarkers {
+  return { addMarker: vi.fn(() => 0), stopMarkerLoop: vi.fn() };
 }
 
 function makeScanner(): StubScanner {
@@ -269,13 +285,15 @@ function buildConstantlyActiveScan(frames: number): ScanOutput {
 describe('TrackAnalysisPanelComponent', () => {
   let fixture: ComponentFixture<TrackAnalysisPanelComponent>;
   let component: TrackAnalysisPanelComponent;
-  let engine: StubEngine;
+  let player: FakeDeckPlayer;
+  let markers: StubMarkers;
   let scanner: StubScanner;
   let tuneIndex: StubTuneIndexService;
   let tuneLoader: StubTuneLoader;
 
   async function setup(file: SidFile | null = fakeSidFile()): Promise<void> {
-    engine = makeEngine();
+    player = makePlayer();
+    markers = makeMarkers();
     scanner = makeScanner();
     tuneIndex = makeTuneIndexService();
     tuneLoader = makeTuneLoader(file);
@@ -285,14 +303,19 @@ describe('TrackAnalysisPanelComponent', () => {
     })
       .overrideComponent(TrackAnalysisPanelComponent, {
         set: {
-          providers: [{ provide: ANALYSIS_SCANNER, useValue: scanner as unknown as AnalysisScanner }],
+          providers: [
+            { provide: ANALYSIS_SCANNER, useValue: scanner as unknown as AnalysisScanner },
+          ],
         },
       })
       .compileComponents();
 
     fixture = TestBed.createComponent(TrackAnalysisPanelComponent);
     component = fixture.componentInstance;
-    fixture.componentRef.setInput('deck', fakeDeckHandle('a', 'A', engine, tuneIndex, tuneLoader));
+    fixture.componentRef.setInput(
+      'deck',
+      fakeDeckHandle('a', 'A', player, markers, tuneIndex, tuneLoader)
+    );
     fixture.detectChanges();
   }
 
@@ -362,8 +385,8 @@ describe('TrackAnalysisPanelComponent', () => {
   });
 
   it('requests a scan bounded by ceilingFrames, at the current subtune', () => {
-    engine.currentSubtune.set(2);
-    engine.ceilingFrames.set(12_345);
+    setSubtune(player, 2);
+    setBasis(player, { ceiling: 12_345 });
     scanner.scan.mockReturnValue(new Promise<ScanResult>(() => undefined));
 
     expand();
@@ -423,7 +446,11 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(match).not.toBeNull();
     const frame = Number((match as RegExpMatchArray)[1].replace(/,/g, ''));
 
-    expect(engine.scrubTo).toHaveBeenCalledWith((frame / engine.positionBasisFrames()) * 100);
+    // A percentage of the basis, resolved onto the ceiling the player measures a seek against.
+    const percent = (frame / POSITION_BASIS_FRAMES) * 100;
+    expect(player.player.seek).toHaveBeenCalledWith(
+      frames(Math.round((percent / 100) * CEILING_FRAMES))
+    );
   });
 
   it('awaits the jump landing before adding a marker from Copy to marker', async () => {
@@ -432,7 +459,7 @@ describe('TrackAnalysisPanelComponent', () => {
     fixture.detectChanges();
 
     let resolveScrub!: () => void;
-    engine.scrubTo.mockImplementation(
+    vi.mocked(player.player.seek).mockImplementation(
       () => new Promise<void>((resolve) => (resolveScrub = resolve))
     );
 
@@ -440,13 +467,13 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(copyButton.disabled).toBe(false);
     copyButton.click();
 
-    expect(engine.addMarker).not.toHaveBeenCalled();
+    expect(markers.addMarker).not.toHaveBeenCalled();
 
     resolveScrub();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(engine.addMarker).toHaveBeenCalled();
+    expect(markers.addMarker).toHaveBeenCalled();
   });
 
   it("clears the analysis when the deck's loaded tune changes", async () => {
@@ -464,25 +491,25 @@ describe('TrackAnalysisPanelComponent', () => {
     await completeAnalysis(buildSpikeScan());
     expect(candidateHits().length).toBeGreaterThan(0);
 
-    engine.currentSubtune.set(2);
+    setSubtune(player, 2);
     fixture.detectChanges();
 
     expect(candidateHits().length).toBe(0);
     expect(fixture.nativeElement.querySelector('.analysis-empty')).not.toBeNull();
   });
 
-  it("retargets onto the newly selected deck's own engine, tune index and loaded tune when the deck input changes", async () => {
+  it("retargets onto the newly selected deck's own player, tune index and loaded tune when the deck input changes", async () => {
     await completeAnalysis(buildSpikeScan());
     expect(candidateHits().length).toBeGreaterThan(0);
-    engine.ceilingFrames.set(999); // proves the outgoing deck's own engine is no longer read
+    setBasis(player, { ceiling: 999 }); // proves the outgoing deck's own player is no longer read
 
-    const otherEngine = makeEngine();
+    const otherPlayer = makePlayer();
     const otherTuneIndex = makeTuneIndexService();
     const otherTuneLoader = makeTuneLoader(fakeSidFile({ name: 'Deck B tune' }));
 
     fixture.componentRef.setInput(
       'deck',
-      fakeDeckHandle('b', 'B', otherEngine, otherTuneIndex, otherTuneLoader)
+      fakeDeckHandle('b', 'B', otherPlayer, makeMarkers(), otherTuneIndex, otherTuneLoader)
     );
     fixture.detectChanges();
 
@@ -491,11 +518,11 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(candidateHits().length).toBe(0);
     expect(fixture.nativeElement.querySelector('.analysis-empty')).not.toBeNull();
 
-    otherEngine.ceilingFrames.set(54_321);
+    setBasis(otherPlayer, { ceiling: 54_321 });
     scanner.scan.mockReturnValue(new Promise<ScanResult>(() => undefined));
     (fixture.nativeElement.querySelector('.analysis-run') as HTMLButtonElement).click();
 
-    // The scan request the new deck's own engine drives, not the outgoing deck's ceiling.
+    // The scan request the new deck's own player drives, not the outgoing deck's ceiling.
     const [request] = scanner.scan.mock.calls[scanner.scan.mock.calls.length - 1];
     expect(request.maxFrames).toBe(54_321);
   });
@@ -513,7 +540,7 @@ describe('TrackAnalysisPanelComponent', () => {
     await completeAnalysis(buildCMajorScan());
     expect(readoutValue('Key (sounding)')).toContain('C major');
 
-    engine.speedMultiplier.set(1.06);
+    setTempoMultiplier(player, 1.06);
     fixture.detectChanges();
 
     expect(readoutValue('Key (native)')).toContain('C major');
@@ -565,7 +592,7 @@ describe('TrackAnalysisPanelComponent', () => {
 
   it('reads a structure, pulse and key row from a cached index record while no scan has run', () => {
     expand();
-    engine.speedMultiplier.set(1.06);
+    setTempoMultiplier(player, 1.06);
     tuneIndex.record.set(
       fakeTuneIndexRecord({
         loopStartFrame: 500,
@@ -583,7 +610,7 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(fixture.nativeElement.querySelector('.lane-stack')).toBeNull();
     expect(fixture.nativeElement.querySelector('.structure-square')).toBeNull();
     expect(fixture.nativeElement.querySelector('.readout-panel')).not.toBeNull();
-    // Derived from the record's frames at the engine's live rate — one intro plus one lap — rather
+    // Derived from the record's frames at the player's live rate — one intro plus one lap — rather
     // than from a duration frozen into the record at scan time.
     expect(readoutValue('Length')).toBe(formatDuration(((500 + 6250) * 19_950) / 1_000_000));
     expect(readoutValue('Loop')).toContain((500).toLocaleString());
@@ -601,7 +628,7 @@ describe('TrackAnalysisPanelComponent', () => {
     fixture.detectChanges();
     const atSingleSpeed = readoutValue('Length');
 
-    engine.playRate.set({
+    setPlayRate(player, {
       callsPerFrame: 2,
       exactCallsPerFrame: 2.4,
       roundedCallsPerFrame: 2,

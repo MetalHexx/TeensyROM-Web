@@ -1,6 +1,6 @@
 import { playCallsToSeconds } from '@sidablist/core';
 import type { PlayRate } from '@sidablist/core';
-import { positionBasisFor } from '../engine/engine-utils';
+import { positionBasisFor } from './tune-length';
 import { PITCH_CLASS_NAMES } from './key';
 import { formatDuration } from './format';
 import type { TuneIndexRecord } from './tune-index.model';
@@ -14,7 +14,7 @@ export const TUNE_INDEX_ENDED_LABEL = 'ends, no loop';
 
 /** Below this, a byte-verified repeat is almost certainly an ostinato or an idle cycle rather than
  *  the tune's musical loop. Informational only — the loop still drives playback unsuppressed; see
- *  the note in `DjPlayerEngine.setTuneIndex`. The bar sits at the top of the range investigation
+ *  the note in `TuneIndexService.publish`. The bar sits at the top of the range investigation
  *  pointed at, because showing the label on a genuine loop costs nothing and missing one costs the
  *  diagnosis the label exists to give. */
 const IMPLAUSIBLE_PERIOD_SECONDS = 15;
@@ -55,7 +55,8 @@ function loopReadoutFor(record: TuneIndexRecord | null, pending: boolean): LoopR
 
   const { loopStartFrame, loopPeriodFrames } = record;
   if (loopStartFrame === null || loopPeriodFrames === null) {
-    const label = record.endedAtFrame === null ? TUNE_INDEX_NOT_FOUND_LABEL : TUNE_INDEX_ENDED_LABEL;
+    const label =
+      record.endedAtFrame === null ? TUNE_INDEX_NOT_FOUND_LABEL : TUNE_INDEX_ENDED_LABEL;
     return { kind: 'placeholder', label };
   }
   return { kind: 'loop', startFrame: loopStartFrame, periodFrames: loopPeriodFrames };
@@ -102,7 +103,9 @@ export function tuneIndexLoopIsImplausible(
   rate: TuneIndexRate
 ): boolean {
   const readout = loopReadoutFor(record, pending);
-  return readout.kind === 'loop' && toSeconds(readout.periodFrames, rate) < IMPLAUSIBLE_PERIOD_SECONDS;
+  return (
+    readout.kind === 'loop' && toSeconds(readout.periodFrames, rate) < IMPLAUSIBLE_PERIOD_SECONDS
+  );
 }
 
 export function tuneIndexKeyLabel(record: TuneIndexRecord | null, pending: boolean): string {
@@ -110,7 +113,10 @@ export function tuneIndexKeyLabel(record: TuneIndexRecord | null, pending: boole
   return record === null ? TUNE_INDEX_UNKNOWN_LABEL : keyLabelFor(record);
 }
 
-export function tuneIndexKeyConfidenceLabel(record: TuneIndexRecord | null, pending: boolean): string {
+export function tuneIndexKeyConfidenceLabel(
+  record: TuneIndexRecord | null,
+  pending: boolean
+): string {
   if (pending) return TUNE_INDEX_ANALYZING_LABEL;
   return record === null ? TUNE_INDEX_UNKNOWN_LABEL : record.keyConfidence;
 }

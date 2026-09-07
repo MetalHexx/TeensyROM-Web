@@ -6,97 +6,17 @@ import { DeckContext } from '../deck-context';
 import { DeckTuneLoader } from '../deck-tune-loader';
 import type { TuneSource } from '../deck-tune-loader';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
-import { DjPlayerEngine } from '../../engine/dj-player-engine';
-import type { EngineState, EngineStats } from '../../engine/dj-player-engine';
+import { DECK_PLAYER_VIEW, SID_PLAYER } from '../deck-player';
+import { MarkerCollection } from '../marker-collection';
 import { TuneIndexService } from '../../analysis/tune-index.service';
 import type { TuneIndexRecord } from '../../analysis/tune-index.model';
-import type { SidFile } from '../../sid/sid-file.model';
-
-const EMPTY_STATS: EngineStats = {
-  framesRendered: 0,
-  packetsSent: 0,
-  bytesSent: 0,
-  suppressedWrites: 0,
-  illegalOpcodeCount: 0,
-  callsPerFrame: 1,
-  effectiveIntervalUs: 0,
-  measuredMeanIntervalUs: 0,
-  driftMs: 0,
-  jitterMs: 0,
-  worstGapMs: 0,
-  lateCallbacks: 0,
-  scheduledFrames: 0,
-  lateFrames: 0,
-  meanLagMs: 0,
-  worstLagMs: 0,
-  reorderedFrames: 0,
-  clampedFrames: 0,
-  cancelSupported: false,
-  lastCancelLatencyMs: -1,
-};
-
-function fakeSidFile(): SidFile {
-  return {
-    format: 'PSID',
-    version: 2,
-    loadAddress: 0x1000,
-    initAddress: 0x1000,
-    playAddress: 0x1003,
-    songs: 1,
-    startSong: 1,
-    speedFlags: 0,
-    name: 'Test Tune',
-    author: 'Test Author',
-    released: '2026',
-    clock: 'pal',
-    model: 'mos6581',
-    secondSidAddress: null,
-    thirdSidAddress: null,
-    data: new Uint8Array([0]),
-  };
-}
-
-interface MockEngine {
-  state: WritableSignal<EngineState>;
-  lastError: WritableSignal<string | null>;
-  stats: WritableSignal<EngineStats>;
-  repeatTrack: WritableSignal<boolean>;
-  currentSubtune: WritableSignal<number>;
-  subtuneCount: WritableSignal<number>;
-  positionPercent: WritableSignal<number>;
-  tuneIndex: WritableSignal<TuneIndexRecord | null>;
-  play: ReturnType<typeof vi.fn>;
-  pause: ReturnType<typeof vi.fn>;
-  stop: ReturnType<typeof vi.fn>;
-  setRepeatTrack: ReturnType<typeof vi.fn>;
-  nextSubtune: ReturnType<typeof vi.fn>;
-  previousSubtune: ReturnType<typeof vi.fn>;
-  scrubTo: ReturnType<typeof vi.fn>;
-}
-
-function makeEngine(): MockEngine {
-  return {
-    state: signal<EngineState>('stopped'),
-    lastError: signal<string | null>(null),
-    stats: signal<EngineStats>(EMPTY_STATS),
-    repeatTrack: signal<boolean>(false),
-    currentSubtune: signal(1),
-    subtuneCount: signal(1),
-    positionPercent: signal(0),
-    tuneIndex: signal<TuneIndexRecord | null>(null),
-    play: vi.fn(),
-    pause: vi.fn(),
-    stop: vi.fn(),
-    setRepeatTrack: vi.fn(),
-    nextSubtune: vi.fn(),
-    previousSubtune: vi.fn(),
-    scrubTo: vi.fn().mockResolvedValue(undefined),
-  };
-}
+import type { SidFile } from '@sidablist/core';
+import { createFakeDeckPlayer, fakeSidFile } from '../../../testing/player-doubles';
+import type { FakeDeckPlayer } from '../../../testing/player-doubles';
 
 describe('TransportPanelComponent', () => {
   let fixture: ComponentFixture<TransportPanelComponent>;
-  let engine: MockEngine;
+  let player: FakeDeckPlayer;
   let tuneLoader: {
     availableTunes: WritableSignal<readonly TuneSource[]>;
     currentTune: WritableSignal<SidFile | null>;
@@ -105,14 +25,17 @@ describe('TransportPanelComponent', () => {
     onFilePicked: ReturnType<typeof vi.fn>;
   };
   let binding: { selectedPortId: WritableSignal<string | null> };
-  let tuneIndexService: { pending: WritableSignal<boolean> };
+  let tuneIndexService: {
+    pending: WritableSignal<boolean>;
+    record: WritableSignal<TuneIndexRecord | null>;
+  };
   let context: DeckContext;
 
   function build(deckLabel: string): void {
     // Lets a single test build two decks in sequence (to compare their accessible names) without
     // TestBed refusing a second `configureTestingModule` call against an already-instantiated module.
     TestBed.resetTestingModule();
-    engine = makeEngine();
+    player = createFakeDeckPlayer();
     tuneLoader = {
       availableTunes: signal<readonly TuneSource[]>([]),
       currentTune: signal<SidFile | null>(null),
@@ -121,7 +44,10 @@ describe('TransportPanelComponent', () => {
       onFilePicked: vi.fn(),
     };
     binding = { selectedPortId: signal<string | null>(null) };
-    tuneIndexService = { pending: signal<boolean>(false) };
+    tuneIndexService = {
+      pending: signal<boolean>(false),
+      record: signal<TuneIndexRecord | null>(null),
+    };
 
     TestBed.configureTestingModule({
       imports: [TransportPanelComponent],
@@ -129,7 +55,9 @@ describe('TransportPanelComponent', () => {
         DeckContext,
         { provide: DeckTuneLoader, useValue: tuneLoader as unknown as DeckTuneLoader },
         { provide: DeckMidiBinding, useValue: binding as unknown as DeckMidiBinding },
-        { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+        { provide: SID_PLAYER, useValue: player.player },
+        { provide: DECK_PLAYER_VIEW, useValue: player.view },
+        { provide: MarkerCollection, useValue: new MarkerCollection(player.player) },
         { provide: TuneIndexService, useValue: tuneIndexService as unknown as TuneIndexService },
       ],
     });
@@ -150,7 +78,7 @@ describe('TransportPanelComponent', () => {
   describe('disabled/enabled logic', () => {
     beforeEach(() => build('A'));
 
-    it('gates Play on a loaded tune, a selected MIDI port, an idle engine and no scan in flight', () => {
+    it('gates Play on a loaded tune, a selected MIDI port, an idle deck and no scan in flight', () => {
       expect(button('Play').disabled).toBe(true);
 
       tuneLoader.currentTune.set(fakeSidFile());
@@ -174,7 +102,7 @@ describe('TransportPanelComponent', () => {
       fixture.detectChanges();
       expect(button('Stop').disabled).toBe(true);
 
-      engine.state.set('playing');
+      player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
       fixture.detectChanges();
       expect(button('Stop').disabled).toBe(false);
     });
@@ -184,7 +112,10 @@ describe('TransportPanelComponent', () => {
       expect(button('▶').disabled).toBe(true);
 
       tuneLoader.currentTune.set(fakeSidFile());
-      engine.subtuneCount.set(3);
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tune: { subtune: 1, subtuneCount: 3, lengthFrames: null },
+      }));
       fixture.detectChanges();
 
       expect(button('◀').disabled).toBe(false);
@@ -210,8 +141,8 @@ describe('TransportPanelComponent', () => {
   describe('error surfaces', () => {
     beforeEach(() => build('A'));
 
-    it("renders the engine's last error as an alert", () => {
-      engine.lastError.set('Delivery stalled.');
+    it("renders the player's last error as an alert", () => {
+      player.snapshot.update((snapshot) => ({ ...snapshot, error: 'Delivery stalled.' }));
       fixture.detectChanges();
 
       const alert = fixture.nativeElement.querySelector('[role="alert"]');

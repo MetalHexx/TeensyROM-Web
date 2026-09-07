@@ -11,7 +11,7 @@ import type { TuneIndexRecord } from './tune-index.model';
  * its own scan.
  *
  * `exactCallsPerFrame`, `callsPerFrame` and `timingMode` ride along in every shared record even
- * though `TuneIndexService.produceRecord` reads them off the producing deck's own engine. This is a
+ * though `TuneIndexService.produceRecord` reads them off the producing deck's own player. This is a
  * recorded decision, not an accident: both decks emulate the same tune identically, so whichever
  * deck happens to produce the record, its rate fields are equally correct read by the other.
  */
