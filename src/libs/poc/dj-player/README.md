@@ -114,26 +114,21 @@ in one of the two.
 The spike is quarantined in one folder and four registration lines. To delete it completely:
 
 1. **Delete the library folder:**
-
    ```
    rm -rf libs/poc/
    ```
 
 2. **Remove the dev route** from `apps/teensyrom-ui/src/app/app.routes.ts`:
-
    - Delete the route entry for `path: 'dev/dj-poc'` (lines 6–12 in the current file)
 
 3. **Remove the scope:poc constraint** from the workspace-root `eslint.config.mjs`:
-
    - Delete the `scope:poc` constraint block (lines 71–74)
    - Remove `'scope:poc'` from the `scope:app` allowlist (line 87)
 
 4. **Drop the path alias** from `tsconfig.base.json`:
-
    - Delete the line `"@teensyrom-nx/poc/dj-player": ["libs/poc/dj-player/src/index.ts"]`
 
 5. **Remove the dependencies:**
-
    ```
    pnpm remove @sidablist/core @sidablist/asid
    ```
@@ -149,17 +144,17 @@ five-edit form of this yank was rehearsed on a scratch branch and reverted succe
 
 Nine tunes from HVSC #83, chosen to break specific things:
 
-| Tune                           | HVSC Path                                           | What It Tests                                                                                                                                           |
-| ------------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Divertigo — _InSID3 Out_       | `MUSICIANS/D/DivertigoO/Divertigo_-_InSID3_Out.sid` | CIA-timed tune; cleared for redistribution ✓ **committed**                                                                                              |
-| Avrilcadabra — _Still Time_    | `MUSICIANS/A/Avrilcadabra/Still_Time.sid`           | 8580 model reporting; cleared for redistribution ✓ **committed**                                                                                        |
-| Rob Hubbard — _Commando_       | `MUSICIANS/R/Rob_Hubbard/Commando.sid`              | 19 subtunes; control case and subtune stepping under load                                                                                               |
-| Geir Tjelta — _Artillery_      | `MUSICIANS/G/Geir_Tjelta/Artillery.sid`             | Second plain case, different player                                                                                                                     |
-| Martin Galway — _Wizball_      | `MUSICIANS/M/Martin_Galway/Wizball.sid`             | Speed flags 511 (every subtune CIA-timed) — canonical CIA-timing breaker                                                                                |
-| Martin Galway — _Arkanoid_     | `MUSICIANS/M/Martin_Galway/Arkanoid.sid`            | RSID v2; assumes real machine, no PSID player shortcuts                                                                                                 |
-| Ashley Hogg — _CJ in the USA_  | `MUSICIANS/C/Cj_In_The_Usa.sid`                     | The tune DeepSID carries a `$D420` workaround for                                                                                                       |
-| Cadaver — _Stereotest 2SID_    | `MUSICIANS/S/Stereotest_2sid.sid`                   | PSID v3, second SID at `$D500`; header v3 parsing without multi-chip emission                                                                           |
-| Booker — _Stereo Pendejo 2SID_ | `MUSICIANS/S/Stereo_Pendejo_2SID.sid`               | Hard mode: three difficulties at once (PSID v3, `$D420`, CIA-timed, 8580). **Diagnostic-only** — failures here are never read as evidence about timing. |
+| Tune | HVSC Path | What It Tests |
+|------|-----------|---------------|
+| Divertigo — *InSID3 Out* | `MUSICIANS/D/DivertigoO/Divertigo_-_InSID3_Out.sid` | CIA-timed tune; cleared for redistribution ✓ **committed** |
+| Avrilcadabra — *Still Time* | `MUSICIANS/A/Avrilcadabra/Still_Time.sid` | 8580 model reporting; cleared for redistribution ✓ **committed** |
+| Rob Hubbard — *Commando* | `MUSICIANS/R/Rob_Hubbard/Commando.sid` | 19 subtunes; control case and subtune stepping under load |
+| Geir Tjelta — *Artillery* | `MUSICIANS/G/Geir_Tjelta/Artillery.sid` | Second plain case, different player |
+| Martin Galway — *Wizball* | `MUSICIANS/M/Martin_Galway/Wizball.sid` | Speed flags 511 (every subtune CIA-timed) — canonical CIA-timing breaker |
+| Martin Galway — *Arkanoid* | `MUSICIANS/M/Martin_Galway/Arkanoid.sid` | RSID v2; assumes real machine, no PSID player shortcuts |
+| Ashley Hogg — *CJ in the USA* | `MUSICIANS/C/Cj_In_The_Usa.sid` | The tune DeepSID carries a `$D420` workaround for |
+| Cadaver — *Stereotest 2SID* | `MUSICIANS/S/Stereotest_2sid.sid` | PSID v3, second SID at `$D500`; header v3 parsing without multi-chip emission |
+| Booker — *Stereo Pendejo 2SID* | `MUSICIANS/S/Stereo_Pendejo_2SID.sid` | Hard mode: three difficulties at once (PSID v3, `$D420`, CIA-timed, 8580). **Diagnostic-only** — failures here are never read as evidence about timing. |
 
 Only the first two are committed (with artist permission). The other seven load via the file picker from your local HVSC #83 collection at `C:\test\HVSC_83-all-of-them\C64Music\`.
 
@@ -176,19 +171,16 @@ For each configuration below, play through the tunes in order, pausing at each t
 ### Configuration Matrix
 
 **C64-side timer modes** (set in the ASID player menu on the cartridge):
-
-- _off_ — plays each packet the moment it arrives, exposing the host's jitter directly
-- _auto-seed_ — measures the first packets to seed its own timer, then trims
-- _fixed 50 Hz_ — seeds from an exact constant
+- *off* — plays each packet the moment it arrives, exposing the host's jitter directly
+- *auto-seed* — measures the first packets to seed its own timer, then trims
+- *fixed 50 Hz* — seeds from an exact constant
 
 **C64-side buffer sizes** (also set on the cartridge):
-
 - Tiny (256 B), Small (512 B), Medium (1024 B), Large (2048 B), XL (4096 B), XXL (8192 B)
 
 **Recipe packet** (toggle in the browser):
-
-- _off_ — no recipe; timer mode and buffer are C64-only
-- _on_ — sends `APT_ContFramerate` (0x31) declaring our frame interval and speed multiplier
+- *off* — no recipe; timer mode and buffer are C64-only
+- *on* — sends `APT_ContFramerate` (0x31) declaring our frame interval and speed multiplier
 
 **Baseline:** fixed 50 Hz with tiny-to-small buffers and recipe off. This is what the firmware author measured as good. Try to beat it with the recipe, then explore the boundaries.
 
@@ -214,7 +206,7 @@ Record observations as they happen during the session. Findings cannot be recons
 
 #### 1. Does the browser hold musical timing over a long playback?
 
-_This is the binding risk in the whole initiative. Everything downstream assumes yes._
+*This is the binding risk in the whole initiative. Everything downstream assumes yes.*
 
 **Observations:** Yes.
 
@@ -222,7 +214,7 @@ _This is the binding risk in the whole initiative. Everything downstream assumes
 
 #### 2. Does the recipe packet close the Web MIDI jitter gap the firmware author measured?
 
-_Whether the transport choice survives contact with hardware._
+*Whether the transport choice survives contact with hardware.*
 
 **Observations:** Moot: the recipe is no longer in the path, because host-side timestamps closed the gap without it.
 
@@ -230,7 +222,7 @@ _Whether the transport choice survives contact with hardware._
 
 #### 3. Which timer mode, at which buffer size, sounds best?
 
-_Replaces guesswork with measured defaults._
+*Replaces guesswork with measured defaults.*
 
 **Observations:**
 
@@ -238,7 +230,7 @@ _Replaces guesswork with measured defaults._
 
 #### 4. What is the real control latency, and how does it trade against buffer size?
 
-_Whether this can feel like an instrument at all._
+*Whether this can feel like an instrument at all.*
 
 **Observations:**
 
@@ -246,7 +238,7 @@ _Whether this can feel like an instrument at all._
 
 #### 5. Can a continuous pitch fader coexist with the frame timer, or must it run timer-off?
 
-_Shapes whether smooth speed and locked timing are mutually exclusive._
+*Shapes whether smooth speed and locked timing are mutually exclusive.*
 
 **Observations:**
 
@@ -254,7 +246,7 @@ _Shapes whether smooth speed and locked timing are mutually exclusive._
 
 #### 6. Does 50.125 Hz versus 50.0 Hz make an audible difference?
 
-_Confirms or overturns D8._
+*Confirms or overturns D8.*
 
 **Observations:**
 
@@ -262,7 +254,7 @@ _Confirms or overturns D8._
 
 #### 7. Do two cartridges present distinguishable MIDI ports, and does the display-chars gesture work?
 
-_Confirms D24 and whether deck binding needs custom firmware._
+*Confirms D24 and whether deck binding needs custom firmware.*
 
 **Observations:**
 
@@ -270,7 +262,7 @@ _Confirms D24 and whether deck binding needs custom firmware._
 
 #### 8. What breaks the emulation, and how fast?
 
-_Sizes the workaround tail. HVSC #83: roughly 10% of tunes set a CIA timer, 5% are RSID._
+*Sizes the workaround tail. HVSC #83: roughly 10% of tunes set a CIA timer, 5% are RSID.*
 
 **Observations:**
 
@@ -278,7 +270,7 @@ _Sizes the workaround tail. HVSC #83: roughly 10% of tunes set a CIA timer, 5% a
 
 #### 9. Does pause/resume leave the chip coherent?
 
-_The first evidence for or against the state-snapshot design in ASID-DJ-3._
+*The first evidence for or against the state-snapshot design in ASID-DJ-3.*
 
 **Observations:**
 
@@ -286,7 +278,7 @@ _The first evidence for or against the state-snapshot design in ASID-DJ-3._
 
 #### 10. How alarming is the SysEx permission prompt in practice?
 
-_Shapes how and when it is requested in the product._
+*Shapes how and when it is requested in the product.*
 
 **Observations:**
 
@@ -294,7 +286,7 @@ _Shapes how and when it is requested in the product._
 
 #### 11. Is Web MIDI's timestamped `send()` honored on this platform?
 
-_Potentially removes a whole class of jitter, and is not currently in the architecture._
+*Potentially removes a whole class of jitter, and is not currently in the architecture.*
 
 **Observations:** Yes, and well enough that no schedule-ahead margin was required.
 
@@ -302,7 +294,7 @@ _Potentially removes a whole class of jitter, and is not currently in the archit
 
 #### 12. Does `R2`'s software control-register interception sound indistinguishable from what real hardware mute would produce?
 
-_Confirms whether the corrected voice-mute design is sound, or whether the firmware ask needs to happen sooner than planned._
+*Confirms whether the corrected voice-mute design is sound, or whether the firmware ask needs to happen sooner than planned.*
 
 **Observations:** Yes, indistinguishable from hardware mute.
 
@@ -310,7 +302,7 @@ _Confirms whether the corrected voice-mute design is sound, or whether the firmw
 
 #### 13. How does jump latency (silent-replay time) scale as the target frame approaches the top of the fixed ceiling, and around what frame count?
 
-_Sizes the practical range where frame-indexed cue points and loop handles remain a usable DJ-cueing primitive._
+*Sizes the practical range where frame-indexed cue points and loop handles remain a usable DJ-cueing primitive.*
 
 **Observations:**
 
@@ -318,7 +310,7 @@ _Sizes the practical range where frame-indexed cue points and loop handles remai
 
 #### 14. Does the mid-stream full-register snapshot every hop/loop-reentry/scrub jump sends cause the same audible interruption the recipe packet did, or is it clean since it never touches `APT_ContFramerate`?
 
-_A second data point for the pause/resume state-snapshot question (D9), now covering hop, loop-reentry, and scrub jumps together against the recipe packet's known interruption cost._
+*A second data point for the pause/resume state-snapshot question (D9), now covering hop, loop-reentry, and scrub jumps together against the recipe packet's known interruption cost.*
 
 **Observations:**
 
@@ -326,7 +318,7 @@ _A second data point for the pause/resume state-snapshot question (D9), now cove
 
 #### 15. Does a momentary invert control feel like a performance gesture, or does the punch-in direction turn out to be the one that actually gets used?
 
-_Decides whether the eventual voice channel strip needs both directions as distinct mapped actions._
+*Decides whether the eventual voice channel strip needs both directions as distinct mapped actions.*
 
 **Observations:**
 
@@ -334,7 +326,7 @@ _Decides whether the eventual voice channel strip needs both directions as disti
 
 #### 16. Is ±25 frames of nudge travel enough to land a missed cue on its transient, and is a one-frame step fine enough to feel exact?
 
-_Sizes the fine-adjustment contract for the real cue and loop features, in the only unit that exists._
+*Sizes the fine-adjustment contract for the real cue and loop features, in the only unit that exists.*
 
 **Observations:**
 
@@ -342,7 +334,7 @@ _Sizes the fine-adjustment contract for the real cue and loop features, in the o
 
 #### 17. Does snapshot-based loop re-entry produce an audible seam?
 
-_Confirms whether a loop can engage without a seam, which is the precondition for hopping between multiple loops later._
+*Confirms whether a loop can engage without a seam, which is the precondition for hopping between multiple loops later.*
 
 **Observations:**
 
@@ -350,7 +342,7 @@ _Confirms whether a loop can engage without a seam, which is the precondition fo
 
 #### 18. Does change detection land on musically real moments across a range of tunes?
 
-_Tests whether the register-stream-derived change signal (F71) tracks what a listener would call a real transition, rather than firing on incidental register noise._
+*Tests whether the register-stream-derived change signal (F71) tracks what a listener would call a real transition, rather than firing on incidental register noise.*
 
 **Observations:**
 
@@ -358,7 +350,7 @@ _Tests whether the register-stream-derived change signal (F71) tracks what a lis
 
 #### 19. Does the candidate strength ladder sort the way a listener would?
 
-_Confirms that the scoring heuristic for change candidates ranks high-confidence structural moments above noise, matching human judgment across genres._
+*Confirms that the scoring heuristic for change candidates ranks high-confidence structural moments above noise, matching human judgment across genres.*
 
 **Observations:**
 
@@ -366,7 +358,7 @@ _Confirms that the scoring heuristic for change candidates ranks high-confidence
 
 #### 20. Do the tunes in the library have findable regular pulses, and how often?
 
-_Determines what proportion of the HVSC repertoire yields a stable tempo signal (F76), sizing the applicability of pulse-based navigation and quantization features._
+*Determines what proportion of the HVSC repertoire yields a stable tempo signal (F76), sizing the applicability of pulse-based navigation and quantization features.*
 
 **Observations:**
 
@@ -374,7 +366,7 @@ _Determines what proportion of the HVSC repertoire yields a stable tempo signal 
 
 #### 21. Does key detection hold up, and on what proportion of tunes does it decline to answer?
 
-_Sizes the reliability of harmonic-content analysis (F73) as a foundation for pitch-shifted mashup matching, and what proportion of tunes need manual override._
+*Sizes the reliability of harmonic-content analysis (F73) as a foundation for pitch-shifted mashup matching, and what proportion of tunes need manual override.*
 
 **Observations:**
 
@@ -382,19 +374,19 @@ _Sizes the reliability of harmonic-content analysis (F73) as a foundation for pi
 
 #### 22. Does the similarity square reveal real structure, and does the loop point match the ear?
 
-_Validates that frame-by-frame feature self-similarity (F72) surfaces loop points and structural boundaries where a listener would place them, enabling seamless looping._
+*Validates that frame-by-frame feature self-similarity (F72) surfaces loop points and structural boundaries where a listener would place them, enabling seamless looping.*
 
 **Observations:**
 
 ---
 
-**Note on ASID-DJ-0.8:** This iteration makes the transport act on the loop point and the key without the listening session having been run, so questions 18–22 remain open. The first real sessions under `-0.8` are informal evidence toward them — a consistently early or late loop point will now be _more_ audible, not less.
+**Note on ASID-DJ-0.8:** This iteration makes the transport act on the loop point and the key without the listening session having been run, so questions 18–22 remain open. The first real sessions under `-0.8` are informal evidence toward them — a consistently early or late loop point will now be *more* audible, not less.
 
 ---
 
 #### 23. Does the intro play exactly once before the loop takes over?
 
-_Confirms the loop lifecycle split by ear — an unrepeating intro followed by a repeating lap — rather than only in the frame arithmetic that drives it._
+*Confirms the loop lifecycle split by ear — an unrepeating intro followed by a repeating lap — rather than only in the frame arithmetic that drives it.*
 
 **Observations:**
 
@@ -402,7 +394,7 @@ _Confirms the loop lifecycle split by ear — an unrepeating intro followed by a
 
 #### 24. Does the deck stop exactly where the position bar says it will, with repeat off?
 
-_Confirms the ended state and the track end frame it renders agree with what a listener actually hears the deck do._
+*Confirms the ended state and the track end frame it renders agree with what a listener actually hears the deck do.*
 
 **Observations:**
 
@@ -410,7 +402,7 @@ _Confirms the ended state and the track end frame it renders agree with what a l
 
 #### 25. Is the pre-playback wait tolerable, weighed against the stutter it replaces?
 
-_Weighs the resumable indexing ladder's fixed wait before a tune starts against the mid-tune stutter the previous scan-on-demand design produced._
+*Weighs the resumable indexing ladder's fixed wait before a tune starts against the mid-tune stutter the previous scan-on-demand design produced.*
 
 **Observations:**
 
