@@ -29,6 +29,7 @@ class FakePlayer implements MarkerPlayer {
   readonly seeks: Frames[] = [];
   readonly armedLoops: (MarkerLoopBounds | null)[] = [];
   playCallCount = 0;
+  capturePositionCallCount = 0;
 
   getSnapshot() {
     return {
@@ -40,6 +41,10 @@ class FakePlayer implements MarkerPlayer {
 
   getPosition(): Frames {
     return this.frame;
+  }
+
+  capturePosition(): void {
+    this.capturePositionCallCount++;
   }
 
   play(): Promise<void> {
@@ -118,6 +123,32 @@ describe('MarkerCollection', () => {
 
       expect(player.seeks).toHaveLength(0);
       expect(collection.markers()).toHaveLength(1);
+    });
+
+    it('captures the position eagerly, so a freshly marked start is already cached before it is ever armed', () => {
+      player.setPosition(5);
+
+      collection.addMarker();
+
+      expect(player.capturePositionCallCount).toBe(1);
+    });
+
+    it('captures the position eagerly on a recapture too, not only on the first mark', () => {
+      const index = collection.addMarker();
+
+      player.setPosition(10);
+      collection.captureMarkerStart(index);
+
+      expect(player.capturePositionCallCount).toBe(2);
+    });
+
+    it('does not capture the position when only an end is marked, since an end is never restored from', () => {
+      const index = collection.addMarker();
+      player.setPosition(10);
+
+      collection.setMarkerEnd(index);
+
+      expect(player.capturePositionCallCount).toBe(1); // from addMarker alone
     });
 
     it('refills a row by capturing into it again, landing at the new position and resetting its nudge', () => {

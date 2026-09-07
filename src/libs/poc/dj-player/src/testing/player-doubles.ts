@@ -137,6 +137,7 @@ export function createFakeDeckPlayer(): FakeDeckPlayer {
     getSnapshot: () => snapshot(),
     getPosition: () => position(),
     getStats: () => stats(),
+    capturePosition: vi.fn(),
     loadTune: vi.fn(),
     play: vi.fn().mockResolvedValue(undefined),
     pause: vi.fn(),

@@ -39,6 +39,12 @@ export interface MarkerPlayer {
   };
   /** The playhead, pulled fresh for every read rather than threaded in by a caller. */
   getPosition(): Frames;
+  /** Snapshots the live machine at the current position into core's entry-image cache, for free —
+   *  mirrors `SidPlayer.capturePosition()`'s own contract. Called alongside `getPosition()` at every
+   *  site that marks "the position I am at right now" as a future loop start, so that loop's first
+   *  trigger is already instant by the time it is ever armed, rather than paying an off-thread
+   *  replay proportional to how deep it sits in the tune. */
+  capturePosition(): void;
   /** Launches (or resumes) playback. `triggerMarker` awaits this when nothing is playing yet. */
   play(): Promise<void>;
   /** Moves the playhead to a frame outright — a cue's trigger and every audition resolve to this. */
@@ -138,6 +144,7 @@ export class MarkerCollection {
   /** Appends a new marker, capturing the current position into its start. Returns the row's index. */
   addMarker(): number {
     const index = this.markers().length;
+    this.player.capturePosition();
     const marker: SavedMarker = {
       startFrame: this.player.getPosition(),
       startOffsetMs: 0,
@@ -153,6 +160,7 @@ export class MarkerCollection {
    */
   captureMarkerStart(index: number): void {
     if (index < 0 || index >= this.markers().length) return;
+    this.player.capturePosition();
     const startFrame = this.player.getPosition();
     this.updateMarker(index, (current) => ({ ...current, startFrame, startOffsetMs: 0 }));
   }
