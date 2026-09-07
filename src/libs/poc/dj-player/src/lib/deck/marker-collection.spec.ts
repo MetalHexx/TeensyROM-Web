@@ -79,6 +79,15 @@ class FakePlayer implements MarkerPlayer {
   setTransport(transport: Transport): void {
     this.transport = transport;
   }
+
+  /** What core's own `stop()` does, wired straight to the transport panel's Stop button: the clock
+   *  stops, the machine goes back to the top of the subtune and the active loop is disarmed — none
+   *  of it routed through `MarkerCollection`. */
+  stopTransport(): void {
+    this.transport = 'stopped';
+    this.frame = frames(0);
+    this.loop = null;
+  }
 }
 
 describe('MarkerCollection', () => {
@@ -428,6 +437,67 @@ describe('MarkerCollection', () => {
 
       expect(collection.queuedMarker()).toBe(cue);
       expect(player.seeks).toHaveLength(seeksBeforeFirstSample);
+    });
+  });
+
+  describe('a loop disarmed outside this collection', () => {
+    it('gives the next trigger back its immediate engagement, rather than queueing behind a lap that is not running', async () => {
+      const loop = collection.addMarker(); // start frame 0
+      player.setPosition(10);
+      collection.setMarkerEnd(loop); // end frame 10
+      await collection.triggerMarker(loop);
+      player.setPosition(40);
+      const cue = collection.addMarker(); // start frame 40
+      await collection.triggerMarker(cue); // queued behind the running lap
+      expect(collection.queuedMarker()).toBe(cue);
+
+      player.stopTransport();
+      collection.noticeActiveLoop(player.getSnapshot().loop);
+
+      expect(collection.loopingMarker()).toBeNull();
+      expect(collection.queuedMarker()).toBeNull();
+
+      const seeksBefore = player.seeks.length;
+      await collection.triggerMarker(cue);
+
+      expect(player.seeks).toHaveLength(seeksBefore + 1);
+      expect(player.seeks.at(-1)).toBe(40);
+    });
+
+    it('forgets the reading it last sampled, so playback restarting at the top is not read as a lap wrap', async () => {
+      const loop = collection.addMarker(); // start frame 0
+      player.setPosition(10);
+      collection.setMarkerEnd(loop); // end frame 10
+      await collection.triggerMarker(loop);
+      player.setPosition(40);
+      const cue = collection.addMarker();
+      await collection.triggerMarker(cue); // queued behind the running lap
+      collection.noticeLoopPosition(frames(8)); // mid-lap, priming lastLoopPosition
+
+      player.stopTransport();
+      collection.noticeActiveLoop(player.getSnapshot().loop);
+      const seeksBefore = player.seeks.length;
+
+      // Play again: the first reading after the restart sits below the one from before the stop,
+      // which the wrap heuristic would take for a lap boundary if it survived.
+      collection.noticeLoopPosition(frames(1));
+
+      expect(collection.queuedMarker()).toBeNull();
+      expect(player.seeks).toHaveLength(seeksBefore);
+    });
+
+    it('leaves the running lap alone while core is still enforcing the loop', async () => {
+      const loop = collection.addMarker();
+      player.setPosition(10);
+      collection.setMarkerEnd(loop);
+      await collection.triggerMarker(loop);
+      const cue = collection.addMarker();
+      await collection.triggerMarker(cue);
+
+      collection.noticeActiveLoop(player.getSnapshot().loop);
+
+      expect(collection.loopingMarker()).toBe(loop);
+      expect(collection.queuedMarker()).toBe(cue);
     });
   });
 

@@ -87,7 +87,10 @@ interface ResolvedLoop {
  *
  * Queuing a marker behind one already looping only ever records the intent (`queuedMarker`) here;
  * advancing it on a lap boundary is `noticeLoopPosition`'s job, since `MarkerPlayer` carries no wrap
- * notification of its own — see that method's doc for how the wrap is inferred instead.
+ * notification of its own — see that method's doc for how the wrap is inferred instead. `MarkerPlayer`
+ * carries no notification of the loop being *cleared* either, and things outside this collection
+ * clear it, so `noticeActiveLoop` is the other half of that: both are fed by the deck from the
+ * player's own read side.
  */
 export class MarkerCollection {
   constructor(private readonly player: MarkerPlayer) {}
@@ -318,6 +321,27 @@ export class MarkerCollection {
   }
 
   /**
+   * Feeds the loop core is actually enforcing in — call this on every published snapshot (the deck's
+   * own player-snapshot signal, in practice), so nothing this collection believes about a running
+   * lap can outlive the loop itself.
+   *
+   * `stopMarkerLoop`, `engageMarker` and `deleteMarker` are not the only things that clear that loop:
+   * a transport stop and a fresh tune load both disarm it in core, and neither passes through here.
+   * Left unnoticed, `loopingMarker` would go on naming a row that is not looping — which sends the
+   * next trigger down `triggerMarker`'s queue-behind-it branch instead of engaging it, the "trigger
+   * does nothing until I hit loop-stop" the operator sees — and `lastLoopPosition` would keep a
+   * reading from before the stop, which the playhead restarting at 0 reads as a lap wrap.
+   *
+   * Only the disarming is noticed. A loop core is enforcing that this collection did not arm is not
+   * a thing that happens, and inferring a row from one would be guessing at which row it came from.
+   */
+  noticeActiveLoop(loop: MarkerLoopBounds | null): void {
+    if (loop !== null || this.loopingMarker() === null) return;
+    this.setLoopingMarker(null);
+    this.queuedMarker.set(null);
+  }
+
+  /**
    * How far the looping marker is through its bounds, 0–100; 0 for every other row. Reads the loop
    * core is presently enforcing and the playhead's current position — never a copy of either.
    */
@@ -336,6 +360,11 @@ export class MarkerCollection {
    * whatever was queued behind it. Re-checks the resolved shape at the point of engagement — a
    * queued row's end can be nudged across its start while it waits, so the trigger-time check alone
    * isn't enough.
+   *
+   * Arms first and seeks second, which is what makes this instant rather than a replay: core serves
+   * a seek landing on the armed loop's own start from the entry image it holds for that loop, and it
+   * only holds one once the loop is armed. Seeking first would land through the generic anchor path
+   * every time, at a cost proportional to how deep the row sits in the tune.
    */
   private async engageMarker(index: number): Promise<void> {
     if (index < 0 || index >= this.markers().length) return;

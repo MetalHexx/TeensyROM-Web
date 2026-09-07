@@ -269,6 +269,7 @@ describe('DeckHostComponent', () => {
       progressPercentFor: ReturnType<typeof vi.fn>;
       stopMarkerLoop: ReturnType<typeof vi.fn>;
       noticeLoopPosition: ReturnType<typeof vi.fn>;
+      noticeActiveLoop: ReturnType<typeof vi.fn>;
     };
     let binding: {
       sink: FakeAsidSink | null;
@@ -301,6 +302,7 @@ describe('DeckHostComponent', () => {
         progressPercentFor: vi.fn(() => 0),
         stopMarkerLoop: vi.fn(),
         noticeLoopPosition: vi.fn(),
+        noticeActiveLoop: vi.fn(),
       };
       binding = {
         sink: null,
@@ -368,6 +370,20 @@ describe('DeckHostComponent', () => {
       fixture.detectChanges();
 
       expect(collection.noticeLoopPosition).toHaveBeenCalledWith(frames(42));
+    });
+
+    it("feeds the loop this deck's player publishes into the marker collection, so one disarmed outside it is noticed", () => {
+      const loop = { startFrame: frames(10), endFrame: frames(20) };
+      player.snapshot.update((snapshot) => ({ ...snapshot, loop }));
+      fixture.detectChanges();
+      expect(collection.noticeActiveLoop).toHaveBeenLastCalledWith(loop);
+
+      // What a transport stop leaves behind: core has dropped the loop with nothing routed through
+      // the collection.
+      player.snapshot.update((snapshot) => ({ ...snapshot, loop: null }));
+      fixture.detectChanges();
+
+      expect(collection.noticeActiveLoop).toHaveBeenLastCalledWith(null);
     });
 
     it("applies each of this deck's four grid-area names, from the areas input, onto that panel and no other", () => {

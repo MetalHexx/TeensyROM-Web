@@ -176,6 +176,13 @@ export class DeckHostComponent implements OnInit, OnDestroy {
     effect(() => {
       this.markers.noticeLoopPosition(this.view.position());
     });
+    // The other half of that hand-off: the transport's own Stop and a fresh tune load both disarm
+    // core's loop without passing through `MarkerCollection`, and a collection still claiming a row
+    // is looping queues the next trigger behind a lap that is not running. Fed from the published
+    // snapshot, so whatever cleared the loop is noticed the same way.
+    effect(() => {
+      this.markers.noticeActiveLoop(this.view.snapshot().loop);
+    });
   }
 
   ngOnInit(): void {
