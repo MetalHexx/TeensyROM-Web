@@ -2,33 +2,33 @@ import { describe, it, expect } from 'vitest';
 import { detectLoop } from './loop-detect';
 import type { LoopDetectOptions } from './loop-detect';
 import type { ScanOutput } from './scan-tune';
-import { ASID_SLOT_COUNT } from '../asid/asid-constants';
+import { SID_REGISTER_COUNT } from '@sidablist/core';
 
 /** Roughly 6 seconds of tail and 2 seconds of idle period at a 50 Hz play rate — small enough to keep
  *  the synthetic streams below short, and far enough apart that neither guard shadows the other. */
 const OPTIONS: LoopDetectOptions = { minTailFrames: 300, idlePeriodFrames: 100 };
 
-/** Writes a frame whose 28 bytes are fully determined by `seed`: two frames sharing a seed are
- *  byte-identical, two with different seeds differ. */
-function writeFrame(slotValues: Uint8Array, frame: number, seed: number): void {
-  const base = frame * ASID_SLOT_COUNT;
-  slotValues[base] = seed & 0xff;
-  slotValues[base + 1] = (seed >>> 8) & 0xff;
-  slotValues[base + 2] = (seed >>> 16) & 0xff;
-  slotValues[base + 3] = (seed >>> 24) & 0xff;
-  for (let i = 4; i < ASID_SLOT_COUNT; i++) {
-    slotValues[base + i] = (seed + i * 13) & 0xff;
+/** Writes a frame whose 25 register bytes are fully determined by `seed`: two frames sharing a seed
+ *  are byte-identical, two with different seeds differ. */
+function writeFrame(registerValues: Uint8Array, frame: number, seed: number): void {
+  const base = frame * SID_REGISTER_COUNT;
+  registerValues[base] = seed & 0xff;
+  registerValues[base + 1] = (seed >>> 8) & 0xff;
+  registerValues[base + 2] = (seed >>> 16) & 0xff;
+  registerValues[base + 3] = (seed >>> 24) & 0xff;
+  for (let i = 4; i < SID_REGISTER_COUNT; i++) {
+    registerValues[base + i] = (seed + i * 13) & 0xff;
   }
 }
 
 /** A scan whose frame content is named entirely by `seedFor` — no emulation, just the register stream
  *  the detector actually reads. */
 function scanOf(frames: number, seedFor: (frame: number) => number): ScanOutput {
-  const slotValues = new Uint8Array(frames * ASID_SLOT_COUNT);
+  const registerValues = new Uint8Array(frames * SID_REGISTER_COUNT);
   for (let f = 0; f < frames; f++) {
-    writeFrame(slotValues, f, seedFor(f));
+    writeFrame(registerValues, f, seedFor(f));
   }
-  return { slotValues, writeCounts: new Uint8Array(frames), frames, callsPerFrame: 1 };
+  return { registerValues, writeCounts: new Uint8Array(frames), frames, callsPerFrame: 1 };
 }
 
 /** Seeds no periodic construction below ever produces, so an intro can never accidentally agree with

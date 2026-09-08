@@ -4,6 +4,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "prestart": "rimraf .angular/cache .nx/cache",
     "start": "nx run teensyrom-ui:serve",
     "generate:api-client": "nx run api-client:generate",
     "generate:asm-64-client": "nx run asm-64-client:generate",
@@ -109,7 +110,8 @@
     "@angular/router": "~19.2.0",
     "@microsoft/signalr": "^8.0.7",
     "@ngrx/signals": "^19.2.0",
-    "mos6502": "1.1.1",
+    "@sidablist/asid": "link:../../SIDablist/libs/asid",
+    "@sidablist/core": "file:../../SIDablist/libs/core",
     "opus-decoder": "^0.7.11",
     "rxjs": "~7.8.0",
     "zone.js": "~0.15.0"

@@ -1,7 +1,7 @@
 import { describe, it } from 'vitest';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSidFile } from '../src/lib/sid/sid-file.parser';
+import { parseSidFile, SID_REGISTER_COUNT } from '@sidablist/core';
 import { scanTune } from '../src/lib/analysis/scan-tune';
 import { detectLoop, MIN_TAIL_SECONDS, IDLE_PERIOD_SECONDS } from '../src/lib/analysis/loop-detect';
 
@@ -22,7 +22,6 @@ const OUT = process.env['STRAT_OUT'];
 
 const PAL_US = 19_950;
 const NTSC_US = 16_715;
-const SLOTS = 28;
 
 /** Mirrors `TuneIndexService.SCAN_DEPTH_SECONDS` — the same ladder the shipped detector climbs. */
 const LADDER = [90, 210, 450, 750];
@@ -173,9 +172,9 @@ function detect(r: Rec): Verdict {
     // Did the tune actually play? A constant stream means nothing sounded.
     let varied = false;
     for (let f = 1; f < out.frames && !varied; f++) {
-      const x = f * SLOTS;
-      for (let d = 0; d < SLOTS; d++) {
-        if (out.slotValues[x + d] !== out.slotValues[d]) {
+      const x = f * SID_REGISTER_COUNT;
+      for (let d = 0; d < SID_REGISTER_COUNT; d++) {
+        if (out.registerValues[x + d] !== out.registerValues[d]) {
           varied = true;
           break;
         }

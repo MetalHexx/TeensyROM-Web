@@ -1,12 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { DjPlayerEngine } from '../../engine/dj-player-engine';
-import type { EngineState } from '../../engine/dj-player-engine';
-import { positionBasisFor, timelineBasisFor } from '../../engine/engine-utils';
-import type { DetectedLoopFrames } from '../../engine/engine-utils';
+import { clamp } from '@sidablist/core';
+import type { PlayerSnapshot } from '@sidablist/core';
+import { positionBasisFor, timelineBasisFor } from '../../analysis/tune-length';
+import type { DetectedLoopFrames } from '../../analysis/tune-length';
 import { TuneIndexService } from '../../analysis/tune-index.service';
 import { DeckContext } from '../deck-context';
+import { DECK_PLAYER_VIEW, SID_PLAYER, scrubToPercent } from '../deck-player';
 import { DeckTuneLoader } from '../deck-tune-loader';
+import { MarkerCollection } from '../marker-collection';
 import type { TuneSource } from '../deck-tune-loader';
+import { saveRepeatTrackPreference } from '../repeat-track';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
 
 /** What the position bar draws. `unknown` is a verdict, not a waiting room — a record that answered
@@ -20,8 +23,8 @@ type BarState =
   | { kind: 'ended'; musicPercent: number }; // no tick — there is no loop point
 
 /** The transport's own six-state readout. `analyzing` is spliced in here, in the deck, over the
- *  engine's own four-plus-one — the engine never learns about scanning. */
-type TransportState = EngineState | 'analyzing';
+ *  player's own four-plus-one — core never learns about scanning. */
+type TransportState = PlayerSnapshot['transport'] | 'analyzing';
 
 /** Text for the LED's adjacent label — the colour reinforces this, it never replaces it. */
 const TRANSPORT_STATE_LABELS: Record<TransportState, string> = {
@@ -49,22 +52,22 @@ const TRANSPORT_STATE_LABELS: Record<TransportState, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TransportPanelComponent {
-  private readonly engine = inject(DjPlayerEngine);
+  private readonly player = inject(SID_PLAYER);
+  private readonly view = inject(DECK_PLAYER_VIEW);
   private readonly context = inject(DeckContext);
   private readonly tuneLoader = inject(DeckTuneLoader);
   private readonly binding = inject(DeckMidiBinding);
-  // Not part of the handoff's inlined external surface — `analyzing`/`canPlay`/`canStop` and the
-  // position bar's `analyzing` state all depend on whether a scan is in flight, which only this
-  // service exposes (`DjPlayerEngine.tuneIndex()` is the settled record, not the in-flight flag).
-  // Carried over unchanged from `DeckHostComponent`, which already depended on it for the same reason.
+  private readonly markers = inject(MarkerCollection);
+  // The in-flight scan flag lives nowhere else: the published record is the settled answer, and
+  // `analyzing`/`canPlay`/`canStop` and the position bar all need to know one is still running.
   private readonly tuneIndex = inject(TuneIndexService);
 
   protected readonly label = this.context.label;
 
-  protected readonly engineState = this.engine.state;
-  protected readonly engineError = this.engine.lastError;
-  protected readonly engineStats = this.engine.stats;
-  protected readonly repeatTrack = this.engine.repeatTrack;
+  private readonly snapshot = this.view.snapshot;
+  protected readonly playerState = computed(() => this.snapshot().transport);
+  protected readonly playerError = computed(() => this.snapshot().error);
+  protected readonly repeatTrack = computed(() => this.snapshot().repeatTrack);
 
   private readonly selectedMidiPortId = this.binding.selectedPortId;
 
@@ -73,17 +76,20 @@ export class TransportPanelComponent {
   protected readonly analyzing = this.tuneIndex.pending;
 
   /** The composed transport readout the LED and its label draw from. Keeps the dependency running
-   *  one way — the tune-index service already depends on the engine, and the engine never on it. */
+   *  one way — the tune-index service already depends on the player, and the player never on it. */
   protected readonly transportState = computed<TransportState>(() =>
-    this.analyzing() ? 'analyzing' : this.engineState()
+    this.analyzing() ? 'analyzing' : this.playerState()
   );
 
   protected readonly transportStateLabel = computed<string>(
     () => TRANSPORT_STATE_LABELS[this.transportState()]
   );
 
-  protected readonly currentSubtune = this.engine.currentSubtune;
-  protected readonly subtuneCount = this.engine.subtuneCount;
+  /** The playhead's own frame number, polled rather than notified — see `animationFrameSignal`. */
+  protected readonly framesRendered = this.view.position;
+
+  protected readonly currentSubtune = computed(() => this.snapshot().tune?.subtune ?? 0);
+  protected readonly subtuneCount = computed(() => this.snapshot().tune?.subtuneCount ?? 0);
 
   protected readonly availableTunes = this.tuneLoader.availableTunes;
   protected readonly currentTune = this.tuneLoader.currentTune;
@@ -96,7 +102,7 @@ export class TransportPanelComponent {
     () =>
       this.currentTune() !== null &&
       this.selectedMidiPortId() !== null &&
-      this.engineState() !== 'playing' &&
+      this.playerState() !== 'playing' &&
       !this.analyzing()
   );
 
@@ -106,7 +112,7 @@ export class TransportPanelComponent {
    *  that deck is running, and taking Stop from it would strand it with no way to silence the
    *  cartridge. */
   protected readonly canStop = computed(
-    () => this.currentTune() !== null && !(this.analyzing() && this.engineState() === 'stopped')
+    () => this.currentTune() !== null && !(this.analyzing() && this.playerState() === 'stopped')
   );
 
   protected readonly canStepSubtune = computed(
@@ -122,36 +128,48 @@ export class TransportPanelComponent {
   }
 
   protected onPlay(): void {
-    void this.engine.play();
+    void this.player.play();
   }
 
   protected onPause(): void {
-    this.engine.pause();
+    this.player.pause();
   }
 
   protected onStop(): void {
-    this.engine.stop();
+    this.player.stop();
   }
 
+  /** Core holds the preference as a value and persists nothing, so this deck's own key is written
+   *  here, beside the call that makes the change take effect. */
   protected onRepeatToggle(event: Event): void {
-    this.engine.setRepeatTrack((event.target as HTMLInputElement).checked);
+    const enabled = (event.target as HTMLInputElement).checked;
+    this.player.setRepeatTrack(enabled);
+    saveRepeatTrackPreference(this.context.id(), enabled);
   }
 
   protected onPreviousSubtune(): void {
-    this.engine.previousSubtune();
+    this.player.previousSubtune();
   }
 
   protected onNextSubtune(): void {
-    this.engine.nextSubtune();
+    this.player.nextSubtune();
   }
 
-  // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the engine's
-  // own position updates (which fire from stats publishes, not from the drag) can't fight it and
-  // snap the thumb out from under the operator. Cleared back to null on release, at which point the
-  // engine's live position takes back over.
+  // Non-null only mid-drag: while dragging, the pointer's own value pins the thumb so the polled
+  // position updates can't fight it and snap the thumb out from under the operator. Cleared back to
+  // null on release, at which point the live position takes back over.
   private readonly scrubDragValue = signal<number | null>(null);
+
+  /** The playhead as a percentage of what the player measures it against. Clamped to 0–100 because a
+   *  tune played past its basis — a loop with looping disarmed, or the fixed ceiling standing in when
+   *  no length was found — must still pin the thumb rather than overflow it. */
+  private readonly positionPercent = computed<number>(() => {
+    const basis = this.snapshot().basis.positionBasisFrames;
+    return basis === 0 ? 0 : clamp((this.view.position() / basis) * 100, 0, 100);
+  });
+
   protected readonly scrubDisplayPercent = computed<number>(
-    () => this.scrubDragValue() ?? this.engine.positionPercent()
+    () => this.scrubDragValue() ?? this.positionPercent()
   );
 
   /** What the position bar draws, over the index record and the pending signal — the one place that
@@ -163,7 +181,7 @@ export class TransportPanelComponent {
     if (this.tuneIndex.pending()) {
       return { kind: 'analyzing' };
     }
-    const record = this.engine.tuneIndex();
+    const record = this.tuneIndex.record();
     if (record === null) {
       return { kind: 'unknown' };
     }
@@ -207,14 +225,14 @@ export class TransportPanelComponent {
 
   // (change) fires on release, not on every drag tick — the seam that makes this "drag anywhere,
   // release, and it jumps" rather than a continuous scrub. The pin stays set — holding the thumb at
-  // the clicked spot — until the engine's async scrub actually lands; releasing it early snapped the
+  // the clicked spot — until the async seek actually lands; releasing it early snapped the
   // thumb back to the stale position and then forward again once the worker's replay landed. Guarded
   // on the pin still being this call's own value so a superseded scrub settling late cannot clear a
   // newer one's pin out from under it.
   protected async onScrubChange(event: Event): Promise<void> {
     const value = Number((event.target as HTMLInputElement).value);
     this.scrubDragValue.set(value);
-    await this.engine.scrubTo(value);
+    await scrubToPercent(this.player, this.markers, value);
     if (this.scrubDragValue() === value) {
       this.scrubDragValue.set(null);
     }

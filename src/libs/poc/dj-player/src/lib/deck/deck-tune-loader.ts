@@ -1,10 +1,9 @@
 import { computed, inject, Injectable, signal, type Signal } from '@angular/core';
-import { DjPlayerEngine } from '../engine/dj-player-engine';
+import { parseSidFile, SidParseError } from '@sidablist/core';
+import type { SidFile } from '@sidablist/core';
 import { TuneIndexService } from '../analysis/tune-index.service';
 import { BUNDLED_TUNES, decodeBundledTune } from '../sid/bundled';
-import { parseSidFile } from '../sid/sid-file.parser';
-import { SidParseError } from '../sid/sid-file.model';
-import type { SidFile } from '../sid/sid-file.model';
+import { SID_PLAYER } from './deck-player';
 
 /** A tune the Tune section can offer as a button — bundled, or opened from disk this session. */
 export interface TuneSource {
@@ -15,12 +14,12 @@ export interface TuneSource {
 
 /**
  * One deck's tune machinery: which tunes it can offer, the one currently loaded, and the load
- * sequence that hands a fresh tune to this deck's own `DjPlayerEngine` and `TuneIndexService`.
+ * sequence that hands a fresh tune to this deck's own player and `TuneIndexService`.
  * Deck-scoped — lifted verbatim out of `DjPocViewComponent`, one instance per deck host.
  */
 @Injectable()
 export class DeckTuneLoader {
-  private readonly engine = inject(DjPlayerEngine);
+  private readonly player = inject(SID_PLAYER);
   private readonly tuneIndex = inject(TuneIndexService);
 
   private readonly bundledSources: readonly TuneSource[] = BUNDLED_TUNES.map((tune) => ({
@@ -80,15 +79,13 @@ export class DeckTuneLoader {
   private async loadTune(file: SidFile, filename: string): Promise<void> {
     this._currentTune.set(file);
     this._tuneError.set(null);
-    this.engine.loadTune(file);
+    this.player.loadTune(file);
     // Called after loadTune, so the tune-index effect reads the subtune the load has already
     // settled on. Awaited so playback never races a background scan for the frame clock's thread —
     // a cache hit or a failed/abandoned scan releases this just as promptly as a completed one. Each
-    // deck awaits its own index only — this loader and its engine are both this deck's own instance.
+    // deck awaits its own index only — this loader and its player are both this deck's own instance.
     await this.tuneIndex.setTune(file, filename);
-    // play() already no-ops into the engine's "no MIDI output port selected" error path when no
-    // port is chosen, so no separate guard is needed here.
-    void this.engine.play();
+    void this.player.play();
   }
 }
 

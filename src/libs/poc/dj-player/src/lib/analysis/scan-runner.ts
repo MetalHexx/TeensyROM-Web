@@ -1,6 +1,6 @@
 import { InjectionToken } from '@angular/core';
 import type { ScanOutput } from './scan-tune';
-import type { SidFile } from '../sid/sid-file.model';
+import type { SidFile } from '@sidablist/core';
 
 /** One scan request, as it crosses the thread boundary. `SidFile` is a plain object around a
  *  `Uint8Array` and carries no methods, so it survives structured clone untouched. */

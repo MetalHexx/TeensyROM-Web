@@ -9,11 +9,7 @@
       >
         Add
       </button>
-      <button
-        type="button"
-        [attr.aria-label]="'Stop loop deck ' + label()"
-        (click)="onStopLoop()"
-      >
+      <button type="button" [attr.aria-label]="'Stop loop deck ' + label()" (click)="onStopLoop()">
         Stop
       </button>
     </div>
@@ -26,7 +22,6 @@
         <div class="marker-row-lead">
           <span class="marker-number">{{ $index + 1 }}</span>
 
-          @if (marker.start) {
           <button
             type="button"
             class="marker-trigger"
@@ -36,16 +31,6 @@
           >
             Trigger
           </button>
-          } @else {
-          <button
-            type="button"
-            class="marker-trigger"
-            [attr.aria-label]="'Capture cue ' + ($index + 1) + ' deck ' + label()"
-            (click)="onCaptureMarkerStart($index)"
-          >
-            Capture
-          </button>
-          }
 
           @if (marker.end) {
           <span class="marker-loop-length">Loop Length: {{ loopLengthFrames($index) }} fr</span>
@@ -85,13 +70,6 @@
 
           <button
             type="button"
-            [attr.aria-label]="'Clear marker ' + ($index + 1) + ' deck ' + label()"
-            (click)="onClearMarker($index)"
-          >
-            Clear
-          </button>
-          <button
-            type="button"
             [attr.aria-label]="'Delete marker ' + ($index + 1) + ' deck ' + label()"
             [disabled]="markerLaunchPending()"
             (click)="onDeleteMarker($index)"
@@ -103,7 +81,6 @@
 
       <div class="marker-slot">
         <span class="marker-sub-tag">Start</span>
-        @if (marker.start) {
         <span class="marker-frame">frame {{ markerStartFrame($index) }}</span>
         <button
           type="button"
@@ -146,31 +123,6 @@
           ▸
         </button>
         <span class="marker-offset">{{ markerStartOffsetLabel($index) }}</span>
-        } @else {
-        <span class="marker-frame marker-frame--empty">empty</span>
-        <button
-          type="button"
-          class="marker-snap marker-snap-prev marker-snap--empty"
-          aria-hidden="true"
-          tabindex="-1"
-          disabled
-        >
-          ◂
-        </button>
-        <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
-          <div class="marker-nudge-centre"></div>
-        </div>
-        <button
-          type="button"
-          class="marker-snap marker-snap-next marker-snap--empty"
-          aria-hidden="true"
-          tabindex="-1"
-          disabled
-        >
-          ▸
-        </button>
-        <span class="marker-offset marker-offset--empty">—</span>
-        }
       </div>
 
       <div class="marker-slot">

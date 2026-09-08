@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { createEnvironmentInjector, EnvironmentInjector, signal, WritableSignal } from '@angular/core';
+import { createEnvironmentInjector, EnvironmentInjector } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TuneIndexService } from './tune-index.service';
 import { SharedTuneIndex } from './shared-tune-index';
-import { DjPlayerEngine } from '../engine/dj-player-engine';
+import { DECK_PLAYER_VIEW, SID_PLAYER } from '../deck/deck-player';
 import { ANALYSIS_SCANNER } from './scan-runner';
 import type { ScanResult } from './scan-runner';
 import type { ScanOutput } from './scan-tune';
@@ -12,18 +12,29 @@ import type { ITuneIndexStorage } from './tune-index-storage';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
 import { DEFAULT_CANDIDATE_THRESHOLD } from './novelty';
-import { ASID_SLOT_COUNT } from '../asid/asid-constants';
-import { PRIMARY_SLOT_FOR_REGISTER } from '../asid/register-frame';
-import type { PlayRate, TimingMode } from '../engine/play-rate';
-import type { SidFile } from '../sid/sid-file.model';
+import { frames, microseconds, SID_REGISTER_COUNT } from '@sidablist/core';
+import type { SidFile } from '@sidablist/core';
+import { createFakeDeckPlayer } from '../../testing/player-doubles';
+import type { FakeDeckPlayer } from '../../testing/player-doubles';
 
-interface StubEngine {
-  currentSubtune: WritableSignal<number>;
-  nominalIntervalUs: WritableSignal<number>;
-  ceilingFrames: WritableSignal<number>;
-  playRate: WritableSignal<PlayRate>;
-  timingMode: WritableSignal<TimingMode>;
-  setTuneIndex: ReturnType<typeof vi.fn>;
+/** What `publish` hands the player for a record — the shape the service converts a stored record's
+ *  plain frame numbers into. */
+function trackStructureOf(record: TuneIndexRecord | null) {
+  return record === null
+    ? null
+    : {
+        loopStartFrame: record.loopStartFrame === null ? null : frames(record.loopStartFrame),
+        loopPeriodFrames: record.loopPeriodFrames === null ? null : frames(record.loopPeriodFrames),
+        endedAtFrame: record.endedAtFrame === null ? null : frames(record.endedAtFrame),
+      };
+}
+
+/** Moves the player's snapshot to `subtune` — the one narrowed read the refresh effect fires on. */
+function setSubtune(player: FakeDeckPlayer, subtune: number): void {
+  player.snapshot.update((snapshot) => ({
+    ...snapshot,
+    tune: { subtune, subtuneCount: 4, lengthFrames: null },
+  }));
 }
 
 interface StubScanner {
@@ -36,22 +47,27 @@ interface StubStorage {
   save: ReturnType<typeof vi.fn>;
 }
 
-function makeEngine(): StubEngine {
-  return {
-    currentSubtune: signal(1),
-    nominalIntervalUs: signal(19_950),
-    ceilingFrames: signal(10_000),
-    // A CIA-timer tune: the two rates differ, which is what makes "which rate did the record store"
-    // and "which rate were the detector's thresholds converted through" separable questions.
-    playRate: signal<PlayRate>({
-      callsPerFrame: 2.4,
-      exactCallsPerFrame: 2.4,
-      roundedCallsPerFrame: 2,
-      mode: 'exact',
-    }),
-    timingMode: signal<TimingMode>('exact'),
-    setTuneIndex: vi.fn(),
-  };
+/** A CIA-timer tune: the two rates differ, which is what makes "which rate did the record store"
+ *  and "which rate were the detector's thresholds converted through" separable questions. */
+function makePlayer(): FakeDeckPlayer {
+  const fake = createFakeDeckPlayer();
+  fake.snapshot.update((snapshot) => ({
+    ...snapshot,
+    tune: { subtune: 1, subtuneCount: 4, lengthFrames: null },
+    tempo: {
+      ...snapshot.tempo,
+      nominalIntervalUs: microseconds(19_950),
+      callsPerFrame: 2,
+      rate: {
+        callsPerFrame: 2.4,
+        exactCallsPerFrame: 2.4,
+        roundedCallsPerFrame: 2,
+        mode: 'exact',
+      },
+      timingMode: 'exact',
+    },
+  }));
+  return fake;
 }
 
 function makeScanner(): StubScanner {
@@ -88,7 +104,7 @@ function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
  *  loop), so only the wiring — not the detector math — is under test here. */
 function makeScan(frames: number, callsPerFrame: number): ScanOutput {
   return {
-    slotValues: new Uint8Array(frames * ASID_SLOT_COUNT),
+    registerValues: new Uint8Array(frames * SID_REGISTER_COUNT),
     writeCounts: new Uint8Array(frames),
     frames,
     callsPerFrame,
@@ -96,7 +112,7 @@ function makeScan(frames: number, callsPerFrame: number): ScanOutput {
 }
 
 /** A scan whose register stream is unique for `introFrames` and then repeats on a `periodFrames` lap,
- *  long enough for the detector's tail guard to be satisfied at this spec's engine rate. */
+ *  long enough for the detector's tail guard to be satisfied at this spec's player rate. */
 function makeLoopingScan(
   frames: number,
   introFrames: number,
@@ -106,13 +122,13 @@ function makeLoopingScan(
   const scan = makeScan(frames, callsPerFrame);
   for (let f = 0; f < frames; f++) {
     const seed = f < introFrames ? 1_000_000 + f : (f - introFrames) % periodFrames;
-    const base = f * ASID_SLOT_COUNT;
+    const base = f * SID_REGISTER_COUNT;
     // Three bytes of the seed, so two frames a multiple of 256 apart are never byte-identical.
-    scan.slotValues[base] = seed & 0xff;
-    scan.slotValues[base + 1] = (seed >>> 8) & 0xff;
-    scan.slotValues[base + 2] = (seed >>> 16) & 0xff;
-    for (let slot = 3; slot < ASID_SLOT_COUNT; slot++) {
-      scan.slotValues[base + slot] = (seed + slot * 13) & 0xff;
+    scan.registerValues[base] = seed & 0xff;
+    scan.registerValues[base + 1] = (seed >>> 8) & 0xff;
+    scan.registerValues[base + 2] = (seed >>> 16) & 0xff;
+    for (let register = 3; register < SID_REGISTER_COUNT; register++) {
+      scan.registerValues[base + register] = (seed + register * 13) & 0xff;
     }
   }
   return scan;
@@ -128,7 +144,7 @@ function makeLoopingScan(
 function makeMomentsScan(): ScanOutput {
   const scan = makeScan(100, 1);
   const setRegister = (frame: number, register: number, value: number): void => {
-    scan.slotValues[frame * ASID_SLOT_COUNT + PRIMARY_SLOT_FOR_REGISTER[register]] = value;
+    scan.registerValues[frame * SID_REGISTER_COUNT + register] = value;
   };
   for (let f = 20; f < 100; f++) {
     setRegister(f, 0, 0x00); // voice0 freq lo
@@ -184,12 +200,12 @@ function buildStoredRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexR
 
 describe('TuneIndexService', () => {
   let service: TuneIndexService;
-  let engine: StubEngine;
+  let player: FakeDeckPlayer;
   let scanner: StubScanner;
   let storage: StubStorage;
 
   function setup(): void {
-    engine = makeEngine();
+    player = makePlayer();
     scanner = makeScanner();
     storage = makeStorage();
 
@@ -197,7 +213,8 @@ describe('TuneIndexService', () => {
       providers: [
         TuneIndexService,
         SharedTuneIndex,
-        { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+        { provide: SID_PLAYER, useValue: player.player },
+        { provide: DECK_PLAYER_VIEW, useValue: player.view },
         { provide: ANALYSIS_SCANNER, useValue: scanner },
         { provide: TUNE_INDEX_STORAGE, useValue: storage as unknown as ITuneIndexStorage },
       ],
@@ -241,12 +258,14 @@ describe('TuneIndexService', () => {
 
     expect(service.pending()).toBe(false);
     expect(service.record()).not.toBeNull();
-    // The seam that bites: callsPerFrame comes off the ScanOutput, not the engine.
+    // The seam that bites: callsPerFrame comes off the ScanOutput, not the player.
     expect(service.record()?.callsPerFrame).toBe(2);
     expect(service.record()?.filename).toBe('Still_Time.sid');
     expect(storage.save).toHaveBeenCalledTimes(1);
     expect(storage.save).toHaveBeenCalledWith(service.record());
-    expect(engine.setTuneIndex).toHaveBeenLastCalledWith(service.record());
+    expect(player.player.setTrackStructure).toHaveBeenLastCalledWith(
+      trackStructureOf(service.record())
+    );
   });
 
   it('records the detected loop as a start and a period, alongside the rate it was scanned at', async () => {
@@ -269,7 +288,7 @@ describe('TuneIndexService', () => {
     expect(record?.loopStartFrame).toBe(100);
     expect(record?.loopPeriodFrames).toBe(400);
     expect(record?.endedAtFrame).toBeNull();
-    // Both rates ride along: the rounded one off the scan, the exact one off the engine, so the
+    // Both rates ride along: the rounded one off the scan, the exact one off the player, so the
     // Timing toggle can flip this tune later without re-scanning it.
     expect(record?.callsPerFrame).toBe(2);
     expect(record?.exactCallsPerFrame).toBe(2.4);
@@ -286,7 +305,7 @@ describe('TuneIndexService', () => {
     expect(scanner.scan).not.toHaveBeenCalled();
     expect(service.pending()).toBe(false);
     expect(service.record()).toEqual(hit);
-    expect(engine.setTuneIndex).toHaveBeenLastCalledWith(hit);
+    expect(player.player.setTrackStructure).toHaveBeenLastCalledWith(trackStructureOf(hit));
   });
 
   it('triggers neither a lookup nor a scan while play, pause and stop leave the loaded tune untouched', () => {
@@ -296,15 +315,15 @@ describe('TuneIndexService', () => {
     TestBed.flushEffects();
     storage.load.mockClear();
     scanner.scan.mockClear();
-    engine.setTuneIndex.mockClear();
+    vi.mocked(player.player.setTrackStructure).mockClear();
 
-    // Play, pause and stop touch neither the identity signal nor currentSubtune, so a further flush
+    // Play, pause and stop touch neither the identity signal nor the subtune, so a further flush
     // with nothing written must re-run nothing.
     TestBed.flushEffects();
 
     expect(storage.load).not.toHaveBeenCalled();
     expect(scanner.scan).not.toHaveBeenCalled();
-    expect(engine.setTuneIndex).not.toHaveBeenCalled();
+    expect(player.player.setTrackStructure).not.toHaveBeenCalled();
   });
 
   it('triggers neither a lookup nor a scan when the nominal interval changes', () => {
@@ -315,7 +334,10 @@ describe('TuneIndexService', () => {
     storage.load.mockClear();
     scanner.scan.mockClear();
 
-    engine.nominalIntervalUs.set(20_000);
+    player.snapshot.update((snapshot) => ({
+      ...snapshot,
+      tempo: { ...snapshot.tempo, nominalIntervalUs: microseconds(20_000) },
+    }));
     TestBed.flushEffects();
 
     expect(storage.load).not.toHaveBeenCalled();
@@ -330,7 +352,7 @@ describe('TuneIndexService', () => {
 
     const hit2 = buildStoredRecord({ filename: 'Multi.sid', subtune: 2 });
     storage.load.mockReturnValue(hit2);
-    engine.currentSubtune.set(2);
+    setSubtune(player, 2);
     TestBed.flushEffects();
 
     expect(storage.load).toHaveBeenCalledWith('Multi.sid', 2);
@@ -389,7 +411,9 @@ describe('TuneIndexService', () => {
     expect(service.pending()).toBe(false);
     expect(service.record()).toBeNull();
     expect(storage.save).not.toHaveBeenCalled();
-    expect(engine.setTuneIndex.mock.calls.every(([record]) => record === null)).toBe(true);
+    expect(
+      vi.mocked(player.player.setTrackStructure).mock.calls.every(([loop]) => loop === null)
+    ).toBe(true);
   });
 
   describe('the scan ladder', () => {
@@ -567,16 +591,17 @@ describe('TuneIndexService', () => {
     });
 
     it('produces one record for two decks loading the same unindexed tune, each through its own scanner instance', async () => {
-      // Deck A is `service`, already wired in `setup()`. Deck B gets its own engine and scanner but
+      // Deck A is `service`, already wired in `setup()`. Deck B gets its own player and scanner but
       // shares the same `SharedTuneIndex` and `TUNE_INDEX_STORAGE` from the parent injector — the DI
       // topology `DeckHostComponent` and `DjPocViewComponent` establish in production.
-      const engineB = makeEngine();
+      const playerB = makePlayer();
       const scannerB = makeScanner();
       const parentInjector = TestBed.inject(EnvironmentInjector);
       const deckBInjector = createEnvironmentInjector(
         [
           TuneIndexService,
-          { provide: DjPlayerEngine, useValue: engineB as unknown as DjPlayerEngine },
+          { provide: SID_PLAYER, useValue: playerB.player },
+          { provide: DECK_PLAYER_VIEW, useValue: playerB.view },
           { provide: ANALYSIS_SCANNER, useValue: scannerB },
         ],
         parentInjector
@@ -733,12 +758,13 @@ describe('TuneIndexService', () => {
 
   describe('setTimingMode', () => {
     it('does nothing when no record has been indexed yet', () => {
-      engine.setTuneIndex.mockClear(); // the constructor's own initial refresh already called it once
+      // The constructor's own initial refresh already published once.
+      vi.mocked(player.player.setTrackStructure).mockClear();
 
       service.setTimingMode('rounded');
 
       expect(storage.save).not.toHaveBeenCalled();
-      expect(engine.setTuneIndex).not.toHaveBeenCalled();
+      expect(player.player.setTrackStructure).not.toHaveBeenCalled();
       expect(service.record()).toBeNull();
     });
 
@@ -748,7 +774,7 @@ describe('TuneIndexService', () => {
       service.setTune(fakeSidFile(), 'Cached.sid');
       TestBed.flushEffects();
       storage.save.mockClear();
-      engine.setTuneIndex.mockClear();
+      vi.mocked(player.player.setTimingMode).mockClear();
 
       service.setTimingMode('rounded');
 
@@ -759,7 +785,7 @@ describe('TuneIndexService', () => {
       expect(record?.filename).toBe('Cached.sid');
       expect(storage.save).toHaveBeenCalledTimes(1);
       expect(storage.save).toHaveBeenCalledWith(record);
-      expect(engine.setTuneIndex).toHaveBeenCalledWith(record);
+      expect(player.player.setTimingMode).toHaveBeenCalledWith('rounded');
     });
   });
 

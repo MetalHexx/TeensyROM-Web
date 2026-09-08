@@ -47,9 +47,12 @@ importers:
       '@ngrx/signals':
         specifier: ^19.2.0
         version: 19.2.1(@angular/core@19.2.15(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
-      mos6502:
-        specifier: 1.1.1
-        version: 1.1.1
+      '@sidablist/asid':
+        specifier: link:../../SIDablist/libs/asid
+        version: link:../../SIDablist/libs/asid
+      '@sidablist/core':
+        specifier: file:../../SIDablist/libs/core
+        version: file:../../SIDablist/libs/core
       opus-decoder:
         specifier: ^0.7.11
         version: 0.7.11
@@ -3223,6 +3226,9 @@ packages:
   '@schematics/angular@19.2.19':
     resolution: {integrity: sha512-6/0pvbPCY4UHeB4lnM/5r250QX5gcLgOYbR5FdhFu+22mOPHfWpRc5tNuY9kCephDHzAHjo6fTW1vefOOmA4jw==}
     engines: {node: ^18.19.1 || ^20.11.1 || >=22.0.0, npm: ^6.11.0 || ^7.5.6 || >=8.0.0, yarn: '>= 1.13.0'}
+
+  '@sidablist/core@file:../../SIDablist/libs/core':
+    resolution: {directory: ../../SIDablist/libs/core, type: directory}
 
   '@sigstore/bundle@3.1.0':
     resolution: {integrity: sha512-Mm1E3/CmDDCz3nDhFKTuYdB47EdRFRQMOE/EAbiG1MJW77/w1b3P7Qx7JSrVJs8PfwOLOVcKQCHErIwCTyPbag==}
@@ -7068,9 +7074,6 @@ packages:
     resolution: {integrity: sha512-fucGSh8643QkSvNRFOaJ3+kfjF0FhA/YtvDncnRAG0A4oCtAzHIFkt/+SgsWil1uwoeT+Nu5fsAnrKkFtnPcZQ==}
     peerDependencies:
       mocha: '>=7'
-
-  mos6502@1.1.1:
-    resolution: {integrity: sha512-yfVQ1EBgi0YoZuNJCvwE1cqrqOoEZY6yykhAGTvH5ePAfx0Cz3rl+ZZXArPxpKVKZ3uCHVpKS337GWptaIcCnQ==}
 
   mrmime@2.0.1:
     resolution: {integrity: sha512-Y3wQdFg2Va6etvQ5I82yUhGdsKrcYox6p7FfL1LbK2J4V01F9TGlepTIhnK24t7koZibmg82KGglhA1XK5IsLQ==}
@@ -13859,6 +13862,8 @@ snapshots:
     transitivePeerDependencies:
       - chokidar
 
+  '@sidablist/core@file:../../SIDablist/libs/core': {}
+
   '@sigstore/bundle@3.1.0':
     dependencies:
       '@sigstore/protobuf-specs': 0.4.3
@@ -18561,8 +18566,6 @@ snapshots:
       mochawesome-report-generator: 6.3.2
       strip-ansi: 6.0.1
       uuid: 8.3.2
-
-  mos6502@1.1.1: {}
 
   mrmime@2.0.1: {}
 

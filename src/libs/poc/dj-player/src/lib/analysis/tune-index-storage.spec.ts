@@ -103,6 +103,16 @@ describe('LocalStorageTuneIndexStorage', () => {
     expect(storage.load(record.filename, record.subtune)).toBeNull();
   });
 
+  it('discards a version-3 record rather than reading frame numbers measured against the ASID stream', () => {
+    // The last version written against the 28-slot stream. Its loop frames came from a different
+    // byte comparison than the one that runs now, so reading it back would hand out wrong loop
+    // points silently — the one failure mode a version gate exists to prevent.
+    const record = buildRecord({ formatVersion: 3, loopStartFrame: 1200, loopPeriodFrames: 4567 });
+    localStorage.setItem(`teensyrom_dj_tune_index_${record.filename}:${record.subtune}`, JSON.stringify(record));
+
+    expect(storage.load(record.filename, record.subtune)).toBeNull();
+  });
+
   it('returns null and logs a warning for a malformed stored value', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     localStorage.setItem('teensyrom_dj_tune_index_Broken.sid:1', '{ not json');

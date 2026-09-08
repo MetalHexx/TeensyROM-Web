@@ -3,8 +3,7 @@ import { segmentNotes, registerToHz, NTSC_CPU_CLOCK_HZ, PAL_CPU_CLOCK_HZ } from 
 import type { Note } from './notes';
 import { detectKey } from './key';
 import type { ScanOutput } from './scan-tune';
-import { PRIMARY_SLOT_FOR_REGISTER } from '../asid/register-frame';
-import { ASID_SLOT_COUNT } from '../asid/asid-constants';
+import { SID_REGISTER_COUNT } from '@sidablist/core';
 
 const REGISTERS_PER_VOICE = 7;
 const PULSE_GATE = 0x41;
@@ -27,7 +26,7 @@ const G_MAJOR = [G4, B4, D5];
 
 function makeScan(frames: number): ScanOutput {
   return {
-    slotValues: new Uint8Array(frames * ASID_SLOT_COUNT),
+    registerValues: new Uint8Array(frames * SID_REGISTER_COUNT),
     writeCounts: new Uint8Array(frames),
     frames,
     callsPerFrame: 1,
@@ -35,8 +34,7 @@ function makeScan(frames: number): ScanOutput {
 }
 
 function setRegister(scan: ScanOutput, frame: number, register: number, value: number): void {
-  const slot = PRIMARY_SLOT_FOR_REGISTER[register];
-  scan.slotValues[frame * ASID_SLOT_COUNT + slot] = value;
+  scan.registerValues[frame * SID_REGISTER_COUNT + register] = value;
 }
 
 function writeVoice(

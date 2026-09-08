@@ -11,7 +11,7 @@ describe('ChannelFaderComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ChannelFaderComponent],
-      providers: [MixerService],
+      providers: [{ provide: MixerService, useFactory: () => new MixerService(DECKS) }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ChannelFaderComponent);

@@ -52,9 +52,22 @@ describe('DJ Poc view — compression down to tablet width', () => {
     // Proves each deck's own controls stay reachable and operable once stacked — not merely
     // rendered. The repeat toggle is used (rather than Play/Pause/Stop) because it never depends
     // on a tune being loaded, so it stays enabled with no fixture setup.
-    cy.get('[aria-label="Repeat track deck A"]').should('be.visible').check();
+    //
+    // `dj-poc-view.component.scss`'s `:host` is the scrolling container here (the route bypasses
+    // the app shell and owns the viewport itself), not the document — so reaching a control below
+    // the fold takes an explicit `scrollIntoView()` rather than the page-level auto-scroll
+    // `.check()` performs by default. Deck A's row happens to sit within the initial viewport at
+    // this height, but deck B's does not, and asserting `be.visible` before scrolling would fail on
+    // a control that is genuinely reachable, only not yet scrolled to — the same failure shape a
+    // permanently clipped control would produce, so scrolling first is what actually distinguishes
+    // the two.
+    cy.get('[aria-label="Repeat track deck A"]').scrollIntoView();
+    cy.get('[aria-label="Repeat track deck A"]').should('be.visible');
+    cy.get('[aria-label="Repeat track deck A"]').check();
     cy.get('[aria-label="Repeat track deck A"]').should('be.checked');
-    cy.get('[aria-label="Repeat track deck B"]').should('be.visible').check();
+    cy.get('[aria-label="Repeat track deck B"]').scrollIntoView();
+    cy.get('[aria-label="Repeat track deck B"]').should('be.visible');
+    cy.get('[aria-label="Repeat track deck B"]').check();
     cy.get('[aria-label="Repeat track deck B"]').should('be.checked');
   });
 });

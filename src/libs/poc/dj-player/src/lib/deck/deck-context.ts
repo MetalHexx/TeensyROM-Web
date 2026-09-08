@@ -4,7 +4,7 @@ import type { DeckDescriptor } from './deck.config';
 /**
  * The one holder every deck-scoped collaborator reaches a deck's identity through. Angular resolves
  * a component's `providers` before its inputs are set, so nothing built from `DeckHostComponent`'s
- * provider list — `DjPlayerEngine`, `DeckMidiBinding`, and this class itself — may read the deck id
+ * provider list — `DeckMidiBinding`, `DeckTuneLoader`, and this class itself — may read the deck id
  * or label at construction time. This is the seam that lets them read it lazily instead: adopted
  * once `DeckHostComponent.ngOnInit` has its own `deck` input, and readable from then on.
  */

@@ -1,15 +1,24 @@
 import { Injectable, signal, type Signal } from '@angular/core';
-import { DjPlayerEngine } from '../engine/dj-player-engine';
+import type { SidPlayer } from '@sidablist/core';
+import type { AsidSink } from '@sidablist/asid';
 import { DeckMidiBinding } from '../midi/deck-midi-binding';
 import { TuneIndexService } from '../analysis/tune-index.service';
+import type { DeckPlayerView } from './deck-player';
 import { DeckTuneLoader } from './deck-tune-loader';
+import { MarkerCollection } from './marker-collection';
 import { DECKS, type DeckDescriptor } from './deck.config';
 
 /** What a page-level surface may reach of one deck — never the deck's own injector, only the
  *  collaborators it composed. */
 export interface DeckHandle {
   readonly descriptor: DeckDescriptor;
-  readonly engine: DjPlayerEngine;
+  readonly player: SidPlayer;
+  /** The deck's far end, for the counters and the schedule-ahead control core's contract has no
+   *  notion of. */
+  readonly sink: AsidSink;
+  /** The player's read side as signals, created once for the whole deck — see `DeckPlayerView`. */
+  readonly view: DeckPlayerView;
+  readonly markers: MarkerCollection;
   readonly binding: DeckMidiBinding;
   readonly tuneIndex: TuneIndexService;
   readonly tuneLoader: DeckTuneLoader;
@@ -38,7 +47,10 @@ export class DeckRegistry {
    *  twice under one id. */
   register(handle: DeckHandle): void {
     this._decks.update((decks) =>
-      sortByDeckOrder([...decks.filter((existing) => existing.descriptor.id !== handle.descriptor.id), handle])
+      sortByDeckOrder([
+        ...decks.filter((existing) => existing.descriptor.id !== handle.descriptor.id),
+        handle,
+      ])
     );
   }
 

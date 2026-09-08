@@ -1,4 +1,5 @@
 import {
+  computed,
   effect,
   inject,
   Injectable,
@@ -27,10 +28,9 @@ import { SharedTuneIndex } from './shared-tune-index';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
 import type { ScanOutput } from './scan-tune';
-import { DjPlayerEngine } from '../engine/dj-player-engine';
-import { asRounded, playCallsPerSecond } from '../engine/play-rate';
-import type { TimingMode } from '../engine/play-rate';
-import type { SidFile } from '../sid/sid-file.model';
+import { asRounded, DEFAULT_TIMING_MODE, frames, playCallsPerSecond } from '@sidablist/core';
+import type { SidFile, TimingMode } from '@sidablist/core';
+import { DECK_PLAYER_VIEW, SID_PLAYER } from '../deck/deck-player';
 
 /** What a load establishes: which file, under which name. `setTune` always writes a fresh object, so
  *  the effect below re-triggers even when the same tune is loaded twice in a session. */
@@ -55,9 +55,9 @@ type LadderOutcome =
   | { readonly kind: 'failed'; readonly error: string };
 
 /**
- * Owns the tune index's whole lifecycle for the tune currently loaded in `DjPlayerEngine`: look up
+ * Owns the tune index's whole lifecycle for the tune currently loaded in this deck's player: look up
  * the stored record on every genuinely new tune or subtune load, scan in the background on a miss,
- * persist what the scan finds, and publish the answer onto `record()` and into the engine. Deck-
+ * persist what the scan finds, and publish the answer onto `record()` and into the player. Deck-
  * host-provided, so its scanner and generation counter are scoped to one deck's own player instance
  * — the same reasoning `TrackAnalysisPanelComponent` uses for its own `ANALYSIS_SCANNER`.
  *
@@ -69,14 +69,23 @@ type LadderOutcome =
  * while the shared run was in flight. A second deck awaiting the same run is unaffected — it applies
  * its own generation, not this one's.
  *
- * Depends on the engine, never the other way around: the engine only stores what this service hands
- * it through `setTuneIndex`, so the dependency runs one way and a back-edge can never form a cycle.
+ * Depends on the player, never the other way around: the player holds no analysis record at all, and
+ * this service is what turns one into the calls below — so the dependency runs one way and a
+ * back-edge can never form a cycle.
  */
 @Injectable()
 export class TuneIndexService implements OnDestroy {
   private readonly shared = inject(SharedTuneIndex);
   private readonly scanner = inject(ANALYSIS_SCANNER);
-  private readonly engine = inject(DjPlayerEngine);
+  private readonly player = inject(SID_PLAYER);
+  private readonly view = inject(DECK_PLAYER_VIEW);
+
+  /** Narrowed off the snapshot rather than read from it directly: the snapshot's identity changes on
+   *  every discrete state change — a play, a mute, a tempo move — and the effect below must fire for
+   *  a subtune step and nothing else. */
+  private readonly currentSubtune = computed<number | null>(
+    () => this.view.snapshot().tune?.subtune ?? null
+  );
 
   private readonly _record = signal<TuneIndexRecord | null>(null);
   readonly record: Signal<TuneIndexRecord | null> = this._record.asReadonly();
@@ -104,10 +113,10 @@ export class TuneIndexService implements OnDestroy {
     // across them.
     effect(() => {
       const tune = this.identity();
-      const subtune = this.engine.currentSubtune();
-      // The refresh reads `engine.nominalIntervalUs()` and `engine.playRate()` to size each rung —
-      // both signals the Timing selector writes on every speed change. Read outside `untracked`,
-      // that becomes a third, unwanted trigger for this effect.
+      const subtune = this.currentSubtune() ?? 0;
+      // The refresh reads the player's nominal interval and play rate to size each rung — both move
+      // with the Timing selector on every speed change. Read outside `untracked`, that becomes a
+      // third, unwanted trigger for this effect.
       untracked(() => {
         const settles = this.pendingSettles;
         this.pendingSettles = [];
@@ -132,8 +141,8 @@ export class TuneIndexService implements OnDestroy {
    * R6's timing escape hatch: rewrites the current record with `mode` and republishes it — no
    * re-scan, since the record already carries both rates. A no-op when nothing is indexed yet.
    *
-   * Goes through `engine.setTuneIndex`, never `engine.timingMode.set` or `engine.setTimingMode`
-   * directly — `setTuneIndex` is what re-resolves the clock, so it is what makes the change audible.
+   * Goes through `publish`, never `player.setTimingMode` on its own, so the mode change and the
+   * structure it belongs with stay one operation — see `publish`.
    */
   setTimingMode(mode: TimingMode): void {
     const current = this.record();
@@ -143,7 +152,38 @@ export class TuneIndexService implements OnDestroy {
     const updated: TuneIndexRecord = { ...current, timingMode: mode };
     this.shared.save(updated);
     this._record.set(updated);
-    this.engine.setTuneIndex(updated);
+    this.publish(updated);
+  }
+
+  /**
+   * Hands the record's three facts to the player together: the track structure — which is what the
+   * position basis, the track's end and the whole-tune loop are all derived from — and the timing
+   * mode the clock resolves against.
+   *
+   * One method, deliberately. They were resolved as a set on the engine this replaces, and the
+   * record they come from is an analysis type that stays in this repository, so this service is the
+   * only place that can keep them together. Scattering these calls across the call sites that
+   * publish a record is exactly the coupling the single method exists to protect.
+   *
+   * **Any verified loop arms, including an implausibly short one — deliberately.** Detection is
+   * byte-exact: it has already compared every frame of the tail against its counterpart one period
+   * earlier, so a loop it reports is a repeat that was proven, not one that scored well. There is no
+   * plausibility gate here, and none should be added: a detection fault must stay audible rather
+   * than hide behind a guard that would also mask a future regression. `null` is the whole "declined
+   * to answer" case.
+   */
+  private publish(record: TuneIndexRecord | null): void {
+    this.player.setTrackStructure(
+      record === null
+        ? null
+        : {
+            loopStartFrame: record.loopStartFrame === null ? null : frames(record.loopStartFrame),
+            loopPeriodFrames:
+              record.loopPeriodFrames === null ? null : frames(record.loopPeriodFrames),
+            endedAtFrame: record.endedAtFrame === null ? null : frames(record.endedAtFrame),
+          }
+    );
+    this.player.setTimingMode(record?.timingMode ?? DEFAULT_TIMING_MODE);
   }
 
   ngOnDestroy(): void {
@@ -185,7 +225,7 @@ export class TuneIndexService implements OnDestroy {
     // A stale answer describing the outgoing tune must never survive one frame into the incoming one.
     this._record.set(null);
     this._pending.set(false);
-    this.engine.setTuneIndex(null);
+    this.publish(null);
 
     if (file === null || filename === null) {
       return;
@@ -195,7 +235,7 @@ export class TuneIndexService implements OnDestroy {
     if (hit !== null) {
       // A cache hit hydrates instantly — no scan at all, so the waiting load is released this turn.
       this._record.set(hit);
-      this.engine.setTuneIndex(hit);
+      this.publish(hit);
       return;
     }
 
@@ -220,7 +260,7 @@ export class TuneIndexService implements OnDestroy {
     }
 
     this._record.set(record);
-    this.engine.setTuneIndex(record);
+    this.publish(record);
   }
 
   /**
@@ -254,10 +294,10 @@ export class TuneIndexService implements OnDestroy {
     const loop = ladder.loop;
     const pulse = computePulse(novelty.candidates);
     const key = detectKey(segmentNotes(output, file.clock));
-    const playRate = this.engine.playRate();
+    const { nominalIntervalUs, rate: playRate, timingMode } = this.view.snapshot().tempo;
     const { native } = impliedTempo(
       pulse.dominantInterval,
-      this.engine.nominalIntervalUs(),
+      nominalIntervalUs,
       output.callsPerFrame,
       1
     );
@@ -282,7 +322,7 @@ export class TuneIndexService implements OnDestroy {
       tuningCents: key.tuning?.cents ?? null,
       keyConfidence: key.confidence,
       scalePitchClasses: key.scalePitchClasses,
-      // Off the ScanOutput, not the engine's machine: a multispeed tune calls the play routine more
+      // Off the ScanOutput, not the player's own rate: a multispeed tune calls the play routine more
       // than once per video frame, and every length and tempo derived later is wrong by that integer
       // factor if the record carries the wrong one.
       dominantIntervalFrames: pulse.dominantInterval,
@@ -290,11 +330,11 @@ export class TuneIndexService implements OnDestroy {
       nativeTempo: native,
       callsPerFrame: output.callsPerFrame,
       // The ScanOutput carries only the rounded rate, so the un-rounded one has to come off the
-      // engine — without it the Timing toggle could not flip a cached tune without a re-scan. Read
-      // off this producing deck's engine, but valid for either deck: see the class doc's note on
+      // player — without it the Timing toggle could not flip a cached tune without a re-scan. Read
+      // off this producing deck's player, but valid for either deck: see the class doc's note on
       // rate-derived fields.
       exactCallsPerFrame: playRate.exactCallsPerFrame,
-      timingMode: this.engine.timingMode(),
+      timingMode,
       formatVersion: TUNE_INDEX_FORMAT_VERSION,
       computedAt: new Date().toISOString(),
     };
@@ -355,11 +395,14 @@ export class TuneIndexService implements OnDestroy {
   /** One rung's depth, in play calls. Converted against the **rounded** rate, for the same reason
    *  `loopDetectOptions` is — the ladder's depths are emulation budgets, not real-time durations. */
   private scanDepthFrames(seconds: number): number {
-    const perSecond = playCallsPerSecond(
-      this.engine.nominalIntervalUs(),
-      asRounded(this.engine.playRate())
-    );
-    return Math.round(seconds * perSecond);
+    return Math.round(seconds * this.roundedPlayCallsPerSecond());
+  }
+
+  /** The player's current rate, forced to the rounded one — the basis both emulation-budget
+   *  conversions below share. */
+  private roundedPlayCallsPerSecond(): number {
+    const { nominalIntervalUs, rate } = this.view.snapshot().tempo;
+    return playCallsPerSecond(nominalIntervalUs, asRounded(rate));
   }
 
   /**
@@ -371,10 +414,7 @@ export class TuneIndexService implements OnDestroy {
    * ~20% on a CIA-timer tune and quietly invalidate the numbers the detector is graded against.
    */
   private loopDetectOptions(): LoopDetectOptions {
-    const perSecond = playCallsPerSecond(
-      this.engine.nominalIntervalUs(),
-      asRounded(this.engine.playRate())
-    );
+    const perSecond = this.roundedPlayCallsPerSecond();
     return {
       minTailFrames: Math.round(MIN_TAIL_SECONDS * perSecond),
       idlePeriodFrames: Math.round(IDLE_PERIOD_SECONDS * perSecond),

@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { FrameAccumulator, ScriptProcessorFrameClock } from './frame-clock';
+import { microseconds } from '@sidablist/core';
+import { ScriptProcessorFrameClock } from './frame-clock';
 
 const BUFFER_FRAMES = 256;
 const SAMPLE_RATE = 48000;
@@ -101,7 +102,7 @@ async function startedClock(
 ) {
   installFakeAudioContext();
   const clock = new ScriptProcessorFrameClock();
-  await clock.start(intervalUs, onFrame);
+  await clock.start(microseconds(intervalUs), onFrame);
   const context = FakeAudioContext.instances[0];
   const node = context.node;
   if (node === null) {
@@ -109,132 +110,6 @@ async function startedClock(
   }
   return { clock, context, node };
 }
-
-describe('FrameAccumulator', () => {
-  it('emits nothing until a whole interval has accumulated', () => {
-    const accumulator = new FrameAccumulator(20000);
-    let frames = 0;
-
-    accumulator.advance(19999, () => frames++);
-
-    expect(frames).toBe(0);
-    expect(accumulator.framesEmitted).toBe(0);
-  });
-
-  it('emits every frame that falls inside one buffer when the interval is the shorter of the two', () => {
-    const accumulator = new FrameAccumulator(1000);
-    let frames = 0;
-
-    accumulator.advance(5333, () => frames++);
-
-    expect(frames).toBe(5);
-    expect(accumulator.framesEmitted).toBe(5);
-  });
-
-  it('carries the remainder across advances rather than resetting it', () => {
-    const accumulator = new FrameAccumulator(20000);
-    let frames = 0;
-    const tick = () => frames++;
-
-    // Three buffers of 5333 µs is 15999 µs — one short — and the fourth crosses the interval.
-    accumulator.advance(5333, tick);
-    accumulator.advance(5333, tick);
-    accumulator.advance(5333, tick);
-    expect(frames).toBe(0);
-
-    accumulator.advance(5333, tick);
-
-    expect(frames).toBe(1);
-  });
-
-  it('applies a new interval on the next advance without dropping the accumulator', () => {
-    const accumulator = new FrameAccumulator(1000);
-    let frames = 0;
-    const tick = () => frames++;
-
-    accumulator.advance(900, tick);
-    expect(frames).toBe(0);
-
-    accumulator.setIntervalUs(500);
-    accumulator.advance(200, tick);
-
-    // The 900 µs already banked plus 200 µs is two 500 µs frames — the accumulator survived.
-    expect(frames).toBe(2);
-    expect(accumulator.nominalIntervalUs).toBe(500);
-  });
-
-  it('accounts nominal elapsed time at the interval in force for each frame', () => {
-    const accumulator = new FrameAccumulator(1000);
-    const tick = () => undefined;
-
-    accumulator.advance(2000, tick);
-    accumulator.setIntervalUs(500);
-    accumulator.advance(1000, tick);
-
-    expect(accumulator.framesEmitted).toBe(4);
-    expect(accumulator.nominalElapsedUs).toBe(2000 + 1000);
-  });
-
-  it('reports a frame that lands on the end of the credited span as due right then', () => {
-    const accumulator = new FrameAccumulator(20000);
-    const lags: number[] = [];
-
-    accumulator.advance(20000, (lagUs) => lags.push(lagUs));
-
-    expect(lags).toEqual([0]);
-  });
-
-  it('reports how late a frame already was when the advance that released it ran', () => {
-    const accumulator = new FrameAccumulator(20000);
-    const lags: number[] = [];
-
-    accumulator.advance(25000, (lagUs) => lags.push(lagUs));
-
-    expect(lags).toEqual([5000]);
-  });
-
-  it('spaces two frames released by one advance an interval apart, both in the past', () => {
-    const accumulator = new FrameAccumulator(20000);
-    const lags: number[] = [];
-
-    // 45 ms banked at a 20 ms interval: the first frame fell due 25 ms before this advance ran, the
-    // second 5 ms before it. They burst out together, but they describe two instants 20 ms apart —
-    // which is what lets the transport hand them to the cartridge that far apart.
-    accumulator.advance(45000, (lagUs) => lags.push(lagUs));
-
-    expect(lags).toEqual([25000, 5000]);
-    expect(lags[0] - lags[1]).toBe(20000);
-  });
-
-  it('measures lag against the interval in force when each frame fell due', () => {
-    const accumulator = new FrameAccumulator(1000);
-    const lags: number[] = [];
-    const record = (lagUs: number) => lags.push(lagUs);
-
-    accumulator.advance(900, record);
-    accumulator.setIntervalUs(500);
-    accumulator.advance(200, record);
-
-    // The 1100 µs banked releases two 500 µs frames, so they sit 500 µs apart rather than 1000.
-    expect(lags).toEqual([600, 100]);
-  });
-
-  it('spreads the catch-up a stall owes across the gap instead of stacking it at the end', () => {
-    const accumulator = new FrameAccumulator(10000);
-    const lags: number[] = [];
-
-    // The shape a long callback gap hands over: four frames owed, oldest first, evenly spaced and
-    // every one of them already due.
-    accumulator.advance(45000, (lagUs) => lags.push(lagUs));
-
-    expect(lags).toEqual([35000, 25000, 15000, 5000]);
-  });
-
-  it('rejects an interval that would never elapse', () => {
-    expect(() => new FrameAccumulator(0)).toThrow(RangeError);
-    expect(() => new FrameAccumulator(1000).setIntervalUs(Number.NaN)).toThrow(RangeError);
-  });
-});
 
 /**
  * Drives `performance.now()` by hand, so a callback gap is whatever the test says it is rather than
@@ -544,7 +419,7 @@ describe('ScriptProcessorFrameClock', () => {
     const { clock, node } = await startedClock(20000, () => frames++);
 
     fireNominal(node, advance, 4);
-    clock.setIntervalUs(10000);
+    clock.setIntervalUs(microseconds(10000));
     fireNominal(node, advance, 2);
 
     expect(clock.stats.nominalIntervalUs).toBe(10000);

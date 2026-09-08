@@ -10,7 +10,7 @@ import {
 import type { TuneIndexRate } from './tune-index-readouts';
 import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
 import type { TuneIndexRecord } from './tune-index.model';
-import type { PlayRate } from '../engine/play-rate';
+import type { PlayRate } from '@sidablist/core';
 
 /** One play call per 20 ms, so a frame count converts to seconds by a round factor of 50. */
 const SINGLE_SPEED: PlayRate = {

@@ -141,14 +141,16 @@ export function computeGridLayout(decks: readonly DeckDescriptor[]): DeckGridLay
   ],
   // Provided here rather than root: this is a quarantined POC surface, and neither the permission-
   // holding MIDI service nor any deck's own audio graph should register in the app injector. Each
-  // deck's own engine, clock, replay worker and scanner are provided one level down, in
+  // deck's own player, sink, clock, replay worker and scanner are provided one level down, in
   // `DeckHostComponent` — see its own `providers` array for why those are never hoisted here.
   providers: [
     MidiAccessService,
     { provide: TUNE_INDEX_STORAGE, useFactory: () => new LocalStorageTuneIndexStorage() },
     SharedTuneIndex,
     DeckRegistry,
-    MixerService,
+    // A factory, not a bare class provider: `MixerService` takes its decks through the constructor
+    // rather than reaching for `DECKS` itself, so this composition root is what hands them over.
+    { provide: MixerService, useFactory: () => new MixerService(DECKS) },
   ],
 })
 export class DjPocViewComponent {

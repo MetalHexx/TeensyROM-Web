@@ -6,8 +6,9 @@ import { DeckContext } from '../deck-context';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
 import { MidiAccessService } from '../../midi/midi-access.service';
 import type { MidiAccessState, MidiPortOption } from '../../midi/midi-access.service';
-import { DjPlayerEngine } from '../../engine/dj-player-engine';
-import type { EngineState } from '../../engine/dj-player-engine';
+import { DECK_PLAYER_VIEW } from '../deck-player';
+import { createFakeDeckPlayer } from '../../../testing/player-doubles';
+import type { FakeDeckPlayer } from '../../../testing/player-doubles';
 
 interface MockBinding {
   selectedPortId: WritableSignal<string | null>;
@@ -24,15 +25,11 @@ interface MockMidiAccess {
   requestAccess: ReturnType<typeof vi.fn>;
 }
 
-interface MockEngine {
-  state: WritableSignal<EngineState>;
-}
-
 describe('BindingCardComponent', () => {
   let fixture: ComponentFixture<BindingCardComponent>;
   let binding: MockBinding;
   let midiAccess: MockMidiAccess;
-  let engine: MockEngine;
+  let player: FakeDeckPlayer;
 
   function build(deckLabel: string): void {
     // Lets a single test build two decks in sequence (to compare their accessible names) without
@@ -51,7 +48,7 @@ describe('BindingCardComponent', () => {
       lastError: signal<string | null>(null),
       requestAccess: vi.fn().mockResolvedValue(undefined),
     };
-    engine = { state: signal<EngineState>('stopped') };
+    player = createFakeDeckPlayer();
 
     TestBed.configureTestingModule({
       imports: [BindingCardComponent],
@@ -59,7 +56,7 @@ describe('BindingCardComponent', () => {
         DeckContext,
         { provide: DeckMidiBinding, useValue: binding as unknown as DeckMidiBinding },
         { provide: MidiAccessService, useValue: midiAccess as unknown as MidiAccessService },
-        { provide: DjPlayerEngine, useValue: engine as unknown as DjPlayerEngine },
+        { provide: DECK_PLAYER_VIEW, useValue: player.view },
       ],
     });
 
@@ -84,7 +81,7 @@ describe('BindingCardComponent', () => {
     expect(select.textContent).toContain('MIDI not enabled');
   });
 
-  it('gates Identify on granted access, a selected port, and an idle engine', () => {
+  it('gates Identify on granted access, a selected port, and an idle deck', () => {
     build('A');
     expect(button('Identify').disabled).toBe(true);
 
@@ -94,12 +91,12 @@ describe('BindingCardComponent', () => {
     fixture.detectChanges();
     expect(button('Identify').disabled).toBe(false);
 
-    engine.state.set('playing');
+    player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
     fixture.detectChanges();
     expect(button('Identify').disabled).toBe(true);
   });
 
-  it('enabling MIDI requests page-level access, then restores this deck\'s own binding', async () => {
+  it("enabling MIDI requests page-level access, then restores this deck's own binding", async () => {
     build('A');
 
     button('Enable MIDI').click();
@@ -110,7 +107,7 @@ describe('BindingCardComponent', () => {
     expect(binding.restore).toHaveBeenCalled();
   });
 
-  it('identifies through this deck\'s own binding, naming the port by its enumerated position', () => {
+  it("identifies through this deck's own binding, naming the port by its enumerated position", () => {
     build('A');
     midiAccess.accessState.set('granted');
     midiAccess.ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);

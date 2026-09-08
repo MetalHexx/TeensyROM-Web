@@ -127,3 +127,8 @@ tbody th[scope='row'] {
 .stall-control input[type='number'] {
   width: 4.5rem;
 }
+
+.linked-core-result {
+  font-size: var(--font-size-sm);
+  color: var(--color-dimmed);
+}

@@ -15,6 +15,201 @@ The spike makes a C64 play a SID tune whose player code runs in this browser tab
 5. Any recent cartridge firmware version is compatible. Current release is 0.7.2.
 6. Use Chrome or Edge. Web MIDI with SysEx is unavailable in Safari and prompt-gated in Firefox.
 
+## The Linked `@sidablist/core` Package
+
+The POC consumes `@sidablist/core` from the sibling `SIDablist` repository through a relative `file:`
+dependency in `src/package.json`.
+
+**Both repositories must be cloned side by side under the same parent.** The specifier resolves
+`../../SIDablist/libs/core` from `TeensyROM-Web/src`, so a clone of only this repository fails at
+`pnpm install` with a resolution error and no further explanation. Clone both:
+
+```
+<parent>/
+  SIDablist/
+  TeensyROM-Web/
+```
+
+### Why `@sidablist/core` Is `file:` and `@sidablist/asid` Is `link:`
+
+Both point at a sibling checkout, but the two specifiers are not interchangeable here. `@sidablist/asid`'s own `package.json` depends on `@sidablist/core` via `workspace:*` — meaningful only inside `SIDablist`'s own pnpm workspace, where that protocol resolves to the sibling package pnpm already linked when `SIDablist` was installed. `link:` from this workspace simply symlinks the already-built `SIDablist/libs/asid` directory as-is and never re-resolves its manifest's own dependencies, so that `workspace:*` entry is never touched. `file:`, by contrast, has pnpm treat the target as a package it needs to install into *this* workspace, which means resolving every dependency in its manifest against packages this workspace's `pnpm-workspace.yaml` lists — and `@sidablist/core` is not one of them here, so `pnpm install` fails outright with `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND`. `@sidablist/core` itself has zero runtime dependencies (`SIDablist`'s own invariant), so it never hits this: `file:` and `link:` behave identically for it, and `file:` was kept as the more literal, unambiguous specifier of the two. Switching `asid` to `file:` to match is not available without either dropping its `workspace:*` dependency on core (a change that belongs to `SIDablist`, not here) or folding `SIDablist`'s libraries into this workspace's own `pnpm-workspace.yaml` (a much larger topology change than a POC linking two sibling repos calls for).
+
+### The Inner Loop
+
+```
+# in SIDablist
+pnpm --filter @sidablist/core build
+
+# in TeensyROM-Web/src — nothing to reinstall
+pnpm nx serve teensyrom-ui
+```
+
+The dev server picks the rebuilt package up on its next reload.
+
+No reinstall is needed, but not for the reason you would expect. pnpm 10 does **not** symlink a
+`file:` directory dependency — it hard-links each file into `node_modules/.pnpm`. The loop stays
+fast because `tsc` rewrites its outputs in place, so the hard links survive a rebuild and both
+repositories keep pointing at the same bytes. **If core's build ever starts by deleting `dist`, that
+breaks**: the new files are different inodes, the old hard links are orphaned, and this workspace
+silently keeps serving the previous build until you `pnpm install` again. Run the core smoke job in
+the setup drawer before you conclude a core change did nothing — `pnpm install` and retry if it still
+disagrees with what you just built.
+
+### Why the Package Declares `main` and `types`
+
+`@sidablist/core` is ESM-only and its `exports` map is the real entry-point contract. It also
+declares `main` and `types` pointing at the same files, purely so this workspace can resolve it:
+`tsconfig.base.json` sets `"moduleResolution": "node"`, which predates `exports` and would otherwise
+fail with `TS2307: Cannot find module '@sidablist/core'` even though the bundler resolves it fine.
+Removing either field breaks the type-check here; switching this workspace to `bundler` resolution
+would be the alternative, and is a far larger change than the POC justifies.
+
+### Why the Worker Goes Through a First-Party Shim
+
+`diagnostics/core-replay.worker.ts` is one line — `import '@sidablist/core/replay.worker';` — and the
+setup drawer starts the worker from it rather than letting the package start its own.
+
+The package can start its own worker under a plain ESM loader, but not under this build. Angular
+rewrites `new Worker(new URL(..., import.meta.url))` specifiers with a **TypeScript transformer**
+(`@angular/build`'s `web-worker-transformer`), which only walks sources in its own program — so the
+copy already compiled into the package's `dist` is never rewritten. Worse, it fails silently: the
+build stays green, the untouched specifier lands in the bundle, and at run time it resolves against
+the emitted chunk's own URL and 404s. Nothing in `dist/apps/teensyrom-ui/browser/` corresponds to it.
+
+Two constraints force the shape. The Worker must be constructed in first-party TypeScript, because
+that is all the transformer sees; and the specifier must be a **relative path**, because the builder
+resolves it with a plain `path.join` rather than module resolution — a bare package specifier cannot
+work there. The shim is the smallest thing satisfying both.
+
+The package's `createWorkerReplayRunner(workerFactory?)` takes the worker as its argument, so no
+part of this leaks back into the library — `@sidablist/core` exposes `./replay.worker` as a public
+subpath export and knows nothing about who consumes it. That is the same mechanism a real published
+npm package would use, so nothing here needs rework when these libraries stop being `file:` links.
+
+**Passing the factory is not optional here.** Calling `createWorkerReplayRunner()` bare falls back to
+the package's own worker and reproduces the silent 404 above. Every linked worker this app grows
+needs its own one-line shim; there is no build setting that makes the fallback work.
+
+### Why `prebundle.exclude` Exists
+
+The **serve** target in `apps/teensyrom-ui/project.json` excludes the `@sidablist/*` packages from
+the dev server's dependency pre-bundling. Pre-bundling rewrites a module into the dev server's own
+cache directory, and the package starts its worker from a `new URL('./replay.worker.js',
+import.meta.url)` specifier that would then resolve against that cache, where no worker file exists.
+The failure is silent — the build stays green and the worker simply never starts — so the exclusion
+is load-bearing rather than an optimisation.
+
+It is a `dev-server` option, not a build option and not a Vite setting. The
+`@angular/build:application` schema rejects `prebundle` outright (`additionalProperties: false`), and
+`vite.config.mts` is read only by the `@nx/vite:test` executor — so writing the exclusion in either
+place fails loudly or does nothing at all.
+
+### Verifying the Link
+
+The setup drawer's Diagnostics panel carries a **Run core smoke job** button: it drives the linked
+`@sidablist/core`'s replay worker over a tiny fixture tune and renders the frame the round trip
+landed on. A worker that fails to resolve renders the failure instead, which is what proves the
+worker inside the currently linked build actually started. Check it against a production build
+served statically as well as against the dev server — pre-bundling and linking faults only show up
+in one of the two.
+
+## Verifying The Build, The Browser, And The Hardware
+
+The failure modes in this spike are runtime ones — a linking or pre-bundling fault is silent at
+build time and only audible (sometimes literally) once a real browser or a real cartridge is in the
+loop. A green build and a green suite are necessary but not sufficient. Run all seven of these before
+trusting a change; each was last run end to end for `P09-T06`, with results below.
+
+1. **Fresh clone, both repos side by side, install, build core, then build the app.**
+
+   ```
+   # in SIDablist
+   pnpm --filter @sidablist/core build
+
+   # in TeensyROM-Web/src
+   pnpm install
+   pnpm nx build teensyrom-ui
+   ```
+
+   No linking incantation beyond the sibling-checkout layout above (`pnpm install` alone resolves
+   `@sidablist/core`/`@sidablist/asid` via the `file:`/`link:` specifiers in `src/package.json`).
+
+2. **The production bundle, served statically.**
+
+   ```
+   pnpm nx run teensyrom-ui:serve-static
+   # in a second shell, once it's listening:
+   pnpm exec cypress run --project apps/teensyrom-ui-e2e \
+     --config baseUrl=http://localhost:<port> --spec="apps/teensyrom-ui-e2e/src/e2e/poc/**/*.cy.ts"
+   ```
+
+   `serve-static` prints the port it actually bound (it falls back past 4200 if something else already
+   holds it — check the printed URL rather than assuming 4200). This drives a genuine browser (not
+   jsdom) through the `/dev/dj-poc` route, the lazy-loaded POC chunk behind it, a captured cue, and a
+   real worker round trip (`dj-poc-core-replay-worker.cy.ts`) against the exact static output a user
+   would be served — the one build a `pnpm nx test` run never touches.
+
+3. **The dev server**, same specs, against `pnpm nx serve teensyrom-ui` (or `pnpm start`) and
+   `http://localhost:4200` instead — this is what actually exercises `prebundle.exclude` (see above);
+   confirm it's still present in `apps/teensyrom-ui/project.json`'s `serve` target before assuming a
+   pass here means anything.
+
+   Running via `pnpm exec nx run teensyrom-ui-e2e:e2e[:production]` also works but has been flaky in
+   this workspace about which server it actually waits on; starting the target server yourself first
+   and pointing `cypress run --config baseUrl=...` at it directly is the reliable path if that
+   happens.
+
+4. **`pnpm exec nx run-many -t lint`, `-t test`, and a Prettier check.** Scope the format check to
+   what the task actually touched — `git config core.autocrlf` being `true` on a Windows checkout
+   makes a bare `prettier --check` over the whole tree report nearly every file over line endings
+   alone, and separately from that, this workspace carries pre-existing formatting and lint drift in
+   libraries this POC never touches (`libs/data-access/asm-64-client`, `libs/ui/*`, and others) — none
+   of it gates CI (`.github/workflows/pr-frontend-checks.yml` runs lint/typecheck/test only against
+   `nx affected`, always excludes `teensyrom-ui-e2e` and every `TeensyRom.*` backend project, and has
+   no format step at all). Treat a clean `dj-player`/`teensyrom-ui`/`teensyrom-ui-e2e` result as the
+   bar, not a clean whole-workspace one.
+
+5. **A real browser session over the POC.** Loading a tune on each deck, capturing/triggering a cue,
+   arming/clearing a loop, and the layout/reflow checks above all run with no MIDI device attached —
+   the Cypress specs in step 2/3 cover exactly this and are real evidence, not a stand-in.
+
+   Play, scrub during playback, tempo, voice mute, subtune stepping and "identify" all sit behind
+   `canPlay()`/a selected MIDI port (`transport-panel.component.ts`), which in turn sits behind
+   `navigator.requestMIDIAccess()` actually reporting a port. **This only exercises for real with a
+   MIDI-capable browser session** — a connected TeensyROM cartridge, at minimum a virtual MIDI port on
+   the host. A plain CI runner or a sandboxed agent has neither (confirmed here:
+   `requestMIDIAccess({ sysex: true })` resolves with zero inputs and zero outputs), so this half of
+   the session cannot be exercised or faked from such an environment — it needs a human at a real
+   machine with the cartridge attached, watching the console for a worker error surfacing (the
+   replay worker and the analysis scan worker are the two that can fail silently) while running
+   through every control above.
+
+6. **The analysis migration on a cleared cache.** `scan-pipeline.spec.ts` runs the real emulation,
+   loop detector and key detector over a bundled tune's actual bytes and asserts the exact
+   pre-extraction loop start/period and key — "the answer for this tune", not a threshold — so a
+   passing run _is_ the proof the register-model migration (`P09-T03`) changed nothing observable.
+   `tune-index-storage.spec.ts`'s "discards a version-3 record" case is the other half: it proves a
+   cache entry stamped with the pre-migration `formatVersion` is read back as a cache miss rather than
+   trusted, which is what makes a stale cache re-scan instead of lying. Together these two suites are
+   the cleared-cache migration check; there is no separate manual step because both halves already run
+   against real bytes/real logic rather than a hand-built fixture.
+
+7. **A listening session on real hardware.** Timing, the gate-off window and the PAL/NTSC pitch
+   correction are judged by ear, against a real cartridge over USB MIDI — nothing above substitutes
+   for it, and nothing in a sandboxed or CI environment can. Before blaming the host for drift,
+   glitching or dropouts, confirm the C64's frame timer reads **Off** — a cartridge left in a
+   frame-timed mode by an earlier session fights this player silently, and the host can neither
+   un-send that recipe nor read the flag back.
+
+**Known limitation: a tune whose `init` never returns.** Loading
+`MUSICIANS/T/Tjelta_Geir/Brain_Artifice.sid` fails with `the play routine did not return within its
+cycle budget`. This is not a regression and is specific to that tune, not this app: `sidablist`'s CPU
+emulation delivers no interrupts at all (the `Cpu6502` port exposes no `irq()`/`nmi()`, and
+`init`/`play` run synchronously per the standard PSID convention), and this tune's `init` busy-waits
+on a RAM flag that only a real IRQ/NMI handler would ever set — so the wait never ends. It is rare
+(the only tune among those exercised here that hits it) and pre-existing; `Brain_Artifice.sid` is the
+known reproducing example if this error surfaces again on some other tune.
+
 ## The Yank — Deleting the Iteration
 
 The spike is quarantined in one folder and four registration lines. To delete it completely:
@@ -34,12 +229,17 @@ The spike is quarantined in one folder and four registration lines. To delete it
 4. **Drop the path alias** from `tsconfig.base.json`:
    - Delete the line `"@teensyrom-nx/poc/dj-player": ["libs/poc/dj-player/src/index.ts"]`
 
-5. **Remove the dependency:**
+5. **Remove the dependencies:**
    ```
-   pnpm remove mos6502
+   pnpm remove @sidablist/core @sidablist/asid
    ```
 
-After these five edits, run `pnpm nx lint` and `pnpm nx test` to verify the workspace is clean. This yank has been rehearsed on a scratch branch and reverted successfully.
+6. **Drop the pre-bundling exclusion** from `apps/teensyrom-ui/project.json`:
+   - Delete the `prebundle` entry under `targets.serve.options` — it exists only for the linked
+     `@sidablist/*` packages
+
+After these six edits, run `pnpm nx lint` and `pnpm nx test` to verify the workspace is clean. The
+five-edit form of this yank was rehearsed on a scratch branch and reverted successfully.
 
 ## The Tune List
 

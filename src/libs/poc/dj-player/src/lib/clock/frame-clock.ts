@@ -1,157 +1,29 @@
-const MICROSECONDS_PER_SECOND = 1_000_000;
+import {
+  createFrameAccumulator,
+  MAX_CATCH_UP_US,
+  MICROSECONDS_PER_SECOND,
+  microseconds,
+  milliseconds,
+} from '@sidablist/core';
+import type {
+  FrameAccumulator,
+  FrameClock,
+  FrameClockStats,
+  Microseconds,
+  Milliseconds,
+} from '@sidablist/core';
+
 const MICROSECONDS_PER_MILLISECOND = 1000;
 
 /** Frames per `createScriptProcessor` buffer — 256 is ≈ 5.3 ms at 48 kHz. */
 const AUDIO_BUFFER_FRAMES = 256;
 
-/**
- * The most catch-up a single callback may emit after a stall.
- *
- * Catching up is normally self-correcting: the cartridge drained frames while we were stalled, so
- * emitting exactly what we owe puts its queue back where it was. That stops holding past the point
- * where the cartridge would have underflowed and re-buffered on its own — beyond there the queue has
- * already refilled itself, and a burst on top of it overflows rather than restores. 250 ms is
- * comfortably past every buffer size the cartridge offers at frame rates this engine runs.
- *
- * It also bounds how far the due times below can be trusted. A gap longer than this credits less
- * time than really passed, so the frames it releases are anchored up to `(gap − 250 ms)` later than
- * they truly fell due. Playback is unharmed — every one of them is in the past and goes out at
- * once — but a lag measured against those due times under-reports by that much, which is why such
- * frames are flagged to the tick callback rather than left to be averaged into a timing figure.
- */
-const MAX_CATCH_UP_US = 250_000;
-
 /** A callback gap beyond this multiple of the nominal buffer duration counts as late. */
 const LATE_CALLBACK_FACTOR = 2;
 
-/** What the clock has actually done since `start`, for the diagnostics panel. */
-export interface FrameClockStats {
-  readonly framesEmitted: number;
-  readonly measuredMeanIntervalUs: number;
-  readonly nominalIntervalUs: number;
-  /**
-   * Cumulative measured − nominal since `start`.
-   *
-   * Now that the clock advances on measured time, this is the check on that: frames fall due against
-   * the wall clock, so a healthy stream holds this near zero. A figure that climbs steadily means the
-   * engine is emitting at a different rate from the one it advertises to the cartridge, which is what
-   * makes the cartridge's queue depth oscillate.
-   */
-  readonly driftMs: number;
-  /**
-   * Standard deviation of the gap between audio callbacks.
-   *
-   * The mean interval and the drift can both look healthy while individual callbacks scatter, and it
-   * is the scatter that empties the cartridge's queue: no callback means no packet, and a queue that
-   * runs dry re-buffers. Measured on the callback rather than on emitted frames so the figure means
-   * the same thing whatever multispeed the tune carries.
-   */
-  readonly jitterMs: number;
-  /**
-   * The longest single gap between audio callbacks since `start`.
-   *
-   * The number that actually catches a rare dropout: one 200 ms main-thread stall barely moves the
-   * standard deviation but empties any buffer outright.
-   */
-  readonly worstGapMs: number;
-  /**
-   * How many callbacks arrived more than `LATE_CALLBACK_FACTOR`x the nominal buffer duration apart.
-   *
-   * `worstGapMs` is a running maximum that never decays, so a single spike sets it for the session
-   * and cannot be told apart from a constant problem. This is the frequency alongside it.
-   */
-  readonly lateCallbacks: number;
-}
-
 /**
- * A source of frame ticks at audio rate.
- *
- * Kept deliberately small so another implementation can replace it without touching the engine.
- */
-// TODO(R6): AudioWorklet variant — worth building only if the ear says the ScriptProcessorNode
-// implementation below disappoints.
-export interface FrameClock {
-  /**
-   * Starts ticking every `intervalUs`. Must be called from a user gesture: it resumes an
-   * `AudioContext`, which browsers only allow from one.
-   *
-   * `dueAtMs` is when that frame fell due on the `performance.now()` timeline, which is *before* the
-   * tick that releases it: a callback releases every frame that fell inside the span it credits, so
-   * frames arrive in bursts but carry due times one interval apart. `catchUpClamped` marks a frame
-   * released from a span that credited less than the time really elapsed (see `MAX_CATCH_UP_US`),
-   * whose due time is therefore later than the truth.
-   */
-  start(
-    intervalUs: number,
-    onFrame: (dueAtMs: number, catchUpClamped: boolean) => void
-  ): Promise<void>;
-  /** Takes effect on the next tick, without a restart and without dropping the accumulator. */
-  setIntervalUs(intervalUs: number): void;
-  stop(): void;
-  readonly stats: FrameClockStats;
-}
-
-/**
- * Turns elapsed audio-buffer time into frame ticks.
- *
- * Split out from the clock because this is the arithmetic that decides how many frames a buffer
- * owes, and it is worth exercising without an `AudioContext` in the way.
- */
-export class FrameAccumulator {
-  private intervalUs: number;
-  private accumulatorUs = 0;
-  private frames = 0;
-  private nominalUsEmitted = 0;
-
-  constructor(intervalUs: number) {
-    assertPositiveInterval(intervalUs);
-    this.intervalUs = intervalUs;
-  }
-
-  get nominalIntervalUs(): number {
-    return this.intervalUs;
-  }
-
-  get framesEmitted(): number {
-    return this.frames;
-  }
-
-  /** The time the emitted frames were supposed to take, summed at the interval in force for each. */
-  get nominalElapsedUs(): number {
-    return this.nominalUsEmitted;
-  }
-
-  /** @throws {RangeError} when `intervalUs` is not a positive finite number. */
-  setIntervalUs(intervalUs: number): void {
-    assertPositiveInterval(intervalUs);
-    this.intervalUs = intervalUs;
-  }
-
-  /**
-   * Adds `elapsedUs` of time and fires every frame that now falls due.
-   *
-   * More than one frame can fall inside a single advance at short intervals, or after a caller
-   * hands over a long measured gap, and they must all fire — so this bursts several packets back to
-   * back. Absorbing bursts is exactly what the cartridge's queue is for.
-   *
-   * Each frame reports `lagUs`: how long before the end of the credited span it fell due. That is
-   * exactly what remains in the accumulator once the frame's interval has come out of it, so a
-   * caller holding the time that span ended can place every frame in the burst — one interval apart
-   * rather than all at the instant the advance happened to run.
-   */
-  advance(elapsedUs: number, onFrame: (lagUs: number) => void): void {
-    this.accumulatorUs += elapsedUs;
-    while (this.accumulatorUs >= this.intervalUs) {
-      this.accumulatorUs -= this.intervalUs;
-      this.frames++;
-      this.nominalUsEmitted += this.intervalUs;
-      onFrame(this.accumulatorUs);
-    }
-  }
-}
-
-/**
- * A frame clock driven by `ScriptProcessorNode.onaudioprocess`.
+ * A frame clock driven by `ScriptProcessorNode.onaudioprocess` — the application's adapter onto
+ * core's `FrameClock` port, and the only part of the cadence that has to know about a browser.
  *
  * It runs on the main thread by design. `createScriptProcessor` is deprecated, and it is still the
  * right choice here: its callback fires on the main thread at audio buffer boundaries, keeps firing
@@ -159,6 +31,8 @@ export class FrameAccumulator {
  * to reach Web MIDI's main-thread-only `send()`. An `AudioWorklet` would have to `postMessage` back
  * and land in the same task queue anyway.
  */
+// TODO(R6): AudioWorklet variant — worth building only if the ear says the ScriptProcessorNode
+// implementation below disappoints.
 export class ScriptProcessorFrameClock implements FrameClock {
   private context: AudioContext | null = null;
   private node: ScriptProcessorNode | null = null;
@@ -179,11 +53,11 @@ export class ScriptProcessorFrameClock implements FrameClock {
     if (accumulator === null) {
       return {
         framesEmitted: 0,
-        measuredMeanIntervalUs: 0,
-        nominalIntervalUs: 0,
-        driftMs: 0,
-        jitterMs: 0,
-        worstGapMs: 0,
+        measuredMeanIntervalUs: microseconds(0),
+        nominalIntervalUs: microseconds(0),
+        driftMs: milliseconds(0),
+        jitterMs: milliseconds(0),
+        worstGapMs: milliseconds(0),
         lateCallbacks: 0,
       };
     }
@@ -192,11 +66,15 @@ export class ScriptProcessorFrameClock implements FrameClock {
     const framesEmitted = accumulator.framesEmitted;
     return {
       framesEmitted,
-      measuredMeanIntervalUs: framesEmitted === 0 ? 0 : measuredElapsedUs / framesEmitted,
+      measuredMeanIntervalUs: microseconds(
+        framesEmitted === 0 ? 0 : measuredElapsedUs / framesEmitted
+      ),
       nominalIntervalUs: accumulator.nominalIntervalUs,
-      driftMs: (measuredElapsedUs - accumulator.nominalElapsedUs) / MICROSECONDS_PER_MILLISECOND,
-      jitterMs: this.gapStandardDeviationMs(),
-      worstGapMs: this.worstGapMs,
+      driftMs: milliseconds(
+        (measuredElapsedUs - accumulator.nominalElapsedUs) / MICROSECONDS_PER_MILLISECOND
+      ),
+      jitterMs: milliseconds(this.gapStandardDeviationMs()),
+      worstGapMs: milliseconds(this.worstGapMs),
       lateCallbacks: this.lateCallbacks,
     };
   }
@@ -212,8 +90,8 @@ export class ScriptProcessorFrameClock implements FrameClock {
 
   /** @throws {RangeError} when `intervalUs` is not a positive finite number. */
   async start(
-    intervalUs: number,
-    onFrame: (dueAtMs: number, catchUpClamped: boolean) => void
+    intervalUs: Microseconds,
+    onFrame: (dueAtMs: Milliseconds, catchUpClamped: boolean) => void
   ): Promise<void> {
     assertPositiveInterval(intervalUs);
     this.stop();
@@ -228,7 +106,7 @@ export class ScriptProcessorFrameClock implements FrameClock {
     // The node is only pumped while its graph reaches the destination, silent or not.
     sink.connect(context.destination);
 
-    const accumulator = new FrameAccumulator(intervalUs);
+    const accumulator = createFrameAccumulator(intervalUs);
     const bufferDurationUs = (AUDIO_BUFFER_FRAMES / context.sampleRate) * MICROSECONDS_PER_SECOND;
 
     this.startedAtMs = performance.now();
@@ -239,15 +117,16 @@ export class ScriptProcessorFrameClock implements FrameClock {
     this.worstGapMs = 0;
     this.lateCallbacks = 0;
 
-    const lateThresholdMs = (bufferDurationUs * LATE_CALLBACK_FACTOR) / MICROSECONDS_PER_MILLISECOND;
+    const lateThresholdMs =
+      (bufferDurationUs * LATE_CALLBACK_FACTOR) / MICROSECONDS_PER_MILLISECOND;
     let firstCallback = true;
     // The end of the span the running callback credits, and whether that span was clamped. Held out
     // here so the frame handler is built once rather than per callback: allocating on this path is
     // the jitter the clock exists to measure.
     let creditedUntilMs = this.startedAtMs;
     let catchUpClamped = false;
-    const emitFrame = (lagUs: number): void =>
-      onFrame(creditedUntilMs - lagUs / MICROSECONDS_PER_MILLISECOND, catchUpClamped);
+    const emitFrame = (lagUs: Microseconds): void =>
+      onFrame(milliseconds(creditedUntilMs - lagUs / MICROSECONDS_PER_MILLISECOND), catchUpClamped);
 
     node.onaudioprocess = () => {
       const now = performance.now();
@@ -255,7 +134,7 @@ export class ScriptProcessorFrameClock implements FrameClock {
       // Credit the accumulator with the time that actually passed, not with the buffer duration the
       // sample rate implies. Those differ by a fraction of a percent — the audio device's crystal
       // against `performance.now()` — and that fraction is a *sustained rate error*: the cartridge
-      // re-times playback to the interval this engine advertises, so a stream that runs slow against
+      // re-times playback to the interval this clock advertises, so a stream that runs slow against
       // its own advertised rate drains the cartridge's queue faster than it fills, until the
       // firmware's slow re-timer claws it back and the depth oscillates. Measuring instead of
       // assuming keeps the advertised rate honest.
@@ -275,9 +154,10 @@ export class ScriptProcessorFrameClock implements FrameClock {
         this.gapSumSqMs += gapMs * gapMs;
         if (gapMs > this.worstGapMs) this.worstGapMs = gapMs;
         if (gapMs > lateThresholdMs) this.lateCallbacks++;
-        const measuredUs = gapMs * MICROSECONDS_PER_MILLISECOND;
-        catchUpClamped = measuredUs > MAX_CATCH_UP_US;
-        elapsedUs = Math.min(measuredUs, MAX_CATCH_UP_US);
+        elapsedUs = gapMs * MICROSECONDS_PER_MILLISECOND;
+        // Resolved before the advance rather than from its return value: `emitFrame` reads this flag
+        // as each frame is released, so it has to be true by the time the first one comes out.
+        catchUpClamped = elapsedUs > MAX_CATCH_UP_US;
       }
 
       this.lastTickAtMs = now;
@@ -285,7 +165,8 @@ export class ScriptProcessorFrameClock implements FrameClock {
       // the span just credited ends here, and each frame's own lag says how far back inside it the
       // frame fell due.
       creditedUntilMs = now;
-      accumulator.advance(elapsedUs, emitFrame);
+      // The accumulator applies `MAX_CATCH_UP_US` itself, so the measured span goes over unclamped.
+      accumulator.advance(microseconds(elapsedUs), emitFrame);
     };
 
     this.context = context;
@@ -299,7 +180,7 @@ export class ScriptProcessorFrameClock implements FrameClock {
    *
    * @throws {RangeError} when `intervalUs` is not a positive finite number.
    */
-  setIntervalUs(intervalUs: number): void {
+  setIntervalUs(intervalUs: Microseconds): void {
     this.accumulator?.setIntervalUs(intervalUs);
   }
 

@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MidiAccessService } from './midi-access.service';
 import { DeckMidiBinding } from './deck-midi-binding';
-import { buildDisplayCharsPacket } from '../asid/asid-encoder';
+import { ASID_SYSEX_END, ASID_SYSEX_START, createAsidSink } from '@sidablist/asid';
+import { createFakeAsidSink } from '../../testing/player-doubles';
 
 interface FakeMidiOutput {
   readonly id: string;
@@ -120,7 +121,7 @@ describe('DeckMidiBinding', () => {
   });
 
   describe('per-deck persistence', () => {
-    it('round-trips a deck\'s selection through its own namespaced localStorage key', async () => {
+    it("round-trips a deck's selection through its own namespaced localStorage key", async () => {
       await grant([makeOutput('port-1', 'TeensyROM Cart', 'Acme')]);
       deckA.selectPort('port-1');
       expect(localStorage.getItem('asid-dj-0.deck-A.selected-midi-port')).toBe('port-1');
@@ -130,9 +131,7 @@ describe('DeckMidiBinding', () => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({ providers: [MidiAccessService] });
       const reloadedAccess = TestBed.inject(MidiAccessService);
-      const reloadedDeck = TestBed.runInInjectionContext(
-        () => new DeckMidiBinding(reloadedAccess)
-      );
+      const reloadedDeck = TestBed.runInInjectionContext(() => new DeckMidiBinding(reloadedAccess));
       reloadedDeck.deckId = 'A';
       stubRequestMidiAccess(() =>
         Promise.resolve(makeAccess([makeOutput('port-1', 'TeensyROM Cart', 'Acme')]))
@@ -151,9 +150,7 @@ describe('DeckMidiBinding', () => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({ providers: [MidiAccessService] });
       const reloadedAccess = TestBed.inject(MidiAccessService);
-      const reloadedDeck = TestBed.runInInjectionContext(
-        () => new DeckMidiBinding(reloadedAccess)
-      );
+      const reloadedDeck = TestBed.runInInjectionContext(() => new DeckMidiBinding(reloadedAccess));
       reloadedDeck.deckId = 'A';
       stubRequestMidiAccess(() =>
         Promise.resolve(makeAccess([makeOutput('port-2', 'Different Cart', 'Acme')]))
@@ -165,11 +162,8 @@ describe('DeckMidiBinding', () => {
       expect(reloadedDeck.selectedPortId()).toBeNull();
     });
 
-    it('two decks persist under independent keys — one never overwrites the other\'s', async () => {
-      await grant([
-        makeOutput('port-1', 'Cart A', 'Acme'),
-        makeOutput('port-2', 'Cart B', 'Acme'),
-      ]);
+    it("two decks persist under independent keys — one never overwrites the other's", async () => {
+      await grant([makeOutput('port-1', 'Cart A', 'Acme'), makeOutput('port-2', 'Cart B', 'Acme')]);
       const deckB = makeDeck('B');
       TestBed.flushEffects();
 
@@ -181,7 +175,7 @@ describe('DeckMidiBinding', () => {
     });
   });
 
-  it('port loss stays local: a statechange that drops one deck\'s port leaves the other deck\'s selection and error untouched', async () => {
+  it("port loss stays local: a statechange that drops one deck's port leaves the other deck's selection and error untouched", async () => {
     const fakeAccess = await grant([
       makeOutput('port-1', 'Cart A', 'Acme'),
       makeOutput('port-2', 'Cart B', 'Acme'),
@@ -203,7 +197,7 @@ describe('DeckMidiBinding', () => {
     expect(access.deckHolding('port-2')).toBe('B');
   });
 
-  it('supportsCancel resolves against this deck\'s own port, not whichever port is selected elsewhere', async () => {
+  it("outputPort.supportsCancel resolves against this deck's own port, not whichever port is selected elsewhere", async () => {
     await grant([
       makeOutput('port-1', 'Cart A', 'Acme', true),
       makeOutput('port-2', 'Cart B', 'Acme', false),
@@ -213,48 +207,92 @@ describe('DeckMidiBinding', () => {
     deckA.selectPort('port-1');
     deckB.selectPort('port-2');
 
-    expect(deckA.supportsCancel()).toBe(true);
-    expect(deckB.supportsCancel()).toBe(false);
+    expect(deckA.outputPort.supportsCancel).toBe(true);
+    expect(deckB.outputPort.supportsCancel).toBe(false);
   });
 
-  describe('send / cancelPending / identify', () => {
-    it('send() routes bytes to this deck\'s own selected port', async () => {
+  describe('outputPort', () => {
+    it("routes bytes to this deck's own selected output, timestamp and all", async () => {
       const output = makeOutput('port-1', 'Cart A', 'Acme');
       await grant([output]);
       deckA.selectPort('port-1');
 
       const bytes = Uint8Array.from([0xf0, 0x2d, 0x4f, 0x41, 0xf7]);
-      deckA.send(bytes, 123);
+      deckA.outputPort.send(bytes, 123);
 
       expect(output.send).toHaveBeenCalledWith(bytes, 123);
     });
 
-    it('send() warns and does not throw when this deck has no port selected', () => {
-      expect(() => deckA.send(Uint8Array.from([0xf0, 0x2d, 0xf7]))).not.toThrow();
+    it('warns and does not throw when this deck has no port selected', () => {
+      expect(() => deckA.outputPort.send(Uint8Array.from([0xf0, 0x2d, 0xf7]))).not.toThrow();
       expect(console.warn).toHaveBeenCalled();
     });
 
-    it('cancelPending() reports false without throwing when this deck has no port selected', () => {
-      expect(deckA.cancelPending()).toBe(false);
+    it('reports no port id and no cancel support until this deck selects one', () => {
+      expect(deckA.outputPort.portId).toBeNull();
+      expect(deckA.outputPort.supportsCancel).toBe(false);
+      expect(deckA.outputPort.cancelPending()).toBe(false);
     });
 
-    it('cancelPending() delegates to the access service for this deck\'s own port', async () => {
+    it('cancels through the selected output when that output can cancel', async () => {
       const output = makeOutput('port-1', 'Cart A', 'Acme', true);
       await grant([output]);
       deckA.selectPort('port-1');
 
-      expect(deckA.cancelPending()).toBe(true);
+      expect(deckA.outputPort.supportsCancel).toBe(true);
+      expect(deckA.outputPort.cancelPending()).toBe(true);
       expect(output.clear).toHaveBeenCalledTimes(1);
     });
 
-    it('identify() sends the encoded display-chars packet to this deck\'s port', async () => {
+    it('follows a port swap without being rebuilt, so the sink over it never has to be', async () => {
+      const first = makeOutput('port-1', 'Cart A', 'Acme');
+      const second = makeOutput('port-2', 'Cart B', 'Acme');
+      await grant([first, second]);
+      const port = deckA.outputPort;
+
+      deckA.selectPort('port-1');
+      port.send(Uint8Array.from([0x01]));
+      deckA.selectPort('port-2');
+      port.send(Uint8Array.from([0x02]));
+
+      expect(first.send).toHaveBeenCalledTimes(1);
+      expect(second.send).toHaveBeenCalledTimes(1);
+      expect(port.portId).toBe('port-2');
+    });
+  });
+
+  describe("the sink built over this deck's port", () => {
+    it("puts the ASID sink's own bytes on the selected browser output", async () => {
       const output = makeOutput('port-1', 'Cart A', 'Acme');
       await grant([output]);
       deckA.selectPort('port-1');
 
+      createAsidSink(deckA.outputPort).showText('TEST');
+
+      expect(output.send).toHaveBeenCalledTimes(1);
+      const [bytes] = vi.mocked(output.send).mock.calls[0];
+      expect(bytes[0]).toBe(ASID_SYSEX_START);
+      expect(bytes[bytes.length - 1]).toBe(ASID_SYSEX_END);
+    });
+  });
+
+  describe('identify', () => {
+    it("shows the text through this deck's sink rather than encoding it here", async () => {
+      const output = makeOutput('port-1', 'Cart A', 'Acme');
+      await grant([output]);
+      deckA.selectPort('port-1');
+      const sink = createFakeAsidSink();
+      deckA.sink = sink;
+
       deckA.identify('TEST');
 
-      expect(output.send).toHaveBeenCalledWith(buildDisplayCharsPacket('TEST'));
+      expect(sink.showText).toHaveBeenCalledWith('TEST');
+      expect(output.send).not.toHaveBeenCalled();
+    });
+
+    it('warns and does not throw before a sink has been set', () => {
+      expect(() => deckA.identify('TEST')).not.toThrow();
+      expect(console.warn).toHaveBeenCalled();
     });
   });
 });

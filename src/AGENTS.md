@@ -175,6 +175,7 @@ Mock only at infrastructure boundaries — application and features tests should
 - Use Conventional Commits (`feat`, `fix`, `refactor`, `docs`, `chore`, optional scopes like `feat(player): ...`).
 - PRs need intent, linked issues, UI screenshots when relevant, and breaking-change notes.
 - Run `pnpm nx lint` and `pnpm nx test -w`; confirm module-boundary linting stays green.
+- **Never** write `Co-Authored-By` or any other agent-harness attribution trailer on a commit or PR description.
 
 ## Working Style
 

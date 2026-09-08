@@ -1,5 +1,4 @@
-import { ASID_SLOT_COUNT } from '../asid/asid-constants';
-import { PRIMARY_SLOT_FOR_REGISTER } from '../asid/register-frame';
+import { SID_REGISTER_COUNT } from '@sidablist/core';
 import type { ScanOutput } from './scan-tune';
 
 export interface VoiceFeatures {
@@ -27,7 +26,7 @@ const FILTER_CUTOFF_HIGH = 22;
 const FILTER_RESONANCE_ROUTING = 23;
 const FILTER_VOLUME = 24;
 
-/** Reads one frame's slot row out of a scan and decodes it into named SID features. */
+/** Reads one frame's register row out of a scan and decodes it into named SID features. */
 export function readFrameFeatures(scan: ScanOutput, frame: number): FrameFeatures {
   const voices: VoiceFeatures[] = [];
   for (let voice = 0; voice < VOICE_COUNT; voice++) {
@@ -68,8 +67,7 @@ function readVoiceFeatures(scan: ScanOutput, frame: number, voice: number): Voic
 }
 
 function readRegister(scan: ScanOutput, frame: number, register: number): number {
-  const slot = PRIMARY_SLOT_FOR_REGISTER[register];
-  return scan.slotValues[frame * ASID_SLOT_COUNT + slot];
+  return scan.registerValues[frame * SID_REGISTER_COUNT + register];
 }
 
 /** Dimension order is fixed and public: readers index it, so it is a contract, not an internal. */
@@ -171,10 +169,4 @@ function normalisedPitch(frequency: number): number {
 
 function normalisedEnvelope(attackDecay: number, sustainRelease: number): number {
   return ((attackDecay << 8) | sustainRelease) / MAX_ENVELOPE_REGISTER_PAIR;
-}
-
-/** frames * (nominalIntervalUs / callsPerFrame) / 1_000_000 — every reader needs this, and every
- *  reader would otherwise get the multispeed factor wrong. */
-export function framesToSeconds(frames: number, nominalIntervalUs: number, callsPerFrame: number): number {
-  return (frames * (nominalIntervalUs / callsPerFrame)) / 1_000_000;
 }

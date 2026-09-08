@@ -17,7 +17,7 @@ export interface MidiPortOption {
  * shape and casts the real access object into it once, at the boundary. Kept here — it is part of
  * the throwaway.
  */
-interface MIDIOutputLike {
+export interface MIDIOutputLike {
   id: string;
   name: string | null;
   manufacturer: string | null;
@@ -170,7 +170,10 @@ export class MidiAccessService {
     return typeof this.outputFor(portId)?.clear === 'function';
   }
 
-  private outputFor(portId: string): MIDIOutputLike | null {
+  /** The bound output object for `portId`, or null when it names no currently enumerated output.
+   *  Public so a caller outside this service — the ASID adapter — can reach the raw output it has to
+   *  wrap; the permission request and the enumeration it depends on are unchanged. */
+  outputFor(portId: string): MIDIOutputLike | null {
     return this.access?.outputs.get(portId) ?? null;
   }
 

@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { SidFile } from '../sid/sid-file.model';
-import { RegisterFrame } from '../asid/register-frame';
-import { C64Machine } from '../cpu/c64-machine';
-import { ASID_SLOT_COUNT } from '../asid/asid-constants';
+import { createC64Machine, createRegisterFrame, SID_REGISTER_COUNT } from '@sidablist/core';
+import type { SidFile } from '@sidablist/core';
 import { scanTune, TuneScan } from './scan-tune';
 import { detectLoop } from './loop-detect';
 
@@ -42,14 +40,14 @@ const RTS = 0x60;
 
 /** init is a no-op; play increments a zero-page counter and stores it into $D400 (voice 1 freq lo)
  *  every frame — one write, always to the same register, so writeCounts is 1 for every frame and
- *  slot 0's value names how many play calls actually ran. */
+ *  register 0's value names how many play calls actually ran. */
 const counterTune: SidFile = tune([
   { at: 0x1000, bytes: [RTS] },
   { at: 0x1010, bytes: [0xe6, 0xfb, 0xa5, 0xfb, 0x8d, 0x00, 0xd4, RTS] }, // INC $FB; LDA $FB; STA $D400; RTS
 ]);
 
 /** Writes four distinct registers every frame — voice 1's freq lo and control, voice 2's freq lo and
- *  control — so the popcount over the dirty mask has a known, non-trivial answer. */
+ *  control — so the frame's write count has a known, non-trivial answer. */
 const fourWriteTune: SidFile = tune([
   { at: 0x1000, bytes: [RTS] },
   {
@@ -72,21 +70,21 @@ const runawayTune: SidFile = tune([
 ]);
 
 describe('scanTune', () => {
-  it('returns one slot row and one write count per requested frame', () => {
+  it('returns one register row and one write count per requested frame', () => {
     const frames = 10;
     const output = scanTune(counterTune, 1, frames);
 
     expect(output.frames).toBe(frames);
     expect(output.writeCounts.length).toBe(frames);
-    expect(output.slotValues.length).toBe(frames * ASID_SLOT_COUNT);
+    expect(output.registerValues.length).toBe(frames * SID_REGISTER_COUNT);
   });
 
   it('accumulates register state across frames, so later rows differ from earlier ones', () => {
     const output = scanTune(counterTune, 1, 10);
 
-    // Slot 0 is $D400, which counterTune's play routine increments and stores every frame.
-    const early = output.slotValues[3 * ASID_SLOT_COUNT + 0];
-    const late = output.slotValues[9 * ASID_SLOT_COUNT + 0];
+    // Register 0 is $D400, which counterTune's play routine increments and stores every frame.
+    const early = output.registerValues[3 * SID_REGISTER_COUNT + 0];
+    const late = output.registerValues[9 * SID_REGISTER_COUNT + 0];
     expect(late).toBeGreaterThan(early);
   });
 
@@ -96,7 +94,7 @@ describe('scanTune', () => {
     expect(Array.from(output.writeCounts)).toEqual([1, 1, 1, 1, 1]);
   });
 
-  it('pops the dirty mask correctly for a frame that touches several distinct registers', () => {
+  it('counts every distinct register a frame touches', () => {
     const output = scanTune(fourWriteTune, 1, 3);
 
     expect(Array.from(output.writeCounts)).toEqual([4, 4, 4]);
@@ -109,7 +107,7 @@ describe('scanTune', () => {
   it('reports the calls-per-frame the machine actually used', () => {
     const output = scanTune(counterTune, 1, 5);
 
-    const machine = new C64Machine(counterTune, new RegisterFrame());
+    const machine = createC64Machine(counterTune, createRegisterFrame());
     machine.initSubtune(1);
     expect(output.callsPerFrame).toBe(machine.callsPerFrame);
   });
@@ -143,7 +141,7 @@ describe('TuneScan', () => {
     expect(deepened.frames).toBe(oneShot.frames);
     expect(deepened.callsPerFrame).toBe(oneShot.callsPerFrame);
     expect(deepened.writeCounts).toEqual(oneShot.writeCounts);
-    expect(deepened.slotValues).toEqual(oneShot.slotValues);
+    expect(deepened.registerValues).toEqual(oneShot.registerValues);
     // Resumption is an efficiency property: the detector must reach the identical verdict either way.
     expect(detectLoop(deepened, DETECT_OPTIONS)).toEqual(detectLoop(oneShot, DETECT_OPTIONS));
   });
@@ -179,7 +177,7 @@ describe('TuneScan', () => {
 
     // Sized to what was recorded, not to the depth that was reserved for the attempt.
     expect(scan.frames).toBe(0);
-    expect(scan.output().slotValues.length).toBe(0);
+    expect(scan.output().registerValues.length).toBe(0);
     expect(scan.output().writeCounts.length).toBe(0);
   });
 });

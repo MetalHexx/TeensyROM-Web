@@ -1,30 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { crossDeckDriftMs, formatCrossDeckDrift } from './cross-deck-drift';
-import type { EngineStats } from '../engine/dj-player-engine';
+import { milliseconds } from '@sidablist/core';
+import type { PlayerStats } from '@sidablist/core';
+import { emptyPlayerStats } from '../../testing/player-doubles';
 
-function statsWithDrift(driftMs: number): EngineStats {
-  return {
-    framesRendered: 0,
-    packetsSent: 0,
-    bytesSent: 0,
-    suppressedWrites: 0,
-    illegalOpcodeCount: 0,
-    callsPerFrame: 1,
-    effectiveIntervalUs: 0,
-    measuredMeanIntervalUs: 0,
-    driftMs,
-    jitterMs: 0,
-    worstGapMs: 0,
-    lateCallbacks: 0,
-    scheduledFrames: 0,
-    lateFrames: 0,
-    meanLagMs: 0,
-    worstLagMs: 0,
-    reorderedFrames: 0,
-    clampedFrames: 0,
-    cancelSupported: false,
-    lastCancelLatencyMs: -1,
-  };
+function statsWithDrift(driftMs: number): PlayerStats {
+  const stats = emptyPlayerStats();
+  return { ...stats, clock: { ...stats.clock, driftMs: milliseconds(driftMs) } };
 }
 
 describe('crossDeckDriftMs', () => {

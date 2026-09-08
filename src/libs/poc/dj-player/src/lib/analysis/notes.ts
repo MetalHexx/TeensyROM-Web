@@ -1,6 +1,6 @@
 import { readFrameFeatures } from './frame-features';
 import type { ScanOutput } from './scan-tune';
-import type { SidClock } from '../sid/sid-file.model';
+import type { SidClock } from '@sidablist/core';
 
 /**
  * One sounding pitch on one voice, for as long as it sounded.

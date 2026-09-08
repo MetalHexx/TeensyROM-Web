@@ -1,7 +1,7 @@
 import type { DetectedMoment } from './tune-index.model';
 
 /** Offsets, relative to `capturedFrame`, of every stored moment a nudge can actually reach —
- *  ascending, deduped, and never outside ±range, because the engine clamps every offset to that. */
+ *  ascending, deduped, and never outside ±range, because every offset is clamped to that. */
 export function reachableMomentOffsets(
   moments: readonly DetectedMoment[],
   capturedFrame: number,

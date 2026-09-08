@@ -12,4 +12,12 @@ export default [
       'src/lib/.openapi-generator-ignore',
     ],
   },
+  {
+    // explore.ts is a throwaway CLI script (see its header comment) — printing results to
+    // stdout is the whole point, not a debug leftover.
+    files: ['explore/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ];

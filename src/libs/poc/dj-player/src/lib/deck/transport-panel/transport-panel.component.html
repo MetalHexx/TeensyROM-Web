@@ -30,7 +30,7 @@
         (change)="onScrubChange($event)"
       />
     </div>
-    <span class="caption">frame {{ engineStats().framesRendered }}</span>
+    <span class="caption">frame {{ framesRendered() }}</span>
   </div>
 
   <div class="line line-transport">
@@ -47,7 +47,7 @@
         type="button"
         [attr.aria-label]="'Pause deck ' + label()"
         (click)="onPause()"
-        [disabled]="engineState() !== 'playing'"
+        [disabled]="playerState() !== 'playing'"
       >
         Pause
       </button>
@@ -124,8 +124,8 @@
     </div>
   </div>
 
-  @if (engineError()) {
-  <p class="error-text" role="alert">{{ engineError() }}</p>
+  @if (playerError()) {
+  <p class="error-text" role="alert">{{ playerError() }}</p>
   } @if (tuneError()) {
   <p class="error-text" role="alert">{{ tuneError() }}</p>
   }

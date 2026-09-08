@@ -2,17 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { DeckRegistry } from './deck-registry';
 import type { DeckHandle } from './deck-registry';
 import { DECKS } from './deck.config';
+import { fakeDeckHandle } from '../../testing/player-doubles';
 
 /** A handle distinguishable only by its own descriptor — `DeckRegistry` never reads the other
  *  fields, only carries them through for its callers. */
 function fakeHandle(id: string, label: string): DeckHandle {
-  return {
-    descriptor: { id, label },
-    engine: {} as DeckHandle['engine'],
-    binding: {} as DeckHandle['binding'],
-    tuneIndex: {} as DeckHandle['tuneIndex'],
-    tuneLoader: {} as DeckHandle['tuneLoader'],
-  };
+  return fakeDeckHandle({ id, label });
 }
 
 function idsOf(handles: readonly DeckHandle[]): string[] {

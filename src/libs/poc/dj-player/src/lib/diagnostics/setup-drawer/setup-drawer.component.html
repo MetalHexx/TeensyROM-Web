@@ -19,7 +19,7 @@
             (change)="onNominalIntervalChange(deck, $event)"
           >
             @for (option of intervalOptionsFor(deck); track option) {
-            <option [value]="option" [selected]="option === deck.engine.nominalIntervalUs()">
+            <option [value]="option" [selected]="option === nominalIntervalUsFor(deck)">
               {{ option }} µs ({{ frameRateHz(option) }} Hz)
             </option>
             }
@@ -36,7 +36,7 @@
             (change)="onScheduleAheadChange(deck, $event)"
           >
             @for (option of scheduleAheadOptionsMs; track option) {
-            <option [value]="option" [selected]="option === deck.engine.scheduleAheadMs()">
+            <option [value]="option" [selected]="option === deck.sink.capabilities.scheduleAheadMs">
               {{ option === 0 ? 'off' : option + ' ms' }}
             </option>
             }
@@ -48,14 +48,12 @@
         <th scope="row">Effective interval</th>
         @for (deck of decks(); track deck.descriptor.id) {
         <td>
-          @if (deck.engine.stats().effectiveIntervalUs > 0) {
-          {{ deck.engine.stats().effectiveIntervalUs.toFixed(1) }} µs ({{
-            frameRateHz(deck.engine.stats().effectiveIntervalUs)
+          @if (deck.view.stats().effectiveIntervalUs > 0) {
+          {{ deck.view.stats().effectiveIntervalUs.toFixed(1) }} µs ({{
+            frameRateHz(deck.view.stats().effectiveIntervalUs)
           }}
-          Hz), {{ deck.engine.stats().callsPerFrame }}x multispeed
-          } @else {
-          — (load a tune to compute)
-          }
+          Hz), {{ deck.view.snapshot().tempo.callsPerFrame }}x multispeed } @else { — (load a tune
+          to compute) }
         </td>
         }
       </tr>
@@ -200,7 +198,9 @@
             [disabled]="tuneIndexTimingModeFor(deck) === null"
             (change)="onTuneIndexTimingModeChange(deck, $event)"
           >
-            <option value="exact" [selected]="tuneIndexTimingModeFor(deck) === 'exact'">Exact</option>
+            <option value="exact" [selected]="tuneIndexTimingModeFor(deck) === 'exact'">
+              Exact
+            </option>
             <option value="rounded" [selected]="tuneIndexTimingModeFor(deck) === 'rounded'">
               Rounded
             </option>
@@ -237,43 +237,43 @@
         <tr>
           <th scope="row">Frames emitted</th>
           @for (deck of decks(); track deck.descriptor.id) {
-          <td>{{ deck.engine.stats().framesRendered }}</td>
+          <td>{{ deck.view.stats().framesRendered }}</td>
           }
         </tr>
         <tr>
           <th scope="row">Track end frame</th>
           @for (deck of decks(); track deck.descriptor.id) {
-          <td>{{ deck.engine.trackEndFrame() ?? '—' }}</td>
+          <td>{{ deck.view.snapshot().basis.trackEndFrame ?? '—' }}</td>
           }
         </tr>
         <tr>
           <th scope="row">Packets / s</th>
           @for (deck of decks(); track deck.descriptor.id) {
-          <td>{{ packetsPerSecond(deck.engine.stats()).toFixed(1) }}</td>
+          <td>{{ packetsPerSecond(deck).toFixed(1) }}</td>
           }
         </tr>
         <tr>
           <th scope="row">Bytes / s</th>
           @for (deck of decks(); track deck.descriptor.id) {
-          <td>{{ bytesPerSecond(deck.engine.stats()).toFixed(0) }}</td>
+          <td>{{ bytesPerSecond(deck).toFixed(0) }}</td>
           }
         </tr>
         <tr>
           <th scope="row">Suppressed writes</th>
           @for (deck of decks(); track deck.descriptor.id) {
-          <td>{{ deck.engine.stats().suppressedWrites }}</td>
+          <td>{{ deck.view.stats().suppressedWrites }}</td>
           }
         </tr>
         <tr>
           <th scope="row">Illegal opcodes</th>
           @for (deck of decks(); track deck.descriptor.id) {
-          <td>{{ deck.engine.stats().illegalOpcodeCount }}</td>
+          <td>{{ deck.view.stats().illegalOpcodeCount }}</td>
           }
         </tr>
         <tr>
           <th scope="row">Last error</th>
           @for (deck of decks(); track deck.descriptor.id) {
-          <td>{{ deck.engine.lastError() ?? '—' }}</td>
+          <td>{{ deck.view.snapshot().error ?? '—' }}</td>
           }
         </tr>
       </tbody>
@@ -296,13 +296,13 @@
           <tr>
             <th scope="row">Drift</th>
             @for (deck of decks(); track deck.descriptor.id) {
-            <td>{{ deck.engine.stats().driftMs.toFixed(1) }} ms</td>
+            <td>{{ deck.view.stats().clock.driftMs.toFixed(1) }} ms</td>
             }
           </tr>
           <tr>
             <th scope="row">Late callbacks</th>
             @for (deck of decks(); track deck.descriptor.id) {
-            <td>{{ deck.engine.stats().lateCallbacks }}</td>
+            <td>{{ deck.view.stats().clock.lateCallbacks }}</td>
             }
           </tr>
           <tr>
@@ -338,25 +338,25 @@
           <tr>
             <th scope="row">Scheduled</th>
             @for (deck of decks(); track deck.descriptor.id) {
-            <td>{{ deck.engine.stats().scheduledFrames }}</td>
+            <td>{{ deck.view.stats().delivery.scheduledFrames }}</td>
             }
           </tr>
           <tr>
             <th scope="row">Late</th>
             @for (deck of decks(); track deck.descriptor.id) {
-            <td>{{ deck.engine.stats().lateFrames }}</td>
+            <td>{{ deck.view.stats().delivery.lateFrames }}</td>
             }
           </tr>
           <tr>
             <th scope="row">Reordered</th>
             @for (deck of decks(); track deck.descriptor.id) {
-            <td>{{ deck.engine.stats().reorderedFrames }}</td>
+            <td>{{ deck.view.stats().delivery.reorderedFrames }}</td>
             }
           </tr>
           <tr>
             <th scope="row">Clamped</th>
             @for (deck of decks(); track deck.descriptor.id) {
-            <td>{{ deck.engine.stats().clampedFrames }}</td>
+            <td>{{ deck.view.stats().delivery.clampedFrames }}</td>
             }
           </tr>
           <tr>
@@ -368,7 +368,7 @@
           <tr>
             <th scope="row">Cancel support</th>
             @for (deck of decks(); track deck.descriptor.id) {
-            <td>{{ deck.engine.stats().cancelSupported ? 'yes' : 'no' }}</td>
+            <td>{{ deck.sink.stats.cancelSupported ? 'yes' : 'no' }}</td>
             }
           </tr>
           <tr>
@@ -407,5 +407,10 @@
       ms
     </label>
     <button type="button" (click)="onStallMainThread()">Stall</button>
+  </div>
+
+  <div class="control-row linked-core-control">
+    <button type="button" (click)="onRunSmokeJob()">Run core smoke job</button>
+    <span class="linked-core-result" role="status">{{ smokeJobResult() }}</span>
   </div>
 </section>
