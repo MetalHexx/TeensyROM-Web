@@ -152,6 +152,8 @@ docs(readme): update installation instructions
 chore(deps): update Angular to version 19
 ```
 
+**Never** write `Co-Authored-By` or any other agent-harness attribution trailer on a commit or PR description.
+
 #### Branch Strategy
 - **Main Branch**: `master` (stable releases)
 - **Feature Branches**: `feat/feature-name`
