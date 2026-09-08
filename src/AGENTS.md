@@ -86,6 +86,19 @@ export class DeviceStore {
 - Regenerate OpenAPI spec: `dotnet build apps/api/src/TeensyRom.Api/TeensyRom.Api.csproj` (generated in `apps/api/src/TeensyRom.Api/api-spec/TeensyRom.Api.json`), then regenerate the TypeScript client and update Angular services/state
 - Dev fixture page: `/dev/transfer-states` — renders every file-transfer modal/dropzone state (including hard-to-trigger ones like `device-busy`, `draining`, `aborted`) with no backend or device needed. Not linked from nav; source in `libs/features/file-transfer/src/lib/dev-transfer-fixtures/`.
 
+### Sibling-repo dependency: SIDablist
+
+`@sidablist/core` and `@sidablist/asid` (consumed by `libs/poc/dj-player`) are not published npm packages — they're `file:`/`link:` dependencies on a sibling repo checked out at `../../SIDablist` (a directory next to this repo's root, not inside it). Both packages resolve through a `dist/` folder that only exists after SIDablist's own build runs, and plain `pnpm install` here does not build it.
+
+**Any agent or pipeline working in a fresh checkout or worktree of this repo must bootstrap SIDablist before the frontend will build**, since it's the same requirement for every branch of this repo, not just main:
+
+1. In the `SIDablist` sibling repo: `pnpm install`, then `pnpm -r run build` (produces `libs/core/dist` and `libs/asid/dist`).
+2. Back in this repo: `pnpm install` (links `@sidablist/core`/`@sidablist/asid` into `node_modules`).
+
+If `SIDablist` isn't present as a sibling directory at all, it needs to be cloned there first — check the repo registry for its location. Skipping this bootstrap produces a wall of `Could not resolve "@sidablist/core"` / `TS2307: Cannot find module '@sidablist/core'` errors from `pnpm start`/`nx build` that look like a code bug but are actually just a missing local build — do this bootstrap before debugging those errors as anything else.
+
+SIDablist changes don't auto-propagate: after editing SIDablist source, re-run its `pnpm -r run build`, then reinstall here. `prestart` already clears `.angular/cache`/`.nx/cache` on every `pnpm start`, since a `file:`-linked package's content can otherwise keep serving stale code across restarts.
+
 ## Code Organization Patterns
 
 ### Backend endpoints
@@ -148,6 +161,7 @@ Mock only at infrastructure boundaries — application and features tests should
 1. **Cross-feature imports** — features cannot import each other; share via the application layer instead.
 2. **API client outside infrastructure** — never import generated API clients directly in features/application; go through domain contracts.
 3. **Forgetting mappers** — always map between API DTOs and domain models in the infrastructure layer.
+4. **SIDablist not bootstrapped** — a fresh checkout/worktree needs the sibling `SIDablist` repo installed and built before `pnpm start` works; see [Sibling-repo dependency: SIDablist](#sibling-repo-dependency-sidablist) above.
 
 ## Real-Time Communication (SignalR)
 
