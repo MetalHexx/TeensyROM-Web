@@ -19,14 +19,15 @@ export const SPEED_HARD_SPAN = 0.7;
  *  the excursion. `home()` is dual-purpose: 1.0 with no excursion open, or the same exact-restore-
  *  and-close an opposite jump takes.
  *
- *  Tracks the multiplier itself, seeded at home (1) — `setTempo` is a pure sink here, not also a
- *  source, so nothing in this module observes a tempo change made outside `jumpUp`/`jumpDown`/
- *  `home` (the fader). Direction is tracked separately from the multiplier because "same button
- *  again" versus "opposite button" cannot be told apart from the multiplier's value alone once a
- *  jump has clamped.
+ *  Opening a fresh excursion seeds `remembered` from `getMultiplier()` — the live tempo — rather
+ *  than trusting an internally tracked value, since a tempo change made outside `jumpUp`/`jumpDown`/
+ *  `home` (the fader, or a tune load) never calls back into this module. Direction is tracked
+ *  separately from the multiplier because "same button again" versus "opposite button" cannot be
+ *  told apart from the multiplier's value alone once a jump has clamped.
  */
 export function createSpeedExcursion(opts: {
   setTempo: (multiplier: number) => void;
+  getMultiplier: () => number;
   slowest: number;
   fastest: number;
 }): {
@@ -35,14 +36,12 @@ export function createSpeedExcursion(opts: {
   jumpDown(): void;
   home(): void;
 } {
-  const { setTempo, slowest, fastest } = opts;
+  const { setTempo, getMultiplier, slowest, fastest } = opts;
   const _remembered = signal<number | null>(null);
-  let current = 1;
   let direction: 'up' | 'down' | null = null;
 
   function returnFromExcursion(rememberedValue: number): void {
-    current = rememberedValue;
-    setTempo(current);
+    setTempo(rememberedValue);
     _remembered.set(null);
     direction = null;
   }
@@ -50,11 +49,11 @@ export function createSpeedExcursion(opts: {
   function jump(dir: 'up' | 'down'): void {
     const rememberedValue = _remembered();
     if (rememberedValue === null) {
-      _remembered.set(current);
+      const liveMultiplier = getMultiplier();
+      _remembered.set(liveMultiplier);
       direction = dir;
       const delta = dir === 'up' ? JUMP_STEP : -JUMP_STEP;
-      current = clamp(current + delta, slowest, fastest);
-      setTempo(current);
+      setTempo(clamp(liveMultiplier + delta, slowest, fastest));
       return;
     }
     if (direction === dir) {
@@ -70,8 +69,7 @@ export function createSpeedExcursion(opts: {
     home: () => {
       const rememberedValue = _remembered();
       if (rememberedValue === null) {
-        current = 1;
-        setTempo(current);
+        setTempo(1);
         return;
       }
       returnFromExcursion(rememberedValue);

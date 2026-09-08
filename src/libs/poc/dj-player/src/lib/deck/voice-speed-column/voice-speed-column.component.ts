@@ -95,6 +95,7 @@ export class VoiceSpeedColumnComponent {
    *  the only one in force on this path. */
   private readonly speedExcursion = createSpeedExcursion({
     setTempo: (multiplier) => this.player.setTempo(multiplier),
+    getMultiplier: () => this.speedMultiplier(),
     slowest: 1 - SPEED_HARD_SPAN,
     fastest: 1 + SPEED_HARD_SPAN,
   });

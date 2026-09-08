@@ -1,11 +1,24 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createSpeedExcursion } from './speed-excursion';
 
-/** Wide enough that none of the plain additive assertions accidentally clamp. */
+/** Wide enough that none of the plain additive assertions accidentally clamp.
+ *
+ *  `getMultiplier` reads a live value that `setTempo` keeps in sync by default — mirroring the real
+ *  wiring, where the player's tempo signal reflects whatever `setTempo` last set — but `setLive` lets
+ *  a test move it independently, simulating a fader (or a tune load) that changes tempo without
+ *  going through the excursion at all. */
 function makeExcursion(slowest = 0.3, fastest = 1.7) {
-  const setTempo = vi.fn();
-  const excursion = createSpeedExcursion({ setTempo, slowest, fastest });
-  return { excursion, setTempo };
+  let live = 1;
+  const setTempo = vi.fn((multiplier: number) => {
+    live = multiplier;
+  });
+  const excursion = createSpeedExcursion({
+    setTempo,
+    getMultiplier: () => live,
+    slowest,
+    fastest,
+  });
+  return { excursion, setTempo, setLive: (value: number) => (live = value) };
 }
 
 describe('createSpeedExcursion', () => {
@@ -93,6 +106,20 @@ describe('createSpeedExcursion', () => {
     excursion.home();
 
     expect(setTempo).toHaveBeenLastCalledWith(1);
+    expect(excursion.remembered()).toBeNull();
+  });
+
+  it('seeds a fresh excursion from the live multiplier, not a stale internally tracked one', () => {
+    const { excursion, setTempo, setLive } = makeExcursion();
+
+    setLive(1.2); // e.g. the fader, moved without going through the excursion at all
+
+    excursion.jumpUp(); // must remember 1.2, not the excursion's own last-known value of 1
+    expect(excursion.remembered()).toBe(1.2);
+    expect(setTempo).toHaveBeenLastCalledWith(1.7);
+
+    excursion.jumpDown(); // opposite button — must restore exactly 1.2
+    expect(setTempo).toHaveBeenLastCalledWith(1.2);
     expect(excursion.remembered()).toBeNull();
   });
 

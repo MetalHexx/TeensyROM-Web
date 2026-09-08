@@ -109,5 +109,22 @@ describe('VoiceSpeedColumnComponent', () => {
 
       expect(player.player.setTempo).toHaveBeenLastCalledWith(1);
     });
+
+    it('remembers the fader-set multiplier, not the excursion module’s own stale tracking', () => {
+      build('A');
+
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tempo: { ...snapshot.tempo, multiplier: 1.2 },
+      }));
+      fixture.detectChanges();
+
+      speedButton('+50%').click(); // must remember 1.2, not the module's own stale value of 1
+      expect(player.player.setTempo).toHaveBeenLastCalledWith(1.7);
+
+      speedButton('−50%').click(); // opposite button — must restore exactly 1.2
+
+      expect(player.player.setTempo).toHaveBeenLastCalledWith(1.2);
+    });
   });
 });
