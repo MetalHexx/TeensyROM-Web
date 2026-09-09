@@ -1,0 +1,25 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.crossfader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.crossfader-label {
+  flex: 0 0 auto;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
