@@ -1,0 +1,23 @@
+<lib-filter-mode-selector [model]="model().filter" (modeSelect)="onFilterModeSelect($event)" />
+
+@for (knob of model().knobs; track knob.id) {
+  <lib-rotary-knob
+    [label]="knob.label"
+    [accessibleName]="knob.accessibleName"
+    [value]="knob.value"
+    [min]="knob.min ?? -1"
+    [max]="knob.max ?? 1"
+    [step]="knob.step ?? 0.01"
+    [readout]="knob.readout ?? null"
+    (valueChange)="onKnobChange(knob.id, $event)"
+  />
+}
+
+<div class="deck-strip-fader">
+  <lib-channel-fader
+    [value]="model().fader.value"
+    [accessibleName]="model().fader.accessibleName"
+    [label]="model().fader.label"
+    (valueChange)="onFaderChange($event)"
+  />
+</div>

@@ -1,9 +1,20 @@
 <div class="mixer-column">
   <div class="channel-faders">
     @for (deck of decks; track deck.id) {
-      <lib-deck-strip [deck]="deck" />
+      <lib-deck-strip
+        [model]="deckStripModel(deck.id)()"
+        (knobChange)="onKnobChange(deck.id, $event)"
+        (faderChange)="onFaderChange(deck.id, $event)"
+        (filterModeSelect)="onFilterModeSelect(deck.id, $event)"
+      />
     }
   </div>
 
-  <lib-crossfader />
+  <lib-crossfader
+    [value]="crossfaderPosition()"
+    [startLabel]="crossfaderStartLabel"
+    [endLabel]="crossfaderEndLabel"
+    [accessibleName]="crossfaderAccessibleName"
+    (valueChange)="onCrossfaderChange($event)"
+  />
 </div>

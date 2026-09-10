@@ -63,3 +63,4 @@ export * from './lib/rotary-knob/rotary-knob.component';
 export * from './lib/filter-mode-selector/filter-mode-selector.component';
 export * from './lib/channel-fader/channel-fader.component';
 export * from './lib/crossfader/crossfader.component';
+export * from './lib/deck-strip/deck-strip.component';

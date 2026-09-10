@@ -15,16 +15,15 @@
 // The strip's own sizing budget for every knob it renders — 64px leaves 8px of air either side of
 // the 80px strip. Reaches into the child's host element the same way `MixerColumnComponent` sizes
 // `lib-crossfader`'s.
-lib-scale-knob {
+lib-rotary-knob {
   --scale-knob-size: 64px;
 }
 
-// The fader used to stretch to whatever height `MixerColumnComponent`'s row rendered at; now it
-// shares the strip with five other controls above it, so it gets a fixed height of its own instead.
-// A `display: flex` row of one item reproduces the exact mechanism `ChannelFaderComponent`'s own
-// host already relies on (`flex: 1 1 0` / `height: 100%`), just scoped to this wrapper rather than
-// the whole row — keeping the "fixed, never `flex: 1 1 auto`" rule that stopped the fader running
-// away in the first place.
+// The fader shares the strip with five other controls above it, so it gets a fixed height of its
+// own rather than stretching to whatever height a parent row renders at. A `display: flex` row of
+// one item reproduces the exact mechanism `ChannelFaderComponent`'s own host already relies on
+// (`flex: 1 1 0` / `height: 100%`), just scoped to this wrapper — keeping the "fixed, never
+// `flex: 1 1 auto`" rule that stops the fader running away.
 .deck-strip-fader {
   display: flex;
   width: 100%;
