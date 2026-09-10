@@ -64,3 +64,6 @@ export * from './lib/filter-mode-selector/filter-mode-selector.component';
 export * from './lib/channel-fader/channel-fader.component';
 export * from './lib/crossfader/crossfader.component';
 export * from './lib/deck-strip/deck-strip.component';
+export * from './lib/status-led/status-led.component';
+export * from './lib/stepper/stepper.component';
+export * from './lib/scrub-position-bar/scrub-position-bar.component';

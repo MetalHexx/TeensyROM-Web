@@ -1,0 +1,17 @@
+<button
+  type="button"
+  [attr.aria-label]="previousAccessibleName()"
+  (click)="previous.emit()"
+  [disabled]="previousDisabled()"
+>
+  ◀
+</button>
+<span>{{ text() }}</span>
+<button
+  type="button"
+  [attr.aria-label]="nextAccessibleName()"
+  (click)="next.emit()"
+  [disabled]="nextDisabled()"
+>
+  ▶
+</button>

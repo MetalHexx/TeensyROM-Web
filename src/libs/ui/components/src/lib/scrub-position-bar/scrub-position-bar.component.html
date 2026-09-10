@@ -1,0 +1,33 @@
+<div class="scrub-bar">
+  @switch (barState().kind) {
+    @case ('loop') {
+      @if (introRegionPercent() > 0) {
+        <div class="scrub-region scrub-region--intro" [style.width.%]="introRegionPercent()"></div>
+      }
+      <div class="scrub-region scrub-region--music" [style.width.%]="musicRegionPercent()"></div>
+    }
+    @case ('ended') {
+      <div class="scrub-region scrub-region--music" [style.width.%]="musicRegionPercent()"></div>
+      <div class="scrub-region scrub-region--dead" [style.width.%]="deadRegionPercent()"></div>
+    }
+    @case ('unknown') {
+      <div class="scrub-region scrub-region--unknown"></div>
+    }
+    @case ('analyzing') {
+      <div class="scrub-region scrub-region--pending"></div>
+    }
+  }
+</div>
+@if (barState().kind === 'loop') {
+  <div class="scrub-tick" [style.left.%]="introRegionPercent()"></div>
+}
+<input
+  type="range"
+  min="0"
+  max="100"
+  [value]="positionPercent()"
+  [disabled]="barState().kind === 'analyzing'"
+  [attr.aria-label]="accessibleName()"
+  (input)="onInput($event)"
+  (change)="onChange($event)"
+/>

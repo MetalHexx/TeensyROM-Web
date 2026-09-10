@@ -1,0 +1,59 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// Unlit by default — the same chrome-inset body every state but stopped starts from. Lit states set
+// both fill and border to the state's colour and add a glow; stopped goes to chrome-dark instead of
+// this default so it never reads as a merely-tinted variant of "off".
+.led {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--chrome-inset, #2e2e3e);
+  border: 1px solid var(--chrome-inset-border, #3d3d52);
+
+  &--playing {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    box-shadow: 0 0 8px rgba(111, 220, 140, 0.95);
+  }
+
+  &--paused {
+    background: var(--color-directory);
+    border-color: var(--color-directory);
+    box-shadow: 0 0 8px rgba(245, 226, 158, 0.9);
+  }
+
+  &--ended {
+    background: var(--color-highlight);
+    border-color: var(--color-highlight);
+    box-shadow: 0 0 8px rgba(0, 247, 255, 0.95);
+  }
+
+  &--analyzing {
+    background: var(--color-primary-bright);
+    border-color: var(--color-primary-bright);
+    box-shadow: 0 0 9px rgba(179, 51, 179, 1);
+  }
+
+  &--error {
+    background: var(--color-error);
+    border-color: var(--color-error);
+    box-shadow: 0 0 8px rgba(255, 111, 111, 0.95);
+  }
+
+  // stopped and ended are the two silent states and must stay visibly distinct — this is dark like
+  // real hardware, not the default unlit body tinted toward a colour.
+  &--stopped {
+    background: var(--chrome-dark, #33334a);
+    border-color: var(--chrome-dark-border, #44445c);
+  }
+}
