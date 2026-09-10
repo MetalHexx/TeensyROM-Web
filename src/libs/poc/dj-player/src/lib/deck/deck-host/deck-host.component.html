@@ -35,4 +35,10 @@
   (stopLoop)="onStopLoop()"
   (rowAction)="onMarkerRowAction($event)"
 />
-<lib-binding-card [style.gridArea]="areas().binding" />
+<lib-binding-card
+  [style.gridArea]="areas().binding"
+  [model]="bindingModel()"
+  (portSelect)="onPortSelect($event)"
+  (enableMidi)="onEnableMidi()"
+  (identify)="onIdentify()"
+/>

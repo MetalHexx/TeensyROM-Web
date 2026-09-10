@@ -389,8 +389,9 @@ describe('DeckHostComponent', () => {
         imports: [DeckHostComponent],
         // Page-level in production; stands in here the same way DeckRegistry does, since this suite
         // has no page above the component under test. `MidiAccessService` is real (not mocked) —
-        // `BindingCardComponent` reaches it directly for the shared port list, and it has no browser
-        // API dependency until `requestAccess()` is actually invoked, which none of these tests do.
+        // `DeckHostComponent` is the Binding adapter and reaches it directly for the shared port
+        // list, and it has no browser API dependency until `requestAccess()` is actually invoked,
+        // which none of these tests do.
         providers: [
           DeckRegistry,
           { provide: MixerService, useFactory: () => new MixerService(DECKS) },
@@ -931,6 +932,45 @@ describe('DeckHostComponent', () => {
         fixture.detectChanges();
 
         expect(fill.style.width).toBe('70%');
+      });
+    });
+
+    describe('the Binding adapter', () => {
+      function midiAccess(): MidiAccessService {
+        return TestBed.inject(MidiAccessService);
+      }
+
+      function hasNoPortsMessage(): boolean {
+        return Array.from(fixture.nativeElement.querySelectorAll('[role="alert"]')).some(
+          (element) => (element as HTMLElement).textContent?.includes('no output ports were found')
+        );
+      }
+
+      it('shows the no-ports-found message only once access is granted with an empty port list', () => {
+        expect(hasNoPortsMessage()).toBe(false);
+
+        midiAccess().accessState.set('granted');
+        fixture.detectChanges();
+        expect(hasNoPortsMessage()).toBe(true);
+
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        fixture.detectChanges();
+        expect(hasNoPortsMessage()).toBe(false);
+      });
+
+      it("disables Identify while this deck's transport is playing, and only then", () => {
+        midiAccess().accessState.set('granted');
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        binding.selectedPortId.set('port-1');
+        fixture.detectChanges();
+
+        const identifyButton = byLabel<HTMLButtonElement>(`Identify deck ${DECKS[0].label}`);
+        expect(identifyButton.disabled).toBe(false);
+
+        player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
+        fixture.detectChanges();
+
+        expect(identifyButton.disabled).toBe(true);
       });
     });
   });

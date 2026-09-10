@@ -20,12 +20,15 @@ import {
 } from '@sidablist/core';
 import { createAsidSink } from '@sidablist/asid';
 import {
+  BindingCardComponent,
   LoopsCuesPanelComponent,
   SpeedPanelComponent,
   TransportPanelComponent,
   VoicePanelComponent,
 } from '@teensyrom-nx/ui/components';
 import type {
+  BindingCardModel,
+  BindingPortModel,
   JumpButtonModel,
   LoopsCuesPanelModel,
   MarkerRowAction,
@@ -47,6 +50,7 @@ import type { DetectedMoment } from '../../analysis/tune-index.model';
 import { positionBasisFor, timelineBasisFor } from '../../analysis/tune-length';
 import type { DetectedLoopFrames } from '../../analysis/tune-length';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
+import { MidiAccessService } from '../../midi/midi-access.service';
 import { MixerService } from '../../mixer/mixer.service';
 import { DeckContext } from '../deck-context';
 import {
@@ -64,7 +68,6 @@ import type { DeckDescriptor } from '../deck.config';
 import { MarkerCollection, NUDGE_RANGE_MS } from '../marker-collection';
 import { loadRepeatTrackPreference, saveRepeatTrackPreference } from '../repeat-track';
 import { createSpeedExcursion, SPEED_HARD_SPAN, SPEED_INPUT_SPAN } from '../speed-excursion';
-import { BindingCardComponent } from '../binding-card/binding-card.component';
 
 /** The `grid-area` name each of this deck's four panels claims in the page's own `.grid` — computed
  *  page-level, from `DECKS`' own order, and handed down whole. Nothing in this file decides what any
@@ -116,13 +119,12 @@ const createReplayWorker = (): Worker =>
  * this component would otherwise draw. No deck-owned code decides what those area names are: the
  * page computes them from `DECKS`' own order and this component only applies whichever it is handed.
  *
- * It is also the adapter for whichever of those panels the shared library owns: Transport, Voice,
- * Speed and Loops/Cues are all presentational and inject nothing, so this component composes each
- * one's whole model from this deck's collaborators and turns its outputs back into player,
- * tune-loader, marker-collection and preference writes. Binding still reaches this component's own
- * injector directly, until its own lift lands. Everything an adapted panel needs lives in that
- * panel's own commented section below, in the order the sections arrive — model, per-frame computeds
- * and output handlers together, never interleaved.
+ * It is also the adapter for every one of those panels: Transport, Voice, Speed, Loops/Cues and
+ * Binding are all presentational and inject nothing, so this component composes each one's whole
+ * model from this deck's collaborators and turns its outputs back into player, tune-loader,
+ * marker-collection, MIDI-binding and preference writes. Everything an adapted panel needs lives in
+ * that panel's own commented section below, in the order the sections arrive — model, per-frame
+ * computeds and output handlers together, never interleaved.
  *
  * Everything that used to sit in this component's own sidebar — Timing, the loaded tune's own
  * read-only fields, Tune Index and Diagnostics — and the Track Analysis panel beside it, are gone
@@ -176,6 +178,10 @@ export class DeckHostComponent implements OnInit, OnDestroy {
   private readonly context = inject(DeckContext);
   private readonly registry = inject(DeckRegistry);
   private readonly binding = inject(DeckMidiBinding);
+  // Page-level, one level up (`DjPocViewComponent`) — the SysEx permission grant and the enumerated
+  // port list are facts about the page's one Web MIDI session, not about this deck, so both decks'
+  // own binding cards read and drive the same instance rather than each holding its own.
+  private readonly midiAccess = inject(MidiAccessService);
   private readonly sink = inject(ASID_SINK);
   private readonly player = inject(SID_PLAYER);
   private readonly view = inject(DECK_PLAYER_VIEW);
@@ -823,5 +829,70 @@ export class DeckHostComponent implements OnInit, OnDestroy {
       this.nudgeRange(),
       direction
     );
+  }
+
+  // ── Binding ────────────────────────────────────────────────────────────────────────────────────
+
+  // Web MIDI enumerates zero ports for a granted-but-empty session (no cartridge attached, or the OS
+  // hasn't surfaced it yet) without the service itself treating that as an error.
+  private readonly noPortsFoundError = computed<string | null>(() =>
+    this.midiAccess.accessState() === 'granted' && this.midiAccess.ports().length === 0
+      ? 'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.'
+      : null
+  );
+
+  /** The whole binding card. `portsEnabled`/`enableDisabled` fall through `'unsupported'` the same
+   *  as `'idle'` and `'denied'` — neither is `'granted'` nor `'requesting'`. Identify stays out of
+   *  reach while this deck plays: it interrupts the cartridge's stream. */
+  protected readonly bindingModel = computed<BindingCardModel>(() => {
+    const label = this.context.label();
+    const accessState = this.midiAccess.accessState();
+    const portsEnabled = accessState === 'granted';
+    const selectedPortId = this.binding.selectedPortId();
+    const ports: readonly BindingPortModel[] = this.midiAccess
+      .ports()
+      .map((port) => ({ id: port.id, label: `${port.name} (${port.manufacturer})` }));
+
+    return {
+      accessibleName: `MIDI binding deck ${label}`,
+      heading: `Deck ${label}`,
+      ports,
+      selectedPortId,
+      portsEnabled,
+      enableDisabled: accessState === 'requesting',
+      identifyDisabled: !(
+        portsEnabled &&
+        selectedPortId !== null &&
+        this.snapshot().transport !== 'playing'
+      ),
+      selectAccessibleName: `Output port deck ${label}`,
+      enableAccessibleName: `Enable MIDI deck ${label}`,
+      identifyAccessibleName: `Identify deck ${label}`,
+      errors: [
+        this.midiAccess.lastError(),
+        this.noPortsFoundError(),
+        this.binding.lastError(),
+      ].filter((error): error is string => error !== null),
+    };
+  });
+
+  /** Requests the page-level grant, then restores this deck's own persisted selection. Idempotent: a
+   *  second press while already granted just re-enumerates and restores again, which is itself a
+   *  no-op once a selection already stands. */
+  protected onEnableMidi(): void {
+    void this.midiAccess.requestAccess().then(() => this.binding.restore());
+  }
+
+  protected onPortSelect(portId: string): void {
+    this.binding.selectPort(portId);
+  }
+
+  /** Names the port by its enumerated position, since Web MIDI exposes nothing else that
+   *  distinguishes two identical cartridges. */
+  protected onIdentify(): void {
+    const ports = this.midiAccess.ports();
+    const index = ports.findIndex((port) => port.id === this.binding.selectedPortId());
+    const label = index === -1 ? 'ASID-DJ-0 PORT ?' : `ASID-DJ-0 PORT ${index + 1}`;
+    this.binding.identify(label);
   }
 }

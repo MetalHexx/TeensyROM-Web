@@ -96,8 +96,8 @@ export function computeGridLayout(decks: readonly DeckDescriptor[]): DeckGridLay
  * The DJ player page — reachable only by typing `/dev/dj-poc` in the browser. Composes one deck host
  * per entry in `DECKS`, laid out on the five-column grid the wireframe draws, and holds only what is
  * genuinely shared across every deck: the Web MIDI permission grant (each deck's own
- * `BindingCardComponent` reaches up to it), the tune-index cache, the registry a page-level surface
- * reaches a deck's own collaborators through, and the mixer's per-deck gain model.
+ * `DeckHostComponent`, the Binding adapter, reaches up to it), the tune-index cache, the registry a
+ * page-level surface reaches a deck's own collaborators through, and the mixer's per-deck gain model.
  *
  * `SharedTuneIndex` lives here, not in `DeckHostComponent`: a loop point, a key, a length are facts
  * about the tune, not about the deck that found them, so every deck's own `TuneIndexService` reaches
@@ -111,8 +111,8 @@ export function computeGridLayout(decks: readonly DeckDescriptor[]): DeckGridLay
  *
  * `MidiAccessService` lives here for the same reason again: the SysEx permission grant and the
  * enumerated port list are facts about the page's one Web MIDI session, not about either deck, so
- * both decks' own `BindingCardComponent`s read and drive the same instance rather than each holding
- * its own.
+ * both decks' own hosts read and drive the same instance — composing their own `BindingCardComponent`'s
+ * model from it — rather than each holding its own.
  *
  * The grid's own template — `.grid`'s `grid-template-columns/-rows/-areas` — is computed once here,
  * from `DECKS`, and bound onto the element rather than declared in the stylesheet: a stylesheet
