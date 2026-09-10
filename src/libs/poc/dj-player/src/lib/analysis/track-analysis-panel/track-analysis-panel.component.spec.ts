@@ -582,13 +582,16 @@ describe('TrackAnalysisPanelComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.voice-block').length).toBe(voiceBlocksBefore);
   });
 
+  // The default 2000ms budget is too tight for this CPU-bound 50k-frame scan on CI's shared
+  // runners: it timed out consistently there (never locally) with no assertion failure —
+  // the analysis itself was just still running.
   it('bounds the rendered element count for a long tune, regardless of frame count', async () => {
     await completeAnalysis(buildConstantlyActiveScan(50_000));
 
     const svg = fixture.nativeElement.querySelector('.lane-stack svg') as SVGSVGElement;
     expect(svg).not.toBeNull();
     expect(svg.querySelectorAll('*').length).toBeLessThan(2000);
-  });
+  }, 10000);
 
   it('reads a structure, pulse and key row from a cached index record while no scan has run', () => {
     expand();
