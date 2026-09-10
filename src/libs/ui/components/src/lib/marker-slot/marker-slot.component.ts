@@ -60,7 +60,9 @@ export class MarkerSlotComponent {
   readonly nudgeInput = output<number>();
   /** Fires on release only — the caller seeks and auditions. */
   readonly nudgeCommit = output<number>();
+  /** Emits when the snap to previous moment button is pressed. */
   readonly snapPrevious = output<void>();
+  /** Emits when the snap to next moment button is pressed. */
   readonly snapNext = output<void>();
 
   /** Offset 0 sits at 50%, ±`nudgeRange` at the edges; a zero range collapses every tick to centre

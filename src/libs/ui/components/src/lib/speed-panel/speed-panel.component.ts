@@ -44,9 +44,10 @@ export interface SpeedPanelModel {
   imports: [ChannelFaderComponent, JumpButtonGroupComponent],
 })
 export class SpeedPanelComponent {
+  /** The speed panel's display model and state. */
   readonly model = input.required<SpeedPanelModel>();
-  /** The fader's raw numeric emission, unrounded and unclamped. */
+  /** Emits the fader's raw numeric emission, unrounded and unclamped. */
   readonly faderChange = output<number>();
-  /** The pressed jump button's own `id`. */
+  /** Emits the pressed jump button's own `id`. */
   readonly jump = output<string>();
 }

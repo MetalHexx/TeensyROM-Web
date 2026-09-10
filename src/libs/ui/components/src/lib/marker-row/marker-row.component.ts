@@ -63,22 +63,35 @@ export interface MarkerRowModel {
   },
 })
 export class MarkerRowComponent {
+  /** The marker row's display model and state. */
   readonly model = input.required<MarkerRowModel>();
   /** 0–100; non-zero only while this row is looping. Its own input, not a model field: it is read
    *  off the polled playhead and changes every animation frame, and folding it into the row model
    *  would rebuild both `MarkerSlotModel`s — and re-run the caller's reachable-moment lookups — at
    *  60 Hz for every row on screen. */
   readonly progressPercent = input<number>(0);
+  /** Emits when the trigger button is pressed. */
   readonly trigger = output<void>();
+  /** Emits when the Set End button is pressed. */
   readonly setEnd = output<void>();
+  /** Emits when the Revert/Clear End button is pressed. */
   readonly clearEnd = output<void>();
+  /** Emits when the Delete button is pressed. */
   readonly delete = output<void>();
+  /** Emits the new nudge value while the start marker's nudge slider is being dragged. */
   readonly startNudgeInput = output<number>();
+  /** Emits the final nudge value when the start marker's nudge slider drag completes. */
   readonly startNudgeCommit = output<number>();
+  /** Emits when the start marker's snap to previous moment button is pressed. */
   readonly startSnapPrevious = output<void>();
+  /** Emits when the start marker's snap to next moment button is pressed. */
   readonly startSnapNext = output<void>();
+  /** Emits the new nudge value while the end marker's nudge slider is being dragged. */
   readonly endNudgeInput = output<number>();
+  /** Emits the final nudge value when the end marker's nudge slider drag completes. */
   readonly endNudgeCommit = output<number>();
+  /** Emits when the end marker's snap to previous moment button is pressed. */
   readonly endSnapPrevious = output<void>();
+  /** Emits when the end marker's snap to next moment button is pressed. */
   readonly endSnapNext = output<void>();
 }

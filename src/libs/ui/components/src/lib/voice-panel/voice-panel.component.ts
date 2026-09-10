@@ -37,11 +37,13 @@ export interface VoicePanelModel {
   imports: [VoiceRowComponent],
 })
 export class VoicePanelComponent {
+  /** The voice panel's display model and state. */
   readonly model = input.required<VoicePanelModel>();
-  /** `index` is the row's position in `model().rows`. */
+  /** Emits when a voice row's mute checkbox is toggled. `index` is the row's position in `model().rows`. */
   readonly mutedChange = output<{ index: number; muted: boolean }>();
-  /** `index` is the row's position in `model().rows`. */
+  /** Emits on a voice row's hold button press or release. `index` is the row's position in `model().rows`, `held` is `true` on press, `false` on release/cancel. */
   readonly heldChange = output<{ index: number; held: boolean }>();
+  /** Emits when the Clear button is pressed. */
   readonly clearMutes = output<void>();
 
   /** Re-packages one row's `mutedChange` with its own index for the panel-level `mutedChange`. */

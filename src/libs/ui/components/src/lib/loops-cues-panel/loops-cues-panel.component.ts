@@ -58,12 +58,15 @@ export interface LoopsCuesPanelModel {
   imports: [MarkerRowComponent],
 })
 export class LoopsCuesPanelComponent {
+  /** The loops/cues panel's display model and state. */
   readonly model = input.required<LoopsCuesPanelModel>();
   /** Index-aligned with `model().rows`, forwarded to each row's own `progressPercent`. Split out for
    *  the reason given on that input: this is the only per-animation-frame value in the panel, and it
    *  must not drag the whole row list's identity along with it. */
   readonly rowProgressPercents = input<readonly number[]>([]);
+  /** Emits when the Add/Set marker button is pressed. */
   readonly addMarker = output<void>();
+  /** Emits when the Stop loop button is pressed. */
   readonly stopLoop = output<void>();
   /** Every row-level output re-emitted with the row's index. */
   readonly rowAction = output<{ index: number; action: MarkerRowAction; value?: number }>();

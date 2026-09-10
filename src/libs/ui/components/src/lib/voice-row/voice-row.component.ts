@@ -43,9 +43,11 @@ export interface VoiceRowModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class VoiceRowComponent {
+  /** The voice row's display model and state. */
   readonly model = input.required<VoiceRowModel>();
+  /** Emits when the mute checkbox is toggled. */
   readonly mutedChange = output<boolean>();
-  /** Momentary. `true` on press (pointer or Enter/Space), `false` on release/cancel. */
+  /** Emits on hold button press (`true`) and release/cancel (`false`). Momentary; both press and release are meaningful. */
   readonly heldChange = output<boolean>();
 
   protected onMutedChange(event: Event): void {

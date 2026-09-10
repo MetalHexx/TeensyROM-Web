@@ -28,7 +28,8 @@ export interface JumpButtonModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class JumpButtonGroupComponent {
+  /** Array of button models, rendered in order from top to bottom. */
   readonly buttons = input.required<readonly JumpButtonModel[]>();
-  /** The pressed button's own `id`. */
+  /** Emits the pressed button's own `id`. */
   readonly jump = output<string>();
 }
