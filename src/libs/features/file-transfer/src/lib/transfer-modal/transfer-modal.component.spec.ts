@@ -54,7 +54,6 @@ const createSnapshot = (overrides: Partial<TransferJobSnapshot> = {}): TransferJ
 const JOB_BACKED_JOB_STATES: Record<string, TransferJobState> = {
   receiving: TransferJobState.Receiving,
   draining: TransferJobState.Sealed,
-  cancelling: TransferJobState.Cancelling,
   completed: TransferJobState.Completed,
   cancelled: TransferJobState.Cancelled,
   aborted: TransferJobState.Aborted,
@@ -67,9 +66,9 @@ const ALL_MODAL_STATES: TransferModalState[] = [
   'device-busy',
   'nothing-to-transfer',
   'failed',
+  'cancel-failed',
   'receiving',
   'draining',
-  'cancelling',
   'completed',
   'cancelled',
   'aborted',
@@ -103,6 +102,11 @@ function driveToState(
 
   if (state === 'failed') {
     store.setTransferError({ deviceId, error: 'Create rejected' });
+    return;
+  }
+
+  if (state === 'cancel-failed') {
+    store.setCancelError({ deviceId, error: 'Cancel rejected' });
     return;
   }
 
@@ -257,6 +261,18 @@ describe('TransferModalComponent', () => {
       const vm = component.vm();
       expect(vm.filesPerSecond).toBe(0);
       expect(vm.bytesPerSecond).toBe(0);
+    });
+
+    it('reads uploadBytesPerSecond from the metrics selector, not the job snapshot', async () => {
+      await setup();
+      transferStore.setTargetDevice({ deviceId });
+      driveToState(transferStore, deviceId, 'receiving');
+
+      createFixture();
+
+      const vm = component.vm();
+      const metrics = transferStore.getTransferMetrics(deviceId)();
+      expect(vm.uploadBytesPerSecond).toBe(metrics.uploadBytesPerSecond);
     });
   });
 

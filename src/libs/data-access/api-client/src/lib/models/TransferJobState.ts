@@ -22,7 +22,6 @@ export const TransferJobState = {
     Receiving: 'Receiving',
     Sealed: 'Sealed',
     Completed: 'Completed',
-    Cancelling: 'Cancelling',
     Cancelled: 'Cancelled',
     Abandoned: 'Abandoned',
     Aborted: 'Aborted'

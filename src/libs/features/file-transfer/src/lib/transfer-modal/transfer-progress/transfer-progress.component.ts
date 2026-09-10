@@ -17,7 +17,13 @@ export interface TransferProgressVm {
   failed: number;
   apiPercent: number;
   devicePercent: number;
+  hasArchive: boolean;
+  expansionPercent: number;
+  expandingArchive: string | null;
+  expansionComplete: boolean;
+  expandedTotal: number | null;
   filesPerSecond: number;
+  uploadBytesPerSecond: number;
   bytesPerSecond: number;
   feed: TransferFeedEntry[];
   failures: TransferFeedEntry[];
@@ -27,7 +33,7 @@ export interface TransferProgressVm {
 }
 
 /** Which family of frame a state renders — several states share the same layout shape. */
-type RenderShape = 'scan' | 'busy-refusal' | 'nothing-to-transfer' | 'active' | 'cancelling' | 'terminal';
+type RenderShape = 'scan' | 'busy-refusal' | 'nothing-to-transfer' | 'active' | 'terminal';
 
 type BottomBarMode = 'determinate' | 'indeterminate' | null;
 
@@ -36,10 +42,10 @@ const STATE_SHAPES: Record<TransferModalState, RenderShape> = {
   starting: 'scan',
   'device-busy': 'busy-refusal',
   failed: 'busy-refusal',
+  'cancel-failed': 'busy-refusal',
   'nothing-to-transfer': 'nothing-to-transfer',
   receiving: 'active',
   draining: 'active',
-  cancelling: 'cancelling',
   completed: 'terminal',
   cancelled: 'terminal',
   aborted: 'terminal',
@@ -49,14 +55,15 @@ const STATE_SHAPES: Record<TransferModalState, RenderShape> = {
 /**
  * Target dialog width per render shape — the mockup's content-heavy vs. small-state widths, plus
  * the terminal state's wider allowance for full failure paths. Every value clamps to the viewport
- * in `frameWidth` below, so a narrow window never pushes the dialog off-screen.
+ * in `frameWidth` below, so a narrow window never pushes the dialog off-screen. Below phone width
+ * the stylesheet's `:host` rule overrides `frameWidth`'s output with `width: 100% !important` —
+ * the shell owns the inset there instead (see transfer-progress.component.scss).
  */
 const SHAPE_WIDTH_PX: Record<RenderShape, number> = {
   scan: 480,
   'busy-refusal': 480,
   'nothing-to-transfer': 480,
   active: 760,
-  cancelling: 760,
   terminal: 900,
 };
 
@@ -66,10 +73,12 @@ const STATE_TITLES: Record<TransferModalState, (vm: TransferProgressVm) => strin
   'device-busy': () => 'Device Busy',
   'nothing-to-transfer': () => 'Nothing to transfer',
   failed: () => "Transfer couldn't start",
+  // The transfer did start — only the request to stop it failed, so it must not read as a
+  // start failure.
+  'cancel-failed': () => "Transfer couldn't be cancelled",
   receiving: (vm) => `Transferring to ${vm.deviceName}`,
   // Same wording as `receiving` — the title must not change when the job seals.
   draining: (vm) => `Transferring to ${vm.deviceName}`,
-  cancelling: () => 'Cancelling',
   completed: () => 'Transfer Completed',
   cancelled: () => 'Transfer cancelled',
   aborted: () => 'Transfer Stopped: Device Lost',
@@ -82,11 +91,11 @@ const STATE_BOTTOM_BAR: Record<TransferModalState, BottomBarMode> = {
   'device-busy': null,
   'nothing-to-transfer': null,
   failed: null,
+  'cancel-failed': null,
   // The write-bars (API/device) already cover progress for these states, so the modal-level
   // bar underneath the actions would be redundant.
   receiving: null,
   draining: null,
-  cancelling: 'indeterminate',
   completed: null,
   cancelled: null,
   aborted: null,
@@ -116,10 +125,12 @@ const STATE_ANNOUNCEMENTS: Record<TransferModalState, (vm: TransferProgressVm) =
   'device-busy': (vm) => `${vm.deviceName} is busy. Nothing has been sent.`,
   'nothing-to-transfer': () => 'Nothing to transfer.',
   failed: (vm) => vm.reason ?? "Transfer couldn't start.",
-  receiving: (vm) =>
-    `${vm.devicePercent}% written to device. ${vm.uploaded} of ${vm.scanTotal} uploaded, ${vm.failed} failed.`,
+  'cancel-failed': (vm) => vm.reason ?? "Transfer couldn't be cancelled.",
+  receiving: (vm) => {
+    const expanding = vm.hasArchive && !vm.expansionComplete ? 'Expanding archives. ' : '';
+    return `${expanding}${vm.devicePercent}% written to device. ${vm.uploaded} of ${vm.scanTotal} uploaded, ${vm.failed} failed.`;
+  },
   draining: (vm) => `${vm.devicePercent}% written to device. Upload complete, ${vm.failed} failed.`,
-  cancelling: () => 'Cancelling. Finishing current file.',
   completed: (vm) =>
     `Transfer complete. ${vm.written} written, ${vm.failed} failed, averaging ${vm.filesPerSecond.toFixed(1)} files per second.`,
   cancelled: (vm) => `Transfer cancelled. ${vm.written} written, ${vm.failed} failed.`,
@@ -193,12 +204,16 @@ export class TransferProgressComponent {
 
   readonly uploadedTileSuccess = computed(() => this.vm().state === 'draining');
   readonly apiBarSuccess = computed(() => this.vm().state === 'draining');
-  readonly metricsMuted = computed(() => this.vm().state === 'cancelling');
+
+  readonly expansionComplete = computed(() => this.vm().expansionComplete);
+  readonly expansionSlotText = computed(() =>
+    this.expansionComplete() ? '100%' : this.vm().expandingArchive
+  );
 
   readonly rateLabel = computed(() => (this.renderShape() === 'terminal' ? 'Avg Rate' : 'Rate'));
-  readonly filesPerSecondLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)} Files/s`);
+  readonly uploadRateLabel = computed(() => `${formatFileSize(this.vm().uploadBytesPerSecond)}/s`);
   readonly bytesPerSecondLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)}/s`);
-  readonly filesPerSecondSpokenLabel = computed(() => `${this.vm().filesPerSecond.toFixed(1)} files per second`);
+  readonly uploadRateSpokenLabel = computed(() => `${formatFileSize(this.vm().uploadBytesPerSecond)} per second`);
   readonly bytesPerSecondSpokenLabel = computed(() => `${formatFileSize(this.vm().bytesPerSecond)} per second`);
 
   readonly terminalBannerTreatment = computed(() => TERMINAL_BANNER_TREATMENT[this.vm().state] ?? null);

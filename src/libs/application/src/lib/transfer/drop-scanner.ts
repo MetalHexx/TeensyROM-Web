@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { TransferManifestEntry } from '@teensyrom-nx/domain';
-import { TRANSFER_SUPPORTED_EXTENSIONS } from './transfer.constants';
+import { TRANSFER_SUPPORTED_EXTENSIONS, TRANSFER_ARCHIVE_EXTENSIONS } from './transfer.constants';
 
 /** How many matches accumulate between `onProgress` ticks, so a large walk stays visibly live. */
 const PROGRESS_BATCH_SIZE = 25;
@@ -8,6 +8,8 @@ const PROGRESS_BATCH_SIZE = 25;
 export interface DropScanResult {
   entries: TransferManifestEntry[];
   rootName: string | null;
+  /** Number of entries admitted as archives — one per archive file, regardless of its contents. */
+  archiveCount: number;
 }
 
 /**
@@ -33,29 +35,37 @@ export class DropScanner {
     onProgress: (found: number) => void,
     signal: AbortSignal
   ): Promise<DropScanResult> {
-    const entries: TransferManifestEntry[] = [];
+    const acc = createAccumulator();
     const progress = createProgressReporter(onProgress);
     let rootName: string | null = null;
 
-    for (const item of Array.from(items)) {
-      if (signal.aborted) break;
+    // Synchronous, before any await: the payload is only readable during the drop event's own turn.
+    const entries = Array.from(items)
+      .map((item) => item.webkitGetAsEntry())
+      .filter((entry): entry is FileSystemEntry => entry !== null);
 
-      const entry = item.webkitGetAsEntry();
-      if (!entry) continue;
+    for (const entry of entries) {
+      if (signal.aborted) break;
 
       if (entry.isDirectory) {
         if (rootName === null) {
           rootName = entry.name;
         }
-        await this.walkDirectory(entry as FileSystemDirectoryEntry, `${entry.name}/`, entries, progress, signal);
+        await this.walkDirectory(
+          entry as FileSystemDirectoryEntry,
+          `${entry.name}/`,
+          acc,
+          progress,
+          signal
+        );
       } else if (entry.isFile) {
         const file = await readFile(entry as FileSystemFileEntry);
-        addIfSupported(entries, file, entry.name, progress);
+        addIfSupported(acc, file, entry.name, progress);
       }
     }
 
-    progress.flush(entries.length);
-    return { entries, rootName };
+    progress.flush(acc.entries.length);
+    return { entries: sortArchivesFirst(acc.entries), rootName, archiveCount: acc.archiveCount };
   }
 
   private async scanFileList(
@@ -63,7 +73,7 @@ export class DropScanner {
     onProgress: (found: number) => void,
     signal: AbortSignal
   ): Promise<DropScanResult> {
-    const entries: TransferManifestEntry[] = [];
+    const acc = createAccumulator();
     const progress = createProgressReporter(onProgress);
     let rootName: string | null = null;
 
@@ -76,17 +86,17 @@ export class DropScanner {
         rootName = file.webkitRelativePath.split('/')[0];
       }
 
-      addIfSupported(entries, file, relativePath, progress);
+      addIfSupported(acc, file, relativePath, progress);
     }
 
-    progress.flush(entries.length);
-    return { entries, rootName };
+    progress.flush(acc.entries.length);
+    return { entries: sortArchivesFirst(acc.entries), rootName, archiveCount: acc.archiveCount };
   }
 
   private async walkDirectory(
     directory: FileSystemDirectoryEntry,
     pathPrefix: string,
-    entries: TransferManifestEntry[],
+    acc: ScanAccumulator,
     progress: ProgressReporter,
     signal: AbortSignal
   ): Promise<void> {
@@ -105,20 +115,22 @@ export class DropScanner {
           await this.walkDirectory(
             child as FileSystemDirectoryEntry,
             `${pathPrefix}${child.name}/`,
-            entries,
+            acc,
             progress,
             signal
           );
         } else if (child.isFile) {
           const file = await readFile(child as FileSystemFileEntry);
-          addIfSupported(entries, file, `${pathPrefix}${child.name}`, progress);
+          addIfSupported(acc, file, `${pathPrefix}${child.name}`, progress);
         }
       }
     }
   }
 }
 
-function isDataTransferItemList(input: DataTransferItemList | FileList): input is DataTransferItemList {
+function isDataTransferItemList(
+  input: DataTransferItemList | FileList
+): input is DataTransferItemList {
   const first = (input as ArrayLike<{ webkitGetAsEntry?: unknown }>)[0];
   return typeof first?.webkitGetAsEntry === 'function';
 }
@@ -131,22 +143,57 @@ function readFile(entry: FileSystemFileEntry): Promise<File> {
   return new Promise((resolve, reject) => entry.file(resolve, reject));
 }
 
-function hasSupportedExtension(relativePath: string): boolean {
+function extensionOf(relativePath: string): string | null {
   const dotIndex = relativePath.lastIndexOf('.');
-  if (dotIndex === -1) return false;
-  return TRANSFER_SUPPORTED_EXTENSIONS.has(relativePath.slice(dotIndex).toLowerCase());
+  return dotIndex === -1 ? null : relativePath.slice(dotIndex).toLowerCase();
+}
+
+function hasSupportedExtension(relativePath: string): boolean {
+  const extension = extensionOf(relativePath);
+  return extension !== null && TRANSFER_SUPPORTED_EXTENSIONS.has(extension);
+}
+
+function isArchiveExtension(relativePath: string): boolean {
+  const extension = extensionOf(relativePath);
+  return extension !== null && TRANSFER_ARCHIVE_EXTENSIONS.has(extension);
+}
+
+interface ScanAccumulator {
+  entries: TransferManifestEntry[];
+  archiveCount: number;
+}
+
+function createAccumulator(): ScanAccumulator {
+  return { entries: [], archiveCount: 0 };
 }
 
 function addIfSupported(
-  entries: TransferManifestEntry[],
+  acc: ScanAccumulator,
   file: File,
   relativePath: string,
   progress: ProgressReporter
 ): void {
   if (!hasSupportedExtension(relativePath)) return;
 
-  entries.push({ file, relativePath, sizeBytes: file.size });
-  progress.report(entries.length);
+  acc.entries.push({ file, relativePath, sizeBytes: file.size });
+  if (isArchiveExtension(relativePath)) {
+    acc.archiveCount++;
+  }
+  progress.report(acc.entries.length);
+}
+
+/**
+ * Groups every archive entry ahead of every ordinary file, at the end of the scan rather than
+ * during it — resorting per batch while walking would cost repeated work for no benefit. `sort`
+ * is stable in every engine the app targets, so relative order within each group survives.
+ */
+function sortArchivesFirst(entries: TransferManifestEntry[]): TransferManifestEntry[] {
+  return [...entries].sort((a, b) => {
+    const aIsArchive = isArchiveExtension(a.relativePath);
+    const bIsArchive = isArchiveExtension(b.relativePath);
+    if (aIsArchive === bIsArchive) return 0;
+    return aIsArchive ? -1 : 1;
+  });
 }
 
 interface ProgressReporter {

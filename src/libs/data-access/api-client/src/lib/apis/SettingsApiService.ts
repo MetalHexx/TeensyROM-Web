@@ -12,27 +12,32 @@
  * Do not edit the class manually.
  */
 
-
 import * as runtime from '../runtime';
-import type {
-  GetSettingsResponse,
-  HttpValidationProblemDetails,
-  ProblemDetails,
-  SaveSettingsRequest,
-  SaveSettingsResponse,
-} from '../models/index';
 import {
+    type GetSettingsResponse,
     GetSettingsResponseFromJSON,
     GetSettingsResponseToJSON,
+} from '../models/GetSettingsResponse';
+import {
+    type HttpValidationProblemDetails,
     HttpValidationProblemDetailsFromJSON,
     HttpValidationProblemDetailsToJSON,
+} from '../models/HttpValidationProblemDetails';
+import {
+    type ProblemDetails,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
+} from '../models/ProblemDetails';
+import {
+    type SaveSettingsRequest,
     SaveSettingsRequestFromJSON,
     SaveSettingsRequestToJSON,
+} from '../models/SaveSettingsRequest';
+import {
+    type SaveSettingsResponse,
     SaveSettingsResponseFromJSON,
     SaveSettingsResponseToJSON,
-} from '../models/index';
+} from '../models/SaveSettingsResponse';
 
 export interface SaveSettingsOperationRequest {
     saveSettingsRequest: SaveSettingsRequest;
@@ -44,20 +49,31 @@ export interface SaveSettingsOperationRequest {
 export class SettingsApiService extends runtime.BaseAPI {
 
     /**
-     * Retrieves all current user settings for the TeensyROM application.  **Settings Categories:** - **Connection Settings**: Device connectivity preferences (Serial/TCP) - **Player Settings**: Playback behavior and startup preferences - **File Transfer Settings**: Auto-copy and directory watching configuration - **Search Settings**: Search weights, stop words, and content exclusions - **App Settings**: Application lifecycle state  Settings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.
-     * Get User Settings
+     * Creates request options for getSettings without sending the request
      */
-    async getSettingsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetSettingsResponse>> {
+    async getSettingsRequestOpts(): Promise<runtime.RequestOpts> {
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/settings`,
+
+        let urlPath = `/api/settings`;
+
+        return {
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Retrieves all current user settings for the TeensyROM application.  **Settings Categories:** - **Connection Settings**: Device connectivity preferences (Serial/TCP) - **Player Settings**: Playback behavior and startup preferences - **File Transfer Settings**: Auto-copy and directory watching configuration - **Search Settings**: Search weights, stop words, and content exclusions - **App Settings**: Application lifecycle state  Settings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.
+     * Get User Settings
+     */
+    async getSettingsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetSettingsResponse>> {
+        const requestOptions = await this.getSettingsRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => GetSettingsResponseFromJSON(jsonValue));
     }
@@ -72,10 +88,9 @@ export class SettingsApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Saves all user settings for the TeensyROM application to persistent storage.  **Settings Categories:** - **Connection Settings**: Device connectivity preferences (Serial/TCP)   - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)   - TCP: Host address, port (1-65535), and timeout values (milliseconds) - **Player Settings**: Playback behavior and startup preferences   - Repeat mode, play timer, mute settings, startup filter and launch options - **File Transfer Settings**: Auto-copy and directory watching configuration   - Watch directory location, auto-transfer path, and sync flags - **Search Settings**: Search weights, stop words, and content exclusions   - Search weights must be >= 0 with at least one > 0   - Stop words, banned directories, and banned files lists - **App Settings**: Application lifecycle state   - First-time setup flag  **Validation:** - All nested settings objects are required - Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200) - TCP port must be between 1 and 65535 - Timeout values must be positive integers (milliseconds) - Watch directory must be empty or a valid absolute path - Search weights must be non-negative with at least one > 0  Settings are persisted to Settings.json and immediately available in memory.
-     * Save User Settings
+     * Creates request options for saveSettings without sending the request
      */
-    async saveSettingsRaw(requestParameters: SaveSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SaveSettingsResponse>> {
+    async saveSettingsRequestOpts(requestParameters: SaveSettingsOperationRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['saveSettingsRequest'] == null) {
             throw new runtime.RequiredError(
                 'saveSettingsRequest',
@@ -89,13 +104,25 @@ export class SettingsApiService extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        const response = await this.request({
-            path: `/api/settings`,
+
+        let urlPath = `/api/settings`;
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
             body: SaveSettingsRequestToJSON(requestParameters['saveSettingsRequest']),
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Saves all user settings for the TeensyROM application to persistent storage.  **Settings Categories:** - **Connection Settings**: Device connectivity preferences (Serial/TCP)   - Serial: Port name (empty for auto-detect) and baud rate (typically 115200)   - TCP: Host address, port (1-65535), and timeout values (milliseconds) - **Player Settings**: Playback behavior and startup preferences   - Repeat mode, play timer, mute settings, startup filter and launch options - **File Transfer Settings**: Auto-copy and directory watching configuration   - Watch directory location, auto-transfer path, and sync flags - **Search Settings**: Search weights, stop words, and content exclusions   - Search weights must be >= 0 with at least one > 0   - Stop words, banned directories, and banned files lists - **App Settings**: Application lifecycle state   - First-time setup flag  **Validation:** - All nested settings objects are required - Baud rate must be positive (typically 9600, 19200, 38400, 57600, or 115200) - TCP port must be between 1 and 65535 - Timeout values must be positive integers (milliseconds) - Watch directory must be empty or a valid absolute path - Search weights must be non-negative with at least one > 0  Settings are persisted to Settings.json and immediately available in memory.
+     * Save User Settings
+     */
+    async saveSettingsRaw(requestParameters: SaveSettingsOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SaveSettingsResponse>> {
+        const requestOptions = await this.saveSettingsRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => SaveSettingsResponseFromJSON(jsonValue));
     }

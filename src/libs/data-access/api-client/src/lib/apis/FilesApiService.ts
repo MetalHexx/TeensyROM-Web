@@ -12,39 +12,52 @@
  * Do not edit the class manually.
  */
 
-
 import * as runtime from '../runtime';
-import type {
-  GetDirectoryResponse,
-  IndexAllResponse,
-  IndexResponse,
-  NullableOfTeensyFilterType,
-  ProblemDetails,
-  RemoveFavoriteResponse,
-  SaveFavoriteResponse,
-  SearchResponse,
-  TeensyStorageType,
-} from '../models/index';
 import {
+    type GetDirectoryResponse,
     GetDirectoryResponseFromJSON,
     GetDirectoryResponseToJSON,
+} from '../models/GetDirectoryResponse';
+import {
+    type IndexAllResponse,
     IndexAllResponseFromJSON,
     IndexAllResponseToJSON,
+} from '../models/IndexAllResponse';
+import {
+    type IndexResponse,
     IndexResponseFromJSON,
     IndexResponseToJSON,
+} from '../models/IndexResponse';
+import {
+    type NullableOfTeensyFilterType,
     NullableOfTeensyFilterTypeFromJSON,
     NullableOfTeensyFilterTypeToJSON,
+} from '../models/NullableOfTeensyFilterType';
+import {
+    type ProblemDetails,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
+} from '../models/ProblemDetails';
+import {
+    type RemoveFavoriteResponse,
     RemoveFavoriteResponseFromJSON,
     RemoveFavoriteResponseToJSON,
+} from '../models/RemoveFavoriteResponse';
+import {
+    type SaveFavoriteResponse,
     SaveFavoriteResponseFromJSON,
     SaveFavoriteResponseToJSON,
+} from '../models/SaveFavoriteResponse';
+import {
+    type SearchResponse,
     SearchResponseFromJSON,
     SearchResponseToJSON,
+} from '../models/SearchResponse';
+import {
+    type TeensyStorageType,
     TeensyStorageTypeFromJSON,
     TeensyStorageTypeToJSON,
-} from '../models/index';
+} from '../models/TeensyStorageType';
 
 export interface GetDirectoryRequest {
     deviceId: string;
@@ -84,10 +97,9 @@ export interface SearchRequest {
 export class FilesApiService extends runtime.BaseAPI {
 
     /**
-     * Gets a directory for given storage device.  - Returns metadata for all files in the directory. - This is not recursive and will only include the files for the requested directory. - Make another request to get subdirectory content.
-     * Get Directory
+     * Creates request options for getDirectory without sending the request
      */
-    async getDirectoryRaw(requestParameters: GetDirectoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetDirectoryResponse>> {
+    async getDirectoryRequestOpts(requestParameters: GetDirectoryRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -110,12 +122,26 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/storage/{storageType}/directories`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/directories`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace('{storageType}', encodeURIComponent(String(requestParameters['storageType'])));
+
+        return {
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Gets a directory for given storage device.  - Returns metadata for all files in the directory. - This is not recursive and will only include the files for the requested directory. - Make another request to get subdirectory content.
+     * Get Directory
+     */
+    async getDirectoryRaw(requestParameters: GetDirectoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetDirectoryResponse>> {
+        const requestOptions = await this.getDirectoryRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => GetDirectoryResponseFromJSON(jsonValue));
     }
@@ -130,10 +156,9 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Indexes the directory structure of a given TeensyROM device and storage type.  - Providing a path will index starting at that directory and all subdirectories below it. - Providing no path will index the whole storage device. - Don\'t touch your commodore while indexing is in progress.
-     * Index
+     * Creates request options for index without sending the request
      */
-    async indexRaw(requestParameters: IndexRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<IndexResponse>> {
+    async indexRequestOpts(requestParameters: IndexRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -156,12 +181,26 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/storage/{storageType}/index`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/index`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace('{storageType}', encodeURIComponent(String(requestParameters['storageType'])));
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Indexes the directory structure of a given TeensyROM device and storage type.  - Providing a path will index starting at that directory and all subdirectories below it. - Providing no path will index the whole storage device. - Don\'t touch your commodore while indexing is in progress.
+     * Index
+     */
+    async indexRaw(requestParameters: IndexRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<IndexResponse>> {
+        const requestOptions = await this.indexRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => IndexResponseFromJSON(jsonValue));
     }
@@ -176,20 +215,31 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Indexes all storage for all connected TeensyROM devices.  - This will recursively index all storage devices. - Multiple devices will be indexed in parallel, one device type at a time. - This could take a few minutes if you have a lot of data. - Don\'t touch your commodores while indexing is in progress.
-     * Index All
+     * Creates request options for indexAll without sending the request
      */
-    async indexAllRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<IndexAllResponse>> {
+    async indexAllRequestOpts(): Promise<runtime.RequestOpts> {
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/files/index/all`,
+
+        let urlPath = `/api/files/index/all`;
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Indexes all storage for all connected TeensyROM devices.  - This will recursively index all storage devices. - Multiple devices will be indexed in parallel, one device type at a time. - This could take a few minutes if you have a lot of data. - Don\'t touch your commodores while indexing is in progress.
+     * Index All
+     */
+    async indexAllRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<IndexAllResponse>> {
+        const requestOptions = await this.indexAllRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => IndexAllResponseFromJSON(jsonValue));
     }
@@ -204,10 +254,9 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Removes a file from favorites, deleting the favorite copy and updating the original file\'s favorite status.
-     * Remove Favorite
+     * Creates request options for removeFavorite without sending the request
      */
-    async removeFavoriteRaw(requestParameters: RemoveFavoriteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RemoveFavoriteResponse>> {
+    async removeFavoriteRequestOpts(requestParameters: RemoveFavoriteRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -237,12 +286,26 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/storage/{storageType}/favorite`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/favorite`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace('{storageType}', encodeURIComponent(String(requestParameters['storageType'])));
+
+        return {
+            path: urlPath,
             method: 'DELETE',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Removes a file from favorites, deleting the favorite copy and updating the original file\'s favorite status.
+     * Remove Favorite
+     */
+    async removeFavoriteRaw(requestParameters: RemoveFavoriteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<RemoveFavoriteResponse>> {
+        const requestOptions = await this.removeFavoriteRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => RemoveFavoriteResponseFromJSON(jsonValue));
     }
@@ -257,10 +320,9 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Saves a file as a favorite, creating a copy in the appropriate favorites directory.
-     * Save Favorite
+     * Creates request options for saveFavorite without sending the request
      */
-    async saveFavoriteRaw(requestParameters: SaveFavoriteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SaveFavoriteResponse>> {
+    async saveFavoriteRequestOpts(requestParameters: SaveFavoriteRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -290,12 +352,26 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/storage/{storageType}/favorite`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/favorite`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace('{storageType}', encodeURIComponent(String(requestParameters['storageType'])));
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Saves a file as a favorite, creating a copy in the appropriate favorites directory.
+     * Save Favorite
+     */
+    async saveFavoriteRaw(requestParameters: SaveFavoriteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SaveFavoriteResponse>> {
+        const requestOptions = await this.saveFavoriteRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => SaveFavoriteResponseFromJSON(jsonValue));
     }
@@ -310,10 +386,9 @@ export class FilesApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Searches for files across all available storage devices (SD and USB) based on search text and filter criteria.  - Searches through file names, titles, creators, and descriptions. - Returns metadata for all matching files from all available storages. - Supports file type filtering (All, Games, Music, Images, Hex). - Supports pagination with Skip and Take parameters. - Excludes favorites and playlist directories from search results. - Uses weighted search algorithm to rank results by relevance. - Default page size is 50, maximum is 200.
-     * Search Files
+     * Creates request options for search without sending the request
      */
-    async searchRaw(requestParameters: SearchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SearchResponse>> {
+    async searchRequestOpts(requestParameters: SearchRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -362,12 +437,25 @@ export class FilesApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/search`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+
+        let urlPath = `/api/devices/{deviceId}/search`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+
+        return {
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Searches for files across all available storage devices (SD and USB) based on search text and filter criteria.  - Searches through file names, titles, creators, and descriptions. - Returns metadata for all matching files from all available storages. - Supports file type filtering (All, Games, Music, Images, Hex). - Supports pagination with Skip and Take parameters. - Excludes favorites and playlist directories from search results. - Uses weighted search algorithm to rank results by relevance. - Default page size is 50, maximum is 200.
+     * Search Files
+     */
+    async searchRaw(requestParameters: SearchRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SearchResponse>> {
+        const requestOptions = await this.searchRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => SearchResponseFromJSON(jsonValue));
     }

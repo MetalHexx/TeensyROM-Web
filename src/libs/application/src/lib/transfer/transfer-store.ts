@@ -19,6 +19,7 @@ export type TransferPhase =
   | 'starting' // creating the job
   | 'device-busy' // create refused as a conflict; the manifest is retained
   | 'failed' // create rejected for another reason; not retryable
+  | 'cancel-failed' // the cancel request itself failed; the job may still be running
   | 'running'; // a job exists — the displayed state comes from job.state
 
 /** Renderable states the transfer modal can be in; `null` from a selector means the modal is closed. */
@@ -28,9 +29,9 @@ export type TransferModalState =
   | 'device-busy'
   | 'nothing-to-transfer'
   | 'failed'
+  | 'cancel-failed'
   | 'receiving'
   | 'draining'
-  | 'cancelling'
   | 'completed'
   | 'cancelled'
   | 'aborted'
@@ -49,7 +50,14 @@ export interface DeviceTransferState {
   phase: TransferPhase;
   job: TransferJobSnapshot | null;
   scanFound: number; // ticks upward during the walk
-  scanTotal: number; // the manifest size — the denominator for both bars
+  // The manifest size — the denominator for both bars. An archive counts as one entry here (it's
+  // one upload); the transferable total once its contents are expanded is a different number the
+  // server has to help compute.
+  scanTotal: number;
+  archivesSent: number; // number of archive entries sent, of scanTotal
+  scanTotalBytes: number; // sum of the manifest's sizeBytes — the browser-to-API byte denominator
+  uploadedBytes: number; // bytes the browser has put on the wire
+  uploadBytesPerSecond: number; // live while running; the lifetime average once the job is terminal
   uploadFailedCount: number; // files that exhausted their upload attempts locally
   feed: TransferFeedEntry[]; // capped, newest first
   failures: TransferFeedEntry[]; // capped, for the end-of-job summary

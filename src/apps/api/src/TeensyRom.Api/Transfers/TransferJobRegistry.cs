@@ -8,9 +8,9 @@ namespace TeensyRom.Api.Transfers
     {
         private readonly ConcurrentDictionary<string, TransferJob> _jobs = new();
 
-        public TransferJob Create(string deviceId, TeensyStorageType storageType, DirectoryPath destination)
+        public TransferJob Create(string deviceId, TeensyStorageType storageType, DirectoryPath destination, int expectedArchiveCount = 0)
         {
-            var job = new TransferJob(deviceId, storageType, destination, options);
+            var job = new TransferJob(deviceId, storageType, destination, options, expectedArchiveCount: expectedArchiveCount);
             _jobs[job.JobId] = job;
             return job;
         }
@@ -22,6 +22,17 @@ namespace TeensyRom.Api.Transfers
 
         public IReadOnlyCollection<TransferJob> All() => _jobs.Values.ToArray();
 
-        public void Remove(string jobId) => _jobs.TryRemove(jobId, out _);
+        /// <summary>
+        /// Evicts the job and disposes it - either once it is terminal, or when a failed create rolls
+        /// it back before it is ever used. Safe in both cases because an evicted job is unreachable
+        /// from that point on, so nothing is left to observe its cancellation source.
+        /// </summary>
+        public void Remove(string jobId)
+        {
+            if (_jobs.TryRemove(jobId, out var job))
+            {
+                job.Dispose();
+            }
+        }
     }
 }

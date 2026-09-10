@@ -7,14 +7,16 @@ namespace TeensyRom.Api.Transfers
 {
     /// <summary>
     /// Runs every <see cref="TransferOptions.SweepInterval"/> and closes the gaps the pump cannot: a
-    /// job whose client vanished before sealing (Abandoned), a job sealed or cancelled with an already-
-    /// empty queue that no worker will ever wake for (the <see cref="TransferPump.TryFinalize"/>
-    /// backstop), and terminal jobs old enough to evict.
+    /// job whose client vanished before sealing (Abandoned), a job sealed with an already-empty queue
+    /// that no worker will ever wake for (the <see cref="TransferPump.TryFinalize"/> backstop), and
+    /// terminal jobs old enough to evict.
     /// </summary>
     public sealed class TransferJobSweeper(
         ITransferJobRegistry registry,
         IDeviceLeaseCoordinator leaseCoordinator,
         ITransferStagingStore staging,
+        ITransferScratchStore scratch,
+        ITransferAdmission admission,
         ITransferSubscriptionTracker tracker,
         IDeviceConnectionManager deviceManager,
         ITransferProgressNotifier notifier,
@@ -54,6 +56,16 @@ namespace TeensyRom.Api.Transfers
             }
         }
 
+        /// <summary>
+        /// A job mid-expansion is never abandoned below, but not because this method checks for it - the
+        /// <c>PendingCount == 0</c> guard on the Created/Receiving branch already excludes it, because an
+        /// accepted archive's own pending slot (taken by <see cref="TransferJob.OnFileReceived"/> when it
+        /// was uploaded) is not released until <see cref="TransferJob.ReleaseFinishedArchiveSlots"/> runs,
+        /// which the walk only calls after every entry every finished archive produced has been admitted.
+        /// That is a consequence of the upload/expansion handoff, not something designed into this sweep -
+        /// so if that release ordering ever changes, a mid-expansion job would start being abandoned out
+        /// from under its own expansion, silently, the next time this runs.
+        /// </summary>
         private void SweepJob(TransferJob job)
         {
             switch (job.State)
@@ -67,7 +79,7 @@ namespace TeensyRom.Api.Transfers
                     }
                     break;
 
-                case TransferJobState.Sealed or TransferJobState.Cancelling:
+                case TransferJobState.Sealed:
                     pump.TryFinalize(job);
                     break;
 
@@ -90,6 +102,8 @@ namespace TeensyRom.Api.Transfers
 
             leaseCoordinator.Release(job.DeviceId, job.JobId);
             staging.PurgeJob(job.JobId);
+            scratch.PurgeJob(job.JobId);
+            admission.DiscardHeld(job.JobId);
             deviceManager.GetAvailableDevice(job.DeviceId)?.GetStorage(job.StorageType)?.PersistCache();
             notifier.JobChanged(job);
         }

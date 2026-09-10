@@ -337,6 +337,6 @@ internal static class TransferApiBlackBoxHarness
     /// </summary>
     private enum TransferJobState
     {
-        Created, Receiving, Sealed, Completed, Cancelling, Cancelled, Abandoned, Aborted
+        Created, Receiving, Sealed, Completed, Cancelled, Abandoned, Aborted
     }
 }

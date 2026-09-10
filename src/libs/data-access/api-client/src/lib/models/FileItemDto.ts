@@ -296,7 +296,7 @@ export function FileItemDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'tags': ((json['tags'] as Array<any>).map(FileTagDtoFromJSON)),
         'youTubeVideos': ((json['youTubeVideos'] as Array<any>).map(YouTubeVideoDtoFromJSON)),
         'competitions': ((json['competitions'] as Array<any>).map(CompetitionDtoFromJSON)),
-        'avgRating': json['avgRating'] == null ? undefined : json['avgRating'],
+        'avgRating': json['avgRating'] === undefined ? undefined : json['avgRating'] === null ? null : json['avgRating'],
         'ratingCount': json['ratingCount'],
         'metadataSourcePath': json['metadataSourcePath'],
         'parentPath': json['parentPath'],

@@ -103,4 +103,43 @@ public class TransferOptionsBinderTests
 
         options.SnapshotThrottle.Should().Be(TimeSpan.FromMilliseconds(250));
     }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    public void BindFrom_OutOfRangeMaxScratchBytes_ClampsToOne(string configuredMaxScratchBytes)
+    {
+        var configuration = ConfigurationFrom(new() { ["Transfer:MaxScratchBytes"] = configuredMaxScratchBytes });
+
+        var options = TransferOptionsBinder.BindFrom(configuration);
+
+        options.MaxScratchBytes.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    public void BindFrom_OutOfRangeMaxExpansionDepth_ClampsToOne(string configuredMaxExpansionDepth)
+    {
+        var configuration = ConfigurationFrom(new() { ["Transfer:MaxExpansionDepth"] = configuredMaxExpansionDepth });
+
+        var options = TransferOptionsBinder.BindFrom(configuration);
+
+        options.MaxExpansionDepth.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    public void BindFrom_OutOfRangeMaxExpandedBytesPerArchive_ClampsToOne(string configuredMaxExpandedBytesPerArchive)
+    {
+        var configuration = ConfigurationFrom(new()
+        {
+            ["Transfer:MaxExpandedBytesPerArchive"] = configuredMaxExpandedBytesPerArchive
+        });
+
+        var options = TransferOptionsBinder.BindFrom(configuration);
+
+        options.MaxExpandedBytesPerArchive.Should().Be(1);
+    }
 }

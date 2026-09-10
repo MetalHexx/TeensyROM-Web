@@ -75,7 +75,7 @@ export class DropzoneCardComponent {
       case 'drag-over':
         return 'Drop to transfer';
       default:
-        return 'Drop files or folders here';
+        return 'Drop files and/or folders here';
     }
   });
 

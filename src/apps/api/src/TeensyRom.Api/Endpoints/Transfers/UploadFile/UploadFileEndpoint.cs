@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.Features;
 using TeensyRom.Api.Models;
 using TeensyRom.Api.Transfers;
+using TeensyRom.Api.Transfers.Archives;
 using TeensyRom.Core.Entities.Transfers;
 
 namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
@@ -8,18 +9,24 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
     /// <summary>
     /// Streams one file's raw body straight to disk per request. The request waits for capacity instead
     /// of failing when the gate is saturated - there is no rejection and no client-side pacing anywhere
-    /// in this design; a slow device just means in-flight uploads take longer to return.
+    /// in this design; a slow device just means in-flight uploads take longer to return. An archive is the
+    /// one exception: it routes to scratch instead of staging and never touches the capacity gate at all,
+    /// since scratch enforces its own, separate ceiling.
     /// </summary>
     public class UploadFileEndpoint(
         ITransferJobRegistry registry,
-        ITransferStagingStore staging,
-        ITransferCapacityGate gate,
-        ITransferQueue queue,
-        ITransferProgressNotifier notifier) : RadEndpoint<UploadFileRequest, UploadFileResponse>
+        ITransferAdmission admission,
+        ITransferScratchStore scratch,
+        IArchiveReader archiveReader,
+        IArchiveExpansionQueue expansionQueue) : RadEndpoint<UploadFileRequest, UploadFileResponse>
     {
         // Used only when the client omits Content-Length (e.g. chunked transfer encoding). Adjust()
         // reconciles this reservation to the real size once the body is fully staged.
         private const long DefaultReservationBytes = 1 * 1024 * 1024;
+
+        // Matches TransferStagingStore's own copy buffer - there is no shared constant between the two,
+        // just the same well-worn stream-copy size.
+        private const int CopyBufferSize = 81_920;
 
         public override void Configure()
         {
@@ -66,53 +73,81 @@ namespace TeensyRom.Api.Endpoints.Transfers.UploadFile
                 return;
             }
 
-            if (!TransferPathResolver.TryResolve(job.Destination, r.Path, out var target, out var error))
+            if (archiveReader.IsArchiveExtension(r.Path))
             {
-                SendValidationError(error!);
+                await HandleArchiveAsync(job, r.Path, ct);
                 return;
             }
 
             var reserved = HttpContext.Request.ContentLength ?? DefaultReservationBytes;
-            await gate.WaitForSlotAsync(reserved, ct);
 
-            string? stagingPath = null;
-            var effective = reserved;
+            var result = await admission.AdmitAsync(job, HttpContext.Request.Body, r.Path, reserved, countAsReceived: true, ct);
+
+            if (!result.Accepted)
+            {
+                SendValidationError(result.Error!);
+                return;
+            }
+
+            Response = new() { RelativePath = r.Path, SizeBytes = result.File!.SizeBytes, Queued = true };
+            Send();
+        }
+
+        /// <summary>
+        /// Streams an archive's raw body to scratch rather than staging and hands it to the expansion
+        /// queue instead of the device queue. Reserves against the scratch ceiling for the raw upload
+        /// itself, exactly like <see cref="ArchiveExpansionService"/> separately reserves for the archive's
+        /// declared uncompressed size once expansion starts - without this, a raw archive body could grow
+        /// scratch disk usage without bound or backpressure while it waits its turn on the expansion queue.
+        /// <see cref="ArchiveExpansionService.ExpandAsync"/> releases the reservation once this archive's
+        /// scratch file is gone. The archive itself still counts toward
+        /// <see cref="TransferJobSnapshot.FilesReceived"/> - it was uploaded - but never reaches the
+        /// device; only what it expands to does.
+        /// </summary>
+        private async Task HandleArchiveAsync(TransferJob job, string relativePath, CancellationToken ct)
+        {
+            scratch.EnsureJobDirectory(job.JobId);
+
+            var reserved = HttpContext.Request.ContentLength ?? DefaultReservationBytes;
+
+            if (!scratch.TryReserve(job.JobId, reserved))
+            {
+                SendValidationError("Insufficient scratch space to accept this archive.");
+                return;
+            }
+
+            var scratchPath = scratch.NewScratchFilePath(job.JobId);
 
             try
             {
-                stagingPath = await staging.StageAsync(job.JobId, HttpContext.Request.Body, ct);
-                var actualBytes = new FileInfo(stagingPath).Length;
-                effective = gate.Adjust(reserved, actualBytes);
-
-                job.OnFileReceived(actualBytes);
-                await queue.EnqueueAsync(
-                    job.DeviceId,
-                    new StagedFile(job.JobId, stagingPath, r.Path, target, job.StorageType, actualBytes, effective),
-                    ct);
-                notifier.JobChanged(job);
-
-                if (job.State == TransferJobState.Created)
+                await using (var fs = new FileStream(
+                    scratchPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    bufferSize: CopyBufferSize, useAsync: true))
                 {
-                    job.TryTransitionTo(TransferJobState.Receiving);
+                    await HttpContext.Request.Body.CopyToAsync(fs, ct);
                 }
-
-                Response = new() { RelativePath = r.Path, SizeBytes = actualBytes, Queued = true };
-                Send();
             }
             catch
             {
-                // A slot leaked here is permanent and eventually deadlocks every upload for the process
-                // lifetime - releasing exactly `effective` (never the raw reservation once Adjust ran)
-                // keeps the byte counter from drifting.
-                gate.ReleaseSlot(effective);
-
-                if (stagingPath is not null)
-                {
-                    staging.DeleteStagedFile(stagingPath);
-                }
-
+                // Whatever landed on disk is orphaned until this job's scratch tree is purged at job exit,
+                // but the reservation itself must not wait that long - a run of failed archive uploads
+                // would otherwise exhaust the ceiling for every other job.
+                scratch.Release(job.JobId, reserved);
                 throw;
             }
+
+            var actualBytes = new FileInfo(scratchPath).Length;
+            var effectiveReserved = scratch.Adjust(job.JobId, reserved, actualBytes);
+
+            job.OnFileReceived(actualBytes);
+            job.OnArchiveAccepted();
+
+            await expansionQueue.EnqueueAsync(new ArchiveExpansionRequest(job.JobId, scratchPath, relativePath, effectiveReserved), ct);
+
+            // Same shape as the ordinary path - the browser cannot tell an archive from any other file
+            // and should not need to.
+            Response = new() { RelativePath = relativePath, SizeBytes = actualBytes, Queued = true };
+            Send();
         }
     }
 }

@@ -1,6 +1,6 @@
 ---
 name: backend-architecture
-description: 'Backend architecture reference for the TeensyROM .NET 9 Web API. Use when working on the backend/API, understanding RadEndpoints structure, MediatR CQRS pipeline behaviors, serial device communication protocol, storage/caching (indexing, favorites, StorageCache), background file transfer to devices (staging, queue, transfer pump, SignalR progress), device connection management, or backend operational concerns (configuration, error handling, retries, observability, logging). Covers Clean Architecture layering, key components, endpoint patterns, MediatR flow diagrams, dependency map, and architecture patterns/anti-patterns to follow or avoid.'
+description: 'Backend architecture reference for the TeensyROM .NET 9 Web API. Use when working on the backend/API, understanding RadEndpoints structure, MediatR CQRS pipeline behaviors, serial device communication protocol, storage/caching (indexing, favorites, StorageCache), background file transfer to devices (staging, queue, transfer pump, SignalR progress, archive expansion and scratch storage), device connection management, or backend operational concerns (configuration, error handling, retries, observability, logging). Covers Clean Architecture layering, key components, endpoint patterns, MediatR flow diagrams, dependency map, and architecture patterns/anti-patterns to follow or avoid.'
 ---
 
 # Backend Architecture Skill

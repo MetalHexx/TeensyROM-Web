@@ -37,7 +37,6 @@ public class TransferJobRegistryTests
     {
         var registry = NewRegistry();
         var job = registry.Create("device-1", TeensyStorageType.SD, new DirectoryPath("/transfers"));
-        job.TryTransitionTo(TransferJobState.Cancelling);
         job.TryTransitionTo(TransferJobState.Cancelled);
 
         registry.GetActive("device-1").Should().BeNull();

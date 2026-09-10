@@ -1,6 +1,5 @@
 using TeensyRom.Api.Models;
 using TeensyRom.Api.Transfers;
-using TeensyRom.Core.Entities.Transfers;
 
 namespace TeensyRom.Api.Endpoints.Transfers.CancelJob
 {
@@ -15,11 +14,12 @@ namespace TeensyRom.Api.Endpoints.Transfers.CancelJob
                 .WithName("CancelTransferJob")
                 .WithSummary("Cancel Transfer Job")
                 .WithDescription(
-                    "Requests cancellation of a transfer job.\n\n" +
-                    "- Returns immediately - it does not wait for the drain. The pump finishes any " +
-                    "in-flight write and drains the rest of the queue in the background.\n" +
-                    "- Idempotent: cancelling an already-cancelling or already-cancelled job returns " +
-                    "success, as does cancelling any other terminal job, without changing anything."
+                    "Cancels a transfer job.\n\n" +
+                    "- Returns the job already cancelled: its device, staged files, and expansion " +
+                    "workspace are all released before this responds, so the device can immediately " +
+                    "take a new job. Files already handed to the device are discarded rather than sent.\n" +
+                    "- Idempotent: cancelling an already-cancelled job returns success, as does " +
+                    "cancelling any other terminal job, without changing anything."
                 )
                 .WithTags("Transfers");
         }
@@ -34,14 +34,9 @@ namespace TeensyRom.Api.Endpoints.Transfers.CancelJob
                 return Task.CompletedTask;
             }
 
-            if (job.State != TransferJobState.Cancelling && !TransferJob.IsTerminal(job.State))
-            {
-                job.TryTransitionTo(TransferJobState.Cancelling);
-            }
-
-            // Finalizes immediately in case the queue is already empty - no worker will ever wake to
-            // drain a job with nothing pending. A no-op otherwise; the pump finalizes once it drains.
-            pump.TryFinalize(job);
+            // Terminal before this returns, whatever the job was doing - a no-op for a job that already
+            // reached a terminal state by any route.
+            pump.Cancel(job);
 
             Response = new() { Job = TransferJobDto.From(job.ToSnapshot()) };
             Send();

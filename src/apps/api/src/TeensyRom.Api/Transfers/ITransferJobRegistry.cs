@@ -8,7 +8,7 @@ namespace TeensyRom.Api.Transfers
     /// </summary>
     public interface ITransferJobRegistry
     {
-        TransferJob Create(string deviceId, TeensyStorageType storageType, DirectoryPath destination);
+        TransferJob Create(string deviceId, TeensyStorageType storageType, DirectoryPath destination, int expectedArchiveCount = 0);
         TransferJob? Get(string jobId);
         TransferJob? GetActive(string deviceId);
         IReadOnlyCollection<TransferJob> All();

@@ -12,39 +12,52 @@
  * Do not edit the class manually.
  */
 
-
 import * as runtime from '../runtime';
-import type {
-  CancelJobResponse,
-  CreateJobBody,
-  CreateJobResponse,
-  GetActiveJobResponse,
-  GetJobResponse,
-  ProblemDetails,
-  SealJobResponse,
-  TeensyStorageType,
-  UploadFileResponse,
-} from '../models/index';
 import {
+    type CancelJobResponse,
     CancelJobResponseFromJSON,
     CancelJobResponseToJSON,
+} from '../models/CancelJobResponse';
+import {
+    type CreateJobBody,
     CreateJobBodyFromJSON,
     CreateJobBodyToJSON,
+} from '../models/CreateJobBody';
+import {
+    type CreateJobResponse,
     CreateJobResponseFromJSON,
     CreateJobResponseToJSON,
+} from '../models/CreateJobResponse';
+import {
+    type GetActiveJobResponse,
     GetActiveJobResponseFromJSON,
     GetActiveJobResponseToJSON,
+} from '../models/GetActiveJobResponse';
+import {
+    type GetJobResponse,
     GetJobResponseFromJSON,
     GetJobResponseToJSON,
+} from '../models/GetJobResponse';
+import {
+    type ProblemDetails,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
+} from '../models/ProblemDetails';
+import {
+    type SealJobResponse,
     SealJobResponseFromJSON,
     SealJobResponseToJSON,
+} from '../models/SealJobResponse';
+import {
+    type TeensyStorageType,
     TeensyStorageTypeFromJSON,
     TeensyStorageTypeToJSON,
+} from '../models/TeensyStorageType';
+import {
+    type UploadFileResponse,
     UploadFileResponseFromJSON,
     UploadFileResponseToJSON,
-} from '../models/index';
+} from '../models/UploadFileResponse';
 
 export interface CancelTransferJobRequest {
     jobId: string;
@@ -79,10 +92,9 @@ export interface UploadTransferFileRequest {
 export class TransfersApiService extends runtime.BaseAPI {
 
     /**
-     * Requests cancellation of a transfer job.  - Returns immediately - it does not wait for the drain. The pump finishes any in-flight write and drains the rest of the queue in the background. - Idempotent: cancelling an already-cancelling or already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.
-     * Cancel Transfer Job
+     * Creates request options for cancelTransferJob without sending the request
      */
-    async cancelTransferJobRaw(requestParameters: CancelTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CancelJobResponse>> {
+    async cancelTransferJobRequestOpts(requestParameters: CancelTransferJobRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['jobId'] == null) {
             throw new runtime.RequiredError(
                 'jobId',
@@ -94,18 +106,31 @@ export class TransfersApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/transfers/{jobId}/cancel`.replace(`{${"jobId"}}`, encodeURIComponent(String(requestParameters['jobId']))),
+
+        let urlPath = `/api/transfers/{jobId}/cancel`;
+        urlPath = urlPath.replace('{jobId}', encodeURIComponent(String(requestParameters['jobId'])));
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Cancels a transfer job.  - Returns the job already cancelled: its device, staged files, and expansion workspace are all released before this responds, so the device can immediately take a new job. Files already handed to the device are discarded rather than sent. - Idempotent: cancelling an already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.
+     * Cancel Transfer Job
+     */
+    async cancelTransferJobRaw(requestParameters: CancelTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CancelJobResponse>> {
+        const requestOptions = await this.cancelTransferJobRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => CancelJobResponseFromJSON(jsonValue));
     }
 
     /**
-     * Requests cancellation of a transfer job.  - Returns immediately - it does not wait for the drain. The pump finishes any in-flight write and drains the rest of the queue in the background. - Idempotent: cancelling an already-cancelling or already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.
+     * Cancels a transfer job.  - Returns the job already cancelled: its device, staged files, and expansion workspace are all released before this responds, so the device can immediately take a new job. Files already handed to the device are discarded rather than sent. - Idempotent: cancelling an already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.
      * Cancel Transfer Job
      */
     async cancelTransferJob(requestParameters: CancelTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CancelJobResponse> {
@@ -114,10 +139,9 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset happens on the first uploaded file.
-     * Create Transfer Job
+     * Creates request options for createTransferJob without sending the request
      */
-    async createTransferJobRaw(requestParameters: CreateTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CreateJobResponse>> {
+    async createTransferJobRequestOpts(requestParameters: CreateTransferJobRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -145,13 +169,27 @@ export class TransfersApiService extends runtime.BaseAPI {
 
         headerParameters['Content-Type'] = 'application/json';
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/storage/{storageType}/transfers`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
+
+        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/transfers`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+        urlPath = urlPath.replace('{storageType}', encodeURIComponent(String(requestParameters['storageType'])));
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
             body: CreateJobBodyToJSON(requestParameters['createJobBody']),
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Starts a new file transfer job for a device\'s storage.  - Acquires an exclusive lease on the device for the lifetime of the job - a device can only have one active transfer at a time. - Issues no device traffic - the device reset happens on the first uploaded file.
+     * Create Transfer Job
+     */
+    async createTransferJobRaw(requestParameters: CreateTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CreateJobResponse>> {
+        const requestOptions = await this.createTransferJobRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => CreateJobResponseFromJSON(jsonValue));
     }
@@ -166,10 +204,9 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Gets the device\'s currently active transfer job.  - Returns 200 with a null job when the device has no transfer in progress - an idle device is a normal answer, not a 404.
-     * Get Active Transfer Job
+     * Creates request options for getActiveTransferJob without sending the request
      */
-    async getActiveTransferJobRaw(requestParameters: GetActiveTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetActiveJobResponse>> {
+    async getActiveTransferJobRequestOpts(requestParameters: GetActiveTransferJobRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -181,12 +218,25 @@ export class TransfersApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/devices/{deviceId}/transfers/active`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
+
+        let urlPath = `/api/devices/{deviceId}/transfers/active`;
+        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
+
+        return {
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Gets the device\'s currently active transfer job.  - Returns 200 with a null job when the device has no transfer in progress - an idle device is a normal answer, not a 404.
+     * Get Active Transfer Job
+     */
+    async getActiveTransferJobRaw(requestParameters: GetActiveTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetActiveJobResponse>> {
+        const requestOptions = await this.getActiveTransferJobRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => GetActiveJobResponseFromJSON(jsonValue));
     }
@@ -201,10 +251,9 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Gets the current snapshot of a transfer job - the same shape the transfer hub pushes over SignalR, so a client can poll this endpoint instead of subscribing.
-     * Get Transfer Job
+     * Creates request options for getTransferJob without sending the request
      */
-    async getTransferJobRaw(requestParameters: GetTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetJobResponse>> {
+    async getTransferJobRequestOpts(requestParameters: GetTransferJobRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['jobId'] == null) {
             throw new runtime.RequiredError(
                 'jobId',
@@ -216,12 +265,25 @@ export class TransfersApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/transfers/{jobId}`.replace(`{${"jobId"}}`, encodeURIComponent(String(requestParameters['jobId']))),
+
+        let urlPath = `/api/transfers/{jobId}`;
+        urlPath = urlPath.replace('{jobId}', encodeURIComponent(String(requestParameters['jobId'])));
+
+        return {
+            path: urlPath,
             method: 'GET',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Gets the current snapshot of a transfer job - the same shape the transfer hub pushes over SignalR, so a client can poll this endpoint instead of subscribing.
+     * Get Transfer Job
+     */
+    async getTransferJobRaw(requestParameters: GetTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetJobResponse>> {
+        const requestOptions = await this.getTransferJobRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => GetJobResponseFromJSON(jsonValue));
     }
@@ -236,10 +298,9 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Marks a transfer job as sealed - no further files will be accepted.  - Idempotent when the job is already sealed. - Rejected with a clear message when the job cannot reach Sealed from its current state. - A job sealed with an empty queue reaches Completed immediately - no upload required.
-     * Seal Transfer Job
+     * Creates request options for sealTransferJob without sending the request
      */
-    async sealTransferJobRaw(requestParameters: SealTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SealJobResponse>> {
+    async sealTransferJobRequestOpts(requestParameters: SealTransferJobRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['jobId'] == null) {
             throw new runtime.RequiredError(
                 'jobId',
@@ -251,12 +312,25 @@ export class TransfersApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/transfers/{jobId}/seal`.replace(`{${"jobId"}}`, encodeURIComponent(String(requestParameters['jobId']))),
+
+        let urlPath = `/api/transfers/{jobId}/seal`;
+        urlPath = urlPath.replace('{jobId}', encodeURIComponent(String(requestParameters['jobId'])));
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Marks a transfer job as sealed - no further files will be accepted.  - Idempotent when the job is already sealed. - Rejected with a clear message when the job cannot reach Sealed from its current state. - A job sealed with an empty queue reaches Completed immediately - no upload required.
+     * Seal Transfer Job
+     */
+    async sealTransferJobRaw(requestParameters: SealTransferJobRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SealJobResponse>> {
+        const requestOptions = await this.sealTransferJobRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => SealJobResponseFromJSON(jsonValue));
     }
@@ -271,10 +345,9 @@ export class TransfersApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Streams a single file\'s raw body (application/octet-stream) into a transfer job.  - One file per request; the body is streamed straight to disk, never buffered. - Blocks until the capacity gate has a free slot instead of failing - a slow device shows up as a slower response, never as an error. - Rejected immediately (400) when the job cannot accept files, and before any file is staged when the relative path is unusable.
-     * Upload Transfer File
+     * Creates request options for uploadTransferFile without sending the request
      */
-    async uploadTransferFileRaw(requestParameters: UploadTransferFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadFileResponse>> {
+    async uploadTransferFileRequestOpts(requestParameters: UploadTransferFileRequest): Promise<runtime.RequestOpts> {
         if (requestParameters['jobId'] == null) {
             throw new runtime.RequiredError(
                 'jobId',
@@ -297,12 +370,25 @@ export class TransfersApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-        const response = await this.request({
-            path: `/api/transfers/{jobId}/files`.replace(`{${"jobId"}}`, encodeURIComponent(String(requestParameters['jobId']))),
+
+        let urlPath = `/api/transfers/{jobId}/files`;
+        urlPath = urlPath.replace('{jobId}', encodeURIComponent(String(requestParameters['jobId'])));
+
+        return {
+            path: urlPath,
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        }, initOverrides);
+        };
+    }
+
+    /**
+     * Streams a single file\'s raw body (application/octet-stream) into a transfer job.  - One file per request; the body is streamed straight to disk, never buffered. - Blocks until the capacity gate has a free slot instead of failing - a slow device shows up as a slower response, never as an error. - Rejected immediately (400) when the job cannot accept files, and before any file is staged when the relative path is unusable.
+     * Upload Transfer File
+     */
+    async uploadTransferFileRaw(requestParameters: UploadTransferFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadFileResponse>> {
+        const requestOptions = await this.uploadTransferFileRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => UploadFileResponseFromJSON(jsonValue));
     }

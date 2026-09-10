@@ -329,7 +329,7 @@
           "Transfers"
         ],
         "summary": "Cancel Transfer Job",
-        "description": "Requests cancellation of a transfer job.\n\n- Returns immediately - it does not wait for the drain. The pump finishes any in-flight write and drains the rest of the queue in the background.\n- Idempotent: cancelling an already-cancelling or already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.",
+        "description": "Cancels a transfer job.\n\n- Returns the job already cancelled: its device, staged files, and expansion workspace are all released before this responds, so the device can immediately take a new job. Files already handed to the device are discarded rather than sent.\n- Idempotent: cancelling an already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.",
         "operationId": "CancelTransferJob",
         "parameters": [
           {
@@ -1492,6 +1492,10 @@
         "properties": {
           "destinationDirectory": {
             "type": "string"
+          },
+          "expectedArchiveCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -2384,7 +2388,9 @@
           "failures",
           "recentCompletions",
           "bytesPerSecond",
-          "filesPerSecond"
+          "filesPerSecond",
+          "expansionBytesWritten",
+          "expansionBytesDeclared"
         ],
         "type": "object",
         "properties": {
@@ -2459,6 +2465,23 @@
           "filesPerSecond": {
             "type": "number",
             "format": "double"
+          },
+          "expandingArchive": {
+            "type": "string",
+            "nullable": true
+          },
+          "expansionBytesWritten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expansionBytesDeclared": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expandedFileCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -2478,7 +2501,9 @@
           "failures",
           "recentCompletions",
           "bytesPerSecond",
-          "filesPerSecond"
+          "filesPerSecond",
+          "expansionBytesWritten",
+          "expansionBytesDeclared"
         ],
         "type": "object",
         "properties": {
@@ -2553,6 +2578,23 @@
           "filesPerSecond": {
             "type": "number",
             "format": "double"
+          },
+          "expandingArchive": {
+            "type": "string",
+            "nullable": true
+          },
+          "expansionBytesWritten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expansionBytesDeclared": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expandedFileCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "nullable": true
@@ -2563,7 +2605,6 @@
           "Receiving",
           "Sealed",
           "Completed",
-          "Cancelling",
           "Cancelled",
           "Abandoned",
           "Aborted"

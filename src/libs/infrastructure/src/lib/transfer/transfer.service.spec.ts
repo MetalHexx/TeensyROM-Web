@@ -30,6 +30,9 @@ class MockXMLHttpRequest {
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onabort: (() => void) | null = null;
+  upload = {
+    onprogress: null as ((e: { loaded: number }) => void) | null,
+  };
 
   constructor() {
     MockXMLHttpRequest.instances.push(this);
@@ -113,24 +116,41 @@ describe('TransferService', () => {
     it('maps a successful create response into the domain snapshot', async () => {
       mockApi.createTransferJob.mockResolvedValue({ jobId: 'job-1', job: jobDto });
 
-      const snapshot = await service.createJob('device-1', StorageType.Sd, '/games');
+      const snapshot = await service.createJob('device-1', StorageType.Sd, '/games', 2);
 
       expect(snapshot.jobId).toBe('job-1');
       expect(snapshot.state).toBe(TransferJobState.Created);
       expect(mockApi.createTransferJob).toHaveBeenCalledWith({
         deviceId: 'device-1',
         storageType: 'SD',
-        createJobBody: { destinationDirectory: '/games' },
+        createJobBody: { destinationDirectory: '/games', expectedArchiveCount: 2 },
+      });
+    });
+
+    it('sends an expectedArchiveCount of 0 for an archive-free drop', async () => {
+      mockApi.createTransferJob.mockResolvedValue({ jobId: 'job-1', job: jobDto });
+
+      await service.createJob('device-1', StorageType.Sd, '/games', 0);
+
+      expect(mockApi.createTransferJob).toHaveBeenCalledWith({
+        deviceId: 'device-1',
+        storageType: 'SD',
+        createJobBody: { destinationDirectory: '/games', expectedArchiveCount: 0 },
       });
     });
 
     it('surfaces TransferDeviceBusyError with the holding job id on a 409', async () => {
-      const response = new Response(JSON.stringify({ title: 'Device busy', activeJobId: 'job-42' }), {
-        status: 409,
-      });
+      const response = new Response(
+        JSON.stringify({ title: 'Device busy', activeJobId: 'job-42' }),
+        {
+          status: 409,
+        }
+      );
       mockApi.createTransferJob.mockRejectedValue(new ResponseError(response, 'error'));
 
-      const error = await service.createJob('device-1', StorageType.Sd, '/games').catch((e) => e);
+      const error = await service
+        .createJob('device-1', StorageType.Sd, '/games', 0)
+        .catch((e) => e);
 
       expect(error).toBeInstanceOf(TransferDeviceBusyError);
       expect((error as TransferDeviceBusyError).activeJobId).toBe('job-42');
@@ -140,7 +160,7 @@ describe('TransferService', () => {
       const response = new Response(JSON.stringify({ title: 'Bad destination' }), { status: 400 });
       mockApi.createTransferJob.mockRejectedValue(new ResponseError(response, 'error'));
 
-      const error = await service.createJob('device-1', StorageType.Sd, '/bad').catch((e) => e);
+      const error = await service.createJob('device-1', StorageType.Sd, '/bad', 0).catch((e) => e);
 
       expect(error).toBeInstanceOf(TransferCreateRejectedError);
     });
@@ -171,12 +191,13 @@ describe('TransferService', () => {
       expect(mockApi.sealTransferJob).toHaveBeenCalledWith({ jobId: 'job-1' });
     });
 
-    it('cancels a job through TransfersApiService', async () => {
+    it('cancels a job through TransfersApiService and returns the post-cancel snapshot', async () => {
       mockApi.cancelTransferJob.mockResolvedValue({ job: jobDto });
 
-      await service.cancelJob('job-1');
+      const snapshot = await service.cancelJob('job-1');
 
       expect(mockApi.cancelTransferJob).toHaveBeenCalledWith({ jobId: 'job-1' });
+      expect(snapshot.jobId).toBe('job-1');
     });
   });
 
@@ -192,8 +213,18 @@ describe('TransferService', () => {
       (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = originalXhr;
     });
 
-    function upload(relativePath: string, signal: AbortSignal): { promise: Promise<void>; xhr: MockXMLHttpRequest } {
-      const promise = service.uploadFile('job-1', new File(['data'], 'file.prg'), relativePath, signal);
+    function upload(
+      relativePath: string,
+      signal: AbortSignal,
+      onProgress?: (bytesUploaded: number) => void
+    ): { promise: Promise<void>; xhr: MockXMLHttpRequest } {
+      const promise = service.uploadFile(
+        'job-1',
+        new File(['data'], 'file.prg'),
+        relativePath,
+        signal,
+        onProgress
+      );
       const xhr = MockXMLHttpRequest.instances[MockXMLHttpRequest.instances.length - 1];
       return { promise, xhr };
     }
@@ -203,7 +234,9 @@ describe('TransferService', () => {
       const { xhr } = upload('games/sub dir/game.prg', controller.signal);
 
       expect(xhr.url).toBe(
-        `http://localhost:5168/api/transfers/job-1/files?Path=${encodeURIComponent('games/sub dir/game.prg')}`
+        `http://localhost:5168/api/transfers/job-1/files?Path=${encodeURIComponent(
+          'games/sub dir/game.prg'
+        )}`
       );
       expect(xhr.method).toBe('POST');
       expect(xhr.headers['Content-Type']).toBe('application/octet-stream');
@@ -272,6 +305,25 @@ describe('TransferService', () => {
 
       await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
       expect(xhr.aborted).toBe(true);
+    });
+
+    it('reports absolute bytes for this file from the upload object as progress arrives', () => {
+      const controller = new AbortController();
+      const onProgress = vi.fn();
+      const { xhr } = upload('game.prg', controller.signal, onProgress);
+
+      xhr.upload.onprogress?.({ loaded: 512 });
+      xhr.upload.onprogress?.({ loaded: 1024 });
+
+      expect(onProgress).toHaveBeenNthCalledWith(1, 512);
+      expect(onProgress).toHaveBeenNthCalledWith(2, 1024);
+    });
+
+    it('stays silent when no progress callback is passed', () => {
+      const controller = new AbortController();
+      const { xhr } = upload('game.prg', controller.signal);
+
+      expect(() => xhr.upload.onprogress?.({ loaded: 512 })).not.toThrow();
     });
   });
 });

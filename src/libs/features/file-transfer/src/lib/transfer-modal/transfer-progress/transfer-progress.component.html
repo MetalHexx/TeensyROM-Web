@@ -43,38 +43,48 @@
 
       @case ('active') {
         <dl class="metrics" data-testid="transfer-progress-metrics">
-          <div class="metric" data-testid="metric-uploaded" [class.metric-success]="uploadedTileSuccess()">
-            <dt class="metric-label">Uploaded</dt>
+          <div class="metric" data-testid="metric-upload-api" [class.metric-success]="uploadedTileSuccess()">
+            <dt class="metric-label">UPLOAD → API</dt>
             <dd class="metric-value" aria-hidden="true">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }}</dd>
+            <dd class="metric-sub" aria-hidden="true">{{ rateLabel() }} {{ uploadRateLabel() }}</dd>
+            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }} uploaded, {{ uploadRateSpokenLabel() }}</dd>
           </div>
-          <div class="metric" data-testid="metric-written">
-            <dt class="metric-label">Completed</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
+          <div class="metric" data-testid="metric-upload-tr">
+            <dt class="metric-label">UPLOAD → TR</dt>
+            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}@if (vm().expandedTotal !== null) {<span class="metric-of">/ {{ vm().expandedTotal | number }}</span>}</dd>
+            <dd class="metric-sub" aria-hidden="true">{{ rateLabel() }} {{ bytesPerSecondLabel() }}</dd>
+            <dd class="visually-hidden">{{ vm().written | number }}@if (vm().expandedTotal !== null) { of {{ vm().expandedTotal | number }}} written, {{ bytesPerSecondSpokenLabel() }}</dd>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
             <dt class="metric-label">Failed</dt>
             <dd class="metric-value">{{ vm().failed | number }}</dd>
           </div>
-          <div class="metric" data-testid="metric-rate">
-            <dt class="metric-label">{{ rateLabel() }}</dt>
-            <dd class="metric-value" aria-hidden="true">{{ filesPerSecondLabel() }}</dd>
-            <dd class="metric-sub" aria-hidden="true">{{ bytesPerSecondLabel() }}</dd>
-            <dd class="visually-hidden">{{ filesPerSecondSpokenLabel() }}, {{ bytesPerSecondSpokenLabel() }}</dd>
-          </div>
         </dl>
 
         <div class="write-bars">
+          @if (vm().hasArchive) {
+            <div class="write-bar">
+              <div class="write-bar-caption">
+                <span>Expanding archives</span>
+                <span class="write-bar-pct expansion-slot"
+                      data-testid="expansion-bar-pct"
+                      [class.write-bar-pct-success]="expansionComplete()">{{ expansionSlotText() }}</span>
+              </div>
+              <mat-progress-bar class="write-bar-track" data-testid="expansion-bar"
+                aria-label="Expanding archives"
+                [class.progress-success]="expansionComplete()"
+                mode="determinate" [value]="vm().expansionPercent"></mat-progress-bar>
+            </div>
+          }
           <div class="write-bar">
             <div class="write-bar-caption">
-              <span>Transferred to API</span>
+              <span>UPLOAD → API</span>
               <span class="write-bar-pct" data-testid="api-bar-pct" [class.write-bar-pct-success]="apiBarSuccess()">{{ vm().apiPercent }}%</span>
             </div>
             <mat-progress-bar
               class="write-bar-track"
               data-testid="api-bar"
-              aria-label="Transferred to API"
+              aria-label="UPLOAD → API"
               [class.progress-success]="apiBarSuccess()"
               mode="determinate"
               [value]="vm().apiPercent"
@@ -82,13 +92,13 @@
           </div>
           <div class="write-bar">
             <div class="write-bar-caption">
-              <span>Transferred to TR</span>
+              <span>UPLOAD → TR</span>
               <span class="write-bar-pct" data-testid="device-bar-pct">{{ vm().devicePercent }}%</span>
             </div>
             <mat-progress-bar
               class="write-bar-track"
               data-testid="device-bar"
-              aria-label="Transferred to TR"
+              aria-label="UPLOAD → TR"
               mode="determinate"
               [value]="vm().devicePercent"
             ></mat-progress-bar>
@@ -120,31 +130,6 @@
         </div>
       }
 
-      @case ('cancelling') {
-        <dl class="metrics metrics-muted" data-testid="transfer-progress-metrics">
-          <div class="metric" data-testid="metric-uploaded">
-            <dt class="metric-label">Uploaded</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }}</dd>
-          </div>
-          <div class="metric" data-testid="metric-written">
-            <dt class="metric-label">Completed</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
-          </div>
-          <div class="metric metric-failed" data-testid="metric-failed">
-            <dt class="metric-label">Failed</dt>
-            <dd class="metric-value">{{ vm().failed | number }}</dd>
-          </div>
-          <div class="metric" data-testid="metric-rate">
-            <dt class="metric-label">{{ rateLabel() }}</dt>
-            <dd class="metric-value" aria-hidden="true">{{ filesPerSecondLabel() }}</dd>
-            <dd class="metric-sub" aria-hidden="true">{{ bytesPerSecondLabel() }}</dd>
-            <dd class="visually-hidden">{{ filesPerSecondSpokenLabel() }}, {{ bytesPerSecondSpokenLabel() }}</dd>
-          </div>
-        </dl>
-      }
-
       @case ('terminal') {
         @if (terminalBannerTreatment()) {
           <div
@@ -163,38 +148,34 @@
         }
 
         <dl class="metrics" data-testid="transfer-progress-metrics">
-          <div class="metric" data-testid="metric-uploaded" [class.metric-success]="uploadedTileSuccess()">
-            <dt class="metric-label">Uploaded</dt>
+          <div class="metric" data-testid="metric-upload-api" [class.metric-success]="uploadedTileSuccess()">
+            <dt class="metric-label">UPLOAD → API</dt>
             <dd class="metric-value" aria-hidden="true">{{ vm().uploaded | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }}</dd>
+            <dd class="metric-sub" aria-hidden="true">{{ rateLabel() }} {{ uploadRateLabel() }}</dd>
+            <dd class="visually-hidden">{{ vm().uploaded | number }} of {{ vm().scanTotal | number }} uploaded, {{ uploadRateSpokenLabel() }}</dd>
           </div>
-          <div class="metric" data-testid="metric-written">
-            <dt class="metric-label">Completed</dt>
-            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}<span class="metric-of">/ {{ vm().scanTotal | number }}</span></dd>
-            <dd class="visually-hidden">{{ vm().written | number }} of {{ vm().scanTotal | number }}</dd>
+          <div class="metric" data-testid="metric-upload-tr">
+            <dt class="metric-label">UPLOAD → TR</dt>
+            <dd class="metric-value" aria-hidden="true">{{ vm().written | number }}@if (vm().expandedTotal !== null) {<span class="metric-of">/ {{ vm().expandedTotal | number }}</span>}</dd>
+            <dd class="metric-sub" aria-hidden="true">{{ rateLabel() }} {{ bytesPerSecondLabel() }}</dd>
+            <dd class="visually-hidden">{{ vm().written | number }}@if (vm().expandedTotal !== null) { of {{ vm().expandedTotal | number }}} written, {{ bytesPerSecondSpokenLabel() }}</dd>
           </div>
           <div class="metric metric-failed" data-testid="metric-failed">
             <dt class="metric-label">Failed</dt>
             <dd class="metric-value">{{ vm().failed | number }}</dd>
-          </div>
-          <div class="metric" data-testid="metric-rate">
-            <dt class="metric-label">{{ rateLabel() }}</dt>
-            <dd class="metric-value" aria-hidden="true">{{ filesPerSecondLabel() }}</dd>
-            <dd class="metric-sub" aria-hidden="true">{{ bytesPerSecondLabel() }}</dd>
-            <dd class="visually-hidden">{{ filesPerSecondSpokenLabel() }}, {{ bytesPerSecondSpokenLabel() }}</dd>
           </div>
         </dl>
 
         <div class="write-bars">
           <div class="write-bar">
             <div class="write-bar-caption">
-              <span>Transferred to API</span>
+              <span>UPLOAD → API</span>
               <span class="write-bar-pct" data-testid="api-bar-pct" [class.write-bar-pct-success]="apiBarSuccess()">{{ vm().apiPercent }}%</span>
             </div>
             <mat-progress-bar
               class="write-bar-track"
               data-testid="api-bar"
-              aria-label="Transferred to API"
+              aria-label="UPLOAD → API"
               [class.progress-success]="apiBarSuccess()"
               mode="determinate"
               [value]="vm().apiPercent"
@@ -202,13 +183,13 @@
           </div>
           <div class="write-bar">
             <div class="write-bar-caption">
-              <span>Transferred to TR</span>
+              <span>UPLOAD → TR</span>
               <span class="write-bar-pct" data-testid="device-bar-pct">{{ vm().devicePercent }}%</span>
             </div>
             <mat-progress-bar
               class="write-bar-track"
               data-testid="device-bar"
-              aria-label="Transferred to TR"
+              aria-label="UPLOAD → TR"
               mode="determinate"
               [value]="vm().devicePercent"
             ></mat-progress-bar>
@@ -268,16 +249,6 @@
       }
       @case ('active') {
         <lib-action-button icon="close" label="Cancel transfer" color="error" [fullWidth]="false" (buttonClick)="onCancel()"></lib-action-button>
-      }
-      @case ('cancelling') {
-        <lib-action-button
-          icon="close"
-          label="Cancel transfer"
-          color="error"
-          [disabled]="true"
-          [fullWidth]="false"
-          (buttonClick)="onCancel()"
-        ></lib-action-button>
       }
       @case ('terminal') {
         <lib-action-button icon="close" label="Close" color="normal" [fullWidth]="false" (buttonClick)="onClose()"></lib-action-button>

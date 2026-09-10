@@ -25,6 +25,12 @@ export interface CreateJobBody {
      * @memberof CreateJobBody
      */
     destinationDirectory?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof CreateJobBody
+     */
+    expectedArchiveCount?: number;
 }
 
 /**
@@ -45,6 +51,7 @@ export function CreateJobBodyFromJSONTyped(json: any, ignoreDiscriminator: boole
     return {
         
         'destinationDirectory': json['destinationDirectory'] == null ? undefined : json['destinationDirectory'],
+        'expectedArchiveCount': json['expectedArchiveCount'] == null ? undefined : json['expectedArchiveCount'],
     };
 }
 
@@ -60,6 +67,7 @@ export function CreateJobBodyToJSONTyped(value?: CreateJobBody | null, ignoreDis
     return {
         
         'destinationDirectory': value['destinationDirectory'],
+        'expectedArchiveCount': value['expectedArchiveCount'],
     };
 }
 
