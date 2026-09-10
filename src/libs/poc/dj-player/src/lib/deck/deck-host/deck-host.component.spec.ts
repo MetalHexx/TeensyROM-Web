@@ -604,6 +604,75 @@ describe('DeckHostComponent', () => {
       expect(readoutText()).toBe('0.350x');
     });
 
+    function speedJumpButton(label: string): HTMLButtonElement {
+      return Array.from(
+        fixture.nativeElement.querySelectorAll<HTMLButtonElement>('lib-jump-button-group button')
+      ).find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
+    }
+
+    describe('the speed jump excursion', () => {
+      it("drives the jump buttons through the player's setTempo, clamped to the hard span", () => {
+        speedJumpButton('+50%').click();
+
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1.5);
+      });
+
+      it('restores home exactly on the opposite button, closing the excursion', () => {
+        speedJumpButton('+50%').click();
+        speedJumpButton('−50%').click();
+
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1);
+      });
+
+      it('routes Home through the same excursion module', () => {
+        speedJumpButton('+50%').click();
+        speedJumpButton('Home').click();
+
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1);
+      });
+
+      it('remembers the fader-set multiplier, not the excursion module’s own stale tracking', () => {
+        player.snapshot.update((snapshot) => ({
+          ...snapshot,
+          tempo: { ...snapshot.tempo, multiplier: 1.2 },
+        }));
+        fixture.detectChanges();
+
+        speedJumpButton('+50%').click(); // must remember 1.2, not the module's own stale value of 1
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1.7);
+
+        speedJumpButton('−50%').click(); // opposite button — must restore exactly 1.2
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1.2);
+      });
+    });
+
+    it("reflects a voice's muted state as its own hold-button label and state caption, from the player's snapshot", () => {
+      function voiceStateText(voice: number): string | undefined {
+        return (
+          fixture.nativeElement.querySelectorAll('.voice-state')[voice] as HTMLElement
+        ).textContent?.trim();
+      }
+      function holdLabel(voice: number): string | undefined {
+        return (
+          fixture.nativeElement.querySelectorAll('.voice-hold')[voice] as HTMLButtonElement
+        ).textContent?.trim();
+      }
+
+      expect(voiceStateText(0)).toBe('audible');
+      expect(holdLabel(0)).toBe('Kill');
+
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        voices: snapshot.voices.map((voice, index) =>
+          index === 0 ? { ...voice, muted: true } : voice
+        ),
+      }));
+      fixture.detectChanges();
+
+      expect(voiceStateText(0)).toBe('muted');
+      expect(holdLabel(0)).toBe('Punch In');
+    });
+
     describe('scrubbing', () => {
       // An 80-second tune at 50 Hz — the basis a released scrub is resolved against.
       const POSITION_BASIS_FRAMES = 4_000;
