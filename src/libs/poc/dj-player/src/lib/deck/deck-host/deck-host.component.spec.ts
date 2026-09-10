@@ -254,6 +254,30 @@ describe('DeckHostComponent', () => {
       expect(firstPitchSpy).toHaveBeenCalledWith(2, 2);
       expect(secondPitchSpy).not.toHaveBeenCalledWith(0, 2);
     });
+
+    it("gives each deck's transport its own accessible names, so two decks on the page never collide", () => {
+      const first = build(DECKS[0]);
+      first.fixture.detectChanges();
+      const second = build(DECKS[1]);
+      second.fixture.detectChanges();
+
+      const playLabel = (fixture: ComponentFixture<DeckHostComponent>) =>
+        (fixture.nativeElement as HTMLElement)
+          .querySelector('button[aria-label^="Play deck "]')
+          ?.getAttribute('aria-label');
+      const positionLabel = (fixture: ComponentFixture<DeckHostComponent>) =>
+        (fixture.nativeElement as HTMLElement)
+          .querySelector('input[type="range"]')
+          ?.getAttribute('aria-label');
+
+      expect(playLabel(first.fixture)).toBe(`Play deck ${DECKS[0].label}`);
+      expect(playLabel(second.fixture)).toBe(`Play deck ${DECKS[1].label}`);
+      expect(playLabel(first.fixture)).not.toBe(playLabel(second.fixture));
+
+      expect(positionLabel(first.fixture)).toBe(`Position deck ${DECKS[0].label}`);
+      expect(positionLabel(second.fixture)).toBe(`Position deck ${DECKS[1].label}`);
+      expect(positionLabel(first.fixture)).not.toBe(positionLabel(second.fixture));
+    });
   });
 
   describe('template wiring, over mocked collaborators', () => {
@@ -462,6 +486,51 @@ describe('DeckHostComponent', () => {
       fixture.detectChanges();
       expect(transportButton('Stop').disabled).toBe(false);
       expect(transportButton('Pause').disabled).toBe(false);
+    });
+
+    it('gates the subtune stepper on a loaded tune with more than one subtune', () => {
+      tuneLoader.currentTune.set(fakeSidFile());
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tune: { subtune: 1, subtuneCount: 1, lengthFrames: null },
+      }));
+      fixture.detectChanges();
+
+      const previousButton = fixture.nativeElement.querySelector(
+        `[aria-label="Previous subtune deck ${DECKS[0].label}"]`
+      ) as HTMLButtonElement;
+      const nextButton = fixture.nativeElement.querySelector(
+        `[aria-label="Next subtune deck ${DECKS[0].label}"]`
+      ) as HTMLButtonElement;
+      expect(previousButton.disabled).toBe(true);
+      expect(nextButton.disabled).toBe(true);
+
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tune: { subtune: 1, subtuneCount: 3, lengthFrames: null },
+      }));
+      fixture.detectChanges();
+
+      expect(previousButton.disabled).toBe(false);
+      expect(nextButton.disabled).toBe(false);
+    });
+
+    it("renders both the player's own error and the tune loader's parse error as alerts, together", () => {
+      function alertTexts(): (string | null | undefined)[] {
+        return Array.from(
+          fixture.nativeElement.querySelectorAll('[role="alert"]')
+        ).map((element) => (element as HTMLElement).textContent?.trim());
+      }
+
+      expect(alertTexts()).toEqual([]);
+
+      player.snapshot.update((snapshot) => ({ ...snapshot, error: 'player blew up' }));
+      fixture.detectChanges();
+      expect(alertTexts()).toEqual(['player blew up']);
+
+      tuneLoader.tuneError.set('not a valid SID file');
+      fixture.detectChanges();
+      expect(alertTexts()).toEqual(['player blew up', 'not a valid SID file']);
     });
 
     it("reflects and writes the player's repeatTrack from the repeat toggle, persisting it under this deck's own key", () => {
