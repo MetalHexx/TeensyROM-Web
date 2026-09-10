@@ -72,3 +72,5 @@ export * from './lib/voice-row/voice-row.component';
 export * from './lib/voice-panel/voice-panel.component';
 export * from './lib/jump-button-group/jump-button-group.component';
 export * from './lib/speed-panel/speed-panel.component';
+export * from './lib/marker-slot/marker-slot.component';
+export * from './lib/marker-row/marker-row.component';

@@ -1,0 +1,66 @@
+<span class="marker-sub-tag">{{ tag() }}</span>
+
+@if (model(); as slot) {
+  <span class="marker-frame">{{ slot.frameLabel }}</span>
+  <button
+    type="button"
+    class="marker-snap marker-snap-prev"
+    [attr.aria-label]="slot.previousAccessibleName"
+    [disabled]="slot.previousDisabled"
+    (click)="snapPrevious.emit()"
+  >
+    ◂
+  </button>
+  <div class="marker-nudge">
+    <div class="marker-nudge-centre"></div>
+    <div class="marker-ticks" aria-hidden="true">
+      @for (offset of slot.tickOffsets; track offset) {
+        <div class="marker-tick" [style.left.%]="tickLeftPercent(offset)"></div>
+      }
+    </div>
+    <input
+      type="range"
+      [min]="-slot.nudgeRange"
+      [max]="slot.nudgeRange"
+      step="1"
+      [attr.aria-label]="slot.nudgeAccessibleName"
+      [value]="slot.nudgeValue"
+      (input)="onNudgeInput($event)"
+      (change)="onNudgeCommit($event)"
+    />
+  </div>
+  <button
+    type="button"
+    class="marker-snap marker-snap-next"
+    [attr.aria-label]="slot.nextAccessibleName"
+    [disabled]="slot.nextDisabled"
+    (click)="snapNext.emit()"
+  >
+    ▸
+  </button>
+  <span class="marker-offset">{{ slot.offsetLabel }}</span>
+} @else {
+  <span class="marker-frame marker-frame--empty" aria-hidden="true">empty</span>
+  <button
+    type="button"
+    class="marker-snap marker-snap-prev marker-snap--empty"
+    aria-hidden="true"
+    tabindex="-1"
+    disabled
+  >
+    ◂
+  </button>
+  <div class="marker-nudge marker-nudge--empty" aria-hidden="true">
+    <div class="marker-nudge-centre"></div>
+  </div>
+  <button
+    type="button"
+    class="marker-snap marker-snap-next marker-snap--empty"
+    aria-hidden="true"
+    tabindex="-1"
+    disabled
+  >
+    ▸
+  </button>
+  <span class="marker-offset marker-offset--empty" aria-hidden="true">—</span>
+}
