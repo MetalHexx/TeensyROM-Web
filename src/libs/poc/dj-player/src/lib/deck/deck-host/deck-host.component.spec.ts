@@ -329,6 +329,8 @@ describe('DeckHostComponent', () => {
       selectedPortId: WritableSignal<string | null>;
       lastError: WritableSignal<string | null>;
       restore: ReturnType<typeof vi.fn>;
+      selectPort: ReturnType<typeof vi.fn>;
+      identify: ReturnType<typeof vi.fn>;
     };
     let tuneLoader: {
       availableTunes: WritableSignal<readonly TuneSource[]>;
@@ -370,6 +372,8 @@ describe('DeckHostComponent', () => {
         selectedPortId: signal<string | null>(null),
         lastError: signal<string | null>(null),
         restore: vi.fn(),
+        selectPort: vi.fn(),
+        identify: vi.fn(),
       };
       tuneLoader = {
         availableTunes: signal<readonly TuneSource[]>([
@@ -971,6 +975,43 @@ describe('DeckHostComponent', () => {
         fixture.detectChanges();
 
         expect(identifyButton.disabled).toBe(true);
+      });
+
+      it("enabling MIDI requests page-level access, then restores this deck's own binding", async () => {
+        const requestAccessSpy = vi.spyOn(midiAccess(), 'requestAccess');
+
+        byLabel<HTMLButtonElement>(`Enable MIDI deck ${DECKS[0].label}`).click();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(requestAccessSpy).toHaveBeenCalled();
+        expect(binding.restore).toHaveBeenCalled();
+      });
+
+      it("forwards the selected port to this deck's own binding", () => {
+        midiAccess().accessState.set('granted');
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        fixture.detectChanges();
+
+        const select = fixture.nativeElement.querySelector(
+          'lib-binding-card select'
+        ) as HTMLSelectElement;
+        const option = select.querySelector('option[value="port-1"]') as HTMLOptionElement;
+        option.selected = true;
+        select.dispatchEvent(new Event('change'));
+
+        expect(binding.selectPort).toHaveBeenCalledWith('port-1');
+      });
+
+      it("identifies through this deck's own binding, naming the port by its enumerated position", () => {
+        midiAccess().accessState.set('granted');
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        binding.selectedPortId.set('port-1');
+        fixture.detectChanges();
+
+        byLabel<HTMLButtonElement>(`Identify deck ${DECKS[0].label}`).click();
+
+        expect(binding.identify).toHaveBeenCalledWith('ASID-DJ-0 PORT 1');
       });
     });
   });

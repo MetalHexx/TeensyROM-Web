@@ -50,6 +50,7 @@ export class VoiceRowComponent {
   /** Emits on hold button press (`true`) and release/cancel (`false`). Momentary; both press and release are meaningful. */
   readonly heldChange = output<boolean>();
 
+  /** Forwards the mute checkbox's toggled state. */
   protected onMutedChange(event: Event): void {
     this.mutedChange.emit((event.target as HTMLInputElement).checked);
   }

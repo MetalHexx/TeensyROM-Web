@@ -71,6 +71,7 @@ export class BindingCardComponent {
   /** Emits when the Identify button is pressed. */
   readonly identify = output<void>();
 
+  /** Forwards the selected port's id, or '' for the placeholder. */
   protected onSelectPort(event: Event): void {
     this.portSelect.emit((event.target as HTMLSelectElement).value);
   }
