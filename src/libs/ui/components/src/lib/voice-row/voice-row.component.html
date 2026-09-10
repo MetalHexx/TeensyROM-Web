@@ -1,0 +1,25 @@
+<div class="voice-row-line">
+  <input
+    type="checkbox"
+    [id]="model().checkboxId"
+    [attr.aria-label]="model().muteAccessibleName"
+    [checked]="model().muted"
+    (change)="onMutedChange($event)"
+  />
+  <label [for]="model().checkboxId">{{ model().label }}</label>
+</div>
+
+<span class="voice-state">{{ model().stateText }}</span>
+
+<button
+  type="button"
+  class="voice-hold"
+  [attr.aria-label]="model().holdAccessibleName"
+  (pointerdown)="onHoldStart($event)"
+  (pointerup)="onHoldEnd()"
+  (pointercancel)="onHoldEnd()"
+  (keydown)="onHoldKeyDown($event)"
+  (keyup)="onHoldKeyUp($event)"
+>
+  {{ model().holdLabel }}
+</button>
