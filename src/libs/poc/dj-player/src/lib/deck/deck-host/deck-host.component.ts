@@ -9,15 +9,28 @@ import {
   type OnDestroy,
   type OnInit,
 } from '@angular/core';
-import { clamp, createSidPlayer, createWorkerReplayRunner, VOICE_COUNT } from '@sidablist/core';
+import {
+  clamp,
+  createSidPlayer,
+  createWorkerReplayRunner,
+  milliseconds,
+  msToPlayCalls,
+  playCallIntervalUs,
+  VOICE_COUNT,
+} from '@sidablist/core';
 import { createAsidSink } from '@sidablist/asid';
 import {
+  LoopsCuesPanelComponent,
   SpeedPanelComponent,
   TransportPanelComponent,
   VoicePanelComponent,
 } from '@teensyrom-nx/ui/components';
 import type {
   JumpButtonModel,
+  LoopsCuesPanelModel,
+  MarkerRowAction,
+  MarkerRowModel,
+  MarkerSlotModel,
   ScrubBarState,
   SpeedPanelModel,
   StatusLedState,
@@ -28,7 +41,9 @@ import type {
 import { ScriptProcessorFrameClock } from '../../clock/frame-clock';
 import { ANALYSIS_SCANNER } from '../../analysis/scan-runner';
 import { WorkerAnalysisScanner } from '../../analysis/worker-analysis-scanner';
+import { nextMomentOffset, reachableMomentOffsets } from '../../analysis/marker-moments';
 import { TuneIndexService } from '../../analysis/tune-index.service';
+import type { DetectedMoment } from '../../analysis/tune-index.model';
 import { positionBasisFor, timelineBasisFor } from '../../analysis/tune-length';
 import type { DetectedLoopFrames } from '../../analysis/tune-length';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
@@ -46,10 +61,9 @@ import {
 import { DeckRegistry } from '../deck-registry';
 import { DeckTuneLoader } from '../deck-tune-loader';
 import type { DeckDescriptor } from '../deck.config';
-import { MarkerCollection } from '../marker-collection';
+import { MarkerCollection, NUDGE_RANGE_MS } from '../marker-collection';
 import { loadRepeatTrackPreference, saveRepeatTrackPreference } from '../repeat-track';
 import { createSpeedExcursion, SPEED_HARD_SPAN, SPEED_INPUT_SPAN } from '../speed-excursion';
-import { LoopsCuesPanelComponent } from '../loops-cues-panel/loops-cues-panel.component';
 import { BindingCardComponent } from '../binding-card/binding-card.component';
 
 /** The `grid-area` name each of this deck's four panels claims in the page's own `.grid` — computed
@@ -60,6 +74,13 @@ export interface DeckPanelAreas {
   readonly voiceSpeed: string;
   readonly loopsCues: string;
   readonly binding: string;
+}
+
+const MICROSECONDS_PER_MILLISECOND = 1000;
+
+/** Signed and unit-suffixed, as a nudge row reads it: `+0 fr`, `−7 fr`. */
+function offsetLabel(offset: number): string {
+  return `${offset < 0 ? '−' : '+'}${Math.abs(offset)} fr`;
 }
 
 /** Text for the state LED's adjacent label — the colour reinforces this, it never replaces it.
@@ -95,13 +116,13 @@ const createReplayWorker = (): Worker =>
  * this component would otherwise draw. No deck-owned code decides what those area names are: the
  * page computes them from `DECKS`' own order and this component only applies whichever it is handed.
  *
- * It is also the adapter for whichever of those panels the shared library owns: Transport, Voice and
- * Speed are all presentational and inject nothing, so this component composes each one's whole model
- * from this deck's collaborators and turns its outputs back into player, tune-loader and preference
- * writes. Loops/Cues and Binding still reach this component's own injector directly, until their own
- * lift lands. Everything an adapted panel needs lives in that panel's own commented section below, in
- * the order the sections arrive — model, per-frame computeds and output handlers together, never
- * interleaved.
+ * It is also the adapter for whichever of those panels the shared library owns: Transport, Voice,
+ * Speed and Loops/Cues are all presentational and inject nothing, so this component composes each
+ * one's whole model from this deck's collaborators and turns its outputs back into player,
+ * tune-loader, marker-collection and preference writes. Binding still reaches this component's own
+ * injector directly, until its own lift lands. Everything an adapted panel needs lives in that
+ * panel's own commented section below, in the order the sections arrive — model, per-frame computeds
+ * and output handlers together, never interleaved.
  *
  * Everything that used to sit in this component's own sidebar — Timing, the loaded tune's own
  * read-only fields, Tune Index and Diagnostics — and the Track Analysis panel beside it, are gone
@@ -531,5 +552,276 @@ export class DeckHostComponent implements OnInit, OnDestroy {
         this.speedExcursion.jumpDown();
         return;
     }
+  }
+
+  // ── Loops/Cues ─────────────────────────────────────────────────────────────────────────────────
+
+  // Marker index → the start offset being dragged right now. Absent means "not dragging that
+  // marker's start". Re-entering a point seeks and re-arms, so the commit has to wait for the
+  // release rather than following every drag tick.
+  private readonly startDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
+
+  // Marker index → the end offset being dragged right now. Kept purely so the readout tracks the
+  // thumb; the commit itself waits for release, because it also auditions the seam.
+  private readonly endDragOffsets = signal<ReadonlyMap<number, number>>(new Map());
+
+  /** The nudge range in the slider's own frames. Derived from the stored real-time range at the
+   *  tune's own rate, so the felt window is the same on a 1x tune and a 2x-multispeed one. */
+  private readonly nudgeRange = computed<number>(() => this.msToFrames(NUDGE_RANGE_MS));
+
+  /** Empty between loads and for a tune with no stored moments. */
+  private readonly moments = computed<readonly DetectedMoment[]>(
+    () => this.tuneIndex.record()?.detectedMoments ?? []
+  );
+
+  /**
+   * The whole marker list except its per-frame progress strips.
+   *
+   * Nudges are drawn in frames and stored in real time. Each slot's slider, ticks and readout are
+   * all frame counts, because a stored moment is a frame number and a tick has to land on one;
+   * `MarkerCollection` holds the committed offset in milliseconds so a row's felt range is the same
+   * on a 1x tune and a 2x-multispeed one. This adapter is the one place the two meet — see
+   * `msToFrames`/`framesToMs`.
+   */
+  protected readonly loopsCuesModel = computed<LoopsCuesPanelModel>(() => {
+    const label = this.context.label();
+    const moments = this.moments();
+    const nudgeRange = this.nudgeRange();
+    const launchPending = this.markers.markerLaunchPending();
+    const looping = this.markers.loopingMarker();
+    const queued = this.markers.queuedMarker();
+
+    const rows: readonly MarkerRowModel[] = this.markers.markers().map((marker, index) => {
+      const number = index + 1;
+      const startOffset = this.displayedMarkerStartOffset(index);
+      const startFrame = marker.startFrame + startOffset;
+      const start: MarkerSlotModel = {
+        frameLabel: `frame ${startFrame}`,
+        offsetLabel: offsetLabel(startOffset),
+        nudgeValue: startOffset,
+        nudgeRange,
+        tickOffsets: reachableMomentOffsets(moments, marker.startFrame, nudgeRange),
+        previousDisabled:
+          nextMomentOffset(moments, marker.startFrame, startOffset, nudgeRange, -1) === null,
+        nextDisabled:
+          nextMomentOffset(moments, marker.startFrame, startOffset, nudgeRange, 1) === null,
+        nudgeAccessibleName: `Nudge marker ${number} start deck ${label}`,
+        previousAccessibleName: `Snap marker ${number} start to previous moment deck ${label}`,
+        nextAccessibleName: `Snap marker ${number} start to next moment deck ${label}`,
+      };
+
+      const savedEnd = marker.end;
+      let end: MarkerSlotModel | null = null;
+      let loopLengthLabel: string | null = null;
+      if (savedEnd !== null) {
+        const endOffset = this.displayedMarkerEndOffset(index);
+        const endFrame = savedEnd.frame + endOffset;
+        end = {
+          frameLabel: `frame ${endFrame}`,
+          offsetLabel: offsetLabel(endOffset),
+          nudgeValue: endOffset,
+          nudgeRange,
+          tickOffsets: reachableMomentOffsets(moments, savedEnd.frame, nudgeRange),
+          previousDisabled:
+            nextMomentOffset(moments, savedEnd.frame, endOffset, nudgeRange, -1) === null,
+          nextDisabled:
+            nextMomentOffset(moments, savedEnd.frame, endOffset, nudgeRange, 1) === null,
+          nudgeAccessibleName: `Nudge marker ${number} end deck ${label}`,
+          previousAccessibleName: `Snap marker ${number} end to previous moment deck ${label}`,
+          nextAccessibleName: `Snap marker ${number} end to next moment deck ${label}`,
+        };
+        loopLengthLabel = `Loop Length: ${endFrame - startFrame} fr`;
+      }
+
+      return {
+        number: String(number),
+        state: looping === index ? 'active' : queued === index ? 'queued' : 'idle',
+        // A delete racing an in-flight trigger would reindex the collection out from under it, so
+        // both go out of reach on every row for the span of a launch.
+        triggerDisabled: launchPending,
+        deleteDisabled: launchPending,
+        loopLengthLabel,
+        start,
+        end,
+        triggerAccessibleName: `Trigger marker ${number} deck ${label}`,
+        setEndAccessibleName: `Set end for marker ${number} deck ${label}`,
+        revertAccessibleName: `Revert marker ${number} to cue deck ${label}`,
+        deleteAccessibleName: `Delete marker ${number} deck ${label}`,
+      };
+    });
+
+    return {
+      accessibleName: `Loops/Cues deck ${label}`,
+      addAccessibleName: `Add marker deck ${label}`,
+      stopAccessibleName: `Stop loop deck ${label}`,
+      rows,
+    };
+  });
+
+  /** 0–100 per row, non-zero only for the marker currently looping. Its own computed rather than a
+   *  field of `loopsCuesModel`: reading the polled playhead is what makes the strip re-render as the
+   *  lap advances, and folding that into the model would rebuild every marker slot — and re-run
+   *  every reachable-moment lookup — sixty times a second. The position read has to come before
+   *  `progressPercentFor`, which pulls the position again for the arithmetic itself. */
+  protected readonly loopsCuesRowProgressPercents = computed<readonly number[]>(() =>
+    this.markers.markers().map((_, index) => {
+      this.view.position();
+      return this.markers.progressPercentFor(index);
+    })
+  );
+
+  /** A real-time nudge in frames — the same conversion `MarkerCollection` applies when it resolves a
+   *  row, so what a readout draws and the frame actually played agree. */
+  private msToFrames(ms: number): number {
+    const { nominalIntervalUs, rate } = this.view.snapshot().tempo;
+    return msToPlayCalls(milliseconds(ms), nominalIntervalUs, rate);
+  }
+
+  /** The inverse, applied once at the commit: the collection stores real time, the slider works in
+   *  frames. */
+  private framesToMs(frameCount: number): number {
+    const { nominalIntervalUs, rate } = this.view.snapshot().tempo;
+    return Math.round(
+      (frameCount * playCallIntervalUs(nominalIntervalUs, rate)) / MICROSECONDS_PER_MILLISECOND
+    );
+  }
+
+  /** The start offset a marker's row shows, in frames: the live drag while one is in flight, the
+   *  committed value otherwise. */
+  private displayedMarkerStartOffset(index: number): number {
+    const committed = this.markers.markers()[index]?.startOffsetMs ?? 0;
+    return this.startDragOffsets().get(index) ?? this.msToFrames(committed);
+  }
+
+  /** The end offset a marker's row shows — mirrors `displayedMarkerStartOffset`. */
+  private displayedMarkerEndOffset(index: number): number {
+    const committed = this.markers.markers()[index]?.end?.offsetMs ?? 0;
+    return this.endDragOffsets().get(index) ?? this.msToFrames(committed);
+  }
+
+  /** Captures a marker at this deck's playhead. */
+  protected onAddMarker(): void {
+    this.markers.addMarker();
+  }
+
+  /** Ends whichever marker is looping — one panel-level control, not a per-row stop. */
+  protected onStopLoop(): void {
+    this.markers.stopMarkerLoop();
+  }
+
+  /** Routes one row's control back to this deck's collection. `index` is the row's position in
+   *  `loopsCuesModel().rows`, which is also its index in the collection. Nudge drags move the
+   *  readout only — committing seeks and re-arms the loop, so running one per drag tick would put a
+   *  steady stream of jumps beside the audio callback. */
+  protected onMarkerRowAction(event: {
+    index: number;
+    action: MarkerRowAction;
+    value?: number;
+  }): void {
+    const { index, action } = event;
+    const value = event.value ?? 0;
+    switch (action) {
+      case 'trigger':
+        void this.markers.triggerMarker(index);
+        return;
+      case 'setEnd':
+        this.markers.setMarkerEnd(index);
+        return;
+      case 'clearEnd':
+        this.markers.clearMarkerEnd(index);
+        return;
+      case 'delete':
+        this.markers.deleteMarker(index);
+        return;
+      case 'startNudgeInput':
+        this.startDragOffsets.update((offsets) => new Map(offsets).set(index, value));
+        return;
+      case 'startNudgeCommit':
+        this.commitStartOffset(index, value);
+        return;
+      case 'startSnapPrevious':
+        this.snapMarkerStart(index, -1);
+        return;
+      case 'startSnapNext':
+        this.snapMarkerStart(index, 1);
+        return;
+      case 'endNudgeInput':
+        this.endDragOffsets.update((offsets) => new Map(offsets).set(index, value));
+        return;
+      case 'endNudgeCommit':
+        this.commitEndOffset(index, value);
+        return;
+      case 'endSnapPrevious':
+        this.snapMarkerEnd(index, -1);
+        return;
+      case 'endSnapNext':
+        this.snapMarkerEnd(index, 1);
+        return;
+    }
+  }
+
+  // Routes through the same commit a slider release makes: clearing the drag-offset entry matters
+  // just as much as the offset itself — a stale entry there would otherwise win over the committed
+  // value in `displayedMarkerStartOffset`.
+  private snapMarkerStart(index: number, direction: -1 | 1): void {
+    const next = this.nextStartMomentOffset(index, direction);
+    if (next === null) return;
+    this.commitStartOffset(index, next);
+  }
+
+  // Mirrors `snapMarkerStart`.
+  private snapMarkerEnd(index: number, direction: -1 | 1): void {
+    const next = this.nextEndMomentOffset(index, direction);
+    if (next === null) return;
+    this.commitEndOffset(index, next);
+  }
+
+  /** Commits a frame offset as the real time the collection stores, then auditions so the operator
+   *  hears where the point now lands. Auditions bypass the queue by design — a setup gesture, not a
+   *  performance trigger. Clearing the drag entry matters as much as the commit: a stale entry there
+   *  would otherwise win over the committed value in `displayedMarkerStartOffset`. */
+  private commitStartOffset(index: number, offsetFrames: number): void {
+    this.markers.setMarkerStartOffset(index, this.framesToMs(offsetFrames));
+    void this.markers.auditionMarkerStart(index);
+    this.startDragOffsets.update((offsets) => {
+      const next = new Map(offsets);
+      next.delete(index);
+      return next;
+    });
+  }
+
+  /** Mirrors `commitStartOffset`. */
+  private commitEndOffset(index: number, offsetFrames: number): void {
+    this.markers.setMarkerEndOffset(index, this.framesToMs(offsetFrames));
+    void this.markers.auditionMarkerEnd(index);
+    this.endDragOffsets.update((offsets) => {
+      const next = new Map(offsets);
+      next.delete(index);
+      return next;
+    });
+  }
+
+  private nextStartMomentOffset(index: number, direction: -1 | 1): number | null {
+    const marker = this.markers.markers()[index] ?? null;
+    if (marker === null) return null;
+    return nextMomentOffset(
+      this.moments(),
+      marker.startFrame,
+      this.displayedMarkerStartOffset(index),
+      this.nudgeRange(),
+      direction
+    );
+  }
+
+  private nextEndMomentOffset(index: number, direction: -1 | 1): number | null {
+    const end = this.markers.markers()[index]?.end ?? null;
+    if (end === null) return null;
+    return nextMomentOffset(
+      this.moments(),
+      end.frame,
+      this.displayedMarkerEndOffset(index),
+      this.nudgeRange(),
+      direction
+    );
   }
 }

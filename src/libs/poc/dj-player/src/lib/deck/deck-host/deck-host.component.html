@@ -27,5 +27,12 @@
     (jump)="onSpeedJump($event)"
   />
 </div>
-<lib-loops-cues-panel [style.gridArea]="areas().loopsCues" />
+<lib-loops-cues-panel
+  [style.gridArea]="areas().loopsCues"
+  [model]="loopsCuesModel()"
+  [rowProgressPercents]="loopsCuesRowProgressPercents()"
+  (addMarker)="onAddMarker()"
+  (stopLoop)="onStopLoop()"
+  (rowAction)="onMarkerRowAction($event)"
+/>
 <lib-binding-card [style.gridArea]="areas().binding" />

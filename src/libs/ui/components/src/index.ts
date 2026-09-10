@@ -74,3 +74,4 @@ export * from './lib/jump-button-group/jump-button-group.component';
 export * from './lib/speed-panel/speed-panel.component';
 export * from './lib/marker-slot/marker-slot.component';
 export * from './lib/marker-row/marker-row.component';
+export * from './lib/loops-cues-panel/loops-cues-panel.component';

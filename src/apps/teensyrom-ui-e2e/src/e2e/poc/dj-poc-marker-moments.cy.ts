@@ -96,15 +96,15 @@ function seededRecord(): SeededTuneIndexRecord {
 function capturedStartFrame(): Cypress.Chainable<number> {
   return cy
     .get('[aria-label="Trigger marker 1 deck A"]')
-    .closest('.marker-row')
-    .find('.marker-slot')
+    .closest('lib-marker-row')
+    .find('lib-marker-slot')
     .first()
     .find('.marker-frame')
     .invoke('text')
     .then((text) => Number(text.replace('frame', '').trim()));
 }
 
-/** True once every direct child of `.marker-slot` sits on the track's own single flex line — a child
+/** True once every direct child of `lib-marker-slot` sits on the track's own single flex line — a child
  *  that actually wrapped lands a full line below the rest, not merely a pixel or two off from
  *  `align-items: center` rounding between controls of different heights. */
 function assertSingleLine(slot: JQuery<HTMLElement>): void {
@@ -177,23 +177,23 @@ describe('DJ Poc marker rows — real-browser tick alignment and reflow', () => 
     it(`does not reflow a captured row's marker-slot at ${width}px wide`, () => {
       cy.viewport(width, 900);
       cy.get('[aria-label="Trigger marker 1 deck A"]')
-        .closest('.marker-row')
-        .find('.marker-slot')
+        .closest('lib-marker-row')
+        .find('lib-marker-slot')
         .first()
         .then(($slot) => assertSingleLine($slot));
     });
 
     it(`does not reflow an empty row's placeholder marker-slot at ${width}px wide`, () => {
       cy.viewport(width, 900);
-      // `addMarker()` (`loops-cues-panel.component.ts`) captures marker 2 with no end already set,
-      // so its End sub-slot (the second `.marker-slot`, per the `@else` branch in
-      // `loops-cues-panel.component.html`) renders the empty placeholder markup by construction —
-      // no separate clear step exists or is needed. The Start slot (the first `.marker-slot`) has
+      // `MarkerCollection.addMarker()` captures marker 2 with no end already set, so its End
+      // sub-slot (the second `lib-marker-slot`, per the `@else` branch in
+      // `marker-slot.component.html`) renders the empty placeholder markup by construction — no
+      // separate clear step exists or is needed. The Start slot (the first `lib-marker-slot`) has
       // no empty variant at all; it always renders a captured frame.
       cy.get('[aria-label="Add marker deck A"]').click();
       cy.get('[aria-label="Trigger marker 2 deck A"]')
-        .closest('.marker-row')
-        .find('.marker-slot')
+        .closest('lib-marker-row')
+        .find('lib-marker-slot')
         .last()
         .then(($slot) => assertSingleLine($slot));
     });

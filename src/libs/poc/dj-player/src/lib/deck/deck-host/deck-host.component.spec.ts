@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Injector, signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { frames } from '@sidablist/core';
+import { frames, PAL_FRAME_INTERVAL_US } from '@sidablist/core';
 import type { SidFile, SidPlayer } from '@sidablist/core';
 import { DeckHostComponent } from './deck-host.component';
 import type { DeckPanelAreas } from './deck-host.component';
@@ -27,7 +27,7 @@ import {
   TUNE_INDEX_STORAGE,
   LocalStorageTuneIndexStorage,
 } from '../../analysis/tune-index-storage';
-import type { TuneIndexRecord } from '../../analysis/tune-index.model';
+import type { DetectedMoment, TuneIndexRecord } from '../../analysis/tune-index.model';
 import { MixerService } from '../../mixer/mixer.service';
 import {
   createFakeAsidSink,
@@ -49,6 +49,27 @@ function silentTune(): SidFile {
 
 function markerWithStart(frame: number): SavedMarker {
   return { startFrame: frame as SavedMarker['startFrame'], startOffsetMs: 0, end: null };
+}
+
+function markerWithLoop(startFrame: number, endFrame: number): SavedMarker {
+  return {
+    startFrame: frames(startFrame),
+    startOffsetMs: 0,
+    end: { frame: frames(endFrame), offsetMs: 0 },
+  };
+}
+
+/** A `TuneIndexRecord` standing in for the one field the marker adapter reads off it — the rest are
+ *  never touched on this path, so a full record would only add noise here. */
+function recordWithMoments(moments: readonly DetectedMoment[]): TuneIndexRecord {
+  return { detectedMoments: moments } as unknown as TuneIndexRecord;
+}
+
+/** The adapter draws nudges in frames and commits them as the real time `MarkerCollection` stores;
+ *  these specs state their intent in frames and convert here, at the same PAL rate the fake
+ *  player's default snapshot reports. */
+function committedMs(offsetFrames: number): number {
+  return Math.round((offsetFrames * PAL_FRAME_INTERVAL_US) / 1000);
 }
 
 /** Deck-host under test carries no ancestor `.grid` for these to actually position anything against
@@ -294,6 +315,14 @@ describe('DeckHostComponent', () => {
       stopMarkerLoop: ReturnType<typeof vi.fn>;
       noticeLoopPosition: ReturnType<typeof vi.fn>;
       noticeActiveLoop: ReturnType<typeof vi.fn>;
+      triggerMarker: ReturnType<typeof vi.fn>;
+      setMarkerEnd: ReturnType<typeof vi.fn>;
+      clearMarkerEnd: ReturnType<typeof vi.fn>;
+      deleteMarker: ReturnType<typeof vi.fn>;
+      setMarkerStartOffset: ReturnType<typeof vi.fn>;
+      setMarkerEndOffset: ReturnType<typeof vi.fn>;
+      auditionMarkerStart: ReturnType<typeof vi.fn>;
+      auditionMarkerEnd: ReturnType<typeof vi.fn>;
     };
     let binding: {
       sink: FakeAsidSink | null;
@@ -327,6 +356,14 @@ describe('DeckHostComponent', () => {
         stopMarkerLoop: vi.fn(),
         noticeLoopPosition: vi.fn(),
         noticeActiveLoop: vi.fn(),
+        triggerMarker: vi.fn().mockResolvedValue(undefined),
+        setMarkerEnd: vi.fn(),
+        clearMarkerEnd: vi.fn(),
+        deleteMarker: vi.fn(),
+        setMarkerStartOffset: vi.fn(),
+        setMarkerEndOffset: vi.fn(),
+        auditionMarkerStart: vi.fn().mockResolvedValue(undefined),
+        auditionMarkerEnd: vi.fn().mockResolvedValue(undefined),
       };
       binding = {
         sink: null,
@@ -736,12 +773,165 @@ describe('DeckHostComponent', () => {
         return 0;
       });
 
-      const addButton = fixture.nativeElement.querySelector(
-        `[aria-label="Loops/Cues deck ${DECKS[0].label}"] .panel-header-actions button`
-      ) as HTMLButtonElement;
-      addButton.click();
+      byLabel<HTMLButtonElement>('Add marker deck A').click();
 
       expect(collection.addMarker).toHaveBeenCalled();
+    });
+
+    function byLabel<T extends Element>(label: string): T {
+      const element = (fixture.nativeElement as HTMLElement).querySelector(
+        `[aria-label="${label}"]`
+      );
+      if (!element) throw new Error(`no element labelled ${label}`);
+      return element as unknown as T;
+    }
+
+    describe('the Loops/Cues marker adapter', () => {
+      function markerRow(index: number): HTMLElement {
+        return (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'lib-marker-row'
+        )[index];
+      }
+
+      /** `.marker-offset` renders once per slot, Start first — the readout that reports whichever
+       *  offset the adapter currently considers displayed. */
+      function offsetText(row: number, side: 'start' | 'end'): string | undefined {
+        return markerRow(row)
+          .querySelectorAll<HTMLElement>('.marker-offset')
+          [side === 'start' ? 0 : 1].textContent?.trim();
+      }
+
+      it("routes each row's header controls to that row's own entry in the collection", () => {
+        collection.markers.set([markerWithStart(0), markerWithLoop(100, 400)]);
+        fixture.detectChanges();
+
+        byLabel<HTMLButtonElement>('Trigger marker 2 deck A').click();
+        byLabel<HTMLButtonElement>('Set end for marker 1 deck A').click();
+        byLabel<HTMLButtonElement>('Revert marker 2 to cue deck A').click();
+        byLabel<HTMLButtonElement>('Delete marker 1 deck A').click();
+        byLabel<HTMLButtonElement>('Stop loop deck A').click();
+
+        expect(collection.triggerMarker).toHaveBeenCalledWith(1);
+        expect(collection.setMarkerEnd).toHaveBeenCalledWith(0);
+        expect(collection.clearMarkerEnd).toHaveBeenCalledWith(1);
+        expect(collection.deleteMarker).toHaveBeenCalledWith(0);
+        expect(collection.stopMarkerLoop).toHaveBeenCalled();
+      });
+
+      it('gates Trigger and Delete alike on markerLaunchPending, leaving Set End reachable', () => {
+        collection.markers.set([markerWithStart(0)]);
+        fixture.detectChanges();
+
+        expect(byLabel<HTMLButtonElement>('Trigger marker 1 deck A').disabled).toBe(false);
+        expect(byLabel<HTMLButtonElement>('Delete marker 1 deck A').disabled).toBe(false);
+
+        collection.markerLaunchPending.set(true);
+        fixture.detectChanges();
+
+        expect(byLabel<HTMLButtonElement>('Trigger marker 1 deck A').disabled).toBe(true);
+        expect(byLabel<HTMLButtonElement>('Delete marker 1 deck A').disabled).toBe(true);
+        expect(byLabel<HTMLButtonElement>('Set end for marker 1 deck A').disabled).toBe(false);
+      });
+
+      it('moves the readout only while a start nudge is dragged, committing nothing', () => {
+        collection.markers.set([markerWithStart(1_000)]);
+        fixture.detectChanges();
+
+        const nudge = byLabel<HTMLInputElement>('Nudge marker 1 start deck A');
+        nudge.value = '5';
+        nudge.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+
+        expect(offsetText(0, 'start')).toBe('+5 fr');
+        expect(collection.setMarkerStartOffset).not.toHaveBeenCalled();
+      });
+
+      it('commits a released start nudge as real time and clears its drag entry', () => {
+        collection.markers.set([markerWithStart(1_000)]);
+        fixture.detectChanges();
+
+        const nudge = byLabel<HTMLInputElement>('Nudge marker 1 start deck A');
+        nudge.value = '5';
+        nudge.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        nudge.value = '8';
+        nudge.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+
+        expect(collection.setMarkerStartOffset).toHaveBeenCalledWith(0, committedMs(8));
+        expect(collection.auditionMarkerStart).toHaveBeenCalledWith(0);
+        expect(collection.setMarkerStartOffset.mock.invocationCallOrder[0]).toBeLessThan(
+          collection.auditionMarkerStart.mock.invocationCallOrder[0]
+        );
+        // The mock never writes the offset back onto `markers()`, so the readout falling back to
+        // the marker's own (unchanged) offset rather than staying at the stale +5 fr drag value is
+        // what shows the drag entry was cleared, not merely overwritten by a newer drag.
+        expect(offsetText(0, 'start')).toBe('+0 fr');
+      });
+
+      it('commits a snapped start nudge down the same path, drag entry and all', () => {
+        collection.markers.set([markerWithStart(1_000)]);
+        // Clustered, irregularly-spaced moments around the captured frame: a near one just past the
+        // offset the drag left the thumb at, a further one still inside the window, and one outside
+        // it entirely.
+        tuneIndexService.record.set(
+          recordWithMoments([
+            { frame: 1_008, strength: 0.9 },
+            { frame: 1_034, strength: 0.6 },
+            { frame: 1_240, strength: 0.95 },
+          ])
+        );
+        fixture.detectChanges();
+
+        const nudge = byLabel<HTMLInputElement>('Nudge marker 1 start deck A');
+        nudge.value = '5';
+        nudge.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        expect(offsetText(0, 'start')).toBe('+5 fr');
+
+        byLabel<HTMLButtonElement>('Snap marker 1 start to next moment deck A').click();
+        fixture.detectChanges();
+
+        // From a displayed offset of +5 the next reachable moment strictly beyond it is +8 — the
+        // same commit a slider released at 8 would have made, drag entry cleared included.
+        expect(collection.setMarkerStartOffset).toHaveBeenCalledWith(0, committedMs(8));
+        expect(collection.auditionMarkerStart).toHaveBeenCalledWith(0);
+        expect(offsetText(0, 'start')).toBe('+0 fr');
+      });
+
+      it('mirrors the whole commit path for the end boundary', () => {
+        collection.markers.set([markerWithLoop(1_000, 5_000)]);
+        tuneIndexService.record.set(recordWithMoments([{ frame: 4_990, strength: 0.5 }]));
+        fixture.detectChanges();
+
+        const nudge = byLabel<HTMLInputElement>('Nudge marker 1 end deck A');
+        nudge.value = '4';
+        nudge.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        expect(offsetText(0, 'end')).toBe('+4 fr');
+
+        byLabel<HTMLButtonElement>('Snap marker 1 end to previous moment deck A').click();
+        fixture.detectChanges();
+
+        expect(collection.setMarkerEndOffset).toHaveBeenCalledWith(0, committedMs(-10));
+        expect(collection.auditionMarkerEnd).toHaveBeenCalledWith(0);
+        expect(offsetText(0, 'end')).toBe('+0 fr');
+      });
+
+      it("re-reads every row's progress strip as the polled playhead advances", () => {
+        collection.markers.set([markerWithStart(0)]);
+        collection.progressPercentFor.mockImplementation(() => player.position() / 10);
+        player.position.set(frames(250));
+        fixture.detectChanges();
+
+        const fill = markerRow(0).querySelector('.marker-progress-fill') as HTMLElement;
+        expect(fill.style.width).toBe('25%');
+
+        player.position.set(frames(700));
+        fixture.detectChanges();
+
+        expect(fill.style.width).toBe('70%');
+      });
     });
   });
 });
