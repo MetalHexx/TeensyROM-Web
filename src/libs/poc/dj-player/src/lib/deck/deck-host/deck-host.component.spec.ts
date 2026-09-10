@@ -282,7 +282,7 @@ describe('DeckHostComponent', () => {
       currentTune: WritableSignal<SidFile | null>;
       tuneError: WritableSignal<string | null>;
       selectTune: ReturnType<typeof vi.fn>;
-      onFilePicked: ReturnType<typeof vi.fn>;
+      loadPickedFile: ReturnType<typeof vi.fn>;
     };
     let tuneIndexService: {
       pending: WritableSignal<boolean>;
@@ -317,7 +317,7 @@ describe('DeckHostComponent', () => {
         currentTune: signal<SidFile | null>(null),
         tuneError: signal<string | null>(null),
         selectTune: vi.fn(),
-        onFilePicked: vi.fn(),
+        loadPickedFile: vi.fn(),
       };
       tuneIndexService = {
         pending: signal<boolean>(false),
@@ -423,20 +423,45 @@ describe('DeckHostComponent', () => {
       expect(player.player.stop).toHaveBeenCalled();
     });
 
-    it('gates Play on a loaded tune, a selected MIDI port and an idle deck', () => {
-      function playButton(): HTMLButtonElement {
-        return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
-          (button) => button.textContent?.trim() === 'Play'
-        ) as HTMLButtonElement;
-      }
+    function transportButton(text: string): HTMLButtonElement {
+      const root = fixture.nativeElement as HTMLElement;
+      return Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) => button.textContent?.trim() === text
+      ) as HTMLButtonElement;
+    }
 
-      expect(playButton().disabled).toBe(true);
+    it('gates Play on a loaded tune, a selected MIDI port, an idle deck and no scan in flight', () => {
+      expect(transportButton('Play').disabled).toBe(true);
 
       tuneLoader.currentTune.set(fakeSidFile());
       binding.selectedPortId.set('port-1');
       fixture.detectChanges();
 
-      expect(playButton().disabled).toBe(false);
+      expect(transportButton('Play').disabled).toBe(false);
+
+      tuneIndexService.pending.set(true);
+      fixture.detectChanges();
+
+      expect(transportButton('Play').disabled).toBe(true);
+    });
+
+    it('keeps Stop and Pause reachable during a scan the deck is playing through, unlike a freshly loaded one', () => {
+      tuneLoader.currentTune.set(fakeSidFile());
+      fixture.detectChanges();
+      expect(transportButton('Stop').disabled).toBe(false);
+
+      // A freshly loaded tune scanning: the deck sits stopped where the load left it, and the load
+      // starts it itself once the scan settles — there is nothing there to stop.
+      tuneIndexService.pending.set(true);
+      fixture.detectChanges();
+      expect(transportButton('Stop').disabled).toBe(true);
+
+      // The same scan raised by a subtune step mid-playback. Both gates read the raw transport, so
+      // neither is fooled by the `analyzing` state spliced in for the LED.
+      player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
+      fixture.detectChanges();
+      expect(transportButton('Stop').disabled).toBe(false);
+      expect(transportButton('Pause').disabled).toBe(false);
     });
 
     it("reflects and writes the player's repeatTrack from the repeat toggle, persisting it under this deck's own key", () => {
@@ -462,7 +487,77 @@ describe('DeckHostComponent', () => {
 
       button?.click();
 
+      // The panel emits the source's id only; resolving it back to the loader's own TuneSource is
+      // this component's job.
       expect(tuneLoader.selectTune).toHaveBeenCalledWith(tuneLoader.availableTunes()[0]);
+    });
+
+    it('hands a picked file straight to the tune loader', () => {
+      const file = new File([new Uint8Array([1])], 'mytune.sid');
+      const input = fixture.nativeElement.querySelector('input[type="file"]') as HTMLInputElement;
+      // jsdom refuses a `files` assignment, so the picked list is defined over the real element.
+      Object.defineProperty(input, 'files', { value: [file], configurable: true });
+
+      input.dispatchEvent(new Event('change'));
+
+      expect(tuneLoader.loadPickedFile).toHaveBeenCalledWith(file);
+    });
+
+    describe('scrubbing', () => {
+      // An 80-second tune at 50 Hz — the basis a released scrub is resolved against.
+      const POSITION_BASIS_FRAMES = 4_000;
+
+      beforeEach(() => {
+        player.snapshot.update((snapshot) => ({
+          ...snapshot,
+          basis: { ...snapshot.basis, positionBasisFrames: frames(POSITION_BASIS_FRAMES) },
+        }));
+        fixture.detectChanges();
+      });
+
+      function scrubTrack(): HTMLInputElement {
+        return fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement;
+      }
+
+      /** Drags the thumb to `percent` and releases it. */
+      function dragTo(percent: number): void {
+        const track = scrubTrack();
+        track.value = String(percent);
+        track.dispatchEvent(new Event('input'));
+        track.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+      }
+
+      it('seeks to the released percentage of the basis the playhead is read against', async () => {
+        dragTo(25);
+        await Promise.resolve();
+
+        expect(collection.stopMarkerLoop).toHaveBeenCalled();
+        expect(player.player.seek).toHaveBeenCalledWith(frames(1_000));
+      });
+
+      it('holds the thumb where it was released until the seek lands, then follows the playhead again', async () => {
+        let landSeek = (): void => undefined;
+        vi.mocked(player.player.seek).mockImplementationOnce(
+          () => new Promise<void>((resolve) => (landSeek = resolve))
+        );
+
+        dragTo(25);
+
+        // The stale playhead the seek has not moved yet — without the pin the thumb snaps back here
+        // and then forward again once the jump lands.
+        player.position.set(frames(0));
+        fixture.detectChanges();
+        expect(Number(scrubTrack().value)).toBe(25);
+
+        landSeek();
+        await Promise.resolve();
+        await Promise.resolve();
+        player.position.set(frames(2_000));
+        fixture.detectChanges();
+
+        expect(Number(scrubTrack().value)).toBe(50);
+      });
     });
 
     it('adds a marker to the collection from the Loops/Cues panel Add control', () => {

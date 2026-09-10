@@ -174,7 +174,7 @@ trusting a change; each was last run end to end for `P09-T06`, with results belo
    the Cypress specs in step 2/3 cover exactly this and are real evidence, not a stand-in.
 
    Play, scrub during playback, tempo, voice mute, subtune stepping and "identify" all sit behind
-   `canPlay()`/a selected MIDI port (`transport-panel.component.ts`), which in turn sits behind
+   `canPlay`/a selected MIDI port (`deck-host.component.ts`), which in turn sits behind
    `navigator.requestMIDIAccess()` actually reporting a port. **This only exercises for real with a
    MIDI-capable browser session** — a connected TeensyROM cartridge, at minimum a virtual MIDI port on
    the host. A plain CI runner or a sandboxed agent has neither (confirmed here:

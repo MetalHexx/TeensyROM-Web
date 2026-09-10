@@ -67,3 +67,4 @@ export * from './lib/deck-strip/deck-strip.component';
 export * from './lib/status-led/status-led.component';
 export * from './lib/stepper/stepper.component';
 export * from './lib/scrub-position-bar/scrub-position-bar.component';
+export * from './lib/transport-panel/transport-panel.component';

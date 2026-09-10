@@ -95,19 +95,17 @@ describe('DeckTuneLoader', () => {
     });
   });
 
-  describe('onFilePicked', () => {
-    function pickedFileEvent(name: string, bytes: Uint8Array): Event {
+  describe('loadPickedFile', () => {
+    function pickedFile(name: string, bytes: Uint8Array): File {
       // jsdom's File has no working arrayBuffer(); a minimal stand-in is enough since only the
       // hand-off — not File parsing itself — is under test here.
-      const file = { name, arrayBuffer: () => Promise.resolve(bytes.buffer) } as unknown as File;
-      const input = { files: [file], value: 'stale.sid' } as unknown as HTMLInputElement;
-      return { target: input } as unknown as Event;
+      return { name, arrayBuffer: () => Promise.resolve(bytes.buffer) } as unknown as File;
     }
 
     it('adds the picked file to availableTunes and hands its own name to the tune index', async () => {
       const before = loader.availableTunes().length;
 
-      const pending = loader.onFilePicked(pickedFileEvent('mytune.sid', validSidBytes()));
+      const pending = loader.loadPickedFile(pickedFile('mytune.sid', validSidBytes()));
       await vi.waitFor(() => expect(tuneIndex.setTune).toHaveBeenCalled());
       resolveSetTune();
       await pending;
@@ -119,33 +117,13 @@ describe('DeckTuneLoader', () => {
       );
     });
 
-    it('clears the input value so the same file can be re-picked later in the session', async () => {
-      const event = pickedFileEvent('mytune.sid', validSidBytes());
-      const input = event.target as HTMLInputElement;
-
-      const pending = loader.onFilePicked(event);
-      expect(input.value).toBe('');
-
-      await vi.waitFor(() => expect(tuneIndex.setTune).toHaveBeenCalled());
-      resolveSetTune();
-      await pending;
-    });
-
     it('sets a tune error on an unparsable picked file, without adding it to availableTunes', async () => {
       const before = loader.availableTunes().length;
 
-      await loader.onFilePicked(pickedFileEvent('bad.sid', Uint8Array.from([1, 2, 3])));
+      await loader.loadPickedFile(pickedFile('bad.sid', Uint8Array.from([1, 2, 3])));
 
       expect(loader.tuneError()).toBeTruthy();
       expect(loader.availableTunes().length).toBe(before);
-    });
-
-    it('does nothing when no file was picked', async () => {
-      const input = { files: [], value: '' } as unknown as HTMLInputElement;
-
-      await loader.onFilePicked({ target: input } as unknown as Event);
-
-      expect(player.loadTune).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,4 +1,19 @@
-<lib-transport-panel [style.gridArea]="areas().transport" />
+<lib-transport-panel
+  [style.gridArea]="areas().transport"
+  [model]="transportModel()"
+  [positionPercent]="transportPositionPercent()"
+  [frameLabel]="transportFrameLabel()"
+  (playClick)="onPlay()"
+  (pauseClick)="onPause()"
+  (stopClick)="onStop()"
+  (repeatTrackChange)="onRepeatTrackChange($event)"
+  (tuneSelect)="onTuneSelect($event)"
+  (fileSelect)="onFileSelect($event)"
+  (previousSubtune)="onPreviousSubtune()"
+  (nextSubtune)="onNextSubtune()"
+  (scrubInput)="onScrubInput($event)"
+  (scrubCommit)="onScrubCommit($event)"
+/>
 <lib-voice-speed-column [style.gridArea]="areas().voiceSpeed" />
 <lib-loops-cues-panel [style.gridArea]="areas().loopsCues" />
 <lib-binding-card [style.gridArea]="areas().binding" />
