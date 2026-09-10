@@ -11,11 +11,19 @@ import {
 } from '@angular/core';
 import { clamp, createSidPlayer, createWorkerReplayRunner, VOICE_COUNT } from '@sidablist/core';
 import { createAsidSink } from '@sidablist/asid';
-import { TransportPanelComponent } from '@teensyrom-nx/ui/components';
+import {
+  SpeedPanelComponent,
+  TransportPanelComponent,
+  VoicePanelComponent,
+} from '@teensyrom-nx/ui/components';
 import type {
+  JumpButtonModel,
   ScrubBarState,
+  SpeedPanelModel,
   StatusLedState,
   TransportPanelModel,
+  VoicePanelModel,
+  VoiceRowModel,
 } from '@teensyrom-nx/ui/components';
 import { ScriptProcessorFrameClock } from '../../clock/frame-clock';
 import { ANALYSIS_SCANNER } from '../../analysis/scan-runner';
@@ -40,7 +48,7 @@ import { DeckTuneLoader } from '../deck-tune-loader';
 import type { DeckDescriptor } from '../deck.config';
 import { MarkerCollection } from '../marker-collection';
 import { loadRepeatTrackPreference, saveRepeatTrackPreference } from '../repeat-track';
-import { VoiceSpeedColumnComponent } from '../voice-speed-column/voice-speed-column.component';
+import { createSpeedExcursion, SPEED_HARD_SPAN, SPEED_INPUT_SPAN } from '../speed-excursion';
 import { LoopsCuesPanelComponent } from '../loops-cues-panel/loops-cues-panel.component';
 import { BindingCardComponent } from '../binding-card/binding-card.component';
 
@@ -80,19 +88,20 @@ const createReplayWorker = (): Worker =>
  * here is looked up by any sibling deck.
  *
  * `:host { display: contents }` — this component renders no box of its own. Its whole template is
- * the four performance-surface panels (`TransportPanelComponent`, `VoiceSpeedColumnComponent`,
- * `LoopsCuesPanelComponent`, `BindingCardComponent`), each carrying its own `grid-area` from the
- * `areas` input — so they render as direct items of the page's own `.grid` (see
- * `dj-poc-view.component.scss`) rather than of a box this component would otherwise draw. No
- * deck-owned code decides what those area names are: the page computes them from `DECKS`' own order
- * and this component only applies whichever it is handed.
+ * the deck's four performance-surface panels (`TransportPanelComponent`; `VoicePanelComponent` and
+ * `SpeedPanelComponent`, sharing the `voiceSpeed` grid area in one wrapper; `LoopsCuesPanelComponent`;
+ * `BindingCardComponent`), each carrying its own `grid-area` from the `areas` input — so they render
+ * as direct items of the page's own `.grid` (see `dj-poc-view.component.scss`) rather than of a box
+ * this component would otherwise draw. No deck-owned code decides what those area names are: the
+ * page computes them from `DECKS`' own order and this component only applies whichever it is handed.
  *
- * It is also the adapter for whichever of those panels the shared library owns: the transport panel
- * is presentational and injects nothing, so this component composes its whole model from this deck's
- * collaborators and turns its outputs back into player, tune-loader and preference writes. The other
- * three still reach this component's own injector directly, until their own lift lands. Everything
- * an adapted panel needs lives in that panel's own commented section below, in the order the
- * sections arrive — model, per-frame computeds and output handlers together, never interleaved.
+ * It is also the adapter for whichever of those panels the shared library owns: Transport, Voice and
+ * Speed are all presentational and inject nothing, so this component composes each one's whole model
+ * from this deck's collaborators and turns its outputs back into player, tune-loader and preference
+ * writes. Loops/Cues and Binding still reach this component's own injector directly, until their own
+ * lift lands. Everything an adapted panel needs lives in that panel's own commented section below, in
+ * the order the sections arrive — model, per-frame computeds and output handlers together, never
+ * interleaved.
  *
  * Everything that used to sit in this component's own sidebar — Timing, the loaded tune's own
  * read-only fields, Tune Index and Diagnostics — and the Track Analysis panel beside it, are gone
@@ -106,7 +115,8 @@ const createReplayWorker = (): Worker =>
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TransportPanelComponent,
-    VoiceSpeedColumnComponent,
+    VoicePanelComponent,
+    SpeedPanelComponent,
     LoopsCuesPanelComponent,
     BindingCardComponent,
   ],
@@ -420,6 +430,106 @@ export class DeckHostComponent implements OnInit, OnDestroy {
     await scrubToPercent(this.player, this.markers, value);
     if (this.scrubDragValue() === value) {
       this.scrubDragValue.set(null);
+    }
+  }
+
+  // ── Voice ──────────────────────────────────────────────────────────────────────────────────────
+
+  /** One row per voice, in playback order. `stateText` is the latched-XOR-held rule: the chip shows
+   *  what is actually happening, not what is latched. `checkboxId` keeps the POC's own
+   *  `voice-mute-<index>-<label>` shape so two decks on the page never collide. */
+  protected readonly voiceModel = computed<VoicePanelModel>(() => {
+    const label = this.context.label();
+    const rows: readonly VoiceRowModel[] = this.snapshot().voices.map((voice, index) => ({
+      label: `V${index + 1}`,
+      muted: voice.muted,
+      stateText: voice.muted !== voice.held ? 'muted' : 'audible',
+      holdLabel: voice.muted ? 'Punch In' : 'Kill',
+      checkboxId: `voice-mute-${index}-${label}`,
+      muteAccessibleName: `Mute voice ${index + 1} deck ${label}`,
+      holdAccessibleName: `${voice.muted ? 'Punch in' : 'Kill'} voice ${index + 1} deck ${label}`,
+    }));
+    return {
+      accessibleName: `Voice deck ${label}`,
+      rows,
+      clearAccessibleName: `Clear all voice mutes deck ${label}`,
+    };
+  });
+
+  /** `index` is the row's position in `voiceModel().rows`, which is also the voice number. */
+  protected onVoiceMutedChange(event: { index: number; muted: boolean }): void {
+    this.player.setVoiceMuted(event.index, event.muted);
+  }
+
+  /** `index` is the row's position in `voiceModel().rows`, which is also the voice number. */
+  protected onVoiceHeldChange(event: { index: number; held: boolean }): void {
+    this.player.setVoiceHeld(event.index, event.held);
+  }
+
+  protected onClearVoiceMutes(): void {
+    this.player.clearVoiceMutes();
+  }
+
+  // ── Speed ──────────────────────────────────────────────────────────────────────────────────────
+
+  private readonly speedMultiplier = computed(() => this.snapshot().tempo.multiplier);
+  private readonly minSpeed = 1 - SPEED_INPUT_SPAN;
+  private readonly maxSpeed = 1 + SPEED_INPUT_SPAN;
+
+  /** The excursion state machine — see `speed-excursion.ts`. Wired straight to the player's
+   *  `setTempo`, which rejects only what it cannot divide by, so the excursion's hard-span clamp is
+   *  the only one in force on this path. */
+  private readonly speedExcursion = createSpeedExcursion({
+    setTempo: (multiplier) => this.player.setTempo(multiplier),
+    getMultiplier: () => this.speedMultiplier(),
+    slowest: 1 - SPEED_HARD_SPAN,
+    fastest: 1 + SPEED_HARD_SPAN,
+  });
+
+  /** `faderValue` is the live multiplier pinned into `[min, max]` — display only, never written back
+   *  to the player, so a jump that carries the multiplier past the fader's own (narrower) span pins
+   *  the thumb instead of dragging the tempo back. */
+  protected readonly speedModel = computed<SpeedPanelModel>(() => {
+    const label = this.context.label();
+    const multiplier = this.speedMultiplier();
+    const jumpButtons: readonly JumpButtonModel[] = [
+      { id: 'up', label: '+50%', accessibleName: `Speed up 50% deck ${label}` },
+      { id: 'home', label: 'Home', accessibleName: `Speed home deck ${label}` },
+      { id: 'down', label: '−50%', accessibleName: `Speed down 50% deck ${label}` },
+    ];
+    return {
+      accessibleName: `Speed deck ${label}`,
+      valueText: `${multiplier.toFixed(3)}x`,
+      faderValue: clamp(multiplier, this.minSpeed, this.maxSpeed),
+      faderAccessibleName: `Speed multiplier deck ${label}`,
+      min: this.minSpeed,
+      max: this.maxSpeed,
+      step: 0.001,
+      jumpButtons,
+    };
+  });
+
+  /** The fader's own narrower span is applied here, not in core: how far a control may reach is the
+   *  application's to decide. */
+  protected onSpeedFaderChange(multiplier: number): void {
+    if (!Number.isFinite(multiplier)) {
+      return;
+    }
+    this.player.setTempo(clamp(multiplier, this.minSpeed, this.maxSpeed));
+  }
+
+  /** Routes the jump group's pressed id to the excursion machine — see `speed-excursion.ts`. */
+  protected onSpeedJump(id: string): void {
+    switch (id) {
+      case 'up':
+        this.speedExcursion.jumpUp();
+        return;
+      case 'home':
+        this.speedExcursion.home();
+        return;
+      case 'down':
+        this.speedExcursion.jumpDown();
+        return;
     }
   }
 }

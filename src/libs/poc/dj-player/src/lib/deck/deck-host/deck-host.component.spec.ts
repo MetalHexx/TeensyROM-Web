@@ -413,7 +413,7 @@ describe('DeckHostComponent', () => {
     it("applies each of this deck's four grid-area names, from the areas input, onto that panel and no other", () => {
       const panelSelectors: Record<keyof DeckPanelAreas, string> = {
         transport: 'lib-transport-panel',
-        voiceSpeed: 'lib-voice-speed-column',
+        voiceSpeed: '.voice-speed-column',
         loopsCues: 'lib-loops-cues-panel',
         binding: 'lib-binding-card',
       };
@@ -517,9 +517,9 @@ describe('DeckHostComponent', () => {
 
     it("renders both the player's own error and the tune loader's parse error as alerts, together", () => {
       function alertTexts(): (string | null | undefined)[] {
-        return Array.from(
-          fixture.nativeElement.querySelectorAll('[role="alert"]')
-        ).map((element) => (element as HTMLElement).textContent?.trim());
+        return Array.from(fixture.nativeElement.querySelectorAll('[role="alert"]')).map((element) =>
+          (element as HTMLElement).textContent?.trim()
+        );
       }
 
       expect(alertTexts()).toEqual([]);
@@ -570,6 +570,38 @@ describe('DeckHostComponent', () => {
       input.dispatchEvent(new Event('change'));
 
       expect(tuneLoader.loadPickedFile).toHaveBeenCalledWith(file);
+    });
+
+    it('pins the speed fader at its own bound once the multiplier is carried past it, while the readout keeps showing the real multiplier', () => {
+      function faderValue(): number {
+        const fader = fixture.nativeElement.querySelector(
+          `[aria-label="Speed multiplier deck ${DECKS[0].label}"]`
+        ) as HTMLInputElement;
+        return Number(fader.value);
+      }
+      function readoutText(): string | undefined {
+        return (
+          fixture.nativeElement.querySelector('.speed-value') as HTMLElement
+        ).textContent?.trim();
+      }
+
+      // A jump past the fader's own [0.5, 1.5] span (still inside the jump buttons' wider hard
+      // span) pins the thumb at the boundary rather than snapping the tempo display back.
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tempo: { ...snapshot.tempo, multiplier: 1.65 },
+      }));
+      fixture.detectChanges();
+      expect(faderValue()).toBe(1.5);
+      expect(readoutText()).toBe('1.650x');
+
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tempo: { ...snapshot.tempo, multiplier: 0.35 },
+      }));
+      fixture.detectChanges();
+      expect(faderValue()).toBe(0.5);
+      expect(readoutText()).toBe('0.350x');
     });
 
     describe('scrubbing', () => {

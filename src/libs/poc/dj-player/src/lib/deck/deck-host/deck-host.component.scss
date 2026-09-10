@@ -13,8 +13,8 @@
   // regardless of Angular's emulated view encapsulation — and regardless of `display: contents`,
   // which only removes this host's own box, never its place in that inheritance chain — so `:host`
   // stays the one place a deck-wide design token is declared, and `lib-transport-panel`,
-  // `lib-voice-speed-column`, `lib-loops-cues-panel` and `lib-binding-card` all read the same values
-  // from here.
+  // `lib-voice-panel`, `lib-speed-panel`, `lib-loops-cues-panel` and `lib-binding-card` all read the
+  // same values from here.
   --perf-control-height: 2rem;
 
   // POC-local semantic aliases over the app's theme tokens, so the drawn structure reads as one
@@ -38,4 +38,17 @@
   --chrome-knob: #6a6a80; // the toggle knob, off
   --chrome-dark: #33334a; // the deliberately-dark `stopped` light
   --chrome-dark-border: #44445c;
+}
+
+// `lib-voice-panel` and `lib-speed-panel` land in one grid area (`voiceSpeed`) as two independent
+// library panels stacked in a single column — the narrowest of the deck's four. This wrapper carries
+// only what belongs to neither panel: the column layout and its 4rem width; each panel brings its
+// own chrome.
+.voice-speed-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-width: 0;
+  min-height: 0;
+  width: 4rem;
 }

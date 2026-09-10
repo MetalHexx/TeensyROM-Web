@@ -1,0 +1,10 @@
+@for (button of buttons(); track button.id) {
+  <button
+    type="button"
+    [attr.aria-label]="button.accessibleName"
+    [disabled]="button.disabled ?? false"
+    (click)="jump.emit(button.id)"
+  >
+    {{ button.label }}
+  </button>
+}

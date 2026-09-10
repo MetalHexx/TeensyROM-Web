@@ -1,0 +1,13 @@
+// Order in the DOM is the visual order top to bottom — the caller decides what that means (for
+// Speed: +50%, Home, −50%, so Home lands between the two jumps).
+:host {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: var(--spacing-xs);
+}
+
+button {
+  width: 100%;
+  height: var(--perf-control-height, 2rem);
+}

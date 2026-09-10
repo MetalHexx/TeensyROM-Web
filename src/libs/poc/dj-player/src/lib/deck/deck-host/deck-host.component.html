@@ -14,6 +14,18 @@
   (scrubInput)="onScrubInput($event)"
   (scrubCommit)="onScrubCommit($event)"
 />
-<lib-voice-speed-column [style.gridArea]="areas().voiceSpeed" />
+<div class="voice-speed-column" [style.gridArea]="areas().voiceSpeed">
+  <lib-voice-panel
+    [model]="voiceModel()"
+    (mutedChange)="onVoiceMutedChange($event)"
+    (heldChange)="onVoiceHeldChange($event)"
+    (clearMutes)="onClearVoiceMutes()"
+  />
+  <lib-speed-panel
+    [model]="speedModel()"
+    (faderChange)="onSpeedFaderChange($event)"
+    (jump)="onSpeedJump($event)"
+  />
+</div>
 <lib-loops-cues-panel [style.gridArea]="areas().loopsCues" />
 <lib-binding-card [style.gridArea]="areas().binding" />
