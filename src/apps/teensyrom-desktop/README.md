@@ -1,12 +1,26 @@
 # TeensyROM desktop shell
 
-Electron owns the application window and the lifetime of the bundled .NET API.
-At startup it selects an ephemeral loopback port, starts the API on that port,
-waits for `/api/version`, and loads the existing Angular app from the API.
+Optional Electron packaging around the existing standalone web app. Electron owns
+the application window and the lifetime of the bundled .NET API.
+
+At startup the shell:
+
+1. Sets `Kestrel__Endpoints__Http__Url` so the child API binds as configured by the
+   shell (standalone `appsettings.json` / `Program.cs` stay unchanged)
+2. Sets `TEENSYROM_DATA_DIR` under the OS user-data directory
+3. Waits for `/api/version`, then loads the Angular app from that API
+
+Without those environment variables, the API keeps its standalone defaults
+(`http://0.0.0.0:213` and assembly-relative data paths).
 
 The renderer is sandboxed: Node integration is disabled and the preload exposes
-no privileged APIs. Persistent application data and upload staging are stored in
-Electron's per-user data directory, not in the installed application bundle.
+no privileged APIs.
+
+## Status vs upstream design requirements
+
+This shell is an early additive slice. Still outstanding: fixed port 213, LAN
+"Share on my network" toggle, remote-host mode, Nx `project.json`, Windows
+`prepare-backend` spawn fix, and MIDI secure-origin handling.
 
 ## Commands
 

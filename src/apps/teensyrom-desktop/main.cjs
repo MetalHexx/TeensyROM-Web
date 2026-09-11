@@ -80,7 +80,9 @@ async function startApi() {
       ...process.env,
       ASPNETCORE_ENVIRONMENT: 'Production',
       TEENSYROM_DATA_DIR: dataDirectory,
-      TEENSYROM_URL: baseUrl,
+      // Override appsettings Kestrel bind without changing Program.cs (R3 Option B).
+      // Temporary ephemeral loopback; R5 will move this to fixed :213 + share toggle.
+      'Kestrel__Endpoints__Http__Url': baseUrl,
     },
     stdio: 'pipe',
     windowsHide: true,

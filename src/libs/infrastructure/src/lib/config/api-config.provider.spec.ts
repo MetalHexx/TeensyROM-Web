@@ -13,7 +13,6 @@ vi.mock('@angular/core', async () => {
 describe('provideApiConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.history.replaceState({}, '', '/?apiUrl=http://127.0.0.1:45123/');
   });
 
   describe('Development Mode', () => {
@@ -26,8 +25,8 @@ describe('provideApiConfig', () => {
 
       // Assert
       expect(config).toMatchObject({
-        basePath: 'http://127.0.0.1:45123',
-        signalRBasePath: 'http://127.0.0.1:45123',
+        basePath: 'http://localhost:213',
+        signalRBasePath: 'http://localhost:213',
       });
     });
   });

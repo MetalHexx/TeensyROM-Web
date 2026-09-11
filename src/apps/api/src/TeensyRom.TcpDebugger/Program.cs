@@ -12,12 +12,7 @@ class Program
 {
 	static async Task Main(string[] args)
 	{
-    if (args.Length == 0)
-    {
-        throw new ArgumentException("Provide the API URL as the first argument.");
-    }
-
-    var apiBaseUrl = args[0];
+    var apiBaseUrl = args.Length > 0 ? args[0] : "http://localhost:213";
     var deviceId = args.Length > 1 ? args[1] : "YRTCPIRY";
     await TransferApiBlackBoxHarness.RunAsync(apiBaseUrl, deviceId, fileCount: 5);
     Console.WriteLine();
