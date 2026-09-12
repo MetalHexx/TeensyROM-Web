@@ -19,14 +19,20 @@ lib-rotary-knob {
   --scale-knob-size: 64px;
 }
 
-// The fader shares the strip with five other controls above it, so it gets a fixed height of its
-// own rather than stretching to whatever height a parent row renders at. A `display: flex` row of
-// one item reproduces the exact mechanism `ChannelFaderComponent`'s own host already relies on
-// (`flex: 1 1 0` / `height: 100%`), just scoped to this wrapper — keeping the "fixed, never
-// `flex: 1 1 auto`" rule that stops the fader running away.
+// The fader shares the strip with five other controls above it, so it gets a fixed length of its
+// own (shared with the crossfader via `--fader-length`, set by callers such as
+// `dj-mixer-card.component.scss`) rather than stretching to whatever height a parent row renders
+// at. A `display: flex` row of one item reproduces the exact mechanism `ChannelFaderComponent`'s
+// own host already relies on (`flex: 1 1 0` / `height: 100%`), just scoped to this wrapper —
+// keeping the "fixed, never `flex: 1 1 auto`" rule that stops the fader running away.
+// `margin-top: auto` floats it to the bottom of the strip — a no-op unless the strip itself
+// renders taller than its content (see `.strips` in `dj-mixer-card.component.scss`), in which
+// case it leaves the filter selector and knobs packed at the top with the leftover space above
+// the fader instead.
 .deck-strip-fader {
   display: flex;
   width: 100%;
-  height: 7.5rem;
+  height: var(--fader-length, 7.5rem);
   min-height: 0;
+  margin-top: auto;
 }
