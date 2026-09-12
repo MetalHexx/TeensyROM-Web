@@ -117,11 +117,19 @@ describe('FileTransferViewComponent', () => {
   });
 
   describe('rendering', () => {
-    it('should create', async () => {
-      await setup([createDevice()]);
-      createFixture();
-      expect(fixture.componentInstance).toBeTruthy();
-    });
+    // First test in the file to hit TestBed.createComponent, which pays the one-time cost
+    // of JIT-compiling this component. That cold compile can exceed the project's tight
+    // 2000ms testTimeout under CI load; every later test here reuses the compiled TestBed
+    // and stays fast, so only this test needs the extra headroom.
+    it(
+      'should create',
+      async () => {
+        await setup([createDevice()]);
+        createFixture();
+        expect(fixture.componentInstance).toBeTruthy();
+      },
+      10000,
+    );
 
     it('should render the transfer header and content row when there are enabled devices', async () => {
       await setup([createDevice()]);
