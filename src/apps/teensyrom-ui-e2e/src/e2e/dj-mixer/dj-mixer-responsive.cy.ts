@@ -121,6 +121,13 @@ describe('DJ Mixer — responsive layout', () => {
       cy.get('lib-deck-strip').should('have.length', 1);
       cy.get('lib-crossfader').should('not.exist');
     });
+
+    NO_OVERFLOW_WIDTHS.forEach((width) => {
+      it(`does not overflow horizontally at ${width}px wide`, () => {
+        cy.viewport(width, 900);
+        expectNoHorizontalOverflow();
+      });
+    });
   });
 
   describe('three decks', () => {
@@ -135,6 +142,13 @@ describe('DJ Mixer — responsive layout', () => {
 
       cy.get('[aria-label="Transport deck C"]').scrollIntoView();
       cy.get('[aria-label="Transport deck C"]').should('be.visible');
+    });
+
+    NO_OVERFLOW_WIDTHS.forEach((width) => {
+      it(`does not overflow horizontally at ${width}px wide`, () => {
+        cy.viewport(width, 900);
+        expectNoHorizontalOverflow();
+      });
     });
   });
 });
