@@ -1,54 +1,66 @@
-# Manual browser verification — DJ Mixer layout vs wireframe
+# Manual browser verification — DJ Mixer layout vs this amendment's description
 
 The phase's own exit criteria require the four layout states (two devices, one device, zero
-devices, stacked) to be checked in a real browser against
-`~/.radorc/projects/ASID-DJ-ROOT/ASID-DJ-ROOT-WIREFRAME-MIXER-VIEW.html`, alongside the automated
-proof in `dj-mixer-navigation.cy.ts` / `dj-mixer-responsive.cy.ts`. This file is that record.
+devices, stacked) to be checked in a real browser, alongside the automated proof in
+`dj-mixer-navigation.cy.ts` / `dj-mixer-responsive.cy.ts`. This file is that record.
 
-Checked against `pnpm nx serve teensyrom-ui` at `http://localhost:4210/mixing` in a real Chrome
+This amendment (`P03`) introduces a shared bottom band — a `Browse` placeholder beside a
+`Directory Listing` placeholder — and flips the mixer's own content to sit at the top of its card
+rather than the bottom. `ASID-DJ-ROOT-WIREFRAME-MIXER-VIEW.html` predates this change and is not
+being redrawn, so the band, the Browse placeholder, and the mixer's alignment are checked below
+against this amendment's description instead; everything else in each state (the deck stacks' own
+content, the voice/speed columns, the zero-device empty state) is still the same shape the
+wireframe shows and isn't re-verified here.
+
+Checked against `pnpm nx serve teensyrom-ui` at `http://localhost:4200/dj-mixer` in a real Chrome
 tab, driving device count through the live `DeviceStore`
-(`ng.getComponent(document.querySelector('lib-layout')).deviceStore`) rather than Cypress
-interceptors, since a real device happened to be attached in this environment.
+(`ng.getComponent(document.querySelector('lib-layout')).deviceStore`), with `window.fetch` patched
+to return a fixture `FindDevicesResponse` for the app's `/api/devices` call rather than letting it
+reach a real backend or any actually-attached device.
 
-The **Stacked** check below was recorded in a later session against `pnpm nx serve teensyrom-ui`
-at `http://localhost:4200`, with no real device attached; it drives device count by having the
-app's own dev-mode API calls hit a throwaway local HTTP server instead of the live `DeviceStore`
-patch used above, for the reasons given in that entry.
-
-- **Two devices** — the attached real device plus a second injected by patching `window.fetch` so
-  `DeviceStore.findDevices()` resolves a two-device `FindDevicesResponse`. Result: `.mixer-grid`
-  carries `mixer-grid--two`; `[aria-label="Transport deck A"]` and
-  `[aria-label="Transport deck B"]` share the same `top`; `lib-dj-mixer-card`'s `left` sits between
-  them; one `lib-crossfader`, two `lib-deck-strip`s; the Voice (V1/V2/V3, audible/Kill) and Speed
-  (jump buttons, filter knobs) panels render unclipped. Matches the wireframe's two-device frame.
-  No deviation.
-- **One device** — the attached real device alone, enabled. Result: `.mixer-grid--one`; transport,
-  Loops/Cues, the deck-A stack (output port, Enable MIDI, Identify, directory listing), and the
-  voice/speed column all present; one `lib-deck-strip`, zero `lib-crossfader`. Matches the
-  wireframe's one-device frame. No deviation.
-- **Zero devices** — the same device disabled via `DeviceStore.disableDevice()`. Result:
+- **Two devices** — `store.findDevices()` resolved after patching `window.fetch` to return a
+  two-device fixture. Result: deck A's transport, controls and Voice/Speed column sit at the left,
+  deck B's mirror sits at the right, the crossfader (`A ... B`) sits between them; the mixer's own
+  content (Voice/Speed panels, crossfader) is pinned to the **top** of its card rather than
+  centered or bottom-aligned — matching this amendment's flip. Below all of that, a single row
+  holds the `Browse` placeholder card on the left and the `Directory Listing` placeholder card on
+  the right, spanning the full width beneath both decks and the mixer. No deviation. Everything
+  else (deck transport, Loops/Cues, output port controls) matches the wireframe's two-device frame
+  unchanged.
+- **One device** — the fixture reduced to the single device from the state above. Result: deck A's
+  full column and its Voice/Speed panel render alone, no crossfader; the same shared bottom band
+  (`Browse` beside `Directory Listing`) still renders beneath it, full width. No deviation.
+  Everything else matches the wireframe's one-device frame unchanged.
+- **Zero devices** — the one device from above disabled via `DeviceStore.disableDevice()`. Result:
   `lib-empty-state-message` renders "No Enabled Devices / Enable a TeensyROM device to get
-  started. / Visit the Device View to manage your devices." verbatim. Matches the wireframe's
-  empty-state frame. No deviation.
+  started. / Visit the Device View to manage your devices." verbatim — the bottom band doesn't
+  render in this state, matching `@if (decks().length === 0)` gating the whole grid (including the
+  band) behind the empty-state branch. Matches the wireframe's empty-state frame. No deviation.
 - **Stacked** (below 1280px, or three-plus decks) — the browser-automation sandbox's own window is
-  locked to a fixed ~1546×568 CSS-px viewport (`resize_window` calls down to 800×900 never change
-  `window.innerWidth`/`innerHeight`), so this state can't be reached by resizing the top-level tab.
-  It is reachable, and was actually checked, by loading `/mixing` inside a same-origin `<iframe>`
-  on `http://localhost:4200` sized to a CSS width of 768px (`VIEWPORT.TABLET`): the iframe's own
-  `document.defaultView.innerWidth` is genuinely 768, so the app's real `below-tablet` media query
-  fires and the live cascade is what's being read, not an assertion inferred from Cypress. Two
-  enabled devices were put in front of the app by pointing its dev-mode API base
-  (`http://localhost:213`) at a throwaway local HTTP server returning a two-device
-  `FindDevicesResponse` fixture, since no real hardware was attached in this session. Result: the
-  grid carries `mixer-grid--two`; reading `getBoundingClientRect()` on the live DOM inside the
-  iframe gives `Transport deck A` top 155px, `lib-dj-mixer-card` top 695px, `Transport deck B` top
-  1403px — the single-column order the wireframe's stacked frame calls out ("deck A with its
-  voice/speed beside it, the mixer as a band, then deck B"); `.router-content`'s `scrollWidth`
-  matched its `clientWidth` (no horizontal overflow). Screenshots scrolled through the same iframe
-  confirm it visually: deck A's transport and Voice column, then the crossfader band labelled A/B,
-  then deck B's transport and Voice column, each full-width and unclipped. Matches the wireframe's
-  stacked frame. No deviation.
+  locked to a fixed CSS-px viewport (`resize_window` never changes `window.innerWidth`/
+  `innerHeight`), so this state can't be reached by resizing the top-level tab. It is reachable,
+  and was actually checked, by loading `/dj-mixer` inside a same-origin `<iframe>` sized to a CSS
+  width of 768px (`VIEWPORT.TABLET`): the iframe's own `document.defaultView.innerWidth` is
+  genuinely 768, so the app's real `below-tablet` media query fires and the live cascade is what's
+  being read, not an assertion inferred from Cypress. Two devices were put in front of the app the
+  same way as the "Two devices" state above (patching `window.fetch` inside the iframe's own
+  `window`). Result: reading `getBoundingClientRect()` on the live DOM inside the iframe gives
+  `Transport deck A` top 155.5px, `lib-dj-mixer-card` top 510.8px, `Transport deck B` top
+  1218.7px — the single-column order the wireframe's stacked frame calls out (deck A with its
+  voice/speed beside it, the mixer as a band, then deck B); the bottom band still renders as a row
+  at this width (`Browse` top 1574px/left 112px, `Directory Listing` top 1574px/left 432.8px —
+  same top, different left), since the band's own column-stack only triggers below phone width, not
+  below tablet width. Narrowing the same iframe to 400px CSS width (the `below-phone` breakpoint)
+  confirmed the band does stack there: `Browse` and `Directory Listing` share the same `left`
+  (16px) and `Browse`'s `top` (999.4px) sits above `Directory Listing`'s `top` (1011.4px).
+  `.router-content`'s `scrollWidth` matched its `clientWidth` at 768px (no horizontal overflow).
+  Screenshots scrolled through the same iframe confirm it visually: deck A's transport and Voice
+  column, then the crossfader band labelled A/B with the Voice/Speed panels immediately above it
+  (not centered in the card), then deck B's transport, then the `Browse`/`Directory Listing` row,
+  each full-width and unclipped. Matches the wireframe's stacked frame for the deck/mixer ordering;
+  the band and mixer alignment are checked against this amendment's description as noted above. No
+  deviation.
 
-The device store was restored to its real single-device state after the two-device check. The
-throwaway local server used for the Stacked check was torn down afterwards and never touched the
-real backend or any committed configuration.
+Device state was left at zero-enabled (matching a clean starting point) after the checks above.
+The dev server started for this session was stopped afterward and never touched the real backend
+or any committed configuration.

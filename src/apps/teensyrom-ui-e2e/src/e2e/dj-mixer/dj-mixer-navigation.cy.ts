@@ -14,7 +14,7 @@ describe('DJ Mixer — Navigation', () => {
     // but still present in the DOM at desktop width — scope to the visible nav-rail item.
     cy.get('.nav-rail-item[aria-label="DJ Mixer"]').click();
 
-    cy.url().should('include', '/mixing');
+    cy.url().should('include', '/dj-mixer');
     cy.get('.dj-mixer-view').should('exist');
   });
 

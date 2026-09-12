@@ -28,7 +28,7 @@ describe('DJ Mixer — responsive layout', () => {
     beforeEach(() => {
       interceptFindDevices({ fixture: twoDevices });
       interceptConnectDevice();
-      cy.visit('/mixing');
+      cy.visit('/dj-mixer');
     });
 
     it('holds deck A, the mixer, and deck B side by side at desktop width', () => {
@@ -52,6 +52,72 @@ describe('DJ Mixer — responsive layout', () => {
                     bRect.left
                   );
                 });
+            });
+        });
+    });
+
+    it('positions the bottom band below the grid content, Browse before Directory Listing', () => {
+      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+
+      cy.get('lib-dj-mixer-card')
+        .then(([mixer]) => mixer.getBoundingClientRect())
+        .then((mixerRect) => {
+          cy.get('.browse-card')
+            .then(([browse]) => browse.getBoundingClientRect())
+            .then((browseRect) => {
+              expect(mixerRect.bottom, 'the mixer sits above the bottom band').to.be.at.most(
+                browseRect.top
+              );
+
+              cy.get('.directory-listing-card')
+                .then(([directoryListing]) => directoryListing.getBoundingClientRect())
+                .then((directoryListingRect) => {
+                  expect(
+                    browseRect.left,
+                    'Browse sits left of Directory Listing'
+                  ).to.be.lessThan(directoryListingRect.left);
+                });
+            });
+        });
+    });
+
+    it('top-aligns the deck strips within the mixer card at desktop width', () => {
+      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+
+      // The deck strip animates in (`animationEntry="from-bottom"` on the mixer's own
+      // `lib-scaling-compact-card`), so the assertion is wrapped in `.should()` — Cypress
+      // retries the whole callback until the entry animation settles, rather than reading a
+      // mid-animation position from a single unretried `.then()`.
+      cy.get('lib-deck-strip')
+        .first()
+        .should(([strip]) => {
+          const mixerCard = strip.ownerDocument.querySelector('lib-dj-mixer-card');
+          const stripRect = strip.getBoundingClientRect();
+          const mixerCardRect = mixerCard!.getBoundingClientRect();
+
+          expect(
+            stripRect.top - mixerCardRect.top,
+            "the deck strip sits within the mixer card's top quarter"
+          ).to.be.lessThan(mixerCardRect.height * 0.25);
+        });
+    });
+
+    it('stacks the bottom band into a single column at phone width', () => {
+      cy.viewport(400, 900);
+
+      cy.get('.browse-card')
+        .then(([browse]) => browse.getBoundingClientRect())
+        .then((browseRect) => {
+          cy.get('.directory-listing-card')
+            .then(([directoryListing]) => directoryListing.getBoundingClientRect())
+            .then((directoryListingRect) => {
+              expect(
+                browseRect.left,
+                'Browse and Directory Listing share the same left'
+              ).to.equal(directoryListingRect.left);
+              expect(browseRect.top, 'Browse sits above Directory Listing').to.be.lessThan(
+                directoryListingRect.top
+              );
             });
         });
     });
@@ -113,7 +179,7 @@ describe('DJ Mixer — responsive layout', () => {
     beforeEach(() => {
       interceptFindDevices(); // default fixture: singleDevice
       interceptConnectDevice();
-      cy.visit('/mixing');
+      cy.visit('/dj-mixer');
       cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
     });
 
@@ -134,7 +200,7 @@ describe('DJ Mixer — responsive layout', () => {
     beforeEach(() => {
       interceptFindDevices({ fixture: multipleDevices });
       interceptConnectDevice();
-      cy.visit('/mixing');
+      cy.visit('/dj-mixer');
     });
 
     it('stacks at every width, including desktop, and keeps deck C reachable via its own scroll', () => {
