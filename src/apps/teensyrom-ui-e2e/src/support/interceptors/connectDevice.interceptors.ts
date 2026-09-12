@@ -22,7 +22,8 @@ interface WindowWithCallCount {
  */
 export const CONNECT_DEVICE_ENDPOINT: EndpointDefinition = {
   method: 'POST',
-  pattern: 'http://localhost:5168/devices/*/connect',
+  // Host-agnostic and `/api`-prefixed — see the matching comment on `FIND_DEVICES_ENDPOINT`.
+  pattern: '/api/devices/*/connect',
   alias: 'connectDevice',
 } as const;
 
