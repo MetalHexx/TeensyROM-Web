@@ -1,0 +1,145 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+
+  @include styles.below-tablet {
+    height: 100%;
+    min-height: 0;
+  }
+
+  @include styles.below-phone {
+    height: auto;
+  }
+
+  // Three or more decks stack at every width, including desktop, where `.router-content` clips
+  // rather than scrolls — the view brings its own scrolling so decks past the first stay reachable.
+  &.dj-mixer-view--many {
+    overflow-y: auto;
+    min-height: 0;
+  }
+}
+
+.dj-mixer-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
+.mixer-grid {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  gap: var(--spacing-md);
+
+  // Shared by every deck-count modifier below: the POC's bare 64px voice/speed column, widened by
+  // the compact card's own side padding since each panel now sits inside a card rather than sitting
+  // bare — at a flat 4rem the panel's fader and buttons would be clipped by `.compact-card`'s
+  // `overflow: hidden`. Tracks the below-desktop padding tightening automatically.
+  --vs-col: calc(4rem + 2 * var(--compact-card-padding, var(--spacing-card-padding-compact)));
+
+  @include styles.below-desktop {
+    gap: var(--spacing-sm);
+    // The house cards already read these — tighten their inner padding one step rather than
+    // reaching into their templates.
+    --compact-card-padding: var(--spacing-sm);
+    --spacing-card-padding: var(--spacing-sm);
+  }
+
+  @include styles.below-phone {
+    // Nothing forces the grid wider than the viewport; deeper overflow inside a deck's own lifted
+    // panels is that panel's responsibility, not the view's.
+    > * {
+      min-width: 0;
+    }
+  }
+}
+
+.mixer-grid--one {
+  grid-template-columns: minmax(0, 1fr) var(--vs-col) 13rem;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    't0 vs0 mx'
+    'c0 vs0 mx'
+    'b0 vs0 mx'
+    'bottom bottom bottom';
+
+  @include styles.below-tablet {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr) var(--vs-col);
+    grid-template-rows: repeat(5, auto);
+    grid-template-areas:
+      't0 vs0'
+      'c0 vs0'
+      'b0 vs0'
+      'mx mx'
+      'bottom bottom';
+  }
+}
+
+.mixer-grid--two {
+  grid-template-columns: minmax(0, 1fr) var(--vs-col) 13rem var(--vs-col) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    't0 vs0 mx vs1 t1'
+    'c0 vs0 mx vs1 c1'
+    'b0 vs0 mx vs1 b1'
+    'bottom bottom bottom bottom bottom';
+
+  @include styles.below-tablet {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr) var(--vs-col);
+    grid-template-rows: repeat(8, auto);
+    grid-template-areas:
+      't0 vs0'
+      'c0 vs0'
+      'b0 vs0'
+      'mx mx'
+      't1 vs1'
+      'c1 vs1'
+      'b1 vs1'
+      'bottom bottom';
+  }
+}
+
+.mixer-grid--many {
+  // Stacked at every width — deck count (and so row count) isn't knowable here, so
+  // `grid-template-areas` is computed and bound inline by the component instead.
+  height: auto;
+  grid-template-columns: minmax(0, 1fr) var(--vs-col);
+}
+
+.bottom-band {
+  grid-area: bottom;
+  display: flex;
+  flex-direction: row;
+  gap: var(--spacing-md);
+  min-height: 11rem;
+
+  @include styles.below-phone {
+    flex-direction: column;
+    min-height: 0;
+  }
+}
+
+.browse-card {
+  flex: 0 1 auto;
+  min-width: 250px;
+  max-width: 500px;
+}
+
+.directory-listing-card {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.browse-card,
+.directory-listing-card {
+  height: 100%;
+}

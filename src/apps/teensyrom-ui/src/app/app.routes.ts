@@ -40,6 +40,12 @@ export const appRoutes: Route[] = [
           import('@teensyrom-nx/features/player').then((m) => m.PlayerViewComponent),
       },
       {
+        path: 'dj-mixer',
+        data: { title: 'DJ Mixer' },
+        loadComponent: () =>
+          import('@teensyrom-nx/features/dj-mixer').then((m) => m.DjMixerViewComponent),
+      },
+      {
         path: 'file-transfer',
         data: { title: 'File Transfer' },
         loadComponent: () =>

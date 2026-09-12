@@ -1,0 +1,17 @@
+<lib-scaling-compact-card cardClass="compact-card--fill" animationEntry="from-bottom">
+  <div class="mixer-body">
+    <div class="strips">
+      @for (deck of decks(); track deck.index) {
+      <lib-deck-strip [model]="stripFor(deck)"></lib-deck-strip>
+      }
+    </div>
+    @if (showCrossfader()) {
+    <lib-crossfader
+      [value]="0"
+      [startLabel]="firstLetter()"
+      [endLabel]="lastLetter()"
+      [accessibleName]="crossfaderName()"
+    ></lib-crossfader>
+    }
+  </div>
+</lib-scaling-compact-card>

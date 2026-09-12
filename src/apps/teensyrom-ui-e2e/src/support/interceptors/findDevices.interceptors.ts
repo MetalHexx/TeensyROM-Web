@@ -16,7 +16,12 @@ import {
  */
 export const FIND_DEVICES_ENDPOINT: EndpointDefinition = {
   method: 'GET',
-  pattern: 'http://localhost:5168/devices*',
+  // Host-agnostic and `/api`-prefixed: the app's `API_CONFIG` resolves to an absolute
+  // `http://<host>:213` origin in dev mode and a same-origin relative path in production (see
+  // `api-config.provider.ts`), and the generated API client always issues `/api/devices`. A
+  // pattern with a literal `://` only matches that exact origin, so this must stay host-agnostic
+  // to match under both.
+  pattern: '/api/devices*',
   alias: 'findDevices',
 } as const;
 

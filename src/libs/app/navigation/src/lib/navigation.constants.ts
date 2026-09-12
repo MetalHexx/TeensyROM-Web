@@ -5,7 +5,7 @@ import { NavItem } from './navigation-item.model';
 export const ROUTES = {
   PLAYER: 'player',
   FILE_TRANSFER: 'file-transfer',
-  MIXER: 'mixing',
+  MIXER: 'dj-mixer',
   DEVICES: 'devices',
   SETTINGS: 'settings',
   THEME_TESTER: 'themes',
@@ -27,15 +27,15 @@ export const NAV_ITEMS: NavItem[] = [
     route: ROUTES.PLAYER,
   },
   {
+    name: ROUTE_TITLES[ROUTES.MIXER],
+    icon: 'tune',
+    route: ROUTES.MIXER,
+  },
+  {
     name: ROUTE_TITLES[ROUTES.FILE_TRANSFER],
     icon: 'upload',
     route: ROUTES.FILE_TRANSFER,
   },
-  // {
-  //   name: ROUTE_TITLES[ROUTES.MIXER],
-  //   icon: 'tune',
-  //   route: ROUTES.MIXER,
-  // },
   {
     name: ROUTE_TITLES[ROUTES.DEVICES],
     icon: 'devices',

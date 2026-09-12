@@ -1,0 +1,32 @@
+<lib-scaling-compact-card [style.gridArea]="'t' + deck().index" animationEntry="from-bottom">
+  <lib-transport-panel
+    [model]="models().transport"
+    [positionPercent]="models().positionPercent"
+    [frameLabel]="models().frameLabel"
+  ></lib-transport-panel>
+</lib-scaling-compact-card>
+
+<lib-scaling-compact-card
+  [style.gridArea]="'c' + deck().index"
+  cardClass="compact-card--fill"
+  animationEntry="from-bottom"
+>
+  <lib-loops-cues-panel [model]="models().loopsCues"></lib-loops-cues-panel>
+</lib-scaling-compact-card>
+
+<lib-scaling-compact-card [style.gridArea]="'b' + deck().index" animationEntry="from-bottom">
+  <lib-binding-card [model]="models().binding"></lib-binding-card>
+</lib-scaling-compact-card>
+
+<div class="voice-speed-column" [style.gridArea]="'vs' + deck().index">
+  <lib-scaling-compact-card class="voice-card" animationEntry="from-bottom">
+    <lib-voice-panel [model]="models().voice"></lib-voice-panel>
+  </lib-scaling-compact-card>
+  <lib-scaling-compact-card
+    class="speed-card"
+    cardClass="compact-card--fill"
+    animationEntry="from-bottom"
+  >
+    <lib-speed-panel [model]="models().speed"></lib-speed-panel>
+  </lib-scaling-compact-card>
+</div>

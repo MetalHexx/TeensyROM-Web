@@ -445,6 +445,20 @@ mat-card-title {
   }
 }
 
+// Compact-card counterpart of .stretch-card below: fills the height its grid/flex area gives
+// it. A separate class (not a .stretch-card extension) because the compact layout host needs
+// the :has() rule and must not inherit .stretch-card's header/content/padding-bottom rules.
+lib-compact-card-layout:has(.compact-card--fill) {
+  height: 100%;
+}
+
+.compact-card--fill {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
 .compact-section-width {
   width: 327px;
   min-width: 327px;

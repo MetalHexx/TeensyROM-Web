@@ -1,0 +1,68 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  grid-area: mx;
+}
+
+// The horizontal band form: below tablet width, at any deck count, and at every width once three
+// or more decks make the stacked form permanent (`:host.dj-mixer-card--band`, set by the view).
+// A shallow band is no longer possible with a full deck strip per deck, so it wraps rather than
+// clips if the strips and the crossfader don't fit on one line.
+@mixin band-form {
+  .mixer-body {
+    flex-direction: row;
+    flex-wrap: wrap;
+    // Bottom-aligned so the crossfader — shorter than a deck strip — sits flush with the
+    // channel faders' bottom edge (each strip's own fader grows to fill its strip's leftover
+    // height, `deck-strip.component.scss`) instead of sitting centred against the strip's full
+    // height.
+    align-items: flex-end;
+    justify-content: flex-start;
+    height: auto;
+  }
+
+  .strips {
+    margin: 0 var(--spacing-md) 0 0;
+  }
+
+  // `lib-crossfader`'s own host is `width: 100%` for the column form, which would force it onto
+  // its own wrapped line here. The band form instead shares the row with `.strips`, letting the
+  // crossfader grow into whatever horizontal room is left (`width: auto`, `flex: 1 1 0`) instead
+  // of filling — or being capped below — the full row. Reaches into the child's host element the
+  // same way the POC's `mixer-column.component.scss` already does; bottom-alignment comes for
+  // free from `.mixer-body`'s own `align-items: flex-end` above.
+  lib-crossfader {
+    width: auto;
+    flex: 1 1 0;
+  }
+}
+
+:host {
+  @include styles.below-tablet {
+    @include band-form;
+  }
+
+  &.dj-mixer-card--band {
+    @include band-form;
+  }
+}
+
+.mixer-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  justify-content: flex-start;
+}
+
+.strips {
+  display: flex;
+  // Grows to fill whatever height `.mixer-body` has beyond its content (the mixer card's grid row
+  // can run taller than a deck strip on tall viewports), so each deck strip stretches taller too
+  // and its own channel fader can grow into that leftover height (`deck-strip.component.scss`).
+  // The crossfader below keeps its own natural size, so it ends up flush against the bottom once
+  // `.strips` has claimed the rest.
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: var(--spacing-xl);
+}
