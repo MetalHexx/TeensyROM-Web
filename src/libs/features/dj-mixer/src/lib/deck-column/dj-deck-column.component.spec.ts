@@ -4,7 +4,6 @@ import { By } from '@angular/platform-browser';
 import {
   BindingCardComponent,
   LoopsCuesPanelComponent,
-  ScalingCardComponent,
   SpeedPanelComponent,
   TransportPanelComponent,
   VoicePanelComponent,
@@ -47,25 +46,17 @@ function outputsOf(instance: object): { emit: (value: unknown) => void }[] {
 }
 
 describe('DjDeckColumnComponent', () => {
-  it('places the six house cards on the view grid for deck index 0', () => {
+  it('places the five house cards on the view grid for deck index 0', () => {
     const fixture = render({ letter: 'A', index: 0 });
-    expect(gridAreas(fixture)).toEqual(['t0', 'c0', 'b0', 'd0', 'vs0']);
+    expect(gridAreas(fixture)).toEqual(['t0', 'c0', 'b0', 'vs0']);
 
     expect(fixture.nativeElement.querySelectorAll('lib-scaling-compact-card').length).toBe(5);
-    expect(fixture.nativeElement.querySelectorAll('lib-scaling-card').length).toBe(1);
+    expect(fixture.nativeElement.querySelectorAll('lib-scaling-card').length).toBe(0);
   });
 
-  it('places the six house cards on the view grid for deck index 1', () => {
+  it('places the five house cards on the view grid for deck index 1', () => {
     const fixture = render({ letter: 'B', index: 1 });
-    expect(gridAreas(fixture)).toEqual(['t1', 'c1', 'b1', 'd1', 'vs1']);
-  });
-
-  it('reserves an empty card titled Directory Listing', () => {
-    const fixture = render({ letter: 'A', index: 0 });
-    const reserved = fixture.debugElement.query(By.directive(ScalingCardComponent))
-      .componentInstance as ScalingCardComponent;
-
-    expect(reserved.title()).toBe('Directory Listing');
+    expect(gridAreas(fixture)).toEqual(['t1', 'c1', 'b1', 'vs1']);
   });
 
   it('feeds every lifted panel from the deck placeholders, letter-scoped', () => {

@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, computed, input } from '@angular/co
 import {
   BindingCardComponent,
   LoopsCuesPanelComponent,
-  ScalingCardComponent,
   ScalingCompactCardComponent,
   SpeedPanelComponent,
   TransportPanelComponent,
@@ -16,7 +15,6 @@ import { createDeckPlaceholders } from '../placeholders/deck-placeholders';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents', '[attr.data-deck]': 'deck().letter' },
   imports: [
-    ScalingCardComponent,
     ScalingCompactCardComponent,
     TransportPanelComponent,
     VoicePanelComponent,

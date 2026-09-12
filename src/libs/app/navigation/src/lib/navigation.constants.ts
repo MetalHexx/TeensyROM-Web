@@ -5,7 +5,7 @@ import { NavItem } from './navigation-item.model';
 export const ROUTES = {
   PLAYER: 'player',
   FILE_TRANSFER: 'file-transfer',
-  MIXER: 'mixing',
+  MIXER: 'dj-mixer',
   DEVICES: 'devices',
   SETTINGS: 'settings',
   THEME_TESTER: 'themes',

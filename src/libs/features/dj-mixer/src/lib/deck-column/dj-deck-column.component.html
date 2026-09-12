@@ -18,13 +18,6 @@
   <lib-binding-card [model]="models().binding"></lib-binding-card>
 </lib-scaling-compact-card>
 
-<lib-scaling-card
-  class="directory-listing-card"
-  [style.gridArea]="'d' + deck().index"
-  title="Directory Listing"
-  animationEntry="from-bottom"
-></lib-scaling-card>
-
 <div class="voice-speed-column" [style.gridArea]="'vs' + deck().index">
   <lib-scaling-compact-card class="voice-card" animationEntry="from-bottom">
     <lib-voice-panel [model]="models().voice"></lib-voice-panel>

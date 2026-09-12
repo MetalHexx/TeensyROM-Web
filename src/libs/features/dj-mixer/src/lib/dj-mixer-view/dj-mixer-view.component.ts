@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, inject } from '@angular/core';
 import { DeviceStore } from '@teensyrom-nx/application';
-import { EmptyStateMessageComponent } from '@teensyrom-nx/ui/components';
+import { EmptyStateMessageComponent, ScalingCardComponent } from '@teensyrom-nx/ui/components';
 import type { Device } from '@teensyrom-nx/domain';
 import { DjDeckColumnComponent } from '../deck-column/dj-deck-column.component';
 import { DjMixerCardComponent } from '../mixer-card/dj-mixer-card.component';
@@ -10,7 +10,12 @@ import type { DeckRef } from '../deck-ref';
   selector: 'lib-dj-mixer-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.dj-mixer-view--many]': 'isMany()' },
-  imports: [EmptyStateMessageComponent, DjDeckColumnComponent, DjMixerCardComponent],
+  imports: [
+    EmptyStateMessageComponent,
+    ScalingCardComponent,
+    DjDeckColumnComponent,
+    DjMixerCardComponent,
+  ],
   templateUrl: './dj-mixer-view.component.html',
   styleUrl: './dj-mixer-view.component.scss',
 })
@@ -38,11 +43,11 @@ export class DjMixerViewComponent {
       rows.push(`"t${deck.index} vs${deck.index}"`);
       rows.push(`"c${deck.index} vs${deck.index}"`);
       rows.push(`"b${deck.index} vs${deck.index}"`);
-      rows.push(`"d${deck.index} vs${deck.index}"`);
       if (deck.index === 0) {
         rows.push('"mx mx"');
       }
     });
+    rows.push('"bottom bottom"');
     return rows.join(' ');
   });
 }

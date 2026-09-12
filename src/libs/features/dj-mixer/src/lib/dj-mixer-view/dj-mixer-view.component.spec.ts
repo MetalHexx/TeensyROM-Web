@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { signal } from '@angular/core';
 import { DeviceStore } from '@teensyrom-nx/application';
+import { ScalingCardComponent } from '@teensyrom-nx/ui/components';
 import { DjMixerViewComponent } from './dj-mixer-view.component';
 
 function device(isEnabled: boolean) {
@@ -121,12 +123,12 @@ describe('DjMixerViewComponent', () => {
       expect(mixerGrid(fixture).style.gridTemplateAreas).toBe('');
     });
 
-    it("names every deck's four panel areas and each deck's voice/speed column exactly once per row", () => {
+    it("names every deck's three panel areas and each deck's voice/speed column exactly once per row", () => {
       const { fixture } = render([device(true), device(true), device(true)]);
       const rows = parseGridAreaRows(mixerGrid(fixture).style.gridTemplateAreas);
 
       for (let deck = 0; deck < 3; deck++) {
-        for (const letter of ['t', 'c', 'b', 'd']) {
+        for (const letter of ['t', 'c', 'b']) {
           const matches = rows.filter((row) => row[0] === `${letter}${deck}`);
           expect(matches).toHaveLength(1);
           expect(matches[0][1]).toBe(`vs${deck}`);
@@ -141,7 +143,47 @@ describe('DjMixerViewComponent', () => {
       const mxRows = rows.filter((row) => row[0] === 'mx');
       expect(mxRows).toHaveLength(1);
       expect(mxRows[0]).toEqual(['mx', 'mx']);
-      expect(rows.indexOf(mxRows[0])).toBe(4); // after deck 0's four rows (t0, c0, b0, d0)
+      expect(rows.indexOf(mxRows[0])).toBe(3); // after deck 0's three rows (t0, c0, b0)
+    });
+
+    it('places the bottom band in exactly one row, as the last row, at three decks', () => {
+      const { fixture } = render([device(true), device(true), device(true)]);
+      const rows = parseGridAreaRows(mixerGrid(fixture).style.gridTemplateAreas);
+
+      const bottomRows = rows.filter((row) => row[0] === 'bottom');
+      expect(bottomRows).toHaveLength(1);
+      expect(bottomRows[0]).toEqual(['bottom', 'bottom']);
+      expect(rows.indexOf(bottomRows[0])).toBe(rows.length - 1);
+    });
+  });
+
+  describe('the bottom band', () => {
+    function expectBrowseAndDirectoryListingCards(
+      fixture: ComponentFixture<DjMixerViewComponent>
+    ): void {
+      const band = fixture.debugElement.query(By.css('.bottom-band'));
+      const cards = band.queryAll(By.directive(ScalingCardComponent));
+
+      expect(cards.length).toBe(2);
+      expect((cards[0].componentInstance as ScalingCardComponent).title()).toBe('Browse');
+      expect((cards[1].componentInstance as ScalingCardComponent).title()).toBe(
+        'Directory Listing'
+      );
+    }
+
+    it('renders a Browse card and a Directory Listing card at one enabled device', () => {
+      const { fixture } = render([device(true)]);
+      expectBrowseAndDirectoryListingCards(fixture);
+    });
+
+    it('renders a Browse card and a Directory Listing card at two enabled devices', () => {
+      const { fixture } = render([device(true), device(true)]);
+      expectBrowseAndDirectoryListingCards(fixture);
+    });
+
+    it('renders a Browse card and a Directory Listing card at three-plus enabled devices', () => {
+      const { fixture } = render([device(true), device(true), device(true)]);
+      expectBrowseAndDirectoryListingCards(fixture);
     });
   });
 

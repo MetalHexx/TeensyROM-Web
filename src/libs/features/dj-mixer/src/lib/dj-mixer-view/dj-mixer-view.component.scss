@@ -68,7 +68,7 @@
     't0 vs0 mx'
     'c0 vs0 mx'
     'b0 vs0 mx'
-    'd0 vs0 mx';
+    'bottom bottom bottom';
 
   @include styles.below-tablet {
     height: auto;
@@ -78,8 +78,8 @@
       't0 vs0'
       'c0 vs0'
       'b0 vs0'
-      'd0 vs0'
-      'mx mx';
+      'mx mx'
+      'bottom bottom';
   }
 }
 
@@ -90,22 +90,21 @@
     't0 vs0 mx vs1 t1'
     'c0 vs0 mx vs1 c1'
     'b0 vs0 mx vs1 b1'
-    'd0 vs0 mx vs1 d1';
+    'bottom bottom bottom bottom bottom';
 
   @include styles.below-tablet {
     height: auto;
     grid-template-columns: minmax(0, 1fr) var(--vs-col);
-    grid-template-rows: repeat(9, auto);
+    grid-template-rows: repeat(8, auto);
     grid-template-areas:
       't0 vs0'
       'c0 vs0'
       'b0 vs0'
-      'd0 vs0'
       'mx mx'
       't1 vs1'
       'c1 vs1'
       'b1 vs1'
-      'd1 vs1';
+      'bottom bottom';
   }
 }
 
@@ -114,4 +113,33 @@
   // `grid-template-areas` is computed and bound inline by the component instead.
   height: auto;
   grid-template-columns: minmax(0, 1fr) var(--vs-col);
+}
+
+.bottom-band {
+  grid-area: bottom;
+  display: flex;
+  flex-direction: row;
+  gap: var(--spacing-md);
+  min-height: 11rem;
+
+  @include styles.below-phone {
+    flex-direction: column;
+    min-height: 0;
+  }
+}
+
+.browse-card {
+  flex: 0 1 auto;
+  min-width: 250px;
+  max-width: 500px;
+}
+
+.directory-listing-card {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.browse-card,
+.directory-listing-card {
+  height: 100%;
 }
