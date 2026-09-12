@@ -1,0 +1,42 @@
+<section class="panel" [attr.aria-label]="model().accessibleName">
+  <div class="panel-header">
+    <h2>Loops/Cues</h2>
+    <div class="panel-header-actions">
+      <button
+        type="button"
+        [attr.aria-label]="model().addAccessibleName"
+        (click)="addMarker.emit()"
+      >
+        Add
+      </button>
+      <button
+        type="button"
+        [attr.aria-label]="model().stopAccessibleName"
+        (click)="stopLoop.emit()"
+      >
+        Stop
+      </button>
+    </div>
+  </div>
+
+  <div class="marker-rows">
+    @for (row of model().rows; track $index) {
+      <lib-marker-row
+        [model]="row"
+        [progressPercent]="progressPercentAt($index)"
+        (trigger)="onRowAction($index, 'trigger')"
+        (setEnd)="onRowAction($index, 'setEnd')"
+        (clearEnd)="onRowAction($index, 'clearEnd')"
+        (delete)="onRowAction($index, 'delete')"
+        (startNudgeInput)="onRowAction($index, 'startNudgeInput', $event)"
+        (startNudgeCommit)="onRowAction($index, 'startNudgeCommit', $event)"
+        (startSnapPrevious)="onRowAction($index, 'startSnapPrevious')"
+        (startSnapNext)="onRowAction($index, 'startSnapNext')"
+        (endNudgeInput)="onRowAction($index, 'endNudgeInput', $event)"
+        (endNudgeCommit)="onRowAction($index, 'endNudgeCommit', $event)"
+        (endSnapPrevious)="onRowAction($index, 'endSnapPrevious')"
+        (endSnapNext)="onRowAction($index, 'endSnapNext')"
+      />
+    }
+  </div>
+</section>

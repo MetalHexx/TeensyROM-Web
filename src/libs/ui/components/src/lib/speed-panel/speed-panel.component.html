@@ -1,0 +1,18 @@
+<section class="panel" [attr.aria-label]="model().accessibleName">
+  <h2>Speed</h2>
+
+  <div class="speed-body">
+    <span class="speed-value">{{ model().valueText }}</span>
+
+    <lib-channel-fader
+      [value]="model().faderValue"
+      [accessibleName]="model().faderAccessibleName"
+      [min]="model().min"
+      [max]="model().max"
+      [step]="model().step"
+      (valueChange)="faderChange.emit($event)"
+    />
+
+    <lib-jump-button-group [buttons]="model().jumpButtons" (jump)="jump.emit($event)" />
+  </div>
+</section>

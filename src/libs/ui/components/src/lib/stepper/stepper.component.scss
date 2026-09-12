@@ -1,0 +1,16 @@
+:host {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  height: var(--perf-control-height, 2rem);
+  min-width: 2rem;
+}

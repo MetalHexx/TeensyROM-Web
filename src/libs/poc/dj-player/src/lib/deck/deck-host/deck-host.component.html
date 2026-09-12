@@ -1,4 +1,44 @@
-<lib-transport-panel [style.gridArea]="areas().transport" />
-<lib-voice-speed-column [style.gridArea]="areas().voiceSpeed" />
-<lib-loops-cues-panel [style.gridArea]="areas().loopsCues" />
-<lib-binding-card [style.gridArea]="areas().binding" />
+<lib-transport-panel
+  [style.gridArea]="areas().transport"
+  [model]="transportModel()"
+  [positionPercent]="transportPositionPercent()"
+  [frameLabel]="transportFrameLabel()"
+  (playClick)="onPlay()"
+  (pauseClick)="onPause()"
+  (stopClick)="onStop()"
+  (repeatTrackChange)="onRepeatTrackChange($event)"
+  (tuneSelect)="onTuneSelect($event)"
+  (fileSelect)="onFileSelect($event)"
+  (previousSubtune)="onPreviousSubtune()"
+  (nextSubtune)="onNextSubtune()"
+  (scrubInput)="onScrubInput($event)"
+  (scrubCommit)="onScrubCommit($event)"
+/>
+<div class="voice-speed-column" [style.gridArea]="areas().voiceSpeed">
+  <lib-voice-panel
+    [model]="voiceModel()"
+    (mutedChange)="onVoiceMutedChange($event)"
+    (heldChange)="onVoiceHeldChange($event)"
+    (clearMutes)="onClearVoiceMutes()"
+  />
+  <lib-speed-panel
+    [model]="speedModel()"
+    (faderChange)="onSpeedFaderChange($event)"
+    (jump)="onSpeedJump($event)"
+  />
+</div>
+<lib-loops-cues-panel
+  [style.gridArea]="areas().loopsCues"
+  [model]="loopsCuesModel()"
+  [rowProgressPercents]="loopsCuesRowProgressPercents()"
+  (addMarker)="onAddMarker()"
+  (stopLoop)="onStopLoop()"
+  (rowAction)="onMarkerRowAction($event)"
+/>
+<lib-binding-card
+  [style.gridArea]="areas().binding"
+  [model]="bindingModel()"
+  (portSelect)="onPortSelect($event)"
+  (enableMidi)="onEnableMidi()"
+  (identify)="onIdentify()"
+/>

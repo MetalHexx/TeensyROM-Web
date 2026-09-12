@@ -1,0 +1,113 @@
+// Stacked at every width: number/trigger + actions header, then Start, then End, then the progress
+// strip — each line running the row's full width. A left border reports active/queued state so the
+// row reads without a text label — solid and lit for active, dashed and dimmer for queued, invisible
+// for idle. `.marker-row` from the POC source describes this component's own host now that the row
+// is its own custom element; `data-marker-state` is bound in the component's `host` metadata since
+// the attribute lives on `:host` itself rather than a child.
+:host {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-left: 3px solid transparent;
+
+  &[data-marker-state='active'] {
+    border-left-color: var(--color-primary);
+  }
+
+  &[data-marker-state='queued'] {
+    border-left-style: dashed;
+    border-left-color: var(--color-dimmed);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// Number/trigger on the left, Set End / Revert / Delete right-aligned — Set End sits here beside the
+// row's other actions, which is what gives the End slot below the same shape as the Start slot.
+.marker-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.marker-row-lead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+// The bare numeral, heavier and larger than the rest of the row's text — this is the row's identity,
+// not a dim caption.
+.marker-number {
+  min-width: 1.25rem;
+  color: var(--color-primary-bright, var(--color-primary));
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  text-align: center;
+}
+
+// `margin-left: auto` (rather than relying solely on `.marker-row-header`'s `space-between`) is what
+// keeps this right-aligned even when it wraps onto a row of its own: `space-between` only spaces
+// *between* items sharing a line, so a lone wrapped item would otherwise land at the line's start.
+.marker-row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+
+  button {
+    height: calc(var(--perf-control-height, 2rem) * 0.8);
+  }
+}
+
+// Fixed width, so `.marker-loop-length`'s alignment below can subtract a known figure for it.
+.marker-trigger {
+  min-width: 6rem;
+  height: calc(var(--perf-control-height, 2rem) * 0.8);
+}
+
+// Backs out the width `.marker-number` + `.marker-trigger` + their two gaps already consume in this
+// row, so the label's left edge lands at the same absolute offset as the nudge track below (past
+// `MarkerSlotComponent`'s own `.marker-sub-tag` + `.marker-frame`) rather than that offset plus this
+// row's own width. The `3rem` and `6rem` (`4.5rem` below 1500px) here are that component's
+// `.marker-sub-tag` and `.marker-frame` widths, duplicated across the component boundary on purpose
+// — change either width in `marker-slot.component.scss` and update both calcs below to match.
+.marker-loop-length {
+  margin-left: calc(3rem + 6rem + var(--spacing-sm) - 1.25rem - 6rem - 2 * var(--spacing-sm));
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+
+  @media (max-width: 1500px) {
+    margin-left: calc(3rem + 4.5rem + var(--spacing-sm) - 1.25rem - 6rem - 2 * var(--spacing-sm));
+  }
+}
+
+.marker-end-revert--empty {
+  opacity: 0.4;
+}
+
+// Spans the full row width beneath its controls — decorative, and empty unless this row is currently
+// looping.
+.marker-progress {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 0.375rem;
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+
+.marker-progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: var(--color-dimmed);
+}

@@ -102,6 +102,25 @@ export class DeckMidiBinding {
     }
   }
 
+  /**
+   * Releases this deck's claim, if it holds one, and forgets its persisted choice — the
+   * placeholder option's target. Distinct from `selectPort`: an empty id is not a port, so it must
+   * never reach `access.claim`, which would otherwise let this deck "hold" a port that does not
+   * exist and read as selected (`selectedPortId() !== null`) with nothing behind it.
+   */
+  clearSelection(): void {
+    this._selectedPortId.set(null);
+    this.lastError.set(null);
+    this.access.release(this.deckId);
+    try {
+      localStorage.removeItem(storageKeyFor(this.deckId));
+    } catch (error) {
+      logWarn(
+        `MIDI: could not clear deck "${this.deckId}"'s persisted port selection from localStorage — ${error}`
+      );
+    }
+  }
+
   private createOutputPort(): MidiOutputPort {
     // Closed over rather than reached through `this`: the object below needs its own `this` for the
     // two getters `MidiOutputPort` declares as properties.

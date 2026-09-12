@@ -90,6 +90,34 @@ describe('DeckMidiBinding', () => {
     expect(access.deckHolding('port-1')).toBe('A');
   });
 
+  describe('clearSelection', () => {
+    it("releases this deck's claim, forgets the persisted choice, and never claims the empty id as a port", async () => {
+      await grant([makeOutput('port-1', 'TeensyROM Cart', 'Acme')]);
+      deckA.selectPort('port-1');
+
+      deckA.clearSelection();
+
+      expect(deckA.selectedPortId()).toBeNull();
+      expect(deckA.lastError()).toBeNull();
+      expect(access.deckHolding('port-1')).toBeNull();
+      expect(access.deckHolding('')).toBeNull();
+      expect(localStorage.getItem('asid-dj-0.deck-A.selected-midi-port')).toBeNull();
+    });
+
+    it('lets a second deck claim the port this deck just released', async () => {
+      await grant([makeOutput('port-1', 'TeensyROM Cart', 'Acme')]);
+      const deckB = makeDeck('B');
+      TestBed.flushEffects();
+      deckA.selectPort('port-1');
+
+      deckA.clearSelection();
+      deckB.selectPort('port-1');
+
+      expect(deckB.selectedPortId()).toBe('port-1');
+      expect(deckB.lastError()).toBeNull();
+    });
+  });
+
   describe('claim refusal, in both directions', () => {
     it('refuses deck B a port deck A already holds, leaving deck A untouched', async () => {
       await grant([makeOutput('port-1', 'TeensyROM Cart', 'Acme')]);

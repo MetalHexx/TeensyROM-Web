@@ -1,0 +1,23 @@
+<section class="panel" [attr.aria-label]="model().accessibleName">
+  <h2>Voice</h2>
+
+  <div class="voice-rows">
+    @for (row of model().rows; track row.checkboxId) {
+      <lib-voice-row
+        [model]="row"
+        (mutedChange)="onMutedChange($index, $event)"
+        (heldChange)="onHeldChange($index, $event)"
+      />
+    }
+  </div>
+
+  <div class="voice-clear">
+    <button
+      type="button"
+      [attr.aria-label]="model().clearAccessibleName"
+      (click)="clearMutes.emit()"
+    >
+      Clear
+    </button>
+  </div>
+</section>

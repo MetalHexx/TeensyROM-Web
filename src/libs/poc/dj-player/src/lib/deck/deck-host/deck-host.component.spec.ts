@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Injector, signal, type WritableSignal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { frames } from '@sidablist/core';
+import { frames, PAL_FRAME_INTERVAL_US } from '@sidablist/core';
 import type { SidFile, SidPlayer } from '@sidablist/core';
 import { DeckHostComponent } from './deck-host.component';
 import type { DeckPanelAreas } from './deck-host.component';
@@ -27,7 +27,7 @@ import {
   TUNE_INDEX_STORAGE,
   LocalStorageTuneIndexStorage,
 } from '../../analysis/tune-index-storage';
-import type { TuneIndexRecord } from '../../analysis/tune-index.model';
+import type { DetectedMoment, TuneIndexRecord } from '../../analysis/tune-index.model';
 import { MixerService } from '../../mixer/mixer.service';
 import {
   createFakeAsidSink,
@@ -49,6 +49,27 @@ function silentTune(): SidFile {
 
 function markerWithStart(frame: number): SavedMarker {
   return { startFrame: frame as SavedMarker['startFrame'], startOffsetMs: 0, end: null };
+}
+
+function markerWithLoop(startFrame: number, endFrame: number): SavedMarker {
+  return {
+    startFrame: frames(startFrame),
+    startOffsetMs: 0,
+    end: { frame: frames(endFrame), offsetMs: 0 },
+  };
+}
+
+/** A `TuneIndexRecord` standing in for the one field the marker adapter reads off it — the rest are
+ *  never touched on this path, so a full record would only add noise here. */
+function recordWithMoments(moments: readonly DetectedMoment[]): TuneIndexRecord {
+  return { detectedMoments: moments } as unknown as TuneIndexRecord;
+}
+
+/** The adapter draws nudges in frames and commits them as the real time `MarkerCollection` stores;
+ *  these specs state their intent in frames and convert here, at the same PAL rate the fake
+ *  player's default snapshot reports. */
+function committedMs(offsetFrames: number): number {
+  return Math.round((offsetFrames * PAL_FRAME_INTERVAL_US) / 1000);
 }
 
 /** Deck-host under test carries no ancestor `.grid` for these to actually position anything against
@@ -254,6 +275,30 @@ describe('DeckHostComponent', () => {
       expect(firstPitchSpy).toHaveBeenCalledWith(2, 2);
       expect(secondPitchSpy).not.toHaveBeenCalledWith(0, 2);
     });
+
+    it("gives each deck's transport its own accessible names, so two decks on the page never collide", () => {
+      const first = build(DECKS[0]);
+      first.fixture.detectChanges();
+      const second = build(DECKS[1]);
+      second.fixture.detectChanges();
+
+      const playLabel = (fixture: ComponentFixture<DeckHostComponent>) =>
+        (fixture.nativeElement as HTMLElement)
+          .querySelector('button[aria-label^="Play deck "]')
+          ?.getAttribute('aria-label');
+      const positionLabel = (fixture: ComponentFixture<DeckHostComponent>) =>
+        (fixture.nativeElement as HTMLElement)
+          .querySelector('input[type="range"]')
+          ?.getAttribute('aria-label');
+
+      expect(playLabel(first.fixture)).toBe(`Play deck ${DECKS[0].label}`);
+      expect(playLabel(second.fixture)).toBe(`Play deck ${DECKS[1].label}`);
+      expect(playLabel(first.fixture)).not.toBe(playLabel(second.fixture));
+
+      expect(positionLabel(first.fixture)).toBe(`Position deck ${DECKS[0].label}`);
+      expect(positionLabel(second.fixture)).toBe(`Position deck ${DECKS[1].label}`);
+      expect(positionLabel(first.fixture)).not.toBe(positionLabel(second.fixture));
+    });
   });
 
   describe('template wiring, over mocked collaborators', () => {
@@ -270,19 +315,30 @@ describe('DeckHostComponent', () => {
       stopMarkerLoop: ReturnType<typeof vi.fn>;
       noticeLoopPosition: ReturnType<typeof vi.fn>;
       noticeActiveLoop: ReturnType<typeof vi.fn>;
+      triggerMarker: ReturnType<typeof vi.fn>;
+      setMarkerEnd: ReturnType<typeof vi.fn>;
+      clearMarkerEnd: ReturnType<typeof vi.fn>;
+      deleteMarker: ReturnType<typeof vi.fn>;
+      setMarkerStartOffset: ReturnType<typeof vi.fn>;
+      setMarkerEndOffset: ReturnType<typeof vi.fn>;
+      auditionMarkerStart: ReturnType<typeof vi.fn>;
+      auditionMarkerEnd: ReturnType<typeof vi.fn>;
     };
     let binding: {
       sink: FakeAsidSink | null;
       selectedPortId: WritableSignal<string | null>;
       lastError: WritableSignal<string | null>;
       restore: ReturnType<typeof vi.fn>;
+      selectPort: ReturnType<typeof vi.fn>;
+      clearSelection: ReturnType<typeof vi.fn>;
+      identify: ReturnType<typeof vi.fn>;
     };
     let tuneLoader: {
       availableTunes: WritableSignal<readonly TuneSource[]>;
       currentTune: WritableSignal<SidFile | null>;
       tuneError: WritableSignal<string | null>;
       selectTune: ReturnType<typeof vi.fn>;
-      onFilePicked: ReturnType<typeof vi.fn>;
+      loadPickedFile: ReturnType<typeof vi.fn>;
     };
     let tuneIndexService: {
       pending: WritableSignal<boolean>;
@@ -303,12 +359,23 @@ describe('DeckHostComponent', () => {
         stopMarkerLoop: vi.fn(),
         noticeLoopPosition: vi.fn(),
         noticeActiveLoop: vi.fn(),
+        triggerMarker: vi.fn().mockResolvedValue(undefined),
+        setMarkerEnd: vi.fn(),
+        clearMarkerEnd: vi.fn(),
+        deleteMarker: vi.fn(),
+        setMarkerStartOffset: vi.fn(),
+        setMarkerEndOffset: vi.fn(),
+        auditionMarkerStart: vi.fn().mockResolvedValue(undefined),
+        auditionMarkerEnd: vi.fn().mockResolvedValue(undefined),
       };
       binding = {
         sink: null,
         selectedPortId: signal<string | null>(null),
         lastError: signal<string | null>(null),
         restore: vi.fn(),
+        selectPort: vi.fn(),
+        clearSelection: vi.fn(),
+        identify: vi.fn(),
       };
       tuneLoader = {
         availableTunes: signal<readonly TuneSource[]>([
@@ -317,7 +384,7 @@ describe('DeckHostComponent', () => {
         currentTune: signal<SidFile | null>(null),
         tuneError: signal<string | null>(null),
         selectTune: vi.fn(),
-        onFilePicked: vi.fn(),
+        loadPickedFile: vi.fn(),
       };
       tuneIndexService = {
         pending: signal<boolean>(false),
@@ -328,8 +395,9 @@ describe('DeckHostComponent', () => {
         imports: [DeckHostComponent],
         // Page-level in production; stands in here the same way DeckRegistry does, since this suite
         // has no page above the component under test. `MidiAccessService` is real (not mocked) —
-        // `BindingCardComponent` reaches it directly for the shared port list, and it has no browser
-        // API dependency until `requestAccess()` is actually invoked, which none of these tests do.
+        // `DeckHostComponent` is the Binding adapter and reaches it directly for the shared port
+        // list, and it has no browser API dependency until `requestAccess()` is actually invoked,
+        // which none of these tests do.
         providers: [
           DeckRegistry,
           { provide: MixerService, useFactory: () => new MixerService(DECKS) },
@@ -389,7 +457,7 @@ describe('DeckHostComponent', () => {
     it("applies each of this deck's four grid-area names, from the areas input, onto that panel and no other", () => {
       const panelSelectors: Record<keyof DeckPanelAreas, string> = {
         transport: 'lib-transport-panel',
-        voiceSpeed: 'lib-voice-speed-column',
+        voiceSpeed: '.voice-speed-column',
         loopsCues: 'lib-loops-cues-panel',
         binding: 'lib-binding-card',
       };
@@ -423,20 +491,90 @@ describe('DeckHostComponent', () => {
       expect(player.player.stop).toHaveBeenCalled();
     });
 
-    it('gates Play on a loaded tune, a selected MIDI port and an idle deck', () => {
-      function playButton(): HTMLButtonElement {
-        return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
-          (button) => button.textContent?.trim() === 'Play'
-        ) as HTMLButtonElement;
-      }
+    function transportButton(text: string): HTMLButtonElement {
+      const root = fixture.nativeElement as HTMLElement;
+      return Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) => button.textContent?.trim() === text
+      ) as HTMLButtonElement;
+    }
 
-      expect(playButton().disabled).toBe(true);
+    it('gates Play on a loaded tune, a selected MIDI port, an idle deck and no scan in flight', () => {
+      expect(transportButton('Play').disabled).toBe(true);
 
       tuneLoader.currentTune.set(fakeSidFile());
       binding.selectedPortId.set('port-1');
       fixture.detectChanges();
 
-      expect(playButton().disabled).toBe(false);
+      expect(transportButton('Play').disabled).toBe(false);
+
+      tuneIndexService.pending.set(true);
+      fixture.detectChanges();
+
+      expect(transportButton('Play').disabled).toBe(true);
+    });
+
+    it('keeps Stop and Pause reachable during a scan the deck is playing through, unlike a freshly loaded one', () => {
+      tuneLoader.currentTune.set(fakeSidFile());
+      fixture.detectChanges();
+      expect(transportButton('Stop').disabled).toBe(false);
+
+      // A freshly loaded tune scanning: the deck sits stopped where the load left it, and the load
+      // starts it itself once the scan settles — there is nothing there to stop.
+      tuneIndexService.pending.set(true);
+      fixture.detectChanges();
+      expect(transportButton('Stop').disabled).toBe(true);
+
+      // The same scan raised by a subtune step mid-playback. Both gates read the raw transport, so
+      // neither is fooled by the `analyzing` state spliced in for the LED.
+      player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
+      fixture.detectChanges();
+      expect(transportButton('Stop').disabled).toBe(false);
+      expect(transportButton('Pause').disabled).toBe(false);
+    });
+
+    it('gates the subtune stepper on a loaded tune with more than one subtune', () => {
+      tuneLoader.currentTune.set(fakeSidFile());
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tune: { subtune: 1, subtuneCount: 1, lengthFrames: null },
+      }));
+      fixture.detectChanges();
+
+      const previousButton = fixture.nativeElement.querySelector(
+        `[aria-label="Previous subtune deck ${DECKS[0].label}"]`
+      ) as HTMLButtonElement;
+      const nextButton = fixture.nativeElement.querySelector(
+        `[aria-label="Next subtune deck ${DECKS[0].label}"]`
+      ) as HTMLButtonElement;
+      expect(previousButton.disabled).toBe(true);
+      expect(nextButton.disabled).toBe(true);
+
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tune: { subtune: 1, subtuneCount: 3, lengthFrames: null },
+      }));
+      fixture.detectChanges();
+
+      expect(previousButton.disabled).toBe(false);
+      expect(nextButton.disabled).toBe(false);
+    });
+
+    it("renders both the player's own error and the tune loader's parse error as alerts, together", () => {
+      function alertTexts(): (string | null | undefined)[] {
+        return Array.from(fixture.nativeElement.querySelectorAll('[role="alert"]')).map((element) =>
+          (element as HTMLElement).textContent?.trim()
+        );
+      }
+
+      expect(alertTexts()).toEqual([]);
+
+      player.snapshot.update((snapshot) => ({ ...snapshot, error: 'player blew up' }));
+      fixture.detectChanges();
+      expect(alertTexts()).toEqual(['player blew up']);
+
+      tuneLoader.tuneError.set('not a valid SID file');
+      fixture.detectChanges();
+      expect(alertTexts()).toEqual(['player blew up', 'not a valid SID file']);
     });
 
     it("reflects and writes the player's repeatTrack from the repeat toggle, persisting it under this deck's own key", () => {
@@ -462,7 +600,178 @@ describe('DeckHostComponent', () => {
 
       button?.click();
 
+      // The panel emits the source's id only; resolving it back to the loader's own TuneSource is
+      // this component's job.
       expect(tuneLoader.selectTune).toHaveBeenCalledWith(tuneLoader.availableTunes()[0]);
+    });
+
+    it('hands a picked file straight to the tune loader', () => {
+      const file = new File([new Uint8Array([1])], 'mytune.sid');
+      const input = fixture.nativeElement.querySelector('input[type="file"]') as HTMLInputElement;
+      // jsdom refuses a `files` assignment, so the picked list is defined over the real element.
+      Object.defineProperty(input, 'files', { value: [file], configurable: true });
+
+      input.dispatchEvent(new Event('change'));
+
+      expect(tuneLoader.loadPickedFile).toHaveBeenCalledWith(file);
+    });
+
+    it('pins the speed fader at its own bound once the multiplier is carried past it, while the readout keeps showing the real multiplier', () => {
+      function faderValue(): number {
+        const fader = fixture.nativeElement.querySelector(
+          `[aria-label="Speed multiplier deck ${DECKS[0].label}"]`
+        ) as HTMLInputElement;
+        return Number(fader.value);
+      }
+      function readoutText(): string | undefined {
+        return (
+          fixture.nativeElement.querySelector('.speed-value') as HTMLElement
+        ).textContent?.trim();
+      }
+
+      // A jump past the fader's own [0.5, 1.5] span (still inside the jump buttons' wider hard
+      // span) pins the thumb at the boundary rather than snapping the tempo display back.
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tempo: { ...snapshot.tempo, multiplier: 1.65 },
+      }));
+      fixture.detectChanges();
+      expect(faderValue()).toBe(1.5);
+      expect(readoutText()).toBe('1.650x');
+
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        tempo: { ...snapshot.tempo, multiplier: 0.35 },
+      }));
+      fixture.detectChanges();
+      expect(faderValue()).toBe(0.5);
+      expect(readoutText()).toBe('0.350x');
+    });
+
+    function speedJumpButton(label: string): HTMLButtonElement {
+      return Array.from(
+        fixture.nativeElement.querySelectorAll<HTMLButtonElement>('lib-jump-button-group button')
+      ).find((button) => button.textContent?.trim() === label) as HTMLButtonElement;
+    }
+
+    describe('the speed jump excursion', () => {
+      it("drives the jump buttons through the player's setTempo, clamped to the hard span", () => {
+        speedJumpButton('+50%').click();
+
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1.5);
+      });
+
+      it('restores home exactly on the opposite button, closing the excursion', () => {
+        speedJumpButton('+50%').click();
+        speedJumpButton('−50%').click();
+
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1);
+      });
+
+      it('routes Home through the same excursion module', () => {
+        speedJumpButton('+50%').click();
+        speedJumpButton('Home').click();
+
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1);
+      });
+
+      it('remembers the fader-set multiplier, not the excursion module’s own stale tracking', () => {
+        player.snapshot.update((snapshot) => ({
+          ...snapshot,
+          tempo: { ...snapshot.tempo, multiplier: 1.2 },
+        }));
+        fixture.detectChanges();
+
+        speedJumpButton('+50%').click(); // must remember 1.2, not the module's own stale value of 1
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1.7);
+
+        speedJumpButton('−50%').click(); // opposite button — must restore exactly 1.2
+        expect(player.player.setTempo).toHaveBeenLastCalledWith(1.2);
+      });
+    });
+
+    it("reflects a voice's muted state as its own hold-button label and state caption, from the player's snapshot", () => {
+      function voiceStateText(voice: number): string | undefined {
+        return (
+          fixture.nativeElement.querySelectorAll('.voice-state')[voice] as HTMLElement
+        ).textContent?.trim();
+      }
+      function holdLabel(voice: number): string | undefined {
+        return (
+          fixture.nativeElement.querySelectorAll('.voice-hold')[voice] as HTMLButtonElement
+        ).textContent?.trim();
+      }
+
+      expect(voiceStateText(0)).toBe('audible');
+      expect(holdLabel(0)).toBe('Kill');
+
+      player.snapshot.update((snapshot) => ({
+        ...snapshot,
+        voices: snapshot.voices.map((voice, index) =>
+          index === 0 ? { ...voice, muted: true } : voice
+        ),
+      }));
+      fixture.detectChanges();
+
+      expect(voiceStateText(0)).toBe('muted');
+      expect(holdLabel(0)).toBe('Punch In');
+    });
+
+    describe('scrubbing', () => {
+      // An 80-second tune at 50 Hz — the basis a released scrub is resolved against.
+      const POSITION_BASIS_FRAMES = 4_000;
+
+      beforeEach(() => {
+        player.snapshot.update((snapshot) => ({
+          ...snapshot,
+          basis: { ...snapshot.basis, positionBasisFrames: frames(POSITION_BASIS_FRAMES) },
+        }));
+        fixture.detectChanges();
+      });
+
+      function scrubTrack(): HTMLInputElement {
+        return fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement;
+      }
+
+      /** Drags the thumb to `percent` and releases it. */
+      function dragTo(percent: number): void {
+        const track = scrubTrack();
+        track.value = String(percent);
+        track.dispatchEvent(new Event('input'));
+        track.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+      }
+
+      it('seeks to the released percentage of the basis the playhead is read against', async () => {
+        dragTo(25);
+        await Promise.resolve();
+
+        expect(collection.stopMarkerLoop).toHaveBeenCalled();
+        expect(player.player.seek).toHaveBeenCalledWith(frames(1_000));
+      });
+
+      it('holds the thumb where it was released until the seek lands, then follows the playhead again', async () => {
+        let landSeek = (): void => undefined;
+        vi.mocked(player.player.seek).mockImplementationOnce(
+          () => new Promise<void>((resolve) => (landSeek = resolve))
+        );
+
+        dragTo(25);
+
+        // The stale playhead the seek has not moved yet — without the pin the thumb snaps back here
+        // and then forward again once the jump lands.
+        player.position.set(frames(0));
+        fixture.detectChanges();
+        expect(Number(scrubTrack().value)).toBe(25);
+
+        landSeek();
+        await Promise.resolve();
+        await Promise.resolve();
+        player.position.set(frames(2_000));
+        fixture.detectChanges();
+
+        expect(Number(scrubTrack().value)).toBe(50);
+      });
     });
 
     it('adds a marker to the collection from the Loops/Cues panel Add control', () => {
@@ -471,12 +780,258 @@ describe('DeckHostComponent', () => {
         return 0;
       });
 
-      const addButton = fixture.nativeElement.querySelector(
-        `[aria-label="Loops/Cues deck ${DECKS[0].label}"] .panel-header-actions button`
-      ) as HTMLButtonElement;
-      addButton.click();
+      byLabel<HTMLButtonElement>('Add marker deck A').click();
 
       expect(collection.addMarker).toHaveBeenCalled();
+    });
+
+    function byLabel<T extends Element>(label: string): T {
+      const element = (fixture.nativeElement as HTMLElement).querySelector(
+        `[aria-label="${label}"]`
+      );
+      if (!element) throw new Error(`no element labelled ${label}`);
+      return element as unknown as T;
+    }
+
+    describe('the Loops/Cues marker adapter', () => {
+      function markerRow(index: number): HTMLElement {
+        return (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+          'lib-marker-row'
+        )[index];
+      }
+
+      /** `.marker-offset` renders once per slot, Start first — the readout that reports whichever
+       *  offset the adapter currently considers displayed. */
+      function offsetText(row: number, side: 'start' | 'end'): string | undefined {
+        return markerRow(row)
+          .querySelectorAll<HTMLElement>('.marker-offset')
+          [side === 'start' ? 0 : 1].textContent?.trim();
+      }
+
+      it("routes each row's header controls to that row's own entry in the collection", () => {
+        collection.markers.set([markerWithStart(0), markerWithLoop(100, 400)]);
+        fixture.detectChanges();
+
+        byLabel<HTMLButtonElement>('Trigger marker 2 deck A').click();
+        byLabel<HTMLButtonElement>('Set end for marker 1 deck A').click();
+        byLabel<HTMLButtonElement>('Revert marker 2 to cue deck A').click();
+        byLabel<HTMLButtonElement>('Delete marker 1 deck A').click();
+        byLabel<HTMLButtonElement>('Stop loop deck A').click();
+
+        expect(collection.triggerMarker).toHaveBeenCalledWith(1);
+        expect(collection.setMarkerEnd).toHaveBeenCalledWith(0);
+        expect(collection.clearMarkerEnd).toHaveBeenCalledWith(1);
+        expect(collection.deleteMarker).toHaveBeenCalledWith(0);
+        expect(collection.stopMarkerLoop).toHaveBeenCalled();
+      });
+
+      it('gates Trigger and Delete alike on markerLaunchPending, leaving Set End reachable', () => {
+        collection.markers.set([markerWithStart(0)]);
+        fixture.detectChanges();
+
+        expect(byLabel<HTMLButtonElement>('Trigger marker 1 deck A').disabled).toBe(false);
+        expect(byLabel<HTMLButtonElement>('Delete marker 1 deck A').disabled).toBe(false);
+
+        collection.markerLaunchPending.set(true);
+        fixture.detectChanges();
+
+        expect(byLabel<HTMLButtonElement>('Trigger marker 1 deck A').disabled).toBe(true);
+        expect(byLabel<HTMLButtonElement>('Delete marker 1 deck A').disabled).toBe(true);
+        expect(byLabel<HTMLButtonElement>('Set end for marker 1 deck A').disabled).toBe(false);
+      });
+
+      it('moves the readout only while a start nudge is dragged, committing nothing', () => {
+        collection.markers.set([markerWithStart(1_000)]);
+        fixture.detectChanges();
+
+        const nudge = byLabel<HTMLInputElement>('Nudge marker 1 start deck A');
+        nudge.value = '5';
+        nudge.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+
+        expect(offsetText(0, 'start')).toBe('+5 fr');
+        expect(collection.setMarkerStartOffset).not.toHaveBeenCalled();
+      });
+
+      it('commits a released start nudge as real time and clears its drag entry', () => {
+        collection.markers.set([markerWithStart(1_000)]);
+        fixture.detectChanges();
+
+        const nudge = byLabel<HTMLInputElement>('Nudge marker 1 start deck A');
+        nudge.value = '5';
+        nudge.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        nudge.value = '8';
+        nudge.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+
+        expect(collection.setMarkerStartOffset).toHaveBeenCalledWith(0, committedMs(8));
+        expect(collection.auditionMarkerStart).toHaveBeenCalledWith(0);
+        expect(collection.setMarkerStartOffset.mock.invocationCallOrder[0]).toBeLessThan(
+          collection.auditionMarkerStart.mock.invocationCallOrder[0]
+        );
+        // The mock never writes the offset back onto `markers()`, so the readout falling back to
+        // the marker's own (unchanged) offset rather than staying at the stale +5 fr drag value is
+        // what shows the drag entry was cleared, not merely overwritten by a newer drag.
+        expect(offsetText(0, 'start')).toBe('+0 fr');
+      });
+
+      it('commits a snapped start nudge down the same path, drag entry and all', () => {
+        collection.markers.set([markerWithStart(1_000)]);
+        // Clustered, irregularly-spaced moments around the captured frame: a near one just past the
+        // offset the drag left the thumb at, a further one still inside the window, and one outside
+        // it entirely.
+        tuneIndexService.record.set(
+          recordWithMoments([
+            { frame: 1_008, strength: 0.9 },
+            { frame: 1_034, strength: 0.6 },
+            { frame: 1_240, strength: 0.95 },
+          ])
+        );
+        fixture.detectChanges();
+
+        const nudge = byLabel<HTMLInputElement>('Nudge marker 1 start deck A');
+        nudge.value = '5';
+        nudge.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        expect(offsetText(0, 'start')).toBe('+5 fr');
+
+        byLabel<HTMLButtonElement>('Snap marker 1 start to next moment deck A').click();
+        fixture.detectChanges();
+
+        // From a displayed offset of +5 the next reachable moment strictly beyond it is +8 — the
+        // same commit a slider released at 8 would have made, drag entry cleared included.
+        expect(collection.setMarkerStartOffset).toHaveBeenCalledWith(0, committedMs(8));
+        expect(collection.auditionMarkerStart).toHaveBeenCalledWith(0);
+        expect(offsetText(0, 'start')).toBe('+0 fr');
+      });
+
+      it('mirrors the whole commit path for the end boundary', () => {
+        collection.markers.set([markerWithLoop(1_000, 5_000)]);
+        tuneIndexService.record.set(recordWithMoments([{ frame: 4_990, strength: 0.5 }]));
+        fixture.detectChanges();
+
+        const nudge = byLabel<HTMLInputElement>('Nudge marker 1 end deck A');
+        nudge.value = '4';
+        nudge.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        expect(offsetText(0, 'end')).toBe('+4 fr');
+
+        byLabel<HTMLButtonElement>('Snap marker 1 end to previous moment deck A').click();
+        fixture.detectChanges();
+
+        expect(collection.setMarkerEndOffset).toHaveBeenCalledWith(0, committedMs(-10));
+        expect(collection.auditionMarkerEnd).toHaveBeenCalledWith(0);
+        expect(offsetText(0, 'end')).toBe('+0 fr');
+      });
+
+      it("re-reads every row's progress strip as the polled playhead advances", () => {
+        collection.markers.set([markerWithStart(0)]);
+        collection.progressPercentFor.mockImplementation(() => player.position() / 10);
+        player.position.set(frames(250));
+        fixture.detectChanges();
+
+        const fill = markerRow(0).querySelector('.marker-progress-fill') as HTMLElement;
+        expect(fill.style.width).toBe('25%');
+
+        player.position.set(frames(700));
+        fixture.detectChanges();
+
+        expect(fill.style.width).toBe('70%');
+      });
+    });
+
+    describe('the Binding adapter', () => {
+      function midiAccess(): MidiAccessService {
+        return TestBed.inject(MidiAccessService);
+      }
+
+      function hasNoPortsMessage(): boolean {
+        return Array.from(fixture.nativeElement.querySelectorAll('[role="alert"]')).some(
+          (element) => (element as HTMLElement).textContent?.includes('no output ports were found')
+        );
+      }
+
+      it('shows the no-ports-found message only once access is granted with an empty port list', () => {
+        expect(hasNoPortsMessage()).toBe(false);
+
+        midiAccess().accessState.set('granted');
+        fixture.detectChanges();
+        expect(hasNoPortsMessage()).toBe(true);
+
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        fixture.detectChanges();
+        expect(hasNoPortsMessage()).toBe(false);
+      });
+
+      it("disables Identify while this deck's transport is playing, and only then", () => {
+        midiAccess().accessState.set('granted');
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        binding.selectedPortId.set('port-1');
+        fixture.detectChanges();
+
+        const identifyButton = byLabel<HTMLButtonElement>(`Identify deck ${DECKS[0].label}`);
+        expect(identifyButton.disabled).toBe(false);
+
+        player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
+        fixture.detectChanges();
+
+        expect(identifyButton.disabled).toBe(true);
+      });
+
+      it("enabling MIDI requests page-level access, then restores this deck's own binding", async () => {
+        const requestAccessSpy = vi.spyOn(midiAccess(), 'requestAccess');
+
+        byLabel<HTMLButtonElement>(`Enable MIDI deck ${DECKS[0].label}`).click();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(requestAccessSpy).toHaveBeenCalled();
+        expect(binding.restore).toHaveBeenCalled();
+      });
+
+      it("forwards the selected port to this deck's own binding", () => {
+        midiAccess().accessState.set('granted');
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        fixture.detectChanges();
+
+        const select = fixture.nativeElement.querySelector(
+          'lib-binding-card select'
+        ) as HTMLSelectElement;
+        const option = select.querySelector('option[value="port-1"]') as HTMLOptionElement;
+        option.selected = true;
+        select.dispatchEvent(new Event('change'));
+
+        expect(binding.selectPort).toHaveBeenCalledWith('port-1');
+      });
+
+      it("routes the placeholder option to clearSelection rather than selectPort, so an empty id can never be claimed as a port", () => {
+        midiAccess().accessState.set('granted');
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        binding.selectedPortId.set('port-1');
+        fixture.detectChanges();
+
+        const select = fixture.nativeElement.querySelector(
+          'lib-binding-card select'
+        ) as HTMLSelectElement;
+        const option = select.querySelector('option[value=""]') as HTMLOptionElement;
+        option.selected = true;
+        select.dispatchEvent(new Event('change'));
+
+        expect(binding.clearSelection).toHaveBeenCalled();
+        expect(binding.selectPort).not.toHaveBeenCalled();
+      });
+
+      it("identifies through this deck's own binding, naming the port by its enumerated position", () => {
+        midiAccess().accessState.set('granted');
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        binding.selectedPortId.set('port-1');
+        fixture.detectChanges();
+
+        byLabel<HTMLButtonElement>(`Identify deck ${DECKS[0].label}`).click();
+
+        expect(binding.identify).toHaveBeenCalledWith('ASID-DJ-0 PORT 1');
+      });
     });
   });
 });

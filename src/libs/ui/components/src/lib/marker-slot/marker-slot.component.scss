@@ -1,0 +1,117 @@
+// tag | frame | nudge track (full width) | offset readout — Start and End slots share this exact
+// shape, which is what makes their nudge sliders equal by construction. Wraps rather than overflows
+// sideways when the row is too narrow for all four in one line — the nudge track, the only item
+// that can shrink to nothing, is what ends up alone on its own full-width line. `.marker-slot` from
+// the POC source describes this component's own host now that the slot is its own custom element.
+:host {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: var(--spacing-sm);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+// Fixed width. `MarkerRowComponent`'s `.marker-loop-length` margin-left calc subtracts this same
+// 3rem to line its label up with the nudge track below — change this width and update that calc too.
+.marker-sub-tag {
+  flex: 0 0 3rem;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+// Fixed width (4.5rem below 1500px). `MarkerRowComponent`'s `.marker-loop-length` margin-left calc
+// subtracts this same figure to line its label up with the nudge track below — change this width and
+// update that calc too.
+.marker-frame {
+  flex: 0 1 6rem;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+
+  @media (max-width: 1500px) {
+    flex-basis: 4.5rem;
+  }
+}
+
+.marker-frame--empty {
+  color: var(--color-dimmed);
+}
+
+// A bare track with no bounding box — the centre detent is the only landmark a bipolar nudge slider
+// needs. Takes every pixel the slot has left over so a one-frame step stays hittable.
+.marker-nudge {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 2.5rem;
+  height: var(--perf-control-height, 2rem);
+
+  input[type='range'] {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    background: transparent;
+  }
+}
+
+.marker-nudge--empty {
+  opacity: 0.4;
+}
+
+.marker-nudge-centre {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--color-dimmed);
+  pointer-events: none;
+}
+
+// One tick per reachable moment, positioned by the same left-percent geometry as the centre rule
+// above. `pointer-events: none` on the layer keeps a tick from ever intercepting the drag the range
+// input beneath it handles.
+.marker-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.marker-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-primary-bright, var(--color-primary));
+}
+
+// Fixed square footprint so a captured slot's pair and an empty slot's placeholder pair occupy
+// exactly the same width — the reason an uncaptured slot never widens its nudge track relative to a
+// captured one.
+.marker-snap {
+  flex: 0 0 auto;
+  width: var(--perf-control-height, 2rem);
+  height: var(--perf-control-height, 2rem);
+  padding: 0;
+  font-size: var(--font-size-md);
+  line-height: 1;
+}
+
+.marker-snap--empty {
+  opacity: 0.4;
+}
+
+.marker-offset {
+  flex: 0 0 3.25rem;
+  font-family: 'Roboto Mono', monospace;
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.marker-offset--empty {
+  color: var(--color-dimmed);
+}

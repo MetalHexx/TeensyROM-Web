@@ -1,0 +1,189 @@
+// A plain block a caller's own `grid-area` (or any other placement) can freely apply to — this
+// component decides nothing about where it sits.
+:host {
+  display: block;
+  min-width: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.transport-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-dimmed);
+  border-radius: var(--border-radius-md);
+
+  @media (max-width: 1500px) {
+    padding: var(--spacing-sm);
+  }
+}
+
+// The three lines the wireframe draws, nothing more.
+.line {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--spacing-sm);
+}
+
+.caption {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--color-dimmed);
+  font-size: var(--font-size-sm);
+}
+
+// The frame readout — the position line's own reserved label. Narrowed rather than left free-width,
+// so it stops competing with the scrub track for space as the surrounding column tightens.
+.line-position .caption:last-child {
+  @media (max-width: 1500px) {
+    max-width: 4.5rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+// Line 2: transport buttons, the repeat toggle directly right of Stop, a spacer, then the state
+// indicator pinned to the row's far right. Below 1240px there is no longer room for all of that on
+// one line, so the row gives up the spacer and wraps instead, with the state indicator's own
+// `margin-left: auto` keeping it pinned right whichever line it lands on.
+.line-transport {
+  justify-content: space-between;
+
+  @media (max-width: 1240px) {
+    flex-wrap: wrap;
+  }
+}
+
+.transport-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height, 2rem);
+    min-width: 4rem;
+  }
+}
+
+.transport-spacer {
+  flex: 1 1 auto;
+
+  @media (max-width: 1240px) {
+    display: none;
+  }
+}
+
+.repeat-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-dimmed);
+}
+
+// A real checkbox styled with appearance: none and a pseudo-element knob, not a hidden input beside
+// a div — accessibility here is whatever the platform gives a native control for free.
+.repeat-toggle-input {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 15px;
+  margin: 0;
+  border-radius: 8px;
+  background: var(--chrome-raised, #2a2a3a);
+  border: 1px solid var(--chrome-inset-border, #3d3d52);
+  cursor: pointer;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--chrome-knob, #6a6a80);
+  }
+
+  &:checked {
+    background: rgba(0, 247, 255, 0.18);
+    border-color: var(--color-highlight);
+
+    &::after {
+      left: auto;
+      right: 1px;
+      background: var(--color-highlight);
+      box-shadow: 0 0 6px rgba(0, 247, 255, 0.9);
+    }
+  }
+}
+
+// The state readout's own place in the row — the LED component draws itself, this only sizes and
+// pins it.
+lib-status-led {
+  flex: 0 0 auto;
+
+  @media (max-width: 1240px) {
+    margin-left: auto;
+  }
+}
+
+// Line 3: the tune buttons and Choose File, with the subtune stepper pinned to the right. Gives up
+// the same ground the transport row does below 1240px: it wraps, and the stepper's own
+// `margin-left: auto` is what keeps it pinned right once it does.
+.line-tunes {
+  justify-content: space-between;
+
+  @media (max-width: 1240px) {
+    flex-wrap: wrap;
+  }
+}
+
+.tune-sources {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacing-sm);
+
+  button {
+    height: var(--perf-control-height, 2rem);
+  }
+}
+
+.file-picker {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+
+  input[type='file'] {
+    max-width: 9rem;
+    font-size: var(--font-size-sm);
+  }
+}
+
+lib-stepper {
+  flex: 0 0 auto;
+
+  @media (max-width: 1240px) {
+    margin-left: auto;
+  }
+}
+
+.error-text {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}

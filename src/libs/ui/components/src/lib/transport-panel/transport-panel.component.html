@@ -1,0 +1,95 @@
+<section class="transport-panel" [attr.aria-label]="model().accessibleName">
+  <div class="line line-position">
+    <span class="caption">Position</span>
+    <lib-scrub-position-bar
+      [barState]="model().bar"
+      [positionPercent]="positionPercent()"
+      [accessibleName]="model().scrubAccessibleName"
+      (scrubInput)="scrubInput.emit($event)"
+      (scrubCommit)="scrubCommit.emit($event)"
+    />
+    <span class="caption">{{ frameLabel() }}</span>
+  </div>
+
+  <div class="line line-transport">
+    <div class="transport-controls">
+      <button
+        type="button"
+        [attr.aria-label]="model().actionAccessibleNames.play"
+        (click)="playClick.emit()"
+        [disabled]="!model().canPlay"
+      >
+        Play
+      </button>
+      <button
+        type="button"
+        [attr.aria-label]="model().actionAccessibleNames.pause"
+        (click)="pauseClick.emit()"
+        [disabled]="!model().canPause"
+      >
+        Pause
+      </button>
+      <button
+        type="button"
+        [attr.aria-label]="model().actionAccessibleNames.stop"
+        (click)="stopClick.emit()"
+        [disabled]="!model().canStop"
+      >
+        Stop
+      </button>
+
+      <label class="repeat-toggle">
+        <input
+          type="checkbox"
+          class="repeat-toggle-input"
+          [attr.aria-label]="model().actionAccessibleNames.repeat"
+          [checked]="model().repeatTrack"
+          (change)="onRepeatToggle($event)"
+        />
+        Repeat track
+      </label>
+    </div>
+
+    <span class="transport-spacer"></span>
+
+    <lib-status-led [state]="model().transport.state" [label]="model().transport.label" />
+  </div>
+
+  <div class="line line-tunes">
+    <div class="tune-sources">
+      @for (source of model().tuneSources; track source.id) {
+        <button
+          type="button"
+          [attr.aria-label]="source.accessibleName"
+          (click)="tuneSelect.emit(source.id)"
+        >
+          {{ source.label }}
+        </button>
+      }
+
+      <label class="file-picker">
+        Choose File
+        <input
+          type="file"
+          accept=".sid"
+          [attr.aria-label]="model().actionAccessibleNames.chooseFile"
+          (change)="onFilePicked($event)"
+        />
+      </label>
+    </div>
+
+    <lib-stepper
+      [text]="model().subtune.text"
+      [previousDisabled]="model().subtune.disabled"
+      [nextDisabled]="model().subtune.disabled"
+      [previousAccessibleName]="model().subtune.previousAccessibleName"
+      [nextAccessibleName]="model().subtune.nextAccessibleName"
+      (previous)="previousSubtune.emit()"
+      (next)="nextSubtune.emit()"
+    />
+  </div>
+
+  @for (error of model().errors; track $index) {
+    <p class="error-text" role="alert">{{ error }}</p>
+  }
+</section>

@@ -51,14 +51,10 @@ export class DeckTuneLoader {
     }
   }
 
-  async onFilePicked(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
-    input.value = ''; // allow re-picking the same file later in the session
-    if (!file) {
-      return;
-    }
-
+  /** Loads a file the operator opened from disk. The picking itself — unwrapping the input's own
+   *  `files` and resetting its value so the same file can be re-picked — belongs to whatever control
+   *  offered the dialog; this entry point sees only the `File` that came out of it. */
+  async loadPickedFile(file: File): Promise<void> {
     const bytes = new Uint8Array(await file.arrayBuffer());
 
     try {

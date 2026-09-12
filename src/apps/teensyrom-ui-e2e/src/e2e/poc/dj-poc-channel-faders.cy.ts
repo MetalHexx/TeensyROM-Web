@@ -42,7 +42,10 @@ function rectsAreClear(a: DOMRect, b: DOMRect): boolean {
 describe('DJ Poc mixer column — real-browser channel fader layout', () => {
   beforeEach(() => {
     cy.visit('/dev/dj-poc');
-    cy.get('lib-channel-fader').should('have.length', 2);
+    // Scoped to the mixer: from P03-T02 on, `SpeedPanelComponent` composes a `lib-channel-fader` too,
+    // one per deck, so the page carries four in total. This suite's layout assertions are about the
+    // mixer's own two channel faders and the crossfader, so it looks only there.
+    cy.get('lib-mixer-column lib-channel-fader').should('have.length', 2);
   });
 
   STACKED_WIDTHS.forEach((width) => {

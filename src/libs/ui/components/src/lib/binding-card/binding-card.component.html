@@ -1,0 +1,45 @@
+<section class="binding-card" [attr.aria-label]="model().accessibleName">
+  <h2 class="binding-deck-label">{{ model().heading }}</h2>
+
+  <label class="control">
+    Output port
+    <select
+      [disabled]="!model().portsEnabled || model().ports.length === 0"
+      [attr.aria-label]="model().selectAccessibleName"
+      (change)="onSelectPort($event)"
+    >
+      @if (model().portsEnabled) {
+      <option value="" [selected]="model().selectedPortId === null">— select a port —</option>
+      @for (port of model().ports; track port.id) {
+      <option [value]="port.id" [selected]="port.id === model().selectedPortId">
+        {{ port.label }}
+      </option>
+      } } @else {
+      <option value="" selected disabled>— MIDI not enabled —</option>
+      }
+    </select>
+  </label>
+
+  <div class="control-row">
+    <button
+      type="button"
+      [attr.aria-label]="model().enableAccessibleName"
+      [disabled]="model().enableDisabled"
+      (click)="enableMidi.emit()"
+    >
+      Enable MIDI
+    </button>
+    <button
+      type="button"
+      [attr.aria-label]="model().identifyAccessibleName"
+      [disabled]="model().identifyDisabled"
+      (click)="identify.emit()"
+    >
+      Identify
+    </button>
+  </div>
+
+  @for (error of model().errors; track $index) {
+  <p class="error-text" role="alert">{{ error }}</p>
+  }
+</section>

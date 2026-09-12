@@ -1,0 +1,14 @@
+<div class="channel-fader">
+  <input
+    type="range"
+    [min]="min()"
+    [max]="max()"
+    [step]="step()"
+    [value]="value()"
+    (input)="onInput($event)"
+    [attr.aria-label]="accessibleName()"
+  />
+  @if (label(); as labelText) {
+  <span class="channel-fader-label">{{ labelText }}</span>
+  }
+</div>

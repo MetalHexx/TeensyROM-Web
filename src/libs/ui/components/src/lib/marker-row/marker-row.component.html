@@ -1,0 +1,82 @@
+<div class="marker-row-header">
+  <div class="marker-row-lead">
+    <span class="marker-number">{{ model().number }}</span>
+
+    <button
+      type="button"
+      class="marker-trigger"
+      [attr.aria-label]="model().triggerAccessibleName"
+      [disabled]="model().triggerDisabled"
+      (click)="trigger.emit()"
+    >
+      Trigger
+    </button>
+
+    @if (model().loopLengthLabel; as loopLengthLabel) {
+      <span class="marker-loop-length">{{ loopLengthLabel }}</span>
+    }
+  </div>
+
+  <div class="marker-row-actions">
+    <button
+      type="button"
+      class="marker-end-set"
+      [attr.aria-label]="model().setEndAccessibleName"
+      (click)="setEnd.emit()"
+    >
+      Set End
+    </button>
+
+    @if (model().end) {
+      <button
+        type="button"
+        class="marker-end-revert"
+        [attr.aria-label]="model().revertAccessibleName"
+        (click)="clearEnd.emit()"
+      >
+        Revert
+      </button>
+    } @else {
+      <button
+        type="button"
+        class="marker-end-revert marker-end-revert--empty"
+        aria-hidden="true"
+        tabindex="-1"
+        disabled
+      >
+        Revert
+      </button>
+    }
+
+    <button
+      type="button"
+      [attr.aria-label]="model().deleteAccessibleName"
+      [disabled]="model().deleteDisabled"
+      (click)="delete.emit()"
+    >
+      Delete
+    </button>
+  </div>
+</div>
+
+<lib-marker-slot
+  [model]="model().start"
+  tag="Start"
+  (nudgeInput)="startNudgeInput.emit($event)"
+  (nudgeCommit)="startNudgeCommit.emit($event)"
+  (snapPrevious)="startSnapPrevious.emit()"
+  (snapNext)="startSnapNext.emit()"
+/>
+
+<lib-marker-slot
+  [model]="model().end"
+  tag="End"
+  (nudgeInput)="endNudgeInput.emit($event)"
+  (nudgeCommit)="endNudgeCommit.emit($event)"
+  (snapPrevious)="endSnapPrevious.emit()"
+  (snapNext)="endSnapNext.emit()"
+/>
+
+<div class="marker-progress" aria-hidden="true">
+  <div class="marker-progress-fill" [style.width.%]="progressPercent()"></div>
+</div>
