@@ -1,0 +1,26 @@
+<div class="dj-mixer-view">
+  @if (decks().length === 0) {
+
+  <lib-empty-state-message
+    icon="devices"
+    title="No Enabled Devices"
+    message="Enable a TeensyROM device to get started."
+    secondaryMessage="Visit the <strong>Device View</strong> to manage your devices."
+  >
+  </lib-empty-state-message>
+
+  } @else {
+
+  <div class="mixer-grid">
+    @for (deck of decks(); track deck.index) {
+    <lib-dj-deck-column [deck]="deck"></lib-dj-deck-column>
+    }
+    <lib-dj-mixer-card
+      [decks]="decks()"
+      [showCrossfader]="showCrossfader()"
+      [band]="isMany()"
+    ></lib-dj-mixer-card>
+  </div>
+
+  }
+</div>

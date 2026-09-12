@@ -1,0 +1,35 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+
+  @include styles.below-tablet {
+    height: 100%;
+    min-height: 0;
+  }
+
+  @include styles.below-phone {
+    height: auto;
+  }
+}
+
+.dj-mixer-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
+.mixer-grid {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: var(--spacing-lg);
+  margin: 0;
+  padding: 0;
+}

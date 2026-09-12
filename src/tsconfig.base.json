@@ -24,6 +24,7 @@
       "@teensyrom-nx/data-access/asm-64-client": ["libs/data-access/asm-64-client/src/index.ts"],
       "@teensyrom-nx/domain": ["libs/domain/src/index.ts"],
       "@teensyrom-nx/features/device": ["libs/features/devices/src/index.ts"],
+      "@teensyrom-nx/features/dj-mixer": ["libs/features/dj-mixer/src/index.ts"],
       "@teensyrom-nx/features/file-transfer": ["libs/features/file-transfer/src/index.ts"],
       "@teensyrom-nx/features/player": ["libs/features/player/src/index.ts"],
       "@teensyrom-nx/features/settings": ["libs/features/settings/src/index.ts"],
