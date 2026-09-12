@@ -25,7 +25,7 @@ See [references/STYLE_GUIDE.md](references/STYLE_GUIDE.md) for the full guide, c
 - **Responsive Breakpoints** — 3-tier system (Phone/Tablet/Desktop) via `_mixins.scss` (`screen-tablet`, `screen-desktop`, `below-tablet`, `below-desktop`, `screen-between`)
 - **Utility Classes** — `.dimmed`, `.no-text-selection`, `.list-item-highlight`, glassy effect variations (`.glassy-subtle` through `.glassy-dark`), `.glassy-card`, `.elevated-card`
 - **Mixins** — glassy effect mixins, `bounce-hover`, `selectable-item`, `pulsing-highlight`
-- **Material Component Customizations** — cards (`.compact-card`, `.stretch-card`), toolbars, buttons/icons (icon button sizes, action button colors), dialogs (`.glassy-dialog`, `.youtube-dialog`), overlay/backdrop system
+- **Material Component Customizations** — cards (`.compact-card`, `.stretch-card`, and `.compact-card--fill` — the compact-card counterpart of `.stretch-card`, filling the card to its grid/flex area's height), toolbars, buttons/icons (icon button sizes, action button colors), dialogs (`.glassy-dialog`, `.youtube-dialog`), overlay/backdrop system
 - **Layout & Typography** — `.section` container patterns
 - **Background Patterns** — synthwave neo-retro grid
 - **CRT Effect CSS Variables** — scanline, vignette, curvature, and color-filter custom properties exposed by `lib-crt-effect-wrapper`
