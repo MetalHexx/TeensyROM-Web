@@ -203,9 +203,66 @@ jobs:
           git commit -m "chore: update Homebrew formula for v${{ needs.validate.outputs.version }}"
           git push origin HEAD:main
 
+  build-desktop:
+    name: Build ${{ matrix.name }} desktop app
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+          - name: macOS Intel
+            os: macos-13
+          - name: macOS Apple Silicon
+            os: macos-14
+          - name: Linux x64
+            os: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install frontend dependencies
+        run: |
+          cd src
+          pnpm install --frozen-lockfile
+
+      - name: Set desktop version
+        run: |
+          cd src
+          pnpm pkg set version=${{ needs.validate.outputs.version }}
+
+      - name: Build desktop package
+        run: |
+          cd src
+          pnpm desktop:package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TeensyROM-Desktop-${{ needs.validate.outputs.version }}-${{ matrix.name }}
+          path: src/dist/desktop/*
+          retention-days: 5
+
   release:
     name: Create GitHub Release
-    needs: [validate, build, update-formula]
+    needs: [validate, build, build-desktop, update-formula]
     if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -236,3 +293,8 @@ jobs:
             artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-osx-x64.tar.gz
             artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-osx-arm64.tar.gz
             artifacts/TeensyROM-Web-${{ needs.validate.outputs.version }}-linux-x64.tar.gz
+            artifacts/**/*.dmg
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
