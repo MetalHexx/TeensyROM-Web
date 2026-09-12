@@ -8,7 +8,7 @@ import {
   DEVICE_STORAGE_SERVICE,
   IStorageService,
 } from '@teensyrom-nx/domain';
-import { findDevices, enableDevice, disableDevice } from './methods/index';
+import { findDevices, connectTcpDevice, enableDevice, disableDevice } from './methods/index';
 import { indexStorage } from './methods/index-storage';
 import { indexAllStorage } from './methods/index-all-storage';
 import { resetAllDevices } from './methods/reset-all-devices';
@@ -44,6 +44,7 @@ export const DeviceStore = signalStore(
       storageService: IStorageService = inject(DEVICE_STORAGE_SERVICE)
     ) => ({
       ...findDevices(store, deviceService),
+      ...connectTcpDevice(store, deviceService),
       ...enableDevice(store),
       ...disableDevice(store),
       ...indexStorage(store, storageService),

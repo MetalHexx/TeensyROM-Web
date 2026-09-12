@@ -4,6 +4,7 @@ import { Device } from '../models';
 
 export interface IDeviceService {
   findDevices(fullScan?: boolean): Observable<Device[]>;
+  connectTcpDevice(ipAddress: string, port?: number): Observable<Device>;
   resetDevice(deviceId: string): Observable<void>;
   pingDevice(deviceId: string): Observable<void>;
 }

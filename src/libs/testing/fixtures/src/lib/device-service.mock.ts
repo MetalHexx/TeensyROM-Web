@@ -7,6 +7,7 @@ export function createMockDeviceService(
 ): Partial<IDeviceService> {
   return {
     findDevices: vi.fn().mockReturnValue(of([])),
+    connectTcpDevice: vi.fn().mockReturnValue(of({})),
     resetDevice: vi.fn().mockReturnValue(of(undefined)),
     pingDevice: vi.fn().mockReturnValue(of(undefined)),
     ...overrides,

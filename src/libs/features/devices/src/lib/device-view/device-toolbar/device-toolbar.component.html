@@ -4,6 +4,29 @@
   data-testid="device-toolbar"
 >
   <div class="toolbar-button-container">
+    <div class="direct-connect" data-testid="device-ip-connect">
+      <label for="device-ip-address">Device IP address</label>
+      <div class="direct-connect-controls">
+        <input
+          #deviceIpAddress
+          id="device-ip-address"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="192.168.1.42"
+          aria-label="Device IP address"
+          (keyup.enter)="onConnectByIp(deviceIpAddress.value)"
+        />
+        <lib-action-button
+          data-testid="toolbar-button-connect-ip"
+          icon="lan"
+          label="Connect"
+          [tooltip]="directConnectTooltip"
+          (buttonClick)="onConnectByIp(deviceIpAddress.value)"
+        >
+        </lib-action-button>
+      </div>
+    </div>
     <lib-action-button
       data-testid="toolbar-button-discover-devices"
       icon="refresh"

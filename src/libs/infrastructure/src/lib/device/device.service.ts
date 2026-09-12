@@ -29,6 +29,17 @@ export class DeviceService implements IDeviceService {
     );
   }
 
+  connectTcpDevice(ipAddress: string, port?: number): Observable<Device> {
+    return from(this.apiService.connectTcpDevice({ connectTcpDeviceRequest: { ipAddress, port } })).pipe(
+      map((response) => {
+        const device = DomainMapper.toDevice(response.device);
+        this.checkIndexStatus([device]);
+        return device;
+      }),
+      catchError((error) => this.handleError(error, 'connectTcpDevice', `Could not connect to ${ipAddress}`))
+    );
+  }
+
   resetDevice(deviceId: string): Observable<void> {
     return from(this.apiService.resetDevice({ deviceId })).pipe(
       map(() => void 0),
