@@ -13,8 +13,9 @@
     flex-direction: row;
     flex-wrap: wrap;
     // Bottom-aligned so the crossfader — shorter than a deck strip — sits flush with the
-    // channel faders' bottom edge (`deck-strip.component.scss`'s own `margin-top: auto`)
-    // instead of sitting centred against the strip's full height.
+    // channel faders' bottom edge (each strip's own fader grows to fill its strip's leftover
+    // height, `deck-strip.component.scss`) instead of sitting centred against the strip's full
+    // height.
     align-items: flex-end;
     justify-content: flex-start;
     height: auto;
@@ -24,16 +25,15 @@
     margin: 0 var(--spacing-md) 0 0;
   }
 
-  // `lib-crossfader`'s own host is `width: 100%` for the column form. The band form needs it to
-  // share the row instead, at the same shared `--fader-length` as the channel faders rather than
-  // filling the row's leftover width — this reaches into the child's host element the same way
-  // the POC's `mixer-column.component.scss` already does. `align-self` overrides the column
-  // form's `align-self: center`, since a flex item's own `align-self` otherwise wins over the
-  // container's `align-items` above.
+  // `lib-crossfader`'s own host is `width: 100%` for the column form, which would force it onto
+  // its own wrapped line here. The band form instead shares the row with `.strips`, letting the
+  // crossfader grow into whatever horizontal room is left (`width: auto`, `flex: 1 1 0`) instead
+  // of filling — or being capped below — the full row. Reaches into the child's host element the
+  // same way the POC's `mixer-column.component.scss` already does; bottom-alignment comes for
+  // free from `.mixer-body`'s own `align-items: flex-end` above.
   lib-crossfader {
-    align-self: flex-end;
-    width: var(--fader-length, 7.5rem);
-    flex: 0 0 auto;
+    width: auto;
+    flex: 1 1 0;
   }
 }
 
@@ -53,25 +53,16 @@
   flex: 1 1 auto;
   min-height: 0;
   justify-content: flex-start;
-  // Shared by every channel fader (`deck-strip.component.scss`) and the crossfader below, so
-  // neither control's slide travel reads longer than the other's.
-  --fader-length: 7.5rem;
 }
 
 .strips {
   display: flex;
-  // Grows to fill whatever height `.mixer-body` has beyond its content (the mixer card's grid
-  // row can run taller than a deck strip on tall viewports) so each strip's own channel fader —
-  // bottom-anchored via `margin-top: auto` — has room to float down away from the knobs above it.
+  // Grows to fill whatever height `.mixer-body` has beyond its content (the mixer card's grid row
+  // can run taller than a deck strip on tall viewports), so each deck strip stretches taller too
+  // and its own channel fader can grow into that leftover height (`deck-strip.component.scss`).
+  // The crossfader below keeps its own natural size, so it ends up flush against the bottom once
+  // `.strips` has claimed the rest.
   flex: 1 1 auto;
   justify-content: center;
   gap: var(--spacing-xl);
-}
-
-// Bottom-anchored to match the channel faders once `.strips` has grown to fill the available
-// height; centred under them since it no longer stretches to the card's full width.
-lib-crossfader {
-  align-self: center;
-  width: var(--fader-length, 7.5rem);
-  flex: 0 0 auto;
 }
