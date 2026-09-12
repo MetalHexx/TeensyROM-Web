@@ -883,7 +883,14 @@ export class DeckHostComponent implements OnInit, OnDestroy {
     void this.midiAccess.requestAccess().then(() => this.binding.restore());
   }
 
+  /** '' names the placeholder option, not a port — routed to `clearSelection` so it can never reach
+   *  `selectPort`, which would otherwise let this deck "hold" a nonexistent port and read as
+   *  selected with nothing behind it. */
   protected onPortSelect(portId: string): void {
+    if (portId === '') {
+      this.binding.clearSelection();
+      return;
+    }
     this.binding.selectPort(portId);
   }
 

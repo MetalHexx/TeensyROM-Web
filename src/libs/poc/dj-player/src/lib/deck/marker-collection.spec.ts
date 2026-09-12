@@ -25,6 +25,10 @@ class FakePlayer implements MarkerPlayer {
   /** False makes `play()` hang until `resolvePendingPlay()` releases it — what the launch-gate test
    *  needs, to observe `markerLaunchPending` while the await is still in flight. */
   playResolvesImmediately = true;
+  /** Same idea as `playResolvesImmediately`, for `seek()` — what to observe `markerLaunchPending`
+   *  across an engagement/audition's own await, not just the play gate. */
+  seekResolvesImmediately = true;
+  private pendingSeek: (() => void) | null = null;
 
   readonly seeks: Frames[] = [];
   readonly armedLoops: (MarkerLoopBounds | null)[] = [];
@@ -68,8 +72,21 @@ class FakePlayer implements MarkerPlayer {
 
   seek(frame: Frames): Promise<void> {
     this.seeks.push(frame);
-    this.frame = frame;
-    return Promise.resolve();
+    if (this.seekResolvesImmediately) {
+      this.frame = frame;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.pendingSeek = () => {
+        this.frame = frame;
+        resolve();
+      };
+    });
+  }
+
+  resolvePendingSeek(): void {
+    this.pendingSeek?.();
+    this.pendingSeek = null;
   }
 
   setActiveLoop(loop: MarkerLoopBounds | null): void {
@@ -555,6 +572,49 @@ describe('MarkerCollection', () => {
       await collection.triggerMarker(index);
 
       expect(player.playCallCount).toBe(0);
+      expect(collection.markerLaunchPending()).toBe(false);
+    });
+
+    it('spans the engagement seek too, when triggered while already playing — not just the play phase', async () => {
+      player.setTransport('playing');
+      player.seekResolvesImmediately = false;
+      const index = collection.addMarker();
+
+      const trigger = collection.triggerMarker(index);
+      expect(collection.markerLaunchPending()).toBe(true);
+
+      player.resolvePendingSeek();
+      await trigger;
+
+      expect(collection.markerLaunchPending()).toBe(false);
+    });
+
+    it('spans auditionMarkerStart’s seek', async () => {
+      player.seekResolvesImmediately = false;
+      const index = collection.addMarker();
+
+      const audition = collection.auditionMarkerStart(index);
+      expect(collection.markerLaunchPending()).toBe(true);
+
+      player.resolvePendingSeek();
+      await audition;
+
+      expect(collection.markerLaunchPending()).toBe(false);
+    });
+
+    it('spans auditionMarkerEnd’s seek', async () => {
+      player.setPosition(10);
+      const index = collection.addMarker();
+      player.setPosition(210);
+      collection.setMarkerEnd(index);
+      player.seekResolvesImmediately = false;
+
+      const audition = collection.auditionMarkerEnd(index);
+      expect(collection.markerLaunchPending()).toBe(true);
+
+      player.resolvePendingSeek();
+      await audition;
+
       expect(collection.markerLaunchPending()).toBe(false);
     });
   });

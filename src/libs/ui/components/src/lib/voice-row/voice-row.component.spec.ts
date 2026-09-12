@@ -112,6 +112,37 @@ describe('VoiceRowComponent', () => {
     expect(emitted).toEqual([]);
   });
 
+  it('emits heldChange(false) on blur when focus leaves mid-hold without a matching keyup', () => {
+    const emitted: boolean[] = [];
+    component.heldChange.subscribe((held) => emitted.push(held));
+
+    holdButton().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    holdButton().dispatchEvent(new Event('blur'));
+
+    expect(emitted).toEqual([true, false]);
+  });
+
+  it('does not double-emit when keyup already ended the hold before blur', () => {
+    const emitted: boolean[] = [];
+    component.heldChange.subscribe((held) => emitted.push(held));
+
+    holdButton().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    holdButton().dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }));
+    holdButton().dispatchEvent(new Event('blur'));
+
+    expect(emitted).toEqual([true, false]);
+  });
+
+  it('leaves a pointer hold alone on blur — pointer capture, not focus, ends it', () => {
+    const emitted: boolean[] = [];
+    component.heldChange.subscribe((held) => emitted.push(held));
+
+    holdButton().dispatchEvent(pointerEvent('pointerdown'));
+    holdButton().dispatchEvent(new Event('blur'));
+
+    expect(emitted).toEqual([true]);
+  });
+
   it("emits mutedChange with the checkbox's checked value", () => {
     const emitted: boolean[] = [];
     component.mutedChange.subscribe((muted) => emitted.push(muted));

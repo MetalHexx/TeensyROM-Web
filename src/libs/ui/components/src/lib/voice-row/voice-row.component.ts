@@ -50,6 +50,10 @@ export class VoiceRowComponent {
   /** Emits on hold button press (`true`) and release/cancel (`false`). Momentary; both press and release are meaningful. */
   readonly heldChange = output<boolean>();
 
+  /** Tracks a keyboard-initiated hold so `onHoldBlur` knows whether to end one — a pointer hold
+   *  ends through `onHoldEnd` regardless of focus, via pointer capture. */
+  private keyHeld = false;
+
   /** Forwards the mute checkbox's toggled state. */
   protected onMutedChange(event: Event): void {
     this.mutedChange.emit((event.target as HTMLInputElement).checked);
@@ -80,6 +84,7 @@ export class VoiceRowComponent {
     if (event.repeat) {
       return;
     }
+    this.keyHeld = true;
     this.heldChange.emit(true);
   }
 
@@ -89,6 +94,18 @@ export class VoiceRowComponent {
       return;
     }
     event.preventDefault();
+    this.keyHeld = false;
+    this.heldChange.emit(false);
+  }
+
+  /** Ends a keyboard hold the browser will never deliver a matching `keyup` for — focus left this
+   *  button (e.g. Tab, or a click elsewhere) while Enter/Space was still down. A no-op otherwise,
+   *  so a pointer hold (which does not touch `keyHeld`) is untouched by a coincidental blur. */
+  protected onHoldBlur(): void {
+    if (!this.keyHeld) {
+      return;
+    }
+    this.keyHeld = false;
     this.heldChange.emit(false);
   }
 }

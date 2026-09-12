@@ -107,8 +107,9 @@ export class MarkerCollection {
   readonly loopingMarker: WritableSignal<number | null> = signal(null);
   /** The marker queued behind the one currently looping, or null. */
   readonly queuedMarker: WritableSignal<number | null> = signal(null);
-  /** True for the span of `triggerMarker`'s `play()` await — the view must gate trigger and delete on
-   *  this rather than trust an index across that gap. */
+  /** True for the span of `triggerMarker`'s `play()` await and of every marker engagement/audition
+   *  seek — the view must gate trigger and delete on this rather than trust an index or a row's
+   *  resolved shape across any of those gaps. */
   readonly markerLaunchPending: WritableSignal<boolean> = signal(false);
 
   /** Converts a real-time duration to frames at the tune's own rate, read fresh from the player
@@ -222,14 +223,22 @@ export class MarkerCollection {
     this.player.setActiveLoop({ startFrame: loop.startFrame, endFrame: loop.outFrame });
     this.setLoopingMarker(index);
     this.queuedMarker.set(null);
-    await this.player.seek(target);
+    this.markerLaunchPending.set(true);
+    try {
+      await this.player.seek(target);
+    } finally {
+      this.markerLaunchPending.set(false);
+    }
   }
 
   /**
    * Engages `index` now if nothing is looping, or queues it behind the current one if something is.
    * Launches (or resumes) playback first if it is not already running, gating the view's trigger and
-   * delete controls on `markerLaunchPending` for exactly that span — a delete racing the await would
-   * otherwise reindex the row this re-checks out from under it.
+   * delete controls on `markerLaunchPending` for that span — a delete racing the await would
+   * otherwise reindex the row this re-checks out from under it. The immediate-engage branch below
+   * gates on the same signal too, from inside `engageMarker` itself: its `seek` is exactly as awaited
+   * as `play()` is here, so a trigger or delete landing mid-seek would leave that seek targeting a row
+   * that has since moved or gone.
    *
    * A no-op for an out-of-range row. Re-triggering the marker already looping, with nothing queued
    * behind it, restarts its lap rather than queueing behind itself.
@@ -373,6 +382,10 @@ export class MarkerCollection {
    * a seek landing on the armed loop's own start from the entry image it holds for that loop, and it
    * only holds one once the loop is armed. Seeking first would land through the generic anchor path
    * every time, at a cost proportional to how deep the row sits in the tune.
+   *
+   * Holds `markerLaunchPending` for the seek's own span, same as `triggerMarker` does around its
+   * `play()` — the view gates trigger and delete on it — so a delete or another trigger landing
+   * mid-seek can never reindex the row this seek is still headed for.
    */
   private async engageMarker(index: number): Promise<void> {
     if (index < 0 || index >= this.markers().length) return;
@@ -385,6 +398,11 @@ export class MarkerCollection {
     );
     this.setLoopingMarker(loop === null ? null : index);
     this.queuedMarker.set(null);
-    await this.player.seek(startFrame);
+    this.markerLaunchPending.set(true);
+    try {
+      await this.player.seek(startFrame);
+    } finally {
+      this.markerLaunchPending.set(false);
+    }
   }
 }

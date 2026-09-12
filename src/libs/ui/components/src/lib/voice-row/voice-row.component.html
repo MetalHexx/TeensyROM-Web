@@ -20,6 +20,7 @@
   (pointercancel)="onHoldEnd()"
   (keydown)="onHoldKeyDown($event)"
   (keyup)="onHoldKeyUp($event)"
+  (blur)="onHoldBlur()"
 >
   {{ model().holdLabel }}
 </button>

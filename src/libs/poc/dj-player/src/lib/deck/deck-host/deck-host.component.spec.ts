@@ -330,6 +330,7 @@ describe('DeckHostComponent', () => {
       lastError: WritableSignal<string | null>;
       restore: ReturnType<typeof vi.fn>;
       selectPort: ReturnType<typeof vi.fn>;
+      clearSelection: ReturnType<typeof vi.fn>;
       identify: ReturnType<typeof vi.fn>;
     };
     let tuneLoader: {
@@ -373,6 +374,7 @@ describe('DeckHostComponent', () => {
         lastError: signal<string | null>(null),
         restore: vi.fn(),
         selectPort: vi.fn(),
+        clearSelection: vi.fn(),
         identify: vi.fn(),
       };
       tuneLoader = {
@@ -1001,6 +1003,23 @@ describe('DeckHostComponent', () => {
         select.dispatchEvent(new Event('change'));
 
         expect(binding.selectPort).toHaveBeenCalledWith('port-1');
+      });
+
+      it("routes the placeholder option to clearSelection rather than selectPort, so an empty id can never be claimed as a port", () => {
+        midiAccess().accessState.set('granted');
+        midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
+        binding.selectedPortId.set('port-1');
+        fixture.detectChanges();
+
+        const select = fixture.nativeElement.querySelector(
+          'lib-binding-card select'
+        ) as HTMLSelectElement;
+        const option = select.querySelector('option[value=""]') as HTMLOptionElement;
+        option.selected = true;
+        select.dispatchEvent(new Event('change'));
+
+        expect(binding.clearSelection).toHaveBeenCalled();
+        expect(binding.selectPort).not.toHaveBeenCalled();
       });
 
       it("identifies through this deck's own binding, naming the port by its enumerated position", () => {
