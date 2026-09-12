@@ -30,6 +30,15 @@ function deckLetters(fixture: ComponentFixture<DjMixerViewComponent>): string[] 
   ) as string[];
 }
 
+function mixerGrid(fixture: ComponentFixture<DjMixerViewComponent>): HTMLElement {
+  return fixture.nativeElement.querySelector('.mixer-grid');
+}
+
+/** Splits a `grid-template-areas` value into its rows, each row into its named cells. */
+function parseGridAreaRows(areas: string): string[][] {
+  return (areas.match(/"[^"]*"/g) ?? []).map((row) => row.slice(1, -1).split(' '));
+}
+
 describe('DjMixerViewComponent', () => {
   it('renders one deck column per enabled device, lettered in store order, plus a mixer card', () => {
     const { fixture, component } = render([device(true), device(true), device(true)]);
@@ -68,5 +77,85 @@ describe('DjMixerViewComponent', () => {
       'No Enabled Devices'
     );
     expect(fixture.nativeElement.querySelector('.mixer-grid')).toBeNull();
+  });
+
+  describe('grid modifier classes', () => {
+    it('carries mixer-grid--one for a single enabled device', () => {
+      const { fixture } = render([device(true)]);
+      const classes = mixerGrid(fixture).classList;
+
+      expect(classes.contains('mixer-grid--one')).toBe(true);
+      expect(classes.contains('mixer-grid--two')).toBe(false);
+      expect(classes.contains('mixer-grid--many')).toBe(false);
+    });
+
+    it('carries mixer-grid--two for two enabled devices', () => {
+      const { fixture } = render([device(true), device(true)]);
+      const classes = mixerGrid(fixture).classList;
+
+      expect(classes.contains('mixer-grid--one')).toBe(false);
+      expect(classes.contains('mixer-grid--two')).toBe(true);
+      expect(classes.contains('mixer-grid--many')).toBe(false);
+    });
+
+    it('carries mixer-grid--many for three or more enabled devices', () => {
+      const { fixture } = render([device(true), device(true), device(true)]);
+      const classes = mixerGrid(fixture).classList;
+
+      expect(classes.contains('mixer-grid--one')).toBe(false);
+      expect(classes.contains('mixer-grid--two')).toBe(false);
+      expect(classes.contains('mixer-grid--many')).toBe(true);
+    });
+  });
+
+  describe('the --many inline grid-template-areas', () => {
+    it('leaves no inline grid-template-areas for one deck — the mixin owns that form', () => {
+      const { fixture } = render([device(true)]);
+
+      expect(mixerGrid(fixture).style.gridTemplateAreas).toBe('');
+    });
+
+    it('leaves no inline grid-template-areas for two decks — the mixin owns that form', () => {
+      const { fixture } = render([device(true), device(true)]);
+
+      expect(mixerGrid(fixture).style.gridTemplateAreas).toBe('');
+    });
+
+    it("names every deck's four panel areas and each deck's voice/speed column exactly once per row", () => {
+      const { fixture } = render([device(true), device(true), device(true)]);
+      const rows = parseGridAreaRows(mixerGrid(fixture).style.gridTemplateAreas);
+
+      for (let deck = 0; deck < 3; deck++) {
+        for (const letter of ['t', 'c', 'b', 'd']) {
+          const matches = rows.filter((row) => row[0] === `${letter}${deck}`);
+          expect(matches).toHaveLength(1);
+          expect(matches[0][1]).toBe(`vs${deck}`);
+        }
+      }
+    });
+
+    it('places the mixer band in exactly one row, spanning both columns, right after the first deck', () => {
+      const { fixture } = render([device(true), device(true), device(true)]);
+      const rows = parseGridAreaRows(mixerGrid(fixture).style.gridTemplateAreas);
+
+      const mxRows = rows.filter((row) => row[0] === 'mx');
+      expect(mxRows).toHaveLength(1);
+      expect(mxRows[0]).toEqual(['mx', 'mx']);
+      expect(rows.indexOf(mxRows[0])).toBe(4); // after deck 0's four rows (t0, c0, b0, d0)
+    });
+  });
+
+  describe('the --many host scroll class', () => {
+    it('withholds dj-mixer-view--many below three decks', () => {
+      const { fixture } = render([device(true), device(true)]);
+
+      expect(fixture.nativeElement.classList.contains('dj-mixer-view--many')).toBe(false);
+    });
+
+    it('adds dj-mixer-view--many to the host once three or more decks stack permanently', () => {
+      const { fixture } = render([device(true), device(true), device(true)]);
+
+      expect(fixture.nativeElement.classList.contains('dj-mixer-view--many')).toBe(true);
+    });
   });
 });

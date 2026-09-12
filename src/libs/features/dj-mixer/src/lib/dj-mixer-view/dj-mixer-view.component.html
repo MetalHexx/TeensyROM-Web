@@ -11,7 +11,13 @@
 
   } @else {
 
-  <div class="mixer-grid">
+  <div
+    class="mixer-grid"
+    [class.mixer-grid--one]="decks().length === 1"
+    [class.mixer-grid--two]="decks().length === 2"
+    [class.mixer-grid--many]="isMany()"
+    [style.grid-template-areas]="isMany() ? manyGridAreas() : null"
+  >
     @for (deck of decks(); track deck.index) {
     <lib-dj-deck-column [deck]="deck"></lib-dj-deck-column>
     }

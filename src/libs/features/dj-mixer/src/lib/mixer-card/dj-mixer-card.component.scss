@@ -1,5 +1,45 @@
+@use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
+
 :host {
   grid-area: mx;
+}
+
+// The horizontal band form: below tablet width, at any deck count, and at every width once three
+// or more decks make the stacked form permanent (`:host.dj-mixer-card--band`, set by the view).
+// A shallow band is no longer possible with a full deck strip per deck, so it wraps rather than
+// clips if the strips and the crossfader don't fit on one line.
+@mixin band-form {
+  .mixer-body {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    height: auto;
+  }
+
+  .strips {
+    flex: 1 1 auto;
+    margin: 0 var(--spacing-md) 0 0;
+  }
+
+  // `lib-crossfader`'s own host is `width: 100%` for the column form, where it is the sole
+  // full-width row beneath `.strips`. The band form needs it to share the row instead — this
+  // reaches into the child's host element the same way the POC's `mixer-column.component.scss`
+  // already does.
+  lib-crossfader {
+    width: auto;
+    flex: 1 1 0;
+  }
+}
+
+:host {
+  @include styles.below-tablet {
+    @include band-form;
+  }
+
+  &.dj-mixer-card--band {
+    @include band-form;
+  }
 }
 
 .mixer-body {
