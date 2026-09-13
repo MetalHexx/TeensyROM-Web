@@ -1,0 +1,12 @@
+@use '@teensyrom-nx/ui-styles' as styles;
+
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: 999px;
+  border: 1px solid var(--color-highlight);
+  white-space: nowrap;
+  @include styles.glassy-dark-effect;
+}

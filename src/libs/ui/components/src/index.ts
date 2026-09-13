@@ -77,3 +77,4 @@ export * from './lib/marker-slot/marker-slot.component';
 export * from './lib/marker-row/marker-row.component';
 export * from './lib/loops-cues-panel/loops-cues-panel.component';
 export * from './lib/binding-card/binding-card.component';
+export * from './lib/drag-chip/drag-chip.component';
