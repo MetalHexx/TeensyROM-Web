@@ -12,37 +12,30 @@
  * Do not edit the class manually.
  */
 
+
 import * as runtime from '../runtime';
+import type {
+  LaunchFileResponse,
+  LaunchRandomResponse,
+  NullableOfTeensyFilterType,
+  ProblemDetails,
+  TeensyStorageType,
+  ToggleMusicResponse,
+} from '../models/index';
 import {
-    type LaunchFileResponse,
     LaunchFileResponseFromJSON,
     LaunchFileResponseToJSON,
-} from '../models/LaunchFileResponse';
-import {
-    type LaunchRandomResponse,
     LaunchRandomResponseFromJSON,
     LaunchRandomResponseToJSON,
-} from '../models/LaunchRandomResponse';
-import {
-    type NullableOfTeensyFilterType,
     NullableOfTeensyFilterTypeFromJSON,
     NullableOfTeensyFilterTypeToJSON,
-} from '../models/NullableOfTeensyFilterType';
-import {
-    type ProblemDetails,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
-} from '../models/ProblemDetails';
-import {
-    type TeensyStorageType,
     TeensyStorageTypeFromJSON,
     TeensyStorageTypeToJSON,
-} from '../models/TeensyStorageType';
-import {
-    type ToggleMusicResponse,
     ToggleMusicResponseFromJSON,
     ToggleMusicResponseToJSON,
-} from '../models/ToggleMusicResponse';
+} from '../models/index';
 
 export interface LaunchFileRequest {
     deviceId: string;
@@ -68,9 +61,10 @@ export interface ToggleMusicRequest {
 export class PlayerApiService extends runtime.BaseAPI {
 
     /**
-     * Creates request options for launchFile without sending the request
+     * Launches a file given a valid path to a file stored on the TeensyRom.
+     * Launch File
      */
-    async launchFileRequestOpts(requestParameters: LaunchFileRequest): Promise<runtime.RequestOpts> {
+    async launchFileRaw(requestParameters: LaunchFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LaunchFileResponse>> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -100,26 +94,12 @@ export class PlayerApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/launch`;
-        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
-        urlPath = urlPath.replace('{storageType}', encodeURIComponent(String(requestParameters['storageType'])));
-
-        return {
-            path: urlPath,
+        const response = await this.request({
+            path: `/api/devices/{deviceId}/storage/{storageType}/launch`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        };
-    }
-
-    /**
-     * Launches a file given a valid path to a file stored on the TeensyRom.
-     * Launch File
-     */
-    async launchFileRaw(requestParameters: LaunchFileRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LaunchFileResponse>> {
-        const requestOptions = await this.launchFileRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
+        }, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => LaunchFileResponseFromJSON(jsonValue));
     }
@@ -134,9 +114,10 @@ export class PlayerApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Creates request options for launchRandom without sending the request
+     * Launches a random file given a device, storage, filter and starting directory location.  - Starting Directory: Starting directory to look for a random file. - Scope: `Storage` - Selects a random file anywhere on the specified storage device. - Scope: `DirDeep` - Selects a random file from the starting directory or any of its subdirectories. - Scope: `DirShallow` - Selects a random file from the starting directory only (subdirectories are not included). - Filter: `All` - Any file type will be randomly selected. - Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games. - Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc). - Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)
+     * Launch Random File
      */
-    async launchRandomRequestOpts(requestParameters: LaunchRandomRequest): Promise<runtime.RequestOpts> {
+    async launchRandomRaw(requestParameters: LaunchRandomRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LaunchRandomResponse>> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -167,26 +148,12 @@ export class PlayerApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/{deviceId}/storage/{storageType}/random-launch`;
-        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
-        urlPath = urlPath.replace('{storageType}', encodeURIComponent(String(requestParameters['storageType'])));
-
-        return {
-            path: urlPath,
+        const response = await this.request({
+            path: `/api/devices/{deviceId}/storage/{storageType}/random-launch`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))).replace(`{${"storageType"}}`, encodeURIComponent(String(requestParameters['storageType']))),
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        };
-    }
-
-    /**
-     * Launches a random file given a device, storage, filter and starting directory location.  - Starting Directory: Starting directory to look for a random file. - Scope: `Storage` - Selects a random file anywhere on the specified storage device. - Scope: `DirDeep` - Selects a random file from the starting directory or any of its subdirectories. - Scope: `DirShallow` - Selects a random file from the starting directory only (subdirectories are not included). - Filter: `All` - Any file type will be randomly selected. - Filter: `Games` - Only game-related files will be selected (e.g., .prg, .crt, .d64, etc). Includes demos and non-games. - Filter: `Music` - Only music or song files will be selected (e.g., .sid, .mus, .mp3, etc). - Filter: `Images` - Only image files will be selected (e.g., .koa, .png, etc). Also includes text files (may be improved in a future release)
-     * Launch Random File
-     */
-    async launchRandomRaw(requestParameters: LaunchRandomRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<LaunchRandomResponse>> {
-        const requestOptions = await this.launchRandomRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
+        }, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => LaunchRandomResponseFromJSON(jsonValue));
     }
@@ -201,9 +168,10 @@ export class PlayerApiService extends runtime.BaseAPI {
     }
 
     /**
-     * Creates request options for toggleMusic without sending the request
+     * Toggles the play/pause state of the currently playing music on the TeensyRom device.
+     * Toggle Music Playback
      */
-    async toggleMusicRequestOpts(requestParameters: ToggleMusicRequest): Promise<runtime.RequestOpts> {
+    async toggleMusicRaw(requestParameters: ToggleMusicRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ToggleMusicResponse>> {
         if (requestParameters['deviceId'] == null) {
             throw new runtime.RequiredError(
                 'deviceId',
@@ -215,25 +183,12 @@ export class PlayerApiService extends runtime.BaseAPI {
 
         const headerParameters: runtime.HTTPHeaders = {};
 
-
-        let urlPath = `/api/devices/{deviceId}/toggle-music`;
-        urlPath = urlPath.replace('{deviceId}', encodeURIComponent(String(requestParameters['deviceId'])));
-
-        return {
-            path: urlPath,
+        const response = await this.request({
+            path: `/api/devices/{deviceId}/toggle-music`.replace(`{${"deviceId"}}`, encodeURIComponent(String(requestParameters['deviceId']))),
             method: 'POST',
             headers: headerParameters,
             query: queryParameters,
-        };
-    }
-
-    /**
-     * Toggles the play/pause state of the currently playing music on the TeensyRom device.
-     * Toggle Music Playback
-     */
-    async toggleMusicRaw(requestParameters: ToggleMusicRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ToggleMusicResponse>> {
-        const requestOptions = await this.toggleMusicRequestOpts(requestParameters);
-        const response = await this.request(requestOptions, initOverrides);
+        }, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => ToggleMusicResponseFromJSON(jsonValue));
     }

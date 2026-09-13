@@ -12,17 +12,18 @@
  * Do not edit the class manually.
  */
 
+
 import * as runtime from '../runtime';
+import type {
+  ListDevicesResponse,
+  ProblemDetails,
+} from '../models/index';
 import {
-    type ListDevicesResponse,
     ListDevicesResponseFromJSON,
     ListDevicesResponseToJSON,
-} from '../models/ListDevicesResponse';
-import {
-    type ProblemDetails,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
-} from '../models/ProblemDetails';
+} from '../models/index';
 
 /**
  * 
@@ -30,31 +31,20 @@ import {
 export class AudioApiService extends runtime.BaseAPI {
 
     /**
-     * Creates request options for listAudioDevices without sending the request
-     */
-    async listAudioDevicesRequestOpts(): Promise<runtime.RequestOpts> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/api/audio/devices`;
-
-        return {
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        };
-    }
-
-    /**
      * Enumerates all available audio input devices on the host system.  **Use Case:** Call this endpoint when configuring audio streaming settings to present the user with a list of audio devices to choose from.  **Device Information:** - **Index**: Device identifier used to select the device for capture - **Name**: Human-readable device name for display in UI - **MaxInputChannels**: Number of audio channels the device supports - **DefaultSampleRate**: The device\'s preferred sample rate  Returns an empty list if no audio input devices are available.
      * List Audio Input Devices
      */
     async listAudioDevicesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ListDevicesResponse>> {
-        const requestOptions = await this.listAudioDevicesRequestOpts();
-        const response = await this.request(requestOptions, initOverrides);
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/audio/devices`,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => ListDevicesResponseFromJSON(jsonValue));
     }

@@ -1035,6 +1035,93 @@
         }
       }
     },
+    "/api/devices/{deviceId}/storage/{storageType}/files/content": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Get File Content",
+        "description": "Returns a file's raw bytes (application/octet-stream) from a device's storage.\n\n- Byte-identical to the file on the cartridge.\n- Refused with 413 above 10 MB.\n- The path must be a Unix-style file path with no '..' segment.",
+        "operationId": "GetFileContent",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageType",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/TeensyStorageType"
+            }
+          },
+          {
+            "name": "Path",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{deviceId}/storage/{storageType}/directories": {
       "get": {
         "tags": [
@@ -2312,6 +2399,10 @@
             "type": "string"
           }
         }
+      },
+      "Stream": {
+        "type": "string",
+        "format": "binary"
       },
       "TeensyFilterType": {
         "enum": [

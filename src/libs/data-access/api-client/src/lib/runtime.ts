@@ -12,6 +12,7 @@
  * Do not edit the class manually.
  */
 
+
 export const BASE_PATH = "http://localhost".replace(/\/+$/, "");
 
 export interface ConfigurationParameters {
@@ -90,7 +91,7 @@ export const DefaultConfig = new Configuration();
  */
 export class BaseAPI {
 
-    private static readonly jsonRegex = /^(:?application\/json|[^;/ \t]+\/[^;/ \t]+[+]json)[ \t]*(:?;.*)?$/i;
+    private static readonly jsonRegex = new RegExp('^(:?application\/json|[^;/ \t]+\/[^;/ \t]+[+]json)[ \t]*(:?;.*)?$', 'i');
     private middleware: Middleware[];
 
     constructor(protected configuration = DefaultConfig) {
@@ -260,12 +261,6 @@ export class ResponseError extends Error {
     override name: "ResponseError" = "ResponseError";
     constructor(public response: Response, msg?: string) {
         super(msg);
-
-        // restore prototype chain
-        const actualProto = new.target.prototype;
-        if (Object.setPrototypeOf) {
-            Object.setPrototypeOf(this, actualProto);
-        }
     }
 }
 
@@ -273,12 +268,6 @@ export class FetchError extends Error {
     override name: "FetchError" = "FetchError";
     constructor(public cause: Error, msg?: string) {
         super(msg);
-
-        // restore prototype chain
-        const actualProto = new.target.prototype;
-        if (Object.setPrototypeOf) {
-            Object.setPrototypeOf(this, actualProto);
-        }
     }
 }
 
@@ -286,12 +275,6 @@ export class RequiredError extends Error {
     override name: "RequiredError" = "RequiredError";
     constructor(public field: string, msg?: string) {
         super(msg);
-
-        // restore prototype chain
-        const actualProto = new.target.prototype;
-        if (Object.setPrototypeOf) {
-            Object.setPrototypeOf(this, actualProto);
-        }
     }
 }
 
@@ -367,14 +350,9 @@ export function mapValues(data: any, fn: (item: any) => any) {
     return result;
 }
 
-// Pass-through serializer for `any`-typed properties in form data. See #1877.
-export function anyToJSON(value: any): any {
-    return value;
-}
-
 export function canConsumeForm(consumes: Consume[]): boolean {
     for (const consume of consumes) {
-        if (consume.contentType?.startsWith('multipart/form-data') == true) {
+        if ('multipart/form-data' === consume.contentType) {
             return true;
         }
     }
