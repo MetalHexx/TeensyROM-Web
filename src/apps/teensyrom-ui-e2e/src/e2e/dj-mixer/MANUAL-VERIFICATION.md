@@ -64,3 +64,18 @@ reach a real backend or any actually-attached device.
 Device state was left at zero-enabled (matching a clean starting point) after the checks above.
 The dev server started for this session was stopped afterward and never touched the real backend
 or any committed configuration.
+
+## Byte fidelity (P03-T02)
+
+Not run. This task (`P03-T02`, wiring the drag/drop-to-alert path) requires a real TeensyROM
+cartridge attached over serial to retrieve an actual `.sid` file's bytes and produce a real
+SHA-256 in the alert. No cartridge was attached in this execution environment, so the drop →
+retrieve → alert path, the byte count, and the hash were never exercised end to end here — this
+check, and the companion real-browser check for the drag chip showing the correct row's name
+(called out in the task as not skippable), are left for an operator with a device attached. No
+hash is recorded here; none was fabricated.
+
+To perform this check once a cartridge is available: `pnpm nx serve teensyrom-ui`, drag a known
+`.sid` file from the DJ mixer's listing onto a deck's transport, copy the hash out of the resulting
+alert, then hash the same file on the desktop (`Get-FileHash -Algorithm SHA256 <file>` on Windows,
+or `sha256sum <file>` on macOS/Linux) and confirm the two hex strings match.

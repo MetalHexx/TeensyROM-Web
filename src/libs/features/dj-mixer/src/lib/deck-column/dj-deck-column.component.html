@@ -1,10 +1,26 @@
-<lib-scaling-compact-card [style.gridArea]="'t' + deck().index" animationEntry="from-bottom">
-  <lib-transport-panel
-    [model]="models().transport"
-    [positionPercent]="models().positionPercent"
-    [frameLabel]="models().frameLabel"
-  ></lib-transport-panel>
-</lib-scaling-compact-card>
+<div class="transport-slot" [style.gridArea]="'t' + deck().index">
+  <lib-scaling-compact-card animationEntry="from-bottom">
+    <lib-transport-panel
+      [model]="models().transport"
+      [positionPercent]="models().positionPercent"
+      [frameLabel]="models().frameLabel"
+    ></lib-transport-panel>
+  </lib-scaling-compact-card>
+
+  @if (dropActive()) {
+  <div
+    class="drop-overlay"
+    [class.drop-overlay--hot]="hot()"
+    aria-hidden="true"
+    (dragenter)="onOverlayDragEnter($event)"
+    (dragover)="onOverlayDragOver($event)"
+    (dragleave)="onOverlayDragLeave($event)"
+    (drop)="onOverlayDrop($event)"
+  >
+    <span class="drop-overlay-label">Drop to load — Deck {{ deck().letter }}</span>
+  </div>
+  }
+</div>
 
 <lib-scaling-compact-card
   [style.gridArea]="'c' + deck().index"

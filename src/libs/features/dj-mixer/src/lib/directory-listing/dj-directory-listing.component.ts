@@ -1,7 +1,19 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  computed,
+  ElementRef,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { StorageStore, type StorageDirectoryState } from '@teensyrom-nx/application';
 import {
+  FileItemType,
   formatFileSize,
   getFileIcon,
   type DirectoryItem,
@@ -9,11 +21,13 @@ import {
 } from '@teensyrom-nx/domain';
 import {
   DirectoryItemComponent,
+  DragChipComponent,
   EmptyStateMessageComponent,
   StorageItemActionsComponent,
   StorageItemComponent,
 } from '@teensyrom-nx/ui/components';
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
+import { setDjFileDragData } from '../drag/dj-file-drag';
 import { DjDirectoryTrailComponent } from './dj-directory-trail.component';
 
 type DirectoryRow = DirectoryItem & { readonly itemType: 'directory' };
@@ -36,6 +50,7 @@ type ListingRow = DirectoryRow | FileRow;
     StorageItemComponent,
     StorageItemActionsComponent,
     EmptyStateMessageComponent,
+    DragChipComponent,
   ],
   templateUrl: './dj-directory-listing.component.html',
   styleUrl: './dj-directory-listing.component.scss',
@@ -43,7 +58,17 @@ type ListingRow = DirectoryRow | FileRow;
 export class DjDirectoryListingComponent {
   readonly activeStorage = input<ActiveStorage | null>(null);
 
+  readonly dragStarted = output<void>();
+  readonly dragEnded = output<void>();
+
   private readonly storageStore = inject(StorageStore);
+  private readonly changeDetectorRef = inject(ChangeDetectorRef);
+
+  /** The off-screen drag-image chip's element, snapshotted synchronously by the browser on `dragstart`. */
+  private readonly dragChipEl = viewChild<ElementRef<HTMLElement>>('dragChip', { read: ElementRef });
+
+  /** The dragged row's name, shown by the off-screen chip that becomes the native drag image. */
+  protected readonly dragChipLabel = signal('');
 
   private readonly entry = computed<StorageDirectoryState | null>(() => {
     const key = activeStorageKey(this.activeStorage());
@@ -78,6 +103,40 @@ export class DjDirectoryListingComponent {
 
   isSelected(row: ListingRow): boolean {
     return this.selectedPath() === row.path;
+  }
+
+  /** Only a `.sid` song row is a drag source — directories and every other file type get nothing. */
+  isDraggableRow(row: ListingRow): row is FileRow {
+    return !this.isDirectoryRow(row) && row.type === FileItemType.Song;
+  }
+
+  onRowDragStart(event: DragEvent, row: ListingRow): void {
+    const active = this.activeStorage();
+    if (!active || !this.isDraggableRow(row) || !event.dataTransfer) return;
+
+    setDjFileDragData(event.dataTransfer, {
+      deviceId: active.deviceId,
+      storageType: active.storageType,
+      path: row.path,
+      fileName: row.name,
+    });
+
+    // The label must be current before the browser snapshots the drag image, which happens
+    // synchronously when this handler returns — zoneless-coalesced change detection would
+    // otherwise still show the previously-dragged row's name.
+    this.dragChipLabel.set(row.name);
+    this.changeDetectorRef.detectChanges();
+
+    const chipEl = this.dragChipEl()?.nativeElement;
+    if (chipEl) {
+      event.dataTransfer.setDragImage(chipEl, 16, chipEl.offsetHeight / 2);
+    }
+
+    this.dragStarted.emit();
+  }
+
+  onRowDragEnd(): void {
+    this.dragEnded.emit();
   }
 
   onDirectorySelected(directory: DirectoryItem): void {

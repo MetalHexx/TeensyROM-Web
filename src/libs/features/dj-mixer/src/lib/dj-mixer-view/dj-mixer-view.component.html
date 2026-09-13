@@ -19,7 +19,11 @@
     [style.grid-template-areas]="isMany() ? manyGridAreas() : null"
   >
     @for (deck of decks(); track deck.index) {
-    <lib-dj-deck-column [deck]="deck"></lib-dj-deck-column>
+    <lib-dj-deck-column
+      [deck]="deck"
+      [dropActive]="dragging()"
+      (fileDropped)="onFileDropped($event)"
+    ></lib-dj-deck-column>
     }
     <lib-dj-mixer-card
       [decks]="decks()"
@@ -43,7 +47,11 @@
         cardClass="compact-card--fill"
         animationEntry="from-bottom"
       >
-        <lib-dj-directory-listing [activeStorage]="activeStorage()"></lib-dj-directory-listing>
+        <lib-dj-directory-listing
+          [activeStorage]="activeStorage()"
+          (dragStarted)="dragging.set(true)"
+          (dragEnded)="dragging.set(false)"
+        ></lib-dj-directory-listing>
       </lib-scaling-compact-card>
     </div>
   </div>

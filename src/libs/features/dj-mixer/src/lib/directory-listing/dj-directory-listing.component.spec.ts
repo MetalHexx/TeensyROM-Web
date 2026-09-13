@@ -3,12 +3,13 @@ import { Component, input, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
 import { StorageStore, type StorageDirectoryState } from '@teensyrom-nx/application';
-import { StorageType, type DirectoryItem, type FileItem } from '@teensyrom-nx/domain';
+import { FileItemType, StorageType, type DirectoryItem, type FileItem } from '@teensyrom-nx/domain';
 import { DirectoryItemComponent, StorageItemComponent } from '@teensyrom-nx/ui/components';
 import { createTestFileItem } from '@teensyrom-nx/testing/fixtures';
 import { DjDirectoryListingComponent } from './dj-directory-listing.component';
 import { DjDirectoryTrailComponent } from './dj-directory-trail.component';
 import type { ActiveStorage } from '../active-storage';
+import { DJ_FILE_DRAG_TYPE, type DjFileDragPayload } from '../drag/dj-file-drag';
 
 @Component({
   selector: 'lib-dj-directory-trail',
@@ -21,6 +22,39 @@ class MockDjDirectoryTrailComponent {
 
 const mockDirectory: DirectoryItem = { name: 'Games', path: '/games' };
 const mockFile: FileItem = createTestFileItem({ name: 'song.sid', path: '/song.sid', size: 4096 });
+const mockImageFile: FileItem = createTestFileItem({
+  name: 'cover.png',
+  path: '/cover.png',
+  size: 2048,
+  type: FileItemType.Image,
+});
+
+/** A stubbed `DataTransfer` sufficient for `setDjFileDragData`/`readDjFileDragData` round-trips. */
+function createFakeDataTransfer(): {
+  dataTransfer: DataTransfer;
+  setDragImage: ReturnType<typeof vi.fn>;
+} {
+  const data: Record<string, string> = {};
+  const types: string[] = [];
+  const setDragImage = vi.fn();
+  const dataTransfer = {
+    setData: (type: string, value: string) => {
+      data[type] = value;
+      types.push(type);
+    },
+    getData: (type: string) => data[type] ?? '',
+    setDragImage,
+    types,
+    effectAllowed: 'none',
+  } as unknown as DataTransfer;
+  return { dataTransfer, setDragImage };
+}
+
+function dragStartEvent(dataTransfer: DataTransfer): DragEvent {
+  const event = new Event('dragstart', { bubbles: true, cancelable: true }) as DragEvent;
+  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer, configurable: true });
+  return event;
+}
 
 function stateWith(overrides: Partial<StorageDirectoryState>): StorageDirectoryState {
   return {
@@ -163,5 +197,70 @@ describe('DjDirectoryListingComponent', () => {
     expect(storageItem.icon()).toBe('music_note');
     expect(storageItem.label()).toBe('song.sid');
     expect(fixture.nativeElement.querySelector('.actions-label').textContent.trim()).toBe('4.0 KB');
+  });
+
+  describe('dragging a song row', () => {
+    it('marks only the Song row draggable, leaving directories and other file types alone', async () => {
+      await setup(active, {
+        'device-1-SD': stateWith({
+          directory: { directories: [mockDirectory], files: [mockFile, mockImageFile], path: '/' },
+        }),
+      });
+
+      const rows = fixture.nativeElement.querySelectorAll('.listing-row');
+      expect(rows[0].getAttribute('draggable')).toBeNull(); // directory
+      expect(rows[1].getAttribute('draggable')).toBe('true'); // song
+      expect(rows[2].getAttribute('draggable')).toBeNull(); // image
+    });
+
+    it('writes the drag payload under DJ_FILE_DRAG_TYPE and emits dragStarted on dragstart', async () => {
+      await setup(active, {
+        'device-1-SD': stateWith({ directory: { directories: [], files: [mockFile], path: '/' } }),
+      });
+
+      const emitted: void[] = [];
+      component.dragStarted.subscribe(() => emitted.push(undefined));
+
+      const row = fixture.nativeElement.querySelector('.listing-row') as HTMLElement;
+      const { dataTransfer } = createFakeDataTransfer();
+      row.dispatchEvent(dragStartEvent(dataTransfer));
+
+      const payload = JSON.parse(dataTransfer.getData(DJ_FILE_DRAG_TYPE)) as DjFileDragPayload;
+      expect(payload).toEqual({
+        deviceId: 'device-1',
+        storageType: StorageType.Sd,
+        path: '/song.sid',
+        fileName: 'song.sid',
+      });
+      expect(emitted.length).toBe(1);
+    });
+
+    it('sets the drag image from the off-screen chip, current with the dragged row', async () => {
+      await setup(active, {
+        'device-1-SD': stateWith({ directory: { directories: [], files: [mockFile], path: '/' } }),
+      });
+
+      const row = fixture.nativeElement.querySelector('.listing-row') as HTMLElement;
+      const { dataTransfer, setDragImage } = createFakeDataTransfer();
+      row.dispatchEvent(dragStartEvent(dataTransfer));
+
+      const chipEl = fixture.nativeElement.querySelector('.drag-chip-ghost');
+      expect(chipEl.querySelector('.icon-label-text')?.textContent?.trim()).toBe('song.sid');
+      expect(setDragImage).toHaveBeenCalledWith(chipEl, 16, chipEl.offsetHeight / 2);
+    });
+
+    it('emits dragEnded on dragend', async () => {
+      await setup(active, {
+        'device-1-SD': stateWith({ directory: { directories: [], files: [mockFile], path: '/' } }),
+      });
+
+      const emitted: void[] = [];
+      component.dragEnded.subscribe(() => emitted.push(undefined));
+
+      const row = fixture.nativeElement.querySelector('.listing-row') as HTMLElement;
+      row.dispatchEvent(new Event('dragend', { bubbles: true, cancelable: true }));
+
+      expect(emitted.length).toBe(1);
+    });
   });
 });

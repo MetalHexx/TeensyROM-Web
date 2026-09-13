@@ -21,6 +21,7 @@
   size="small"
 ></lib-empty-state-message>
 } @else {
+<lib-drag-chip #dragChip class="drag-chip-ghost" [label]="dragChipLabel()"></lib-drag-chip>
 <div class="viewport-wrapper">
   <cdk-virtual-scroll-viewport
     itemSize="42"
@@ -33,6 +34,9 @@
       class="listing-row"
       [attr.data-item-path]="row.path"
       [attr.data-file-type]="isDirectoryRow(row) ? null : row.type"
+      [attr.draggable]="isDraggableRow(row) ? true : null"
+      (dragstart)="onRowDragStart($event, row)"
+      (dragend)="onRowDragEnd()"
     >
       @if (isDirectoryRow(row)) {
       <lib-directory-item

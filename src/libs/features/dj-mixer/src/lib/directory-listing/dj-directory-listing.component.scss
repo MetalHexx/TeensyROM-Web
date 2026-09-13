@@ -14,6 +14,14 @@ lib-dj-directory-trail {
   flex: 0 0 auto;
 }
 
+// The native drag image is snapshotted from this element on `dragstart`; off-screen rather than
+// `opacity: 0`/`display: none` because Chrome ignores those as drag images.
+.drag-chip-ghost {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+}
+
 .viewport-wrapper {
   flex: 1 1 0;
   min-height: 0;

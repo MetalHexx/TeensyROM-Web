@@ -8,7 +8,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
+import { DeviceStore, DjStore, StorageStore } from '@teensyrom-nx/application';
 import {
   EmptyStateMessageComponent,
   ScalingCompactCardComponent,
@@ -23,6 +23,8 @@ import {
 import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-listing.component';
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
 import type { DeckRef } from '../deck-ref';
+import type { DjFileDragPayload } from '../drag/dj-file-drag';
+import { formatSidEvidence } from '../drag/sid-evidence';
 
 @Component({
   selector: 'lib-dj-mixer-view',
@@ -42,6 +44,7 @@ import type { DeckRef } from '../deck-ref';
 export class DjMixerViewComponent {
   private readonly deviceStore = inject(DeviceStore);
   private readonly storageStore = inject(StorageStore);
+  private readonly djStore = inject(DjStore);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly enabledDevices = computed<Device[]>(() =>
@@ -55,6 +58,9 @@ export class DjMixerViewComponent {
 
   /** The DJ-local state: which device/storage the browse trees and listing currently show. */
   readonly activeStorage = signal<ActiveStorage | null>(null);
+
+  /** Whether a SID drag from the listing is currently in flight — lights every deck's overlay. */
+  readonly dragging = signal(false);
 
   /** deviceId currently holding the navigation pin taken by this view. */
   private pinnedDeviceId: string | null = null;
@@ -132,6 +138,17 @@ export class DjMixerViewComponent {
     this.activeStorage.set(event);
     const path = this.storageStore.storageEntries()[activeStorageKey(event)]?.currentPath ?? '/';
     void this.storageStore.navigateToDirectory({ ...event, path });
+  }
+
+  /**
+   * Retrieves the dropped SID's bytes into the store (a no-op if already retrieved), then alerts
+   * the byte evidence. Both retrieval and formatting are awaited — `formatSidEvidence` hashes
+   * asynchronously, so an un-awaited call would alert `[object Promise]`.
+   */
+  async onFileDropped({ deviceId, storageType, path }: DjFileDragPayload): Promise<void> {
+    await this.djStore.retrieveFile({ deviceId, storageType, path });
+    const entry = this.djStore.getFile(deviceId, storageType, path)();
+    window.alert(await formatSidEvidence(entry));
   }
 
   private async seedStorage(device: Device): Promise<void> {
