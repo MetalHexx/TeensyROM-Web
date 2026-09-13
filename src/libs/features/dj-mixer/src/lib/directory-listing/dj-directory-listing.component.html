@@ -1,0 +1,63 @@
+@if (activeStorage(); as active) {
+<lib-dj-directory-trail [activeStorage]="active"></lib-dj-directory-trail>
+
+@if (isLoading()) {
+<lib-empty-state-message
+  icon="hourglass_empty"
+  title="Loading"
+  size="small"
+></lib-empty-state-message>
+} @else { @if (error(); as message) {
+<lib-empty-state-message
+  icon="error_outline"
+  title="Directory Unavailable"
+  [message]="message"
+  size="small"
+></lib-empty-state-message>
+} @else if (!hasContent()) {
+<lib-empty-state-message
+  icon="folder_open"
+  title="Empty Directory"
+  size="small"
+></lib-empty-state-message>
+} @else {
+<div class="viewport-wrapper">
+  <cdk-virtual-scroll-viewport
+    itemSize="42"
+    class="listing-viewport"
+    minBufferPx="200"
+    maxBufferPx="400"
+  >
+    <div
+      *cdkVirtualFor="let row of rows(); trackBy: trackByPath"
+      class="listing-row"
+      [attr.data-item-path]="row.path"
+      [attr.data-file-type]="isDirectoryRow(row) ? null : row.type"
+    >
+      @if (isDirectoryRow(row)) {
+      <lib-directory-item
+        [directoryItem]="row"
+        [selected]="isSelected(row)"
+        (itemSelected)="onDirectorySelected($event)"
+      ></lib-directory-item>
+      } @else {
+      <lib-storage-item
+        [icon]="getFileIcon(row.type)"
+        iconColor="normal"
+        [label]="row.name"
+        [selected]="isSelected(row)"
+        (selectedChange)="onFileSelected(row)"
+      >
+        <lib-storage-item-actions [label]="formatFileSize(row.size)"></lib-storage-item-actions>
+      </lib-storage-item>
+      }
+    </div>
+  </cdk-virtual-scroll-viewport>
+</div>
+} } } @else {
+<lib-empty-state-message
+  icon="devices"
+  title="Select a Storage"
+  size="small"
+></lib-empty-state-message>
+}

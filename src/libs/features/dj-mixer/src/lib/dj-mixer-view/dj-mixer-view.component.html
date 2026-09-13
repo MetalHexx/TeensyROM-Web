@@ -27,16 +27,24 @@
       [band]="isMany()"
     ></lib-dj-mixer-card>
     <div class="bottom-band">
-      <lib-scaling-card
+      <lib-scaling-compact-card
         class="browse-card"
-        title="Browse"
+        cardClass="compact-card--fill"
         animationEntry="from-bottom"
-      ></lib-scaling-card>
-      <lib-scaling-card
+      >
+        <lib-dj-browse-trees
+          [devices]="enabledDevices()"
+          [activeStorage]="activeStorage()"
+          (storageSelect)="onStorageSelect($event)"
+        ></lib-dj-browse-trees>
+      </lib-scaling-compact-card>
+      <lib-scaling-compact-card
         class="directory-listing-card"
-        title="Directory Listing"
+        cardClass="compact-card--fill"
         animationEntry="from-bottom"
-      ></lib-scaling-card>
+      >
+        <lib-dj-directory-listing [activeStorage]="activeStorage()"></lib-dj-directory-listing>
+      </lib-scaling-compact-card>
     </div>
   </div>
 

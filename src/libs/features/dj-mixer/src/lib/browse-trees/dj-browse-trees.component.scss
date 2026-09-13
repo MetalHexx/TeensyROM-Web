@@ -1,0 +1,9 @@
+// Sole content of the browse card's `.compact-card--fill` flex column: `flex: 1 1 auto` claims
+// the column's full height and `min-height: 0` lets it shrink below its trees' natural height so
+// this element — not the outer `.compact-card`'s `overflow: hidden` — is what scrolls.
+:host {
+  display: block;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}

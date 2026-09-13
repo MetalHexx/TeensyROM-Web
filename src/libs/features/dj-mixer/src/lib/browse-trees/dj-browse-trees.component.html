@@ -1,0 +1,9 @@
+@for (tree of trees(); track tree.deviceId) {
+<lib-browse-tree
+  [model]="tree"
+  [expanded]="isExpanded(tree.deviceId)"
+  [selectedStorageType]="selectedStorageTypeFor(tree.deviceId)"
+  (expandedChange)="onExpandedChange(tree.deviceId, $event)"
+  (storageSelect)="onStorageSelect(tree.deviceId, $event)"
+></lib-browse-tree>
+}

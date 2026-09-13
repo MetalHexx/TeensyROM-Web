@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { DirectoryTreeNodeComponent } from '../directory-tree/directory-tree-node/directory-tree-node.component';
 import { DirectoryTreeNodeType, StorageType } from '@teensyrom-nx/domain';
 
@@ -25,7 +25,7 @@ import { DirectoryTreeNodeType, StorageType } from '@teensyrom-nx/domain';
   imports: [DirectoryTreeNodeComponent],
   templateUrl: './browse-tree.component.html',
   styleUrl: './browse-tree.component.scss',
-  changeDetection: 'OnPush',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BrowseTreeComponent {
   /**
