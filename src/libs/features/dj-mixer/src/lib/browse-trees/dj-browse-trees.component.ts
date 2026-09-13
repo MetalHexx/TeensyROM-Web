@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
-import { BrowseTreeComponent, type BrowseTreeModel } from '@teensyrom-nx/ui/components';
+import { BrowseTreeComponent, type BrowseTreeModel, type BrowseTreeStorageModel } from '@teensyrom-nx/ui/components';
 import { StorageType, type Device } from '@teensyrom-nx/domain';
 import type { ActiveStorage } from '../active-storage';
 
@@ -53,7 +53,7 @@ export class DjBrowseTreesComponent {
 }
 
 function toBrowseTreeModel(device: Device): BrowseTreeModel {
-  const storages: BrowseTreeModel['storages'] = [];
+  const storages: BrowseTreeStorageModel[] = [];
 
   if (device.sdStorage?.available) {
     storages.push({
