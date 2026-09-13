@@ -72,4 +72,32 @@ describe('CrossfaderComponent', () => {
 
     expect(rangeInput().value).toBe('0.42');
   });
+
+  describe('trackLength', () => {
+    function labelsRow(): HTMLElement | null {
+      return fixture.nativeElement.querySelector('.crossfader-labels');
+    }
+
+    it('sets neither the CSS variable nor the fixed-track attribute when null', () => {
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(host.style.getPropertyValue('--crossfader-track-length')).toBe('');
+      expect(host.hasAttribute('data-fixed-track')).toBe(false);
+      expect(labelsRow()).toBeNull();
+    });
+
+    it('sets the CSS variable, the fixed-track attribute and the label row above the track when set', () => {
+      fixture.componentRef.setInput('trackLength', '148px');
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.style.getPropertyValue('--crossfader-track-length')).toBe('148px');
+      expect(host.hasAttribute('data-fixed-track')).toBe(true);
+
+      const labels = labelsRow();
+      expect(labels).not.toBeNull();
+      expect(labels?.textContent).toContain('A');
+      expect(labels?.textContent).toContain('B');
+    });
+  });
 });

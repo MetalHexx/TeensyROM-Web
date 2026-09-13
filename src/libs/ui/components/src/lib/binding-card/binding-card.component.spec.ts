@@ -146,4 +146,16 @@ describe('BindingCardComponent', () => {
 
     expect(fixture.nativeElement.querySelectorAll('[role="alert"]').length).toBe(0);
   });
+
+  it('defaults data-layout to stacked and reflects the layout input', () => {
+    setModel(model());
+    const host = fixture.nativeElement as HTMLElement;
+
+    expect(host.getAttribute('data-layout')).toBe('stacked');
+
+    fixture.componentRef.setInput('layout', 'inline');
+    fixture.detectChanges();
+
+    expect(host.getAttribute('data-layout')).toBe('inline');
+  });
 });

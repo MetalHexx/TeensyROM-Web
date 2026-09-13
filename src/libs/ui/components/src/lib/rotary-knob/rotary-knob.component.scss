@@ -1,5 +1,24 @@
 :host {
   display: inline-flex;
+  --scale-knob-size: 64px;
+  --scale-knob-font: var(--font-size-sm);
+}
+
+// `large` is the default and matches the block above exactly — every existing use, unaware of
+// `size`, renders pixel-identical.
+:host([data-size='small']) {
+  --scale-knob-size: 36px;
+  --scale-knob-font: 0.7rem;
+}
+
+:host([data-size='medium']) {
+  --scale-knob-size: 48px;
+  --scale-knob-font: 0.75rem;
+}
+
+:host([data-size='extra-large']) {
+  --scale-knob-size: 80px;
+  --scale-knob-font: var(--font-size-md);
 }
 
 .scale-knob {
@@ -79,13 +98,13 @@ svg {
 
 .scale-knob-readout {
   color: var(--color-dimmed-light);
-  font-size: var(--font-size-sm);
+  font-size: var(--scale-knob-font);
   font-family: 'Roboto Mono', monospace;
 }
 
 .scale-knob-label {
   color: var(--color-dimmed);
-  font-size: var(--font-size-sm);
+  font-size: var(--scale-knob-font);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   white-space: nowrap;

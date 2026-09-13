@@ -26,7 +26,6 @@ const model: VoicePanelModel = {
     {
       label: 'V1',
       muted: false,
-      stateText: 'audible',
       holdLabel: 'Kill',
       checkboxId: 'voice-mute-0-a',
       muteAccessibleName: 'Mute voice 1 deck A',
@@ -35,16 +34,14 @@ const model: VoicePanelModel = {
     {
       label: 'V2',
       muted: true,
-      stateText: 'muted',
-      holdLabel: 'Punch In',
+      holdLabel: 'Punch',
       checkboxId: 'voice-mute-1-a',
       muteAccessibleName: 'Mute voice 2 deck A',
-      holdAccessibleName: 'Punch in voice 2 deck A',
+      holdAccessibleName: 'Punch voice 2 deck A',
     },
     {
       label: 'V3',
       muted: false,
-      stateText: 'audible',
       holdLabel: 'Kill',
       checkboxId: 'voice-mute-2-a',
       muteAccessibleName: 'Mute voice 3 deck A',

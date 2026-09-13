@@ -35,8 +35,9 @@ export interface TransportPanelModel {
   readonly canStop: boolean;
   /** The repeat toggle's checked state. */
   readonly repeatTrack: boolean;
-  /** Rendered in this array's order, one button each. */
-  readonly tuneSources: readonly TransportTuneSourceModel[];
+  /** Rendered in this array's order, one button each. Optional — absent or empty hides the tune
+   *  line entirely unless `showFilePicker` is set. */
+  readonly tuneSources?: readonly TransportTuneSourceModel[];
   /** The subtune stepper's caption, disabled state and both accessible names. */
   readonly subtune: {
     /** The caption between the two buttons, e.g. 'Subtune 1 of 3'. */
@@ -58,17 +59,18 @@ export interface TransportPanelModel {
     readonly stop: string;
     /** e.g. 'Repeat track deck A'. */
     readonly repeat: string;
-    /** e.g. 'Choose file deck A'. */
-    readonly chooseFile: string;
+    /** e.g. 'Choose file deck A'. Required only when `showFilePicker` is set. */
+    readonly chooseFile?: string;
   };
   /** Rendered in order as `role="alert"` paragraphs. Empty renders nothing. */
   readonly errors: readonly string[];
 }
 
 /**
- * One deck's transport, in the three lines the wireframe draws: position bar and frame readout;
- * transport buttons, repeat toggle and state LED; tune sources, file picker and subtune stepper.
- * Purely presentational — it composes `ScrubPositionBarComponent`, `StatusLedComponent` and
+ * One deck's transport, in two lines, three with POC affordances: position bar and frame readout;
+ * transport buttons, repeat toggle, subtune stepper and state LED; and, only when `showFilePicker`
+ * is set or the model carries `tuneSources`, a third line of tune-source buttons and the file
+ * picker. Purely presentational — it composes `ScrubPositionBarComponent`, `StatusLedComponent` and
  * `StepperComponent`, holds no state of its own beyond resetting its file input, and leaves every
  * gate, label and accessible name to the caller that builds the model.
  *
@@ -78,6 +80,7 @@ export interface TransportPanelModel {
  *   [model]="transportModel()"
  *   [positionPercent]="transportPositionPercent()"
  *   [frameLabel]="transportFrameLabel()"
+ *   [showFilePicker]="true"
  *   (playClick)="onPlay()"
  *   (repeatTrackChange)="onRepeatTrackChange($event)"
  *   (fileSelect)="onFileSelect($event)"
@@ -103,6 +106,10 @@ export class TransportPanelComponent {
   /** The frame readout beside the position bar, e.g. 'frame 1234' — per-frame, like
    *  `positionPercent`, and caller-composed. */
   readonly frameLabel = input.required<string>();
+  /** Renders the tune-source line's file picker, and forces that whole line to render even when
+   *  `model().tuneSources` is empty. The POC is the one caller that sets this; a model-driven
+   *  caller with its own `tuneSources` needs it only if it also wants a file picker. */
+  readonly showFilePicker = input<boolean>(false);
   /** The Play button was pressed. Named for the click rather than the transport verb: `play` and
    *  `pause` are standard DOM media events, which an output may not shadow. */
   readonly playClick = output<void>();

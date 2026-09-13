@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import type { ControlSize } from '../shared/control-size';
 
 /** Structural twin of the engine's own filter-mode union — declared locally so this library never
  *  imports an engine type. */
@@ -52,10 +53,17 @@ const OFF_OPTION: FilterModeOption = { mode: 'off', label: 'OFF' };
   templateUrl: './filter-mode-selector.component.html',
   styleUrl: './filter-mode-selector.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.data-size]': 'size()',
+  },
 })
 export class FilterModeSelectorComponent {
   /** The engaged mode and the caller-composed accessible names to render it with. */
   readonly model = input.required<FilterModeSelectorModel>();
+  /** The option buttons' rendered size — reflected as `data-size` on the host, which the
+   *  stylesheet reads to step each option's own height and font size. Defaults to `'large'`,
+   *  today's only size, so every existing use renders pixel-identical. */
+  readonly size = input<ControlSize>('large');
   /** Emits the newly engaged mode, or `null` when the engaged option was clicked again. */
   readonly modeSelect = output<FilterModeValue | null>();
 

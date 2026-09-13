@@ -10,6 +10,11 @@
   width: 100%;
 }
 
+.crossfader-labels {
+  display: flex;
+  justify-content: space-between;
+}
+
 .crossfader-label {
   flex: 0 0 auto;
   color: var(--color-dimmed);
@@ -22,4 +27,16 @@ input[type='range'] {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
+}
+
+// Fixed-track mode: the labels leave the track's own row and move above it, so the track can claim
+// the card's full content width instead of being shortened by two inline labels beside it.
+:host([data-fixed-track]) .crossfader {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+:host([data-fixed-track]) input[type='range'] {
+  flex: 0 0 auto;
+  width: var(--crossfader-track-length);
 }

@@ -130,6 +130,16 @@ describe('RotaryKnobComponent', () => {
     );
   });
 
+  it('defaults data-size to large and reflects the size input', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.getAttribute('data-size')).toBe('large');
+
+    fixture.componentRef.setInput('size', 'small');
+    fixture.detectChanges();
+
+    expect(host.getAttribute('data-size')).toBe('small');
+  });
+
   describe('vertical pointer drag', () => {
     // jsdom (this workspace's version) has no `PointerEvent` constructor — a `MouseEvent` carries
     // every field the component's handlers actually read (`clientY`, `shiftKey`, `target`) except

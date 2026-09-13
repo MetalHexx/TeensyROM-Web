@@ -1,6 +1,25 @@
 :host {
   display: block;
   width: 100%;
+  --filter-mode-option-height: 28px;
+  --filter-mode-option-font: var(--font-size-sm);
+}
+
+// `large` is the default and matches the block above exactly — every existing use, unaware of
+// `size`, renders pixel-identical. Font stepping mirrors `lib-rotary-knob`'s own `--scale-knob-font`.
+:host([data-size='small']) {
+  --filter-mode-option-height: 20px;
+  --filter-mode-option-font: 0.7rem;
+}
+
+:host([data-size='medium']) {
+  --filter-mode-option-height: 24px;
+  --filter-mode-option-font: 0.75rem;
+}
+
+:host([data-size='extra-large']) {
+  --filter-mode-option-height: 32px;
+  --filter-mode-option-font: var(--font-size-md);
 }
 
 * {
@@ -33,12 +52,12 @@
 }
 
 .filter-mode-option {
-  height: 28px;
+  height: var(--filter-mode-option-height);
   padding: 0;
   border: none;
   background: transparent;
   color: var(--color-dimmed);
-  font-size: var(--font-size-sm);
+  font-size: var(--filter-mode-option-font);
   cursor: pointer;
 }
 

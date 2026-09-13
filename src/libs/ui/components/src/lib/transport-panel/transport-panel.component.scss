@@ -22,7 +22,7 @@
   }
 }
 
-// The three lines the wireframe draws, nothing more.
+// The two lines every transport draws, plus the POC-only third line below.
 .line {
   display: flex;
   align-items: center;
@@ -48,10 +48,11 @@
   }
 }
 
-// Line 2: transport buttons, the repeat toggle directly right of Stop, a spacer, then the state
-// indicator pinned to the row's far right. Below 1240px there is no longer room for all of that on
-// one line, so the row gives up the spacer and wraps instead, with the state indicator's own
-// `margin-left: auto` keeping it pinned right whichever line it lands on.
+// Line 2: transport buttons, the repeat toggle directly right of Stop, a spacer, then the subtune
+// stepper and the state indicator pinned to the row's far right. Below 1240px there is no longer
+// room for all of that on one line, so the row gives up the spacer and wraps instead, with the
+// stepper's and the state indicator's own `margin-left: auto` keeping them pinned right whichever
+// line they land on.
 .line-transport {
   justify-content: space-between;
 
@@ -137,9 +138,9 @@ lib-status-led {
   }
 }
 
-// Line 3: the tune buttons and Choose File, with the subtune stepper pinned to the right. Gives up
-// the same ground the transport row does below 1240px: it wraps, and the stepper's own
-// `margin-left: auto` is what keeps it pinned right once it does.
+// Line 3 (POC only): the tune buttons and, when `showFilePicker` is set, Choose File. Rendered at
+// all only when there is something to show — see the `@if` around it in the template. Gives up the
+// same ground the transport row does below 1240px: it wraps.
 .line-tunes {
   justify-content: space-between;
 

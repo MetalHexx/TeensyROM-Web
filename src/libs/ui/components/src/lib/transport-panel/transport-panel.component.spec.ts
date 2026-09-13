@@ -158,6 +158,11 @@ describe('TransportPanelComponent', () => {
   });
 
   describe('file picking', () => {
+    beforeEach(() => {
+      fixture.componentRef.setInput('showFilePicker', true);
+      fixture.detectChanges();
+    });
+
     it('carries the picked File itself on fileSelect, never the event', () => {
       const emitted: File[] = [];
       component.fileSelect.subscribe((file) => emitted.push(file));
@@ -240,5 +245,49 @@ describe('TransportPanelComponent', () => {
 
       expect(rangeInput().value).toBe('37');
     });
+  });
+
+  describe('the tune-source line', () => {
+    it('renders neither the tune buttons nor the file picker with no sources and no showFilePicker', () => {
+      setModel({ tuneSources: [] });
+
+      expect(root().querySelectorAll('.tune-sources button').length).toBe(0);
+      expect(root().querySelector('.file-picker')).toBeNull();
+    });
+
+    it('renders the tune buttons without the file picker when sources exist and showFilePicker is unset', () => {
+      expect(root().querySelectorAll('.tune-sources button').length).toBe(2);
+      expect(root().querySelector('.file-picker')).toBeNull();
+    });
+
+    it('renders both the tune buttons and the file picker when showFilePicker is set alongside sources', () => {
+      fixture.componentRef.setInput('showFilePicker', true);
+      fixture.detectChanges();
+
+      expect(root().querySelectorAll('.tune-sources button').length).toBe(2);
+      expect(root().querySelector('.file-picker')).not.toBeNull();
+    });
+
+    it('renders the file picker with no tune buttons when showFilePicker is set and sources are empty', () => {
+      setModel({ tuneSources: [] });
+      fixture.componentRef.setInput('showFilePicker', true);
+      fixture.detectChanges();
+
+      expect(root().querySelectorAll('.tune-sources button').length).toBe(0);
+      expect(root().querySelector('.file-picker')).not.toBeNull();
+    });
+  });
+
+  it('places the subtune stepper before the status LED in line 2', () => {
+    const transportLine = root().querySelector('.line-transport') as HTMLElement;
+    const stepper = transportLine.querySelector('lib-stepper');
+    const led = transportLine.querySelector('lib-status-led');
+
+    expect(stepper).not.toBeNull();
+    expect(led).not.toBeNull();
+    if (stepper === null || led === null) {
+      throw new Error('unreachable: asserted non-null above');
+    }
+    expect(stepper.compareDocumentPosition(led) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

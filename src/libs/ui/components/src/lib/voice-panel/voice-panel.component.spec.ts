@@ -7,11 +7,10 @@ function rowModel(n: number, muted = false): VoiceRowModel {
   return {
     label: `V${n}`,
     muted,
-    stateText: muted ? 'muted' : 'audible',
-    holdLabel: muted ? 'Punch In' : 'Kill',
+    holdLabel: muted ? 'Punch' : 'Kill',
     checkboxId: `voice-mute-${n}-a`,
     muteAccessibleName: `Mute voice ${n} deck A`,
-    holdAccessibleName: muted ? `Punch in voice ${n} deck A` : `Kill voice ${n} deck A`,
+    holdAccessibleName: muted ? `Punch voice ${n} deck A` : `Kill voice ${n} deck A`,
   };
 }
 

@@ -690,19 +690,13 @@ describe('DeckHostComponent', () => {
       });
     });
 
-    it("reflects a voice's muted state as its own hold-button label and state caption, from the player's snapshot", () => {
-      function voiceStateText(voice: number): string | undefined {
-        return (
-          fixture.nativeElement.querySelectorAll('.voice-state')[voice] as HTMLElement
-        ).textContent?.trim();
-      }
+    it("reflects a voice's muted state as its own hold-button label, from the player's snapshot", () => {
       function holdLabel(voice: number): string | undefined {
         return (
           fixture.nativeElement.querySelectorAll('.voice-hold')[voice] as HTMLButtonElement
         ).textContent?.trim();
       }
 
-      expect(voiceStateText(0)).toBe('audible');
       expect(holdLabel(0)).toBe('Kill');
 
       player.snapshot.update((snapshot) => ({
@@ -713,8 +707,7 @@ describe('DeckHostComponent', () => {
       }));
       fixture.detectChanges();
 
-      expect(voiceStateText(0)).toBe('muted');
-      expect(holdLabel(0)).toBe('Punch In');
+      expect(holdLabel(0)).toBe('Punch');
     });
 
     describe('scrubbing', () => {

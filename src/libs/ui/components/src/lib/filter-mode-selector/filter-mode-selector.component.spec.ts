@@ -119,4 +119,14 @@ describe('FilterModeSelectorComponent', () => {
   it('carries no dropdown', () => {
     expect(fixture.nativeElement.querySelector('select')).toBeNull();
   });
+
+  it('defaults data-size to large and reflects the size input', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.getAttribute('data-size')).toBe('large');
+
+    fixture.componentRef.setInput('size', 'small');
+    fixture.detectChanges();
+
+    expect(host.getAttribute('data-size')).toBe('small');
+  });
 });

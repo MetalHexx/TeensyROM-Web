@@ -60,10 +60,16 @@ export interface BindingCardModel {
   templateUrl: './binding-card.component.html',
   styleUrl: './binding-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.data-layout]': 'layout()',
+  },
 })
 export class BindingCardComponent {
   /** The binding card's display model and state. */
   readonly model = input.required<BindingCardModel>();
+  /** `'stacked'` (the default) is today's column layout, unchanged. `'inline'` lays the heading,
+   *  the port control and the two buttons on one row, for a host with less vertical room to give. */
+  readonly layout = input<'stacked' | 'inline'>('stacked');
   /** Emits the chosen port id, or '' when the placeholder option was chosen. */
   readonly portSelect = output<string>();
   /** Emits when the Enable MIDI button is pressed. */

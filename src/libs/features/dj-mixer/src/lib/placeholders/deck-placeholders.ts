@@ -42,18 +42,6 @@ export function createDeckPlaceholders(deck: DeckRef): DeckPlaceholderModels {
     canPause: true,
     canStop: true,
     repeatTrack: false,
-    tuneSources: [
-      {
-        id: 'tune-1',
-        label: 'InSID3 Out — Divertigo',
-        accessibleName: `InSID3 Out — Divertigo deck ${letter}`,
-      },
-      {
-        id: 'tune-2',
-        label: 'Still Time — Avrilcadabra',
-        accessibleName: `Still Time — Avrilcadabra deck ${letter}`,
-      },
-    ],
     subtune: {
       text: 'Subtune 0 of 0',
       disabled: true,
@@ -65,7 +53,6 @@ export function createDeckPlaceholders(deck: DeckRef): DeckPlaceholderModels {
       pause: `Pause deck ${letter}`,
       stop: `Stop deck ${letter}`,
       repeat: `Repeat track deck ${letter}`,
-      chooseFile: `Choose file deck ${letter}`,
     },
     errors: [],
   };
@@ -77,7 +64,6 @@ export function createDeckPlaceholders(deck: DeckRef): DeckPlaceholderModels {
       return {
         label,
         muted: false,
-        stateText: 'audible',
         holdLabel: 'Kill',
         checkboxId: `voice-${letter}-${n}`,
         muteAccessibleName: `Mute voice ${n} deck ${letter}`,

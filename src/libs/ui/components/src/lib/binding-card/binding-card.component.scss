@@ -59,3 +59,33 @@
   color: var(--color-error);
   font-size: var(--font-size-sm);
 }
+
+// Inline layout: heading, port control and the two buttons share one row instead of stacking, and
+// the card sheds the section's usual `--spacing-md` padding so the whole card lands close to the
+// wireframe's own height. `flex-wrap: wrap` (rather than the stacked layout's implicit column
+// flow) is what lets a rendered error paragraph's own `flex-basis: 100%` push it onto a line of its
+// own beneath everything else, while the heading/control/control-row group still fits on the first
+// line untouched.
+:host([data-layout='inline']) .binding-card {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+:host([data-layout='inline']) .binding-deck-label {
+  flex: 0 0 auto;
+}
+
+:host([data-layout='inline']) .control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+:host([data-layout='inline']) .control-row {
+  flex: 0 0 auto;
+}
+
+:host([data-layout='inline']) .error-text {
+  flex-basis: 100%;
+}

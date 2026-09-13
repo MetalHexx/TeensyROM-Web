@@ -13,7 +13,9 @@ const meta: Meta<DeckStripComponent> = {
           "model's own order, then the channel fader. Purely presentational — composes " +
           '`FilterModeSelectorComponent`, one `RotaryKnobComponent` per knob and ' +
           '`ChannelFaderComponent`, and holds no state of its own; the caller owns every value and ' +
-          'every write.',
+          "every write. `size` forwards to the filter selector, every knob and the fader; " +
+          "`faderLength` pins the fader's own travel and stops the wrapper's grow-with-floor " +
+          'behavior along with it.',
       },
     },
   },
@@ -53,4 +55,19 @@ const model: DeckStripModel = {
 
 export const Default: Story = {
   args: { model },
+};
+
+/** All four `ControlSize` steps side by side, each rendering the same model. */
+export const Sizes: Story = {
+  render: () => ({
+    props: { model },
+    template: `
+      <div style="display: flex; align-items: flex-start; gap: 24px;">
+        <lib-deck-strip [model]="model" size="small" />
+        <lib-deck-strip [model]="model" size="medium" />
+        <lib-deck-strip [model]="model" size="large" />
+        <lib-deck-strip [model]="model" size="extra-large" />
+      </div>
+    `,
+  }),
 };

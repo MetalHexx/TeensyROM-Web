@@ -6,6 +6,7 @@ import type {
   FilterModeValue,
 } from '../filter-mode-selector/filter-mode-selector.component';
 import { RotaryKnobComponent } from '../rotary-knob/rotary-knob.component';
+import type { ControlSize } from '../shared/control-size';
 
 /** One rotary knob's caller-composed state within a deck strip. Nested one level under
  *  `DeckStripModel`, mirroring the composition exactly: the strip is a filter selector, this
@@ -74,6 +75,13 @@ export interface DeckStripModel {
 export class DeckStripComponent {
   /** The whole strip's state: filter, knobs and fader. */
   readonly model = input.required<DeckStripModel>();
+  /** Forwarded to the filter selector, every knob and the fader. Defaults to `'large'`, today's
+   *  only size, so every existing use renders pixel-identical. */
+  readonly size = input<ControlSize>('large');
+  /** Forwarded to the fader's own `length` — a fixed CSS length for its travel, pinning the
+   *  wrapper's `flex: 1 1 0` growth and `7.5rem` floor off along with it. `null` (the default)
+   *  keeps the strip's existing grow-with-floor behavior. */
+  readonly faderLength = input<string | null>(null);
   /** Emits the moved knob's `id` alongside its new value. */
   readonly knobChange = output<{ id: string; value: number }>();
   /** Forwards the channel fader's `valueChange` unchanged. */

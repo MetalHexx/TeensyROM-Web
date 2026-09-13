@@ -1,4 +1,8 @@
-<lib-filter-mode-selector [model]="model().filter" (modeSelect)="onFilterModeSelect($event)" />
+<lib-filter-mode-selector
+  [model]="model().filter"
+  [size]="size()"
+  (modeSelect)="onFilterModeSelect($event)"
+/>
 
 @for (knob of model().knobs; track knob.id) {
   <lib-rotary-knob
@@ -9,15 +13,18 @@
     [max]="knob.max ?? 1"
     [step]="knob.step ?? 0.01"
     [readout]="knob.readout ?? null"
+    [size]="size()"
     (valueChange)="onKnobChange(knob.id, $event)"
   />
 }
 
-<div class="deck-strip-fader">
+<div class="deck-strip-fader" [class.deck-strip-fader--fixed]="faderLength() !== null">
   <lib-channel-fader
     [value]="model().fader.value"
     [accessibleName]="model().fader.accessibleName"
     [label]="model().fader.label"
+    [size]="size()"
+    [length]="faderLength()"
     (valueChange)="onFaderChange($event)"
   />
 </div>

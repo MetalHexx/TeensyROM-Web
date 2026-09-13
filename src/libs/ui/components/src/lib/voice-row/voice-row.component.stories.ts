@@ -9,11 +9,10 @@ const meta: Meta<VoiceRowComponent> = {
     docs: {
       description: {
         component:
-          "One voice's mute/kill controls: a checkbox for the latched mute, a caption reporting " +
-          'whether the voice is currently audible or muted, and a momentary hold button that ' +
-          "inverts the latched mute for as long as it's held — by pointer or by Enter/Space. Purely " +
-          'presentational: it never resolves latched-XOR-held itself, so these stories do that on ' +
-          "the caller's behalf to show the hold button visibly doing something while held.",
+          "One voice's mute/kill controls: a checkbox for the latched mute, checkbox and label on " +
+          'one line, and a momentary hold button beneath them that inverts the latched mute for as ' +
+          "long as it's held — by pointer or by Enter/Space. Purely presentational: `holdLabel` is " +
+          "the caller's own resolved verb, unaffected by whether the button is currently held.",
       },
     },
   },
@@ -22,39 +21,21 @@ const meta: Meta<VoiceRowComponent> = {
 export default meta;
 type Story = StoryObj<VoiceRowComponent>;
 
-function rowModel(muted: boolean, held: boolean): VoiceRowModel {
-  const effectiveMuted = muted !== held;
+function rowModel(muted: boolean): VoiceRowModel {
   return {
     label: 'V1',
     muted,
-    stateText: effectiveMuted ? 'muted' : 'audible',
-    holdLabel: muted ? 'Punch In' : 'Kill',
+    holdLabel: muted ? 'Punch' : 'Kill',
     checkboxId: 'voice-row-story-checkbox',
     muteAccessibleName: 'Mute voice 1 deck A',
-    holdAccessibleName: muted ? 'Punch in voice 1 deck A' : 'Kill voice 1 deck A',
+    holdAccessibleName: muted ? 'Punch voice 1 deck A' : 'Kill voice 1 deck A',
   };
 }
 
 export const Audible: Story = {
-  render: () => ({
-    props: {
-      model: rowModel(false, false),
-      onHeldChange(held: boolean) {
-        this['model'] = rowModel(false, held);
-      },
-    },
-    template: `<lib-voice-row [model]="model" (heldChange)="onHeldChange($event)" />`,
-  }),
+  args: { model: rowModel(false) },
 };
 
 export const Muted: Story = {
-  render: () => ({
-    props: {
-      model: rowModel(true, false),
-      onHeldChange(held: boolean) {
-        this['model'] = rowModel(true, held);
-      },
-    },
-    template: `<lib-voice-row [model]="model" (heldChange)="onHeldChange($event)" />`,
-  }),
+  args: { model: rowModel(true) },
 };

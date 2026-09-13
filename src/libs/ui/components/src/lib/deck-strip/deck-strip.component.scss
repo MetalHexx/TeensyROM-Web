@@ -12,13 +12,6 @@
   min-height: 0;
 }
 
-// The strip's own sizing budget for every knob it renders — 64px leaves 8px of air either side of
-// the 80px strip. Reaches into the child's host element the same way `MixerColumnComponent` sizes
-// `lib-crossfader`'s.
-lib-rotary-knob {
-  --scale-knob-size: 64px;
-}
-
 // The fader shares the strip with five other controls above it, so — unlike them — it grows to
 // claim whatever height the strip has left over beyond their natural size (the mixer card's grid
 // row can run taller than a deck strip's own content on tall viewports; see `.strips` in
@@ -41,4 +34,12 @@ lib-rotary-knob {
   width: 100%;
   flex: 1 1 0;
   min-height: 7.5rem;
+}
+
+// `faderLength` pins the fader's own travel to a fixed length; the wrapper's `flex: 1 1 0` growth
+// and `7.5rem` floor have to stop too, or the floor would re-inflate a shorter fixed fader and the
+// pixel match a caller measures against would fail.
+.deck-strip-fader--fixed {
+  flex: 0 0 auto;
+  min-height: 0;
 }

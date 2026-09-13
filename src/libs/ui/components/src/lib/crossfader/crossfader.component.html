@@ -1,5 +1,12 @@
 <div class="crossfader">
-  <span class="crossfader-label">{{ startLabel() }}</span>
+  @if (trackLength() !== null) {
+    <div class="crossfader-labels">
+      <span class="crossfader-label">{{ startLabel() }}</span>
+      <span class="crossfader-label">{{ endLabel() }}</span>
+    </div>
+  } @else {
+    <span class="crossfader-label">{{ startLabel() }}</span>
+  }
   <input
     type="range"
     [min]="min()"
@@ -9,5 +16,7 @@
     (input)="onInput($event)"
     [attr.aria-label]="accessibleName()"
   />
-  <span class="crossfader-label">{{ endLabel() }}</span>
+  @if (trackLength() === null) {
+    <span class="crossfader-label">{{ endLabel() }}</span>
+  }
 </div>
