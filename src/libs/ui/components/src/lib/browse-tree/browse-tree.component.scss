@@ -1,0 +1,32 @@
+.device-row {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.storage-list {
+  .storage-row {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: var(--spacing-lg);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+
+    &:focus {
+      outline: none;
+    }
+  }
+}

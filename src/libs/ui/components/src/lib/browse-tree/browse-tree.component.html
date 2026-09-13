@@ -1,0 +1,40 @@
+<button
+  role="treeitem"
+  [attr.aria-expanded]="expanded()"
+  aria-selected="false"
+  tabindex="0"
+  (click)="onDeviceClick()"
+  (keydown.enter)="onDeviceClick()"
+  (keydown.space)="onDeviceClick()"
+  class="device-row"
+>
+  <lib-directory-tree-node
+    [icon]="model().icon"
+    [text]="model().label"
+    [nodeType]="DirectoryTreeNodeType.Device"
+  ></lib-directory-tree-node>
+</button>
+
+@if (expanded()) {
+  <div role="group" class="storage-list">
+    @for (storage of model().storages; track storage.storageType) {
+      <button
+        role="treeitem"
+        [attr.aria-selected]="storage.storageType === selectedStorageType()"
+        [attr.aria-label]="storage.accessibleName"
+        tabindex="0"
+        (click)="onStorageSelect(storage.storageType)"
+        (keydown.enter)="onStorageSelect(storage.storageType)"
+        (keydown.space)="onStorageSelect(storage.storageType)"
+        class="storage-row"
+      >
+        <lib-directory-tree-node
+          [icon]="storage.icon"
+          [text]="storage.label"
+          [nodeType]="DirectoryTreeNodeType.StorageType"
+          [isSelected]="storage.storageType === selectedStorageType()"
+        ></lib-directory-tree-node>
+      </button>
+    }
+  </div>
+}
