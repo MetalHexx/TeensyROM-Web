@@ -2,8 +2,52 @@
   display: contents;
 }
 
-.transport-slot {
-  position: relative;
+// A deck contributes two items to the view's grid, and both are column stacks with one growing
+// card. The grid row that holds them is content-sized, so the row's height is the tallest thing in
+// it and every stack is stretched to match — that stretch, not a fixed height, is what gives
+// Loops/Cues and Speed their fill. `min-height: 0` on the stack and on the growing card is what
+// keeps the pair shrinkable instead of flooring the row at their own content.
+.deck-stack,
+.voice-speed-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dj-card-gap, var(--spacing-md));
+  min-width: 0;
+  min-height: 0;
+}
+
+// `lib-scaling-compact-card`'s own host is `height: 100%`, which as a flex item's `auto` basis
+// resolves against the whole stack rather than the card's own content — hence `height: auto` on
+// every card here, growing or not.
+.deck-stack {
+  .transport-slot {
+    position: relative; // anchors the drop overlay
+    flex: 0 0 auto;
+  }
+
+  .binding-card-slot {
+    flex: 0 0 auto;
+    height: auto;
+  }
+}
+
+.voice-speed-column {
+  .voice-card {
+    flex: 0 0 auto;
+    height: auto;
+  }
+}
+
+// The one card in each stack that takes the slack. An `auto` basis rather than a zero one: in the
+// column form the row is stretched taller than this stack's content and either basis fills it, but
+// the stacked forms size every row by its own content, where a zero-basis item has no leftover
+// space to grow into and renders at zero — an empty card. Basing on its own content keeps it
+// usable in both.
+.loops-card,
+.speed-card {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
 }
 
 .drop-overlay {
@@ -32,21 +76,4 @@
   font-size: var(--font-size-md);
   text-align: center;
   padding: 0 var(--spacing-md);
-}
-
-.voice-speed-column {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  min-height: 0;
-
-  .voice-card {
-    flex: 0 0 auto;
-    height: auto;
-  }
-
-  .speed-card {
-    flex: 1 1 0;
-    min-height: 0;
-  }
 }

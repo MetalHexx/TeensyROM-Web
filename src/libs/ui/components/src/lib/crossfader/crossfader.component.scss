@@ -40,3 +40,9 @@ input[type='range'] {
   flex: 0 0 auto;
   width: var(--crossfader-track-length);
 }
+
+// Fixed-track mode is the vertical form, where the labels' own row is height the card has to find
+// somewhere else — so they step down one size. The fluid form keeps them inline and unchanged.
+:host([data-fixed-track]) .crossfader-label {
+  font-size: 0.7rem;
+}

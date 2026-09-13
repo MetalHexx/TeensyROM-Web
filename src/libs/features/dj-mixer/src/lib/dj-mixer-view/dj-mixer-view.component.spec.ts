@@ -200,7 +200,7 @@ describe('DjMixerViewComponent', () => {
       expect(mixerGrid(fixture).style.gridTemplateAreas).toBe('');
     });
 
-    it("names every deck's three panel areas and each deck's voice/speed column exactly once per row", () => {
+    it("gives every deck one stack row beside that deck's own voice/speed column", () => {
       const { fixture } = render([
         device({ deviceId: 'a' }),
         device({ deviceId: 'b' }),
@@ -209,11 +209,9 @@ describe('DjMixerViewComponent', () => {
       const rows = parseGridAreaRows(mixerGrid(fixture).style.gridTemplateAreas);
 
       for (let deck = 0; deck < 3; deck++) {
-        for (const letter of ['t', 'c', 'b']) {
-          const matches = rows.filter((row) => row[0] === `${letter}${deck}`);
-          expect(matches).toHaveLength(1);
-          expect(matches[0][1]).toBe(`vs${deck}`);
-        }
+        const matches = rows.filter((row) => row[0] === `d${deck}`);
+        expect(matches).toHaveLength(1);
+        expect(matches[0][1]).toBe(`vs${deck}`);
       }
     });
 
@@ -228,7 +226,7 @@ describe('DjMixerViewComponent', () => {
       const mxRows = rows.filter((row) => row[0] === 'mx');
       expect(mxRows).toHaveLength(1);
       expect(mxRows[0]).toEqual(['mx', 'mx']);
-      expect(rows.indexOf(mxRows[0])).toBe(3); // after deck 0's three rows (t0, c0, b0)
+      expect(rows.indexOf(mxRows[0])).toBe(1); // after deck 0's single stack row
     });
 
     it('places the bottom band in exactly one row, as the last row, at three decks', () => {

@@ -68,17 +68,28 @@ function outputsOf(instance: object): { emit: (value: unknown) => void }[] {
 }
 
 describe('DjDeckColumnComponent', () => {
-  it('places the five house cards on the view grid for deck index 0', () => {
+  it('contributes a deck stack and a voice/speed column to the view grid for deck index 0', () => {
     const fixture = render({ letter: 'A', index: 0 });
-    expect(gridAreas(fixture)).toEqual(['t0', 'c0', 'b0', 'vs0']);
+    expect(gridAreas(fixture)).toEqual(['d0', 'vs0']);
 
     expect(fixture.nativeElement.querySelectorAll('lib-scaling-compact-card').length).toBe(5);
     expect(fixture.nativeElement.querySelectorAll('lib-scaling-card').length).toBe(0);
   });
 
-  it('places the five house cards on the view grid for deck index 1', () => {
+  it('contributes a deck stack and a voice/speed column to the view grid for deck index 1', () => {
     const fixture = render({ letter: 'B', index: 1 });
-    expect(gridAreas(fixture)).toEqual(['t1', 'c1', 'b1', 'vs1']);
+    expect(gridAreas(fixture)).toEqual(['d1', 'vs1']);
+  });
+
+  it('stacks the transport, Loops/Cues and the binding card in that order inside the deck stack', () => {
+    const fixture = render({ letter: 'A', index: 0 });
+    const stack = fixture.nativeElement.querySelector('.deck-stack') as HTMLElement;
+    const slots = ['.transport-slot', '.loops-card', '.binding-card-slot'].map((selector) =>
+      stack.querySelector(`:scope > ${selector}`)
+    );
+
+    expect(slots.every(Boolean)).toBe(true);
+    expect(Array.from(stack.children)).toEqual(slots);
   });
 
   it('feeds every lifted panel from the deck placeholders, letter-scoped', () => {
@@ -87,6 +98,14 @@ describe('DjDeckColumnComponent', () => {
       .componentInstance as BindingCardComponent;
 
     expect(binding.model().heading).toBe('Deck B');
+  });
+
+  it('lays the binding card out inline — one line at the bottom of the deck stack', () => {
+    const fixture = render({ letter: 'A', index: 0 });
+    const binding = fixture.debugElement.query(By.directive(BindingCardComponent))
+      .componentInstance as BindingCardComponent;
+
+    expect(binding.layout()).toBe('inline');
   });
 
   it('binds no output handlers on the lifted panels', () => {
@@ -108,13 +127,6 @@ describe('DjDeckColumnComponent', () => {
     function overlay(fixture: ComponentFixture<DjDeckColumnComponent>): HTMLElement | null {
       return fixture.nativeElement.querySelector('.drop-overlay');
     }
-
-    it('carries the grid-area on the transport-slot wrapper, not the card', () => {
-      const fixture = render({ letter: 'B', index: 1 });
-      const slot = fixture.nativeElement.querySelector('.transport-slot') as HTMLElement;
-
-      expect(slot.style.gridArea).toBe('t1');
-    });
 
     it('renders no overlay when dropActive is false', () => {
       const fixture = render({ letter: 'B', index: 1 }, false);

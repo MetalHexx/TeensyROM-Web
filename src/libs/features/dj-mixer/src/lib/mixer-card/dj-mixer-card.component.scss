@@ -21,10 +21,6 @@
     height: auto;
   }
 
-  .strips {
-    margin: 0 var(--spacing-md) 0 0;
-  }
-
   // `lib-crossfader`'s own host is `width: 100%` for the column form, which would force it onto
   // its own wrapped line here. The band form instead shares the row with `.strips`, letting the
   // crossfader grow into whatever horizontal room is left (`width: auto`, `flex: 1 1 0`) instead
@@ -53,16 +49,18 @@
   flex: 1 1 auto;
   min-height: 0;
   justify-content: flex-start;
+  // The single gap inside this card, in both forms — a column gap here, a row gap once
+  // `band-form` turns `.mixer-body` sideways.
+  gap: var(--spacing-md);
 }
 
+// Content-sized in both forms now: each strip's channel fader is cut to `faderLength` in the column
+// form rather than growing into leftover height, and the strips stay symmetric about the crossfader
+// beneath them.
 .strips {
   display: flex;
-  // Grows to fill whatever height `.mixer-body` has beyond its content (the mixer card's grid row
-  // can run taller than a deck strip on tall viewports), so each deck strip stretches taller too
-  // and its own channel fader can grow into that leftover height (`deck-strip.component.scss`).
-  // The crossfader below keeps its own natural size, so it ends up flush against the bottom once
-  // `.strips` has claimed the rest.
-  flex: 1 1 auto;
   justify-content: center;
-  gap: var(--spacing-xl);
+  // Two medium strips plus this gap have to fit the card's own content width — the same 148px the
+  // crossfader's track is cut to at desktop.
+  gap: var(--spacing-md);
 }

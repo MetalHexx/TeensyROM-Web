@@ -38,7 +38,7 @@ export function retrieveFile(
             storageType,
             path,
             fileName: path.substring(path.lastIndexOf('/') + 1),
-            status: 'retrieving',
+            status: 'retrieving' as const,
             bytes: null,
             byteLength: null,
             error: null,
@@ -60,7 +60,7 @@ export function retrieveFile(
             ...state.files,
             [key]: {
               ...state.files[key],
-              status: 'retrieved',
+              status: 'retrieved' as const,
               bytes: fileContent.bytes,
               byteLength: fileContent.byteLength,
             },
@@ -76,7 +76,7 @@ export function retrieveFile(
             ...state.files,
             [key]: {
               ...state.files[key],
-              status: 'failed',
+              status: 'failed' as const,
               bytes: null,
               error: (error as { message?: string })?.message || 'Failed to retrieve file',
             },

@@ -175,9 +175,7 @@ export class DjMixerViewComponent {
   readonly manyGridAreas = computed<string>(() => {
     const rows: string[] = [];
     this.decks().forEach((deck) => {
-      rows.push(`"t${deck.index} vs${deck.index}"`);
-      rows.push(`"c${deck.index} vs${deck.index}"`);
-      rows.push(`"b${deck.index} vs${deck.index}"`);
+      rows.push(`"d${deck.index} vs${deck.index}"`);
       if (deck.index === 0) {
         rows.push('"mx mx"');
       }

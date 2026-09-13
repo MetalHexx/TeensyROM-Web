@@ -70,6 +70,9 @@ export interface DeckStripModel {
   templateUrl: './deck-strip.component.html',
   styleUrl: './deck-strip.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // The strip's own gap between its six controls is size-dependent, the same way its children's
+  // dimensions are — so the size reaches this stylesheet the way it reaches theirs.
+  host: { '[attr.data-size]': 'size()' },
   imports: [FilterModeSelectorComponent, RotaryKnobComponent, ChannelFaderComponent],
 })
 export class DeckStripComponent {

@@ -62,4 +62,49 @@ describe('DjMixerCardComponent', () => {
 
     expect(fixture.nativeElement.classList.contains('dj-mixer-card--band')).toBe(true);
   });
+
+  describe('the medium column form', () => {
+    it('sizes every strip medium and hands it the same travel the crossfader gets', () => {
+      const fixture = render(
+        [
+          { letter: 'A', index: 0 },
+          { letter: 'B', index: 1 },
+        ],
+        true
+      );
+
+      const strips = fixture.debugElement
+        .queryAll(By.directive(DeckStripComponent))
+        .map((s) => s.componentInstance as DeckStripComponent);
+      const crossfader = fixture.debugElement.query(By.directive(CrossfaderComponent))
+        .componentInstance as CrossfaderComponent;
+
+      expect(strips.map((s) => s.size())).toEqual(['medium', 'medium']);
+      expect(crossfader.trackLength()).toBeTruthy();
+      expect(strips.map((s) => s.faderLength())).toEqual([
+        crossfader.trackLength(),
+        crossfader.trackLength(),
+      ]);
+    });
+
+    it('releases both travels in the band form, where the card is no longer a fixed column', () => {
+      const fixture = render(
+        [
+          { letter: 'A', index: 0 },
+          { letter: 'B', index: 1 },
+        ],
+        true
+      );
+      fixture.componentRef.setInput('band', true);
+      fixture.detectChanges();
+
+      const strip = fixture.debugElement.query(By.directive(DeckStripComponent))
+        .componentInstance as DeckStripComponent;
+      const crossfader = fixture.debugElement.query(By.directive(CrossfaderComponent))
+        .componentInstance as CrossfaderComponent;
+
+      expect(strip.faderLength()).toBeNull();
+      expect(crossfader.trackLength()).toBeNull();
+    });
+  });
 });

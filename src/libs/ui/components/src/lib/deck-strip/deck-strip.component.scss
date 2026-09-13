@@ -7,28 +7,34 @@
   // the knobs' own shrink-to-fit width — 64px — centred with air either side instead of stretched
   // and left-aligned against the strip's 80px.
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--deck-strip-gap);
   min-width: 0;
   min-height: 0;
+  --deck-strip-gap: var(--spacing-md);
+}
+
+// `medium` is the size a whole strip has to fit a short viewport's height alongside a fixed fader
+// travel, so it packs one step tighter than the other sizes. Every other size — `large` above all,
+// the default every pre-existing use renders at — keeps the original gap.
+:host([data-size='medium']) {
+  --deck-strip-gap: var(--spacing-sm);
 }
 
 // The fader shares the strip with five other controls above it, so — unlike them — it grows to
-// claim whatever height the strip has left over beyond their natural size (the mixer card's grid
-// row can run taller than a deck strip's own content on tall viewports; see `.strips` in
-// `dj-mixer-card.component.scss`). `flex: 1 1 0` (zero basis, the same technique this strip's own
-// host and `ChannelFaderComponent`'s host already use) rather than `flex: 1 1 auto` — an `auto`
-// basis would measure this wrapper's natural content height first, and that pulls in the range
-// input's indefinite `height: 100%` (`ChannelFaderComponent`'s own `input[type='range']`), which
-// resolves to the control's oversized native intrinsic size and inflates every ancestor up the
-// flex chain. A `display: flex` row of one item reproduces the exact mechanism
-// `ChannelFaderComponent`'s own host already relies on to stretch its child to fill it, just
-// scoped to this wrapper. Being the strip's last, sole growing child, it naturally ends up flush
-// with the strip's bottom edge, with the filter selector and knobs packed at the top above it.
-// `min-height` is a floor, not the capped length this replaces: the band/stacked form's grid rows
-// are all content-sized (`auto`), so a zero-basis flex-grow item there has no externally-imposed
-// leftover space to grow into and renders at 0 — an invisible, unusable control — unless a floor
-// keeps it usable. The column form's own external height (the grid's `minmax(0, 1fr)` row) still
-// gives it real room to grow past this floor.
+// claim whatever height the strip has left over beyond their natural size, whenever a caller
+// stretches the strip past its own content. `flex: 1 1 0` (zero basis, the same technique this
+// strip's own host and `ChannelFaderComponent`'s host already use) rather than `flex: 1 1 auto` —
+// an `auto` basis would measure this wrapper's natural content height first, and that pulls in
+// the range input's indefinite `height: 100%` (`ChannelFaderComponent`'s own
+// `input[type='range']`), which resolves to the control's oversized native intrinsic size and
+// inflates every ancestor up the flex chain. A `display: flex` row of one item reproduces the
+// exact mechanism `ChannelFaderComponent`'s own host already relies on to stretch its child to
+// fill it, just scoped to this wrapper. Being the strip's last, sole growing child, it ends up
+// flush with the strip's bottom edge, the filter selector and knobs packed at the top above it.
+// `min-height` is a floor, not a cap: a caller whose own height is content-sized leaves a
+// zero-basis flex-grow item nothing to grow into, and it renders at 0 — an invisible, unusable
+// control — unless a floor keeps it usable. A caller that stretches the strip gives it real room
+// to grow past the floor, and `faderLength` replaces both with a fixed travel.
 .deck-strip-fader {
   display: flex;
   width: 100%;
