@@ -1,4 +1,15 @@
+// Block-level (rather than a bare button's default `inline-block`): once both device trees are
+// collapsed, nothing else in `lib-dj-browse-trees` forces them onto their own lines, so an inline
+// host here would let the two `.device-row` buttons flow side by side.
+:host {
+  display: block;
+}
+
 .device-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
   background: none;
   border: none;
   padding: 0;
@@ -11,6 +22,11 @@
   &:focus {
     outline: none;
   }
+}
+
+.device-row-chevron {
+  flex-shrink: 0;
+  color: var(--color-dimmed);
 }
 
 .storage-list {

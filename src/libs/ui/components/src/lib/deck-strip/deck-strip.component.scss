@@ -35,11 +35,20 @@
 // zero-basis flex-grow item nothing to grow into, and it renders at 0 — an invisible, unusable
 // control — unless a floor keeps it usable. A caller that stretches the strip gives it real room
 // to grow past the floor, and `faderLength` replaces both with a fixed travel.
+// `justify-content: center` centres the fader (a fixed, shrink-to-fit width once `faderLength` pins
+// it — see `.deck-strip-fader--fixed` below) on this row's own full width, matching the knobs'
+// centre line above it; without it, a shrink-wrapped fader sits pinned to the row's left edge.
+// `margin-top: auto` absorbs whatever height the strip has beyond its own children's natural sizes,
+// pushing the fader flush to the strip's bottom edge — the DJ mixer card stretches `.strips` past
+// its content height (`dj-mixer-card.component.scss`) precisely so this has room to act; callers
+// that don't stretch the strip leave no extra height for it to consume, so it's a no-op there.
 .deck-strip-fader {
   display: flex;
+  justify-content: center;
   width: 100%;
   flex: 1 1 0;
   min-height: 7.5rem;
+  margin-top: auto;
 }
 
 // `faderLength` pins the fader's own travel to a fixed length; the wrapper's `flex: 1 1 0` growth

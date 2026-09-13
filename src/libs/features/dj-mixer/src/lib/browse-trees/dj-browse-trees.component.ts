@@ -74,7 +74,9 @@ function toBrowseTreeModel(device: Device): BrowseTreeModel {
 
   return {
     deviceId: device.deviceId,
-    label: device.name,
+    // The real devices' reported `name` is currently always "Unnamed" — `deviceId` (e.g.
+    // `YRTCPIRY`) is the only value that actually distinguishes them in the tree.
+    label: device.deviceId,
     icon: 'desktop_windows',
     accessibleName: `Device ${device.deviceId}`,
     storages,

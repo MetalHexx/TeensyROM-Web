@@ -29,9 +29,12 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 export class CrossfaderComponent {
   /** The fader's current position, between `min()` and `max()`. */
   readonly value = input.required<number>();
-  /** e.g. 'A' — the label rendered at the fader's minimum end. */
+  /** e.g. 'A' — the label rendered at the fader's minimum end. An empty string renders no label
+   *  (and, in fixed-track mode, no label row at all when `endLabel` is also empty) — for a caller
+   *  whose own UI already labels the two ends elsewhere. */
   readonly startLabel = input.required<string>();
-  /** e.g. 'B' — the label rendered at the fader's maximum end. */
+  /** e.g. 'B' — the label rendered at the fader's maximum end. An empty string renders no label,
+   *  same as `startLabel`. */
   readonly endLabel = input.required<string>();
   /** Accessible label announced to assistive technology, e.g. 'Crossfader, deck A to deck B'. */
   readonly accessibleName = input.required<string>();

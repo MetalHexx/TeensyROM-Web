@@ -133,6 +133,24 @@ describe('BrowseTreeComponent', () => {
       const deviceButton = hostFixture.nativeElement.querySelector('.device-row');
       expect(deviceButton.getAttribute('aria-expanded')).toBe('false');
     });
+
+    it('should render an expand_more chevron when expanded', () => {
+      hostComponent.model.set(mockModel);
+      hostComponent.expanded.set(true);
+      hostFixture.detectChanges();
+
+      const chevron = hostFixture.nativeElement.querySelector('.device-row-chevron');
+      expect(chevron.textContent.trim()).toBe('expand_more');
+    });
+
+    it('should render a chevron_right chevron when collapsed', () => {
+      hostComponent.model.set(mockModel);
+      hostComponent.expanded.set(false);
+      hostFixture.detectChanges();
+
+      const chevron = hostFixture.nativeElement.querySelector('.device-row-chevron');
+      expect(chevron.textContent.trim()).toBe('chevron_right');
+    });
   });
 
   describe('device row click', () => {

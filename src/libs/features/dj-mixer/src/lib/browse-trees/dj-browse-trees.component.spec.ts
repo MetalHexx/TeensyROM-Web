@@ -40,7 +40,7 @@ describe('DjBrowseTreesComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.device-row').length).toBe(3);
   });
 
-  it('builds each tree model from the device and its available storages', () => {
+  it('builds each tree model from the device and its available storages, labelling it by device id', () => {
     const { fixture } = render([device('SGVISJTN', { name: 'Workbench' })]);
 
     const tree = fixture.debugElement.query(By.directive(BrowseTreeComponent))
@@ -48,7 +48,7 @@ describe('DjBrowseTreesComponent', () => {
 
     expect(tree.model()).toEqual({
       deviceId: 'SGVISJTN',
-      label: 'Workbench',
+      label: 'SGVISJTN',
       icon: 'desktop_windows',
       accessibleName: 'Device SGVISJTN',
       storages: [

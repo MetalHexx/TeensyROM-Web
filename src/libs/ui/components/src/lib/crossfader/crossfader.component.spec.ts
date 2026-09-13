@@ -62,6 +62,14 @@ describe('CrossfaderComponent', () => {
     expect(text).toContain('B');
   });
 
+  it('renders no labels when both are empty strings', () => {
+    fixture.componentRef.setInput('startLabel', '');
+    fixture.componentRef.setInput('endLabel', '');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('.crossfader-label').length).toBe(0);
+  });
+
   it('names itself from the caller-supplied accessible name', () => {
     expect(rangeInput().getAttribute('aria-label')).toBe('Crossfader, deck A to deck B');
   });
@@ -98,6 +106,15 @@ describe('CrossfaderComponent', () => {
       expect(labels).not.toBeNull();
       expect(labels?.textContent).toContain('A');
       expect(labels?.textContent).toContain('B');
+    });
+
+    it('renders no label row at all when both labels are empty, even with a fixed track', () => {
+      fixture.componentRef.setInput('trackLength', '148px');
+      fixture.componentRef.setInput('startLabel', '');
+      fixture.componentRef.setInput('endLabel', '');
+      fixture.detectChanges();
+
+      expect(labelsRow()).toBeNull();
     });
   });
 });

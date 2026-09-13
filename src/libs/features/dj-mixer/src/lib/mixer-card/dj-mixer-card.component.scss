@@ -21,6 +21,12 @@
     height: auto;
   }
 
+  // Content-sized again in the row direction — the column form's grow-to-fill-leftover-height
+  // behaviour (below) is a vertical mechanism that doesn't apply once `.mixer-body` turns sideways.
+  .strips {
+    flex: 0 1 auto;
+  }
+
   // `lib-crossfader`'s own host is `width: 100%` for the column form, which would force it onto
   // its own wrapped line here. The band form instead shares the row with `.strips`, letting the
   // crossfader grow into whatever horizontal room is left (`width: auto`, `flex: 1 1 0`) instead
@@ -54,11 +60,18 @@
   gap: var(--spacing-md);
 }
 
-// Content-sized in both forms now: each strip's channel fader is cut to `faderLength` in the column
-// form rather than growing into leftover height, and the strips stay symmetric about the crossfader
-// beneath them.
+// Each strip's channel fader is cut to `faderLength` in the column form rather than growing with
+// it, so a strip's own natural content height no longer reaches `.mixer-body`'s full height by
+// itself. `flex: 1 1 auto` lets `.strips` claim whatever height `.mixer-body` has left beyond the
+// crossfader below it; each `lib-deck-strip` then stretches to match (the default cross-axis
+// `align-items: stretch` this row never overrides), and its own `.deck-strip-fader`'s
+// `margin-top: auto` (`deck-strip.component.scss`) pushes the fader into that newly-available
+// height, flush with the strip's — and so the crossfader's — bottom edge, with the leftover space
+// left above the fader instead of below the crossfader. Reset to content-sized in the band form
+// (below), a horizontal layout this vertical mechanism doesn't apply to.
 .strips {
   display: flex;
+  flex: 1 1 auto;
   justify-content: center;
   // Two medium strips plus this gap have to fit the card's own content width — the same 148px the
   // crossfader's track is cut to at desktop.

@@ -1,11 +1,13 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { DirectoryTreeNodeComponent } from '../directory-tree/directory-tree-node/directory-tree-node.component';
 import { DirectoryTreeNodeType, StorageType } from '@teensyrom-nx/domain';
 
 /**
  * The DJ view's storage browser tree: a single device node with its storage types as leaves.
- * Uses `DirectoryTreeNodeComponent` for node iconography and colors without the player's
- * `mat-tree` component. Renders the device node with an expand/collapse toggle, and when
+ * Built for this project — uses `DirectoryTreeNodeComponent` for node iconography and colors,
+ * and its own `mat-icon` expand/collapse chevron, without the Player view's `mat-tree`-based
+ * `DirectoryTreeComponent`. Renders the device node with an expand/collapse toggle, and when
  * expanded, shows a list of storage type leaves. Emits `expandedChange` on device node
  * activation and `storageSelect` when a storage leaf is selected.
  *
@@ -22,7 +24,7 @@ import { DirectoryTreeNodeType, StorageType } from '@teensyrom-nx/domain';
  */
 @Component({
   selector: 'lib-browse-tree',
-  imports: [DirectoryTreeNodeComponent],
+  imports: [MatIconModule, DirectoryTreeNodeComponent],
   templateUrl: './browse-tree.component.html',
   styleUrl: './browse-tree.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -90,7 +92,7 @@ export interface BrowseTreeStorageModel {
  */
 export interface BrowseTreeModel {
   readonly deviceId: string;
-  readonly label: string; // the device's display name
+  readonly label: string; // the text rendered on the device row, e.g. the device id
   readonly icon: string; // 'desktop_windows'
   readonly accessibleName: string; // 'Device SGVISJTN'
   readonly storages: readonly BrowseTreeStorageModel[];

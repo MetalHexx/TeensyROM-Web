@@ -38,9 +38,9 @@
   }
 }
 
-// Label left, its control pushed right — both cards render the same port name in the same shape, so
-// the Identify gesture's whole point (confirming which physical port each card actually drives) is
-// never disguised by inconsistent formatting between them.
+// No visible "Output port" text — the select's own `aria-label` (`selectAccessibleName`) carries
+// that meaning for assistive technology instead. The label element still wraps the select alone so
+// it fills the row cleanly.
 .control {
   display: flex;
   align-items: center;
@@ -49,7 +49,7 @@
 
   > select {
     flex: 1 1 auto;
-    margin-left: auto;
+    width: 100%;
     min-width: 0;
   }
 }

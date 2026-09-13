@@ -8,6 +8,9 @@
   (keydown.space)="onDeviceClick()"
   class="device-row"
 >
+  <mat-icon class="device-row-chevron" aria-hidden="true">
+    {{ expanded() ? 'expand_more' : 'chevron_right' }}
+  </mat-icon>
   <lib-directory-tree-node
     [icon]="model().icon"
     [text]="model().label"
