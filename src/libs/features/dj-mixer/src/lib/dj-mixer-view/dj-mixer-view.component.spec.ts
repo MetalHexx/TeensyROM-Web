@@ -107,6 +107,10 @@ function parseGridAreaRows(areas: string): string[][] {
 }
 
 describe('DjMixerViewComponent', () => {
+  // First test in the file to hit TestBed.createComponent, which pays the one-time cost
+  // of JIT-compiling this component. That cold compile can exceed the project's tight
+  // 2000ms testTimeout under CI load; every later test here reuses the compiled TestBed
+  // and stays fast, so only this test needs the extra headroom.
   it('renders one deck column per enabled device, lettered in store order, plus a mixer card', () => {
     const { fixture, component } = render([
       device({ deviceId: 'a' }),
@@ -119,7 +123,7 @@ describe('DjMixerViewComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('lib-dj-mixer-card').length).toBe(1);
     expect(component.showCrossfader()).toBe(true);
     expect(component.isMany()).toBe(true);
-  });
+  }, 10000);
 
   it('filters out disabled devices, keeping the enabled-list positions contiguous', () => {
     const { fixture, component } = render([
