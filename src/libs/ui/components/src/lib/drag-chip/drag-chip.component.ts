@@ -1,4 +1,4 @@
-import { Component, input, OnPush } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { IconLabelComponent } from '../icon-label/icon-label.component';
 
 /**
@@ -19,7 +19,7 @@ import { IconLabelComponent } from '../icon-label/icon-label.component';
   selector: 'lib-drag-chip',
   standalone: true,
   imports: [IconLabelComponent],
-  changeDetection: OnPush,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './drag-chip.component.html',
   styleUrl: './drag-chip.component.scss',
 })

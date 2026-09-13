@@ -1,4 +1,4 @@
-@use '@teensyrom-nx/ui-styles' as styles;
+@use '../../../../styles/src/lib/theme/mixins' as styles;
 
 :host {
   display: inline-flex;

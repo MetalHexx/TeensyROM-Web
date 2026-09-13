@@ -65,7 +65,7 @@ export class DjDirectoryListingComponent {
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
 
   /** The off-screen drag-image chip's element, snapshotted synchronously by the browser on `dragstart`. */
-  private readonly dragChipEl = viewChild<ElementRef<HTMLElement>>('dragChip', { read: ElementRef });
+  private readonly dragChipEl = viewChild<ElementRef<HTMLElement>, ElementRef<HTMLElement>>('dragChip', { read: ElementRef });
 
   /** The dragged row's name, shown by the off-screen chip that becomes the native drag image. */
   protected readonly dragChipLabel = signal('');
