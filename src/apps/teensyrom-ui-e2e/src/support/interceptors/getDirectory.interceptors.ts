@@ -24,7 +24,12 @@ import {
  */
 export const GET_DIRECTORY_ENDPOINT: EndpointDefinition = {
   method: 'GET' as Method,
-  pattern: 'http://localhost:5168/devices/*/storage/*/directories*',
+  // Host-agnostic and `/api`-prefixed, matching `FIND_DEVICES_ENDPOINT`'s pattern: the app's
+  // `API_CONFIG` resolves to an absolute `http://<host>:213` origin in dev mode and a same-origin
+  // relative path in production (see `api-config.provider.ts`), and the generated API client always
+  // issues `/api/devices/{id}/storage/{type}/directories`. A pattern with a literal `://` origin only
+  // matches that exact origin, so this must stay host-agnostic to match under both.
+  pattern: '/api/devices/*/storage/*/directories*',
   alias: 'getDirectory',
 };
 
