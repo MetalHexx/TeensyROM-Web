@@ -1,5 +1,11 @@
-import { STORAGE_SERVICE, API_CONFIG, IApiConfig } from '@teensyrom-nx/domain';
+import {
+  STORAGE_SERVICE,
+  FILE_CONTENT_SERVICE,
+  API_CONFIG,
+  IApiConfig,
+} from '@teensyrom-nx/domain';
 import { StorageService } from './storage.service';
+import { FileContentService } from './file-content.service';
 import { FilesApiService, Configuration } from '@teensyrom-nx/data-access/api-client';
 
 // API Client provider for Files
@@ -20,5 +26,15 @@ export const FILES_API_CLIENT_PROVIDER = {
 export const STORAGE_SERVICE_PROVIDER = {
   provide: STORAGE_SERVICE,
   useClass: StorageService,
+  deps: [FilesApiService],
+};
+
+/**
+ * Provider configuration for binding the file content service interface to its concrete
+ * implementation, mirroring STORAGE_SERVICE_PROVIDER. Reuses the existing FilesApiService client.
+ */
+export const FILE_CONTENT_SERVICE_PROVIDER = {
+  provide: FILE_CONTENT_SERVICE,
+  useClass: FileContentService,
   deps: [FilesApiService],
 };

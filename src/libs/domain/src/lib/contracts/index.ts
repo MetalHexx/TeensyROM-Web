@@ -8,6 +8,7 @@ export * from './device-logs.contract';
 // Storage contracts
 export * from './storage.contract';
 export * from './device-storage.token';
+export * from './file-content.contract';
 
 // Player contracts
 export * from './player.contract';

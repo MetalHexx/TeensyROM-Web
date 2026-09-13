@@ -5,6 +5,10 @@ export * from './lib/device/device-store';
 export * from './lib/storage/storage-store';
 export * from './lib/storage/storage-key.util';
 
+// DJ state management
+export * from './lib/dj/dj-store';
+export * from './lib/dj/dj-file-key.util';
+
 // Player state management
 export * from './lib/player/player-store';
 export * from './lib/player/player-key.util';
