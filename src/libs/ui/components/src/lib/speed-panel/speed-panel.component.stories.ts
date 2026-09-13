@@ -11,7 +11,9 @@ const meta: Meta<SpeedPanelComponent> = {
         component:
           "One deck's speed control: a readout, a vertical fader and a jump button group. Purely " +
           'presentational — it holds no state of its own; the caller has already pinned ' +
-          '`faderValue` into `[min, max]` and formatted `valueText`.',
+          '`faderValue` into `[min, max]` and formatted `valueText`. The host is itself a flex ' +
+          "column, so the fader's own `flex: 1 1 0` fills whatever height a bounded ancestor gives " +
+          "this component — see the `BoundedColumn` story.",
       },
     },
   },
@@ -37,4 +39,18 @@ const model: SpeedPanelModel = {
 
 export const Default: Story = {
   args: { model },
+};
+
+/** Rendered inside a fixed-height flex column (360px), the state the shell failed to reach: the
+ *  fader fills the height between the readout and the jump buttons instead of collapsing to its
+ *  own content size. */
+export const BoundedColumn: Story = {
+  render: () => ({
+    props: { model },
+    template: `
+      <div style="display: flex; flex-direction: column; height: 360px;">
+        <lib-speed-panel [model]="model" />
+      </div>
+    `,
+  }),
 };

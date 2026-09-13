@@ -9,12 +9,13 @@ const meta: Meta<TransportPanelComponent> = {
     docs: {
       description: {
         component:
-          "One deck's transport, in the three lines the wireframe draws: position bar and frame " +
-          'readout; transport buttons, repeat toggle and state LED; tune sources, file picker and ' +
-          'subtune stepper. Purely presentational — it composes `ScrubPositionBarComponent`, ' +
-          '`StatusLedComponent` and `StepperComponent`, holds no state of its own beyond resetting ' +
-          'its file input, and leaves every gate, label and accessible name to the caller that ' +
-          'builds the model.',
+          "One deck's transport, in two lines, three with POC affordances: position bar and frame " +
+          'readout; transport buttons, repeat toggle, subtune stepper and state LED; and, only when ' +
+          '`showFilePicker` is set or the model carries `tuneSources`, a third line of tune-source ' +
+          'buttons and the file picker. Purely presentational — it composes ' +
+          '`ScrubPositionBarComponent`, `StatusLedComponent` and `StepperComponent`, holds no state ' +
+          'of its own beyond resetting its file input, and leaves every gate, label and accessible ' +
+          'name to the caller that builds the model.',
       },
     },
   },
@@ -55,6 +56,27 @@ function baseModel(): TransportPanelModel {
     errors: [],
   };
 }
+
+/** No POC affordances: no `showFilePicker`, and a model with no tune sources — just the position
+ *  bar and the transport row, subtune stepper beside the LED. */
+export const Default: Story = {
+  args: {
+    model: { ...baseModel(), tuneSources: [] },
+    positionPercent: 0,
+    frameLabel: 'frame 0',
+  },
+};
+
+/** The POC's own affordances: `showFilePicker` set, with tune sources on the model — the third
+ *  line renders both the tune buttons and Choose File. */
+export const WithPoCAffordances: Story = {
+  args: {
+    model: baseModel(),
+    positionPercent: 0,
+    frameLabel: 'frame 0',
+    showFilePicker: true,
+  },
+};
 
 export const Stopped: Story = {
   args: { model: baseModel(), positionPercent: 0, frameLabel: 'frame 0' },

@@ -6,8 +6,12 @@
 }
 
 // `.speed-panel`'s own sizing from the POC source — it described the panel element there; here it
-// describes this component's own host.
+// describes this component's own host. `display: flex; flex-direction: column` is what makes the
+// host itself a fill chain link: without it, a bounded ancestor's height stops here and never
+// reaches `.panel` (a `<section>`, content-sized by default) or the fader beneath it.
 :host {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   width: 100%;
   min-height: 0;
@@ -21,6 +25,7 @@
   padding: var(--spacing-sm);
   border: 1px solid var(--color-dimmed);
   border-radius: var(--border-radius-md);
+  flex: 1 1 auto;
   min-height: 0;
   text-align: center;
 
@@ -55,7 +60,10 @@
 
 // `ChannelFaderComponent` already carries the vertical orientation (writing-mode/direction) and its
 // own flex/margin in its own stylesheet; only the size this panel wants is layered on here.
+// `flex: 1 1 0` is what lets the fader actually reach a bounded ancestor's height once `.panel` and
+// `.speed-body` above it are both fill-chain links rather than content-sized boxes.
 lib-channel-fader {
+  flex: 1 1 0;
   min-height: 6rem;
   width: 1.5rem;
 }

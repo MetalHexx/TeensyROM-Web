@@ -5,8 +5,9 @@ import {
   StyledIconColor,
   StyledIconSize,
 } from '../styled-icon/styled-icon.component';
+import type { ControlSize } from '../shared/control-size';
 
-export type IconLabelSize = 'small' | 'medium' | 'large' | 'extra-large';
+export type IconLabelSize = ControlSize;
 
 interface IconLabelSizePreset {
   iconSize: StyledIconSize;

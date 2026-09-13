@@ -1,6 +1,7 @@
 import { faker } from '../faker-config';
 import {
   FileItemType,
+  TeensyStorageType,
   type FileItemDto,
   type FileItemType as FileItemTypeUnion,
 } from '@teensyrom-nx/data-access/api-client';
@@ -33,6 +34,7 @@ export function generateFileItem(overrides: Partial<FileItemDto> = {}): FileItem
     name,
     path: overrides.path ?? inferredPath,
     size: overrides.size ?? faker.number.int(DEFAULT_FILE_SIZE_RANGE),
+    storageType: overrides.storageType ?? TeensyStorageType.Sd,
     type: overrides.type ?? FileItemType.Game,
     isFavorite: overrides.isFavorite ?? false,
     isCompatible: overrides.isCompatible ?? true,

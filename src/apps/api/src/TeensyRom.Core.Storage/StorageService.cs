@@ -41,6 +41,41 @@ namespace TeensyRom.Core.Storage
             return file;
         }
 
+        public async Task<FileBytesResult> ReadFileBytes(FilePath filePath, CancellationToken ct)
+        {
+            var command = new GetFileCommand
+            {
+                StorageType = settings.CartStorage.Type,
+                FilePath = filePath,
+                DeviceId = settings.CartStorage.DeviceId,
+                CommunicationPort = _communicationPort
+            };
+            var result = await mediator.Send(command, ct);
+
+            if (result.IsSuccess && result.FileData is not null)
+            {
+                return FileBytesResult.Success(result.FileData);
+            }
+
+            switch (result.ErrorCode)
+            {
+                case GetFileErrorCode.FileNotFound:
+                case GetFileErrorCode.FileOpenError:
+                case GetFileErrorCode.PathParamError:
+                    log.InternalWarning($"The file {filePath} was not found.", settings.CartStorage.DeviceId);
+                    return FileBytesResult.Failure(FileBytesError.NotFound);
+
+                case GetFileErrorCode.StorageUnavailable:
+                case GetFileErrorCode.StorageParamError:
+                    log.InternalError($"The storage {settings.CartStorage.Type} is not available.", settings.CartStorage.DeviceId);
+                    return FileBytesResult.Failure(FileBytesError.StorageUnavailable);
+
+                default:
+                    log.InternalError($"There was an error reading {filePath} from the device.", settings.CartStorage.DeviceId);
+                    return FileBytesResult.Failure(FileBytesError.Failed);
+            }
+        }
+
         public async Task<IStorageCacheItem?> GetDirectory(DirectoryPath path)
         {
             var cacheItem = cache.GetByDirPath(path);

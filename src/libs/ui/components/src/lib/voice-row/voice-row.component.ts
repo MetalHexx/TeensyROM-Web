@@ -6,9 +6,7 @@ export interface VoiceRowModel {
   readonly label: string;
   /** The latched mute — drives the checkbox and the hold button's verb. */
   readonly muted: boolean;
-  /** 'muted' | 'audible' — the caller resolves latched-XOR-held before handing this down. */
-  readonly stateText: string;
-  /** 'Kill' | 'Punch In' — the hold button's own text. */
+  /** 'Kill' | 'Punch' — the hold button's own text. */
   readonly holdLabel: string;
   /** Unique per rendered row; the caller composes it. */
   readonly checkboxId: string;
@@ -19,13 +17,13 @@ export interface VoiceRowModel {
 }
 
 /**
- * One voice's mute/kill controls: a checkbox for the latched mute, a caption reporting whether the
- * voice is currently audible or muted, and a momentary hold button whose press and release are both
- * meaningful — held down it inverts the latched mute for as long as it's held, by pointer or by
- * Enter/Space, which is the only way a keyboard user can express "while held".
+ * One voice's mute/kill controls: a checkbox for the latched mute, checkbox and label on one line,
+ * and beneath them a momentary hold button whose press and release are both meaningful — held down
+ * it inverts the latched mute for as long as it's held, by pointer or by Enter/Space, which is the
+ * only way a keyboard user can express "while held".
  *
  * Purely presentational: it holds no state of its own and never resolves latched-XOR-held itself —
- * `model().stateText` already carries whatever the caller decided that means.
+ * `model().holdLabel` already carries whatever the caller decided that means.
  *
  * @example
  * ```html

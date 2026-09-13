@@ -1,5 +1,14 @@
 @use '../../../../../ui/styles/src/lib/theme/mixins' as styles;
 
+// The stacked forms are as tall as their content and scroll. `.dj-mixer-view` is a flex column, so
+// releasing `height: 100%` is not enough on its own — the grid is also that column's flex item, and
+// left shrinkable it is squeezed back to the column's height, which crushes its content-sized rows
+// to a few pixels each instead of letting them overflow into the scroll.
+@mixin stacked-grid {
+  height: auto;
+  flex: 0 0 auto;
+}
+
 :host {
   display: flex;
   flex-direction: column;
@@ -36,7 +45,12 @@
   display: grid;
   height: 100%;
   min-height: 0;
-  gap: var(--spacing-md);
+  gap: var(--dj-card-gap);
+
+  // The one gap between sibling cards anywhere in this view: the grid's own tracks, each deck's
+  // stack and voice/speed column, and the bottom band all read it, so a tier change moves them
+  // together instead of drifting apart.
+  --dj-card-gap: var(--spacing-md);
 
   // Shared by every deck-count modifier below: the POC's bare 64px voice/speed column, widened by
   // the compact card's own side padding since each panel now sits inside a card rather than sitting
@@ -44,66 +58,62 @@
   // `overflow: hidden`. Tracks the below-desktop padding tightening automatically.
   --vs-col: calc(4rem + 2 * var(--compact-card-padding, var(--spacing-card-padding-compact)));
 
+  // The wireframe's 172px mixer. Definite rather than `auto` because the mixer card derives both
+  // fader travels from this track less its own card padding (`dj-mixer-card.component.ts`), and an
+  // `auto` track would make that circular.
+  --mixer-col: 10.75rem;
+
+  // Nothing forces the grid wider than the viewport; deeper overflow inside a deck's own lifted
+  // panels is that panel's responsibility, not the view's.
+  > * {
+    min-width: 0;
+  }
+
   @include styles.below-desktop {
-    gap: var(--spacing-sm);
+    --dj-card-gap: var(--spacing-sm);
     // The house cards already read these — tighten their inner padding one step rather than
     // reaching into their templates.
     --compact-card-padding: var(--spacing-sm);
     --spacing-card-padding: var(--spacing-sm);
   }
-
-  @include styles.below-phone {
-    // Nothing forces the grid wider than the viewport; deeper overflow inside a deck's own lifted
-    // panels is that panel's responsibility, not the view's.
-    > * {
-      min-width: 0;
-    }
-  }
 }
 
+// Two rows at every column form: the deck row is its own content's height, and the bottom band is
+// the only region that flexes. Zooming out therefore buys listing rows and nothing else, and no
+// card can be squeezed into collapse by a taller sibling.
 .mixer-grid--one {
-  grid-template-columns: minmax(0, 1fr) var(--vs-col) 13rem;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) var(--vs-col) var(--mixer-col);
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    't0 vs0 mx'
-    'c0 vs0 mx'
-    'b0 vs0 mx'
+    'd0 vs0 mx'
     'bottom bottom bottom';
 
   @include styles.below-tablet {
-    height: auto;
+    @include stacked-grid;
     grid-template-columns: minmax(0, 1fr) var(--vs-col);
-    grid-template-rows: repeat(5, auto);
+    grid-template-rows: repeat(3, auto);
     grid-template-areas:
-      't0 vs0'
-      'c0 vs0'
-      'b0 vs0'
+      'd0 vs0'
       'mx mx'
       'bottom bottom';
   }
 }
 
 .mixer-grid--two {
-  grid-template-columns: minmax(0, 1fr) var(--vs-col) 13rem var(--vs-col) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) var(--vs-col) var(--mixer-col) var(--vs-col) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    't0 vs0 mx vs1 t1'
-    'c0 vs0 mx vs1 c1'
-    'b0 vs0 mx vs1 b1'
+    'd0 vs0 mx vs1 d1'
     'bottom bottom bottom bottom bottom';
 
   @include styles.below-tablet {
-    height: auto;
+    @include stacked-grid;
     grid-template-columns: minmax(0, 1fr) var(--vs-col);
-    grid-template-rows: repeat(8, auto);
+    grid-template-rows: repeat(4, auto);
     grid-template-areas:
-      't0 vs0'
-      'c0 vs0'
-      'b0 vs0'
+      'd0 vs0'
       'mx mx'
-      't1 vs1'
-      'c1 vs1'
-      'b1 vs1'
+      'd1 vs1'
       'bottom bottom';
   }
 }
@@ -111,7 +121,7 @@
 .mixer-grid--many {
   // Stacked at every width — deck count (and so row count) isn't knowable here, so
   // `grid-template-areas` is computed and bound inline by the component instead.
-  height: auto;
+  @include stacked-grid;
   grid-template-columns: minmax(0, 1fr) var(--vs-col);
 }
 
@@ -119,27 +129,47 @@
   grid-area: bottom;
   display: flex;
   flex-direction: row;
-  gap: var(--spacing-md);
-  min-height: 11rem;
+  gap: var(--dj-card-gap);
+  min-height: 0;
+
+  // The floor belongs only to the stacked forms, whose rows are all content-sized and whose page
+  // scrolls anyway. In a column form the band *is* the flexing row, and a floor there is precisely
+  // what pushes the grid past the viewport and costs the listing its trail.
+  @include styles.below-tablet {
+    min-height: 11rem;
+  }
 
   @include styles.below-phone {
     flex-direction: column;
-    min-height: 0;
   }
-}
-
-.browse-card {
-  flex: 0 1 auto;
-  min-width: 250px;
-  max-width: 500px;
-}
-
-.directory-listing-card {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 .browse-card,
 .directory-listing-card {
+  min-height: 0;
   height: 100%;
+}
+
+.browse-card {
+  flex: 0 0 300px;
+  min-width: 0;
+
+  @include styles.below-phone {
+    // 300px is a width while the band is a row; once it stacks, that basis would become a height.
+    flex: 0 0 auto;
+    height: auto;
+  }
+}
+
+.directory-listing-card {
+  flex: 1 1 0;
+  min-width: 0;
+
+  @include styles.below-phone {
+    flex: 1 1 auto;
+  }
+}
+
+.mixer-grid--many .bottom-band {
+  min-height: 11rem;
 }

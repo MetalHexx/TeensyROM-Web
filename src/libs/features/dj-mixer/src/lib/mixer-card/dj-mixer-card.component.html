@@ -2,15 +2,20 @@
   <div class="mixer-body">
     <div class="strips">
       @for (deck of decks(); track deck.index) {
-      <lib-deck-strip [model]="stripFor(deck)"></lib-deck-strip>
+      <lib-deck-strip
+        [model]="stripFor(deck)"
+        size="medium"
+        [faderLength]="faderLength()"
+      ></lib-deck-strip>
       }
     </div>
     @if (showCrossfader()) {
     <lib-crossfader
       [value]="0"
-      [startLabel]="firstLetter()"
-      [endLabel]="lastLetter()"
+      startLabel=""
+      endLabel=""
       [accessibleName]="crossfaderName()"
+      [trackLength]="faderLength()"
     ></lib-crossfader>
     }
   </div>

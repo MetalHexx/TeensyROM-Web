@@ -1,8 +1,39 @@
 :host {
   display: flex;
+  // `.channel-fader`'s own width is now the size-driven `--channel-fader-thickness` rather than a
+  // stretched 100%, so this keeps it centred in whatever width a flex ancestor (e.g. the deck strip's
+  // `.deck-strip-fader`) still gives this host — invisible when a caller's width matches the host's
+  // own, which is every use that predates `size`.
+  justify-content: center;
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
+  --channel-fader-thickness: 1.5rem;
+  --channel-fader-font: var(--font-size-sm);
+}
+
+// `large` is the default and matches the block above exactly — every existing use, unaware of
+// `size`, renders pixel-identical. Font stepping mirrors `lib-rotary-knob`'s own `--scale-knob-font`.
+:host([data-size='small']) {
+  --channel-fader-thickness: 1rem;
+  --channel-fader-font: 0.7rem;
+}
+
+:host([data-size='medium']) {
+  --channel-fader-thickness: 1.25rem;
+  --channel-fader-font: 0.75rem;
+}
+
+:host([data-size='extra-large']) {
+  --channel-fader-thickness: 1.75rem;
+  --channel-fader-font: var(--font-size-md);
+}
+
+// `length` pins the range input's own travel instead of letting it grow with the host — the host
+// itself stops growing too, so a fixed length isn't re-inflated by the flex-grow it otherwise shares
+// with everything else in its column.
+:host([data-fixed-length]) {
+  flex: 0 0 auto;
 }
 
 .channel-fader {
@@ -10,7 +41,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-sm);
-  width: 100%;
+  width: var(--channel-fader-thickness);
   height: 100%;
   min-height: 0;
 }
@@ -18,7 +49,7 @@
 .channel-fader-label {
   flex: 0 0 auto;
   color: var(--color-dimmed);
-  font-size: var(--font-size-sm);
+  font-size: var(--channel-fader-font);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -32,4 +63,9 @@ input[type='range'] {
   direction: rtl; // min at the bottom
   width: auto;
   height: 100%;
+}
+
+:host([data-fixed-length]) input[type='range'] {
+  flex: 0 0 auto;
+  height: var(--channel-fader-length);
 }

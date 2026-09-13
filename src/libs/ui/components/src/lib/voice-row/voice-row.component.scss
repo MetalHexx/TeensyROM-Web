@@ -1,6 +1,6 @@
-// checkbox+name on one line, the audible/muted state stacked beneath it, then the hold button —
-// every line centred, as the wireframe draws it. `.voice-row` from the POC source describes this
-// component's own host now that the row is its own custom element.
+// checkbox+name on one line, the hold button beneath it — both centred, as the wireframe draws it.
+// `.voice-row` from the POC source describes this component's own host now that the row is its own
+// custom element.
 :host {
   display: flex;
   flex-direction: column;
@@ -21,12 +21,7 @@
   }
 }
 
-.voice-state {
-  color: var(--color-dimmed);
-  font-size: var(--font-size-sm);
-}
-
-// `width: 100%` inside this fixed-width, centred column is what gives Kill, Punch In and Clear one
+// `width: 100%` inside this fixed-width, centred column is what gives Kill, Punch and Clear one
 // shared width without ever measuring the text.
 .voice-hold {
   width: 100%;

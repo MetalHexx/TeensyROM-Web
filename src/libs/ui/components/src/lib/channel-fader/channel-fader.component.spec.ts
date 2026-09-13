@@ -79,4 +79,32 @@ describe('ChannelFaderComponent', () => {
 
     expect(rangeInput().value).toBe('0.42');
   });
+
+  it('defaults data-size to large and reflects the size input', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.getAttribute('data-size')).toBe('large');
+
+    fixture.componentRef.setInput('size', 'small');
+    fixture.detectChanges();
+
+    expect(host.getAttribute('data-size')).toBe('small');
+  });
+
+  describe('length', () => {
+    it('sets neither the CSS variable nor the fixed-length attribute when null', () => {
+      const host = fixture.nativeElement as HTMLElement;
+
+      expect(host.style.getPropertyValue('--channel-fader-length')).toBe('');
+      expect(host.hasAttribute('data-fixed-length')).toBe(false);
+    });
+
+    it('sets the CSS variable and the fixed-length attribute when given a length', () => {
+      fixture.componentRef.setInput('length', '148px');
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.style.getPropertyValue('--channel-fader-length')).toBe('148px');
+      expect(host.hasAttribute('data-fixed-length')).toBe(true);
+    });
+  });
 });

@@ -1,0 +1,13 @@
+<lib-directory-trail
+  [currentPath]="currentPath()"
+  [storageTypeLabel]="storageTypeLabel()"
+  [canNavigateUp]="canNavigateUp()"
+  [canNavigateBack]="canNavigateBack()"
+  [canNavigateForward]="canNavigateForward()"
+  [isLoading]="isLoading()"
+  (backClicked)="onBackClick()"
+  (forwardClicked)="onForwardClick()"
+  (upClicked)="onUpClick()"
+  (refreshClicked)="onRefreshClick()"
+  (navigationRequested)="onNavigationRequested($event)"
+></lib-directory-trail>

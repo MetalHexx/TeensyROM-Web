@@ -52,32 +52,6 @@
 
     <span class="transport-spacer"></span>
 
-    <lib-status-led [state]="model().transport.state" [label]="model().transport.label" />
-  </div>
-
-  <div class="line line-tunes">
-    <div class="tune-sources">
-      @for (source of model().tuneSources; track source.id) {
-        <button
-          type="button"
-          [attr.aria-label]="source.accessibleName"
-          (click)="tuneSelect.emit(source.id)"
-        >
-          {{ source.label }}
-        </button>
-      }
-
-      <label class="file-picker">
-        Choose File
-        <input
-          type="file"
-          accept=".sid"
-          [attr.aria-label]="model().actionAccessibleNames.chooseFile"
-          (change)="onFilePicked($event)"
-        />
-      </label>
-    </div>
-
     <lib-stepper
       [text]="model().subtune.text"
       [previousDisabled]="model().subtune.disabled"
@@ -87,7 +61,37 @@
       (previous)="previousSubtune.emit()"
       (next)="nextSubtune.emit()"
     />
+
+    <lib-status-led [state]="model().transport.state" [label]="model().transport.label" />
   </div>
+
+  @if (showFilePicker() || (model().tuneSources?.length ?? 0) > 0) {
+    <div class="line line-tunes">
+      <div class="tune-sources">
+        @for (source of model().tuneSources ?? []; track source.id) {
+          <button
+            type="button"
+            [attr.aria-label]="source.accessibleName"
+            (click)="tuneSelect.emit(source.id)"
+          >
+            {{ source.label }}
+          </button>
+        }
+
+        @if (showFilePicker()) {
+          <label class="file-picker">
+            Choose File
+            <input
+              type="file"
+              accept=".sid"
+              [attr.aria-label]="model().actionAccessibleNames.chooseFile"
+              (change)="onFilePicked($event)"
+            />
+          </label>
+        }
+      </div>
+    </div>
+  }
 
   @for (error of model().errors; track $index) {
     <p class="error-text" role="alert">{{ error }}</p>

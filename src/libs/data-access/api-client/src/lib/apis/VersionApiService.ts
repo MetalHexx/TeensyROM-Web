@@ -12,17 +12,18 @@
  * Do not edit the class manually.
  */
 
+
 import * as runtime from '../runtime';
+import type {
+  GetVersionResponse,
+  ProblemDetails,
+} from '../models/index';
 import {
-    type GetVersionResponse,
     GetVersionResponseFromJSON,
     GetVersionResponseToJSON,
-} from '../models/GetVersionResponse';
-import {
-    type ProblemDetails,
     ProblemDetailsFromJSON,
     ProblemDetailsToJSON,
-} from '../models/ProblemDetails';
+} from '../models/index';
 
 /**
  * 
@@ -30,31 +31,20 @@ import {
 export class VersionApiService extends runtime.BaseAPI {
 
     /**
-     * Creates request options for getVersion without sending the request
-     */
-    async getVersionRequestOpts(): Promise<runtime.RequestOpts> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/api/version`;
-
-        return {
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        };
-    }
-
-    /**
      * Retrieves the current semantic version of the TeensyROM application.  The version follows semantic versioning format: **Major.Minor.Patch[-prerelease]**  **Version Information:** - **Major**: Breaking changes or significant new features - **Minor**: Backward-compatible new features - **Patch**: Backward-compatible bug fixes - **Prerelease**: Optional prerelease identifier (e.g., alpha.1, beta.2)  This version is read from the assembly metadata and matches the version specified in the TeensyRom.Api.csproj file.
      * Get Application Version
      */
     async getVersionRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetVersionResponse>> {
-        const requestOptions = await this.getVersionRequestOpts();
-        const response = await this.request(requestOptions, initOverrides);
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const response = await this.request({
+            path: `/api/version`,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
 
         return new runtime.JSONApiResponse(response, (jsonValue) => GetVersionResponseFromJSON(jsonValue));
     }

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import type { ControlSize } from '../shared/control-size';
 
 const CENTER = 40;
 const HOME_ANGLE_DEG = -90;
@@ -51,10 +52,17 @@ function pointOnCircle(angleDeg: number, radius: number): Point {
   templateUrl: './rotary-knob.component.html',
   styleUrl: './rotary-knob.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[attr.data-size]': 'size()',
+  },
 })
 export class RotaryKnobComponent {
   /** 'Cutoff' | 'Resonance' | 'Pulse Width' | 'Key' */
   readonly label = input.required<string>();
+  /** The dial's rendered size — reflected as `data-size` on the host, which the stylesheet reads to
+   *  set the dial's own dimensions and font size. Defaults to `'large'`, today's only size, so every
+   *  existing use renders pixel-identical. */
+  readonly size = input<ControlSize>('large');
   /** e.g. 'Cutoff deck A' — caller composes it. */
   readonly accessibleName = input.required<string>();
   /** The dial's current position, between `min()` and `max()`. */

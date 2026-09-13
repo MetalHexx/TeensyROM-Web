@@ -136,4 +136,37 @@ describe('DeckStripComponent', () => {
 
     expect(emitted).toEqual([null]);
   });
+
+  it('forwards size to the filter selector, every knob and the fader, defaulting to large', () => {
+    function dataSize(selector: string): string | null {
+      return (fixture.nativeElement.querySelector(selector) as HTMLElement).getAttribute(
+        'data-size'
+      );
+    }
+
+    expect(dataSize('lib-filter-mode-selector')).toBe('large');
+    expect(dataSize('lib-rotary-knob')).toBe('large');
+    expect(dataSize('lib-channel-fader')).toBe('large');
+
+    fixture.componentRef.setInput('size', 'small');
+    fixture.detectChanges();
+
+    expect(dataSize('lib-filter-mode-selector')).toBe('small');
+    expect(dataSize('lib-rotary-knob')).toBe('small');
+    expect(dataSize('lib-channel-fader')).toBe('small');
+  });
+
+  it('toggles the fixed-fader wrapper class from faderLength and forwards it to the fader', () => {
+    const wrapper = () => fixture.nativeElement.querySelector('.deck-strip-fader') as HTMLElement;
+    const fader = () => fixture.nativeElement.querySelector('lib-channel-fader') as HTMLElement;
+
+    expect(wrapper().classList.contains('deck-strip-fader--fixed')).toBe(false);
+    expect(fader().hasAttribute('data-fixed-length')).toBe(false);
+
+    fixture.componentRef.setInput('faderLength', '148px');
+    fixture.detectChanges();
+
+    expect(wrapper().classList.contains('deck-strip-fader--fixed')).toBe(true);
+    expect(fader().hasAttribute('data-fixed-length')).toBe(true);
+  });
 });

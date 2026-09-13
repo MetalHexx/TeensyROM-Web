@@ -12,7 +12,8 @@ const meta: Meta<BindingCardComponent> = {
           "One deck's own MIDI binding: its Output port selector, Enable MIDI beside Identify, " +
           'and whichever of its three distinct error states apply. Purely presentational — it ' +
           'holds no state of its own; the caller owns the permission grant, the enumerated port ' +
-          "list and this deck's own persisted selection.",
+          "list and this deck's own persisted selection. `layout=\"inline\"` lays the heading, the " +
+          "port control and the two buttons on one row instead of the default `\"stacked\"` column.",
       },
     },
   },
@@ -80,5 +81,22 @@ export const BindingError: Story = {
       ports: [{ id: 'port-1', label: 'TeensyROM (PJRC)' }],
       errors: ['Deck B is already bound to that port. Pick a different one.'],
     }),
+  },
+};
+
+/** `layout="inline"`: heading, port control and the two buttons share one row instead of
+ *  stacking, for a host with less vertical room to give. */
+export const Inline: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      ports: [
+        { id: 'port-1', label: 'TeensyROM (PJRC)' },
+        { id: 'port-2', label: 'Cart B (Acme)' },
+      ],
+      selectedPortId: 'port-1',
+      identifyDisabled: false,
+    }),
+    layout: 'inline',
   },
 };

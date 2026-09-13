@@ -462,19 +462,17 @@ export class DeckHostComponent implements OnInit, OnDestroy {
 
   // ── Voice ──────────────────────────────────────────────────────────────────────────────────────
 
-  /** One row per voice, in playback order. `stateText` is the latched-XOR-held rule: the chip shows
-   *  what is actually happening, not what is latched. `checkboxId` keeps the POC's own
+  /** One row per voice, in playback order. `checkboxId` keeps the POC's own
    *  `voice-mute-<index>-<label>` shape so two decks on the page never collide. */
   protected readonly voiceModel = computed<VoicePanelModel>(() => {
     const label = this.context.label();
     const rows: readonly VoiceRowModel[] = this.snapshot().voices.map((voice, index) => ({
       label: `V${index + 1}`,
       muted: voice.muted,
-      stateText: voice.muted !== voice.held ? 'muted' : 'audible',
-      holdLabel: voice.muted ? 'Punch In' : 'Kill',
+      holdLabel: voice.muted ? 'Punch' : 'Kill',
       checkboxId: `voice-mute-${index}-${label}`,
       muteAccessibleName: `Mute voice ${index + 1} deck ${label}`,
-      holdAccessibleName: `${voice.muted ? 'Punch in' : 'Kill'} voice ${index + 1} deck ${label}`,
+      holdAccessibleName: `${voice.muted ? 'Punch' : 'Kill'} voice ${index + 1} deck ${label}`,
     }));
     return {
       accessibleName: `Voice deck ${label}`,

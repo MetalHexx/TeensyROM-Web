@@ -6,7 +6,6 @@ function testModel(overrides: Partial<VoiceRowModel> = {}): VoiceRowModel {
   return {
     label: 'V1',
     muted: false,
-    stateText: 'audible',
     holdLabel: 'Kill',
     checkboxId: 'voice-mute-0-a',
     muteAccessibleName: 'Mute voice 1 deck A',
@@ -156,9 +155,13 @@ describe('VoiceRowComponent', () => {
   it("renders the hold button's text from holdLabel", () => {
     expect(holdButton().textContent?.trim()).toBe('Kill');
 
-    fixture.componentRef.setInput('model', testModel({ muted: true, holdLabel: 'Punch In' }));
+    fixture.componentRef.setInput('model', testModel({ muted: true, holdLabel: 'Punch' }));
     fixture.detectChanges();
 
-    expect(holdButton().textContent?.trim()).toBe('Punch In');
+    expect(holdButton().textContent?.trim()).toBe('Punch');
+  });
+
+  it('renders no state caption', () => {
+    expect(fixture.nativeElement.querySelector('.voice-state')).toBeNull();
   });
 });

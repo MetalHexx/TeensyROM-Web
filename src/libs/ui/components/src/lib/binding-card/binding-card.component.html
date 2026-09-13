@@ -2,7 +2,6 @@
   <h2 class="binding-deck-label">{{ model().heading }}</h2>
 
   <label class="control">
-    Output port
     <select
       [disabled]="!model().portsEnabled || model().ports.length === 0"
       [attr.aria-label]="model().selectAccessibleName"

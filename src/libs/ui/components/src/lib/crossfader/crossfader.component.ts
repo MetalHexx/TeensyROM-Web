@@ -21,13 +21,20 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
   templateUrl: './crossfader.component.html',
   styleUrl: './crossfader.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[style.--crossfader-track-length]': 'trackLength()',
+    '[attr.data-fixed-track]': "trackLength() !== null ? '' : null",
+  },
 })
 export class CrossfaderComponent {
   /** The fader's current position, between `min()` and `max()`. */
   readonly value = input.required<number>();
-  /** e.g. 'A' — the label rendered at the fader's minimum end. */
+  /** e.g. 'A' — the label rendered at the fader's minimum end. An empty string renders no label
+   *  (and, in fixed-track mode, no label row at all when `endLabel` is also empty) — for a caller
+   *  whose own UI already labels the two ends elsewhere. */
   readonly startLabel = input.required<string>();
-  /** e.g. 'B' — the label rendered at the fader's maximum end. */
+  /** e.g. 'B' — the label rendered at the fader's maximum end. An empty string renders no label,
+   *  same as `startLabel`. */
   readonly endLabel = input.required<string>();
   /** Accessible label announced to assistive technology, e.g. 'Crossfader, deck A to deck B'. */
   readonly accessibleName = input.required<string>();
@@ -37,6 +44,11 @@ export class CrossfaderComponent {
   readonly max = input<number>(1);
   /** Granularity of the native range input. Defaults to `0.01`. */
   readonly step = input<number>(0.01);
+  /** A CSS length for the track's own extent. When set, the two deck-letter labels move above the
+   *  track (`.crossfader-labels`) so the track itself can claim the card's full content width, and
+   *  the track stops growing with `flex: 1 1 auto`, pinned instead to this length. `null` (the
+   *  default) keeps today's row layout: inline labels and a track that grows with its container. */
+  readonly trackLength = input<string | null>(null);
   /** Emits the raw numeric value read off the native range input, unrounded. */
   readonly valueChange = output<number>();
 

@@ -167,6 +167,19 @@ describe('DJ Mixer — responsive layout', () => {
       cy.get('[aria-label="Speed up 50% deck A"]').should('be.visible');
     });
 
+    it('fits the whole grid in the viewport at desktop width — the page itself never scrolls', () => {
+      cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
+
+      // Retried via `.should()`: the cards animate in (`animationEntry="from-bottom"`), so a single
+      // unretried read can catch a mid-animation height.
+      cy.get('.mixer-grid').should(([grid]) => {
+        const page = grid.ownerDocument.documentElement;
+        expect(page.scrollHeight, 'the page itself does not scroll').to.be.at.most(
+          page.clientHeight
+        );
+      });
+    });
+
     it('shows a crossfader with two decks', () => {
       cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
 
