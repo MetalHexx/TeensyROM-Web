@@ -8,13 +8,45 @@
       (change)="onSelectPort($event)"
     >
       @if (model().portsEnabled) {
-      <option value="" [selected]="model().selectedPortId === null">— select a port —</option>
+      <option value="" [selected]="model().selectedPortId === null">
+        {{ model().portPlaceholder }}
+      </option>
       @for (port of model().ports; track port.id) {
-      <option [value]="port.id" [selected]="port.id === model().selectedPortId">
-        {{ port.label }}
+      <option
+        [value]="port.id"
+        [selected]="port.id === model().selectedPortId"
+        [disabled]="!!port.takenBy"
+      >
+        {{ port.takenBy ? port.label + ' — taken by Deck ' + port.takenBy + ' —' : port.label }}
       </option>
       } } @else {
-      <option value="" selected disabled>— MIDI not enabled —</option>
+      <option value="" selected disabled>{{ model().portPlaceholder }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="control">
+    <select
+      [disabled]="model().devices.length === 0"
+      [attr.aria-label]="model().deviceSelectAccessibleName"
+      (change)="onSelectDevice($event)"
+    >
+      @if (model().devices.length > 0) {
+      <option value="" [selected]="model().selectedDeviceId === null">
+        {{ model().devicePlaceholder }}
+      </option>
+      @for (device of model().devices; track device.id) {
+      <option
+        [value]="device.id"
+        [selected]="device.id === model().selectedDeviceId"
+        [disabled]="!!device.takenBy"
+      >
+        {{
+          device.takenBy ? device.label + ' — taken by Deck ' + device.takenBy + ' —' : device.label
+        }}
+      </option>
+      } } @else {
+      <option value="" selected disabled>{{ model().devicePlaceholder }}</option>
       }
     </select>
   </label>

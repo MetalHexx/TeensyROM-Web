@@ -8,8 +8,7 @@ function testModel(): TransportPanelModel {
     bar: { kind: 'unknown' },
     scrubAccessibleName: 'Position deck A',
     transport: { state: 'stopped', label: 'Stopped' },
-    canPlay: true,
-    canPause: false,
+    playPause: { showing: 'play', disabled: false },
     canStop: true,
     repeatTrack: true,
     tuneSources: [
@@ -93,18 +92,16 @@ describe('TransportPanelComponent', () => {
   }
 
   describe('outputs', () => {
-    it('fires play, pause and stop from their own buttons', () => {
+    it('fires playPauseClick from the toggle and stopClick from its own button', () => {
       const fired: string[] = [];
-      component.playClick.subscribe(() => fired.push('play'));
-      component.pauseClick.subscribe(() => fired.push('pause'));
+      component.playPauseClick.subscribe(() => fired.push('playPause'));
       component.stopClick.subscribe(() => fired.push('stop'));
 
-      setModel({ canPlay: true, canPause: true, canStop: true });
+      setModel({ playPause: { showing: 'play', disabled: false }, canStop: true });
       button('Play').click();
-      button('Pause').click();
       button('Stop').click();
 
-      expect(fired).toEqual(['play', 'pause', 'stop']);
+      expect(fired).toEqual(['playPause', 'stop']);
     });
 
     it("carries the clicked source's own id on tuneSelect", () => {
@@ -204,17 +201,25 @@ describe('TransportPanelComponent', () => {
   });
 
   describe('model-driven state', () => {
-    it('disables each transport button from its own gate', () => {
-      setModel({ canPlay: false, canPause: true, canStop: false });
+    it("shows the toggle's text and aria-label from playPause.showing", () => {
+      setModel({ playPause: { showing: 'play', disabled: false } });
+      expect(button('Play').getAttribute('aria-label')).toBe('Play deck A');
+      expect(button('Play').getAttribute('data-showing')).toBe('play');
+
+      setModel({ playPause: { showing: 'pause', disabled: false } });
+      expect(button('Pause').getAttribute('aria-label')).toBe('Pause deck A');
+      expect(button('Pause').getAttribute('data-showing')).toBe('pause');
+    });
+
+    it('disables the toggle and Stop from their own gates', () => {
+      setModel({ playPause: { showing: 'play', disabled: true }, canStop: false });
 
       expect(button('Play').disabled).toBe(true);
-      expect(button('Pause').disabled).toBe(false);
       expect(button('Stop').disabled).toBe(true);
 
-      setModel({ canPlay: true, canPause: false, canStop: true });
+      setModel({ playPause: { showing: 'pause', disabled: false }, canStop: true });
 
-      expect(button('Play').disabled).toBe(false);
-      expect(button('Pause').disabled).toBe(true);
+      expect(button('Pause').disabled).toBe(false);
       expect(button('Stop').disabled).toBe(false);
     });
 

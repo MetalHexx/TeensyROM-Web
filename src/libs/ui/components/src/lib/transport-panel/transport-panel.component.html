@@ -15,19 +15,16 @@
     <div class="transport-controls">
       <button
         type="button"
-        [attr.aria-label]="model().actionAccessibleNames.play"
-        (click)="playClick.emit()"
-        [disabled]="!model().canPlay"
+        [attr.aria-label]="
+          model().playPause.showing === 'play'
+            ? model().actionAccessibleNames.play
+            : model().actionAccessibleNames.pause
+        "
+        [attr.data-showing]="model().playPause.showing"
+        (click)="playPauseClick.emit()"
+        [disabled]="model().playPause.disabled"
       >
-        Play
-      </button>
-      <button
-        type="button"
-        [attr.aria-label]="model().actionAccessibleNames.pause"
-        (click)="pauseClick.emit()"
-        [disabled]="!model().canPause"
-      >
-        Pause
+        {{ model().playPause.showing === 'play' ? 'Play' : 'Pause' }}
       </button>
       <button
         type="button"

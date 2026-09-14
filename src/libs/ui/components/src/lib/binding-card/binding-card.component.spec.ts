@@ -6,8 +6,8 @@ import {
   type BindingPortModel,
 } from './binding-card.component';
 
-function port(id: string, label: string): BindingPortModel {
-  return { id, label };
+function port(id: string, label: string, takenBy?: string): BindingPortModel {
+  return { id, label, takenBy };
 }
 
 function model(overrides: Partial<BindingCardModel> = {}): BindingCardModel {
@@ -17,9 +17,14 @@ function model(overrides: Partial<BindingCardModel> = {}): BindingCardModel {
     ports: [],
     selectedPortId: null,
     portsEnabled: false,
+    portPlaceholder: '— MIDI not enabled —',
+    devices: [],
+    selectedDeviceId: null,
+    devicePlaceholder: '— select a device —',
     enableDisabled: false,
     identifyDisabled: false,
     selectAccessibleName: 'Output port deck A',
+    deviceSelectAccessibleName: 'Device deck A',
     enableAccessibleName: 'Enable MIDI deck A',
     identifyAccessibleName: 'Identify deck A',
     errors: [],
@@ -44,7 +49,11 @@ describe('BindingCardComponent', () => {
   }
 
   function select(): HTMLSelectElement {
-    return fixture.nativeElement.querySelector('select') as HTMLSelectElement;
+    return fixture.nativeElement.querySelectorAll('select')[0] as HTMLSelectElement;
+  }
+
+  function deviceSelect(): HTMLSelectElement {
+    return fixture.nativeElement.querySelectorAll('select')[1] as HTMLSelectElement;
   }
 
   function button(label: string): HTMLButtonElement {
@@ -74,6 +83,7 @@ describe('BindingCardComponent', () => {
     setModel(
       model({
         portsEnabled: true,
+        portPlaceholder: '— select a port —',
         ports: [port('port-1', 'Cart A (Acme)'), port('port-2', 'Cart B (Acme)')],
         selectedPortId: 'port-2',
       })
@@ -94,6 +104,20 @@ describe('BindingCardComponent', () => {
     expect(select().disabled).toBe(true);
   });
 
+  it('renders a taken port option disabled, with the taking deck named in its own text', () => {
+    setModel(
+      model({
+        portsEnabled: true,
+        portPlaceholder: '— select a port —',
+        ports: [port('port-1', 'Cart A (Acme)'), port('port-2', 'Cart B (Acme)', 'B')],
+      })
+    );
+
+    const option = select().querySelector('option[value="port-2"]') as HTMLOptionElement;
+    expect(option.textContent?.trim()).toBe('Cart B (Acme) — taken by Deck B —');
+    expect(option.disabled).toBe(true);
+  });
+
   it('emits the chosen port id on portSelect, including the empty placeholder value', () => {
     setModel(
       model({
@@ -111,6 +135,61 @@ describe('BindingCardComponent', () => {
     select().dispatchEvent(new Event('change'));
 
     expect(emitted).toEqual(['port-1', '']);
+  });
+
+  it('renders the placeholder and every device option when devices are present', () => {
+    setModel(
+      model({
+        devices: [
+          { id: 'device-1', label: 'nanoKONTROL2' },
+          { id: 'device-2', label: 'Launchpad Mini' },
+        ],
+        selectedDeviceId: 'device-2',
+        devicePlaceholder: '— select a device —',
+      })
+    );
+
+    const options = Array.from(deviceSelect().querySelectorAll('option'));
+    expect(options.map((option) => option.textContent?.trim())).toEqual([
+      '— select a device —',
+      'nanoKONTROL2',
+      'Launchpad Mini',
+    ]);
+    expect(deviceSelect().disabled).toBe(false);
+  });
+
+  it('renders a taken device option disabled, with the taking deck named in its own text', () => {
+    setModel(
+      model({
+        devices: [{ id: 'device-1', label: 'nanoKONTROL2', takenBy: 'B' }],
+        devicePlaceholder: '— select a device —',
+      })
+    );
+
+    const option = deviceSelect().querySelector('option[value="device-1"]') as HTMLOptionElement;
+    expect(option.textContent?.trim()).toBe('nanoKONTROL2 — taken by Deck B —');
+    expect(option.disabled).toBe(true);
+  });
+
+  it('disables the device select and renders its placeholder when devices is empty', () => {
+    setModel(model({ devices: [], devicePlaceholder: '— select a device —' }));
+
+    expect(deviceSelect().disabled).toBe(true);
+    expect(deviceSelect().textContent).toContain('select a device');
+  });
+
+  it('emits the chosen device id on deviceSelect, including the empty placeholder value', () => {
+    setModel(model({ devices: [{ id: 'device-1', label: 'nanoKONTROL2' }] }));
+    const emitted: string[] = [];
+    component.deviceSelect.subscribe((value) => emitted.push(value));
+
+    const options = deviceSelect().querySelectorAll('option');
+    (options[1] as HTMLOptionElement).selected = true;
+    deviceSelect().dispatchEvent(new Event('change'));
+    (options[0] as HTMLOptionElement).selected = true;
+    deviceSelect().dispatchEvent(new Event('change'));
+
+    expect(emitted).toEqual(['device-1', '']);
   });
 
   it('fires enableMidi and identify, and respects their own disabled flags', () => {

@@ -339,18 +339,22 @@ export class DeckHostComponent implements OnInit, OnDestroy {
     const state: StatusLedState = analyzing ? 'analyzing' : snapshot.transport;
     const hasTune = this.tuneLoader.currentTune() !== null;
     const subtuneCount = snapshot.tune?.subtuneCount ?? 0;
+    const canPlay =
+      hasTune &&
+      this.binding.selectedPortId() !== null &&
+      snapshot.transport !== 'playing' &&
+      !analyzing;
+    const canPause = snapshot.transport === 'playing';
 
     return {
       accessibleName: `Transport deck ${label}`,
       bar: this.transportBar(),
       scrubAccessibleName: `Position deck ${label}`,
       transport: { state, label: TRANSPORT_STATE_LABELS[state] },
-      canPlay:
-        hasTune &&
-        this.binding.selectedPortId() !== null &&
-        snapshot.transport !== 'playing' &&
-        !analyzing,
-      canPause: snapshot.transport === 'playing',
+      playPause: {
+        showing: snapshot.transport === 'playing' ? 'pause' : 'play',
+        disabled: !(canPlay || canPause),
+      },
       canStop: hasTune && !(analyzing && snapshot.transport === 'stopped'),
       repeatTrack: snapshot.repeatTrack,
       tuneSources: this.tuneLoader.availableTunes().map((source) => ({
@@ -395,14 +399,13 @@ export class DeckHostComponent implements OnInit, OnDestroy {
    *  Narrow and per-frame, for the same reason as `transportPositionPercent`. */
   protected readonly transportFrameLabel = computed<string>(() => `frame ${this.view.position()}`);
 
-  /** Starts this deck. */
-  protected onPlay(): void {
-    void this.player.play();
-  }
-
-  /** Pauses this deck. */
-  protected onPause(): void {
-    this.player.pause();
+  /** Starts or pauses this deck, by whichever the merged toggle is currently showing. */
+  protected onPlayPauseToggle(): void {
+    if (this.snapshot().transport === 'playing') {
+      this.player.pause();
+    } else {
+      void this.player.play();
+    }
   }
 
   /** Stops this deck. */
@@ -860,6 +863,12 @@ export class DeckHostComponent implements OnInit, OnDestroy {
       ports,
       selectedPortId,
       portsEnabled,
+      portPlaceholder: portsEnabled ? '— select a port —' : '— MIDI not enabled —',
+      // The POC binds no input device — DeckMidiBinding has no device concept, so this list is
+      // always empty and the select stays disabled on its own placeholder.
+      devices: [],
+      selectedDeviceId: null,
+      devicePlaceholder: '— select a device —',
       enableDisabled: accessState === 'requesting',
       identifyDisabled: !(
         portsEnabled &&
@@ -867,6 +876,7 @@ export class DeckHostComponent implements OnInit, OnDestroy {
         this.snapshot().transport !== 'playing'
       ),
       selectAccessibleName: `Output port deck ${label}`,
+      deviceSelectAccessibleName: `Device deck ${label}`,
       enableAccessibleName: `Enable MIDI deck ${label}`,
       identifyAccessibleName: `Identify deck ${label}`,
       errors: [

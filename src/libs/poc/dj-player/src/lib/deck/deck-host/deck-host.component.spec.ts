@@ -471,23 +471,29 @@ describe('DeckHostComponent', () => {
       }
     });
 
-    it('calls play, pause and stop on the player from the transport buttons', () => {
+    it('calls play, pause and stop on the player from the merged toggle and the stop button', () => {
       binding.selectedPortId.set('port-1');
       tuneLoader.currentTune.set(fakeSidFile());
       fixture.detectChanges();
 
-      const buttons: HTMLButtonElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('button')
-      );
-      buttons.find((button) => button.textContent?.trim() === 'Play')?.click();
+      function playPauseButton(): HTMLButtonElement | undefined {
+        return Array.from(
+          fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')
+        ).find((button) => ['Play', 'Pause'].includes(button.textContent?.trim() ?? ''));
+      }
+
+      playPauseButton()?.click();
       expect(player.player.play).toHaveBeenCalled();
 
       player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
       fixture.detectChanges();
-      buttons.find((button) => button.textContent?.trim() === 'Pause')?.click();
+      playPauseButton()?.click();
       expect(player.player.pause).toHaveBeenCalled();
 
-      buttons.find((button) => button.textContent?.trim() === 'Stop')?.click();
+      const stopButton = Array.from(
+        fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')
+      ).find((button) => button.textContent?.trim() === 'Stop');
+      stopButton?.click();
       expect(player.player.stop).toHaveBeenCalled();
     });
 
