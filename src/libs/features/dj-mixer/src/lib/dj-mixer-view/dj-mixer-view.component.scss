@@ -24,13 +24,6 @@
   @include styles.below-phone {
     height: auto;
   }
-
-  // Three or more decks stack at every width, including desktop, where `.router-content` clips
-  // rather than scrolls — the view brings its own scrolling so decks past the first stay reachable.
-  &.dj-mixer-view--many {
-    overflow-y: auto;
-    min-height: 0;
-  }
 }
 
 .dj-mixer-view {
@@ -81,24 +74,6 @@
 // Two rows at every column form: the deck row is its own content's height, and the bottom band is
 // the only region that flexes. Zooming out therefore buys listing rows and nothing else, and no
 // card can be squeezed into collapse by a taller sibling.
-.mixer-grid--one {
-  grid-template-columns: minmax(0, 1fr) var(--vs-col) var(--mixer-col);
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-areas:
-    'd0 vs0 mx'
-    'bottom bottom bottom';
-
-  @include styles.below-tablet {
-    @include stacked-grid;
-    grid-template-columns: minmax(0, 1fr) var(--vs-col);
-    grid-template-rows: repeat(3, auto);
-    grid-template-areas:
-      'd0 vs0'
-      'mx mx'
-      'bottom bottom';
-  }
-}
-
 .mixer-grid--two {
   grid-template-columns: minmax(0, 1fr) var(--vs-col) var(--mixer-col) var(--vs-col) minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
@@ -116,13 +91,6 @@
       'd1 vs1'
       'bottom bottom';
   }
-}
-
-.mixer-grid--many {
-  // Stacked at every width — deck count (and so row count) isn't knowable here, so
-  // `grid-template-areas` is computed and bound inline by the component instead.
-  @include stacked-grid;
-  grid-template-columns: minmax(0, 1fr) var(--vs-col);
 }
 
 .bottom-band {
@@ -168,8 +136,4 @@
   @include styles.below-phone {
     flex: 1 1 auto;
   }
-}
-
-.mixer-grid--many .bottom-band {
-  min-height: 11rem;
 }

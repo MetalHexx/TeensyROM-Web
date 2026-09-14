@@ -27,7 +27,6 @@ import type { DeckRef } from '../deck-ref';
 @Component({
   selector: 'lib-dj-mixer-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '[class.dj-mixer-view--many]': 'isMany()' },
   imports: [
     EmptyStateMessageComponent,
     ScalingCompactCardComponent,
@@ -56,7 +55,6 @@ export class DjMixerViewComponent {
     index,
   }));
   readonly showCrossfader = computed(() => this.decks.length >= 2);
-  readonly isMany = computed(() => this.decks.length >= 3); // the stacked-at-every-width form
 
   /** The DJ-local state: which device/storage the browse trees and listing currently show. */
   readonly activeStorage = signal<ActiveStorage | null>(null);
@@ -156,24 +154,6 @@ export class DjMixerViewComponent {
       });
     }
   }
-
-  /**
-   * Inline `grid-template-areas` for the three-or-more stacked form. Deck count (and so row
-   * count) isn't knowable in SCSS, so this is the one grid template value bound directly on the
-   * element rather than owned by a breakpoint mixin — every other layout decision stays in the
-   * stylesheet.
-   */
-  readonly manyGridAreas = computed<string>(() => {
-    const rows: string[] = [];
-    this.decks.forEach((deck) => {
-      rows.push(`"d${deck.index} vs${deck.index}"`);
-      if (deck.index === 0) {
-        rows.push('"mx mx"');
-      }
-    });
-    rows.push('"bottom bottom"');
-    return rows.join(' ');
-  });
 }
 
 /** The first enabled device's first available storage, in SD-then-USB order. */

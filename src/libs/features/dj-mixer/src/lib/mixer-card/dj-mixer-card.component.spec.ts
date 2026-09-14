@@ -1,17 +1,26 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { of } from 'rxjs';
 import { CrossfaderComponent, DeckStripComponent } from '@teensyrom-nx/ui/components';
 import { DjMixerCardComponent } from './dj-mixer-card.component';
 import type { DeckRef } from '../deck-ref';
 
 function render(
   decks: readonly DeckRef[],
-  showCrossfader: boolean
+  showCrossfader: boolean,
+  belowTablet = false
 ): ComponentFixture<DjMixerCardComponent> {
   TestBed.configureTestingModule({
     imports: [DjMixerCardComponent],
-    providers: [provideNoopAnimations()],
+    providers: [
+      provideNoopAnimations(),
+      {
+        provide: BreakpointObserver,
+        useValue: { observe: () => of({ matches: belowTablet, breakpoints: {} }) },
+      },
+    ],
   });
 
   const fixture = TestBed.createComponent(DjMixerCardComponent);
@@ -55,16 +64,6 @@ describe('DjMixerCardComponent', () => {
     expect(crossfader.accessibleName()).toBe('Crossfader, deck A to deck B');
   });
 
-  it('toggles the band host class from the band input', () => {
-    const fixture = render([{ slot: 'A', letter: 'A', index: 0 }], false);
-    expect(fixture.nativeElement.classList.contains('dj-mixer-card--band')).toBe(false);
-
-    fixture.componentRef.setInput('band', true);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.classList.contains('dj-mixer-card--band')).toBe(true);
-  });
-
   describe('the medium column form', () => {
     it('sizes every strip medium and hands it the same travel the crossfader gets', () => {
       const fixture = render(
@@ -95,10 +94,9 @@ describe('DjMixerCardComponent', () => {
           { slot: 'A', letter: 'A', index: 0 },
           { slot: 'B', letter: 'B', index: 1 },
         ],
+        true,
         true
       );
-      fixture.componentRef.setInput('band', true);
-      fixture.detectChanges();
 
       const strip = fixture.debugElement.query(By.directive(DeckStripComponent))
         .componentInstance as DeckStripComponent;

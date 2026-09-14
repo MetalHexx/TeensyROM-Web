@@ -1,19 +1,9 @@
 <div class="dj-mixer-view">
-  <div
-    class="mixer-grid"
-    [class.mixer-grid--one]="decks.length === 1"
-    [class.mixer-grid--two]="decks.length === 2"
-    [class.mixer-grid--many]="isMany()"
-    [style.grid-template-areas]="isMany() ? manyGridAreas() : null"
-  >
+  <div class="mixer-grid" [class.mixer-grid--two]="decks.length === 2">
     @for (deck of decks; track deck.index) {
     <lib-dj-deck-column [deck]="deck" [dropActive]="dragging()"></lib-dj-deck-column>
     }
-    <lib-dj-mixer-card
-      [decks]="decks"
-      [showCrossfader]="showCrossfader()"
-      [band]="isMany()"
-    ></lib-dj-mixer-card>
+    <lib-dj-mixer-card [decks]="decks" [showCrossfader]="showCrossfader()"></lib-dj-mixer-card>
     <div class="bottom-band">
       @if (enabledDevices().length === 0) {
 

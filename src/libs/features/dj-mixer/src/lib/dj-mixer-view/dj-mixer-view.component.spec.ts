@@ -161,7 +161,6 @@ describe('DjMixerViewComponent', () => {
       expect(deckLetters(fixture)).toEqual(['A', 'B']);
       expect(fixture.nativeElement.querySelectorAll('lib-dj-mixer-card').length).toBe(1);
       expect(component.showCrossfader()).toBe(true);
-      expect(component.isMany()).toBe(false);
     }, 10000);
 
     it('still renders exactly two deck columns with one enabled device', () => {
@@ -170,7 +169,6 @@ describe('DjMixerViewComponent', () => {
       expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
       expect(deckLetters(fixture)).toEqual(['A', 'B']);
       expect(component.showCrossfader()).toBe(true);
-      expect(component.isMany()).toBe(false);
     });
 
     it('still renders exactly two deck columns with three enabled devices', () => {
@@ -183,7 +181,6 @@ describe('DjMixerViewComponent', () => {
       expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
       expect(deckLetters(fixture)).toEqual(['A', 'B']);
       expect(component.showCrossfader()).toBe(true);
-      expect(component.isMany()).toBe(false);
     });
   });
 
