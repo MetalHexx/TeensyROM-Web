@@ -260,8 +260,9 @@ export class DeckService {
   /** Records this slot's current playhead. Unconditional — the rAF loop gates its own calls on
    *  the frame having changed, but every explicit transport transition samples regardless, so a
    *  stop shows the bar back at the start even when the engine happened to land on the same frame
-   *  it was already holding. Specs drive this directly, in place of a real animation frame. */
-  sample(slot: Slot): void {
+   *  it was already holding. Specs exercise this indirectly, through the public commands that
+   *  already call it. */
+  private sample(slot: Slot): void {
     this.store.samplePosition({ slot, positionFrames: this.runtime.position(slot) });
   }
 
