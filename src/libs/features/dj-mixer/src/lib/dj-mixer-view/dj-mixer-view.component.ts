@@ -8,13 +8,12 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
+import { DECK_SLOTS, DeviceStore, StorageStore } from '@teensyrom-nx/application';
 import {
   EmptyStateMessageComponent,
   ScalingCompactCardComponent,
 } from '@teensyrom-nx/ui/components';
 import { StorageType, type Device } from '@teensyrom-nx/domain';
-import { LogType, logInfo } from '@teensyrom-nx/utils';
 import { DjDeckColumnComponent } from '../deck-column/dj-deck-column.component';
 import { DjMixerCardComponent } from '../mixer-card/dj-mixer-card.component';
 import {
@@ -24,7 +23,6 @@ import {
 import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-listing.component';
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
 import type { DeckRef } from '../deck-ref';
-import type { DjFileDragPayload } from '../drag/dj-file-drag';
 
 @Component({
   selector: 'lib-dj-mixer-view',
@@ -49,11 +47,16 @@ export class DjMixerViewComponent {
   readonly enabledDevices = computed<Device[]>(() =>
     this.deviceStore.devices().filter((d) => d.isEnabled)
   );
-  readonly decks = computed<readonly DeckRef[]>(() =>
-    this.enabledDevices().map((_, index) => ({ letter: String.fromCharCode(65 + index), index }))
-  );
-  readonly showCrossfader = computed(() => this.decks().length >= 2);
-  readonly isMany = computed(() => this.decks().length >= 3); // the stacked-at-every-width form
+
+  /** The two fixed deck columns the DJ view always renders — never derived from device count or
+   *  order; only which device (if any) a deck is bound to changes. */
+  readonly decks: readonly DeckRef[] = DECK_SLOTS.map((slot, index) => ({
+    slot,
+    letter: slot,
+    index,
+  }));
+  readonly showCrossfader = computed(() => this.decks.length >= 2);
+  readonly isMany = computed(() => this.decks.length >= 3); // the stacked-at-every-width form
 
   /** The DJ-local state: which device/storage the browse trees and listing currently show. */
   readonly activeStorage = signal<ActiveStorage | null>(null);
@@ -139,14 +142,6 @@ export class DjMixerViewComponent {
     void this.storageStore.navigateToDirectory({ ...event, path });
   }
 
-  /**
-   * A SID was dropped on a deck. Resolving it into that deck is the deck service's job (wired in
-   * P04-T02); this just proves the drop reaches the view.
-   */
-  onFileDropped(payload: DjFileDragPayload): void {
-    logInfo(LogType.Info, `File dropped on deck: ${payload.fileName}`, payload);
-  }
-
   private async seedStorage(device: Device): Promise<void> {
     if (device.sdStorage?.available) {
       await this.storageStore.initializeStorage({
@@ -170,7 +165,7 @@ export class DjMixerViewComponent {
    */
   readonly manyGridAreas = computed<string>(() => {
     const rows: string[] = [];
-    this.decks().forEach((deck) => {
+    this.decks.forEach((deck) => {
       rows.push(`"d${deck.index} vs${deck.index}"`);
       if (deck.index === 0) {
         rows.push('"mx mx"');

@@ -3,13 +3,18 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
-import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
+import {
+  DeckService,
+  DeviceStore,
+  DjStore,
+  StorageStore,
+  type DeckBindingSummary,
+  type DeckTransportSummary,
+} from '@teensyrom-nx/application';
 import { StorageType } from '@teensyrom-nx/domain';
 import { DjMixerViewComponent } from './dj-mixer-view.component';
 import { DjBrowseTreesComponent } from '../browse-trees/dj-browse-trees.component';
 import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-listing.component';
-import { DjDeckColumnComponent } from '../deck-column/dj-deck-column.component';
-import type { DjFileDragPayload } from '../drag/dj-file-drag';
 
 interface DeviceFixtureOptions {
   deviceId?: string;
@@ -58,6 +63,64 @@ function createStorageStoreStub(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** An idle deck: nothing loaded, nothing bound — everything `DjDeckColumnComponent` needs to
+ *  render its lifted panels, but nothing this view's own spec asserts on (see the deck column's
+ *  own spec for the wiring behavior). */
+function idleTransportSummary(): DeckTransportSummary {
+  return {
+    status: 'empty',
+    led: 'stopped',
+    label: 'Stopped',
+    showing: 'play',
+    controlsDisabled: true,
+    canStop: false,
+    scrubPercent: 0,
+    bar: { kind: 'unknown' },
+    frameLabel: 'frame 0',
+    subtuneText: 'Subtune 0 of 0',
+    subtuneDisabled: true,
+    repeat: true,
+    errors: [],
+  };
+}
+
+function idleBindingSummary(): DeckBindingSummary {
+  return {
+    portOptions: [],
+    selectedPortId: null,
+    portPlaceholder: '— MIDI not enabled —',
+    deviceOptions: [],
+    selectedDeviceId: null,
+    devicePlaceholder: '— select a device —',
+    portsEnabled: false,
+    enableDisabled: false,
+    identifyDisabled: true,
+    errors: [],
+  };
+}
+
+function createDjStoreStub() {
+  return {
+    transportSummary: () => signal(idleTransportSummary()),
+    bindingSummary: () => signal(idleBindingSummary()),
+  };
+}
+
+function createDeckServiceStub() {
+  return {
+    load: vi.fn(),
+    togglePlayPause: vi.fn(),
+    stop: vi.fn(),
+    setRepeat: vi.fn(),
+    selectSubtune: vi.fn(),
+    seek: vi.fn(),
+    bindPort: vi.fn(),
+    bindDevice: vi.fn(),
+    enableMidi: vi.fn(),
+    identify: vi.fn(),
+  };
+}
+
 function render(devices: unknown[], storageStoreOverrides: Record<string, unknown> = {}) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
 
@@ -67,6 +130,8 @@ function render(devices: unknown[], storageStoreOverrides: Record<string, unknow
       provideNoopAnimations(),
       { provide: DeviceStore, useValue: { devices: signal(devices) } },
       { provide: StorageStore, useValue: storageStore },
+      { provide: DjStore, useValue: createDjStoreStub() },
+      { provide: DeckService, useValue: createDeckServiceStub() },
     ],
   });
 
@@ -83,223 +148,81 @@ function deckLetters(fixture: ComponentFixture<DjMixerViewComponent>): string[] 
   ) as string[];
 }
 
-function mixerGrid(fixture: ComponentFixture<DjMixerViewComponent>): HTMLElement {
-  return fixture.nativeElement.querySelector('.mixer-grid');
-}
-
-/** Splits a `grid-template-areas` value into its rows, each row into its named cells. */
-function parseGridAreaRows(areas: string): string[][] {
-  return (areas.match(/"[^"]*"/g) ?? []).map((row) => row.slice(1, -1).split(' '));
-}
-
 describe('DjMixerViewComponent', () => {
-  // First test in the file to hit TestBed.createComponent, which pays the one-time cost
-  // of JIT-compiling this component. That cold compile can exceed the project's tight
-  // 2000ms testTimeout under CI load; every later test here reuses the compiled TestBed
-  // and stays fast, so only this test needs the extra headroom.
-  it('renders one deck column per enabled device, lettered in store order, plus a mixer card', () => {
-    const { fixture, component } = render([
-      device({ deviceId: 'a' }),
-      device({ deviceId: 'b' }),
-      device({ deviceId: 'c' }),
-    ]);
+  describe('the two fixed deck columns', () => {
+    // First test in the file to hit TestBed.createComponent, which pays the one-time cost of
+    // JIT-compiling this component and its deck columns' lifted panels. That cold compile can
+    // exceed the project's tight 2000ms testTimeout under CI load; every later test here reuses
+    // the compiled TestBed and stays fast, so only this test needs the extra headroom.
+    it('renders exactly two deck columns, lettered A and B, and one mixer card with no enabled devices', () => {
+      const { fixture, component } = render([]);
 
-    expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(3);
-    expect(deckLetters(fixture)).toEqual(['A', 'B', 'C']);
-    expect(fixture.nativeElement.querySelectorAll('lib-dj-mixer-card').length).toBe(1);
-    expect(component.showCrossfader()).toBe(true);
-    expect(component.isMany()).toBe(true);
-  }, 10000);
+      expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
+      expect(deckLetters(fixture)).toEqual(['A', 'B']);
+      expect(fixture.nativeElement.querySelectorAll('lib-dj-mixer-card').length).toBe(1);
+      expect(component.showCrossfader()).toBe(true);
+      expect(component.isMany()).toBe(false);
+    }, 10000);
 
-  it('filters out disabled devices, keeping the enabled-list positions contiguous', () => {
-    const { fixture, component } = render([
-      device({ deviceId: 'a' }),
-      device({ deviceId: 'b', isEnabled: false }),
-      device({ deviceId: 'c' }),
-    ]);
+    it('still renders exactly two deck columns with one enabled device', () => {
+      const { fixture, component } = render([device()]);
 
-    expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
-    expect(deckLetters(fixture)).toEqual(['A', 'B']);
-    expect(component.showCrossfader()).toBe(true);
-    expect(component.isMany()).toBe(false);
-  });
-
-  it('renders a single column and mixer card with no crossfader when only one device is enabled', () => {
-    const { fixture, component } = render([device()]);
-
-    expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(1);
-    expect(deckLetters(fixture)).toEqual(['A']);
-    expect(fixture.nativeElement.querySelectorAll('lib-dj-mixer-card').length).toBe(1);
-    expect(component.showCrossfader()).toBe(false);
-  });
-
-  it('renders the empty state and no mixer grid when no devices are enabled', () => {
-    const { fixture } = render([device({ isEnabled: false })]);
-
-    const emptyState = fixture.nativeElement.querySelector('lib-empty-state-message');
-    expect(emptyState).toBeTruthy();
-    expect(emptyState.querySelector('.empty-state-title')?.textContent?.trim()).toBe(
-      'No Enabled Devices'
-    );
-    expect(fixture.nativeElement.querySelector('.mixer-grid')).toBeNull();
-  });
-
-  describe('grid modifier classes', () => {
-    it('carries mixer-grid--one for a single enabled device', () => {
-      const { fixture } = render([device()]);
-      const classes = mixerGrid(fixture).classList;
-
-      expect(classes.contains('mixer-grid--one')).toBe(true);
-      expect(classes.contains('mixer-grid--two')).toBe(false);
-      expect(classes.contains('mixer-grid--many')).toBe(false);
+      expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
+      expect(deckLetters(fixture)).toEqual(['A', 'B']);
+      expect(component.showCrossfader()).toBe(true);
+      expect(component.isMany()).toBe(false);
     });
 
-    it('carries mixer-grid--two for two enabled devices', () => {
-      const { fixture } = render([device({ deviceId: 'a' }), device({ deviceId: 'b' })]);
-      const classes = mixerGrid(fixture).classList;
-
-      expect(classes.contains('mixer-grid--one')).toBe(false);
-      expect(classes.contains('mixer-grid--two')).toBe(true);
-      expect(classes.contains('mixer-grid--many')).toBe(false);
-    });
-
-    it('carries mixer-grid--many for three or more enabled devices', () => {
-      const { fixture } = render([
+    it('still renders exactly two deck columns with three enabled devices', () => {
+      const { fixture, component } = render([
         device({ deviceId: 'a' }),
         device({ deviceId: 'b' }),
         device({ deviceId: 'c' }),
       ]);
-      const classes = mixerGrid(fixture).classList;
 
-      expect(classes.contains('mixer-grid--one')).toBe(false);
-      expect(classes.contains('mixer-grid--two')).toBe(false);
-      expect(classes.contains('mixer-grid--many')).toBe(true);
-    });
-  });
-
-  describe('the --many inline grid-template-areas', () => {
-    it('leaves no inline grid-template-areas for one deck — the mixin owns that form', () => {
-      const { fixture } = render([device()]);
-
-      expect(mixerGrid(fixture).style.gridTemplateAreas).toBe('');
-    });
-
-    it('leaves no inline grid-template-areas for two decks — the mixin owns that form', () => {
-      const { fixture } = render([device({ deviceId: 'a' }), device({ deviceId: 'b' })]);
-
-      expect(mixerGrid(fixture).style.gridTemplateAreas).toBe('');
-    });
-
-    it("gives every deck one stack row beside that deck's own voice/speed column", () => {
-      const { fixture } = render([
-        device({ deviceId: 'a' }),
-        device({ deviceId: 'b' }),
-        device({ deviceId: 'c' }),
-      ]);
-      const rows = parseGridAreaRows(mixerGrid(fixture).style.gridTemplateAreas);
-
-      for (let deck = 0; deck < 3; deck++) {
-        const matches = rows.filter((row) => row[0] === `d${deck}`);
-        expect(matches).toHaveLength(1);
-        expect(matches[0][1]).toBe(`vs${deck}`);
-      }
-    });
-
-    it('places the mixer band in exactly one row, spanning both columns, right after the first deck', () => {
-      const { fixture } = render([
-        device({ deviceId: 'a' }),
-        device({ deviceId: 'b' }),
-        device({ deviceId: 'c' }),
-      ]);
-      const rows = parseGridAreaRows(mixerGrid(fixture).style.gridTemplateAreas);
-
-      const mxRows = rows.filter((row) => row[0] === 'mx');
-      expect(mxRows).toHaveLength(1);
-      expect(mxRows[0]).toEqual(['mx', 'mx']);
-      expect(rows.indexOf(mxRows[0])).toBe(1); // after deck 0's single stack row
-    });
-
-    it('places the bottom band in exactly one row, as the last row, at three decks', () => {
-      const { fixture } = render([
-        device({ deviceId: 'a' }),
-        device({ deviceId: 'b' }),
-        device({ deviceId: 'c' }),
-      ]);
-      const rows = parseGridAreaRows(mixerGrid(fixture).style.gridTemplateAreas);
-
-      const bottomRows = rows.filter((row) => row[0] === 'bottom');
-      expect(bottomRows).toHaveLength(1);
-      expect(bottomRows[0]).toEqual(['bottom', 'bottom']);
-      expect(rows.indexOf(bottomRows[0])).toBe(rows.length - 1);
+      expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
+      expect(deckLetters(fixture)).toEqual(['A', 'B']);
+      expect(component.showCrossfader()).toBe(true);
+      expect(component.isMany()).toBe(false);
     });
   });
 
   describe('the bottom band', () => {
-    function expectBrowseAndDirectoryListingContainers(
-      fixture: ComponentFixture<DjMixerViewComponent>
-    ): void {
-      const band = fixture.debugElement.query(By.css('.bottom-band'));
-
-      expect(band.queryAll(By.directive(DjBrowseTreesComponent)).length).toBe(1);
-      expect(band.queryAll(By.directive(DjDirectoryListingComponent)).length).toBe(1);
-      // The placeholder cards carried headings; the compact cards that replaced them carry none.
-      expect(band.nativeElement.querySelector('.card-title, .scaling-card-title')).toBeNull();
+    /** The band's own empty state, not the directory listing's unrelated "Empty Directory" one —
+     *  scoped to a direct child of `.bottom-band` via the native DOM's own `:scope` support,
+     *  which Angular's `DebugElement` matcher does not implement. */
+    function bandEmptyState(fixture: ComponentFixture<DjMixerViewComponent>): Element | null {
+      return fixture.nativeElement
+        .querySelector('.bottom-band')
+        .querySelector(':scope > lib-empty-state-message');
     }
 
-    it('renders the browse trees and directory listing containers at one enabled device', () => {
-      const { fixture } = render([device()]);
-      expectBrowseAndDirectoryListingContainers(fixture);
+    it('shows the empty state and hides browse/listing when no devices are enabled', () => {
+      const { fixture } = render([device({ isEnabled: false })]);
+      const band = fixture.debugElement.query(By.css('.bottom-band'));
+
+      expect(bandEmptyState(fixture)).toBeTruthy();
+      expect(band.queryAll(By.directive(DjBrowseTreesComponent)).length).toBe(0);
+      expect(band.queryAll(By.directive(DjDirectoryListingComponent)).length).toBe(0);
+      // The decks and the mixer always render, even with the bottom band in its empty state.
+      expect(fixture.nativeElement.querySelectorAll('lib-dj-deck-column').length).toBe(2);
+      expect(fixture.nativeElement.querySelector('.mixer-grid')).toBeTruthy();
     });
 
-    it('renders the browse trees and directory listing containers at two enabled devices', () => {
-      const { fixture } = render([device({ deviceId: 'a' }), device({ deviceId: 'b' })]);
-      expectBrowseAndDirectoryListingContainers(fixture);
-    });
-
-    it('renders the browse trees and directory listing containers at three-plus enabled devices', () => {
-      const { fixture } = render([
-        device({ deviceId: 'a' }),
-        device({ deviceId: 'b' }),
-        device({ deviceId: 'c' }),
-      ]);
-      expectBrowseAndDirectoryListingContainers(fixture);
-    });
-
-    it('passes the enabled devices and the active storage through to the browse trees container', () => {
+    it('hides the empty state and shows browse/listing once a device is enabled', () => {
       const { fixture, component } = render([device({ deviceId: 'a' }), device({ deviceId: 'b' })]);
+      const band = fixture.debugElement.query(By.css('.bottom-band'));
 
-      const browseTrees = fixture.debugElement.query(By.directive(DjBrowseTreesComponent))
+      expect(bandEmptyState(fixture)).toBeNull();
+
+      const browseTrees = band.query(By.directive(DjBrowseTreesComponent))
         .componentInstance as DjBrowseTreesComponent;
+      const listing = band.query(By.directive(DjDirectoryListingComponent))
+        .componentInstance as DjDirectoryListingComponent;
 
       expect(browseTrees.devices()).toEqual(component.enabledDevices());
       expect(browseTrees.activeStorage()).toEqual(component.activeStorage());
-    });
-
-    it('passes the active storage through to the directory listing container', () => {
-      const { fixture, component } = render([device()]);
-
-      const listing = fixture.debugElement.query(By.directive(DjDirectoryListingComponent))
-        .componentInstance as DjDirectoryListingComponent;
-
       expect(listing.activeStorage()).toEqual(component.activeStorage());
-    });
-  });
-
-  describe('the --many host scroll class', () => {
-    it('withholds dj-mixer-view--many below three decks', () => {
-      const { fixture } = render([device({ deviceId: 'a' }), device({ deviceId: 'b' })]);
-
-      expect(fixture.nativeElement.classList.contains('dj-mixer-view--many')).toBe(false);
-    });
-
-    it('adds dj-mixer-view--many to the host once three or more decks stack permanently', () => {
-      const { fixture } = render([
-        device({ deviceId: 'a' }),
-        device({ deviceId: 'b' }),
-        device({ deviceId: 'c' }),
-      ]);
-
-      expect(fixture.nativeElement.classList.contains('dj-mixer-view--many')).toBe(true);
     });
   });
 
@@ -434,17 +357,7 @@ describe('DjMixerViewComponent', () => {
     });
   });
 
-  describe('the SID drag and drop bridge', () => {
-    function fileDragPayload(overrides: Partial<DjFileDragPayload> = {}): DjFileDragPayload {
-      return {
-        deviceId: 'a',
-        storageType: StorageType.Sd,
-        path: '/song.sid',
-        fileName: 'song.sid',
-        ...overrides,
-      };
-    }
-
+  describe('the SID drag bridge', () => {
     it('lights every deck overlay while a drag is in flight and clears them on drag end', () => {
       const { fixture } = render([device({ deviceId: 'a' }), device({ deviceId: 'b' })]);
 
@@ -458,23 +371,6 @@ describe('DjMixerViewComponent', () => {
       listing.dragEnded.emit();
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelectorAll('.drop-overlay').length).toBe(0);
-    });
-
-    it('logs the drop instead of alerting — the deck service resolves it (wired in P04-T02)', () => {
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
-      const { fixture } = render([device({ deviceId: 'a' })]);
-
-      const deckColumn = fixture.debugElement.query(By.directive(DjDeckColumnComponent))
-        .componentInstance as DjDeckColumnComponent;
-
-      deckColumn.fileDropped.emit(fileDragPayload());
-
-      expect(logSpy).toHaveBeenCalled();
-      expect(alertSpy).not.toHaveBeenCalled();
-
-      logSpy.mockRestore();
-      alertSpy.mockRestore();
     });
   });
 });

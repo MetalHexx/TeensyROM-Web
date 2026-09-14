@@ -1,25 +1,20 @@
 import type {
-  BindingCardModel,
   DeckStripModel,
   LoopsCuesPanelModel,
   SpeedPanelModel,
-  TransportPanelModel,
   VoicePanelModel,
 } from '@teensyrom-nx/ui/components';
 import type { DeckRef } from '../deck-ref';
 
 /**
- * Everything one deck column and its mixer strip need to render an idle deck — no device
- * bound, nothing loaded, nothing enabled yet.
+ * Everything one deck column and its mixer strip need to render the panels that stay inert —
+ * Voice, Speed, Loops/Cues and the mixer strip. Transport and the binding card are wired live
+ * from `DjStore` (see `DjDeckColumnComponent`) and no longer come from here.
  */
 export interface DeckPlaceholderModels {
-  readonly transport: TransportPanelModel;
-  readonly positionPercent: number;
-  readonly frameLabel: string;
   readonly voice: VoicePanelModel;
   readonly speed: SpeedPanelModel;
   readonly loopsCues: LoopsCuesPanelModel;
-  readonly binding: BindingCardModel;
   readonly strip: DeckStripModel;
 }
 
@@ -32,29 +27,6 @@ const VOICE_ROW_LABELS = ['V1', 'V2', 'V3'] as const;
  */
 export function createDeckPlaceholders(deck: DeckRef): DeckPlaceholderModels {
   const { letter } = deck;
-
-  const transport: TransportPanelModel = {
-    accessibleName: `Transport deck ${letter}`,
-    bar: { kind: 'unknown' },
-    scrubAccessibleName: `Position deck ${letter}`,
-    transport: { state: 'stopped', label: 'Stopped' },
-    playPause: { showing: 'play', disabled: true },
-    canStop: true,
-    repeatTrack: false,
-    subtune: {
-      text: 'Subtune 0 of 0',
-      disabled: true,
-      previousAccessibleName: `Previous subtune deck ${letter}`,
-      nextAccessibleName: `Next subtune deck ${letter}`,
-    },
-    actionAccessibleNames: {
-      play: `Play deck ${letter}`,
-      pause: `Pause deck ${letter}`,
-      stop: `Stop deck ${letter}`,
-      repeat: `Repeat track deck ${letter}`,
-    },
-    errors: [],
-  };
 
   const voice: VoicePanelModel = {
     accessibleName: `Voice deck ${letter}`,
@@ -94,25 +66,6 @@ export function createDeckPlaceholders(deck: DeckRef): DeckPlaceholderModels {
     rows: [],
   };
 
-  const binding: BindingCardModel = {
-    accessibleName: `MIDI binding deck ${letter}`,
-    heading: `Deck ${letter}`,
-    ports: [],
-    selectedPortId: null,
-    portsEnabled: false,
-    portPlaceholder: '— MIDI not enabled —',
-    devices: [],
-    selectedDeviceId: null,
-    devicePlaceholder: '— select a device —',
-    enableDisabled: false,
-    identifyDisabled: true,
-    selectAccessibleName: `Output port deck ${letter}`,
-    deviceSelectAccessibleName: `Device deck ${letter}`,
-    enableAccessibleName: `Enable MIDI deck ${letter}`,
-    identifyAccessibleName: `Identify deck ${letter}`,
-    errors: [],
-  };
-
   const strip: DeckStripModel = {
     filter: {
       engaged: 'lowPass',
@@ -139,13 +92,9 @@ export function createDeckPlaceholders(deck: DeckRef): DeckPlaceholderModels {
   };
 
   return {
-    transport,
-    positionPercent: 0,
-    frameLabel: 'frame 0',
     voice,
     speed,
     loopsCues,
-    binding,
     strip,
   };
 }

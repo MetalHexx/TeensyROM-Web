@@ -23,7 +23,7 @@ function render(
 
 describe('DjMixerCardComponent', () => {
   it('renders one strip and no crossfader for a single deck', () => {
-    const fixture = render([{ letter: 'A', index: 0 }], false);
+    const fixture = render([{ slot: 'A', letter: 'A', index: 0 }], false);
 
     const strips = fixture.debugElement.queryAll(By.directive(DeckStripComponent));
     expect(strips.length).toBe(1);
@@ -34,8 +34,8 @@ describe('DjMixerCardComponent', () => {
   it('renders two strips and a crossfader named, but not visibly labelled, A to B for two decks', () => {
     const fixture = render(
       [
-        { letter: 'A', index: 0 },
-        { letter: 'B', index: 1 },
+        { slot: 'A', letter: 'A', index: 0 },
+        { slot: 'B', letter: 'B', index: 1 },
       ],
       true
     );
@@ -56,7 +56,7 @@ describe('DjMixerCardComponent', () => {
   });
 
   it('toggles the band host class from the band input', () => {
-    const fixture = render([{ letter: 'A', index: 0 }], false);
+    const fixture = render([{ slot: 'A', letter: 'A', index: 0 }], false);
     expect(fixture.nativeElement.classList.contains('dj-mixer-card--band')).toBe(false);
 
     fixture.componentRef.setInput('band', true);
@@ -69,8 +69,8 @@ describe('DjMixerCardComponent', () => {
     it('sizes every strip medium and hands it the same travel the crossfader gets', () => {
       const fixture = render(
         [
-          { letter: 'A', index: 0 },
-          { letter: 'B', index: 1 },
+          { slot: 'A', letter: 'A', index: 0 },
+          { slot: 'B', letter: 'B', index: 1 },
         ],
         true
       );
@@ -92,8 +92,8 @@ describe('DjMixerCardComponent', () => {
     it('releases both travels in the band form, where the card is no longer a fixed column', () => {
       const fixture = render(
         [
-          { letter: 'A', index: 0 },
-          { letter: 'B', index: 1 },
+          { slot: 'A', letter: 'A', index: 0 },
+          { slot: 'B', letter: 'B', index: 1 },
         ],
         true
       );
