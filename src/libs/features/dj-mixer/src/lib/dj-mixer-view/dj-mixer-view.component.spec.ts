@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
-import { DeviceStore, DjStore, StorageStore, type DjFileEntry } from '@teensyrom-nx/application';
+import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
 import { StorageType } from '@teensyrom-nx/domain';
 import { DjMixerViewComponent } from './dj-mixer-view.component';
 import { DjBrowseTreesComponent } from '../browse-trees/dj-browse-trees.component';
@@ -58,21 +58,8 @@ function createStorageStoreStub(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function createDjStoreStub(overrides: Record<string, unknown> = {}) {
-  return {
-    retrieveFile: vi.fn().mockResolvedValue(undefined),
-    getFile: vi.fn(() => signal(undefined)),
-    ...overrides,
-  };
-}
-
-function render(
-  devices: unknown[],
-  storageStoreOverrides: Record<string, unknown> = {},
-  djStoreOverrides: Record<string, unknown> = {}
-) {
+function render(devices: unknown[], storageStoreOverrides: Record<string, unknown> = {}) {
   const storageStore = createStorageStoreStub(storageStoreOverrides);
-  const djStore = createDjStoreStub(djStoreOverrides);
 
   TestBed.configureTestingModule({
     imports: [DjMixerViewComponent],
@@ -80,7 +67,6 @@ function render(
       provideNoopAnimations(),
       { provide: DeviceStore, useValue: { devices: signal(devices) } },
       { provide: StorageStore, useValue: storageStore },
-      { provide: DjStore, useValue: djStore },
     ],
   });
 
@@ -88,7 +74,7 @@ function render(
     TestBed.createComponent(DjMixerViewComponent);
   fixture.detectChanges();
 
-  return { fixture, component: fixture.componentInstance, storageStore, djStore };
+  return { fixture, component: fixture.componentInstance, storageStore };
 }
 
 function deckLetters(fixture: ComponentFixture<DjMixerViewComponent>): string[] {
@@ -474,42 +460,20 @@ describe('DjMixerViewComponent', () => {
       expect(fixture.nativeElement.querySelectorAll('.drop-overlay').length).toBe(0);
     });
 
-    it('dispatches retrieveFile with the dragged key, then alerts a resolved string carrying the filename', async () => {
+    it('logs the drop instead of alerting — the deck service resolves it (wired in P04-T02)', () => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
-      // A 'failed' entry formats synchronously (no SHA-256 hashing), keeping this test clear of
-      // Web Crypto availability in the test environment while still exercising both awaits.
-      const entry: DjFileEntry = {
-        deviceId: 'a',
-        storageType: StorageType.Sd,
-        path: '/song.sid',
-        fileName: 'song.sid',
-        status: 'failed',
-        bytes: null,
-        byteLength: null,
-        error: 'boom',
-      };
-      const { fixture, djStore } = render([device({ deviceId: 'a' })], {}, {
-        getFile: vi.fn(() => signal(entry)),
-      });
+      const { fixture } = render([device({ deviceId: 'a' })]);
 
       const deckColumn = fixture.debugElement.query(By.directive(DjDeckColumnComponent))
         .componentInstance as DjDeckColumnComponent;
 
       deckColumn.fileDropped.emit(fileDragPayload());
 
-      await vi.waitFor(() => {
-        expect(djStore.retrieveFile).toHaveBeenCalledWith({
-          deviceId: 'a',
-          storageType: StorageType.Sd,
-          path: '/song.sid',
-        });
-      });
-      await vi.waitFor(() => expect(alertSpy).toHaveBeenCalled());
+      expect(logSpy).toHaveBeenCalled();
+      expect(alertSpy).not.toHaveBeenCalled();
 
-      const [alerted] = alertSpy.mock.calls[0];
-      expect(typeof alerted).toBe('string');
-      expect(alerted).toContain('song.sid');
-
+      logSpy.mockRestore();
       alertSpy.mockRestore();
     });
   });

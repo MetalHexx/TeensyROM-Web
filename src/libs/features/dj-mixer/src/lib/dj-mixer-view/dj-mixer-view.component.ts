@@ -8,12 +8,13 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { DeviceStore, DjStore, StorageStore } from '@teensyrom-nx/application';
+import { DeviceStore, StorageStore } from '@teensyrom-nx/application';
 import {
   EmptyStateMessageComponent,
   ScalingCompactCardComponent,
 } from '@teensyrom-nx/ui/components';
 import { StorageType, type Device } from '@teensyrom-nx/domain';
+import { LogType, logInfo } from '@teensyrom-nx/utils';
 import { DjDeckColumnComponent } from '../deck-column/dj-deck-column.component';
 import { DjMixerCardComponent } from '../mixer-card/dj-mixer-card.component';
 import {
@@ -24,7 +25,6 @@ import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-l
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
 import type { DeckRef } from '../deck-ref';
 import type { DjFileDragPayload } from '../drag/dj-file-drag';
-import { formatSidEvidence } from '../drag/sid-evidence';
 
 @Component({
   selector: 'lib-dj-mixer-view',
@@ -44,7 +44,6 @@ import { formatSidEvidence } from '../drag/sid-evidence';
 export class DjMixerViewComponent {
   private readonly deviceStore = inject(DeviceStore);
   private readonly storageStore = inject(StorageStore);
-  private readonly djStore = inject(DjStore);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly enabledDevices = computed<Device[]>(() =>
@@ -141,14 +140,11 @@ export class DjMixerViewComponent {
   }
 
   /**
-   * Retrieves the dropped SID's bytes into the store (a no-op if already retrieved), then alerts
-   * the byte evidence. Both retrieval and formatting are awaited — `formatSidEvidence` hashes
-   * asynchronously, so an un-awaited call would alert `[object Promise]`.
+   * A SID was dropped on a deck. Resolving it into that deck is the deck service's job (wired in
+   * P04-T02); this just proves the drop reaches the view.
    */
-  async onFileDropped({ deviceId, storageType, path }: DjFileDragPayload): Promise<void> {
-    await this.djStore.retrieveFile({ deviceId, storageType, path });
-    const entry = this.djStore.getFile(deviceId, storageType, path)();
-    window.alert(await formatSidEvidence(entry));
+  onFileDropped(payload: DjFileDragPayload): void {
+    logInfo(LogType.Info, `File dropped on deck: ${payload.fileName}`, payload);
   }
 
   private async seedStorage(device: Device): Promise<void> {

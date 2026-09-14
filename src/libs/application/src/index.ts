@@ -10,6 +10,8 @@ export * from './lib/dj/dj-store';
 export * from './lib/dj/dj-file-key.util';
 export * from './lib/dj/slot';
 export * from './lib/dj/ports';
+export * from './lib/dj/selectors/transport-summary';
+export * from './lib/dj/selectors/binding-summary';
 
 // Player state management
 export * from './lib/player/player-store';
