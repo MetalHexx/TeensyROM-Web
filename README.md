@@ -154,10 +154,25 @@ TeensyROM Web is built as a hybrid application combining:
 
 ## 🎯 Deployment Modes
 
-This application can be deployed in two ways:
+This application can be deployed in three ways:
 
-1. **Standalone Web Application** - Full-stack application with integrated API and web UI
+1. **Standalone Web Application** - Full-stack application with integrated API and web UI (default)
 2. **API-Only Mode** - Headless API server for integration with custom clients or automation
+3. **Electron Desktop App** *(optional)* - Native window that hosts the same API + UI locally
+
+### Optional Electron desktop packaging
+
+From `src/`:
+
+```bash
+pnpm desktop:start        # local desktop development run
+pnpm desktop:package      # host-platform installer/package
+pnpm desktop:package:dir  # unpacked smoke-test build
+```
+
+See `src/apps/teensyrom-desktop/README.md`. Standalone server defaults (`http://0.0.0.0:213`,
+Homebrew, LAN access) are unchanged. Host/remote modes and network sharing are follow-up work
+aligned with upstream design requirements.
 
 ## 🚀 Quick Start
 

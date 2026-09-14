@@ -59,6 +59,9 @@ docs/projects
 # Frontend build output (built by CI or copy-frontend.ps1)
 apps/api/src/TeensyRom.Api/wwwroot/*
 
+# Generated, platform-specific input for Electron Builder
+apps/teensyrom-desktop/resources/backend/
+
 # .NET
 **/bin/
 **/obj/
