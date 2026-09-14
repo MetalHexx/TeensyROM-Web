@@ -110,8 +110,10 @@
     "@angular/router": "~19.2.0",
     "@microsoft/signalr": "^8.0.7",
     "@ngrx/signals": "^19.2.0",
+    "@sidablist/analysis": "link:../../SIDablist/libs/analysis",
     "@sidablist/asid": "link:../../SIDablist/libs/asid",
     "@sidablist/core": "file:../../SIDablist/libs/core",
+    "@sidablist/tunes": "link:../../SIDablist/libs/tunes",
     "opus-decoder": "^0.7.11",
     "rxjs": "~7.8.0",
     "zone.js": "~0.15.0"

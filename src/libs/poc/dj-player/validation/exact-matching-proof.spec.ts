@@ -1,9 +1,13 @@
 import { describe, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseSidFile, PAL_FRAME_INTERVAL_US, playCallsPerSecond, type PlayRate } from '@sidablist/core';
-import { scanTune } from '../src/lib/analysis/scan-tune';
-import { detectLoop, MIN_TAIL_SECONDS, IDLE_PERIOD_SECONDS } from '../src/lib/analysis/loop-detect';
+import {
+  parseSidFile,
+  PAL_FRAME_INTERVAL_US,
+  playCallsPerSecond,
+  type PlayRate,
+} from '@sidablist/core';
+import { scanTune, detectLoop, MIN_TAIL_SECONDS, IDLE_PERIOD_SECONDS } from '@sidablist/analysis';
 
 /** Musical seconds deep enough to reach a verified repeat on both bundled tunes — matches the depth
  *  the production `TuneIndexService.SCAN_DEPTH_SECONDS` ladder ultimately reaches for them. */
@@ -16,7 +20,12 @@ const TARGET_SECONDS = 450;
 const PROBE_FRAMES = 64;
 
 function rateFor(callsPerFrame: number): PlayRate {
-  return { callsPerFrame, exactCallsPerFrame: callsPerFrame, roundedCallsPerFrame: callsPerFrame, mode: 'rounded' };
+  return {
+    callsPerFrame,
+    exactCallsPerFrame: callsPerFrame,
+    roundedCallsPerFrame: callsPerFrame,
+    mode: 'rounded',
+  };
 }
 
 /** Runs the real `detectLoop` — the same function the tune index scans against — over one bundled
@@ -36,7 +45,9 @@ function analyse(name: string, targetSeconds = TARGET_SECONDS): void {
 
   console.log(`\n===== ${name} =====`);
   console.log(
-    `scanned ${frames} play-calls, callsPerFrame=${callsPerFrame} => ${(frames * secPerCall).toFixed(1)}s of music`
+    `scanned ${frames} play-calls, callsPerFrame=${callsPerFrame} => ${(
+      frames * secPerCall
+    ).toFixed(1)}s of music`
   );
 
   const loop = detectLoop(out, {
@@ -50,20 +61,30 @@ function analyse(name: string, targetSeconds = TARGET_SECONDS): void {
   }
   if (loop.kind === 'ended') {
     console.log(
-      `>>> settled into a static idle cycle at call ${loop.endFrame} (${(loop.endFrame * secPerCall).toFixed(2)}s)`
+      `>>> settled into a static idle cycle at call ${loop.endFrame} (${(
+        loop.endFrame * secPerCall
+      ).toFixed(2)}s)`
     );
     return;
   }
 
   const verifiedTail = frames - (loop.startFrame + loop.periodFrames);
   console.log(`>>> EXACT loop confirmed`);
-  console.log(`    loop start  = call ${loop.startFrame} (${(loop.startFrame * secPerCall).toFixed(2)}s)`);
-  console.log(`    period      = ${loop.periodFrames} calls (${(loop.periodFrames * secPerCall).toFixed(2)}s)`);
+  console.log(
+    `    loop start  = call ${loop.startFrame} (${(loop.startFrame * secPerCall).toFixed(2)}s)`
+  );
+  console.log(
+    `    period      = ${loop.periodFrames} calls (${(loop.periodFrames * secPerCall).toFixed(2)}s)`
+  );
   console.log(`    verified over ${verifiedTail} consecutive calls, byte-identical`);
 }
 
 describe('EXACT MATCHING PROOF: detectLoop over the bundled tunes', () => {
   it('InSID3_Out', () => analyse('InSID3_Out.sid'), 900_000);
-  it('InSID3_Out (double scan window)', () => analyse('InSID3_Out.sid', TARGET_SECONDS * 2), 900_000);
+  it(
+    'InSID3_Out (double scan window)',
+    () => analyse('InSID3_Out.sid', TARGET_SECONDS * 2),
+    900_000
+  );
   it('Still_Time', () => analyse('Still_Time.sid'), 900_000);
 });

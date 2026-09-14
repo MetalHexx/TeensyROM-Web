@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal, type Signal } from '@angular/core';
 import { parseSidFile, SidParseError } from '@sidablist/core';
 import type { SidFile } from '@sidablist/core';
+import { md5Hex } from '@sidablist/tunes';
 import { TuneIndexService } from '../analysis/tune-index.service';
 import { BUNDLED_TUNES, decodeBundledTune } from '../sid/bundled';
 import { SID_PLAYER } from './deck-player';
@@ -43,8 +44,9 @@ export class DeckTuneLoader {
   readonly tuneError: Signal<string | null> = this._tuneError.asReadonly();
 
   selectTune(source: TuneSource): void {
+    const bytes = source.getBytes();
     try {
-      void this.loadTune(parseSidFile(source.getBytes()), source.label);
+      void this.loadTune(bytes, parseSidFile(bytes), source.label);
     } catch (error) {
       this._currentTune.set(null);
       this._tuneError.set(describeParseError(error));
@@ -65,14 +67,14 @@ export class DeckTuneLoader {
         getBytes: () => bytes,
       };
       this.diskSources.update((sources) => [...sources, source]);
-      await this.loadTune(parsed, file.name);
+      await this.loadTune(bytes, parsed, file.name);
     } catch (error) {
       this._currentTune.set(null);
       this._tuneError.set(describeParseError(error));
     }
   }
 
-  private async loadTune(file: SidFile, filename: string): Promise<void> {
+  private async loadTune(bytes: Uint8Array, file: SidFile, filename: string): Promise<void> {
     this._currentTune.set(file);
     this._tuneError.set(null);
     this.player.loadTune(file);
@@ -80,7 +82,7 @@ export class DeckTuneLoader {
     // settled on. Awaited so playback never races a background scan for the frame clock's thread —
     // a cache hit or a failed/abandoned scan releases this just as promptly as a completed one. Each
     // deck awaits its own index only — this loader and its player are both this deck's own instance.
-    await this.tuneIndex.setTune(file, filename);
+    await this.tuneIndex.setTune(bytes, file, md5Hex(bytes));
     void this.player.play();
   }
 }

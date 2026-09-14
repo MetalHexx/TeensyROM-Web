@@ -15,41 +15,49 @@ import type { SidFile } from '@sidablist/core';
 import type { DeckHandle } from '../../deck/deck-registry';
 import type { DeckPlayerView } from '../../deck/deck-player';
 import { scrubToPercent } from '../../deck/deck-player';
-import { positionBasisFor } from '../tune-length';
-import type { DetectedLoopFrames } from '../tune-length';
-import { ANALYSIS_SCANNER } from '../scan-runner';
-import type { ScanRequest, ScanResult } from '../scan-runner';
-import { WorkerAnalysisScanner } from '../worker-analysis-scanner';
-import type { ScanOutput } from '../scan-tune';
-import { buildFeatureMatrix, readFrameFeatures } from '../frame-features';
-import type { FeatureMatrix } from '../frame-features';
 import {
+  positionBasisFor,
+  buildFeatureMatrix,
+  readFrameFeatures,
   computeNovelty,
   candidatesAbove,
   DEFAULT_CANDIDATE_THRESHOLD,
   DEFAULT_FEATURE_WEIGHTS,
-} from '../novelty';
-import type { Candidate, FeatureWeights, NoveltyResult } from '../novelty';
-import { computeStructure } from '../structure';
-import type { StructureResult } from '../structure';
-import { detectLoop, IDLE_PERIOD_SECONDS, MIN_TAIL_SECONDS } from '../loop-detect';
-import type { LoopDetection, LoopDetectOptions } from '../loop-detect';
-import { computePulse, impliedTempo } from '../pulse';
-import type { PulseResult } from '../pulse';
-import { segmentNotes } from '../notes';
-import type { Note } from '../notes';
-import {
+  computeStructure,
+  detectLoop,
+  IDLE_PERIOD_SECONDS,
+  MIN_TAIL_SECONDS,
+  computePulse,
+  impliedTempo,
+  segmentNotes,
   detectKey,
   detectKeyPerSection,
   isOutOfScale,
   keyName,
   PITCH_CLASS_NAMES,
   soundingKey,
-} from '../key';
-import type { KeyResult } from '../key';
-import { formatCents, formatDuration } from '../format';
+  formatCents,
+  formatDuration,
+} from '@sidablist/analysis';
+import type {
+  DetectedLoopFrames,
+  ScanOutput,
+  FeatureMatrix,
+  Candidate,
+  FeatureWeights,
+  NoveltyResult,
+  StructureResult,
+  LoopDetection,
+  LoopDetectOptions,
+  PulseResult,
+  Note,
+  KeyResult,
+  TuneIndexRecord,
+} from '@sidablist/analysis';
+import { ANALYSIS_SCANNER } from '../scan-runner';
+import type { ScanRequest, ScanResult } from '../scan-runner';
+import { WorkerAnalysisScanner } from '../worker-analysis-scanner';
 import type { TuneIndexService } from '../tune-index.service';
-import type { TuneIndexRecord } from '../tune-index.model';
 
 /** Buckets the whole scanned frame range into this many horizontal columns, regardless of how many
  *  frames were scanned — the aggregation that keeps a tune with tens of thousands of frames from

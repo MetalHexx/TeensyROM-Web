@@ -2,10 +2,14 @@ import { describe, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSidFile } from '@sidablist/core';
-import { scanTune } from '../src/lib/analysis/scan-tune';
-import { buildFeatureMatrix } from '../src/lib/analysis/frame-features';
-import { computeStructure } from '../src/lib/analysis/structure';
-import { dimensionWeightsFor, DEFAULT_FEATURE_WEIGHTS, rowDistance } from '../src/lib/analysis/novelty';
+import {
+  scanTune,
+  buildFeatureMatrix,
+  computeStructure,
+  dimensionWeightsFor,
+  DEFAULT_FEATURE_WEIGHTS,
+  rowDistance,
+} from '@sidablist/analysis';
 
 /**
  * `structure.ts` no longer runs a threshold-and-sustained-run search over the block similarity
@@ -48,10 +52,15 @@ function analyse(name: string): void {
   const pct = (p: number) => offdiag[Math.floor((offdiag.length - 1) * p)].toFixed(4);
   const above = offdiag.filter((v) => v >= SIMILARITY_THRESHOLD).length;
   console.log(
-    `similarity off-diagonal: min=${pct(0)} p25=${pct(0.25)} median=${pct(0.5)} p75=${pct(0.75)} max=${pct(1)}`
+    `similarity off-diagonal: min=${pct(0)} p25=${pct(0.25)} median=${pct(0.5)} p75=${pct(
+      0.75
+    )} max=${pct(1)}`
   );
   console.log(
-    `fraction of ALL block pairs >= ${SIMILARITY_THRESHOLD} threshold: ${((above / offdiag.length) * 100).toFixed(1)}%`
+    `fraction of ALL block pairs >= ${SIMILARITY_THRESHOLD} threshold: ${(
+      (above / offdiag.length) *
+      100
+    ).toFixed(1)}%`
   );
 
   // What a threshold-and-sustained-run search sees at each of the first offsets, and where it would
@@ -105,7 +114,9 @@ function analyse(name: string): void {
     }
   }
   console.log(
-    `refineLoopOffset window=[${from}..${to}] -> picks offset=${bestOffset} (distance ${best.toFixed(4)})`
+    `refineLoopOffset window=[${from}..${to}] -> picks offset=${bestOffset} (distance ${best.toFixed(
+      4
+    )})`
   );
 }
 

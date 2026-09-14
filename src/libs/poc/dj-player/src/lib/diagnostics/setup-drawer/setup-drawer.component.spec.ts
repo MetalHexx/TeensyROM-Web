@@ -24,8 +24,8 @@ import { MixerService } from '../../mixer/mixer.service';
 import { microseconds, milliseconds } from '@sidablist/core';
 import type { SidFile, TimingMode } from '@sidablist/core';
 import type { TuneIndexService } from '../../analysis/tune-index.service';
-import type { TuneIndexRecord } from '../../analysis/tune-index.model';
-import { TUNE_INDEX_FORMAT_VERSION } from '../../analysis/tune-index.model';
+import type { TuneIndexRecord } from '@sidablist/analysis';
+import { TUNE_INDEX_FORMAT_VERSION } from '@sidablist/analysis';
 import type { DeckTuneLoader } from '../../deck/deck-tune-loader';
 import {
   createFakeAsidSink,
@@ -72,7 +72,7 @@ function fakeTuneLoader(file: SidFile | null = null): StubTuneLoader {
 
 function fakeRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
-    filename: 'test.sid',
+    sidHash: 'test.sid',
     subtune: 1,
     loopStartFrame: 0,
     loopPeriodFrames: 6700,

@@ -1,10 +1,10 @@
 import { InjectionToken } from '@angular/core';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
-import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
-import type { TuneIndexRecord } from './tune-index.model';
+import { TUNE_INDEX_FORMAT_VERSION } from '@sidablist/analysis';
+import type { TuneIndexRecord } from '@sidablist/analysis';
 
 export interface ITuneIndexStorage {
-  load(filename: string, subtune: number): TuneIndexRecord | null;
+  load(sidHash: string, subtune: number): TuneIndexRecord | null;
   save(record: TuneIndexRecord): void;
 }
 
@@ -17,40 +17,45 @@ export const TUNE_INDEX_STORAGE = new InjectionToken<ITuneIndexStorage>('TUNE_IN
 export class LocalStorageTuneIndexStorage implements ITuneIndexStorage {
   private readonly STORAGE_KEY_PREFIX = 'teensyrom_dj_tune_index_';
 
-  load(filename: string, subtune: number): TuneIndexRecord | null {
-    const key = this.getStorageKey(filename, subtune);
+  load(sidHash: string, subtune: number): TuneIndexRecord | null {
+    const key = this.getStorageKey(sidHash, subtune);
     try {
       const json = localStorage.getItem(key);
       if (json === null) {
-        logInfo(LogType.Info, `TuneIndexStorage: No stored record for ${filename}:${subtune}`);
+        logInfo(LogType.Info, `TuneIndexStorage: No stored record for ${sidHash}:${subtune}`);
         return null;
       }
 
       const parsed: unknown = JSON.parse(json);
       if (!isRecordLike(parsed) || parsed['formatVersion'] !== TUNE_INDEX_FORMAT_VERSION) {
-        logWarn(`TuneIndexStorage: Discarding stale or malformed record for ${filename}:${subtune}`);
+        logWarn(`TuneIndexStorage: Discarding stale or malformed record for ${sidHash}:${subtune}`);
         return null;
       }
 
       return parsed as unknown as TuneIndexRecord;
     } catch (error) {
-      logWarn(`TuneIndexStorage: Failed to load record for ${filename}:${subtune}: ${error}`);
+      logWarn(`TuneIndexStorage: Failed to load record for ${sidHash}:${subtune}: ${error}`);
       return null;
     }
   }
 
   save(record: TuneIndexRecord): void {
     try {
-      const key = this.getStorageKey(record.filename, record.subtune);
+      const key = this.getStorageKey(record.sidHash, record.subtune);
       localStorage.setItem(key, JSON.stringify(record));
-      logInfo(LogType.Success, `TuneIndexStorage: Persisted record for ${record.filename}:${record.subtune}`);
+      logInfo(
+        LogType.Success,
+        `TuneIndexStorage: Persisted record for ${record.sidHash}:${record.subtune}`
+      );
     } catch (error) {
-      logWarn(`TuneIndexStorage: Failed to save record for ${record.filename}:${record.subtune}: ${error}`);
+      logWarn(
+        `TuneIndexStorage: Failed to save record for ${record.sidHash}:${record.subtune}: ${error}`
+      );
     }
   }
 
-  private getStorageKey(filename: string, subtune: number): string {
-    return `${this.STORAGE_KEY_PREFIX}${filename}:${subtune}`;
+  private getStorageKey(sidHash: string, subtune: number): string {
+    return `${this.STORAGE_KEY_PREFIX}${sidHash}:${subtune}`;
   }
 }
 

@@ -27,7 +27,7 @@ import {
   TUNE_INDEX_STORAGE,
   LocalStorageTuneIndexStorage,
 } from '../../analysis/tune-index-storage';
-import type { DetectedMoment, TuneIndexRecord } from '../../analysis/tune-index.model';
+import type { DetectedMoment, TuneIndexRecord } from '@sidablist/analysis';
 import { MixerService } from '../../mixer/mixer.service';
 import {
   createFakeAsidSink,
@@ -998,7 +998,7 @@ describe('DeckHostComponent', () => {
         expect(binding.selectPort).toHaveBeenCalledWith('port-1');
       });
 
-      it("routes the placeholder option to clearSelection rather than selectPort, so an empty id can never be claimed as a port", () => {
+      it('routes the placeholder option to clearSelection rather than selectPort, so an empty id can never be claimed as a port', () => {
         midiAccess().accessState.set('granted');
         midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
         binding.selectedPortId.set('port-1');

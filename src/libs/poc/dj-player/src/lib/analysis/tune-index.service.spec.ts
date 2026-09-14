@@ -1,18 +1,25 @@
 import { TestBed } from '@angular/core/testing';
 import { createEnvironmentInjector, EnvironmentInjector } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// The ladder and detectors are the package's own — `index-tune.spec.ts` in `@sidablist/analysis`
+// proves those. This suite mocks `indexTune` itself so it stays about the service's own wiring: the
+// cache, the generation guard, `publish`, `setTimingMode` and settle behaviour.
+const indexTuneMock = vi.hoisted(() => vi.fn());
+vi.mock('@sidablist/analysis', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sidablist/analysis')>()),
+  indexTune: indexTuneMock,
+}));
+
 import { TuneIndexService } from './tune-index.service';
 import { SharedTuneIndex } from './shared-tune-index';
 import { DECK_PLAYER_VIEW, SID_PLAYER } from '../deck/deck-player';
 import { ANALYSIS_SCANNER } from './scan-runner';
-import type { ScanResult } from './scan-runner';
-import type { ScanOutput } from './scan-tune';
 import { TUNE_INDEX_STORAGE } from './tune-index-storage';
 import type { ITuneIndexStorage } from './tune-index-storage';
-import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
-import type { TuneIndexRecord } from './tune-index.model';
-import { DEFAULT_CANDIDATE_THRESHOLD } from './novelty';
-import { frames, microseconds, SID_REGISTER_COUNT } from '@sidablist/core';
+import { TUNE_INDEX_FORMAT_VERSION } from '@sidablist/analysis';
+import type { TuneIndexRecord } from '@sidablist/analysis';
+import { frames, microseconds } from '@sidablist/core';
 import type { SidFile } from '@sidablist/core';
 import { createFakeDeckPlayer } from '../../testing/player-doubles';
 import type { FakeDeckPlayer } from '../../testing/player-doubles';
@@ -47,8 +54,6 @@ interface StubStorage {
   save: ReturnType<typeof vi.fn>;
 }
 
-/** A CIA-timer tune: the two rates differ, which is what makes "which rate did the record store"
- *  and "which rate were the detector's thresholds converted through" separable questions. */
 function makePlayer(): FakeDeckPlayer {
   const fake = createFakeDeckPlayer();
   fake.snapshot.update((snapshot) => ({
@@ -100,70 +105,10 @@ function fakeSidFile(overrides: Partial<SidFile> = {}): SidFile {
   };
 }
 
-/** A silent, all-zero scan — the detectors all handle it gracefully (no candidates, no notes, no
- *  loop), so only the wiring — not the detector math — is under test here. */
-function makeScan(frames: number, callsPerFrame: number): ScanOutput {
-  return {
-    registerValues: new Uint8Array(frames * SID_REGISTER_COUNT),
-    writeCounts: new Uint8Array(frames),
-    frames,
-    callsPerFrame,
-  };
-}
-
-/** A scan whose register stream is unique for `introFrames` and then repeats on a `periodFrames` lap,
- *  long enough for the detector's tail guard to be satisfied at this spec's player rate. */
-function makeLoopingScan(
-  frames: number,
-  introFrames: number,
-  periodFrames: number,
-  callsPerFrame: number
-): ScanOutput {
-  const scan = makeScan(frames, callsPerFrame);
-  for (let f = 0; f < frames; f++) {
-    const seed = f < introFrames ? 1_000_000 + f : (f - introFrames) % periodFrames;
-    const base = f * SID_REGISTER_COUNT;
-    // Three bytes of the seed, so two frames a multiple of 256 apart are never byte-identical.
-    scan.registerValues[base] = seed & 0xff;
-    scan.registerValues[base + 1] = (seed >>> 8) & 0xff;
-    scan.registerValues[base + 2] = (seed >>> 16) & 0xff;
-    for (let register = 3; register < SID_REGISTER_COUNT; register++) {
-      scan.registerValues[base + register] = (seed + register * 13) & 0xff;
-    }
-  }
-  return scan;
-}
-
-/** Three well-separated events — a full voice-on transition at frame 20 and its voice-off mirror at
- *  frame 70 (activity, gate and waveform all move at once each time, comfortably above
- *  `DEFAULT_CANDIDATE_THRESHOLD` once normalised), with a volume-only swing at frame 45 in between
- *  (one mid-weight dimension, comfortably below it) — so a single record exercises the filter's above-
- *  and below-threshold sides together, with two surviving candidates to order. Short enough that no
- *  lap of it ever satisfies the loop detector's minimum tail, so every rung the ladder tries sees the
- *  same data. */
-function makeMomentsScan(): ScanOutput {
-  const scan = makeScan(100, 1);
-  const setRegister = (frame: number, register: number, value: number): void => {
-    scan.registerValues[frame * SID_REGISTER_COUNT + register] = value;
-  };
-  for (let f = 20; f < 100; f++) {
-    setRegister(f, 0, 0x00); // voice0 freq lo
-    setRegister(f, 1, 0x20); // voice0 freq hi
-    setRegister(f, 4, 0x41); // voice0 control: pulse waveform, gate on
-  }
-  for (let f = 45; f < 100; f++) {
-    setRegister(f, 24, 0x0f); // master volume, alone
-  }
-  for (let f = 70; f < 100; f++) {
-    setRegister(f, 4, 0x00); // voice0 control: gate back off
-  }
-  return scan;
-}
-
-/** Drains the microtask queue several turns deep — a resolved scan now crosses more than one
- *  `await` before it reaches `record()`: the ladder, `produceRecord`, `SharedTuneIndex.produceOnce`
- *  and finally `refreshIndex`'s own await all sit between them. A single `await Promise.resolve()`
- *  settles only the innermost of those. */
+/** Drains the microtask queue several turns deep — a resolved production now crosses more than one
+ *  `await` before it reaches `record()`: `produceRecord`, `SharedTuneIndex.produceOnce` and finally
+ *  `refreshIndex`'s own await all sit between them. A single `await Promise.resolve()` settles only
+ *  the innermost of those. */
 async function settleTicks(times = 6): Promise<void> {
   for (let i = 0; i < times; i++) {
     await Promise.resolve();
@@ -172,7 +117,7 @@ async function settleTicks(times = 6): Promise<void> {
 
 function buildStoredRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
-    filename: 'Still_Time.sid',
+    sidHash: 'still-time-hash',
     subtune: 1,
     loopStartFrame: null,
     loopPeriodFrames: null,
@@ -229,92 +174,59 @@ describe('TuneIndexService', () => {
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    indexTuneMock.mockReset();
     setup();
   });
 
-  it('starts exactly one scan on a cache miss, and publishes the record it produces on completion', async () => {
-    const file = fakeSidFile();
-    let resolveScan!: (result: ScanResult) => void;
-    scanner.scan.mockImplementation(
-      () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+  it('calls indexTune exactly once on a cache miss, and publishes the record it produces on completion', async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    let resolveIndex!: (record: TuneIndexRecord) => void;
+    indexTuneMock.mockImplementation(
+      () => new Promise<TuneIndexRecord>((resolve) => (resolveIndex = resolve))
     );
 
-    service.setTune(file, 'Still_Time.sid');
+    service.setTune(bytes, fakeSidFile(), 'Still_Time.sid');
     TestBed.flushEffects();
 
-    expect(scanner.scan).toHaveBeenCalledTimes(1);
-    const [request] = scanner.scan.mock.calls[0];
-    expect(request.file).toBe(file);
-    expect(request.subtune).toBe(1);
-    expect(request.maxFrames).toBeGreaterThan(0);
+    expect(indexTuneMock).toHaveBeenCalledTimes(1);
+    const [calledScanner, calledBytes, identity] = indexTuneMock.mock.calls[0];
+    expect(calledScanner).toBe(scanner);
+    expect(calledBytes).toBe(bytes);
+    expect(identity).toEqual({ sidHash: 'Still_Time.sid', subtune: 1 });
     expect(service.pending()).toBe(true);
     expect(service.record()).toBeNull();
 
-    // Long and silent enough to answer conclusively on the ladder's very first rung, so exactly one
-    // scan is expected below.
-    const scan = makeScan(2_000, 2);
-    resolveScan({ id: request.id, kind: 'done', output: scan });
+    const record = buildStoredRecord({ sidHash: 'Still_Time.sid', callsPerFrame: 2 });
+    resolveIndex(record);
     await settleTicks();
 
     expect(service.pending()).toBe(false);
-    expect(service.record()).not.toBeNull();
-    // The seam that bites: callsPerFrame comes off the ScanOutput, not the player.
-    expect(service.record()?.callsPerFrame).toBe(2);
-    expect(service.record()?.filename).toBe('Still_Time.sid');
+    expect(service.record()).toEqual(record);
     expect(storage.save).toHaveBeenCalledTimes(1);
-    expect(storage.save).toHaveBeenCalledWith(service.record());
-    expect(player.player.setTrackStructure).toHaveBeenLastCalledWith(
-      trackStructureOf(service.record())
-    );
+    expect(storage.save).toHaveBeenCalledWith(record);
+    expect(player.player.setTrackStructure).toHaveBeenLastCalledWith(trackStructureOf(record));
   });
 
-  it('records the detected loop as a start and a period, alongside the rate it was scanned at', async () => {
-    let resolveScan!: (result: ScanResult) => void;
-    scanner.scan.mockImplementation(
-      () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
-    );
-
-    service.setTune(fakeSidFile(), 'Looping.sid');
-    TestBed.flushEffects();
-
-    resolveScan({
-      id: 1,
-      kind: 'done',
-      output: makeLoopingScan(2500, 100, 400, 2),
-    });
-    await settleTicks();
-
-    const record = service.record();
-    expect(record?.loopStartFrame).toBe(100);
-    expect(record?.loopPeriodFrames).toBe(400);
-    expect(record?.endedAtFrame).toBeNull();
-    // Both rates ride along: the rounded one off the scan, the exact one off the player, so the
-    // Timing toggle can flip this tune later without re-scanning it.
-    expect(record?.callsPerFrame).toBe(2);
-    expect(record?.exactCallsPerFrame).toBe(2.4);
-    expect(record?.timingMode).toBe('exact');
-  });
-
-  it('publishes a stored record immediately and starts no scan on a cache hit', () => {
-    const hit = buildStoredRecord({ filename: 'Cached.sid', callsPerFrame: 3 });
+  it('publishes a stored record immediately and starts no production on a cache hit', () => {
+    const hit = buildStoredRecord({ sidHash: 'Cached.sid', callsPerFrame: 3 });
     storage.load.mockReturnValue(hit);
 
-    service.setTune(fakeSidFile(), 'Cached.sid');
+    service.setTune(new Uint8Array([1]), fakeSidFile(), 'Cached.sid');
     TestBed.flushEffects();
 
-    expect(scanner.scan).not.toHaveBeenCalled();
+    expect(indexTuneMock).not.toHaveBeenCalled();
     expect(service.pending()).toBe(false);
     expect(service.record()).toEqual(hit);
     expect(player.player.setTrackStructure).toHaveBeenLastCalledWith(trackStructureOf(hit));
   });
 
-  it('triggers neither a lookup nor a scan while play, pause and stop leave the loaded tune untouched', () => {
-    const hit = buildStoredRecord({ filename: 'Loaded.sid' });
+  it('triggers neither a lookup nor a production while play, pause and stop leave the loaded tune untouched', () => {
+    const hit = buildStoredRecord({ sidHash: 'Loaded.sid' });
     storage.load.mockReturnValue(hit);
-    service.setTune(fakeSidFile(), 'Loaded.sid');
+    service.setTune(new Uint8Array([1]), fakeSidFile(), 'Loaded.sid');
     TestBed.flushEffects();
     storage.load.mockClear();
-    scanner.scan.mockClear();
+    indexTuneMock.mockClear();
     vi.mocked(player.player.setTrackStructure).mockClear();
 
     // Play, pause and stop touch neither the identity signal nor the subtune, so a further flush
@@ -322,17 +234,17 @@ describe('TuneIndexService', () => {
     TestBed.flushEffects();
 
     expect(storage.load).not.toHaveBeenCalled();
-    expect(scanner.scan).not.toHaveBeenCalled();
+    expect(indexTuneMock).not.toHaveBeenCalled();
     expect(player.player.setTrackStructure).not.toHaveBeenCalled();
   });
 
-  it('triggers neither a lookup nor a scan when the nominal interval changes', () => {
-    const hit = buildStoredRecord({ filename: 'Loaded.sid' });
+  it('triggers neither a lookup nor a production when the nominal interval changes', () => {
+    const hit = buildStoredRecord({ sidHash: 'Loaded.sid' });
     storage.load.mockReturnValue(hit);
-    service.setTune(fakeSidFile(), 'Loaded.sid');
+    service.setTune(new Uint8Array([1]), fakeSidFile(), 'Loaded.sid');
     TestBed.flushEffects();
     storage.load.mockClear();
-    scanner.scan.mockClear();
+    indexTuneMock.mockClear();
 
     player.snapshot.update((snapshot) => ({
       ...snapshot,
@@ -341,16 +253,16 @@ describe('TuneIndexService', () => {
     TestBed.flushEffects();
 
     expect(storage.load).not.toHaveBeenCalled();
-    expect(scanner.scan).not.toHaveBeenCalled();
+    expect(indexTuneMock).not.toHaveBeenCalled();
   });
 
   it('triggers a fresh lookup when the subtune steps', () => {
-    storage.load.mockReturnValueOnce(buildStoredRecord({ filename: 'Multi.sid', subtune: 1 }));
-    service.setTune(fakeSidFile(), 'Multi.sid');
+    storage.load.mockReturnValueOnce(buildStoredRecord({ sidHash: 'Multi.sid', subtune: 1 }));
+    service.setTune(new Uint8Array([1]), fakeSidFile(), 'Multi.sid');
     TestBed.flushEffects();
     storage.load.mockClear();
 
-    const hit2 = buildStoredRecord({ filename: 'Multi.sid', subtune: 2 });
+    const hit2 = buildStoredRecord({ sidHash: 'Multi.sid', subtune: 2 });
     storage.load.mockReturnValue(hit2);
     setSubtune(player, 2);
     TestBed.flushEffects();
@@ -359,53 +271,49 @@ describe('TuneIndexService', () => {
     expect(service.record()).toEqual(hit2);
   });
 
-  it('discards a scan that resolves after the tune changed while it was in flight, but still persists what it found', async () => {
-    const resolvers: ((result: ScanResult) => void)[] = [];
-    scanner.scan.mockImplementation(
-      () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
+  it('discards a completed record for a tune this deck moved on from, but still persists what it produced', async () => {
+    const resolvers: ((record: TuneIndexRecord) => void)[] = [];
+    indexTuneMock.mockImplementation(
+      () => new Promise<TuneIndexRecord>((resolve) => resolvers.push(resolve))
     );
 
-    service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
+    service.setTune(new Uint8Array([1]), fakeSidFile({ name: 'A' }), 'A.sid');
     TestBed.flushEffects();
-    expect(scanner.scan).toHaveBeenCalledTimes(1);
+    expect(indexTuneMock).toHaveBeenCalledTimes(1);
 
-    service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
+    service.setTune(new Uint8Array([2]), fakeSidFile({ name: 'B' }), 'B.sid');
     TestBed.flushEffects();
-    expect(scanner.scan).toHaveBeenCalledTimes(2);
+    expect(indexTuneMock).toHaveBeenCalledTimes(2);
 
-    // The stale scan for the outgoing tune resolves only after B has already taken over. The ladder
-    // is guard-free, so it still runs detection and answers — long and silent enough to answer
-    // conclusively on this very first rung.
-    resolvers[0]({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+    // The stale production for the outgoing tune resolves only after B has already taken over.
+    resolvers[0](buildStoredRecord({ sidHash: 'A.sid' }));
     await settleTicks();
 
     // Discarded here — this deck's own generation moved on — but persisted for whichever deck (or
     // later load) asks for A.sid next.
     expect(service.record()).toBeNull();
-    expect(service.pending()).toBe(true); // B's own scan is still in flight
+    expect(service.pending()).toBe(true); // B's own production is still in flight
     expect(storage.save).toHaveBeenCalledTimes(1);
-    expect(storage.save).toHaveBeenCalledWith(expect.objectContaining({ filename: 'A.sid' }));
-    expect(scanner.scan).toHaveBeenCalledTimes(2); // A's ladder answered on its own first rung
+    expect(storage.save).toHaveBeenCalledWith(expect.objectContaining({ sidHash: 'A.sid' }));
 
-    // Long and silent enough to answer conclusively on B's very first rung.
-    resolvers[1]({ id: 2, kind: 'done', output: makeScan(2_000, 4) });
+    resolvers[1](buildStoredRecord({ sidHash: 'B.sid', callsPerFrame: 4 }));
     await settleTicks();
 
-    expect(service.record()?.filename).toBe('B.sid');
+    expect(service.record()?.sidHash).toBe('B.sid');
     expect(service.record()?.callsPerFrame).toBe(4);
   });
 
-  it('stores nothing and clears pending on a failed scan, so the next load retries', async () => {
-    let resolveScan!: (result: ScanResult) => void;
-    scanner.scan.mockImplementation(
-      () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+  it('stores nothing and clears pending when indexTune rejects, so the next load retries', async () => {
+    let rejectIndex!: (error: unknown) => void;
+    indexTuneMock.mockImplementation(
+      () => new Promise<TuneIndexRecord>((_resolve, reject) => (rejectIndex = reject))
     );
 
-    service.setTune(fakeSidFile(), 'Failing.sid');
+    service.setTune(new Uint8Array([1]), fakeSidFile(), 'Failing.sid');
     TestBed.flushEffects();
     expect(service.pending()).toBe(true);
 
-    resolveScan({ id: 1, kind: 'failed', error: 'the analysis scan worker stopped responding' });
+    rejectIndex(new Error('the analysis scan worker stopped responding'));
     await settleTicks();
 
     expect(service.pending()).toBe(false);
@@ -416,181 +324,40 @@ describe('TuneIndexService', () => {
     ).toBe(true);
   });
 
-  describe('the scan ladder', () => {
-    it('deepens the scan when a rung finds no loop, and stops at the first rung that answers', async () => {
-      const resolvers: ((result: ScanResult) => void)[] = [];
-      scanner.scan.mockImplementation(
-        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
-      );
-
-      service.setTune(fakeSidFile(), 'Deepens.sid');
-      TestBed.flushEffects();
-      expect(scanner.scan).toHaveBeenCalledTimes(1);
-
-      // The shallowest rung finds nothing to work with — too short a tail to confirm a repeat.
-      resolvers[0]({ id: 1, kind: 'done', output: makeScan(40, 2) });
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(scanner.scan).toHaveBeenCalledTimes(2);
-      expect(service.pending()).toBe(true); // still deepening, not yet an answer
-
-      // Neither does the second rung.
-      resolvers[1]({ id: 2, kind: 'done', output: makeScan(40, 2) });
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(scanner.scan).toHaveBeenCalledTimes(3);
-      // Each rung reaches further into the tune than the one before it.
-      const [first, second, third] = scanner.scan.mock.calls.map(([request]) => request.maxFrames);
-      expect(second).toBeGreaterThan(first);
-      expect(third).toBeGreaterThan(second);
-
-      // The third rung finally answers.
-      resolvers[2]({ id: 3, kind: 'done', output: makeLoopingScan(2500, 100, 400, 2) });
-      await settleTicks();
-
-      expect(scanner.scan).toHaveBeenCalledTimes(3); // the ladder stopped — no fourth rung
-      expect(service.pending()).toBe(false);
-      expect(service.record()?.loopStartFrame).toBe(100);
-      expect(service.record()?.loopPeriodFrames).toBe(400);
-    });
-
-    it('scans all the way to the deepest rung and writes a null record when no rung finds a loop', async () => {
-      scanner.scan.mockImplementation(() =>
-        Promise.resolve<ScanResult>({ id: 0, kind: 'done', output: makeScan(40, 2) })
-      );
-
-      service.setTune(fakeSidFile(), 'NoLoop.sid');
-      TestBed.flushEffects();
-
-      // Enough microtask turns for every rung's await to settle in sequence.
-      for (let i = 0; i < 20; i++) {
-        await Promise.resolve();
-      }
-
-      expect(scanner.scan.mock.calls.length).toBeGreaterThan(1); // more than one rung was tried
-      const callsOnceSettled = scanner.scan.mock.calls.length;
-      for (let i = 0; i < 5; i++) {
-        await Promise.resolve();
-      }
-      expect(scanner.scan.mock.calls.length).toBe(callsOnceSettled); // the ladder terminates
-
-      expect(service.pending()).toBe(false);
-      const record = service.record();
-      expect(record).not.toBeNull();
-      expect(record?.loopStartFrame).toBeNull();
-      expect(record?.loopPeriodFrames).toBeNull();
-      expect(record?.endedAtFrame).toBeNull();
-      expect(storage.save).toHaveBeenCalledTimes(1);
-    });
-
-    it('stamps every rung of one ladder with a single session, and a new ladder with a different one', async () => {
-      const resolvers: ((result: ScanResult) => void)[] = [];
-      scanner.scan.mockImplementation(
-        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
-      );
-
-      service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
-      TestBed.flushEffects();
-
-      // Two rungs that find nothing, so the ladder deepens twice under the one session.
-      for (const rung of [0, 1]) {
-        resolvers[rung]({ id: rung + 1, kind: 'done', output: makeScan(40, 2) });
-        await Promise.resolve();
-        await Promise.resolve();
-      }
-      expect(scanner.scan).toHaveBeenCalledTimes(3);
-
-      const sessions = scanner.scan.mock.calls.map(([request]) => request.session);
-      expect(new Set(sessions).size).toBe(1);
-
-      // Different music is a different ladder: reusing the session would let its first rung continue
-      // the scan the outgoing tune left behind.
-      service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
-      TestBed.flushEffects();
-
-      const [latest] = scanner.scan.mock.calls[scanner.scan.mock.calls.length - 1];
-      expect(latest.session).not.toBe(sessions[0]);
-    });
-
-    it('keeps a ladder running to completion for a tune this deck has moved past, discarding the record here but persisting it', async () => {
-      const resolvers: ((result: ScanResult) => void)[] = [];
-      scanner.scan.mockImplementation(
-        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
-      );
-
-      service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
-      TestBed.flushEffects();
-      expect(scanner.scan).toHaveBeenCalledTimes(1);
-
-      // A's shallowest rung finds nothing, so the ladder deepens.
-      resolvers[0]({ id: 1, kind: 'done', output: makeScan(40, 2) });
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(scanner.scan).toHaveBeenCalledTimes(2); // A's second rung now in flight
-
-      // The tune changes before A's second rung resolves.
-      service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
-      TestBed.flushEffects();
-      expect(scanner.scan).toHaveBeenCalledTimes(3); // B's own first rung
-
-      // A's stale rung resolves after B has already taken over. The ladder is guard-free, so it
-      // still concludes on this loop-shaped answer and persists it — even though this deck's own
-      // generation has already moved on and will not publish it.
-      resolvers[1]({ id: 2, kind: 'done', output: makeLoopingScan(2500, 100, 400, 2) });
-      await settleTicks();
-
-      expect(service.record()).toBeNull(); // B's own ladder is still running
-      expect(storage.save).toHaveBeenCalledTimes(1);
-      expect(storage.save).toHaveBeenCalledWith(
-        expect.objectContaining({ filename: 'A.sid', loopStartFrame: 100 })
-      );
-      expect(scanner.scan).toHaveBeenCalledTimes(3); // A's ladder answered at its second rung
-
-      // B's first rung answers.
-      resolvers[2]({ id: 3, kind: 'done', output: makeLoopingScan(2500, 60, 400, 4) });
-      await settleTicks();
-
-      expect(service.record()?.filename).toBe('B.sid');
-      expect(service.record()?.loopStartFrame).toBe(60);
-    });
-  });
-
   describe('sharing across decks', () => {
     it('discards the produced record for the deck whose own generation moved on, but resolves it for another caller of the same run', async () => {
-      const resolvers: ((result: ScanResult) => void)[] = [];
-      scanner.scan.mockImplementation(
-        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
+      const resolvers: ((record: TuneIndexRecord) => void)[] = [];
+      indexTuneMock.mockImplementation(
+        () => new Promise<TuneIndexRecord>((resolve) => resolvers.push(resolve))
       );
 
-      service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
+      service.setTune(new Uint8Array([1]), fakeSidFile({ name: 'A' }), 'A.sid');
       TestBed.flushEffects();
-      expect(scanner.scan).toHaveBeenCalledTimes(1);
+      expect(indexTuneMock).toHaveBeenCalledTimes(1);
 
-      // A second caller for the exact same (filename, subtune) joins the run already in flight — the
-      // shared collaborator hands it the same promise instead of starting a second scan.
+      // A second caller for the exact same (sidHash, subtune) joins the run already in flight — the
+      // shared collaborator hands it the same promise instead of starting a second production.
       const shared = TestBed.inject(SharedTuneIndex);
       const otherCallerRun = vi.fn(() => Promise.resolve(null));
       const otherCallerRecord = shared.produceOnce('A.sid', 1, otherCallerRun);
       expect(otherCallerRun).not.toHaveBeenCalled();
 
-      // This deck's own tune moves on mid-scan; the shared run is guard-free and keeps running.
-      service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
+      // This deck's own tune moves on mid-production; the shared run is guard-free and keeps running.
+      service.setTune(new Uint8Array([2]), fakeSidFile({ name: 'B' }), 'B.sid');
       TestBed.flushEffects();
-      expect(scanner.scan).toHaveBeenCalledTimes(2); // B's own ladder, independent of A's still-running one
+      expect(indexTuneMock).toHaveBeenCalledTimes(2); // B's own production, independent of A's still-running one
 
-      resolvers[0]({ id: 1, kind: 'done', output: makeScan(2_000, 2) });
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
+      resolvers[0](buildStoredRecord({ sidHash: 'A.sid' }));
+      await settleTicks();
 
       // The deck that moved on discarded the record for the tune it left behind.
       expect(service.record()).toBeNull();
       // The other caller of the same run — its own generation untouched — still receives it.
       const resolved = await otherCallerRecord;
-      expect(resolved?.filename).toBe('A.sid');
+      expect(resolved?.sidHash).toBe('A.sid');
     });
 
-    it('produces one record for two decks loading the same unindexed tune, each through its own scanner instance', async () => {
+    it('produces one record for two decks loading the same unindexed tune, sharing a single indexTune call', async () => {
       // Deck A is `service`, already wired in `setup()`. Deck B gets its own player and scanner but
       // shares the same `SharedTuneIndex` and `TUNE_INDEX_STORAGE` from the parent injector — the DI
       // topology `DeckHostComponent` and `DjPocViewComponent` establish in production.
@@ -608,31 +375,30 @@ describe('TuneIndexService', () => {
       );
 
       try {
-        let resolveScan!: (result: ScanResult) => void;
-        scanner.scan.mockImplementation(
-          () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+        let resolveIndex!: (record: TuneIndexRecord) => void;
+        indexTuneMock.mockImplementation(
+          () => new Promise<TuneIndexRecord>((resolve) => (resolveIndex = resolve))
         );
 
-        service.setTune(fakeSidFile(), 'Shared.sid');
+        service.setTune(new Uint8Array([1]), fakeSidFile(), 'Shared.sid');
         TestBed.flushEffects();
-        expect(scanner.scan).toHaveBeenCalledTimes(1); // deck A produces
+        expect(indexTuneMock).toHaveBeenCalledTimes(1); // deck A produces
 
         const serviceB = deckBInjector.get(TuneIndexService);
-        const settledB = serviceB.setTune(fakeSidFile(), 'Shared.sid');
+        const settledB = serviceB.setTune(new Uint8Array([1]), fakeSidFile(), 'Shared.sid');
         TestBed.flushEffects();
 
-        // Deck B rode deck A's in-flight production — its own scanner was never touched.
-        expect(scannerB.scan).not.toHaveBeenCalled();
+        // Deck B rode deck A's in-flight production — indexTune was never invoked a second time.
+        expect(indexTuneMock).toHaveBeenCalledTimes(1);
 
-        resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 3) });
+        resolveIndex(buildStoredRecord({ sidHash: 'Shared.sid', callsPerFrame: 3 }));
         await settledB;
 
-        expect(service.record()?.filename).toBe('Shared.sid');
-        expect(serviceB.record()?.filename).toBe('Shared.sid');
+        expect(service.record()?.sidHash).toBe('Shared.sid');
+        expect(serviceB.record()?.sidHash).toBe('Shared.sid');
         expect(serviceB.record()?.callsPerFrame).toBe(3);
-        expect(storage.save).toHaveBeenCalledTimes(1); // one scan, one persisted record
-        expect(scanner.scan).toHaveBeenCalledTimes(1);
-        expect(scannerB.scan).not.toHaveBeenCalled();
+        expect(storage.save).toHaveBeenCalledTimes(1); // one production, one persisted record
+        expect(indexTuneMock).toHaveBeenCalledTimes(1);
       } finally {
         deckBInjector.destroy();
       }
@@ -640,119 +406,127 @@ describe('TuneIndexService', () => {
   });
 
   describe("setTune's returned promise", () => {
-    it('resolves once a cache hit publishes the record, without requesting a scan', async () => {
-      const hit = buildStoredRecord({ filename: 'Cached.sid' });
+    it('resolves once a cache hit publishes the record, without requesting a production', async () => {
+      const hit = buildStoredRecord({ sidHash: 'Cached.sid' });
       storage.load.mockReturnValue(hit);
 
-      const settled = service.setTune(fakeSidFile(), 'Cached.sid');
+      const settled = service.setTune(new Uint8Array([1]), fakeSidFile(), 'Cached.sid');
       TestBed.flushEffects();
       await expect(settled).resolves.toBeUndefined();
 
-      expect(scanner.scan).not.toHaveBeenCalled();
+      expect(indexTuneMock).not.toHaveBeenCalled();
       expect(service.record()).toEqual(hit);
     });
 
-    it('stays unresolved while a genuinely new tune scans, and resolves once the scan completes', async () => {
-      let resolveScan!: (result: ScanResult) => void;
-      scanner.scan.mockImplementation(
-        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+    it('stays unresolved while a genuinely new tune is produced, and resolves once it completes', async () => {
+      let resolveIndex!: (record: TuneIndexRecord) => void;
+      indexTuneMock.mockImplementation(
+        () => new Promise<TuneIndexRecord>((resolve) => (resolveIndex = resolve))
       );
       let settledFlag = false;
 
       const settled = service
-        .setTune(fakeSidFile(), 'Still_Time.sid')
+        .setTune(new Uint8Array([1]), fakeSidFile(), 'Still_Time.sid')
         .then(() => (settledFlag = true));
       TestBed.flushEffects();
       await Promise.resolve();
       expect(settledFlag).toBe(false);
 
-      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 2) });
+      resolveIndex(buildStoredRecord({ sidHash: 'Still_Time.sid', callsPerFrame: 2 }));
       await settled;
 
       expect(settledFlag).toBe(true);
       expect(service.record()).not.toBeNull();
     });
 
-    it('resolves — never rejects — when the scan fails', async () => {
-      let resolveScan!: (result: ScanResult) => void;
-      scanner.scan.mockImplementation(
-        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+    it('resolves — never rejects — when indexTune rejects', async () => {
+      let rejectIndex!: (error: unknown) => void;
+      indexTuneMock.mockImplementation(
+        () => new Promise<TuneIndexRecord>((_resolve, reject) => (rejectIndex = reject))
       );
 
-      const settled = service.setTune(fakeSidFile(), 'Failing.sid');
+      const settled = service.setTune(new Uint8Array([1]), fakeSidFile(), 'Failing.sid');
       TestBed.flushEffects();
 
-      resolveScan({ id: 1, kind: 'failed', error: 'the analysis scan worker stopped responding' });
+      rejectIndex(new Error('the analysis scan worker stopped responding'));
       await expect(settled).resolves.toBeUndefined();
 
       expect(service.record()).toBeNull();
     });
 
-    it('resolves the superseded load once its own ladder concludes, without waiting on the newer one', async () => {
-      const resolvers: ((result: ScanResult) => void)[] = [];
-      scanner.scan.mockImplementation(
-        () => new Promise<ScanResult>((resolve) => resolvers.push(resolve))
+    it('resolves the superseded load once its own production concludes, without waiting on the newer one', async () => {
+      const resolvers: ((record: TuneIndexRecord) => void)[] = [];
+      indexTuneMock.mockImplementation(
+        () => new Promise<TuneIndexRecord>((resolve) => resolvers.push(resolve))
       );
 
-      const settledA = service.setTune(fakeSidFile({ name: 'A' }), 'A.sid');
+      const settledA = service.setTune(new Uint8Array([1]), fakeSidFile({ name: 'A' }), 'A.sid');
       TestBed.flushEffects();
-      expect(scanner.scan).toHaveBeenCalledTimes(1);
+      expect(indexTuneMock).toHaveBeenCalledTimes(1);
 
-      const settledB = service.setTune(fakeSidFile({ name: 'B' }), 'B.sid');
+      const settledB = service.setTune(new Uint8Array([2]), fakeSidFile({ name: 'B' }), 'B.sid');
       TestBed.flushEffects();
-      expect(scanner.scan).toHaveBeenCalledTimes(2);
+      expect(indexTuneMock).toHaveBeenCalledTimes(2);
 
-      // A's own rung resolves only after B has already taken over — discarded by A's own generation
-      // check, but still released, and still persisted.
-      resolvers[0]({ id: 1, kind: 'done', output: makeScan(2_000, 1) });
+      // A's own production resolves only after B has already taken over — discarded by A's own
+      // generation check, but still released, and still persisted.
+      resolvers[0](buildStoredRecord({ sidHash: 'A.sid' }));
       await expect(settledA).resolves.toBeUndefined();
-      expect(service.record()).toBeNull(); // B's own ladder is still running
+      expect(service.record()).toBeNull(); // B's own production is still in flight
 
-      resolvers[1]({ id: 2, kind: 'done', output: makeScan(2_000, 4) });
+      resolvers[1](buildStoredRecord({ sidHash: 'B.sid', callsPerFrame: 4 }));
       await expect(settledB).resolves.toBeUndefined();
-      expect(service.record()?.filename).toBe('B.sid');
+      expect(service.record()?.sidHash).toBe('B.sid');
     });
 
     it('releases every caller when two loads coalesce into one effect run, on a cache hit', async () => {
-      const hit = buildStoredRecord({ filename: 'B.sid' });
+      const hit = buildStoredRecord({ sidHash: 'B.sid' });
       storage.load.mockReturnValue(hit);
       const settled: string[] = [];
 
       // No flush between the two calls: Angular coalesces the two identity writes into a single
       // effect run that reads only B, so both callers ride on the one refresh it starts.
-      void service.setTune(fakeSidFile({ name: 'A' }), 'A.sid').then(() => settled.push('A'));
-      void service.setTune(fakeSidFile({ name: 'B' }), 'B.sid').then(() => settled.push('B'));
+      void service
+        .setTune(new Uint8Array([1]), fakeSidFile({ name: 'A' }), 'A.sid')
+        .then(() => settled.push('A'));
+      void service
+        .setTune(new Uint8Array([2]), fakeSidFile({ name: 'B' }), 'B.sid')
+        .then(() => settled.push('B'));
       TestBed.flushEffects();
       await Promise.resolve();
       await Promise.resolve();
 
       expect([...settled].sort()).toEqual(['A', 'B']);
-      expect(scanner.scan).not.toHaveBeenCalled();
+      expect(indexTuneMock).not.toHaveBeenCalled();
       expect(service.record()).toEqual(hit);
     });
 
-    it('releases every caller when two loads coalesce into one effect run, once the scan settles', async () => {
-      let resolveScan!: (result: ScanResult) => void;
-      scanner.scan.mockImplementation(
-        () => new Promise<ScanResult>((resolve) => (resolveScan = resolve))
+    it('releases every caller when two loads coalesce into one effect run, once the production settles', async () => {
+      let resolveIndex!: (record: TuneIndexRecord) => void;
+      indexTuneMock.mockImplementation(
+        () => new Promise<TuneIndexRecord>((resolve) => (resolveIndex = resolve))
       );
       const settled: string[] = [];
 
-      void service.setTune(fakeSidFile({ name: 'A' }), 'A.sid').then(() => settled.push('A'));
-      void service.setTune(fakeSidFile({ name: 'B' }), 'B.sid').then(() => settled.push('B'));
+      void service
+        .setTune(new Uint8Array([1]), fakeSidFile({ name: 'A' }), 'A.sid')
+        .then(() => settled.push('A'));
+      void service
+        .setTune(new Uint8Array([2]), fakeSidFile({ name: 'B' }), 'B.sid')
+        .then(() => settled.push('B'));
       TestBed.flushEffects();
       await Promise.resolve();
 
-      // A never reached a ladder of its own — it was superseded before the effect ever ran — so the
-      // single scan in flight is B's, and it holds both callers.
-      expect(scanner.scan).toHaveBeenCalledTimes(1);
+      // A never reached a production of its own — it was superseded before the effect ever ran — so
+      // the single production in flight is B's, and it holds both callers.
+      expect(indexTuneMock).toHaveBeenCalledTimes(1);
       expect(settled).toEqual([]);
 
-      resolveScan({ id: 1, kind: 'done', output: makeScan(2_000, 2) });
+      resolveIndex(buildStoredRecord({ sidHash: 'B.sid', callsPerFrame: 2 }));
       await settleTicks();
 
       expect([...settled].sort()).toEqual(['A', 'B']);
-      expect(service.record()?.filename).toBe('B.sid');
+      expect(service.record()?.sidHash).toBe('B.sid');
     });
   });
 
@@ -769,63 +543,23 @@ describe('TuneIndexService', () => {
     });
 
     it('rewrites and republishes the current record with the new mode, without touching the scanner', () => {
-      const hit = buildStoredRecord({ filename: 'Cached.sid', timingMode: 'exact' });
+      const hit = buildStoredRecord({ sidHash: 'Cached.sid', timingMode: 'exact' });
       storage.load.mockReturnValue(hit);
-      service.setTune(fakeSidFile(), 'Cached.sid');
+      service.setTune(new Uint8Array([1]), fakeSidFile(), 'Cached.sid');
       TestBed.flushEffects();
       storage.save.mockClear();
       vi.mocked(player.player.setTimingMode).mockClear();
 
       service.setTimingMode('rounded');
 
-      expect(scanner.scan).not.toHaveBeenCalled();
+      expect(indexTuneMock).not.toHaveBeenCalled();
       const record = service.record();
       expect(record?.timingMode).toBe('rounded');
       // The rest of the record rides along untouched — this is a rewrite, not a re-scan.
-      expect(record?.filename).toBe('Cached.sid');
+      expect(record?.sidHash).toBe('Cached.sid');
       expect(storage.save).toHaveBeenCalledTimes(1);
       expect(storage.save).toHaveBeenCalledWith(record);
       expect(player.player.setTimingMode).toHaveBeenCalledWith('rounded');
-    });
-  });
-
-  describe('detectedMoments', () => {
-    it('carries only the above-threshold candidates, in frame order, with no contributors on any stored entry', async () => {
-      scanner.scan.mockImplementation(() =>
-        Promise.resolve<ScanResult>({ id: 0, kind: 'done', output: makeMomentsScan() })
-      );
-
-      service.setTune(fakeSidFile(), 'Moments.sid');
-      TestBed.flushEffects();
-
-      // No lap of the controlled scan ever satisfies the loop detector's minimum tail, so the ladder
-      // deepens through every rung before answering — settle enough microtask turns for all four.
-      for (let i = 0; i < 20; i++) {
-        await Promise.resolve();
-      }
-
-      const moments = service.record()?.detectedMoments;
-      expect(moments).toBeDefined();
-      expect(moments?.map((moment) => moment.frame)).toEqual([20, 70]);
-      for (const moment of moments ?? []) {
-        expect(moment.strength).toBeGreaterThanOrEqual(DEFAULT_CANDIDATE_THRESHOLD);
-        expect(Object.keys(moment).sort()).toEqual(['frame', 'strength']);
-      }
-    });
-
-    it('stores an empty array when the curve produces no above-threshold peak', async () => {
-      scanner.scan.mockImplementation(() =>
-        Promise.resolve<ScanResult>({ id: 0, kind: 'done', output: makeScan(60, 1) })
-      );
-
-      service.setTune(fakeSidFile(), 'Silent.sid');
-      TestBed.flushEffects();
-
-      for (let i = 0; i < 20; i++) {
-        await Promise.resolve();
-      }
-
-      expect(service.record()?.detectedMoments).toEqual([]);
     });
   });
 });

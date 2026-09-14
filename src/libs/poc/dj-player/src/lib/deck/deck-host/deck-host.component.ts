@@ -44,11 +44,14 @@ import type {
 import { ScriptProcessorFrameClock } from '../../clock/frame-clock';
 import { ANALYSIS_SCANNER } from '../../analysis/scan-runner';
 import { WorkerAnalysisScanner } from '../../analysis/worker-analysis-scanner';
-import { nextMomentOffset, reachableMomentOffsets } from '../../analysis/marker-moments';
+import {
+  nextMomentOffset,
+  reachableMomentOffsets,
+  positionBasisFor,
+  timelineBasisFor,
+} from '@sidablist/analysis';
+import type { DetectedMoment, DetectedLoopFrames } from '@sidablist/analysis';
 import { TuneIndexService } from '../../analysis/tune-index.service';
-import type { DetectedMoment } from '../../analysis/tune-index.model';
-import { positionBasisFor, timelineBasisFor } from '../../analysis/tune-length';
-import type { DetectedLoopFrames } from '../../analysis/tune-length';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
 import { MidiAccessService } from '../../midi/midi-access.service';
 import { MixerService } from '../../mixer/mixer.service';

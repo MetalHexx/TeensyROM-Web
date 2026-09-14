@@ -47,12 +47,18 @@ importers:
       '@ngrx/signals':
         specifier: ^19.2.0
         version: 19.2.1(@angular/core@19.2.15(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
+      '@sidablist/analysis':
+        specifier: link:../../SIDablist/libs/analysis
+        version: link:../../SIDablist/libs/analysis
       '@sidablist/asid':
         specifier: link:../../SIDablist/libs/asid
         version: link:../../SIDablist/libs/asid
       '@sidablist/core':
         specifier: file:../../SIDablist/libs/core
         version: file:../../SIDablist/libs/core
+      '@sidablist/tunes':
+        specifier: link:../../SIDablist/libs/tunes
+        version: link:../../SIDablist/libs/tunes
       opus-decoder:
         specifier: ^0.7.11
         version: 0.7.11
