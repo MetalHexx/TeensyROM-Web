@@ -23,6 +23,7 @@ import {
   AUDIO_STREAM_PROVIDERS,
   API_CONFIG_PROVIDER,
   TRANSFER_PROVIDERS,
+  DJ_STORAGE_PROVIDERS,
 } from '@teensyrom-nx/infrastructure';
 
 export const appConfig: ApplicationConfig = {
@@ -54,5 +55,6 @@ export const appConfig: ApplicationConfig = {
     CRT_PROVIDERS,
     AUDIO_STREAM_PROVIDERS,
     TRANSFER_PROVIDERS,
+    DJ_STORAGE_PROVIDERS,
   ],
 };
