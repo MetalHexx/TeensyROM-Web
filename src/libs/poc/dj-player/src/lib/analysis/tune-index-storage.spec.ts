@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LocalStorageTuneIndexStorage } from './tune-index-storage';
-import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
-import type { TuneIndexRecord } from './tune-index.model';
+import { TUNE_INDEX_FORMAT_VERSION } from '@sidablist/analysis';
+import type { TuneIndexRecord } from '@sidablist/analysis';
 
 function buildRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
-    filename: 'Still_Time.sid',
+    sidHash: 'Still_Time.sid',
     subtune: 1,
     loopStartFrame: null,
     loopPeriodFrames: null,
@@ -78,13 +78,13 @@ describe('LocalStorageTuneIndexStorage', () => {
     });
 
     storage.save(record);
-    const loaded = storage.load(record.filename, record.subtune);
+    const loaded = storage.load(record.sidHash, record.subtune);
 
     expect(loaded).toEqual(record);
   });
 
-  it('finds a saved record by the same (filename, subtune), but not under a different subtune', () => {
-    const record = buildRecord({ filename: 'Multi_Tune.sid', subtune: 2 });
+  it('finds a saved record by the same (sidHash, subtune), but not under a different subtune', () => {
+    const record = buildRecord({ sidHash: 'Multi_Tune.sid', subtune: 2 });
 
     storage.save(record);
 
@@ -98,9 +98,12 @@ describe('LocalStorageTuneIndexStorage', () => {
 
   it('reads a record written under the previous format version as a cache miss, so it is re-scanned', () => {
     const record = buildRecord({ formatVersion: TUNE_INDEX_FORMAT_VERSION - 1 });
-    localStorage.setItem(`teensyrom_dj_tune_index_${record.filename}:${record.subtune}`, JSON.stringify(record));
+    localStorage.setItem(
+      `teensyrom_dj_tune_index_${record.sidHash}:${record.subtune}`,
+      JSON.stringify(record)
+    );
 
-    expect(storage.load(record.filename, record.subtune)).toBeNull();
+    expect(storage.load(record.sidHash, record.subtune)).toBeNull();
   });
 
   it('discards a version-3 record rather than reading frame numbers measured against the ASID stream', () => {
@@ -108,9 +111,12 @@ describe('LocalStorageTuneIndexStorage', () => {
     // byte comparison than the one that runs now, so reading it back would hand out wrong loop
     // points silently — the one failure mode a version gate exists to prevent.
     const record = buildRecord({ formatVersion: 3, loopStartFrame: 1200, loopPeriodFrames: 4567 });
-    localStorage.setItem(`teensyrom_dj_tune_index_${record.filename}:${record.subtune}`, JSON.stringify(record));
+    localStorage.setItem(
+      `teensyrom_dj_tune_index_${record.sidHash}:${record.subtune}`,
+      JSON.stringify(record)
+    );
 
-    expect(storage.load(record.filename, record.subtune)).toBeNull();
+    expect(storage.load(record.sidHash, record.subtune)).toBeNull();
   });
 
   it('returns null and logs a warning for a malformed stored value', () => {

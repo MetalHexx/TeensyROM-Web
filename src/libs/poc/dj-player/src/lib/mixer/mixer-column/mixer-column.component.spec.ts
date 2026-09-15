@@ -6,13 +6,13 @@ import { MixerService } from '../mixer.service';
 import { DeckRegistry } from '../../deck/deck-registry';
 import { DECKS } from '../../deck/deck.config';
 import type { TuneIndexService } from '../../analysis/tune-index.service';
-import type { TuneIndexRecord } from '../../analysis/tune-index.model';
-import { TUNE_INDEX_FORMAT_VERSION } from '../../analysis/tune-index.model';
+import type { TuneIndexRecord } from '@sidablist/analysis';
+import { TUNE_INDEX_FORMAT_VERSION } from '@sidablist/analysis';
 import { fakeDeckHandle } from '../../../testing/player-doubles';
 
 function fakeRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
-    filename: 'test.sid',
+    sidHash: 'test.sid',
     subtune: 1,
     loopStartFrame: null,
     loopPeriodFrames: null,
@@ -177,7 +177,9 @@ describe('MixerColumnComponent', () => {
   });
 
   it('binds and writes the crossfader position, labeled from the first two DECKS entries', () => {
-    const crossfader = fixture.nativeElement.querySelector('lib-crossfader input') as HTMLInputElement;
+    const crossfader = fixture.nativeElement.querySelector(
+      'lib-crossfader input'
+    ) as HTMLInputElement;
     expect(crossfader.getAttribute('aria-label')).toBe(
       `Crossfader, deck ${DECKS[0].label} to deck ${DECKS[1].label}`
     );

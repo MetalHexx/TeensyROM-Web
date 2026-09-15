@@ -24,15 +24,14 @@ const FADER_LENGTH =
 /**
  * `$bp-tablet` is 1280px in `_mixins.scss`; below it this card's own stylesheet switches to the
  * band form. A template can't read its own media query, so the one place that needs the answer in
- * TypeScript observes the same breakpoint. This and `manyGridAreas` are the only two breakpoint
- * values in this feature expressed outside a stylesheet.
+ * TypeScript observes the same breakpoint.
  */
 const BELOW_TABLET = '(max-width: 1279px)';
 
 @Component({
   selector: 'lib-dj-mixer-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { style: 'grid-area: mx', '[class.dj-mixer-card--band]': 'band()' },
+  host: { style: 'grid-area: mx' },
   imports: [ScalingCompactCardComponent, DeckStripComponent, CrossfaderComponent],
   templateUrl: './dj-mixer-card.component.html',
   styleUrl: './dj-mixer-card.component.scss',
@@ -40,7 +39,6 @@ const BELOW_TABLET = '(max-width: 1279px)';
 export class DjMixerCardComponent {
   readonly decks = input.required<readonly DeckRef[]>();
   readonly showCrossfader = input.required<boolean>();
-  readonly band = input<boolean>(false); // true → the horizontal band form at every width (three or more decks)
 
   private readonly stripsByIndex = computed<ReadonlyMap<number, DeckStripModel>>(
     () => new Map(this.decks().map((deck) => [deck.index, createDeckPlaceholders(deck).strip]))
@@ -60,7 +58,7 @@ export class DjMixerCardComponent {
   );
 
   /** True in the vertical form the definite `--mixer-col` track exists for. */
-  readonly columnForm = computed(() => !this.band() && !this.belowTablet());
+  readonly columnForm = computed(() => !this.belowTablet());
 
   /**
    * The pinned travel in the column form, `null` everywhere else — the band and stacked forms keep

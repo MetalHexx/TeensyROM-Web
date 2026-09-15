@@ -58,7 +58,14 @@
       "executor": "@angular-devkit/build-angular:dev-server",
       "options": {
         "host": "0.0.0.0",
-        "prebundle": { "exclude": ["@sidablist/core", "@sidablist/asid"] }
+        "prebundle": {
+          "exclude": [
+            "@sidablist/core",
+            "@sidablist/asid",
+            "@sidablist/analysis",
+            "@sidablist/tunes"
+          ]
+        }
       },
       "configurations": {
         "production": {

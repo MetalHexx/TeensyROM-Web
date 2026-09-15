@@ -9,11 +9,12 @@ const meta: Meta<BindingCardComponent> = {
     docs: {
       description: {
         component:
-          "One deck's own MIDI binding: its Output port selector, Enable MIDI beside Identify, " +
-          'and whichever of its three distinct error states apply. Purely presentational — it ' +
-          'holds no state of its own; the caller owns the permission grant, the enumerated port ' +
-          "list and this deck's own persisted selection. `layout=\"inline\"` lays the heading, the " +
-          "port control and the two buttons on one row instead of the default `\"stacked\"` column.",
+          "One deck's own MIDI binding: its Output port selector beside a Device selector, Enable " +
+          'MIDI beside Identify, and whichever of its three distinct error states apply. Purely ' +
+          'presentational — it holds no state of its own; the caller owns the permission grant, ' +
+          "the enumerated port and device lists and this deck's own persisted selections. " +
+          '`layout="inline"` lays the heading, both controls and the two buttons on one row ' +
+          'instead of the default `"stacked"` column.',
       },
     },
   },
@@ -29,9 +30,14 @@ function bindingModel(overrides: Partial<BindingCardModel> = {}): BindingCardMod
     ports: [],
     selectedPortId: null,
     portsEnabled: false,
+    portPlaceholder: '— MIDI not enabled —',
+    devices: [],
+    selectedDeviceId: null,
+    devicePlaceholder: '— select a device —',
     enableDisabled: false,
     identifyDisabled: true,
     selectAccessibleName: 'Output port deck A',
+    deviceSelectAccessibleName: 'Device deck A',
     enableAccessibleName: 'Enable MIDI deck A',
     identifyAccessibleName: 'Identify deck A',
     errors: [],
@@ -50,6 +56,7 @@ export const GrantedWithPorts: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
+      portPlaceholder: '— select a port —',
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
@@ -66,6 +73,7 @@ export const GrantedNoPortsFound: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
+      portPlaceholder: '— select a port —',
       errors: [
         'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.',
       ],
@@ -78,6 +86,7 @@ export const BindingError: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
+      portPlaceholder: '— select a port —',
       ports: [{ id: 'port-1', label: 'TeensyROM (PJRC)' }],
       errors: ['Deck B is already bound to that port. Pick a different one.'],
     }),
@@ -90,12 +99,90 @@ export const Inline: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
+      portPlaceholder: '— select a port —',
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
       ],
       selectedPortId: 'port-1',
       identifyDisabled: false,
+    }),
+    layout: 'inline',
+  },
+};
+
+/** `layout="inline"`, nothing bound yet: both selects show their own placeholder. */
+export const Unbound: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      ports: [
+        { id: 'port-1', label: 'TeensyROM (PJRC)' },
+        { id: 'port-2', label: 'Cart B (Acme)' },
+      ],
+      devices: [
+        { id: 'device-1', label: 'nanoKONTROL2' },
+        { id: 'device-2', label: 'Launchpad Mini' },
+      ],
+      devicePlaceholder: '— select a device —',
+    }),
+    layout: 'inline',
+  },
+};
+
+/** `layout="inline"`, both a port and a device already selected. */
+export const Bound: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      ports: [
+        { id: 'port-1', label: 'TeensyROM (PJRC)' },
+        { id: 'port-2', label: 'Cart B (Acme)' },
+      ],
+      selectedPortId: 'port-1',
+      devices: [
+        { id: 'device-1', label: 'nanoKONTROL2' },
+        { id: 'device-2', label: 'Launchpad Mini' },
+      ],
+      selectedDeviceId: 'device-1',
+      devicePlaceholder: '— select a device —',
+      identifyDisabled: false,
+    }),
+    layout: 'inline',
+  },
+};
+
+/** `layout="inline"`, Deck B already holds one port and one device — both taken options render
+ *  the deck letter as text, never colour alone, and are disabled. */
+export const Taken: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      ports: [
+        { id: 'port-1', label: 'TeensyROM (PJRC)' },
+        { id: 'port-2', label: 'Cart B (Acme)', takenBy: 'B' },
+      ],
+      devices: [
+        { id: 'device-1', label: 'nanoKONTROL2' },
+        { id: 'device-2', label: 'Launchpad Mini', takenBy: 'B' },
+      ],
+      devicePlaceholder: '— select a device —',
+    }),
+    layout: 'inline',
+  },
+};
+
+/** `layout="inline"`, before the Enable gesture with a previously bound port and device now
+ *  absent — the stored name still shows rather than the generic placeholder, on every reload. */
+export const LastSaw: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: false,
+      portPlaceholder: '— last saw TeensyROM (PJRC) —',
+      devicePlaceholder: '— last saw nanoKONTROL2 —',
     }),
     layout: 'inline',
   },

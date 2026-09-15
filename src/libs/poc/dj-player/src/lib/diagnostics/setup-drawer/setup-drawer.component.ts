@@ -19,8 +19,8 @@ import {
   tuneIndexLoopIsImplausible,
   tuneIndexLoopPeriodLabel,
   tuneIndexLoopStartLabel,
-} from '../../analysis/tune-index-readouts';
-import type { TuneIndexRate } from '../../analysis/tune-index-readouts';
+} from '@sidablist/analysis';
+import type { TuneIndexRate } from '@sidablist/analysis';
 import { crossDeckDriftMs, formatCrossDeckDrift } from '../cross-deck-drift';
 
 const MICROSECONDS_PER_SECOND = 1_000_000;

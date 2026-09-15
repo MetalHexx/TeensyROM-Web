@@ -2,8 +2,7 @@ import { describe, it } from 'vitest';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseSidFile, SID_REGISTER_COUNT } from '@sidablist/core';
-import { scanTune } from '../src/lib/analysis/scan-tune';
-import { detectLoop, MIN_TAIL_SECONDS, IDLE_PERIOD_SECONDS } from '../src/lib/analysis/loop-detect';
+import { scanTune, detectLoop, MIN_TAIL_SECONDS, IDLE_PERIOD_SECONDS } from '@sidablist/analysis';
 
 /** Root of a local HVSC collection, e.g. `C:/Users/you/HVSC/C64Music`. No sane default exists — this
  *  is a developer machine's music collection, not a repo asset — so the suite skips when it is unset
@@ -14,7 +13,10 @@ const HVSC_ROOT = process.env['HVSC_ROOT'];
  *  differently-laid-out checkout. */
 const CSV =
   process.env['SID_CSV'] ??
-  join(__dirname, '../../../../apps/api/src/TeensyRom.Core/Assets/Music/SidList/SIDlist_82_UTF8.csv');
+  join(
+    __dirname,
+    '../../../../apps/api/src/TeensyRom.Core/Assets/Music/SidList/SIDlist_82_UTF8.csv'
+  );
 
 /** Where the full per-tune results land. Optional — when unset the run still prints its summary to
  *  the console, it just writes no file. */
@@ -128,7 +130,8 @@ function buildSample(hvscRoot: string): Rec[] {
   }
   console.log(`CSV rows usable (single-song, length known): ${all.length}`);
 
-  const keyOf = (r: Rec) => `${r.clock}|${r.area}|${r.lenBucket}|${r.multispeed ? 'multi' : 'single'}`;
+  const keyOf = (r: Rec) =>
+    `${r.clock}|${r.area}|${r.lenBucket}|${r.multispeed ? 'multi' : 'single'}`;
   const strata = new Map<string, Rec[]>();
   for (const r of all) {
     const k = keyOf(r);
@@ -152,7 +155,8 @@ function buildSample(hvscRoot: string): Rec[] {
   // Trim to target, keeping the stratified spread.
   const out: Rec[] = [];
   const step = Math.max(1, picked.length / TARGET);
-  for (let i = 0; out.length < TARGET && i < picked.length; i += step) out.push(picked[Math.floor(i)]);
+  for (let i = 0; out.length < TARGET && i < picked.length; i += step)
+    out.push(picked[Math.floor(i)]);
   return out;
 }
 
@@ -213,7 +217,9 @@ describe('STRATIFIED VALIDATION vs HVSC', () => {
       const distinctPaths = new Set(sample.map((r) => r.path));
       if (distinctPaths.size !== sample.length) {
         throw new Error(
-          `sampler produced ${sample.length - distinctPaths.size} duplicate pick(s) across ${sample.length} rows`
+          `sampler produced ${sample.length - distinctPaths.size} duplicate pick(s) across ${
+            sample.length
+          } rows`
         );
       }
       console.log(`sampled ${sample.length} tunes, all distinct\n`);
@@ -240,7 +246,9 @@ describe('STRATIFIED VALIDATION vs HVSC', () => {
         let best: number | null = null;
         if (v.kind === 'loop') {
           best =
-            Math.abs(v.seconds - r.songlen) <= Math.abs(v.totalSeconds - r.songlen) ? v.seconds : v.totalSeconds;
+            Math.abs(v.seconds - r.songlen) <= Math.abs(v.totalSeconds - r.songlen)
+              ? v.seconds
+              : v.totalSeconds;
         } else if (v.kind === 'ended') {
           best = v.seconds;
         }
@@ -326,14 +334,23 @@ describe('STRATIFIED VALIDATION vs HVSC', () => {
         writeFileSync(
           OUT,
           JSON.stringify(
-            rows.map((x) => ({ ...x.r, verdict: x.verdict, best: x.best, delta: x.delta, ratio: x.ratio, cls: x.cls })),
+            rows.map((x) => ({
+              ...x.r,
+              verdict: x.verdict,
+              best: x.best,
+              delta: x.delta,
+              ratio: x.ratio,
+              cls: x.cls,
+            })),
             null,
             1
           )
         );
         console.log(`\nfull results -> ${OUT}`);
       } else {
-        console.log(`\nSTRAT_OUT not set; per-tune results were printed above only, not written to disk.`);
+        console.log(
+          `\nSTRAT_OUT not set; per-tune results were printed above only, not written to disk.`
+        );
       }
     },
     7_200_000

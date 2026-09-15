@@ -1,0 +1,22 @@
+import { InjectionToken } from '@angular/core';
+import { Slot } from '../slot';
+
+/** Which MIDI port and TeensyROM device a deck slot is bound to. Null fields mean unbound. */
+export interface DeckBinding {
+  readonly slot: Slot;
+  readonly midiPortId: string | null;
+  readonly midiPortName: string | null;
+  readonly deviceId: string | null;
+  readonly deviceName: string | null;
+}
+
+/** Persists per-slot deck bindings so they survive a refresh. */
+export interface IDeckBindingsRepository {
+  load(slot: Slot): Promise<DeckBinding | null>;
+  loadAll(): Promise<readonly DeckBinding[]>;
+  save(binding: DeckBinding): Promise<void>;
+}
+
+export const DECK_BINDINGS_REPOSITORY = new InjectionToken<IDeckBindingsRepository>(
+  'DECK_BINDINGS_REPOSITORY'
+);

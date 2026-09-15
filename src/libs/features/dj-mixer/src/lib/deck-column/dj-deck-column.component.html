@@ -2,9 +2,16 @@
   <div class="transport-slot">
     <lib-scaling-compact-card animationEntry="from-bottom">
       <lib-transport-panel
-        [model]="models().transport"
-        [positionPercent]="models().positionPercent"
-        [frameLabel]="models().frameLabel"
+        [model]="transportModel()"
+        [positionPercent]="positionPercent()"
+        [frameLabel]="frameLabel()"
+        (playPauseClick)="onPlayPauseClick()"
+        (stopClick)="onStopClick()"
+        (repeatTrackChange)="onRepeatTrackChange($event)"
+        (previousSubtune)="onPreviousSubtune()"
+        (nextSubtune)="onNextSubtune()"
+        (scrubInput)="onScrubInput($event)"
+        (scrubCommit)="onScrubCommit($event)"
       ></lib-transport-panel>
     </lib-scaling-compact-card>
 
@@ -32,7 +39,14 @@
   </lib-scaling-compact-card>
 
   <lib-scaling-compact-card class="binding-card-slot" animationEntry="from-bottom">
-    <lib-binding-card [model]="models().binding" layout="inline"></lib-binding-card>
+    <lib-binding-card
+      [model]="bindingModel()"
+      layout="inline"
+      (portSelect)="onPortSelect($event)"
+      (deviceSelect)="onDeviceSelect($event)"
+      (enableMidi)="onEnableMidi()"
+      (identify)="onIdentify()"
+    ></lib-binding-card>
   </lib-scaling-compact-card>
 </div>
 

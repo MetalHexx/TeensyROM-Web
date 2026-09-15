@@ -1,177 +1,544 @@
-import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
-import { of, throwError, from, type Observable } from 'rxjs';
-import '@analogjs/vitest-angular/setup-zone';
-import { TestBed, getTestBed } from '@angular/core/testing';
-import {
-  BrowserDynamicTestingModule,
-  platformBrowserDynamicTesting,
-} from '@angular/platform-browser-dynamic/testing';
-
-import { DjStore, DjFileEntry } from './dj-store';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import type { TuneReference } from '@sidablist/tunes';
+import { StorageType, DeviceState, type Device } from '@teensyrom-nx/domain';
+import { DjStore, DeckBindingState, DeckStatus, MidiState } from './dj-store';
+import { DeviceStore } from '../device/device-store';
 import { DjFileKeyUtil } from './dj-file-key.util';
-import {
-  FileContent,
-  StorageType,
-  IFileContentService,
-  FILE_CONTENT_SERVICE,
-} from '@teensyrom-nx/domain';
 
-type DjStoreInstance = {
-  files: () => Record<string, DjFileEntry>;
-  retrieveFile: (args: {
-    deviceId: string;
-    storageType: StorageType;
-    path: string;
-  }) => Promise<void>;
-  getFile: (
-    deviceId: string,
-    storageType: StorageType,
-    path: string
-  ) => () => DjFileEntry | undefined;
-};
-
-describe('DjStore (NgRx Signal Store)', () => {
-  let store: DjStoreInstance;
-  type GetFileContentFn = (
-    deviceId: string,
-    storageType: StorageType,
-    path: string
-  ) => Observable<FileContent>;
-  let getFileContentMock: MockedFunction<GetFileContentFn>;
-  let mockFileContentService: IFileContentService;
-
-  const createMockFileContent = (overrides: Partial<FileContent> = {}): FileContent => ({
-    bytes: new Uint8Array([1, 2, 3]).buffer,
-    byteLength: 3,
-    fileName: 'test.sid',
+function tuneReference(overrides: Partial<TuneReference> = {}): TuneReference {
+  return {
+    identity: { sidHash: 'hash-1', subtune: 1 },
+    title: 'Test Tune',
+    author: 'Test Author',
+    released: '2024 Test',
+    subtuneCount: 3,
+    byteLength: 1234,
     ...overrides,
-  });
-
-  const createTestStore = () => {
-    getFileContentMock = vi.fn<GetFileContentFn>();
-    mockFileContentService = {
-      getFileContent: getFileContentMock,
-    };
-
-    TestBed.configureTestingModule({
-      providers: [{ provide: FILE_CONTENT_SERVICE, useValue: mockFileContentService }],
-    });
-
-    store = TestBed.inject(DjStore) as unknown as DjStoreInstance;
   };
+}
 
-  beforeEach(() => {
-    TestBed.resetTestingModule();
-    try {
-      getTestBed().initTestEnvironment(
-        BrowserDynamicTestingModule,
-        platformBrowserDynamicTesting()
-      );
-    } catch {
-      // ignore if already initialized
-    }
-    createTestStore();
+function device(overrides: Partial<Device> = {}): Device {
+  const deviceId = overrides.deviceId ?? 'device-a';
+  return {
+    deviceId,
+    comPort: 'COM3',
+    name: `TeensyROM ${deviceId}`,
+    fwVersion: '1.0.0',
+    isCompatible: true,
+    isConnected: true,
+    deviceState: DeviceState.Connected,
+    isEnabled: true,
+    usbStorage: { deviceId, type: StorageType.Usb, available: true, indexExists: false },
+    sdStorage: { deviceId, type: StorageType.Sd, available: true, indexExists: false },
+    ...overrides,
+  };
+}
+
+const emptyBinding = (): DeckBindingState => ({
+  port: null,
+  portPresent: false,
+  device: null,
+  devicePresent: false,
+  error: null,
+});
+
+describe('DjStore', () => {
+  let store: InstanceType<typeof DjStore>;
+
+  function setup(devices: Device[] = []): void {
+    TestBed.configureTestingModule({
+      providers: [DjStore, { provide: DeviceStore, useValue: { devices: signal(devices) } }],
+    });
+    store = TestBed.inject(DjStore);
+  }
+
+  describe('initial state', () => {
+    beforeEach(() => setup());
+
+    it('starts with two empty decks, unbound slots, idle MIDI, and no seen tunes', () => {
+      expect(store.decks().A.status).toBe('empty');
+      expect(store.decks().A.loaded).toBeNull();
+      expect(store.decks().A.repeat).toBe(true);
+      expect(store.decks().B).toEqual(store.decks().A);
+
+      expect(store.bindings().A).toEqual(emptyBinding());
+      expect(store.bindings().B).toEqual(emptyBinding());
+
+      expect(store.midi()).toEqual({ accessState: 'idle', ports: [], lastError: null });
+      expect(store.seen()).toEqual({});
+    });
   });
 
-  describe('Store Setup', () => {
-    it('should be injectable via TestBed (providedIn: root)', () => {
-      expect(store).toBeDefined();
+  describe('actions', () => {
+    beforeEach(() => setup());
+
+    it('setDeckStatus sets the status and clears error unless one is given', () => {
+      store.setDeckStatus({ slot: 'A', status: 'failed', error: 'boom' });
+      expect(store.decks().A.status).toBe('failed');
+      expect(store.decks().A.error).toBe('boom');
+
+      store.setDeckStatus({ slot: 'A', status: 'stopped' });
+      expect(store.decks().A.status).toBe('stopped');
+      expect(store.decks().A.error).toBeNull();
     });
 
-    it('should initialize with an empty files map', () => {
-      expect(store.files()).toEqual({});
+    it('setDeckStatus leaves the other slot untouched', () => {
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+      expect(store.decks().B.status).toBe('empty');
     });
-  });
 
-  describe('retrieveFile', () => {
-    const deviceId = 'device-1';
-    const storageType = StorageType.Sd;
-    const path = '/music/test.sid';
-    const key = DjFileKeyUtil.create(deviceId, storageType, path);
-
-    it('lands retrieving then retrieved with the bytes and byte length', async () => {
-      let resolveFn!: (value: FileContent) => void;
-      const pending = new Promise<FileContent>((resolve) => {
-        resolveFn = resolve;
+    it('setDeckLoaded sets loaded and the reference-derived subtune fields, and resets position/length/structure/error', () => {
+      store.samplePosition({ slot: 'A', positionFrames: 500 });
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: 10, loopPeriodFrames: 20, endedAtFrame: null },
+        lengthFrames: 999,
       });
-      getFileContentMock.mockReturnValue(from(pending));
+      store.setDeckStatus({ slot: 'A', status: 'failed', error: 'previous failure' });
 
-      const call = store.retrieveFile({ deviceId, storageType, path });
+      const reference = tuneReference({ identity: { sidHash: 'abc', subtune: 2 }, subtuneCount: 5 });
+      store.setDeckLoaded({ slot: 'A', reference });
 
-      const retrievingEntry = store.files()[key];
-      expect(retrievingEntry.status).toBe('retrieving');
-      expect(retrievingEntry.fileName).toBe('test.sid');
-      expect(retrievingEntry.error).toBeNull();
-
-      const fileContent = createMockFileContent();
-      resolveFn(fileContent);
-      await call;
-
-      const retrievedEntry = store.files()[key];
-      expect(retrievedEntry.status).toBe('retrieved');
-      expect(retrievedEntry.bytes).toBe(fileContent.bytes);
-      expect(retrievedEntry.byteLength).toBe(fileContent.byteLength);
-      expect(retrievedEntry.error).toBeNull();
-
-      expect(getFileContentMock).toHaveBeenCalledWith(deviceId, storageType, path);
+      const deck = store.decks().A;
+      expect(deck.loaded).toBe(reference);
+      expect(deck.subtune).toBe(2);
+      expect(deck.subtuneCount).toBe(5);
+      expect(deck.positionFrames).toBe(0);
+      expect(deck.lengthFrames).toBeNull();
+      expect(deck.structure).toBeNull();
+      expect(deck.error).toBeNull();
+      expect(deck.status).toBe('failed'); // status is a separate action; setDeckLoaded doesn't touch it
     });
 
-    it('lands failed with the error text and null bytes on failure', async () => {
-      getFileContentMock.mockReturnValue(throwError(() => new Error('Network error')));
+    it('setDeckStructure sets structure and length', () => {
+      const structure = { loopStartFrame: 100, loopPeriodFrames: 200, endedAtFrame: null };
+      store.setDeckStructure({ slot: 'B', structure, lengthFrames: 300 });
 
-      await store.retrieveFile({ deviceId, storageType, path });
-
-      const entry = store.files()[key];
-      expect(entry.status).toBe('failed');
-      expect(entry.bytes).toBeNull();
-      expect(entry.error).toBe('Network error');
+      expect(store.decks().B.structure).toEqual(structure);
+      expect(store.decks().B.lengthFrames).toBe(300);
     });
 
-    it('does not call the service a second time for an already-retrieved key', async () => {
-      getFileContentMock.mockReturnValue(of(createMockFileContent()));
-      await store.retrieveFile({ deviceId, storageType, path });
+    it('samplePosition sets only positionFrames', () => {
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+      store.samplePosition({ slot: 'A', positionFrames: 42 });
 
-      getFileContentMock.mockClear();
-      await store.retrieveFile({ deviceId, storageType, path });
-
-      expect(getFileContentMock).not.toHaveBeenCalled();
+      expect(store.decks().A.positionFrames).toBe(42);
+      expect(store.decks().A.status).toBe('playing');
     });
 
-    it('calls the service again for a key that previously failed', async () => {
-      getFileContentMock.mockReturnValue(throwError(() => new Error('Network error')));
-      await store.retrieveFile({ deviceId, storageType, path });
-
-      getFileContentMock.mockReturnValue(of(createMockFileContent()));
-      await store.retrieveFile({ deviceId, storageType, path });
-
-      expect(getFileContentMock).toHaveBeenCalledTimes(2);
-      expect(store.files()[key].status).toBe('retrieved');
+    it('setDeckSubtune sets subtune', () => {
+      store.setDeckSubtune({ slot: 'A', subtune: 3 });
+      expect(store.decks().A.subtune).toBe(3);
     });
 
-    it('keys entries as `${deviceId}-${storageType}-${path}`', async () => {
-      getFileContentMock.mockReturnValue(of(createMockFileContent()));
-      await store.retrieveFile({ deviceId, storageType, path });
+    it('setDeckRepeat sets repeat', () => {
+      store.setDeckRepeat({ slot: 'A', repeat: false });
+      expect(store.decks().A.repeat).toBe(false);
+    });
 
-      expect(Object.keys(store.files())).toContain(`${deviceId}-${storageType}-${path}`);
+    it('setBinding replaces the slot binding wholesale, leaving the other slot untouched', () => {
+      const binding: DeckBindingState = {
+        port: { id: 'port-1', name: 'Port One' },
+        portPresent: true,
+        device: null,
+        devicePresent: false,
+        error: null,
+      };
+      store.setBinding({ slot: 'A', binding });
+
+      expect(store.bindings().A).toEqual(binding);
+      expect(store.bindings().B).toEqual(emptyBinding());
+    });
+
+    it('setMidi replaces the whole MIDI slice', () => {
+      const midi: MidiState = {
+        accessState: 'granted',
+        ports: [{ id: 'p1', name: 'Port', manufacturer: 'Acme' }],
+        lastError: null,
+      };
+      store.setMidi(midi);
+
+      expect(store.midi()).toEqual(midi);
+    });
+
+    it('markSeen accumulates entries keyed by file key', () => {
+      const keyA = DjFileKeyUtil.create('device-1', StorageType.Sd, '/a.sid');
+      const keyB = DjFileKeyUtil.create('device-1', StorageType.Sd, '/b.sid');
+      const refA = tuneReference({ title: 'A' });
+      const refB = tuneReference({ title: 'B' });
+
+      store.markSeen({ key: keyA, reference: refA });
+      store.markSeen({ key: keyB, reference: refB });
+
+      expect(store.seen()).toEqual({ [keyA]: refA, [keyB]: refB });
     });
   });
 
-  describe('getFile', () => {
-    it('returns the entry for the matching device, storage type and path', async () => {
-      const deviceId = 'device-2';
-      const storageType = StorageType.Usb;
-      const path = '/games/game.prg';
-      getFileContentMock.mockReturnValue(of(createMockFileContent({ fileName: 'game.prg' })));
+  describe('transportSummary', () => {
+    beforeEach(() => setup());
 
-      await store.retrieveFile({ deviceId, storageType, path });
+    const statusCases: Array<{
+      status: DeckStatus;
+      led: string;
+      label: string;
+      showing: 'play' | 'pause';
+      controlsDisabled: boolean;
+      canStop: boolean;
+    }> = [
+      {
+        status: 'empty',
+        led: 'stopped',
+        label: 'Stopped',
+        showing: 'play',
+        controlsDisabled: true,
+        canStop: false,
+      },
+      {
+        status: 'loading',
+        led: 'analyzing',
+        label: 'Analyzing…',
+        showing: 'play',
+        controlsDisabled: true,
+        canStop: false,
+      },
+      {
+        status: 'indexing',
+        led: 'analyzing',
+        label: 'Analyzing…',
+        showing: 'play',
+        controlsDisabled: true,
+        canStop: false,
+      },
+      {
+        status: 'playing',
+        led: 'playing',
+        label: 'Playing',
+        showing: 'pause',
+        controlsDisabled: false,
+        canStop: true,
+      },
+      {
+        status: 'paused',
+        led: 'paused',
+        label: 'Paused',
+        showing: 'play',
+        controlsDisabled: false,
+        canStop: true,
+      },
+      {
+        status: 'stopped',
+        led: 'stopped',
+        label: 'Stopped',
+        showing: 'play',
+        controlsDisabled: false,
+        canStop: false,
+      },
+    ];
 
-      const entry = store.getFile(deviceId, storageType, path)();
-      expect(entry?.status).toBe('retrieved');
-      expect(entry?.fileName).toBe('game.prg');
+    it.each(statusCases)(
+      'derives led/label/showing/gates for status $status',
+      ({ status, led, label, showing, controlsDisabled, canStop }) => {
+        store.setDeckStatus({ slot: 'A', status });
+        const summary = store.transportSummary('A')();
+
+        expect(summary.led).toBe(led);
+        expect(summary.label).toBe(label);
+        expect(summary.showing).toBe(showing);
+        expect(summary.controlsDisabled).toBe(controlsDisabled);
+        expect(summary.canStop).toBe(canStop);
+      }
+    );
+
+    it('failed status reports the error reason as its label, under the error led', () => {
+      store.setDeckStatus({ slot: 'A', status: 'failed', error: 'Device disconnected' });
+      const summary = store.transportSummary('A')();
+
+      expect(summary.led).toBe('error');
+      expect(summary.label).toBe('Device disconnected');
     });
 
-    it('returns undefined when no entry exists for the key', () => {
-      expect(store.getFile('unknown-device', StorageType.Sd, '/nope.sid')()).toBeUndefined();
+    it('the bar is analyzing while indexing, even with structure already present', () => {
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: 0, loopPeriodFrames: 100, endedAtFrame: null },
+        lengthFrames: 100,
+      });
+      store.setDeckStatus({ slot: 'A', status: 'indexing' });
+
+      expect(store.transportSummary('A')().bar).toEqual({ kind: 'analyzing' });
+    });
+
+    it('the bar is unknown with no structure', () => {
+      store.setDeckStatus({ slot: 'A', status: 'stopped' });
+      expect(store.transportSummary('A')().bar).toEqual({ kind: 'unknown' });
+    });
+
+    it('the bar is unknown when structure carries no usable span', () => {
+      store.setDeckStatus({ slot: 'A', status: 'stopped' });
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+        lengthFrames: null,
+      });
+
+      expect(store.transportSummary('A')().bar).toEqual({ kind: 'unknown' });
+    });
+
+    it('the bar is a loop with introPercent when a usable period exists', () => {
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: 100, loopPeriodFrames: 300, endedAtFrame: null },
+        lengthFrames: 400,
+      });
+
+      expect(store.transportSummary('A')().bar).toEqual({ kind: 'loop', introPercent: 25 });
+    });
+
+    it('the bar is ended with the fixed 80% music share when no loop period exists', () => {
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: 500 },
+        lengthFrames: 500,
+      });
+
+      expect(store.transportSummary('A')().bar).toEqual({ kind: 'ended', musicPercent: 80 });
+    });
+
+    it('clamps scrubPercent to [0, 100] and reports 0 with no length', () => {
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+      expect(store.transportSummary('A')().scrubPercent).toBe(0);
+
+      store.setDeckStructure({
+        slot: 'A',
+        structure: { loopStartFrame: null, loopPeriodFrames: null, endedAtFrame: null },
+        lengthFrames: 1000,
+      });
+      store.samplePosition({ slot: 'A', positionFrames: 250 });
+      expect(store.transportSummary('A')().scrubPercent).toBe(25);
+
+      store.samplePosition({ slot: 'A', positionFrames: 5000 });
+      expect(store.transportSummary('A')().scrubPercent).toBe(100);
+    });
+
+    it('gates subtuneDisabled on controlsDisabled and a single subtune', () => {
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+      store.setDeckLoaded({
+        slot: 'A',
+        reference: tuneReference({ subtuneCount: 1, identity: { sidHash: 'x', subtune: 1 } }),
+      });
+      expect(store.transportSummary('A')().subtuneDisabled).toBe(true);
+
+      store.setDeckLoaded({
+        slot: 'A',
+        reference: tuneReference({ subtuneCount: 3, identity: { sidHash: 'x', subtune: 1 } }),
+      });
+      expect(store.transportSummary('A')().subtuneDisabled).toBe(false);
+
+      store.setDeckStatus({ slot: 'A', status: 'loading' });
+      expect(store.transportSummary('A')().subtuneDisabled).toBe(true);
+    });
+
+    it('formats frameLabel and subtuneText', () => {
+      store.setDeckLoaded({
+        slot: 'A',
+        reference: tuneReference({ subtuneCount: 4, identity: { sidHash: 'x', subtune: 1 } }),
+      });
+      store.samplePosition({ slot: 'A', positionFrames: 777 });
+      store.setDeckSubtune({ slot: 'A', subtune: 2 });
+
+      const summary = store.transportSummary('A')();
+      expect(summary.frameLabel).toBe('frame 777');
+      expect(summary.subtuneText).toBe('Subtune 2 of 4');
+    });
+  });
+
+  describe('bindingSummary', () => {
+    const deviceA = device({
+      deviceId: 'device-a',
+      name: 'TeensyROM A',
+      isEnabled: true,
+      isConnected: false,
+    });
+    const deviceB = device({
+      deviceId: 'device-b',
+      name: 'TeensyROM B',
+      isEnabled: false,
+      isConnected: true,
+    });
+
+    beforeEach(() => setup([deviceA, deviceB]));
+
+    it('lists enabled devices only (regardless of isConnected), and flags ports/devices already taken by the other slot', () => {
+      store.setMidi({
+        accessState: 'granted',
+        ports: [
+          { id: 'port-1', name: 'Port One', manufacturer: 'Acme' },
+          { id: 'port-2', name: 'Port Two', manufacturer: 'Acme' },
+        ],
+        lastError: null,
+      });
+      store.setBinding({
+        slot: 'B',
+        binding: {
+          port: { id: 'port-1', name: 'Port One' },
+          portPresent: true,
+          device: { id: 'device-a', name: 'TeensyROM A' },
+          devicePresent: true,
+          error: null,
+        },
+      });
+
+      const summary = store.bindingSummary('A')();
+
+      expect(summary.portOptions).toEqual([
+        { id: 'port-1', label: 'Port One (Acme)', takenBy: 'B' },
+        { id: 'port-2', label: 'Port Two (Acme)', takenBy: null },
+      ]);
+      expect(summary.deviceOptions).toEqual([{ id: 'device-a', label: 'device-a', takenBy: 'B' }]);
+    });
+
+    it('flags taken in the other direction too', () => {
+      store.setMidi({
+        accessState: 'granted',
+        ports: [{ id: 'port-1', name: 'Port One', manufacturer: 'Acme' }],
+        lastError: null,
+      });
+      store.setBinding({
+        slot: 'A',
+        binding: {
+          port: { id: 'port-1', name: 'Port One' },
+          portPresent: true,
+          device: null,
+          devicePresent: false,
+          error: null,
+        },
+      });
+
+      expect(store.bindingSummary('B')().portOptions).toEqual([
+        { id: 'port-1', label: 'Port One (Acme)', takenBy: 'A' },
+      ]);
+    });
+
+    it('reports the selected id only while present, and null while stored-but-absent', () => {
+      store.setBinding({
+        slot: 'A',
+        binding: {
+          port: { id: 'port-1', name: 'Port One' },
+          portPresent: true,
+          device: null,
+          devicePresent: false,
+          error: null,
+        },
+      });
+      expect(store.bindingSummary('A')().selectedPortId).toBe('port-1');
+
+      store.setBinding({
+        slot: 'A',
+        binding: {
+          port: { id: 'port-1', name: 'Port One' },
+          portPresent: false,
+          device: null,
+          devicePresent: false,
+          error: null,
+        },
+      });
+      expect(store.bindingSummary('A')().selectedPortId).toBeNull();
+    });
+
+    it('portPlaceholder shows the last-saw name whenever a port is bound but absent, whatever the access state', () => {
+      store.setBinding({
+        slot: 'A',
+        binding: {
+          port: { id: 'port-1', name: 'Port One' },
+          portPresent: false,
+          device: null,
+          devicePresent: false,
+          error: null,
+        },
+      });
+
+      expect(store.bindingSummary('A')().portPlaceholder).toBe('— last saw Port One —');
+
+      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
+      expect(store.bindingSummary('A')().portPlaceholder).toBe('— last saw Port One —');
+    });
+
+    it('portPlaceholder is "MIDI not enabled" with nothing stored, and "select a port" once granted', () => {
+      expect(store.bindingSummary('A')().portPlaceholder).toBe('— MIDI not enabled —');
+
+      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
+      expect(store.bindingSummary('A')().portPlaceholder).toBe('— select a port —');
+    });
+
+    it('devicePlaceholder mirrors the port rule, without a MIDI-gated variant', () => {
+      expect(store.bindingSummary('A')().devicePlaceholder).toBe('— select a device —');
+
+      store.setBinding({
+        slot: 'A',
+        binding: {
+          port: null,
+          portPresent: false,
+          device: { id: 'device-z', name: 'Old Device' },
+          devicePresent: false,
+          error: null,
+        },
+      });
+      expect(store.bindingSummary('A')().devicePlaceholder).toBe('— last saw Old Device —');
+    });
+
+    it('portsEnabled and enableDisabled follow accessState', () => {
+      expect(store.bindingSummary('A')().portsEnabled).toBe(false);
+      expect(store.bindingSummary('A')().enableDisabled).toBe(false);
+
+      store.setMidi({ accessState: 'requesting', ports: [], lastError: null });
+      expect(store.bindingSummary('A')().enableDisabled).toBe(true);
+
+      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
+      expect(store.bindingSummary('A')().portsEnabled).toBe(true);
+    });
+
+    it('identifyDisabled unless granted, a present port is bound, and the deck is not playing', () => {
+      expect(store.bindingSummary('A')().identifyDisabled).toBe(true);
+
+      store.setMidi({
+        accessState: 'granted',
+        ports: [{ id: 'port-1', name: 'Port One', manufacturer: 'Acme' }],
+        lastError: null,
+      });
+      store.setBinding({
+        slot: 'A',
+        binding: {
+          port: { id: 'port-1', name: 'Port One' },
+          portPresent: true,
+          device: null,
+          devicePresent: false,
+          error: null,
+        },
+      });
+      expect(store.bindingSummary('A')().identifyDisabled).toBe(false);
+
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+      expect(store.bindingSummary('A')().identifyDisabled).toBe(true);
+    });
+
+    it('collects midi, no-ports-found, and binding errors, filtering out the absent ones', () => {
+      expect(store.bindingSummary('A')().errors).toEqual([]);
+
+      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
+      expect(store.bindingSummary('A')().errors).toEqual([
+        'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.',
+      ]);
+
+      store.setMidi({ accessState: 'idle', ports: [], lastError: 'Web MIDI unavailable' });
+      store.setBinding({
+        slot: 'A',
+        binding: { port: null, portPresent: false, device: null, devicePresent: false, error: 'device missing' },
+      });
+      expect(store.bindingSummary('A')().errors).toEqual(['Web MIDI unavailable', 'device missing']);
     });
   });
 });

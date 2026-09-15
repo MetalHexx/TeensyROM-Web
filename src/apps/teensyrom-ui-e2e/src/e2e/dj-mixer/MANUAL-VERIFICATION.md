@@ -148,3 +148,25 @@ To perform this check once a cartridge is available: `pnpm nx serve teensyrom-ui
 `.sid` file from the DJ mixer's listing onto a deck's transport, copy the hash out of the resulting
 alert, then hash the same file on the desktop (`Get-FileHash -Algorithm SHA256 <file>` on Windows,
 or `sha256sum <file>` on macOS/Linux) and confirm the two hex strings match.
+
+## Hardware acceptance (P04-T02)
+
+Not run. This task wires the DJ Mixer's deck columns to `DeckService`/`DjStore` — the load,
+transport, and MIDI binding path — which the automated Cypress specs exercise against fixture
+devices only (`dj-mixer-decks.cy.ts`, `dj-mixer-responsive.cy.ts`). The checklist below requires a
+real TeensyROM cartridge connected over serial and was not exercised end to end in this execution
+environment; no result is recorded here, only what an operator with a device attached still needs
+to confirm, per the task's own acceptance criteria:
+
+- `pnpm nx serve teensyrom-ui`, connect a device, and drag a `.sid` file from the listing onto
+  deck A: the transport's status LED shows **Analyzing…** and then **Playing** — or, on a failed
+  read, **failed** with a reason on the LED and no DJ-raised alert (a device-read failure still
+  carries the `-3` file service's own alert; that alert is expected and accepted, not a DJ Mixer
+  regression).
+- Dragging the same file onto deck A again shows no new network request in DevTools' Network tab
+  and skips the Analyzing phase — the tune is already resolved from the prior drop.
+- After a page refresh, deck A's Output port and Device selects come back either bound to their
+  prior selection or showing the "last saw" placeholder for a port/device not currently present —
+  never reset to the unbound placeholder while a binding is on record.
+- With deck A already bound to a MIDI output port or input device, that same port/device appears
+  disabled and marked "taken by Deck A" in deck B's own binding card selects.

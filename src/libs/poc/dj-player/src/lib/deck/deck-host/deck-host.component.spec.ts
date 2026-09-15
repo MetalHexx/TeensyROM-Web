@@ -27,7 +27,7 @@ import {
   TUNE_INDEX_STORAGE,
   LocalStorageTuneIndexStorage,
 } from '../../analysis/tune-index-storage';
-import type { DetectedMoment, TuneIndexRecord } from '../../analysis/tune-index.model';
+import type { DetectedMoment, TuneIndexRecord } from '@sidablist/analysis';
 import { MixerService } from '../../mixer/mixer.service';
 import {
   createFakeAsidSink,
@@ -471,23 +471,29 @@ describe('DeckHostComponent', () => {
       }
     });
 
-    it('calls play, pause and stop on the player from the transport buttons', () => {
+    it('calls play, pause and stop on the player from the merged toggle and the stop button', () => {
       binding.selectedPortId.set('port-1');
       tuneLoader.currentTune.set(fakeSidFile());
       fixture.detectChanges();
 
-      const buttons: HTMLButtonElement[] = Array.from(
-        fixture.nativeElement.querySelectorAll('button')
-      );
-      buttons.find((button) => button.textContent?.trim() === 'Play')?.click();
+      function playPauseButton(): HTMLButtonElement | undefined {
+        return Array.from(
+          fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')
+        ).find((button) => ['Play', 'Pause'].includes(button.textContent?.trim() ?? ''));
+      }
+
+      playPauseButton()?.click();
       expect(player.player.play).toHaveBeenCalled();
 
       player.snapshot.update((snapshot) => ({ ...snapshot, transport: 'playing' }));
       fixture.detectChanges();
-      buttons.find((button) => button.textContent?.trim() === 'Pause')?.click();
+      playPauseButton()?.click();
       expect(player.player.pause).toHaveBeenCalled();
 
-      buttons.find((button) => button.textContent?.trim() === 'Stop')?.click();
+      const stopButton = Array.from(
+        fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')
+      ).find((button) => button.textContent?.trim() === 'Stop');
+      stopButton?.click();
       expect(player.player.stop).toHaveBeenCalled();
     });
 
@@ -998,7 +1004,7 @@ describe('DeckHostComponent', () => {
         expect(binding.selectPort).toHaveBeenCalledWith('port-1');
       });
 
-      it("routes the placeholder option to clearSelection rather than selectPort, so an empty id can never be claimed as a port", () => {
+      it('routes the placeholder option to clearSelection rather than selectPort, so an empty id can never be claimed as a port', () => {
         midiAccess().accessState.set('granted');
         midiAccess().ports.set([{ id: 'port-1', name: 'Cart A', manufacturer: 'Acme' }]);
         binding.selectedPortId.set('port-1');

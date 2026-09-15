@@ -6,7 +6,9 @@ import { interceptFindDevices } from '../../support/interceptors/findDevices.int
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
 
 // There is no two-device fixture in the suite (`singleDevice` has one, `multipleDevices` three).
-// Devices map in with `isEnabled: true` by default, so two discovered devices become two decks.
+// The decks are a fixed pair (A and B) regardless of device count — this fixture exists only to
+// keep at least one enabled device around, so the bottom band renders Browse and Directory
+// Listing instead of the "No Enabled Devices" empty state.
 const twoDevices: MockDeviceFixture = { devices: [generateDevice(), generateDevice()] };
 
 const STACKED_WIDTHS = [1279, VIEWPORT.TABLET.width] as const;
@@ -188,7 +190,7 @@ describe('DJ Mixer — responsive layout', () => {
     });
   });
 
-  describe('one deck', () => {
+  describe('one device still renders two decks', () => {
     beforeEach(() => {
       interceptFindDevices(); // default fixture: singleDevice
       interceptConnectDevice();
@@ -196,9 +198,9 @@ describe('DJ Mixer — responsive layout', () => {
       cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
     });
 
-    it('renders one deck strip and no crossfader', () => {
-      cy.get('lib-deck-strip').should('have.length', 1);
-      cy.get('lib-crossfader').should('not.exist');
+    it('renders two deck strips and a crossfader — the decks are a fixed pair, not one per device', () => {
+      cy.get('lib-deck-strip').should('have.length', 2);
+      cy.get('lib-crossfader').should('exist');
     });
 
     NO_OVERFLOW_WIDTHS.forEach((width) => {
@@ -209,18 +211,17 @@ describe('DJ Mixer — responsive layout', () => {
     });
   });
 
-  describe('three decks', () => {
+  describe('three devices still render two decks', () => {
     beforeEach(() => {
       interceptFindDevices({ fixture: multipleDevices });
       interceptConnectDevice();
       cy.visit('/dj-mixer');
     });
 
-    it('stacks at every width, including desktop, and keeps deck C reachable via its own scroll', () => {
+    it('renders no deck C — the decks are a fixed pair, not one per device', () => {
       cy.viewport(1600, 900);
 
-      cy.get('[aria-label="Transport deck C"]').scrollIntoView();
-      cy.get('[aria-label="Transport deck C"]').should('be.visible');
+      cy.get('[aria-label="Transport deck C"]').should('not.exist');
     });
 
     NO_OVERFLOW_WIDTHS.forEach((width) => {
