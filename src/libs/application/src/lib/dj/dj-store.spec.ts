@@ -398,7 +398,7 @@ describe('DjStore', () => {
         { id: 'port-1', label: 'Port One (Acme)', takenBy: 'B' },
         { id: 'port-2', label: 'Port Two (Acme)', takenBy: null },
       ]);
-      expect(summary.deviceOptions).toEqual([{ id: 'device-a', label: 'TeensyROM A', takenBy: 'B' }]);
+      expect(summary.deviceOptions).toEqual([{ id: 'device-a', label: 'device-a', takenBy: 'B' }]);
     });
 
     it('flags taken in the other direction too', () => {

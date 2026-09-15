@@ -71,7 +71,7 @@ export function bindingSummary(
           .filter((device) => device.isEnabled)
           .map((device) => ({
             id: device.deviceId,
-            label: device.name,
+            label: device.deviceId,
             takenBy: otherBinding.device?.id === device.deviceId ? other : null,
           }));
 
