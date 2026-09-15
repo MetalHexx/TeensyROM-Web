@@ -68,7 +68,7 @@ export function bindingSummary(
 
         const deviceOptions: BindingOption[] = deviceStore
           .devices()
-          .filter((device) => device.isConnected)
+          .filter((device) => device.isEnabled)
           .map((device) => ({
             id: device.deviceId,
             label: device.name,

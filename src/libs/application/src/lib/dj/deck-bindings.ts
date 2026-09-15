@@ -22,7 +22,7 @@ function recordFor(slot: Slot, binding: DeckBindingState): DeckBinding {
 /**
  * Each deck slot's MIDI output port and TeensyROM device: loaded from `DECK_BINDINGS_REPOSITORY`
  * at startup, reconciled against what `IMidiAccess` enumerates and `DeviceStore` reports
- * connected, saved on every successful bind, exclusive across the two slots, and re-resolved the
+ * enabled, saved on every successful bind, exclusive across the two slots, and re-resolved the
  * moment an absent id reappears.
  *
  * A port claim and a device binding are enforced differently: `IMidiAccess` owns a claims map, so
@@ -117,7 +117,7 @@ export class DeckBindings {
     if (id !== null) {
       const found = this.deviceStore.devices().find((candidate) => candidate.deviceId === id);
       device = { id, name: found?.name ?? '' };
-      devicePresent = found?.isConnected ?? false;
+      devicePresent = found?.isEnabled ?? false;
     }
 
     const binding: DeckBindingState = { ...current, device, devicePresent, error: null };
@@ -150,7 +150,7 @@ export class DeckBindings {
   }
 
   /**
-   * Recomputes one slot's presence against what is currently enumerated (ports) or connected
+   * Recomputes one slot's presence against what is currently enumerated (ports) or enabled
    * (devices), always built from the store's own current binding — never from the array
    * `loadAll()` returned at hydration, which a port bound afterwards would otherwise be
    * reconciled back to on the next port-list change. The id/name pair itself is never touched
@@ -160,7 +160,7 @@ export class DeckBindings {
    * A present port claims it — `runtime.setPort` follows the claim, not the enumeration, so a
    * port claimed by the other slot in the interim still reads as absent here even though it is
    * enumerated. Devices mirror the same shape without a claim step: there is no claims map to
-   * consult, only `DeviceStore`'s own connected flag.
+   * consult, only `DeviceStore`'s own enabled flag.
    */
   private reconcile(slot: Slot): void {
     const current = this.store.binding(slot)();
@@ -178,14 +178,14 @@ export class DeckBindings {
     if (device !== null) {
       devicePresent = this.deviceStore
         .devices()
-        .some((candidate) => candidate.deviceId === device.id && candidate.isConnected);
+        .some((candidate) => candidate.deviceId === device.id && candidate.isEnabled);
     }
 
     this.store.setBinding({ slot, binding: { ...current, portPresent, devicePresent } });
   }
 
   /** Installed once, in the injector context — `AudioBootstrapService.init`'s own pattern. Two
-   *  effects re-run both slots' reconcile whenever the enumerated ports or the connected devices
+   *  effects re-run both slots' reconcile whenever the enumerated ports or the enabled devices
    *  change, so a reappearing id re-binds and a vanished one flips to last-saw; a third mirrors
    *  `IMidiAccess`'s own state onto `store.setMidi`. Every store read a reconcile pass makes runs
    *  `untracked` so these effects depend only on `midiAccess.ports()` / `deviceStore.devices()` —

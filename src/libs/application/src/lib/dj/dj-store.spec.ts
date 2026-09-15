@@ -357,12 +357,22 @@ describe('DjStore', () => {
   });
 
   describe('bindingSummary', () => {
-    const deviceA = device({ deviceId: 'device-a', name: 'TeensyROM A', isConnected: true });
-    const deviceB = device({ deviceId: 'device-b', name: 'TeensyROM B', isConnected: false });
+    const deviceA = device({
+      deviceId: 'device-a',
+      name: 'TeensyROM A',
+      isEnabled: true,
+      isConnected: false,
+    });
+    const deviceB = device({
+      deviceId: 'device-b',
+      name: 'TeensyROM B',
+      isEnabled: false,
+      isConnected: true,
+    });
 
     beforeEach(() => setup([deviceA, deviceB]));
 
-    it('lists connected devices only, and flags ports/devices already taken by the other slot', () => {
+    it('lists enabled devices only (regardless of isConnected), and flags ports/devices already taken by the other slot', () => {
       store.setMidi({
         accessState: 'granted',
         ports: [
