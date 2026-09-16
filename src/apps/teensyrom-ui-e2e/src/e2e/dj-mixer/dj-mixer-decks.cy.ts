@@ -15,11 +15,26 @@ function clearDjBindingsDatabase(): void {
   );
 }
 
+/** Stubs the Permissions API's `midi` query to `'prompt'` before the app's own scripts run, so
+ *  `DeckBindings.hydrate` never auto-connects on this suite's own account. Some Chromium/Electron
+ *  builds answer `navigator.permissions.query({ name: 'midi' })` with `'granted'` even with no
+ *  prior grant at all, which would otherwise auto-connect and hide the Enable MIDI button —
+ *  this arranges the "no MIDI grant" precondition the suite is named for instead of relying on
+ *  whatever the host browser's ambient default happens to be. */
+function stubNoMidiGrant(win: Cypress.AUTWindow): void {
+  if (!win.navigator.permissions) {
+    return;
+  }
+  cy.stub(win.navigator.permissions, 'query')
+    .withArgs(Cypress.sinon.match({ name: 'midi' }))
+    .resolves({ state: 'prompt' } as PermissionStatus);
+}
+
 describe('DJ Mixer — fixed decks with no enabled devices', () => {
   beforeEach(() => {
     clearDjBindingsDatabase();
     interceptFindDevices({ fixture: noDevices });
-    cy.visit('/dj-mixer');
+    cy.visit('/dj-mixer', { onBeforeLoad: stubNoMidiGrant });
   });
 
   it('renders both transports with every disable-able control disabled', () => {
