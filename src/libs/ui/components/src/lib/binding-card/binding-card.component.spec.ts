@@ -18,6 +18,7 @@ function model(overrides: Partial<BindingCardModel> = {}): BindingCardModel {
     selectedPortId: null,
     portsEnabled: false,
     portPlaceholder: '— MIDI not enabled —',
+    enableVisible: true,
     enableDisabled: false,
     identifyDisabled: false,
     selectAccessibleName: 'Output port deck A',
@@ -151,6 +152,14 @@ describe('BindingCardComponent', () => {
 
     expect(enabled.length).toBe(1);
     expect(identified.length).toBe(1);
+  });
+
+  it('shows the Enable MIDI button when enableVisible is true and hides it when false', () => {
+    setModel(model({ enableVisible: true }));
+    expect(button('Enable MIDI')).toBeTruthy();
+
+    setModel(model({ enableVisible: false }));
+    expect(button('Enable MIDI')).toBeFalsy();
   });
 
   it('renders one role="alert" per error entry, in order', () => {

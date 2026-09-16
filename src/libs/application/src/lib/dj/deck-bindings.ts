@@ -1,4 +1,5 @@
 import { effect, inject, Injectable, Injector, runInInjectionContext, untracked } from '@angular/core';
+import { ALERT_SERVICE, type IAlertService } from '@teensyrom-nx/domain';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore, type DeckBindingState, type MidiState } from './dj-store';
@@ -28,6 +29,7 @@ function recordFor(slot: Slot, binding: DeckBindingState): DeckBinding {
 export class DeckBindings {
   private readonly repository: IDeckBindingsRepository = inject(DECK_BINDINGS_REPOSITORY);
   private readonly midiAccess: IMidiAccess = inject(MIDI_ACCESS);
+  private readonly alertService: IAlertService = inject(ALERT_SERVICE);
   private readonly store = inject(DjStore);
   private readonly runtime = inject(DeckRuntime);
   private readonly injector = inject(Injector);
@@ -35,10 +37,15 @@ export class DeckBindings {
   private effectsInstalled = false;
 
   /**
-   * Seeds the store from the repository, reconciles both slots against what is currently
-   * enumerated, then installs the effect that keeps reconciling as ports come and go. Calls only
-   * `runtime.setPort` — never anything that would start a clock — so a refresh can hydrate ahead
-   * of the one user gesture MIDI access still needs.
+   * Seeds the store from the repository, then — before the first reconcile — queries the origin's
+   * standing MIDI permission and requests access on its own when it is already granted, so a
+   * reload lands bound with no click: the first reconcile pass then already sees the freshly
+   * enumerated ports and claims them, rather than reconciling unbound and catching up later.
+   * Reconciles both slots against what is now enumerated, then installs the effect that keeps
+   * reconciling as ports come and go. A granted origin whose auto-connect still fails raises an
+   * `ALERT_SERVICE` error; `prompt`, `denied` and `unsupported` raise nothing here — the binding
+   * card's own Enable button is the surface for those. Calls only `runtime.setPort` — never
+   * anything that would start a clock.
    */
   async hydrate(): Promise<void> {
     logInfo(LogType.Start, 'DeckBindings: hydrating deck bindings');
@@ -46,6 +53,15 @@ export class DeckBindings {
     const stored = await this.repository.loadAll();
     for (const record of stored) {
       this.store.setBinding({ slot: record.slot, binding: this.stateFromRecord(record) });
+    }
+
+    if ((await this.midiAccess.queryPermission()) === 'granted') {
+      await this.midiAccess.requestAccess();
+      if (this.midiAccess.accessState() !== 'granted') {
+        this.alertService.error(
+          `MIDI could not be connected: ${this.midiAccess.lastError() ?? 'unknown error'}`
+        );
+      }
     }
 
     for (const slot of DECK_SLOTS) {
@@ -88,9 +104,9 @@ export class DeckBindings {
     await this.repository.save(recordFor(slot, binding));
   }
 
-  /** Must be called from a user gesture — only ever the binding card's own Enable button.
-   *  Idempotent once granted: `IMidiAccess.requestAccess` re-enumerates and this reconciles both
-   *  slots against the fresh list. */
+  /** The manual path for an origin that has not granted — `hydrate` already auto-connects one
+   *  that has. Idempotent once granted: `IMidiAccess.requestAccess` re-enumerates and this
+   *  reconciles both slots against the fresh list. */
   async enableMidi(): Promise<void> {
     await this.midiAccess.requestAccess();
     for (const slot of DECK_SLOTS) {

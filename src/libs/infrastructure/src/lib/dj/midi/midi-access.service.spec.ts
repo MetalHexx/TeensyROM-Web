@@ -43,6 +43,18 @@ function stubRequestMidiAccess(
   });
 }
 
+/** Replaces `navigator.permissions` for the duration of a test. `undefined` simulates a browser
+ *  whose Permissions API cannot answer at all. */
+function stubPermissionsQuery(
+  impl: undefined | ((desc: PermissionDescriptor) => Promise<{ state: string }>)
+): void {
+  Object.defineProperty(navigator, 'permissions', {
+    configurable: true,
+    writable: true,
+    value: impl ? { query: impl } : undefined,
+  });
+}
+
 describe('MidiAccessService', () => {
   let service: MidiAccessService;
 
@@ -57,11 +69,59 @@ describe('MidiAccessService', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     stubRequestMidiAccess(undefined);
+    stubPermissionsQuery(undefined);
   });
 
   it('starts idle with no ports', () => {
     expect(service.accessState()).toBe('idle');
     expect(service.ports()).toEqual([]);
+  });
+
+  describe('queryPermission', () => {
+    it('returns unsupported and sets accessState/lastError when the browser exposes no requestMIDIAccess', async () => {
+      stubRequestMidiAccess(undefined);
+
+      const result = await service.queryPermission();
+
+      expect(result).toBe('unsupported');
+      expect(service.accessState()).toBe('unsupported');
+      expect(service.lastError()).toBeTruthy();
+    });
+
+    it('returns granted when the Permissions API reports granted', async () => {
+      stubRequestMidiAccess(() => Promise.resolve(makeAccess([])));
+      stubPermissionsQuery(() => Promise.resolve({ state: 'granted' }));
+
+      expect(await service.queryPermission()).toBe('granted');
+    });
+
+    it('returns denied when the Permissions API reports denied', async () => {
+      stubRequestMidiAccess(() => Promise.resolve(makeAccess([])));
+      stubPermissionsQuery(() => Promise.resolve({ state: 'denied' }));
+
+      expect(await service.queryPermission()).toBe('denied');
+    });
+
+    it('returns prompt when the Permissions API reports prompt', async () => {
+      stubRequestMidiAccess(() => Promise.resolve(makeAccess([])));
+      stubPermissionsQuery(() => Promise.resolve({ state: 'prompt' }));
+
+      expect(await service.queryPermission()).toBe('prompt');
+    });
+
+    it('returns prompt when navigator.permissions is missing', async () => {
+      stubRequestMidiAccess(() => Promise.resolve(makeAccess([])));
+      stubPermissionsQuery(undefined);
+
+      expect(await service.queryPermission()).toBe('prompt');
+    });
+
+    it('returns prompt rather than rejecting when the query throws', async () => {
+      stubRequestMidiAccess(() => Promise.resolve(makeAccess([])));
+      stubPermissionsQuery(() => Promise.reject(new Error('midi is not a known permission')));
+
+      await expect(service.queryPermission()).resolves.toBe('prompt');
+    });
   });
 
   it('sets unsupported and a non-null lastError when the browser exposes no requestMIDIAccess', async () => {

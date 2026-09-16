@@ -14,15 +14,17 @@ export interface DeckBindingSummary {
   selectedPortId: string | null;
   portPlaceholder: string;
   portsEnabled: boolean;
+  enableVisible: boolean;
   enableDisabled: boolean;
   identifyDisabled: boolean;
   errors: readonly string[];
 }
 
 /** Web MIDI enumerates zero ports for a granted-but-empty session (no cartridge attached, or the
- *  OS hasn't surfaced it yet) without the service itself treating that as an error. */
+ *  OS hasn't surfaced it yet) without the service itself treating that as an error. A plugged-in
+ *  cartridge re-enumerates on its own — no "re-enable MIDI" click needed. */
 const NO_PORTS_FOUND_ERROR =
-  'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.';
+  'MIDI access was granted, but no output ports were found. Connect the cartridge — it appears here as soon as the browser sees it.';
 
 /** After a reload and before the Enable gesture, every stored port is absent — the name is the
  *  whole point of remembering it, so the last-saw placeholder wins regardless of access state. */
@@ -63,6 +65,7 @@ export function bindingSummary(store: WritableStore<DjState>) {
           selectedPortId,
           portPlaceholder: portPlaceholderFor(binding, midi.accessState),
           portsEnabled: midi.accessState === 'granted',
+          enableVisible: midi.accessState !== 'granted',
           enableDisabled: midi.accessState === 'requesting',
           identifyDisabled: !(
             midi.accessState === 'granted' &&

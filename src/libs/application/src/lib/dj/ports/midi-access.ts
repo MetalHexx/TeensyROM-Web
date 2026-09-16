@@ -3,6 +3,10 @@ import type { MidiOutputPort } from '@sidablist/asid';
 
 export type MidiAccessState = 'idle' | 'requesting' | 'granted' | 'denied' | 'unsupported';
 
+/** The origin's standing Web MIDI (SysEx) permission, as read by `queryPermission` without
+ *  prompting. */
+export type MidiPermission = 'granted' | 'prompt' | 'denied' | 'unsupported';
+
 export interface MidiPortOption {
   readonly id: string;
   readonly name: string;
@@ -18,7 +22,12 @@ export interface IMidiAccess {
   readonly accessState: Signal<MidiAccessState>;
   readonly ports: Signal<readonly MidiPortOption[]>;
   readonly lastError: Signal<string | null>;
-  /** Must be called from a user gesture. Idempotent once granted: re-enumerates. */
+  /** The origin's standing Web MIDI (SysEx) permission, read without prompting. `unsupported`
+   *  when `navigator.requestMIDIAccess` is missing; `prompt` when the Permissions API cannot
+   *  answer (absent, throws, or does not know `midi`). Never rejects. */
+  queryPermission(): Promise<MidiPermission>;
+  /** Prompts when the origin has not granted; resolves silently when it has. Idempotent once
+   *  granted: re-enumerates. Needs a user gesture only for the prompt. */
   requestAccess(): Promise<void>;
   /** Which slot holds `portId`, or null. */
   holderOf(portId: string): string | null;

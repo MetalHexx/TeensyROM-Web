@@ -456,6 +456,16 @@ describe('DjStore', () => {
       expect(store.bindingSummary('A')().portsEnabled).toBe(true);
     });
 
+    it('enableVisible is true for every access state except granted', () => {
+      for (const accessState of ['idle', 'requesting', 'denied', 'unsupported'] as const) {
+        store.setMidi({ accessState, ports: [], lastError: null });
+        expect(store.bindingSummary('A')().enableVisible).toBe(true);
+      }
+
+      store.setMidi({ accessState: 'granted', ports: [], lastError: null });
+      expect(store.bindingSummary('A')().enableVisible).toBe(false);
+    });
+
     it('identifyDisabled unless granted, a present port is bound, and the deck is not playing', () => {
       expect(store.bindingSummary('A')().identifyDisabled).toBe(true);
 
@@ -478,9 +488,9 @@ describe('DjStore', () => {
       expect(store.bindingSummary('A')().errors).toEqual([]);
 
       store.setMidi({ accessState: 'granted', ports: [], lastError: null });
-      expect(store.bindingSummary('A')().errors).toEqual([
-        'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.',
-      ]);
+      const noPortsErrors = store.bindingSummary('A')().errors;
+      expect(noPortsErrors).toHaveLength(1);
+      expect(noPortsErrors[0]).not.toContain('re-enable');
 
       store.setMidi({ accessState: 'idle', ports: [], lastError: 'Web MIDI unavailable' });
       store.setBinding({

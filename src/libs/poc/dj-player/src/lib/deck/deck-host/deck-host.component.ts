@@ -838,10 +838,11 @@ export class DeckHostComponent implements OnInit, OnDestroy {
   // ── Binding ────────────────────────────────────────────────────────────────────────────────────
 
   // Web MIDI enumerates zero ports for a granted-but-empty session (no cartridge attached, or the OS
-  // hasn't surfaced it yet) without the service itself treating that as an error.
+  // hasn't surfaced it yet) without the service itself treating that as an error. A plugged-in
+  // cartridge re-enumerates on its own — no "re-enable MIDI" click needed.
   private readonly noPortsFoundError = computed<string | null>(() =>
     this.midiAccess.accessState() === 'granted' && this.midiAccess.ports().length === 0
-      ? 'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.'
+      ? 'MIDI access was granted, but no output ports were found. Connect the cartridge — it appears here as soon as the browser sees it.'
       : null
   );
 
@@ -864,6 +865,7 @@ export class DeckHostComponent implements OnInit, OnDestroy {
       selectedPortId,
       portsEnabled,
       portPlaceholder: portsEnabled ? '— select a port —' : '— MIDI not enabled —',
+      enableVisible: accessState !== 'granted',
       enableDisabled: accessState === 'requesting',
       identifyDisabled: !(
         portsEnabled &&

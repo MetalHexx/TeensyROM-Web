@@ -19,7 +19,7 @@ import { DeckBindings } from './deck-bindings';
 import { TuneLoader } from './tune-loader';
 import { DjStore } from './dj-store';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS, TUNE_INSERTER, TUNE_RESOLVER } from './ports';
-import type { IMidiAccess, MidiAccessState, MidiPortOption } from './ports/midi-access';
+import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 import type { LoadSource } from './load-source';
 import { logWarn } from '@teensyrom-nx/utils';
 
@@ -178,6 +178,7 @@ describe('DeckService', () => {
       accessState: signal<MidiAccessState>('granted'),
       ports: signal<readonly MidiPortOption[]>([]),
       lastError: signal<string | null>(null),
+      queryPermission: (): Promise<MidiPermission> => Promise.resolve('granted'),
       requestAccess: (): Promise<void> => Promise.resolve(),
       holderOf: (): string | null => null,
       claim: (): boolean => true,

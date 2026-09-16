@@ -93,6 +93,7 @@ export class DjDeckColumnComponent {
       selectedPortId: binding.selectedPortId,
       portsEnabled: binding.portsEnabled,
       portPlaceholder: binding.portPlaceholder,
+      enableVisible: binding.enableVisible,
       enableDisabled: binding.enableDisabled,
       identifyDisabled: binding.identifyDisabled,
       selectAccessibleName: `Output port deck ${letter}`,

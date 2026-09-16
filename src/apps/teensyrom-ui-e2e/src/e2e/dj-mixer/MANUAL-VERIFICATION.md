@@ -171,3 +171,21 @@ to confirm, per the task's own acceptance criteria:
   unbound placeholder while a binding is on record.
 - With deck A already bound to a MIDI output port, that same port appears disabled and marked
   "taken by Deck A" in deck B's own binding card select.
+
+## Permission auto-connect on reload (P05-T04)
+
+Not run. This task makes `DeckBindings.hydrate` query the origin's standing Web MIDI permission
+and request access on its own when already granted, so a reload comes up bound with no click, and
+hides each deck's Enable MIDI button while access is granted. Cypress cannot carry a real,
+persisted Web MIDI permission grant across a page reload (`dj-mixer-decks.cy.ts` runs with no
+grant, by design, and asserts the button is present in that state), so the granted-origin path
+needs a real browser to confirm:
+
+- `pnpm nx serve teensyrom-ui`, open `/dj-mixer`, click a deck's Enable MIDI button and grant the
+  browser's SysEx permission prompt. Both decks' Enable MIDI buttons disappear once granted.
+- Reload the page. Both decks come up with their prior selection bound (or the "last saw"
+  placeholder for a port not currently present) with no click — Enable MIDI stays hidden on the
+  granted origin.
+- In the browser's site settings, revoke the MIDI permission for the origin, then reload. Enable
+  MIDI is showing again on both decks, and no alert was raised for a merely-not-yet-granted
+  origin.

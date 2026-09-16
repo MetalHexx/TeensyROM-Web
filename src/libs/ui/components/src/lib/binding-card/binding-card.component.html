@@ -26,6 +26,7 @@
   </label>
 
   <div class="control-row">
+    @if (model().enableVisible) {
     <button
       type="button"
       [attr.aria-label]="model().enableAccessibleName"
@@ -34,6 +35,7 @@
     >
       Enable MIDI
     </button>
+    }
     <button
       type="button"
       [attr.aria-label]="model().identifyAccessibleName"

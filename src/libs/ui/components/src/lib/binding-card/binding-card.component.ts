@@ -30,6 +30,9 @@ export interface BindingCardModel {
    *  Enable gesture (every reload) when a previously bound port is not currently present. Rendered
    *  as the select's one option when `!portsEnabled`, and as its first when enabled. */
   readonly portPlaceholder: string;
+  /** false hides the Enable MIDI button entirely — a granted origin auto-connects on its own, so
+   *  there is nothing left for the button to do. */
+  readonly enableVisible: boolean;
   /** true while the permission grant is in flight. */
   readonly enableDisabled: boolean;
   /** true when the Identify button should be disabled. */

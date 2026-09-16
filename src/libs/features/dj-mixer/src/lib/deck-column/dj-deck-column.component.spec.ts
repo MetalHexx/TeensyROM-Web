@@ -50,6 +50,7 @@ function idleBindingSummary(overrides: Partial<DeckBindingSummary> = {}): DeckBi
     selectedPortId: null,
     portPlaceholder: '— MIDI not enabled —',
     portsEnabled: false,
+    enableVisible: true,
     enableDisabled: false,
     identifyDisabled: true,
     errors: [],
@@ -318,6 +319,7 @@ describe('DjDeckColumnComponent', () => {
           binding: {
             selectedPortId: 'port-1',
             portsEnabled: true,
+            enableVisible: false,
           },
         }
       );
@@ -329,6 +331,7 @@ describe('DjDeckColumnComponent', () => {
       expect(model.enableAccessibleName).toBe('Enable MIDI deck B');
       expect(model.identifyAccessibleName).toBe('Identify deck B');
       expect(model.selectedPortId).toBe('port-1');
+      expect(model.enableVisible).toBe(false);
     });
 
     it('maps a null takenBy to undefined and a bound slot through as-is', () => {

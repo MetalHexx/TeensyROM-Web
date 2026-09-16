@@ -90,6 +90,7 @@ function idleBindingSummary(): DeckBindingSummary {
     selectedPortId: null,
     portPlaceholder: '— MIDI not enabled —',
     portsEnabled: false,
+    enableVisible: true,
     enableDisabled: false,
     identifyDisabled: true,
     errors: [],

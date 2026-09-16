@@ -1,6 +1,11 @@
 import { Injectable, signal } from '@angular/core';
 import { logInfo, logWarn, LogType } from '@teensyrom-nx/utils';
-import type { IMidiAccess, MidiAccessState, MidiPortOption } from '@teensyrom-nx/application';
+import type {
+  IMidiAccess,
+  MidiAccessState,
+  MidiPermission,
+  MidiPortOption,
+} from '@teensyrom-nx/application';
 import type { MidiOutputPort } from '@sidablist/asid';
 import { midiOutputPortFrom } from '@sidablist/asid/web-midi';
 
@@ -49,6 +54,33 @@ export class MidiAccessService implements IMidiAccess {
   private readonly wrapped = new Map<string, { output: MIDIOutputLike; port: MidiOutputPort }>();
 
   /**
+   * The origin's standing Web MIDI (SysEx) permission, read via the Permissions API without
+   * prompting. `unsupported` when the browser exposes no `requestMIDIAccess` at all; `prompt`
+   * when the Permissions API itself cannot answer — absent, throws, or does not know the `midi`
+   * name — since that is the safe default a caller should treat the same as "not yet decided".
+   * Never rejects.
+   */
+  async queryPermission(): Promise<MidiPermission> {
+    if (!this.ensureSupported()) {
+      return 'unsupported';
+    }
+
+    try {
+      const status = await navigator.permissions?.query(
+        // `lib.dom`'s `PermissionName` does not list `midi` and `PermissionDescriptor` has no
+        // `sysex` — the real, browser-supported query shape has both, so the cast is required.
+        { name: 'midi', sysex: true } as unknown as PermissionDescriptor
+      );
+      const permission = (status?.state as MidiPermission | undefined) ?? 'prompt';
+      logInfo(LogType.Midi, `MIDI: queryPermission() → ${permission}`);
+      return permission;
+    } catch (error) {
+      logInfo(LogType.Midi, `MIDI: queryPermission() could not read a standing grant — ${error}`);
+      return 'prompt';
+    }
+  }
+
+  /**
    * Triggers the browser's SysEx permission prompt. Must be called from a user gesture — Chrome
    * silently ignores (or Firefox queues) a request made outside one, and `access.outputs` stays
    * empty until the promise resolves either way.
@@ -63,10 +95,7 @@ export class MidiAccessService implements IMidiAccess {
       return;
     }
 
-    if (typeof navigator.requestMIDIAccess !== 'function') {
-      this.accessState.set('unsupported');
-      this.lastError.set('Web MIDI is not available in this browser. Try Chrome or Edge.');
-      logWarn('MIDI: navigator.requestMIDIAccess is unavailable — Web MIDI unsupported here.');
+    if (!this.ensureSupported()) {
       return;
     }
 
@@ -192,6 +221,19 @@ export class MidiAccessService implements IMidiAccess {
     const port = midiOutputPortFrom(output as unknown as MIDIOutput);
     this.wrapped.set(portId, { output, port });
     return port;
+  }
+
+  /** `false` when `navigator.requestMIDIAccess` is missing — Web MIDI is unsupported in this
+   *  browser — after setting `accessState`/`lastError` to say so; shared by `queryPermission` and
+   *  `requestAccess` so the two never disagree about what "unsupported" looks like. */
+  private ensureSupported(): boolean {
+    if (typeof navigator.requestMIDIAccess === 'function') {
+      return true;
+    }
+    this.accessState.set('unsupported');
+    this.lastError.set('Web MIDI is not available in this browser. Try Chrome or Edge.');
+    logWarn('MIDI: navigator.requestMIDIAccess is unavailable — Web MIDI unsupported here.');
+    return false;
   }
 
   private refreshPorts(): void {

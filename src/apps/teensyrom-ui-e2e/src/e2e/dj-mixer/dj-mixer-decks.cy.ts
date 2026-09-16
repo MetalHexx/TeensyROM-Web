@@ -37,4 +37,10 @@ describe('DJ Mixer — fixed decks with no enabled devices', () => {
       cy.get(`[aria-label="Output port deck ${letter}"]`).should('exist');
     });
   });
+
+  it('shows the Enable MIDI button for both decks — the suite runs with no MIDI grant', () => {
+    DECK_LETTERS.forEach((letter) => {
+      cy.get(`[aria-label="Enable MIDI deck ${letter}"]`).should('exist');
+    });
+  });
 });

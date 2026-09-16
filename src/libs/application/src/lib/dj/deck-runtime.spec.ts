@@ -6,7 +6,7 @@ import type { FrameClock, ReplayRunner } from '@sidablist/core';
 import type { MidiOutputPort } from '@sidablist/asid';
 import { DeckRuntime } from './deck-runtime';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS } from './ports';
-import type { IMidiAccess, MidiAccessState, MidiPortOption } from './ports/midi-access';
+import type { IMidiAccess, MidiAccessState, MidiPermission, MidiPortOption } from './ports/midi-access';
 
 /** Only `dispose()` is exercised here, so `run` is never expected to be called. */
 class FakeReplayRunner implements ReplayRunner {
@@ -35,6 +35,7 @@ function fakeMidiAccess(outputPortFor: (id: string) => MidiOutputPort | null): I
     accessState: signal<MidiAccessState>('granted'),
     ports: signal<readonly MidiPortOption[]>([]),
     lastError: signal<string | null>(null),
+    queryPermission: (): Promise<MidiPermission> => Promise.resolve('granted'),
     requestAccess: (): Promise<void> => Promise.resolve(),
     holderOf: (): string | null => null,
     claim: (): boolean => true,

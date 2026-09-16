@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ALERT_SERVICE } from '@teensyrom-nx/domain';
 import { DeckBindings } from './deck-bindings';
 import { DeckRuntime } from './deck-runtime';
 import { DjStore } from './dj-store';
@@ -10,6 +11,7 @@ import type {
   IDeckBindingsRepository,
   IMidiAccess,
   MidiAccessState,
+  MidiPermission,
   MidiPortOption,
 } from './ports';
 
@@ -20,11 +22,23 @@ class FakeMidiAccess implements IMidiAccess {
   readonly ports = signal<readonly MidiPortOption[]>([]);
   readonly lastError = signal<string | null>(null);
   requestAccessCalls = 0;
+  /** What `queryPermission` answers — a test sets this to drive `hydrate`'s auto-connect. */
+  permission: MidiPermission = 'granted';
+  /** Ports `requestAccess` reveals when called, mimicking the browser only enumerating once
+   *  access is (re-)confirmed — null makes it a no-op on the port list, as most tests want. */
+  portsOnRequestAccess: readonly MidiPortOption[] | null = null;
   private readonly claims = new Map<string, string>();
+
+  async queryPermission(): Promise<MidiPermission> {
+    return this.permission;
+  }
 
   async requestAccess(): Promise<void> {
     this.requestAccessCalls++;
     this.accessState.set('granted');
+    if (this.portsOnRequestAccess !== null) {
+      this.ports.set(this.portsOnRequestAccess);
+    }
   }
 
   holderOf(portId: string): string | null {
@@ -80,12 +94,14 @@ describe('DeckBindings', () => {
   let midiAccess: FakeMidiAccess;
   let runtime: { setPort: ReturnType<typeof vi.fn>; identify: ReturnType<typeof vi.fn> };
   let repository: IDeckBindingsRepository & { saved: DeckBinding[] };
+  let alertService: { error: ReturnType<typeof vi.fn> };
 
   function configure(initial: readonly DeckBinding[] = []): void {
     TestBed.resetTestingModule();
     repository = fakeRepository(initial);
     midiAccess = new FakeMidiAccess();
     runtime = { setPort: vi.fn(), identify: vi.fn() };
+    alertService = { error: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
@@ -94,6 +110,7 @@ describe('DeckBindings', () => {
         { provide: DeckRuntime, useValue: runtime },
         { provide: DECK_BINDINGS_REPOSITORY, useValue: repository },
         { provide: MIDI_ACCESS, useValue: midiAccess },
+        { provide: ALERT_SERVICE, useValue: alertService },
       ],
     });
 
@@ -141,6 +158,46 @@ describe('DeckBindings', () => {
 
     expect(store.binding('A')().portPresent).toBe(true);
     expect(runtime.setPort).toHaveBeenCalledWith('A', 'port-1');
+  });
+
+  describe('auto-connect on hydrate', () => {
+    it('a granted query calls requestAccess before the first reconcile, binding an enumerated stored port with no gesture', async () => {
+      configure([{ slot: 'A', midiPortId: 'port-1', midiPortName: 'Port One' }]);
+      midiAccess.portsOnRequestAccess = [{ id: 'port-1', name: 'Port One', manufacturer: 'Acme' }];
+
+      await service.hydrate();
+
+      expect(midiAccess.requestAccessCalls).toBe(1);
+      const binding = store.binding('A')();
+      expect(binding.portPresent).toBe(true);
+      expect(runtime.setPort).toHaveBeenCalledWith('A', 'port-1');
+      expect(alertService.error).not.toHaveBeenCalled();
+    });
+
+    it('a prompt query never calls requestAccess and raises no alert', async () => {
+      midiAccess.permission = 'prompt';
+
+      await service.hydrate();
+
+      expect(midiAccess.requestAccessCalls).toBe(0);
+      expect(alertService.error).not.toHaveBeenCalled();
+    });
+
+    it('a granted query whose requestAccess lands denied raises exactly one ALERT_SERVICE.error', async () => {
+      midiAccess.permission = 'granted';
+      midiAccess.requestAccess = async () => {
+        midiAccess.requestAccessCalls++;
+        midiAccess.accessState.set('denied');
+        midiAccess.lastError.set('SysEx access was denied');
+      };
+
+      await service.hydrate();
+
+      expect(alertService.error).toHaveBeenCalledTimes(1);
+      expect(alertService.error).toHaveBeenCalledWith(
+        expect.stringContaining('SysEx access was denied')
+      );
+    });
   });
 
   describe('bindPort', () => {

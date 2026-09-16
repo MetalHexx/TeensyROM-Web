@@ -31,6 +31,7 @@ function bindingModel(overrides: Partial<BindingCardModel> = {}): BindingCardMod
     selectedPortId: null,
     portsEnabled: false,
     portPlaceholder: '— MIDI not enabled —',
+    enableVisible: true,
     enableDisabled: false,
     identifyDisabled: true,
     selectAccessibleName: 'Output port deck A',
@@ -41,10 +42,25 @@ function bindingModel(overrides: Partial<BindingCardModel> = {}): BindingCardMod
   };
 }
 
-/** Before the permission grant: the select shows its single disabled placeholder and Identify is
- *  out of reach. */
+/** Before the permission grant: the select shows its single disabled placeholder, Identify is
+ *  out of reach, and the Enable MIDI button is showing. */
 export const NotEnabled: Story = {
   args: { model: bindingModel() },
+};
+
+/** Granted: the origin auto-connected on its own, so the Enable MIDI button is hidden entirely —
+ *  there is nothing left for it to do. */
+export const Granted: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
+      ports: [{ id: 'port-1', label: 'TeensyROM (PJRC)' }],
+      selectedPortId: 'port-1',
+      identifyDisabled: false,
+    }),
+  },
 };
 
 /** Granted, with a port list to choose from and one already selected. */
@@ -53,6 +69,7 @@ export const GrantedWithPorts: Story = {
     model: bindingModel({
       portsEnabled: true,
       portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
@@ -70,8 +87,9 @@ export const GrantedNoPortsFound: Story = {
     model: bindingModel({
       portsEnabled: true,
       portPlaceholder: '— select a port —',
+      enableVisible: false,
       errors: [
-        'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.',
+        'MIDI access was granted, but no output ports were found. Connect the cartridge — it appears here as soon as the browser sees it.',
       ],
     }),
   },
@@ -83,6 +101,7 @@ export const BindingError: Story = {
     model: bindingModel({
       portsEnabled: true,
       portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [{ id: 'port-1', label: 'TeensyROM (PJRC)' }],
       errors: ['Deck B is already bound to that port. Pick a different one.'],
     }),
@@ -96,6 +115,7 @@ export const Inline: Story = {
     model: bindingModel({
       portsEnabled: true,
       portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
@@ -113,6 +133,7 @@ export const Unbound: Story = {
     model: bindingModel({
       portsEnabled: true,
       portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
@@ -128,6 +149,7 @@ export const Bound: Story = {
     model: bindingModel({
       portsEnabled: true,
       portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
@@ -146,6 +168,7 @@ export const Taken: Story = {
     model: bindingModel({
       portsEnabled: true,
       portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)', takenBy: 'B' },
@@ -162,6 +185,7 @@ export const LastSaw: Story = {
     model: bindingModel({
       portsEnabled: false,
       portPlaceholder: '— last saw TeensyROM (PJRC) —',
+      enableVisible: true,
     }),
     layout: 'inline',
   },
