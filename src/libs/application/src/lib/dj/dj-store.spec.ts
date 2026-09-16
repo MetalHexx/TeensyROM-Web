@@ -60,6 +60,7 @@ describe('DjStore', () => {
     it('starts with two empty decks, unbound slots, idle MIDI, and no seen tunes', () => {
       expect(store.decks().A.status).toBe('empty');
       expect(store.decks().A.loaded).toBeNull();
+      expect(store.decks().A.busy).toBe(false);
       expect(store.decks().A.repeat).toBe(true);
       expect(store.decks().B).toEqual(store.decks().A);
 
@@ -138,6 +139,15 @@ describe('DjStore', () => {
       expect(store.decks().A.repeat).toBe(false);
     });
 
+    it('setDeckBusy sets busy, leaving the other slot untouched', () => {
+      store.setDeckBusy({ slot: 'A', busy: true });
+      expect(store.decks().A.busy).toBe(true);
+      expect(store.decks().B.busy).toBe(false);
+
+      store.setDeckBusy({ slot: 'A', busy: false });
+      expect(store.decks().A.busy).toBe(false);
+    });
+
     it('setBinding replaces the slot binding wholesale, leaving the other slot untouched', () => {
       const binding: DeckBindingState = {
         port: { id: 'port-1', name: 'Port One' },
@@ -179,8 +189,12 @@ describe('DjStore', () => {
   describe('transportSummary', () => {
     beforeEach(() => setup());
 
+    // `busy` here mirrors what `DeckService` actually sets alongside each status in real usage —
+    // `loading`/`indexing` never occur without it — so the matrix stays a realistic scenario, not
+    // just an isolated formula check.
     const statusCases: Array<{
       status: DeckStatus;
+      busy: boolean;
       led: string;
       label: string;
       showing: 'play' | 'pause';
@@ -189,6 +203,7 @@ describe('DjStore', () => {
     }> = [
       {
         status: 'empty',
+        busy: false,
         led: 'stopped',
         label: 'Stopped',
         showing: 'play',
@@ -197,6 +212,7 @@ describe('DjStore', () => {
       },
       {
         status: 'loading',
+        busy: true,
         led: 'analyzing',
         label: 'Analyzing…',
         showing: 'play',
@@ -205,6 +221,7 @@ describe('DjStore', () => {
       },
       {
         status: 'indexing',
+        busy: true,
         led: 'analyzing',
         label: 'Analyzing…',
         showing: 'play',
@@ -213,6 +230,7 @@ describe('DjStore', () => {
       },
       {
         status: 'playing',
+        busy: false,
         led: 'playing',
         label: 'Playing',
         showing: 'pause',
@@ -221,6 +239,7 @@ describe('DjStore', () => {
       },
       {
         status: 'paused',
+        busy: false,
         led: 'paused',
         label: 'Paused',
         showing: 'play',
@@ -229,6 +248,7 @@ describe('DjStore', () => {
       },
       {
         status: 'stopped',
+        busy: false,
         led: 'stopped',
         label: 'Stopped',
         showing: 'play',
@@ -238,9 +258,10 @@ describe('DjStore', () => {
     ];
 
     it.each(statusCases)(
-      'derives led/label/showing/gates for status $status',
-      ({ status, led, label, showing, controlsDisabled, canStop }) => {
+      'derives led/label/showing/gates for status $status (busy=$busy)',
+      ({ status, busy, led, label, showing, controlsDisabled, canStop }) => {
         store.setDeckStatus({ slot: 'A', status });
+        store.setDeckBusy({ slot: 'A', busy });
         const summary = store.transportSummary('A')();
 
         expect(summary.led).toBe(led);
@@ -250,6 +271,25 @@ describe('DjStore', () => {
         expect(summary.canStop).toBe(canStop);
       }
     );
+
+    it('busy disables controls and blocks canStop even while playing or paused — the cache-hit seam', () => {
+      store.setDeckStatus({ slot: 'A', status: 'playing' });
+      store.setDeckBusy({ slot: 'A', busy: true });
+      let summary = store.transportSummary('A')();
+      expect(summary.led).toBe('playing');
+      expect(summary.controlsDisabled).toBe(true);
+      expect(summary.canStop).toBe(false);
+
+      store.setDeckStatus({ slot: 'A', status: 'paused' });
+      summary = store.transportSummary('A')();
+      expect(summary.controlsDisabled).toBe(true);
+      expect(summary.canStop).toBe(false);
+
+      store.setDeckBusy({ slot: 'A', busy: false });
+      summary = store.transportSummary('A')();
+      expect(summary.controlsDisabled).toBe(false);
+      expect(summary.canStop).toBe(true);
+    });
 
     it('failed status reports the error reason as its label, under the error led', () => {
       store.setDeckStatus({ slot: 'A', status: 'failed', error: 'Device disconnected' });
@@ -338,7 +378,7 @@ describe('DjStore', () => {
       });
       expect(store.transportSummary('A')().subtuneDisabled).toBe(false);
 
-      store.setDeckStatus({ slot: 'A', status: 'loading' });
+      store.setDeckBusy({ slot: 'A', busy: true });
       expect(store.transportSummary('A')().subtuneDisabled).toBe(true);
     });
 

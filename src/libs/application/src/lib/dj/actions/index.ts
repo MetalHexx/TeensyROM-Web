@@ -1,6 +1,7 @@
 import { withMethods } from '@ngrx/signals';
 import { DjState, WritableStore } from '../dj-store';
 import { setDeckStatus } from './set-deck-status';
+import { setDeckBusy } from './set-deck-busy';
 import { setDeckLoaded } from './set-deck-loaded';
 import { setDeckStructure } from './set-deck-structure';
 import { samplePosition } from './sample-position';
@@ -15,6 +16,7 @@ export function withDjActions() {
     const writableStore = store as WritableStore<DjState>;
     return {
       ...setDeckStatus(writableStore),
+      ...setDeckBusy(writableStore),
       ...setDeckLoaded(writableStore),
       ...setDeckStructure(writableStore),
       ...samplePosition(writableStore),

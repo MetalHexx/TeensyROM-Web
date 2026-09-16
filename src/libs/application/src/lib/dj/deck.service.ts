@@ -61,13 +61,13 @@ export class DeckService {
 
   async load(slot: Slot, source: LoadSource): Promise<void> {
     const mySeq = ++this.sequence[slot];
+    this.store.setDeckBusy({ slot, busy: true });
     this.suspended[slot] = true;
 
     // Always, idempotent on an already-stopped player: a drop during an older load's `play` must
     // silence that tune, and the status alone cannot say whether one is currently sounding.
     this.runtime.stop(slot);
     this.sample(slot);
-    this.store.setDeckStatus({ slot, status: 'loading' });
 
     let failure: string | null = null;
     try {
@@ -88,6 +88,9 @@ export class DeckService {
       }
 
       this.runtime.load(slot, playable);
+      // Lands the reference even on a cache hit, when the loader's own callback above never fired
+      // for either phase — the subtune path below always did this at its own equivalent line.
+      this.store.setDeckLoaded({ slot, reference: playable.reference });
       this.store.setDeckStructure({
         slot,
         structure: {
@@ -109,6 +112,7 @@ export class DeckService {
     } finally {
       if (this.sequence[slot] === mySeq) {
         this.suspended[slot] = false;
+        this.store.setDeckBusy({ slot, busy: false });
         // The notification that matters — `play()` announcing `playing` — arrives inside the
         // suspended window above and is dropped there; this is what lands it, once, on the way out.
         this.applySnapshot(slot);
@@ -122,21 +126,24 @@ export class DeckService {
   }
 
   async togglePlayPause(slot: Slot): Promise<void> {
-    const status = this.store.deck(slot)().status;
-    if (status === 'playing') {
+    const deck = this.store.deck(slot)();
+    if (deck.busy) {
+      return;
+    }
+    if (deck.status === 'playing') {
       this.runtime.pause(slot);
       this.sample(slot);
       return;
     }
-    if (status === 'paused' || status === 'stopped') {
+    if (deck.status === 'paused' || deck.status === 'stopped') {
       await this.runtime.play(slot);
       this.sample(slot);
     }
   }
 
   stop(slot: Slot): void {
-    const status = this.store.deck(slot)().status;
-    if (status !== 'playing' && status !== 'paused') {
+    const deck = this.store.deck(slot)();
+    if (deck.busy || (deck.status !== 'playing' && deck.status !== 'paused')) {
       return;
     }
     this.runtime.stop(slot);
@@ -144,7 +151,8 @@ export class DeckService {
   }
 
   async seek(slot: Slot, percent: number): Promise<void> {
-    if (!RESUMABLE_STATUSES.includes(this.store.deck(slot)().status)) {
+    const deck = this.store.deck(slot)();
+    if (deck.busy || !RESUMABLE_STATUSES.includes(deck.status)) {
       return;
     }
     await this.runtime.seekToPercent(slot, percent);
@@ -153,7 +161,7 @@ export class DeckService {
 
   async selectSubtune(slot: Slot, subtune: number): Promise<void> {
     const current = this.store.deck(slot)();
-    if (!RESUMABLE_STATUSES.includes(current.status) || current.loaded === null) {
+    if (current.busy || !RESUMABLE_STATUSES.includes(current.status) || current.loaded === null) {
       return;
     }
 
@@ -162,10 +170,10 @@ export class DeckService {
     const sidHash = current.loaded.identity.sidHash;
 
     const mySeq = ++this.sequence[slot];
+    this.store.setDeckBusy({ slot, busy: true });
     this.suspended[slot] = true;
     this.runtime.stop(slot);
     this.sample(slot);
-    this.store.setDeckStatus({ slot, status: 'indexing' });
 
     let failure: string | null = null;
     try {
@@ -218,6 +226,7 @@ export class DeckService {
     } finally {
       if (this.sequence[slot] === mySeq) {
         this.suspended[slot] = false;
+        this.store.setDeckBusy({ slot, busy: false });
         this.applySnapshot(slot);
         if (failure !== null) {
           this.store.setDeckStatus({ slot, status: 'failed', error: failure });

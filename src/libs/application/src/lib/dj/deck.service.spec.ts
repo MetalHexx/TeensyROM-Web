@@ -268,22 +268,25 @@ describe('DeckService', () => {
     await service.load(slot, fixture.source);
   }
 
-  it('writes loading → indexing → playing in order, and plays only after the resolver resolves', async () => {
+  it('writes loading → indexing → playing in order when the resolver scans, busy throughout', async () => {
     const fixture = register(makeFixture());
     let releaseResolve!: (playable: Playable | null) => void;
     resolveMock.mockImplementationOnce(
-      () =>
+      (_identity: TuneIdentity, options?: { onScanStart?: () => void }) =>
         new Promise<Playable | null>((resolve) => {
+          options?.onScanStart?.();
           releaseResolve = resolve;
         })
     );
     const playSpy = vi.spyOn(runtime, 'play');
 
     const load = service.load('A', fixture.source);
+    expect(store.deck('A')().busy).toBe(true);
     await vi.waitFor(() => expect(store.deck('A')().status).toBe('loading'));
 
     await vi.waitFor(() => expect(resolveMock).toHaveBeenCalled());
     expect(store.deck('A')().status).toBe('indexing');
+    expect(store.deck('A')().busy).toBe(true);
     expect(playSpy).not.toHaveBeenCalled();
 
     releaseResolve(playableOf(fixture));
@@ -291,6 +294,80 @@ describe('DeckService', () => {
 
     expect(playSpy).toHaveBeenCalledTimes(1);
     expect(store.deck('A')().status).toBe('playing');
+    expect(store.deck('A')().busy).toBe(false);
+  });
+
+  it('a cache-hit load whose resolver never scans records no loading or indexing write and lands playing directly', async () => {
+    const fixture = register(makeFixture());
+    await loadAndWait('A', fixture);
+    expect(store.deck('A')().status).toBe('playing');
+
+    const statusSpy = vi.spyOn(store, 'setDeckStatus');
+    statusSpy.mockClear();
+
+    await loadAndWait('A', fixture);
+
+    const statusesWritten = statusSpy.mock.calls.map((call) => call[0].status);
+    expect(statusesWritten).not.toContain('loading');
+    expect(statusesWritten).not.toContain('indexing');
+    expect(store.deck('A')().status).toBe('playing');
+    expect(store.deck('A')().busy).toBe(false);
+  });
+
+  it('busy is true across a failed load and cleared once it settles', async () => {
+    const fixture = register(makeFixture({ invalidBytes: true }));
+
+    const load = service.load('A', fixture.source);
+    expect(store.deck('A')().busy).toBe(true);
+
+    await load;
+
+    expect(store.deck('A')().status).toBe('failed');
+    expect(store.deck('A')().busy).toBe(false);
+  });
+
+  it('the four gated commands no-op while busy, with a cache-hit load held in flight — not through a status write', async () => {
+    const fixture = register(makeFixture({ subtuneCount: 2 }));
+    await loadAndWait('A', fixture);
+    expect(store.deck('A')().status).toBe('playing');
+
+    let releaseResolve!: (playable: Playable | null) => void;
+    resolveMock.mockImplementationOnce(
+      () =>
+        new Promise<Playable | null>((resolve) => {
+          releaseResolve = resolve;
+        })
+    );
+
+    const secondLoad = service.load('A', fixture.source);
+    await vi.waitFor(() => expect(resolveMock).toHaveBeenCalledTimes(2));
+
+    // The seam: nothing honest has happened yet, so the status is exactly what it was before the
+    // drop — busy is what actually gates the transport here.
+    expect(store.deck('A')().busy).toBe(true);
+    expect(store.deck('A')().status).toBe('playing');
+
+    const playSpy = vi.spyOn(runtime, 'play');
+    const pauseSpy = vi.spyOn(runtime, 'pause');
+    const stopSpy = vi.spyOn(runtime, 'stop');
+    const seekSpy = vi.spyOn(runtime, 'seekToPercent');
+    const resolveSubtuneSpy = vi.spyOn(TuneLoader.prototype, 'resolveSubtune');
+
+    await service.togglePlayPause('A');
+    service.stop('A');
+    await service.seek('A', 50);
+    await service.selectSubtune('A', 2);
+
+    expect(playSpy).not.toHaveBeenCalled();
+    expect(pauseSpy).not.toHaveBeenCalled();
+    expect(stopSpy).not.toHaveBeenCalled();
+    expect(seekSpy).not.toHaveBeenCalled();
+    expect(resolveSubtuneSpy).not.toHaveBeenCalled();
+
+    releaseResolve(playableOf(fixture));
+    await secondLoad;
+
+    expect(store.deck('A')().busy).toBe(false);
   });
 
   it('a drop on a playing slot stops it first', async () => {
@@ -567,12 +644,60 @@ describe('DeckService', () => {
 
     expect(store.deck('A')().status).toBe('playing');
     expect(store.deck('A')().loaded?.identity.sidHash).toBe(fixtureB.reference.identity.sidHash);
+    // The second command already ran its own finally and cleared busy for itself.
+    expect(store.deck('A')().busy).toBe(false);
 
     const callsBeforeFirstSettles = statusSpy.mock.calls.length;
     releaseFirstPlay();
     await first;
 
+    // The first command's own finally still runs, but its `sequence` guard must stop it from
+    // clearing a flag the newer command already owns and cleared.
     expect(statusSpy.mock.calls.length).toBe(callsBeforeFirstSettles);
+    expect(store.deck('A')().status).toBe('playing');
+    expect(store.deck('A')().loaded?.identity.sidHash).toBe(fixtureB.reference.identity.sidHash);
+    expect(store.deck('A')().busy).toBe(false);
+  });
+
+  it('a superseded load does not clear busy while the newer load is still in flight', async () => {
+    const fixtureA = register(makeFixture());
+    const fixtureB = register(makeFixture());
+
+    const realPlay = DeckRuntime.prototype.play.bind(runtime);
+    let releaseFirstPlay!: () => void;
+    const playSpy = vi.spyOn(runtime, 'play').mockImplementation((slot) => {
+      if (playSpy.mock.calls.length === 1) {
+        return new Promise<void>((resolve) => {
+          releaseFirstPlay = resolve;
+        });
+      }
+      return realPlay(slot);
+    });
+
+    const first = service.load('A', fixtureA.source);
+    await vi.waitFor(() => expect(playSpy).toHaveBeenCalledTimes(1));
+    expect(store.deck('A')().busy).toBe(true);
+
+    let releaseSecondResolve!: (playable: Playable | null) => void;
+    resolveMock.mockImplementationOnce(
+      () =>
+        new Promise<Playable | null>((resolve) => {
+          releaseSecondResolve = resolve;
+        })
+    );
+    const second = service.load('A', fixtureB.source);
+    await vi.waitFor(() => expect(resolveMock).toHaveBeenCalledTimes(2));
+
+    // The superseded first command's play() now resolves and its own finally runs, but the
+    // second command still owns the slot and is still mid-resolve — busy must stay true.
+    releaseFirstPlay();
+    await first;
+    expect(store.deck('A')().busy).toBe(true);
+
+    releaseSecondResolve(playableOf(fixtureB));
+    await second;
+
+    expect(store.deck('A')().busy).toBe(false);
     expect(store.deck('A')().status).toBe('playing');
     expect(store.deck('A')().loaded?.identity.sidHash).toBe(fixtureB.reference.identity.sidHash);
   });

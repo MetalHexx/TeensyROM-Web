@@ -76,8 +76,7 @@ export function transportSummary(store: WritableStore<DjState>) {
       computed<DeckTransportSummary>(() => {
         const deck = store.decks()[slot];
         const led = ledFor(deck.status);
-        const controlsDisabled =
-          deck.status === 'empty' || deck.status === 'loading' || deck.status === 'indexing';
+        const controlsDisabled = deck.status === 'empty' || deck.busy;
 
         return {
           status: deck.status,
@@ -85,7 +84,7 @@ export function transportSummary(store: WritableStore<DjState>) {
           label: labelFor(deck.status, led, deck.error),
           showing: deck.status === 'playing' ? 'pause' : 'play',
           controlsDisabled,
-          canStop: deck.status === 'playing' || deck.status === 'paused',
+          canStop: (deck.status === 'playing' || deck.status === 'paused') && !deck.busy,
           scrubPercent:
             deck.lengthFrames === null
               ? 0

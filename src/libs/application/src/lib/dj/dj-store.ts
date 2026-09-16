@@ -27,6 +27,10 @@ export interface DeckStructure {
 export interface DeckState {
   loaded: TuneReference | null;
   status: DeckStatus;
+  /** True for the whole span of an in-flight load or subtune switch, regardless of what `status`
+   *  shows — a cache hit never reports `loading`/`indexing`, so this is what actually gates the
+   *  transport while one is in flight. */
+  busy: boolean;
   positionFrames: number;
   lengthFrames: number | null;
   structure: DeckStructure | null;
@@ -60,6 +64,7 @@ export interface DjState {
 const initialDeckState: DeckState = {
   loaded: null,
   status: 'empty',
+  busy: false,
   positionFrames: 0,
   lengthFrames: null,
   structure: null,

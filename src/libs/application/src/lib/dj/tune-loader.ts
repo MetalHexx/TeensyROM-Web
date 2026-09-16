@@ -1,6 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import type { Playable, TuneIdentity, TuneInserter, TuneReference, TuneResolver } from '@sidablist/tunes';
+import type {
+  Playable,
+  ResolveOptions,
+  TuneIdentity,
+  TuneInserter,
+  TuneReference,
+  TuneResolver,
+} from '@sidablist/tunes';
 import { FILE_CONTENT_SERVICE, type IFileContentService } from '@teensyrom-nx/domain';
 import { DjStore } from './dj-store';
 import { DjFileKeyUtil } from './dj-file-key.util';
@@ -10,7 +17,9 @@ import type { LoadSource } from './load-source';
 
 /** Called as a load or a subtune resolve crosses each phase. `reference` carries the tune's
  *  header facts once they are known; it is `null` for the `loading` phase and for a subtune
- *  resolve, which starts from an identity it already knows the header for. */
+ *  resolve, which starts from an identity it already knows the header for. The `indexing` phase
+ *  fires only when the resolver actually starts a scan; a lookup hit resolves silently, reporting
+ *  neither phase. */
 export type LoadPhase = (phase: 'loading' | 'indexing', reference: TuneReference | null) => void;
 
 /**
@@ -56,9 +65,8 @@ export class TuneLoader {
       this.store.markSeen({ key, reference });
     }
 
-    onPhase('indexing', reference);
-
-    const playable = await this.resolver.resolve(reference.identity);
+    const options: ResolveOptions = { onScanStart: () => onPhase('indexing', reference) };
+    const playable = await this.resolver.resolve(reference.identity, options);
     if (this.generation[slot] !== myGeneration) {
       return null;
     }
@@ -71,14 +79,13 @@ export class TuneLoader {
   /** Resolves a subtune switch on an already-loaded tune. Bumps the same per-slot generation
    *  `load` does — the one counter, one rule — so a drop supersedes an in-flight subtune resolve
    *  and a subtune switch supersedes an in-flight load. Reports the same `indexing` phase `load`
-   *  does before its own resolve, with no reference — a subtune switch starts from an identity
-   *  whose header is already known, not from a fresh fetch. */
+   *  does, on the same `onScanStart` condition, with no reference — a subtune switch starts from
+   *  an identity whose header is already known, not from a fresh fetch. */
   async resolveSubtune(slot: Slot, identity: TuneIdentity, onPhase: LoadPhase): Promise<Playable | null> {
     const myGeneration = ++this.generation[slot];
 
-    onPhase('indexing', null);
-
-    const playable = await this.resolver.resolve(identity);
+    const options: ResolveOptions = { onScanStart: () => onPhase('indexing', null) };
+    const playable = await this.resolver.resolve(identity, options);
     if (this.generation[slot] !== myGeneration) {
       return null;
     }

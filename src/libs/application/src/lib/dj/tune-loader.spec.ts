@@ -108,11 +108,14 @@ describe('TuneLoader', () => {
     store = TestBed.inject(DjStore);
   });
 
-  it('fetches and inserts on first sight, then resolves the inserted reference', async () => {
+  it('fetches and inserts on first sight, reporting indexing when the resolver actually scans', async () => {
     const reference = tuneReference();
     fileContentService.getFileContent.mockReturnValue(of(fileContentFor('a.sid')));
     inserter.insert.mockResolvedValue(reference);
-    resolver.resolve.mockResolvedValue(playableFor(reference));
+    resolver.resolve.mockImplementation(async (_identity: TuneIdentity, options?: { onScanStart?: () => void }) => {
+      options?.onScanStart?.();
+      return playableFor(reference);
+    });
 
     const source = loadSource();
     const result = await loader.load('A', source, onPhase);
@@ -124,7 +127,7 @@ describe('TuneLoader', () => {
     );
     expect(inserter.insert).toHaveBeenCalledTimes(1);
     expect(inserter.insert.mock.calls[0][0]).toEqual(new Uint8Array([1, 2, 3]));
-    expect(resolver.resolve).toHaveBeenCalledWith(reference.identity);
+    expect(resolver.resolve).toHaveBeenCalledWith(reference.identity, { onScanStart: expect.any(Function) });
     expect(result?.reference).toEqual(reference);
 
     const key = DjFileKeyUtil.create(source.deviceId, source.storageType, source.path);
@@ -135,7 +138,19 @@ describe('TuneLoader', () => {
     ]);
   });
 
-  it('skips the fetch and insert once the key has been seen, resolving straight from the cached reference', async () => {
+  it('reports only loading, and no indexing, when a seen-miss resolve is a lookup hit', async () => {
+    const reference = tuneReference();
+    fileContentService.getFileContent.mockReturnValue(of(fileContentFor('a.sid')));
+    inserter.insert.mockResolvedValue(reference);
+    resolver.resolve.mockResolvedValue(playableFor(reference));
+
+    const result = await loader.load('A', loadSource(), onPhase);
+
+    expect(result?.reference).toEqual(reference);
+    expect(phases).toEqual([['loading', null]]);
+  });
+
+  it('skips the fetch and insert once the key has been seen, reporting nothing when the resolver does not scan', async () => {
     const reference = tuneReference({ title: 'Already Seen' });
     const source = loadSource();
     const key = DjFileKeyUtil.create(source.deviceId, source.storageType, source.path);
@@ -146,7 +161,23 @@ describe('TuneLoader', () => {
 
     expect(fileContentService.getFileContent).not.toHaveBeenCalled();
     expect(inserter.insert).not.toHaveBeenCalled();
-    expect(resolver.resolve).toHaveBeenCalledWith(reference.identity);
+    expect(resolver.resolve).toHaveBeenCalledWith(reference.identity, { onScanStart: expect.any(Function) });
+    expect(result?.reference).toEqual(reference);
+    expect(phases).toEqual([]);
+  });
+
+  it('reports indexing with no reference on a seen hit whose resolver does scan', async () => {
+    const reference = tuneReference({ title: 'Reindexed' });
+    const source = loadSource();
+    const key = DjFileKeyUtil.create(source.deviceId, source.storageType, source.path);
+    store.markSeen({ key, reference });
+    resolver.resolve.mockImplementation(async (_identity: TuneIdentity, options?: { onScanStart?: () => void }) => {
+      options?.onScanStart?.();
+      return playableFor(reference);
+    });
+
+    const result = await loader.load('A', source, onPhase);
+
     expect(result?.reference).toEqual(reference);
     expect(phases).toEqual([['indexing', reference]]);
   });
@@ -245,5 +276,29 @@ describe('TuneLoader', () => {
 
     expect(subtuneResult).toBeNull();
     expect(loadResult?.reference).toEqual(referenceB);
+  });
+
+  it('resolveSubtune reports indexing with a null reference when the resolver scans', async () => {
+    const identity: TuneIdentity = { sidHash: 'hash-a', subtune: 2 };
+    resolver.resolve.mockImplementation(async (_identity: TuneIdentity, options?: { onScanStart?: () => void }) => {
+      options?.onScanStart?.();
+      return playableFor(tuneReference({ identity }));
+    });
+
+    const result = await loader.resolveSubtune('A', identity, onPhase);
+
+    expect(resolver.resolve).toHaveBeenCalledWith(identity, { onScanStart: expect.any(Function) });
+    expect(result?.reference.identity).toEqual(identity);
+    expect(phases).toEqual([['indexing', null]]);
+  });
+
+  it('resolveSubtune reports nothing when the resolver does not scan', async () => {
+    const identity: TuneIdentity = { sidHash: 'hash-a', subtune: 2 };
+    resolver.resolve.mockResolvedValue(playableFor(tuneReference({ identity })));
+
+    const result = await loader.resolveSubtune('A', identity, onPhase);
+
+    expect(result?.reference.identity).toEqual(identity);
+    expect(phases).toEqual([]);
   });
 });

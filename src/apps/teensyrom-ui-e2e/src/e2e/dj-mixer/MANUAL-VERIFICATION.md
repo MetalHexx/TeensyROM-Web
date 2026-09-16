@@ -164,7 +164,8 @@ to confirm, per the task's own acceptance criteria:
   carries the `-3` file service's own alert; that alert is expected and accepted, not a DJ Mixer
   regression).
 - Dragging the same file onto deck A again shows no new network request in DevTools' Network tab
-  and skips the Analyzing phase — the tune is already resolved from the prior drop.
+  and goes straight to **Playing**, skipping both the Loading and Analyzing phases — the tune is
+  already resolved from the prior drop, so nothing new is fetched or scanned.
 - After a page refresh, deck A's Output port and Device selects come back either bound to their
   prior selection or showing the "last saw" placeholder for a port/device not currently present —
   never reset to the unbound placeholder while a binding is on record.
