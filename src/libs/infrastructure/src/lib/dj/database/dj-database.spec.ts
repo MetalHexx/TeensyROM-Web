@@ -60,13 +60,7 @@ describe('DjDatabase', () => {
       const database = TestBed.inject(DjDatabase);
       currentDb = await database.open();
 
-      const binding = {
-        slot: 'A',
-        midiPortId: 'p1',
-        midiPortName: 'Port 1',
-        deviceId: 'd1',
-        deviceName: 'Device 1',
-      };
+      const binding = { slot: 'A', midiPortId: 'p1', midiPortName: 'Port 1' };
       await database.put(DECK_BINDINGS_STORE, binding);
 
       const result = await database.get<typeof binding>(DECK_BINDINGS_STORE, 'A');
@@ -85,20 +79,8 @@ describe('DjDatabase', () => {
       const database = TestBed.inject(DjDatabase);
       currentDb = await database.open();
 
-      await database.put(DECK_BINDINGS_STORE, {
-        slot: 'A',
-        midiPortId: null,
-        midiPortName: null,
-        deviceId: null,
-        deviceName: null,
-      });
-      await database.put(DECK_BINDINGS_STORE, {
-        slot: 'B',
-        midiPortId: null,
-        midiPortName: null,
-        deviceId: null,
-        deviceName: null,
-      });
+      await database.put(DECK_BINDINGS_STORE, { slot: 'A', midiPortId: null, midiPortName: null });
+      await database.put(DECK_BINDINGS_STORE, { slot: 'B', midiPortId: null, midiPortName: null });
 
       const rows = await database.getAll<{ slot: string }>(DECK_BINDINGS_STORE);
       expect(rows.map((row) => row.slot).sort()).toEqual(['A', 'B']);

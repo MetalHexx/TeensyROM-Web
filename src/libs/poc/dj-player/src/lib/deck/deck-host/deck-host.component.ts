@@ -864,11 +864,6 @@ export class DeckHostComponent implements OnInit, OnDestroy {
       selectedPortId,
       portsEnabled,
       portPlaceholder: portsEnabled ? '— select a port —' : '— MIDI not enabled —',
-      // The POC binds no input device — DeckMidiBinding has no device concept, so this list is
-      // always empty and the select stays disabled on its own placeholder.
-      devices: [],
-      selectedDeviceId: null,
-      devicePlaceholder: '— select a device —',
       enableDisabled: accessState === 'requesting',
       identifyDisabled: !(
         portsEnabled &&
@@ -876,7 +871,6 @@ export class DeckHostComponent implements OnInit, OnDestroy {
         this.snapshot().transport !== 'playing'
       ),
       selectAccessibleName: `Output port deck ${label}`,
-      deviceSelectAccessibleName: `Device deck ${label}`,
       enableAccessibleName: `Enable MIDI deck ${label}`,
       identifyAccessibleName: `Identify deck ${label}`,
       errors: [

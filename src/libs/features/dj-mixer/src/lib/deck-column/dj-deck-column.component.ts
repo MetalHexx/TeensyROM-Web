@@ -93,17 +93,9 @@ export class DjDeckColumnComponent {
       selectedPortId: binding.selectedPortId,
       portsEnabled: binding.portsEnabled,
       portPlaceholder: binding.portPlaceholder,
-      devices: binding.deviceOptions.map((option) => ({
-        id: option.id,
-        label: option.label,
-        takenBy: option.takenBy ?? undefined,
-      })),
-      selectedDeviceId: binding.selectedDeviceId,
-      devicePlaceholder: binding.devicePlaceholder,
       enableDisabled: binding.enableDisabled,
       identifyDisabled: binding.identifyDisabled,
       selectAccessibleName: `Output port deck ${letter}`,
-      deviceSelectAccessibleName: `Device deck ${letter}`,
       enableAccessibleName: `Enable MIDI deck ${letter}`,
       identifyAccessibleName: `Identify deck ${letter}`,
       errors: binding.errors,
@@ -190,10 +182,6 @@ export class DjDeckColumnComponent {
 
   onPortSelect(id: string): void {
     void this.deckService.bindPort(this.deck().slot, id || null);
-  }
-
-  onDeviceSelect(id: string): void {
-    void this.deckService.bindDevice(this.deck().slot, id || null);
   }
 
   onEnableMidi(): void {

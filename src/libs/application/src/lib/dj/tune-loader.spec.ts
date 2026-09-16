@@ -1,5 +1,4 @@
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { of, Subject } from 'rxjs';
 import type { Playable, TuneIdentity, TuneReference } from '@sidablist/tunes';
@@ -13,7 +12,6 @@ import {
 import { TuneLoader, type LoadPhase } from './tune-loader';
 import { TUNE_INSERTER, TUNE_RESOLVER } from './ports';
 import { DjStore } from './dj-store';
-import { DeviceStore } from '../device/device-store';
 import { DjFileKeyUtil } from './dj-file-key.util';
 import type { LoadSource } from './load-source';
 
@@ -97,7 +95,6 @@ describe('TuneLoader', () => {
       providers: [
         TuneLoader,
         DjStore,
-        { provide: DeviceStore, useValue: { devices: signal([]) } },
         { provide: FILE_CONTENT_SERVICE, useValue: fileContentService as unknown as IFileContentService },
         { provide: TUNE_INSERTER, useValue: inserter },
         { provide: TUNE_RESOLVER, useValue: resolver },

@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import type { TuneReference } from '@sidablist/tunes';
-import { StorageType, DeviceState, type Device } from '@teensyrom-nx/domain';
+import { StorageType } from '@teensyrom-nx/domain';
 import { DjStore, DeckBindingState, DeckStatus, MidiState } from './dj-store';
-import { DeviceStore } from '../device/device-store';
 import { DjFileKeyUtil } from './dj-file-key.util';
 
 function tuneReference(overrides: Partial<TuneReference> = {}): TuneReference {
@@ -19,38 +17,17 @@ function tuneReference(overrides: Partial<TuneReference> = {}): TuneReference {
   };
 }
 
-function device(overrides: Partial<Device> = {}): Device {
-  const deviceId = overrides.deviceId ?? 'device-a';
-  return {
-    deviceId,
-    comPort: 'COM3',
-    name: `TeensyROM ${deviceId}`,
-    fwVersion: '1.0.0',
-    isCompatible: true,
-    isConnected: true,
-    deviceState: DeviceState.Connected,
-    isEnabled: true,
-    usbStorage: { deviceId, type: StorageType.Usb, available: true, indexExists: false },
-    sdStorage: { deviceId, type: StorageType.Sd, available: true, indexExists: false },
-    ...overrides,
-  };
-}
-
 const emptyBinding = (): DeckBindingState => ({
   port: null,
   portPresent: false,
-  device: null,
-  devicePresent: false,
   error: null,
 });
 
 describe('DjStore', () => {
   let store: InstanceType<typeof DjStore>;
 
-  function setup(devices: Device[] = []): void {
-    TestBed.configureTestingModule({
-      providers: [DjStore, { provide: DeviceStore, useValue: { devices: signal(devices) } }],
-    });
+  function setup(): void {
+    TestBed.configureTestingModule({ providers: [DjStore] });
     store = TestBed.inject(DjStore);
   }
 
@@ -152,8 +129,6 @@ describe('DjStore', () => {
       const binding: DeckBindingState = {
         port: { id: 'port-1', name: 'Port One' },
         portPresent: true,
-        device: null,
-        devicePresent: false,
         error: null,
       };
       store.setBinding({ slot: 'A', binding });
@@ -397,22 +372,9 @@ describe('DjStore', () => {
   });
 
   describe('bindingSummary', () => {
-    const deviceA = device({
-      deviceId: 'device-a',
-      name: 'TeensyROM A',
-      isEnabled: true,
-      isConnected: false,
-    });
-    const deviceB = device({
-      deviceId: 'device-b',
-      name: 'TeensyROM B',
-      isEnabled: false,
-      isConnected: true,
-    });
+    beforeEach(() => setup());
 
-    beforeEach(() => setup([deviceA, deviceB]));
-
-    it('lists enabled devices only (regardless of isConnected), and flags ports/devices already taken by the other slot', () => {
+    it('flags ports already taken by the other slot', () => {
       store.setMidi({
         accessState: 'granted',
         ports: [
@@ -423,13 +385,7 @@ describe('DjStore', () => {
       });
       store.setBinding({
         slot: 'B',
-        binding: {
-          port: { id: 'port-1', name: 'Port One' },
-          portPresent: true,
-          device: { id: 'device-a', name: 'TeensyROM A' },
-          devicePresent: true,
-          error: null,
-        },
+        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: true, error: null },
       });
 
       const summary = store.bindingSummary('A')();
@@ -438,7 +394,6 @@ describe('DjStore', () => {
         { id: 'port-1', label: 'Port One (Acme)', takenBy: 'B' },
         { id: 'port-2', label: 'Port Two (Acme)', takenBy: null },
       ]);
-      expect(summary.deviceOptions).toEqual([{ id: 'device-a', label: 'device-a', takenBy: 'B' }]);
     });
 
     it('flags taken in the other direction too', () => {
@@ -449,13 +404,7 @@ describe('DjStore', () => {
       });
       store.setBinding({
         slot: 'A',
-        binding: {
-          port: { id: 'port-1', name: 'Port One' },
-          portPresent: true,
-          device: null,
-          devicePresent: false,
-          error: null,
-        },
+        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: true, error: null },
       });
 
       expect(store.bindingSummary('B')().portOptions).toEqual([
@@ -466,25 +415,13 @@ describe('DjStore', () => {
     it('reports the selected id only while present, and null while stored-but-absent', () => {
       store.setBinding({
         slot: 'A',
-        binding: {
-          port: { id: 'port-1', name: 'Port One' },
-          portPresent: true,
-          device: null,
-          devicePresent: false,
-          error: null,
-        },
+        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: true, error: null },
       });
       expect(store.bindingSummary('A')().selectedPortId).toBe('port-1');
 
       store.setBinding({
         slot: 'A',
-        binding: {
-          port: { id: 'port-1', name: 'Port One' },
-          portPresent: false,
-          device: null,
-          devicePresent: false,
-          error: null,
-        },
+        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: false, error: null },
       });
       expect(store.bindingSummary('A')().selectedPortId).toBeNull();
     });
@@ -492,13 +429,7 @@ describe('DjStore', () => {
     it('portPlaceholder shows the last-saw name whenever a port is bound but absent, whatever the access state', () => {
       store.setBinding({
         slot: 'A',
-        binding: {
-          port: { id: 'port-1', name: 'Port One' },
-          portPresent: false,
-          device: null,
-          devicePresent: false,
-          error: null,
-        },
+        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: false, error: null },
       });
 
       expect(store.bindingSummary('A')().portPlaceholder).toBe('— last saw Port One —');
@@ -512,22 +443,6 @@ describe('DjStore', () => {
 
       store.setMidi({ accessState: 'granted', ports: [], lastError: null });
       expect(store.bindingSummary('A')().portPlaceholder).toBe('— select a port —');
-    });
-
-    it('devicePlaceholder mirrors the port rule, without a MIDI-gated variant', () => {
-      expect(store.bindingSummary('A')().devicePlaceholder).toBe('— select a device —');
-
-      store.setBinding({
-        slot: 'A',
-        binding: {
-          port: null,
-          portPresent: false,
-          device: { id: 'device-z', name: 'Old Device' },
-          devicePresent: false,
-          error: null,
-        },
-      });
-      expect(store.bindingSummary('A')().devicePlaceholder).toBe('— last saw Old Device —');
     });
 
     it('portsEnabled and enableDisabled follow accessState', () => {
@@ -551,13 +466,7 @@ describe('DjStore', () => {
       });
       store.setBinding({
         slot: 'A',
-        binding: {
-          port: { id: 'port-1', name: 'Port One' },
-          portPresent: true,
-          device: null,
-          devicePresent: false,
-          error: null,
-        },
+        binding: { port: { id: 'port-1', name: 'Port One' }, portPresent: true, error: null },
       });
       expect(store.bindingSummary('A')().identifyDisabled).toBe(false);
 
@@ -576,9 +485,9 @@ describe('DjStore', () => {
       store.setMidi({ accessState: 'idle', ports: [], lastError: 'Web MIDI unavailable' });
       store.setBinding({
         slot: 'A',
-        binding: { port: null, portPresent: false, device: null, devicePresent: false, error: 'device missing' },
+        binding: { port: null, portPresent: false, error: 'port missing' },
       });
-      expect(store.bindingSummary('A')().errors).toEqual(['Web MIDI unavailable', 'device missing']);
+      expect(store.bindingSummary('A')().errors).toEqual(['Web MIDI unavailable', 'port missing']);
     });
   });
 });

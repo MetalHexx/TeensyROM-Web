@@ -3,8 +3,8 @@ import { interceptFindDevices } from '../../support/interceptors/findDevices.int
 
 const DECK_LETTERS = ['A', 'B'] as const;
 
-/** Clears the DJ bindings database before each test so a port/device bound by one spec never
- *  leaks its selection into the next — bindings persist across page loads by design. */
+/** Clears the DJ bindings database before each test so a port bound by one spec never leaks its
+ *  selection into the next — bindings persist across page loads by design. */
 function clearDjBindingsDatabase(): void {
   cy.window().then(
     (win) =>
@@ -32,10 +32,9 @@ describe('DJ Mixer — fixed decks with no enabled devices', () => {
     });
   });
 
-  it('renders both binding cards with their output port and device selects', () => {
+  it('renders both binding cards with their output port select', () => {
     DECK_LETTERS.forEach((letter) => {
       cy.get(`[aria-label="Output port deck ${letter}"]`).should('exist');
-      cy.get(`[aria-label="Device deck ${letter}"]`).should('exist');
     });
   });
 });

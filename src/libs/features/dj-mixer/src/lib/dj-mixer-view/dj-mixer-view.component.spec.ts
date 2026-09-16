@@ -89,9 +89,6 @@ function idleBindingSummary(): DeckBindingSummary {
     portOptions: [],
     selectedPortId: null,
     portPlaceholder: '— MIDI not enabled —',
-    deviceOptions: [],
-    selectedDeviceId: null,
-    devicePlaceholder: '— select a device —',
     portsEnabled: false,
     enableDisabled: false,
     identifyDisabled: true,
@@ -115,7 +112,6 @@ function createDeckServiceStub() {
     selectSubtune: vi.fn(),
     seek: vi.fn(),
     bindPort: vi.fn(),
-    bindDevice: vi.fn(),
     enableMidi: vi.fn(),
     identify: vi.fn(),
   };

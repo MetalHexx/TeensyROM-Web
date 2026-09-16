@@ -241,8 +241,8 @@ export class DeckService {
     this.store.setDeckRepeat({ slot, repeat: on });
   }
 
-  /** Loads both slots' bindings from the repository, reconciles them against what is enumerated
-   *  and connected, and installs the effects that keep reconciling from then on. The constructor
+  /** Loads both slots' bindings from the repository, reconciles them against what is currently
+   *  enumerated, and installs the effect that keeps reconciling from then on. The constructor
    *  above builds the runtimes a bind can target; this is the separate call `DjBootstrapService`
    *  makes in the same startup beat, so a spec can construct this service without the repository
    *  ever answering. */
@@ -252,10 +252,6 @@ export class DeckService {
 
   async bindPort(slot: Slot, portId: string | null): Promise<void> {
     await this.bindings.bindPort(slot, portId);
-  }
-
-  async bindDevice(slot: Slot, deviceId: string | null): Promise<void> {
-    await this.bindings.bindDevice(slot, deviceId);
   }
 
   async enableMidi(): Promise<void> {

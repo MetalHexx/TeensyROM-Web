@@ -18,13 +18,9 @@ function model(overrides: Partial<BindingCardModel> = {}): BindingCardModel {
     selectedPortId: null,
     portsEnabled: false,
     portPlaceholder: '— MIDI not enabled —',
-    devices: [],
-    selectedDeviceId: null,
-    devicePlaceholder: '— select a device —',
     enableDisabled: false,
     identifyDisabled: false,
     selectAccessibleName: 'Output port deck A',
-    deviceSelectAccessibleName: 'Device deck A',
     enableAccessibleName: 'Enable MIDI deck A',
     identifyAccessibleName: 'Identify deck A',
     errors: [],
@@ -52,10 +48,6 @@ describe('BindingCardComponent', () => {
     return fixture.nativeElement.querySelectorAll('select')[0] as HTMLSelectElement;
   }
 
-  function deviceSelect(): HTMLSelectElement {
-    return fixture.nativeElement.querySelectorAll('select')[1] as HTMLSelectElement;
-  }
-
   function button(label: string): HTMLButtonElement {
     return Array.from(fixture.nativeElement.querySelectorAll<HTMLButtonElement>('button')).find(
       (candidate) => candidate.textContent?.trim() === label
@@ -70,6 +62,12 @@ describe('BindingCardComponent', () => {
         fixture.nativeElement.querySelector('.binding-deck-label') as HTMLElement
       ).textContent?.trim()
     ).toBe('Deck B');
+  });
+
+  it('renders exactly one select', () => {
+    setModel(model());
+
+    expect(fixture.nativeElement.querySelectorAll('select').length).toBe(1);
   });
 
   it('renders the disabled "MIDI not enabled" option and disables the select when ports are not enabled', () => {
@@ -135,61 +133,6 @@ describe('BindingCardComponent', () => {
     select().dispatchEvent(new Event('change'));
 
     expect(emitted).toEqual(['port-1', '']);
-  });
-
-  it('renders the placeholder and every device option when devices are present', () => {
-    setModel(
-      model({
-        devices: [
-          { id: 'device-1', label: 'nanoKONTROL2' },
-          { id: 'device-2', label: 'Launchpad Mini' },
-        ],
-        selectedDeviceId: 'device-2',
-        devicePlaceholder: '— select a device —',
-      })
-    );
-
-    const options = Array.from(deviceSelect().querySelectorAll('option'));
-    expect(options.map((option) => option.textContent?.trim())).toEqual([
-      '— select a device —',
-      'nanoKONTROL2',
-      'Launchpad Mini',
-    ]);
-    expect(deviceSelect().disabled).toBe(false);
-  });
-
-  it('renders a taken device option disabled, with the taking deck named in its own text', () => {
-    setModel(
-      model({
-        devices: [{ id: 'device-1', label: 'nanoKONTROL2', takenBy: 'B' }],
-        devicePlaceholder: '— select a device —',
-      })
-    );
-
-    const option = deviceSelect().querySelector('option[value="device-1"]') as HTMLOptionElement;
-    expect(option.textContent?.trim()).toBe('nanoKONTROL2 — taken by Deck B —');
-    expect(option.disabled).toBe(true);
-  });
-
-  it('disables the device select and renders its placeholder when devices is empty', () => {
-    setModel(model({ devices: [], devicePlaceholder: '— select a device —' }));
-
-    expect(deviceSelect().disabled).toBe(true);
-    expect(deviceSelect().textContent).toContain('select a device');
-  });
-
-  it('emits the chosen device id on deviceSelect, including the empty placeholder value', () => {
-    setModel(model({ devices: [{ id: 'device-1', label: 'nanoKONTROL2' }] }));
-    const emitted: string[] = [];
-    component.deviceSelect.subscribe((value) => emitted.push(value));
-
-    const options = deviceSelect().querySelectorAll('option');
-    (options[1] as HTMLOptionElement).selected = true;
-    deviceSelect().dispatchEvent(new Event('change'));
-    (options[0] as HTMLOptionElement).selected = true;
-    deviceSelect().dispatchEvent(new Event('change'));
-
-    expect(emitted).toEqual(['device-1', '']);
   });
 
   it('fires enableMidi and identify, and respects their own disabled flags', () => {

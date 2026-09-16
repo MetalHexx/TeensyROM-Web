@@ -166,8 +166,8 @@ to confirm, per the task's own acceptance criteria:
 - Dragging the same file onto deck A again shows no new network request in DevTools' Network tab
   and goes straight to **Playing**, skipping both the Loading and Analyzing phases — the tune is
   already resolved from the prior drop, so nothing new is fetched or scanned.
-- After a page refresh, deck A's Output port and Device selects come back either bound to their
-  prior selection or showing the "last saw" placeholder for a port/device not currently present —
-  never reset to the unbound placeholder while a binding is on record.
-- With deck A already bound to a MIDI output port or input device, that same port/device appears
-  disabled and marked "taken by Deck A" in deck B's own binding card selects.
+- After a page refresh, deck A's Output port select comes back either bound to its prior selection
+  or showing the "last saw" placeholder for a port not currently present — never reset to the
+  unbound placeholder while a binding is on record.
+- With deck A already bound to a MIDI output port, that same port appears disabled and marked
+  "taken by Deck A" in deck B's own binding card select.

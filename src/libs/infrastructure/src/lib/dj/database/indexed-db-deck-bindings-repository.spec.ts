@@ -3,17 +3,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import type { DeckBinding } from '@teensyrom-nx/application';
 import { ALERT_SERVICE, IAlertService } from '@teensyrom-nx/domain';
-import { DjDatabase, DJ_DATABASE_NAME } from './dj-database';
+import { DjDatabase, DJ_DATABASE_NAME, DECK_BINDINGS_STORE } from './dj-database';
 import { IndexedDbDeckBindingsRepository } from './indexed-db-deck-bindings-repository';
 
 function buildBinding(slot: 'A' | 'B'): DeckBinding {
-  return {
-    slot,
-    midiPortId: `midi-${slot}`,
-    midiPortName: `MIDI ${slot}`,
-    deviceId: `device-${slot}`,
-    deviceName: `Device ${slot}`,
-  };
+  return { slot, midiPortId: `midi-${slot}`, midiPortName: `MIDI ${slot}` };
 }
 
 describe('IndexedDbDeckBindingsRepository', () => {
@@ -60,6 +54,23 @@ describe('IndexedDbDeckBindingsRepository', () => {
 
     const all = await repository.loadAll();
     expect(all.map((binding) => binding.slot).sort()).toEqual(['A', 'B']);
+  });
+
+  it('load and loadAll narrow a stale record that still carries extra device fields', async () => {
+    const database = TestBed.inject(DjDatabase);
+    const repository = TestBed.inject(IndexedDbDeckBindingsRepository);
+    currentDb = await database.open();
+
+    await database.put(DECK_BINDINGS_STORE, {
+      slot: 'A',
+      midiPortId: 'midi-A',
+      midiPortName: 'MIDI A',
+      deviceId: 'device-A',
+      deviceName: 'Device A',
+    });
+
+    expect(await repository.load('A')).toEqual(buildBinding('A'));
+    expect(await repository.loadAll()).toEqual([buildBinding('A')]);
   });
 
   it('resolves null when a slot has no saved binding', async () => {

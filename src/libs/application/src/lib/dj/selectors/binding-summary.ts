@@ -2,7 +2,6 @@ import { computed } from '@angular/core';
 import { DeckBindingState, DjState, WritableStore } from '../dj-store';
 import { otherSlot, type Slot } from '../slot';
 import type { MidiAccessState } from '../ports/midi-access';
-import { DeviceStore } from '../../device/device-store';
 
 export interface BindingOption {
   id: string;
@@ -14,9 +13,6 @@ export interface DeckBindingSummary {
   portOptions: readonly BindingOption[];
   selectedPortId: string | null;
   portPlaceholder: string;
-  deviceOptions: readonly BindingOption[];
-  selectedDeviceId: string | null;
-  devicePlaceholder: string;
   portsEnabled: boolean;
   enableDisabled: boolean;
   identifyDisabled: boolean;
@@ -35,21 +31,12 @@ function portPlaceholderFor(binding: DeckBindingState, accessState: MidiAccessSt
   return accessState === 'granted' ? '— select a port —' : '— MIDI not enabled —';
 }
 
-function devicePlaceholderFor(binding: DeckBindingState): string {
-  if (binding.device && !binding.devicePresent) return `— last saw ${binding.device.name} —`;
-  return '— select a device —';
-}
-
 /**
- * The binding card's whole display model for one deck: the port and device option lists (with
- * which slot, if any, already holds each one), the current selections, placeholders, and the
- * gates on Enable/Identify. `DeviceStore` is injected here — the one cross-store read this store
- * makes — so the "taken by the other deck" rule has a single home.
+ * The binding card's whole display model for one deck: the port option list (with which slot, if
+ * any, already holds each one), the current selection, placeholder, and the gates on
+ * Enable/Identify.
  */
-export function bindingSummary(
-  store: WritableStore<DjState>,
-  deviceStore: InstanceType<typeof DeviceStore>
-) {
+export function bindingSummary(store: WritableStore<DjState>) {
   return {
     bindingSummary: (slot: Slot) =>
       computed<DeckBindingSummary>(() => {
@@ -66,17 +53,7 @@ export function bindingSummary(
           takenBy: otherBinding.port?.id === port.id ? other : null,
         }));
 
-        const deviceOptions: BindingOption[] = deviceStore
-          .devices()
-          .filter((device) => device.isEnabled)
-          .map((device) => ({
-            id: device.deviceId,
-            label: device.deviceId,
-            takenBy: otherBinding.device?.id === device.deviceId ? other : null,
-          }));
-
         const selectedPortId = binding.portPresent ? (binding.port?.id ?? null) : null;
-        const selectedDeviceId = binding.devicePresent ? (binding.device?.id ?? null) : null;
 
         const noPortsFound =
           midi.accessState === 'granted' && midi.ports.length === 0 ? NO_PORTS_FOUND_ERROR : null;
@@ -85,9 +62,6 @@ export function bindingSummary(
           portOptions,
           selectedPortId,
           portPlaceholder: portPlaceholderFor(binding, midi.accessState),
-          deviceOptions,
-          selectedDeviceId,
-          devicePlaceholder: devicePlaceholderFor(binding),
           portsEnabled: midi.accessState === 'granted',
           enableDisabled: midi.accessState === 'requesting',
           identifyDisabled: !(

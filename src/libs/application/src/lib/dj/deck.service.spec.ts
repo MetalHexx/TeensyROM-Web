@@ -18,7 +18,6 @@ import { DeckRuntime } from './deck-runtime';
 import { DeckBindings } from './deck-bindings';
 import { TuneLoader } from './tune-loader';
 import { DjStore } from './dj-store';
-import { DeviceStore } from '../device/device-store';
 import { FRAME_CLOCK_FACTORY, REPLAY_RUNNER_FACTORY, MIDI_ACCESS, TUNE_INSERTER, TUNE_RESOLVER } from './ports';
 import type { IMidiAccess, MidiAccessState, MidiPortOption } from './ports/midi-access';
 import type { LoadSource } from './load-source';
@@ -145,7 +144,6 @@ describe('DeckService', () => {
   let fakeBindings: {
     hydrate: ReturnType<typeof vi.fn>;
     bindPort: ReturnType<typeof vi.fn>;
-    bindDevice: ReturnType<typeof vi.fn>;
     enableMidi: ReturnType<typeof vi.fn>;
     identify: ReturnType<typeof vi.fn>;
   };
@@ -221,12 +219,11 @@ describe('DeckService', () => {
     const fileContentService: IFileContentService = { getFileContent: fileContentMock };
 
     // `DeckBindings` is faked wholesale here: `DeckService` only ever delegates to it, and this
-    // spec's own coverage of `hydrate`/`bindPort`/`bindDevice`/`enableMidi`/`identify` is exactly
-    // that delegation, never the reconcile behaviour `deck-bindings.spec.ts` owns.
+    // spec's own coverage of `hydrate`/`bindPort`/`enableMidi`/`identify` is exactly that
+    // delegation, never the reconcile behaviour `deck-bindings.spec.ts` owns.
     fakeBindings = {
       hydrate: vi.fn().mockResolvedValue(undefined),
       bindPort: vi.fn().mockResolvedValue(undefined),
-      bindDevice: vi.fn().mockResolvedValue(undefined),
       enableMidi: vi.fn().mockResolvedValue(undefined),
       identify: vi.fn(),
     };
@@ -237,7 +234,6 @@ describe('DeckService', () => {
         DeckRuntime,
         TuneLoader,
         DjStore,
-        { provide: DeviceStore, useValue: { devices: signal([]) } },
         { provide: DeckBindings, useValue: fakeBindings },
         { provide: FRAME_CLOCK_FACTORY, useValue: (): FakeClock => new FakeClock() },
         { provide: REPLAY_RUNNER_FACTORY, useValue: (): ReplayRunner => new FakeReplayRunner() },
@@ -722,11 +718,6 @@ describe('DeckService', () => {
     it('bindPort delegates the slot and port id', async () => {
       await service.bindPort('A', 'port-1');
       expect(fakeBindings.bindPort).toHaveBeenCalledWith('A', 'port-1');
-    });
-
-    it('bindDevice delegates the slot and device id', async () => {
-      await service.bindDevice('B', 'device-1');
-      expect(fakeBindings.bindDevice).toHaveBeenCalledWith('B', 'device-1');
     });
 
     it('enableMidi delegates', async () => {

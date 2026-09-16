@@ -9,11 +9,11 @@ const meta: Meta<BindingCardComponent> = {
     docs: {
       description: {
         component:
-          "One deck's own MIDI binding: its Output port selector beside a Device selector, Enable " +
-          'MIDI beside Identify, and whichever of its three distinct error states apply. Purely ' +
-          'presentational — it holds no state of its own; the caller owns the permission grant, ' +
-          "the enumerated port and device lists and this deck's own persisted selections. " +
-          '`layout="inline"` lays the heading, both controls and the two buttons on one row ' +
+          "One deck's own MIDI binding: its Output port selector, Enable MIDI beside Identify, " +
+          'and whichever of its three distinct error states apply. Purely presentational — it ' +
+          'holds no state of its own; the caller owns the permission grant, the enumerated port ' +
+          "list and this deck's own persisted selection. " +
+          '`layout="inline"` lays the heading, the control and the two buttons on one row ' +
           'instead of the default `"stacked"` column.',
       },
     },
@@ -31,13 +31,9 @@ function bindingModel(overrides: Partial<BindingCardModel> = {}): BindingCardMod
     selectedPortId: null,
     portsEnabled: false,
     portPlaceholder: '— MIDI not enabled —',
-    devices: [],
-    selectedDeviceId: null,
-    devicePlaceholder: '— select a device —',
     enableDisabled: false,
     identifyDisabled: true,
     selectAccessibleName: 'Output port deck A',
-    deviceSelectAccessibleName: 'Device deck A',
     enableAccessibleName: 'Enable MIDI deck A',
     identifyAccessibleName: 'Identify deck A',
     errors: [],
@@ -111,7 +107,7 @@ export const Inline: Story = {
   },
 };
 
-/** `layout="inline"`, nothing bound yet: both selects show their own placeholder. */
+/** `layout="inline"`, nothing bound yet: the select shows its own placeholder. */
 export const Unbound: Story = {
   args: {
     model: bindingModel({
@@ -121,17 +117,12 @@ export const Unbound: Story = {
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
       ],
-      devices: [
-        { id: 'device-1', label: 'nanoKONTROL2' },
-        { id: 'device-2', label: 'Launchpad Mini' },
-      ],
-      devicePlaceholder: '— select a device —',
     }),
     layout: 'inline',
   },
 };
 
-/** `layout="inline"`, both a port and a device already selected. */
+/** `layout="inline"`, a port already selected. */
 export const Bound: Story = {
   args: {
     model: bindingModel({
@@ -142,20 +133,14 @@ export const Bound: Story = {
         { id: 'port-2', label: 'Cart B (Acme)' },
       ],
       selectedPortId: 'port-1',
-      devices: [
-        { id: 'device-1', label: 'nanoKONTROL2' },
-        { id: 'device-2', label: 'Launchpad Mini' },
-      ],
-      selectedDeviceId: 'device-1',
-      devicePlaceholder: '— select a device —',
       identifyDisabled: false,
     }),
     layout: 'inline',
   },
 };
 
-/** `layout="inline"`, Deck B already holds one port and one device — both taken options render
- *  the deck letter as text, never colour alone, and are disabled. */
+/** `layout="inline"`, Deck B already holds one port — the taken option renders the deck letter as
+ *  text, never colour alone, and is disabled. */
 export const Taken: Story = {
   args: {
     model: bindingModel({
@@ -165,24 +150,18 @@ export const Taken: Story = {
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)', takenBy: 'B' },
       ],
-      devices: [
-        { id: 'device-1', label: 'nanoKONTROL2' },
-        { id: 'device-2', label: 'Launchpad Mini', takenBy: 'B' },
-      ],
-      devicePlaceholder: '— select a device —',
     }),
     layout: 'inline',
   },
 };
 
-/** `layout="inline"`, before the Enable gesture with a previously bound port and device now
- *  absent — the stored name still shows rather than the generic placeholder, on every reload. */
+/** `layout="inline"`, before the Enable gesture with a previously bound port now absent — the
+ *  stored name still shows rather than the generic placeholder, on every reload. */
 export const LastSaw: Story = {
   args: {
     model: bindingModel({
       portsEnabled: false,
       portPlaceholder: '— last saw TeensyROM (PJRC) —',
-      devicePlaceholder: '— last saw nanoKONTROL2 —',
     }),
     layout: 'inline',
   },

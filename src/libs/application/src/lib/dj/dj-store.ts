@@ -43,8 +43,6 @@ export interface DeckState {
 export interface DeckBindingState {
   port: { id: string; name: string } | null;
   portPresent: boolean;
-  device: { id: string; name: string } | null;
-  devicePresent: boolean;
   error: string | null;
 }
 
@@ -77,8 +75,6 @@ const initialDeckState: DeckState = {
 const initialBindingState: DeckBindingState = {
   port: null,
   portPresent: false,
-  device: null,
-  devicePresent: false,
   error: null,
 };
 

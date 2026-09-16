@@ -49,9 +49,6 @@ function idleBindingSummary(overrides: Partial<DeckBindingSummary> = {}): DeckBi
     portOptions: [],
     selectedPortId: null,
     portPlaceholder: '— MIDI not enabled —',
-    deviceOptions: [],
-    selectedDeviceId: null,
-    devicePlaceholder: '— select a device —',
     portsEnabled: false,
     enableDisabled: false,
     identifyDisabled: true,
@@ -69,7 +66,6 @@ function createDeckServiceStub() {
     selectSubtune: vi.fn().mockResolvedValue(undefined),
     seek: vi.fn().mockResolvedValue(undefined),
     bindPort: vi.fn().mockResolvedValue(undefined),
-    bindDevice: vi.fn().mockResolvedValue(undefined),
     enableMidi: vi.fn().mockResolvedValue(undefined),
     identify: vi.fn(),
   };
@@ -322,7 +318,6 @@ describe('DjDeckColumnComponent', () => {
           binding: {
             selectedPortId: 'port-1',
             portsEnabled: true,
-            selectedDeviceId: 'device-1',
           },
         }
       );
@@ -331,11 +326,9 @@ describe('DjDeckColumnComponent', () => {
       expect(model.accessibleName).toBe('MIDI binding deck B');
       expect(model.heading).toBe('Deck B');
       expect(model.selectAccessibleName).toBe('Output port deck B');
-      expect(model.deviceSelectAccessibleName).toBe('Device deck B');
       expect(model.enableAccessibleName).toBe('Enable MIDI deck B');
       expect(model.identifyAccessibleName).toBe('Identify deck B');
       expect(model.selectedPortId).toBe('port-1');
-      expect(model.selectedDeviceId).toBe('device-1');
     });
 
     it('maps a null takenBy to undefined and a bound slot through as-is', () => {
@@ -343,15 +336,19 @@ describe('DjDeckColumnComponent', () => {
         { slot: 'A', letter: 'A', index: 0 },
         {
           binding: {
-            portOptions: [{ id: 'p1', label: 'Port 1', takenBy: null }],
-            deviceOptions: [{ id: 'd1', label: 'Device 1', takenBy: 'B' }],
+            portOptions: [
+              { id: 'p1', label: 'Port 1', takenBy: null },
+              { id: 'p2', label: 'Port 2', takenBy: 'B' },
+            ],
           },
         }
       );
       const model = fixture.componentInstance.bindingModel();
 
-      expect(model.ports).toEqual([{ id: 'p1', label: 'Port 1', takenBy: undefined }]);
-      expect(model.devices).toEqual([{ id: 'd1', label: 'Device 1', takenBy: 'B' }]);
+      expect(model.ports).toEqual([
+        { id: 'p1', label: 'Port 1', takenBy: undefined },
+        { id: 'p2', label: 'Port 2', takenBy: 'B' },
+      ]);
     });
 
     it('renders a taken option disabled', () => {
@@ -372,7 +369,7 @@ describe('DjDeckColumnComponent', () => {
       expect(option.disabled).toBe(true);
     });
 
-    it('dispatches bindPort and bindDevice with this deck\'s slot, mapping the placeholder to null', () => {
+    it("dispatches bindPort with this deck's slot, mapping the placeholder to null", () => {
       const { fixture, deckService } = render({ slot: 'B', letter: 'B', index: 1 });
 
       bindingCard(fixture).portSelect.emit('port-9');
@@ -380,12 +377,6 @@ describe('DjDeckColumnComponent', () => {
 
       bindingCard(fixture).portSelect.emit('');
       expect(deckService.bindPort).toHaveBeenCalledWith('B', null);
-
-      bindingCard(fixture).deviceSelect.emit('device-9');
-      expect(deckService.bindDevice).toHaveBeenCalledWith('B', 'device-9');
-
-      bindingCard(fixture).deviceSelect.emit('');
-      expect(deckService.bindDevice).toHaveBeenCalledWith('B', null);
     });
 
     it('dispatches enableMidi and identify with this deck\'s slot', () => {
