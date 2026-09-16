@@ -136,7 +136,17 @@ export class DeckService {
       return;
     }
     if (deck.status === 'paused' || deck.status === 'stopped') {
-      await this.runtime.play(slot);
+      // Busy for the whole await, exactly as `load()` holds it across its own `runtime.play` —
+      // otherwise `canStop` reads true against a status that has not moved yet (`paused` stays
+      // `paused` until this resolves) and a Stop click can reach the runtime mid-flight, superseding
+      // this call's still-pending `clock.start()` and leaving the store reporting `playing` for a
+      // deck that the superseded start actually left silent.
+      this.store.setDeckBusy({ slot, busy: true });
+      try {
+        await this.runtime.play(slot);
+      } finally {
+        this.store.setDeckBusy({ slot, busy: false });
+      }
       this.sample(slot);
     }
   }

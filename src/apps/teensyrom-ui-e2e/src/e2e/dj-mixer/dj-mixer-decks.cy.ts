@@ -1,5 +1,6 @@
 import { noDevices } from '../../support/test-data/fixtures';
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
+import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 
 const DECK_LETTERS = ['A', 'B'] as const;
 
@@ -34,7 +35,7 @@ describe('DJ Mixer — fixed decks with no enabled devices', () => {
   beforeEach(() => {
     clearDjBindingsDatabase();
     interceptFindDevices({ fixture: noDevices });
-    cy.visit('/dj-mixer', { onBeforeLoad: stubNoMidiGrant });
+    cy.visit(APP_ROUTES.djMixer, { onBeforeLoad: stubNoMidiGrant });
   });
 
   it('renders both transports with every disable-able control disabled', () => {

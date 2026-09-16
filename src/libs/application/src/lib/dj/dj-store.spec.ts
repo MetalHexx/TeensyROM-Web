@@ -274,6 +274,17 @@ describe('DjStore', () => {
       expect(summary.label).toBe('Device disconnected');
     });
 
+    // DeckService.togglePlayPause() is a deliberate no-op while failed (deck.service.spec.ts's
+    // "is a no-op while %s" matrix covers 'failed'), so the toggle must render disabled here too —
+    // an enabled Play button that does nothing on click is the bug this guards against.
+    it('failed status disables the transport controls, matching togglePlayPause() being a no-op', () => {
+      store.setDeckStatus({ slot: 'A', status: 'failed', error: 'Device disconnected' });
+      const summary = store.transportSummary('A')();
+
+      expect(summary.controlsDisabled).toBe(true);
+      expect(summary.canStop).toBe(false);
+    });
+
     it('the bar is analyzing while indexing, even with structure already present', () => {
       store.setDeckStructure({
         slot: 'A',

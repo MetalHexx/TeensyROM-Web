@@ -47,6 +47,12 @@ export class ScriptProcessorFrameClock implements FrameClock {
   private gapSumSqMs = 0;
   private worstGapMs = 0;
   private lateCallbacks = 0;
+  // Bumped by every `stop()` — including the one `start()` opens with — and captured by each
+  // `start()` call as its own token. `resume()` is the only await standing between creating an
+  // `AudioContext` and publishing it onto the instance; if the token has moved on by the time it
+  // settles, a later `start()` or an explicit `stop()` ran in the meantime, and this call's context
+  // is superseded — closed rather than wired up, never assigned to `this.context`.
+  private startToken = 0;
 
   get stats(): FrameClockStats {
     const accumulator = this.accumulator;
@@ -96,8 +102,22 @@ export class ScriptProcessorFrameClock implements FrameClock {
     assertPositiveInterval(intervalUs);
     this.stop();
 
+    const myToken = ++this.startToken;
     const context = new AudioContext();
-    await context.resume();
+    try {
+      await context.resume();
+    } catch (error) {
+      // Never leak the context a rejected resume() leaves unassigned.
+      void context.close().catch(() => undefined);
+      throw error;
+    }
+
+    if (myToken !== this.startToken) {
+      // Superseded while `resume()` was pending — a later `start()` or a `stop()` already ran.
+      // Never publish this graph, and close the context nothing else will ever stop.
+      void context.close().catch(() => undefined);
+      return;
+    }
 
     const node = context.createScriptProcessor(AUDIO_BUFFER_FRAMES, 1, 1);
     const sink = context.createGain();
@@ -184,8 +204,10 @@ export class ScriptProcessorFrameClock implements FrameClock {
     this.accumulator?.setIntervalUs(intervalUs);
   }
 
-  /** Tears the audio graph down but keeps the accumulator, so `stats` still reads after a stop. */
+  /** Tears the audio graph down but keeps the accumulator, so `stats` still reads after a stop.
+   *  Also invalidates any `start()` still waiting on `resume()` — see `startToken`. */
   stop(): void {
+    this.startToken++;
     if (this.node !== null) {
       this.node.onaudioprocess = null;
       this.node.disconnect();

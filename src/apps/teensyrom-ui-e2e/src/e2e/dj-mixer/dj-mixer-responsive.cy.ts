@@ -1,4 +1,5 @@
 import { VIEWPORT } from '../../support/constants/test.constants';
+import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 import { multipleDevices } from '../../support/test-data/fixtures';
 import type { MockDeviceFixture } from '../../support/test-data/fixtures/fixture.types';
 import { generateDevice } from '../../support/test-data/generators/device.generators';
@@ -30,7 +31,7 @@ describe('DJ Mixer — responsive layout', () => {
     beforeEach(() => {
       interceptFindDevices({ fixture: twoDevices });
       interceptConnectDevice();
-      cy.visit('/dj-mixer');
+      cy.visit(APP_ROUTES.djMixer);
     });
 
     it('holds deck A, the mixer, and deck B side by side at desktop width', () => {
@@ -194,7 +195,7 @@ describe('DJ Mixer — responsive layout', () => {
     beforeEach(() => {
       interceptFindDevices(); // default fixture: singleDevice
       interceptConnectDevice();
-      cy.visit('/dj-mixer');
+      cy.visit(APP_ROUTES.djMixer);
       cy.viewport(VIEWPORT.STANDARD.width, VIEWPORT.STANDARD.height);
     });
 
@@ -215,7 +216,7 @@ describe('DJ Mixer — responsive layout', () => {
     beforeEach(() => {
       interceptFindDevices({ fixture: multipleDevices });
       interceptConnectDevice();
-      cy.visit('/dj-mixer');
+      cy.visit(APP_ROUTES.djMixer);
     });
 
     it('renders no deck C — the decks are a fixed pair, not one per device', () => {

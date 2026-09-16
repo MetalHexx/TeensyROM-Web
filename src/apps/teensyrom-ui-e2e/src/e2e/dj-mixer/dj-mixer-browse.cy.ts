@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 import type { MockDeviceFixture } from '../../support/test-data/fixtures/fixture.types';
 import { generateDevice } from '../../support/test-data/generators/device.generators';
 import { generateFileItem } from '../../support/test-data/generators/storage.generators';
@@ -22,7 +23,7 @@ describe('DJ Mixer — Browse', () => {
 
   it('shows one browse tree per enabled device and seeds every available storage on mount', () => {
     interceptGetDirectory();
-    cy.visit('/dj-mixer');
+    cy.visit(APP_ROUTES.djMixer);
 
     cy.get('lib-browse-tree').should('have.length', 2);
 
@@ -35,7 +36,7 @@ describe('DJ Mixer — Browse', () => {
   it("shows the first device's first available storage in the listing by default", () => {
     const files = [generateFileItem({ name: 'song.sid', path: '/song.sid' })];
     setupGetDirectoryWithFiles(files);
-    cy.visit('/dj-mixer');
+    cy.visit(APP_ROUTES.djMixer);
 
     cy.get('.breadcrumb-chips .breadcrumb-chip').first().should('contain.text', 'SD Card');
     cy.get('[data-item-path="/song.sid"]').should('exist');
@@ -44,7 +45,7 @@ describe('DJ Mixer — Browse', () => {
   it("switches the listing to the second device's USB storage on leaf click, naming it in the trail and issuing no new request", () => {
     const files = [generateFileItem({ name: 'song.sid', path: '/song.sid' })];
     setupGetDirectoryWithFiles(files);
-    cy.visit('/dj-mixer');
+    cy.visit(APP_ROUTES.djMixer);
 
     // The first device's SD storage (the default) is already loaded before the leaf click.
     cy.get('[data-item-path="/song.sid"]').should('exist');

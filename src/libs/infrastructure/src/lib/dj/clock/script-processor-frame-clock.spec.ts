@@ -14,6 +14,10 @@ const BUFFER_DURATION_US = (BUFFER_FRAMES / SAMPLE_RATE) * 1_000_000;
  */
 class FakeAudioContext {
   static instances: FakeAudioContext[] = [];
+  // Consumed once per instance construction — set it immediately before the `start()` call whose
+  // context should get this instance's `resume()` behaviour, so a test can hold that one call's
+  // `resume()` open (or reject it) while every other instance in the same test resolves normally.
+  static nextResume: (() => Promise<void>) | null = null;
 
   readonly sampleRate = SAMPLE_RATE;
   readonly destination = { id: 'destination' };
@@ -22,14 +26,17 @@ class FakeAudioContext {
   gain: FakeGainNode | null = null;
   resumed = false;
   closed = false;
+  private readonly resumeImpl: () => Promise<void>;
 
   constructor() {
     FakeAudioContext.instances.push(this);
+    this.resumeImpl = FakeAudioContext.nextResume ?? (() => Promise.resolve());
+    FakeAudioContext.nextResume = null;
   }
 
   resume(): Promise<void> {
     this.resumed = true;
-    return Promise.resolve();
+    return this.resumeImpl();
   }
 
   close(): Promise<void> {
@@ -93,7 +100,21 @@ function describeTarget(target: unknown): string {
 
 function installFakeAudioContext(): void {
   FakeAudioContext.instances = [];
+  FakeAudioContext.nextResume = null;
   vi.stubGlobal('AudioContext', FakeAudioContext);
+}
+
+/** A deferred `resume()`, so a test can decide exactly when one `AudioContext`'s `resume()`
+ *  settles instead of it resolving in the same microtask it was created in. */
+function deferredResume(): { settle: () => void; fail: (error: unknown) => void } {
+  let settle!: () => void;
+  let fail!: (error: unknown) => void;
+  const promise = new Promise<void>((resolve, reject) => {
+    settle = resolve;
+    fail = reject;
+  });
+  FakeAudioContext.nextResume = () => promise;
+  return { settle, fail };
 }
 
 async function startedClock(
@@ -440,5 +461,62 @@ describe('ScriptProcessorFrameClock', () => {
     expect(context.closed).toBe(true);
     expect(frames).toBe(1);
     expect(clock.stats.framesEmitted).toBe(1);
+  });
+
+  describe('a pending start() superseded before resume() settles', () => {
+    it('closes the context and never publishes a graph when stop() runs first', async () => {
+      installFakeAudioContext();
+      const resume = deferredResume();
+      const clock = new ScriptProcessorFrameClock();
+
+      const startPromise = clock.start(microseconds(20000), () => undefined);
+      const context = FakeAudioContext.instances[0];
+      clock.stop();
+      resume.settle();
+      await startPromise;
+
+      expect(context.closed).toBe(true);
+      // The graph is built after the token check, so a superseded start() never reaches it.
+      expect(context.node).toBeNull();
+      expect(context.connections).toEqual([]);
+      expect(clock.stats.framesEmitted).toBe(0);
+    });
+
+    it('closes the stale context and wires up only the later start() when it runs before resume() settles', async () => {
+      installFakeAudioContext();
+      const firstResume = deferredResume();
+      const clock = new ScriptProcessorFrameClock();
+
+      const firstStart = clock.start(microseconds(20000), () => undefined);
+      const staleContext = FakeAudioContext.instances[0];
+
+      // The superseding start() resolves immediately (the default fake resume()).
+      const secondStart = clock.start(microseconds(10000), () => undefined);
+      const liveContext = FakeAudioContext.instances[1];
+      await secondStart;
+
+      firstResume.settle();
+      await firstStart;
+
+      expect(staleContext.closed).toBe(true);
+      expect(staleContext.node).toBeNull();
+      expect(liveContext.closed).toBe(false);
+      expect(liveContext.node).not.toBeNull();
+      expect(clock.stats.nominalIntervalUs).toBe(10000);
+    });
+
+    it('closes the context when resume() itself rejects', async () => {
+      installFakeAudioContext();
+      const resume = deferredResume();
+      const clock = new ScriptProcessorFrameClock();
+
+      const startPromise = clock.start(microseconds(20000), () => undefined);
+      const context = FakeAudioContext.instances[0];
+      const failure = new Error('resume denied');
+      resume.fail(failure);
+
+      await expect(startPromise).rejects.toThrow('resume denied');
+      expect(context.closed).toBe(true);
+    });
   });
 });

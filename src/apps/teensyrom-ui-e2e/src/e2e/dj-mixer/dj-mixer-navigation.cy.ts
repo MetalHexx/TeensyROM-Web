@@ -1,5 +1,6 @@
 import { interceptFindDevices } from '../../support/interceptors/findDevices.interceptors';
 import { interceptConnectDevice } from '../../support/interceptors/connectDevice.interceptors';
+import { APP_ROUTES } from '../../support/constants/app-routes.constants';
 
 describe('DJ Mixer — Navigation', () => {
   beforeEach(() => {
@@ -14,7 +15,7 @@ describe('DJ Mixer — Navigation', () => {
     // but still present in the DOM at desktop width — scope to the visible nav-rail item.
     cy.get('.nav-rail-item[aria-label="DJ Mixer"]').click();
 
-    cy.url().should('include', '/dj-mixer');
+    cy.url().should('include', APP_ROUTES.djMixer);
     cy.get('.dj-mixer-view').should('exist');
   });
 

@@ -504,6 +504,42 @@ describe('DeckService', () => {
       expect(playSpy).not.toHaveBeenCalled();
       expect(pauseSpy).not.toHaveBeenCalled();
     });
+
+    it('holds the deck busy across a pending resume so a racing stop() cannot supersede it', async () => {
+      const fixture = register(makeFixture());
+      await loadAndWait('A', fixture);
+      await service.togglePlayPause('A'); // pause
+      expect(store.deck('A')().status).toBe('paused');
+
+      const realPlay = DeckRuntime.prototype.play.bind(runtime);
+      let releasePlay!: () => void;
+      const playSpy = vi.spyOn(runtime, 'play').mockImplementation(
+        (slot) =>
+          new Promise<void>((resolve) => {
+            releasePlay = () => resolve(realPlay(slot));
+          })
+      );
+      const stopSpy = vi.spyOn(runtime, 'stop');
+
+      const toggle = service.togglePlayPause('A'); // resume
+      await vi.waitFor(() => expect(playSpy).toHaveBeenCalledTimes(1));
+
+      // Before the fix, `status` stayed 'paused' and `busy` stayed false through this whole await,
+      // so `canStop` read true and a Stop click reached the runtime — superseding the still-pending
+      // play and leaving the store reporting `playing` for a deck that never actually resumed.
+      expect(store.deck('A')().busy).toBe(true);
+      expect(store.transportSummary('A')().canStop).toBe(false);
+
+      service.stop('A');
+      expect(stopSpy).not.toHaveBeenCalled();
+      expect(store.deck('A')().status).toBe('paused');
+
+      releasePlay();
+      await toggle;
+
+      expect(store.deck('A')().busy).toBe(false);
+      expect(store.deck('A')().status).toBe('playing');
+    });
   });
 
   it('stop samples the position once and is a no-op unless playing or paused', async () => {

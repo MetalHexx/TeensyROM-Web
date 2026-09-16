@@ -126,6 +126,44 @@ describe('DjDatabase', () => {
       const result = await database.get(TUNES_STORE, 'missing-hash');
       expect(result).toBeUndefined();
     });
+
+    it('put rejects when the transaction aborts even though the write request already succeeded', async () => {
+      const database = TestBed.inject(DjDatabase);
+      const db = await database.open();
+      currentDb = db;
+      if (!db) throw new Error('expected the database to open');
+
+      // A bare-bones fake transaction/request pair, in the same spirit as `stubFailingOpen()` below:
+      // it lets the test fire `req.onsuccess` and then `tx.onabort` in that exact order, which real
+      // IndexedDB can do (a quota error or a sibling request failing at commit time) but is not
+      // something this suite can reliably trigger through the real fake-indexeddb driver.
+      const fakeRequest = {} as IDBRequest<IDBValidKey>;
+      const fakeObjectStore = { put: () => fakeRequest } as unknown as IDBObjectStore;
+      const fakeTx = {
+        objectStore: () => fakeObjectStore,
+        oncomplete: null,
+        onerror: null,
+        onabort: null,
+      } as unknown as IDBTransaction;
+      vi.spyOn(db, 'transaction').mockReturnValue(fakeTx);
+
+      const putPromise = database.put(DECK_BINDINGS_STORE, { slot: 'A' });
+
+      // `put()` reaches `db.transaction(...)` only after its own internal `await open()` — flush
+      // that microtask before the fake request's handlers are wired up and ready to fire.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The write itself succeeds...
+      Object.defineProperty(fakeRequest, 'result', { value: 'A', configurable: true });
+      fakeRequest.onsuccess?.(new Event('success'));
+
+      // ...but the transaction still fails to commit.
+      Object.defineProperty(fakeTx, 'error', { value: new Error('commit failed'), configurable: true });
+      fakeTx.onabort?.(new Event('abort'));
+
+      await expect(putPromise).rejects.toThrow('commit failed');
+    });
   });
 
   describe('when opening the database fails', () => {

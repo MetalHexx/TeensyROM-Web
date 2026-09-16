@@ -59,6 +59,10 @@ export class WorkerAnalysisScanner implements AnalysisScanner {
         entry.resolve({ id, kind: 'failed', error: 'the analysis scan worker stopped responding' });
       }
       this.pending.clear();
+      // Also drop the cached reference — same cleanup `dispose()` does — so the next `scan()` builds
+      // a fresh worker instead of reusing this dead one and posting into the void.
+      worker.terminate();
+      this.worker = null;
     };
     this.worker = worker;
     return worker;

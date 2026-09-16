@@ -129,9 +129,18 @@ export class DjDatabase {
       const tx = db.transaction(store, mode);
       const objectStore = tx.objectStore(store);
       const req = run(objectStore);
-      req.onsuccess = () => resolve(req.result);
+      // Resolved from `tx.oncomplete`, not `req.onsuccess` — a request can succeed and still have
+      // its transaction abort before committing (quota exceeded, a disk error, another request in
+      // the same transaction failing), same reasoning as `update()` below. The request's own result
+      // is captured here and handed out once the transaction actually commits.
+      let result: T;
+      req.onsuccess = () => {
+        result = req.result;
+      };
       req.onerror = () => reject(req.error);
+      tx.oncomplete = () => resolve(result);
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('DjDatabase.request transaction aborted'));
     });
   }
 

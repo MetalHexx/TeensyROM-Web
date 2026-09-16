@@ -76,7 +76,10 @@ export function transportSummary(store: WritableStore<DjState>) {
       computed<DeckTransportSummary>(() => {
         const deck = store.decks()[slot];
         const led = ledFor(deck.status);
-        const controlsDisabled = deck.status === 'empty' || deck.busy;
+        // `failed` included alongside `empty`: DeckService.togglePlayPause() is a deliberate no-op
+        // for a failed deck (there is nothing loaded to resume), so the Play toggle has to render
+        // disabled here too or it dead-clicks — matching the Errored transport-panel story.
+        const controlsDisabled = deck.status === 'empty' || deck.status === 'failed' || deck.busy;
 
         return {
           status: deck.status,

@@ -9,6 +9,7 @@ export const APP_ROUTES = {
   root: '/',
   devices: '/devices',
   player: '/player',
+  djMixer: '/dj-mixer',
 } as const;
 
 export const ROUTE_NAMES = {
