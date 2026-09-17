@@ -32,8 +32,7 @@ function baseModel(): TransportPanelModel {
     bar: { kind: 'loop', introPercent: 25 },
     scrubAccessibleName: 'Position deck A',
     transport: { state: 'stopped', label: 'Stopped' },
-    canPlay: true,
-    canPause: false,
+    playPause: { showing: 'play', disabled: false },
     canStop: true,
     repeatTrack: true,
     tuneSources: [
@@ -82,26 +81,28 @@ export const Stopped: Story = {
   args: { model: baseModel(), positionPercent: 0, frameLabel: 'frame 0' },
 };
 
+/** `playPause.showing` follows the deck's own transport state — playing shows Pause. */
 export const Playing: Story = {
   args: {
     model: {
       ...baseModel(),
       transport: { state: 'playing', label: 'Playing' },
-      canPlay: false,
-      canPause: true,
+      playPause: { showing: 'pause', disabled: false },
     },
     positionPercent: 42,
     frameLabel: 'frame 2100',
   },
 };
 
+/** The toggle goes out of reach for the whole of a scan — `playPause.disabled`, not a hidden
+ *  button. */
 export const Analyzing: Story = {
   args: {
     model: {
       ...baseModel(),
       bar: { kind: 'analyzing' },
       transport: { state: 'analyzing', label: 'Analyzing…' },
-      canPlay: false,
+      playPause: { showing: 'play', disabled: true },
       canStop: false,
     },
     positionPercent: 0,
@@ -115,7 +116,7 @@ export const Errored: Story = {
       ...baseModel(),
       bar: { kind: 'unknown' },
       transport: { state: 'error', label: 'Error' },
-      canPlay: false,
+      playPause: { showing: 'play', disabled: true },
       canStop: false,
       errors: ['Delivery stalled.', 'Not a valid SID file.'],
     },
@@ -129,8 +130,7 @@ export const MultipleSubtunes: Story = {
     model: {
       ...baseModel(),
       transport: { state: 'playing', label: 'Playing' },
-      canPlay: false,
-      canPause: true,
+      playPause: { showing: 'pause', disabled: false },
       subtune: {
         text: 'Subtune 2 of 5',
         disabled: false,

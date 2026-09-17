@@ -5,16 +5,17 @@ import { TrackAnalysisPanelComponent } from './track-analysis-panel.component';
 import { frames, microseconds } from '@sidablist/core';
 import { ANALYSIS_SCANNER } from '../scan-runner';
 import type { AnalysisScanner, ScanResult } from '../scan-runner';
-import type { ScanOutput } from '../scan-tune';
 import { SID_REGISTER_COUNT } from '@sidablist/core';
 import type { SidFile } from '@sidablist/core';
-import { PAL_CPU_CLOCK_HZ } from '../notes';
+import {
+  PAL_CPU_CLOCK_HZ,
+  TUNE_INDEX_FORMAT_VERSION,
+  DEFAULT_CANDIDATE_THRESHOLD,
+  formatDuration,
+} from '@sidablist/analysis';
+import type { ScanOutput, TuneIndexRecord } from '@sidablist/analysis';
 import type { TuneIndexService } from '../tune-index.service';
-import { TUNE_INDEX_FORMAT_VERSION } from '../tune-index.model';
-import type { TuneIndexRecord } from '../tune-index.model';
-import { DEFAULT_CANDIDATE_THRESHOLD } from '../novelty';
 import type { PlayRate } from '@sidablist/core';
-import { formatDuration } from '../format';
 import type { DeckHandle } from '../../deck/deck-registry';
 import type { DeckTuneLoader } from '../../deck/deck-tune-loader';
 import type { MarkerCollection } from '../../deck/marker-collection';
@@ -111,7 +112,7 @@ function setPlayRate(player: FakeDeckPlayer, rate: PlayRate): void {
 
 function fakeTuneIndexRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
-    filename: 'Test Tune',
+    sidHash: 'Test Tune',
     subtune: 1,
     loopStartFrame: 0,
     loopPeriodFrames: 6250,

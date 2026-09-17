@@ -44,11 +44,14 @@ import type {
 import { ScriptProcessorFrameClock } from '../../clock/frame-clock';
 import { ANALYSIS_SCANNER } from '../../analysis/scan-runner';
 import { WorkerAnalysisScanner } from '../../analysis/worker-analysis-scanner';
-import { nextMomentOffset, reachableMomentOffsets } from '../../analysis/marker-moments';
+import {
+  nextMomentOffset,
+  reachableMomentOffsets,
+  positionBasisFor,
+  timelineBasisFor,
+} from '@sidablist/analysis';
+import type { DetectedMoment, DetectedLoopFrames } from '@sidablist/analysis';
 import { TuneIndexService } from '../../analysis/tune-index.service';
-import type { DetectedMoment } from '../../analysis/tune-index.model';
-import { positionBasisFor, timelineBasisFor } from '../../analysis/tune-length';
-import type { DetectedLoopFrames } from '../../analysis/tune-length';
 import { DeckMidiBinding } from '../../midi/deck-midi-binding';
 import { MidiAccessService } from '../../midi/midi-access.service';
 import { MixerService } from '../../mixer/mixer.service';
@@ -336,18 +339,22 @@ export class DeckHostComponent implements OnInit, OnDestroy {
     const state: StatusLedState = analyzing ? 'analyzing' : snapshot.transport;
     const hasTune = this.tuneLoader.currentTune() !== null;
     const subtuneCount = snapshot.tune?.subtuneCount ?? 0;
+    const canPlay =
+      hasTune &&
+      this.binding.selectedPortId() !== null &&
+      snapshot.transport !== 'playing' &&
+      !analyzing;
+    const canPause = snapshot.transport === 'playing';
 
     return {
       accessibleName: `Transport deck ${label}`,
       bar: this.transportBar(),
       scrubAccessibleName: `Position deck ${label}`,
       transport: { state, label: TRANSPORT_STATE_LABELS[state] },
-      canPlay:
-        hasTune &&
-        this.binding.selectedPortId() !== null &&
-        snapshot.transport !== 'playing' &&
-        !analyzing,
-      canPause: snapshot.transport === 'playing',
+      playPause: {
+        showing: snapshot.transport === 'playing' ? 'pause' : 'play',
+        disabled: !(canPlay || canPause),
+      },
       canStop: hasTune && !(analyzing && snapshot.transport === 'stopped'),
       repeatTrack: snapshot.repeatTrack,
       tuneSources: this.tuneLoader.availableTunes().map((source) => ({
@@ -392,14 +399,13 @@ export class DeckHostComponent implements OnInit, OnDestroy {
    *  Narrow and per-frame, for the same reason as `transportPositionPercent`. */
   protected readonly transportFrameLabel = computed<string>(() => `frame ${this.view.position()}`);
 
-  /** Starts this deck. */
-  protected onPlay(): void {
-    void this.player.play();
-  }
-
-  /** Pauses this deck. */
-  protected onPause(): void {
-    this.player.pause();
+  /** Starts or pauses this deck, by whichever the merged toggle is currently showing. */
+  protected onPlayPauseToggle(): void {
+    if (this.snapshot().transport === 'playing') {
+      this.player.pause();
+    } else {
+      void this.player.play();
+    }
   }
 
   /** Stops this deck. */
@@ -832,10 +838,11 @@ export class DeckHostComponent implements OnInit, OnDestroy {
   // ── Binding ────────────────────────────────────────────────────────────────────────────────────
 
   // Web MIDI enumerates zero ports for a granted-but-empty session (no cartridge attached, or the OS
-  // hasn't surfaced it yet) without the service itself treating that as an error.
+  // hasn't surfaced it yet) without the service itself treating that as an error. A plugged-in
+  // cartridge re-enumerates on its own — no "re-enable MIDI" click needed.
   private readonly noPortsFoundError = computed<string | null>(() =>
     this.midiAccess.accessState() === 'granted' && this.midiAccess.ports().length === 0
-      ? 'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.'
+      ? 'MIDI access was granted, but no output ports were found. Connect the cartridge — it appears here as soon as the browser sees it.'
       : null
   );
 
@@ -857,6 +864,8 @@ export class DeckHostComponent implements OnInit, OnDestroy {
       ports,
       selectedPortId,
       portsEnabled,
+      portPlaceholder: portsEnabled ? '— select a port —' : '— MIDI not enabled —',
+      enableVisible: accessState !== 'granted',
       enableDisabled: accessState === 'requesting',
       identifyDisabled: !(
         portsEnabled &&

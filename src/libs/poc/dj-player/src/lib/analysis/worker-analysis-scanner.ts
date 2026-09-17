@@ -1,4 +1,4 @@
-import type { AnalysisScanner, ScanMessage, ScanRequest, ScanResult } from './scan-runner';
+import type { AnalysisScanner, ScanMessage, ScanRequest, ScanResult } from '@sidablist/analysis';
 
 interface PendingScan {
   readonly resolve: (result: ScanResult) => void;
@@ -36,7 +36,9 @@ export class WorkerAnalysisScanner implements AnalysisScanner {
       return existing;
     }
 
-    const worker = new Worker(new URL('./scan.worker', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('../diagnostics/analysis-scan.worker', import.meta.url), {
+      type: 'module',
+    });
     worker.onmessage = (event: MessageEvent<ScanMessage>): void => {
       const message = event.data;
       const entry = this.pending.get(message.id);

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { md5Hex } from '@sidablist/tunes';
 import { DeckTuneLoader } from './deck-tune-loader';
 import { SID_PLAYER } from './deck-player';
 import { TuneIndexService } from '../analysis/tune-index.service';
@@ -76,10 +77,16 @@ describe('DeckTuneLoader', () => {
       expect(player.play).toHaveBeenCalledTimes(1);
     });
 
-    it('passes the parsed file and the source label to the tune index', () => {
-      loader.selectTune({ id: 'auto', label: 'Auto tune', getBytes: validSidBytes });
+    it('passes the raw bytes, the parsed file and the content hash to the tune index', () => {
+      const bytes = validSidBytes();
 
-      expect(tuneIndex.setTune).toHaveBeenCalledWith(player.loadTune.mock.calls[0][0], 'Auto tune');
+      loader.selectTune({ id: 'auto', label: 'Auto tune', getBytes: () => bytes });
+
+      expect(tuneIndex.setTune).toHaveBeenCalledWith(
+        bytes,
+        player.loadTune.mock.calls[0][0],
+        md5Hex(bytes)
+      );
     });
 
     it('sets a tune error and clears currentTune when the bytes do not parse, without touching the player', () => {
@@ -102,18 +109,20 @@ describe('DeckTuneLoader', () => {
       return { name, arrayBuffer: () => Promise.resolve(bytes.buffer) } as unknown as File;
     }
 
-    it('adds the picked file to availableTunes and hands its own name to the tune index', async () => {
+    it('adds the picked file to availableTunes and hands its own bytes and hash to the tune index', async () => {
       const before = loader.availableTunes().length;
+      const bytes = validSidBytes();
 
-      const pending = loader.loadPickedFile(pickedFile('mytune.sid', validSidBytes()));
+      const pending = loader.loadPickedFile(pickedFile('mytune.sid', bytes));
       await vi.waitFor(() => expect(tuneIndex.setTune).toHaveBeenCalled());
       resolveSetTune();
       await pending;
 
       expect(loader.availableTunes().length).toBe(before + 1);
       expect(tuneIndex.setTune).toHaveBeenCalledWith(
+        expect.any(Uint8Array),
         player.loadTune.mock.calls[0][0],
-        'mytune.sid'
+        md5Hex(bytes)
       );
     });
 

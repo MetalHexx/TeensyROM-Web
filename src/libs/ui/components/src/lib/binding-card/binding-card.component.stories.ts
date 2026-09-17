@@ -12,8 +12,9 @@ const meta: Meta<BindingCardComponent> = {
           "One deck's own MIDI binding: its Output port selector, Enable MIDI beside Identify, " +
           'and whichever of its three distinct error states apply. Purely presentational — it ' +
           'holds no state of its own; the caller owns the permission grant, the enumerated port ' +
-          "list and this deck's own persisted selection. `layout=\"inline\"` lays the heading, the " +
-          "port control and the two buttons on one row instead of the default `\"stacked\"` column.",
+          "list and this deck's own persisted selection. " +
+          '`layout="inline"` lays the heading, the control and the two buttons on one row ' +
+          'instead of the default `"stacked"` column.',
       },
     },
   },
@@ -29,6 +30,8 @@ function bindingModel(overrides: Partial<BindingCardModel> = {}): BindingCardMod
     ports: [],
     selectedPortId: null,
     portsEnabled: false,
+    portPlaceholder: '— MIDI not enabled —',
+    enableVisible: true,
     enableDisabled: false,
     identifyDisabled: true,
     selectAccessibleName: 'Output port deck A',
@@ -39,10 +42,25 @@ function bindingModel(overrides: Partial<BindingCardModel> = {}): BindingCardMod
   };
 }
 
-/** Before the permission grant: the select shows its single disabled placeholder and Identify is
- *  out of reach. */
+/** Before the permission grant: the select shows its single disabled placeholder, Identify is
+ *  out of reach, and the Enable MIDI button is showing. */
 export const NotEnabled: Story = {
   args: { model: bindingModel() },
+};
+
+/** Granted: the origin auto-connected on its own, so the Enable MIDI button is hidden entirely —
+ *  there is nothing left for it to do. */
+export const Granted: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
+      ports: [{ id: 'port-1', label: 'TeensyROM (PJRC)' }],
+      selectedPortId: 'port-1',
+      identifyDisabled: false,
+    }),
+  },
 };
 
 /** Granted, with a port list to choose from and one already selected. */
@@ -50,6 +68,8 @@ export const GrantedWithPorts: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
@@ -66,8 +86,10 @@ export const GrantedNoPortsFound: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
       errors: [
-        'MIDI access was granted, but no output ports were found. Connect the cartridge and re-enable MIDI.',
+        'MIDI access was granted, but no output ports were found. Connect the cartridge — it appears here as soon as the browser sees it.',
       ],
     }),
   },
@@ -78,6 +100,8 @@ export const BindingError: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [{ id: 'port-1', label: 'TeensyROM (PJRC)' }],
       errors: ['Deck B is already bound to that port. Pick a different one.'],
     }),
@@ -90,12 +114,78 @@ export const Inline: Story = {
   args: {
     model: bindingModel({
       portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
       ports: [
         { id: 'port-1', label: 'TeensyROM (PJRC)' },
         { id: 'port-2', label: 'Cart B (Acme)' },
       ],
       selectedPortId: 'port-1',
       identifyDisabled: false,
+    }),
+    layout: 'inline',
+  },
+};
+
+/** `layout="inline"`, nothing bound yet: the select shows its own placeholder. */
+export const Unbound: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
+      ports: [
+        { id: 'port-1', label: 'TeensyROM (PJRC)' },
+        { id: 'port-2', label: 'Cart B (Acme)' },
+      ],
+    }),
+    layout: 'inline',
+  },
+};
+
+/** `layout="inline"`, a port already selected. */
+export const Bound: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
+      ports: [
+        { id: 'port-1', label: 'TeensyROM (PJRC)' },
+        { id: 'port-2', label: 'Cart B (Acme)' },
+      ],
+      selectedPortId: 'port-1',
+      identifyDisabled: false,
+    }),
+    layout: 'inline',
+  },
+};
+
+/** `layout="inline"`, Deck B already holds one port — the taken option renders the deck letter as
+ *  text, never colour alone, and is disabled. */
+export const Taken: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: true,
+      portPlaceholder: '— select a port —',
+      enableVisible: false,
+      ports: [
+        { id: 'port-1', label: 'TeensyROM (PJRC)' },
+        { id: 'port-2', label: 'Cart B (Acme)', takenBy: 'B' },
+      ],
+    }),
+    layout: 'inline',
+  },
+};
+
+/** `layout="inline"`, before the Enable gesture with a previously bound port now absent — the
+ *  stored name still shows rather than the generic placeholder, on every reload. */
+export const LastSaw: Story = {
+  args: {
+    model: bindingModel({
+      portsEnabled: false,
+      portPlaceholder: '— last saw TeensyROM (PJRC) —',
+      enableVisible: true,
     }),
     layout: 'inline',
   },

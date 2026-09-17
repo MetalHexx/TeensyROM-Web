@@ -148,3 +148,44 @@ To perform this check once a cartridge is available: `pnpm nx serve teensyrom-ui
 `.sid` file from the DJ mixer's listing onto a deck's transport, copy the hash out of the resulting
 alert, then hash the same file on the desktop (`Get-FileHash -Algorithm SHA256 <file>` on Windows,
 or `sha256sum <file>` on macOS/Linux) and confirm the two hex strings match.
+
+## Hardware acceptance (P04-T02)
+
+Not run. This task wires the DJ Mixer's deck columns to `DeckService`/`DjStore` — the load,
+transport, and MIDI binding path — which the automated Cypress specs exercise against fixture
+devices only (`dj-mixer-decks.cy.ts`, `dj-mixer-responsive.cy.ts`). The checklist below requires a
+real TeensyROM cartridge connected over serial and was not exercised end to end in this execution
+environment; no result is recorded here, only what an operator with a device attached still needs
+to confirm, per the task's own acceptance criteria:
+
+- `pnpm nx serve teensyrom-ui`, connect a device, and drag a `.sid` file from the listing onto
+  deck A: the transport's status LED shows **Analyzing…** and then **Playing** — or, on a failed
+  read, **failed** with a reason on the LED and no DJ-raised alert (a device-read failure still
+  carries the `-3` file service's own alert; that alert is expected and accepted, not a DJ Mixer
+  regression).
+- Dragging the same file onto deck A again shows no new network request in DevTools' Network tab
+  and goes straight to **Playing**, skipping both the Loading and Analyzing phases — the tune is
+  already resolved from the prior drop, so nothing new is fetched or scanned.
+- After a page refresh, deck A's Output port select comes back either bound to its prior selection
+  or showing the "last saw" placeholder for a port not currently present — never reset to the
+  unbound placeholder while a binding is on record.
+- With deck A already bound to a MIDI output port, that same port appears disabled and marked
+  "taken by Deck A" in deck B's own binding card select.
+
+## Permission auto-connect on reload (P05-T04)
+
+Not run. This task makes `DeckBindings.hydrate` query the origin's standing Web MIDI permission
+and request access on its own when already granted, so a reload comes up bound with no click, and
+hides each deck's Enable MIDI button while access is granted. Cypress cannot carry a real,
+persisted Web MIDI permission grant across a page reload (`dj-mixer-decks.cy.ts` runs with no
+grant, by design, and asserts the button is present in that state), so the granted-origin path
+needs a real browser to confirm:
+
+- `pnpm nx serve teensyrom-ui`, open `/dj-mixer`, click a deck's Enable MIDI button and grant the
+  browser's SysEx permission prompt. Both decks' Enable MIDI buttons disappear once granted.
+- Reload the page. Both decks come up with their prior selection bound (or the "last saw"
+  placeholder for a port not currently present) with no click — Enable MIDI stays hidden on the
+  granted origin.
+- In the browser's site settings, revoke the MIDI permission for the origin, then reload. Enable
+  MIDI is showing again on both decks, and no alert was raised for a merely-not-yet-granted
+  origin.

@@ -7,10 +7,13 @@ export interface BindingPortModel {
   readonly id: string;
   /** The port's user-readable name. */
   readonly label: string;
+  /** The deck letter that already holds this port, if set. Rendered as text in the option
+   *  (`{{ label }} — taken by Deck {{ takenBy }} —`) and disables it — never colour alone. */
+  readonly takenBy?: string;
 }
 
-/** One deck's whole MIDI binding: its own accessible name, the port list, and up to three distinct
- *  error states. */
+/** One deck's whole MIDI binding: its own accessible name, the port list, and up to three
+ *  distinct error states. */
 export interface BindingCardModel {
   /** The section's own aria-label, e.g. 'MIDI binding deck A'. */
   readonly accessibleName: string;
@@ -20,8 +23,16 @@ export interface BindingCardModel {
   readonly ports: readonly BindingPortModel[];
   /** The currently selected port's id, or `null` if none selected. */
   readonly selectedPortId: string | null;
-  /** false renders the single disabled '— MIDI not enabled —' option instead of the port list. */
+  /** false renders the single disabled `portPlaceholder` option instead of the port list. */
   readonly portsEnabled: boolean;
+  /** The port select's placeholder option text — composed by the caller, e.g.
+   *  `— select a port —`, `— MIDI not enabled —`, or `— last saw TeensyROM (PJRC) —` before the
+   *  Enable gesture (every reload) when a previously bound port is not currently present. Rendered
+   *  as the select's one option when `!portsEnabled`, and as its first when enabled. */
+  readonly portPlaceholder: string;
+  /** false hides the Enable MIDI button entirely — a granted origin auto-connects on its own, so
+   *  there is nothing left for the button to do. */
+  readonly enableVisible: boolean;
   /** true while the permission grant is in flight. */
   readonly enableDisabled: boolean;
   /** true when the Identify button should be disabled. */
@@ -38,12 +49,12 @@ export interface BindingCardModel {
 
 /**
  * One deck's MIDI binding card: its own Output port selector, Enable MIDI beside Identify, and
- * whichever of its three distinct error states apply. Purely presentational — it holds no state of
- * its own; the caller owns the permission grant, the enumerated port list and this deck's own
+ * whichever of its three distinct error states apply. Purely presentational — it holds no state
+ * of its own; the caller owns the permission grant, the enumerated port list, and this deck's own
  * persisted selection.
  *
- * The `<select>`'s own disabled state is derived here from `portsEnabled` and `ports.length`, not
- * carried on the model — one owner, and it is this side.
+ * The port `<select>`'s own disabled state is derived here from `portsEnabled` and `ports.length`
+ * — neither is carried on the model, one owner, and it is this side.
  *
  * @example
  * ```html
@@ -68,7 +79,8 @@ export class BindingCardComponent {
   /** The binding card's display model and state. */
   readonly model = input.required<BindingCardModel>();
   /** `'stacked'` (the default) is today's column layout, unchanged. `'inline'` lays the heading,
-   *  the port control and the two buttons on one row, for a host with less vertical room to give. */
+   *  the port control and the two buttons on one row, for a host with less vertical room to
+   *  give. */
   readonly layout = input<'stacked' | 'inline'>('stacked');
   /** Emits the chosen port id, or '' when the placeholder option was chosen. */
   readonly portSelect = output<string>();

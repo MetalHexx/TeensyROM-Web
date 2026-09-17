@@ -8,7 +8,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { DeviceStore, DjStore, StorageStore } from '@teensyrom-nx/application';
+import { DECK_SLOTS, DeviceStore, StorageStore } from '@teensyrom-nx/application';
 import {
   EmptyStateMessageComponent,
   ScalingCompactCardComponent,
@@ -23,13 +23,10 @@ import {
 import { DjDirectoryListingComponent } from '../directory-listing/dj-directory-listing.component';
 import { activeStorageKey, type ActiveStorage } from '../active-storage';
 import type { DeckRef } from '../deck-ref';
-import type { DjFileDragPayload } from '../drag/dj-file-drag';
-import { formatSidEvidence } from '../drag/sid-evidence';
 
 @Component({
   selector: 'lib-dj-mixer-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '[class.dj-mixer-view--many]': 'isMany()' },
   imports: [
     EmptyStateMessageComponent,
     ScalingCompactCardComponent,
@@ -44,17 +41,20 @@ import { formatSidEvidence } from '../drag/sid-evidence';
 export class DjMixerViewComponent {
   private readonly deviceStore = inject(DeviceStore);
   private readonly storageStore = inject(StorageStore);
-  private readonly djStore = inject(DjStore);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly enabledDevices = computed<Device[]>(() =>
     this.deviceStore.devices().filter((d) => d.isEnabled)
   );
-  readonly decks = computed<readonly DeckRef[]>(() =>
-    this.enabledDevices().map((_, index) => ({ letter: String.fromCharCode(65 + index), index }))
-  );
-  readonly showCrossfader = computed(() => this.decks().length >= 2);
-  readonly isMany = computed(() => this.decks().length >= 3); // the stacked-at-every-width form
+
+  /** The two fixed deck columns the DJ view always renders — never derived from device count or
+   *  order; only which device (if any) a deck is bound to changes. */
+  readonly decks: readonly DeckRef[] = DECK_SLOTS.map((slot, index) => ({
+    slot,
+    letter: slot,
+    index,
+  }));
+  readonly showCrossfader = computed(() => this.decks.length >= 2);
 
   /** The DJ-local state: which device/storage the browse trees and listing currently show. */
   readonly activeStorage = signal<ActiveStorage | null>(null);
@@ -140,17 +140,6 @@ export class DjMixerViewComponent {
     void this.storageStore.navigateToDirectory({ ...event, path });
   }
 
-  /**
-   * Retrieves the dropped SID's bytes into the store (a no-op if already retrieved), then alerts
-   * the byte evidence. Both retrieval and formatting are awaited — `formatSidEvidence` hashes
-   * asynchronously, so an un-awaited call would alert `[object Promise]`.
-   */
-  async onFileDropped({ deviceId, storageType, path }: DjFileDragPayload): Promise<void> {
-    await this.djStore.retrieveFile({ deviceId, storageType, path });
-    const entry = this.djStore.getFile(deviceId, storageType, path)();
-    window.alert(await formatSidEvidence(entry));
-  }
-
   private async seedStorage(device: Device): Promise<void> {
     if (device.sdStorage?.available) {
       await this.storageStore.initializeStorage({
@@ -165,24 +154,6 @@ export class DjMixerViewComponent {
       });
     }
   }
-
-  /**
-   * Inline `grid-template-areas` for the three-or-more stacked form. Deck count (and so row
-   * count) isn't knowable in SCSS, so this is the one grid template value bound directly on the
-   * element rather than owned by a breakpoint mixin — every other layout decision stays in the
-   * stylesheet.
-   */
-  readonly manyGridAreas = computed<string>(() => {
-    const rows: string[] = [];
-    this.decks().forEach((deck) => {
-      rows.push(`"d${deck.index} vs${deck.index}"`);
-      if (deck.index === 0) {
-        rows.push('"mx mx"');
-      }
-    });
-    rows.push('"bottom bottom"');
-    return rows.join(' ');
-  });
 }
 
 /** The first enabled device's first available storage, in SD-then-USB order. */

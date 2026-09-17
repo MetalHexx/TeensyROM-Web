@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { keyDisplayFor } from './key-display';
-import type { TuneIndexRecord } from '../analysis/tune-index.model';
-import { TUNE_INDEX_FORMAT_VERSION } from '../analysis/tune-index.model';
+import type { TuneIndexRecord } from '@sidablist/analysis';
+import { TUNE_INDEX_FORMAT_VERSION } from '@sidablist/analysis';
 
 function fakeRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
-    filename: 'test.sid',
+    sidHash: 'test.sid',
     subtune: 1,
     loopStartFrame: null,
     loopPeriodFrames: null,

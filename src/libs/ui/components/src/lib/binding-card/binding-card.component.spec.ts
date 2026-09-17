@@ -6,8 +6,8 @@ import {
   type BindingPortModel,
 } from './binding-card.component';
 
-function port(id: string, label: string): BindingPortModel {
-  return { id, label };
+function port(id: string, label: string, takenBy?: string): BindingPortModel {
+  return { id, label, takenBy };
 }
 
 function model(overrides: Partial<BindingCardModel> = {}): BindingCardModel {
@@ -17,6 +17,8 @@ function model(overrides: Partial<BindingCardModel> = {}): BindingCardModel {
     ports: [],
     selectedPortId: null,
     portsEnabled: false,
+    portPlaceholder: '— MIDI not enabled —',
+    enableVisible: true,
     enableDisabled: false,
     identifyDisabled: false,
     selectAccessibleName: 'Output port deck A',
@@ -44,7 +46,7 @@ describe('BindingCardComponent', () => {
   }
 
   function select(): HTMLSelectElement {
-    return fixture.nativeElement.querySelector('select') as HTMLSelectElement;
+    return fixture.nativeElement.querySelectorAll('select')[0] as HTMLSelectElement;
   }
 
   function button(label: string): HTMLButtonElement {
@@ -63,6 +65,12 @@ describe('BindingCardComponent', () => {
     ).toBe('Deck B');
   });
 
+  it('renders exactly one select', () => {
+    setModel(model());
+
+    expect(fixture.nativeElement.querySelectorAll('select').length).toBe(1);
+  });
+
   it('renders the disabled "MIDI not enabled" option and disables the select when ports are not enabled', () => {
     setModel(model({ portsEnabled: false }));
 
@@ -74,6 +82,7 @@ describe('BindingCardComponent', () => {
     setModel(
       model({
         portsEnabled: true,
+        portPlaceholder: '— select a port —',
         ports: [port('port-1', 'Cart A (Acme)'), port('port-2', 'Cart B (Acme)')],
         selectedPortId: 'port-2',
       })
@@ -92,6 +101,20 @@ describe('BindingCardComponent', () => {
     setModel(model({ portsEnabled: true, ports: [] }));
 
     expect(select().disabled).toBe(true);
+  });
+
+  it('renders a taken port option disabled, with the taking deck named in its own text', () => {
+    setModel(
+      model({
+        portsEnabled: true,
+        portPlaceholder: '— select a port —',
+        ports: [port('port-1', 'Cart A (Acme)'), port('port-2', 'Cart B (Acme)', 'B')],
+      })
+    );
+
+    const option = select().querySelector('option[value="port-2"]') as HTMLOptionElement;
+    expect(option.textContent?.trim()).toBe('Cart B (Acme) — taken by Deck B —');
+    expect(option.disabled).toBe(true);
   });
 
   it('emits the chosen port id on portSelect, including the empty placeholder value', () => {
@@ -129,6 +152,14 @@ describe('BindingCardComponent', () => {
 
     expect(enabled.length).toBe(1);
     expect(identified.length).toBe(1);
+  });
+
+  it('shows the Enable MIDI button when enableVisible is true and hides it when false', () => {
+    setModel(model({ enableVisible: true }));
+    expect(button('Enable MIDI')).toBeTruthy();
+
+    setModel(model({ enableVisible: false }));
+    expect(button('Enable MIDI')).toBeFalsy();
   });
 
   it('renders one role="alert" per error entry, in order', () => {

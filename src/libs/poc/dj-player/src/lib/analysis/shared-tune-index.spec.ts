@@ -3,8 +3,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SharedTuneIndex } from './shared-tune-index';
 import { TUNE_INDEX_STORAGE } from './tune-index-storage';
 import type { ITuneIndexStorage } from './tune-index-storage';
-import { TUNE_INDEX_FORMAT_VERSION } from './tune-index.model';
-import type { TuneIndexRecord } from './tune-index.model';
+import { TUNE_INDEX_FORMAT_VERSION } from '@sidablist/analysis';
+import type { TuneIndexRecord } from '@sidablist/analysis';
 
 interface StubStorage {
   load: ReturnType<typeof vi.fn>;
@@ -17,7 +17,7 @@ function makeStorage(): StubStorage {
 
 function buildRecord(overrides: Partial<TuneIndexRecord> = {}): TuneIndexRecord {
   return {
-    filename: 'Still_Time.sid',
+    sidHash: 'Still_Time.sid',
     subtune: 1,
     loopStartFrame: null,
     loopPeriodFrames: null,
@@ -60,7 +60,7 @@ describe('SharedTuneIndex', () => {
 
   describe('load / save', () => {
     it('reads straight through to the injected storage', () => {
-      const hit = buildRecord({ filename: 'Cached.sid' });
+      const hit = buildRecord({ sidHash: 'Cached.sid' });
       storage.load.mockReturnValue(hit);
 
       expect(shared.load('Cached.sid', 1)).toBe(hit);
@@ -68,7 +68,7 @@ describe('SharedTuneIndex', () => {
     });
 
     it('writes straight through to the injected storage', () => {
-      const record = buildRecord({ filename: 'New.sid' });
+      const record = buildRecord({ sidHash: 'New.sid' });
 
       shared.save(record);
 
@@ -77,7 +77,7 @@ describe('SharedTuneIndex', () => {
   });
 
   describe('produceOnce', () => {
-    it('hands a second caller for the same (filename, subtune) the first run in flight, never invoking its own', async () => {
+    it('hands a second caller for the same (sidHash, subtune) the first run in flight, never invoking its own', async () => {
       let resolveFirst!: (record: TuneIndexRecord | null) => void;
       const firstRun = vi.fn(
         () => new Promise<TuneIndexRecord | null>((resolve) => (resolveFirst = resolve))
@@ -91,20 +91,20 @@ describe('SharedTuneIndex', () => {
       expect(secondRun).not.toHaveBeenCalled();
       expect(secondPromise).toBe(firstPromise);
 
-      const record = buildRecord({ filename: 'Track.sid' });
+      const record = buildRecord({ sidHash: 'Track.sid' });
       resolveFirst(record);
 
       await expect(firstPromise).resolves.toBe(record);
       await expect(secondPromise).resolves.toBe(record);
     });
 
-    it('runs independent productions for different (filename, subtune) keys', () => {
+    it('runs independent productions for different (sidHash, subtune) keys', () => {
       const runForA = vi.fn(() => new Promise<TuneIndexRecord | null>(() => undefined));
       const runForB = vi.fn(() => new Promise<TuneIndexRecord | null>(() => undefined));
 
       shared.produceOnce('A.sid', 1, runForA);
       shared.produceOnce('B.sid', 1, runForB);
-      shared.produceOnce('A.sid', 2, runForA); // same filename, different subtune — still independent
+      shared.produceOnce('A.sid', 2, runForA); // same sidHash, different subtune — still independent
 
       expect(runForA).toHaveBeenCalledTimes(2);
       expect(runForB).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe('SharedTuneIndex', () => {
       );
 
       const firstPromise = shared.produceOnce('Track.sid', 1, firstRun);
-      resolveFirst(buildRecord({ filename: 'Track.sid' }));
+      resolveFirst(buildRecord({ sidHash: 'Track.sid' }));
       await firstPromise;
 
       const secondRun = vi.fn(() => Promise.resolve<TuneIndexRecord | null>(null));

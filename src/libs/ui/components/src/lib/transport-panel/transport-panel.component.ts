@@ -27,10 +27,8 @@ export interface TransportPanelModel {
   readonly scrubAccessibleName: string;
   /** The state readout: the LED's colour and the text beside it, both caller-composed. */
   readonly transport: { readonly state: StatusLedState; readonly label: string };
-  /** Enables the Play button. */
-  readonly canPlay: boolean;
-  /** Enables the Pause button. */
-  readonly canPause: boolean;
+  /** The merged Play/Pause toggle: which label it shows, and whether it is reachable. */
+  readonly playPause: { readonly showing: 'play' | 'pause'; readonly disabled: boolean };
   /** Enables the Stop button. */
   readonly canStop: boolean;
   /** The repeat toggle's checked state. */
@@ -49,7 +47,9 @@ export interface TransportPanelModel {
     /** The next button's accessible name, e.g. 'Next subtune deck A'. */
     readonly nextAccessibleName: string;
   };
-  /** Accessible names for the five controls that are not composed from anything else on the panel. */
+  /** Accessible names for the five controls that are not composed from anything else on the panel.
+   *  `play` and `pause` are both still carried here — the toggle's own `aria-label` is whichever
+   *  matches `playPause.showing`. */
   readonly actionAccessibleNames: {
     /** e.g. 'Play deck A'. */
     readonly play: string;
@@ -81,7 +81,7 @@ export interface TransportPanelModel {
  *   [positionPercent]="transportPositionPercent()"
  *   [frameLabel]="transportFrameLabel()"
  *   [showFilePicker]="true"
- *   (playClick)="onPlay()"
+ *   (playPauseClick)="onPlayPauseToggle()"
  *   (repeatTrackChange)="onRepeatTrackChange($event)"
  *   (fileSelect)="onFileSelect($event)"
  *   (scrubCommit)="onScrubCommit($event)"
@@ -110,11 +110,10 @@ export class TransportPanelComponent {
    *  `model().tuneSources` is empty. The POC is the one caller that sets this; a model-driven
    *  caller with its own `tuneSources` needs it only if it also wants a file picker. */
   readonly showFilePicker = input<boolean>(false);
-  /** The Play button was pressed. Named for the click rather than the transport verb: `play` and
-   *  `pause` are standard DOM media events, which an output may not shadow. */
-  readonly playClick = output<void>();
-  /** The Pause button was pressed. */
-  readonly pauseClick = output<void>();
+  /** The merged Play/Pause toggle was pressed — whichever it was showing at the time. Named for the
+   *  click rather than the transport verb: `play` and `pause` are standard DOM media events, which
+   *  an output may not shadow. */
+  readonly playPauseClick = output<void>();
   /** The Stop button was pressed. */
   readonly stopClick = output<void>();
   /** The repeat toggle was flipped, carrying its new checked state. */

@@ -34,3 +34,6 @@ export * from './lib/audio';
 
 // Transfer implementations
 export * from './lib/transfer';
+
+// DJ storage implementations
+export * from './lib/dj';

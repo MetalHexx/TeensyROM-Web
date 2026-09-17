@@ -1,5 +1,5 @@
-import { camelotFor, PITCH_CLASS_NAMES } from '../analysis/key';
-import type { TuneIndexRecord } from '../analysis/tune-index.model';
+import { camelotFor, PITCH_CLASS_NAMES } from '@sidablist/analysis';
+import type { TuneIndexRecord } from '@sidablist/analysis';
 
 /** How the Key knob's readout renders a tune's key. Camelot is the DJ-mixing wheel number a
  *  beatmatching workflow reasons about; note is the compact music-theory name. */
@@ -26,7 +26,9 @@ export function keyDisplayFor(
   if (tonic === null || mode === null || camelot === null) return null;
 
   if (semitoneOffset === 0) {
-    return format === 'camelot' ? camelot : `${PITCH_CLASS_NAMES[tonic]}${mode === 'minor' ? 'm' : ''}`;
+    return format === 'camelot'
+      ? camelot
+      : `${PITCH_CLASS_NAMES[tonic]}${mode === 'minor' ? 'm' : ''}`;
   }
 
   const shiftedTonic = wrapPitchClass(tonic + semitoneOffset);

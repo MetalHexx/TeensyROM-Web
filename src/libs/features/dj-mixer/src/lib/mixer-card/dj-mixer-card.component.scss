@@ -4,10 +4,9 @@
   grid-area: mx;
 }
 
-// The horizontal band form: below tablet width, at any deck count, and at every width once three
-// or more decks make the stacked form permanent (`:host.dj-mixer-card--band`, set by the view).
-// A shallow band is no longer possible with a full deck strip per deck, so it wraps rather than
-// clips if the strips and the crossfader don't fit on one line.
+// The horizontal band form: below tablet width, at either fixed deck. A shallow band is no
+// longer possible with a full deck strip per deck, so it wraps rather than clips if the strips
+// and the crossfader don't fit on one line.
 @mixin band-form {
   .mixer-body {
     flex-direction: row;
@@ -41,10 +40,6 @@
 
 :host {
   @include styles.below-tablet {
-    @include band-form;
-  }
-
-  &.dj-mixer-card--band {
     @include band-form;
   }
 }

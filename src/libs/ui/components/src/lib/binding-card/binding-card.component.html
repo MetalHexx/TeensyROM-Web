@@ -8,18 +8,25 @@
       (change)="onSelectPort($event)"
     >
       @if (model().portsEnabled) {
-      <option value="" [selected]="model().selectedPortId === null">— select a port —</option>
+      <option value="" [selected]="model().selectedPortId === null">
+        {{ model().portPlaceholder }}
+      </option>
       @for (port of model().ports; track port.id) {
-      <option [value]="port.id" [selected]="port.id === model().selectedPortId">
-        {{ port.label }}
+      <option
+        [value]="port.id"
+        [selected]="port.id === model().selectedPortId"
+        [disabled]="!!port.takenBy"
+      >
+        {{ port.takenBy ? port.label + ' — taken by Deck ' + port.takenBy + ' —' : port.label }}
       </option>
       } } @else {
-      <option value="" selected disabled>— MIDI not enabled —</option>
+      <option value="" selected disabled>{{ model().portPlaceholder }}</option>
       }
     </select>
   </label>
 
   <div class="control-row">
+    @if (model().enableVisible) {
     <button
       type="button"
       [attr.aria-label]="model().enableAccessibleName"
@@ -28,6 +35,7 @@
     >
       Enable MIDI
     </button>
+    }
     <button
       type="button"
       [attr.aria-label]="model().identifyAccessibleName"

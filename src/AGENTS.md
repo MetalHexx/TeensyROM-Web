@@ -88,12 +88,12 @@ export class DeviceStore {
 
 ### Sibling-repo dependency: SIDablist
 
-`@sidablist/core` and `@sidablist/asid` (consumed by `libs/poc/dj-player`) are not published npm packages — they're `file:`/`link:` dependencies on a sibling repo checked out at `../../SIDablist` (a directory next to this repo's root, not inside it). Both packages resolve through a `dist/` folder that only exists after SIDablist's own build runs, and plain `pnpm install` here does not build it.
+`@sidablist/core`, `@sidablist/asid`, `@sidablist/analysis` and `@sidablist/tunes` (consumed by `libs/poc/dj-player`) are not published npm packages — they're `file:`/`link:` dependencies on a sibling repo checked out at `../../SIDablist` (a directory next to this repo's root, not inside it). All four packages resolve through a `dist/` folder that only exists after SIDablist's own build runs, and plain `pnpm install` here does not build it.
 
 **Any agent or pipeline working in a fresh checkout or worktree of this repo must bootstrap SIDablist before the frontend will build**, since it's the same requirement for every branch of this repo, not just main:
 
-1. In the `SIDablist` sibling repo: `pnpm install`, then `pnpm -r run build` (produces `libs/core/dist` and `libs/asid/dist`).
-2. Back in this repo: `pnpm install` (links `@sidablist/core`/`@sidablist/asid` into `node_modules`).
+1. In the `SIDablist` sibling repo: `pnpm install`, then `pnpm -r run build` (produces `libs/core/dist`, `libs/asid/dist`, `libs/analysis/dist` and `libs/tunes/dist`).
+2. Back in this repo: `pnpm install` (links `@sidablist/core`/`@sidablist/asid`/`@sidablist/analysis`/`@sidablist/tunes` into `node_modules`).
 
 If `SIDablist` isn't present as a sibling directory at all, it needs to be cloned there first — check the repo registry for its location. Skipping this bootstrap produces a wall of `Could not resolve "@sidablist/core"` / `TS2307: Cannot find module '@sidablist/core'` errors from `pnpm start`/`nx build` that look like a code bug but are actually just a missing local build — do this bootstrap before debugging those errors as anything else.
 

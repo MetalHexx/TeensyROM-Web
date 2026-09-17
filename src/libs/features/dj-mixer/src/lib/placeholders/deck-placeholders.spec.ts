@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type {
-  BindingCardModel,
   DeckStripModel,
   LoopsCuesPanelModel,
   SpeedPanelModel,
-  TransportPanelModel,
   VoicePanelModel,
 } from '@teensyrom-nx/ui/components';
 import { createDeckPlaceholders } from './deck-placeholders';
@@ -27,25 +25,20 @@ function collectAccessibleNames(value: unknown, results: string[] = []): string[
 
 describe('createDeckPlaceholders', () => {
   it('builds every accessible name from the deck letter', () => {
-    const models = createDeckPlaceholders({ letter: 'B', index: 1 });
+    const models = createDeckPlaceholders({ slot: 'B', letter: 'B', index: 1 });
     const names = collectAccessibleNames(models);
 
     expect(names.length).toBeGreaterThan(0);
     names.forEach((name) => expect(name.endsWith('deck B')).toBe(true));
   });
 
-  it('headers the binding card with the deck letter', () => {
-    const models = createDeckPlaceholders({ letter: 'B', index: 1 });
-    expect(models.binding.heading).toBe('Deck B');
-  });
-
   it('labels the strip fader with the bare deck letter', () => {
-    const models = createDeckPlaceholders({ letter: 'B', index: 1 });
+    const models = createDeckPlaceholders({ slot: 'B', letter: 'B', index: 1 });
     expect(models.strip.fader.label).toBe('B');
   });
 
   it('scopes every voice checkboxId to the deck letter and keeps them unique', () => {
-    const models = createDeckPlaceholders({ letter: 'B', index: 1 });
+    const models = createDeckPlaceholders({ slot: 'B', letter: 'B', index: 1 });
     const checkboxIds = models.voice.rows.map((row) => row.checkboxId);
 
     expect(checkboxIds.length).toBe(3);
@@ -54,21 +47,13 @@ describe('createDeckPlaceholders', () => {
   });
 
   it('type-checks against the model-shaped component inputs', () => {
-    const models = createDeckPlaceholders({ letter: 'B', index: 1 });
+    const models = createDeckPlaceholders({ slot: 'B', letter: 'B', index: 1 });
 
-    const transport: TransportPanelModel = models.transport;
-    const positionPercent: number = models.positionPercent;
-    const frameLabel: string = models.frameLabel;
     const voice: VoicePanelModel = models.voice;
     const speed: SpeedPanelModel = models.speed;
     const loopsCues: LoopsCuesPanelModel = models.loopsCues;
-    const binding: BindingCardModel = models.binding;
     const strip: DeckStripModel = models.strip;
 
-    expect(
-      [transport, positionPercent, frameLabel, voice, speed, loopsCues, binding, strip].every(
-        (value) => value !== undefined
-      )
-    ).toBe(true);
+    expect([voice, speed, loopsCues, strip].every((value) => value !== undefined)).toBe(true);
   });
 });

@@ -8,6 +8,14 @@ export * from './lib/storage/storage-key.util';
 // DJ state management
 export * from './lib/dj/dj-store';
 export * from './lib/dj/dj-file-key.util';
+export * from './lib/dj/slot';
+export * from './lib/dj/ports';
+export * from './lib/dj/selectors/transport-summary';
+export * from './lib/dj/selectors/binding-summary';
+export * from './lib/dj/load-source';
+export * from './lib/dj/deck-runtime';
+export * from './lib/dj/tune-loader';
+export * from './lib/dj/deck.service';
 
 // Player state management
 export * from './lib/player/player-store';
