@@ -6,6 +6,7 @@ using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial;
+using TeensyRom.Core.Serial.Routines;
 using TeensyRom.Core.Storage;
 
 namespace TeensyRom.Core.Device
@@ -18,13 +19,13 @@ namespace TeensyRom.Core.Device
 	public class CartFinder(
 		ILoggingService log,
 		IStorageFactory storageFactory,
-		ICartTagger tagger,
-		IFwVersionChecker versionChecker,
+		IDeviceInterrogator interrogator,
+		IAlertService alert,
 		IMediator mediator,
 		IEnumerable<IDiscoveryStrategy> discoveryStrategies,
 		IDeviceSettingsProvider settingsProvider) : ICartFinder
 	{
-		private const string _undefinedDeviceIdBase = "Unidentified";
+		private const string _unknownDeviceIdBase = "Unknown";
 		private readonly IEnumerable<IDiscoveryStrategy> _discoveryStrategies = discoveryStrategies;
 		private readonly IDeviceSettingsProvider _settingsProvider = settingsProvider;
 
@@ -54,14 +55,12 @@ namespace TeensyRom.Core.Device
 					var device = await ValidateAndCreateDevice(endpoint, ct);
 					if (device != null)
 					{
-						if (string.IsNullOrWhiteSpace(device.Cart.DeviceId))
+						if (device.Cart.DeviceId is null)
 						{
-							var unknownCartId = foundDevices
-								.Where(d => d.Cart.DeviceId!.Contains(_undefinedDeviceIdBase))
-								.ToList()
-								.Count();
-
-							var deviceId = $"{_undefinedDeviceIdBase}[{unknownCartId}]";
+							var standInCount = foundDevices.Count(d => IsStandInDeviceId(d.Cart.DeviceId));
+							var deviceId = standInCount == 0
+								? _unknownDeviceIdBase
+								: $"{_unknownDeviceIdBase}-{standInCount + 1}";
 
 							device.Cart.DeviceId = deviceId;
 							device.Cart.SdStorage.DeviceId = deviceId;
@@ -76,7 +75,7 @@ namespace TeensyRom.Core.Device
 
 				foreach (var device in foundDevices)
 				{
-					if (device.Cart?.DeviceId is not null)
+					if (device.Cart?.DeviceId is not null && device.Cart.IsCompatible)
 					{
 						EnsureDeviceInSettings(device.Cart.DeviceId);
 					}
@@ -115,6 +114,8 @@ namespace TeensyRom.Core.Device
 		/// <summary>
 		/// Validates a discovered endpoint as a TeensyROM device and creates a device instance.
 		/// This unified pipeline works for both Serial and TCP endpoints.
+		/// Identity and hardware facts come from the device's version reply; storage availability
+		/// comes from a read-only root probe of each storage type.
 		/// Expects discovery strategies to always provide an open ICommunicationPort.
 		/// </summary>
 		private async Task<TeensyRomDevice?> ValidateAndCreateDevice(
@@ -134,15 +135,33 @@ namespace TeensyRom.Core.Device
 					log.ExternalError($"{methodName} Version check failed for {endpoint.Display}.  PingResponse was null.");
 					return null;
 				}
-				log.Internal($"Performing Version Check on port: {endpoint.Address}");
-				var (isCompatible, version) = versionChecker.VersionCheck(endpoint.PingResponse);
+
+				log.Internal($"{methodName} Reading version from port: {endpoint.Address}");
+				var reply = interrogator.ReadVersion(communicationPort);
 
 				var cart = new Cart
 				{
 					Name = "Unnamed",
-					FwVersion = version?.ToString() ?? "",
-					IsCompatible = isCompatible
+					DeviceId = reply.ChipId,
+					FwVersion = reply.FirmwareVersion?.ToString() ?? "",
+					IsCompatible = VersionReplyParser.IsCompatible(reply) && !reply.IsMinimalFirmware,
+					HardwareVariant = reply.HardwareVariant,
+					IsMinimalFirmware = reply.IsMinimalFirmware,
+					BuildTimestamp = reply.BuildTimestamp,
+					CpuMhz = reply.CpuMhz,
+					TemperatureC = reply.TemperatureC,
+					Machine = reply.Machine,
+					VideoStandard = reply.VideoStandard,
+					TodClockHz = reply.TodClockHz,
+					SdStorage = new CartStorage(TeensyStorageType.SD, available: false) { DeviceId = reply.ChipId ?? "" },
+					UsbStorage = new CartStorage(TeensyStorageType.USB, available: false) { DeviceId = reply.ChipId ?? "" }
 				};
+
+				if (reply.IsMinimalFirmware)
+				{
+					log.InternalWarning($"{methodName} device is in minimal firmware; not ready");
+					return null;
+				}
 
 				if (endpoint.PingResponse.Contains("busy"))
 				{
@@ -153,53 +172,83 @@ namespace TeensyRom.Core.Device
 					});
 				}
 
-			log.Internal($"Checking storage tags for device on Port {endpoint.Address}");
-			var tagResult = await tagger.EnsureTagsForDevice(communicationPort);
-			var sdStorage = tagResult.SdStorage;
-			var usbStorage = tagResult.UsbStorage;
+				if (!cart.IsCompatible)
+				{
+					ReportIncompatibleFirmware(reply);
+				}
+				else
+				{
+					var sd = interrogator.ProbeStorage(communicationPort, TeensyStorageType.SD);
+					var usb = interrogator.ProbeStorage(communicationPort, TeensyStorageType.USB);
 
-			log.Internal($"SD storage {(sdStorage.Available ? "available" : "unavailable")}");
-			log.Internal($"USB storage {(usbStorage.Available ? "available" : "unavailable")}");
-			log.Internal($"Device ID: {tagResult.DeviceId}");
+					cart.SdStorage.Available = sd == StoragePresence.Present;
+					cart.UsbStorage.Available = usb == StoragePresence.Present;
 
-			cart.DeviceId = tagResult.DeviceId;
-			cart.SdStorage = sdStorage;
-			cart.UsbStorage = usbStorage;
+					log.Internal($"{methodName} SD probe {sd}, USB probe {usb}");
+				}
 
-			var device = new TeensyRomDevice(
-				cart,
-				communicationPort,
-			storageFactory.Create(sdStorage, communicationPort),
-			storageFactory.Create(usbStorage, communicationPort)
-		);
+				var device = new TeensyRomDevice(
+					cart,
+					communicationPort,
+					storageFactory.Create(cart.SdStorage, communicationPort),
+					storageFactory.Create(cart.UsbStorage, communicationPort)
+				);
 
-		log.InternalSuccess($"{methodName} Validated and created device {cart.DeviceId} at {endpoint.Display}");
+				log.InternalSuccess($"{methodName} {reply.HardwareVariant} fw {cart.FwVersion} chip {reply.ChipId ?? "none"} on {reply.Machine} {reply.VideoStandard} {reply.TodClockHz?.ToString() ?? "unknown"} Hz");
 
-		return device;
-	}
-	catch (Exception ex)
-	{
-		log.ExternalError($"{methodName} Error creating device: {ex.Message}");
-		return null;
-	}
-}
+				return device;
+			}
+			catch (Exception ex)
+			{
+				log.ExternalError($"{methodName} Error creating device: {ex.Message}");
+				return null;
+			}
+		}
 
-/// <summary>
-/// Ensures a discovered device is saved to settings.
-/// Skips unidentified devices (no stable DeviceId).
-/// </summary>
-private void EnsureDeviceInSettings(string deviceId)
-{
-	if (string.IsNullOrWhiteSpace(deviceId) || deviceId.StartsWith(_undefinedDeviceIdBase))
-	{
-		log.Internal($"CartFinder.EnsureDeviceInSettings: Skipping unidentified device {deviceId}");
-		return;
-	}
+		/// <summary>
+		/// Publishes the user-facing alert and log trail for a device whose firmware is below the
+		/// supported floor. The device is still created and listed so the UI can report it.
+		/// </summary>
+		private void ReportIncompatibleFirmware(VersionReply reply)
+		{
+			alert.Publish($"TeensyROM firmware check failed. v{VersionReplyParser.FullFirmwareFloor}+ is required. (See: Terminal Logs)");
+			log.InternalError($"TeensyROM firmware check failed. v{VersionReplyParser.FullFirmwareFloor}+ is required.");
 
-	try
-	{
-		_settingsProvider.GetOrCreateDeviceSettings(deviceId);
-		log.Internal($"CartFinder.EnsureDeviceInSettings: Ensured device {deviceId} exists in settings");
+			if (reply.FirmwareVersion is null)
+			{
+				alert.Publish("Unable to determine the version of TeensyROM. (See: Terminal Logs)");
+				log.InternalError("Unable to determine the version of TeensyROM.");
+			}
+			else
+			{
+				log.InternalError($"v{reply.FirmwareVersion} is not supported by this app and may lead to unexpected results.");
+			}
+			log.InternalError("FW Download: https://github.com/SensoriumEmbedded/TeensyROM/tree/main/bin/TeensyROM");
+			log.InternalError("FW Instructions: https://github.com/SensoriumEmbedded/TeensyROM/blob/main/docs/General_Usage.md#firmware-updates");
+		}
+
+		/// <summary>
+		/// True when the id is a per-run stand-in rather than a chip id read from the device.
+		/// </summary>
+		private static bool IsStandInDeviceId(string? deviceId) =>
+			deviceId == _unknownDeviceIdBase || (deviceId?.StartsWith($"{_unknownDeviceIdBase}-") ?? false);
+
+		/// <summary>
+		/// Ensures a discovered device is saved to settings.
+		/// Skips devices without a chip id (no stable DeviceId to key on).
+		/// </summary>
+		private void EnsureDeviceInSettings(string deviceId)
+		{
+			if (string.IsNullOrWhiteSpace(deviceId) || IsStandInDeviceId(deviceId))
+			{
+				log.Internal($"CartFinder.EnsureDeviceInSettings: Skipping unidentified device {deviceId}");
+				return;
+			}
+
+			try
+			{
+				_settingsProvider.GetOrCreateDeviceSettings(deviceId);
+				log.Internal($"CartFinder.EnsureDeviceInSettings: Ensured device {deviceId} exists in settings");
 			}
 			catch (Exception ex)
 			{

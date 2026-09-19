@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reactive.Linq;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
@@ -12,12 +13,14 @@ namespace TeensyRom.Core.Device
         private List<TeensyRomDevice> _availableDevices = [];
        
         private readonly ICartFinder _finder;
+        private readonly ILoggingService _log;
 
         public DeviceConnectionManager(
             ICartFinder finder,
             ILoggingService log)
         {
             _finder = finder;
+            _log = log;
         }
 
         public List<TeensyRomDevice> GetAvailableDevices() => _availableDevices;
@@ -25,9 +28,12 @@ namespace TeensyRom.Core.Device
 
         public async Task<List<TeensyRomDevice>> FindDevices(bool autoConnect, CancellationToken ct, bool fullScan = false)
         {
+            var stopwatch = Stopwatch.StartNew();
             _availableDevices.ForEach(d => d.CommunicationPort.Dispose());
             _availableDevices.Clear();
             _availableDevices = await _finder.FindDevices(ct, fullScan);
+            stopwatch.Stop();
+            _log.InternalSuccess($"DeviceConnectionManager.FindDevices: {_availableDevices.Count} device(s) ready in {stopwatch.ElapsedMilliseconds} ms");
             return _availableDevices;
         }
     }
