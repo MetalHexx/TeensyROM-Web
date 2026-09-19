@@ -76,7 +76,7 @@ export interface UploadTransferFileRequest {
 /**
  * 
  */
-export class TransfersApi extends runtime.BaseAPI {
+export class TransfersApiService extends runtime.BaseAPI {
 
     /**
      * Cancels a transfer job.  - Returns the job already cancelled: its device, staged files, and expansion workspace are all released before this responds, so the device can immediately take a new job. Files already handed to the device are discarded rather than sent. - Idempotent: cancelling an already-cancelled job returns success, as does cancelling any other terminal job, without changing anything.

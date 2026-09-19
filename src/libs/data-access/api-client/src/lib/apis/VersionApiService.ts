@@ -28,7 +28,7 @@ import {
 /**
  * 
  */
-export class VersionApi extends runtime.BaseAPI {
+export class VersionApiService extends runtime.BaseAPI {
 
     /**
      * Retrieves the current semantic version of the TeensyROM application.  The version follows semantic versioning format: **Major.Minor.Patch[-prerelease]**  **Version Information:** - **Major**: Breaking changes or significant new features - **Minor**: Backward-compatible new features - **Patch**: Backward-compatible bug fixes - **Prerelease**: Optional prerelease identifier (e.g., alpha.1, beta.2)  This version is read from the assembly metadata and matches the version specified in the TeensyRom.Api.csproj file.

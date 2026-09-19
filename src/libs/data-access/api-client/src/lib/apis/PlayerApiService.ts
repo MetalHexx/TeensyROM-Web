@@ -58,7 +58,7 @@ export interface ToggleMusicRequest {
 /**
  * 
  */
-export class PlayerApi extends runtime.BaseAPI {
+export class PlayerApiService extends runtime.BaseAPI {
 
     /**
      * Launches a file given a valid path to a file stored on the TeensyRom.
