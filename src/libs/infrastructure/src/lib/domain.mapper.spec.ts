@@ -19,6 +19,10 @@ import {
   AppSettingsDto,
   TeensyFilterType as ApiFilterType,
   AudioSettingsDto,
+  HardwareVariant,
+  MachineType,
+  VideoStandard,
+  ConnectionType,
 } from '@teensyrom-nx/data-access/api-client';
 import { DomainMapper } from './domain.mapper';
 import {
@@ -545,6 +549,11 @@ describe('DomainMapper (Device)', () => {
         isCompatible: true,
         isConnected: true,
         deviceState: ApiDeviceState.Connected,
+        hardwareVariant: HardwareVariant.TeensyRomPlus,
+        isMinimalFirmware: false,
+        buildTimestamp: 'Sep 18 2026, 09:41:32',
+        machine: MachineType.C64,
+        videoStandard: VideoStandard.Ntsc,
         sdStorage: {
           deviceId: 'device-123',
           type: ApiStorageType.Sd,
@@ -557,7 +566,7 @@ describe('DomainMapper (Device)', () => {
           available: false,
           indexExists: false,
         },
-        connectionType: 'Serial',
+        connectionType: ConnectionType.Serial,
         ipAddress: '',
         tcpPort: 0,
       };
@@ -656,6 +665,11 @@ describe('DomainMapper (Device)', () => {
           isCompatible: true,
           isConnected: false,
           deviceState: ApiDeviceState.Connectable,
+          hardwareVariant: HardwareVariant.TeensyRomPlus,
+          isMinimalFirmware: false,
+          buildTimestamp: 'Sep 18 2026, 09:41:32',
+          machine: MachineType.C64,
+          videoStandard: VideoStandard.Ntsc,
           sdStorage: {
             deviceId: 'device-1',
             type: ApiStorageType.Sd,
@@ -668,7 +682,7 @@ describe('DomainMapper (Device)', () => {
             available: true,
             indexExists: false,
           },
-          connectionType: 'Serial',
+          connectionType: ConnectionType.Serial,
           ipAddress: '',
           tcpPort: 0,
         },
@@ -680,6 +694,11 @@ describe('DomainMapper (Device)', () => {
           isCompatible: false,
           isConnected: true,
           deviceState: ApiDeviceState.Connected,
+          hardwareVariant: HardwareVariant.TeensyRom,
+          isMinimalFirmware: false,
+          buildTimestamp: 'Sep 18 2026, 09:41:32',
+          machine: MachineType.C128,
+          videoStandard: VideoStandard.Pal,
           sdStorage: {
             deviceId: 'device-2',
             type: ApiStorageType.Sd,
@@ -692,7 +711,7 @@ describe('DomainMapper (Device)', () => {
             available: true,
             indexExists: true,
           },
-          connectionType: 'Serial',
+          connectionType: ConnectionType.Serial,
           ipAddress: '',
           tcpPort: 0,
         },

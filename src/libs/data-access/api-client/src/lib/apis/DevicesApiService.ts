@@ -52,7 +52,7 @@ export interface ResetDeviceRequest {
 /**
  * 
  */
-export class DevicesApiService extends runtime.BaseAPI {
+export class DevicesApi extends runtime.BaseAPI {
 
     /**
      * Returns all available and connected TeensyROM devices.  - This will momentarily disconnect all devices. - All available COM ports will be scanned for TeensyROM devices. - TCP devices use cached IPs by default (fullScan=false) for fast discovery. - Set fullScan=true to perform a complete network scan for TCP devices. - Devices with auto-connect enabled will reconnect automatically.

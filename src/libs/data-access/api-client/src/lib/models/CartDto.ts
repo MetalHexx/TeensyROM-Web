@@ -27,6 +27,27 @@ import {
     ConnectionTypeToJSON,
     ConnectionTypeToJSONTyped,
 } from './ConnectionType';
+import type { HardwareVariant } from './HardwareVariant';
+import {
+    HardwareVariantFromJSON,
+    HardwareVariantFromJSONTyped,
+    HardwareVariantToJSON,
+    HardwareVariantToJSONTyped,
+} from './HardwareVariant';
+import type { MachineType } from './MachineType';
+import {
+    MachineTypeFromJSON,
+    MachineTypeFromJSONTyped,
+    MachineTypeToJSON,
+    MachineTypeToJSONTyped,
+} from './MachineType';
+import type { VideoStandard } from './VideoStandard';
+import {
+    VideoStandardFromJSON,
+    VideoStandardFromJSONTyped,
+    VideoStandardToJSON,
+    VideoStandardToJSONTyped,
+} from './VideoStandard';
 import type { CartStorageDto } from './CartStorageDto';
 import {
     CartStorageDtoFromJSON,
@@ -103,6 +124,54 @@ export interface CartDto {
     isCompatible: boolean;
     /**
      * 
+     * @type {HardwareVariant}
+     * @memberof CartDto
+     */
+    hardwareVariant: HardwareVariant;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof CartDto
+     */
+    isMinimalFirmware: boolean;
+    /**
+     * 
+     * @type {string}
+     * @memberof CartDto
+     */
+    buildTimestamp: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof CartDto
+     */
+    cpuMhz?: number | null;
+    /**
+     * 
+     * @type {number}
+     * @memberof CartDto
+     */
+    temperatureC?: number | null;
+    /**
+     * 
+     * @type {MachineType}
+     * @memberof CartDto
+     */
+    machine: MachineType;
+    /**
+     * 
+     * @type {VideoStandard}
+     * @memberof CartDto
+     */
+    videoStandard: VideoStandard;
+    /**
+     * 
+     * @type {number}
+     * @memberof CartDto
+     */
+    todClockHz?: number | null;
+    /**
+     * 
      * @type {CartStorageDto}
      * @memberof CartDto
      */
@@ -131,6 +200,11 @@ export function instanceOfCartDto(value: object): value is CartDto {
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('fwVersion' in value) || value['fwVersion'] === undefined) return false;
     if (!('isCompatible' in value) || value['isCompatible'] === undefined) return false;
+    if (!('hardwareVariant' in value) || value['hardwareVariant'] === undefined) return false;
+    if (!('isMinimalFirmware' in value) || value['isMinimalFirmware'] === undefined) return false;
+    if (!('buildTimestamp' in value) || value['buildTimestamp'] === undefined) return false;
+    if (!('machine' in value) || value['machine'] === undefined) return false;
+    if (!('videoStandard' in value) || value['videoStandard'] === undefined) return false;
     if (!('sdStorage' in value) || value['sdStorage'] === undefined) return false;
     if (!('usbStorage' in value) || value['usbStorage'] === undefined) return false;
     return true;
@@ -156,6 +230,14 @@ export function CartDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean): C
         'name': json['name'],
         'fwVersion': json['fwVersion'],
         'isCompatible': json['isCompatible'],
+        'hardwareVariant': HardwareVariantFromJSON(json['hardwareVariant']),
+        'isMinimalFirmware': json['isMinimalFirmware'],
+        'buildTimestamp': json['buildTimestamp'],
+        'cpuMhz': json['cpuMhz'] == null ? undefined : json['cpuMhz'],
+        'temperatureC': json['temperatureC'] == null ? undefined : json['temperatureC'],
+        'machine': MachineTypeFromJSON(json['machine']),
+        'videoStandard': VideoStandardFromJSON(json['videoStandard']),
+        'todClockHz': json['todClockHz'] == null ? undefined : json['todClockHz'],
         'sdStorage': CartStorageDtoFromJSON(json['sdStorage']),
         'usbStorage': CartStorageDtoFromJSON(json['usbStorage']),
     };
@@ -182,6 +264,14 @@ export function CartDtoToJSONTyped(value?: CartDto | null, ignoreDiscriminator: 
         'name': value['name'],
         'fwVersion': value['fwVersion'],
         'isCompatible': value['isCompatible'],
+        'hardwareVariant': HardwareVariantToJSON(value['hardwareVariant']),
+        'isMinimalFirmware': value['isMinimalFirmware'],
+        'buildTimestamp': value['buildTimestamp'],
+        'cpuMhz': value['cpuMhz'],
+        'temperatureC': value['temperatureC'],
+        'machine': MachineTypeToJSON(value['machine']),
+        'videoStandard': VideoStandardToJSON(value['videoStandard']),
+        'todClockHz': value['todClockHz'],
         'sdStorage': CartStorageDtoToJSON(value['sdStorage']),
         'usbStorage': CartStorageDtoToJSON(value['usbStorage']),
     };

@@ -33,6 +33,7 @@ models/GetDirectoryResponse.ts
 models/GetJobResponse.ts
 models/GetSettingsResponse.ts
 models/GetVersionResponse.ts
+models/HardwareVariant.ts
 models/HttpValidationProblemDetails.ts
 models/IndexAllResponse.ts
 models/IndexResponse.ts
@@ -40,6 +41,7 @@ models/IndexingStatusDto.ts
 models/LaunchFileResponse.ts
 models/LaunchRandomResponse.ts
 models/ListDevicesResponse.ts
+models/MachineType.ts
 models/NullableOfTeensyFilterType.ts
 models/PingDeviceResponse.ts
 models/PlayerSettingsDto.ts
@@ -65,6 +67,7 @@ models/TransferJobDto2.ts
 models/TransferJobState.ts
 models/UploadFileResponse.ts
 models/VideoSettingsDto.ts
+models/VideoStandard.ts
 models/ViewableItemImageDto.ts
 models/YouTubeVideoDto.ts
 models/index.ts

@@ -28,7 +28,7 @@ import {
 /**
  * 
  */
-export class AudioApiService extends runtime.BaseAPI {
+export class AudioApi extends runtime.BaseAPI {
 
     /**
      * Enumerates all available audio input devices on the host system.  **Use Case:** Call this endpoint when configuring audio streaming settings to present the user with a list of audio devices to choose from.  **Device Information:** - **Index**: Device identifier used to select the device for capture - **Name**: Human-readable device name for display in UI - **MaxInputChannels**: Number of audio channels the device supports - **DefaultSampleRate**: The device\'s preferred sample rate  Returns an empty list if no audio input devices are available.

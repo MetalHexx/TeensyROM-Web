@@ -87,7 +87,7 @@ export interface SearchRequest {
 /**
  * 
  */
-export class FilesApiService extends runtime.BaseAPI {
+export class FilesApi extends runtime.BaseAPI {
 
     /**
      * Gets a directory for given storage device.  - Returns metadata for all files in the directory. - This is not recursive and will only include the files for the requested directory. - Make another request to get subdirectory content.

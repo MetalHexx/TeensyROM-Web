@@ -41,7 +41,7 @@ export interface SaveSettingsOperationRequest {
 /**
  * 
  */
-export class SettingsApiService extends runtime.BaseAPI {
+export class SettingsApi extends runtime.BaseAPI {
 
     /**
      * Retrieves all current user settings for the TeensyROM application.  **Settings Categories:** - **Connection Settings**: Device connectivity preferences (Serial/TCP) - **Player Settings**: Playback behavior and startup preferences - **File Transfer Settings**: Auto-copy and directory watching configuration - **Search Settings**: Search weights, stop words, and content exclusions - **App Settings**: Application lifecycle state  Settings are loaded from the Settings.json file and cached in memory. This endpoint always returns the current in-memory settings state.
