@@ -31,6 +31,7 @@ namespace TeensyRom.Core.Serial
         public static readonly TeensyToken FWMinimalToken = new(0x64E1, nameof(FWMinimalToken));
         public static readonly TeensyToken FWFullToken = new(0x64E2, nameof(FWFullToken));
 		public static readonly TeensyToken VersionCheck = new('v', nameof(VersionCheck));
+        public static readonly TeensyToken VersionInfo = new(0x6476, nameof(VersionInfo));
 
         private TeensyToken(ushort value, string name) : base(name, value) { }
     }
