@@ -55,7 +55,7 @@ namespace TeensyRom.Core.Serial
             @"\s+", RegexOptions.NonBacktracking);
 
         public static readonly Version FullFirmwareFloor = new(0, 8, 0, 9);
-        public static readonly Version MinimalFirmwareFloor = new(0, 0, 2); // unchanged from FwVersionChecker
+        public static readonly Version MinimalFirmwareFloor = new(0, 0, 2);
 
         public static VersionReply Parse(string? replyText)
         {

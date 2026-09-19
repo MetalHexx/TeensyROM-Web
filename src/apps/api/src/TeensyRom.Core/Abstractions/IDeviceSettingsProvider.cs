@@ -18,7 +18,7 @@ namespace TeensyRom.Core.Abstractions
         /// <summary>
         /// Gets settings for a specific device by ID.
         /// </summary>
-        /// <param name="deviceId">The unique device identifier (hash from cart-tag.txt).</param>
+        /// <param name="deviceId">The unique device identifier (the device's chip ID).</param>
         /// <returns>The device settings if found; null otherwise.</returns>
         DeviceSettings? GetDeviceSettings(string deviceId);
 
@@ -26,7 +26,7 @@ namespace TeensyRom.Core.Abstractions
         /// Gets settings for a device, creating a new entry with defaults if not found.
         /// New devices are created with: EnableVideo=false, AutoConnectEnabled=true.
         /// </summary>
-        /// <param name="deviceId">The unique device identifier (hash from cart-tag.txt).</param>
+        /// <param name="deviceId">The unique device identifier (the device's chip ID).</param>
         /// <returns>The existing or newly created device settings.</returns>
         DeviceSettings GetOrCreateDeviceSettings(string deviceId);
 

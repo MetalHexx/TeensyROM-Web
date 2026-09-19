@@ -16,7 +16,6 @@ namespace TeensyRom.Core.Serial
         public static readonly TeensyToken SendFile = new(0x64BB, nameof(SendFile));
         public static readonly TeensyToken CopyFile = new(0x64FF, nameof(CopyFile));
         public static readonly TeensyToken GetFile = new(0x64B0, nameof(GetFile));
-        public static readonly TeensyToken CheckStorage = new(0x64B2, nameof(CheckStorage));
         public static readonly TeensyToken DeleteFile = new(0x64CF, nameof(DeleteFile));
         public static readonly TeensyToken LegacySendFile = new(0x64AA, nameof(LegacySendFile));
         public static readonly TeensyToken Ack = new(0x64CC, nameof(Ack));
@@ -30,7 +29,6 @@ namespace TeensyRom.Core.Serial
         public static readonly TeensyToken FwCheckToken = new(0x64E0, nameof(FwCheckToken));
         public static readonly TeensyToken FWMinimalToken = new(0x64E1, nameof(FWMinimalToken));
         public static readonly TeensyToken FWFullToken = new(0x64E2, nameof(FWFullToken));
-		public static readonly TeensyToken VersionCheck = new('v', nameof(VersionCheck));
         public static readonly TeensyToken VersionInfo = new(0x6476, nameof(VersionInfo));
 
         private TeensyToken(ushort value, string name) : base(name, value) { }

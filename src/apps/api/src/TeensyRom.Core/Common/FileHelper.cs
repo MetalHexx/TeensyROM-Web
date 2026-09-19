@@ -55,11 +55,10 @@ namespace TeensyRom.Core.Common
             return date.ToString("yyyy-MM-dd_HH-mm-ss");
         }
 
-        public static bool IsValidFilenameSafeHash(this string? deviceId)
-        {
-            return !string.IsNullOrEmpty(deviceId)
-                && Regex.IsMatch(deviceId, @"^[A-Z2-7]{8}$");
-        }
+        // Letters, digits, hyphen, underscore; 1–32 characters. Accepts chip IDs ("19307720"), the display-only
+        // "Unknown"/"Unknown-2" stand-ins, and any file-name-safe key. Rejects empty, whitespace, and punctuation.
+        public static bool IsValidDeviceId(this string? deviceId)
+            => !string.IsNullOrEmpty(deviceId) && Regex.IsMatch(deviceId, @"^[A-Za-z0-9_-]{1,32}$");
 
 
         public static string GenerateFilenameSafeHash(this string stringToHash)

@@ -60,7 +60,7 @@ public class GetDirectoryTests(EndpointFixture f)
 
         // Assert
         r.Should().BeValidationProblem()
-            .WithKeyAndValue("DeviceId", "Device ID must be a valid filename-safe hash of 8 characters long.");
+            .WithKeyAndValue("DeviceId", "Device ID must be 1–32 letters, digits, hyphens, or underscores.");
     }
 
     [Fact]

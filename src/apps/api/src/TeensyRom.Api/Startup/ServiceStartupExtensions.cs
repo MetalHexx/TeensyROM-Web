@@ -36,10 +36,8 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IFileTransferSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<ISearchSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IAppSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
-            services.AddSingleton<IFwVersionChecker, FwVersionChecker>();
             services.AddSingleton<IDeviceInterrogator, DeviceInterrogator>();
 			services.AddSingleton<ICartFinder, CartFinder>();
-			services.AddSingleton<ICartTagger, CartTagger>();
             services.AddSingleton<IDeviceConnectionManager, DeviceConnectionManager>();
             services.AddSingleton<IDeviceTransportFactory, DeviceTransportFactory>();
             services.AddSingleton<IStorageFactory, StorageFactory>();

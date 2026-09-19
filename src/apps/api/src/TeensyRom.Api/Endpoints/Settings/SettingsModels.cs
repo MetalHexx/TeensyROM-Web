@@ -10,7 +10,7 @@ namespace TeensyRom.Api.Endpoints.Settings
     public record DeviceSettingsDto
     {
         /// <summary>
-        /// Unique device identifier (hash from cart-tag.txt).
+        /// Unique device identifier (the device's chip ID).
         /// </summary>
         [Required] public string DeviceId { get; set; } = string.Empty;
 

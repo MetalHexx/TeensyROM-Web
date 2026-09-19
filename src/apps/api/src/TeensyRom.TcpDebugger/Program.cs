@@ -45,9 +45,7 @@ class Program
 
 				//ExecutePingCommand(tcpPort, "Ping #1 (Version Check)");
 				//ExecutePingCommand(tcpPort, "Ping #2");
-				// ExecutePingCommand(tcpPort, "Ping #3 (CartTagger)");
 
-				//ExecuteGetFileCommand(tcpPort, "/cart-tag.txt");
 				//ExecuteGetFileCommand(tcpPort, "/music/MUSICIANS/C/Corpsicle/playlist.json");
 				//ExecuteGetFileCommand(tcpPort, "/music/MUSICIANS/G/Gangstar/playlist.json");
 				//ExecuteGetFileCommand(tcpPort, "/music/MUSICIANS/R/Remarque/Worktunes/playlist.json");
