@@ -24,7 +24,7 @@ node_modules
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-!.vscode/ensure-sidablist.ps1
+!.vscode/ensure-sidablist.mjs
 
 # misc
 /.sass-cache

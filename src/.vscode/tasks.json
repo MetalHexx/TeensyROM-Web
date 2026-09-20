@@ -4,8 +4,8 @@
     {
       "label": "Ensure SIDablist Ready",
       "type": "shell",
-      "command": "pwsh",
-      "args": ["-NoLogo", "-NoProfile", "-File", "${workspaceFolder}/.vscode/ensure-sidablist.ps1"],
+      "command": "node",
+      "args": ["${workspaceFolder}/.vscode/ensure-sidablist.mjs"],
       "presentation": {
         "reveal": "silent",
         "panel": "shared"
