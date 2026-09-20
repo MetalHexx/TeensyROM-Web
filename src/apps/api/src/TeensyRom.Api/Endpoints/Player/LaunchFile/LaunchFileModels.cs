@@ -34,7 +34,7 @@ namespace TeensyRom.Api.Endpoints.Player.LaunchFile
         {
             RuleFor(x => x.DeviceId)
                 .NotEmpty().WithMessage("Device ID is required.")
-                .Must(deviceId => deviceId.IsValidFilenameSafeHash()).WithMessage("Device ID must be a valid filename-safe hash of 8 characters long.");
+                .Must(deviceId => deviceId.IsValidDeviceId()).WithMessage("Device ID must be 1–32 letters, digits, hyphens, or underscores.");
 
             RuleFor(x => x.FilePath)
                 .NotEmpty().WithMessage("Path is required.")

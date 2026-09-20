@@ -59,6 +59,46 @@ namespace TeensyRom.Api.Models
         [Required] public bool IsCompatible { get; set; }
 
         /// <summary>
+        /// The TeensyROM hardware variant reported by the device.
+        /// </summary>
+        [Required] public HardwareVariant HardwareVariant { get; set; } = HardwareVariant.Unknown;
+
+        /// <summary>
+        /// Indicates whether the device is running minimal firmware rather than full firmware.
+        /// </summary>
+        [Required] public bool IsMinimalFirmware { get; set; }
+
+        /// <summary>
+        /// The firmware build timestamp reported by the device.
+        /// </summary>
+        [Required] public string BuildTimestamp { get; set; } = string.Empty;
+
+        /// <summary>
+        /// The reported Teensy CPU clock speed in MHz. Null when the device did not report it.
+        /// </summary>
+        public int? CpuMhz { get; set; }
+
+        /// <summary>
+        /// The reported Teensy temperature in degrees Celsius. Null when the device did not report it.
+        /// </summary>
+        public decimal? TemperatureC { get; set; }
+
+        /// <summary>
+        /// The host machine the cartridge is installed in.
+        /// </summary>
+        [Required] public MachineType Machine { get; set; } = MachineType.Unknown;
+
+        /// <summary>
+        /// The video standard of the host machine.
+        /// </summary>
+        [Required] public VideoStandard VideoStandard { get; set; } = VideoStandard.Unknown;
+
+        /// <summary>
+        /// The reported time-of-day clock frequency in Hz. Null when the device did not report it.
+        /// </summary>
+        public int? TodClockHz { get; set; }
+
+        /// <summary>
         /// Information about the SD storage on the device.
         /// </summary>
         [Required] public CartStorageDto SdStorage { get; set; } = null!;
@@ -87,6 +127,14 @@ namespace TeensyRom.Api.Models
                 Name = device.Cart.Name,
                 FwVersion = device.Cart.FwVersion,
                 IsCompatible = device.Cart.IsCompatible,
+                HardwareVariant = device.Cart.HardwareVariant,
+                IsMinimalFirmware = device.Cart.IsMinimalFirmware,
+                BuildTimestamp = device.Cart.BuildTimestamp,
+                CpuMhz = device.Cart.CpuMhz,
+                TemperatureC = device.Cart.TemperatureC,
+                Machine = device.Cart.Machine,
+                VideoStandard = device.Cart.VideoStandard,
+                TodClockHz = device.Cart.TodClockHz,
                 SdStorage = CartStorageDto.FromStorage(device.Cart.SdStorage, indexingStatus?.SdLastIndexed),
                 UsbStorage = CartStorageDto.FromStorage(device.Cart.UsbStorage, indexingStatus?.UsbLastIndexed)
             };

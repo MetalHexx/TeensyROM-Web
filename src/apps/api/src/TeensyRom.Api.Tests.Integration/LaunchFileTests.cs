@@ -114,7 +114,7 @@ namespace TeensyRom.Api.Tests.Integration
             // Act - TrClient automatically handles enum serialization
             var request = new LaunchFileRequest
             {
-                DeviceId = "invalid-device-id",
+                DeviceId = "invalid@@id",
                 FilePath = NonExistentPath,
                 StorageType = TeensyStorageType.SD
             };

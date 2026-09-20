@@ -25,6 +25,10 @@ import {
   CartStorageDto,
   DeviceState,
   TeensyStorageType,
+  HardwareVariant,
+  MachineType,
+  VideoStandard,
+  ConnectionType,
 } from '@teensyrom-nx/data-access/api-client';
 import { faker } from '../faker-config';
 
@@ -55,6 +59,7 @@ export function generateCartStorage(overrides?: Partial<CartStorageDto>): CartSt
     deviceId: faker.string.uuid(),
     type: faker.helpers.arrayElement([TeensyStorageType.Sd, TeensyStorageType.Usb]),
     available: true,
+    indexExists: false,
   };
 
   return { ...generated, ...overrides };
@@ -107,6 +112,14 @@ export function generateDevice(overrides?: Partial<CartDto>): CartDto {
     name: `TeensyROM ${faker.company.name()}`,
     fwVersion,
     isCompatible: true,
+    hardwareVariant: HardwareVariant.TeensyRomPlus,
+    isMinimalFirmware: false,
+    buildTimestamp: 'Sep 18 2026, 09:41:32',
+    machine: MachineType.C64,
+    videoStandard: VideoStandard.Ntsc,
+    connectionType: ConnectionType.Serial,
+    ipAddress: '',
+    tcpPort: 0,
     sdStorage: generateCartStorage({ deviceId, type: TeensyStorageType.Sd }),
     usbStorage: generateCartStorage({ deviceId, type: TeensyStorageType.Usb }),
   };

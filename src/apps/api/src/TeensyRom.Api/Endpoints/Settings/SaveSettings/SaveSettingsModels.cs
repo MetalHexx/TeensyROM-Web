@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using TeensyRom.Core.Common;
 
 namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
 {
@@ -79,7 +80,8 @@ namespace TeensyRom.Api.Endpoints.Settings.SaveSettings
         public DeviceSettingsValidator()
         {
             RuleFor(x => x.DeviceId)
-                .NotEmpty().WithMessage("Device ID is required.");
+                .NotEmpty().WithMessage("Device ID is required.")
+                .Must(deviceId => deviceId.IsValidDeviceId()).WithMessage("Device ID must be 1–32 letters, digits, hyphens, or underscores.");
 
             RuleFor(x => x.VideoSettings)
                 .NotNull().WithMessage("Video settings are required for each device.")

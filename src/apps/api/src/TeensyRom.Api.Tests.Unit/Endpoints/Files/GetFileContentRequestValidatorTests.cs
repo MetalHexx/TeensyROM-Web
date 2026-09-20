@@ -26,14 +26,14 @@ public class GetFileContentRequestValidatorTests
     public void Validate_InvalidDeviceId_FailsWithDeviceIdError()
     {
         var request = ValidRequest();
-        request.DeviceId = "not-a-hash";
+        request.DeviceId = "invalid@@id";
 
         var result = _validator.Validate(request);
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e =>
             e.PropertyName == nameof(GetFileContentRequest.DeviceId) &&
-            e.ErrorMessage == "Device ID must be a valid filename-safe hash of 8 characters long.");
+            e.ErrorMessage == "Device ID must be 1–32 letters, digits, hyphens, or underscores.");
     }
 
     [Fact]

@@ -70,7 +70,7 @@ namespace TeensyRom.Api.Tests.Integration
             // Act
             var request = new RemoveFavoriteRequest
             {
-                DeviceId = "invalid-device-id",
+                DeviceId = "invalid@@id",
                 FilePath = _nonExistentPath,
                 StorageType = TeensyStorageType.SD
             };

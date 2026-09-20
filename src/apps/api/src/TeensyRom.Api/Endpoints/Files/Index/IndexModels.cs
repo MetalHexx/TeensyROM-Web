@@ -34,7 +34,7 @@ namespace TeensyRom.Api.Endpoints.Files.Index
         public IndexRequestValidator()
         {
             RuleFor(x => x.DeviceId)
-                .Must(deviceId => deviceId.IsValidFilenameSafeHash())
+                .Must(deviceId => deviceId.IsValidDeviceId())
                 .WithMessage("Invalid Device Id.");
 
             RuleFor(x => x.StorageType)

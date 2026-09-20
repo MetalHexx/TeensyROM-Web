@@ -1469,6 +1469,11 @@
           "name",
           "fwVersion",
           "isCompatible",
+          "hardwareVariant",
+          "isMinimalFirmware",
+          "buildTimestamp",
+          "machine",
+          "videoStandard",
           "sdStorage",
           "usbStorage"
         ],
@@ -1504,6 +1509,36 @@
           },
           "isCompatible": {
             "type": "boolean"
+          },
+          "hardwareVariant": {
+            "$ref": "#/components/schemas/HardwareVariant"
+          },
+          "isMinimalFirmware": {
+            "type": "boolean"
+          },
+          "buildTimestamp": {
+            "type": "string"
+          },
+          "cpuMhz": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "temperatureC": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "machine": {
+            "$ref": "#/components/schemas/MachineType"
+          },
+          "videoStandard": {
+            "$ref": "#/components/schemas/VideoStandard"
+          },
+          "todClockHz": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           },
           "sdStorage": {
             "$ref": "#/components/schemas/CartStorageDto"
@@ -1950,6 +1985,13 @@
           }
         }
       },
+      "HardwareVariant": {
+        "enum": [
+          "Unknown",
+          "TeensyRom",
+          "TeensyRomPlus"
+        ]
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -2073,6 +2115,13 @@
             }
           }
         }
+      },
+      "MachineType": {
+        "enum": [
+          "Unknown",
+          "C64",
+          "C128"
+        ]
       },
       "NullableOfTeensyFilterType": {
         "enum": [
@@ -2735,6 +2784,13 @@
             "type": "string"
           }
         }
+      },
+      "VideoStandard": {
+        "enum": [
+          "Unknown",
+          "NTSC",
+          "PAL"
+        ]
       },
       "ViewableItemImageDto": {
         "required": [

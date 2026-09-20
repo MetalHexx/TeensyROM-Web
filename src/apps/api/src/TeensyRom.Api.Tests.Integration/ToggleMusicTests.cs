@@ -54,7 +54,7 @@ namespace TeensyRom.Api.Tests.Integration
             // Act
             var request = new ToggleMusicRequest
             {
-                DeviceId = "invalid-device-id"
+                DeviceId = "invalid@@id"
             };
             var r = await f.Client.PostAsync<ToggleMusicEndpoint, ToggleMusicRequest, ValidationProblemDetails>(request);
 

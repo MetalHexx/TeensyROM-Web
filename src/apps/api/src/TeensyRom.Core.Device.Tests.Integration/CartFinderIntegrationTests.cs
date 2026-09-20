@@ -3,8 +3,6 @@ using TeensyRom.Core.Device;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Settings;
-using TeensyRom.Core.Commands.GetFile;
-using TeensyRom.Core.Commands;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.ValueObjects;
 using TeensyRom.Core.Entities.Serial;
@@ -25,19 +23,6 @@ public class CartFinderTests : IAsyncDisposable
         _log = Substitute.For<ILoggingService>();
         _mockTransportFactory = Substitute.For<IDeviceTransportFactory>();
     }
-
-    #region Helper Methods
-
-    /// <summary>
-    /// Serializes a CartTag with the given DeviceId for use in mock GetFileResult responses.
-    /// </summary>
-    private byte[] SerializeTag(string deviceId)
-    {
-        var tag = new CartTag { DeviceId = deviceId };
-        return tag.Serialize() ?? throw new InvalidOperationException("Failed to serialize tag");
-    }
-
-    #endregion
 
     [Fact]
     public async Task CartFinder_With_Serial_Only_Strategy_Discovers_Serial_Devices()
@@ -157,396 +142,148 @@ public class CartFinderTests : IAsyncDisposable
         Assert.Equal(endpoints1.Count, endpoints2.Count);
     }
 
-    #region Tag Synchronization Integration Tests
+    #region Version Reply Integration Tests
+
+    private const string FullReplyText =
+        "\n  FW: TeensyROM+ v0.8.0.9\r\n      Sep 18 2026, 09:41:32\r\n  Teensy: 816MHz  59.1C  UID: 19307720\r\n  C128  NTSC Vid  60 Hz\n";
+
+    private const string BelowFloorReplyText =
+        "\n  FW: TeensyROM v0.7.2.10\r\n      Jan 03 2024, 11:02:14\r\n  Teensy: 600MHz  48.2C  UID: 12345678\r\n  C64  PAL Vid  50 Hz\n";
+
+    private const string ChipId = "19307720";
 
     /// <summary>
-    /// Integration test verifying device discovery succeeds when both storage have the same DeviceId.
-    /// Uses real CartFinder and CartTagger with mocked MediatR commands.
+    /// Scripts one segment for a present storage root: the parameter ack, the command ack, then an
+    /// empty directory listing.
+    /// </summary>
+    private static void ScriptStoragePresent(ScriptedCommunicationPort port) =>
+        port.NewSegment()
+            .EnqueueToken(TeensyToken.Ack)
+            .EnqueueToken(TeensyToken.Ack)
+            .EnqueueToken(TeensyToken.StartDirectoryList)
+            .EnqueueToken(TeensyToken.EndDirectoryList);
+
+    /// <summary>Scripts one segment for a storage root the firmware reports as missing.</summary>
+    private static void ScriptStorageAbsent(ScriptedCommunicationPort port) =>
+        port.NewSegment()
+            .EnqueueToken(TeensyToken.Ack)
+            .EnqueueToken(TeensyToken.Fail)
+            .EnqueueText("Specified storage device was not found: 1");
+
+    private CartFinder CreateFinder(
+        IStorageFactory storageFactory,
+        IMediator mediator,
+        IAlertService alert,
+        IDeviceSettingsProvider settingsProvider) =>
+        new(
+            _log,
+            storageFactory,
+            new DeviceInterrogator(_log),
+            alert,
+            mediator,
+            Array.Empty<IDiscoveryStrategy>(),
+            settingsProvider);
+
+    private static async Task<TeensyRomDevice?> ValidateAndCreateDevice(CartFinder finder, ICommunicationPort port)
+    {
+        var endpoint = new DiscoveredEndpoint(ConnectionType.Serial, "COM3", null, "TeensyROM Ready!", port);
+
+        var method = typeof(CartFinder).GetMethod("ValidateAndCreateDevice",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        var deviceTask = method?.Invoke(finder, new object[] { endpoint, CancellationToken.None }) as Task<TeensyRomDevice?>;
+        return await deviceTask!;
+    }
+
+    /// <summary>
+    /// The real interrogator and parser over a scripted transport: a full reply plus two present
+    /// storage roots yields a device keyed on the reported chip id with both storages available.
     /// </summary>
     [Fact]
-    public async Task CartFinder_WithMatchingStorageIds_SuccessfullyCreatesDevice()
+    public async Task CartFinder_WithFullReplyAndBothStoragePresent_CreatesDeviceFromReply()
     {
-        // Arrange
-        var mockMediator = Substitute.For<IMediator>();
-        var mockPort = Substitute.For<ICommunicationPort>();
+        var port = new ScriptedCommunicationPort();
+        port.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueText(FullReplyText);
+        ScriptStoragePresent(port);
+        ScriptStoragePresent(port);
+
         var mockStorageFactory = Substitute.For<IStorageFactory>();
-        var mockVersionChecker = Substitute.For<IFwVersionChecker>();
-        var mockSettingsProvider = Substitute.For<IDeviceSettingsProvider>();
-        
-        var sharedId = "AAA111";
-        
-        // Mock GetFile commands for both storage types with matching IDs
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.SD))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = true,
-                FileData = SerializeTag(sharedId)
-            });
-
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.USB))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = true,
-                FileData = SerializeTag(sharedId)
-            });
-
-        // Mock version check to return compatible version
-        mockVersionChecker.VersionCheck(Arg.Any<string>())
-            .Returns((true, new Version("1.0.0")));
-
-        // Create real CartTagger and CartFinder instances
-        var cartTagger = new CartTagger(_log, mockMediator);
-        var cartFinder = new CartFinder(
-            _log,
+        var finder = CreateFinder(
             mockStorageFactory,
-            cartTagger,
-            mockVersionChecker,
-            mockMediator,
-            Array.Empty<IDiscoveryStrategy>(),
-            mockSettingsProvider
-        );
+            Substitute.For<IMediator>(),
+            Substitute.For<IAlertService>(),
+            Substitute.For<IDeviceSettingsProvider>());
 
-        // Create a mock endpoint with ping response
-        var endpoint = new DiscoveredEndpoint(
-            ConnectionType.Serial,
-            "COM3",
-            null,
-            "TeensyROM v1.0.0",
-            mockPort
-        );
+        var device = await ValidateAndCreateDevice(finder, port);
 
-        // Use reflection to call ValidateAndCreateDevice
-        var method = typeof(CartFinder).GetMethod("ValidateAndCreateDevice", 
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        // Act
-        var deviceTask = method?.Invoke(cartFinder, new object[] { endpoint, CancellationToken.None }) as Task<TeensyRomDevice?>;
-        var device = await deviceTask!;
-
-        // Assert
         Assert.NotNull(device);
-        Assert.Equal(sharedId, device.Cart.DeviceId);
+        Assert.Equal(ChipId, device.Cart.DeviceId);
+        Assert.True(device.Cart.IsCompatible);
+        Assert.Equal("0.8.0.9", device.Cart.FwVersion);
+        Assert.Equal(HardwareVariant.TeensyRomPlus, device.Cart.HardwareVariant);
+        Assert.Equal(MachineType.C128, device.Cart.Machine);
+        Assert.Equal(VideoStandard.NTSC, device.Cart.VideoStandard);
         Assert.True(device.Cart.SdStorage.Available);
         Assert.True(device.Cart.UsbStorage.Available);
-        Assert.Equal(sharedId, device.Cart.SdStorage.DeviceId);
-        Assert.Equal(sharedId, device.Cart.UsbStorage.DeviceId);
-
-        // Verify no SaveFilesCommand was sent (already synchronized)
-        await mockMediator.DidNotReceive().Send(Arg.Any<SaveFilesCommand>());
+        Assert.Equal(ChipId, device.Cart.SdStorage.DeviceId);
+        Assert.Equal(ChipId, device.Cart.UsbStorage.DeviceId);
     }
 
     /// <summary>
-    /// Integration test verifying SD DeviceId is preferred and USB is updated when IDs differ.
-    /// Uses real CartFinder and CartTagger with mocked MediatR commands.
+    /// A storage-not-found failure on the SD probe leaves SD unavailable without affecting USB.
     /// </summary>
     [Fact]
-    public async Task CartFinder_WithMismatchedStorageIds_ResolvesConflictAndUpdatesUsb()
+    public async Task CartFinder_WithFullReplyAndSdAbsent_LeavesSdUnavailableAndUsbAvailable()
     {
-        // Arrange
-        var mockMediator = Substitute.For<IMediator>();
-        var mockPort = Substitute.For<ICommunicationPort>();
-        var mockStorageFactory = Substitute.For<IStorageFactory>();
-        var mockVersionChecker = Substitute.For<IFwVersionChecker>();
-        var mockSettingsProvider = Substitute.For<IDeviceSettingsProvider>();
-        
-        var sdId = "SD-ID-111";
-        var usbId = "USB-ID-222";
-        
-        // Mock GetFile commands with different IDs
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.SD))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = true,
-                FileData = SerializeTag(sdId)
-            });
+        var port = new ScriptedCommunicationPort();
+        port.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueText(FullReplyText);
+        ScriptStorageAbsent(port);
+        ScriptStoragePresent(port);
 
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.USB))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = true,
-                FileData = SerializeTag(usbId)
-            });
+        var finder = CreateFinder(
+            Substitute.For<IStorageFactory>(),
+            Substitute.For<IMediator>(),
+            Substitute.For<IAlertService>(),
+            Substitute.For<IDeviceSettingsProvider>());
 
-        // Mock SaveFilesCommand to succeed
-        mockMediator.Send(Arg.Any<SaveFilesCommand>())
-            .Returns(new SaveFilesResult { IsSuccess = true });
+        var device = await ValidateAndCreateDevice(finder, port);
 
-        // Mock version check
-        mockVersionChecker.VersionCheck(Arg.Any<string>())
-            .Returns((true, new Version("1.0.0")));
-
-        // Create real CartTagger and CartFinder instances
-        var cartTagger = new CartTagger(_log, mockMediator);
-        var cartFinder = new CartFinder(
-            _log,
-            mockStorageFactory,
-            cartTagger,
-            mockVersionChecker,
-            mockMediator,
-            Array.Empty<IDiscoveryStrategy>(),
-            mockSettingsProvider
-        );
-
-        // Create a mock endpoint
-        var endpoint = new DiscoveredEndpoint(
-            ConnectionType.Serial,
-            "COM3",
-            null,
-            "TeensyROM v1.0.0",
-            mockPort
-        );
-
-        // Use reflection to call ValidateAndCreateDevice
-        var method = typeof(CartFinder).GetMethod("ValidateAndCreateDevice", 
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        // Act
-        var deviceTask = method?.Invoke(cartFinder, new object[] { endpoint, CancellationToken.None }) as Task<TeensyRomDevice?>;
-        var device = await deviceTask!;
-
-        // Assert
         Assert.NotNull(device);
-        Assert.Equal(sdId, device.Cart.DeviceId); // SD preferred
-        Assert.True(device.Cart.SdStorage.Available);
-        Assert.True(device.Cart.UsbStorage.Available);
-
-        // Verify SaveFilesCommand was sent to update USB
-        await mockMediator.Received(1).Send(Arg.Is<SaveFilesCommand>(c =>
-            c.Files.Any(f => f.TargetStorage == TeensyStorageType.USB)
-        ));
-    }
-
-    /// <summary>
-    /// Integration test verifying device creation succeeds when USB storage is unavailable (Error 3).
-    /// Uses real CartFinder and CartTagger with mocked MediatR commands.
-    /// </summary>
-    [Fact]
-    public async Task CartFinder_WithUsbUnavailable_CreatesDeviceWithSdIdOnly()
-    {
-        // Arrange
-        var mockMediator = Substitute.For<IMediator>();
-        var mockPort = Substitute.For<ICommunicationPort>();
-        var mockStorageFactory = Substitute.For<IStorageFactory>();
-        var mockVersionChecker = Substitute.For<IFwVersionChecker>();
-        var mockSettingsProvider = Substitute.For<IDeviceSettingsProvider>();
-        
-        var sdOnlyId = "ONLY-SD";
-        
-        // Mock GetFile: SD succeeds, USB unavailable
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.SD))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = true,
-                FileData = SerializeTag(sdOnlyId)
-            });
-
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.USB))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = false,
-                ErrorCode = GetFileErrorCode.StorageUnavailable
-            });
-
-        // Mock version check
-        mockVersionChecker.VersionCheck(Arg.Any<string>())
-            .Returns((true, new Version("1.0.0")));
-
-        // Create real CartTagger and CartFinder instances
-        var cartTagger = new CartTagger(_log, mockMediator);
-        var cartFinder = new CartFinder(
-            _log,
-            mockStorageFactory,
-            cartTagger,
-            mockVersionChecker,
-            mockMediator,
-            Array.Empty<IDiscoveryStrategy>(),
-            mockSettingsProvider
-        );
-
-        // Create a mock endpoint
-        var endpoint = new DiscoveredEndpoint(
-            ConnectionType.Serial,
-            "COM3",
-            null,
-            "TeensyROM v1.0.0",
-            mockPort
-        );
-
-        // Use reflection to call ValidateAndCreateDevice
-        var method = typeof(CartFinder).GetMethod("ValidateAndCreateDevice", 
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        // Act
-        var deviceTask = method?.Invoke(cartFinder, new object[] { endpoint, CancellationToken.None }) as Task<TeensyRomDevice?>;
-        var device = await deviceTask!;
-
-        // Assert
-        Assert.NotNull(device);
-        Assert.Equal(sdOnlyId, device.Cart.DeviceId);
-        Assert.True(device.Cart.SdStorage.Available);
-        Assert.False(device.Cart.UsbStorage.Available);
-
-        // Verify no SaveFilesCommand was sent to USB (unavailable)
-        await mockMediator.DidNotReceive().Send(Arg.Is<SaveFilesCommand>(c =>
-            c.Files.Any(f => f.TargetStorage == TeensyStorageType.USB)
-        ));
-    }
-
-    /// <summary>
-    /// Integration test verifying device creation when SD storage is unavailable but USB has a tag.
-    /// Uses real CartFinder and CartTagger with mocked MediatR commands.
-    /// </summary>
-    [Fact]
-    public async Task CartFinder_WithSdUnavailable_CreatesDeviceWithUsbIdOnly()
-    {
-        // Arrange
-        var mockMediator = Substitute.For<IMediator>();
-        var mockPort = Substitute.For<ICommunicationPort>();
-        var mockStorageFactory = Substitute.For<IStorageFactory>();
-        var mockVersionChecker = Substitute.For<IFwVersionChecker>();
-        var mockSettingsProvider = Substitute.For<IDeviceSettingsProvider>();
-        
-        var usbOnlyId = "ONLY-USB";
-        
-        // Mock GetFile: SD unavailable, USB succeeds
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.SD))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = false,
-                ErrorCode = GetFileErrorCode.StorageUnavailable
-            });
-
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.USB))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = true,
-                FileData = SerializeTag(usbOnlyId)
-            });
-
-        // Mock version check
-        mockVersionChecker.VersionCheck(Arg.Any<string>())
-            .Returns((true, new Version("1.0.0")));
-
-        // Create real CartTagger and CartFinder instances
-        var cartTagger = new CartTagger(_log, mockMediator);
-        var cartFinder = new CartFinder(
-            _log,
-            mockStorageFactory,
-            cartTagger,
-            mockVersionChecker,
-            mockMediator,
-            Array.Empty<IDiscoveryStrategy>(),
-            mockSettingsProvider
-        );
-
-        // Create a mock endpoint
-        var endpoint = new DiscoveredEndpoint(
-            ConnectionType.Serial,
-            "COM3",
-            null,
-            "TeensyROM v1.0.0",
-            mockPort
-        );
-
-        // Use reflection to call ValidateAndCreateDevice
-        var method = typeof(CartFinder).GetMethod("ValidateAndCreateDevice", 
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        // Act
-        var deviceTask = method?.Invoke(cartFinder, new object[] { endpoint, CancellationToken.None }) as Task<TeensyRomDevice?>;
-        var device = await deviceTask!;
-
-        // Assert
-        Assert.NotNull(device);
-        Assert.Equal(usbOnlyId, device.Cart.DeviceId);
+        Assert.Equal(ChipId, device.Cart.DeviceId);
         Assert.False(device.Cart.SdStorage.Available);
         Assert.True(device.Cart.UsbStorage.Available);
-
-        // Verify no SaveFilesCommand was sent to SD (unavailable)
-        await mockMediator.DidNotReceive().Send(Arg.Is<SaveFilesCommand>(c =>
-            c.Files.Any(f => f.TargetStorage == TeensyStorageType.SD)
-        ));
     }
 
     /// <summary>
-    /// Integration test verifying device creation when neither storage has existing tags.
-    /// CartTagger should generate a new DeviceId and save to both storage types.
+    /// A reply below the firmware floor is still listed - with its chip id on the cart and on both
+    /// storage descriptors - but nothing is probed and the incompatibility is alerted.
     /// </summary>
     [Fact]
-    public async Task CartFinder_WithNoExistingTags_GeneratesNewDeviceIdAndSavesToBoth()
+    public async Task CartFinder_WithBelowFloorReply_ListsIncompatibleDeviceWithoutProbing()
     {
-        // Arrange
-        var mockMediator = Substitute.For<IMediator>();
-        var mockPort = Substitute.For<ICommunicationPort>();
-        var mockStorageFactory = Substitute.For<IStorageFactory>();
-        var mockVersionChecker = Substitute.For<IFwVersionChecker>();
+        var port = new ScriptedCommunicationPort();
+        port.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueText(BelowFloorReplyText);
+
+        var mockAlert = Substitute.For<IAlertService>();
         var mockSettingsProvider = Substitute.For<IDeviceSettingsProvider>();
-        
-        // Mock GetFile: Both return FileNotFound (available but empty)
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.SD))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = false,
-                ErrorCode = GetFileErrorCode.FileNotFound
-            });
+        var finder = CreateFinder(
+            Substitute.For<IStorageFactory>(),
+            Substitute.For<IMediator>(),
+            mockAlert,
+            mockSettingsProvider);
 
-        mockMediator.Send(Arg.Is<GetFileCommand>(c => c.StorageType == TeensyStorageType.USB))
-            .Returns(new GetFileResult
-            {
-                IsSuccess = false,
-                ErrorCode = GetFileErrorCode.FileNotFound
-            });
+        var device = await ValidateAndCreateDevice(finder, port);
 
-        // Mock SaveFilesCommand to succeed
-        mockMediator.Send(Arg.Any<SaveFilesCommand>())
-            .Returns(new SaveFilesResult { IsSuccess = true });
-
-        // Mock version check
-        mockVersionChecker.VersionCheck(Arg.Any<string>())
-            .Returns((true, new Version("1.0.0")));
-
-        // Create real CartTagger and CartFinder instances
-        var cartTagger = new CartTagger(_log, mockMediator);
-        var cartFinder = new CartFinder(
-            _log,
-            mockStorageFactory,
-            cartTagger,
-            mockVersionChecker,
-            mockMediator,
-            Array.Empty<IDiscoveryStrategy>(),
-            mockSettingsProvider
-        );
-
-        // Create a mock endpoint
-        var endpoint = new DiscoveredEndpoint(
-            ConnectionType.Serial,
-            "COM3",
-            null,
-            "TeensyROM v1.0.0",
-            mockPort
-        );
-
-        // Use reflection to call ValidateAndCreateDevice
-        var method = typeof(CartFinder).GetMethod("ValidateAndCreateDevice", 
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        // Act
-        var deviceTask = method?.Invoke(cartFinder, new object[] { endpoint, CancellationToken.None }) as Task<TeensyRomDevice?>;
-        var device = await deviceTask!;
-
-        // Assert
         Assert.NotNull(device);
-        Assert.False(string.IsNullOrEmpty(device.Cart.DeviceId)); // New ID generated
-        Assert.True(device.Cart.SdStorage.Available);
-        Assert.True(device.Cart.UsbStorage.Available);
-
-        // Verify SaveFilesCommand was sent to both storage types (2 separate calls)
-        await mockMediator.Received(1).Send(Arg.Is<SaveFilesCommand>(c =>
-            c.Files.Any(f => f.TargetStorage == TeensyStorageType.SD)
-        ));
-        await mockMediator.Received(1).Send(Arg.Is<SaveFilesCommand>(c =>
-            c.Files.Any(f => f.TargetStorage == TeensyStorageType.USB)
-        ));
+        Assert.False(device.Cart.IsCompatible);
+        Assert.Equal("0.7.2.10", device.Cart.FwVersion);
+        Assert.Equal("12345678", device.Cart.DeviceId);
+        Assert.Equal("12345678", device.Cart.SdStorage.DeviceId);
+        Assert.Equal("12345678", device.Cart.UsbStorage.DeviceId);
+        Assert.False(device.Cart.SdStorage.Available);
+        Assert.False(device.Cart.UsbStorage.Available);
+        mockAlert.Received(1).Publish(Arg.Any<string>());
+        mockSettingsProvider.DidNotReceive().GetOrCreateDeviceSettings(Arg.Any<string>());
     }
 
     #endregion

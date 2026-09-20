@@ -55,7 +55,7 @@ namespace TeensyRom.Api.Endpoints.Transfers.CreateJob
         {
             RuleFor(x => x.DeviceId)
                 .NotEmpty().WithMessage("Device ID is required.")
-                .Must(id => id.IsValidFilenameSafeHash()).WithMessage("Device ID must be a valid filename-safe hash of 8 characters long.");
+                .Must(id => id.IsValidDeviceId()).WithMessage("Device ID must be 1–32 letters, digits, hyphens, or underscores.");
 
             RuleFor(x => x.StorageType)
                 .IsInEnum().WithMessage("Storage type must be a valid enum value.");
