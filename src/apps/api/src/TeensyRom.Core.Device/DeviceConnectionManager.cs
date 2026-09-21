@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
@@ -30,7 +31,7 @@ namespace TeensyRom.Core.Device
         private readonly ConnectionOptions _options;
         private readonly ILoggingService _log;
 
-        private readonly Dictionary<string, TeensyRomDevice> _byChip = [];
+        private readonly ConcurrentDictionary<string, TeensyRomDevice> _byChip = new();
         private readonly SemaphoreSlim _occasionGate = new(1, 1);
         private Task<List<TeensyRomDevice>>? _inFlight;
 
