@@ -32,6 +32,15 @@ namespace TeensyRom.Api.Tests.Integration.Common
         private List<byte> _pendingBody = [];
         private ushort _nextTwoByteResponse = TeensyToken.Ack.Value;
 
+        /// <summary>
+        /// True from the moment a command response is queued until <see cref="Read(byte[], int, int)"/>
+        /// delivers it - the seam <see cref="BytesToRead"/> reads to report "no more data" once that one
+        /// reply has been consumed, the same as a real port going idle. Without it, a caller polling for
+        /// idle (<c>TRDiscoveryRoutines.ReadTextUntilIdle</c>) sees a permanently nonzero backlog and
+        /// spins for its full timeout on every call instead of returning as soon as the reply is read.
+        /// </summary>
+        private bool _hasUnreadResponse;
+
         /// <summary>Applied while a file body is being written - the knob the concurrency proof turns.</summary>
         public TimeSpan PerFileDelay { get; set; } = TimeSpan.Zero;
 
@@ -49,7 +58,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
         public IReadOnlyList<FakeReceivedFile> Received => [.. _received];
 
         public bool IsOpen => !SimulateDeviceLoss;
-        public int BytesToRead => 2;
+        public int BytesToRead => _hasUnreadResponse ? 2 : 0;
 
         public void ClearBuffers() { }
 
@@ -65,6 +74,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
                 if (numBytes == 2 && intToSend == TeensyToken.FwCheckToken.Value)
                 {
                     _nextTwoByteResponse = TeensyToken.FWFullToken.Value;
+                    _hasUnreadResponse = true;
                     return;
                 }
                 if (numBytes == 2 && intToSend == TeensyToken.Ping.Value)
@@ -75,12 +85,14 @@ namespace TeensyRom.Api.Tests.Integration.Common
                 {
                     _stage = Stage.AwaitLength;
                     _nextTwoByteResponse = TeensyToken.Ack.Value;
+                    _hasUnreadResponse = true;
                     return;
                 }
                 if (numBytes == 2 && intToSend == TeensyToken.DeleteFile.Value)
                 {
                     _stage = Stage.AwaitDeleteStorageToken;
                     _nextTwoByteResponse = TeensyToken.Ack.Value;
+                    _hasUnreadResponse = true;
                     return;
                 }
 
@@ -103,6 +115,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
                         break;
                 }
                 _nextTwoByteResponse = TeensyToken.Ack.Value;
+                _hasUnreadResponse = true;
             }
         }
 
@@ -174,6 +187,7 @@ namespace TeensyRom.Api.Tests.Integration.Common
             lock (_gate)
             {
                 response = _nextTwoByteResponse;
+                _hasUnreadResponse = false;
             }
             var bytes = BitConverter.GetBytes(response);
             var toCopy = Math.Min(count, bytes.Length);
