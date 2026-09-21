@@ -14,6 +14,7 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
     public sealed class ScriptedCommunicationPort : ICommunicationPort
     {
         private readonly Queue<Queue<byte>> _segments = new();
+        private readonly Queue<(int QuietMs, byte[] Bytes)> _lateArrivals = new();
         private readonly List<byte> _written = [];
         private Queue<byte>? _authoringSegment;
         private Queue<byte>? _currentSegment;
@@ -50,6 +51,23 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
 
         public ScriptedCommunicationPort EnqueueText(string text) =>
             Enqueue(Encoding.Latin1.GetBytes(text));
+
+        /// <summary>
+        /// Scripts bytes the device only sends after <paramref name="quietMs"/> of silence - the shape of
+        /// the C64 menu's boot SID token, which lands well after the reset text has gone quiet. They
+        /// become readable inside <see cref="WaitForSerialData"/>, and only when the caller gave that wait
+        /// a budget long enough to cover the gap, so a routine that stops reading too early misses them.
+        /// Virtual time: no test actually sleeps.
+        /// </summary>
+        public ScriptedCommunicationPort EnqueueAfterQuiet(int quietMs, params byte[] bytes)
+        {
+            _lateArrivals.Enqueue((quietMs, bytes));
+            return this;
+        }
+
+        /// <summary>Late-arriving device->host token, low byte first - see <see cref="EnqueueAfterQuiet"/>.</summary>
+        public ScriptedCommunicationPort EnqueueTokenAfterQuiet(int quietMs, TeensyToken token) =>
+            EnqueueAfterQuiet(quietMs, (byte)(token.Value & 0xFF), (byte)(token.Value >> 8));
 
         /// <summary>Arms a one-shot exception thrown by the next <see cref="ReadSerialBytes(int)"/> call, then clears itself.</summary>
         public ScriptedCommunicationPort ThrowOnNextRead(Exception exception)
@@ -140,13 +158,36 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
             return bytes;
         }
 
-        /// <summary>Throws immediately (no real waiting) when the current segment holds fewer than <paramref name="numBytes"/> bytes.</summary>
+        /// <summary>
+        /// Returns as soon as the current segment holds <paramref name="numBytes"/> bytes. Otherwise it
+        /// advances virtual time by <paramref name="timeoutMs"/> and delivers any late arrival whose quiet
+        /// gap fits inside that budget; nothing left to deliver in time is a timeout, thrown immediately
+        /// so no test spends real seconds waiting.
+        /// </summary>
         public void WaitForSerialData(int numBytes, int timeoutMs)
         {
-            if (BytesToRead < numBytes)
+            if (BytesToRead >= numBytes)
             {
-                throw new TimeoutException();
+                return;
             }
+
+            if (_lateArrivals.Count > 0 && _lateArrivals.Peek().QuietMs <= timeoutMs)
+            {
+                var (_, bytes) = _lateArrivals.Dequeue();
+                _currentSegment ??= new Queue<byte>();
+
+                foreach (var b in bytes)
+                {
+                    _currentSegment.Enqueue(b);
+                }
+
+                if (BytesToRead >= numBytes)
+                {
+                    return;
+                }
+            }
+
+            throw new TimeoutException();
         }
 
         public void SendSignedChar(sbyte charToSend) { }

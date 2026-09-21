@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands.MuteSidVoices;
 using TeensyRom.Core.Common;
@@ -14,6 +15,9 @@ namespace TeensyRom.Core.Serial.Routines
 	public static class TRStreamExtensions
 	{
 		private const string _logClass = $"{nameof(TRStreamExtensions)}:";
+
+		/// <summary>Bench: the menu's SID token lands about 650 ms after the reset text; this is headroom over that, not a wait anyone expects to spend.</summary>
+		private const int _menuBootTimeoutMs = 3000;
 
 		public static byte[] GetFile(this ICommunicationPort communicationPort, string filePath, TeensyStorageType storageType)
 		{
@@ -111,24 +115,115 @@ namespace TeensyRom.Core.Serial.Routines
 		}
 
 		/// <summary>
-		/// Sends the raw reset token and reads whatever reply follows. Never throws on a transport drop: a
-		/// reset sent to a device in minimal reboots the Teensy mid-reply, so the port going away while
-		/// reading is the normal path there, not an error - the caller decides whether recovery follows.
+		/// Sends the raw reset token and reads the reply through to the C64 menu coming back up - see
+		/// <see cref="WaitForMenuBootToken"/> for why the menu's token has to be consumed here. This is the
+		/// only writer of the reset token, so every caller (the gate, <c>CartFinder</c>, the reset command)
+		/// gets that guarantee without a guard of its own. Never throws on a transport drop: a reset sent to
+		/// a device in minimal reboots the Teensy mid-reply, so the port going away while reading is the
+		/// normal path there, not an error - the caller decides whether recovery follows.
 		/// </summary>
-		public static void ResetDevice(this ICommunicationPort communicationPort, ILoggingService log)
+		/// <returns>
+		/// True when the menu announced itself and its token was consumed; false when it never did inside
+		/// the bound, or the transport dropped first - in which case the next command may still meet the
+		/// token and the caller has to bring the device back itself.
+		/// </returns>
+		public static bool ResetDevice(this ICommunicationPort communicationPort, ILoggingService log, int menuBootTimeoutMs = _menuBootTimeoutMs)
 		{
 			log.Internal($"{_logClass} Resetting TeensyROM");
 			try
 			{
 				communicationPort.SendIntBytes(TeensyToken.Reset, 2);
-				var response = TRDiscoveryRoutines.ReadTextUntilIdle(communicationPort, idleTimeoutMs: 200);
-				log.External($"{_logClass} TR Response: '{response.Trim()}'");
+				return communicationPort.WaitForMenuBootToken(log, menuBootTimeoutMs);
 			}
 			catch (Exception ex) when (TransportDrop.IsDrop(ex, communicationPort))
 			{
 				log.Internal($"{_logClass} reset sent; transport dropped during the reply (expected when the device was in minimal)");
+				return false;
 			}
 		}
+
+		/// <summary>
+		/// Reads the device's post-reset output until the C64 menu's boot-time SID load answers with
+		/// <see cref="TeensyToken.GoodSIDToken"/> or <see cref="TeensyToken.BadSIDToken"/>, bounded by
+		/// <paramref name="timeoutMs"/>. Every reset boots the menu, and the menu asks the firmware for its
+		/// default SID unconditionally; the firmware answers on the same channel commands use, roughly
+		/// 650 ms after the reset text. Left there, that token is read as the next command's Ack, so this
+		/// waits for the firmware's own signal - no fixed sleep - and clears the buffers behind it.
+		/// </summary>
+		/// <returns>
+		/// True when the token arrived. False is a timeout, not a quiet success: the menu never came up
+		/// within the bound, and it is logged as such.
+		/// </returns>
+		public static bool WaitForMenuBootToken(this ICommunicationPort communicationPort, ILoggingService log, int timeoutMs = _menuBootTimeoutMs)
+		{
+			var received = new List<byte>();
+			var stopwatch = Stopwatch.StartNew();
+
+			while (true)
+			{
+				var remainingMs = timeoutMs - (int)stopwatch.ElapsedMilliseconds;
+
+				if (remainingMs <= 0)
+				{
+					break;
+				}
+
+				try
+				{
+					communicationPort.WaitForSerialData(numBytes: 1, timeoutMs: remainingMs);
+				}
+				catch (TimeoutException)
+				{
+					break;
+				}
+
+				var toRead = communicationPort.BytesToRead;
+
+				if (toRead <= 0)
+				{
+					break;
+				}
+
+				var buffer = new byte[toRead];
+				var bytesRead = communicationPort.Read(buffer, 0, toRead);
+
+				if (bytesRead <= 0)
+				{
+					break;
+				}
+
+				received.AddRange(bytesRead == buffer.Length ? buffer : buffer.Take(bytesRead));
+
+				if (ContainsMenuBootToken(received))
+				{
+					log.External($"{_logClass} TR Response: '{AsText(received)}'");
+					communicationPort.ClearBuffers();
+					return true;
+				}
+			}
+
+			log.InternalWarning($"{_logClass} the C64 menu did not come up within {timeoutMs} ms - no SID token after the reset. TR Response: '{AsText(received)}'");
+			return false;
+		}
+
+		/// <summary>Scans every byte offset, not just even ones: the token can follow an odd-length run of menu text.</summary>
+		private static bool ContainsMenuBootToken(List<byte> received)
+		{
+			for (var i = 0; i + 1 < received.Count; i++)
+			{
+				var value = (ushort)(received[i] | (received[i + 1] << 8));
+
+				if (value == TeensyToken.GoodSIDToken.Value || value == TeensyToken.BadSIDToken.Value)
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		private static string AsText(List<byte> received) =>
+			Encoding.Latin1.GetString([.. received]).Replace("\0", string.Empty).Trim();
 
 		public static void ToggleSid(this ICommunicationPort communicationPort)
 		{
@@ -286,7 +381,9 @@ namespace TeensyRom.Core.Serial.Routines
 		/// <summary>
 		/// A reset in full firmware keeps the transport, and a device in minimal never reaches this
 		/// handler (the gate resets it back to full first) - so there is nothing left to reconnect or
-		/// hunt for. Kept as a facade over <see cref="ResetDevice"/> for its existing callers.
+		/// hunt for. Kept as a facade over <see cref="ResetDevice"/> for its existing callers. A menu that
+		/// never announced itself is reported by <see cref="ResetDevice"/>'s own log rather than failing
+		/// the reset: the device was still reset, which is all this command promises.
 		/// </summary>
 		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{

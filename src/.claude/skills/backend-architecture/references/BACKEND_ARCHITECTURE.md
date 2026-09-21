@@ -375,6 +375,15 @@ Every command runs `Logging → Exception → CommunicationPort`:
   6. Busy → idle for non-launch — if the device is believed `FullBusy` (a handler-swapping launch left a cart/PRG/image owning the firmware's IO handler, so every non-always-available command answers `Busy!`) and the command is not `LaunchFileCommand`, resets it, clears the buffers and marks the record idle before letting the command through. No recovery routine and no sleep: a full-firmware reset keeps the port/socket open. A launch is again exempt — the firmware takes a launch directly, and reactive `Busy` is the backstop if it does not
 - **What it does not do**: it never closes the port itself — only `DeviceRecovery` closes and reopens one, and only while reacquiring
 
+### The Reset Primitive
+
+`TRStreamExtensions.ResetDevice(port, log)` is the **only** writer of the reset token (`0x64EE`) — the gate's three branches, `CartFinder` and the reset command all go through it — so the guarantees below hold everywhere without a caller-side guard:
+
+- **Sends the reset token, then waits for the C64 menu to come back up.** Every reset boots the TeensyROM menu, and the menu asks the firmware for its default SID unconditionally. The firmware answers on the command channel with `GoodSIDToken` (`0x9B81`) or `BadSIDToken` (`0x9B80`) roughly 650 ms after the reset text — long after the reply has gone quiet. Left on the wire, that token is read as the *next* command's Ack ("Received unexpected response from TR").
+- **Waits on the token, not the clock** — `WaitForMenuBootToken` reads until it sees either token, bounded (3 s default), then clears the buffers. No fixed sleep.
+- **A timeout is reported, not swallowed**: `ResetDevice` returns `false` and logs that the menu never came up. The reset command does not fail on it — the device was still reset — but the log says so.
+- **The one reset that cannot finish this itself** is a reset sent to a device in minimal: the Teensy reboots and the transport drops mid-reply. `DeviceRecovery`'s `LeaveMinimal` path does the same bounded wait before declaring the device full (below).
+
 ### The Three Discovery Occasions
 
 | Occasion | Trigger | What it touches |
@@ -391,6 +400,7 @@ Every command runs `Logging → Exception → CommunicationPort`:
 - **Poll version**: once reacquired, polls the version command every `ConnectionOptions.PollIntervalMs` (default 250 ms) until it answers with the reason's expected mode
 - **Ceiling per transport**: bounded by `ConnectionOptions.Tcp`/`ConnectionOptions.Serial` (`ToMinimalMs`, `ToFullMs`), selected by `RecoveryReason` — `LargeLaunch` waits for `Minimal`, `LeaveMinimal` waits for full, `ChainedLaunch` (a launch sent while already `Minimal`) waits `ToFull + ToMinimal + LaunchSettleMs` since the end state depends on the file, `Drop` accepts either mode within `max(ToMinimalMs, ToFullMs)`
 - **Unreachable on ceiling**: no correct-chip reply within the ceiling marks the device `Unreachable` and closes the port; its record is kept so the next discovery occasion can find it again
+- **Menu-boot wait on `LeaveMinimal`**: the reset that started this recovery dropped the transport before it could consume the menu's boot SID token, and the version poll can answer before the C64 menu is even up — so this path waits for that token (same bound as the reset primitive) before declaring the device full. A miss is recorded on `RecoveryOutcome.Failure` and logged as a warning rather than passed off as a clean recovery
 
 `appsettings.json`'s `Connection` section binds `ConnectionOptions`:
 

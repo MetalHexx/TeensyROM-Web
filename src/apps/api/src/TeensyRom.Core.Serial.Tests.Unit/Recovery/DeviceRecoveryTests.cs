@@ -159,6 +159,52 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
             device.Connection.Mode.Should().Be(DeviceMode.Minimal);
         }
 
+        /// <summary>
+        /// The reset that started this recovery rebooted the Teensy and dropped the transport, so it could
+        /// not consume the C64 menu's boot SID token itself. Recovery has to, before the device is declared
+        /// full - otherwise the token lands on the next command as a bogus Ack.
+        /// </summary>
+        [Fact]
+        public async Task RecoverAsync_LeaveMinimal_FullAnswerThenMenuSidToken_ConsumesTheTokenAndReportsNoFailure()
+        {
+            var (device, port) = BuildDevice();
+            port.EnqueueToken(TeensyToken.GoodSIDToken);
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(CorrectChip(minimal: false));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.FullIdle);
+            outcome.Failure.Should().BeNull();
+            port.BytesToRead.Should().Be(0);
+        }
+
+        [Fact]
+        public async Task RecoverAsync_LeaveMinimal_FullAnswerWithoutMenuSidToken_ReportsTheMissAsAFailure()
+        {
+            var (device, port) = BuildDevice();
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(CorrectChip(minimal: false));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.FullIdle);
+            outcome.Failure.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Drop_FullAnswerWithoutMenuSidToken_DoesNotWaitOnAMenuItNeverReset()
+        {
+            var (device, port) = BuildDevice();
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(CorrectChip(minimal: false));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.FullIdle);
+            outcome.Failure.Should().BeNull();
+        }
+
         [Fact]
         public async Task RecoverAsync_FullThenStorageBusy_MarksFullBusyAndLeavesStorageAvailabilityUnchanged()
         {

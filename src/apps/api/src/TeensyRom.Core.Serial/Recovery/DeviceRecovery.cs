@@ -95,7 +95,7 @@ namespace TeensyRom.Core.Serial.Recovery
                     }
                     else if (expected is null || expected == mode)
                     {
-                        return Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed);
+                        return Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed, MenuBootFailure(reason, port));
                     }
                     else
                     {
@@ -130,6 +130,33 @@ namespace TeensyRom.Core.Serial.Recovery
             if (port.IsOpen) port.ClosePort();
             log.InternalError($"{_logClass} Recovery {reason} on {transport} for {chipId} failed after {sw.Elapsed.TotalMilliseconds} ms (ceiling {ceiling.TotalMilliseconds} ms)");
             return new RecoveryOutcome(DeviceMode.Unreachable, sw.Elapsed, ceiling, $"no correct-chip reply from {chipId} within {ceiling.TotalMilliseconds} ms");
+        }
+
+        /// <summary>
+        /// Leaving minimal is the one reset <c>TRStreamExtensions.ResetDevice</c> cannot finish for itself:
+        /// the Teensy reboots and drops the transport mid-reply, so the reset never sees the C64 menu's
+        /// boot-time SID token, and the version poll here can answer before the menu is even up - leaving
+        /// the token to land on the next command as a bogus Ack. Wait it out on the firmware's own signal
+        /// before the device is declared full. A miss is not swallowed: it comes back as the outcome's
+        /// <see cref="RecoveryOutcome.Failure"/> and a warning, since the next command may still meet it.
+        /// </summary>
+        private string? MenuBootFailure(RecoveryReason reason, ICommunicationPort port)
+        {
+            if (reason != RecoveryReason.LeaveMinimal)
+            {
+                return null;
+            }
+
+            try
+            {
+                return port.WaitForMenuBootToken(log)
+                    ? null
+                    : "the C64 menu never announced itself after the reset";
+            }
+            catch (Exception ex) when (TransportDrop.IsDrop(ex, port))
+            {
+                return $"the transport dropped waiting for the C64 menu: {ex.Message}";
+            }
         }
 
         /// <summary>TCP: close if open, then a single bounded connect attempt. A failed or timed-out connect is a miss, not an error - swallowed so the caller reads it from the port staying closed.</summary>
