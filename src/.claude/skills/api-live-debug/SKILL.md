@@ -36,7 +36,7 @@ takes one debugger at a time.
 ## Pristine restart
 
 The Debug build's `bin/.../Assets/System` holds live state: `Config/Settings.json`,
-`Config/DeviceIps.json`, `Config/SerialPorts.json` (discovery caches),
+`Config/ConnectionRecords.json` (discovery cache),
 `Cache/Sd-<chipId>.json` (storage indexes), `Logs/`. Deleting the whole `bin`
 folder gives a truly pristine API — it self-heals settings on first run and
 indexes directories on demand (`GetDirectory`), so no full index is needed.
@@ -49,7 +49,7 @@ dotnet run --no-build --project apps/api/src/TeensyRom.Api   # port 213
 
 **Startup runs discovery by itself** (`ApplicationBootstrap: Scanning for devices...`,
 right after "Now listening") — ~18 s with two units on serial, and it writes
-`SerialPorts.json`. So a pristine start still opens every COM port and, with no IP
+`ConnectionRecords.json`. So a pristine start still opens every COM port and, with no IP
 cache, sweeps the /24. Discovery also runs when the UI bootstraps, on the device
 toolbar refresh, and on `GET /api/devices/?FullScan=…` (that endpoint *is*
 discovery; `FullScan` is required). The console shows none of this — app log lines
@@ -138,7 +138,7 @@ The order that worked, one step per turn against real hardware:
    | `…/CommunicationPortBehavior.cs:67` | gate found busy → reset | `request` |
    | `TeensyRom.Core.Serial/Commands/LaunchFile/LaunchFileHandler.cs:15,19,31,43,100,103,109` | handler entry, large branch, minimal reconnect, poll result | `r.LaunchItem.Size`, `result.Value`, `isMinimalFwReady`, `resultType`, `i`, `ex.Message` |
    | `TeensyRom.Core.Serial/Commands/Reset/ResetCommandHandler.cs:11` | explicit resets | `request.DeviceId` |
-   | `TeensyRom.Core.Device/CartFinder.cs:34`, `DeviceConnectionManager.cs:31` | every discovery | `fullScan`, `_availableDevices.Count` |
+   | `TeensyRom.Core.Device/CartFinder.cs:50`, `DeviceConnectionManager.cs:140` | every discovery | `fullScan`, `_availableDevices.Count` |
 
    `request` evaluates to `{…CommandName}` — enough to name the command. Token values
    print as decimal (`25804` = `0x64CC` = Ack).

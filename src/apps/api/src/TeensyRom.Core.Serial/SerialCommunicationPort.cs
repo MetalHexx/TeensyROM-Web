@@ -54,7 +54,7 @@ namespace TeensyRom.Core.Serial
 
     public string? OpenPort(bool useRetryLoop = true)
     {
-      // Parameter ignored for now - will be implemented later
+      // useRetryLoop is a no-op here: EnsureConnection always makes a single attempt.
       EnsureConnection();
       return _serialPort.PortName;
     }
