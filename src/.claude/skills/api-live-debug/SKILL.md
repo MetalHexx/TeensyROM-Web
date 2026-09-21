@@ -48,12 +48,16 @@ dotnet run --no-build --project apps/api/src/TeensyRom.Api   # port 213
 ```
 
 **Startup runs discovery by itself** (`ApplicationBootstrap: Scanning for devices...`,
-right after "Now listening") — ~18 s with two units on serial, and it writes
-`ConnectionRecords.json`. So a pristine start still opens every COM port and, with no IP
-cache, sweeps the /24. Discovery also runs when the UI bootstraps, on the device
-toolbar refresh, and on `GET /api/devices/?FullScan=…` (that endpoint *is*
-discovery; `FullScan` is required). The console shows none of this — app log lines
-go only to the file log and the SignalR hub.
+right after "Now listening") — the start occasion confirms cached endpoints by chip id and
+only falls back to a full discovery sweep on a miss. A *pristine* start has no cache at all
+(the whole `bin` folder, and `ConnectionRecords.json` with it, is gone), so it always takes
+the miss path: opens every COM port and sweeps the /24, ~18 s with two units on serial, then
+writes a fresh `ConnectionRecords.json`. The only other occasion that contacts a device is the
+device toolbar's Discover Devices action — `GET /api/devices/?FullScan=true` (that call *is*
+discovery). The UI's own bootstrap call (`GET /api/devices/`, `FullScan=false`) is a page-load
+listing, not a discovery: it returns whatever the manager already knows without opening a
+port. The console shows none of this — app log lines go only to the file log and the SignalR
+hub.
 
 ## Log tap
 
@@ -115,6 +119,9 @@ a few milliseconds — use it on timing-sensitive paths (handshake, discovery).
 - **Discovery bypasses the command pipeline.** `CartFinder` and the strategies talk
   to the port through `TRStreamExtensions` directly; tracepoints in
   `CommunicationPortBehavior` see only MediatR commands.
+- **The API no longer sends `FwCheck` or `Ping` on its own** — if you see `64 E0` in a
+  trace it came from your probe, not the API; discovery and recovery both confirm a
+  device with the version command (`64 76`) instead.
 
 ## Proven round-trip (2026-09-20)
 
@@ -133,12 +140,14 @@ The order that worked, one step per turn against real hardware:
    | File:line | What it shows | `exprs` |
    |---|---|---|
    | `TeensyRom.Api/Endpoints/Player/LaunchFile/LaunchFileEndpoint.cs:24` | every launch request | `r.DeviceId`, `r.StorageType`, `r.FilePath` |
-   | `TeensyRom.Core.Serial/Commands/Behaviors/CommunicationPortBehavior.cs:31` | every command entering the gate | `request`, `request.DeviceId`, `request.CommunicationPort.IsOpen` |
-   | `…/CommunicationPortBehavior.cs:54` | gate found minimal → reboot to full | `request` |
-   | `…/CommunicationPortBehavior.cs:67` | gate found busy → reset | `request` |
-   | `TeensyRom.Core.Serial/Commands/LaunchFile/LaunchFileHandler.cs:15,19,31,43,100,103,109` | handler entry, large branch, minimal reconnect, poll result | `r.LaunchItem.Size`, `result.Value`, `isMinimalFwReady`, `resultType`, `i`, `ex.Message` |
+   | `TeensyRom.Core.Serial/Commands/Behaviors/CommunicationPortBehavior.cs:36` | every command entering the gate | `request`, `request.DeviceId`, `request.CommunicationPort.IsOpen` |
+   | `…/CommunicationPortBehavior.cs:68` | gate found minimal → reset to full | `request`, `device.Connection.Mode` |
+   | `…/CommunicationPortBehavior.cs:101` | gate found busy → reset once | `request`, `busyRetries` |
+   | `TeensyRom.Core.Serial/Commands/LaunchFile/LaunchFileHandler.cs:18,21,27,41,69` | handler entry, minimal-chain check, retry-token check, watch result, recovery call | `r.LaunchItem.Size`, `fromMinimal`, `ack`, `final`/`dropped`, `reason` |
+   | `TeensyRom.Core.Serial/Recovery/DeviceRecovery.cs:35` | every recovery attempt starts | `reason`, `transport`, `chipId`, `ceiling` |
    | `TeensyRom.Core.Serial/Commands/Reset/ResetCommandHandler.cs:11` | explicit resets | `request.DeviceId` |
-   | `TeensyRom.Core.Device/CartFinder.cs:50`, `DeviceConnectionManager.cs:140` | every discovery | `fullScan`, `_availableDevices.Count` |
+   | `TeensyRom.Core.Device/CartFinder.cs:52` | every discovery sweep starts | `_discoveryStrategies.Count()` |
+   | `TeensyRom.Core.Device/DeviceConnectionManager.cs:62` | every `FindDevices` call (page load vs. full scan) | `fullScan`, `_byChip.Count` |
 
    `request` evaluates to `{…CommandName}` — enough to name the command. Token values
    print as decimal (`25804` = `0x64CC` = Ack).
@@ -160,4 +169,5 @@ node -e 'const s=require("net").connect(2112,"192.168.1.37",()=>s.write(Buffer.f
 ```
 
 `64 E0` is the FW-check token (reply `E1 64` = minimal, `E2 64` = full); `64 76` is
-the version command (text reply, includes `UID:`).
+the version command (text reply, includes `UID:`). The API's own discovery/recovery paths
+only ever send the version command — see the gotcha below.

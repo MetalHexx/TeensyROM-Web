@@ -11,8 +11,8 @@ Reference for the TeensyROM .NET 9 backend: a layered Web API managing physical 
 
 - Working on the .NET API/backend (`apps/api/src/TeensyRom.*`)
 - Understanding endpoint structure (RadEndpoints) or adding new endpoints
-- Tracing the MediatR pipeline (LoggingBehavior, ExceptionBehavior, SerialBehavior) or command/handler flow
-- Understanding serial device communication (state machine, ACK/NAK protocol, reconnection logic)
+- Tracing the MediatR pipeline (LoggingBehavior, ExceptionBehavior, CommunicationPortBehavior — the gate) or command/handler flow
+- Understanding serial device communication (the connectivity ring, ACK/NAK protocol, device recovery)
 - Working with storage/indexing/caching (`StorageService`, `StorageCache`, favorites, metadata enrichment)
 - Working on file transfer, upload endpoints, the transfer queue/pump, or the transfer hub
 - Investigating backend operational concerns: configuration, error handling, retries/timeouts, health checks, logging/observability
@@ -38,8 +38,9 @@ See [references/BACKEND_ARCHITECTURE.md](references/BACKEND_ARCHITECTURE.md) for
 
 - System architecture diagram and key components per layer (API, Device, Serial, Storage)
 - Endpoint organization, versioning/validation conventions, and a typical endpoint code example
-- Serial pipeline behaviors, command protocol (ACK/NAK), error handling/reconnection logic
-- MediatR sequence diagrams for serial commands and storage indexing
+- The connectivity ring: the three discovery occasions, the gate (`CommunicationPortBehavior`), device recovery, and the serial locator
+- Serial pipeline behaviors, command protocol (ACK/NAK), device modes
+- MediatR sequence diagrams for the launch flow and storage indexing
 - Storage/indexing deep dive: cache file structure, indexing strategies, read/write paths, metadata enrichment
 - Major dependencies and dependency flow between projects
 - Operational concerns: configuration, error handling layers, retries/timeouts, health checks, logging/observability
