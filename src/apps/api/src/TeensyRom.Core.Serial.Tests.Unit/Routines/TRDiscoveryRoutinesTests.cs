@@ -111,14 +111,14 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Routines
         }
 
         [Fact]
-        public void ProbeStorageRoot_FailBusyOnFirstAck_ReturnsUnknown()
+        public void ProbeStorageRoot_FailBusyOnFirstAck_ReturnsBusy()
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Fail).EnqueueText("Busy!");
 
             var result = port.ProbeStorageRoot(TeensyStorageType.SD, _log);
 
-            result.Should().Be(StoragePresence.Unknown);
+            result.Should().Be(StoragePresence.Busy);
         }
 
         [Fact]

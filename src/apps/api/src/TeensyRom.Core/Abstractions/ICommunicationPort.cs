@@ -54,6 +54,18 @@ namespace TeensyRom.Core.Abstractions
     string? OpenPort(bool useRetryLoop = true);
 
     /// <summary>
+    /// Opens the port with a single connect attempt bounded to <paramref name="connectTimeoutMs"/>, for
+    /// callers - recovery, start confirm - that poll a connect repeatedly and cannot afford a transport
+    /// whose unbounded attempt blocks for the OS's own connect timeout (TCP: tens of seconds). The
+    /// default implementation is correct for any transport with no real "connect" phase to bound, i.e.
+    /// serial, and falls back to <see cref="OpenPort(bool)"/> with no retry loop.
+    /// </summary>
+    /// <param name="connectTimeoutMs">Bound on the connect attempt.</param>
+    /// <returns>The endpoint if the connect succeeded, else null.</returns>
+    /// <exception cref="TimeoutException">The connect attempt exceeded <paramref name="connectTimeoutMs"/> (TCP only).</exception>
+    string? OpenPort(int connectTimeoutMs) => OpenPort(useRetryLoop: false);
+
+    /// <summary>
     /// Closes the port
     /// </summary>
     Unit ClosePort();

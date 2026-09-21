@@ -7,7 +7,7 @@ using TeensyRom.Core.Logging;
 
 namespace TeensyRom.Core.Serial.Routines
 {
-    public enum StoragePresence { Unknown, Present, Absent }
+    public enum StoragePresence { Unknown, Present, Absent, Busy }
 
     /// <summary>
     /// Raw, MediatR-free port routines used to interrogate a device outside the command pipeline, so they
@@ -67,7 +67,7 @@ namespace TeensyRom.Core.Serial.Routines
                 catch (TeensyBusyException)
                 {
                     log.Internal($"{_logClass} ProbeStorageRoot: device busy ({storageType})");
-                    return StoragePresence.Unknown;
+                    return StoragePresence.Busy;
                 }
 
                 port.SendIntBytes(storageType.GetStorageToken(), 1);
@@ -90,7 +90,7 @@ namespace TeensyRom.Core.Serial.Routines
                     }
                     if (text.Contains("Busy!"))
                     {
-                        return StoragePresence.Unknown;
+                        return StoragePresence.Busy;
                     }
                     log.InternalWarning($"{_logClass} ProbeStorageRoot: unexpected fail text ({storageType}): {text.SanitizeForLogging()}");
                     return StoragePresence.Unknown;

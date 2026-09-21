@@ -13,7 +13,7 @@ namespace TeensyRom.Core.Serial
         /// <summary>Never throws; a failed or empty reply yields an empty <see cref="VersionReply"/>.</summary>
         VersionReply ReadVersion(ICommunicationPort port);
 
-        /// <summary>Never throws.</summary>
+        /// <summary>Never throws. <see cref="StoragePresence.Busy"/> means the device answered but couldn't service the listing - try again later, not "no storage".</summary>
         StoragePresence ProbeStorage(ICommunicationPort port, TeensyStorageType storageType);
     }
 }

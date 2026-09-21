@@ -67,6 +67,56 @@ namespace TeensyRom.Core.Serial
       return _endpoint;
     }
 
+    /// <summary>
+    /// A single connect attempt bounded to <paramref name="connectTimeoutMs"/>, via <see cref="TcpClient.ConnectAsync(string, int, CancellationToken)"/>
+    /// awaited synchronously - this port is a synchronous object. A connect that does not complete in
+    /// time is cancelled and surfaces as a <see cref="TimeoutException"/> rather than the OS's own
+    /// multi-second SYN retry.
+    /// </summary>
+    public string? OpenPort(int connectTimeoutMs)
+    {
+      if (IsOpen) return _endpoint;
+
+      ClosePort();
+
+      if (!NetworkHelper.TryParseEndpoint(_endpoint!, out var host, out var port))
+      {
+        throw new TeensyException($"Invalid endpoint format: {_endpoint}");
+      }
+
+      _tcpClient = new TcpClient
+      {
+        ReceiveTimeout = _readTimeoutMs,
+        SendTimeout = _writeTimeoutMs
+      };
+
+      using var cts = new CancellationTokenSource(connectTimeoutMs);
+
+      try
+      {
+        log.Internal($"TcpObservablePort.OpenPort: Connecting to {_endpoint} (bounded, {connectTimeoutMs}ms)");
+        _tcpClient.ConnectAsync(host, port, cts.Token).AsTask().GetAwaiter().GetResult();
+        _networkStream = _tcpClient.GetStream();
+        _networkStream.ReadTimeout = _readTimeoutMs;
+        _networkStream.WriteTimeout = _writeTimeoutMs;
+        log.InternalSuccess($"TcpObservablePort.OpenPort: Successfully connected to {_endpoint}");
+      }
+      catch (OperationCanceledException)
+      {
+        log.Internal($"TcpObservablePort.OpenPort: Connect to {_endpoint} did not complete within {connectTimeoutMs}ms");
+        _tcpClient?.Close();
+        throw new TimeoutException($"Connection to {_endpoint} timed out after {connectTimeoutMs}ms");
+      }
+      catch (Exception)
+      {
+        log.Internal($"TcpObservablePort.OpenPort: There was an error trying to connect to {_endpoint}");
+        _tcpClient?.Close();
+        throw;
+      }
+
+      return _endpoint;
+    }
+
     public Unit ClosePort()
     {
       log.Internal($"Disconnecting from {_endpoint}.");
@@ -146,7 +196,9 @@ namespace TeensyRom.Core.Serial
       }
       catch (Exception ex)
       {
-        log.InternalError($"TcpObservablePort.TryConnect: There was an error trying to connect to {_endpoint}");
+        // Polling connect misses are expected here (discovery's fast single-attempt scan and the
+        // retry loop both call this repeatedly), so a miss is not error-worthy on its own.
+        log.Internal($"TcpObservablePort.TryConnect: There was an error trying to connect to {_endpoint}");
         throw;
       }
     }

@@ -87,7 +87,6 @@ namespace TeensyRom.Core.Serial
       catch (UnauthorizedAccessException ex)
       {
         log.InternalError(failureMessage);
-        log.InternalError("ObservableSerialPort.EnsureConnection: Make sure you don't have multiple TeensyROM API instances running!");
         throw;
       }
       catch (Exception)
