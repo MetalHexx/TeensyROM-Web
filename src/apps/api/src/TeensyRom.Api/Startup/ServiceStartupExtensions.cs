@@ -40,7 +40,13 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<IAppSettingsProvider>(sp => sp.GetRequiredService<SettingsService>());
             services.AddSingleton<IDeviceInterrogator, DeviceInterrogator>();
 			services.AddSingleton<ICartFinder, CartFinder>();
+            // WindowsRegistryDescriptorReader is [SupportedOSPlatform("windows")], but registering the
+            // type does no Windows-only work eagerly (see Win32RegistryView), and TeensyPortLocator.ListPorts()
+            // only invokes the reader whose IsSupported is true, so it's safe to register unconditionally
+            // alongside the Mac/Linux readers.
+#pragma warning disable CA1416
             services.AddSingleton<IUsbSerialDescriptorReader, WindowsRegistryDescriptorReader>();
+#pragma warning restore CA1416
             services.AddSingleton<IUsbSerialDescriptorReader, MacOsPortNameDescriptorReader>();
             services.AddSingleton<IUsbSerialDescriptorReader, LinuxSysfsDescriptorReader>();
             services.AddSingleton<ITeensyPortLocator, TeensyPortLocator>();

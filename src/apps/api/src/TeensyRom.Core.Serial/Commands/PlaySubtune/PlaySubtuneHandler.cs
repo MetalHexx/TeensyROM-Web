@@ -7,7 +7,7 @@ namespace TeensyRom.Core.Commands.PlaySubtune
 
     public class PlaySubtuneHandler() : IRequestHandler<PlaySubtuneCommand, PlaySubtuneResult>
     {
-        public Task<PlaySubtuneResult> Handle(PlaySubtuneCommand request, CancellationToken cancellationToken)
+        public async Task<PlaySubtuneResult> Handle(PlaySubtuneCommand request, CancellationToken cancellationToken)
         {
             try
             {
@@ -15,16 +15,16 @@ namespace TeensyRom.Core.Commands.PlaySubtune
             }
             catch (TeensyException ex)
             {
-                return Task.FromResult(new PlaySubtuneResult
+                return new PlaySubtuneResult
                 {
                     IsSuccess = false,
                     Error = ex.Message
-                });
+                };
             }
-            return Task.FromResult(new PlaySubtuneResult
+            return new PlaySubtuneResult
             {
                 IsSuccess = true
-            });
+            };
         }
     }
 }

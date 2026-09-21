@@ -19,7 +19,7 @@ namespace TeensyRom.Core.Commands.GetFile
     public class GetFileCommandHandler() : IRequestHandler<GetFileCommand, GetFileResult>
     {
         private ICommunicationPort _communicationPort = null!;
-        public Task<GetFileResult> Handle(GetFileCommand r, CancellationToken cancellationToken)
+        public async Task<GetFileResult> Handle(GetFileCommand r, CancellationToken cancellationToken)
         {
             _communicationPort = r.CommunicationPort;
 
@@ -35,11 +35,11 @@ namespace TeensyRom.Core.Commands.GetFile
 
 				if (ackResult != TeensyToken.Ack)
 				{
-					return Task.FromResult(new GetFileResult
+					return new GetFileResult
 					{
 						IsSuccess = false,
 						ErrorCode = GetFileErrorCode.UnknownError
-					});
+					};
 				}
 
 			}
@@ -54,12 +54,12 @@ namespace TeensyRom.Core.Commands.GetFile
                     string msg when msg.Contains("Error 5") => GetFileErrorCode.FileOpenError,
                     _ => GetFileErrorCode.UnknownError
                 };
-                return Task.FromResult(new GetFileResult
+                return new GetFileResult
                 {
                     IsSuccess = false,
                     Error = ex.Message.SanitizeForLogging(),
                     ErrorCode = errorCode
-                });
+                };
             }
 
             var fileLength = _communicationPort.ReadIntBytes(4);
@@ -73,10 +73,10 @@ namespace TeensyRom.Core.Commands.GetFile
             {
                 throw new TeensyException("Checksum Mismatch");
             }
-            return Task.FromResult(new GetFileResult
+            return new GetFileResult
             {
                 FileData = buffer
-            });
+            };
         }
 
         private byte[] GetFileBytes(uint fileLength)
