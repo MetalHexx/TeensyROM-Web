@@ -63,7 +63,7 @@ Each endpoint lives in `Endpoints/[Domain]/[Action]/` with `[Action]Endpoint.cs`
 
 ### Connectivity Ring
 
-No state-machine object: each device's `DeviceConnectionRecord` tracks a `DeviceMode` (`FullIdle → FullBusy`, `Minimal`, `Unreachable`) plus its known endpoints. The gate (`CommunicationPortBehavior`) locks one command at a time per device and reacts to what the exchange reports; a transport drop or a `Minimal` device hands off to `DeviceRecovery`, which reacquires the device on its own port and polls the version command up to a per-transport ceiling — no background health-check task. Three occasions run discovery: API start (cache-first, confirmed by chip id), the "Discover Devices" full sweep, and a page-load listing that contacts nothing.
+No state-machine object: each device's `DeviceConnectionRecord` tracks a `DeviceMode` (`FullIdle → FullBusy`, `Minimal`, `Unreachable`) plus its known endpoints. The gate (`CommunicationPortBehavior`) locks one command at a time per device and reacts to what the exchange reports — including a reactive Busy reset when the device answers busy; a transport drop or a `Minimal` device hands off to `DeviceRecovery`, which reacquires the device on its own port and polls the version command up to a per-transport ceiling — no background health-check task. Serial recovery and discovery locate a device's current port by chip id via `TeensyPortLocator` (`apps/api/src/TeensyRom.Core.Serial/Usb/TeensyPortLocator.cs`), falling back to probing every port when the USB descriptor filter is unavailable. Three occasions run discovery: API start (cache-first, confirmed by chip id), the "Discover Devices" full sweep, and a page-load listing that contacts nothing.
 
 ### Storage Caching
 

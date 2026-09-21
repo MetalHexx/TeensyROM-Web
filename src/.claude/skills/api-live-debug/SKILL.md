@@ -122,6 +122,11 @@ a few milliseconds — use it on timing-sensitive paths (handshake, discovery).
 - **The API no longer sends `FwCheck` or `Ping` on its own** — if you see `64 E0` in a
   trace it came from your probe, not the API; discovery and recovery both confirm a
   device with the version command (`64 76`) instead.
+- **Chasing a "device not found" bug?** Serial recovery and discovery find a device's
+  current port by chip id via `TeensyPortLocator`
+  (`apps/api/src/TeensyRom.Core.Serial/Usb/TeensyPortLocator.cs`), which classifies
+  COM ports by USB VID/PID before opening any of them — breakpoint there, not just
+  in `CartFinder` or `DeviceRecovery`, when a port isn't being matched.
 
 ## Proven round-trip (2026-09-20)
 
