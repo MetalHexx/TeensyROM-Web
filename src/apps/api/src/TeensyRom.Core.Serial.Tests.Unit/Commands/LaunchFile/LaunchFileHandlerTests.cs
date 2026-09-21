@@ -23,10 +23,10 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         // without spending real test time - the fake port never actually sleeps.
         private static ConnectionOptions FastOptions() => new() { LaunchSettleMs = 50 };
 
-        private static LaunchFileCommand BuildCommand(ScriptedCommunicationPort port, string? deviceId = null) => new()
+        private static LaunchFileCommand BuildCommand(ScriptedCommunicationPort port, string? deviceId = null, string path = "/games/game.prg") => new()
         {
             StorageType = TeensyStorageType.SD,
-            LaunchItem = new LaunchableItem { Path = new FilePath("/games/game.prg"), Size = 900_000 },
+            LaunchItem = new LaunchableItem { Path = new FilePath(path), Size = 900_000 },
             CommunicationPort = port,
             DeviceId = deviceId
         };
@@ -72,12 +72,12 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         }
 
         [Fact]
-        public async Task Handle_PrgLaunch_LoadingTextThenFullVersionReply_ReturnsSuccessAndMarksDeviceIdle()
+        public async Task Handle_PrgLaunch_LoadingTextThenFullVersionReply_ReturnsSuccessAndMarksDeviceBusy()
         {
             var port = new ScriptedCommunicationPort();
             port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
             port.NewSegment().EnqueueText("Loading IO handler: TeensyROM");
-            var device = BuildDevice(port, DeviceMode.FullBusy);
+            var device = BuildDevice(port, DeviceMode.FullIdle);
             _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(VersionReply.Empty with { IsTeensyRom = true, IsMinimalFirmware = false });
             var handler = BuildHandler();
 
@@ -86,6 +86,43 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
             result.IsSuccess.Should().BeTrue();
             result.LaunchResult.Should().Be(LaunchFileResultType.Success);
             await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+        }
+
+        /// <summary>
+        /// The reported defect's shape: over TCP the firmware's "Loading IO handler:" text never arrives
+        /// (it is USB-serial-only), so the watch window sees silence and the version reply says full - but
+        /// the running cart still owns the IO handler, so the record must not be called idle.
+        /// </summary>
+        [Fact]
+        public async Task Handle_CartLaunchOverTcp_SilenceThenFullVersionReply_MarksDeviceBusy()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullIdle);
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(VersionReply.Empty with { IsTeensyRom = true, IsMinimalFirmware = false });
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/games/5th Gear.crt"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+            await _recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+        }
+
+        /// <summary>A SID keeps playing under the TeensyROM handler, so the device stays reachable and idle.</summary>
+        [Fact]
+        public async Task Handle_SidLaunch_SilenceThenFullVersionReply_MarksDeviceIdle()
+        {
+            var port = new ScriptedCommunicationPort();
+            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
+            var device = BuildDevice(port, DeviceMode.FullBusy);
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(VersionReply.Empty with { IsTeensyRom = true, IsMinimalFirmware = false });
+            var handler = BuildHandler();
+
+            var result = await handler.Handle(BuildCommand(port, DeviceId, "/music/tune.sid"), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
             device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
         }
 

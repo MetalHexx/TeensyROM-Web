@@ -242,8 +242,13 @@ public class CommunicationPortBehaviorTests
         port.ClosePortCallCount.Should().Be(0);
     }
 
+    /// <summary>
+    /// The believed-busy device is the one a handler-swapping launch left running a game: the firmware
+    /// answers Busy! to everything until it is reset, so the gate has to reset before the command runs,
+    /// not after the handler has already swallowed the Busy! reply.
+    /// </summary>
     [Fact]
-    public async Task Handle_FullBusyRecord_HandlerSucceedsFirstTime_NoResetOneInvocationRecordEndsFullIdle()
+    public async Task Handle_FullBusyRecordNonLaunchCommand_ResetsBeforeHandlerRuns_RecordEndsFullIdle()
     {
         var deviceId = Guid.NewGuid().ToString("N");
         var port = new StubCommunicationPort();
@@ -251,21 +256,60 @@ public class CommunicationPortBehaviorTests
         device.MarkBusy();
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
         var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
-            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+            Substitute.For<ILoggingService>(), devices, recovery);
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
+        var modeWhenHandlerRan = default(DeviceMode?);
+        var resetsWhenHandlerRan = 0;
 
         var response = await behavior.Handle(command, () =>
         {
             invocations++;
+            modeWhenHandlerRan = device.Connection.Mode;
+            resetsWhenHandlerRan = port.SentTokens.Count(t => t == TeensyToken.Reset.Value);
             return Task.FromResult(new TeensyCommandResult());
         }, CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
         invocations.Should().Be(1);
-        port.SentTokens.Should().NotContain(TeensyToken.Reset.Value);
+        resetsWhenHandlerRan.Should().Be(1);
+        modeWhenHandlerRan.Should().Be(DeviceMode.FullIdle);
         device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        await recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_FullBusyRecordLaunchFileCommand_SkipsTheResetAndLeavesTheRecordBusy()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.MarkBusy();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<LaunchFileCommand, LaunchFileResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+        var command = new LaunchFileCommand
+        {
+            StorageType = TeensyStorageType.SD,
+            LaunchItem = new LaunchableItem(),
+            DeviceId = deviceId,
+            CommunicationPort = port
+        };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new LaunchFileResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(1);
+        port.SentTokens.Should().NotContain(TeensyToken.Reset.Value);
+        device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
     }
 
     [Fact]

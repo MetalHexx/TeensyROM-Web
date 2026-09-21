@@ -19,7 +19,9 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 	/// Ensures only one command at a time (per device) can be executed, keeps the port open for the
 	/// command's own exchange, and reacts to what the exchange actually reports instead of probing the
 	/// firmware first: a device believed to be in minimal is reset back to full before any non-launch
-	/// command runs, a <see cref="TeensyBusyException"/> from the command's own reply earns one reset and
+	/// command runs, a device believed busy is reset the same way (a handler-swapping launch leaves the
+	/// firmware answering <c>Busy!</c> to every non-always-available command until something resets it),
+	/// a <see cref="TeensyBusyException"/> from the command's own reply earns one reset and
 	/// one re-send, and a transport drop hands the device to <see cref="IDeviceRecovery"/>. A
 	/// <c>ResetCommand</c> sent to a device believed to be in minimal is reset twice this way - once here
 	/// to bring it back to full, once by the handler itself - landing on the same correct end state either
@@ -65,18 +67,27 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					throw;
 				}
 
-				if (device?.Connection.Mode == DeviceMode.Minimal && request is not LaunchFileCommand)
+				if (device is not null && request is not LaunchFileCommand)
 				{
-					port.ResetDevice(log);
-					var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, cancellationToken);
-
-					if (outcome.Mode is not (DeviceMode.FullIdle or DeviceMode.FullBusy))
+					if (device.Connection.Mode == DeviceMode.Minimal)
 					{
-						return new()
+						port.ResetDevice(log);
+						var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, cancellationToken);
+
+						if (outcome.Mode is not (DeviceMode.FullIdle or DeviceMode.FullBusy))
 						{
-							IsSuccess = false,
-							Error = "Command Failed. Cart was in Minimal and could not be brought back to full firmware."
-						};
+							return new()
+							{
+								IsSuccess = false,
+								Error = "Command Failed. Cart was in Minimal and could not be brought back to full firmware."
+							};
+						}
+					}
+					else if (device.Connection.Mode == DeviceMode.FullBusy)
+					{
+						port.ResetDevice(log);
+						port.ClearBuffers();
+						device.MarkIdle();
 					}
 				}
 
@@ -85,7 +96,10 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 				async Task<TResponse> SendAsync()
 				{
 					var response = await next();
-					if (device?.Connection.Mode == DeviceMode.FullBusy)
+
+					// A launch owns its own end state - a handler-swapping launch deliberately leaves the
+					// record busy - so only a non-launch command's success proves the device is idle again.
+					if (device?.Connection.Mode == DeviceMode.FullBusy && request is not LaunchFileCommand)
 					{
 						device.MarkIdle();
 					}

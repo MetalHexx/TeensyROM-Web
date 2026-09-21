@@ -49,7 +49,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 
 					if (reply.IsTeensyRom && !reply.IsMinimalFirmware)
 					{
-						device?.MarkIdle();
+						MarkLaunched(device, r.LaunchItem);
 						return new() { LaunchResult = LaunchFileResultType.Success };
 					}
 				}
@@ -69,6 +69,30 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 			var outcome = await recovery.RecoverAsync(device, reason, cancellationToken);
 
 			return BuildRecoveryResult(outcome, fromMinimal);
+		}
+
+		/// <summary>
+		/// Records what the launched item left the full firmware doing. Anything that swaps the firmware's
+		/// IO handler - a cart, a PRG, an image - answers <c>Busy!</c> to every non-always-available command
+		/// until something resets it, so its record is marked busy and the gate resets before the next
+		/// non-launch command. A SID plays under the TeensyROM handler, which keeps answering, so it stays
+		/// idle. The item's type decides this rather than what the port echoed: the firmware's
+		/// "Loading IO handler:" text is USB-serial-only and never arrives over TCP.
+		/// </summary>
+		private static void MarkLaunched(TeensyRomDevice? device, LaunchableItem item)
+		{
+			if (device is null)
+			{
+				return;
+			}
+
+			if (item.FileType == TeensyFileType.Sid)
+			{
+				device.MarkIdle();
+				return;
+			}
+
+			device.MarkBusy();
 		}
 
 		private static LaunchFileResult BuildRecoveryResult(RecoveryOutcome outcome, bool fromMinimal)
