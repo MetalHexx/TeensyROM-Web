@@ -1,13 +1,14 @@
-using MediatR;
 using TeensyRom.Core.Entities.Serial;
+using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Serial.Routines;
 using TeensyRom.Core.Storage;
 
 namespace TeensyRom.Core.Device.Tests.Unit;
 
 /// <summary>
-/// Unit tests for CartFinder's device validation: identity and hardware facts come from the
-/// version reply, storage availability from the read-only root probe.
+/// Unit tests for CartFinder's device building: identity and hardware facts come from the endpoint's
+/// version reply, storage availability from the read-only root probe, minimal firmware is carried
+/// through recovery, and a busy storage probe is reset and re-probed once.
 /// </summary>
 public class CartFinderTests
 {
@@ -17,7 +18,7 @@ public class CartFinderTests
     private readonly IStorageFactory _mockStorageFactory;
     private readonly IDeviceInterrogator _mockInterrogator;
     private readonly IAlertService _mockAlert;
-    private readonly IMediator _mockMediator;
+    private readonly IDeviceRecovery _mockRecovery;
     private readonly IDeviceSettingsProvider _mockSettingsProvider;
     private readonly List<IDiscoveryStrategy> _mockDiscoveryStrategies;
     private readonly CartFinder _sut;
@@ -28,7 +29,7 @@ public class CartFinderTests
         _mockStorageFactory = Substitute.For<IStorageFactory>();
         _mockInterrogator = Substitute.For<IDeviceInterrogator>();
         _mockAlert = Substitute.For<IAlertService>();
-        _mockMediator = Substitute.For<IMediator>();
+        _mockRecovery = Substitute.For<IDeviceRecovery>();
         _mockSettingsProvider = Substitute.For<IDeviceSettingsProvider>();
         _mockDiscoveryStrategies = [];
 
@@ -40,7 +41,7 @@ public class CartFinderTests
             _mockStorageFactory,
             _mockInterrogator,
             _mockAlert,
-            _mockMediator,
+            _mockRecovery,
             _mockDiscoveryStrategies,
             _mockSettingsProvider
         );
@@ -57,9 +58,10 @@ public class CartFinderTests
 
     private static DiscoveredEndpoint CreateTestEndpoint(
         ICommunicationPort port,
+        VersionReply reply,
         string address = "COM3",
         ConnectionType connectionType = ConnectionType.Serial) =>
-        new(connectionType, address, connectionType == ConnectionType.Tcp ? 80 : null, VersionReply.Empty with { IsTeensyRom = true }, port);
+        new(connectionType, address, connectionType == ConnectionType.Tcp ? 80 : null, reply, port);
 
     private void SetupDiscoveryStrategy(params DiscoveredEndpoint[] endpoints)
     {
@@ -92,13 +94,20 @@ public class CartFinderTests
         ChipId = chipId
     };
 
-    private void SetupReply(VersionReply reply) =>
-        _mockInterrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(reply);
-
-    private void SetupProbes(StoragePresence sd, StoragePresence usb)
+    private static VersionReply MinimalReply(string? chipId = ChipId) => new()
     {
-        _mockInterrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), TeensyStorageType.SD).Returns(sd);
-        _mockInterrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), TeensyStorageType.USB).Returns(usb);
+        IsTeensyRom = true,
+        IsMinimalFirmware = true,
+        ChipId = chipId
+    };
+
+    private void SetupProbes(StoragePresence sd, StoragePresence usb) =>
+        SetupProbes(new Queue<StoragePresence>([sd]), new Queue<StoragePresence>([usb]));
+
+    private void SetupProbes(Queue<StoragePresence> sd, Queue<StoragePresence> usb)
+    {
+        _mockInterrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), TeensyStorageType.SD).Returns(_ => sd.Dequeue());
+        _mockInterrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), TeensyStorageType.USB).Returns(_ => usb.Dequeue());
     }
 
     #endregion
@@ -107,9 +116,8 @@ public class CartFinderTests
     public async Task FindDevices_WithCompatibleReply_BuildsCartFromReplyAndProbeResults()
     {
         var port = CreatePort();
-        SetupDiscoveryStrategy(CreateTestEndpoint(port));
         var reply = FullReply();
-        SetupReply(reply);
+        SetupDiscoveryStrategy(CreateTestEndpoint(port, reply));
         SetupProbes(StoragePresence.Present, StoragePresence.Absent);
 
         var result = await _sut.FindDevices(CancellationToken.None);
@@ -131,6 +139,7 @@ public class CartFinderTests
         cart.UsbStorage.Available.Should().BeFalse();
         cart.SdStorage.DeviceId.Should().Be(ChipId);
         cart.UsbStorage.DeviceId.Should().Be(ChipId);
+        result.Single().Connection.Mode.Should().Be(DeviceMode.FullIdle);
         _mockSettingsProvider.Received(1).GetOrCreateDeviceSettings(ChipId);
     }
 
@@ -138,8 +147,7 @@ public class CartFinderTests
     public async Task FindDevices_WithBelowFloorReply_ListsIncompatibleDeviceWithoutProbingOrSettings()
     {
         var port = CreatePort();
-        SetupDiscoveryStrategy(CreateTestEndpoint(port));
-        SetupReply(BelowFloorReply());
+        SetupDiscoveryStrategy(CreateTestEndpoint(port, BelowFloorReply()));
 
         var result = await _sut.FindDevices(CancellationToken.None);
 
@@ -161,9 +169,8 @@ public class CartFinderTests
     public async Task FindDevices_WithTwoRepliesMissingChipId_AssignsNumberedUnknownStandIns()
     {
         SetupDiscoveryStrategy(
-            CreateTestEndpoint(CreatePort(), "COM3"),
-            CreateTestEndpoint(CreatePort(), "COM4"));
-        SetupReply(BelowFloorReply(chipId: null));
+            CreateTestEndpoint(CreatePort(), BelowFloorReply(chipId: null), "COM3"),
+            CreateTestEndpoint(CreatePort(), BelowFloorReply(chipId: null), "COM4"));
 
         var result = await _sut.FindDevices(CancellationToken.None);
 
@@ -178,8 +185,7 @@ public class CartFinderTests
     public async Task FindDevices_WithCompatibleReplyMissingChipId_ListsStandInAndSkipsSettings()
     {
         var port = CreatePort();
-        SetupDiscoveryStrategy(CreateTestEndpoint(port));
-        SetupReply(FullReply(chipId: null));
+        SetupDiscoveryStrategy(CreateTestEndpoint(port, FullReply(chipId: null)));
         SetupProbes(StoragePresence.Present, StoragePresence.Present);
 
         var result = await _sut.FindDevices(CancellationToken.None);
@@ -191,33 +197,25 @@ public class CartFinderTests
     }
 
     [Fact]
-    public async Task FindDevices_WithMinimalFirmwareReply_YieldsNoDeviceAndNoProbe()
-    {
-        var port = CreatePort();
-        SetupDiscoveryStrategy(CreateTestEndpoint(port));
-        SetupReply(FullReply() with { IsMinimalFirmware = true });
-
-        var result = await _sut.FindDevices(CancellationToken.None);
-
-        result.Should().BeEmpty();
-        _mockInterrogator.DidNotReceive().ProbeStorage(Arg.Any<ICommunicationPort>(), Arg.Any<TeensyStorageType>());
-    }
-
-    [Fact]
     public async Task FindDevices_WithSameChipIdOnSerialAndTcp_KeepsTcpAndDisposesSerialPort()
     {
         var serialPort = CreatePort();
         var tcpPort = CreatePort(ConnectionType.Tcp);
         SetupDiscoveryStrategy(
-            CreateTestEndpoint(serialPort, "COM3"),
-            CreateTestEndpoint(tcpPort, "192.168.1.10:80", connectionType: ConnectionType.Tcp));
-        SetupReply(FullReply());
-        SetupProbes(StoragePresence.Present, StoragePresence.Present);
+            CreateTestEndpoint(serialPort, FullReply(), "COM3"),
+            CreateTestEndpoint(tcpPort, FullReply(), "192.168.1.10:80", connectionType: ConnectionType.Tcp));
+        SetupProbes(
+            new Queue<StoragePresence>([StoragePresence.Present, StoragePresence.Present]),
+            new Queue<StoragePresence>([StoragePresence.Present, StoragePresence.Present]));
 
         var result = await _sut.FindDevices(CancellationToken.None);
 
         result.Should().HaveCount(1);
-        result.Single().ConnectionType.Should().Be(ConnectionType.Tcp);
+        var device = result.Single();
+        device.ConnectionType.Should().Be(ConnectionType.Tcp);
+        device.Connection.TransportInUse.Should().Be(ConnectionType.Tcp);
+        device.Connection.SerialPortName.Should().Be("COM3");
+        device.Connection.TcpEndpoint.Should().NotBeNull();
         serialPort.Received(1).Dispose();
         tcpPort.DidNotReceive().Dispose();
         _mockSettingsProvider.Received(1).GetOrCreateDeviceSettings(ChipId);
@@ -229,8 +227,7 @@ public class CartFinderTests
     public async Task FindDevices_WithNonPresentProbeResult_MarksStorageUnavailable(StoragePresence presence)
     {
         var port = CreatePort();
-        SetupDiscoveryStrategy(CreateTestEndpoint(port));
-        SetupReply(FullReply());
+        SetupDiscoveryStrategy(CreateTestEndpoint(port, FullReply()));
         SetupProbes(presence, presence);
 
         var result = await _sut.FindDevices(CancellationToken.None);
@@ -238,5 +235,75 @@ public class CartFinderTests
         var cart = result.Single().Cart;
         cart.SdStorage.Available.Should().BeFalse();
         cart.UsbStorage.Available.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BuildDevice_WithMinimalFirmwareReply_ResetsThenRecoversBeforeReturningDevice()
+    {
+        var port = CreatePort();
+        var endpoint = CreateTestEndpoint(port, MinimalReply());
+        _mockRecovery.RecoverAsync(Arg.Any<TeensyRomDevice>(), RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
+            .Returns(new RecoveryOutcome(DeviceMode.FullIdle, TimeSpan.Zero, TimeSpan.Zero, null));
+
+        var device = await _sut.BuildDevice(endpoint, CancellationToken.None);
+
+        device.Should().NotBeNull();
+        port.Received(1).SendIntBytes(TeensyToken.Reset, 2);
+        await _mockRecovery.Received(1).RecoverAsync(
+            Arg.Is<TeensyRomDevice>(d => d.DeviceId == ChipId),
+            RecoveryReason.LeaveMinimal,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(DeviceMode.Minimal)]
+    [InlineData(DeviceMode.Unreachable)]
+    public async Task BuildDevice_WithMinimalFirmwareReply_WhenRecoveryDoesNotReachFull_ReturnsNull(DeviceMode outcomeMode)
+    {
+        var port = CreatePort();
+        var endpoint = CreateTestEndpoint(port, MinimalReply());
+        _mockRecovery.RecoverAsync(Arg.Any<TeensyRomDevice>(), RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
+            .Returns(new RecoveryOutcome(outcomeMode, TimeSpan.Zero, TimeSpan.Zero, "did not reach full"));
+
+        var device = await _sut.BuildDevice(endpoint, CancellationToken.None);
+
+        device.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task BuildDevice_WithStorageBusyOnce_ResetsAndReprobesThenListsIdle()
+    {
+        var port = CreatePort();
+        var endpoint = CreateTestEndpoint(port, FullReply());
+        SetupProbes(
+            new Queue<StoragePresence>([StoragePresence.Busy, StoragePresence.Present]),
+            new Queue<StoragePresence>([StoragePresence.Busy, StoragePresence.Present]));
+
+        var device = await _sut.BuildDevice(endpoint, CancellationToken.None);
+
+        device.Should().NotBeNull();
+        device!.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+        device.Cart.SdStorage.Available.Should().BeTrue();
+        device.Cart.UsbStorage.Available.Should().BeTrue();
+        port.Received(1).SendIntBytes(TeensyToken.Reset, 2);
+        _mockInterrogator.Received(2).ProbeStorage(port, TeensyStorageType.SD);
+    }
+
+    [Fact]
+    public async Task BuildDevice_WithStorageBusyAfterReset_ListsAsBusyWithStorageUnknown()
+    {
+        var port = CreatePort();
+        var endpoint = CreateTestEndpoint(port, FullReply());
+        SetupProbes(
+            new Queue<StoragePresence>([StoragePresence.Busy, StoragePresence.Busy]),
+            new Queue<StoragePresence>([StoragePresence.Busy, StoragePresence.Busy]));
+
+        var device = await _sut.BuildDevice(endpoint, CancellationToken.None);
+
+        device.Should().NotBeNull();
+        device!.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+        port.Received(1).SendIntBytes(TeensyToken.Reset, 2);
+        _mockInterrogator.Received(2).ProbeStorage(port, TeensyStorageType.SD);
+        _mockInterrogator.Received(2).ProbeStorage(port, TeensyStorageType.USB);
     }
 }

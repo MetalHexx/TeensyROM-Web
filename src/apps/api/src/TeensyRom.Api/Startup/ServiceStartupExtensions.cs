@@ -46,6 +46,7 @@ namespace TeensyRom.Api.Startup
             services.AddSingleton<ITeensyPortLocator, TeensyPortLocator>();
             services.AddSingleton(sp => ConnectionOptionsBinder.BindFrom(sp.GetRequiredService<IConfiguration>()));
             services.AddSingleton<IDeviceRecovery, DeviceRecovery>();
+            services.AddSingleton<IConnectionRecordCache, ConnectionRecordCache>();
             services.AddSingleton<IDeviceConnectionManager, DeviceConnectionManager>();
             services.AddSingleton<IDeviceTransportFactory, DeviceTransportFactory>();
             services.AddSingleton<IStorageFactory, StorageFactory>();
