@@ -10,8 +10,11 @@ namespace TeensyRom.Core.Serial.Usb
         bool IsSupported { get; }
 
         /// <summary>
-        /// Reads descriptors for ports that are PRESENT right now, cross-checked against
-        /// <paramref name="presentPortNames"/>. May throw; <see cref="ITeensyPortLocator"/> catches.
+        /// Reads descriptors for ports that are PRESENT right now. <paramref name="presentPortNames"/> is
+        /// the cross-check a reader needs only when its native source can retain entries for devices that
+        /// are no longer attached (e.g. the Windows registry); a reader whose enumeration is itself
+        /// present-only by construction (sysfs tty nodes, macOS device nodes) may ignore it. May throw;
+        /// <see cref="ITeensyPortLocator"/> catches.
         /// </summary>
         IReadOnlyList<UsbSerialDescriptor> Read(IReadOnlyCollection<string> presentPortNames);
     }
