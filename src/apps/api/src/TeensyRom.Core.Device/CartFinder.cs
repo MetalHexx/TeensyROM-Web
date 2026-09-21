@@ -102,7 +102,7 @@ namespace TeensyRom.Core.Device
 				log.Internal("CartFinder.DiscoverAllEndpoints: No discovery strategies registered");
 				return [];
 			}
-			var tasks = _discoveryStrategies.Select(s => s.FindEndpoints(ct, fullScan));
+			var tasks = _discoveryStrategies.Select(s => s.FindEndpoints(ct));
 			var results = await Task.WhenAll(tasks);
 			var allEndpoints = results.SelectMany(r => r).ToList();
 
@@ -130,9 +130,9 @@ namespace TeensyRom.Core.Device
 
 			try
 			{
-				if (endpoint.PingResponse is null)
+				if (!endpoint.Version.IsTeensyRom)
 				{
-					log.ExternalError($"{methodName} Version check failed for {endpoint.Display}.  PingResponse was null.");
+					log.ExternalError($"{methodName} Version check failed for {endpoint.Display}.  No TeensyROM version reply.");
 					return null;
 				}
 
@@ -161,15 +161,6 @@ namespace TeensyRom.Core.Device
 				{
 					log.InternalWarning($"{methodName} device is in minimal firmware; not ready");
 					return null;
-				}
-
-				if (endpoint.PingResponse.Contains("busy"))
-				{
-					log.Internal($"{methodName}  TR is Busy, restarting");
-					await mediator.Send(new ResetCommand
-					{
-						CommunicationPort = communicationPort
-					});
 				}
 
 				if (!cart.IsCompatible)

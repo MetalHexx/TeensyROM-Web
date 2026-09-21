@@ -1,5 +1,4 @@
 using MediatR;
-using TeensyRom.Core.Commands;
 using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Serial.Routines;
 using TeensyRom.Core.Storage;
@@ -59,14 +58,13 @@ public class CartFinderTests
     private static DiscoveredEndpoint CreateTestEndpoint(
         ICommunicationPort port,
         string address = "COM3",
-        string? pingResponse = "TeensyROM Ready!",
         ConnectionType connectionType = ConnectionType.Serial) =>
-        new(connectionType, address, connectionType == ConnectionType.Tcp ? 80 : null, pingResponse, port);
+        new(connectionType, address, connectionType == ConnectionType.Tcp ? 80 : null, VersionReply.Empty with { IsTeensyRom = true }, port);
 
     private void SetupDiscoveryStrategy(params DiscoveredEndpoint[] endpoints)
     {
         var mockStrategy = Substitute.For<IDiscoveryStrategy>();
-        mockStrategy.FindEndpoints(Arg.Any<CancellationToken>(), Arg.Any<bool>())
+        mockStrategy.FindEndpoints(Arg.Any<CancellationToken>())
             .Returns(endpoints.ToList());
         _mockDiscoveryStrategies.Add(mockStrategy);
     }
@@ -134,25 +132,6 @@ public class CartFinderTests
         cart.SdStorage.DeviceId.Should().Be(ChipId);
         cart.UsbStorage.DeviceId.Should().Be(ChipId);
         _mockSettingsProvider.Received(1).GetOrCreateDeviceSettings(ChipId);
-    }
-
-    [Fact]
-    public async Task FindDevices_WithBusyPingResponse_ReadsVersionBeforeResettingAndProbesAfter()
-    {
-        var port = CreatePort();
-        SetupDiscoveryStrategy(CreateTestEndpoint(port, pingResponse: "TeensyROM is busy"));
-        SetupReply(FullReply());
-        SetupProbes(StoragePresence.Present, StoragePresence.Present);
-
-        await _sut.FindDevices(CancellationToken.None);
-
-        Received.InOrder(() =>
-        {
-            _mockInterrogator.ReadVersion(port);
-            _mockMediator.Send(Arg.Any<ResetCommand>());
-            _mockInterrogator.ProbeStorage(port, TeensyStorageType.SD);
-            _mockInterrogator.ProbeStorage(port, TeensyStorageType.USB);
-        });
     }
 
     [Fact]
