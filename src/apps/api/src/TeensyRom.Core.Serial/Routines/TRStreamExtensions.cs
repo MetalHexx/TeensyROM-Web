@@ -7,6 +7,7 @@ using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Logging;
 using TeensyRom.Core.Music;
+using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Settings;
 
 namespace TeensyRom.Core.Serial.Routines
@@ -110,13 +111,24 @@ namespace TeensyRom.Core.Serial.Routines
 			communicationPort.HandleAck();
 		}
 
+		/// <summary>
+		/// Sends the raw reset token and reads whatever reply follows. Never throws on a transport drop: a
+		/// reset sent to a device in minimal reboots the Teensy mid-reply, so the port going away while
+		/// reading is the normal path there, not an error - the caller decides whether recovery follows.
+		/// </summary>
 		public static void ResetDevice(this ICommunicationPort communicationPort, ILoggingService log)
 		{
 			log.Internal($"{_logClass} Resetting TeensyROM");
-			communicationPort.SendIntBytes(TeensyToken.Reset, 2);
-			var response = communicationPort.ReadAndLogSerialAsString(200);
-			Thread.Sleep(1000);
-			log.External($"{_logClass} TR Response: '{response?.Trim()}'");
+			try
+			{
+				communicationPort.SendIntBytes(TeensyToken.Reset, 2);
+				var response = TRDiscoveryRoutines.ReadTextUntilIdle(communicationPort, idleTimeoutMs: 200);
+				log.External($"{_logClass} TR Response: '{response.Trim()}'");
+			}
+			catch (Exception ex) when (TransportDrop.IsDrop(ex, communicationPort))
+			{
+				log.Internal($"{_logClass} reset sent; transport dropped during the reply (expected when the device was in minimal)");
+			}
 		}
 
 		//public static bool ResetDevice(this ICommunicationPort communicationPort)
@@ -352,13 +364,15 @@ namespace TeensyRom.Core.Serial.Routines
 			return false;
 		}
 
+		/// <summary>
+		/// A reset in full firmware keeps the transport, and a device in minimal never reaches this
+		/// handler (the gate resets it back to full first) - so there is nothing left to reconnect or
+		/// hunt for. Kept as a facade over <see cref="ResetDevice"/> for its existing callers.
+		/// </summary>
 		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{
-			if (communicationPort.GetConnectionType() is ConnectionType.Serial)
-			{
-				communicationPort.ResetDevice(log);
-			}
-			return communicationPort.ReconnectToFullFw(log);
+			communicationPort.ResetDevice(log);
+			return true;
 		}
 
 		public static bool ReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)

@@ -14,8 +14,8 @@ namespace TeensyRom.Api.Tests.Integration.Common
 
     /// <summary>
     /// A hardware-free <see cref="ICommunicationPort"/> that speaks just enough of the wire protocol to
-    /// satisfy <c>CommunicationPortBehavior</c>'s pre-handler firmware/busy checks and the SendFile /
-    /// DeleteFile handshake, recording every file it "receives" for test assertions.
+    /// satisfy the SendFile / DeleteFile handshake, recording every file it "receives" for test
+    /// assertions.
     /// </summary>
     public sealed class FakeCommunicationPort : ICommunicationPort
     {
@@ -38,12 +38,17 @@ namespace TeensyRom.Api.Tests.Integration.Common
         /// <summary>When set, invoked with the target path of an incoming SendFile write; a non-null result is thrown.</summary>
         public Func<string, Exception?>? FailFor { get; set; }
 
-        /// <summary>When true, every command the device would otherwise acknowledge fails as if the device vanished mid-command.</summary>
+        /// <summary>
+        /// When true, every command the device would otherwise acknowledge fails as if the device
+        /// vanished mid-command - <see cref="IsOpen"/> reports closed from that point on too, the same
+        /// as a real transport drop, since callers (the command pipeline's gate, <c>TransferFilesCommandHandler</c>)
+        /// key their own "device is gone" branch off it rather than the exception alone.
+        /// </summary>
         public bool SimulateDeviceLoss { get; set; }
 
         public IReadOnlyList<FakeReceivedFile> Received => [.. _received];
 
-        public bool IsOpen => true;
+        public bool IsOpen => !SimulateDeviceLoss;
         public int BytesToRead => 2;
 
         public void ClearBuffers() { }

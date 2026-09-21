@@ -1,10 +1,15 @@
 using System.Reflection;
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
+using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Entities.Serial;
+using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Serial;
 using TeensyRom.Core.Serial.Commands;
 using TeensyRom.Core.Serial.Commands.Behaviors;
+using TeensyRom.Core.Serial.Commands.LaunchFile;
+using TeensyRom.Core.Serial.Recovery;
+using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Serial.Tests.Unit.Commands.Behaviors;
 
@@ -17,43 +22,75 @@ public class CommunicationPortBehaviorTests
     }
 
     /// <summary>
-    /// Answers just enough of the pre-handler firmware/busy handshake for
-    /// <see cref="CommunicationPortBehavior{TRequest,TResponse}"/> to fall through to <c>next()</c>.
+    /// Records the gate's own port traffic (open/clear/reset) so tests can assert on it directly - no
+    /// firmware check or busy ping to answer, since the gate no longer sends either.
+    /// <see cref="WaitForSerialData"/> times out immediately by default, so a raw <c>ResetDevice</c> call
+    /// (its idle-read loop) returns fast with an empty reply unless a test scripts otherwise.
     /// </summary>
     private sealed class StubCommunicationPort : ICommunicationPort
     {
-        public bool IsOpen => true;
-        public int BytesToRead => 2;
+        public bool IsOpen { get; set; } = true;
+        public int BytesToRead => 0;
+        public List<uint> SentTokens { get; } = [];
+        public int ClosePortCallCount { get; private set; }
+
+        /// <summary>Runs inside <see cref="OpenPort"/> before it marks the port open; throw here to simulate a failed open.</summary>
+        public Action? OpenPortAction { get; set; }
+
+        /// <summary>Runs instead of the default immediate timeout; throw a non-<see cref="TimeoutException"/> to simulate a drop mid-read.</summary>
+        public Action? WaitForSerialDataAction { get; set; }
 
         public void ClearBuffers() { }
-        public void SendIntBytes(uint intToSend, short numBytes) { }
+        public void SendIntBytes(uint intToSend, short numBytes) => SentTokens.Add(intToSend);
         public uint ReadIntBytes(short byteLength) => 0;
-
-        public int Read(byte[] buffer, int offset, int count)
-        {
-            var bytes = BitConverter.GetBytes(TeensyToken.FWFullToken.Value);
-            var toCopy = Math.Min(count, bytes.Length);
-            Array.Copy(bytes, 0, buffer, offset, toCopy);
-            return toCopy;
-        }
-
+        public int Read(byte[] buffer, int offset, int count) => 0;
         public int ReadByte() => -1;
         public void Write(string text) { }
         public void Write(byte[] buffer, int offset, int count) { }
         public void Write(char[] buffer, int offset, int count) { }
         public System.Reactive.Unit SetPort(string port) => System.Reactive.Unit.Default;
-        public string? OpenPort(bool useRetryLoop = true) => "TEST";
-        public System.Reactive.Unit ClosePort() => System.Reactive.Unit.Default;
+
+        public string? OpenPort(bool useRetryLoop = true)
+        {
+            OpenPortAction?.Invoke();
+            IsOpen = true;
+            return "TEST";
+        }
+
+        public System.Reactive.Unit ClosePort()
+        {
+            ClosePortCallCount++;
+            IsOpen = false;
+            return System.Reactive.Unit.Default;
+        }
+
         public string ReadSerialAsString(int msToWait = 0) => string.Empty;
         public string ReadAndLogSerialAsString(int msToWait = 0) => string.Empty;
         public byte[] ReadSerialBytes() => [];
         public byte[] ReadSerialBytes(int msToWait = 0) => [];
-        public void WaitForSerialData(int numBytes, int timeoutMs) { }
+
+        public void WaitForSerialData(int numBytes, int timeoutMs)
+        {
+            if (WaitForSerialDataAction is not null)
+            {
+                WaitForSerialDataAction();
+                return;
+            }
+            throw new TimeoutException();
+        }
+
         public void SendSignedChar(sbyte charToSend) { }
         public void SendSignedShort(short value) { }
         public string GetEndpoint() => "TEST";
         public ConnectionType GetConnectionType() => ConnectionType.Tcp;
         public void Dispose() { }
+    }
+
+    /// <summary>A device with a default, confirmed <see cref="DeviceMode.FullIdle"/> record on <paramref name="port"/>.</summary>
+    private static TeensyRomDevice BuildDevice(StubCommunicationPort port, string deviceId)
+    {
+        var cart = new Cart { DeviceId = deviceId };
+        return new TeensyRomDevice(cart, port, Substitute.For<IStorageService>(), Substitute.For<IStorageService>());
     }
 
     /// <summary>
@@ -73,8 +110,10 @@ public class CommunicationPortBehaviorTests
         try
         {
             var log = Substitute.For<ILoggingService>();
-            var behaviorA = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(log);
-            var behaviorB = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(log);
+            var devices = Substitute.For<IDeviceConnectionManager>();
+            var recovery = Substitute.For<IDeviceRecovery>();
+            var behaviorA = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(log, devices, recovery);
+            var behaviorB = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(log, devices, recovery);
             var deviceId = Guid.NewGuid().ToString("N");
             var commandA = new FakeCommand { DeviceId = deviceId, CommunicationPort = new StubCommunicationPort() };
             var commandB = new FakeCommand { DeviceId = deviceId, CommunicationPort = new StubCommunicationPort() };
@@ -102,5 +141,258 @@ public class CommunicationPortBehaviorTests
         {
             staleLockField.SetValue(null, original);
         }
+    }
+
+    [Fact]
+    public async Task Handle_DefaultRecord_SendsExactlyOneExchange_NoFwCheckOrPingBytes()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(1);
+        port.SentTokens.Should().NotContain(TeensyToken.FwCheckToken.Value);
+        port.SentTokens.Should().NotContain(TeensyToken.Ping.Value);
+    }
+
+    [Fact]
+    public async Task Handle_BusyOnceThenSucceeds_ResetsOnceInvokesHandlerTwiceRecordEndsFullIdle()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            if (invocations == 1)
+            {
+                throw new TeensyBusyException("busy");
+            }
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(2);
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+    }
+
+    [Fact]
+    public async Task Handle_BusyTwice_ResetsOnceExceptionPropagatesRecordEndsFullBusy()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+
+        Func<Task> act = () => behavior.Handle(command, () => throw new TeensyBusyException("busy"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<TeensyBusyException>();
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+    }
+
+    [Fact]
+    public async Task Handle_HandlerThrowsWithPortReportingClosed_RecoversWithDropAndPropagates_GateNeverClosesPort()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>())
+            .Returns(new RecoveryOutcome(DeviceMode.Unreachable, TimeSpan.Zero, TimeSpan.Zero, "dropped"));
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, recovery);
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+
+        Func<Task> act = () => behavior.Handle(command, () =>
+        {
+            port.IsOpen = false;
+            throw new TeensyException("boom");
+        }, CancellationToken.None);
+
+        await act.Should().ThrowAsync<TeensyException>();
+        await recovery.Received(1).RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>());
+        port.ClosePortCallCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Handle_FullBusyRecord_HandlerSucceedsFirstTime_NoResetOneInvocationRecordEndsFullIdle()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.MarkBusy();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(1);
+        port.SentTokens.Should().NotContain(TeensyToken.Reset.Value);
+        device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
+    }
+
+    [Fact]
+    public async Task Handle_MinimalNonLaunchCommand_RecoveryAnswersMinimal_FailsWithoutRunningHandler()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.Minimal);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
+            .Returns(new RecoveryOutcome(DeviceMode.Minimal, TimeSpan.Zero, TimeSpan.Zero, "still minimal"));
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, recovery);
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Error.Should().Be("Command Failed. Cart was in Minimal and could not be brought back to full firmware.");
+        invocations.Should().Be(0);
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        await recovery.Received(1).RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_MinimalRecordLaunchFileCommand_SkipsResetAndRecovery_HandlerRuns()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.Minimal);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        var behavior = new CommunicationPortBehavior<LaunchFileCommand, LaunchFileResult>(
+            Substitute.For<ILoggingService>(), devices, recovery);
+        var command = new LaunchFileCommand
+        {
+            StorageType = TeensyStorageType.SD,
+            LaunchItem = new LaunchableItem(),
+            DeviceId = deviceId,
+            CommunicationPort = port
+        };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new LaunchFileResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        invocations.Should().Be(1);
+        port.SentTokens.Should().NotContain(TeensyToken.Reset.Value);
+        await recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_PortReportingClosedAndOpenPortThrows_RecoversWithDropAndPropagates()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort
+        {
+            IsOpen = false,
+            OpenPortAction = () => throw new InvalidOperationException("The port is closed.")
+        };
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>())
+            .Returns(new RecoveryOutcome(DeviceMode.Unreachable, TimeSpan.Zero, TimeSpan.Zero, "dropped"));
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, recovery);
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        Func<Task> act = () => behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        await recovery.Received(1).RecoverAsync(device, RecoveryReason.Drop, Arg.Any<CancellationToken>());
+        invocations.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Handle_PortReportingClosedAndOpenPortSucceeds_NoRecoveryRuns()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort { IsOpen = false };
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, recovery);
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+
+        var response = await behavior.Handle(command, () => Task.FromResult(new TeensyCommandResult()), CancellationToken.None);
+
+        response.IsSuccess.Should().BeTrue();
+        await recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ResetDevice_ReplyReadThrowsDropClassException_ReturnsNormally()
+    {
+        var port = new StubCommunicationPort
+        {
+            IsOpen = false,
+            WaitForSerialDataAction = () => throw new InvalidOperationException("The port is closed.")
+        };
+        var log = Substitute.For<ILoggingService>();
+
+        var act = () => port.ResetDevice(log);
+
+        act.Should().NotThrow();
     }
 }

@@ -1,9 +1,13 @@
 using MediatR;
 using System.Collections.Concurrent;
 using System.Reactive.Linq;
+using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Commands;
 using TeensyRom.Core.Common;
+using TeensyRom.Core.Entities.Device;
 using TeensyRom.Core.Logging;
+using TeensyRom.Core.Serial.Commands.LaunchFile;
+using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Serial.Routines;
 
 namespace TeensyRom.Core.Serial.Commands.Behaviors
@@ -12,12 +16,17 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 	/// Serial/TCP pipeline to manage cross-cutting behaviors for all commands.
 	///
 	/// <remarks>
-	/// Handles general connectivity and manages scenarios where TeensyROM is busy
-	/// or needs to revert to the Full TeeensyROM firmware.  It also ensures only
-	/// one command at a time (per device) can be executed.
+	/// Ensures only one command at a time (per device) can be executed, keeps the port open for the
+	/// command's own exchange, and reacts to what the exchange actually reports instead of probing the
+	/// firmware first: a device believed to be in minimal is reset back to full before any non-launch
+	/// command runs, a <see cref="TeensyBusyException"/> from the command's own reply earns one reset and
+	/// one re-send, and a transport drop hands the device to <see cref="IDeviceRecovery"/>. A
+	/// <c>ResetCommand</c> sent to a device believed to be in minimal is reset twice this way - once here
+	/// to bring it back to full, once by the handler itself - landing on the same correct end state either
+	/// way; the simplicity is worth the redundant reset.
 	/// </remarks>
 	/// </summary>
-	public class CommunicationPortBehavior<TRequest, TResponse>(ILoggingService log) : IPipelineBehavior<TRequest, TResponse>
+	public class CommunicationPortBehavior<TRequest, TResponse>(ILoggingService log, IDeviceConnectionManager devices, IDeviceRecovery recovery) : IPipelineBehavior<TRequest, TResponse>
 		where TRequest : ITeensyCommand<TResponse>
 		where TResponse : TeensyCommandResult, new()
 	{
@@ -36,56 +45,72 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 
 			try
 			{
-				TResponse response = default!;
 				var port = request.CommunicationPort;
+				var device = request.DeviceId is null ? null : devices.GetAvailableDevice(request.DeviceId);
 
-				if (!port.IsOpen)
+				try
 				{
-					port.ClosePort();
-					port.OpenPort();
+					if (!port.IsOpen)
+					{
+						port.OpenPort();
+					}
+					else
+					{
+						port.ClearBuffers();
+					}
 				}
-				else
+				catch (Exception ex) when (device is not null && TransportDrop.IsDrop(ex, port))
 				{
-					port.ClearBuffers();
-				}	
+					await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
+					throw;
+				}
 
-				if (port.SendFwCheckCommand(log) != TeensyToken.FWFullToken)
+				if (device?.Connection.Mode == DeviceMode.Minimal && request is not LaunchFileCommand)
 				{
-					if (!port.ReconnectToFullFw(log))
+					port.ResetDevice(log);
+					var outcome = await recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, cancellationToken);
+
+					if (outcome.Mode is not (DeviceMode.FullIdle or DeviceMode.FullBusy))
 					{
 						return new()
 						{
 							IsSuccess = false,
-							Error = "SerialBehavior: Command Failed. Cart was in Minimal and was unable to reset to full FW."
+							Error = "Command Failed. Cart was in Minimal and could not be brought back to full firmware."
 						};
 					}
 				}
-				else if (request is not IBusyTolerant)
+
+				var busyRetries = 0;
+
+				async Task<TResponse> SendAsync()
 				{
-					if (port.PingDevice().IsTeensyRomBusy())
+					var response = await next();
+					if (device?.Connection.Mode == DeviceMode.FullBusy)
 					{
-						if (!port.ForceResetAndReconnectToFullFw(log))
-						{
-							return new()
-							{
-								IsSuccess = false,
-								Error = "SerialBehavior: Command Failed. Cart was busy and was unable to reset."
-							};
-						}
+						device.MarkIdle();
 					}
+					return response;
 				}
+
 				try
 				{
-					port.ClearBuffers();
-					response = await next();
+					try
+					{
+						return await SendAsync();
+					}
+					catch (TeensyBusyException) when (busyRetries++ == 0)
+					{
+						device?.MarkBusy();
+						port.ResetDevice(log);
+						port.ClearBuffers();
+						return await SendAsync();
+					}
 				}
-				catch
+				catch (Exception ex) when (device is not null && TransportDrop.IsDrop(ex, port))
 				{
-					port?.ClosePort();
-					log.InternalError("Closing port due to an error during communication port command.");
+					await recovery.RecoverAsync(device, RecoveryReason.Drop, cancellationToken);
 					throw;
 				}
-				return response;
 			}
 			finally
 			{

@@ -129,7 +129,7 @@ namespace TeensyRom.Core.Serial.Routines
         /// serial polls BytesToRead while TCP pulls arriving bytes into its receive buffer, so the same
         /// wait-then-read loop is correct on both, unlike <c>ICommunicationPort.ReadSerialAsString</c>.
         /// </summary>
-        private static string ReadTextUntilIdle(ICommunicationPort port, int idleTimeoutMs, int maxTotalMs = 2000)
+        internal static string ReadTextUntilIdle(ICommunicationPort port, int idleTimeoutMs, int maxTotalMs = 2000)
         {
             var received = new List<byte>();
             var stopwatch = Stopwatch.StartNew();

@@ -555,14 +555,14 @@ namespace TeensyRom.Api.Tests.Integration.Transfers
             var firstTarget = new FilePath("/games/rejected-1.prg");
             var secondTarget = new FilePath("/games/rejected-2.prg");
 
-            // CommunicationPortBehavior's firmware pre-check throws as soon as it touches the port;
-            // MediatR's ExceptionBehavior converts that into a normal TransferFilesResult with
-            // IsSuccess = false and an empty Outcomes list rather than letting the exception escape
-            // mediator.Send - the second escape path the exactly-once cleanup invariant has to cover,
-            // since no file is ever reported through the per-file callback at all. SendBatchAsync must
-            // notice IsSuccess = false and abort every still-pending file with the reported error,
-            // the same way the sibling catch-block does for a composition exception - otherwise these
-            // two files would vanish with the job reporting Completed and no failure at all.
+            // TransferFilesCommandHandler's own SendFileAsync throws as soon as it touches the port and,
+            // seeing the port closed, reports DeviceLost on the very first file without exhausting its
+            // retry loop - MediatR returns that as a normal TransferFilesResult with IsSuccess = false
+            // and Outcomes covering only the files attempted rather than letting an exception escape
+            // mediator.Send - the second escape path the exactly-once cleanup invariant has to cover.
+            // SendBatchAsync must notice IsSuccess = false and abort every still-pending file with the
+            // reported error, the same way the sibling catch-block does for a composition exception -
+            // otherwise these two files would vanish with the job reporting Completed and no failure at all.
             port.SimulateDeviceLoss = true;
 
             try
