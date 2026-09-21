@@ -194,7 +194,7 @@ namespace TeensyRom.Core.Serial
         log.InternalSuccess($"TcpObservablePort.TryConnect: Successfully connected to {_endpoint}");
         return true;
       }
-      catch (Exception ex)
+      catch (Exception)
       {
         // Polling connect misses are expected here (discovery's fast single-attempt scan and the
         // retry loop both call this repeatedly), so a miss is not error-worthy on its own.

@@ -14,10 +14,18 @@ namespace TeensyRom.Core.Device.Tests.Integration;
 /// invoked directly against the fixture's real <see cref="IDeviceConnectionManager"/> and
 /// <see cref="IDeviceRecovery"/> - the same dependencies the command pipeline's own handlers take -
 /// bypassing MediatR entirely; nothing here exercises storage indexing or the pipeline's cross-cutting
-/// behaviors. With no hardware attached every test reports skipped, not failed - see
+/// behaviors. With no hardware attached the test reports skipped, not failed - see
 /// <see cref="HardwareFixture.HasHardware"/>.
+///
+/// Written as one scripted flow rather than independent facts, mirroring <see cref="DiscoveryOccasionsTests"/>:
+/// each transition's starting state is the previous transition's end state, and xUnit gives no ordering
+/// guarantee between independent <c>[Fact]</c>s in the same class - a real bench run proved this
+/// empirically (transitions executed out of declaration order, sending a launch command while the device
+/// was mid-operation and hanging the ack). Shares its fixture with <see cref="DiscoveryOccasionsTests"/>
+/// via <see cref="HardwareCollection"/> so the two classes never race for the same physical connection.
 /// </summary>
-public class ConnectionTransitionsTests(HardwareFixture fixture, ITestOutputHelper output) : IClassFixture<HardwareFixture>
+[Collection(HardwareCollection.Name)]
+public class ConnectionTransitionsTests(HardwareFixture fixture, ITestOutputHelper output)
 {
     // Real bench SD card content, the same files TeensyRom.Api.Tests.Integration's LaunchFileTests uses:
     // large enough that launching it reboots the device through minimal, small enough (a SID) to settle
@@ -35,28 +43,24 @@ public class ConnectionTransitionsTests(HardwareFixture fixture, ITestOutputHelp
     };
 
     [SkippableFact]
-    public async Task LargeLaunch_FromFull_EndsInMinimalWithinToMinimalCeiling()
+    public async Task ConnectionTransitions_FullMinimalRoundTripsAndReset()
     {
         var device = GivenDevice();
+        var handler = BuildLaunchHandler();
+
+        // Transition 1: full -> minimal (large launch).
         await EnsureFullAsync(device);
 
-        var handler = BuildLaunchHandler();
-        var (result, elapsed) = await fixture.MeasureAsync(output, "LargeLaunch (full -> minimal)",
+        var (largeFromFull, largeFromFullElapsed) = await fixture.MeasureAsync(output, "LargeLaunch (full -> minimal)",
             () => handler.Handle(LaunchCommand(device, LargeLaunchItem), CancellationToken.None));
 
-        result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+        largeFromFull.LaunchResult.Should().Be(LaunchFileResultType.Success);
         device.Connection.Mode.Should().Be(DeviceMode.Minimal);
-        elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToMinimalMs));
-    }
+        largeFromFullElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToMinimalMs));
 
-    [SkippableFact]
-    public async Task DirectoryListing_FromMinimal_LeavesMinimalAndListsWithinToFullCeiling()
-    {
-        var device = GivenDevice();
-        await EnsureMinimalAsync(device);
-
+        // Transition 2: minimal -> full (directory listing forces the reboot path).
         var listingHandler = new GetDirectoryRecursiveHandler(fixture.Log);
-        var command = new GetDirectoryRecursiveCommand
+        var listingCommand = new GetDirectoryRecursiveCommand
         {
             StorageType = TeensyStorageType.SD,
             Path = new DirectoryPath("/"),
@@ -65,63 +69,48 @@ public class ConnectionTransitionsTests(HardwareFixture fixture, ITestOutputHelp
             CommunicationPort = device.CommunicationPort
         };
 
-        var (result, elapsed) = await fixture.MeasureAsync(output, "Minimal -> Full (directory listing)", async () =>
+        var (listing, listingElapsed) = await fixture.MeasureAsync(output, "Minimal -> Full (directory listing)", async () =>
         {
             device.CommunicationPort.ResetDevice(fixture.Log);
             var outcome = await fixture.Recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, CancellationToken.None);
             outcome.Reachable.Should().BeTrue("the device must leave minimal before a listing can be attempted");
-            return await listingHandler.Handle(command, CancellationToken.None);
+            return await listingHandler.Handle(listingCommand, CancellationToken.None);
         });
 
-        result.IsSuccess.Should().BeTrue();
+        listing.IsSuccess.Should().BeTrue();
         device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
-        elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToFullMs));
-    }
+        listingElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToFullMs));
 
-    [SkippableFact]
-    public async Task SidLaunch_FromMinimal_SettlesInFullWithinToFullPlusSettleCeiling()
-    {
-        var device = GivenDevice();
+        // Transition 3: minimal -> full (SID jump path, settles in full without a separate reboot).
         await EnsureMinimalAsync(device);
 
-        var handler = BuildLaunchHandler();
-        var (result, elapsed) = await fixture.MeasureAsync(output, "ChainedLaunch (minimal -> SID)",
+        var (sidLaunch, sidLaunchElapsed) = await fixture.MeasureAsync(output, "ChainedLaunch (minimal -> SID)",
             () => handler.Handle(LaunchCommand(device, SidLaunchItem), CancellationToken.None));
 
-        result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+        sidLaunch.LaunchResult.Should().Be(LaunchFileResultType.Success);
         device.Connection.Mode.Should().BeOneOf(DeviceMode.FullIdle, DeviceMode.FullBusy);
-        elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToFullMs + fixture.Options.LaunchSettleMs));
-    }
+        sidLaunchElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToFullMs + fixture.Options.LaunchSettleMs));
 
-    [SkippableFact]
-    public async Task LargeLaunch_FromMinimal_EndsBackInMinimalWithinChainedCeiling()
-    {
-        var device = GivenDevice();
+        // Transition 4: minimal -> full -> minimal (chained large launch).
         await EnsureMinimalAsync(device);
 
-        var handler = BuildLaunchHandler();
-        var (result, elapsed) = await fixture.MeasureAsync(output, "ChainedLaunch (minimal -> large -> minimal)",
+        var (largeFromMinimal, largeFromMinimalElapsed) = await fixture.MeasureAsync(output, "ChainedLaunch (minimal -> large -> minimal)",
             () => handler.Handle(LaunchCommand(device, LargeLaunchItem), CancellationToken.None));
 
-        result.LaunchResult.Should().Be(LaunchFileResultType.Success);
+        largeFromMinimal.LaunchResult.Should().Be(LaunchFileResultType.Success);
         device.Connection.Mode.Should().Be(DeviceMode.Minimal);
-        elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToFullMs + fixture.Ceilings.ToMinimalMs + fixture.Options.LaunchSettleMs));
-    }
+        largeFromMinimalElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToFullMs + fixture.Ceilings.ToMinimalMs + fixture.Options.LaunchSettleMs));
 
-    [SkippableFact]
-    public async Task Reset_InFull_LeavesTransportOpenWithoutInvokingRecovery()
-    {
-        var device = GivenDevice();
+        // Occasion: reset while full leaves the transport open without invoking recovery.
         await EnsureFullAsync(device);
-
         fixture.Log.ClearReceivedCalls();
 
         var resetHandler = new ResetCommandHandler(fixture.Log);
-        var command = new ResetCommand { DeviceId = device.DeviceId, CommunicationPort = device.CommunicationPort };
+        var resetCommand = new ResetCommand { DeviceId = device.DeviceId, CommunicationPort = device.CommunicationPort };
 
-        var (result, _) = await fixture.MeasureAsync(output, "Reset (full)", () => resetHandler.Handle(command, CancellationToken.None));
+        var (resetResult, _) = await fixture.MeasureAsync(output, "Reset (full)", () => resetHandler.Handle(resetCommand, CancellationToken.None));
 
-        result.IsSuccess.Should().BeTrue();
+        resetResult.IsSuccess.Should().BeTrue();
 
         // Over TCP nothing announces the reboot, so IsOpen alone would not catch a stale port - a
         // following version command answering is the real proof the transport is still good.

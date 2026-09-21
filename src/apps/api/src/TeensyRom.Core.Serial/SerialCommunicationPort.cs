@@ -84,7 +84,7 @@ namespace TeensyRom.Core.Serial
       {
         _serialPort.Open();
       }
-      catch (UnauthorizedAccessException ex)
+      catch (UnauthorizedAccessException)
       {
         log.InternalError(failureMessage);
         throw;

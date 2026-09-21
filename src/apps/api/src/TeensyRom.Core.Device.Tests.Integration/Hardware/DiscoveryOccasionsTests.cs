@@ -12,9 +12,11 @@ namespace TeensyRom.Core.Device.Tests.Integration;
 /// without a sweep. Written as one scripted flow rather than three independent facts because each phase's
 /// starting state is the previous phase's end state - splitting them would just re-derive the same
 /// sequence with extra setup. With no hardware attached the test reports skipped, not failed - see
-/// <see cref="HardwareFixture.HasHardware"/>.
+/// <see cref="HardwareFixture.HasHardware"/>. Shares its fixture with <see cref="ConnectionTransitionsTests"/>
+/// via <see cref="HardwareCollection"/> so the two classes never race for the same physical connection.
 /// </summary>
-public class DiscoveryOccasionsTests(HardwareFixture fixture, ITestOutputHelper output) : IClassFixture<HardwareFixture>
+[Collection(HardwareCollection.Name)]
+public class DiscoveryOccasionsTests(HardwareFixture fixture, ITestOutputHelper output)
 {
     // Same large bench file ConnectionTransitionsTests uses to force minimal firmware deliberately.
     private static readonly LaunchableItem LargeLaunchItem = new()

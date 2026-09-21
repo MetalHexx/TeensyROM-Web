@@ -42,7 +42,7 @@ measurement — you want a warm cache for anything that is not itself a cold-sta
 
 ```
 cd src/apps/api/src/TeensyRom.Core.Device.Tests.Integration
-TEENSYROM_BENCH_TRANSPORT=Tcp TEENSYROM_BENCH_CHIP_IDS=<chipId1>,<chipId2> dotnet test --filter "FullyQualifiedName~Hardware"
+TEENSYROM_BENCH_TRANSPORT=Tcp TEENSYROM_BENCH_CHIP_IDS=<chipId1>,<chipId2> dotnet test --filter "FullyQualifiedName~ConnectionTransitionsTests|FullyQualifiedName~DiscoveryOccasionsTests"
 ```
 
 `TEENSYROM_BENCH_TRANSPORT` selects `Serial` or `Tcp` (default `Tcp`) — whichever transport the bench is
@@ -133,10 +133,10 @@ measured value plus margin, never the raw number.
 
 | Measurement | Before | After | Ceiling seed | Ceiling set |
 |---|---|---|---|---|
-| Full → minimal (TCP) | 3.56–3.58 s | | `Tcp.ToMinimalMs` = 8000 | |
-| Minimal → full (TCP) | 7.06–7.09 s | | `Tcp.ToFullMs` = 15000 | |
-| Large launch from minimal (TCP, chained) | 15.2 s | 8–10 s expected | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` | |
-| Directory listing / SID launch from minimal (TCP) | 8.7–8.8 s | | `Tcp.ToFullMs + LaunchSettleMs` | |
+| Full → minimal (TCP) | 3.56–3.58 s | 5.81 s (2026-09-21 session) | `Tcp.ToMinimalMs` = 8000 | |
+| Minimal → full (TCP) | 7.06–7.09 s | 8.62 s (2026-09-21 session) | `Tcp.ToFullMs` = 15000 | |
+| Large launch from minimal (TCP, chained) | 15.2 s | | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` | |
+| Directory listing / SID launch from minimal (TCP) | 8.7–8.8 s | directory listing 8.62 s (see row above); SID chain did not complete — see session note | `Tcp.ToFullMs + LaunchSettleMs` | |
 | 1. Minimal → full: reboot path (Serial) | | | `Serial.ToFullMs` = 15000 (seeded from a 13.7 s serial round trip) | |
 | 1. Minimal → full: jump path (Serial) | | | `Serial.ToFullMs + LaunchSettleMs` | |
 | 2. Full → minimal, listener off (Serial) | | | `Serial.ToMinimalMs` = 15000 (seeded from a 13.7 s serial round trip) | |
@@ -144,10 +144,34 @@ measured value plus margin, never the raw number.
 | 4. Serial-only cold start, two dead TCP rows | | | `ConnectTimeoutMs` × dead rows + full discovery | |
 | 5. Listener on, unplugged (TCP) | | | `ConnectTimeoutMs` = 2000 per attempt | |
 
+### Session note (2026-09-21)
+
+One bench session against real hardware on this machine's LAN produced the two TCP "after" numbers
+above before the run stopped early: the chained SID launch (minimal → full, jump path) did not answer
+within the current `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` = 18 s ceiling (it ran 27.3 s and
+came back `Disconnected`), so `ConnectionTransitions_FullMinimalRoundTripsAndReset` stopped there and
+never reached the chained-large-launch or reset steps in that run. Three follow-up automated attempts
+(two on TCP, one on Serial) found no device to test against at all. The Serial attempt is expected to
+dead-end whenever Ethernet is also reachable: `CartFinderIntegrationTests` already covers that the finder
+prefers Ethernet and disposes the serial port when the same chip answers on both, so a fixture filtered to
+`ConnectionType.Serial` sees nothing until someone disables the C64's Ethernet listener for real serial
+testing (exactly what measurement #2 below already asks a bench operator to do). TCP access did not come
+back within the session — plausibly because the listener (`F8 → 3 → b`) needs a person to re-enable it
+after a reboot cycle, which an automated test run cannot do. The one SID-chain miss is worth a deliberate
+re-measurement (it may mean
+`Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` is genuinely too tight for the jump path now), but one
+non-completion is not a bench number — no ceiling is set from it here. The remaining TCP row, all five
+serial measurements, and the discovery/occasion table below need a further bench session with a person
+at the C64 to toggle the listener and drive the physical settings menu; none of that is achievable from
+this environment alone.
+
 ## Discovery/occasion after-numbers
 
 Mirrors `Hardware/DiscoveryOccasionsTests.cs`'s scripted flow and the Ground Truth bench rows for the
 three discovery occasions. Run with `TEENSYROM_BENCH_TRANSPORT` set to whichever transport is wired.
+
+Not run this session — see the session note above; TCP access did not stay up long enough to reach
+`DiscoveryOccasionsTests`, and serial is currently unavailable on this machine.
 
 | Occasion | Assertion | After |
 |---|---|---|
