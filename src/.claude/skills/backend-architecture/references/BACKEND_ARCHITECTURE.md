@@ -144,7 +144,7 @@ This ensures all device operations are scoped to the correct physical device in 
 **Device Modes** (`DeviceMode`, tracked per `DeviceConnectionRecord`, not by a state-machine object):
 - **FullIdle**: full firmware, connected, accepts commands
 - **FullBusy**: full firmware, but not answering commands — the device replied `Busy!`, or a handler-swapping launch (cart, PRG, image) left something other than the TeensyROM IO handler in charge. The gate resets a device believed busy before any non-launch command
-- **Minimal**: minimal (recovery) firmware — only a launch chains through it; the gate resets every other command back to full first
+- **Minimal**: minimal (recovery) firmware — the gate resets every command, launches included, back to full before it reaches a handler
 - **Unreachable**: no correct-chip reply within the recovery ceiling; its endpoints and last-known facts are kept so the next discovery occasion can find it again
 
 **Command Protocol**: Commands send token bytes (`TeensyToken.LaunchFile`, `TeensyToken.GetDirectory`) followed by parameters, then wait for `TeensyToken.Ack` (or, for a launch, `TeensyToken.RetryLaunch` — the device asking for a re-send, not a failure) and parse result data. See *Connectivity Ring* below for the gate that wraps every exchange and the recovery that follows a drop.
@@ -371,7 +371,7 @@ Every command runs `Logging → Exception → CommunicationPort`:
   2. Opens the port if it is closed, else clears its buffers
   3. Reactive `Busy` once — a `TeensyBusyException` from the handler earns exactly one reset + retry, never a loop
   4. Drop → recovery — a transport drop (`TransportDrop.IsDrop`), whether at open or during the exchange, hands the device to `DeviceRecovery.RecoverAsync(..., RecoveryReason.Drop)` and rethrows
-  5. Minimal → full for non-launch — if the device is believed `Minimal` and the command is not `LaunchFileCommand`, resets it and recovers to full (`RecoveryReason.LeaveMinimal`) before letting the command through; a launch is the one command allowed to run against a `Minimal` device
+  5. Minimal → full, launches included — if the device is believed `Minimal`, resets it and recovers to full (`RecoveryReason.LeaveMinimal`) before letting *any* command through, a launch included; minimal firmware cannot run a file at all, and sending a launch to it left the device unreachable when the reboot-vs-jump outcome went wrong, so there is no exemption here
   6. Busy → idle for non-launch — if the device is believed `FullBusy` (a handler-swapping launch left a cart/PRG/image owning the firmware's IO handler, so every non-always-available command answers `Busy!`) and the command is not `LaunchFileCommand`, resets it, clears the buffers and marks the record idle before letting the command through. No recovery routine and no sleep: a full-firmware reset keeps the port/socket open. A launch is again exempt — the firmware takes a launch directly, and reactive `Busy` is the backstop if it does not
 - **What it does not do**: it never closes the port itself — only `DeviceRecovery` closes and reopens one, and only while reacquiring
 
@@ -398,7 +398,7 @@ Every command runs `Logging → Exception → CommunicationPort`:
 
 - **Reacquire in place**: serial finds the device's current port by chip id via `TeensyPortLocator` (falling back to probing every present COM port when the descriptor filter is unavailable); TCP closes and reconnects to the device's last-known endpoint
 - **Poll version**: once reacquired, polls the version command every `ConnectionOptions.PollIntervalMs` (default 250 ms) until it answers with the reason's expected mode
-- **Ceiling per transport**: bounded by `ConnectionOptions.Tcp`/`ConnectionOptions.Serial` (`ToMinimalMs`, `ToFullMs`), selected by `RecoveryReason` — `LargeLaunch` waits for `Minimal`, `LeaveMinimal` waits for full, `ChainedLaunch` (a launch sent while already `Minimal`) waits `ToFull + ToMinimal + LaunchSettleMs` since the end state depends on the file, `Drop` accepts either mode within `max(ToMinimalMs, ToFullMs)`
+- **Ceiling per transport**: bounded by `ConnectionOptions.Tcp`/`ConnectionOptions.Serial` (`ToMinimalMs`, `ToFullMs`), selected by `RecoveryReason` — `LargeLaunch` waits for `Minimal`, `LeaveMinimal` waits for full, `Drop` accepts either mode within `max(ToMinimalMs, ToFullMs)`. There is no reason for a launch sent while already `Minimal`: the gate resets every `Minimal` device to full before a launch (or any other command) reaches the handler, so a launch's own recovery only ever runs `LargeLaunch`
 - **Unreachable on ceiling**: no correct-chip reply within the ceiling marks the device `Unreachable` and closes the port; its record is kept so the next discovery occasion can find it again
 - **Menu-boot wait on `LeaveMinimal`**: the reset that started this recovery dropped the transport before it could consume the menu's boot SID token, and the version poll can answer before the C64 menu is even up — so this path waits for that token (same bound as the reset primitive) before declaring the device full. A miss is recorded on `RecoveryOutcome.Failure` and logged as a warning rather than passed off as a clean recovery
 
@@ -416,12 +416,12 @@ Every command runs `Logging → Exception → CommunicationPort`:
 
 ### Launch's Drop-Expecting Flow
 
-`LaunchFileHandler` is the one handler written to expect a mid-command drop, because a large launch reboots the device:
+`LaunchFileHandler` is the one handler written to expect a mid-command drop, because a large launch reboots the device. It never sees a `Minimal` device itself — the gate resets minimal to full before a launch reaches it, the same as every other command — so everything below runs from full:
 
 1. Sends the `LaunchFile` token and clears buffers, then reads the ack. If the device replies `TeensyToken.RetryLaunch` — a request to re-send, not a failure — the handler returns `Declined` immediately, no recovery involved.
 2. Sends the storage token and path, then **watches** the port for up to `ConnectionOptions.LaunchSettleMs`, reading in 25 ms slices. A recognizable final reply (success/SID error/program error) short-circuits the wait.
 3. A read that throws an exception `TransportDrop` classifies as a drop skips straight to recovery — serial already gave a definitive answer. Silence through the whole window (ambiguous; a TCP drop never throws) instead confirms with one version-command read: a full, non-minimal reply is treated as success without invoking recovery, and the record is marked from the launched item's type — `FullBusy` for anything that swaps the IO handler (cart, PRG, image), `FullIdle` only for a SID. The type decides it rather than the port's echo because the firmware's "Loading IO handler:" text is USB-serial-only and never arrives over TCP.
-4. Otherwise it calls `DeviceRecovery.RecoverAsync` with `RecoveryReason.ChainedLaunch` (already `Minimal` when the launch was sent) or `RecoveryReason.LargeLaunch` (was full before the launch), and maps the outcome: unreachable → `Disconnected`; for `LargeLaunch`, ending in `Minimal` → success; for `ChainedLaunch`, no `Failure` on the outcome → success.
+4. Otherwise it calls `DeviceRecovery.RecoverAsync` with `RecoveryReason.LargeLaunch` — the only reason a launch ever needs, since a large file is the one thing that reboots the device mid-launch — and maps the outcome via `BuildRecoveryResult`: unreachable → `Disconnected`; ending in `Minimal` → success (the large file rebooted the device to receive it); any other reachable mode → `Error` ("the launch did not take: the device came back in full firmware").
 
 ### Serial Locator
 
@@ -436,19 +436,29 @@ Every command runs `Logging → Exception → CommunicationPort`:
 
 ## MediatR Flow Diagrams
 
-### Launch Sequence: Ack → Watch → Drop → Recovery → Mode
+### Launch Sequence: Gate Reset → Ack → Watch → Drop → Recovery → Mode
 
 ```mermaid
 %%{init: {'theme': 'dark', 'primaryColor': '#5a2c6b', 'primaryBorderColor': '#7d3fa3', 'primaryTextColor': '#fff', 'secondaryColor': '#0066cc', 'secondaryBorderColor': '#0052a3', 'tertiaryColor': '#2d7a3e', 'tertiaryBorderColor': '#1f5a2e', 'lineColor': '#b3b3b3', 'tertiaryTextColor': '#fff'}}%%
 sequenceDiagram
     participant EP as LaunchFileEndpoint
+    participant G as CommunicationPortBehavior
     participant H as LaunchFileHandler
     participant P as ICommunicationPort
     participant D as Physical Device
     participant R as DeviceRecovery
     participant L as TeensyPortLocator
 
-    EP->>H: Send(LaunchFileCommand)
+    EP->>G: Send(LaunchFileCommand)
+
+    alt device believed Minimal
+        G->>P: ResetDevice()
+        G->>R: RecoverAsync(device, LeaveMinimal)
+        R-->>G: RecoveryOutcome(FullIdle | FullBusy | Unreachable)
+        Note over G: not reachable in full → fail here, the handler never runs
+    end
+
+    G->>H: next() — device is full (or was already)
     H->>P: ClearBuffers() + SendIntBytes(LaunchFile)
     P->>D: [TX] LaunchFile token
     D-->>P: [RX] Ack | RetryLaunch
@@ -475,7 +485,7 @@ sequenceDiagram
 
         alt final result parsed (not dropped)
             H-->>EP: mapped result
-        else not fromMinimal and not dropped
+        else not dropped
             H->>P: ReadVersion()
             alt full, non-minimal reply
                 Note over H: mark record FullBusy (handler-swapping item) | FullIdle (SID)
@@ -485,7 +495,7 @@ sequenceDiagram
             end
         end
 
-        H->>R: RecoverAsync(device, LargeLaunch | ChainedLaunch)
+        H->>R: RecoverAsync(device, LargeLaunch)
         R->>L: FindByChipId (serial) | reconnect (tcp)
         L-->>R: matched port | miss
         R->>P: reopen + poll ReadVersion until ceiling

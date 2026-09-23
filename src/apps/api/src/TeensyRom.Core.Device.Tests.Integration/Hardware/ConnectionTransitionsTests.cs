@@ -81,21 +81,37 @@ public class ConnectionTransitionsTests(HardwareFixture fixture, ITestOutputHelp
         device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
         listingElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToFullMs));
 
-        // Transition 3: minimal -> full (SID jump path, settles in full without a separate reboot).
+        // Transition 3: minimal -> full (reset-and-recover), then a SID launch settles in full as an IO
+        // handler. The firmware can still chain a launch straight through minimal on its own, but the gate
+        // (CommunicationPortBehavior) never lets a command reach it that way any more - minimal always earns
+        // an explicit reset+recovery first, launches included - so this stage drives the same two steps by
+        // hand instead of relying on a chain. Before this amendment, the direct chain measured 8.7-8.8 s on
+        // TCP against a ToFullMs + LaunchSettleMs ceiling, and a later bench session's chain attempt never
+        // completed at all (see CONNECTION-2-BENCH-RUNBOOK.md's session note) - the reason the chain was
+        // dropped, not because it was slow.
         await EnsureMinimalAsync(device);
 
-        var (sidLaunch, sidLaunchElapsed) = await fixture.MeasureAsync(output, "ChainedLaunch (minimal -> SID)",
-            () => handler.Handle(LaunchCommand(device, SidLaunchItem), CancellationToken.None));
+        var (sidLaunch, sidLaunchElapsed) = await fixture.MeasureAsync(output, "SidLaunch (minimal -> full, reset-and-recover)", async () =>
+        {
+            await EnsureFullAsync(device);
+            return await handler.Handle(LaunchCommand(device, SidLaunchItem), CancellationToken.None);
+        });
 
         sidLaunch.LaunchResult.Should().Be(LaunchFileResultType.Success);
         device.Connection.Mode.Should().BeOneOf(DeviceMode.FullIdle, DeviceMode.FullBusy);
         sidLaunchElapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(fixture.Ceilings.ToFullMs + fixture.Options.LaunchSettleMs));
 
-        // Transition 4: minimal -> full -> minimal (chained large launch).
+        // Transition 4: minimal -> full (reset-and-recover) -> minimal (large launch reboots the device to
+        // receive it). Same harness-trap fix as transition 3: EnsureFullAsync stands in for the gate's own
+        // minimal reset before the large launch is sent. Before this amendment, the direct chain measured
+        // 15.2 s on TCP against a ToFullMs + ToMinimalMs + LaunchSettleMs ceiling.
         await EnsureMinimalAsync(device);
 
-        var (largeFromMinimal, largeFromMinimalElapsed) = await fixture.MeasureAsync(output, "ChainedLaunch (minimal -> large -> minimal)",
-            () => handler.Handle(LaunchCommand(device, LargeLaunchItem), CancellationToken.None));
+        var (largeFromMinimal, largeFromMinimalElapsed) = await fixture.MeasureAsync(output, "LargeLaunch (minimal -> full -> minimal, reset-and-recover)", async () =>
+        {
+            await EnsureFullAsync(device);
+            return await handler.Handle(LaunchCommand(device, LargeLaunchItem), CancellationToken.None);
+        });
 
         largeFromMinimal.LaunchResult.Should().Be(LaunchFileResultType.Success);
         device.Connection.Mode.Should().Be(DeviceMode.Minimal);

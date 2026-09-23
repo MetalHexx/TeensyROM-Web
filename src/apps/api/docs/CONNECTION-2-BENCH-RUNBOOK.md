@@ -63,28 +63,50 @@ These need a person at the bench — a debugger-free log tap, the physical unit(
 page. The listener toggle lives at **F8 → 3 → b** on the C64 settings page (F8 opens the settings menu,
 `3` selects the connection page, `b` toggles the Ethernet listener on/off).
 
-### 1. Minimal → full: reboot path and jump path
+### 1. Minimal → full: reboot path, now the only path
 
-Two distinct ways a unit leaves minimal, both already covered by the automated suite on whichever
-transport is wired — run each once on **Serial** here:
+There used to be a second, faster way a unit left minimal: a small file (a SID) launched straight
+into a device already in minimal would answer full directly within `LaunchSettleMs`, no separate
+reboot-to-menu step observed on the wire (`RecoveryReason.ChainedLaunch`). That path is gone. The
+gate (`CommunicationPortBehavior`) now resets a device it believes is in `Minimal` and recovers it
+to full (`RecoveryReason.LeaveMinimal`) before *any* command reaches its handler — a launch
+included — so every transition out of minimal is the reboot path; nothing chains any more. The
+chained path was abandoned for reachability, not speed: an unexpected reboot-vs-jump outcome could
+leave the device unreachable with no way to observe what happened. **Expect the numbers below to
+run slower than the superseded chained ones** — that is the deliberate trade, not a regression; the
+table keeps both so a future reader does not try to "optimise" it back.
 
-- **Reboot path** (`RecoveryReason.LeaveMinimal`): device is in minimal, a non-launch command (or the
-  bench operator resetting it directly) forces a real reboot back to the menu.
-  `Hardware/ConnectionTransitionsTests.cs`'s `DirectoryListing_FromMinimal_*` test exercises exactly this.
-- **Jump path** (`RecoveryReason.ChainedLaunch`, settle rule): a small file (a SID) launched from minimal
-  answers Full directly within `LaunchSettleMs` — no separate reboot-to-menu step observed on the wire.
-  `SidLaunch_FromMinimal_*` exercises this.
+Three stages exercise this, all inside the automated suite's single `[SkippableFact]`,
+`ConnectionTransitions_FullMinimalRoundTripsAndReset` — there is no `DirectoryListing_FromMinimal_*`,
+`SidLaunch_FromMinimal_*`, or `LargeLaunch_FromFull_*` test method; those names do not exist in
+`ConnectionTransitionsTests.cs`. Run the whole fact once on **Serial** here (the automated half
+already covers whichever transport `TEENSYROM_BENCH_TRANSPORT` is set to; this measurement wants
+the Serial numbers specifically):
+
+- **Non-launch reboot** — stage `"Minimal -> Full (directory listing)"`: a `GetDirectoryRecursiveCommand`
+  forces the reboot with no launch involved.
+- **SID launch from minimal** — stage `"SidLaunch (minimal -> full, reset-and-recover)"`: the test's
+  `EnsureFullAsync` helper stands in for the gate's own reset (it isn't exercised through the gate —
+  see the class doc comment), then a SID is launched against the now-full device. The measured span
+  covers both the reset-and-recovery and the launch's own `Watch`/version-confirm window.
+- **Large launch from minimal** — stage `"LargeLaunch (minimal -> full -> minimal, reset-and-recover)"`:
+  same reset first, then a large launch that reboots the device straight back into minimal to
+  receive it.
 
 Read from the log tap: `DeviceRecovery: Recovery LeaveMinimal on Serial for <chipId>: ceiling <ms> ms`
-followed by `DeviceRecovery: Recovery LeaveMinimal -> FullIdle in <ms> ms` for the reboot path; the
-`ChainedLaunch` pair of log lines for the jump path.
+followed by `DeviceRecovery: Recovery LeaveMinimal -> FullIdle in <ms> ms` for the reset-and-recovery
+portion of every stage above. Each stage's own total (reset-and-recovery plus whatever it does
+afterward) is what `HardwareFixture.MeasureAsync` writes to the test's own output as
+`<stage name>: <ms> ms` — see "Running the automated half" above for how to see it inline.
 
 ### 2. Full → minimal with the listener off
 
 Toggle the listener **off** (F8 → 3 → b), confirm over serial the unit answers, then launch a large file
-(`/games/Very Large/Lemmings [EasyFlash].crt`) from the C64 UI or via `LargeLaunch_FromFull_*`
-against `TEENSYROM_BENCH_TRANSPORT=Serial`. With the listener off, nothing on the wire can be TCP, so this
-isolates the serial-only full→minimal reboot from any TCP retry noise.
+(`/games/Very Large/Lemmings [EasyFlash].crt`) from the C64 UI or via the automated suite's
+`"LargeLaunch (full -> minimal)"` stage (the first stage in
+`ConnectionTransitions_FullMinimalRoundTripsAndReset`) against `TEENSYROM_BENCH_TRANSPORT=Serial`. With
+the listener off, nothing on the wire can be TCP, so this isolates the serial-only full→minimal reboot
+from any TCP retry noise.
 
 Read: `DeviceRecovery: Recovery LargeLaunch on Serial for <chipId>: ceiling <ms> ms` /
 `-> Minimal in <ms> ms`.
@@ -134,17 +156,31 @@ measured value plus margin, never the raw number.
 | Measurement | Before | After | Ceiling seed | Ceiling set |
 |---|---|---|---|---|
 | Full → minimal (TCP) | 3.56–3.58 s | 5.81 s (2026-09-21 session) | `Tcp.ToMinimalMs` = 8000 | |
-| Minimal → full (TCP) | 7.06–7.09 s | 8.62 s (2026-09-21 session) | `Tcp.ToFullMs` = 15000 | |
-| Large launch from minimal (TCP, chained) | 15.2 s | | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` | |
-| Directory listing / SID launch from minimal (TCP) | 8.7–8.8 s | directory listing 8.62 s (see row above); SID chain did not complete — see session note | `Tcp.ToFullMs + LaunchSettleMs` | |
-| 1. Minimal → full: reboot path (Serial) | | | `Serial.ToFullMs` = 15000 (seeded from a 13.7 s serial round trip) | |
-| 1. Minimal → full: jump path (Serial) | | | `Serial.ToFullMs + LaunchSettleMs` | |
+| Minimal → full, non-launch reboot (TCP) | 7.06–7.09 s | 8.62 s (2026-09-21 session) | `Tcp.ToFullMs` = 15000 | |
+| Large launch from minimal, reset-and-recover (TCP) | superseded chained path: 15.2 s — abandoned for reachability, not speed (see "1. Minimal → full" above) | | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` | |
+| SID launch from minimal, reset-and-recover (TCP) | superseded chained path: 8.7–8.8 s; a later attempt at the same chained path did not complete — see session note | | `Tcp.ToFullMs + LaunchSettleMs` | |
+| 1. Minimal → full, non-launch reboot (Serial) | | | `Serial.ToFullMs` = 15000 (seeded from a 13.7 s serial round trip) | |
+| 1. SID launch from minimal, reset-and-recover (Serial) | | | `Serial.ToFullMs + LaunchSettleMs` | |
+| 1. Large launch from minimal, reset-and-recover (Serial) | | | `Serial.ToFullMs + Serial.ToMinimalMs + LaunchSettleMs` | |
 | 2. Full → minimal, listener off (Serial) | | | `Serial.ToMinimalMs` = 15000 (seeded from a 13.7 s serial round trip) | |
 | 3. Both units in minimal at once (Serial) | | | n/a — sanity check, not a ceiling | |
 | 4. Serial-only cold start, two dead TCP rows | | | `ConnectTimeoutMs` × dead rows + full discovery | |
 | 5. Listener on, unplugged (TCP) | | | `ConnectTimeoutMs` = 2000 per attempt | |
 
+The reset-and-recover rows above measure more than their ceiling seed's formula covers: `EnsureFullAsync`'s
+`RecoveryReason.LeaveMinimal` recovery runs two storage probes (`DeviceRecovery.Succeed`, each bounded by
+`ProbeStorageRoot`'s 6 s ack timeout) and waits for the menu-boot token (`WaitForMenuBootToken`, 3 s bound)
+*after* its own poll ceiling is satisfied — neither is exposed as a `ConnectionOptions` ceiling. Derive the
+actual number from what the bench reports rather than the raw `ToFullMs + LaunchSettleMs` /
+`ToFullMs + ToMinimalMs + LaunchSettleMs` sum, and note here whether that overhead showed up in practice.
+
 ### Session note (2026-09-21)
+
+*Historical record of the now-superseded chained path — the stage names below (`ChainedLaunch (minimal
+-> SID)`, `ChainedLaunch (minimal -> large -> minimal)`) no longer exist; this amendment renamed them to
+`SidLaunch (minimal -> full, reset-and-recover)` and `LargeLaunch (minimal -> full -> minimal,
+reset-and-recover)` and changed what they measure. Left as-is below since it is the only record of the
+chained path's cost.*
 
 One bench session against real hardware on this machine's LAN produced the two TCP "after" numbers
 above before the run stopped early: the chained SID launch (minimal → full, jump path) did not answer

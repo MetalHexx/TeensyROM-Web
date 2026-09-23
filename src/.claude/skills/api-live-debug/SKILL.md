@@ -69,6 +69,10 @@ Connects to `/api/logHub`, POSTs `/api/logs` to enable streaming, appends every
 `LogProduced` line with a millisecond timestamp. The API also writes
 `bin/.../Assets/System/Logs/Logs-<start>.txt` per run.
 
+**The tap file is append-only and now carries raw token bytes** (e.g. the menu-boot SID
+token) alongside the timestamped text lines, so plain `grep` reports "Binary file
+matches" instead of the line you want — use `grep -a` (or `grep --text`) against it.
+
 ## Debugger driver
 
 ```
@@ -127,6 +131,15 @@ a few milliseconds — use it on timing-sensitive paths (handshake, discovery).
   (`apps/api/src/TeensyRom.Core.Serial/Usb/TeensyPortLocator.cs`), which classifies
   COM ports by USB VID/PID before opening any of them — breakpoint there, not just
   in `CartFinder` or `DeviceRecovery`, when a port isn't being matched.
+- **The firmware serves one TCP client at a time.** A raw probe (the `node -e`
+  connect below, or anything else that opens the port directly) needs the API
+  stopped first, or it just contends with the API's own connection — except ICMP
+  (`ping`), which works alongside the API since it never touches the TCP listener;
+  that's what proved a reachability failure during the bench session rather than a
+  probe fighting the API for the socket.
+- **The bench endpoints take query-string parameters, not JSON bodies** — e.g.
+  `LaunchFileRequest.FilePath` is `[FromQuery]`. Driving one with `curl` needs
+  `?FilePath=...` on the URL, not a `-d` JSON payload.
 
 ## Proven round-trip (2026-09-20)
 
@@ -145,10 +158,10 @@ The order that worked, one step per turn against real hardware:
    | File:line | What it shows | `exprs` |
    |---|---|---|
    | `TeensyRom.Api/Endpoints/Player/LaunchFile/LaunchFileEndpoint.cs:24` | every launch request | `r.DeviceId`, `r.StorageType`, `r.FilePath` |
-   | `TeensyRom.Core.Serial/Commands/Behaviors/CommunicationPortBehavior.cs:36` | every command entering the gate | `request`, `request.DeviceId`, `request.CommunicationPort.IsOpen` |
-   | `…/CommunicationPortBehavior.cs:68` | gate found minimal → reset to full | `request`, `device.Connection.Mode` |
-   | `…/CommunicationPortBehavior.cs:101` | gate found busy → reset once | `request`, `busyRetries` |
-   | `TeensyRom.Core.Serial/Commands/LaunchFile/LaunchFileHandler.cs:18,21,27,41,69` | handler entry, minimal-chain check, retry-token check, watch result, recovery call | `r.LaunchItem.Size`, `fromMinimal`, `ack`, `final`/`dropped`, `reason` |
+   | `TeensyRom.Core.Serial/Commands/Behaviors/CommunicationPortBehavior.cs:45` | every command entering the gate | `request`, `request.DeviceId`, `request.CommunicationPort.IsOpen` |
+   | `…/CommunicationPortBehavior.cs:79` | gate found minimal → reset to full (launches included — no exemption any more) | `request`, `device.Connection.Mode` |
+   | `…/CommunicationPortBehavior.cs:120` | gate caught a reactive `Busy` reply → reset once | `request`, `busyRetries` |
+   | `TeensyRom.Core.Serial/Commands/LaunchFile/LaunchFileHandler.cs:18,26,36,64` | handler entry, retry-token check, watch result, recovery call — no minimal-chain check any more, the gate resets minimal to full before the handler ever runs | `r.LaunchItem.Size`, `ack`, `final`/`dropped`, `device?.Connection.Mode` |
    | `TeensyRom.Core.Serial/Recovery/DeviceRecovery.cs:35` | every recovery attempt starts | `reason`, `transport`, `chipId`, `ceiling` |
    | `TeensyRom.Core.Serial/Commands/Reset/ResetCommandHandler.cs:11` | explicit resets | `request.DeviceId` |
    | `TeensyRom.Core.Device/CartFinder.cs:52` | every discovery sweep starts | `_discoveryStrategies.Count()` |
