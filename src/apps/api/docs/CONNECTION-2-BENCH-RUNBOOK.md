@@ -14,6 +14,11 @@ comes from the log tap's millisecond timestamps against a pristine, undebugged A
   steps).
 - `dotnet test` access to `TeensyRom.Core.Device.Tests.Integration` for the automated half of this runbook
   (`Hardware/ConnectionTransitionsTests.cs`, `Hardware/DiscoveryOccasionsTests.cs`).
+- The C64 menu's "sync time from network at power-up" setting adds a variable, blocking step (a DNS
+  lookup plus up to a ~2.5 s NTP wait, `StatusFunctions.c:83,109`) to every reset before the menu's
+  listener comes up (`MainMenu.asm:267` runs before `:276`). Record whether it is on or off for any timed
+  run — it is not claimed that it must be off, only that a session's numbers are not comparable to one
+  taken with the setting in the other state.
 
 ## Pristine restart
 
@@ -174,6 +179,13 @@ The reset-and-recover rows above measure more than their ceiling seed's formula 
 actual number from what the bench reports rather than the raw `ToFullMs + LaunchSettleMs` /
 `ToFullMs + ToMinimalMs + LaunchSettleMs` sum, and note here whether that overhead showed up in practice.
 
+**It does.** Every reset-from-minimal driven through the API logs "the C64 menu did not come up within
+3000 ms" twice, not once: the gate's own `ResetDevice` call on a device still in minimal (minimal never
+emits the SID token, since it has no menu to boot), and then `WaitForMenuBootToken` again inside the
+`LeaveMinimal` recovery's `Succeed` path (by the time TCP recovery reconnects, the token was already
+emitted and missed). That is two back-to-back 3 s misses — roughly 6 s of the observed ~12.7 s
+reset-from-minimal round trip — which accounts for most of the overhead this note asks about.
+
 ### Session note (2026-09-23)
 
 TCP-only session (no serial-capable bench available this day; all five serial measurements and the
@@ -190,16 +202,49 @@ via `--logger trx`, since `ITestOutputHelper` lines don't surface at console ver
 vs 8.62 s) — still well inside the 15 s `Tcp.ToFullMs` ceiling, kept here rather than discarded since
 silently dropping a slower rerun would be exactly the kind of guess this table exists to avoid.
 
-**New finding, reproduced twice:** immediately after `ConnectionTransitions` finishes (its own last
-step is `EnsureFullAsync` -> `Reset (full)` -> a version-command confirm), `DiscoveryOccasionsTests`
-runs next in the same collection/process and — since the device isn't already in `Minimal` — fires a
-fresh large-file launch with no gap after that reset. Both runs failed identically:
-`result.LaunchResult` came back `Disconnected` instead of `Success`, at `DiscoveryOccasionsTests.cs:92`,
-~14 s after the reset, same failure both times (not flaky). Not isolated or root-caused this session —
-worth a dedicated look at whether a launch fired too soon after a plain (non-recovery) reset is a real
-gap in the reset-and-recover path, or an artifact specific to two hardware test classes sharing one
-process with zero pause between them. The `Discovery/occasion after-numbers` table below could not be
-filled in as a result — none of the three occasions were reached.
+**New finding, reproduced twice, since root-caused — not fixed yet, see disposition below.**
+Immediately after `ConnectionTransitions` finishes (its own last step is `EnsureFullAsync` -> `Reset
+(full)` -> a version-command confirm), `DiscoveryOccasionsTests` runs next in the same
+collection/process and — since the device isn't already in `Minimal` — fires a fresh large-file launch
+with no gap after that reset. Both runs failed identically: `result.LaunchResult` came back
+`Disconnected` instead of `Success`, at `DiscoveryOccasionsTests.cs:92`, ~14 s after the reset, same
+failure both times (not flaky).
+
+A same-day corrective first attributed this to the TCP transport itself going stale after a reset (the
+Teensy's network stack supposedly restarting on any landing at the menu) and shipped a close/reopen of
+the TCP port inside `ForceResetAndReconnectToFullFw` (commit `fab4cd6b`). **That premise was bench-
+disproven and the fix reverted.** Traced against the firmware over USB (COM4) while reproducing on the
+live TR+ over TCP: a reset in full firmware does *not* restart the network stack — the menu's listener
+init calls `EthernetInit`, which returns immediately once the link is up
+(`IOH_Swiftlink.c:323-331`), and the fix in place made no difference (same `Disconnected`, same ~14 s).
+
+The real mechanism, read from `MainMenu.asm`'s post-reset order: remote-launch check (`:211`), SID load
+(emits the token our `ResetDevice` waits on, `:239`), then — when the C64's "sync time from network at
+power-up" setting is on — a network time sync (`:267`, `jsr SetRTCfromEthernet`) *before* the listener
+comes up (`:276`) and the menu's main loop starts (`:286`). That sync runs `SetRTCfromNet` on the
+Teensy's main loop (`StatusFunctions.c:44`): a DNS lookup plus up to a 2500 ms wait for an NTP reply
+(`StatusFunctions.c:83`, timeout logged at `:109`) — during which the Teensy services no command on any
+transport. Measured over USB across 20 bare resets: the SID token arrives ~560-575 ms in, then a stall
+begins 50-70 ms later, usually 124-133 ms (a fast NTP round trip) but 2543 ms once (the NTP timeout). A
+command sent right after `ResetDevice` returns can land inside that stall. It reproduced intermittently
+because NTP response time varies — the original failures clustered 04:40-05:28; a later full hardware-
+suite run, with the sync-time window accounted for, passed both tests.
+
+Why a launch lands as `Disconnected` rather than merely slow: `RemoteLaunch` needs the C64 menu to
+acknowledge an IRQ within 50/200 ms (`RemoteControl.ino:48,61`); missing that window makes the firmware
+fall back to resetting the C64 and relaunching (`RemoteControl.ino:295-305`), and in the observed
+failure the device went unreachable on TCP for 14+ s and came back in full firmware with nothing
+launched. This also bounds P06's own reset-and-recover path: after a minimal->full reboot, TCP recovery
+cannot complete until the listener starts at `:276`, which is after the time sync — `ConnectionTransitions`
+passed 4/4 the night this was traced. The exposure specific to this finding is an explicit `Reset`
+followed within roughly 1-3 s by another command; whether Serial carries the same risk is still an open
+question for the pending serial session (USB itself answers ~3.7 s after a reboot, while the DHCP +
+time-sync window inside the menu boot may still be running at that point).
+
+**Disposition: pending an operator decision**, not fixed in this corrective — options on the table are a
+firmware-side readiness signal the API could wait on, or a follow-up change scoped once that decision is
+made. The `Discovery/occasion after-numbers` table below could not be filled in as a result of the
+original two failed runs — none of the three occasions were reached in that attempt.
 
 `appsettings.json` is **unchanged**: both new TCP numbers land comfortably inside their ceiling seed
 (SID 12.28 s vs 17 s ceiling, 28% margin; large launch 17.41 s vs 25 s ceiling, 30% margin) — the extra
