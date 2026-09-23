@@ -155,10 +155,10 @@ measured value plus margin, never the raw number.
 
 | Measurement | Before | After | Ceiling seed | Ceiling set |
 |---|---|---|---|---|
-| Full → minimal (TCP) | 3.56–3.58 s | 5.81 s (2026-09-21 session) | `Tcp.ToMinimalMs` = 8000 | |
-| Minimal → full, non-launch reboot (TCP) | 7.06–7.09 s | 8.62 s (2026-09-21 session) | `Tcp.ToFullMs` = 15000 | |
-| Large launch from minimal, reset-and-recover (TCP) | superseded chained path: 15.2 s — abandoned for reachability, not speed (see "1. Minimal → full" above) | | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` | |
-| SID launch from minimal, reset-and-recover (TCP) | superseded chained path: 8.7–8.8 s; a later attempt at the same chained path did not complete — see session note | | `Tcp.ToFullMs + LaunchSettleMs` | |
+| Full → minimal (TCP) | 3.56–3.58 s | 5.81 s (2026-09-21 session); reconfirmed 5.82 s (2026-09-23 session) | `Tcp.ToMinimalMs` = 8000 | |
+| Minimal → full, non-launch reboot (TCP) | 7.06–7.09 s | 8.62 s (2026-09-21 session); reconfirmed 11.69 s (2026-09-23 session) — see session note | `Tcp.ToFullMs` = 15000 | |
+| Large launch from minimal, reset-and-recover (TCP) | superseded chained path: 15.2 s — abandoned for reachability, not speed (see "1. Minimal → full" above) | 17.41 s (2026-09-23 session) | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` = 25000 | unchanged — 30% margin (7.6 s) under ceiling seed |
+| SID launch from minimal, reset-and-recover (TCP) | superseded chained path: 8.7–8.8 s; a later attempt at the same chained path did not complete — see session note | 12.28 s (2026-09-23 session) | `Tcp.ToFullMs + LaunchSettleMs` = 17000 | unchanged — 28% margin (4.7 s) under ceiling seed |
 | 1. Minimal → full, non-launch reboot (Serial) | | | `Serial.ToFullMs` = 15000 (seeded from a 13.7 s serial round trip) | |
 | 1. SID launch from minimal, reset-and-recover (Serial) | | | `Serial.ToFullMs + LaunchSettleMs` | |
 | 1. Large launch from minimal, reset-and-recover (Serial) | | | `Serial.ToFullMs + Serial.ToMinimalMs + LaunchSettleMs` | |
@@ -173,6 +173,38 @@ The reset-and-recover rows above measure more than their ceiling seed's formula 
 *after* its own poll ceiling is satisfied — neither is exposed as a `ConnectionOptions` ceiling. Derive the
 actual number from what the bench reports rather than the raw `ToFullMs + LaunchSettleMs` /
 `ToFullMs + ToMinimalMs + LaunchSettleMs` sum, and note here whether that overhead showed up in practice.
+
+### Session note (2026-09-23)
+
+TCP-only session (no serial-capable bench available this day; all five serial measurements and the
+Serial `ConnectionTransitions` rows remain unmeasured — a further session with the unit reachable
+over serial is still needed). Two units on the bench: TR+ (`19277260`) on TCP at `192.168.1.37:2112`,
+TR (`14470230`) on `COM12` — the serial unit was left untouched.
+
+`ConnectionTransitions_FullMinimalRoundTripsAndReset` ran **green** against the TR+ on TCP, in 1 m 11–12 s
+total, confirming every stage's own ceiling assertion held. The four TCP numbers above (`LargeLaunch
+(full -> minimal)`, `Minimal -> Full (directory listing)`, `SidLaunch (…, reset-and-recover)`,
+`LargeLaunch (…, reset-and-recover)`) are read directly from that run's `MeasureAsync` output (captured
+via `--logger trx`, since `ITestOutputHelper` lines don't surface at console verbosity `normal`). The
+`Minimal -> Full (directory listing)` number came in ~3 s slower than the 2026-09-21 session's (11.69 s
+vs 8.62 s) — still well inside the 15 s `Tcp.ToFullMs` ceiling, kept here rather than discarded since
+silently dropping a slower rerun would be exactly the kind of guess this table exists to avoid.
+
+**New finding, reproduced twice:** immediately after `ConnectionTransitions` finishes (its own last
+step is `EnsureFullAsync` -> `Reset (full)` -> a version-command confirm), `DiscoveryOccasionsTests`
+runs next in the same collection/process and — since the device isn't already in `Minimal` — fires a
+fresh large-file launch with no gap after that reset. Both runs failed identically:
+`result.LaunchResult` came back `Disconnected` instead of `Success`, at `DiscoveryOccasionsTests.cs:92`,
+~14 s after the reset, same failure both times (not flaky). Not isolated or root-caused this session —
+worth a dedicated look at whether a launch fired too soon after a plain (non-recovery) reset is a real
+gap in the reset-and-recover path, or an artifact specific to two hardware test classes sharing one
+process with zero pause between them. The `Discovery/occasion after-numbers` table below could not be
+filled in as a result — none of the three occasions were reached.
+
+`appsettings.json` is **unchanged**: both new TCP numbers land comfortably inside their ceiling seed
+(SID 12.28 s vs 17 s ceiling, 28% margin; large launch 17.41 s vs 25 s ceiling, 30% margin) — the extra
+overhead the reset-and-recover rows carry (two storage probes, the menu-boot-token wait) is already
+absorbed by the existing `ToFullMs`/`ToMinimalMs`/`LaunchSettleMs` values.
 
 ### Session note (2026-09-21)
 
@@ -206,8 +238,10 @@ this environment alone.
 Mirrors `Hardware/DiscoveryOccasionsTests.cs`'s scripted flow and the Ground Truth bench rows for the
 three discovery occasions. Run with `TEENSYROM_BENCH_TRANSPORT` set to whichever transport is wired.
 
-Not run this session — see the session note above; TCP access did not stay up long enough to reach
-`DiscoveryOccasionsTests`, and serial is currently unavailable on this machine.
+Not run this session either: the 2026-09-21 session's TCP access did not stay up long enough to reach
+`DiscoveryOccasionsTests`; the 2026-09-23 session did reach it, twice, but both attempts failed before
+the first occasion's assertion — see that session note's "New finding" above. Serial is still
+unavailable on this machine.
 
 | Occasion | Assertion | After |
 |---|---|---|

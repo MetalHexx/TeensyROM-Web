@@ -379,15 +379,42 @@ namespace TeensyRom.Core.Serial.Routines
 		}
 
 		/// <summary>
-		/// A reset in full firmware keeps the transport, and a device in minimal never reaches this
-		/// handler (the gate resets it back to full first) - so there is nothing left to reconnect or
-		/// hunt for. Kept as a facade over <see cref="ResetDevice"/> for its existing callers. A menu that
-		/// never announced itself is reported by <see cref="ResetDevice"/>'s own log rather than failing
-		/// the reset: the device was still reset, which is all this command promises.
+		/// A device in minimal never reaches this handler (the gate resets it back to full first), so the
+		/// menu boot token above is the only firmware-side signal this reset waits on. On TCP that is not
+		/// enough on its own: landing back at the C64 menu restarts the Teensy's network stack (the same
+		/// behavior behind the chained-launch Ethernet drop), and the socket this call started with can go
+		/// stale seconds after the token arrives even though <see cref="ICommunicationPort.IsOpen"/> still
+		/// reports it connected - nothing else in this path forces a fresh connect the way
+		/// <see cref="DeviceRecovery"/>'s own TCP reacquire does. A caller that chains straight into another
+		/// command with no gap of its own (this command's one deliberate promise: it does not invoke
+		/// recovery) would otherwise be handed that stale socket. Reconnecting here, bounded by the port's
+		/// own retry loop, re-proves the network before handing the transport back. A menu that never
+		/// announced itself, or a reconnect that never lands, is reported by the underlying calls' own logs
+		/// rather than failing the reset: the device was still reset, which is all this command promises.
 		/// </summary>
 		public static bool ForceResetAndReconnectToFullFw(this ICommunicationPort communicationPort, ILoggingService log)
 		{
 			communicationPort.ResetDevice(log);
+
+			if (communicationPort.GetConnectionType() == ConnectionType.Tcp)
+			{
+				var endpoint = communicationPort.GetEndpoint();
+				communicationPort.ClosePort();
+
+				if (!string.IsNullOrEmpty(endpoint))
+				{
+					try
+					{
+						communicationPort.SetPort(endpoint);
+						communicationPort.OpenPort();
+					}
+					catch (Exception ex)
+					{
+						log.InternalWarning($"{_logClass} reconnect after reset to {endpoint} did not land: {ex.Message}");
+					}
+				}
+			}
+
 			return true;
 		}
 	}
