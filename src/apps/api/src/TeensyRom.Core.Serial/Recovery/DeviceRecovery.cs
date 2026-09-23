@@ -36,9 +36,6 @@ namespace TeensyRom.Core.Serial.Recovery
 
             var sw = Stopwatch.StartNew();
             var lastProbeAnswered = false;
-            var missSeen = false;
-            var fullSeen = false;
-            Stopwatch? settleStopwatch = null;
             DeviceMode? lastSeenMode = null;
             VersionReply? lastCorrectReply = null;
             var fallbackLogged = false;
@@ -69,31 +66,7 @@ namespace TeensyRom.Core.Serial.Recovery
                     var mode = reply.IsMinimalFirmware ? DeviceMode.Minimal : DeviceMode.FullIdle;
                     lastSeenMode = mode;
 
-                    if (reason == RecoveryReason.ChainedLaunch)
-                    {
-                        if (mode == DeviceMode.Minimal)
-                        {
-                            if (missSeen)
-                            {
-                                // Rule (b) tail / (c): a Minimal answer after a miss is the chain completing
-                                // in Minimal, whether or not a Full answer was ever observed in between.
-                                return Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed);
-                            }
-                            log.Internal($"{_logClass} {chipId} answered in Minimal; still the pre-launch state, waiting for it to leave.");
-                        }
-                        else if (!fullSeen)
-                        {
-                            fullSeen = true;
-                            settleStopwatch = Stopwatch.StartNew();
-                            log.Internal($"{_logClass} {chipId} answered in Full; settling for {options.LaunchSettleMs} ms to confirm.");
-                        }
-                        else if (settleStopwatch!.Elapsed >= TimeSpan.FromMilliseconds(options.LaunchSettleMs))
-                        {
-                            // Rule (b): every probe through the settle hold stayed Full - the small file launched.
-                            return Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed);
-                        }
-                    }
-                    else if (expected is null || expected == mode)
+                    if (expected is null || expected == mode)
                     {
                         return Succeed(device, port, transport, reply, mode, reason, ceiling, sw.Elapsed, MenuBootFailure(reason, port));
                     }
@@ -111,7 +84,6 @@ namespace TeensyRom.Core.Serial.Recovery
                 }
                 else
                 {
-                    missSeen = true;
                     lastProbeAnswered = false;
                 }
 
@@ -122,7 +94,7 @@ namespace TeensyRom.Core.Serial.Recovery
             {
                 // The device is reachable, just not in the mode this reason expected - the caller (e.g. a
                 // launch) decides what that means.
-                var failure = $"expected {DescribeExpectation(reason, expected)}, device is in {unexpectedMode}";
+                var failure = $"expected {DescribeExpectation(expected)}, device is in {unexpectedMode}";
                 return Succeed(device, port, transport, lastCorrectReply, unexpectedMode, reason, ceiling, sw.Elapsed, failure);
             }
 
@@ -297,7 +269,6 @@ namespace TeensyRom.Core.Serial.Recovery
                 RecoveryReason.LargeLaunch => TimeSpan.FromMilliseconds(ceilings.ToMinimalMs),
                 RecoveryReason.LeaveMinimal => TimeSpan.FromMilliseconds(ceilings.ToFullMs),
                 RecoveryReason.Drop => TimeSpan.FromMilliseconds(Math.Max(ceilings.ToMinimalMs, ceilings.ToFullMs)),
-                RecoveryReason.ChainedLaunch => TimeSpan.FromMilliseconds(ceilings.ToFullMs + ceilings.ToMinimalMs + options.LaunchSettleMs),
                 _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null)
             };
         }
@@ -309,7 +280,6 @@ namespace TeensyRom.Core.Serial.Recovery
             _ => null
         };
 
-        private static string DescribeExpectation(RecoveryReason reason, DeviceMode? expected) =>
-            expected?.ToString() ?? (reason == RecoveryReason.ChainedLaunch ? "the chain to complete" : "either mode");
+        private static string DescribeExpectation(DeviceMode? expected) => expected?.ToString() ?? "either mode";
     }
 }

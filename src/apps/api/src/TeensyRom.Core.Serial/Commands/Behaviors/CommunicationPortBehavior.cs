@@ -18,11 +18,16 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 	/// <remarks>
 	/// Ensures only one command at a time (per device) can be executed, keeps the port open for the
 	/// command's own exchange, and reacts to what the exchange actually reports instead of probing the
-	/// firmware first: a device believed to be in minimal is reset back to full before any non-launch
-	/// command runs, a device believed busy is reset the same way (a handler-swapping launch leaves the
-	/// firmware answering <c>Busy!</c> to every non-always-available command until something resets it),
-	/// a <see cref="TeensyBusyException"/> from the command's own reply earns one reset and
-	/// one re-send, and a transport drop hands the device to <see cref="IDeviceRecovery"/>. A
+	/// firmware first: a device believed to be in minimal is reset back to full before any command runs,
+	/// launches included - minimal is a separate firmware image that cannot run files at all, and there is
+	/// nothing to be gained by sending a launch to it. A device believed busy is reset the same way before
+	/// any non-launch command (a handler-swapping launch leaves the firmware answering <c>Busy!</c> to
+	/// every non-always-available command until something resets it), but a launch is exempt from that
+	/// reset: the firmware dispatches <c>LaunchFileToken</c> above the busy gate (<c>SerUSBIO.ino:549</c>,
+	/// alongside reset, version, and firmware-check - "only these commands are available when busy"), so a
+	/// cart-running device accepts a launch by design and resetting first would cost a reboot and drop the
+	/// user to the menu for nothing. A <see cref="TeensyBusyException"/> from the command's own reply earns
+	/// one reset and one re-send, and a transport drop hands the device to <see cref="IDeviceRecovery"/>. A
 	/// <c>ResetCommand</c> sent to a device believed to be in minimal is reset twice this way - once here
 	/// to bring it back to full, once by the handler itself - landing on the same correct end state either
 	/// way; the simplicity is worth the redundant reset.
@@ -67,7 +72,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					throw;
 				}
 
-				if (device is not null && request is not LaunchFileCommand)
+				if (device is not null)
 				{
 					if (device.Connection.Mode == DeviceMode.Minimal)
 					{
@@ -83,7 +88,7 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 							};
 						}
 					}
-					else if (device.Connection.Mode == DeviceMode.FullBusy)
+					else if (device.Connection.Mode == DeviceMode.FullBusy && request is not LaunchFileCommand)
 					{
 						port.ResetDevice(log);
 						port.ClearBuffers();

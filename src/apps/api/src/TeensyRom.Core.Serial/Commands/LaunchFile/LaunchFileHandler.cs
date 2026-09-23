@@ -18,9 +18,8 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 		public async Task<LaunchFileResult> Handle(LaunchFileCommand r, CancellationToken cancellationToken)
 		{
 			var device = r.DeviceId is null ? null : devices.GetAvailableDevice(r.DeviceId);
-			var fromMinimal = device?.Connection.Mode == DeviceMode.Minimal;
 
-			log.Internal($"LaunchFileHandler: {r.LaunchItem.Path} ({r.LaunchItem.Size} bytes){(fromMinimal ? " — device is in minimal, firmware will chain" : "")}");
+			log.Internal($"LaunchFileHandler: {r.LaunchItem.Path} ({r.LaunchItem.Size} bytes)");
 
 			var ack = TryLaunchCommand(r);
 
@@ -34,24 +33,21 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				};
 			}
 
-			if (!fromMinimal)
+			var (final, dropped) = Watch(r.CommunicationPort);
+
+			if (final is not null)
 			{
-				var (final, dropped) = Watch(r.CommunicationPort);
+				return GetFinalResult(final.Value);
+			}
 
-				if (final is not null)
+			if (!dropped)
+			{
+				var reply = interrogator.ReadVersion(r.CommunicationPort);
+
+				if (reply.IsTeensyRom && !reply.IsMinimalFirmware)
 				{
-					return GetFinalResult(final.Value);
-				}
-
-				if (!dropped)
-				{
-					var reply = interrogator.ReadVersion(r.CommunicationPort);
-
-					if (reply.IsTeensyRom && !reply.IsMinimalFirmware)
-					{
-						MarkLaunched(device, r.LaunchItem);
-						return new() { LaunchResult = LaunchFileResultType.Success };
-					}
+					MarkLaunched(device, r.LaunchItem);
+					return new() { LaunchResult = LaunchFileResultType.Success };
 				}
 			}
 
@@ -65,10 +61,9 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				};
 			}
 
-			var reason = fromMinimal ? RecoveryReason.ChainedLaunch : RecoveryReason.LargeLaunch;
-			var outcome = await recovery.RecoverAsync(device, reason, cancellationToken);
+			var outcome = await recovery.RecoverAsync(device, RecoveryReason.LargeLaunch, cancellationToken);
 
-			return BuildRecoveryResult(outcome, fromMinimal);
+			return BuildRecoveryResult(outcome);
 		}
 
 		/// <summary>
@@ -95,7 +90,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 			device.MarkBusy();
 		}
 
-		private static LaunchFileResult BuildRecoveryResult(RecoveryOutcome outcome, bool fromMinimal)
+		private static LaunchFileResult BuildRecoveryResult(RecoveryOutcome outcome)
 		{
 			if (!outcome.Reachable)
 			{
@@ -107,13 +102,7 @@ namespace TeensyRom.Core.Serial.Commands.LaunchFile
 				};
 			}
 
-			// LargeLaunch expects Minimal; ChainedLaunch's end state depends on the file, so recovery's
-			// own Failure note (set only when its expectation for the reason was not met) is the signal.
-			var succeeded = fromMinimal
-				? outcome.Failure is null
-				: outcome.Mode == DeviceMode.Minimal;
-
-			if (succeeded)
+			if (outcome.Mode == DeviceMode.Minimal)
 			{
 				return new() { LaunchResult = LaunchFileResultType.Success };
 			}

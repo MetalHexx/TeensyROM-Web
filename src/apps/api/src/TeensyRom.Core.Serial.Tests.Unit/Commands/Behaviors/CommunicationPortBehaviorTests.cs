@@ -280,6 +280,12 @@ public class CommunicationPortBehaviorTests
         await recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// The busy exemption is launch-specific and deliberate, not an oversight: the firmware dispatches
+    /// <c>LaunchFileToken</c> above the busy gate (SerUSBIO.ino:549, "only these commands are available
+    /// when busy"), so a cart-running device accepts a launch by design and resetting first would cost a
+    /// reboot for nothing.
+    /// </summary>
     [Fact]
     public async Task Handle_FullBusyRecordLaunchFileCommand_SkipsTheResetAndLeavesTheRecordBusy()
     {
@@ -343,7 +349,7 @@ public class CommunicationPortBehaviorTests
     }
 
     [Fact]
-    public async Task Handle_MinimalRecordLaunchFileCommand_SkipsResetAndRecovery_HandlerRuns()
+    public async Task Handle_MinimalRecordLaunchFileCommand_RecoveryAnswersFull_ResetsAndRecoversBeforeHandlerRuns()
     {
         var deviceId = Guid.NewGuid().ToString("N");
         var port = new StubCommunicationPort();
@@ -352,6 +358,8 @@ public class CommunicationPortBehaviorTests
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
         var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
+            .Returns(new RecoveryOutcome(DeviceMode.FullIdle, TimeSpan.Zero, TimeSpan.Zero, null));
         var behavior = new CommunicationPortBehavior<LaunchFileCommand, LaunchFileResult>(
             Substitute.For<ILoggingService>(), devices, recovery);
         var command = new LaunchFileCommand
@@ -371,8 +379,50 @@ public class CommunicationPortBehaviorTests
 
         response.IsSuccess.Should().BeTrue();
         invocations.Should().Be(1);
-        port.SentTokens.Should().NotContain(TeensyToken.Reset.Value);
-        await recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        await recovery.Received(1).RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The trap this closes: the gate's generic failure result is constructed via <c>new()</c> with only
+    /// <c>IsSuccess</c> set, so <c>LaunchFileResult.LaunchResult</c> would silently read as its enum
+    /// default if that default were <see cref="LaunchFileResultType.Success"/>. Asserted directly on the
+    /// typed result rather than relied upon via the endpoint's <c>IsSuccess</c> branch.
+    /// </summary>
+    [Fact]
+    public async Task Handle_MinimalRecordLaunchFileCommand_RecoveryAnswersMinimal_FailsWithoutRunningHandler()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.Confirm(ConnectionType.Tcp, "TEST", DeviceMode.Minimal);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var recovery = Substitute.For<IDeviceRecovery>();
+        recovery.RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>())
+            .Returns(new RecoveryOutcome(DeviceMode.Minimal, TimeSpan.Zero, TimeSpan.Zero, "still minimal"));
+        var behavior = new CommunicationPortBehavior<LaunchFileCommand, LaunchFileResult>(
+            Substitute.For<ILoggingService>(), devices, recovery);
+        var command = new LaunchFileCommand
+        {
+            StorageType = TeensyStorageType.SD,
+            LaunchItem = new LaunchableItem(),
+            DeviceId = deviceId,
+            CommunicationPort = port
+        };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new LaunchFileResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.LaunchResult.Should().NotBe(LaunchFileResultType.Success);
+        invocations.Should().Be(0);
+        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        await recovery.Received(1).RecoverAsync(device, RecoveryReason.LeaveMinimal, Arg.Any<CancellationToken>());
     }
 
     [Fact]

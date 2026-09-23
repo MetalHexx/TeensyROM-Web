@@ -12,13 +12,6 @@ namespace TeensyRom.Core.Serial.Recovery
         /// <summary>The device is leaving minimal back to full idle. Ceiling = ToFull.</summary>
         LeaveMinimal,
 
-        /// <summary>
-        /// A launch was sent to a device already in minimal; the chain's end depends on the file, so no
-        /// single mode is expected - see <see cref="DeviceRecovery"/>'s chained rule.
-        /// Ceiling = ToFull + ToMinimal + LaunchSettleMs.
-        /// </summary>
-        ChainedLaunch,
-
         /// <summary>An unexplained transport drop; either mode counts as success. Ceiling = max(ToMinimal, ToFull).</summary>
         Drop
     }

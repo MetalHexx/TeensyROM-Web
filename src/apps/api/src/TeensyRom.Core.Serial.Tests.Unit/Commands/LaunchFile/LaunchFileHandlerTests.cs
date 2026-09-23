@@ -199,55 +199,6 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Commands.LaunchFile
         }
 
         [Fact]
-        public async Task Handle_LaunchFromMinimal_RecoversWithChainedLaunchImmediatelyAfterAck_WithoutWatchingOrInterrogating()
-        {
-            var port = new ScriptedCommunicationPort();
-            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
-            var device = BuildDevice(port, DeviceMode.Minimal);
-            _recovery.RecoverAsync(device, RecoveryReason.ChainedLaunch, Arg.Any<CancellationToken>())
-                .Returns(new RecoveryOutcome(DeviceMode.Minimal, TimeSpan.Zero, TimeSpan.FromSeconds(1), null));
-            var handler = BuildHandler();
-
-            var result = await handler.Handle(BuildCommand(port, DeviceId), CancellationToken.None);
-
-            result.IsSuccess.Should().BeTrue();
-            _interrogator.DidNotReceive().ReadVersion(Arg.Any<ICommunicationPort>());
-            await _recovery.Received(1).RecoverAsync(device, RecoveryReason.ChainedLaunch, Arg.Any<CancellationToken>());
-        }
-
-        [Fact]
-        public async Task Handle_LaunchFromMinimal_RecoveryReturnsFullIdleWithNoFailure_ReturnsSuccess()
-        {
-            var port = new ScriptedCommunicationPort();
-            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
-            var device = BuildDevice(port, DeviceMode.Minimal);
-            _recovery.RecoverAsync(device, RecoveryReason.ChainedLaunch, Arg.Any<CancellationToken>())
-                .Returns(new RecoveryOutcome(DeviceMode.FullIdle, TimeSpan.Zero, TimeSpan.FromSeconds(1), null));
-            var handler = BuildHandler();
-
-            var result = await handler.Handle(BuildCommand(port, DeviceId), CancellationToken.None);
-
-            result.IsSuccess.Should().BeTrue();
-            result.LaunchResult.Should().Be(LaunchFileResultType.Success);
-        }
-
-        [Fact]
-        public async Task Handle_LaunchFromMinimal_RecoveryReturnsFailureNote_ReturnsDidNotTakeError()
-        {
-            var port = new ScriptedCommunicationPort();
-            port.EnqueueToken(TeensyToken.Ack).EnqueueToken(TeensyToken.Ack);
-            var device = BuildDevice(port, DeviceMode.Minimal);
-            _recovery.RecoverAsync(device, RecoveryReason.ChainedLaunch, Arg.Any<CancellationToken>())
-                .Returns(new RecoveryOutcome(DeviceMode.FullIdle, TimeSpan.Zero, TimeSpan.FromSeconds(1), "the chain never left Minimal"));
-            var handler = BuildHandler();
-
-            var result = await handler.Handle(BuildCommand(port, DeviceId), CancellationToken.None);
-
-            result.IsSuccess.Should().BeFalse();
-            result.Error.Should().Be("The launch did not take: the device came back in full firmware.");
-        }
-
-        [Fact]
         public async Task Handle_RetryLaunchToken_ReturnsDeclinedWithoutRecovery()
         {
             var port = new ScriptedCommunicationPort();

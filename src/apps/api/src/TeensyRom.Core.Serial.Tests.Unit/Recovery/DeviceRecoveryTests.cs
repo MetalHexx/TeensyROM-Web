@@ -92,60 +92,6 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         }
 
         [Fact]
-        public async Task RecoverAsync_ChainedLaunch_MinimalMissFullFullFull_ReturnsFullIdleWithNoReacquireBetweenFullAnswers()
-        {
-            var (device, port) = BuildDevice();
-            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(
-                CorrectChip(minimal: true), Miss, CorrectChip(minimal: false), CorrectChip(minimal: false), CorrectChip(minimal: false));
-            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(launchSettleMs: 2), _log);
-
-            var outcome = await recovery.RecoverAsync(device, RecoveryReason.ChainedLaunch, CancellationToken.None);
-
-            outcome.Mode.Should().Be(DeviceMode.FullIdle);
-            port.Calls.Should().Equal("Open", "Close", "Open");
-        }
-
-        [Fact]
-        public async Task RecoverAsync_ChainedLaunch_MinimalMissFullMissMinimal_ReturnsMinimal()
-        {
-            var (device, port) = BuildDevice();
-            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(
-                CorrectChip(minimal: true), Miss, CorrectChip(minimal: false), Miss, CorrectChip(minimal: true));
-            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(launchSettleMs: 2000), _log);
-
-            var outcome = await recovery.RecoverAsync(device, RecoveryReason.ChainedLaunch, CancellationToken.None);
-
-            outcome.Mode.Should().Be(DeviceMode.Minimal);
-        }
-
-        [Fact]
-        public async Task RecoverAsync_ChainedLaunch_MinimalMissMinimal_ReturnsMinimal()
-        {
-            var (device, port) = BuildDevice();
-            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(
-                CorrectChip(minimal: true), Miss, CorrectChip(minimal: true));
-            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
-
-            var outcome = await recovery.RecoverAsync(device, RecoveryReason.ChainedLaunch, CancellationToken.None);
-
-            outcome.Mode.Should().Be(DeviceMode.Minimal);
-        }
-
-        [Fact]
-        public async Task RecoverAsync_ChainedLaunch_AlwaysMinimalNoMiss_RunsToCeilingAndReturnsMinimalWithFailure()
-        {
-            var (device, port) = BuildDevice();
-            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(CorrectChip(minimal: true));
-            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toMinimalMs: 5, toFullMs: 5, launchSettleMs: 5), _log);
-
-            var outcome = await recovery.RecoverAsync(device, RecoveryReason.ChainedLaunch, CancellationToken.None);
-
-            outcome.Mode.Should().Be(DeviceMode.Minimal);
-            outcome.Failure.Should().NotBeNull();
-            device.Connection.Mode.Should().Be(DeviceMode.Minimal);
-        }
-
-        [Fact]
         public async Task RecoverAsync_LeaveMinimal_AlwaysMinimal_RunsToCeilingAndReturnsMinimalWithFailureConfirmed()
         {
             var (device, port) = BuildDevice();
