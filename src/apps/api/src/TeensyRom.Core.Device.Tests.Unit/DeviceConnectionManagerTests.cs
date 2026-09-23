@@ -39,7 +39,7 @@ public class DeviceConnectionManagerTests
     }
 
     private void AllowSerialLookup(string chipId, string portName) =>
-        _locator.FindByChipId(chipId).Returns(new PortLookup(new TeensyRomPort(portName, chipId, TeensyRomImage.Full), true, null));
+        _locator.FindByChipId(chipId).Returns(new PortLookup([new TeensyRomPort(portName, chipId, TeensyRomImage.Full)], true, null));
 
     [Fact]
     public async Task FindDevices_WithFullScanFalse_ReturnsCurrentDevicesWithoutInvokingFinderOrTouchingPorts()
@@ -222,6 +222,75 @@ public class DeviceConnectionManagerTests
         device.Connection.Mode.Should().Be(DeviceMode.Unreachable);
         device.Connection.SerialPortName.Should().Be("COM12");
         _cache.Received(1).Save(Arg.Is<IEnumerable<CachedConnectionRecord>>(rows => !rows.Any()));
+    }
+
+    [Fact]
+    public async Task ConnectAtStartAsync_WithCachedPortNameAmongSeveralCandidates_AcceptsTheCachedPortWithoutFullSweep()
+    {
+        var port = CreatePort(ConnectionType.Serial);
+        var device = CreateDevice("11112222", ConnectionType.Serial, "COM5", port);
+
+        _cache.Load().Returns(new List<CachedConnectionRecord> { new("11112222", "COM5", null, ConnectionType.Serial) });
+        _locator.FindByChipId("11112222").Returns(new PortLookup(
+            [new TeensyRomPort("COM9", "11112222", TeensyRomImage.Minimal), new TeensyRomPort("COM5", "11112222", TeensyRomImage.Full)],
+            true, null));
+        _transports.CreateSerial("COM5").Returns(port);
+        _interrogator.ReadVersion(port).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
+        _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(Task.FromException<List<TeensyRomDevice>>(new InvalidOperationException("full discovery must not run")));
+
+        var manager = CreateManager();
+        var result = await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        result.Should().ContainSingle(d => d.DeviceId == "11112222");
+        await _finder.Received(1).BuildDevice(Arg.Is<DiscoveredEndpoint>(e => e.Address == "COM5"), Arg.Any<CancellationToken>());
+        _transports.DidNotReceive().CreateSerial("COM9");
+    }
+
+    [Fact]
+    public async Task ConnectAtStartAsync_WithCachedPortNoLongerACandidate_TriesRemainingCandidatesAndAdoptsTheFirstThatAnswers()
+    {
+        var firstCandidatePort = CreatePort(ConnectionType.Serial);
+        firstCandidatePort.OpenPort(Arg.Any<int>()).Returns(_ => throw new TimeoutException("bounded connect timed out"));
+        var secondCandidatePort = CreatePort(ConnectionType.Serial);
+        var device = CreateDevice("11112222", ConnectionType.Serial, "COM7", secondCandidatePort);
+
+        _cache.Load().Returns(new List<CachedConnectionRecord> { new("11112222", "COM5", null, ConnectionType.Serial) });
+        _locator.FindByChipId("11112222").Returns(new PortLookup(
+            [new TeensyRomPort("COM9", "11112222", TeensyRomImage.Minimal), new TeensyRomPort("COM7", "11112222", TeensyRomImage.Full)],
+            true, null));
+        _transports.CreateSerial("COM9").Returns(firstCandidatePort);
+        _transports.CreateSerial("COM7").Returns(secondCandidatePort);
+        _interrogator.ReadVersion(secondCandidatePort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
+        _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(Task.FromException<List<TeensyRomDevice>>(new InvalidOperationException("full discovery must not run")));
+
+        var manager = CreateManager();
+        var result = await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        result.Should().ContainSingle(d => d.DeviceId == "11112222");
+        await _finder.Received(1).BuildDevice(Arg.Is<DiscoveredEndpoint>(e => e.Address == "COM7"), Arg.Any<CancellationToken>());
+        firstCandidatePort.Received(1).Dispose();
+    }
+
+    [Fact]
+    public async Task ConnectAtStartAsync_WithFilterUnavailable_TrustsTheCachedPortNameAndProceeds()
+    {
+        var port = CreatePort(ConnectionType.Serial);
+        var device = CreateDevice("11112222", ConnectionType.Serial, "COM5", port);
+
+        _cache.Load().Returns(new List<CachedConnectionRecord> { new("11112222", "COM5", null, ConnectionType.Serial) });
+        _locator.FindByChipId("11112222").Returns(new PortLookup([], false, "no USB descriptor reader supports this platform"));
+        _transports.CreateSerial("COM5").Returns(port);
+        _interrogator.ReadVersion(port).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
+        _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(Task.FromException<List<TeensyRomDevice>>(new InvalidOperationException("full discovery must not run")));
+
+        var manager = CreateManager();
+        var result = await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        result.Should().ContainSingle(d => d.DeviceId == "11112222");
+        await _finder.Received(1).BuildDevice(Arg.Is<DiscoveredEndpoint>(e => e.Address == "COM5"), Arg.Any<CancellationToken>());
     }
 
     [Fact]

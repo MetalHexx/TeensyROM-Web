@@ -177,92 +177,110 @@ namespace TeensyRom.Core.Device
         }
 
         /// <summary>
-        /// Reacquires one cached row by chip id: opens the remembered endpoint bounded by
-        /// <see cref="ConnectionOptions.ConnectTimeoutMs"/> and confirms it answers as the expected chip,
-        /// then hands the confirmed endpoint to <see cref="ICartFinder.BuildDevice"/> - the same builder
-        /// full discovery uses. Returns null - the opened port disposed - on any miss.
+        /// Reacquires one cached row by chip id. TCP opens the remembered endpoint directly. Serial trusts
+        /// the cached port name as-is whenever the descriptor filter still lists it among this chip's
+        /// candidates - or the filter is unavailable, since "cannot tell" must not become "reject" - which
+        /// alone survives Windows holding a stale port entry for an image that just detached. When the
+        /// cached name is no longer among the candidates, the chip has genuinely moved (e.g. a mode switch
+        /// swaps minimal COM7 for full COM4): every remaining candidate is opened and version-confirmed in
+        /// order rather than paying for a full sweep, and the first that answers as this chip is adopted.
+        /// Every attempt is bounded by <see cref="ConnectionOptions.ConnectTimeoutMs"/> and hands its
+        /// confirmed endpoint to <see cref="ICartFinder.BuildDevice"/> - the same builder full discovery
+        /// uses. Returns null - every opened port disposed - on any miss.
         /// </summary>
         private async Task<TeensyRomDevice?> TryConfirmCachedRow(CachedConnectionRecord row, CancellationToken ct)
         {
-            ICommunicationPort? port = null;
+            if (row.TransportInUse == ConnectionType.Serial)
+            {
+                return await TryConfirmCachedSerialRow(row, ct);
+            }
+
+            if (string.IsNullOrEmpty(row.TcpEndpoint) || !NetworkHelper.TryParseEndpoint(row.TcpEndpoint, out var host, out var parsedPort))
+            {
+                _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: no cached endpoint");
+                return null;
+            }
+
+            return await TryOpenAndConfirm(_transports.CreateTcp(row.TcpEndpoint), row.ChipId, row.TransportInUse, host, parsedPort, ct);
+        }
+
+        private async Task<TeensyRomDevice?> TryConfirmCachedSerialRow(CachedConnectionRecord row, CancellationToken ct)
+        {
+            if (string.IsNullOrEmpty(row.SerialPortName))
+            {
+                _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: no cached port name");
+                return null;
+            }
+
+            var lookup = _locator.FindByChipId(row.ChipId);
+            var cachedNameStillCandidate = !lookup.FilterAvailable ||
+                lookup.Candidates.Any(c => string.Equals(c.PortName, row.SerialPortName, StringComparison.OrdinalIgnoreCase));
+
+            if (cachedNameStillCandidate)
+            {
+                return await TryOpenAndConfirm(_transports.CreateSerial(row.SerialPortName), row.ChipId, row.TransportInUse, row.SerialPortName, null, ct);
+            }
+
+            foreach (var candidate in lookup.Candidates)
+            {
+                var device = await TryOpenAndConfirm(_transports.CreateSerial(candidate.PortName), row.ChipId, row.TransportInUse, candidate.PortName, null, ct);
+                if (device is not null)
+                {
+                    return device;
+                }
+            }
+
+            // No candidate answered as this chip: the cache said otherwise, so full discovery decides.
+            _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: descriptor no longer names this chip");
+            return null;
+        }
+
+        /// <summary>Opens <paramref name="port"/> bounded by the connect timeout, confirms the version reply is <paramref name="chipId"/>, and builds the device - disposing the port on any miss.</summary>
+        private async Task<TeensyRomDevice?> TryOpenAndConfirm(ICommunicationPort port, string chipId, ConnectionType transport, string address, int? tcpPort, CancellationToken ct)
+        {
+            ICommunicationPort? owned = port;
 
             try
             {
-                string address;
-                int? tcpPort = null;
-
-                if (row.TransportInUse == ConnectionType.Serial)
-                {
-                    if (string.IsNullOrEmpty(row.SerialPortName))
-                    {
-                        _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: no cached port name");
-                        return null;
-                    }
-
-                    var lookup = _locator.FindByChipId(row.ChipId);
-                    if (lookup.FilterAvailable &&
-                        (lookup.Port is null || !string.Equals(lookup.Port.PortName, row.SerialPortName, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        // A different port is still a miss: the cache said otherwise, so full discovery decides.
-                        _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: descriptor no longer names this chip");
-                        return null;
-                    }
-
-                    address = row.SerialPortName;
-                    port = _transports.CreateSerial(row.SerialPortName);
-                }
-                else
-                {
-                    if (string.IsNullOrEmpty(row.TcpEndpoint) || !NetworkHelper.TryParseEndpoint(row.TcpEndpoint, out var host, out var parsedPort))
-                    {
-                        _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: no cached endpoint");
-                        return null;
-                    }
-
-                    address = host;
-                    tcpPort = parsedPort;
-                    port = _transports.CreateTcp(row.TcpEndpoint);
-                }
-
                 try
                 {
-                    port.OpenPort(_options.ConnectTimeoutMs);
+                    owned.OpenPort(_options.ConnectTimeoutMs);
                 }
                 catch (Exception ex)
                 {
-                    _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: open failed: {ex.Message}");
+                    _log.Internal($"DeviceConnectionManager: start confirm miss for {chipId}: open failed: {ex.Message}");
                     return null;
                 }
 
-                var reply = _interrogator.ReadVersion(port);
+                var reply = _interrogator.ReadVersion(owned);
 
                 if (!reply.IsTeensyRom)
                 {
-                    _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: no answer");
+                    _log.Internal($"DeviceConnectionManager: start confirm miss for {chipId}: no answer");
                     return null;
                 }
 
-                if (reply.ChipId != row.ChipId)
+                if (reply.ChipId != chipId)
                 {
-                    _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: wrong chip ({reply.ChipId})");
+                    _log.Internal($"DeviceConnectionManager: start confirm miss for {chipId}: wrong chip ({reply.ChipId})");
                     return null;
                 }
 
-                var endpoint = new DiscoveredEndpoint(row.TransportInUse, address, tcpPort, reply, port);
+                var endpoint = new DiscoveredEndpoint(transport, address, tcpPort, reply, owned);
                 var device = await _finder.BuildDevice(endpoint, ct);
 
                 if (device is null)
                 {
-                    _log.Internal($"DeviceConnectionManager: start confirm miss for {row.ChipId}: builder rejected the endpoint");
+                    _log.Internal($"DeviceConnectionManager: start confirm miss for {chipId}: builder rejected the endpoint");
                     return null;
                 }
 
-                port = null; // ownership passed to the device
+                owned = null; // ownership passed to the device
                 return device;
             }
             finally
             {
-                port?.Dispose();
+                owned?.Dispose();
             }
         }
 

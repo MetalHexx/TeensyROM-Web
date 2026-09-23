@@ -150,28 +150,23 @@ namespace TeensyRom.Core.Serial.Recovery
         }
 
         /// <summary>
-        /// Serial: finds the device's current port by chip id and reopens on it. When the filter cannot
-        /// be trusted this call, falls back to scanning every present COM port (except the one already
-        /// set) and version-probing each in turn, returning the matching reply directly since the scan
-        /// already obtained it.
+        /// Serial: tries every port the descriptor filter currently claims for this chip id, in listing
+        /// order, reopening and version-confirming each before accepting it. A descriptor match alone does
+        /// not prove which port is live: full and minimal are different USB identities (0489 / 0483),
+        /// Windows keeps a just-detached image's port entry alive, and chip 19277260 was observed claiming
+        /// COM4 and COM7 at once on the bench - so the version reply is what actually decides, and this
+        /// otherwise-redundant-looking reopen-and-confirm is why. When the filter cannot be trusted this
+        /// call, falls back to scanning every present COM port (except the one already set) and
+        /// version-probing each in turn, returning the matching reply directly since the scan already
+        /// obtained it.
         /// </summary>
         private VersionReply? ReacquireSerial(string chipId, ICommunicationPort port, ref bool fallbackLogged)
         {
             var lookup = locator.FindByChipId(chipId);
 
-            if (lookup.FilterAvailable && lookup.Port is not null)
+            if (lookup.FilterAvailable && lookup.Candidates.Count > 0)
             {
-                if (port.IsOpen) port.ClosePort();
-                try
-                {
-                    port.SetPort(lookup.Port.PortName);
-                    port.OpenPort(useRetryLoop: false);
-                }
-                catch (Exception)
-                {
-                    // A just-enumerated port can still fail to open - a miss, not an error.
-                }
-                return null;
+                return ReacquireCandidates(chipId, port, lookup.Candidates);
             }
 
             if (lookup.FilterAvailable)
@@ -187,6 +182,38 @@ namespace TeensyRom.Core.Serial.Recovery
             }
 
             return ScanSerialPortsForChip(chipId, port);
+        }
+
+        /// <summary>
+        /// Opens each candidate in turn and accepts the first whose version reply proves it is this chip;
+        /// a candidate that opens but answers wrong or not at all is closed and the loop moves on.
+        /// Exhausting the list is a miss - the outer poll retries within the unchanged ceiling.
+        /// </summary>
+        private VersionReply? ReacquireCandidates(string chipId, ICommunicationPort port, IReadOnlyList<TeensyRomPort> candidates)
+        {
+            foreach (var candidate in candidates)
+            {
+                if (port.IsOpen) port.ClosePort();
+
+                try
+                {
+                    port.SetPort(candidate.PortName);
+                    port.OpenPort(useRetryLoop: false);
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                var reply = interrogator.ReadVersion(port);
+                if (reply.IsTeensyRom && reply.ChipId == chipId)
+                {
+                    return reply;
+                }
+            }
+
+            if (port.IsOpen) port.ClosePort();
+            return null;
         }
 
         private VersionReply ScanSerialPortsForChip(string chipId, ICommunicationPort port)
@@ -243,8 +270,12 @@ namespace TeensyRom.Core.Serial.Recovery
                 }
                 else
                 {
-                    device.Cart.SdStorage.Available = sd == StoragePresence.Present;
-                    device.Cart.UsbStorage.Available = usb == StoragePresence.Present;
+                    // Unknown leaves the last known value in place rather than writing either answer - the
+                    // probe's own log line (TRDiscoveryRoutines.ProbeStorageRoot) says why it couldn't tell.
+                    // Treating Unknown as Absent previously produced a 404 "does not have an SD card" for a
+                    // device whose SD had been indexed minutes earlier.
+                    if (sd is StoragePresence.Present or StoragePresence.Absent) device.Cart.SdStorage.Available = sd == StoragePresence.Present;
+                    if (usb is StoragePresence.Present or StoragePresence.Absent) device.Cart.UsbStorage.Available = usb == StoragePresence.Present;
                 }
             }
 

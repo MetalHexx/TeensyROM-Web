@@ -108,11 +108,11 @@ public class TeensyPortLocatorTests
         var result = locator.FindByChipId("14470230");
 
         result.FilterAvailable.Should().BeTrue();
-        result.Port.Should().Be(new TeensyRomPort("COM12", "14470230", TeensyRomImage.Full));
+        result.Candidates.Should().Equal(new TeensyRomPort("COM12", "14470230", TeensyRomImage.Full));
     }
 
     [Fact]
-    public void FindByChipId_ReturnsNullPort_WhenChipIsNotAmongPresentPorts()
+    public void FindByChipId_ReturnsNoCandidates_WhenChipIsNotAmongPresentPorts()
     {
         var rows = new[]
         {
@@ -123,7 +123,7 @@ public class TeensyPortLocatorTests
         var result = locator.FindByChipId("14470230");
 
         result.FilterAvailable.Should().BeTrue();
-        result.Port.Should().BeNull();
+        result.Candidates.Should().BeEmpty();
     }
 
     [Fact]
@@ -137,12 +137,12 @@ public class TeensyPortLocatorTests
         var result = locator.FindByChipId("14470230");
 
         result.FilterAvailable.Should().BeFalse();
-        result.Port.Should().BeNull();
+        result.Candidates.Should().BeEmpty();
         result.UnavailableReason.Should().Be("boom");
     }
 
     [Fact]
-    public void FindByChipId_ReturnsFirstMatch_AndLogsWarning_WhenSeveralPresentPortsClaimTheSameChip()
+    public void FindByChipId_ReturnsBothCandidatesInListingOrder_AndLogsNoWarning_WhenSeveralPresentPortsClaimTheSameChip()
     {
         var rows = new[]
         {
@@ -154,7 +154,9 @@ public class TeensyPortLocatorTests
         var result = locator.FindByChipId("14470230");
 
         result.FilterAvailable.Should().BeTrue();
-        result.Port!.PortName.Should().Be("COM12");
-        _log.Received(1).InternalWarning(Arg.Is<string>(m => m.Contains("14470230")), Arg.Any<string>());
+        result.Candidates.Should().Equal(
+            new TeensyRomPort("COM12", "14470230", TeensyRomImage.Full),
+            new TeensyRomPort("COM5", "14470230", TeensyRomImage.Minimal));
+        _log.DidNotReceiveWithAnyArgs().InternalWarning(default!, default);
     }
 }

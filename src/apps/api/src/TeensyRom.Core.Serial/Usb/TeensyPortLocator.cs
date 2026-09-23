@@ -64,22 +64,12 @@ namespace TeensyRom.Core.Serial.Usb
 
             if (!result.FilterAvailable)
             {
-                return new PortLookup(null, false, result.UnavailableReason);
+                return new PortLookup([], false, result.UnavailableReason);
             }
 
             var matches = result.Ports.Where(p => string.Equals(p.ChipId, chipId, StringComparison.OrdinalIgnoreCase)).ToList();
 
-            if (matches.Count == 0)
-            {
-                return new PortLookup(null, true, null);
-            }
-
-            if (matches.Count > 1)
-            {
-                _log.InternalWarning($"TeensyPortLocator: chip id '{chipId}' matched {matches.Count} ports ({string.Join(", ", matches.Select(m => m.PortName))}); using '{matches[0].PortName}'.");
-            }
-
-            return new PortLookup(matches[0], true, null);
+            return new PortLookup(matches, true, null);
         }
 
         private static TeensyRomPort? Classify(UsbSerialDescriptor descriptor)

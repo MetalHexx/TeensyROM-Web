@@ -90,6 +90,7 @@ namespace TeensyRom.Core.Serial.Routines
                     }
                     if (text.Contains("Busy!"))
                     {
+                        log.Internal($"{_logClass} ProbeStorageRoot: device busy ({storageType}): {text.SanitizeForLogging()}");
                         return StoragePresence.Busy;
                     }
                     log.InternalWarning($"{_logClass} ProbeStorageRoot: unexpected fail text ({storageType}): {text.SanitizeForLogging()}");
@@ -98,7 +99,8 @@ namespace TeensyRom.Core.Serial.Routines
 
                 if (reply != TeensyToken.Ack.Value)
                 {
-                    ReadTextUntilIdle(port, 200);
+                    var drained = ReadTextUntilIdle(port, 200);
+                    log.InternalWarning($"{_logClass} ProbeStorageRoot: non-Ack reply ({storageType}): 0x{reply:X4}, drained: {drained.SanitizeForLogging()}");
                     return StoragePresence.Unknown;
                 }
 
@@ -114,11 +116,13 @@ namespace TeensyRom.Core.Serial.Routines
                     return StoragePresence.Present;
                 }
 
-                ReadTextUntilIdle(port, 200);
+                var trailingText = ReadTextUntilIdle(port, 200);
+                log.InternalWarning($"{_logClass} ProbeStorageRoot: unexpected list tokens ({storageType}): start 0x{startToken:X4}, end 0x{endToken:X4}, drained: {trailingText.SanitizeForLogging()}");
                 return StoragePresence.Unknown;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                log.InternalWarning($"{_logClass} ProbeStorageRoot: {ex.GetType().Name} ({storageType}): {ex.Message}");
                 return StoragePresence.Unknown;
             }
         }

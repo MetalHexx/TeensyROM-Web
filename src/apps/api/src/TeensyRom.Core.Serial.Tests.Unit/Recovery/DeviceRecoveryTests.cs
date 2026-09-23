@@ -1,5 +1,6 @@
 using TeensyRom.Core.Abstractions;
 using TeensyRom.Core.Entities.Device;
+using TeensyRom.Core.Entities.Serial;
 using TeensyRom.Core.Entities.Storage;
 using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Serial.Routines;
@@ -15,9 +16,9 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         private readonly ITeensyPortLocator _locator = Substitute.For<ITeensyPortLocator>();
         private readonly ILoggingService _log = Substitute.For<ILoggingService>();
 
-        private static (TeensyRomDevice Device, RecoveryScriptedPort Port) BuildDevice(string endpoint = "10.0.0.5:6464")
+        private static (TeensyRomDevice Device, RecoveryScriptedPort Port) BuildDevice(string endpoint = "10.0.0.5:6464", ConnectionType connectionType = ConnectionType.Tcp)
         {
-            var port = new RecoveryScriptedPort();
+            var port = new RecoveryScriptedPort { ConnectionType = connectionType };
             port.SetPort(endpoint);
 
             var cart = new Cart { DeviceId = ChipId };
@@ -149,6 +150,72 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
 
             outcome.Mode.Should().Be(DeviceMode.FullIdle);
             outcome.Failure.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Serial_FirstCandidateOpensButAnswersNothing_SecondAnswersCorrectly_AcceptsTheSecondWithinOnePollCycle()
+        {
+            var (device, port) = BuildDevice(endpoint: "COM5", connectionType: ConnectionType.Serial);
+            port.ThenSucceed().ThenSucceed();
+            _locator.FindByChipId(ChipId).Returns(new PortLookup(
+                [new TeensyRomPort("COM4", ChipId, TeensyRomImage.Minimal), new TeensyRomPort("COM7", ChipId, TeensyRomImage.Full)],
+                true, null));
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(Miss, CorrectChip(minimal: false));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.FullIdle);
+            device.Connection.SerialPortName.Should().Be("COM7");
+            _interrogator.Received(2).ReadVersion(Arg.Any<ICommunicationPort>());
+        }
+
+        [Fact]
+        public async Task RecoverAsync_Serial_AllCandidatesFailToOpen_ReturnsAMissAndPollsAgainRatherThanAborting()
+        {
+            var (device, port) = BuildDevice(endpoint: "COM5", connectionType: ConnectionType.Serial);
+            port.ThenTimeOut().ThenTimeOut().ThenSucceed();
+            _locator.FindByChipId(ChipId).Returns(new PortLookup(
+                [new TeensyRomPort("COM4", ChipId, TeensyRomImage.Minimal), new TeensyRomPort("COM7", ChipId, TeensyRomImage.Full)],
+                true, null));
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(CorrectChip(minimal: false));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.FullIdle);
+        }
+
+        [Fact]
+        public async Task RecoverAsync_FullWithUnknownSdAndPresentUsb_PreservesSdAndWritesUsb()
+        {
+            var (device, port) = BuildDevice();
+            device.Cart.SdStorage.Available = true;
+            device.Cart.UsbStorage.Available = false;
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(CorrectChip(minimal: false));
+            _interrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), TeensyStorageType.SD).Returns(StoragePresence.Unknown);
+            _interrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), TeensyStorageType.USB).Returns(StoragePresence.Present);
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            device.Cart.SdStorage.Available.Should().BeTrue();
+            device.Cart.UsbStorage.Available.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task RecoverAsync_FullWithAbsentSd_OverwritesAPreviouslyTrueAvailability()
+        {
+            var (device, port) = BuildDevice();
+            device.Cart.SdStorage.Available = true;
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(CorrectChip(minimal: false));
+            _interrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), TeensyStorageType.SD).Returns(StoragePresence.Absent);
+            _interrogator.ProbeStorage(Arg.Any<ICommunicationPort>(), TeensyStorageType.USB).Returns(StoragePresence.Absent);
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            device.Cart.SdStorage.Available.Should().BeFalse();
         }
 
         [Fact]
