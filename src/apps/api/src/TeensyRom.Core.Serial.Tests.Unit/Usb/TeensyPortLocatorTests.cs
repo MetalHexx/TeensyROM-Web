@@ -142,6 +142,82 @@ public class TeensyPortLocatorTests
     }
 
     [Fact]
+    public void FindByChipId_ReturnsUnavailable_WhenChipHasNeverBeenClassified()
+    {
+        var locator = new TeensyPortLocator([SupportedReader()], _log, () => ["COM1", "COM2"]);
+
+        var result = locator.FindByChipId("14470230");
+
+        result.FilterAvailable.Should().BeFalse();
+        result.Candidates.Should().BeEmpty();
+        result.UnavailableReason.Should().Be("descriptor filter found no TeensyROM among 2 present ports");
+    }
+
+    [Fact]
+    public void FindByChipId_ReturnsNotPresentRightNow_ForARememberedChipTheReaderNoLongerSees()
+    {
+        var rows = new[]
+        {
+            new UsbSerialDescriptor("COM4", TeensyUsbIds.Vendor, TeensyUsbIds.ProductFull, "TeensyROM-Serial-14470230")
+        };
+        var reader = Substitute.For<IUsbSerialDescriptorReader>();
+        reader.IsSupported.Returns(true);
+        reader.Read(Arg.Any<IReadOnlyCollection<string>>()).Returns(rows, Array.Empty<UsbSerialDescriptor>());
+        var locator = new TeensyPortLocator([reader], _log, () => ["COM4"]);
+
+        // First read classifies the chip while it is present.
+        locator.FindByChipId("14470230").Candidates.Should().NotBeEmpty();
+
+        // Second read: the chip has rebooted out and a foreign device now occupies the only present port.
+        var result = locator.FindByChipId("14470230");
+
+        result.FilterAvailable.Should().BeTrue("the reader worked and this chip has been classified before - a miss, not \"cannot tell\"");
+        result.Candidates.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void FindByChipId_ReturnsUnavailable_ForARememberedChip_WhenTheReaderThrows()
+    {
+        var rows = new[]
+        {
+            new UsbSerialDescriptor("COM4", TeensyUsbIds.Vendor, TeensyUsbIds.ProductFull, "TeensyROM-Serial-14470230")
+        };
+        var reader = Substitute.For<IUsbSerialDescriptorReader>();
+        reader.IsSupported.Returns(true);
+        reader.Read(Arg.Any<IReadOnlyCollection<string>>()).Returns(_ => rows, _ => throw new InvalidOperationException("registry access denied"));
+        var locator = new TeensyPortLocator([reader], _log, () => ["COM4"]);
+
+        locator.FindByChipId("14470230").Candidates.Should().NotBeEmpty();
+
+        var result = locator.FindByChipId("14470230");
+
+        result.FilterAvailable.Should().BeFalse("a throwing reader is \"cannot tell\" even for a chip named before");
+        result.Candidates.Should().BeEmpty();
+        result.UnavailableReason.Should().Be("registry access denied");
+    }
+
+    [Fact]
+    public void ListPorts_IsUnaffectedByRememberedChips_AndStillReportsUnavailableWhenNothingIsFound()
+    {
+        var rows = new[]
+        {
+            new UsbSerialDescriptor("COM4", TeensyUsbIds.Vendor, TeensyUsbIds.ProductFull, "TeensyROM-Serial-14470230")
+        };
+        var reader = Substitute.For<IUsbSerialDescriptorReader>();
+        reader.IsSupported.Returns(true);
+        reader.Read(Arg.Any<IReadOnlyCollection<string>>()).Returns(rows, Array.Empty<UsbSerialDescriptor>());
+        var locator = new TeensyPortLocator([reader], _log, () => ["COM4"]);
+
+        locator.FindByChipId("14470230").Candidates.Should().NotBeEmpty();
+
+        var result = locator.ListPorts();
+
+        result.FilterAvailable.Should().BeFalse("ListPorts never changes behavior based on remembered chips");
+        result.Ports.Should().BeEmpty();
+        result.UnavailableReason.Should().Be("descriptor filter found no TeensyROM among 1 present ports");
+    }
+
+    [Fact]
     public void FindByChipId_ReturnsBothCandidatesInListingOrder_AndLogsNoWarning_WhenSeveralPresentPortsClaimTheSameChip()
     {
         var rows = new[]

@@ -22,6 +22,9 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         public ConnectionType ConnectionType { get; set; } = ConnectionType.Tcp;
         public bool Disposed { get; private set; }
 
+        /// <summary>Every <c>SetPort</c> call, in order, with the DTR (isTeensyRomPort) flag it was made with.</summary>
+        public List<(string Port, bool IsTeensyRomPort)> SetPortCalls { get; } = [];
+
         private string? _endpoint;
 
         public RecoveryScriptedPort ThenSucceed()
@@ -75,9 +78,12 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
         public void Write(byte[] buffer, int offset, int count) { }
         public void Write(char[] buffer, int offset, int count) { }
 
-        public System.Reactive.Unit SetPort(string port)
+        public System.Reactive.Unit SetPort(string port) => SetPort(port, isTeensyRomPort: false);
+
+        public System.Reactive.Unit SetPort(string port, bool isTeensyRomPort)
         {
             _endpoint = port;
+            SetPortCalls.Add((port, isTeensyRomPort));
             return System.Reactive.Unit.Default;
         }
 

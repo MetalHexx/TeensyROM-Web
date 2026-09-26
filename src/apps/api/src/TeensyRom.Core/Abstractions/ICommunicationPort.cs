@@ -45,6 +45,14 @@ namespace TeensyRom.Core.Abstractions
     Unit SetPort(string port);
 
     /// <summary>
+    /// Sets the port to connect to, and (serial only) whether it is proven a TeensyROM by USB
+    /// vendor/product - the gate for asserting DTR, so a foreign serial device sharing the host is never
+    /// reset. The default forwards to <see cref="SetPort(string)"/>, leaving TCP and every existing fake
+    /// unaffected; only <c>SerialCommunicationPort</c> gives the flag meaning.
+    /// </summary>
+    Unit SetPort(string port, bool isTeensyRomPort) => SetPort(port);
+
+    /// <summary>
     /// Opens the port with the current set port
     /// </summary>
     /// <param name="useRetryLoop">When true, uses retry logic for stability. When false, attempts single connection for fast discovery.</param>

@@ -9,6 +9,14 @@ namespace TeensyRom.Core.Serial.Usb
         private readonly ILoggingService _log;
         private readonly Func<IReadOnlyList<string>> _getPresentPorts;
 
+        /// <summary>
+        /// Chip ids this process has classified at least once. The locator is a singleton, so this
+        /// outlives any single call: it is what lets <see cref="FindByChipId"/> answer "not present right
+        /// now" for a chip a working reader has already named, instead of "cannot tell" - see the read
+        /// path in <see cref="ReadPorts"/>.
+        /// </summary>
+        private readonly HashSet<string> _classifiedChipIds = new(StringComparer.OrdinalIgnoreCase);
+
         public TeensyPortLocator(IEnumerable<IUsbSerialDescriptorReader> readers, ILoggingService log)
             : this(readers, log, SerialHelper.GetComPorts)
         {
@@ -24,11 +32,54 @@ namespace TeensyRom.Core.Serial.Usb
 
         public PortLocatorResult ListPorts()
         {
+            var outcome = ReadPorts();
+
+            if (!outcome.ReaderFunctional || outcome.UnavailableReason is not null)
+            {
+                return new PortLocatorResult([], false, outcome.UnavailableReason);
+            }
+
+            return new PortLocatorResult(outcome.Ports, true, null);
+        }
+
+        public PortLookup FindByChipId(string chipId)
+        {
+            var outcome = ReadPorts();
+
+            if (outcome.ReaderFunctional && outcome.UnavailableReason is null)
+            {
+                var matches = outcome.Ports
+                    .Where(p => string.Equals(p.ChipId, chipId, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                return new PortLookup(matches, true, null);
+            }
+
+            if (outcome.ReaderFunctional && _classifiedChipIds.Contains(chipId))
+            {
+                // The reader worked and simply found no port for this chip this round. Since this chip
+                // has been classified before, that is "not present right now", not "cannot tell".
+                return new PortLookup([], true, null);
+            }
+
+            return new PortLookup([], false, outcome.UnavailableReason);
+        }
+
+        /// <summary>
+        /// The one read of the descriptor source, shared by <see cref="ListPorts"/> and
+        /// <see cref="FindByChipId"/>. <see cref="ReadOutcome.ReaderFunctional"/> is true whenever a
+        /// supported reader read without throwing - even when it classified nothing among present ports -
+        /// so callers can tell that case apart from "no reader" or "reader threw", which
+        /// <see cref="ListPorts"/> collapses into a single "cannot tell" but <see cref="FindByChipId"/>
+        /// does not.
+        /// </summary>
+        private ReadOutcome ReadPorts()
+        {
             var reader = _readers.FirstOrDefault(r => r.IsSupported);
 
             if (reader is null)
             {
-                return new PortLocatorResult([], false, "No USB descriptor reader supports this platform.");
+                return new ReadOutcome([], false, "No USB descriptor reader supports this platform.");
             }
 
             var presentPorts = _getPresentPorts();
@@ -41,7 +92,7 @@ namespace TeensyRom.Core.Serial.Usb
             catch (Exception ex)
             {
                 _log.InternalError($"TeensyPortLocator: descriptor reader threw: {ex.Message}");
-                return new PortLocatorResult([], false, ex.Message);
+                return new ReadOutcome([], false, ex.Message);
             }
 
             var ports = descriptors
@@ -50,27 +101,20 @@ namespace TeensyRom.Core.Serial.Usb
                 .Select(p => p!)
                 .ToList();
 
+            foreach (var port in ports)
+            {
+                _classifiedChipIds.Add(port.ChipId);
+            }
+
             if (ports.Count == 0 && presentPorts.Count > 0)
             {
-                return new PortLocatorResult([], false, $"descriptor filter found no TeensyROM among {presentPorts.Count} present ports");
+                return new ReadOutcome([], true, $"descriptor filter found no TeensyROM among {presentPorts.Count} present ports");
             }
 
-            return new PortLocatorResult(ports, true, null);
+            return new ReadOutcome(ports, true, null);
         }
 
-        public PortLookup FindByChipId(string chipId)
-        {
-            var result = ListPorts();
-
-            if (!result.FilterAvailable)
-            {
-                return new PortLookup([], false, result.UnavailableReason);
-            }
-
-            var matches = result.Ports.Where(p => string.Equals(p.ChipId, chipId, StringComparison.OrdinalIgnoreCase)).ToList();
-
-            return new PortLookup(matches, true, null);
-        }
+        private sealed record ReadOutcome(IReadOnlyList<TeensyRomPort> Ports, bool ReaderFunctional, string? UnavailableReason);
 
         private static TeensyRomPort? Classify(UsbSerialDescriptor descriptor)
         {

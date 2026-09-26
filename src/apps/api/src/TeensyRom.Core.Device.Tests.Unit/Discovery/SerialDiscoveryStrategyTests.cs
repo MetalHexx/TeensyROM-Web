@@ -38,19 +38,38 @@ public class SerialDiscoveryStrategyTests
 
         var port3 = CreatePort();
         var port5 = CreatePort();
-        _transportFactory.CreateSerial("COM3").Returns(port3);
-        _transportFactory.CreateSerial("COM5").Returns(port5);
+        _transportFactory.CreateSerial("COM3", true).Returns(port3);
+        _transportFactory.CreateSerial("COM5", true).Returns(port5);
         _interrogator.ReadVersion(port3).Returns(TeensyRomReply("chip-1"));
         _interrogator.ReadVersion(port5).Returns(TeensyRomReply("chip-2"));
 
         var result = await CreateSut().FindEndpoints(CancellationToken.None);
 
         result.Should().HaveCount(2);
-        _transportFactory.Received(1).CreateSerial("COM3");
-        _transportFactory.Received(1).CreateSerial("COM5");
-        _transportFactory.Received(2).CreateSerial(Arg.Any<string>());
+        _transportFactory.Received(1).CreateSerial("COM3", true);
+        _transportFactory.Received(1).CreateSerial("COM5", true);
+        _transportFactory.Received(2).CreateSerial(Arg.Any<string>(), Arg.Any<bool>());
         port3.Received(1).OpenPort(useRetryLoop: false);
         port5.Received(1).OpenPort(useRetryLoop: false);
+    }
+
+    /// <summary>A macOS <c>cu.usbmodem*</c> row is classified Unknown - advisory, not proof - so DTR stays off even though the locator names it a candidate.</summary>
+    [Fact]
+    public async Task FindEndpoints_WhenLocatorNamesAnUnknownRow_OpensItWithDtrOff()
+    {
+        _locator.ListPorts().Returns(new PortLocatorResult(
+            [new TeensyRomPort("/dev/cu.usbmodem1", "chip-1", TeensyRomImage.Unknown)],
+            FilterAvailable: true,
+            UnavailableReason: null));
+
+        var port = CreatePort();
+        _transportFactory.CreateSerial("/dev/cu.usbmodem1", false).Returns(port);
+        _interrogator.ReadVersion(port).Returns(TeensyRomReply("chip-1"));
+
+        var result = await CreateSut().FindEndpoints(CancellationToken.None);
+
+        result.Should().ContainSingle();
+        _transportFactory.Received(1).CreateSerial("/dev/cu.usbmodem1", false);
     }
 
     [Fact]
@@ -58,7 +77,7 @@ public class SerialDiscoveryStrategyTests
     {
         _locator.ListPorts().Returns(new PortLocatorResult([], FilterAvailable: false, UnavailableReason: "no USB descriptor reader supports this platform"));
         _interrogator.ReadVersion(Arg.Any<ICommunicationPort>()).Returns(VersionReply.Empty);
-        _transportFactory.CreateSerial(Arg.Any<string>()).Returns(_ => CreatePort());
+        _transportFactory.CreateSerial(Arg.Any<string>(), false).Returns(_ => CreatePort());
 
         var expectedPorts = SerialHelper.GetComPorts();
 
@@ -66,7 +85,7 @@ public class SerialDiscoveryStrategyTests
 
         _log.Received(1).InternalWarning(Arg.Is<string>(s =>
             s.Contains("descriptor filter unavailable") && s.Contains("no USB descriptor reader supports this platform")));
-        _transportFactory.Received(expectedPorts.Count).CreateSerial(Arg.Any<string>());
+        _transportFactory.Received(expectedPorts.Count).CreateSerial(Arg.Any<string>(), false);
     }
 
     [Fact]
@@ -76,7 +95,7 @@ public class SerialDiscoveryStrategyTests
             [new TeensyRomPort("COM3", "chip-1", TeensyRomImage.Full)], FilterAvailable: true, UnavailableReason: null));
 
         var port = CreatePort();
-        _transportFactory.CreateSerial("COM3").Returns(port);
+        _transportFactory.CreateSerial("COM3", true).Returns(port);
         _interrogator.ReadVersion(port).Returns(VersionReply.Empty);
 
         var result = await CreateSut().FindEndpoints(CancellationToken.None);
@@ -94,7 +113,7 @@ public class SerialDiscoveryStrategyTests
 
         var port = CreatePort();
         port.When(p => p.OpenPort(Arg.Any<bool>())).Do(_ => throw new InvalidOperationException("port busy"));
-        _transportFactory.CreateSerial("COM3").Returns(port);
+        _transportFactory.CreateSerial("COM3", true).Returns(port);
 
         var result = await CreateSut().FindEndpoints(CancellationToken.None);
 
@@ -112,7 +131,7 @@ public class SerialDiscoveryStrategyTests
 
         var port = CreatePort();
         port.IsOpen.Returns(true);
-        _transportFactory.CreateSerial("COM3").Returns(port);
+        _transportFactory.CreateSerial("COM3", true).Returns(port);
         _interrogator.ReadVersion(port).Returns(TeensyRomReply("chip-1"));
 
         var result = await CreateSut().FindEndpoints(CancellationToken.None);
@@ -133,7 +152,7 @@ public class SerialDiscoveryStrategyTests
             [new TeensyRomPort("COM3", "descriptor-chip", TeensyRomImage.Full)], FilterAvailable: true, UnavailableReason: null));
 
         var port = CreatePort();
-        _transportFactory.CreateSerial("COM3").Returns(port);
+        _transportFactory.CreateSerial("COM3", true).Returns(port);
         _interrogator.ReadVersion(port).Returns(TeensyRomReply("reply-chip"));
 
         var result = await CreateSut().FindEndpoints(CancellationToken.None);

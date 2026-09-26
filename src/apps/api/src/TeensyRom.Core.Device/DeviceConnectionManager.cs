@@ -213,17 +213,30 @@ namespace TeensyRom.Core.Device
             }
 
             var lookup = _locator.FindByChipId(row.ChipId);
-            var cachedNameStillCandidate = !lookup.FilterAvailable ||
-                lookup.Candidates.Any(c => string.Equals(c.PortName, row.SerialPortName, StringComparison.OrdinalIgnoreCase));
 
-            if (cachedNameStillCandidate)
+            if (!lookup.FilterAvailable)
             {
-                return await TryOpenAndConfirm(_transports.CreateSerial(row.SerialPortName), row.ChipId, row.TransportInUse, row.SerialPortName, null, ct);
+                // "Cannot tell" must not become "reject" - the one case that survives Windows holding a
+                // stale port entry for an image that just detached. But since the filter cannot vouch for
+                // this port, it may just as well be some other device now: DTR never asserts here.
+                return await TryOpenAndConfirm(_transports.CreateSerial(row.SerialPortName, isTeensyRomPort: false), row.ChipId, row.TransportInUse, row.SerialPortName, null, ct);
             }
 
+            var cachedCandidate = lookup.Candidates.FirstOrDefault(c => string.Equals(c.PortName, row.SerialPortName, StringComparison.OrdinalIgnoreCase));
+
+            if (cachedCandidate is not null)
+            {
+                var isTeensyRomPort = cachedCandidate.Image is TeensyRomImage.Full or TeensyRomImage.Minimal;
+                return await TryOpenAndConfirm(_transports.CreateSerial(row.SerialPortName, isTeensyRomPort), row.ChipId, row.TransportInUse, row.SerialPortName, null, ct);
+            }
+
+            // The cached name is no longer among the candidates - a genuine move (e.g. a mode switch
+            // swaps minimal COM7 for full COM4) or the chip is off USB entirely (empty candidates, a
+            // miss below). Every remaining candidate is opened and version-confirmed in order.
             foreach (var candidate in lookup.Candidates)
             {
-                var device = await TryOpenAndConfirm(_transports.CreateSerial(candidate.PortName), row.ChipId, row.TransportInUse, candidate.PortName, null, ct);
+                var isTeensyRomPort = candidate.Image is TeensyRomImage.Full or TeensyRomImage.Minimal;
+                var device = await TryOpenAndConfirm(_transports.CreateSerial(candidate.PortName, isTeensyRomPort), row.ChipId, row.TransportInUse, candidate.PortName, null, ct);
                 if (device is not null)
                 {
                     return device;

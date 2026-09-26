@@ -49,7 +49,7 @@ public class DeviceConnectionManagerTests
 
         _cache.Load().Returns(new List<CachedConnectionRecord> { new("11112222", "COM5", null, ConnectionType.Serial) });
         AllowSerialLookup("11112222", "COM5");
-        _transports.CreateSerial("COM5").Returns(port);
+        _transports.CreateSerial("COM5", true).Returns(port);
         _interrogator.ReadVersion(port).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
         _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
         _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(Task.FromException<List<TeensyRomDevice>>(new InvalidOperationException("full discovery must not run")));
@@ -57,6 +57,7 @@ public class DeviceConnectionManagerTests
         var manager = CreateManager();
         var started = await manager.ConnectAtStartAsync(CancellationToken.None);
         started.Should().ContainSingle();
+        _transports.Received(1).CreateSerial("COM5", true);
 
         port.ClearReceivedCalls();
         _cache.ClearReceivedCalls();
@@ -86,7 +87,7 @@ public class DeviceConnectionManagerTests
             new("22222222", null, "10.0.0.5:80", ConnectionType.Tcp)
         });
         AllowSerialLookup("11111111", "COM3");
-        _transports.CreateSerial("COM3").Returns(serialPort);
+        _transports.CreateSerial("COM3", true).Returns(serialPort);
         _transports.CreateTcp("10.0.0.5:80").Returns(tcpPort);
         _interrogator.ReadVersion(serialPort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11111111" });
         _interrogator.ReadVersion(tcpPort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "22222222" });
@@ -112,6 +113,7 @@ public class DeviceConnectionManagerTests
         await _finder.Received(1).BuildDevice(
             Arg.Is<DiscoveredEndpoint>(e => e.ConnectionType == ConnectionType.Tcp && e.Version.ChipId == "22222222"),
             Arg.Any<CancellationToken>());
+        _transports.Received(1).CreateSerial("COM3", true);
 
         _cache.Received(1).Save(Arg.Is<IEnumerable<CachedConnectionRecord>>(rows =>
             rows.Count() == 2 &&
@@ -163,7 +165,7 @@ public class DeviceConnectionManagerTests
 
         _cache.Load().Returns(new List<CachedConnectionRecord> { new("44444444", "COM9", null, ConnectionType.Serial) });
         AllowSerialLookup("44444444", "COM9");
-        _transports.CreateSerial("COM9").Returns(cachedPort);
+        _transports.CreateSerial("COM9", true).Returns(cachedPort);
         _interrogator.ReadVersion(cachedPort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "99999999" });
         _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(new List<TeensyRomDevice> { freshDevice });
 
@@ -234,7 +236,7 @@ public class DeviceConnectionManagerTests
         _locator.FindByChipId("11112222").Returns(new PortLookup(
             [new TeensyRomPort("COM9", "11112222", TeensyRomImage.Minimal), new TeensyRomPort("COM5", "11112222", TeensyRomImage.Full)],
             true, null));
-        _transports.CreateSerial("COM5").Returns(port);
+        _transports.CreateSerial("COM5", true).Returns(port);
         _interrogator.ReadVersion(port).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
         _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
         _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(Task.FromException<List<TeensyRomDevice>>(new InvalidOperationException("full discovery must not run")));
@@ -244,7 +246,8 @@ public class DeviceConnectionManagerTests
 
         result.Should().ContainSingle(d => d.DeviceId == "11112222");
         await _finder.Received(1).BuildDevice(Arg.Is<DiscoveredEndpoint>(e => e.Address == "COM5"), Arg.Any<CancellationToken>());
-        _transports.DidNotReceive().CreateSerial("COM9");
+        _transports.Received(1).CreateSerial("COM5", true);
+        _transports.DidNotReceive().CreateSerial("COM9", Arg.Any<bool>());
     }
 
     [Fact]
@@ -259,8 +262,8 @@ public class DeviceConnectionManagerTests
         _locator.FindByChipId("11112222").Returns(new PortLookup(
             [new TeensyRomPort("COM9", "11112222", TeensyRomImage.Minimal), new TeensyRomPort("COM7", "11112222", TeensyRomImage.Full)],
             true, null));
-        _transports.CreateSerial("COM9").Returns(firstCandidatePort);
-        _transports.CreateSerial("COM7").Returns(secondCandidatePort);
+        _transports.CreateSerial("COM9", true).Returns(firstCandidatePort);
+        _transports.CreateSerial("COM7", true).Returns(secondCandidatePort);
         _interrogator.ReadVersion(secondCandidatePort).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
         _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
         _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(Task.FromException<List<TeensyRomDevice>>(new InvalidOperationException("full discovery must not run")));
@@ -271,6 +274,8 @@ public class DeviceConnectionManagerTests
         result.Should().ContainSingle(d => d.DeviceId == "11112222");
         await _finder.Received(1).BuildDevice(Arg.Is<DiscoveredEndpoint>(e => e.Address == "COM7"), Arg.Any<CancellationToken>());
         firstCandidatePort.Received(1).Dispose();
+        _transports.Received(1).CreateSerial("COM9", true);
+        _transports.Received(1).CreateSerial("COM7", true);
     }
 
     [Fact]
@@ -281,7 +286,7 @@ public class DeviceConnectionManagerTests
 
         _cache.Load().Returns(new List<CachedConnectionRecord> { new("11112222", "COM5", null, ConnectionType.Serial) });
         _locator.FindByChipId("11112222").Returns(new PortLookup([], false, "no USB descriptor reader supports this platform"));
-        _transports.CreateSerial("COM5").Returns(port);
+        _transports.CreateSerial("COM5", false).Returns(port);
         _interrogator.ReadVersion(port).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
         _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
         _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(Task.FromException<List<TeensyRomDevice>>(new InvalidOperationException("full discovery must not run")));
@@ -291,6 +296,30 @@ public class DeviceConnectionManagerTests
 
         result.Should().ContainSingle(d => d.DeviceId == "11112222");
         await _finder.Received(1).BuildDevice(Arg.Is<DiscoveredEndpoint>(e => e.Address == "COM5"), Arg.Any<CancellationToken>());
+        _transports.Received(1).CreateSerial("COM5", false);
+    }
+
+    /// <summary>An Unknown row (macOS: descriptor cannot prove vendor/product) never asserts DTR, even though it is a live candidate.</summary>
+    [Fact]
+    public async Task ConnectAtStartAsync_WithCachedPortNameMatchingAnUnknownCandidate_OpensItWithDtrOff()
+    {
+        var port = CreatePort(ConnectionType.Serial);
+        var device = CreateDevice("11112222", ConnectionType.Serial, "/dev/cu.usbmodem1", port);
+
+        _cache.Load().Returns(new List<CachedConnectionRecord> { new("11112222", "/dev/cu.usbmodem1", null, ConnectionType.Serial) });
+        _locator.FindByChipId("11112222").Returns(new PortLookup(
+            [new TeensyRomPort("/dev/cu.usbmodem1", "11112222", TeensyRomImage.Unknown)],
+            true, null));
+        _transports.CreateSerial("/dev/cu.usbmodem1", false).Returns(port);
+        _interrogator.ReadVersion(port).Returns(new VersionReply { IsTeensyRom = true, ChipId = "11112222" });
+        _finder.BuildDevice(Arg.Any<DiscoveredEndpoint>(), Arg.Any<CancellationToken>()).Returns(device);
+        _finder.FindDevices(Arg.Any<CancellationToken>()).Returns(Task.FromException<List<TeensyRomDevice>>(new InvalidOperationException("full discovery must not run")));
+
+        var manager = CreateManager();
+        var result = await manager.ConnectAtStartAsync(CancellationToken.None);
+
+        result.Should().ContainSingle(d => d.DeviceId == "11112222");
+        _transports.Received(1).CreateSerial("/dev/cu.usbmodem1", false);
     }
 
     [Fact]

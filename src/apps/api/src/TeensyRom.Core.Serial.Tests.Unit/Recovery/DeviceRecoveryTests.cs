@@ -261,6 +261,49 @@ namespace TeensyRom.Core.Serial.Tests.Unit.Recovery
             _interrogator.Received(1).ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>());
         }
 
+        /// <summary>DTR is asserted only for a candidate USB vendor/product already proved a TeensyROM; an Unknown row (macOS) is treated like any foreign device.</summary>
+        [Fact]
+        public async Task RecoverAsync_Serial_ReacquireCandidates_AssertsDtrOnlyForFullOrMinimalImages()
+        {
+            var (device, port) = BuildDevice(endpoint: "COM5", connectionType: ConnectionType.Serial);
+            port.ThenTimeOut().ThenTimeOut().ThenSucceed();
+            _locator.FindByChipId(ChipId).Returns(new PortLookup(
+                [
+                    new TeensyRomPort("COM4", ChipId, TeensyRomImage.Unknown),
+                    new TeensyRomPort("COM6", ChipId, TeensyRomImage.Minimal),
+                    new TeensyRomPort("COM7", ChipId, TeensyRomImage.Full)
+                ],
+                true, null));
+            _interrogator.ReadVersion(Arg.Any<ICommunicationPort>(), Arg.Any<int>()).Returns(CorrectChip(minimal: false));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(), _log);
+
+            await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            port.SetPortCalls.Should().Contain(("COM4", false));
+            port.SetPortCalls.Should().Contain(("COM6", true));
+            port.SetPortCalls.Should().Contain(("COM7", true));
+        }
+
+        /// <summary>
+        /// A known chip's FindByChipId answers "not present right now" (empty candidates, filter
+        /// available) during its own reboot gap - recovery must keep polling rather than fall back to a
+        /// blind scan that would open whatever foreign port happens to be present.
+        /// </summary>
+        [Fact]
+        public async Task RecoverAsync_Serial_RebootGapOfAKnownUnit_PollsAndNeverOpensAForeignPort()
+        {
+            var (device, port) = BuildDevice(endpoint: "COM5", connectionType: ConnectionType.Serial);
+            port.SetPortCalls.Clear();
+            _locator.FindByChipId(ChipId).Returns(new PortLookup([], true, null));
+            var recovery = new DeviceRecovery(_interrogator, _locator, FastOptions(toMinimalMs: 15, toFullMs: 15), _log);
+
+            var outcome = await recovery.RecoverAsync(device, RecoveryReason.Drop, CancellationToken.None);
+
+            outcome.Mode.Should().Be(DeviceMode.Unreachable);
+            port.Calls.Should().BeEmpty("no candidate is opened while the filter simply cannot see this known chip yet");
+            port.SetPortCalls.Should().BeEmpty();
+        }
+
         [Fact]
         public async Task RecoverAsync_FullWithUnknownSdAndPresentUsb_PreservesSdAndWritesUsb()
         {

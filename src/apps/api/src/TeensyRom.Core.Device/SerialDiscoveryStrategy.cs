@@ -24,16 +24,21 @@ public class SerialDiscoveryStrategy(
 
         List<string> candidates;
         Dictionary<string, string> descriptorChipIds;
+        Dictionary<string, bool> isTeensyRomPort;
 
         if (located.FilterAvailable)
         {
             candidates = located.Ports.Select(p => p.PortName).ToList();
             descriptorChipIds = located.Ports.ToDictionary(p => p.PortName, p => p.ChipId);
+            // DTR only for a row USB vendor/product already proved a TeensyROM; an Unknown row (macOS)
+            // gets it off, same as any foreign device.
+            isTeensyRomPort = located.Ports.ToDictionary(p => p.PortName, p => p.Image is TeensyRomImage.Full or TeensyRomImage.Minimal);
         }
         else
         {
             candidates = SerialHelper.GetComPorts();
             descriptorChipIds = [];
+            isTeensyRomPort = [];
             log.InternalWarning($"Serial discovery: descriptor filter unavailable ({located.UnavailableReason}); probing all {candidates.Count} port(s)");
         }
 
@@ -43,7 +48,7 @@ public class SerialDiscoveryStrategy(
         {
             ct.ThrowIfCancellationRequested();
 
-            var endpoint = TryDiscoverDevice(portName, descriptorChipIds.GetValueOrDefault(portName));
+            var endpoint = TryDiscoverDevice(portName, descriptorChipIds.GetValueOrDefault(portName), isTeensyRomPort.GetValueOrDefault(portName));
             if (endpoint is not null)
             {
                 discovered.Add(endpoint);
@@ -58,13 +63,13 @@ public class SerialDiscoveryStrategy(
     /// disposed - unless the reply proves a TeensyROM is present; an open failure is logged and
     /// skipped rather than thrown, since one bad port must not abort the rest of the scan.
     /// </summary>
-    private DiscoveredEndpoint? TryDiscoverDevice(string portName, string? descriptorChipId)
+    private DiscoveredEndpoint? TryDiscoverDevice(string portName, string? descriptorChipId, bool isTeensyRomPort)
     {
         ICommunicationPort? communicationPort = null;
 
         try
         {
-            communicationPort = transportFactory.CreateSerial(portName);
+            communicationPort = transportFactory.CreateSerial(portName, isTeensyRomPort);
             communicationPort.OpenPort(useRetryLoop: false);
         }
         catch (Exception ex)

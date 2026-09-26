@@ -12,15 +12,20 @@ namespace TeensyRom.Core.Serial
   public class SerialCommunicationPort(ILoggingService log) : ICommunicationPort
   {
     /// <remarks>
-    /// DTR on, as a terminal would. Both firmware images call Teensy 4's <c>Serial.begin()</c> at boot,
-    /// which blocks until the host asserts DTR (up to 2 s once USB is enumerated), so a port opened with
-    /// DTR off holds the boot - twice on a reboot out of minimal, once in each image.
+    /// DTR off by default. Both TeensyROM images call Teensy 4's <c>Serial.begin()</c> at boot, which
+    /// blocks until the host asserts DTR (up to 2 s once USB is enumerated) - so a port proven a
+    /// TeensyROM by USB vendor/product wants DTR asserted, or a reboot holds twice (once in each image).
+    /// But asserting DTR is also how a terminal resets an Arduino-style board, and this port is opened
+    /// for any COM name a caller hands it - including, on a shared host, one that is not a TeensyROM at
+    /// all. Asserting DTR unconditionally would reset that foreign board for no reason the caller asked
+    /// for, so DTR only ever comes on when <see cref="SetPort(string, bool)"/> is told the port is a
+    /// TeensyROM, and stays set until a later <see cref="SetPort(string, bool)"/> names another port.
     /// </remarks>
     private readonly SerialPort _serialPort = new()
     {
       Encoding = Encoding.UTF8,
       BaudRate = 115200,
-      DtrEnable = true
+      DtrEnable = false
     };
 
     public int BytesToRead => _serialPort.BytesToRead;
@@ -41,7 +46,9 @@ namespace TeensyRom.Core.Serial
     public void Write(byte[] buffer, int offset, int count) => _serialPort.Write(buffer, offset, count);
     public void Write(char[] buffer, int offset, int count) => _serialPort.Write(buffer, offset, count);
 
-    public Unit SetPort(string port)
+    public Unit SetPort(string port) => SetPort(port, isTeensyRomPort: false);
+
+    public Unit SetPort(string port, bool isTeensyRomPort)
     {
       if (string.IsNullOrWhiteSpace(port))
       {
@@ -54,6 +61,7 @@ namespace TeensyRom.Core.Serial
         throw new TeensyException("The set port is currently unavailable");
       }
       _serialPort.PortName = port;
+      _serialPort.DtrEnable = isTeensyRomPort;
 
       return Unit.Default;
     }

@@ -220,7 +220,9 @@ namespace TeensyRom.Core.Serial.Recovery
 
                 try
                 {
-                    port.SetPort(candidate.PortName);
+                    // DTR on only for a candidate USB vendor/product already proved a TeensyROM (Full or
+                    // Minimal); an Unknown row (macOS) gets it off, same as any foreign device.
+                    port.SetPort(candidate.PortName, candidate.Image is TeensyRomImage.Full or TeensyRomImage.Minimal);
                     port.OpenPort(useRetryLoop: false);
                 }
                 catch (Exception)
@@ -308,7 +310,9 @@ namespace TeensyRom.Core.Serial.Recovery
 
                 try
                 {
-                    port.SetPort(candidate);
+                    // Blind scan of every present port: none of them is proven a TeensyROM, so DTR stays
+                    // off.
+                    port.SetPort(candidate, isTeensyRomPort: false);
                     port.OpenPort(useRetryLoop: false);
                 }
                 catch (Exception)
