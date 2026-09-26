@@ -1,6 +1,7 @@
 // The swap routine through the API: launch a large cart (the TR reboots into minimal), wait, then launch
 // a SID, which makes the API bring the device back to full before it can launch. Prints which transport
-// the API is actually using first - the API keeps TCP whenever the device answers on both.
+// the API is actually using first - Connection:PreferredTransport decides which transport wins when
+// the device answers on both.
 //   node api-swap.mjs --device 19277260 [--api http://localhost:213] [--rounds 10] [--wait 5000]
 //        [--large "/games/Large/706k The Secret of Monkey Island (D42) [EasyFlash].crt"]
 //        [--sid "/music/DEMOS/M-R/Melody.sid"] [--out file]

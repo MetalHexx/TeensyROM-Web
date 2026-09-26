@@ -118,7 +118,7 @@ graph TB
 | Component | Purpose | Key Files |
 |-----------|---------|-----------|
 | **DeviceConnectionManager** | Owns the three discovery occasions (start, Discover Devices, page load) and the confirmed device set, keyed by chip id | #file:apps/api/src/TeensyRom.Core.Device/DeviceConnectionManager.cs |
-| **CartFinder** | Turns one confirmed endpoint into a listed device: resets minimal firmware back to full through recovery, probes storage, dedupes a chip found on both transports | #file:apps/api/src/TeensyRom.Core.Device/CartFinder.cs |
+| **CartFinder** | Turns one confirmed endpoint into a listed device: resets minimal firmware back to full through recovery, probes storage, dedupes a chip found on both transports by `ConnectionOptions.PreferredTransport` | #file:apps/api/src/TeensyRom.Core.Device/CartFinder.cs |
 | **SerialDiscoveryStrategy / TcpDiscoveryStrategy** | Probe every USB-descriptor-matched COM port / the local `/24` subnet with the version command; each yields one `DiscoveredEndpoint` per TeensyROM reply | #file:apps/api/src/TeensyRom.Core.Device/SerialDiscoveryStrategy.cs<br/>#file:apps/api/src/TeensyRom.Core.Device/TcpDiscoveryStrategy.cs |
 | **ConnectionRecordCache** | Whole-file JSON cache of confirmed connection records (`Config/ConnectionRecords.json`), read by the start occasion and rewritten after any occasion that contacts a device | #file:apps/api/src/TeensyRom.Core.Device/ConnectionRecordCache.cs |
 | **TeensyRomDevice** | Aggregate root representing a device: `Cart` metadata + `ICommunicationPort` + storage services | #file:apps/api/src/TeensyRom.Core/Entities/Device/TeensyRomDevice.cs |
@@ -326,7 +326,7 @@ graph TB
 | **DeviceConnectionRecord** | Per-device record: endpoints known per transport, transport in use, last-known `DeviceMode`, last-confirmed time. Survives across any single port. | #file:apps/api/src/TeensyRom.Core/Entities/Device/DeviceConnectionRecord.cs |
 | **DeviceConnectionManager** | Owns the three occasions and the confirmed device set (`_byChip`), keyed by chip id | #file:apps/api/src/TeensyRom.Core.Device/DeviceConnectionManager.cs<br/>#file:apps/api/src/TeensyRom.Core/Abstractions/IDeviceConnnectionManager.cs |
 | **ConnectionRecordCache** | Whole-file JSON cache of confirmed rows (`Config/ConnectionRecords.json`), loaded by the start occasion, replaced whole after start/FullScan | #file:apps/api/src/TeensyRom.Core.Device/ConnectionRecordCache.cs |
-| **CartFinder** | Turns one confirmed endpoint into a listed device (`BuildDevice`); resets minimal firmware back to full through recovery, probes storage, dedupes a chip found on two transports | #file:apps/api/src/TeensyRom.Core.Device/CartFinder.cs |
+| **CartFinder** | Turns one confirmed endpoint into a listed device (`BuildDevice`); resets minimal firmware back to full through recovery, probes storage, dedupes a chip found on two transports by `ConnectionOptions.PreferredTransport` (default `Tcp`) | #file:apps/api/src/TeensyRom.Core.Device/CartFinder.cs |
 | **SerialDiscoveryStrategy / TcpDiscoveryStrategy** | Probe USB-descriptor-matched COM ports / the local `/24` subnet with the version command | #file:apps/api/src/TeensyRom.Core.Device/SerialDiscoveryStrategy.cs<br/>#file:apps/api/src/TeensyRom.Core.Device/TcpDiscoveryStrategy.cs |
 | **CommunicationPortBehavior** | The gate: the MediatR pipeline behavior every command passes through | #file:apps/api/src/TeensyRom.Core.Serial/Commands/Behaviors/CommunicationPortBehavior.cs |
 | **DeviceRecovery** | Reacquires a device on its own port instance after a drop, or when leaving minimal firmware | #file:apps/api/src/TeensyRom.Core.Serial/Recovery/DeviceRecovery.cs<br/>#file:apps/api/src/TeensyRom.Core.Serial/Recovery/IDeviceRecovery.cs |
@@ -377,12 +377,30 @@ Every command runs `Logging → Exception → CommunicationPort`:
 
 ### The Reset Primitive
 
-`TRStreamExtensions.ResetDevice(port, log)` is the **only** writer of the reset token (`0x64EE`) — the gate's three branches, `CartFinder` and the reset command all go through it — so the guarantees below hold everywhere without a caller-side guard:
+Two functions in `TRStreamExtensions` are the **only** writers of the reset token (`0x64EE`), so the
+guarantees below hold everywhere without a caller-side guard: `ResetDevice(port, log)` for a device
+believed already in full firmware (the gate's busy branch and its reactive-`Busy` retry, the reset
+command), and `ResetFromMinimal(port, log)` for a device believed already in minimal (the gate's minimal
+branch, `CartFinder.BuildDevice`) — sent and forgotten, since the reboot drops the transport before any
+reply could matter.
 
-- **Sends the reset token, then waits for the C64 menu to come back up.** Every reset boots the TeensyROM menu, and the menu asks the firmware for its default SID unconditionally. The firmware answers on the command channel with `GoodSIDToken` (`0x9B81`) or `BadSIDToken` (`0x9B80`) roughly 650 ms after the reset text — long after the reply has gone quiet. Left on the wire, that token is read as the *next* command's Ack ("Received unexpected response from TR").
-- **Waits on the token, not the clock** — `WaitForMenuBootToken` reads until it sees either token, bounded (3 s default), then clears the buffers. No fixed sleep.
-- **A timeout is reported, not swallowed**: `ResetDevice` returns `false` and logs that the menu never came up. The reset command does not fail on it — the device was still reset — but the log says so.
-- **The one reset that cannot finish this itself** is a reset sent to a device in minimal: the Teensy reboots and the transport drops mid-reply. `DeviceRecovery`'s `LeaveMinimal` path does the same bounded wait before declaring the device full (below).
+- **`ResetDevice` sends the reset token, then waits for the C64 menu to come back up and finish
+  booting.** Every reset boots the TeensyROM menu, and the menu asks the firmware for its default SID
+  unconditionally. The firmware answers on the command channel with `GoodSIDToken` (`0x9B81`) or
+  `BadSIDToken` (`0x9B80`) roughly 650 ms after the reset text — long after the reply has gone quiet.
+  Left on the wire, that token is read as the *next* command's Ack ("Received unexpected response from
+  TR"). Only once that token is seen does it move on to waiting for the firmware's own `Boot: complete`
+  flag: the menu still has its network time sync and item listing ahead of it, and a command sent in
+  that window can be lost.
+- **Waits on signals, not the clock.** `WaitForMenuBootToken` reads until it sees either SID token,
+  bounded (3 s default), then clears the buffers; `WaitForBootComplete` polls the version command every
+  `PollIntervalMs` until the reply's `Boot:` line reads `complete`, bounded (8 s default — covers the
+  roughly 1-in-20 resets where the menu's network time sync stalls it). No fixed sleep either way.
+- **A timeout at either wait is reported, not swallowed**: `ResetDevice` returns `false` and logs which
+  wait failed. The reset command does not fail on it — the device was still reset — but the log says so.
+- **`ResetFromMinimal` cannot wait at all**: the Teensy reboots immediately, so the transport drops
+  before either signal could arrive. `DeviceRecovery`'s `LeaveMinimal` path does the equivalent wait once
+  the device is reacquired (below).
 
 ### The Three Discovery Occasions
 
@@ -400,7 +418,7 @@ Every command runs `Logging → Exception → CommunicationPort`:
 - **Poll version**: once reacquired, polls the version command every `ConnectionOptions.PollIntervalMs` (default 250 ms) until it answers with the reason's expected mode
 - **Ceiling per transport**: bounded by `ConnectionOptions.Tcp`/`ConnectionOptions.Serial` (`ToMinimalMs`, `ToFullMs`), selected by `RecoveryReason` — `LargeLaunch` waits for `Minimal`, `LeaveMinimal` waits for full, `Drop` accepts either mode within `max(ToMinimalMs, ToFullMs)`. There is no reason for a launch sent while already `Minimal`: the gate resets every `Minimal` device to full before a launch (or any other command) reaches the handler, so a launch's own recovery only ever runs `LargeLaunch`
 - **Unreachable on ceiling**: no correct-chip reply within the ceiling marks the device `Unreachable` and closes the port; its record is kept so the next discovery occasion can find it again
-- **Menu-boot wait on `LeaveMinimal`**: the reset that started this recovery dropped the transport before it could consume the menu's boot SID token, and the version poll can answer before the C64 menu is even up — so this path waits for that token (same bound as the reset primitive) before declaring the device full. A miss is recorded on `RecoveryOutcome.Failure` and logged as a warning rather than passed off as a clean recovery
+- **Menu-boot wait on `LeaveMinimal`**: the reset that started this recovery dropped the transport before it could consume the menu's boot SID token, so on serial the reacquire itself (`ReacquireCandidates`) listens for that token before asking a full candidate for its version at all — a request answered too early can make the Teensy miss a C64 bus cycle and corrupt the menu's copy of itself. Once reacquired, the version poll can still answer before the menu has finished booting (`Boot: in progress`); unless the reply already says `Boot: complete`, `MenuBootFailure` waits on `WaitForBootComplete` (same signal and bound as the reset primitive) before declaring the device full. A miss at either wait is recorded on `RecoveryOutcome.Failure` and logged as a warning rather than passed off as a clean recovery
 
 `appsettings.json`'s `Connection` section binds `ConnectionOptions`:
 
@@ -452,7 +470,7 @@ sequenceDiagram
     EP->>G: Send(LaunchFileCommand)
 
     alt device believed Minimal
-        G->>P: ResetDevice()
+        G->>P: ResetFromMinimal()
         G->>R: RecoverAsync(device, LeaveMinimal)
         R-->>G: RecoveryOutcome(FullIdle | FullBusy | Unreachable)
         Note over G: not reachable in full → fail here, the handler never runs

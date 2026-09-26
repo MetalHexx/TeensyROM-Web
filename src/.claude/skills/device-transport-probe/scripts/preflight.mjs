@@ -84,7 +84,7 @@ for (const port of ports) {
     uids.add(got.reply.uid);
     report('PASS', `${port.path} version`, `${got.reply.fw}, UID ${got.reply.uid}${got.reply.minimal ? ' (minimal)' : ''}`);
     if (!got.reply.minimal) {
-      if (got.boot === null) report('WARN', `${port.path} boot flag`, 'no "Boot:" line: this firmware lacks the boot-complete flag, so boot waits fall back to the SID token');
+      if (got.boot === null) report('FAIL', `${port.path} boot flag`, 'no "Boot:" line: this firmware lacks the boot-complete flag the API requires');
       else report(got.boot === 'complete' ? 'PASS' : 'WARN', `${port.path} boot flag`, `Boot: ${got.boot}${got.boot === 'complete' ? '' : ' - the menu is still booting; wait and re-run'}`);
     }
   } else if (got.tokens.includes('FwMinimal')) {

@@ -162,9 +162,12 @@ The order that worked, one step per turn against real hardware:
    | `…/CommunicationPortBehavior.cs:79` | gate found minimal → reset to full (launches included — no exemption any more) | `request`, `device.Connection.Mode` |
    | `…/CommunicationPortBehavior.cs:120` | gate caught a reactive `Busy` reply → reset once | `request`, `busyRetries` |
    | `TeensyRom.Core.Serial/Commands/LaunchFile/LaunchFileHandler.cs:18,26,36,64` | handler entry, retry-token check, watch result, recovery call — no minimal-chain check any more, the gate resets minimal to full before the handler ever runs | `r.LaunchItem.Size`, `ack`, `final`/`dropped`, `device?.Connection.Mode` |
-   | `TeensyRom.Core.Serial/Recovery/DeviceRecovery.cs:35` | every recovery attempt starts | `reason`, `transport`, `chipId`, `ceiling` |
+   | `TeensyRom.Core.Serial/Recovery/DeviceRecovery.cs:42` | every recovery attempt starts | `reason`, `transport`, `chipId`, `ceiling` |
+   | `TeensyRom.Core.Serial/Recovery/DeviceRecovery.cs:239` | serial reacquire listens for the C64 menu's boot token before asking a full candidate its version | `candidate.PortName`, `candidate.Image`, `menuTokenSeen` |
+   | `TeensyRom.Core.Serial/Recovery/DeviceRecovery.cs:130` | `LeaveMinimal` recovery checks whether the reply already reported boot-complete before waiting on it | `reason`, `reply.BootComplete` |
+   | `TeensyRom.Core.Serial/Routines/TRStreamExtensions.cs:202` | `WaitForBootComplete`'s poll, once per version request | `polls`, `stopwatch.ElapsedMilliseconds` |
    | `TeensyRom.Core.Serial/Commands/Reset/ResetCommandHandler.cs:11` | explicit resets | `request.DeviceId` |
-   | `TeensyRom.Core.Device/CartFinder.cs:52` | every discovery sweep starts | `_discoveryStrategies.Count()` |
+   | `TeensyRom.Core.Device/CartFinder.cs:53` | every discovery sweep starts | `_discoveryStrategies.Count()` |
    | `TeensyRom.Core.Device/DeviceConnectionManager.cs:62` | every `FindDevices` call (page load vs. full scan) | `fullScan`, `_byChip.Count` |
 
    `request` evaluates to `{…CommandName}` — enough to name the command. Token values

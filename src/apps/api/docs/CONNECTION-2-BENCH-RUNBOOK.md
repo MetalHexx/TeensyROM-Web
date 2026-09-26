@@ -153,6 +153,13 @@ the cached-row variant.
 
 ## Measurement table
 
+**Superseded by the boot-complete-flag firmware (P07, 2026-09-26).** Every row and session note below
+this point was taken on stock firmware, where a reset's only readiness signal was the menu's SID token.
+P07 landed firmware that reports its own `Boot: complete` flag and a reset primitive that polls past the
+token for it, which changes the mechanism these numbers describe, not just their values. Left in place
+(struck through, not deleted) as the historical record; see "P07 bench evidence" below for the current
+numbers.
+
 Fill in **after** once the bench run above is done. **Before** is the Ground Truth bench session
 (2026-09-20, TCP with static IPs) or the current `ConnectionOptions` seed comment where noted; leave a row
 blank rather than guess. **Ceiling set** is what actually gets written to `appsettings.json` — the
@@ -160,10 +167,10 @@ measured value plus margin, never the raw number.
 
 | Measurement | Before | After | Ceiling seed | Ceiling set |
 |---|---|---|---|---|
-| Full → minimal (TCP) | 3.56–3.58 s | 5.81 s (2026-09-21 session); reconfirmed 5.82 s (2026-09-23 session) | `Tcp.ToMinimalMs` = 8000 | |
-| Minimal → full, non-launch reboot (TCP) | 7.06–7.09 s | 8.62 s (2026-09-21 session); reconfirmed 11.69 s (2026-09-23 session) — see session note | `Tcp.ToFullMs` = 15000 | |
-| Large launch from minimal, reset-and-recover (TCP) | superseded chained path: 15.2 s — abandoned for reachability, not speed (see "1. Minimal → full" above) | 17.41 s (2026-09-23 session) | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` = 25000 | unchanged — 30% margin (7.6 s) under ceiling seed |
-| SID launch from minimal, reset-and-recover (TCP) | superseded chained path: 8.7–8.8 s; a later attempt at the same chained path did not complete — see session note | 12.28 s (2026-09-23 session) | `Tcp.ToFullMs + LaunchSettleMs` = 17000 | unchanged — 28% margin (4.7 s) under ceiling seed |
+| Full → minimal (TCP) | ~~3.56–3.58 s~~ | ~~5.81 s (2026-09-21 session); reconfirmed 5.82 s (2026-09-23 session)~~ | `Tcp.ToMinimalMs` = 8000 | |
+| Minimal → full, non-launch reboot (TCP) | ~~7.06–7.09 s~~ | ~~8.62 s (2026-09-21 session); reconfirmed 11.69 s (2026-09-23 session) — see session note~~ | `Tcp.ToFullMs` = 15000 | |
+| Large launch from minimal, reset-and-recover (TCP) | ~~superseded chained path: 15.2 s — abandoned for reachability, not speed (see "1. Minimal → full" above)~~ | ~~17.41 s (2026-09-23 session)~~ | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` = 25000 | unchanged — 30% margin (7.6 s) under ceiling seed |
+| SID launch from minimal, reset-and-recover (TCP) | ~~superseded chained path: 8.7–8.8 s; a later attempt at the same chained path did not complete — see session note~~ | ~~12.28 s (2026-09-23 session)~~ | `Tcp.ToFullMs + LaunchSettleMs` = 17000 | unchanged — 28% margin (4.7 s) under ceiling seed |
 | 1. Minimal → full, non-launch reboot (Serial) | | | `Serial.ToFullMs` = 15000 (seeded from a 13.7 s serial round trip) | |
 | 1. SID launch from minimal, reset-and-recover (Serial) | | | `Serial.ToFullMs + LaunchSettleMs` | |
 | 1. Large launch from minimal, reset-and-recover (Serial) | | | `Serial.ToFullMs + Serial.ToMinimalMs + LaunchSettleMs` | |
@@ -174,9 +181,13 @@ measured value plus margin, never the raw number.
 
 The reset-and-recover rows above measure more than their ceiling seed's formula covers: `EnsureFullAsync`'s
 `RecoveryReason.LeaveMinimal` recovery runs two storage probes (`DeviceRecovery.Succeed`, each bounded by
-`ProbeStorageRoot`'s 6 s ack timeout) and waits for the menu-boot token (`WaitForMenuBootToken`, 3 s bound)
-*after* its own poll ceiling is satisfied — neither is exposed as a `ConnectionOptions` ceiling. Derive the
-actual number from what the bench reports rather than the raw `ToFullMs + LaunchSettleMs` /
+`ProbeStorageRoot`'s 6 s ack timeout) and ~~waits for the menu-boot token (`WaitForMenuBootToken`, 3 s
+bound) *after* its own poll ceiling is satisfied~~ **(superseded: it now waits for the firmware's own
+boot-complete flag, `WaitForBootComplete`, 8 s bound, after its own poll ceiling is satisfied — the token
+precedes the menu's network start and item listing, so stopping at the token was never actually "ready",
+and polling before the token corrupts the boot, so the primitive still listens for it first before moving
+on to the boot-complete wait)** — neither is exposed as a `ConnectionOptions` ceiling. Derive the actual
+number from what the bench reports rather than the raw `ToFullMs + LaunchSettleMs` /
 `ToFullMs + ToMinimalMs + LaunchSettleMs` sum, and note here whether that overhead showed up in practice.
 
 **It does.** Every reset-from-minimal driven through the API logs "the C64 menu did not come up within
@@ -277,6 +288,42 @@ non-completion is not a bench number — no ceiling is set from it here. The rem
 serial measurements, and the discovery/occasion table below need a further bench session with a person
 at the C64 to toggle the listener and drive the physical settings menu; none of that is achievable from
 this environment alone.
+
+## P07 bench evidence (boot-complete-flag firmware, 2026-09-26)
+
+Ran the `device-transport-probe` skill's "Prove a connection change" procedure end to end against device
+`19277260` (TR+, fork `boot-complete-flag` branch flashed) on both transports. Confirmed along the way:
+a cached connection row keeps the transport it cached — after setting `Connection__PreferredTransport`,
+the cache-first start still opened the old transport until `GET /api/devices/?fullScan=true` forced a
+full discovery; and once the API held Serial as its live connection, `preflight.mjs --api-expected`
+correctly reported a FAIL on "COM4 open" (access denied) — expected, not a defect.
+
+**`api-swap.mjs`, 10 rounds each** (`--out api-swap-tcp.txt` / `api-swap-serial.txt`):
+
+| Transport | Result | SID step | Large step |
+|---|---|---|---|
+| TCP (`Connection:PreferredTransport=Tcp`, default) | 10/10 | min 8.54 / median 9.03 / max 9.14 s | 5.78–5.85 s |
+| Serial (`Connection__PreferredTransport=Serial` + forced full scan) | 10/10 | min 5.00 / median 5.30 / max 5.69 s | 3.85–3.95 s |
+
+**`reset-launch.mjs`, 10 rounds each** (`--out reset-launch-tcp.txt` / `reset-launch-serial.txt`):
+
+| Transport | Result | Reset | Launch |
+|---|---|---|---|
+| TCP | 10/10 | 1.10–1.51 s | 0.19–0.24 s |
+| Serial | 10/10 | 1.10–1.51 s (one round 3.71 s — the network time-sync stall) | 0.15–0.17 s |
+
+**Hardware suite** (`TeensyRom.Core.Device.Tests.Integration`, `TEENSYROM_BENCH_CHIP_IDS=19277260`,
+`--filter "FullyQualifiedName~ConnectionTransitionsTests|FullyQualifiedName~DiscoveryOccasionsTests"`):
+
+| Transport | `ConnectionTransitionsTests` | `DiscoveryOccasionsTests` |
+|---|---|---|
+| TCP | Passed, 59 s | Passed, 12 s |
+| Serial | Passed, 41 s | Passed, 10 s |
+
+Every number above lands well inside the existing `appsettings.json` ceilings (`Tcp.ToFullMs` = 15000,
+`Serial.ToFullMs` = 15000) with the boot-complete-flag firmware; `appsettings.json` is unchanged by this
+task. `reset-launch.mjs`'s 10/10 on both transports is the direct proof the boot-complete wait holds at
+the tightest timing the API can produce — a reset immediately followed by a launch, no pause.
 
 ## Discovery/occasion after-numbers
 

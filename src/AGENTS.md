@@ -137,6 +137,11 @@ Mock only at infrastructure boundaries — application and features tests should
 - Unit: colocate `*.spec.ts`, prefer MSW for HTTP mocking.
 - E2E: Cypress specs under `apps/teensyrom-ui-e2e/src`.
 - Backend: `dotnet test` for API/Core projects (`*.Tests.Unit`, `*.Tests.Integration`).
+- The backend hardware suite (`TeensyRom.Core.Device.Tests.Integration`, `ConnectionTransitionsTests` /
+  `DiscoveryOccasionsTests`) runs only on a bench with a TeensyROM on the boot-flag firmware, driven with
+  the `device-transport-probe` skill and `TEENSYROM_BENCH_TRANSPORT`. **Never run
+  `TeensyRom.Api.Tests.Integration` while bench work is in progress** — it boots the real API, whose
+  startup discovery opens the COM ports.
 
 ## Development Workflow
 
@@ -173,6 +178,10 @@ Mock only at infrastructure boundaries — application and features tests should
 - CORS is configured for the Angular dev server via the `UiCors` extension.
 - Rate limiting is opt-in per endpoint via a named policy (currently used only by the device discovery endpoint).
 - Assets are automatically unpacked on startup.
+- The API requires TeensyROM firmware that reports its boot state (the version reply's `Boot:` line —
+  fork branch `boot-complete-flag`, pending upstream).
+- `Connection:PreferredTransport` (default `Tcp`) picks the transport for a unit reachable on both.
+- After any reset the API stays silent until the C64 menu's SID token.
 
 ## UI & Styling Resources
 
