@@ -10,6 +10,7 @@ using TeensyRom.Core.Serial.Commands.Behaviors;
 using TeensyRom.Core.Serial.Commands.LaunchFile;
 using TeensyRom.Core.Serial.Recovery;
 using TeensyRom.Core.Serial.Routines;
+using TeensyRom.Core.Serial.Tests.Unit.Routines;
 
 namespace TeensyRom.Core.Serial.Tests.Unit.Commands.Behaviors;
 
@@ -87,10 +88,28 @@ public class CommunicationPortBehaviorTests
     }
 
     /// <summary>A device with a default, confirmed <see cref="DeviceMode.FullIdle"/> record on <paramref name="port"/>.</summary>
-    private static TeensyRomDevice BuildDevice(StubCommunicationPort port, string deviceId)
+    private static TeensyRomDevice BuildDevice(ICommunicationPort port, string deviceId)
     {
         var cart = new Cart { DeviceId = deviceId };
         return new TeensyRomDevice(cart, port, Substitute.For<IStorageService>(), Substitute.For<IStorageService>());
+    }
+
+    /// <summary>
+    /// A <see cref="ScriptedCommunicationPort"/> whose <c>ResetDevice</c> call succeeds fast: the menu's
+    /// boot token lands after a virtual quiet gap, then one version poll reports boot complete. Three
+    /// segments queue up because three separate <c>ClearBuffers</c> calls run before the version reply is
+    /// readable: the gate's own clear at the top of <c>Handle</c>, then <c>WaitForMenuBootToken</c>'s clear
+    /// once it finds the token, then <c>ReadVersionReply</c>'s clear before it sends the version request -
+    /// the first two have nothing to absorb, so they are empty placeholders.
+    /// </summary>
+    private static ScriptedCommunicationPort PortWithSuccessfulReset()
+    {
+        var port = new ScriptedCommunicationPort();
+        port.EnqueueTokenAfterQuiet(650, TeensyToken.GoodSIDToken);
+        port.NewSegment();
+        port.NewSegment();
+        port.NewSegment().EnqueueToken(TeensyToken.Ack).EnqueueText("Boot: complete\n");
+        return port;
     }
 
     /// <summary>
@@ -172,7 +191,7 @@ public class CommunicationPortBehaviorTests
     public async Task Handle_BusyOnceThenSucceeds_ResetsOnceInvokesHandlerTwiceRecordEndsFullIdle()
     {
         var deviceId = Guid.NewGuid().ToString("N");
-        var port = new StubCommunicationPort();
+        var port = PortWithSuccessfulReset();
         var device = BuildDevice(port, deviceId);
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
@@ -193,7 +212,7 @@ public class CommunicationPortBehaviorTests
 
         response.IsSuccess.Should().BeTrue();
         invocations.Should().Be(2);
-        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        port.Written.Should().Equal(0x64, 0xEE, 0x64, 0x76);
         device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
     }
 
@@ -201,7 +220,7 @@ public class CommunicationPortBehaviorTests
     public async Task Handle_BusyTwice_ResetsOnceExceptionPropagatesRecordEndsFullBusy()
     {
         var deviceId = Guid.NewGuid().ToString("N");
-        var port = new StubCommunicationPort();
+        var port = PortWithSuccessfulReset();
         var device = BuildDevice(port, deviceId);
         var devices = Substitute.For<IDeviceConnectionManager>();
         devices.GetAvailableDevice(deviceId).Returns(device);
@@ -212,7 +231,37 @@ public class CommunicationPortBehaviorTests
         Func<Task> act = () => behavior.Handle(command, () => throw new TeensyBusyException("busy"), CancellationToken.None);
 
         await act.Should().ThrowAsync<TeensyBusyException>();
-        port.SentTokens.Count(t => t == TeensyToken.Reset.Value).Should().Be(1);
+        port.Written.Should().Equal(0x64, 0xEE, 0x64, 0x76);
+        device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
+    }
+
+    /// <summary>
+    /// The reset the reactive-busy backstop fires can itself miss (the menu never re-announced itself, or
+    /// never reported boot complete) - the command must fail with a legible reason instead of retrying
+    /// into a device that may still be mid-boot.
+    /// </summary>
+    [Fact]
+    public async Task Handle_BusyOnce_ResetMisses_FailsWithoutRetryingRecordEndsFullBusy()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            throw new TeensyBusyException("busy");
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Error.Should().Be("Command Failed. The menu did not come back up after the reset.");
+        invocations.Should().Be(1);
         device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
     }
 
@@ -251,7 +300,7 @@ public class CommunicationPortBehaviorTests
     public async Task Handle_FullBusyRecordNonLaunchCommand_ResetsBeforeHandlerRuns_RecordEndsFullIdle()
     {
         var deviceId = Guid.NewGuid().ToString("N");
-        var port = new StubCommunicationPort();
+        var port = PortWithSuccessfulReset();
         var device = BuildDevice(port, deviceId);
         device.MarkBusy();
         var devices = Substitute.For<IDeviceConnectionManager>();
@@ -262,22 +311,53 @@ public class CommunicationPortBehaviorTests
         var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
         var invocations = 0;
         var modeWhenHandlerRan = default(DeviceMode?);
-        var resetsWhenHandlerRan = 0;
+        byte[]? writtenWhenHandlerRan = null;
 
         var response = await behavior.Handle(command, () =>
         {
             invocations++;
             modeWhenHandlerRan = device.Connection.Mode;
-            resetsWhenHandlerRan = port.SentTokens.Count(t => t == TeensyToken.Reset.Value);
+            writtenWhenHandlerRan = port.Written.ToArray();
             return Task.FromResult(new TeensyCommandResult());
         }, CancellationToken.None);
 
         response.IsSuccess.Should().BeTrue();
         invocations.Should().Be(1);
-        resetsWhenHandlerRan.Should().Be(1);
+        writtenWhenHandlerRan.Should().Equal(0x64, 0xEE, 0x64, 0x76);
         modeWhenHandlerRan.Should().Be(DeviceMode.FullIdle);
         device.Connection.Mode.Should().Be(DeviceMode.FullIdle);
         await recovery.DidNotReceive().RecoverAsync(Arg.Any<TeensyRomDevice>(), Arg.Any<RecoveryReason>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The reset the pre-check fires before a non-launch command can itself miss - the command must fail
+    /// with a legible reason instead of being sent into a device that may still be mid-boot, and the
+    /// handler must never run.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FullBusyRecordNonLaunchCommand_ResetMisses_FailsWithoutRunningHandler()
+    {
+        var deviceId = Guid.NewGuid().ToString("N");
+        var port = new StubCommunicationPort();
+        var device = BuildDevice(port, deviceId);
+        device.MarkBusy();
+        var devices = Substitute.For<IDeviceConnectionManager>();
+        devices.GetAvailableDevice(deviceId).Returns(device);
+        var behavior = new CommunicationPortBehavior<FakeCommand, TeensyCommandResult>(
+            Substitute.For<ILoggingService>(), devices, Substitute.For<IDeviceRecovery>());
+        var command = new FakeCommand { DeviceId = deviceId, CommunicationPort = port };
+        var invocations = 0;
+
+        var response = await behavior.Handle(command, () =>
+        {
+            invocations++;
+            return Task.FromResult(new TeensyCommandResult());
+        }, CancellationToken.None);
+
+        response.IsSuccess.Should().BeFalse();
+        response.Error.Should().Be("Command Failed. The menu did not come back up after the reset.");
+        invocations.Should().Be(0);
+        device.Connection.Mode.Should().Be(DeviceMode.FullBusy);
     }
 
     /// <summary>

@@ -26,8 +26,11 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 	/// reset: the firmware dispatches <c>LaunchFileToken</c> above the busy gate (<c>SerUSBIO.ino:549</c>,
 	/// alongside reset, version, and firmware-check - "only these commands are available when busy"), so a
 	/// cart-running device accepts a launch by design and resetting first would cost a reboot and drop the
-	/// user to the menu for nothing. A <see cref="TeensyBusyException"/> from the command's own reply earns
-	/// one reset and one re-send, and a transport drop hands the device to <see cref="IDeviceRecovery"/>. A
+	/// user to the menu for nothing. Either reset's own outcome is read, not assumed: a menu that never
+	/// comes back up (no recovery routine runs here - the port/socket stay open) fails the command with a
+	/// legible reason instead of sending it into a still-booting device. A <see cref="TeensyBusyException"/>
+	/// from the command's own reply earns one reset and one re-send, and a transport drop hands the device
+	/// to <see cref="IDeviceRecovery"/>. A
 	/// <c>ResetCommand</c> sent to a device believed to be in minimal is reset twice this way - once here
 	/// to bring it back to full, once by the handler itself - landing on the same correct end state either
 	/// way; the simplicity is worth the redundant reset.
@@ -90,8 +93,18 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					}
 					else if (device.Connection.Mode == DeviceMode.FullBusy && request is not LaunchFileCommand)
 					{
-						port.ResetDevice(log);
+						var resetOk = port.ResetDevice(log);
 						port.ClearBuffers();
+
+						if (!resetOk)
+						{
+							return new()
+							{
+								IsSuccess = false,
+								Error = "Command Failed. The menu did not come back up after the reset."
+							};
+						}
+
 						device.MarkIdle();
 					}
 				}
@@ -120,8 +133,18 @@ namespace TeensyRom.Core.Serial.Commands.Behaviors
 					catch (TeensyBusyException) when (busyRetries++ == 0)
 					{
 						device?.MarkBusy();
-						port.ResetDevice(log);
+						var resetOk = port.ResetDevice(log);
 						port.ClearBuffers();
+
+						if (!resetOk)
+						{
+							return new()
+							{
+								IsSuccess = false,
+								Error = "Command Failed. The menu did not come back up after the reset."
+							};
+						}
+
 						return await SendAsync();
 					}
 				}

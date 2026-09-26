@@ -171,13 +171,13 @@ measured value plus margin, never the raw number.
 | Minimal → full, non-launch reboot (TCP) | ~~7.06–7.09 s~~ | ~~8.62 s (2026-09-21 session); reconfirmed 11.69 s (2026-09-23 session) — see session note~~ | `Tcp.ToFullMs` = 15000 | |
 | Large launch from minimal, reset-and-recover (TCP) | ~~superseded chained path: 15.2 s — abandoned for reachability, not speed (see "1. Minimal → full" above)~~ | ~~17.41 s (2026-09-23 session)~~ | `Tcp.ToFullMs + Tcp.ToMinimalMs + LaunchSettleMs` = 25000 | unchanged — 30% margin (7.6 s) under ceiling seed |
 | SID launch from minimal, reset-and-recover (TCP) | ~~superseded chained path: 8.7–8.8 s; a later attempt at the same chained path did not complete — see session note~~ | ~~12.28 s (2026-09-23 session)~~ | `Tcp.ToFullMs + LaunchSettleMs` = 17000 | unchanged — 28% margin (4.7 s) under ceiling seed |
-| 1. Minimal → full, non-launch reboot (Serial) | | | `Serial.ToFullMs` = 15000 (seeded from a 13.7 s serial round trip) | |
-| 1. SID launch from minimal, reset-and-recover (Serial) | | | `Serial.ToFullMs + LaunchSettleMs` | |
-| 1. Large launch from minimal, reset-and-recover (Serial) | | | `Serial.ToFullMs + Serial.ToMinimalMs + LaunchSettleMs` | |
-| 2. Full → minimal, listener off (Serial) | | | `Serial.ToMinimalMs` = 15000 (seeded from a 13.7 s serial round trip) | |
-| 3. Both units in minimal at once (Serial) | | | n/a — sanity check, not a ceiling | |
-| 4. Serial-only cold start, two dead TCP rows | | | `ConnectTimeoutMs` × dead rows + full discovery | |
-| 5. Listener on, unplugged (TCP) | | | `ConnectTimeoutMs` = 2000 per attempt | |
+| 1. Minimal → full, non-launch reboot (Serial) | | 5.26 s (2026-09-26 session, run 1); reconfirmed 5.27 s (run 2) | `Serial.ToFullMs` = 15000 (seeded from a 13.7 s serial round trip) | unchanged — comfortably inside seed |
+| 1. SID launch from minimal, reset-and-recover (Serial) | | 5.40 s (run 1); reconfirmed 5.04 s (run 2) | `Serial.ToFullMs + LaunchSettleMs` | unchanged — comfortably inside seed |
+| 1. Large launch from minimal, reset-and-recover (Serial) | | 9.01 s (run 1); reconfirmed 9.05 s (run 2) | `Serial.ToFullMs + Serial.ToMinimalMs + LaunchSettleMs` | unchanged — comfortably inside seed |
+| 2. Full → minimal, listener off (Serial) | | 3.52 s (run 1); reconfirmed 3.93 s (run 2) — **listener left ON** (Ethernet reachable throughout; the fixture forces Serial regardless of Ethernet state), so TCP retry noise is not ruled out. A true listener-off isolation still needs a person at the C64 settings menu — see "Still needs a human" below | `Serial.ToMinimalMs` = 15000 (seeded from a 13.7 s serial round trip) | unchanged — comfortably inside seed even un-isolated |
+| 3. Both units in minimal at once (Serial) | | not run — needs a second physical unit; only device `19277260` was attached and authorized this session — see "Still needs a human" below | n/a — sanity check, not a ceiling | |
+| 4. Serial-only cold start, two dead TCP rows | | not run — needs a second unit (the miss requires "both units' rows" to fail) plus the listener physically off — see "Still needs a human" below | `ConnectTimeoutMs` × dead rows + full discovery | |
+| 5. Listener on, unplugged (TCP) | | not run — needs a person to physically unplug the unit's Ethernet cable — see "Still needs a human" below | `ConnectTimeoutMs` = 2000 per attempt | |
 
 The reset-and-recover rows above measure more than their ceiling seed's formula covers: `EnsureFullAsync`'s
 `RecoveryReason.LeaveMinimal` recovery runs two storage probes (`DeviceRecovery.Succeed`, each bounded by
@@ -289,6 +289,66 @@ serial measurements, and the discovery/occasion table below need a further bench
 at the C64 to toggle the listener and drive the physical settings menu; none of that is achievable from
 this environment alone.
 
+### Session note (2026-09-26, discovery occasions + Serial measurement table)
+
+Bench session against the single authorized unit, TR+ `19277260` (fork `boot-complete-flag` firmware),
+reachable on both USB serial (COM4) and TCP (`192.168.1.37:2112`); no second unit was attached or
+authorized this session. Preflight passed clean before and after (`preflight.mjs --tcp 192.168.1.37 --uid
+19277260`).
+
+**Discovery occasions (TCP), driven through the live API rather than a browser.** Pristine restart
+(`bin` wiped), log tap attached, then: `POST /api/devices/19277260/storage/SD/launch?FilePath=...` on the
+large bench cart to force the device into minimal, `GET /api/devices/?FullScan=false` (page-load listing)
+while it sat there, `GET /api/devices/?FullScan=true` (Discover Devices) to bring it back, then the API
+process was stopped and restarted (cache left intact) to measure the second, warm-cache start. Repeated
+once end-to-end for reconfirmation. Numbers read from the API's own internal `Stopwatch` timings in the
+log (`DeviceConnectionManager.FindDevices: ...`), not wall-clock estimates:
+
+| Occasion | Run 1 | Run 2 |
+|---|---|---|
+| `FindDevices(fullScan: false)` while minimal | 0 ms | 0 ms |
+| `FindDevices(fullScan: true)` from minimal | 8393 ms | 6276 ms |
+| Second start, warm cache (`Discovery (start, cached)`) | 663 ms | — (not rerun) |
+
+The full-scan-from-minimal runs both show two back-to-back `LeaveMinimal` recoveries in the log (one per
+transport candidate the sweep opens for the same chip — serial first, ~7.1 s and ~5.0 s on the two runs,
+then a fast TCP reconnect once the menu is already up, ~0.26–0.28 s) — expected given a full sweep probes
+every candidate endpoint, not a defect.
+
+**Discovery occasions (Serial) and the Serial measurement-table rows, via the automated suite**
+(`TeensyRom.Core.Device.Tests.Integration`, `TEENSYROM_BENCH_TRANSPORT=Serial`,
+`TEENSYROM_BENCH_CHIP_IDS=19277260`, `--filter "FullyQualifiedName~ConnectionTransitionsTests|FullyQualifiedName~DiscoveryOccasionsTests"`,
+API stopped first — it and the suite both hold the port exclusively). Two runs, both green
+(`ConnectionTransitionsTests`: 37 s / 38 s; `DiscoveryOccasionsTests`: 10 s), numbers read from
+`MeasureAsync`'s own output via `--logger trx`:
+
+| Occasion | Run 1 | Run 2 |
+|---|---|---|
+| `FindDevices(fullScan: false)` while minimal | — (not run) | 0 ms |
+| `FindDevices(fullScan: true)` from minimal | — (not run) | 5941 ms |
+| Second start, warm cache | — (not run) | 511 ms |
+
+These are the numbers now recorded in the "Measurement table" Serial rows above (run 1 = the standalone
+`ConnectionTransitionsTests` pass; run 2 = the combined pass that also produced the Serial discovery-
+occasion numbers just above).
+
+**Still needs a human — not invented, left open:**
+- **Item 2's true isolation** (Full → minimal, listener off): the number recorded is real but the
+  Ethernet listener was left on throughout (`TEENSYROM_BENCH_TRANSPORT` forces Serial without needing the
+  listener off, per the `device-transport-probe` skill) — a genuinely isolated measurement needs a person
+  at the C64 settings menu (`F8 → 3 → b`) to disable the listener first.
+- **Item 3** (both units in minimal at once) and **item 4** (serial-only cold start, two dead cached TCP
+  rows): both need a second physical TeensyROM unit attached and authorized; only `19277260` was available
+  this session.
+- **Item 5** (listener on, unplugged): needs a person to physically unplug the unit's Ethernet cable (or
+  otherwise make its address unreachable) while the listener still claims availability.
+
+`appsettings.json` is **unchanged**: every new Serial number (5.0–9.1 s range) lands comfortably inside the
+existing seeded ceilings (`Serial.ToFullMs` = 15000, `Serial.ToMinimalMs` = 15000), and the three items
+above that still need a human mean the Serial ceilings are not yet backed by a complete measurement set —
+tightening them now would be a guess in a different spot, the same fabrication problem this table exists
+to avoid.
+
 ## P07 bench evidence (boot-complete-flag firmware, 2026-09-26)
 
 Ran the `device-transport-probe` skill's "Prove a connection change" procedure end to end against device
@@ -330,16 +390,18 @@ the tightest timing the API can produce — a reset immediately followed by a la
 Mirrors `Hardware/DiscoveryOccasionsTests.cs`'s scripted flow and the Ground Truth bench rows for the
 three discovery occasions. Run with `TEENSYROM_BENCH_TRANSPORT` set to whichever transport is wired.
 
-Not run this session either: the 2026-09-21 session's TCP access did not stay up long enough to reach
-`DiscoveryOccasionsTests`; the 2026-09-23 session did reach it, twice, but both attempts failed before
-the first occasion's assertion — see that session note's "New finding" above. Serial is still
-unavailable on this machine.
+Run 2026-09-26 against device `19277260` on both transports — TCP driven live through the API's own
+endpoints (pristine restart, log tap, `POST .../launch` to force minimal, `GET /api/devices/?FullScan=…`,
+then a process restart with the cache left intact for the third occasion), Serial through the automated
+suite (`DiscoveryOccasionsTests`, `TEENSYROM_BENCH_TRANSPORT=Serial`). See the "Session note
+(2026-09-26, discovery occasions + Serial measurement table)" above for the full methodology and what
+still needs a human.
 
 | Occasion | Assertion | After |
 |---|---|---|
-| `FindDevices(fullScan: false)` while a unit is in minimal | listed as minimal, no contact (version command afterwards still reports minimal) | |
-| `FindDevices(fullScan: true)` from minimal | unit back at the menu (`FullIdle`/`FullBusy`) | |
-| Second `ConnectAtStartAsync` (new manager, same cache path) | no sweep — every cached row confirmed, under `ConnectTimeoutMs + 4 s` | |
+| `FindDevices(fullScan: false)` while a unit is in minimal | listed as minimal, no contact (version command afterwards still reports minimal) | TCP: 0 ms, 0 ms (2 runs); Serial: 0 ms — confirmed `isMinimalFirmware: true` on the API's own response each time |
+| `FindDevices(fullScan: true)` from minimal | unit back at the menu (`FullIdle`/`FullBusy`) | TCP: 8393 ms, 6276 ms (2 runs); Serial: 5941 ms — confirmed `isMinimalFirmware: false` after |
+| Second `ConnectAtStartAsync` (new manager, same cache path) | no sweep — every cached row confirmed, under `ConnectTimeoutMs + 4 s` | TCP: 663 ms; Serial: 511 ms — both well inside the 6000 ms bound (`ConnectTimeoutMs` 2000 + 4 s) |
 
 ## Updating the ceilings
 
